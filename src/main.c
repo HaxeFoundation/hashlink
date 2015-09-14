@@ -24,6 +24,12 @@
 #include <stdlib.h>
 #include <memory.h>
 
+#include "opcodes.h"
+#define OP(_,n) n,
+#define OP_BEGIN static int hl_op_nargs[] = {
+#define OP_END };
+#include "opcodes.h"
+
 typedef enum {
 	HVOID	= 0,
 	HUI8	= 1,
@@ -52,21 +58,44 @@ typedef struct {
 } hl_native;
 
 typedef struct {
+	hl_op op;
+	int p1;
+	int p2;
+	int p3;
+	void *extra;
+} hl_opcode;
+
+typedef struct hl_ptr_list hl_ptr_list;
+
+typedef struct {
+	int index;
+	int nregs;
+	int nops;
+	int nallocs;
+	hl_type **regs;
+	hl_opcode *ops;
+	void **allocs;
+} hl_function;
+
+typedef struct {
 	int version;
-	int nstrings;
+	int nints;
 	int nfloats;
+	int nstrings;
 	int ntypes;
 	int nglobals;
 	int nnatives;
 	int nfunctions;
 	int entrypoint;
-	char *strings_data;
-	int  *strings_lens;
-	char **strings;
-	double *floats;
-	hl_type *types;
-	hl_type **globals;
-	hl_native *natives;
+	int*		ints;
+	double*		floats;
+	char**		strings;
+	char*		strings_data;
+	int*		strings_lens;
+	hl_type*	types;
+	hl_type**	globals;
+	hl_native*	natives;
+	hl_function*functions;
 } hl_code;
 
 typedef struct {
@@ -88,7 +117,8 @@ void hl_global_free() {
 #define READ() hl_read_b(r)
 #define INDEX() hl_read_index(r)
 #define UINDEX() hl_read_uindex(r)
-#define ERROR(msg) r->error = msg;
+#define ERROR(msg) if( !r->error ) r->error = msg;
+#define CHK_ERROR() if( r->error ) return
 
 static unsigned char hl_read_b( hl_reader *r ) {
 	if( r->pos >= r->size ) {
@@ -162,10 +192,11 @@ static int hl_read_uindex( hl_reader *r ) {
 void hl_code_free( hl_code *c ) {
 	int i;
 	if( c == NULL ) return;
-	if( c->strings_data ) free(c->strings_data);
-	if( c->strings_lens ) free(c->strings_lens);
+	if( c->ints ) free(c->ints);
 	if( c->strings ) free(c->strings);
 	if( c->floats ) free(c->floats);
+	if( c->strings_data ) free(c->strings_data);
+	if( c->strings_lens ) free(c->strings_lens);
 	if( c->types ) {
 		for(i=0;i<c->ntypes;i++) {
 			hl_type *t = c->types + i;
@@ -175,6 +206,20 @@ void hl_code_free( hl_code *c ) {
 	}
 	if( c->globals ) free(c->globals);
 	if( c->natives ) free(c->natives);
+	if( c->functions ) {
+		for(i=0;i<c->nfunctions;i++) {
+			hl_function *f = c->functions + i;
+			if( f->regs ) free(f->regs);
+			if( f->allocs ) {
+				int j;
+				for(j=0;j<f->nallocs;j++)
+					free(f->allocs[j]);
+				free(f->allocs);
+			}
+			if( f->ops ) free(f->ops);
+		}
+		free(c->functions);
+	}
 	free(c);
 }
 
@@ -229,6 +274,99 @@ void hl_read_type( hl_reader *r, hl_type *t ) {
 	}
 }
 
+void hl_op_alloc( hl_reader *r, hl_function *f, hl_opcode *o, void *data, int *maxAllocs ) {
+	if( f->nallocs == *maxAllocs ) {
+		void **nallocs;
+		int i;
+		int resize = ((*maxAllocs) * 3) >> 1;
+		if( resize == 0 ) resize = 4;
+		nallocs = (void**)malloc(sizeof(void*)*resize);
+		if( nallocs == NULL ) {
+			free(data);
+			r->error = "Out of memory";
+			return;
+		}
+		for(i=0;i<f->nallocs;i++)
+			nallocs[i] = f->allocs[i];
+		if( f->allocs ) free(f->allocs);
+		f->allocs = nallocs;
+		*maxAllocs = resize;
+	}
+	f->allocs[f->nallocs++] = data;
+}
+
+void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o, int *maxAllocs ) {
+	o->op = (hl_op)READ();
+	if( o->op >= OLast ) {
+		ERROR("Invalid opcode");
+		return;
+	}
+	switch( hl_op_nargs[o->op] ) {
+	case 0:
+		break;
+	case 1:
+		o->p1 = INDEX();
+		break;
+	case 2:
+		o->p1 = INDEX();
+		o->p2 = INDEX();
+		break;
+	case 3:
+		o->p1 = INDEX();
+		o->p2 = INDEX();
+		o->p3 = INDEX();
+		break;
+	default:
+		switch( o->op ) {
+		case OCall2:
+			o->p1 = INDEX();
+			o->p2 = INDEX();
+			o->p3 = INDEX();
+			o->extra = (void*)INDEX();
+			break;
+		case OCallN:
+			{
+				int nargs, *args, i;
+				o->p1 = INDEX();
+				o->p2 = INDEX();
+				nargs = READ();
+				args = (int*)malloc(sizeof(int) * nargs);
+				for(i=0;i<nargs;i++)
+					args[i] = INDEX();
+				hl_op_alloc(r,f,o,args,maxAllocs);
+			}
+			break;
+		default:
+			ERROR("Don't know how to process opcode");
+			break;
+		}
+	}
+}
+
+void hl_read_function( hl_reader *r, hl_function *f ) {
+	int i;
+	int maxAlloc = 0;
+	f->index = UINDEX();
+	f->nregs = UINDEX();
+	f->nops = UINDEX();
+	f->regs = (hl_type**)malloc(f->nregs * sizeof(hl_type*));
+	if( f->regs == NULL ) {
+		ERROR("Out of memory");
+		return;
+	}
+	for(i=0;i<f->nregs;i++)
+		f->regs[i] = hl_get_type(r);
+	CHK_ERROR();
+	f->ops = (hl_opcode*)malloc(f->nops * sizeof(hl_opcode));
+	if( f->ops == NULL ) {
+		ERROR("Out of memory");
+		return;
+	}
+	for(i=0;i<f->nops;i++)
+		hl_read_opcode(r, f, f->ops+i, &maxAlloc);
+}
+
+#undef CHK_ERROR
 #define CHK_ERROR() if( r->error ) { hl_code_free(c); printf("%s\n", r->error); return NULL; }
 #define EXIT(msg) { ERROR(msg); CHK_ERROR(); }
 #define ALLOC(v,ptr,count) { v = (ptr *)malloc(count*sizeof(ptr)); if( v == NULL ) EXIT("Out of memory") else memset(v, 0, count*sizeof(ptr)); }
@@ -247,13 +385,23 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 		printf("VER=%d\n",c->version);
 		EXIT("Unsupported version");
 	}
-	c->nstrings = UINDEX();
+	c->nints = UINDEX();
 	c->nfloats = UINDEX();
+	c->nstrings = UINDEX();
 	c->ntypes = UINDEX();
 	c->nglobals = UINDEX();
 	c->nnatives = UINDEX();
 	c->nfunctions = UINDEX();
 	c->entrypoint = UINDEX();	
+	CHK_ERROR();
+	ALLOC(c->ints, int, c->nints);
+	for(i=0;i<c->nints;i++)
+		c->ints[i] = hl_read_i32(r);
+	CHK_ERROR();
+	ALLOC(c->floats, double, c->nfloats);
+	for(i=0;i<c->nfloats;i++)
+		c->floats[i] = hl_read_double(r);
+	CHK_ERROR();
 	{
 		int size = hl_read_i32(r);
 		char *sdata;
@@ -276,28 +424,28 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 		}
 	}
 	CHK_ERROR();
-	ALLOC(c->floats, double, sizeof(double)*c->nfloats);
-	for(i=0;i<c->nfloats;i++)
-		c->floats[i] = hl_read_double(r);
-	CHK_ERROR();
-	ALLOC(c->types, hl_type, sizeof(hl_type)*c->ntypes);
+	ALLOC(c->types, hl_type, c->ntypes);
 	for(i=0;i<c->ntypes;i++) {
 		hl_read_type(r, c->types + i);
 		CHK_ERROR();
 	}
-	ALLOC(c->globals, hl_type*, sizeof(hl_type*)*c->nglobals);
+	ALLOC(c->globals, hl_type*, c->nglobals);
 	for(i=0;i<c->nglobals;i++)
 		c->globals[i] = hl_get_type(r);
 	CHK_ERROR();
-	ALLOC(c->natives, hl_native, sizeof(hl_native)*c->nnatives);
+	ALLOC(c->natives, hl_native, c->nnatives);
 	for(i=0;i<c->nnatives;i++) {
 		c->natives[i].name = hl_get_string(r);
 		c->natives[i].global = hl_get_global(r);
-		printf("%s,%d\n", c->natives[i].name, c->natives[i].global);
 	}
 	CHK_ERROR();
-	EXIT("TODO");
-	return NULL;
+	ALLOC(c->functions, hl_function, c->nfunctions);
+	for(i=0;i<c->nfunctions;i++) {
+		hl_read_function(r,c->functions+i);
+		CHK_ERROR();
+	}
+	CHK_ERROR();
+	return c;
 }
 
 
