@@ -50,12 +50,20 @@ hl_module *hl_module_alloc( hl_code *c ) {
 		return NULL;
 	}
 	memset(m->functions_ptrs,0,sizeof(void*)*c->nfunctions);
-	for(i=0;i<c->nfunctions;i++) {
-		m->functions_ptrs[i] = hl_jit_function(m,c->functions+i);
-		if( m->functions_ptrs[i] == NULL ) {
-			printf("Failed to JIT fun#%d\n",i);
+	{
+		jit_ctx *ctx = hl_jit_alloc();
+		if( ctx == NULL ) {
 			hl_module_free(m);
 			return NULL;
+		}
+		for(i=0;i<c->nfunctions;i++) {
+			int f = hl_jit_function(ctx, m, c->functions+i);
+			if( f < 0 ) {
+				printf("Failed to JIT fun#%d\n",i);
+				hl_module_free(m);
+				return NULL;
+			}
+			m->functions_ptrs[i] = (void*)f;
 		}
 	}
 	return m;

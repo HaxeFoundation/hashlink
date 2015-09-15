@@ -213,6 +213,7 @@ void hl_op_alloc( hl_reader *r, hl_function *f, hl_opcode *o, void *data, int *m
 		*maxAllocs = resize;
 	}
 	f->allocs[f->nallocs++] = data;
+	o->extra = data;
 }
 
 void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o, int *maxAllocs ) {
@@ -246,12 +247,12 @@ void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o, int *maxAllocs 
 			break;
 		case OCallN:
 			{
-				int nargs, *args, i;
+				int *args, i;
 				o->p1 = INDEX();
 				o->p2 = INDEX();
-				nargs = READ();
-				args = (int*)malloc(sizeof(int) * nargs);
-				for(i=0;i<nargs;i++)
+				o->p3 = READ();
+				args = (int*)malloc(sizeof(int) * o->p3);
+				for(i=0;i<o->p3;i++)
 					args[i] = INDEX();
 				hl_op_alloc(r,f,o,args,maxAllocs);
 			}

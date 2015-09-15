@@ -104,6 +104,8 @@ typedef struct {
 	void **functions_ptrs;
 } hl_module;
 
+typedef struct jit_ctx jit_ctx;
+
 void hl_global_init();
 void hl_global_free();
 
@@ -115,6 +117,8 @@ void hl_code_free( hl_code *c );
 hl_module *hl_module_alloc( hl_code *code );
 void hl_module_free( hl_module *m );
 
-void *hl_jit_function( hl_module *m, hl_function *f );
+jit_ctx *hl_jit_alloc();
+void hl_jit_free( jit_ctx *ctx );
+int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 
 #endif
