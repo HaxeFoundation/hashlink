@@ -22,6 +22,10 @@
 #ifndef HL_H
 #define HL_H
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <memory.h>
+
 #define HL_VERSION	010
 #include "opcodes.h"
 
@@ -93,9 +97,24 @@ typedef struct {
 	hl_function*functions;
 } hl_code;
 
+typedef struct {
+	hl_code *code;
+	int *globals_indexes;
+	unsigned char *globals_data;
+	void **functions_ptrs;
+} hl_module;
+
 void hl_global_init();
 void hl_global_free();
 
+int hl_type_size( hl_type *t );
+
 hl_code *hl_code_read( const unsigned char *data, int size );
+void hl_code_free( hl_code *c );
+
+hl_module *hl_module_alloc( hl_code *code );
+void hl_module_free( hl_module *m );
+
+void *hl_jit_function( hl_module *m, hl_function *f );
 
 #endif

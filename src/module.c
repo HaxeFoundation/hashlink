@@ -19,48 +19,50 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#define _CRT_SECURE_NO_WARNINGS
 #include "hl.h"
 
-int main( int argc, char *argv[] ) {
-	if( argc == 1 ) {
-		printf("HLVM %d.%d.%d (c)2015 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION/100,(HL_VERSION/10)%10,HL_VERSION%10);
-		return 1;
+hl_module *hl_module_alloc( hl_code *c ) {
+	int i;
+	int gsize = 0;
+	hl_module *m = (hl_module*)malloc(sizeof(hl_module));
+	if( m == NULL )
+		return NULL;	
+	memset(m,0,sizeof(hl_module));
+	m->code = c;
+	m->globals_indexes = (int*)malloc(sizeof(int)*c->nglobals);
+	if( m == NULL ) {
+		hl_module_free(m);
+		return NULL;
 	}
-	hl_global_init();
-	{
-		hl_code *code;
-		hl_module *m;
-		const char *file = argv[1];
-		FILE *f = fopen(file,"rb");
-		int pos, size;
-		char *fdata;
-		if( f == NULL ) {
-			printf("File not found '%s'\n",file);
-			return -1;
-		}
-		fseek(f, 0, SEEK_END);
-		size = (int)ftell(f);
-		fseek(f, 0, SEEK_SET);
-		fdata = (char*)malloc(size);
-		pos = 0;
-		while( pos < size ) {
-			int r = (int)fread(fdata + pos, 1, size-pos, f);
-			if( r <= 0 ) {
-				printf("Failed to read '%s'\n",file);
-				return -1;
-			}
-			pos += r;
-		}
-		fclose(f);
-		code = hl_code_read((unsigned char*)fdata, size);
-		if( code == NULL )
-			return -1;
-		m = hl_module_alloc(code);
-		if( m == NULL )
-			return -1;
-		hl_code_free(code);
+	for(i=0;i<c->nglobals;i++) {
+		m->globals_indexes[i] = gsize;
+		gsize += hl_type_size(c->globals[i]);
 	}
-	hl_global_free();
-	return 0;
+	m->globals_data = (unsigned char*)malloc(gsize);
+	if( m->globals_data == NULL ) {
+		hl_module_free(m);
+		return NULL;
+	}
+	memset(m->globals_data,0,gsize);
+	m->functions_ptrs = (void**)malloc(sizeof(void*)*c->nfunctions);
+	if( m->functions_ptrs == NULL ) {
+		hl_module_free(m);
+		return NULL;
+	}
+	memset(m->functions_ptrs,0,sizeof(void*)*c->nfunctions);
+	for(i=0;i<c->nfunctions;i++) {
+		m->functions_ptrs[i] = hl_jit_function(m,c->functions+i);
+		if( m->functions_ptrs[i] == NULL ) {
+			printf("Failed to JIT fun#%d\n",i);
+			hl_module_free(m);
+			return NULL;
+		}
+	}
+	return m;
+}
+
+void hl_module_free( hl_module *m ) {
+	free(m->globals_indexes);
+	free(m->globals_data);
+	free(m);
 }

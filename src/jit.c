@@ -19,48 +19,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#define _CRT_SECURE_NO_WARNINGS
 #include "hl.h"
 
-int main( int argc, char *argv[] ) {
-	if( argc == 1 ) {
-		printf("HLVM %d.%d.%d (c)2015 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION/100,(HL_VERSION/10)%10,HL_VERSION%10);
-		return 1;
-	}
-	hl_global_init();
-	{
-		hl_code *code;
-		hl_module *m;
-		const char *file = argv[1];
-		FILE *f = fopen(file,"rb");
-		int pos, size;
-		char *fdata;
-		if( f == NULL ) {
-			printf("File not found '%s'\n",file);
-			return -1;
-		}
-		fseek(f, 0, SEEK_END);
-		size = (int)ftell(f);
-		fseek(f, 0, SEEK_SET);
-		fdata = (char*)malloc(size);
-		pos = 0;
-		while( pos < size ) {
-			int r = (int)fread(fdata + pos, 1, size-pos, f);
-			if( r <= 0 ) {
-				printf("Failed to read '%s'\n",file);
-				return -1;
-			}
-			pos += r;
-		}
-		fclose(f);
-		code = hl_code_read((unsigned char*)fdata, size);
-		if( code == NULL )
-			return -1;
-		m = hl_module_alloc(code);
-		if( m == NULL )
-			return -1;
-		hl_code_free(code);
-	}
-	hl_global_free();
-	return 0;
+void *hl_jit_function( hl_module *m, hl_function *f ) {
+	return NULL;
 }
+
+

@@ -75,7 +75,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\code.c" />
+    <ClCompile Include="src\global.c" />
+    <ClCompile Include="src\jit.c" />
     <ClCompile Include="src\main.c" />
+    <ClCompile Include="src\module.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\hl.h" />

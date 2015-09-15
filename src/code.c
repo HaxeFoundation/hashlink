@@ -20,9 +20,6 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include "hl.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <memory.h>
 
 #define OP(_,n) n,
 #define OP_BEGIN static int hl_op_nargs[] = {
@@ -36,12 +33,6 @@ typedef struct {
 	const char *error;
 	hl_code *code;
 } hl_reader;
-
-void hl_global_init() {
-}
-
-void hl_global_free() {
-}
 
 #define READ() hl_read_b(r)
 #define INDEX() hl_read_index(r)
