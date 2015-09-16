@@ -20,6 +20,9 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include "hl.h"
+#ifdef HL_WIN
+#	include <windows.h>
+#endif
 
 void hl_global_init() {
 }
@@ -90,4 +93,13 @@ void hl_free( hl_alloc *a ) {
 	// check if our allocator was not part of the last free block
 	if( (int_val)a < prev || (int_val)a > prev+size )
 		a->cur = NULL;
+}
+
+void *hl_alloc_executable_memory( int size ) {
+#ifdef HL_WIN
+	return VirtualAlloc(NULL,size,MEM_COMMIT,PAGE_EXECUTE_READWRITE);
+#else
+	printf("NOT IMPLEMENTED\n");
+	return NULL;
+#endif
 }

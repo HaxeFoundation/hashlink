@@ -60,9 +60,7 @@ int main( int argc, char *argv[] ) {
 		m = hl_module_alloc(code);
 		if( m == NULL )
 			return 4;
-		
 		((fptr)m->functions_ptrs[m->code->entrypoint])();
-
 		hl_module_free(m);
 		hl_free(&code->alloc);
 	}

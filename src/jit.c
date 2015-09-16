@@ -223,7 +223,6 @@ static void op_callr( jit_ctx *ctx, int r, int rf, int size ) {
 }
 
 static void op_enter( jit_ctx *ctx ) {
-	XRet();
 	XPush_r(Ebp);
 	XMov_rr(Ebp, Esp);
 	XAdd_rc(Esp, ctx->totalRegsSize);
@@ -413,9 +412,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	return codePos;
 }
 
+void *hl_alloc_executable_memory( int size );
+
 void *hl_jit_code( jit_ctx *ctx ) {
 	int size = ctx->buf.b - ctx->startBuf;
-	void *code = malloc(size);
+	void *code = hl_alloc_executable_memory(size);
 	if( code == NULL ) return NULL;
 	memcpy(code,ctx->startBuf,size);
 	return code;

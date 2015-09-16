@@ -22,6 +22,10 @@
 #ifndef HL_H
 #define HL_H
 
+#ifdef _WIN32
+#	define HL_WIN
+#endif
+
 #if defined(__APPLE__) || defined(__MACH__) || defined(macintosh)
 #	define HL_MAC
 #endif
