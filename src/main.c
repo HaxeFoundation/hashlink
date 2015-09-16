@@ -19,8 +19,9 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#define _CRT_SECURE_NO_WARNINGS
 #include "hl.h"
+
+typedef void (_cdecl *fptr)();
 
 int main( int argc, char *argv[] ) {
 	if( argc == 1 ) {
@@ -37,7 +38,7 @@ int main( int argc, char *argv[] ) {
 		char *fdata;
 		if( f == NULL ) {
 			printf("File not found '%s'\n",file);
-			return -1;
+			return 1;
 		}
 		fseek(f, 0, SEEK_END);
 		size = (int)ftell(f);
@@ -48,18 +49,22 @@ int main( int argc, char *argv[] ) {
 			int r = (int)fread(fdata + pos, 1, size-pos, f);
 			if( r <= 0 ) {
 				printf("Failed to read '%s'\n",file);
-				return -1;
+				return 2;
 			}
 			pos += r;
 		}
 		fclose(f);
 		code = hl_code_read((unsigned char*)fdata, size);
 		if( code == NULL )
-			return -1;
+			return 3;
 		m = hl_module_alloc(code);
 		if( m == NULL )
-			return -1;
-		hl_code_free(code);
+			return 4;
+		
+		((fptr)m->functions_ptrs[m->code->entrypoint])();
+
+		hl_module_free(m);
+		hl_free(&code->alloc);
 	}
 	hl_global_free();
 	return 0;

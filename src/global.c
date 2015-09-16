@@ -41,3 +41,53 @@ int hl_type_size( hl_type *t ) {
 	};
 	return SIZES[t->kind];
 }
+
+struct hl_alloc_block {
+	int size;
+	hl_alloc_block *next;
+	unsigned char *p;
+};
+
+void hl_alloc_init( hl_alloc *a ) {
+	a->cur = NULL;
+}
+
+void *hl_malloc( hl_alloc *a, int size ) {
+	hl_alloc_block *b = a->cur;
+	void *p;
+	if( b == NULL || b->size <= size ) {
+		int alloc = size < 4096-sizeof(hl_alloc_block) ? 4096-sizeof(hl_alloc_block) : size;
+		b = (hl_alloc_block *)malloc(sizeof(hl_alloc_block) + alloc);
+		if( b == NULL ) return NULL;
+		b->p = ((unsigned char*)b) + sizeof(hl_alloc_block);
+		b->size = alloc;
+		b->next = a->cur;
+		a->cur = b;
+	}
+	p = b->p;
+	b->p += size;
+	b->size -= size;
+	return p;
+}
+
+void *hl_zalloc( hl_alloc *a, int size ) {
+	void *p = hl_malloc(a,size);
+	if( p ) memset(p,0,size);
+	return p;
+}
+
+void hl_free( hl_alloc *a ) {
+	hl_alloc_block *b = a->cur;
+	int_val prev = 0;
+	int size = 0;
+	while( b ) {
+		hl_alloc_block *n = b->next;
+		size = b->p + b->size - ((unsigned char*)b);
+		prev = (int_val)b;
+		free(b);
+		b = n;
+	}
+	// check if our allocator was not part of the last free block
+	if( (int_val)a < prev || (int_val)a > prev+size )
+		a->cur = NULL;
+}

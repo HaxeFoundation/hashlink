@@ -109,40 +109,6 @@ static int hl_read_uindex( hl_reader *r ) {
 	return i;
 }
 
-void hl_code_free( hl_code *c ) {
-	int i;
-	if( c == NULL ) return;
-	if( c->ints ) free(c->ints);
-	if( c->strings ) free(c->strings);
-	if( c->floats ) free(c->floats);
-	if( c->strings_data ) free(c->strings_data);
-	if( c->strings_lens ) free(c->strings_lens);
-	if( c->types ) {
-		for(i=0;i<c->ntypes;i++) {
-			hl_type *t = c->types + i;
-			if( t->args ) free(t->args);
-		}
-		free(c->types);
-	}
-	if( c->globals ) free(c->globals);
-	if( c->natives ) free(c->natives);
-	if( c->functions ) {
-		for(i=0;i<c->nfunctions;i++) {
-			hl_function *f = c->functions + i;
-			if( f->regs ) free(f->regs);
-			if( f->allocs ) {
-				int j;
-				for(j=0;j<f->nallocs;j++)
-					free(f->allocs[j]);
-				free(f->allocs);
-			}
-			if( f->ops ) free(f->ops);
-		}
-		free(c->functions);
-	}
-	free(c);
-}
-
 hl_type *hl_get_type( hl_reader *r ) {
 	int i = INDEX();
 	if( i < 0 || i >= r->code->ntypes ) {
@@ -180,7 +146,7 @@ void hl_read_type( hl_reader *r, hl_type *t ) {
 	switch( t->kind ) {
 	case HFUN:
 		t->nargs = READ();
-		t->args = (hl_type**)malloc(sizeof(hl_type*)*t->nargs);
+		t->args = (hl_type**)hl_malloc(&r->code->alloc, sizeof(hl_type*)*t->nargs);
 		if( t->args == NULL ) {
 			ERROR("Out of memory");
 			return;
@@ -194,29 +160,7 @@ void hl_read_type( hl_reader *r, hl_type *t ) {
 	}
 }
 
-void hl_op_alloc( hl_reader *r, hl_function *f, hl_opcode *o, void *data, int *maxAllocs ) {
-	if( f->nallocs == *maxAllocs ) {
-		void **nallocs;
-		int i;
-		int resize = ((*maxAllocs) * 3) >> 1;
-		if( resize == 0 ) resize = 4;
-		nallocs = (void**)malloc(sizeof(void*)*resize);
-		if( nallocs == NULL ) {
-			free(data);
-			r->error = "Out of memory";
-			return;
-		}
-		for(i=0;i<f->nallocs;i++)
-			nallocs[i] = f->allocs[i];
-		if( f->allocs ) free(f->allocs);
-		f->allocs = nallocs;
-		*maxAllocs = resize;
-	}
-	f->allocs[f->nallocs++] = data;
-	o->extra = data;
-}
-
-void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o, int *maxAllocs ) {
+void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 	o->op = (hl_op)READ();
 	if( o->op >= OLast ) {
 		ERROR("Invalid opcode");
@@ -251,10 +195,14 @@ void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o, int *maxAllocs 
 				o->p1 = INDEX();
 				o->p2 = INDEX();
 				o->p3 = READ();
-				args = (int*)malloc(sizeof(int) * o->p3);
+				args = (int*)hl_malloc(&r->code->alloc,sizeof(int) * o->p3);
+				if( args == NULL ) {
+					ERROR("Out of memory");
+					return;
+				}
 				for(i=0;i<o->p3;i++)
 					args[i] = INDEX();
-				hl_op_alloc(r,f,o,args,maxAllocs);
+				o->extra = args;
 			}
 			break;
 		default:
@@ -266,11 +214,10 @@ void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o, int *maxAllocs 
 
 void hl_read_function( hl_reader *r, hl_function *f ) {
 	int i;
-	int maxAlloc = 0;
 	f->index = UINDEX();
 	f->nregs = UINDEX();
 	f->nops = UINDEX();
-	f->regs = (hl_type**)malloc(f->nregs * sizeof(hl_type*));
+	f->regs = (hl_type**)hl_malloc(&r->code->alloc, f->nregs * sizeof(hl_type*));
 	if( f->regs == NULL ) {
 		ERROR("Out of memory");
 		return;
@@ -278,26 +225,31 @@ void hl_read_function( hl_reader *r, hl_function *f ) {
 	for(i=0;i<f->nregs;i++)
 		f->regs[i] = hl_get_type(r);
 	CHK_ERROR();
-	f->ops = (hl_opcode*)malloc(f->nops * sizeof(hl_opcode));
+	f->ops = (hl_opcode*)hl_malloc(&r->code->alloc, f->nops * sizeof(hl_opcode));
 	if( f->ops == NULL ) {
 		ERROR("Out of memory");
 		return;
 	}
 	for(i=0;i<f->nops;i++)
-		hl_read_opcode(r, f, f->ops+i, &maxAlloc);
+		hl_read_opcode(r, f, f->ops+i);
 }
 
 #undef CHK_ERROR
-#define CHK_ERROR() if( r->error ) { hl_code_free(c); printf("%s\n", r->error); return NULL; }
+#define CHK_ERROR() if( r->error ) { if( c ) hl_free(&c->alloc); printf("%s\n", r->error); return NULL; }
 #define EXIT(msg) { ERROR(msg); CHK_ERROR(); }
-#define ALLOC(v,ptr,count) { v = (ptr *)malloc(count*sizeof(ptr)); if( v == NULL ) EXIT("Out of memory") else memset(v, 0, count*sizeof(ptr)); }
+#define ALLOC(v,ptr,count) { v = (ptr *)hl_zalloc(&c->alloc,count*sizeof(ptr)); if( v == NULL ) EXIT("Out of memory"); }
 
 hl_code *hl_code_read( const unsigned char *data, int size ) {
 	hl_reader _r = { data, size, 0, 0, NULL };	
 	hl_reader *r = &_r;
 	hl_code *c;
+	hl_alloc alloc;
 	int i;
-	ALLOC(c, hl_code, 1);
+	hl_alloc_init(&alloc);
+	c = hl_zalloc(&alloc,sizeof(hl_code));
+	if( c == NULL )
+		EXIT("Out of memory");
+	c->alloc = alloc;
 	if( READ() != 'H' || READ() != 'L' || READ() != 'B' )
 		EXIT("Invalid header");
 	r->code = c;
@@ -327,7 +279,7 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 		int size = hl_read_i32(r);
 		char *sdata;
 		CHK_ERROR();
-		sdata = (char*)malloc(sizeof(char) * size);
+		sdata = (char*)hl_malloc(&c->alloc,sizeof(char) * size);
 		if( sdata == NULL )
 			EXIT("Out of memory");
 		hl_read_bytes(r, sdata, size);

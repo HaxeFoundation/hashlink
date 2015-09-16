@@ -34,6 +34,8 @@
 #define JGte		0x83
 #define JEq			0x84
 #define JNeq		0x85
+#define JZero		JEq
+#define JNotZero	JNeq
 #define JLte		0x86
 #define JGt			0x87
 #define JSignLt		0x8C
@@ -67,23 +69,45 @@
 #define XCall_d(delta)			B(0xE8); W(delta)
 #define XPush_r(r)				B(0x50+(r))
 #define XPush_c(cst)			B(0x68); W(cst)
+//XPush_p
 #define XPush_p(reg,idx)		OP_ADDR(0xFF,idx,reg,6)
 #define XAdd_rc(reg,cst)		if IS_SBYTE(cst) { OP_RM(0x83,3,0,reg); B(cst); } else { OP_RM(0x81,3,0,reg); W(cst); }
 #define XAdd_rr(dst,src)		OP_RM(0x03,3,dst,src)
+//XAdd_rp
+//XAdd_pr
+//XAdd_pc
 #define XSub_rc(reg,cst)		if IS_SBYTE(cst) { OP_RM(0x83,3,5,reg); B(cst); } else { OP_RM(0x81,3,5,reg); W(cst); }
 #define XSub_rr(dst,src)		OP_RM(0x2B,3,dst,src)
+//XSub_rp
+//XSub_pr
+//XSub_pc
 #define XCmp_rr(r1,r2)			OP_RM(0x3B,3,r1,r2)
 #define XCmp_rc(reg,cst)		if( reg == Eax ) { B(0x3D); } else { OP_RM(0x81,3,7,reg); }; W(cst)
 #define XCmp_rb(reg,byte)		OP_RM(0x83,3,7,reg); B(byte)
-#define XJump(how,local)		if( (how) == JAlways ) { B(0xE9); } else { B(0x0F); B(how); }; local = buf.i; W(0)
-#define XJump_near(local)		B(0xEB); local = buf.c; B(0)
+#define XJump(how,local)		if( (how) == JAlways ) { B(0xE9); } else { B(0x0F); B(how); }; local = ctx->buf.i; W(0)
+#define XJump_near(local)		B(0xEB); local = ctx->buf.c; B(0)
 #define XJump_r(reg)			OP_RM(0xFF,3,4,reg)
 #define XPop_r(reg)				B(0x58 + (reg))
+//XPop_p
+//XInc_r
+//XInc_p
+//XDec_r
+//XDec_p
+
+//XLea_rp
+//XNot_r
+//XNot_p
+//XNeg_r
+//XNeg_p
 
 #define XTest_rc(r,cst)			if( r == Eax ) { B(0xA9); W(cst); } else { B(0xF7); MOD_RM(3,0,r); W(cst); }
 #define XTest_rr(r,src)			B(0x85); MOD_RM(3,r,src)
 #define XAnd_rc(r,cst)			if( r == Eax ) { B(0x25); W(cst); } else { B(0x81); MOD_RM(3,4,r); W(cst); }
 #define XAnd_rr(r,src)			B(0x23); MOD_RM(3,r,src)
+//XAnd_rp
+//XAnd_rc
+//XAnd_pr
+//XAnd_pc
 #define XOr_rc(r,cst)			if( r == Eax ) { B(0x0D); W(cst); } else { B(0x81); MOD_RM(3,1,r); W(cst); }
 #define XOr_rr(r,src)			B(0x0B); MOD_RM(3,r,src)
 #define XXor_rc(r,cst)			if( r == Eax ) { B(0x35); W(cst); } else { B(0x81); MOD_RM(3,6,r); W(cst); }
@@ -94,13 +118,22 @@
 
 #define XShl_rr(r,src)			if( src != Ecx ) ERROR; shift_r(r,4)
 #define XShl_rc(r,n)			shift_c(r,n,4)
+//XShl_pr
+//XShl_pc
 #define XShr_rr(r,src)			if( src != Ecx ) ERROR; shift_r(r,7)
 #define XShr_rc(r,n)			shift_c(r,n,7)
 #define XUShr_rr(r,src)			if( src != Ecx ) ERROR; shift_r(r,5)
 #define XUShr_rc(r,n)			shift_c(r,n,5)
 
+//XMul (unsigned)
+//
+
 #define XIMul_rr(dst,src)		B(0x0F); B(0xAF); MOD_RM(3,dst,src)
+//XIMul_rp
+//XIMul_rrc
+//XIMul_rpc
 #define XIDiv_r(r)				B(0xF7); MOD_RM(3,7,r)
+//XIDiv_p
 #define XCdq()					B(0x99);
 
 // FPU
@@ -119,19 +152,31 @@
 #define LOAD(cpuReg,vReg)		XMov_rp(cpuReg,Ebp,-ctx->regsPos[vReg])
 #define STORE(vReg, cpuReg)		XMov_pr(Ebp,-ctx->regsPos[vReg],cpuReg)
 
+typedef struct jlist jlist;
+struct jlist {
+	int pos;
+	int target;
+	jlist *next;
+};
+
 struct jit_ctx {
 	union {
 		unsigned char *b;
 		unsigned int *w;
+		int *i;
 	} buf;
 	int *regsPos;
 	int *regsSize;
+	int *opsPos;
 	int maxRegs;
+	int maxOps;
 	unsigned char *startBuf;
 	int bufSize;
 	int totalRegsSize;
 	hl_module *m;
 	hl_function *f;
+	jlist *jumps;
+	hl_alloc alloc;
 };
 
 static void jit_buf( jit_ctx *ctx ) {
@@ -178,6 +223,7 @@ static void op_callr( jit_ctx *ctx, int r, int rf, int size ) {
 }
 
 static void op_enter( jit_ctx *ctx ) {
+	XRet();
 	XPush_r(Ebp);
 	XMov_rr(Ebp, Esp);
 	XAdd_rc(Esp, ctx->totalRegsSize);
@@ -192,28 +238,76 @@ static void op_ret( jit_ctx *ctx, int r ) {
 
 static void op_sub( jit_ctx *ctx, int r, int a, int b ) {
 	LOAD(Eax, a);
-	LOAD(Ebx, b);
-	XSub_rr(Eax, Ebx);
+	LOAD(Ecx, b);
+	XSub_rr(Eax, Ecx);
 	STORE(r, Eax);
 }
 
 static void op_add( jit_ctx *ctx, int r, int a, int b ) {
 	LOAD(Eax, a);
-	LOAD(Ebx, b);
-	XAdd_rr(Eax, Ebx);
+	LOAD(Ecx, b);
+	XAdd_rr(Eax, Ecx);
 	STORE(r, Eax);
+}
+
+static int *do_jump( jit_ctx *ctx, hl_op op ) {
+	int *j;
+	switch( op ) {
+	case OJAlways:
+		XJump(JAlways,j);
+		break;
+	case OGte:
+		XJump(JGte,j);
+		break;
+	default:
+		j = NULL;
+		printf("Unknown JUMP %d\n",op);
+		break;
+	}
+	return j;
+}
+
+static void patch_jump( jit_ctx *ctx, int *p ) {
+	if( p == NULL ) return;
+	*p = (int)((int_val)ctx->buf.b - ((int_val)p + 1)) - 3;
+}
+
+static void op_cmp( jit_ctx *ctx, hl_opcode *op ) {
+	int *p,*e;
+	LOAD(Eax, op->p2);
+	LOAD(Ecx, op->p3);
+	XCmp_rr(Eax, Ecx);
+	p = do_jump(ctx,op->op);
+	XMov_pc(Ebp,-ctx->regsPos[op->p1],0);
+	e = do_jump(ctx,OJAlways);
+	XMov_pc(Ebp,-ctx->regsPos[op->p1],1);
+	patch_jump(ctx,p);
+	patch_jump(ctx,e);
+}
+
+static void register_jump( jit_ctx *ctx, int *p, int target ) {
+	int pos = (int_val)p - (int_val)ctx->startBuf; 
+	jlist *j = (jlist*)hl_malloc(&ctx->alloc, sizeof(jlist));
+	j->pos = pos;
+	j->target = target;
+	j->next = ctx->jumps;
+	ctx->jumps = j;
 }
 
 jit_ctx *hl_jit_alloc() {
 	jit_ctx *ctx = (jit_ctx*)malloc(sizeof(jit_ctx));
 	if( ctx == NULL ) return NULL;
 	memset(ctx,0,sizeof(jit_ctx));
+	hl_alloc_init(&ctx->alloc);
 	return ctx;
 }
 
 void hl_jit_free( jit_ctx *ctx ) {
 	free(ctx->regsPos);
+	free(ctx->regsSize);
+	free(ctx->opsPos);
 	free(ctx->startBuf);
+	hl_free(&ctx->alloc);
 	free(ctx);
 }
 
@@ -233,6 +327,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		}
 		ctx->maxRegs = f->nregs;
 	}
+	if( f->nops >= ctx->maxOps ) {
+		free(ctx->opsPos);
+		ctx->opsPos = (int*)malloc(sizeof(int) * (f->nops + 1));
+		if( ctx->opsPos == NULL ) {
+			ctx->maxOps = 0;
+			return -1;
+		}
+		ctx->maxOps = f->nops;
+	}
 	for(i=0;i<f->nregs;i++) {
 		int sz = hl_type_size(f->regs[i]);
 		ctx->regsSize[i] = sz;
@@ -242,7 +345,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
 	op_enter(ctx);
+	ctx->opsPos[0] = 0;
 	for(i=0;i<f->nops;i++) {
+		int *jump;
 		hl_opcode *o = f->ops + i;
 		jit_buf(ctx);
 		switch( o->op ) {
@@ -274,10 +379,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			op_add(ctx, o->p1, o->p2, o->p3);
 			break;
 		case OGte:
-			TODO();
+			op_cmp(ctx, o);
 			break;
 		case OJFalse:
-			TODO();
+			LOAD(Eax,o->p1);
+			XTest_rr(Eax,Eax);
+			XJump(JZero,jump);
+			register_jump(ctx,jump,(i + 1) + o->p2);
 			break;
 		case OJToAny:
 			// NOP
@@ -289,8 +397,26 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			printf("Don't know how to jit op #%d\n",o->op);
 			return -1;
 		}
+		ctx->opsPos[i+1] = ctx->buf.b - ctx->startBuf;
 	}
+	// patch jumps
+	{
+		jlist *j = ctx->jumps;
+		while( j ) {
+			*(int*)(ctx->startBuf + j->pos) = ctx->opsPos[j->target] - j->pos;
+			j = j->next;
+		}
+		ctx->jumps = NULL;
+	}
+	// reset tmp allocator
+	hl_free(&ctx->alloc);
 	return codePos;
 }
 
-
+void *hl_jit_code( jit_ctx *ctx ) {
+	int size = ctx->buf.b - ctx->startBuf;
+	void *code = malloc(size);
+	if( code == NULL ) return NULL;
+	memcpy(code,ctx->startBuf,size);
+	return code;
+}

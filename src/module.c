@@ -65,6 +65,10 @@ hl_module *hl_module_alloc( hl_code *c ) {
 			}
 			m->functions_ptrs[i] = (void*)f;
 		}
+		m->jit_code = hl_jit_code(ctx);
+		for(i=0;i<c->nfunctions;i++)
+			m->functions_ptrs[i] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[i]);
+		hl_jit_free(ctx);
 	}
 	return m;
 }
