@@ -69,7 +69,6 @@
 #define XCall_d(delta)			B(0xE8); W(delta)
 #define XPush_r(r)				B(0x50+(r))
 #define XPush_c(cst)			B(0x68); W(cst)
-//XPush_p
 #define XPush_p(reg,idx)		OP_ADDR(0xFF,idx,reg,6)
 #define XAdd_rc(reg,cst)		if IS_SBYTE(cst) { OP_RM(0x83,3,0,reg); B(cst); } else { OP_RM(0x81,3,0,reg); W(cst); }
 #define XAdd_rr(dst,src)		OP_RM(0x03,3,dst,src)
@@ -99,6 +98,8 @@
 //XNot_p
 //XNeg_r
 //XNeg_p
+
+#define XNop()					B(0x90)				
 
 #define XTest_rc(r,cst)			if( r == Eax ) { B(0xA9); W(cst); } else { B(0xF7); MOD_RM(3,0,r); W(cst); }
 #define XTest_rr(r,src)			B(0x85); MOD_RM(3,r,src)
@@ -173,17 +174,24 @@ struct jit_ctx {
 	unsigned char *startBuf;
 	int bufSize;
 	int totalRegsSize;
+	int *globalToFunction;
+	int functionPos;
 	hl_module *m;
 	hl_function *f;
 	jlist *jumps;
-	hl_alloc alloc;
+	jlist *calls;
+	hl_alloc falloc; // cleared per-function
+	hl_alloc galloc;
 };
 
 static void jit_buf( jit_ctx *ctx ) {
 	if( ctx->buf.b - ctx->startBuf > ctx->bufSize - MAX_OP_SIZE ) {
 		int nsize = ctx->bufSize ? (ctx->bufSize * 4) / 3 : ctx->f->nops * 4;
-		unsigned char *nbuf = (unsigned char*)malloc(nsize);
-		int curpos = ctx->buf.b - ctx->startBuf;
+		unsigned char *nbuf;
+		int curpos;
+		if( nsize < ctx->bufSize + MAX_OP_SIZE * 4 ) nsize = ctx->bufSize + MAX_OP_SIZE * 4;
+		curpos = ctx->buf.b - ctx->startBuf;
+		nbuf = (unsigned char*)malloc(nsize);
 		// TODO : check nbuf
 		if( ctx->startBuf ) {
 			memcpy(nbuf,ctx->startBuf,curpos);
@@ -222,6 +230,38 @@ static void op_callr( jit_ctx *ctx, int r, int rf, int size ) {
 	STORE(r, Eax);
 }
 
+static void op_callg( jit_ctx *ctx, int r, int g, int size ) {
+	int fid = ctx->globalToFunction[g];
+	if( fid < 0 ) {
+		// not a static function or native, load it at runtime
+		XMov_ra(Eax, (int_val)(ctx->m->globals_data + ctx->m->globals_indexes[g]));
+		XCall_r(Eax);
+	} else if( fid >= ctx->m->code->nfunctions ) {
+		// native function, already resolved
+		XMov_rc(Eax, *(int_val*)(ctx->m->globals_data + ctx->m->globals_indexes[g]));
+		XCall_r(Eax);
+	} else {
+		int cpos = ctx->buf.b - ctx->startBuf;
+		if( ctx->m->functions_ptrs[fid] ) {
+			// already compiled
+			XCall_d((int_val)ctx->m->functions_ptrs[fid] - (cpos + 5));
+		} else if( ctx->m->code->functions + fid == ctx->f ) {
+			// our current function
+			XCall_d(ctx->functionPos - (cpos + 5));
+		} else {
+			// stage for later
+			jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
+			j->pos = cpos;
+			j->target = g;
+			j->next = ctx->calls;
+			ctx->calls = j;
+			XCall_d(0);
+		}
+	}
+	XAdd_rc(Esp, size);
+	STORE(r, Eax);
+}
+
 static void op_enter( jit_ctx *ctx ) {
 	XPush_r(Ebp);
 	XMov_rr(Ebp, Esp);
@@ -256,7 +296,20 @@ static int *do_jump( jit_ctx *ctx, hl_op op ) {
 		XJump(JAlways,j);
 		break;
 	case OGte:
+	case OJGte:
 		XJump(JGte,j);
+		break;
+	case OLt:
+	case OJLt:
+		XJump(JLt,j);
+		break;
+	case OEq:
+	case OJEq:
+		XJump(JEq,j);
+		break;
+	case ONotEq:
+	case OJNeq:
+		XJump(JNeq,j);
 		break;
 	default:
 		j = NULL;
@@ -286,7 +339,7 @@ static void op_cmp( jit_ctx *ctx, hl_opcode *op ) {
 
 static void register_jump( jit_ctx *ctx, int *p, int target ) {
 	int pos = (int_val)p - (int_val)ctx->startBuf; 
-	jlist *j = (jlist*)hl_malloc(&ctx->alloc, sizeof(jlist));
+	jlist *j = (jlist*)hl_malloc(&ctx->falloc, sizeof(jlist));
 	j->pos = pos;
 	j->target = target;
 	j->next = ctx->jumps;
@@ -297,7 +350,8 @@ jit_ctx *hl_jit_alloc() {
 	jit_ctx *ctx = (jit_ctx*)malloc(sizeof(jit_ctx));
 	if( ctx == NULL ) return NULL;
 	memset(ctx,0,sizeof(jit_ctx));
-	hl_alloc_init(&ctx->alloc);
+	hl_alloc_init(&ctx->falloc);
+	hl_alloc_init(&ctx->galloc);
 	return ctx;
 }
 
@@ -306,16 +360,35 @@ void hl_jit_free( jit_ctx *ctx ) {
 	free(ctx->regsSize);
 	free(ctx->opsPos);
 	free(ctx->startBuf);
-	hl_free(&ctx->alloc);
+	hl_free(&ctx->falloc);
+	hl_free(&ctx->galloc);
 	free(ctx);
+}
+
+int pad_stack( jit_ctx *ctx, int size ) {
+	int total = size + ctx->totalRegsSize + HL_WSIZE * 2; // EIP+EBP
+	if( total & 15 ) {
+		int pad = 16 - (total & 15);
+		XSub_rc(Esp,pad);
+		size += pad;
+	}
+	return size;
 }
 
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, j, size = 0;
 	int codePos = ctx->buf.b - ctx->startBuf;
-	int nargs = m->code->globals[f->index]->nargs;
+	int nargs = m->code->globals[f->global]->nargs;
 	ctx->m = m;
 	ctx->f = f;
+	if( !ctx->globalToFunction ) {
+		ctx->globalToFunction = (int*)malloc(sizeof(int)*m->code->nglobals);
+		memset(ctx->globalToFunction,0xFF,sizeof(int)*m->code->nglobals);
+		for(i=0;i<m->code->nfunctions;i++)
+			ctx->globalToFunction[(m->code->functions + i)->global] = i;
+		for(i=0;i<m->code->nnatives;i++)
+			ctx->globalToFunction[(m->code->natives + i)->global] = i + m->code->nfunctions;
+	}
 	if( f->nregs > ctx->maxRegs ) {
 		free(ctx->regsPos);
 		free(ctx->regsSize);
@@ -352,6 +425,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	}
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
+	ctx->functionPos = ctx->buf.b - ctx->startBuf;
 	op_enter(ctx);
 	ctx->opsPos[0] = 0;
 	for(i=0;i<f->nops;i++) {
@@ -374,11 +448,42 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OCallN:
 			size = 0;
 			for(j=o->p3-1;j>=0;j--) {
-				int r = ((int*)o->extra)[j];
+				int r = o->extra[j];
+				size += ctx->regsSize[r];
+			}
+			size = pad_stack(ctx,size);
+			for(j=o->p3-1;j>=0;j--) {
+				int r = o->extra[j];
+				if( (j & 7) == 0 ) jit_buf(ctx);
 				op_pushr(ctx, r);
-				size += 4; // regsize !
 			}
 			op_callr(ctx, o->p1, o->p2, size);
+			break;
+		case OCall1:
+			size = pad_stack(ctx,ctx->regsSize[o->p3]);
+			op_pushr(ctx, o->p3);
+			op_callg(ctx, o->p1, o->p2, size);
+			break;
+		case OCall2:
+			size = pad_stack(ctx,ctx->regsSize[o->p3] + ctx->regsSize[(int)(int_val)o->extra]);
+			op_pushr(ctx, (int)(int_val)o->extra);
+			op_pushr(ctx, o->p3);
+			op_callg(ctx, o->p1, o->p2, size);
+			break;
+		case OCall3:
+			size = pad_stack(ctx,ctx->regsSize[o->p3] + ctx->regsSize[o->extra[0]] + ctx->regsSize[o->extra[1]]);
+			op_pushr(ctx, o->extra[1]);
+			op_pushr(ctx, o->extra[0]);
+			op_pushr(ctx, o->p3);
+			op_callg(ctx, o->p1, o->p2, size);
+			break;
+		case OCall4:
+			size = pad_stack(ctx,ctx->regsSize[o->p3] + ctx->regsSize[o->extra[0]] + ctx->regsSize[o->extra[1]] + ctx->regsSize[o->extra[2]]);
+			op_pushr(ctx, o->extra[2]);
+			op_pushr(ctx, o->extra[1]);
+			op_pushr(ctx, o->extra[0]);
+			op_pushr(ctx, o->p3);
+			op_callg(ctx, o->p1, o->p2, size);
 			break;
 		case OSub:
 			op_sub(ctx, o->p1, o->p2, o->p3);
@@ -395,6 +500,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			XJump(JZero,jump);
 			register_jump(ctx,jump,(i + 1) + o->p2);
 			break;
+		case OJLt:
+			LOAD(Eax,o->p1);
+			LOAD(Ecx,o->p2);
+			XCmp_rr(Eax, Ecx);
+			jump = do_jump(ctx,o->op);
+			register_jump(ctx,jump,(i + 1) + o->p3);
+			break;
 		case OToAny:
 			op_mov(ctx,o->p1,o->p2); // TODO
 			break;
@@ -402,7 +514,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			op_ret(ctx, o->p1);
 			break;
 		default:
-			printf("Don't know how to jit op #%d\n",o->op);
+			printf("Don't know how to jit %s(%d)\n",hl_op_name(o->op),o->op);
 			return -1;
 		}
 		ctx->opsPos[i+1] = ctx->buf.b - ctx->startBuf;
@@ -416,17 +528,30 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		}
 		ctx->jumps = NULL;
 	}
+	// add nops padding
+	while( (ctx->buf.b - ctx->startBuf) & 15 )
+		XNop();
 	// reset tmp allocator
-	hl_free(&ctx->alloc);
+	hl_free(&ctx->falloc);
 	return codePos;
 }
 
 void *hl_alloc_executable_memory( int size );
 
-void *hl_jit_code( jit_ctx *ctx ) {
+void *hl_jit_code( jit_ctx *ctx, hl_module *m ) {
+	jlist *c;
 	int size = ctx->buf.b - ctx->startBuf;
-	void *code = hl_alloc_executable_memory(size);
+	unsigned char *code = (unsigned char*)hl_alloc_executable_memory(size);
 	if( code == NULL ) return NULL;
 	memcpy(code,ctx->startBuf,size);
+	// patch calls
+	c = ctx->calls;
+	while( c ) {
+		int fid = ctx->globalToFunction[c->target];
+		int fpos = (int_val)m->functions_ptrs[fid];
+		*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
+		c = c->next;
+	}
 	return code;
 }
+

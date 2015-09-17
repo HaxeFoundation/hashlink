@@ -26,6 +26,11 @@
 #define OP_END };
 #include "opcodes.h"
 
+#define OP(n,_) #n,
+#define OP_BEGIN static const char *hl_op_names[] = {
+#define OP_END };
+#include "opcodes.h"
+
 typedef struct {
 	const unsigned char *b;
 	int size;
@@ -109,7 +114,7 @@ static int hl_read_uindex( hl_reader *r ) {
 	return i;
 }
 
-hl_type *hl_get_type( hl_reader *r ) {
+static hl_type *hl_get_type( hl_reader *r ) {
 	int i = INDEX();
 	if( i < 0 || i >= r->code->ntypes ) {
 		ERROR("Invalid type index");
@@ -118,7 +123,7 @@ hl_type *hl_get_type( hl_reader *r ) {
 	return r->code->types + i;
 }
 
-const char *hl_get_string( hl_reader *r ) {
+static const char *hl_get_string( hl_reader *r ) {
 	int i = INDEX();
 	if( i < 0 || i >= r->code->nstrings ) {
 		ERROR("Invalid string index");
@@ -127,7 +132,7 @@ const char *hl_get_string( hl_reader *r ) {
 	return r->code->strings[i];
 }
 
-int hl_get_global( hl_reader *r ) {
+static int hl_get_global( hl_reader *r ) {
 	int g = INDEX();
 	if( g < 0 || g >= r->code->nglobals ) {
 		ERROR("Invalid global index");
@@ -136,7 +141,7 @@ int hl_get_global( hl_reader *r ) {
 	return g;
 }
 
-void hl_read_type( hl_reader *r, hl_type *t ) {
+static void hl_read_type( hl_reader *r, hl_type *t ) {
 	int i;
 	t->kind = READ();
 	if( t->kind >= HLAST ) {
@@ -160,7 +165,7 @@ void hl_read_type( hl_reader *r, hl_type *t ) {
 	}
 }
 
-void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
+static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 	o->op = (hl_op)READ();
 	if( o->op >= OLast ) {
 		ERROR("Invalid opcode");
@@ -181,40 +186,54 @@ void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 		o->p2 = INDEX();
 		o->p3 = INDEX();
 		break;
-	default:
+	case 4:
+		o->p1 = INDEX();
+		o->p2 = INDEX();
+		o->p3 = INDEX();
+		o->extra = (int*)INDEX();
+		break;
+	case -1:
 		switch( o->op ) {
-		case OCall2:
-			o->p1 = INDEX();
-			o->p2 = INDEX();
-			o->p3 = INDEX();
-			o->extra = (void*)INDEX();
-			break;
 		case OCallN:
 			{
-				int *args, i;
+				int i;
 				o->p1 = INDEX();
 				o->p2 = INDEX();
 				o->p3 = READ();
-				args = (int*)hl_malloc(&r->code->alloc,sizeof(int) * o->p3);
-				if( args == NULL ) {
+				o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * o->p3);
+				if( o->extra == NULL ) {
 					ERROR("Out of memory");
 					return;
 				}
 				for(i=0;i<o->p3;i++)
-					args[i] = INDEX();
-				o->extra = args;
+					o->extra[i] = INDEX();
 			}
 			break;
 		default:
 			ERROR("Don't know how to process opcode");
 			break;
 		}
+	default:
+		{
+			int i, size = hl_op_nargs[o->op] - 3;
+			o->p1 = INDEX();
+			o->p2 = INDEX();
+			o->p3 = INDEX();
+			o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * size);
+			if( o->extra == NULL ) {
+				ERROR("Out of memory");
+				return;
+			}
+			for(i=0;i<size;i++)
+				o->extra[i] = INDEX();
+		}
+		break;
 	}
 }
 
-void hl_read_function( hl_reader *r, hl_function *f ) {
+static void hl_read_function( hl_reader *r, hl_function *f ) {
 	int i;
-	f->index = UINDEX();
+	f->global = UINDEX();
 	f->nregs = UINDEX();
 	f->nops = UINDEX();
 	f->regs = (hl_type**)hl_malloc(&r->code->alloc, f->nregs * sizeof(hl_type*));
@@ -238,6 +257,12 @@ void hl_read_function( hl_reader *r, hl_function *f ) {
 #define CHK_ERROR() if( r->error ) { if( c ) hl_free(&c->alloc); printf("%s\n", r->error); return NULL; }
 #define EXIT(msg) { ERROR(msg); CHK_ERROR(); }
 #define ALLOC(v,ptr,count) { v = (ptr *)hl_zalloc(&c->alloc,count*sizeof(ptr)); if( v == NULL ) EXIT("Out of memory"); }
+
+const char *hl_op_name( int op ) {
+	if( op < 0 || op >= OLast )
+		return "UnknownOp";
+	return hl_op_names[op];
+}
 
 hl_code *hl_code_read( const unsigned char *data, int size ) {
 	hl_reader _r = { data, size, 0, 0, NULL };	

@@ -108,13 +108,13 @@ typedef struct {
 	int p1;
 	int p2;
 	int p3;
-	void *extra;
+	int *extra;
 } hl_opcode;
 
 typedef struct hl_ptr_list hl_ptr_list;
 
 typedef struct {
-	int index;
+	int global;
 	int nregs;
 	int nops;
 	hl_type **regs;
@@ -166,14 +166,15 @@ int hl_word_size( hl_type *t ); // same as hl_type_size, but round to the next w
 
 hl_code *hl_code_read( const unsigned char *data, int size );
 void hl_code_free( hl_code *c );
+const char* hl_op_name( int op );
 
 hl_module *hl_module_alloc( hl_code *code );
+int hl_module_init( hl_module *m );
 void hl_module_free( hl_module *m );
 
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
-int hl_module_init( hl_module *m );
-void *hl_jit_code( jit_ctx *ctx );
+void *hl_jit_code( jit_ctx *ctx, hl_module *m );
 
 #endif

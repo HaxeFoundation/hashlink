@@ -65,33 +65,36 @@ static void do_log( int i ) {
 int hl_module_init( hl_module *m ) {
 	int i;
 	jit_ctx *ctx;
+	// RESET globals
+	for(i=0;i<m->code->nglobals;i++) {
+		hl_type *t = m->code->globals[i];
+		if( t->kind == HFUN ) *(fptr*)(m->globals_data + m->globals_indexes[i]) = null_function;
+	}
+	// INIT natives
+	for(i=0;i<m->code->nnatives;i++) {
+		hl_native *n = m->code->natives + i;
+		*(void**)(m->globals_data + m->globals_indexes[n->global]) = do_log;
+	}
 	// JIT
 	ctx = hl_jit_alloc();
 	if( ctx == NULL )
 		return 0;
 	for(i=0;i<m->code->nfunctions;i++) {
 		int f = hl_jit_function(ctx, m, m->code->functions+i);
-		if( f < 0 ) return 0;
+		if( f < 0 ) {
+			hl_jit_free(ctx);
+			return 0;
+		}
 		m->functions_ptrs[i] = (void*)f;
 	}
-	m->jit_code = hl_jit_code(ctx);
+	m->jit_code = hl_jit_code(ctx, m);
 	for(i=0;i<m->code->nfunctions;i++)
 		m->functions_ptrs[i] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[i]);
 	hl_jit_free(ctx);
-	// INIT globals
-	for(i=0;i<m->code->nglobals;i++) {
-		hl_type *t = m->code->globals[i];
-		if( t->kind == HFUN ) *(fptr*)(m->globals_data + m->globals_indexes[i]) = null_function;
-	}
 	// INIT functions
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
-		*(void**)(m->globals_data + m->globals_indexes[f->index]) = m->functions_ptrs[i];
-	}
-	// INIT natives
-	for(i=0;i<m->code->nnatives;i++) {
-		hl_native *n = m->code->natives + i;
-		*(void**)(m->globals_data + m->globals_indexes[n->global]) = do_log;
+		*(void**)(m->globals_data + m->globals_indexes[f->global]) = m->functions_ptrs[i];
 	}
 	return 1;
 }
