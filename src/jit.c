@@ -149,8 +149,8 @@
 
 #define TODO()					printf("TODO(jit.c:%d)\n",__LINE__)
 
-#define LOAD(cpuReg,vReg)		XMov_rp(cpuReg,Ebp,-ctx->regsPos[vReg])
-#define STORE(vReg, cpuReg)		XMov_pr(Ebp,-ctx->regsPos[vReg],cpuReg)
+#define LOAD(cpuReg,vReg)		XMov_rp(cpuReg,Ebp,ctx->regsPos[vReg])
+#define STORE(vReg, cpuReg)		XMov_pr(Ebp,ctx->regsPos[vReg],cpuReg)
 
 typedef struct jlist jlist;
 struct jlist {
@@ -203,16 +203,16 @@ static void op_mov( jit_ctx *ctx, int to, int from ) {
 }
 
 static void op_movc( jit_ctx *ctx, int to, void *value ) {
-	XMov_pc(Ebp,-ctx->regsPos[to],*(int*)value);
+	XMov_pc(Ebp,ctx->regsPos[to],*(int*)value);
 }
 
 static void op_mova( jit_ctx *ctx, int to, void *value ) {
-	XMov_ra(Eax,(int)value);
+	XMov_ra(Eax,(int_val)value);
 	STORE(to, Eax);
 }
 
 static void op_pushr( jit_ctx *ctx, int r ) {
-	XPush_p(Ebp,-ctx->regsPos[r]);
+	XPush_p(Ebp,ctx->regsPos[r]);
 }
 
 static void op_callr( jit_ctx *ctx, int r, int rf, int size ) {
@@ -225,12 +225,12 @@ static void op_callr( jit_ctx *ctx, int r, int rf, int size ) {
 static void op_enter( jit_ctx *ctx ) {
 	XPush_r(Ebp);
 	XMov_rr(Ebp, Esp);
-	XAdd_rc(Esp, ctx->totalRegsSize);
+	XSub_rc(Esp, ctx->totalRegsSize);
 }
 
 static void op_ret( jit_ctx *ctx, int r ) {
 	LOAD(Eax, r);
-	XSub_rc(Esp, ctx->totalRegsSize);
+	XAdd_rc(Esp, ctx->totalRegsSize);
 	XPop_r(Ebp);
 	XRet();
 }
@@ -277,10 +277,10 @@ static void op_cmp( jit_ctx *ctx, hl_opcode *op ) {
 	LOAD(Ecx, op->p3);
 	XCmp_rr(Eax, Ecx);
 	p = do_jump(ctx,op->op);
-	XMov_pc(Ebp,-ctx->regsPos[op->p1],0);
+	XMov_pc(Ebp,ctx->regsPos[op->p1],0);
 	e = do_jump(ctx,OJAlways);
-	XMov_pc(Ebp,-ctx->regsPos[op->p1],1);
 	patch_jump(ctx,p);
+	XMov_pc(Ebp,ctx->regsPos[op->p1],1);
 	patch_jump(ctx,e);
 }
 
@@ -313,6 +313,7 @@ void hl_jit_free( jit_ctx *ctx ) {
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, j, size = 0;
 	int codePos = ctx->buf.b - ctx->startBuf;
+	int nargs = m->code->globals[f->index]->nargs;
 	ctx->m = m;
 	ctx->f = f;
 	if( f->nregs > ctx->maxRegs ) {
@@ -335,10 +336,18 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		}
 		ctx->maxOps = f->nops;
 	}
-	for(i=0;i<f->nregs;i++) {
-		int sz = hl_type_size(f->regs[i]);
+	size = HL_WSIZE;
+	for(i=0;i<nargs;i++) {
+		int sz = hl_word_size(f->regs[i]);
 		ctx->regsSize[i] = sz;
+		size += sz;
 		ctx->regsPos[i] = size;
+	}
+	size = 0;
+	for(i=nargs;i<f->nregs;i++) {
+		int sz = hl_word_size(f->regs[i]);
+		ctx->regsSize[i] = sz;
+		ctx->regsPos[i] = -(size + HL_WSIZE);
 		size += sz;
 	}
 	ctx->totalRegsSize = size;
@@ -386,8 +395,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			XJump(JZero,jump);
 			register_jump(ctx,jump,(i + 1) + o->p2);
 			break;
-		case OJToAny:
-			// NOP
+		case OToAny:
+			op_mov(ctx,o->p1,o->p2); // TODO
 			break;
 		case ORet:
 			op_ret(ctx, o->p1);
@@ -402,7 +411,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	{
 		jlist *j = ctx->jumps;
 		while( j ) {
-			*(int*)(ctx->startBuf + j->pos) = ctx->opsPos[j->target] - j->pos;
+			*(int*)(ctx->startBuf + j->pos) = ctx->opsPos[j->target] - j->pos - 10;
 			j = j->next;
 		}
 		ctx->jumps = NULL;

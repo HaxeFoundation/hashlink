@@ -54,7 +54,7 @@ OP_BEGIN
 	OP(OJNull,2)
 	OP(OJNotNull,2)
 	OP(OJAlways,1)
-	OP(OJToAny,2)
+	OP(OToAny,2)
 	// --
 	OP(OLast,0)
 OP_END

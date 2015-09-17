@@ -31,7 +31,6 @@ void hl_global_free() {
 }
 
 int hl_type_size( hl_type *t ) {
-#	define PTR 4
 	static int SIZES[] = {
 		4,
 		1,
@@ -39,10 +38,16 @@ int hl_type_size( hl_type *t ) {
 		4,
 		8,
 		1,
-		PTR * 2,
-		PTR,
+		HL_WSIZE,
+		HL_WSIZE,
 	};
 	return SIZES[t->kind];
+}
+
+int hl_word_size( hl_type *t ) {
+	int sz = hl_type_size(t);	
+	if( sz & (HL_WSIZE-1) ) sz += HL_WSIZE - (sz&(HL_WSIZE-1));
+	return sz;
 }
 
 struct hl_alloc_block {

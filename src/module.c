@@ -50,27 +50,50 @@ hl_module *hl_module_alloc( hl_code *c ) {
 		return NULL;
 	}
 	memset(m->functions_ptrs,0,sizeof(void*)*c->nfunctions);
-	{
-		jit_ctx *ctx = hl_jit_alloc();
-		if( ctx == NULL ) {
-			hl_module_free(m);
-			return NULL;
-		}
-		for(i=0;i<c->nfunctions;i++) {
-			int f = hl_jit_function(ctx, m, c->functions+i);
-			if( f < 0 ) {
-				printf("Failed to JIT fun#%d\n",i);
-				hl_module_free(m);
-				return NULL;
-			}
-			m->functions_ptrs[i] = (void*)f;
-		}
-		m->jit_code = hl_jit_code(ctx);
-		for(i=0;i<c->nfunctions;i++)
-			m->functions_ptrs[i] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[i]);
-		hl_jit_free(ctx);
-	}
 	return m;
+}
+
+static void null_function() {
+	// TODO : throw an error instead
+	printf("Null function ptr\n");
+}
+
+static void do_log( int i ) {
+	printf("%d\n",i);
+}
+
+int hl_module_init( hl_module *m ) {
+	int i;
+	jit_ctx *ctx;
+	// JIT
+	ctx = hl_jit_alloc();
+	if( ctx == NULL )
+		return 0;
+	for(i=0;i<m->code->nfunctions;i++) {
+		int f = hl_jit_function(ctx, m, m->code->functions+i);
+		if( f < 0 ) return 0;
+		m->functions_ptrs[i] = (void*)f;
+	}
+	m->jit_code = hl_jit_code(ctx);
+	for(i=0;i<m->code->nfunctions;i++)
+		m->functions_ptrs[i] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[i]);
+	hl_jit_free(ctx);
+	// INIT globals
+	for(i=0;i<m->code->nglobals;i++) {
+		hl_type *t = m->code->globals[i];
+		if( t->kind == HFUN ) *(fptr*)(m->globals_data + m->globals_indexes[i]) = null_function;
+	}
+	// INIT functions
+	for(i=0;i<m->code->nfunctions;i++) {
+		hl_function *f = m->code->functions + i;
+		*(void**)(m->globals_data + m->globals_indexes[f->index]) = m->functions_ptrs[i];
+	}
+	// INIT natives
+	for(i=0;i<m->code->nnatives;i++) {
+		hl_native *n = m->code->natives + i;
+		*(void**)(m->globals_data + m->globals_indexes[n->global]) = do_log;
+	}
+	return 1;
 }
 
 void hl_module_free( hl_module *m ) {

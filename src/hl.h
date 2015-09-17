@@ -57,7 +57,13 @@
 #	include <stdint.h>
 #endif
 
+#ifdef HL_64
+#	define	HL_WSIZE 8
+#else
+#	define	HL_WSIZE 4
+#endif
 
+typedef void (_cdecl *fptr)();
 typedef intptr_t int_val;
 
 #include <stdlib.h>
@@ -156,6 +162,7 @@ void hl_global_init();
 void hl_global_free();
 
 int hl_type_size( hl_type *t );
+int hl_word_size( hl_type *t ); // same as hl_type_size, but round to the next word size
 
 hl_code *hl_code_read( const unsigned char *data, int size );
 void hl_code_free( hl_code *c );
@@ -166,6 +173,7 @@ void hl_module_free( hl_module *m );
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
+int hl_module_init( hl_module *m );
 void *hl_jit_code( jit_ctx *ctx );
 
 #endif

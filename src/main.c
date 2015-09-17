@@ -21,8 +21,6 @@
  */
 #include "hl.h"
 
-typedef void (_cdecl *fptr)();
-
 int main( int argc, char *argv[] ) {
 	if( argc == 1 ) {
 		printf("HLVM %d.%d.%d (c)2015 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION/100,(HL_VERSION/10)%10,HL_VERSION%10);
@@ -60,7 +58,9 @@ int main( int argc, char *argv[] ) {
 		m = hl_module_alloc(code);
 		if( m == NULL )
 			return 4;
-		((fptr)m->functions_ptrs[m->code->entrypoint])();
+		if( !hl_module_init(m) )
+			return 5;
+		(*(fptr*)(m->globals_data + m->globals_indexes[m->code->entrypoint]))();
 		hl_module_free(m);
 		hl_free(&code->alloc);
 	}
