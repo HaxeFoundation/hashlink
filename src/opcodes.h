@@ -36,6 +36,8 @@ OP_BEGIN
 	OP(OBool,2)
 	OP(OAdd,3)
 	OP(OSub,3)
+	OP(OMul,3)
+	OP(ODiv,3)
 	OP(OIncr,1)
 	OP(ODecr,1)
 	OP(OCall0,2)

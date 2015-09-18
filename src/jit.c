@@ -165,6 +165,7 @@
 #define STORE(vReg, cpuReg)		XMov_pr(Ebp,ctx->regsPos[vReg],cpuReg)
 
 #define BUF_POS()				((int)(ctx->buf.b - ctx->startBuf))
+#define RTYPE(r)				ctx->f->regs[r]->kind
 
 #ifdef HL_64
 #	define XMov_rc	XMov_rc64
@@ -303,17 +304,53 @@ static void op_ret( jit_ctx *ctx, int r ) {
 }
 
 static void op_sub( jit_ctx *ctx, int r, int a, int b ) {
-	LOAD(Eax, a);
-	LOAD(Ecx, b);
-	XSub_rr(Eax, Ecx);
-	STORE(r, Eax);
+	switch( RTYPE(r) ) {
+	case HI32:
+		LOAD(Eax, a);
+		LOAD(Ecx, b);
+		XSub_rr(Eax, Ecx);
+		STORE(r, Eax);
+		break;
+	default:
+		printf("Don't know how to sub %d\n",RTYPE(r));
+		break;
+	}
 }
 
 static void op_add( jit_ctx *ctx, int r, int a, int b ) {
-	LOAD(Eax, a);
-	LOAD(Ecx, b);
-	XAdd_rr(Eax, Ecx);
-	STORE(r, Eax);
+	switch( RTYPE(r) ) {
+	case HI32:
+		LOAD(Eax, a);
+		LOAD(Ecx, b);
+		XAdd_rr(Eax, Ecx);
+		STORE(r, Eax);
+		break;
+	default:
+		printf("Don't know how to add %d\n",RTYPE(r));
+		break;
+	}
+}
+
+static void op_mul( jit_ctx *ctx, int r, int a, int b ) {
+	switch( RTYPE(r) ) {
+	case HI32:
+		LOAD(Eax, a);
+		LOAD(Ecx, b);
+		XIMul_rr(Eax, Ecx);
+		STORE(r, Eax);
+		break;
+	default:
+		printf("Don't know how to mul %d\n",RTYPE(r));
+		break;
+	}
+}
+
+static void op_div( jit_ctx *ctx, int r, int a, int b ) {
+	switch( RTYPE(r) ) {
+	default:
+		printf("Don't know how to div %d\n",RTYPE(r));
+		break;
+	}
 }
 
 static int *do_jump( jit_ctx *ctx, hl_op op ) {
@@ -517,6 +554,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OAdd:
 			op_add(ctx, o->p1, o->p2, o->p3);
+			break;
+		case OMul:
+			op_mul(ctx, o->p1, o->p2, o->p3);
+			break;
+		case ODiv:
+			op_div(ctx, o->p1, o->p2, o->p3);
 			break;
 		case OGte:
 			op_cmp(ctx, o);
