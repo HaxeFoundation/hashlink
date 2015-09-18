@@ -46,6 +46,11 @@
 #define JCarry		0x82
 #define B(bv)	*ctx->buf.b++ = bv
 #define W(wv)	*ctx->buf.w++ = wv
+#define W64(wv)	*ctx->buf.w64++ = wv
+#define REX_W	(64|8)
+#define REX_R	(64|4)
+#define REX_X	(64|2)
+#define REX_B	(64|1)
 #define MOD_RM(mod,reg,rm)		B((mod << 6) | (reg << 3) | rm)
 #define IS_SBYTE(c)				( (c) >= -128 && (c) < 128 )
 #define OP_RM(op,mod,reg,rm)	{ B(op); MOD_RM(mod,reg,rm); }
@@ -57,9 +62,15 @@
 								else W(addr); }
 #define XRet()					B(0xC3)
 #define XMov_rr(dst,src)		OP_RM(0x8B,3,dst,src)
-#define XMov_rc(dst,cst)		B(0xB8+(dst)); W(cst)
+
+#define XMov_rc32(dst,cst)		B(0xB8+(dst)); W(cst)
+#define XMov_rc64(dst,cst)		B(REX_W); B(0xB8+(dst)); W64(cst)
+#define XMov_ra32(dst,addr)		OP_RM(0x8B,0,dst,5); W(addr)
+#define XMov_ra64(dst,addr)		B(REX_W); OP_RM(0x8B,0,dst,5); W64(addr)
+
 #define XMov_rp(dst,reg,idx)	OP_ADDR(0x8B,idx,reg,dst)
-#define XMov_ra(dst,addr)		OP_RM(0x8B,0,dst,5); W(addr)
+#define XMov_rp64(dst,reg,idx)	B(REX_W); OP_ADDR(0x8B,idx,reg,dst)
+
 #define XMov_rx(dst,r,idx,mult) OP_RM(0x8B,0,dst,4); SIB(Mult##mult,idx,r)
 #define XMov_pr(dst,idx,src)	OP_ADDR(0x89,idx,dst,src)
 #define XMov_pc(dst,idx,c)		OP_ADDR(0xC7,idx,dst,0); W(c)
@@ -153,6 +164,16 @@
 #define LOAD(cpuReg,vReg)		XMov_rp(cpuReg,Ebp,ctx->regsPos[vReg])
 #define STORE(vReg, cpuReg)		XMov_pr(Ebp,ctx->regsPos[vReg],cpuReg)
 
+#define BUF_POS()				((int)(ctx->buf.b - ctx->startBuf))
+
+#ifdef HL_64
+#	define XMov_rc	XMov_rc64
+#	define XMov_ra	XMov_ra64
+#else
+#	define XMov_rc	XMov_rc32
+#	define XMov_ra	XMov_ra32
+#endif
+
 typedef struct jlist jlist;
 struct jlist {
 	int pos;
@@ -164,6 +185,7 @@ struct jit_ctx {
 	union {
 		unsigned char *b;
 		unsigned int *w;
+		unsigned long long *w64;
 		int *i;
 	} buf;
 	int *regsPos;
@@ -185,12 +207,12 @@ struct jit_ctx {
 };
 
 static void jit_buf( jit_ctx *ctx ) {
-	if( ctx->buf.b - ctx->startBuf > ctx->bufSize - MAX_OP_SIZE ) {
+	if( BUF_POS() > ctx->bufSize - MAX_OP_SIZE ) {
 		int nsize = ctx->bufSize ? (ctx->bufSize * 4) / 3 : ctx->f->nops * 4;
 		unsigned char *nbuf;
 		int curpos;
 		if( nsize < ctx->bufSize + MAX_OP_SIZE * 4 ) nsize = ctx->bufSize + MAX_OP_SIZE * 4;
-		curpos = ctx->buf.b - ctx->startBuf;
+		curpos = BUF_POS();
 		nbuf = (unsigned char*)malloc(nsize);
 		// TODO : check nbuf
 		if( ctx->startBuf ) {
@@ -237,14 +259,19 @@ static void op_callg( jit_ctx *ctx, int r, int g, int size ) {
 		XMov_ra(Eax, (int_val)(ctx->m->globals_data + ctx->m->globals_indexes[g]));
 		XCall_r(Eax);
 	} else if( fid >= ctx->m->code->nfunctions ) {
+#		ifdef HL_64
+		// TODO ! native x64 calling convention are not __cdecl !
+		// args needs to be passed in registers
+		XMov_rp64(Ecx, Esp, 0);
+#		endif
 		// native function, already resolved
 		XMov_rc(Eax, *(int_val*)(ctx->m->globals_data + ctx->m->globals_indexes[g]));
 		XCall_r(Eax);
 	} else {
-		int cpos = ctx->buf.b - ctx->startBuf;
+		int cpos = BUF_POS();
 		if( ctx->m->functions_ptrs[fid] ) {
 			// already compiled
-			XCall_d((int_val)ctx->m->functions_ptrs[fid] - (cpos + 5));
+			XCall_d((int)ctx->m->functions_ptrs[fid] - (cpos + 5));
 		} else if( ctx->m->code->functions + fid == ctx->f ) {
 			// our current function
 			XCall_d(ctx->functionPos - (cpos + 5));
@@ -338,7 +365,7 @@ static void op_cmp( jit_ctx *ctx, hl_opcode *op ) {
 }
 
 static void register_jump( jit_ctx *ctx, int *p, int target ) {
-	int pos = (int_val)p - (int_val)ctx->startBuf; 
+	int pos = (int)((int_val)p - (int_val)ctx->startBuf); 
 	jlist *j = (jlist*)hl_malloc(&ctx->falloc, sizeof(jlist));
 	j->pos = pos;
 	j->target = target;
@@ -377,7 +404,7 @@ int pad_stack( jit_ctx *ctx, int size ) {
 
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, j, size = 0;
-	int codePos = ctx->buf.b - ctx->startBuf;
+	int codePos = BUF_POS();
 	int nargs = m->code->globals[f->global]->nargs;
 	ctx->m = m;
 	ctx->f = f;
@@ -425,7 +452,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	}
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
-	ctx->functionPos = ctx->buf.b - ctx->startBuf;
+	ctx->functionPos = BUF_POS();
 	op_enter(ctx);
 	ctx->opsPos[0] = 0;
 	for(i=0;i<f->nops;i++) {
@@ -517,7 +544,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			printf("Don't know how to jit %s(%d)\n",hl_op_name(o->op),o->op);
 			return -1;
 		}
-		ctx->opsPos[i+1] = ctx->buf.b - ctx->startBuf;
+		ctx->opsPos[i+1] = BUF_POS();
 	}
 	// patch jumps
 	{
@@ -529,7 +556,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		ctx->jumps = NULL;
 	}
 	// add nops padding
-	while( (ctx->buf.b - ctx->startBuf) & 15 )
+	while( BUF_POS() & 15 )
 		XNop();
 	// reset tmp allocator
 	hl_free(&ctx->falloc);
@@ -540,7 +567,7 @@ void *hl_alloc_executable_memory( int size );
 
 void *hl_jit_code( jit_ctx *ctx, hl_module *m ) {
 	jlist *c;
-	int size = ctx->buf.b - ctx->startBuf;
+	int size = BUF_POS();
 	unsigned char *code = (unsigned char*)hl_alloc_executable_memory(size);
 	if( code == NULL ) return NULL;
 	memcpy(code,ctx->startBuf,size);
@@ -548,7 +575,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m ) {
 	c = ctx->calls;
 	while( c ) {
 		int fid = ctx->globalToFunction[c->target];
-		int fpos = (int_val)m->functions_ptrs[fid];
+		int fpos = (int)m->functions_ptrs[fid];
 		*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
 		c = c->next;
 	}

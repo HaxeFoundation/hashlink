@@ -36,7 +36,7 @@ hl_module *hl_module_alloc( hl_code *c ) {
 	}
 	for(i=0;i<c->nglobals;i++) {
 		m->globals_indexes[i] = gsize;
-		gsize += hl_type_size(c->globals[i]);
+		gsize += hl_word_size(c->globals[i]);
 	}
 	m->globals_data = (unsigned char*)malloc(gsize);
 	if( m->globals_data == NULL ) {

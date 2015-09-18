@@ -38,8 +38,8 @@
 #	define HL_BSD
 #endif
 
-#if defined(_64BITS) || defined(__x86_64__)
-#	define HL64
+#if defined(_64BITS) || defined(__x86_64__) || defined(_M_X64)
+#	define HL_64
 #endif
 
 #if defined(__GNUC__)

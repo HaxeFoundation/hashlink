@@ -32,14 +32,14 @@ void hl_global_free() {
 
 int hl_type_size( hl_type *t ) {
 	static int SIZES[] = {
-		4,
-		1,
-		4,
-		4,
-		8,
-		1,
-		HL_WSIZE,
-		HL_WSIZE,
+		4, // VOID
+		1, // UI8
+		4, // UI32
+		4, // F32
+		8, // F64
+		1, // BOOL
+		HL_WSIZE, // ANY
+		HL_WSIZE, // FUN
 	};
 	return SIZES[t->kind];
 }
@@ -90,7 +90,7 @@ void hl_free( hl_alloc *a ) {
 	int size = 0;
 	while( b ) {
 		hl_alloc_block *n = b->next;
-		size = b->p + b->size - ((unsigned char*)b);
+		size = (int)(b->p + b->size - ((unsigned char*)b));
 		prev = (int_val)b;
 		free(b);
 		b = n;
