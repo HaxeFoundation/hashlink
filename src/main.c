@@ -21,7 +21,15 @@
  */
 #include "hl.h"
 
+#ifdef HL_VCC
+#	include <crtdbg.h>
+#else
+#	define _CrtSetDbgFlag(x)
+#endif
+
+
 int main( int argc, char *argv[] ) {
+	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 	if( argc == 1 ) {
 		printf("HLVM %d.%d.%d (c)2015 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION/100,(HL_VERSION/10)%10,HL_VERSION%10);
 		return 1;
@@ -53,6 +61,7 @@ int main( int argc, char *argv[] ) {
 		}
 		fclose(f);
 		code = hl_code_read((unsigned char*)fdata, size);
+		free(fdata);
 		if( code == NULL )
 			return 3;
 		m = hl_module_alloc(code);
@@ -60,7 +69,7 @@ int main( int argc, char *argv[] ) {
 			return 4;
 		if( !hl_module_init(m) )
 			return 5;
-		(*(fptr*)(m->globals_data + m->globals_indexes[m->code->entrypoint]))();
+		hl_call_fun(*((fptr*)(m->globals_data + m->globals_indexes[m->code->entrypoint])));
 		hl_module_free(m);
 		hl_free(&code->alloc);
 	}

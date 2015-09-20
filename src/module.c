@@ -35,8 +35,9 @@ hl_module *hl_module_alloc( hl_code *c ) {
 		return NULL;
 	}
 	for(i=0;i<c->nglobals;i++) {
+		gsize += hl_pad_size(gsize, c->globals[i]);
 		m->globals_indexes[i] = gsize;
-		gsize += hl_word_size(c->globals[i]);
+		gsize += hl_type_size(c->globals[i]);
 	}
 	m->globals_data = (unsigned char*)malloc(gsize);
 	if( m->globals_data == NULL ) {
@@ -100,6 +101,7 @@ int hl_module_init( hl_module *m ) {
 }
 
 void hl_module_free( hl_module *m ) {
+	free(m->functions_ptrs);
 	free(m->globals_indexes);
 	free(m->globals_data);
 	free(m);

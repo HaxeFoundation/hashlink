@@ -32,7 +32,7 @@ void hl_global_free() {
 
 int hl_type_size( hl_type *t ) {
 	static int SIZES[] = {
-		4, // VOID
+		0, // VOID
 		1, // UI8
 		4, // UI32
 		4, // F32
@@ -44,10 +44,12 @@ int hl_type_size( hl_type *t ) {
 	return SIZES[t->kind];
 }
 
-int hl_word_size( hl_type *t ) {
-	int sz = hl_type_size(t);	
-	if( sz & (HL_WSIZE-1) ) sz += HL_WSIZE - (sz&(HL_WSIZE-1));
-	return sz;
+int hl_pad_size( int pos, hl_type *t ) {
+	int sz = hl_type_size(t);
+	int align = pos & (sz - 1);
+	if( align && t->kind != HVOID )
+		return sz - align;
+	return 0;
 }
 
 struct hl_alloc_block {
@@ -107,4 +109,17 @@ void *hl_alloc_executable_memory( int size ) {
 	printf("NOT IMPLEMENTED\n");
 	return NULL;
 #endif
+}
+
+void hl_call_fun( fptr fun ) {
+	int_val _esi, _edi, _ebx;
+	__asm {
+		mov _esi, esi
+		mov _edi, edi
+		mov _ebx, ebx
+		call fun
+		mov esi, _esi
+		mov edi, _edi
+		mov ebx, _ebx
+	};
 }

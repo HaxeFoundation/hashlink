@@ -63,6 +63,7 @@ OP_BEGIN
 	OP(OJNeq,3)
 	OP(OJAlways,1)
 	OP(OToAny,2)
+	OP(OLabel,0)
 	// --
 	OP(OLast,0)
 OP_END

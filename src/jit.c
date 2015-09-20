@@ -83,14 +83,15 @@
 #define XPush_p(reg,idx)		OP_ADDR(0xFF,idx,reg,6)
 #define XAdd_rc(reg,cst)		if IS_SBYTE(cst) { OP_RM(0x83,3,0,reg); B(cst); } else { OP_RM(0x81,3,0,reg); W(cst); }
 #define XAdd_rr(dst,src)		OP_RM(0x03,3,dst,src)
-//XAdd_rp
-//XAdd_pr
-//XAdd_pc
+
 #define XSub_rc(reg,cst)		if IS_SBYTE(cst) { OP_RM(0x83,3,5,reg); B(cst); } else { OP_RM(0x81,3,5,reg); W(cst); }
 #define XSub_rr(dst,src)		OP_RM(0x2B,3,dst,src)
-//XSub_rp
-//XSub_pr
-//XSub_pc
+#define XSub_pr(reg,idx,src)	OP_ADDR(0x29,idx,reg,src)
+#define XAdd_pr(dst,idx,src)	OP_ADDR(0x01,idx,dst,src)
+#define XAdd_rp(dst,reg,idx)	OP_ADDR(0x03,idx,reg,dst)
+
+#define XCmp_rp(dst,reg,idx)	OP_ADDR(0x3B,idx,reg,dst)
+#define XCmp_pr(dst,reg,idx)	OP_ADDR(0x39,idx,reg,dst)
 #define XCmp_rr(r1,r2)			OP_RM(0x3B,3,r1,r2)
 #define XCmp_rc(reg,cst)		if( reg == Eax ) { B(0x3D); } else { OP_RM(0x81,3,7,reg); }; W(cst)
 #define XCmp_rb(reg,byte)		OP_RM(0x83,3,7,reg); B(byte)
@@ -161,11 +162,8 @@
 
 #define TODO()					printf("TODO(jit.c:%d)\n",__LINE__)
 
-#define LOAD(cpuReg,vReg)		XMov_rp(cpuReg,Ebp,ctx->regsPos[vReg])
-#define STORE(vReg, cpuReg)		XMov_pr(Ebp,ctx->regsPos[vReg],cpuReg)
-
 #define BUF_POS()				((int)(ctx->buf.b - ctx->startBuf))
-#define RTYPE(r)				ctx->f->regs[r]->kind
+#define RTYPE(r)				r->t->kind
 
 #ifdef HL_64
 #	define XMov_rc	XMov_rc64
@@ -182,6 +180,48 @@ struct jlist {
 	jlist *next;
 };
 
+typedef struct vreg vreg;
+
+typedef enum {
+	RCPU = 0,
+	RFPU = 1,
+	RSTACK = 2,
+	RCONST = 3
+} preg_kind;
+
+typedef struct {
+	int id;
+	preg_kind kind;
+	vreg *holds;
+} preg;
+
+struct vreg {
+	int stackPos;
+	int size;
+	hl_type *t;
+	preg *current;
+	preg stack;
+};
+
+#define REG_AT(i)		(ctx->pregs + (i))
+
+#ifdef HL_64
+#	define RCPU_COUNT	14
+#	define RFPU_COUNT	16
+#else
+#	define RCPU_COUNT	6
+#	define RFPU_COUNT	8
+#	define RCPU_SCRATCH_COUNT	3
+static int CPU_REGS[] = { Eax, Ecx, Edx, Ebx, Esi, Edi };
+#	define PEAX			REG_AT(0)
+#endif
+
+#define REG_COUNT	(RCPU_COUNT + RFPU_COUNT)
+
+#define ID2(a,b)	((a) | ((b)<<8))
+#define R(id)		(ctx->vregs + (id))
+#define ASSERT(i)	{ printf("JIT ERROR %d@%d\n",i,__LINE__); exit(-1); }
+
 struct jit_ctx {
 	union {
 		unsigned char *b;
@@ -189,8 +229,8 @@ struct jit_ctx {
 		unsigned long long *w64;
 		int *i;
 	} buf;
-	int *regsPos;
-	int *regsSize;
+	vreg *vregs;
+	preg pregs[REG_COUNT];
 	int *opsPos;
 	int maxRegs;
 	int maxOps;
@@ -199,6 +239,7 @@ struct jit_ctx {
 	int totalRegsSize;
 	int *globalToFunction;
 	int functionPos;
+	int allocOffset;
 	hl_module *m;
 	hl_function *f;
 	jlist *jumps;
@@ -215,7 +256,7 @@ static void jit_buf( jit_ctx *ctx ) {
 		if( nsize < ctx->bufSize + MAX_OP_SIZE * 4 ) nsize = ctx->bufSize + MAX_OP_SIZE * 4;
 		curpos = BUF_POS();
 		nbuf = (unsigned char*)malloc(nsize);
-		// TODO : check nbuf
+		if( nbuf == NULL ) ASSERT(nsize);
 		if( ctx->startBuf ) {
 			memcpy(nbuf,ctx->startBuf,curpos);
 			free(ctx->startBuf);
@@ -226,39 +267,187 @@ static void jit_buf( jit_ctx *ctx ) {
 	}
 }
 
-// TODO : variants when size of register != 32 bits !
-
-static void op_mov( jit_ctx *ctx, int to, int from ) {
-	LOAD(Eax,from);
-	STORE(to, Eax);
+static void patch_jump( jit_ctx *ctx, int *p ) {
+	if( p == NULL ) return;
+	*p = (int)((int_val)ctx->buf.b - ((int_val)p + 1)) - 3;
 }
 
-static void op_movc( jit_ctx *ctx, int to, void *value ) {
-	XMov_pc(Ebp,ctx->regsPos[to],*(int*)value);
+static preg *alloc_reg( jit_ctx *ctx, preg_kind k ) {
+	int i, start, count;
+	int off = ctx->allocOffset++;
+	if( k == RCPU ) {
+		start = 0;
+		count = RCPU_COUNT;
+	} else if( k == RFPU ) {
+		start = RCPU_COUNT;
+		count = RFPU_COUNT;
+	} else
+		ASSERT(k);
+	for(i=0;i<count;i++) {
+		int r = start + ((i + off)%count);
+		if( ctx->pregs[r].holds == NULL )
+			return ctx->pregs + r;
+	}
+	i = start + (off%count);
+	return ctx->pregs + i;
 }
 
-static void op_mova( jit_ctx *ctx, int to, void *value ) {
-	XMov_ra(Eax,(int_val)value);
-	STORE(to, Eax);
+static preg *fetch( vreg *r ) {
+	if( r->current )
+		return r->current;
+	return &r->stack;
 }
 
-static void op_pushr( jit_ctx *ctx, int r ) {
-	XPush_p(Ebp,ctx->regsPos[r]);
+static void scratch( preg *r ) {
+	if( r->holds ) {
+		r->holds->current = NULL;
+		r->holds = NULL;
+	}
 }
 
-static void op_callr( jit_ctx *ctx, int r, int rf, int size ) {
-	LOAD(Eax, rf);
-	XCall_r(Eax);
-	XAdd_rc(Esp, size);
-	STORE(r, Eax);
+static void load( jit_ctx *ctx, preg *r, vreg *v ) {
+	preg *from = fetch(v);
+	if( from == r || v->size == 0 ) return;
+	if( r->holds ) r->holds->current = NULL;
+	r->holds = v;
+	v->current = r;
+	if( r->kind != RCPU ) ASSERT(r->kind);
+	switch( from->kind ) {
+	case RCPU:
+		XMov_rr(CPU_REGS[r->id],CPU_REGS[from->id]);
+		break;
+	case RSTACK:
+		XMov_rp(CPU_REGS[r->id],Ebp,R(from->id)->stackPos);
+		break;
+	default:
+		ASSERT(from->kind);
+	}
 }
 
-static void op_callg( jit_ctx *ctx, int r, int g, int size ) {
+static preg *alloc_cpu( jit_ctx *ctx, vreg *r ) {
+	preg *p = fetch(r);
+	p = alloc_reg(ctx, RCPU);
+	load(ctx, p, r);
+	return p;
+}
+
+static void store( jit_ctx *ctx, vreg *r, preg *v ) {
+	if( r->current && r->current != v ) {
+		r->current->holds = NULL;
+		r->current = NULL;
+	}
+	switch( r->size ) {
+	case 0:
+		break;
+	case 4:
+		switch( v->kind ) {
+		case RCPU:
+			XMov_pr(Ebp,r->stackPos,CPU_REGS[v->id]);
+			if( v->holds == NULL ) {
+				r->current = v;
+				v->holds = r;
+			}
+			break;
+		case RSTACK:
+			store(ctx,r,alloc_cpu(ctx, R(v->id)));
+			break;
+		default:
+			ASSERT(v->kind);
+		}
+		break;
+	default:
+		ASSERT(r->size);
+	}
+}
+
+static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
+	preg *r = fetch(from);
+	store(ctx, to, r);
+}
+
+static void store_const( jit_ctx *ctx, vreg *r, int v, bool useTmpReg ) {
+	if( r->size != 4 ) ASSERT(r->size);
+	if( useTmpReg ) {
+		if( !r->current || r->current->kind != RCPU ) {
+			if( r->current )
+				r->current->holds = NULL;
+			r->current = alloc_reg(ctx, RCPU);
+		}
+		XMov_rc(CPU_REGS[r->current->id],v);
+		store(ctx,r,r->current);
+	} else {
+		if( r->current ) {
+			r->current->holds = NULL;
+			r->current = NULL;
+		}
+		XMov_pc(Ebp, r->stackPos, v); 
+	}
+}
+
+static void op_mova( jit_ctx *ctx, vreg *to, void *value ) {
+	preg *r = alloc_cpu(ctx, to);
+	XMov_ra(CPU_REGS[r->id],(int_val)value);
+	store(ctx, to, r);
+}
+
+static void discard_regs( jit_ctx *ctx, int native_call ) {
+	int i;
+	for(i=(native_call ? RCPU_SCRATCH_COUNT : 0);i<RCPU_COUNT;i++) {
+		preg *r = ctx->pregs + i;
+		if( r->holds ) {
+			r->holds->current = NULL;
+			r->holds = NULL;
+		}
+	}
+	for(i=0;i<RFPU_COUNT;i++) {
+		preg *r = ctx->pregs + (i + RCPU_COUNT);
+		if( r->holds ) {
+			r->holds->current = NULL;
+			r->holds = NULL;
+			ASSERT(0); // Need FPU stack reset ?
+		}
+	}
+}
+
+static int pad_stack( jit_ctx *ctx, int size ) {
+	int total = size + ctx->totalRegsSize + HL_WSIZE * 2; // EIP+EBP
+	if( total & 15 ) {
+		int pad = 16 - (total & 15);
+		XSub_rc(Esp,pad);
+		size += pad;
+	}
+	return size;
+}
+
+static void stack_align_error( int r ) {
+	printf("STACK ALIGN ERROR %d !\n",r&15);
+	exit(1);
+}
+
+//#define CHECK_STACK_ALIGN
+
+static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 	int fid = ctx->globalToFunction[g];
+	int i, size = 0;
+	for(i=0;i<count;i++) {
+		// TODO : padding ?
+		size += R(args[i])->size;
+	}
+	size = pad_stack(ctx,size);
+	for(i=0;i<count;i++) {
+		// RTL
+		vreg *r = R(args[count - (i + 1)]);
+		if( (i & 7) == 0 ) jit_buf(ctx);
+		if( r->current && r->current->kind == RCPU )
+			XPush_r(CPU_REGS[r->current->id]);
+		else
+			XPush_p(Ebp,r->stackPos);
+	}
 	if( fid < 0 ) {
 		// not a static function or native, load it at runtime
 		XMov_ra(Eax, (int_val)(ctx->m->globals_data + ctx->m->globals_indexes[g]));
 		XCall_r(Eax);
+		discard_regs(ctx, 1);
 	} else if( fid >= ctx->m->code->nfunctions ) {
 #		ifdef HL_64
 		// TODO ! native x64 calling convention are not __cdecl !
@@ -267,7 +456,18 @@ static void op_callg( jit_ctx *ctx, int r, int g, int size ) {
 #		endif
 		// native function, already resolved
 		XMov_rc(Eax, *(int_val*)(ctx->m->globals_data + ctx->m->globals_indexes[g]));
+#		ifdef CHECK_STACK_ALIGN
+		{
+			int *j;
+			XTest_rc(Esp,15);
+			XJump(JZero,j);
+			XPush_r(Esp);
+			XMov_rc(Eax, (int_val)stack_align_error);
+			patch_jump(ctx,j);
+		}
+#		endif
 		XCall_r(Eax);
+		discard_regs(ctx, 0);
 	} else {
 		int cpos = BUF_POS();
 		if( ctx->m->functions_ptrs[fid] ) {
@@ -285,9 +485,10 @@ static void op_callg( jit_ctx *ctx, int r, int g, int size ) {
 			ctx->calls = j;
 			XCall_d(0);
 		}
+		discard_regs(ctx, 1);
 	}
 	XAdd_rc(Esp, size);
-	STORE(r, Eax);
+	store(ctx, dst, PEAX);
 }
 
 static void op_enter( jit_ctx *ctx ) {
@@ -296,61 +497,92 @@ static void op_enter( jit_ctx *ctx ) {
 	XSub_rc(Esp, ctx->totalRegsSize);
 }
 
-static void op_ret( jit_ctx *ctx, int r ) {
-	LOAD(Eax, r);
+static void op_ret( jit_ctx *ctx, vreg *r ) {
+	load(ctx, PEAX, r);
 	XAdd_rc(Esp, ctx->totalRegsSize);
 	XPop_r(Ebp);
 	XRet();
 }
 
-static void op_sub( jit_ctx *ctx, int r, int a, int b ) {
-	switch( RTYPE(r) ) {
+static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op ) {
+	preg *pa = fetch(a), *pb = fetch(b), *out = NULL;
+	switch( RTYPE(a) ) {
 	case HI32:
-		LOAD(Eax, a);
-		LOAD(Ecx, b);
-		XSub_rr(Eax, Ecx);
-		STORE(r, Eax);
-		break;
+		switch( ID2(pa->kind, pb->kind) ) {
+		case ID2(RCPU,RCPU):
+			switch( op->op ) {
+			case OAdd:
+				XAdd_rr(CPU_REGS[pa->id],CPU_REGS[pb->id]);
+				scratch(pa);
+				out = pa;
+				break;
+			case OSub:
+				XSub_rr(CPU_REGS[pa->id],CPU_REGS[pb->id]);
+				scratch(pa);
+				out = pa;
+				break;
+			case OGte:
+			case OLt:
+			case OJLt:
+			case OJGte:
+				XCmp_rr(CPU_REGS[pa->id],CPU_REGS[pb->id]);
+				break;
+			default:
+				printf("%s\n", hl_op_name(op->op));
+				ASSERT(op->op);
+			}
+			break;
+		case ID2(RCPU,RSTACK):
+			switch( op->op ) {
+			case OGte:
+			case OLt:
+			case OJLt:
+			case OJGte:
+				XCmp_rp(CPU_REGS[pa->id],Ebp,R(pb->id)->stackPos);
+				break;
+			case OAdd:
+				XAdd_rp(CPU_REGS[pa->id],Ebp,R(pb->id)->stackPos);
+				scratch(pa);
+				out = pa;
+				break;
+			default:
+				printf("%s\n", hl_op_name(op->op));
+				ASSERT(op->op);
+			}
+			break;
+		case ID2(RSTACK,RCPU):
+			if( dst == a ) {
+				switch( op->op ) {
+				case OSub:
+					XSub_pr(Ebp,R(pa->id)->stackPos,CPU_REGS[pb->id]);
+					break;
+				case OAdd:
+					XAdd_pr(Ebp,R(pa->id)->stackPos,CPU_REGS[pb->id]);
+					break;
+				default:
+					printf("%s\n", hl_op_name(op->op));
+					ASSERT(op->op);
+				}
+				dst = NULL;
+				out = pa;
+			} else {
+				alloc_cpu(ctx,a);
+				return op_binop(ctx,dst,a,b,op);
+			}
+			break;
+		case ID2(RSTACK,RSTACK):
+			alloc_cpu(ctx, a);
+			return op_binop(ctx, dst, a, b, op);
+		default:
+			printf("%s(%d,%d)\n", hl_op_name(op->op), pa->kind, pb->kind);
+			ASSERT(ID2(pa->kind, pb->kind));
+		}
+		if( dst ) store(ctx, dst, out);
+		return out;
 	default:
-		printf("Don't know how to sub %d\n",RTYPE(r));
-		break;
+		ASSERT(RTYPE(dst));
 	}
-}
-
-static void op_add( jit_ctx *ctx, int r, int a, int b ) {
-	switch( RTYPE(r) ) {
-	case HI32:
-		LOAD(Eax, a);
-		LOAD(Ecx, b);
-		XAdd_rr(Eax, Ecx);
-		STORE(r, Eax);
-		break;
-	default:
-		printf("Don't know how to add %d\n",RTYPE(r));
-		break;
-	}
-}
-
-static void op_mul( jit_ctx *ctx, int r, int a, int b ) {
-	switch( RTYPE(r) ) {
-	case HI32:
-		LOAD(Eax, a);
-		LOAD(Ecx, b);
-		XIMul_rr(Eax, Ecx);
-		STORE(r, Eax);
-		break;
-	default:
-		printf("Don't know how to mul %d\n",RTYPE(r));
-		break;
-	}
-}
-
-static void op_div( jit_ctx *ctx, int r, int a, int b ) {
-	switch( RTYPE(r) ) {
-	default:
-		printf("Don't know how to div %d\n",RTYPE(r));
-		break;
-	}
+	return NULL;
 }
 
 static int *do_jump( jit_ctx *ctx, hl_op op ) {
@@ -383,21 +615,14 @@ static int *do_jump( jit_ctx *ctx, hl_op op ) {
 	return j;
 }
 
-static void patch_jump( jit_ctx *ctx, int *p ) {
-	if( p == NULL ) return;
-	*p = (int)((int_val)ctx->buf.b - ((int_val)p + 1)) - 3;
-}
-
 static void op_cmp( jit_ctx *ctx, hl_opcode *op ) {
-	int *p,*e;
-	LOAD(Eax, op->p2);
-	LOAD(Ecx, op->p3);
-	XCmp_rr(Eax, Ecx);
+	int *p, *e;
+	op_binop(ctx,NULL,R(op->p2),R(op->p3),op);
 	p = do_jump(ctx,op->op);
-	XMov_pc(Ebp,ctx->regsPos[op->p1],0);
+	store_const(ctx, R(op->p1), 0, false);
 	e = do_jump(ctx,OJAlways);
 	patch_jump(ctx,p);
-	XMov_pc(Ebp,ctx->regsPos[op->p1],1);
+	store_const(ctx, R(op->p1), 1, false);
 	patch_jump(ctx,e);
 }
 
@@ -411,36 +636,37 @@ static void register_jump( jit_ctx *ctx, int *p, int target ) {
 }
 
 jit_ctx *hl_jit_alloc() {
+	int i;
 	jit_ctx *ctx = (jit_ctx*)malloc(sizeof(jit_ctx));
 	if( ctx == NULL ) return NULL;
 	memset(ctx,0,sizeof(jit_ctx));
 	hl_alloc_init(&ctx->falloc);
 	hl_alloc_init(&ctx->galloc);
+	for(i=0;i<RCPU_COUNT;i++) {
+		preg *r = REG_AT(i);
+		r->id = i;
+		r->kind = RCPU;
+	}
+	for(i=0;i<RFPU_COUNT;i++) {
+		preg *r = REG_AT(i + RCPU_COUNT);
+		r->id = i;
+		r->kind = RFPU;
+	}
 	return ctx;
 }
 
 void hl_jit_free( jit_ctx *ctx ) {
-	free(ctx->regsPos);
-	free(ctx->regsSize);
+	free(ctx->vregs);
 	free(ctx->opsPos);
 	free(ctx->startBuf);
+	free(ctx->globalToFunction);
 	hl_free(&ctx->falloc);
 	hl_free(&ctx->galloc);
 	free(ctx);
 }
 
-int pad_stack( jit_ctx *ctx, int size ) {
-	int total = size + ctx->totalRegsSize + HL_WSIZE * 2; // EIP+EBP
-	if( total & 15 ) {
-		int pad = 16 - (total & 15);
-		XSub_rc(Esp,pad);
-		size += pad;
-	}
-	return size;
-}
-
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
-	int i, j, size = 0;
+	int i, size = 0;
 	int codePos = BUF_POS();
 	int nargs = m->code->globals[f->global]->nargs;
 	ctx->m = m;
@@ -454,11 +680,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			ctx->globalToFunction[(m->code->natives + i)->global] = i + m->code->nfunctions;
 	}
 	if( f->nregs > ctx->maxRegs ) {
-		free(ctx->regsPos);
-		free(ctx->regsSize);
-		ctx->regsPos = (int*)malloc(sizeof(int) * f->nregs);
-		ctx->regsSize = (int*)malloc(sizeof(int) * f->nregs);
-		if( ctx->regsPos == NULL || ctx->regsSize == NULL ) {
+		free(ctx->vregs);
+		ctx->vregs = (vreg*)malloc(sizeof(vreg) * f->nregs);
+		if( ctx->vregs == NULL ) {
 			ctx->maxRegs = 0;
 			return -1;
 		}
@@ -473,20 +697,26 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		}
 		ctx->maxOps = f->nops;
 	}
-	size = HL_WSIZE;
-	for(i=0;i<nargs;i++) {
-		int sz = hl_word_size(f->regs[i]);
-		ctx->regsSize[i] = sz;
-		size += sz;
-		ctx->regsPos[i] = size;
-	}
 	size = 0;
-	for(i=nargs;i<f->nregs;i++) {
-		int sz = hl_word_size(f->regs[i]);
-		ctx->regsSize[i] = sz;
-		ctx->regsPos[i] = -(size + HL_WSIZE);
-		size += sz;
+	for(i=0;i<f->nregs;i++) {
+		vreg *r = R(i);
+		r->t = f->regs[i];
+		r->current = NULL;
+		r->size = hl_type_size(r->t);
+		// TODO : hl_pad_size ?
+		if( i >= nargs ) {
+			if( i == nargs ) size = 0;
+			r->stackPos = -(size + HL_WSIZE);
+			size += r->size;
+		} else {
+			size += r->size;
+			r->stackPos = size + HL_WSIZE;
+		}
+		r->stack.holds = NULL;
+		r->stack.id = i;
+		r->stack.kind = RSTACK;
 	}
+	if( f->nregs == nargs ) size = 0;
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
 	ctx->functionPos = BUF_POS();
@@ -498,90 +728,65 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		jit_buf(ctx);
 		switch( o->op ) {
 		case OMov:
-			op_mov(ctx, o->p1, o->p2);
+			op_mov(ctx, R(o->p1), R(o->p2));
 			break;
 		case OInt:
-			op_movc(ctx, o->p1, m->code->ints + o->p2);
-			break;
-		case OFloat:
-			op_movc(ctx, o->p1, m->code->floats + o->p2);
+			{
+				preg *r = R(o->p1)->current;
+				if( r == NULL || r->kind != RCPU ) r = alloc_reg(ctx, RCPU);
+				XMov_rc(CPU_REGS[r->id], m->code->ints[o->p2]);
+				store(ctx,R(o->p1),r);
+			}
 			break;
 		case OGetGlobal:
-			op_mova(ctx, o->p1, m->globals_data + m->globals_indexes[o->p2]);
-			break;
-		case OCallN:
-			size = 0;
-			for(j=o->p3-1;j>=0;j--) {
-				int r = o->extra[j];
-				size += ctx->regsSize[r];
-			}
-			size = pad_stack(ctx,size);
-			for(j=o->p3-1;j>=0;j--) {
-				int r = o->extra[j];
-				if( (j & 7) == 0 ) jit_buf(ctx);
-				op_pushr(ctx, r);
-			}
-			op_callr(ctx, o->p1, o->p2, size);
-			break;
-		case OCall1:
-			size = pad_stack(ctx,ctx->regsSize[o->p3]);
-			op_pushr(ctx, o->p3);
-			op_callg(ctx, o->p1, o->p2, size);
-			break;
-		case OCall2:
-			size = pad_stack(ctx,ctx->regsSize[o->p3] + ctx->regsSize[(int)(int_val)o->extra]);
-			op_pushr(ctx, (int)(int_val)o->extra);
-			op_pushr(ctx, o->p3);
-			op_callg(ctx, o->p1, o->p2, size);
+			op_mova(ctx, R(o->p1), m->globals_data + m->globals_indexes[o->p2]);
 			break;
 		case OCall3:
-			size = pad_stack(ctx,ctx->regsSize[o->p3] + ctx->regsSize[o->extra[0]] + ctx->regsSize[o->extra[1]]);
-			op_pushr(ctx, o->extra[1]);
-			op_pushr(ctx, o->extra[0]);
-			op_pushr(ctx, o->p3);
-			op_callg(ctx, o->p1, o->p2, size);
-			break;
 		case OCall4:
-			size = pad_stack(ctx,ctx->regsSize[o->p3] + ctx->regsSize[o->extra[0]] + ctx->regsSize[o->extra[1]] + ctx->regsSize[o->extra[2]]);
-			op_pushr(ctx, o->extra[2]);
-			op_pushr(ctx, o->extra[1]);
-			op_pushr(ctx, o->extra[0]);
-			op_pushr(ctx, o->p3);
-			op_callg(ctx, o->p1, o->p2, size);
+		case OCallN:
+			op_callg(ctx, R(o->p1), o->p2, o->p3, o->extra);
+			break;
+		case OCall0:
+			op_callg(ctx, R(o->p1), o->p2, 0, NULL);
+			break;
+		case OCall1:
+			op_callg(ctx, R(o->p1), o->p2, 1, &o->p3);
+			break;
+		case OCall2:
+			{
+				int args[2];
+				args[0] = o->p3;
+				args[1] = (int)o->extra;
+				op_callg(ctx, R(o->p1), o->p2, 2, args);
+			}
 			break;
 		case OSub:
-			op_sub(ctx, o->p1, o->p2, o->p3);
-			break;
 		case OAdd:
-			op_add(ctx, o->p1, o->p2, o->p3);
-			break;
 		case OMul:
-			op_mul(ctx, o->p1, o->p2, o->p3);
-			break;
 		case ODiv:
-			op_div(ctx, o->p1, o->p2, o->p3);
+			op_binop(ctx, R(o->p1), R(o->p2), R(o->p3), o);
 			break;
 		case OGte:
 			op_cmp(ctx, o);
 			break;
 		case OJFalse:
-			LOAD(Eax,o->p1);
-			XTest_rr(Eax,Eax);
-			XJump(JZero,jump);
-			register_jump(ctx,jump,(i + 1) + o->p2);
+			{
+				preg *r = alloc_cpu(ctx, R(o->p1));
+				XTest_rr(CPU_REGS[r->id],CPU_REGS[r->id]);
+				XJump(JZero,jump);
+				register_jump(ctx,jump,(i + 1) + o->p2);
+			}
 			break;
 		case OJLt:
-			LOAD(Eax,o->p1);
-			LOAD(Ecx,o->p2);
-			XCmp_rr(Eax, Ecx);
+			op_binop(ctx, NULL, R(o->p1), R(o->p2), o);
 			jump = do_jump(ctx,o->op);
 			register_jump(ctx,jump,(i + 1) + o->p3);
 			break;
 		case OToAny:
-			op_mov(ctx,o->p1,o->p2); // TODO
+			op_mov(ctx,R(o->p1),R(o->p2)); // TODO
 			break;
 		case ORet:
-			op_ret(ctx, o->p1);
+			op_ret(ctx, R(o->p1));
 			break;
 		default:
 			printf("Don't know how to jit %s(%d)\n",hl_op_name(o->op),o->op);
@@ -593,7 +798,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	{
 		jlist *j = ctx->jumps;
 		while( j ) {
-			*(int*)(ctx->startBuf + j->pos) = ctx->opsPos[j->target] - j->pos - 10;
+			*(int*)(ctx->startBuf + j->pos) = ctx->opsPos[j->target] - (j->pos + 4);
 			j = j->next;
 		}
 		ctx->jumps = NULL;
