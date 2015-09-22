@@ -179,6 +179,4 @@ void hl_jit_free( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m );
 
-void hl_call_fun( fptr fun );
-
 #endif

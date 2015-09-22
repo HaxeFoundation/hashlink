@@ -27,7 +27,6 @@
 #	define _CrtSetDbgFlag(x)
 #endif
 
-
 int main( int argc, char *argv[] ) {
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 	if( argc == 1 ) {
@@ -69,7 +68,7 @@ int main( int argc, char *argv[] ) {
 			return 4;
 		if( !hl_module_init(m) )
 			return 5;
-		hl_call_fun(*((fptr*)(m->globals_data + m->globals_indexes[m->code->entrypoint])));
+		(*(fptr*)(m->globals_data + m->globals_indexes[m->code->entrypoint]))();
 		hl_module_free(m);
 		hl_free(&code->alloc);
 	}

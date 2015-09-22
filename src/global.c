@@ -46,7 +46,9 @@ int hl_type_size( hl_type *t ) {
 
 int hl_pad_size( int pos, hl_type *t ) {
 	int sz = hl_type_size(t);
-	int align = pos & (sz - 1);
+	int align;
+	if( sz < HL_WSIZE ) sz = HL_WSIZE;
+	align = pos & (sz - 1);
 	if( align && t->kind != HVOID )
 		return sz - align;
 	return 0;
@@ -109,17 +111,4 @@ void *hl_alloc_executable_memory( int size ) {
 	printf("NOT IMPLEMENTED\n");
 	return NULL;
 #endif
-}
-
-void hl_call_fun( fptr fun ) {
-	int_val _esi, _edi, _ebx;
-	__asm {
-		mov _esi, esi
-		mov _edi, edi
-		mov _ebx, ebx
-		call fun
-		mov esi, _esi
-		mov edi, _edi
-		mov ebx, _ebx
-	};
 }
