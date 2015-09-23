@@ -908,7 +908,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		}
 		ctx->maxRegs = f->nregs;
 	}
-	if( f->nops >= ctx->maxOps ) {
+	if( f->nops > ctx->maxOps ) {
 		free(ctx->opsPos);
 		ctx->opsPos = (int*)malloc(sizeof(int) * (f->nops + 1));
 		if( ctx->opsPos == NULL ) {
@@ -917,7 +917,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		}
 		ctx->maxOps = f->nops;
 	}
-	memset(ctx->opsPos,0,f->nops*sizeof(int));
+	memset(ctx->opsPos,0,(f->nops+1)*sizeof(int));
 	size = 0;
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
@@ -1026,6 +1026,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	// add nops padding
 	while( BUF_POS() & 15 )
 		op32(ctx, NOP, UNUSED, UNUSED);
+	// clear regs
+	for(i=0;i<REG_COUNT;i++)
+		REG_AT(i)->holds = NULL;
 	// reset tmp allocator
 	hl_free(&ctx->falloc);
 	return codePos;
