@@ -21,6 +21,8 @@
  */
 #include "hl.h"
 
+//#define OP_LOG
+
 typedef enum {
 	Eax = 0,
 	Ecx = 1,
@@ -58,42 +60,40 @@ typedef enum {
 } CpuOp;
 
 #define JAlways		0
+#define JOverflow	0x80
 #define JLt			0x82
 #define JGte		0x83
 #define JEq			0x84
 #define JNeq		0x85
-#define JZero		JEq
-#define JNotZero	JNeq
 #define JLte		0x86
 #define JGt			0x87
 #define JSignLt		0x8C
 #define JSignGte	0x8D
 #define JSignLte	0x8E
 #define JSignGt		0x8F
-#define JOverflow	0x80
-#define JCarry		0x82
+
+#define JCarry		JLt
+#define JZero		JEq
+#define JNotZero	JNeq
 
 #define B(bv)	*ctx->buf.b++ = bv
 #define W(wv)	*ctx->buf.w++ = wv
 
 #ifdef HL_64
 #	define W64(wv)	*ctx->buf.w64++ = wv
-#	define REX_W()	B(64|8)
-#	define REX_R()	B(64|4)
-#	define REX_X()	B(64|2)
-#	define REX_B()	B(64|1)
 #else
 #	define W64(wv)	W(wv)
-#	define REX_W()
-#	define REX_R()
-#	define REX_X()
-#	define REX_B()
 #endif
 
-#define MOD_RM(mod,reg,rm)		B(((mod) << 6) | ((reg) << 3) | (rm))
+#define MOD_RM(mod,reg,rm)		B(((mod) << 6) | (((reg)&7) << 3) | ((rm)&7))
 #define IS_SBYTE(c)				( (c) >= -128 && (c) < 128 )
 
-#define XJump(how,local)		if( (how) == JAlways ) { B(0xE9); } else { B(0x0F); B(how); }; local = ctx->buf.i; W(0)
+#define AddJump(how,local)		{ if( (how) == JAlways ) { B(0xE9); } else { B(0x0F); B(how); }; local = ctx->buf.i; W(0); }
+#ifdef OP_LOG
+#	define XJump(how,local)		{ AddJump(how,local); printf("%s\n",(how) == JAlways ? "JUMP" : JUMP_NAMES[(how)&0x7F]); }
+#else
+#	define XJump(how,local)		AddJump(how,local)
+#endif
 
 #define MAX_OP_SIZE				64
 
@@ -157,7 +157,7 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 
 #define ID2(a,b)	((a) | ((b)<<8))
 #define R(id)		(ctx->vregs + (id))
-#define ASSERT(i)	{ printf("JIT ERROR %d@%d\n",i,__LINE__); exit(-1); }
+#define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,__LINE__); exit(-1); }
 
 static preg _unused = { 0, RUNUSED, NULL };
 static preg *UNUSED = &_unused;
@@ -262,28 +262,96 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "NOP", 0x90 }
 };
 
-static void op32( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
+static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" }; 
+static const char *JUMP_NAMES[] = { "JOVERFLOW", "J???", "JLT", "JGTE", "JEQ", "JNEQ", "JLTE", "JGT", "J?8", "J?9", "J?A", "J?B", "JSLT", "JSGTE", "JSLTE", "JSGT" };
+
+static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
+	static char buf[64];
+	switch( r->kind ) {
+	case RCPU:
+		if( r->id < 8 )
+			sprintf(buf,"%c%s",mode64?'r':'e',REG_NAMES[r->id]);
+		else
+			sprintf(buf,"r%d%s",r->id,mode64?"":"d");
+		break;
+	case RSTACK:
+		{
+			int sp = R(r->id)->stackPos;
+			sprintf(buf,"@%d[%s%Xh]",r->id,sp < 0 ? "-" : "", sp < 0 ? -sp : sp);
+		}
+		break;
+	case RCONST:
+		{
+			int_val v = r->holds ? (int_val)r->holds : r->id;
+			sprintf(buf,"%s%llXh",v < 0 ? "-" : "", v < 0 ? -v : v);
+		}
+		break;
+	case RMEM:
+		{
+			CpuReg reg = r->id & 0xFF;
+			int regOrOffs = r->id >> 16;  
+			int mult = (r->id >> 8) & 0xFF;
+			if( mult == 0 ) {
+				int off = regOrOffs;
+				if( r->id < 8 )
+					sprintf(buf,"[%c%s %c %Xh]",mode64?'r':'e',REG_NAMES[r->id], off < 0 ? '-' : '+', off < 0 ? -off : off);
+				else
+					sprintf(buf,"[r%d%s %c %Xh]",r->id,mode64?"":"d",off < 0 ? '-' : '+', off < 0 ? -off : off);
+			} else {
+				return "TODO";
+			}
+		}
+		break;
+	default:
+		return "???";
+	}
+	return buf;
+}
+
+#ifdef HL_64
+#	define REX()	if( r64 ) B(r64 | 0x40)
+#else
+#	define REX()
+#endif
+
+static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
+	int r64 = mode64 && (o != PUSH && o != POP && o != CALL) ? 8 : 0;
+#	ifdef OP_LOG
+	printf("%s%s",f->name,mode64?"64":"");
+	if( a->kind != RUNUSED )
+		printf(" %s",preg_str(ctx, a, r64));
+	if( b->kind != RUNUSED )
+		printf(",%s",preg_str(ctx, b, r64));
+	printf("\n");
+#	endif
 	switch( ID2(a->kind,b->kind) ) {
 	case ID2(RUNUSED,RUNUSED):
 		ERRIF(f->r_mem == 0);
+		REX();
 		B(f->r_mem);
 		break;
 	case ID2(RCPU,RCPU):
-		ERRIF( f->r_mem == 0 || a->id > 7 || b->id > 7 );
+		ERRIF( f->r_mem == 0 );
+		if( a->id > 7 ) r64 |= 4;
+		if( b->id > 7 ) r64 |= 1;
+		REX();
 		B(f->r_mem);
 		MOD_RM(3,a->id,b->id);
 		break;
 	case ID2(RCPU,RUNUSED):
-		ERRIF( f->r_mem == 0 || a->id > 7 );
+		ERRIF( f->r_mem == 0 );
+		if( a->id > 7 ) r64 |= 1;
+		REX();
 		if( GET_RM(f->r_mem) > 0 ) {
 			B(f->r_mem);
 			MOD_RM(3, GET_RM(f->r_mem)-1, a->id); 
 		} else
-			B(f->r_mem + a->id);
+			B(f->r_mem + (a->id&7));
 		break;
 	case ID2(RSTACK,RUNUSED):
 		ERRIF( f->mem_r == 0 || GET_RM(f->mem_r) == 0 );
+		REX();
 		{
 			int stackPos = R(a->id)->stackPos;
 			B(f->mem_r);
@@ -297,27 +365,31 @@ static void op32( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
 		}
 		break;
 	case ID2(RCPU,RCONST):
-		ERRIF( f->r_const == 0 || a->id > 7 );
+		ERRIF( f->r_const == 0 );
+		if( a->id > 7 ) r64 |= 1;
+		REX();
 		{
 			int bform = f->r_const >> 16;
-			int cval = b->holds ? (int)b->holds : b->id;
+			int_val cval = b->holds ? (int_val)b->holds : b->id;
 			// short byte form
 			if( bform && IS_SBYTE(cval) ) {
 				B(bform);
 				MOD_RM(3,GET_RM(bform)-1,a->id);
-				B(cval);
+				B((int)cval);
 			} else if( GET_RM(f->r_const) > 0 ) {
 				B(f->r_const);
 				MOD_RM(3,GET_RM(f->r_const)-1,a->id);
-				W(cval);
+				if( mode64 ) W64(cval); else W((int)cval);
 			} else {
-				B(f->r_const + a->id);
-				W(cval);
+				B(f->r_const + (a->id&7));
+				if( mode64 ) W64(cval); else W((int)cval);
 			}
 		}
 		break;
 	case ID2(RSTACK,RCPU):
-		ERRIF( f->mem_r == 0 || b->id > 7 );
+		ERRIF( f->mem_r == 0 );
+		if( b->id > 7 ) r64 |= 4;
+		REX();
 		{
 			int stackPos = R(a->id)->stackPos;
 			B(f->mem_r);
@@ -331,7 +403,9 @@ static void op32( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
 		}
 		break;
 	case ID2(RCPU,RSTACK):
-		ERRIF( f->r_mem == 0 || a->id > 7 );
+		ERRIF( f->r_mem == 0 );
+		if( a->id > 7 ) r64 |= 4;
+		REX();
 		{
 			int stackPos = R(b->id)->stackPos;
 			B(f->r_mem);
@@ -346,22 +420,83 @@ static void op32( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
 		break;
 	case ID2(RCONST,RUNUSED):
 		ERRIF( f->r_const == 0 );
+		REX();
 		{
-			int cval = a->holds ? (int)a->holds : a->id;
+			int_val cval = a->holds ? (int_val)a->holds : a->id;
 			B(f->r_const);
-			W(cval);
+			if( mode64 ) W64(cval); else W((int)cval);
+		}
+		break;
+	case ID2(RCPU, RMEM):
+		ERRIF( f->r_mem == 0 );
+		{
+			CpuReg reg = b->id & 0xFF;
+			int regOrOffs = b->id >> 16;  
+			int mult = (b->id >> 8) & 0xFF;
+			if( mult == 0 ) {
+				if( a->id > 7 ) r64 |= 4;
+				if( reg > 7 ) r64 |= 1;
+				REX();
+				B(f->r_mem);
+				if( regOrOffs == 0 && (reg&7) != Ebp ) {
+					MOD_RM(0,a->id,reg);
+					if( (reg&7) == Esp ) B(0x24);
+				} else if( IS_SBYTE(regOrOffs) ) {
+					MOD_RM(1,a->id,reg);
+					if( (reg&7) == Esp ) B(0x24);
+					B(regOrOffs);
+				} else {
+					MOD_RM(2,a->id,reg);
+					if( (reg&7) == Esp ) B(0x24);
+					W(regOrOffs);
+				}
+			} else {
+				ERRIF(1);
+			}
+		}
+		break;
+	case ID2(RMEM, RCPU):
+		ERRIF( f->mem_r == 0 );
+		{
+			CpuReg reg = a->id & 0xFF;
+			int regOrOffs = a->id >> 16;  
+			int mult = (a->id >> 8) & 0xFF;
+			if( mult == 0 ) {
+				if( b->id > 7 ) r64 |= 4;
+				if( reg > 7 ) r64 |= 1;
+				REX();
+				B(f->mem_r);
+				if( regOrOffs == 0 && (reg&7) != Ebp ) {
+					MOD_RM(0,b->id,reg);
+					if( (reg&7) == Esp ) B(0x24);
+				} else if( IS_SBYTE(regOrOffs) ) {
+					MOD_RM(1,b->id,reg);
+					if( (reg&7) == Esp ) B(0x24);
+					B(regOrOffs);
+				} else {
+					MOD_RM(2,b->id,reg);
+					if( (reg&7) == Esp ) B(0x24);
+					W(regOrOffs);
+				}
+			} else {
+				ERRIF(1);
+			}
 		}
 		break;
 	default:
-		ERRIF(1)printf("%s(%d,%d)\n",o,a ? a->kind : -1,b ? b->kind : -1);
-		ASSERT(o);
+		ERRIF(1);
 	}
+}
+
+static void op32( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
+	op(ctx,o,a,b,false);
 }
 
 static void op64( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
 #ifndef HL_64
-	op32(ctx,o,a,b);
+	op(ctx,o,a,b,false);
 #else
+	op(ctx,o,a,b,true);
 #endif
 }
 
@@ -528,15 +663,42 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 	int i, size = 0;
 	preg p;
 	for(i=0;i<count;i++) {
-		// TODO : padding ?
-		size += R(args[i])->size;
+		vreg *r = R(args[count - (i + 1)]);
+		size += hl_pad_size(size,r->t);
+		size += r->size;
 	}
 	size = pad_stack(ctx,size);
-	for(i=0;i<count;i++) {
-		// RTL
-		vreg *r = R(args[count - (i + 1)]);
-		if( (i & 7) == 0 ) jit_buf(ctx);
-		op64(ctx,PUSH,fetch(r),UNUSED);
+	{
+		int size2 = 0;
+		for(i=0;i<count;i++) {
+			// RTL
+			vreg *r = R(args[count - (i + 1)]);
+			int pad = hl_pad_size(size2,r->t);
+			if( (i & 7) == 0 ) jit_buf(ctx);
+			if( pad ) {
+				op64(ctx,SUB,PESP,pconst(&p,pad));
+				size2 += size;
+			}
+			switch( r->size ) {
+#			ifndef HL_64
+			case 4:
+				op32(ctx,PUSH,fetch(r),UNUSED);
+				break;
+#			else
+			case 4:
+				// pseudo push32 (not available)
+				op64(ctx,SUB,PESP,pconst(&p,4));
+				op32(ctx,MOV,pmem(&p,Esp,0,0),fetch(r));
+				break;
+			case 8:
+				op64(ctx,PUSH,fetch(r),UNUSED);
+				break;
+#			endif
+			default:
+				ASSERT(r->size);
+			}
+			size2 += r->size;
+		}
 	}
 	if( fid < 0 ) {
 		// not a static function or native, load it at runtime
@@ -762,7 +924,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		r->t = f->regs[i];
 		r->current = NULL;
 		r->size = hl_type_size(r->t);
-		// TODO : hl_pad_size ?
 		if( i >= nargs ) {
 			if( i == nargs ) size = 0;
 			size += hl_pad_size(size,r->t);
