@@ -123,6 +123,7 @@ typedef enum {
 
 typedef struct {
 	int id;
+	int lock;
 	preg_kind kind;
 	vreg *holds;
 } preg;
@@ -159,7 +160,7 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 #define R(id)		(ctx->vregs + (id))
 #define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,__LINE__); exit(-1); }
 
-static preg _unused = { 0, RUNUSED, NULL };
+static preg _unused = { 0, 0, RUNUSED, NULL };
 static preg *UNUSED = &_unused;
 
 struct jit_ctx {
@@ -174,12 +175,13 @@ struct jit_ctx {
 	int *opsPos;
 	int maxRegs;
 	int maxOps;
-	unsigned char *startBuf;
 	int bufSize;
 	int totalRegsSize;
-	int *globalToFunction;
 	int functionPos;
 	int allocOffset;
+	int currentPos;
+	int *globalToFunction;
+	unsigned char *startBuf;
 	hl_module *m;
 	hl_function *f;
 	jlist *jumps;
@@ -516,12 +518,17 @@ static preg *alloc_reg( jit_ctx *ctx, preg_kind k ) {
 		p = ctx->pregs + r;
 		if( p->holds == NULL ) return p;
 	}
-	p = ctx->pregs + RCPU_SCRATCH_REGS[start + (off%count)];
-	if( p->holds ) {
-		p->holds->current = NULL;
-		p->holds = NULL;
+	for(i=0;i<count;i++) {
+		preg *p = ctx->pregs + RCPU_SCRATCH_REGS[start + ((i + off)%count)];
+		if( p->lock >= ctx->currentPos ) continue;
+		if( p->holds ) {
+			p->holds->current = NULL;
+			p->holds = NULL;
+			return p;
+		}
 	}
-	return p;
+	ASSERT(0); // out of registers !
+	return NULL;
 }
 
 static preg *fetch( vreg *r ) {
@@ -658,11 +665,50 @@ static void stack_align_error( int r ) {
 
 //#define CHECK_STACK_ALIGN
 
+#ifdef HL_64
+static CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
+#endif
+
 static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 	int fid = ctx->globalToFunction[g];
-	int i, size = 0;
+	int isNative = fid >= ctx->m->code->nfunctions;
+	int i = 0, size = 0;
 	preg p;
-	for(i=0;i<count;i++) {
+	int stackRegs = count;
+#ifdef HL_64
+	if( isNative ) {
+		for(i=0;i<count;i++) {
+			vreg *v = R(args[i]);
+			preg *vr = fetch(v);
+			preg *r = REG_AT(CALL_REGS[i]);
+#			ifdef HL_VCC
+			if( i == 4 ) break;
+#			endif
+			if( vr != r ) {
+				switch( v->size ) {
+				case 1:
+				case 2:
+				case 4:
+					op32(ctx,MOV,r,vr);
+					break;
+				case 8:
+					if( v->t->kind == HF64 ) {
+						ASSERT(0); // TODO : use XMM register !
+					} else
+						op64(ctx,MOV,r,vr);
+					break;
+				default:
+					ASSERT(v->size);
+					break;
+				}
+			}
+			if( r->lock < ctx->currentPos )
+				r->lock = ctx->currentPos;
+		}
+		stackRegs = count - i;
+	}
+#endif
+	for(i=0;i<stackRegs;i++) {
 		vreg *r = R(args[count - (i + 1)]);
 		size += hl_pad_size(size,r->t);
 		size += r->size;
@@ -670,7 +716,7 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 	size = pad_stack(ctx,size);
 	{
 		int size2 = 0;
-		for(i=0;i<count;i++) {
+		for(i=0;i<stackRegs;i++) {
 			// RTL
 			vreg *r = R(args[count - (i + 1)]);
 			int pad = hl_pad_size(size2,r->t);
@@ -705,11 +751,11 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 		op64(ctx,MOV,PEAX,paddr(&p,ctx->m->globals_data + ctx->m->globals_indexes[g]));
 		op64(ctx,CALL,PEAX,NULL);
 		discard_regs(ctx, 1);
-	} else if( fid >= ctx->m->code->nfunctions ) {
-#		ifdef HL_64
-		// TODO ! native x64 calling convention are not __cdecl !
-		// args needs to be passed in registers
-		op64(ctx,MOV,REG_AT(Ecx),pmem(&p,Esp,0,0));
+	} else if( isNative ) {
+#		if defined(HL_VCC) && defined(HL_64)
+		// MSVC requires 32bytes of free space here
+		op64(ctx,SUB,PESP,pconst(&p,32));
+		size += 32;
 #		endif
 		// native function, already resolved
 		op64(ctx,MOV,PEAX,pconst64(&p,*(int_val*)(ctx->m->globals_data + ctx->m->globals_indexes[g])));
@@ -734,7 +780,7 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 		}
 		discard_regs(ctx, 1);
 	}
-	op64(ctx,ADD,PESP,pconst(&p,size));
+	if( size ) op64(ctx,ADD,PESP,pconst(&p,size));
 	store(ctx, dst, PEAX, true);
 }
 
@@ -742,13 +788,13 @@ static void op_enter( jit_ctx *ctx ) {
 	preg p;
 	op64(ctx, PUSH, PEBP, UNUSED);
 	op64(ctx, MOV, PEBP, PESP);
-	op64(ctx, SUB, PESP, pconst(&p,ctx->totalRegsSize));
+	if( ctx->totalRegsSize ) op64(ctx, SUB, PESP, pconst(&p,ctx->totalRegsSize));
 }
 
 static void op_ret( jit_ctx *ctx, vreg *r ) {
 	preg p;
 	load(ctx, PEAX, r);
-	op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
+	if( ctx->totalRegsSize ) op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
 	op64(ctx, POP, PEBP, UNUSED);
 	op64(ctx, RET, UNUSED, UNUSED);
 }
@@ -947,6 +993,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	for(i=0;i<f->nops;i++) {
 		int *jump;
 		hl_opcode *o = f->ops + i;
+		ctx->currentPos = i;
 		jit_buf(ctx);
 		switch( o->op ) {
 		case OMov:
@@ -1027,8 +1074,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	while( BUF_POS() & 15 )
 		op32(ctx, NOP, UNUSED, UNUSED);
 	// clear regs
-	for(i=0;i<REG_COUNT;i++)
-		REG_AT(i)->holds = NULL;
+	for(i=0;i<REG_COUNT;i++) {
+		preg *r = REG_AT(i);
+		r->holds = NULL;
+		r->lock = 0;
+	}
 	// reset tmp allocator
 	hl_free(&ctx->falloc);
 	return codePos;

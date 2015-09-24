@@ -43,7 +43,7 @@
 #endif
 
 #if defined(__GNUC__)
-#	define NEKO_GCC
+#	define HL_GCC
 #endif
 
 #if defined(_MSC_VER)
