@@ -21,7 +21,7 @@
  */
 #include "hl.h"
 
-//#define OP_LOG
+#define OP_LOG
 
 typedef enum {
 	Eax = 0,
@@ -56,6 +56,11 @@ typedef enum {
 	AND,
 	CMP,
 	NOP,
+	__SSE__,
+	MOVSD,
+	COMISD,
+	ADDSD,
+	SUBSD,
 	_CPU_LAST
 } CpuOp;
 
@@ -142,6 +147,7 @@ struct vreg {
 #	define RCPU_COUNT	14
 #	define RFPU_COUNT	16
 #	define RCPU_SCRATCH_COUNT	7
+#	define RFPU_SCRATCH_COUNT	6
 static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, R8, R9, R10, R11 };
 #else
 #	define RCPU_COUNT	6
@@ -149,6 +155,9 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, R8, R9, R10, R11 };
 #	define RCPU_SCRATCH_COUNT	3
 static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 #endif
+
+#define XMM(i)			((i) + RCPU_COUNT)
+#define PXMM(i)			REG_AT(XMM(i))
 
 #define PEAX			REG_AT(Eax)
 #define PESP			REG_AT(Esp)
@@ -158,7 +167,8 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 
 #define ID2(a,b)	((a) | ((b)<<8))
 #define R(id)		(ctx->vregs + (id))
-#define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,__LINE__); exit(-1); }
+#define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,__LINE__); jit_exit(); }
+#define IS_FLOAT(r)	((r)->t->kind == HF64)
 
 static preg _unused = { 0, 0, RUNUSED, NULL };
 static preg *UNUSED = &_unused;
@@ -169,6 +179,7 @@ struct jit_ctx {
 		unsigned int *w;
 		unsigned long long *w64;
 		int *i;
+		double *d;
 	} buf;
 	vreg *vregs;
 	preg pregs[REG_COUNT];
@@ -189,6 +200,10 @@ struct jit_ctx {
 	hl_alloc falloc; // cleared per-function
 	hl_alloc galloc;
 };
+
+static void jit_exit() {
+	exit(-1);
+}
 
 static preg *pmem( preg *r, CpuReg reg, int regOrOffset, int mult ) {
 	r->kind = RMEM;
@@ -261,7 +276,12 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CALL", RM(0xFF,2), 0, 0xE8 },
 	{ "AND" },
 	{ "CMP", 0x3B, 0x39, RM(0x81,7) | SBYTE(RM(0x83,7)) },
-	{ "NOP", 0x90 }
+	{ "NOP", 0x90 },
+	{ NULL }, // SSE
+	{ "MOVSD", 0, 0, 0xF20F11, 0xF20F10 },
+	{ "COMISD" },
+	{ "ADDSD", 0xF20F58 },
+	{ "SUBSD", 0xF20F5C },
 };
 
 static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" }; 
@@ -275,6 +295,9 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 			sprintf(buf,"%c%s",mode64?'r':'e',REG_NAMES[r->id]);
 		else
 			sprintf(buf,"r%d%s",r->id,mode64?"":"d");
+		break;
+	case RFPU:
+		sprintf(buf,"xmm%d",r->id,mode64?"":"f");
 		break;
 	case RSTACK:
 		{
@@ -304,6 +327,9 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 			}
 		}
 		break;
+	case RADDR:
+		sprintf(buf, "%s ptr[%llXh]", mode64 ? "qword" : "dword", r->holds);
+		break;
 	default:
 		return "???";
 	}
@@ -316,17 +342,23 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 #	define REX()
 #endif
 
+static void log_op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
+	opform *f = &OP_FORMS[o];
+	printf("@%d %s%s",ctx->currentPos, f->name,mode64?"64":"");
+	if( a->kind != RUNUSED )
+		printf(" %s",preg_str(ctx, a, mode64));
+	if( b->kind != RUNUSED )
+		printf(",%s",preg_str(ctx, b, mode64));
+	printf("\n");
+}
+
 static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
 	int r64 = mode64 && (o != PUSH && o != POP && o != CALL) ? 8 : 0;
 #	ifdef OP_LOG
-	printf("%s%s",f->name,mode64?"64":"");
-	if( a->kind != RUNUSED )
-		printf(" %s",preg_str(ctx, a, r64));
-	if( b->kind != RUNUSED )
-		printf(",%s",preg_str(ctx, b, r64));
-	printf("\n");
+	log_op(ctx,o,a,b,r64);
 #	endif
+	if( o > __SSE__ ) ASSERT(o);
 	switch( ID2(a->kind,b->kind) ) {
 	case ID2(RUNUSED,RUNUSED):
 		ERRIF(f->r_mem == 0);
@@ -490,6 +522,44 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	}
 }
 
+#define SSE(v)	{ B((v)>>16); B((v)>>8); B(v); }
+
+static void opSSE( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
+	opform *f = &OP_FORMS[o];
+#	ifdef OP_LOG
+	log_op(ctx,o,a,b,true);
+#	endif
+	switch( ID2(a->kind,b->kind) ) {
+	case ID2(RFPU,RFPU):
+		TODO();
+		break;
+	case ID2(RFPU,RCONST):
+		ERRIF(f->mem_const == 0);
+		{
+			int pos;
+			SSE(f->mem_const);
+			MOD_RM(0,a->id,5);
+			pos = BUF_POS() + 4;
+			W(b->id * 8 - pos);
+		}
+		break;
+	case ID2(RSTACK,RFPU):
+		//ERRIF(f->mem_const == 0);
+		TODO();
+		break;
+	case ID2(RFPU,RSTACK):
+		//ERRIF(f->mem_const == 0);
+		TODO();
+		break;
+	case ID2(RMEM,RFPU):
+		//ERRIF(f->mem_const == 0);
+		TODO();
+		break;
+	default:
+		ERRIF(1);
+	}
+}
+
 static void op32( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
 	op(ctx,o,a,b,false);
 }
@@ -508,24 +578,50 @@ static void patch_jump( jit_ctx *ctx, int *p ) {
 }
 
 static preg *alloc_reg( jit_ctx *ctx, preg_kind k ) {
-	int i, start = 0;
-	int off = ctx->allocOffset++;
+	int i;
 	preg *p;
-	const int count = RCPU_SCRATCH_COUNT;
-	if( k != RCPU ) ASSERT(k);
-	for(i=0;i<count;i++) {
-		int r = RCPU_SCRATCH_REGS[start + ((i + off)%count)];
-		p = ctx->pregs + r;
-		if( p->holds == NULL ) return p;
-	}
-	for(i=0;i<count;i++) {
-		preg *p = ctx->pregs + RCPU_SCRATCH_REGS[start + ((i + off)%count)];
-		if( p->lock >= ctx->currentPos ) continue;
-		if( p->holds ) {
-			p->holds->current = NULL;
-			p->holds = NULL;
-			return p;
+	switch( k ) {
+	case RCPU:
+		{
+			int off = ctx->allocOffset++;
+			const int count = RCPU_SCRATCH_COUNT;
+			for(i=0;i<count;i++) {
+				int r = RCPU_SCRATCH_REGS[(i + off)%count];
+				p = ctx->pregs + r;
+				if( p->holds == NULL ) return p;
+			}
+			for(i=0;i<count;i++) {
+				preg *p = ctx->pregs + RCPU_SCRATCH_REGS[(i + off)%count];
+				if( p->lock >= ctx->currentPos ) continue;
+				if( p->holds ) {
+					p->holds->current = NULL;
+					p->holds = NULL;
+					return p;
+				}
+			}
 		}
+		break;
+	case RFPU:
+		{
+			int off = ctx->allocOffset++;
+			const int count = RFPU_SCRATCH_COUNT;
+			for(i=0;i<count;i++) {
+				preg *p = PXMM((i + off)%count);
+				if( p->holds == NULL ) return p;
+			}
+			for(i=0;i<count;i++) {
+				preg *p = PXMM((i + off)%count);
+				if( p->lock >= ctx->currentPos ) continue;
+				if( p->holds ) {
+					p->holds->current = NULL;
+					p->holds = NULL;
+					return p;
+				}
+			}
+		}
+		break;
+	default:
+		ASSERT(k);
 	}
 	ASSERT(0); // out of registers !
 	return NULL;
@@ -550,10 +646,29 @@ static void load( jit_ctx *ctx, preg *r, vreg *v ) {
 	if( r->holds ) r->holds->current = NULL;
 	r->holds = v;
 	v->current = r;
-	if( v->size > 4 )
+	if( r->kind == RFPU )
+		opSSE(ctx,MOVSD,r,from);
+	else if( v->size > 4 )
 		op64(ctx,MOV,r,from);
 	else
 		op32(ctx,MOV,r,from);
+}
+
+static preg *alloc_fpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
+	preg *p = fetch(r);
+	if( p->kind != RFPU ) {
+		if( r->size != 8 ) ASSERT(r->size);
+		p = alloc_reg(ctx, RFPU);
+		if( andLoad )
+			load(ctx,p,r);
+		else {
+			if( r->current )
+				r->current->holds = NULL;
+			r->current = p;
+			p->holds = r;
+		}
+	}
+	return p;
 }
 
 static preg *alloc_cpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
@@ -587,12 +702,19 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 #ifdef HL_64
 	case 8:
 #endif
-		if( v->kind == RSTACK )
-			store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
-		else if( r->size == 4 )
-			op32(ctx,MOV,&r->stack,v);
-		else
-			op64(ctx,MOV,&r->stack,v);
+		if( IS_FLOAT(r) || v->kind == RFPU ) {
+			if( v->kind == RSTACK )
+				store(ctx,r,alloc_fpu(ctx, R(v->id), true), bind);
+			else 
+				opSSE(ctx,MOVSD,&r->stack,v);
+		} else {
+			if( v->kind == RSTACK )
+				store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
+			else if( r->size == 4 )
+				op32(ctx,MOV,&r->stack,v);
+			else
+				op64(ctx,MOV,&r->stack,v);
+		}
 		break;
 	default:
 		ASSERT(r->size);
@@ -642,7 +764,9 @@ static void discard_regs( jit_ctx *ctx, int native_call ) {
 		if( r->holds ) {
 			r->holds->current = NULL;
 			r->holds = NULL;
+#			ifndef HL_64
 			ASSERT(0); // Need FPU stack reset ?
+#			endif
 		}
 	}
 }
@@ -692,7 +816,7 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 					op32(ctx,MOV,r,vr);
 					break;
 				case 8:
-					if( v->t->kind == HF64 ) {
+					if( IS_FLOAT(v) ) {
 						ASSERT(0); // TODO : use XMM register !
 					} else
 						op64(ctx,MOV,r,vr);
@@ -737,7 +861,11 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 				op32(ctx,MOV,pmem(&p,Esp,0,0),fetch(r));
 				break;
 			case 8:
-				op64(ctx,PUSH,fetch(r),UNUSED);
+				if( fetch(r)->kind == RFPU ) {
+					op64(ctx,SUB,PESP,pconst(&p,8));
+					opSSE(ctx,MOVSD,pmem(&p,Esp,0,0),fetch(r));
+				} else
+					op64(ctx,PUSH,fetch(r),UNUSED);
 				break;
 #			endif
 			default:
@@ -781,7 +909,7 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 		discard_regs(ctx, 1);
 	}
 	if( size ) op64(ctx,ADD,PESP,pconst(&p,size));
-	store(ctx, dst, PEAX, true);
+	store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
 }
 
 static void op_enter( jit_ctx *ctx ) {
@@ -793,7 +921,7 @@ static void op_enter( jit_ctx *ctx ) {
 
 static void op_ret( jit_ctx *ctx, vreg *r ) {
 	preg p;
-	load(ctx, PEAX, r);
+	load(ctx, IS_FLOAT(r) ? PXMM(0) : PEAX, r);
 	if( ctx->totalRegsSize ) op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
 	op64(ctx, POP, PEBP, UNUSED);
 	op64(ctx, RET, UNUSED, UNUSED);
@@ -802,18 +930,34 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op ) {
 	preg *pa = fetch(a), *pb = fetch(b), *out = NULL;
 	CpuOp o;
-	switch( op->op ) {
-	case OAdd: o = ADD; break;
-	case OSub: o = SUB; break;
-	case OGte:
-	case OLt:
-	case OJLt:
-	case OJGte:
-		o = CMP;
-		break;
-	default:
-		printf("%s\n", hl_op_name(op->op));
-		ASSERT(op->op);
+	if( IS_FLOAT(a) ) {
+		switch( op->op ) {
+		case OAdd: o = ADDSD; break;
+		case OSub: o = SUBSD; break;
+		case OGte:
+		case OLt:
+		case OJLt:
+		case OJGte:
+			o = COMISD;
+			break;
+		default:
+			printf("%s\n", hl_op_name(op->op));
+			ASSERT(op->op);
+		}
+	} else {
+		switch( op->op ) {
+		case OAdd: o = ADD; break;
+		case OSub: o = SUB; break;
+		case OGte:
+		case OLt:
+		case OJLt:
+		case OJGte:
+			o = CMP;
+			break;
+		default:
+			printf("%s\n", hl_op_name(op->op));
+			ASSERT(op->op);
+		}
 	}
 	switch( RTYPE(a) ) {
 	case HI32:
@@ -843,8 +987,23 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		}
 		if( dst ) store(ctx, dst, out, true);
 		return out;
+	case HF64:
+		pa = alloc_fpu(ctx, a, true);
+		pb = alloc_fpu(ctx, b, true);
+		switch( ID2(pa->kind, pb->kind) ) {
+		case ID2(RFPU,RFPU):
+			opSSE(ctx,o,pa,pb);
+			scratch(pa);
+			out = pa;
+			break;
+		default:
+			printf("%s(%d,%d)\n", hl_op_name(op->op), pa->kind, pb->kind);
+			ASSERT(ID2(pa->kind, pb->kind));
+		}
+		if( dst ) store(ctx, dst, out, true);
+		return out;
 	default:
-		ASSERT(RTYPE(dst));
+		ASSERT(RTYPE(a));
 	}
 	return NULL;
 }
@@ -933,8 +1092,9 @@ void hl_jit_free( jit_ctx *ctx ) {
 
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0;
-	int codePos = BUF_POS();
+	int codePos;
 	int nargs = m->code->globals[f->global]->nargs;
+	preg p;
 	ctx->m = m;
 	ctx->f = f;
 	if( !ctx->globalToFunction ) {
@@ -944,6 +1104,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			ctx->globalToFunction[(m->code->functions + i)->global] = i;
 		for(i=0;i<m->code->nnatives;i++)
 			ctx->globalToFunction[(m->code->natives + i)->global] = i + m->code->nfunctions;
+		for(i=0;i<m->code->nfloats;i++) {
+			jit_buf(ctx);
+			*ctx->buf.d++ = m->code->floats[i];
+		}
+		while( BUF_POS() & 15 )
+			op32(ctx, NOP, UNUSED, UNUSED);
 	}
 	if( f->nregs > ctx->maxRegs ) {
 		free(ctx->vregs);
@@ -965,6 +1131,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	}
 	memset(ctx->opsPos,0,(f->nops+1)*sizeof(int));
 	size = 0;
+	codePos = BUF_POS();
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
@@ -1052,8 +1219,17 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case ORet:
 			op_ret(ctx, R(o->p1));
 			break;
+		case OFloat:
+			{
+				vreg *r = R(o->p1);
+				if( r->size != 8 ) ASSERT(r->size);
+				opSSE(ctx,MOVSD,alloc_fpu(ctx,r,false),pconst(&p,o->p2));
+				store(ctx,r,r->current,false); 
+			}
+			break;
 		default:
-			printf("Don't know how to jit %s(%d)\n",hl_op_name(o->op),o->op);
+			printf("Don't know how to jit %s\n",hl_op_name(o->op));
+			ASSERT(o->op);
 			return -1;
 		}
 		// we are landing at this position, assume we have lost our registers
