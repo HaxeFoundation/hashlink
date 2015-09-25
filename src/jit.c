@@ -21,7 +21,7 @@
  */
 #include "hl.h"
 
-#define OP_LOG
+//#define OP_LOG
 
 typedef enum {
 	Eax = 0,
@@ -207,10 +207,15 @@ static void jit_exit() {
 
 static preg *pmem( preg *r, CpuReg reg, int regOrOffset, int mult ) {
 	r->kind = RMEM;
-	r->id = reg | (mult << 8) | (regOrOffset << 16);
+	r->id = mult | (reg << 4) | (regOrOffset << 8);
 	return r;
 }
 
+static preg *pcodeaddr( preg *r, int offset ) {
+	r->kind = RMEM;
+	r->id = 15 | (offset << 4);
+	return r;
+}
 
 static preg *pconst( preg *r, int c ) {
 	r->kind = RCONST;
@@ -278,8 +283,8 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CMP", 0x3B, 0x39, RM(0x81,7) | SBYTE(RM(0x83,7)) },
 	{ "NOP", 0x90 },
 	{ NULL }, // SSE
-	{ "MOVSD", 0, 0, 0xF20F11, 0xF20F10 },
-	{ "COMISD" },
+	{ "MOVSD", 0xF20F10, 0xF20F11  },
+	{ "COMISD", 0x660F2F },
 	{ "ADDSD", 0xF20F58 },
 	{ "SUBSD", 0xF20F5C },
 };
@@ -313,10 +318,12 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 		break;
 	case RMEM:
 		{
-			CpuReg reg = r->id & 0xFF;
-			int regOrOffs = r->id >> 16;  
-			int mult = (r->id >> 8) & 0xFF;
-			if( mult == 0 ) {
+			int mult = r->id & 0xF;
+			int regOrOffs = mult == 15 ? r->id >> 4 : r->id >> 8;  
+			CpuReg reg = (r->id >> 4) & 0xF;
+			if( mult == 15 ) {
+				sprintf(buf,"%s ptr[%c%Xh]",mode64 ? "qword" : "dword", regOrOffs<0?'-':'+',regOrOffs<0?-regOrOffs:regOrOffs);
+			} else if( mult == 0 ) {
 				int off = regOrOffs;
 				if( r->id < 8 )
 					sprintf(buf,"[%c%s %c %Xh]",mode64?'r':'e',REG_NAMES[r->id], off < 0 ? '-' : '+', off < 0 ? -off : off);
@@ -342,6 +349,9 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 #	define REX()
 #endif
 
+#define SSE(v)	{ B((v)>>16); B((v)>>8); B(v); }
+#define	OP(b)	if( (b) > 0xFFFF ) SSE(b) else { REX(); B(b); }
+
 static void log_op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
 	printf("@%d %s%s",ctx->currentPos, f->name,mode64?"64":"");
@@ -358,37 +368,33 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 #	ifdef OP_LOG
 	log_op(ctx,o,a,b,r64);
 #	endif
-	if( o > __SSE__ ) ASSERT(o);
 	switch( ID2(a->kind,b->kind) ) {
 	case ID2(RUNUSED,RUNUSED):
 		ERRIF(f->r_mem == 0);
-		REX();
-		B(f->r_mem);
+		OP(f->r_mem);
 		break;
 	case ID2(RCPU,RCPU):
+	case ID2(RFPU,RFPU):
 		ERRIF( f->r_mem == 0 );
 		if( a->id > 7 ) r64 |= 4;
 		if( b->id > 7 ) r64 |= 1;
-		REX();
-		B(f->r_mem);
+		OP(f->r_mem);
 		MOD_RM(3,a->id,b->id);
 		break;
 	case ID2(RCPU,RUNUSED):
 		ERRIF( f->r_mem == 0 );
 		if( a->id > 7 ) r64 |= 1;
-		REX();
 		if( GET_RM(f->r_mem) > 0 ) {
-			B(f->r_mem);
+			OP(f->r_mem);
 			MOD_RM(3, GET_RM(f->r_mem)-1, a->id); 
 		} else
-			B(f->r_mem + (a->id&7));
+			OP(f->r_mem + (a->id&7));
 		break;
 	case ID2(RSTACK,RUNUSED):
 		ERRIF( f->mem_r == 0 || GET_RM(f->mem_r) == 0 );
-		REX();
 		{
 			int stackPos = R(a->id)->stackPos;
-			B(f->mem_r);
+			OP(f->mem_r);
 			if( IS_SBYTE(stackPos) ) {
 				MOD_RM(1,GET_RM(f->mem_r)-1,Ebp);
 				B(stackPos);
@@ -401,32 +407,31 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	case ID2(RCPU,RCONST):
 		ERRIF( f->r_const == 0 );
 		if( a->id > 7 ) r64 |= 1;
-		REX();
 		{
 			int bform = f->r_const >> 16;
 			int_val cval = b->holds ? (int_val)b->holds : b->id;
 			// short byte form
 			if( bform && IS_SBYTE(cval) ) {
-				B(bform);
+				OP(bform&0xFF);
 				MOD_RM(3,GET_RM(bform)-1,a->id);
 				B((int)cval);
 			} else if( GET_RM(f->r_const) > 0 ) {
-				B(f->r_const);
+				OP(f->r_const&0xFF);
 				MOD_RM(3,GET_RM(f->r_const)-1,a->id);
 				if( mode64 ) W64(cval); else W((int)cval);
 			} else {
-				B(f->r_const + (a->id&7));
+				OP((f->r_const&0xFF) + (a->id&7));
 				if( mode64 ) W64(cval); else W((int)cval);
 			}
 		}
 		break;
 	case ID2(RSTACK,RCPU):
+	case ID2(RSTACK,RFPU):
 		ERRIF( f->mem_r == 0 );
 		if( b->id > 7 ) r64 |= 4;
-		REX();
 		{
 			int stackPos = R(a->id)->stackPos;
-			B(f->mem_r);
+			OP(f->mem_r);
 			if( IS_SBYTE(stackPos) ) {
 				MOD_RM(1,b->id,Ebp);
 				B(stackPos);
@@ -437,12 +442,12 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		}
 		break;
 	case ID2(RCPU,RSTACK):
+	case ID2(RFPU,RSTACK):
 		ERRIF( f->r_mem == 0 );
 		if( a->id > 7 ) r64 |= 4;
-		REX();
 		{
 			int stackPos = R(b->id)->stackPos;
-			B(f->r_mem);
+			OP(f->r_mem);
 			if( IS_SBYTE(stackPos) ) {
 				MOD_RM(1,a->id,Ebp);
 				B(stackPos);
@@ -454,24 +459,30 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		break;
 	case ID2(RCONST,RUNUSED):
 		ERRIF( f->r_const == 0 );
-		REX();
 		{
 			int_val cval = a->holds ? (int_val)a->holds : a->id;
-			B(f->r_const);
+			OP(f->r_const);
 			if( mode64 ) W64(cval); else W((int)cval);
 		}
 		break;
 	case ID2(RCPU, RMEM):
+	case ID2(RFPU, RMEM):
 		ERRIF( f->r_mem == 0 );
 		{
-			CpuReg reg = b->id & 0xFF;
-			int regOrOffs = b->id >> 16;  
-			int mult = (b->id >> 8) & 0xFF;
-			if( mult == 0 ) {
+			int mult = b->id & 0xF;
+			int regOrOffs = mult == 15 ? b->id >> 4 : b->id >> 8;  
+			CpuReg reg = (b->id >> 4) & 0xF;
+			if( mult == 15 ) {
+				int pos;
+				if( a->id > 7 ) r64 |= 4;
+				OP(f->r_mem);
+				MOD_RM(0,a->id,5);
+				pos = BUF_POS() + 4;
+				W(regOrOffs - pos);
+			} else if( mult == 0 ) {
 				if( a->id > 7 ) r64 |= 4;
 				if( reg > 7 ) r64 |= 1;
-				REX();
-				B(f->r_mem);
+				OP(f->r_mem);
 				if( regOrOffs == 0 && (reg&7) != Ebp ) {
 					MOD_RM(0,a->id,reg);
 					if( (reg&7) == Esp ) B(0x24);
@@ -485,21 +496,29 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 					W(regOrOffs);
 				}
 			} else {
+				// [eax + ebx * M]
 				ERRIF(1);
 			}
 		}
 		break;
 	case ID2(RMEM, RCPU):
+	case ID2(RMEM, RFPU):
 		ERRIF( f->mem_r == 0 );
 		{
-			CpuReg reg = a->id & 0xFF;
-			int regOrOffs = a->id >> 16;  
-			int mult = (a->id >> 8) & 0xFF;
-			if( mult == 0 ) {
+			int mult = a->id & 0xF;
+			int regOrOffs = mult == 15 ? a->id >> 4 : a->id >> 8;  
+			CpuReg reg = (a->id >> 4) & 0xF;
+			if( mult == 15 ) {
+				int pos;
+				if( b->id > 7 ) r64 |= 4;
+				OP(f->mem_r);
+				MOD_RM(0,b->id,5);
+				pos = BUF_POS() + 4;
+				W(regOrOffs - pos);
+			} else if( mult == 0 ) {
 				if( b->id > 7 ) r64 |= 4;
 				if( reg > 7 ) r64 |= 1;
-				REX();
-				B(f->mem_r);
+				OP(f->mem_r);
 				if( regOrOffs == 0 && (reg&7) != Ebp ) {
 					MOD_RM(0,b->id,reg);
 					if( (reg&7) == Esp ) B(0x24);
@@ -513,47 +532,10 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 					W(regOrOffs);
 				}
 			} else {
+				// [eax + ebx * M]
 				ERRIF(1);
 			}
 		}
-		break;
-	default:
-		ERRIF(1);
-	}
-}
-
-#define SSE(v)	{ B((v)>>16); B((v)>>8); B(v); }
-
-static void opSSE( jit_ctx *ctx, CpuOp o, preg *a, preg *b ) {
-	opform *f = &OP_FORMS[o];
-#	ifdef OP_LOG
-	log_op(ctx,o,a,b,true);
-#	endif
-	switch( ID2(a->kind,b->kind) ) {
-	case ID2(RFPU,RFPU):
-		TODO();
-		break;
-	case ID2(RFPU,RCONST):
-		ERRIF(f->mem_const == 0);
-		{
-			int pos;
-			SSE(f->mem_const);
-			MOD_RM(0,a->id,5);
-			pos = BUF_POS() + 4;
-			W(b->id * 8 - pos);
-		}
-		break;
-	case ID2(RSTACK,RFPU):
-		//ERRIF(f->mem_const == 0);
-		TODO();
-		break;
-	case ID2(RFPU,RSTACK):
-		//ERRIF(f->mem_const == 0);
-		TODO();
-		break;
-	case ID2(RMEM,RFPU):
-		//ERRIF(f->mem_const == 0);
-		TODO();
 		break;
 	default:
 		ERRIF(1);
@@ -646,8 +628,8 @@ static void load( jit_ctx *ctx, preg *r, vreg *v ) {
 	if( r->holds ) r->holds->current = NULL;
 	r->holds = v;
 	v->current = r;
-	if( r->kind == RFPU )
-		opSSE(ctx,MOVSD,r,from);
+	if( IS_FLOAT(v) )
+		op64(ctx,MOVSD,r,from);
 	else if( v->size > 4 )
 		op64(ctx,MOV,r,from);
 	else
@@ -706,7 +688,7 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 			if( v->kind == RSTACK )
 				store(ctx,r,alloc_fpu(ctx, R(v->id), true), bind);
 			else 
-				opSSE(ctx,MOVSD,&r->stack,v);
+				op64(ctx,MOVSD,&r->stack,v);
 		} else {
 			if( v->kind == RSTACK )
 				store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
@@ -863,7 +845,7 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 			case 8:
 				if( fetch(r)->kind == RFPU ) {
 					op64(ctx,SUB,PESP,pconst(&p,8));
-					opSSE(ctx,MOVSD,pmem(&p,Esp,0,0),fetch(r));
+					op64(ctx,MOVSD,pmem(&p,Esp,0,0),fetch(r));
 				} else
 					op64(ctx,PUSH,fetch(r),UNUSED);
 				break;
@@ -992,7 +974,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		pb = alloc_fpu(ctx, b, true);
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RFPU,RFPU):
-			opSSE(ctx,o,pa,pb);
+			op64(ctx,o,pa,pb);
 			scratch(pa);
 			out = pa;
 			break;
@@ -1223,7 +1205,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				vreg *r = R(o->p1);
 				if( r->size != 8 ) ASSERT(r->size);
-				opSSE(ctx,MOVSD,alloc_fpu(ctx,r,false),pconst(&p,o->p2));
+				op64(ctx,MOVSD,alloc_fpu(ctx,r,false),pcodeaddr(&p,o->p2 * 8));
 				store(ctx,r,r->current,false); 
 			}
 			break;

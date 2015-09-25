@@ -59,8 +59,8 @@ static void null_function() {
 	printf("Null function ptr\n");
 }
 
-static void do_log( int i ) {
-	printf("%d\n",i);
+static void do_log( double i ) {
+	printf("%.19g\n",i);
 }
 
 int hl_module_init( hl_module *m ) {
