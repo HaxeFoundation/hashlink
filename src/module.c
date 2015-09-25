@@ -59,8 +59,18 @@ static void null_function() {
 	printf("Null function ptr\n");
 }
 
-static void do_log( double i ) {
-	printf("%.19g\n",i);
+static void do_log( vdynamic *v ) {
+	switch( v->t->kind ) {
+	case HI32:
+		printf("%di\n",v->v.i);
+		break;
+	case HF64:
+		printf("%df\n",v->v.d);
+		break;
+	default:
+		printf("%llXH\n",v->v.ptr);
+		break;
+	}
 }
 
 int hl_module_init( hl_module *m ) {

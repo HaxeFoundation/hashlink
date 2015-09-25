@@ -86,8 +86,10 @@ typedef enum {
 
 #ifdef HL_64
 #	define W64(wv)	*ctx->buf.w64++ = wv
+#	define IS_64	1
 #else
 #	define W64(wv)	W(wv)
+#	define IS_64	0
 #endif
 
 #define MOD_RM(mod,reg,rm)		B(((mod) << 6) | (((reg)&7) << 3) | ((rm)&7))
@@ -153,6 +155,7 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, R8, R9, R10, R11 };
 #	define RCPU_COUNT	6
 #	define RFPU_COUNT	8
 #	define RCPU_SCRATCH_COUNT	3
+#	define RFPU_SCRATCH_COUNT	8
 static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 #endif
 
@@ -273,7 +276,7 @@ typedef struct {
 
 static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOV", 0x8B, 0x89, 0xB8, RM(0xC7,0) },
-	{ "PUSH", 0x50, RM(0xFF,6) },
+	{ "PUSH", 0x50, RM(0xFF,6), 0x68 | SBYTE(0x6A) },
 	{ "ADD", 0x03, 0x01, RM(0x81,0) | SBYTE(RM(0x83,0)) },
 	{ "SUB", 0x2B, 0x29, RM(0x81,5) | SBYTE(RM(0x83,5)) },
 	{ "POP", 0x58, RM(0x8F,0) },
@@ -477,8 +480,13 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 				if( a->id > 7 ) r64 |= 4;
 				OP(f->r_mem);
 				MOD_RM(0,a->id,5);
-				pos = BUF_POS() + 4;
-				W(regOrOffs - pos);
+				if( IS_64 ) {
+					// offset wrt current code
+					pos = BUF_POS() + 4;
+					W(regOrOffs - pos);
+				} else {
+					ERRIF(1);
+				}
 			} else if( mult == 0 ) {
 				if( a->id > 7 ) r64 |= 4;
 				if( reg > 7 ) r64 |= 1;
@@ -501,6 +509,19 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 			}
 		}
 		break;
+#	ifndef HL_64
+	case ID2(RFPU,RADDR):
+#	endif
+	case ID2(RCPU,RADDR):
+		ERRIF( f->r_mem == 0 );
+		if( a->id > 7 ) r64 |= 4;
+		OP(f->r_mem);
+		MOD_RM(0,a->id,5);
+		if( IS_64 )
+			W64((int_val)b->holds);
+		else
+			W((int_val)b->holds);
+		break;
 	case ID2(RMEM, RCPU):
 	case ID2(RMEM, RFPU):
 		ERRIF( f->mem_r == 0 );
@@ -513,8 +534,13 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 				if( b->id > 7 ) r64 |= 4;
 				OP(f->mem_r);
 				MOD_RM(0,b->id,5);
-				pos = BUF_POS() + 4;
-				W(regOrOffs - pos);
+				if( IS_64 ) {
+					// offset wrt current code
+					pos = BUF_POS() + 4;
+					W(regOrOffs - pos);
+				} else {
+					ERRIF(1);
+				}
 			} else if( mult == 0 ) {
 				if( b->id > 7 ) r64 |= 4;
 				if( reg > 7 ) r64 |= 1;
@@ -681,21 +707,24 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 	case 0:
 		break;
 	case 4:
-#ifdef HL_64
+		if( v->kind == RSTACK )
+			store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
+		else if( r->size == 4 )
+			op32(ctx,MOV,&r->stack,v);
+		break;
 	case 8:
-#endif
 		if( IS_FLOAT(r) || v->kind == RFPU ) {
 			if( v->kind == RSTACK )
 				store(ctx,r,alloc_fpu(ctx, R(v->id), true), bind);
 			else 
 				op64(ctx,MOVSD,&r->stack,v);
-		} else {
+		} else if( IS_64 ) {
 			if( v->kind == RSTACK )
 				store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
-			else if( r->size == 4 )
-				op32(ctx,MOV,&r->stack,v);
 			else
 				op64(ctx,MOV,&r->stack,v);
+		} else {
+			ASSERT(r->size);
 		}
 		break;
 	default:
@@ -746,9 +775,6 @@ static void discard_regs( jit_ctx *ctx, int native_call ) {
 		if( r->holds ) {
 			r->holds->current = NULL;
 			r->holds = NULL;
-#			ifndef HL_64
-			ASSERT(0); // Need FPU stack reset ?
-#			endif
 		}
 	}
 }
@@ -775,12 +801,11 @@ static void stack_align_error( int r ) {
 static CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
 #endif
 
-static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
-	int fid = ctx->globalToFunction[g];
-	int isNative = fid >= ctx->m->code->nfunctions;
-	int i = 0, size = 0;
-	preg p;
+static int prepare_call_args( jit_ctx *ctx, int count, int *args, bool isNative ) {
+	int i;
 	int stackRegs = count;
+	int size = 0;
+	preg p;
 #ifdef HL_64
 	if( isNative ) {
 		for(i=0;i<count;i++) {
@@ -832,45 +857,60 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 				size2 += size;
 			}
 			switch( r->size ) {
-#			ifndef HL_64
 			case 4:
-				op32(ctx,PUSH,fetch(r),UNUSED);
-				break;
-#			else
-			case 4:
-				// pseudo push32 (not available)
-				op64(ctx,SUB,PESP,pconst(&p,4));
-				op32(ctx,MOV,pmem(&p,Esp,0,0),fetch(r));
+				if( !IS_64 )
+					op32(ctx,PUSH,fetch(r),UNUSED);
+				else {
+					// pseudo push32 (not available)
+					op64(ctx,SUB,PESP,pconst(&p,4));
+					op32(ctx,MOV,pmem(&p,Esp,0,0),fetch(r));
+				}
 				break;
 			case 8:
 				if( fetch(r)->kind == RFPU ) {
 					op64(ctx,SUB,PESP,pconst(&p,8));
 					op64(ctx,MOVSD,pmem(&p,Esp,0,0),fetch(r));
-				} else
+				} else if( IS_64 )
 					op64(ctx,PUSH,fetch(r),UNUSED);
+				else
+					ASSERT(r->t->kind);
 				break;
-#			endif
 			default:
 				ASSERT(r->size);
 			}
 			size2 += r->size;
 		}
 	}
+	return size;
+}
+
+static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
+	preg p;
+#	if defined(HL_VCC) && defined(HL_64)
+	// MSVC requires 32bytes of free space here
+	op64(ctx,SUB,PESP,pconst(&p,32));
+	size += 32;
+#	endif
+	// native function, already resolved
+	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
+	op64(ctx,CALL,PEAX,UNUSED);
+	discard_regs(ctx, 0);
+	op64(ctx,ADD,PESP,pconst(&p,size));
+}
+
+static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
+	int fid = ctx->globalToFunction[g];
+	int isNative = fid >= ctx->m->code->nfunctions;
+	int i = 0, size = prepare_call_args(ctx,count,args,isNative);
+	preg p;
 	if( fid < 0 ) {
 		// not a static function or native, load it at runtime
 		op64(ctx,MOV,PEAX,paddr(&p,ctx->m->globals_data + ctx->m->globals_indexes[g]));
 		op64(ctx,CALL,PEAX,NULL);
 		discard_regs(ctx, 1);
 	} else if( isNative ) {
-#		if defined(HL_VCC) && defined(HL_64)
-		// MSVC requires 32bytes of free space here
-		op64(ctx,SUB,PESP,pconst(&p,32));
-		size += 32;
-#		endif
-		// native function, already resolved
-		op64(ctx,MOV,PEAX,pconst64(&p,*(int_val*)(ctx->m->globals_data + ctx->m->globals_indexes[g])));
-		op64(ctx,CALL,PEAX,UNUSED);
-		discard_regs(ctx, 0);
+		call_native(ctx,*(void**)(ctx->m->globals_data + ctx->m->globals_indexes[g]), size);
+		size = 0;
 	} else {
 		int cpos = BUF_POS();
 		if( ctx->m->functions_ptrs[fid] ) {
@@ -1196,7 +1236,31 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			register_jump(ctx,jump,(i + 1) + o->p3);
 			break;
 		case OToAny:
-			op_mov(ctx,R(o->p1),R(o->p2)); // TODO
+			{
+				vreg *r = R(o->p2);
+				int size = pad_stack(ctx, IS_64 ? 0 : HL_WSIZE);
+#				ifdef HL_64
+					op64(ctx, MOV, REG_AT(CALL_REGS[0]), pconst64(&p, (int_val)r->t));
+#				else
+					op32(ctx, PUSH, pconst64(&p, (int_val)r->t), UNUSED);
+#				endif
+				call_native(ctx, hl_alloc_dynamic, size);
+				// copy value to dynamic
+				if( IS_FLOAT(r) && !IS_64 ) {
+					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
+					op64(ctx,MOV,tmp,&r->stack);
+					op64(ctx,MOV,pmem(&p,Eax,8,0),tmp);
+					r->stackPos += 4;
+					op64(ctx,MOV,tmp,&r->stack);
+					op64(ctx,MOV,pmem(&p,Eax,12,0),tmp);
+					r->stackPos -= 4;
+				} else {
+					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
+					op64(ctx,MOV,tmp,&r->stack);
+					op64(ctx,MOV,pmem(&p,Eax,8,0),tmp);
+				}
+				store(ctx, R(o->p1), PEAX, true);
+			}
 			break;
 		case ORet:
 			op_ret(ctx, R(o->p1));
@@ -1205,7 +1269,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				vreg *r = R(o->p1);
 				if( r->size != 8 ) ASSERT(r->size);
+#				ifdef HL_64
 				op64(ctx,MOVSD,alloc_fpu(ctx,r,false),pcodeaddr(&p,o->p2 * 8));
+#				else
+				op64(ctx,MOVSD,alloc_fpu(ctx,r,false),paddr(&p,m->code->floats + o->p2));
+#				endif
 				store(ctx,r,r->current,false); 
 			}
 			break;

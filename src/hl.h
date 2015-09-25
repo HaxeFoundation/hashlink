@@ -179,4 +179,19 @@ void hl_jit_free( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m );
 
+typedef struct {
+	hl_type *t;
+#	ifndef HL_64
+	int __pad; // force align
+#	endif
+	union {
+		double d;
+		float f;
+		int i;
+		void *ptr;
+	} v;
+} vdynamic;
+
+vdynamic *hl_alloc_dynamic( hl_type *t );
+
 #endif

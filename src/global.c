@@ -112,3 +112,11 @@ void *hl_alloc_executable_memory( int size ) {
 	return NULL;
 #endif
 }
+
+vdynamic *hl_alloc_dynamic( hl_type *t ) {
+	vdynamic *d = (vdynamic*)malloc(sizeof(vdynamic));
+	d->t = t;
+	d->v.ptr = NULL;
+	return d;
+}
+
