@@ -56,7 +56,7 @@ typedef enum {
 	AND,
 	CMP,
 	NOP,
-	__SSE__,
+	// SSE
 	MOVSD,
 	COMISD,
 	ADDSD,
@@ -267,6 +267,7 @@ typedef struct {
 	int r_mem;		// r32 / r/m32 
 	int mem_r;		// r/m32 / r32
 	int r_const;	// r32 / imm32
+	int r_i8;		// r32 / imm8
 	int mem_const;	// r/m32 / imm32
 } opform;
 
@@ -275,17 +276,17 @@ typedef struct {
 #define SBYTE(op) ((op) << 16)
 
 static opform OP_FORMS[_CPU_LAST] = {
-	{ "MOV", 0x8B, 0x89, 0xB8, RM(0xC7,0) },
-	{ "PUSH", 0x50, RM(0xFF,6), 0x68 | SBYTE(0x6A) },
-	{ "ADD", 0x03, 0x01, RM(0x81,0) | SBYTE(RM(0x83,0)) },
-	{ "SUB", 0x2B, 0x29, RM(0x81,5) | SBYTE(RM(0x83,5)) },
+	{ "MOV", 0x8B, 0x89, 0xB8, 0, RM(0xC7,0) },
+	{ "PUSH", 0x50, RM(0xFF,6), 0x68, 0x6A },
+	{ "ADD", 0x03, 0x01, RM(0x81,0), RM(0x83,0) },
+	{ "SUB", 0x2B, 0x29, RM(0x81,5), RM(0x83,5) },
 	{ "POP", 0x58, RM(0x8F,0) },
 	{ "RET", 0xC3 },
 	{ "CALL", RM(0xFF,2), 0, 0xE8 },
 	{ "AND" },
-	{ "CMP", 0x3B, 0x39, RM(0x81,7) | SBYTE(RM(0x83,7)) },
+	{ "CMP", 0x3B, 0x39, RM(0x81,7), RM(0x83,7) },
 	{ "NOP", 0x90 },
-	{ NULL }, // SSE
+	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "COMISD", 0x660F2F },
 	{ "ADDSD", 0xF20F58 },
@@ -316,7 +317,10 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 	case RCONST:
 		{
 			int_val v = r->holds ? (int_val)r->holds : r->id;
-			sprintf(buf,"%s%llXh",v < 0 ? "-" : "", v < 0 ? -v : v);
+			if( IS_64 )
+				sprintf(buf,"%s%llXh",v < 0 ? "-" : "", v < 0 ? -v : v);
+			else
+				sprintf(buf,"%s%Xh",v < 0 ? "-" : "", v < 0 ? -v : v);
 		}
 		break;
 	case RMEM:
@@ -338,7 +342,10 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 		}
 		break;
 	case RADDR:
-		sprintf(buf, "%s ptr[%llXh]", mode64 ? "qword" : "dword", r->holds);
+		if( IS_64 )
+			sprintf(buf, "%s ptr[%llXh]", mode64 ? "qword" : "dword", r->holds);
+		else
+			sprintf(buf, "%s ptr[%Xh]", mode64 ? "qword" : "dword", r->holds);
 		break;
 	default:
 		return "???";
@@ -369,7 +376,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
 	int r64 = mode64 && (o != PUSH && o != POP && o != CALL) ? 8 : 0;
 #	ifdef OP_LOG
-	log_op(ctx,o,a,b,r64);
+	log_op(ctx,o,a,b,mode64 && IS_64);
 #	endif
 	switch( ID2(a->kind,b->kind) ) {
 	case ID2(RUNUSED,RUNUSED):
@@ -411,20 +418,19 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		ERRIF( f->r_const == 0 );
 		if( a->id > 7 ) r64 |= 1;
 		{
-			int bform = f->r_const >> 16;
 			int_val cval = b->holds ? (int_val)b->holds : b->id;
 			// short byte form
-			if( bform && IS_SBYTE(cval) ) {
-				OP(bform&0xFF);
-				MOD_RM(3,GET_RM(bform)-1,a->id);
+			if( f->r_i8 && IS_SBYTE(cval) ) {
+				OP(f->r_i8);
+				MOD_RM(3,GET_RM(f->r_i8)-1,a->id);
 				B((int)cval);
 			} else if( GET_RM(f->r_const) > 0 ) {
 				OP(f->r_const&0xFF);
 				MOD_RM(3,GET_RM(f->r_const)-1,a->id);
-				if( mode64 ) W64(cval); else W((int)cval);
+				if( mode64 && IS_64 ) W64(cval); else W((int)cval);
 			} else {
 				OP((f->r_const&0xFF) + (a->id&7));
-				if( mode64 ) W64(cval); else W((int)cval);
+				if( mode64 && IS_64 ) W64(cval); else W((int)cval);
 			}
 		}
 		break;
@@ -465,7 +471,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		{
 			int_val cval = a->holds ? (int_val)a->holds : a->id;
 			OP(f->r_const);
-			if( mode64 ) W64(cval); else W((int)cval);
+			if( mode64 && IS_64 ) W64(cval); else W((int)cval);
 		}
 		break;
 	case ID2(RCPU, RMEM):
@@ -520,7 +526,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		if( IS_64 )
 			W64((int_val)b->holds);
 		else
-			W((int_val)b->holds);
+			W((int)b->holds);
 		break;
 	case ID2(RMEM, RCPU):
 	case ID2(RMEM, RFPU):
@@ -1152,28 +1158,30 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		ctx->maxOps = f->nops;
 	}
 	memset(ctx->opsPos,0,(f->nops+1)*sizeof(int));
-	size = 0;
 	codePos = BUF_POS();
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
-		r->current = NULL;
 		r->size = hl_type_size(r->t);
-		if( i >= nargs ) {
-			if( i == nargs ) size = 0;
-			size += hl_pad_size(size,r->t);
-			r->stackPos = -(size + HL_WSIZE);
-			size += r->size;
-		} else {
-			size += r->size;
-			size += hl_pad_size(-size,r->t);
-			r->stackPos = size + HL_WSIZE;
-		}
+		r->current = NULL;
 		r->stack.holds = NULL;
 		r->stack.id = i;
 		r->stack.kind = RSTACK;
 	}
-	if( f->nregs == nargs ) size = 0;
+	size = 0;
+	for(i=0;i<nargs;i++) {
+		vreg *r = R(i);
+		r->stackPos = size + HL_WSIZE * 2;
+		size += r->size;
+		size += hl_pad_size(-size,r->t);
+	}
+	size = 0;
+	for(i=nargs;i<f->nregs;i++) {
+		vreg *r = R(i);
+		size += r->size;
+		size += hl_pad_size(size + HL_WSIZE,r->t);
+		r->stackPos = -(size + HL_WSIZE);
+	}
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
 	ctx->functionPos = BUF_POS();

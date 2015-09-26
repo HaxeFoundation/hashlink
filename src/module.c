@@ -65,7 +65,10 @@ static void do_log( vdynamic *v ) {
 		printf("%di\n",v->v.i);
 		break;
 	case HF64:
-		printf("%df\n",v->v.d);
+		printf("%.19gf\n",v->v.d);
+		break;
+	case HVOID:
+		printf("void\n");
 		break;
 	default:
 		printf("%llXH\n",v->v.ptr);
