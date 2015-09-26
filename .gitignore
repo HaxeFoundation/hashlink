@@ -12,3 +12,7 @@
 *.user
 Release
 x64
+/bench/Bench.n
+/bench/main.exe
+/bench/main.hl
+*.obj
