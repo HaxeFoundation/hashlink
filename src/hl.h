@@ -192,6 +192,7 @@ typedef struct {
 	} v;
 } vdynamic;
 
+void hl_call( void *f );
 vdynamic *hl_alloc_dynamic( hl_type *t );
 
 #endif

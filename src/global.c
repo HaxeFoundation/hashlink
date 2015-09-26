@@ -120,3 +120,19 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	return d;
 }
 
+void hl_call( void *f ) {
+#	if !defined(HL_64) && defined(HL_VCC)
+	int old_esp;
+	__asm {
+		mov old_esp, esp
+		mov eax, esp
+		and eax, 15
+		sub esp, eax
+		call f
+		mov esp, old_esp
+	}
+#	else
+	((fptr)f)();
+#	endif
+}
+
