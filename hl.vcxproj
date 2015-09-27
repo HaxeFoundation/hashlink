@@ -139,8 +139,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\alloc.c" />
     <ClCompile Include="src\code.c" />
-    <ClCompile Include="src\global.c" />
     <ClCompile Include="src\jit.c" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\module.c" />

@@ -63,7 +63,12 @@ OP_BEGIN
 	OP(OJNeq,3)
 	OP(OJAlways,1)
 	OP(OToAny,2)
-	OP(OLabel,0)
+	OP(OLabel,1)
+	OP(ONew,1)
+	OP(OField,3)
+	OP(OSetField,3)
+	OP(OGetThis,2)
+	OP(OSetThis,2)
 	// --
 	OP(OLast,0)
 OP_END

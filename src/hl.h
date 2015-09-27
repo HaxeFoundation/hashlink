@@ -86,18 +86,46 @@ typedef enum {
 	HBOOL	= 5,
 	HANY	= 6,
 	HFUN	= 7,
+	HOBJ	= 8,
 	// ---------
-	HLAST	= 8,
+	HLAST	= 9,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
 typedef struct hl_type hl_type;
 
+typedef struct {
+	int nargs;
+	hl_type *ret;
+	hl_type *args;
+} hl_type_fun;
+
+typedef struct {
+	const char *name;
+	hl_type *t;
+} hl_obj_field;
+
+typedef struct {
+	const char *name;
+	hl_type *t;
+	int global;
+} hl_obj_proto;
+
+typedef struct {
+	int nfields;
+	int nproto;
+	const char *name;
+	hl_type *super;
+	hl_obj_field *fields;
+	hl_obj_proto *proto;
+} hl_type_obj;
+
 struct hl_type {
 	hl_type_kind kind;
-	int nargs;
-	hl_type **args;
-	hl_type *ret;
+	union {
+		hl_type_fun *fun;
+		hl_type_obj *obj;
+	};
 };
 
 typedef struct {
@@ -179,6 +207,8 @@ void hl_jit_free( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m );
 
+/* -------------------- RUNTIME ------------------------------ */
+
 typedef struct {
 	hl_type *t;
 #	ifndef HL_64
@@ -192,7 +222,18 @@ typedef struct {
 	} v;
 } vdynamic;
 
+typedef struct vobj_proto vobj_proto;
+
+struct vobj_proto {
+	hl_type *t;
+};
+
+typedef struct {
+	vobj_proto *proto;
+} vobj;
+
 void hl_call( void *f );
 vdynamic *hl_alloc_dynamic( hl_type *t );
+vobj *hl_alloc_obj( hl_module *m, hl_type_obj *o );
 
 #endif

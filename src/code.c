@@ -142,7 +142,6 @@ static int hl_get_global( hl_reader *r ) {
 }
 
 static void hl_read_type( hl_reader *r, hl_type *t ) {
-	int i;
 	t->kind = READ();
 	if( t->kind >= HLAST ) {
 		ERROR("Invalid type");
@@ -150,16 +149,42 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 	}
 	switch( t->kind ) {
 	case HFUN:
-		t->nargs = READ();
-		t->args = (hl_type**)hl_malloc(&r->code->alloc, sizeof(hl_type*)*t->nargs);
-		if( t->args == NULL ) {
-			ERROR("Out of memory");
-			return;
+		{
+			int i;
+			int nargs = READ(); 
+			t->fun = (hl_type_fun*)hl_malloc(&r->code->alloc,sizeof(hl_type_fun) + sizeof(hl_type*)*(nargs-1));
+			t->fun->nargs = nargs;
+			for(i=0;i<nargs;i++)
+				(&t->fun->args)[i] = hl_get_type(r);
+			t->fun->ret = hl_get_type(r);
 		}
-		for(i=0;i<t->nargs;i++)
-			t->args[i] = hl_get_type(r);
-		t->ret = hl_get_type(r);
 		break;
+	case HOBJ:
+		{
+			int i;
+			const char *name = hl_get_string(r);
+			int super = INDEX() - 1;
+			int nfields = INDEX();
+			int nproto = INDEX();
+			t->obj = (hl_type_obj*)hl_malloc(&r->code->alloc,sizeof(hl_type_obj));
+			t->obj->name = name;
+			t->obj->super = super < 0 ? NULL : r->code->types + super;
+			t->obj->nfields = nfields;
+			t->obj->nproto = nproto;
+			t->obj->fields = (hl_obj_field*)hl_malloc(&r->code->alloc,sizeof(hl_obj_field)*nfields);
+			t->obj->proto = (hl_obj_proto*)hl_malloc(&r->code->alloc,sizeof(hl_obj_proto)*nproto);
+			for(i=0;i<nfields;i++) {
+				hl_obj_field *f = t->obj->fields + i;
+				f->name = hl_get_string(r);
+				f->t = hl_get_type(r);
+			}
+			for(i=0;i<nproto;i++) {
+				hl_obj_proto *p = t->obj->proto + i;
+				p->name = hl_get_string(r);
+				p->t = hl_get_type(r);
+				p->global = UINDEX();
+			}
+		}
 	default:
 		break;
 	}
@@ -201,10 +226,6 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 				o->p2 = INDEX();
 				o->p3 = READ();
 				o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * o->p3);
-				if( o->extra == NULL ) {
-					ERROR("Out of memory");
-					return;
-				}
 				for(i=0;i<o->p3;i++)
 					o->extra[i] = INDEX();
 			}
@@ -220,10 +241,6 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 			o->p2 = INDEX();
 			o->p3 = INDEX();
 			o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * size);
-			if( o->extra == NULL ) {
-				ERROR("Out of memory");
-				return;
-			}
 			for(i=0;i<size;i++)
 				o->extra[i] = INDEX();
 		}
@@ -237,18 +254,10 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 	f->nregs = UINDEX();
 	f->nops = UINDEX();
 	f->regs = (hl_type**)hl_malloc(&r->code->alloc, f->nregs * sizeof(hl_type*));
-	if( f->regs == NULL ) {
-		ERROR("Out of memory");
-		return;
-	}
 	for(i=0;i<f->nregs;i++)
 		f->regs[i] = hl_get_type(r);
 	CHK_ERROR();
 	f->ops = (hl_opcode*)hl_malloc(&r->code->alloc, f->nops * sizeof(hl_opcode));
-	if( f->ops == NULL ) {
-		ERROR("Out of memory");
-		return;
-	}
 	for(i=0;i<f->nops;i++)
 		hl_read_opcode(r, f, f->ops+i);
 }
@@ -256,7 +265,7 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 #undef CHK_ERROR
 #define CHK_ERROR() if( r->error ) { if( c ) hl_free(&c->alloc); printf("%s\n", r->error); return NULL; }
 #define EXIT(msg) { ERROR(msg); CHK_ERROR(); }
-#define ALLOC(v,ptr,count) { v = (ptr *)hl_zalloc(&c->alloc,count*sizeof(ptr)); if( v == NULL ) EXIT("Out of memory"); }
+#define ALLOC(v,ptr,count) v = (ptr *)hl_zalloc(&c->alloc,count*sizeof(ptr))
 
 const char *hl_op_name( int op ) {
 	if( op < 0 || op >= OLast )
@@ -272,8 +281,6 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	int i;
 	hl_alloc_init(&alloc);
 	c = hl_zalloc(&alloc,sizeof(hl_code));
-	if( c == NULL )
-		EXIT("Out of memory");
 	c->alloc = alloc;
 	if( READ() != 'H' || READ() != 'L' || READ() != 'B' )
 		EXIT("Invalid header");
@@ -305,8 +312,6 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 		char *sdata;
 		CHK_ERROR();
 		sdata = (char*)hl_malloc(&c->alloc,sizeof(char) * size);
-		if( sdata == NULL )
-			EXIT("Out of memory");
 		hl_read_bytes(r, sdata, size);
 		c->strings_data = sdata;
 		ALLOC(c->strings, char*, c->nstrings);

@@ -1088,6 +1088,20 @@ static void register_jump( jit_ctx *ctx, int *p, int target ) {
 	ctx->opsPos[target] = -1;
 }
 
+static void call_native_consts( jit_ctx *ctx, void *nativeFun, int_val *args, int nargs ) {
+	int size = pad_stack(ctx, IS_64 ? 0 : HL_WSIZE*nargs);
+	preg p;
+	int i;
+#	ifdef HL_64
+	for(i=0;i<nargs;i++)
+		op64(ctx, MOV, REG_AT(CALL_REGS[i]), pconst64(&p, args[i]));
+#	else
+	for(i=nargs-1;i>=0;i--)
+		op32(ctx, PUSH, pconst64(&p, args[i]), UNUSED);
+#	endif
+	call_native(ctx, nativeFun, size);
+}
+
 jit_ctx *hl_jit_alloc() {
 	int i;
 	jit_ctx *ctx = (jit_ctx*)malloc(sizeof(jit_ctx));
@@ -1121,7 +1135,7 @@ void hl_jit_free( jit_ctx *ctx ) {
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0;
 	int codePos;
-	int nargs = m->code->globals[f->global]->nargs;
+	int nargs = m->code->globals[f->global]->fun->nargs;
 	preg p;
 	ctx->m = m;
 	ctx->f = f;
@@ -1228,17 +1242,20 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			op_binop(ctx, R(o->p1), R(o->p2), R(o->p3), o);
 			break;
 		case OGte:
+		case OLt:
 			op_cmp(ctx, o);
 			break;
 		case OJFalse:
+		case OJTrue:
 			{
 				preg *r = alloc_cpu(ctx, R(o->p1), true);
 				op32(ctx, AND, r, r);
-				XJump(JZero,jump);
+				XJump( o->op == OJFalse ? JZero : JNotZero,jump);
 				register_jump(ctx,jump,(i + 1) + o->p2);
 			}
 			break;
 		case OJLt:
+		case OJGte:
 			op_binop(ctx, NULL, R(o->p1), R(o->p2), o);
 			jump = do_jump(ctx,o->op);
 			register_jump(ctx,jump,(i + 1) + o->p3);
@@ -1246,13 +1263,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OToAny:
 			{
 				vreg *r = R(o->p2);
-				int size = pad_stack(ctx, IS_64 ? 0 : HL_WSIZE);
-#				ifdef HL_64
-					op64(ctx, MOV, REG_AT(CALL_REGS[0]), pconst64(&p, (int_val)r->t));
-#				else
-					op32(ctx, PUSH, pconst64(&p, (int_val)r->t), UNUSED);
-#				endif
-				call_native(ctx, hl_alloc_dynamic, size);
+				int_val rt = (int_val)r->t;
+				call_native_consts(ctx, hl_alloc_dynamic, &rt, 1);
 				// copy value to dynamic
 				if( IS_FLOAT(r) && !IS_64 ) {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
@@ -1283,6 +1295,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOVSD,alloc_fpu(ctx,r,false),paddr(&p,m->code->floats + o->p2));
 #				endif
 				store(ctx,r,r->current,false); 
+			}
+			break;
+		case ONew:
+			{
+				vreg *r = R(o->p1);
+				int_val args[2] = { (int_val)m, (int_val)r->t->obj }; 
+				if( r->t->kind != HOBJ ) ASSERT(r->t->kind);
+				call_native_consts(ctx, hl_alloc_obj, args, 2);
+				store(ctx, r, PEAX, true);
 			}
 			break;
 		default:

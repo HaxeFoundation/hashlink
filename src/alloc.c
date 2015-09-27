@@ -40,6 +40,7 @@ int hl_type_size( hl_type *t ) {
 		1, // BOOL
 		HL_WSIZE, // ANY
 		HL_WSIZE, // FUN
+		HL_WSIZE, // OBJ
 	};
 	return SIZES[t->kind];
 }
@@ -70,7 +71,10 @@ void *hl_malloc( hl_alloc *a, int size ) {
 	if( b == NULL || b->size <= size ) {
 		int alloc = size < 4096-sizeof(hl_alloc_block) ? 4096-sizeof(hl_alloc_block) : size;
 		b = (hl_alloc_block *)malloc(sizeof(hl_alloc_block) + alloc);
-		if( b == NULL ) return NULL;
+		if( b == NULL ) {
+			printf("Out of memory");
+			exit(99);
+		}
 		b->p = ((unsigned char*)b) + sizeof(hl_alloc_block);
 		b->size = alloc;
 		b->next = a->cur;
@@ -118,6 +122,11 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	d->t = t;
 	d->v.ptr = NULL;
 	return d;
+}
+
+vobj *hl_alloc_obj( hl_module *m, hl_type_obj *t ) {
+	printf("TODO");
+	return NULL;
 }
 
 void hl_call( void *f ) {
