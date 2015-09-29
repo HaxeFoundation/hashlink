@@ -163,9 +163,9 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 		{
 			int i;
 			const char *name = hl_get_string(r);
-			int super = INDEX() - 1;
-			int nfields = INDEX();
-			int nproto = INDEX();
+			int super = INDEX();
+			int nfields = UINDEX();
+			int nproto = UINDEX();
 			t->obj = (hl_type_obj*)hl_malloc(&r->code->alloc,sizeof(hl_type_obj));
 			t->obj->name = name;
 			t->obj->super = super < 0 ? NULL : r->code->types + super;
@@ -181,8 +181,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			for(i=0;i<nproto;i++) {
 				hl_obj_proto *p = t->obj->proto + i;
 				p->name = hl_get_string(r);
-				p->t = hl_get_type(r);
-				p->global = UINDEX();
+				p->findex = UINDEX();
 			}
 		}
 	default:
@@ -220,6 +219,8 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 	case -1:
 		switch( o->op ) {
 		case OCallN:
+		case OCallClosure:
+		case OCallMethod:
 			{
 				int i;
 				o->p1 = INDEX();
@@ -234,6 +235,7 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 			ERROR("Don't know how to process opcode");
 			break;
 		}
+		break;
 	default:
 		{
 			int i, size = hl_op_nargs[o->op] - 3;
@@ -250,7 +252,8 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 
 static void hl_read_function( hl_reader *r, hl_function *f ) {
 	int i;
-	f->global = UINDEX();
+	f->type = hl_get_type(r);
+	f->findex = UINDEX();
 	f->nregs = UINDEX();
 	f->nops = UINDEX();
 	f->regs = (hl_type**)hl_malloc(&r->code->alloc, f->nregs * sizeof(hl_type*));
@@ -338,8 +341,10 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	CHK_ERROR();
 	ALLOC(c->natives, hl_native, c->nnatives);
 	for(i=0;i<c->nnatives;i++) {
-		c->natives[i].name = hl_get_string(r);
-		c->natives[i].global = hl_get_global(r);
+		hl_native *n = c->natives + i;
+		n->name = hl_get_string(r);
+		n->t = hl_get_type(r);
+		n->findex = UINDEX();
 	}
 	CHK_ERROR();
 	ALLOC(c->functions, hl_function, c->nfunctions);

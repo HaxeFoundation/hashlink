@@ -107,8 +107,7 @@ typedef struct {
 
 typedef struct {
 	const char *name;
-	hl_type *t;
-	int global;
+	int findex;
 } hl_obj_proto;
 
 typedef struct {
@@ -130,7 +129,8 @@ struct hl_type {
 
 typedef struct {
 	const char *name;
-	int global;
+	hl_type *t;
+	int findex;
 } hl_native;
 
 typedef struct {
@@ -144,9 +144,10 @@ typedef struct {
 typedef struct hl_ptr_list hl_ptr_list;
 
 typedef struct {
-	int global;
+	int findex;
 	int nregs;
 	int nops;
+	hl_type *type;
 	hl_type **regs;
 	hl_opcode *ops;
 } hl_function;

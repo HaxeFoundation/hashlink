@@ -194,7 +194,7 @@ struct jit_ctx {
 	int functionPos;
 	int allocOffset;
 	int currentPos;
-	int *globalToFunction;
+	int *functionReindex;
 	unsigned char *startBuf;
 	hl_module *m;
 	hl_function *f;
@@ -528,6 +528,19 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		else
 			W((int)b->holds);
 		break;
+#	ifndef HL_64
+	case ID2(RADDR,RFPU):
+#	endif
+	case ID2(RADDR,RCPU):
+		ERRIF( f->mem_r == 0 );
+		if( b->id > 7 ) r64 |= 4;
+		OP(f->mem_r);
+		MOD_RM(0,b->id,5);
+		if( IS_64 )
+			W64((int_val)a->holds);
+		else
+			W((int)a->holds);
+		break;
 	case ID2(RMEM, RCPU):
 	case ID2(RMEM, RFPU):
 		ERRIF( f->mem_r == 0 );
@@ -760,13 +773,6 @@ static void store_const( jit_ctx *ctx, vreg *r, int c, bool useTmpReg ) {
 	}
 }
 
-static void op_mova( jit_ctx *ctx, vreg *to, void *value ) {
-	preg *r = alloc_cpu(ctx, to, false);
-	preg p;
-	op32(ctx,MOV,r,paddr(&p,value));
-	store(ctx, to, r, false);
-}
-
 static void discard_regs( jit_ctx *ctx, int native_call ) {
 	int i;
 	for(i=0;i<RCPU_SCRATCH_COUNT;i++) {
@@ -904,24 +910,24 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	op64(ctx,ADD,PESP,pconst(&p,size));
 }
 
-static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
-	int fid = ctx->globalToFunction[g];
+static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *args ) {
+	int fid = ctx->functionReindex[findex];
 	int isNative = fid >= ctx->m->code->nfunctions;
 	int i = 0, size = prepare_call_args(ctx,count,args,isNative);
 	preg p;
 	if( fid < 0 ) {
 		// not a static function or native, load it at runtime
-		op64(ctx,MOV,PEAX,paddr(&p,ctx->m->globals_data + ctx->m->globals_indexes[g]));
+		op64(ctx,MOV,PEAX,paddr(&p,ctx->m->functions_ptrs + findex));
 		op64(ctx,CALL,PEAX,NULL);
 		discard_regs(ctx, 1);
 	} else if( isNative ) {
-		call_native(ctx,*(void**)(ctx->m->globals_data + ctx->m->globals_indexes[g]), size);
+		call_native(ctx,ctx->m->functions_ptrs[findex],size);
 		size = 0;
 	} else {
 		int cpos = BUF_POS();
-		if( ctx->m->functions_ptrs[fid] ) {
+		if( ctx->m->functions_ptrs[findex] ) {
 			// already compiled
-			op32(ctx,CALL,pconst(&p,(int)ctx->m->functions_ptrs[fid] - (cpos + 5)), UNUSED);
+			op32(ctx,CALL,pconst(&p,(int)ctx->m->functions_ptrs[findex] - (cpos + 5)), UNUSED);
 		} else if( ctx->m->code->functions + fid == ctx->f ) {
 			// our current function
 			op32(ctx,CALL,pconst(&p, ctx->functionPos - (cpos + 5)), UNUSED);
@@ -929,7 +935,7 @@ static void op_callg( jit_ctx *ctx, vreg *dst, int g, int count, int *args ) {
 			// stage for later
 			jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
 			j->pos = cpos;
-			j->target = g;
+			j->target = findex;
 			j->next = ctx->calls;
 			ctx->calls = j;
 			op32(ctx,CALL,pconst(&p,0),UNUSED);
@@ -1126,7 +1132,7 @@ void hl_jit_free( jit_ctx *ctx ) {
 	free(ctx->vregs);
 	free(ctx->opsPos);
 	free(ctx->startBuf);
-	free(ctx->globalToFunction);
+	free(ctx->functionReindex);
 	hl_free(&ctx->falloc);
 	hl_free(&ctx->galloc);
 	free(ctx);
@@ -1135,17 +1141,17 @@ void hl_jit_free( jit_ctx *ctx ) {
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0;
 	int codePos;
-	int nargs = m->code->globals[f->global]->fun->nargs;
+	int nargs = f->type->fun->nargs;
 	preg p;
 	ctx->m = m;
 	ctx->f = f;
-	if( !ctx->globalToFunction ) {
-		ctx->globalToFunction = (int*)malloc(sizeof(int)*m->code->nglobals);
-		memset(ctx->globalToFunction,0xFF,sizeof(int)*m->code->nglobals);
+	if( !ctx->functionReindex ) {
+		ctx->functionReindex = (int*)malloc(sizeof(int)*(m->code->nfunctions+m->code->nnatives));
+		memset(ctx->functionReindex,0xFF,sizeof(int)*(m->code->nfunctions+m->code->nnatives));
 		for(i=0;i<m->code->nfunctions;i++)
-			ctx->globalToFunction[(m->code->functions + i)->global] = i;
+			ctx->functionReindex[(m->code->functions + i)->findex] = i;
 		for(i=0;i<m->code->nnatives;i++)
-			ctx->globalToFunction[(m->code->natives + i)->global] = i + m->code->nfunctions;
+			ctx->functionReindex[(m->code->natives + i)->findex] = i + m->code->nfunctions;
 		for(i=0;i<m->code->nfloats;i++) {
 			jit_buf(ctx);
 			*ctx->buf.d++ = m->code->floats[i];
@@ -1214,25 +1220,45 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			store_const(ctx, R(o->p1), m->code->ints[o->p2], true);
 			break;
 		case OGetGlobal:
-			op_mova(ctx, R(o->p1), m->globals_data + m->globals_indexes[o->p2]);
+			{
+				vreg *to = R(o->p1);
+				preg *r = IS_FLOAT(to) ? alloc_fpu(ctx,to,false) : alloc_cpu(ctx, to, false);
+				void *addr = m->globals_data + m->globals_indexes[o->p2];
+				if( IS_FLOAT(to) )
+					op64(ctx,MOVSD,r,paddr(&p,addr));
+				else
+					op32(ctx,MOV,r,paddr(&p,addr));
+				store(ctx, to, r, false);
+			}
+			break;
+		case OSetGlobal:
+			{
+				vreg *r = R(o->p2);
+				preg *v = IS_FLOAT(r) ? alloc_fpu(ctx,r,true) : alloc_cpu(ctx,r,true);
+				void *addr = m->globals_data + m->globals_indexes[o->p1];
+				if( IS_FLOAT(r) )
+					op64(ctx,MOVSD,paddr(&p,addr),v);
+				else
+					op32(ctx,MOV,paddr(&p,addr),v);
+			}
 			break;
 		case OCall3:
 		case OCall4:
 		case OCallN:
-			op_callg(ctx, R(o->p1), o->p2, o->p3, o->extra);
+			op_call_fun(ctx, R(o->p1), o->p2, o->p3, o->extra);
 			break;
 		case OCall0:
-			op_callg(ctx, R(o->p1), o->p2, 0, NULL);
+			op_call_fun(ctx, R(o->p1), o->p2, 0, NULL);
 			break;
 		case OCall1:
-			op_callg(ctx, R(o->p1), o->p2, 1, &o->p3);
+			op_call_fun(ctx, R(o->p1), o->p2, 1, &o->p3);
 			break;
 		case OCall2:
 			{
 				int args[2];
 				args[0] = o->p3;
 				args[1] = (int)o->extra;
-				op_callg(ctx, R(o->p1), o->p2, 2, args);
+				op_call_fun(ctx, R(o->p1), o->p2, 2, args);
 			}
 			break;
 		case OSub:
@@ -1308,8 +1334,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		default:
 			printf("Don't know how to jit %s\n",hl_op_name(o->op));
-			ASSERT(o->op);
-			return -1;
+			break;
 		}
 		// we are landing at this position, assume we have lost our registers
 		if( ctx->opsPos[i+1] == -1 )
@@ -1350,8 +1375,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m ) {
 	// patch calls
 	c = ctx->calls;
 	while( c ) {
-		int fid = ctx->globalToFunction[c->target];
-		int fpos = (int)m->functions_ptrs[fid];
+		int fpos = (int)m->functions_ptrs[c->target];
 		*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
 		c = c->next;
 	}

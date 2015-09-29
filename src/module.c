@@ -87,29 +87,27 @@ int hl_module_init( hl_module *m ) {
 	// INIT natives
 	for(i=0;i<m->code->nnatives;i++) {
 		hl_native *n = m->code->natives + i;
-		*(void**)(m->globals_data + m->globals_indexes[n->global]) = do_log;
+		m->functions_ptrs[n->findex] = do_log;
 	}
 	// JIT
 	ctx = hl_jit_alloc();
 	if( ctx == NULL )
 		return 0;
 	for(i=0;i<m->code->nfunctions;i++) {
-		int f = hl_jit_function(ctx, m, m->code->functions+i);
-		if( f < 0 ) {
+		hl_function *f = m->code->functions + i;
+		int fpos = hl_jit_function(ctx, m, f);
+		if( fpos < 0 ) {
 			hl_jit_free(ctx);
 			return 0;
 		}
-		m->functions_ptrs[i] = (void*)f;
+		m->functions_ptrs[f->findex] = (void*)fpos;
 	}
 	m->jit_code = hl_jit_code(ctx, m);
-	for(i=0;i<m->code->nfunctions;i++)
-		m->functions_ptrs[i] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[i]);
-	hl_jit_free(ctx);
-	// INIT functions
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
-		*(void**)(m->globals_data + m->globals_indexes[f->global]) = m->functions_ptrs[i];
+		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
 	}
+	hl_jit_free(ctx);
 	return 1;
 }
 
