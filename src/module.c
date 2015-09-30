@@ -21,6 +21,65 @@
  */
 #include "hl.h"
 
+hl_runtime_obj *hl_get_obj_rt( hl_module *m, hl_type *ot ) {
+	hl_alloc *alloc = &m->code->alloc;
+	hl_type_obj *o = ot->obj;
+	hl_runtime_obj *p = NULL, *t;
+	int i, size, start;
+	if( o->rt ) return o->rt;
+	if( o->super ) p = hl_get_obj_rt(m, o->super);
+	t = (hl_runtime_obj*)hl_malloc(alloc,sizeof(hl_runtime_obj));
+	t->nfields = o->nfields + (p ? p->nfields : 0);
+	t->fields_indexes = (int*)hl_malloc(alloc,sizeof(int)*t->nfields);
+	
+	// fields indexes
+	start = 0;
+	if( p ) {
+		start = p->nfields;
+		memcpy(t->fields_indexes, p->fields_indexes, sizeof(int)*p->nfields);
+	}
+	size = p ? p->size : HL_WSIZE; // hl_type*
+	for(i=0;i<o->nfields;i++) {
+		hl_type *ft = o->fields[i].t;
+		size += hl_pad_size(size,ft);
+		t->fields_indexes[i+start] = size;
+		size += hl_type_size(ft);
+	}
+	t->size = size;
+	t->proto = NULL;
+	o->rt = t;
+	return t;
+}
+
+hl_runtime_obj *hl_get_obj_proto( hl_module *m, hl_type *ot ) {
+	hl_alloc *alloc = &m->code->alloc;
+	hl_type_obj *o = ot->obj;
+	hl_runtime_obj *p = NULL, *t = hl_get_obj_rt(m, ot);
+	int i;
+	if( t->proto ) return t;
+	if( o->super ) p = hl_get_obj_proto(m,o->super);
+	if( p )
+		t->nproto = p->nproto;
+	else
+		t->nproto = 0;
+	for(i=0;i<o->nproto;i++) {
+		hl_obj_proto *p = o->proto + i;
+		if( p->pindex >= t->nproto ) t->nproto = p->pindex + 1;
+	}
+	t->proto = (vobj_proto*)hl_malloc(alloc, sizeof(vobj_proto) + t->nproto * sizeof(void*));
+	t->proto->t = ot;
+	if( t->nproto ) {
+		void **fptr = (void**)((unsigned char*)t->proto + sizeof(vobj_proto));
+		if( p )
+			memcpy(fptr, (unsigned char*)p->proto + sizeof(vobj_proto), p->nproto * sizeof(void*));
+		for(i=0;i<o->nproto;i++) {
+			hl_obj_proto *p = o->proto + i;
+			if( p->pindex >= 0 ) fptr[p->pindex] = m->functions_ptrs[p->findex];
+		}
+	}
+	return t;
+}
+
 hl_module *hl_module_alloc( hl_code *c ) {
 	int i;
 	int gsize = 0;
@@ -45,12 +104,12 @@ hl_module *hl_module_alloc( hl_code *c ) {
 		return NULL;
 	}
 	memset(m->globals_data,0,gsize);
-	m->functions_ptrs = (void**)malloc(sizeof(void*)*c->nfunctions);
+	m->functions_ptrs = (void**)malloc(sizeof(void*)*(c->nfunctions + c->nnatives));
 	if( m->functions_ptrs == NULL ) {
 		hl_module_free(m);
 		return NULL;
 	}
-	memset(m->functions_ptrs,0,sizeof(void*)*c->nfunctions);
+	memset(m->functions_ptrs,0,sizeof(void*)*(c->nfunctions + c->nnatives));
 	return m;
 }
 
@@ -112,6 +171,7 @@ int hl_module_init( hl_module *m ) {
 }
 
 void hl_module_free( hl_module *m ) {
+	hl_free_executable_memory(m->code);
 	free(m->functions_ptrs);
 	free(m->globals_indexes);
 	free(m->globals_data);

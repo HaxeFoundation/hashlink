@@ -173,6 +173,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			t->obj->nproto = nproto;
 			t->obj->fields = (hl_obj_field*)hl_malloc(&r->code->alloc,sizeof(hl_obj_field)*nfields);
 			t->obj->proto = (hl_obj_proto*)hl_malloc(&r->code->alloc,sizeof(hl_obj_proto)*nproto);
+			t->obj->rt = NULL;
 			for(i=0;i<nfields;i++) {
 				hl_obj_field *f = t->obj->fields + i;
 				f->name = hl_get_string(r);
@@ -182,6 +183,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 				hl_obj_proto *p = t->obj->proto + i;
 				p->name = hl_get_string(r);
 				p->findex = UINDEX();
+				p->pindex = INDEX();
 			}
 		}
 	default:

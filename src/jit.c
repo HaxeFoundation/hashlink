@@ -875,7 +875,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, bool isNative 
 				else {
 					// pseudo push32 (not available)
 					op64(ctx,SUB,PESP,pconst(&p,4));
-					op32(ctx,MOV,pmem(&p,Esp,0,0),fetch(r));
+					op32(ctx,MOV,pmem(&p,Esp,0,0),alloc_cpu(ctx,r,true));
 				}
 				break;
 			case 8:
@@ -911,14 +911,15 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 }
 
 static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *args ) {
-	int fid = ctx->functionReindex[findex];
+	int fid = findex < 0 ? -1 : ctx->functionReindex[findex];
 	int isNative = fid >= ctx->m->code->nfunctions;
 	int i = 0, size = prepare_call_args(ctx,count,args,isNative);
 	preg p;
 	if( fid < 0 ) {
-		// not a static function or native, load it at runtime
-		op64(ctx,MOV,PEAX,paddr(&p,ctx->m->functions_ptrs + findex));
-		op64(ctx,CALL,PEAX,NULL);
+		// closure
+		preg *r = alloc_cpu(ctx, R(-findex), true);
+		op64(ctx,MOV,PEAX,pmem(&p,(CpuReg)r->id,0,0));
+		op64(ctx,CALL,PEAX,UNUSED);
 		discard_regs(ctx, 1);
 	} else if( isNative ) {
 		call_native(ctx,ctx->m->functions_ptrs[findex],size);
@@ -1326,10 +1327,52 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case ONew:
 			{
 				vreg *r = R(o->p1);
-				int_val args[2] = { (int_val)m, (int_val)r->t->obj }; 
+				int_val args[2] = { (int_val)m, (int_val)r->t }; 
 				if( r->t->kind != HOBJ ) ASSERT(r->t->kind);
 				call_native_consts(ctx, hl_alloc_obj, args, 2);
 				store(ctx, r, PEAX, true);
+			}
+			break;
+		case OGetFunction:
+			{
+				vreg *r = R(o->p1);
+				int_val args[2] = { (int_val)m, (int_val)o->p2 };
+				call_native_consts(ctx, hl_alloc_closure_void, args, 2);
+				store(ctx, r, PEAX, true);
+			}
+			break;
+		case OCallClosure:
+			// TODO : if closure has value ?
+			// TODO : if closure is native ?
+			// TODO : how to apply first value ?
+			// requires dynamic branching ?
+			op_call_fun(ctx,R(o->p1),-o->p2,o->p3,o->extra);
+			break;
+		case OGetThis:
+			{
+				vreg *r = R(0);
+				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
+				preg *rr = alloc_cpu(ctx,r, true);
+				preg *rv;
+				if( rr->lock < i ) rr->lock = i;
+				rv = alloc_reg(ctx,RCPU);
+				if( rr == rv ) ASSERT(0);
+				// TODO : copy data
+				op32(ctx, MOV, rv, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2], 0));
+				store(ctx, R(o->p1), rv, true);
+			}
+			break;
+		case OSetThis:
+			{
+				vreg *r = R(0);
+				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
+				preg *rr = alloc_cpu(ctx, r, true);
+				preg *rv;
+				if( rr->lock < i ) rr->lock = i;
+				rv = alloc_cpu(ctx, R(o->p2), true);
+				if( rr == rv ) ASSERT(0);
+				// TODO : copy data
+				op32(ctx, MOV, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p1], 0), rv);
 			}
 			break;
 		default:
@@ -1363,8 +1406,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	hl_free(&ctx->falloc);
 	return codePos;
 }
-
-void *hl_alloc_executable_memory( int size );
 
 void *hl_jit_code( jit_ctx *ctx, hl_module *m ) {
 	jlist *c;

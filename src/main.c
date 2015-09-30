@@ -68,7 +68,7 @@ int main( int argc, char *argv[] ) {
 			return 4;
 		if( !hl_module_init(m) )
 			return 5;
-		hl_call(*(fptr*)(m->globals_data + m->globals_indexes[m->code->entrypoint]));
+		hl_call(m->functions_ptrs[m->code->entrypoint]);
 		hl_module_free(m);
 		hl_free(&code->alloc);
 	}

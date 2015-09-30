@@ -117,6 +117,15 @@ void *hl_alloc_executable_memory( int size ) {
 #endif
 }
 
+void hl_free_executable_memory( void *c ) {
+#ifdef HL_WIN
+	VirtualFree(c,0,MEM_RELEASE);
+#else
+	printf("NOT IMPLEMENTED\n");
+	return NULL;
+#endif
+}
+
 vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	vdynamic *d = (vdynamic*)malloc(sizeof(vdynamic));
 	d->t = t;
@@ -124,9 +133,23 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	return d;
 }
 
-vobj *hl_alloc_obj( hl_module *m, hl_type_obj *t ) {
-	printf("TODO");
-	return NULL;
+vobj *hl_alloc_obj( hl_module *m, hl_type *t ) {
+	vobj *o;
+	int size;
+	hl_runtime_obj *rt = t->obj->rt;
+	if( rt == NULL || rt->proto == NULL ) rt = hl_get_obj_proto(m,t);
+	size = rt->size;
+	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
+	o = (vobj*)malloc(size);
+	memset(o,0,size);
+	o->proto = rt->proto;
+	return o;
+}
+
+vclosure *hl_alloc_closure_void( hl_module *m, int_val fid ) {
+	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
+	c->fun = m->functions_ptrs[fid];
+	return c;
 }
 
 void hl_call( void *f ) {

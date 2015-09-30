@@ -93,6 +93,7 @@ typedef enum {
 } hl_type_kind;
 
 typedef struct hl_type hl_type;
+typedef struct hl_runtime_obj hl_runtime_obj;
 
 typedef struct {
 	int nargs;
@@ -108,6 +109,7 @@ typedef struct {
 typedef struct {
 	const char *name;
 	int findex;
+	int pindex;
 } hl_obj_proto;
 
 typedef struct {
@@ -117,6 +119,7 @@ typedef struct {
 	hl_type *super;
 	hl_obj_field *fields;
 	hl_obj_proto *proto;
+	hl_runtime_obj *rt;
 } hl_type_obj;
 
 struct hl_type {
@@ -202,6 +205,8 @@ const char* hl_op_name( int op );
 hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m );
 void hl_module_free( hl_module *m );
+hl_runtime_obj *hl_get_obj_rt( hl_module *m, hl_type *ot );
+hl_runtime_obj *hl_get_obj_proto( hl_module *m, hl_type *ot );
 
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
@@ -210,31 +215,59 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m );
 
 /* -------------------- RUNTIME ------------------------------ */
 
+typedef struct vobj vobj;
+typedef struct vclosure vclosure;
+
+typedef union {
+	int i;
+	float f;
+	double d;
+	vobj *o;
+	vclosure *c;
+	void *ptr;
+} value;
+
 typedef struct {
 	hl_type *t;
 #	ifndef HL_64
 	int __pad; // force align
 #	endif
-	union {
-		double d;
-		float f;
-		int i;
-		void *ptr;
-	} v;
+	value v;
 } vdynamic;
 
-typedef struct vobj_proto vobj_proto;
-
-struct vobj_proto {
+typedef struct {
 	hl_type *t;
+} vobj_proto;
+
+struct vobj {
+	vobj_proto *proto;
 };
 
-typedef struct {
+struct vclosure {
+	void *fun;
+};
+
+struct hl_runtime_obj {
+	int nfields; // absolute
+	int nproto;  // absolute
+	int size;
+	int *fields_indexes;
 	vobj_proto *proto;
-} vobj;
+};
+
+void *hl_alloc_executable_memory( int size );
+void hl_free_executable_memory( void *ptr );
 
 void hl_call( void *f );
 vdynamic *hl_alloc_dynamic( hl_type *t );
-vobj *hl_alloc_obj( hl_module *m, hl_type_obj *o );
+vobj *hl_alloc_obj( hl_module *m, hl_type *t );
+
+vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
+/*
+vclosure *hl_alloc_closure_int( hl_module *m, int_val f, int param );
+vclosure *hl_alloc_closure_double( hl_module *m, int_val f, double param );
+vclosure *hl_alloc_closure_float( hl_module *m, int_val f, float param );
+vclosure *hl_alloc_closure_ptr( hl_module *m, int_val f, void *param );
+*/
 
 #endif
