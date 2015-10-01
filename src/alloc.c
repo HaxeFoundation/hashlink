@@ -149,6 +149,15 @@ vobj *hl_alloc_obj( hl_module *m, hl_type *t ) {
 vclosure *hl_alloc_closure_void( hl_module *m, int_val fid ) {
 	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
 	c->fun = m->functions_ptrs[fid];
+	c->bits = 0;
+	return c;
+}
+
+vclosure *hl_alloc_closure_int( hl_module *m, int fid, int v ) {
+	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
+	c->fun = m->functions_ptrs[fid];
+	c->bits = CL_HAS_V32;
+	c->v32 = v;
 	return c;
 }
 

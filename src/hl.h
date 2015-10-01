@@ -243,8 +243,16 @@ struct vobj {
 	vobj_proto *proto;
 };
 
+#define CL_HAS_V32		1
+#define CL_HAS_V64		2
+
 struct vclosure {
 	void *fun;
+	int bits;
+	union {
+		int v32;
+		int_val v64;
+	};
 };
 
 struct hl_runtime_obj {
@@ -263,6 +271,8 @@ vdynamic *hl_alloc_dynamic( hl_type *t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );
 
 vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
+vclosure *hl_alloc_closure_int( hl_module *m, int f, int v );
+
 /*
 vclosure *hl_alloc_closure_int( hl_module *m, int_val f, int param );
 vclosure *hl_alloc_closure_double( hl_module *m, int_val f, double param );

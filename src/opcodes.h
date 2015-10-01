@@ -47,6 +47,7 @@ OP_BEGIN
 	OP(OCall4,6)
 	OP(OCallN,-1)
 	OP(OCallMethod,-1)
+	OP(OCallThis,-1)
 	OP(OCallClosure,-1)
 	OP(OGetFunction,2)
 	OP(OClosure,3)

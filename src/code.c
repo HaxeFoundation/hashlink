@@ -223,6 +223,7 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 		case OCallN:
 		case OCallClosure:
 		case OCallMethod:
+		case OCallThis:
 			{
 				int i;
 				o->p1 = INDEX();
