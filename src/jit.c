@@ -883,7 +883,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 #endif
 	for(i=0;i<stackRegs;i++) {
 		vreg *r = vregs + args[i];
-		size += hl_pad_size(size,r->t);
+		size += hl_pad_size(size + ctx->totalRegsSize,r->t);
 		size += r->size;
 	}
 	paddedSize = pad_stack(ctx,size);
@@ -893,7 +893,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 		vreg *r = vregs + args[count - (i + 1)];
 		int pad;
 		size += r->size;
-		pad = hl_pad_size(size,r->t);
+		pad = hl_pad_size(size + ctx->totalRegsSize,r->t);
 		if( (i & 7) == 0 ) jit_buf(ctx);
 		if( pad ) {
 			op64(ctx,SUB,PESP,pconst(&p,pad));
