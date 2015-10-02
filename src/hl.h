@@ -271,13 +271,7 @@ vdynamic *hl_alloc_dynamic( hl_type *t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );
 
 vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
-vclosure *hl_alloc_closure_int( hl_module *m, int f, int v );
-
-/*
-vclosure *hl_alloc_closure_int( hl_module *m, int_val f, int param );
-vclosure *hl_alloc_closure_double( hl_module *m, int_val f, double param );
-vclosure *hl_alloc_closure_float( hl_module *m, int_val f, float param );
-vclosure *hl_alloc_closure_ptr( hl_module *m, int_val f, void *param );
-*/
+vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
+vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
 
 #endif

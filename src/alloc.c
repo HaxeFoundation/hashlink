@@ -153,11 +153,19 @@ vclosure *hl_alloc_closure_void( hl_module *m, int_val fid ) {
 	return c;
 }
 
-vclosure *hl_alloc_closure_int( hl_module *m, int fid, int v ) {
+vclosure *hl_alloc_closure_i32( hl_module *m, int_val fid, int v32 ) {
 	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
 	c->fun = m->functions_ptrs[fid];
 	c->bits = CL_HAS_V32;
-	c->v32 = v;
+	c->v32 = v32;
+	return c;
+}
+
+vclosure *hl_alloc_closure_i64( hl_module *m, int_val fid, int_val v64 ) {
+	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
+	c->fun = m->functions_ptrs[fid];
+	c->bits = CL_HAS_V64;
+	c->v64 = v64;
 	return c;
 }
 
