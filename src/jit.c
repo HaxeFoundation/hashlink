@@ -197,7 +197,6 @@ struct jit_ctx {
 	int functionPos;
 	int allocOffset;
 	int currentPos;
-	int *functionReindex;
 	unsigned char *startBuf;
 	hl_module *m;
 	hl_function *f;
@@ -245,9 +244,15 @@ static preg *paddr( preg *r, void *p ) {
 
 static void jit_buf( jit_ctx *ctx ) {
 	if( BUF_POS() > ctx->bufSize - MAX_OP_SIZE ) {
-		int nsize = ctx->bufSize ? (ctx->bufSize * 4) / 3 : ctx->f->nops * 4;
+		int nsize = ctx->bufSize * 4 / 3;
 		unsigned char *nbuf;
 		int curpos;
+		if( nsize == 0 ) {
+			int i;
+			for(i=0;i<ctx->m->code->nfunctions;i++)
+				nsize += ctx->m->code->functions[i].nops;
+			nsize *= 4;
+		}
 		if( nsize < ctx->bufSize + MAX_OP_SIZE * 4 ) nsize = ctx->bufSize + MAX_OP_SIZE * 4;
 		curpos = BUF_POS();
 		nbuf = (unsigned char*)malloc(nsize);
@@ -940,7 +945,7 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 }
 
 static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *args ) {
-	int fid = findex < 0 ? -1 : ctx->functionReindex[findex];
+	int fid = findex < 0 ? -1 : ctx->m->functions_indexes[findex];
 	int isNative = fid >= ctx->m->code->nfunctions;
 	int i = 0, size = prepare_call_args(ctx,count,args,ctx->vregs,isNative);
 	preg p;
@@ -987,13 +992,13 @@ static void op_call_closure( jit_ctx *ctx, vreg *dst, vreg *f, int nargs, int *r
 	LOCK(r);
 	tmp = alloc_reg(ctx, RCPU);
 	// read bits
-	op32(ctx,MOV,tmp,pmem(&p,(CpuReg)r->id,HL_WSIZE,0));
+	op32(ctx,MOV,tmp,pmem(&p,(CpuReg)r->id,HL_WSIZE*2,0));
 	op32(ctx,CMP,tmp,pconst(&p,0));
 	XJump(JNeq,has_param);
 	{
 		// no argument call
 		int size = prepare_call_args(ctx,nargs,rargs,ctx->vregs,false);
-		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,0,0),UNUSED);
+		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,HL_WSIZE,0),UNUSED);
 		if( size ) op64(ctx,ADD,PESP,pconst(&p,size));
 		XJump(JAlways,end1);
 	}
@@ -1014,7 +1019,7 @@ static void op_call_closure( jit_ctx *ctx, vreg *dst, vreg *f, int nargs, int *r
 		fake.t = &ti32;
 		fake.current = alloc_reg(ctx,RCPU);
 		LOCK(fake.current);
-		op32(ctx,MOV,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*2,0));
+		op32(ctx,MOV,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*3,0));
 
 		// prepare the args
 		vargs = (vreg*)hl_malloc(&ctx->falloc,sizeof(vreg)*(nargs+1));
@@ -1028,7 +1033,7 @@ static void op_call_closure( jit_ctx *ctx, vreg *dst, vreg *f, int nargs, int *r
 
 		// call
 		size = prepare_call_args(ctx,nargs+1,args,vargs,false);
-		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,0,0),UNUSED);
+		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,HL_WSIZE,0),UNUSED);
 		op64(ctx,ADD,PESP,pconst(&p,size));
 		XJump(JAlways,end2);
 	}
@@ -1048,7 +1053,7 @@ static void op_call_closure( jit_ctx *ctx, vreg *dst, vreg *f, int nargs, int *r
 		fake.current = alloc_reg(ctx,RFPU);
 		LOCK(fake.current);
 
-		op64(ctx,MOVSD,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*2,0));
+		op64(ctx,MOVSD,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*3,0));
 
 		// prepare the args
 		vargs = (vreg*)hl_malloc(&ctx->falloc,sizeof(vreg)*(nargs+1));
@@ -1062,7 +1067,7 @@ static void op_call_closure( jit_ctx *ctx, vreg *dst, vreg *f, int nargs, int *r
 
 		// call
 		size = prepare_call_args(ctx,nargs+1,args,vargs,false);
-		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,0,0),UNUSED);
+		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,HL_WSIZE,0),UNUSED);
 		op64(ctx,ADD,PESP,pconst(&p,size));
 	}
 	patch_jump(ctx,end1);
@@ -1256,33 +1261,28 @@ void hl_jit_free( jit_ctx *ctx ) {
 	free(ctx->vregs);
 	free(ctx->opsPos);
 	free(ctx->startBuf);
-	free(ctx->functionReindex);
 	hl_free(&ctx->falloc);
 	hl_free(&ctx->galloc);
 	free(ctx);
 }
 
+void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
+	int i;
+	ctx->m = m;
+	for(i=0;i<m->code->nfloats;i++) {
+		jit_buf(ctx);
+		*ctx->buf.d++ = m->code->floats[i];
+	}
+	while( BUF_POS() & 15 )
+		op32(ctx, NOP, UNUSED, UNUSED);
+}
+
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0, opCount;
-	int codePos;
+	int codePos = BUF_POS();
 	int nargs = f->type->fun->nargs;
 	preg p;
-	ctx->m = m;
 	ctx->f = f;
-	if( !ctx->functionReindex ) {
-		ctx->functionReindex = (int*)malloc(sizeof(int)*(m->code->nfunctions+m->code->nnatives));
-		memset(ctx->functionReindex,0xFF,sizeof(int)*(m->code->nfunctions+m->code->nnatives));
-		for(i=0;i<m->code->nfunctions;i++)
-			ctx->functionReindex[(m->code->functions + i)->findex] = i;
-		for(i=0;i<m->code->nnatives;i++)
-			ctx->functionReindex[(m->code->natives + i)->findex] = i + m->code->nfunctions;
-		for(i=0;i<m->code->nfloats;i++) {
-			jit_buf(ctx);
-			*ctx->buf.d++ = m->code->floats[i];
-		}
-		while( BUF_POS() & 15 )
-			op32(ctx, NOP, UNUSED, UNUSED);
-	}
 	if( f->nregs > ctx->maxRegs ) {
 		free(ctx->vregs);
 		ctx->vregs = (vreg*)malloc(sizeof(vreg) * f->nregs);
@@ -1302,7 +1302,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		ctx->maxOps = f->nops;
 	}
 	memset(ctx->opsPos,0,(f->nops+1)*sizeof(int));
-	codePos = BUF_POS();
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
@@ -1421,7 +1420,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OToAny:
 			{
 				vreg *r = R(o->p2);
-				int_val rt = (int_val)r->t;
+				int_val rt = (int_val)&f->regs[o->p1];
 				call_native_consts(ctx, hl_alloc_dynamic, &rt, 1);
 				// copy value to dynamic
 				if( IS_FLOAT(r) && !IS_64 ) {

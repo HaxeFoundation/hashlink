@@ -105,11 +105,13 @@ hl_module *hl_module_alloc( hl_code *c ) {
 	}
 	memset(m->globals_data,0,gsize);
 	m->functions_ptrs = (void**)malloc(sizeof(void*)*(c->nfunctions + c->nnatives));
-	if( m->functions_ptrs == NULL ) {
+	m->functions_indexes = (int*)malloc(sizeof(int)*(c->nfunctions + c->nnatives));
+	if( m->functions_ptrs == NULL || m->functions_indexes == NULL ) {
 		hl_module_free(m);
 		return NULL;
 	}
 	memset(m->functions_ptrs,0,sizeof(void*)*(c->nfunctions + c->nnatives));
+	memset(m->functions_indexes,0xFF,sizeof(void*)*(c->nfunctions + c->nnatives));
 	return m;
 }
 
@@ -119,7 +121,7 @@ static void null_function() {
 }
 
 static void do_log( vdynamic *v ) {
-	switch( v->t->kind ) {
+	switch( (*v->t)->dyn->kind ) {
 	case HI32:
 		printf("%di\n",v->v.i);
 		break;
@@ -148,10 +150,20 @@ int hl_module_init( hl_module *m ) {
 		hl_native *n = m->code->natives + i;
 		m->functions_ptrs[n->findex] = do_log;
 	}
+	// INIT indexes
+	for(i=0;i<m->code->nfunctions;i++) {
+		hl_function *f = m->code->functions + i;
+		m->functions_indexes[f->findex] = i;
+	}
+	for(i=0;i<m->code->nnatives;i++) {
+		hl_native *n = m->code->natives + i;
+		m->functions_indexes[n->findex] = i + m->code->nfunctions;
+	}
 	// JIT
 	ctx = hl_jit_alloc();
 	if( ctx == NULL )
 		return 0;
+	hl_jit_init(ctx, m);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		int fpos = hl_jit_function(ctx, m, f);
@@ -172,6 +184,7 @@ int hl_module_init( hl_module *m ) {
 
 void hl_module_free( hl_module *m ) {
 	hl_free_executable_memory(m->code);
+	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->globals_indexes);
 	free(m->globals_data);

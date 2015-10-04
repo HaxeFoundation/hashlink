@@ -143,10 +143,6 @@ static int hl_get_global( hl_reader *r ) {
 
 static void hl_read_type( hl_reader *r, hl_type *t ) {
 	t->kind = READ();
-	if( t->kind >= HLAST ) {
-		ERROR("Invalid type");
-		return;
-	}
 	switch( t->kind ) {
 	case HFUN:
 		{
@@ -186,7 +182,13 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 				p->pindex = INDEX();
 			}
 		}
+		break;
+	case HDYN | 0x80:
+		t->kind = HDYN;
+		t->dyn = hl_get_type(r);
+		break;
 	default:
+		if( t->kind >= HLAST ) ERROR("Invalid type");
 		break;
 	}
 }

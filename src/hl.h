@@ -84,7 +84,7 @@ typedef enum {
 	HF32	= 3,
 	HF64	= 4,
 	HBOOL	= 5,
-	HANY	= 6,
+	HDYN	= 6,
 	HFUN	= 7,
 	HOBJ	= 8,
 	// ---------
@@ -127,6 +127,7 @@ struct hl_type {
 	union {
 		hl_type_fun *fun;
 		hl_type_obj *obj;
+		hl_type	*dyn;
 	};
 };
 
@@ -182,6 +183,7 @@ typedef struct {
 	int *globals_indexes;
 	unsigned char *globals_data;
 	void **functions_ptrs;
+	int *functions_indexes;
 	void *jit_code;
 } hl_module;
 
@@ -210,6 +212,7 @@ hl_runtime_obj *hl_get_obj_proto( hl_module *m, hl_type *ot );
 
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
+void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m );
 
@@ -218,21 +221,19 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m );
 typedef struct vobj vobj;
 typedef struct vclosure vclosure;
 
-typedef union {
-	int i;
-	float f;
-	double d;
-	vobj *o;
-	vclosure *c;
-	void *ptr;
-} value;
-
 typedef struct {
-	hl_type *t;
+	hl_type **t;
 #	ifndef HL_64
 	int __pad; // force align
 #	endif
-	value v;
+	union {
+		int i;
+		float f;
+		double d;
+		vobj *o;
+		vclosure *c;
+		void *ptr;
+	} v;
 } vdynamic;
 
 typedef struct {
@@ -247,6 +248,7 @@ struct vobj {
 #define CL_HAS_V64		2
 
 struct vclosure {
+	hl_type **t;
 	void *fun;
 	int bits;
 	union {
@@ -267,7 +269,7 @@ void *hl_alloc_executable_memory( int size );
 void hl_free_executable_memory( void *ptr );
 
 void hl_call( void *f );
-vdynamic *hl_alloc_dynamic( hl_type *t );
+vdynamic *hl_alloc_dynamic( hl_type **t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );
 
 vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
