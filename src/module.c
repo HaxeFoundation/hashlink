@@ -31,6 +31,7 @@ hl_runtime_obj *hl_get_obj_rt( hl_module *m, hl_type *ot ) {
 	t = (hl_runtime_obj*)hl_malloc(alloc,sizeof(hl_runtime_obj));
 	t->nfields = o->nfields + (p ? p->nfields : 0);
 	t->fields_indexes = (int*)hl_malloc(alloc,sizeof(int)*t->nfields);
+	t->toString = NULL;
 	
 	// fields indexes
 	start = 0;
@@ -65,6 +66,8 @@ hl_runtime_obj *hl_get_obj_proto( hl_module *m, hl_type *ot ) {
 	for(i=0;i<o->nproto;i++) {
 		hl_obj_proto *p = o->proto + i;
 		if( p->pindex >= t->nproto ) t->nproto = p->pindex + 1;
+		if( memcmp(p->name,"__string",9) == 0 )
+			t->toString = m->functions_ptrs[p->findex];
 	}
 	t->proto = (vobj_proto*)hl_malloc(alloc, sizeof(vobj_proto) + t->nproto * sizeof(void*));
 	t->proto->t = ot;
@@ -121,7 +124,7 @@ static void null_function() {
 }
 
 static void do_log( vdynamic *v ) {
-	switch( (*v->t)->dyn->kind ) {
+	switch( (*v->t)->t->kind ) {
 	case HI32:
 		printf("%di\n",v->v.i);
 		break;
@@ -131,8 +134,23 @@ static void do_log( vdynamic *v ) {
 	case HVOID:
 		printf("void\n");
 		break;
+	case HBYTES:
+		printf("[%s]\n",v->v);
+		break;
+	case HOBJ:
+		{
+			hl_type_obj *o = v->v.o->proto->t->obj;
+			if( o->rt == NULL || o->rt->toString == NULL )
+				printf("#%s\n",o->name);
+			else
+				printf("[%s]\n",o->rt->toString(v->v.o));
+		}
+		break;
 	default:
-		printf("%llXH\n",v->v.ptr);
+		if( IS_64 )
+			printf("%llXH\n",v->v.ptr);
+		else
+			printf("%XH\n",v->v.ptr);
 		break;
 	}
 }

@@ -34,6 +34,8 @@ OP_BEGIN
 	OP(OInt,2)
 	OP(OFloat,2)
 	OP(OBool,2)
+	OP(OString,2)
+	OP(ONull,1)
 	OP(OAdd,3)
 	OP(OSub,3)
 	OP(OMul,3)
@@ -75,6 +77,7 @@ OP_BEGIN
 	OP(OSetField,3)
 	OP(OGetThis,2)
 	OP(OSetThis,2)
+	OP(OThrow,1)
 	// --
 	OP(OLast,0)
 OP_END

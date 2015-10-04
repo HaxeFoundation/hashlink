@@ -54,6 +54,7 @@ typedef enum {
 	RET,
 	CALL,
 	AND,
+	XOR,
 	CMP,
 	NOP,
 	// SSE
@@ -61,6 +62,9 @@ typedef enum {
 	COMISD,
 	ADDSD,
 	SUBSD,
+	// 8 bits
+	MOV8,
+	// --
 	_CPU_LAST
 } CpuOp;
 
@@ -86,10 +90,8 @@ typedef enum {
 
 #ifdef HL_64
 #	define W64(wv)	*ctx->buf.w64++ = wv
-#	define IS_64	1
 #else
 #	define W64(wv)	W(wv)
-#	define IS_64	0
 #endif
 
 #define MOD_RM(mod,reg,rm)		B(((mod) << 6) | (((reg)&7) << 3) | ((rm)&7))
@@ -292,6 +294,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "RET", 0xC3 },
 	{ "CALL", RM(0xFF,2), 0, 0xE8 },
 	{ "AND" },
+	{ "XOR", 0x33, 0x31, RM(0x81,6), RM(0x83,6) },
 	{ "CMP", 0x3B, 0x39, RM(0x81,7), RM(0x83,7) },
 	{ "NOP", 0x90 },
 	// SSE
@@ -299,6 +302,8 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "COMISD", 0x660F2F },
 	{ "ADDSD", 0xF20F58 },
 	{ "SUBSD", 0xF20F5C },
+	// 8 bits,
+	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
 };
 
 static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" }; 
@@ -761,10 +766,16 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 	switch( r->size ) {
 	case 0:
 		break;
+	case 1:
+		if( v->kind == RSTACK )
+			store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
+		else
+			op32(ctx,MOV8,&r->stack,v);
+		break;
 	case 4:
 		if( v->kind == RSTACK )
 			store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
-		else if( r->size == 4 )
+		else
 			op32(ctx,MOV,&r->stack,v);
 		break;
 	case 8:
@@ -799,9 +810,13 @@ static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
 
 static void store_const( jit_ctx *ctx, vreg *r, int c, bool useTmpReg ) {
 	preg p;
-	if( r->size != 4 ) ASSERT(r->size);
+	if( r->size > 4 )
+		ASSERT(r->size);
 	if( useTmpReg ) {
-		op32(ctx,MOV,alloc_cpu(ctx,r,false),pconst(&p,c));
+		if( c == 0 )
+			op32(ctx,XOR,alloc_cpu(ctx,r,false),alloc_cpu(ctx,r,false));
+		else
+			op32(ctx,MOV,alloc_cpu(ctx,r,false),pconst(&p,c));
 		store(ctx,r,r->current,false);
 	} else {
 		scratch(r->current);
@@ -1342,6 +1357,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OInt:
 			store_const(ctx, R(o->p1), m->code->ints[o->p2], true);
 			break;
+		case OBool:
+			store_const(ctx, R(o->p1), o->p2, true);
+			break;
 		case OGetGlobal:
 			{
 				vreg *to = R(o->p1);
@@ -1454,6 +1472,20 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx,r,r->current,false); 
 			}
 			break;
+		case OString:
+			{
+				vreg *r = R(o->p1);
+				op64(ctx,MOV,alloc_cpu(ctx, r, false),pconst64(&p,(int_val)m->code->strings[o->p2]));
+				store(ctx,r,r->current,false);
+			}
+			break;
+		case ONull:
+			{
+				vreg *r = R(o->p1);
+				op64(ctx,XOR,alloc_cpu(ctx, r, false),alloc_cpu(ctx, r, false));
+				store(ctx,r,r->current,false);
+			}
+			break;
 		case ONew:
 			{
 				vreg *r = R(o->p1);
@@ -1502,6 +1534,33 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OCallClosure:
 			op_call_closure(ctx,R(o->p1),R(o->p2),o->p3,o->extra);
+			break;
+		case OField:
+			{
+				vreg *r = R(o->p2);
+				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
+				preg *rr = alloc_cpu(ctx,r, true);
+				preg *rv;
+				LOCK(rr);
+				rv = alloc_reg(ctx,RCPU);
+				if( rr == rv ) ASSERT(0);
+				// TODO : copy data
+				op32(ctx, MOV, rv, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3], 0));
+				store(ctx, R(o->p1), rv, true);
+			}
+			break;
+		case OSetField:
+			{
+				vreg *r = R(o->p1);
+				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
+				preg *rr = alloc_cpu(ctx, r, true);
+				preg *rv;
+				LOCK(rr);
+				rv = alloc_cpu(ctx, R(o->p3), true);
+				if( rr == rv ) ASSERT(0);
+				// TODO : copy data
+				op32(ctx, MOV, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2], 0), rv);
+			}
 			break;
 		case OGetThis:
 			{
@@ -1568,6 +1627,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				discard_regs(ctx, false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
 				store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+			}
+			break;
+		case OThrow:
+			{
+				// TODO
+				BREAK();
 			}
 			break;
 		default:

@@ -58,9 +58,11 @@
 #endif
 
 #ifdef HL_64
-#	define	HL_WSIZE 8
+#	define HL_WSIZE 8
+#	define IS_64	1
 #else
-#	define	HL_WSIZE 4
+#	define HL_WSIZE 4
+#	define IS_64	0
 #endif
 
 typedef	enum { false = 0, true = 1 } bool;
@@ -87,8 +89,10 @@ typedef enum {
 	HDYN	= 6,
 	HFUN	= 7,
 	HOBJ	= 8,
+	HBYTES	= 9,
+	HARRAY	= 10,
 	// ---------
-	HLAST	= 9,
+	HLAST	= 11,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
@@ -127,7 +131,7 @@ struct hl_type {
 	union {
 		hl_type_fun *fun;
 		hl_type_obj *obj;
-		hl_type	*dyn;
+		hl_type	*t;
 	};
 };
 
@@ -263,6 +267,7 @@ struct hl_runtime_obj {
 	int size;
 	int *fields_indexes;
 	vobj_proto *proto;
+	const char *(*toString)( vobj * );
 };
 
 void *hl_alloc_executable_memory( int size );

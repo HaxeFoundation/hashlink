@@ -185,7 +185,10 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 		break;
 	case HDYN | 0x80:
 		t->kind = HDYN;
-		t->dyn = hl_get_type(r);
+		t->t = hl_get_type(r);
+		break;
+	case HARRAY:
+		t->t = hl_get_type(r);
 		break;
 	default:
 		if( t->kind >= HLAST ) ERROR("Invalid type");
