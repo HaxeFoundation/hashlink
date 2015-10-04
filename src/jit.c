@@ -1739,12 +1739,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	return codePos;
 }
 
-void *hl_jit_code( jit_ctx *ctx, hl_module *m ) {
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
 	jlist *c;
 	int size = BUF_POS();
-	unsigned char *code = (unsigned char*)hl_alloc_executable_memory(size);
+	unsigned char *code;
+	if( size & 4095 ) size += 4096 - (size&4095);
+	code = (unsigned char*)hl_alloc_executable_memory(size);
 	if( code == NULL ) return NULL;
 	memcpy(code,ctx->startBuf,size);
+	*codesize = size;
 	// patch calls
 	c = ctx->calls;
 	while( c ) {

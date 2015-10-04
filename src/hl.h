@@ -190,6 +190,7 @@ typedef struct {
 
 typedef struct {
 	hl_code *code;
+	int codesize;
 	int *globals_indexes;
 	unsigned char *globals_data;
 	void **functions_ptrs;
@@ -225,7 +226,7 @@ void hl_jit_free( jit_ctx *ctx );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_init_callback( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
-void *hl_jit_code( jit_ctx *ctx, hl_module *m );
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize );
 
 /* -------------------- RUNTIME ------------------------------ */
 
@@ -279,7 +280,7 @@ struct hl_runtime_obj {
 };
 
 void *hl_alloc_executable_memory( int size );
-void hl_free_executable_memory( void *ptr );
+void hl_free_executable_memory( void *ptr, int size );
 
 vdynamic *hl_alloc_dynamic( hl_type **t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );

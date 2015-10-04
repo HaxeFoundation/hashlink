@@ -9,6 +9,9 @@ hl32:
 	
 hl64:
 	make CC=gcc ARCH=64 build
+
+bench:
+	(cd bench && haxe --interp -main Bench)
 	
 use: all
 	cp hl32.exe Release/hl.exe
@@ -22,4 +25,4 @@ build: $(SRC)
 .c.o :
 	${CC} ${CFLAGS} -o $@ -c $<
 	
-.PHONY: hl32 hl64
+.PHONY: hl32 hl64 bench

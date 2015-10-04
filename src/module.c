@@ -189,7 +189,7 @@ int hl_module_init( hl_module *m ) {
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
 	}
-	m->jit_code = hl_jit_code(ctx, m);
+	m->jit_code = hl_jit_code(ctx, m, &m->codesize);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
@@ -200,7 +200,7 @@ int hl_module_init( hl_module *m ) {
 }
 
 void hl_module_free( hl_module *m ) {
-	hl_free_executable_memory(m->code);
+	hl_free_executable_memory(m->code, m->codesize);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->globals_indexes);

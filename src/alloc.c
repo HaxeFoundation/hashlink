@@ -22,6 +22,9 @@
 #include "hl.h"
 #ifdef HL_WIN
 #	include <windows.h>
+#else
+#	include <sys/types.h>
+#	include <sys/mman.h>
 #endif
 
 void hl_global_init() {
@@ -114,16 +117,17 @@ void *hl_alloc_executable_memory( int size ) {
 #ifdef HL_WIN
 	return VirtualAlloc(NULL,size,MEM_COMMIT,PAGE_EXECUTE_READWRITE);
 #else
-	printf("NOT IMPLEMENTED\n");
-	return NULL;
+	void *p;
+	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,(MAP_PRIVATE|MAP_ANON),-1,0);
+	return p;
 #endif
 }
 
-void hl_free_executable_memory( void *c ) {
+void hl_free_executable_memory( void *c, int size ) {
 #ifdef HL_WIN
 	VirtualFree(c,0,MEM_RELEASE);
 #else
-	printf("NOT IMPLEMENTED\n");
+	munmap(c, size);
 #endif
 }
 
