@@ -38,4 +38,5 @@ int main() {
 	c->o = o;
 	p->fib = ofib;
 	printf("%di\n",o->p->fib(o,40));
+	return 0;
 }

@@ -2,8 +2,8 @@ class Bench {
 
 	static var BENCH_COUNT = 2;
 
-	static function bestTime( cmd : String, args : Array<String> ) {
-		var out = null, bestTime = 1e9;
+	static function bestTime( cmd : String, args : Array<String>, out ) {
+		var bestTime = 1e9;
 		var targs = args.copy();
 		targs.unshift("./"+cmd);
 		targs.unshift("%e");
@@ -18,15 +18,12 @@ class Bench {
 			}
 			var o = StringTools.trim(p.stdout.readAll().toString());
 			var t = Std.parseFloat(p.stderr.readAll().toString());
-			if( out == null ) {
-				out = o;
-				bestTime = t;
-			} else {
-				if( out != o )
-					Sys.println("Varying output " + o + " != " + out);
-				if( t < bestTime )
-					bestTime = t;
+			if( out != o ) {
+				Sys.println("Bad ouput : " + o + " should be " + out);
+				return null;
 			}
+			if( t < bestTime )
+				bestTime = t;
 			p.close();
 		}
 		return { t : bestTime, out : out };
@@ -36,35 +33,64 @@ class Bench {
 		var count = 0;
 		for( f in sys.FileSystem.readDirectory(".") ) {
 			if( !sys.FileSystem.isDirectory(f) ) continue;
-			if( !sys.FileSystem.exists(f + "/main.c") || !sys.FileSystem.exists(f + "/Main.hx") ) continue;
+			if( !sys.FileSystem.exists(f + "/out.txt") || !sys.FileSystem.exists(f + "/Main.hx") ) continue;
 			Sys.println(f);
+			
+			var out = StringTools.trim(sys.io.File.getContent(f+"/out.txt"));
+			var c32 = null, c64 = null;
 
-			// C32
-			var p = new sys.io.Process("cl.exe", ["/nologo", "/Ot", "/arch:SSE2", "/fp:fast", f + "/main.c"]);
-			var code = p.exitCode();
-			if( code != 0 ) {
-				Sys.println("C32 Compilation failed with code " + code);
-				continue;
-			}
-			var c32 = bestTime("main.exe", []);
-			if( c32 == null ) continue;
-			Sys.println("  C-32 " + c32.t);
+			if( sys.FileSystem.exists(f+"/main.c") ) {
+				// MSVC32
+				var p = new sys.io.Process("cl.exe", ["/nologo", "/Ot", "/arch:SSE2", "/fp:fast", f + "/main.c"]);
+				var code = p.exitCode();
+				if( code != 0 ) {
+					Sys.println("MSVC32 Compilation failed with code " + code);
+					continue;
+				}
+				c32 = bestTime("main.exe", [], out);
+				if( c32 != null )
+					Sys.println("  MSVC-32 " + c32.t);
+	
+				// C64
+				var lib = Sys.getEnv("LIB");
+				Sys.putEnv("LIB", "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\VC\\lib\\amd64;C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Lib\\x64;" + lib);
+				var p = new sys.io.Process("C:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\VC\\bin\\amd64\\cl.exe", ["/nologo", "/Ot", "/fp:fast", f + "/main.c"]);
+				var code = p.exitCode();
+				Sys.putEnv("LIB", lib); // restore
+				if( code != 0 ) {
+					Sys.println("C64 Compilation failed with code " + code);
+					continue;
+				}
+				c64 = bestTime("main.exe", [], out);
+				if( c64 != null )
+					Sys.println("  MSVC-64 " + c64.t);
 
-			// C64
-			var lib = Sys.getEnv("LIB");
-			Sys.putEnv("LIB", "C:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\VC\\lib\\amd64;C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Lib\\x64;" + lib);
- 			var p = new sys.io.Process("C:\\Program Files (x86)\\Microsoft Visual Studio 10.0\\VC\\bin\\amd64\\cl.exe", ["/nologo", "/Ot", "/fp:fast", f + "/main.c"]);
-			var code = p.exitCode();
-			Sys.putEnv("LIB", lib); // restore
-			if( code != 0 ) {
-				Sys.println("C64 Compilation failed with code " + code);
-				continue;
+				// GCC32
+				var p = new sys.io.Process("i686-pc-cygwin-gcc", ["-m32", "-msse2", "-mfpmath=sse", "-O3", f + "/main.c"]);
+				var code = p.exitCode();
+				if( code != 0 ) {
+					Sys.println("GCC32 Compilation failed with code " + code);
+					continue;
+				}
+				var gc32 = bestTime("a.exe", [], out);
+				if( gc32 != null ) {
+					Sys.println("  GCC-32 " + gc32.t);
+					if( c32 == null || c32.t > gc32.t ) c32 = gc32;
+				}
+				
+				// GCC64
+				var p = new sys.io.Process("gcc", ["-m64", "-msse2", "-mfpmath=sse", "-O3", f + "/main.c"]);
+				var code = p.exitCode();
+				if( code != 0 ) {
+					Sys.println("GCC64 Compilation failed with code " + code);
+					continue;
+				}
+				var gc64 = bestTime("a.exe", [], out);
+				if( gc64 != null ) {
+					Sys.println("  GCC-64 " + gc64.t);
+					if( c64 == null || c64.t > gc64.t ) c64 = gc64;
+				}
 			}
-			var c64 = bestTime("main.exe", []);
-			if( c64 == null ) continue;
-			if( c32.out != c64.out )
-				Sys.println("32/64 output vary : " + c32.out + " != " + c64.out);
-			Sys.println("  C-64 " + c64.t);
 
 			// HAXE
 			var p = new sys.io.Process("haxe", ["-cp", f, "-dce", "full", "-hl", "main.hl", "-main", "Main"]);
@@ -76,18 +102,14 @@ class Bench {
 			}
 
 			// HL32
-			var h32 = bestTime("../Release/hl.exe", ["main.hl"]);
-			if( h32 == null ) continue;
-			if( h32.out != c32.out )
-				Sys.println("Bad HL ouput : " + h32.out + " should be " + c32.out);
-			Sys.println("  HL-32 " + h32.t + " " + Math.round(c32.t * 100 / h32.t) + "%");
+			var h32 = bestTime("../Release/hl.exe", ["main.hl"], out);
+			if( h32 != null )
+				Sys.println("  HL-32 " + h32.t + (c32 == null ? "" : " " + Math.round(c32.t * 100 / h32.t) + "%"));
 
 			// HL64
-			var h64 = bestTime("../x64/Release/hl.exe", ["main.hl"]);
-			if( h64 == null ) continue;
-			if( h64.out != c64.out )
-				Sys.println("Bad HL ouput : " + h64.out + " should be " + c64.out);
-			Sys.println("  HL-64 " + h64.t + " " + Math.round(c64.t * 100 / h64.t) + "%");
+			var h64 = bestTime("../x64/Release/hl.exe", ["main.hl"], out);
+			if( h64 != null )
+				Sys.println("  HL-64 " + h64.t + (c64 == null ? "" : " " + Math.round(c64.t * 100 / h64.t) + "%"));
 
 			count++;
 		}

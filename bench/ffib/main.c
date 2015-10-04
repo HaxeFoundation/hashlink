@@ -8,4 +8,5 @@ double ffib( double n ) {
 
 int main() {
 	printf("%.19gf\n", ffib(39));
+	return 0;
 }

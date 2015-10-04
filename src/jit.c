@@ -904,6 +904,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 					ASSERT(v->size);
 					break;
 				}
+				scratch(r);
 			}
 			LOCK(r);
 		}
