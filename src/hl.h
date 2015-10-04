@@ -217,6 +217,7 @@ hl_runtime_obj *hl_get_obj_proto( hl_module *m, hl_type *ot );
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
+int hl_jit_init_callback( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m );
 
@@ -231,6 +232,7 @@ typedef struct {
 	int __pad; // force align
 #	endif
 	union {
+		unsigned char b;
 		int i;
 		float f;
 		double d;
@@ -267,15 +269,17 @@ struct hl_runtime_obj {
 	int size;
 	int *fields_indexes;
 	vobj_proto *proto;
-	const char *(*toString)( vobj * );
+	void *toString;
 };
 
 void *hl_alloc_executable_memory( int size );
 void hl_free_executable_memory( void *ptr );
 
-void hl_call( void *f );
 vdynamic *hl_alloc_dynamic( hl_type **t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );
+
+void hl_callback_init( void *e );
+void *hl_callback( void *f, int nargs, vdynamic **args );
 
 vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
 vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );

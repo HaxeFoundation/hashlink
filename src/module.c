@@ -114,7 +114,7 @@ hl_module *hl_module_alloc( hl_code *c ) {
 		return NULL;
 	}
 	memset(m->functions_ptrs,0,sizeof(void*)*(c->nfunctions + c->nnatives));
-	memset(m->functions_indexes,0xFF,sizeof(void*)*(c->nfunctions + c->nnatives));
+	memset(m->functions_indexes,0xFF,sizeof(int)*(c->nfunctions + c->nnatives));
 	return m;
 }
 
@@ -143,7 +143,7 @@ static void do_log( vdynamic *v ) {
 			if( o->rt == NULL || o->rt->toString == NULL )
 				printf("#%s\n",o->name);
 			else
-				printf("[%s]\n",o->rt->toString(v->v.o));
+				printf("[%s]\n",hl_callback(o->rt->toString,1,&v));
 		}
 		break;
 	default:
@@ -156,7 +156,7 @@ static void do_log( vdynamic *v ) {
 }
 
 int hl_module_init( hl_module *m ) {
-	int i;
+	int i, entry;
 	jit_ctx *ctx;
 	// RESET globals
 	for(i=0;i<m->code->nglobals;i++) {
@@ -182,6 +182,7 @@ int hl_module_init( hl_module *m ) {
 	if( ctx == NULL )
 		return 0;
 	hl_jit_init(ctx, m);
+	entry = hl_jit_init_callback(ctx);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		int fpos = hl_jit_function(ctx, m, f);
@@ -196,6 +197,7 @@ int hl_module_init( hl_module *m ) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
 	}
+	hl_callback_init(((unsigned char*)m->jit_code) + entry);
 	hl_jit_free(ctx);
 	return 1;
 }

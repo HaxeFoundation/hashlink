@@ -173,20 +173,3 @@ vclosure *hl_alloc_closure_i64( hl_module *m, int_val fid, int_val v64 ) {
 	c->v64 = v64;
 	return c;
 }
-
-void hl_call( void *f ) {
-#	if !defined(HL_64) && defined(HL_VCC)
-	int old_esp;
-	__asm {
-		mov old_esp, esp
-		mov eax, esp
-		and eax, 15
-		sub esp, eax
-		call f
-		mov esp, old_esp
-	}
-#	else
-	((fptr)f)();
-#	endif
-}
-

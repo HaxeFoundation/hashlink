@@ -68,7 +68,7 @@ int main( int argc, char *argv[] ) {
 			return 4;
 		if( !hl_module_init(m) )
 			return 5;
-		hl_call(m->functions_ptrs[m->code->entrypoint]);
+		hl_callback(m->functions_ptrs[m->code->entrypoint],0,NULL);
 		hl_module_free(m);
 		hl_free(&code->alloc);
 	}
