@@ -67,12 +67,9 @@ static void hl_read_bytes( hl_reader *r, void *data, int size ) {
 }
 
 static double hl_read_double( hl_reader *r ) {
-	union {
-		double d;
-		char b[8];
-	} s;
-	hl_read_bytes(r, s.b, 8);
-	return s.d;
+	double d = 0.;
+	hl_read_bytes(r, &d, 8);
+	return d;
 }
 
 static int hl_read_i32( hl_reader *r ) {
@@ -132,18 +129,9 @@ static const char *hl_get_string( hl_reader *r ) {
 	return r->code->strings[i];
 }
 
-static int hl_get_global( hl_reader *r ) {
-	int g = INDEX();
-	if( g < 0 || g >= r->code->nglobals ) {
-		ERROR("Invalid global index");
-		g = 0;
-	}
-	return g;
-}
-
 static void hl_read_type( hl_reader *r, hl_type *t ) {
 	t->kind = READ();
-	switch( t->kind ) {
+	switch( (int)t->kind ) {
 	case HFUN:
 		{
 			int i;
@@ -221,7 +209,7 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 		o->p1 = INDEX();
 		o->p2 = INDEX();
 		o->p3 = INDEX();
-		o->extra = (int*)INDEX();
+		o->extra = (int*)(int_val)INDEX();
 		break;
 	case -1:
 		switch( o->op ) {

@@ -124,7 +124,6 @@ void hl_free_executable_memory( void *c ) {
 	VirtualFree(c,0,MEM_RELEASE);
 #else
 	printf("NOT IMPLEMENTED\n");
-	return NULL;
 #endif
 }
 

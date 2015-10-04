@@ -135,7 +135,7 @@ static void do_log( vdynamic *v ) {
 		printf("void\n");
 		break;
 	case HBYTES:
-		printf("[%s]\n",v->v);
+		printf("[%s]\n",(char*)v->v.ptr);
 		break;
 	case HOBJ:
 		{
@@ -143,14 +143,11 @@ static void do_log( vdynamic *v ) {
 			if( o->rt == NULL || o->rt->toString == NULL )
 				printf("#%s\n",o->name);
 			else
-				printf("[%s]\n",hl_callback(o->rt->toString,1,&v));
+				printf("[%s]\n",(char*)hl_callback(o->rt->toString,1,&v));
 		}
 		break;
 	default:
-		if( IS_64 )
-			printf("%llXH\n",v->v.ptr);
-		else
-			printf("%XH\n",v->v.ptr);
+		printf(_PTR_FMT "H\n",(int_val)v->v.ptr);
 		break;
 	}
 }
@@ -190,7 +187,7 @@ int hl_module_init( hl_module *m ) {
 			hl_jit_free(ctx);
 			return 0;
 		}
-		m->functions_ptrs[f->findex] = (void*)fpos;
+		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
 	}
 	m->jit_code = hl_jit_code(ctx, m);
 	for(i=0;i<m->code->nfunctions;i++) {

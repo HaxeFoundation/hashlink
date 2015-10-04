@@ -60,9 +60,15 @@
 #ifdef HL_64
 #	define HL_WSIZE 8
 #	define IS_64	1
+#	ifdef HL_VCC
+#		define _PTR_FMT	"%llX"
+#	else
+#		define _PTR_FMT	"%lX"
+#	endif
 #else
 #	define HL_WSIZE 4
 #	define IS_64	0
+#	define _PTR_FMT	"%X"
 #endif
 
 typedef	enum { false = 0, true = 1 } bool;

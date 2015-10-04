@@ -220,11 +220,13 @@ static preg *pmem( preg *r, CpuReg reg, int regOrOffset ) {
 	return r;
 }
 
+#ifdef HL_64
 static preg *pcodeaddr( preg *r, int offset ) {
 	r->kind = RMEM;
 	r->id = 15 | (offset << 4);
 	return r;
 }
+#endif
 
 static preg *pconst( preg *r, int c ) {
 	r->kind = RCONST;
@@ -309,6 +311,8 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
 };
 
+#ifdef OP_LOG
+
 static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" }; 
 static const char *JUMP_NAMES[] = { "JOVERFLOW", "J???", "JLT", "JGTE", "JEQ", "JNEQ", "JLTE", "JGT", "J?8", "J?9", "J?A", "J?B", "JSLT", "JSGTE", "JSLTE", "JSGT" };
 
@@ -322,7 +326,7 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 			sprintf(buf,"r%d%s",r->id,mode64?"":"d");
 		break;
 	case RFPU:
-		sprintf(buf,"xmm%d",r->id,mode64?"":"f");
+		sprintf(buf,"xmm%d%s",r->id,mode64?"":"f");
 		break;
 	case RSTACK:
 		{
@@ -333,10 +337,7 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 	case RCONST:
 		{
 			int_val v = r->holds ? (int_val)r->holds : r->id;
-			if( IS_64 )
-				sprintf(buf,"%s%llXh",v < 0 ? "-" : "", v < 0 ? -v : v);
-			else
-				sprintf(buf,"%s%Xh",v < 0 ? "-" : "", v < 0 ? -v : v);
+			sprintf(buf,"%s" _PTR_FMT "h",v < 0 ? "-" : "", v < 0 ? -v : v);
 		}
 		break;
 	case RMEM:
@@ -358,24 +359,13 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 		}
 		break;
 	case RADDR:
-		if( IS_64 )
-			sprintf(buf, "%s ptr[%llXh]", mode64 ? "qword" : "dword", r->holds);
-		else
-			sprintf(buf, "%s ptr[%Xh]", mode64 ? "qword" : "dword", r->holds);
+		sprintf(buf, "%s ptr[" _PTR_FMT "h]", mode64 ? "qword" : "dword", r->holds);
 		break;
 	default:
 		return "???";
 	}
 	return buf;
 }
-
-#ifdef HL_64
-#	define REX()	if( r64 ) B(r64 | 0x40)
-#else
-#	define REX()
-#endif
-
-#define	OP(b)	if( (b) > 0xFFFF ) {  B((b)>>16); if( r64 ) B(r64 | 0x40); B((b)>>8); B(b); } else { REX(); B(b); }
 
 static void log_op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
@@ -386,6 +376,16 @@ static void log_op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		printf(",%s",preg_str(ctx, b, mode64));
 	printf("\n");
 }
+
+#endif
+
+#ifdef HL_64
+#	define REX()	if( r64 ) B(r64 | 0x40)
+#else
+#	define REX()
+#endif
+
+#define	OP(b)	if( (b) > 0xFFFF ) {  B((b)>>16); if( r64 ) B(r64 | 0x40); B((b)>>8); B(b); } else { REX(); B(b); }
 
 static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
@@ -571,7 +571,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		if( IS_64 )
 			W64((int_val)b->holds);
 		else
-			W((int)b->holds);
+			W((int)(int_val)b->holds);
 		break;
 #	ifndef HL_64
 	case ID2(RADDR,RFPU):
@@ -584,7 +584,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		if( IS_64 )
 			W64((int_val)a->holds);
 		else
-			W((int)a->holds);
+			W((int)(int_val)a->holds);
 		break;
 	case ID2(RMEM, RCPU):
 	case ID2(RMEM, RFPU):
@@ -862,13 +862,6 @@ static int pad_stack( jit_ctx *ctx, int size ) {
 	return size;
 }
 
-static void stack_align_error( int r ) {
-	printf("STACK ALIGN ERROR %d !\n",r&15);
-	exit(1);
-}
-
-//#define CHECK_STACK_ALIGN
-
 #ifdef HL_64
 static CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
 #endif
@@ -972,7 +965,7 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *args ) {
 	int fid = findex < 0 ? -1 : ctx->m->functions_indexes[findex];
 	int isNative = fid >= ctx->m->code->nfunctions;
-	int i = 0, size = prepare_call_args(ctx,count,args,ctx->vregs,isNative);
+	int size = prepare_call_args(ctx,count,args,ctx->vregs,isNative);
 	preg p;
 	if( fid < 0 ) {
 		ASSERT(fid);
@@ -983,7 +976,7 @@ static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *ar
 		int cpos = BUF_POS();
 		if( ctx->m->functions_ptrs[findex] ) {
 			// already compiled
-			op32(ctx,CALL,pconst(&p,(int)ctx->m->functions_ptrs[findex] - (cpos + 5)), UNUSED);
+			op32(ctx,CALL,pconst(&p,(int)(int_val)ctx->m->functions_ptrs[findex] - (cpos + 5)), UNUSED);
 		} else if( ctx->m->code->functions + fid == ctx->f ) {
 			// our current function
 			op32(ctx,CALL,pconst(&p, ctx->functionPos - (cpos + 5)), UNUSED);
@@ -1485,7 +1478,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				int args[2];
 				args[0] = o->p3;
-				args[1] = (int)o->extra;
+				args[1] = (int)(int_val)o->extra;
 				op_call_fun(ctx, R(o->p1), o->p2, 2, args);
 			}
 			break;
@@ -1755,7 +1748,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m ) {
 	// patch calls
 	c = ctx->calls;
 	while( c ) {
-		int fpos = (int)m->functions_ptrs[c->target];
+		int fpos = (int)(int_val)m->functions_ptrs[c->target];
 		*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
 		c = c->next;
 	}
