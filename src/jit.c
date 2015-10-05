@@ -152,9 +152,17 @@ struct vreg {
 #ifdef HL_64
 #	define RCPU_COUNT	14
 #	define RFPU_COUNT	16
-#	define RCPU_SCRATCH_COUNT	7
-#	define RFPU_SCRATCH_COUNT	6
+#	ifdef HL_WIN_CALL
+#		define RCPU_SCRATCH_COUNT	7
+#		define RFPU_SCRATCH_COUNT	6
 static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, R8, R9, R10, R11 };
+static CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
+#	else
+#		define RCPU_SCRATCH_COUNT	9
+#		define RFPU_SCRATCH_COUNT	16
+static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, Esi, Edi, R8, R9, R10, R11 };
+static CpuReg CALL_REGS[] = { Edi, Esi, Edx, Ecx, R8, R9 };
+#	endif
 #else
 #	define RCPU_COUNT	8
 #	define RFPU_COUNT	8
@@ -717,18 +725,15 @@ static void scratch( preg *r ) {
 	}
 }
 
+static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size );
+
 static void load( jit_ctx *ctx, preg *r, vreg *v ) {
 	preg *from = fetch(v);
 	if( from == r || v->size == 0 ) return;
 	if( r->holds ) r->holds->current = NULL;
 	r->holds = v;
 	v->current = r;
-	if( IS_FLOAT(v) )
-		op64(ctx,MOVSD,r,from);
-	else if( v->size > 4 )
-		op64(ctx,MOV,r,from);
-	else
-		op32(ctx,MOV,r,from);
+	copy(ctx,r,from,v->size);
 }
 
 static preg *alloc_fpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
@@ -767,45 +772,77 @@ static preg *alloc_cpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
 	return p;
 }
 
+static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
+	if( size == 0 || to == from ) return to;
+	switch( ID2(to->kind,from->kind) ) {
+	case ID2(RMEM,RCPU):
+	case ID2(RSTACK,RCPU):
+	case ID2(RCPU,RSTACK):
+	case ID2(RCPU,RMEM):
+	case ID2(RCPU,RCPU):
+		switch( size ) {
+		case 1:
+			op32(ctx,MOV8,to,from);
+			break;
+		case 4:
+			op32(ctx,MOV,to,from);
+			break;
+		case 8:
+			if( IS_64 ) {
+				op64(ctx,MOV,to,from);
+				break;
+			}
+		default:
+			ASSERT(size);
+		}
+		return to->kind == RCPU ? to : from;
+	case ID2(RFPU,RFPU):
+	case ID2(RMEM,RFPU):
+	case ID2(RSTACK,RFPU):
+	case ID2(RFPU,RMEM):
+	case ID2(RFPU,RSTACK):
+		switch( size ) {
+		case 8:
+			op64(ctx,MOVSD,to,from);
+			break;
+		default:
+			ASSERT(size);
+		}
+		return to->kind == RFPU ? to : from;
+	case ID2(RMEM,RSTACK):
+		{
+			vreg *rfrom = R(from->id);
+			if( IS_FLOAT(rfrom) )
+				return copy(ctx,to,alloc_fpu(ctx,rfrom,true),size);
+			return copy(ctx,to,alloc_cpu(ctx,rfrom,true),size);
+		}
+	case ID2(RSTACK,RMEM):
+		{
+			preg *tmp;
+			if( size == 8 && !IS_64 ) {
+				tmp = alloc_reg(ctx, RFPU);
+				op64(ctx,MOVSD,tmp,from);
+			} else {
+				tmp = alloc_reg(ctx, RCPU);
+				copy(ctx,tmp,from,size);
+			}
+			return copy(ctx,to,tmp,size);
+		}
+	default:
+		break;
+	}
+	printf("copy(%s,%s)\n",KNAMES[to->kind], KNAMES[from->kind]);
+	ASSERT(0);
+	return NULL;
+}
+
 static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 	if( r->current && r->current != v ) {
 		r->current->holds = NULL;
 		r->current = NULL;
 	}
-	switch( r->size ) {
-	case 0:
-		break;
-	case 1:
-		if( v->kind == RSTACK )
-			store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
-		else
-			op32(ctx,MOV8,&r->stack,v);
-		break;
-	case 4:
-		if( v->kind == RSTACK )
-			store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
-		else
-			op32(ctx,MOV,&r->stack,v);
-		break;
-	case 8:
-		if( IS_FLOAT(r) || v->kind == RFPU ) {
-			if( v->kind == RSTACK )
-				store(ctx,r,alloc_fpu(ctx, R(v->id), true), bind);
-			else 
-				op64(ctx,MOVSD,&r->stack,v);
-		} else if( IS_64 ) {
-			if( v->kind == RSTACK )
-				store(ctx,r,alloc_cpu(ctx, R(v->id), true), bind);
-			else
-				op64(ctx,MOV,&r->stack,v);
-		} else {
-			ASSERT(r->size);
-		}
-		break;
-	default:
-		ASSERT(r->size);
-	}
-	if( bind && r->current != v ) {
+	v = copy(ctx,&r->stack,v,r->size);
+	if( bind && r->current != v && (v->kind == RCPU || v->kind == RFPU) ) {
 		scratch(v);
 		r->current = v;
 		v->holds = r;
@@ -815,6 +852,14 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
 	preg *r = fetch(from);
 	store(ctx, to, r, true);
+}
+
+static void copy_to( jit_ctx *ctx, vreg *to, preg *from ) {
+	store(ctx,to,from,true);
+}
+
+static void copy_from( jit_ctx *ctx, preg *to, vreg *from ) {
+	copy(ctx,to,fetch(from),from->size);
 }
 
 static void store_const( jit_ctx *ctx, vreg *r, int c, bool useTmpReg ) {
@@ -862,10 +907,6 @@ static int pad_stack( jit_ctx *ctx, int size ) {
 	return size;
 }
 
-#ifdef HL_64
-static CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
-#endif
-
 static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, bool isNative ) {
 	int i;
 	int stackRegs = count;
@@ -877,26 +918,13 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 			vreg *v = vregs + args[i];
 			preg *vr = fetch(v);
 			preg *r = REG_AT(CALL_REGS[i]);
-#			ifdef HL_VCC
+#			ifdef HL_WIN_CALL
 			if( i == 4 ) break;
+#			else
+			// TODO : when more than 6 args
 #			endif
 			if( vr != r ) {
-				switch( v->size ) {
-				case 1:
-				case 2:
-				case 4:
-					op32(ctx,MOV,r,vr);
-					break;
-				case 8:
-					if( IS_FLOAT(v) ) {
-						ASSERT(0); // TODO : use XMM register !
-					} else
-						op64(ctx,MOV,r,vr);
-					break;
-				default:
-					ASSERT(v->size);
-					break;
-				}
+				copy(ctx,r,vr,v->size);
 				scratch(r);
 			}
 			LOCK(r);
@@ -950,7 +978,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 
 static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	preg p;
-#	if defined(HL_VCC) && defined(HL_64)
+#	if defined(HL_WIN_CALL) && defined(HL_64)
 	// MSVC requires 32bytes of free space here
 	op64(ctx,SUB,PESP,pconst(&p,32));
 	size += 32;
@@ -1434,33 +1462,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OGetGlobal:
 			{
-				vreg *to = R(o->p1);
-				preg *r = IS_FLOAT(to) ? alloc_fpu(ctx,to,false) : alloc_cpu(ctx, to, false);
 				void *addr = m->globals_data + m->globals_indexes[o->p2];
-				if( IS_FLOAT(to) )
-					op64(ctx,MOVSD,r,paddr(&p,addr));
-				else if( IS_64 ) {
-					op64(ctx,MOV,r,pconst64(&p,(int_val)addr));
-					op32(ctx,MOV,r,pmem(&p,r->id,0));
-				} else
-					op64(ctx,MOV,r,paddr(&p,addr));
-				store(ctx, to, r, false);
+				copy_to(ctx, R(o->p1), paddr(&p,addr));
 			}
 			break;
 		case OSetGlobal:
 			{
-				vreg *r = R(o->p2);
-				preg *v = IS_FLOAT(r) ? alloc_fpu(ctx,r,true) : alloc_cpu(ctx,r,true);
 				void *addr = m->globals_data + m->globals_indexes[o->p1];
-				LOCK(v);
-				if( IS_FLOAT(r) )
-					op64(ctx,MOVSD,paddr(&p,addr),v);
-				else if( IS_64 ) {
-					preg *tmp = alloc_reg(ctx, RCPU);
-					op64(ctx,MOV,tmp,pconst64(&p,(int_val)addr));
-					op32(ctx,MOV,pmem(&p,(CpuReg)tmp->id,0),v);
-				} else
-					op32(ctx,MOV,paddr(&p,addr),v);
+				copy_from(ctx, paddr(&p,addr), R(o->p2));
 			}
 			break;
 		case OCall3:
@@ -1612,13 +1621,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(o->p2);
 				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
 				preg *rr = alloc_cpu(ctx,r, true);
-				preg *rv;
 				LOCK(rr);
-				rv = alloc_reg(ctx,RCPU);
-				if( rr == rv ) ASSERT(0);
-				// TODO : copy data
-				op32(ctx, MOV, rv, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3]));
-				store(ctx, R(o->p1), rv, true);
+				copy_to(ctx,R(o->p1),pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3]));
 			}
 			break;
 		case OSetField:
@@ -1626,12 +1630,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(o->p1);
 				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
 				preg *rr = alloc_cpu(ctx, r, true);
-				preg *rv;
 				LOCK(rr);
-				rv = alloc_cpu(ctx, R(o->p3), true);
-				if( rr == rv ) ASSERT(0);
-				// TODO : copy data
-				op32(ctx, MOV, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]), rv);
+				copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]), R(o->p3));
 			}
 			break;
 		case OGetThis:
@@ -1639,13 +1639,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(0);
 				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
 				preg *rr = alloc_cpu(ctx,r, true);
-				preg *rv;
 				LOCK(rr);
-				rv = alloc_reg(ctx,RCPU);
-				if( rr == rv ) ASSERT(0);
-				// TODO : copy data
-				op32(ctx, MOV, rv, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]));
-				store(ctx, R(o->p1), rv, true);
+				copy_to(ctx,R(o->p1),pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]));
 			}
 			break;
 		case OSetThis:
@@ -1653,12 +1648,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(0);
 				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
 				preg *rr = alloc_cpu(ctx, r, true);
-				preg *rv;
 				LOCK(rr);
-				rv = alloc_cpu(ctx, R(o->p2), true);
-				if( rr == rv ) ASSERT(0);
-				// TODO : copy data
-				op32(ctx, MOV, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p1]), rv);
+				copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p1]), R(o->p2));
 			}
 			break;
 		case OCallThis:
@@ -1746,7 +1737,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
 	if( size & 4095 ) size += 4096 - (size&4095);
 	code = (unsigned char*)hl_alloc_executable_memory(size);
 	if( code == NULL ) return NULL;
-	memcpy(code,ctx->startBuf,size);
+	memcpy(code,ctx->startBuf,BUF_POS());
 	*codesize = size;
 	// patch calls
 	c = ctx->calls;

@@ -52,6 +52,10 @@
 #	pragma warning( disable : 4996 )
 #endif
 
+#if defined(HL_VCC) || defined(__CYGWIN__)
+#	define HL_WIN_CALL
+#endif
+
 #include <stddef.h>
 #ifndef HL_VCC
 #	include <stdint.h>
@@ -264,6 +268,9 @@ struct vclosure {
 	hl_type **t;
 	void *fun;
 	int bits;
+#	ifdef HL_64
+	int __pad;
+#	endif
 	union {
 		int v32;
 		int_val v64;
