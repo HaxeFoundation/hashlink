@@ -338,6 +338,7 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	ALLOC(c->natives, hl_native, c->nnatives);
 	for(i=0;i<c->nnatives;i++) {
 		hl_native *n = c->natives + i;
+		n->lib = hl_get_string(r);
 		n->name = hl_get_string(r);
 		n->t = hl_get_type(r);
 		n->findex = UINDEX();

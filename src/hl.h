@@ -146,6 +146,7 @@ struct hl_type {
 };
 
 typedef struct {
+	const char *lib;
 	const char *name;
 	hl_type *t;
 	int findex;
