@@ -52,8 +52,7 @@ void *hl_callback( void *f, int nargs, vdynamic **args ) {
 			stack.d[pos>>3] = d->v.d;
 			break;
 		default:
-			printf("Invalid callback arg\n");
-			return NULL;
+			hl_error("Invalid callback arg");
 		}
 		pos += tsize;
 	}

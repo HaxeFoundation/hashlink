@@ -46,19 +46,35 @@
 #	define HL_GCC
 #endif
 
+#if defined(__MINGW32__)
+#	define HL_MINGW
+#endif
+
+#if defined(__CYGWIN__)
+#	define HL_CYGWIN
+#endif
+
 #if defined(_MSC_VER)
 #	define HL_VCC
 // remove deprecated C API usage warnings
 #	pragma warning( disable : 4996 )
 #endif
 
-#if defined(HL_VCC) || defined(__CYGWIN__)
+#if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CYGWIN)
 #	define HL_WIN_CALL
 #endif
 
 #include <stddef.h>
 #ifndef HL_VCC
 #	include <stdint.h>
+#endif
+
+#if defined(HL_VCC) || defined(HL_MINGW)
+#	define EXPORT __declspec( dllexport )
+#	define IMPORT __declspec( dllimport )
+#else
+#	define EXPORT
+#	define IMPORT
 #endif
 
 #ifdef HL_64
@@ -75,7 +91,19 @@
 #	define _PTR_FMT	"%X"
 #endif
 
-typedef	enum { false = 0, true = 1 } bool;
+#ifdef __cplusplus
+#	define C_FUNCTION_BEGIN extern "C" {
+#	define C_FUNCTION_END	};
+#else
+#	define C_FUNCTION_BEGIN
+#	define C_FUNCTION_END
+#	ifndef true
+#		define true 1
+#		define false 0
+		typedef int bool;
+#	endif
+#endif
+
 typedef void (_cdecl *fptr)();
 typedef intptr_t int_val;
 
@@ -233,6 +261,8 @@ int hl_jit_init_callback( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize );
 
+void hl_error( const char *fmt, ... );
+
 /* -------------------- RUNTIME ------------------------------ */
 
 typedef struct vobj vobj;
@@ -299,5 +329,25 @@ void *hl_callback( void *f, int nargs, vdynamic **args );
 vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
 vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
 vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
+
+// match GNU C++ mangling
+#define TYPE_STR	"vhifdbXPOBA"
+
+#undef  _VOID
+#define _NO_ARG
+#define _VOID						"v"
+#define	_UI8						"h"
+#define _I32						"i"
+#define _F32						"f"
+#define _F64						"d"
+#define _BOOL						"b"
+#define _DYN						"X"
+#define _FUN(t, args)				"P" args "_" t
+#define _OBJ						"O"
+#define _BYTES						"B"
+#define _ARR(t)						"A" t
+
+#define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
+#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hl_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&name); } C_FUNCTION_END
 
 #endif

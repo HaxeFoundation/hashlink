@@ -21,6 +21,14 @@
  */
 #include "hl.h"
 
+#ifdef HL_WIN
+#	include <windows.h>
+#	define dlopen(l,p)		(void*)( (l) ? LoadLibraryA(l) : GetModuleHandle(NULL))
+#	define dlsym(h,n)		GetProcAddress((HANDLE)h,n)
+#else
+#	include <dlfcn.h>
+#endif
+
 hl_runtime_obj *hl_get_obj_rt( hl_module *m, hl_type *ot ) {
 	hl_alloc *alloc = &m->code->alloc;
 	hl_type_obj *o = ot->obj;
@@ -119,35 +127,25 @@ hl_module *hl_module_alloc( hl_code *c ) {
 }
 
 static void null_function() {
-	// TODO : throw an error instead
-	printf("Null function ptr\n");
+	hl_error("Null function ptr");
 }
 
-static void do_log( vdynamic *v ) {
-	switch( (*v->t)->t->kind ) {
-	case HI32:
-		printf("%di\n",v->v.i);
-		break;
-	case HF64:
-		printf("%.19gf\n",v->v.d);
-		break;
-	case HVOID:
-		printf("void\n");
-		break;
-	case HBYTES:
-		printf("[%s]\n",(char*)v->v.ptr);
-		break;
-	case HOBJ:
+static void append_type( char **p, hl_type *t ) {
+	*(*p)++ = TYPE_STR[t->kind];
+	switch( t->kind ) {
+	case HFUN:
 		{
-			hl_type_obj *o = v->v.o->proto->t->obj;
-			if( o->rt == NULL || o->rt->toString == NULL )
-				printf("#%s\n",o->name);
-			else
-				printf("[%s]\n",(char*)hl_callback(o->rt->toString,1,&v));
+			int i;
+			for(i=0;i<t->fun->nargs;i++)
+				append_type(p,t->fun->args + i);
+			*(*p)++ = '_';
+			append_type(p,t->fun->ret);
+			break;
 		}
+	case HARRAY:
+		append_type(p,t->t);
 		break;
 	default:
-		printf(_PTR_FMT "H\n",(int_val)v->v.ptr);
 		break;
 	}
 }
@@ -161,9 +159,41 @@ int hl_module_init( hl_module *m ) {
 		if( t->kind == HFUN ) *(fptr*)(m->globals_data + m->globals_indexes[i]) = null_function;
 	}
 	// INIT natives
-	for(i=0;i<m->code->nnatives;i++) {
-		hl_native *n = m->code->natives + i;
-		m->functions_ptrs[n->findex] = do_log;
+	{
+		char tmp[256];
+		void *libHandler = NULL;
+		const char *curlib = NULL, *sign;
+		for(i=0;i<m->code->nnatives;i++) {
+			hl_native *n = m->code->natives + i;
+			char *p = tmp;
+			void *f;
+			if( curlib != n->lib ) {
+				curlib = n->lib;
+				strcpy(tmp,n->lib);
+#				ifdef HL_64
+				strcpy(tmp+strlen(tmp),"64.hdll");
+#				else
+				strcpy(tmp+strlen(tmp),".hdll");
+#				endif
+				libHandler = dlopen(memcmp(n->lib,"std",4) == 0 ? NULL : tmp,RTLD_LAZY);
+				if( libHandler == NULL )
+					hl_error("Failed to load library %s",tmp);
+			}
+			strcpy(p,"hl_");
+			p += 3;
+			strcpy(p,n->name);
+			p += strlen(n->name);
+			*p++ = 0;
+			f = dlsym(libHandler,tmp);
+			if( f == NULL )
+				hl_error("Failed to load function %s@%s",n->lib,n->name);
+			m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
+			p = tmp;
+			append_type(&p,n->t);
+			*p++ = 0;
+			if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
+				hl_error("Invalid signature for function %s@%s : %s should be %s",n->lib,n->name,tmp,sign);
+		}
 	}
 	// INIT indexes
 	for(i=0;i<m->code->nfunctions;i++) {

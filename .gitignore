@@ -13,3 +13,4 @@ Debug
 Release
 x64
 *.stackdump
+*.hdll

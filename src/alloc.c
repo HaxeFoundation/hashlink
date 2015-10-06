@@ -27,39 +27,6 @@
 #	include <sys/mman.h>
 #endif
 
-void hl_global_init() {
-}
-
-void hl_global_free() {
-}
-
-int hl_type_size( hl_type *t ) {
-	static int SIZES[] = {
-		0, // VOID
-		1, // UI8
-		4, // UI32
-		4, // F32
-		8, // F64
-		1, // BOOL
-		HL_WSIZE, // ANY
-		HL_WSIZE, // FUN
-		HL_WSIZE, // OBJ
-		HL_WSIZE, // BYTES
-		HL_WSIZE, // ARRAY
-	};
-	return SIZES[t->kind];
-}
-
-int hl_pad_size( int pos, hl_type *t ) {
-	int sz = hl_type_size(t);
-	int align;
-	if( sz < HL_WSIZE ) sz = HL_WSIZE;
-	align = pos & (sz - 1);
-	if( align && t->kind != HVOID )
-		return sz - align;
-	return 0;
-}
-
 struct hl_alloc_block {
 	int size;
 	hl_alloc_block *next;
