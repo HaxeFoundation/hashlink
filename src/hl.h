@@ -119,18 +119,19 @@ typedef struct { hl_alloc_block *cur; } hl_alloc;
 
 typedef enum {
 	HVOID	= 0,
-	HUI8	= 1,
-	HI32	= 2,
-	HF32	= 3,
-	HF64	= 4,
-	HBOOL	= 5,
-	HDYN	= 6,
-	HFUN	= 7,
-	HOBJ	= 8,
-	HBYTES	= 9,
-	HARRAY	= 10,
+	HI8		= 1,
+	HI16	= 2,
+	HI32	= 3,
+	HF32	= 4,
+	HF64	= 5,
+	HBOOL	= 6,
+	HBYTES	= 7,
+	HDYN	= 8,
+	HFUN	= 9,
+	HOBJ	= 10,
+	HARRAY	= 11,
 	// ---------
-	HLAST	= 11,
+	HLAST	= 12,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
@@ -331,12 +332,13 @@ vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
 vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
 
 // match GNU C++ mangling
-#define TYPE_STR	"vhifdbXPOBA"
+#define TYPE_STR	"vcsifdbBXPOA"
 
 #undef  _VOID
 #define _NO_ARG
 #define _VOID						"v"
-#define	_UI8						"h"
+#define	_I8							"c"
+#define _I16						"s"
 #define _I32						"i"
 #define _F32						"f"
 #define _F64						"d"

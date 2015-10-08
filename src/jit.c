@@ -51,7 +51,8 @@ typedef enum {
 	PUSH,
 	ADD,
 	SUB,
-	IMUL,
+	IMUL,	// only overflow flag changes compared to MUL
+	DIV,
 	IDIV,
 	CDQ,
 	POP,
@@ -63,6 +64,8 @@ typedef enum {
 	TEST,
 	NOP,
 	SHL,
+	SHR,
+	SAR,
 	// SSE
 	MOVSD,
 	COMISD,
@@ -81,16 +84,16 @@ typedef enum {
 
 #define JAlways		0
 #define JOverflow	0x80
-#define JLt			0x82
-#define JGte		0x83
+#define JULt		0x82
+#define JUGte		0x83
 #define JEq			0x84
 #define JNeq		0x85
-#define JLte		0x86
-#define JGt			0x87
-#define JSignLt		0x8C
-#define JSignGte	0x8D
-#define JSignLte	0x8E
-#define JSignGt		0x8F
+#define JULte		0x86
+#define JUGt		0x87
+#define JSLt		0x8C
+#define JSGte		0x8D
+#define JSLte		0x8E
+#define JSGt		0x8F
 
 #define JCarry		JLt
 #define JZero		JEq
@@ -316,6 +319,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "ADD", 0x03, 0x01, RM(0x81,0), RM(0x83,0) },
 	{ "SUB", 0x2B, 0x29, RM(0x81,5), RM(0x83,5) },
 	{ "IMUL", LONG_OP(0x0FAF) },
+	{ "DIV", RM(0xF7,6), RM(0xF7,6) },
 	{ "IDIV", RM(0xF7,7), RM(0xF7,7) },
 	{ "CDQ", 0x99 },
 	{ "POP", 0x58, RM(0x8F,0) },
@@ -326,7 +330,9 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CMP", 0x3B, 0x39, RM(0x81,7), RM(0x83,7) },
 	{ "TEST", 0x85, 0x85/*SWP?*/, RM(0xF7,0) },
 	{ "NOP", 0x90 },
-	{ "SHL", 0, 0, 0, RM(0xC1,4) },
+	{ "SHL", RM(0xD3,4), 0, 0, RM(0xC1,4) },
+	{ "SHR", RM(0xD3,5), 0, 0, RM(0xC1,5) },
+	{ "SAR", RM(0xD3,7), 0, 0, RM(0xC1,7) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "COMISD", 0x660F2F },
@@ -1197,11 +1203,11 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OAdd: o = ADDSD; break;
 		case OSub: o = SUBSD; break;
 		case OMul: o = MULSD; break;
-		case ODiv: o = DIVSD; break;
-		case OGte:
-		case OLt:
-		case OJLt:
-		case OJGte:
+		case OSDiv: o = DIVSD; break;
+		case OSGte:
+		case OSLt:
+		case OJSLt:
+		case OJSGte:
 		case OJEq:
 		case OJNeq:
 			o = COMISD;
@@ -1215,7 +1221,24 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OAdd: o = ADD; break;
 		case OSub: o = SUB; break;
 		case OMul: o = IMUL; break;
-		case ODiv:
+		case OShl:
+		case OUShr: 
+		case OSShr:
+			if( !b->current || b->current->kind != RCPU || b->current->id != Ecx ) {
+				scratch(REG_AT(Ecx));
+				op32(ctx,MOV,REG_AT(Ecx),pb);
+				RLOCK(REG_AT(Ecx));
+				pa = fetch(a);
+			}
+			if( pa->kind != RCPU ) {
+				pa = alloc_reg(ctx, RCPU);
+				op32(ctx,MOV,pa,fetch(a));
+			}
+			op32(ctx,op->op == OShl ? SHL : (op->op == OUShr ? SHR : SAR), pa, UNUSED);
+			if( dst ) store(ctx, dst, pa, true);
+			return pa;
+		case OSDiv:
+		case OUDiv:
 			{
 				preg *r = alloc_cpu(ctx,b,true);
 				int jz, jend;
@@ -1229,17 +1252,24 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 					scratch(PEAX);
 					load(ctx,PEAX,a);
 				}
-				op32(ctx, CDQ, UNUSED, UNUSED); // sign-extend Eax into Eax:Edx
 				scratch(REG_AT(Edx));
-				op32(ctx, IDIV, pb, UNUSED);
+				if( op->op == OUDiv )
+					op32(ctx, XOR, REG_AT(Edx), REG_AT(Edx));
+				else
+					op32(ctx, CDQ, UNUSED, UNUSED); // sign-extend Eax into Eax:Edx
+				op32(ctx, op->op == OUDiv ? DIV : IDIV, pb, UNUSED);
 				patch_jump(ctx, jend);
 			}
 			if( dst ) store(ctx, dst, PEAX, true);
 			return PEAX;
-		case OGte:
-		case OLt:
-		case OJLt:
-		case OJGte:
+		case OSGte:
+		case OSLt:
+		case OJSLt:
+		case OJSGte:
+		case OUGte:
+		case OULt:
+		case OJULt:
+		case OJUGte:
 		case OJEq:
 		case OJNeq:
 			o = CMP;
@@ -1304,13 +1334,21 @@ static int do_jump( jit_ctx *ctx, hl_op op ) {
 	case OJAlways:
 		XJump(JAlways,j);
 		break;
-	case OGte:
-	case OJGte:
-		XJump(JGte,j);
+	case OSGte:
+	case OJSGte:
+		XJump(JSGte,j);
 		break;
-	case OLt:
-	case OJLt:
-		XJump(JLt,j);
+	case OUGte:
+	case OJUGte:
+		XJump(JUGte,j);
+		break;
+	case OSLt:
+	case OJSLt:
+		XJump(JSLt,j);
+		break;
+	case OULt:
+	case OJULt:
+		XJump(JULt,j);
 		break;
 	case OEq:
 	case OJEq:
@@ -1471,6 +1509,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int nargs = f->type->fun->nargs;
 	preg p;
 	ctx->f = f;
+	ctx->allocOffset = 0;
 	if( f->nregs > ctx->maxRegs ) {
 		free(ctx->vregs);
 		ctx->vregs = (vreg*)malloc(sizeof(vreg) * f->nregs);
@@ -1574,7 +1613,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OSub:
 		case OAdd:
 		case OMul:
-		case ODiv:
+		case OSDiv:
+		case OUDiv:
+		case OShl:
+		case OSShr:
+		case OUShr:
 			op_binop(ctx, R(o->p1), R(o->p2), R(o->p3), o);
 			break;
 		case ONeg:
@@ -1595,8 +1638,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 			}
 			break;
-		case OGte:
-		case OLt:
+		case OSGte:
+		case OSLt:
+		case OUGte:
+		case OULt:
 			op_cmp(ctx, o);
 			break;
 		case OJFalse:
@@ -1608,10 +1653,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				register_jump(ctx,jump,(opCount + 1) + o->p2);
 			}
 			break;
-		case OJLt:
 		case OJEq:
 		case OJNeq:
-		case OJGte:
+		case OJSLt:
+		case OJSGte:
+		case OJULt:
+		case OJUGte:
 			op_binop(ctx, NULL, R(o->p1), R(o->p2), o);
 			jump = do_jump(ctx,o->op);
 			register_jump(ctx,jump,(opCount + 1) + o->p3);

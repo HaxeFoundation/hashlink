@@ -10,15 +10,16 @@ void hl_global_free() {
 int hl_type_size( hl_type *t ) {
 	static int SIZES[] = {
 		0, // VOID
-		1, // UI8
-		4, // UI32
+		1, // I8
+		2, // I16
+		4, // I32
 		4, // F32
 		8, // F64
 		1, // BOOL
-		HL_WSIZE, // ANY
+		HL_WSIZE, // BYTES
+		HL_WSIZE, // DYN
 		HL_WSIZE, // FUN
 		HL_WSIZE, // OBJ
-		HL_WSIZE, // BYTES
 		HL_WSIZE, // ARRAY
 	};
 	return SIZES[t->kind];
