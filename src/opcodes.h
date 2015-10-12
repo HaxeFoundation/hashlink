@@ -81,7 +81,7 @@ OP_BEGIN
 	OP(OToAny,2)
 	OP(OToFloat,2)
 	OP(OToInt,2)
-	OP(OLabel,1)
+	OP(OLabel,0)
 	OP(ONew,1)
 	OP(OField,3)
 	OP(OMethod,3)

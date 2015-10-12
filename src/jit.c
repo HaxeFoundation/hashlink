@@ -66,6 +66,8 @@ typedef enum {
 	SHL,
 	SHR,
 	SAR,
+	INC,
+	DEC,
 	// SSE
 	MOVSD,
 	COMISD,
@@ -333,6 +335,8 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "SHL", RM(0xD3,4), 0, 0, RM(0xC1,4) },
 	{ "SHR", RM(0xD3,5), 0, 0, RM(0xC1,5) },
 	{ "SAR", RM(0xD3,7), 0, 0, RM(0xC1,7) },
+	{ "INC", IS_64 ? RM(0xFF,0) : 0x40, RM(0xFF,0) },
+	{ "DEC", IS_64 ? RM(0xFF,1) : 0x48, RM(0xFF,1) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "COMISD", 0x660F2F },
@@ -842,6 +846,10 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 	case ID2(RCPU,RSTACK):
 	case ID2(RCPU,RMEM):
 	case ID2(RCPU,RCPU):
+#	ifndef HL_64
+	case ID2(RCPU,RADDR):
+	case ID2(RADDR,RCPU):
+#	endif
 		switch( size ) {
 		case 1:
 			op32(ctx,MOV8,to,from);
@@ -878,7 +886,13 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 				return copy(ctx,to,alloc_fpu(ctx,rfrom,true),size);
 			return copy(ctx,to,alloc_cpu(ctx,rfrom,true),size);
 		}
+	case ID2(RMEM,RMEM):
 	case ID2(RSTACK,RMEM):
+	case ID2(RSTACK,RSTACK):
+#	ifndef HL_64
+	case ID2(RMEM,RADDR):
+	case ID2(RSTACK,RADDR):
+#	endif
 		{
 			preg *tmp;
 			if( size == 8 && !IS_64 ) {
@@ -890,6 +904,26 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 			}
 			return copy(ctx,to,tmp,size);
 		}
+#	ifdef HL_64
+	case ID2(RCPU,RADDR):
+	case ID2(RMEM,RADDR):
+	case ID2(RSTACK,RADDR):
+		{
+			preg p;
+			preg *tmp = alloc_reg(ctx, RCPU);
+			op64(ctx,MOV,tmp,pconst64(&p,(int_val)from->holds));
+			return copy(ctx,to,pmem(&p,tmp->id,0),size);
+		}
+	case ID2(RADDR,RCPU):
+	case ID2(RADDR,RMEM):
+	case ID2(RADDR,RSTACK):
+		{
+			preg p;
+			preg *tmp = alloc_reg(ctx, RCPU);
+			op64(ctx,MOV,tmp,pconst64(&p,(int_val)to->holds));
+			return copy(ctx,pmem(&p,tmp->id,0),from,size);
+		}
+#	endif
 	default:
 		break;
 	}
@@ -1383,8 +1417,8 @@ static void register_jump( jit_ctx *ctx, int pos, int target ) {
 	j->target = target;
 	j->next = ctx->jumps;
 	ctx->jumps = j;
-	if( target == 0 || ctx->opsPos[target] > 0 ) ASSERT(target);
-	ctx->opsPos[target] = -1;
+	if( target != 0 && ctx->opsPos[target] == 0 )
+		ctx->opsPos[target] = -1;
 }
 
 static void call_native_consts( jit_ctx *ctx, void *nativeFun, int_val *args, int nargs ) {
@@ -1663,6 +1697,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			jump = do_jump(ctx,o->op);
 			register_jump(ctx,jump,(opCount + 1) + o->p3);
 			break;
+		case OJAlways:
+			jump = do_jump(ctx,o->op);
+			register_jump(ctx,jump,(opCount + 1) + o->p1);
+			break;
 		case OToAny:
 			{
 				vreg *r = R(o->p2);
@@ -1703,6 +1741,30 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case ORet:
 			op_ret(ctx, R(o->p1));
+			break;
+		case OIncr:
+			{
+				vreg *r = R(o->p1);
+				preg *v = fetch(r);
+				if( IS_FLOAT(r) ) {
+					ASSERT(0);
+				} else {
+					op32(ctx,INC,v,UNUSED);
+					if( v->kind != RSTACK ) store(ctx, r, v, false);
+				}
+			}
+			break;
+		case ODecr:
+			{
+				vreg *r = R(o->p1);
+				preg *v = fetch(r);
+				if( IS_FLOAT(r) ) {
+					ASSERT(0);
+				} else {
+					op32(ctx,DEC,v,UNUSED);
+					if( v->kind != RSTACK ) store(ctx, r, v, false);
+				}
+			}
 			break;
 		case OFloat:
 			{
@@ -1856,6 +1918,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				// TODO
 				BREAK();
 			}
+			break;
+		case OLabel:
+			// NOP for now
+			discard_regs(ctx,false);
 			break;
 		default:
 			printf("Don't know how to jit %s\n",hl_op_name(o->op));
