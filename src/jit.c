@@ -111,7 +111,10 @@ typedef enum {
 #	define W64(wv)	W(wv)
 #endif
 
+static int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
+
 #define MOD_RM(mod,reg,rm)		B(((mod) << 6) | (((reg)&7) << 3) | ((rm)&7))
+#define SIB(mult,rmult,rbase)	B((SIB_MULT[mult]<<6) | (((rmult)&7)<<3) | ((rbase)&7))
 #define IS_SBYTE(c)				( (c) >= -128 && (c) < 128 )
 
 #define AddJump(how,local)		{ if( (how) == JAlways ) { B(0xE9); } else { B(0x0F); B(how); }; local = BUF_POS(); W(0); }
@@ -240,9 +243,15 @@ static void jit_exit() {
 	exit(-1);
 }
 
-static preg *pmem( preg *r, CpuReg reg, int regOrOffset ) {
+static preg *pmem( preg *r, CpuReg reg, int offset ) {
 	r->kind = RMEM;
-	r->id = 0 | (reg << 4) | (regOrOffset << 8);
+	r->id = 0 | (reg << 4) | (offset << 8);
+	return r;
+}
+
+static preg *pmem2( preg *r, CpuReg reg, CpuReg reg2, int mult ) {
+	r->kind = RMEM;
+	r->id = mult | (reg << 4) | (reg2 << 8);
 	return r;
 }
 
@@ -672,8 +681,12 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 					W(regOrOffs);
 				}
 			} else {
-				// [eax + ebx * M]
-				ERRIF(1);
+				if( b->id > 7 ) r64 |= 4;
+				if( reg > 7 ) r64 |= 1;
+				if( regOrOffs > 7 ) r64 |= 2;
+				OP(f->mem_r);
+				MOD_RM(0,b->id,4);
+				SIB(mult,regOrOffs,reg);
 			}
 		}
 		break;
@@ -1315,6 +1328,11 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	}
 	switch( RTYPE(a) ) {
 	case HI32:
+#	ifndef HL_64
+	case HOBJ:
+	case HFUN:
+	case HBYTES:
+#	endif
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
 		case ID2(RCPU,RSTACK):
@@ -1626,7 +1644,17 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OCall3:
+			{
+				int args[3] = { o->p3, o->extra[0], o->extra[1] };
+				op_call_fun(ctx, R(o->p1), o->p2, 3, args);
+			}
+			break;
 		case OCall4:
+			{
+				int args[4] = { o->p3, o->extra[0], o->extra[1], o->extra[2] };
+				op_call_fun(ctx, R(o->p1), o->p2, 4, args);
+			}
+			break;
 		case OCallN:
 			op_call_fun(ctx, R(o->p1), o->p2, o->p3, o->extra);
 			break;
@@ -1638,9 +1666,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OCall2:
 			{
-				int args[2];
-				args[0] = o->p3;
-				args[1] = (int)(int_val)o->extra;
+				int args[2] = { o->p3, (int)(int_val)o->extra };
 				op_call_fun(ctx, R(o->p1), o->p2, 2, args);
 			}
 			break;
@@ -1933,6 +1959,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OLabel:
 			// NOP for now
 			discard_regs(ctx,false);
+			break;
+		case OSetByte:
+			{
+				preg *base = alloc_cpu(ctx, R(o->p1), true);
+				preg *offset = alloc_cpu(ctx, R(o->p2), true);
+				preg *value = alloc_cpu(ctx, R(o->p3), true);
+				op32(ctx,MOV8,pmem2(&p,base->id,offset->id,1),value);
+			}
 			break;
 		default:
 			printf("Don't know how to jit %s\n",hl_op_name(o->op));

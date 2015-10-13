@@ -150,6 +150,7 @@
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\module.c" />
     <ClCompile Include="src\other.c" />
+    <ClCompile Include="src\std\bytes.c" />
     <ClCompile Include="src\std\misc.c" />
   </ItemGroup>
   <ItemGroup>

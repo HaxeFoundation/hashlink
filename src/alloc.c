@@ -143,3 +143,7 @@ vclosure *hl_alloc_closure_i64( hl_module *m, int_val fid, int_val v64 ) {
 	c->v64 = v64;
 	return c;
 }
+
+void *hl_alloc_bytes( int size ) {
+	return malloc(size);
+}

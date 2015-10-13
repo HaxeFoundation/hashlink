@@ -137,7 +137,7 @@ static void append_type( char **p, hl_type *t ) {
 		{
 			int i;
 			for(i=0;i<t->fun->nargs;i++)
-				append_type(p,t->fun->args + i);
+				append_type(p,(&t->fun->args)[i]);
 			*(*p)++ = '_';
 			append_type(p,t->fun->ret);
 			break;
@@ -179,8 +179,8 @@ int hl_module_init( hl_module *m ) {
 				if( libHandler == NULL )
 					hl_error("Failed to load library %s",tmp);
 			}
-			strcpy(p,"hl_");
-			p += 3;
+			strcpy(p,"hlp_");
+			p += 4;
 			strcpy(p,n->name);
 			p += strlen(n->name);
 			*p++ = 0;

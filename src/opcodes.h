@@ -93,6 +93,7 @@ OP_BEGIN
 	OP(OGetThis,2)
 	OP(OSetThis,2)
 	OP(OThrow,1)
+	OP(OSetByte,3)
 	// --
 	OP(OLast,0)
 OP_END

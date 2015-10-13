@@ -323,6 +323,7 @@ void hl_free_executable_memory( void *ptr, int size );
 
 vdynamic *hl_alloc_dynamic( hl_type **t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );
+void *hl_alloc_bytes( int size );
 
 void hl_callback_init( void *e );
 void *hl_callback( void *f, int nargs, vdynamic **args );
@@ -350,6 +351,6 @@ vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
 #define _ARR(t)						"A" t
 
 #define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
-#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hl_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&name); } C_FUNCTION_END
+#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&name); } C_FUNCTION_END
 
 #endif
