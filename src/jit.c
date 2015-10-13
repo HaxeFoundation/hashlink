@@ -1033,6 +1033,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 				copy(ctx,r,vr,v->size);
 				scratch(r);
 			}
+			RLOCK(r);
 		}
 		stackRegs = count - i;
 	}
@@ -1359,6 +1360,37 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		}
 		if( dst ) store(ctx, dst, out, true);
 		return out;
+#	ifdef HL_64
+	case HOBJ:
+	case HFUN:
+	case HBYTES:
+		switch( ID2(pa->kind, pb->kind) ) {
+		case ID2(RCPU,RCPU):
+		case ID2(RCPU,RSTACK):
+			op64(ctx, o, pa, pb);
+			scratch(pa);
+			out = pa;
+			break;
+		case ID2(RSTACK,RCPU):
+			if( dst == a ) {
+				op64(ctx, o, pa, pb);
+				dst = NULL;
+				out = pa;
+			} else {
+				alloc_cpu(ctx,a, true);
+				return op_binop(ctx,dst,a,b,op);
+			}
+			break;
+		case ID2(RSTACK,RSTACK):
+			alloc_cpu(ctx, a, true);
+			return op_binop(ctx, dst, a, b, op);
+		default:
+			printf("%s(%d,%d)\n", hl_op_name(op->op), pa->kind, pb->kind);
+			ASSERT(ID2(pa->kind, pb->kind));
+		}
+		if( dst ) store(ctx, dst, out, true);
+		return out;
+#	endif
 	case HF64:
 		pa = alloc_fpu(ctx, a, true);
 		pb = alloc_fpu(ctx, b, true);
