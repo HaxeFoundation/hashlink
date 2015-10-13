@@ -14,6 +14,9 @@ static void do_log( vdynamic *v ) {
 	case HBYTES:
 		printf("[%s]\n",(char*)v->v.ptr);
 		break;
+	case HBOOL:
+		printf("%s\n",v->v.b ? "true" : "false");
+		break;
 	case HOBJ:
 		{
 			hl_type_obj *o = v->v.o->proto->t->obj;

@@ -59,6 +59,7 @@ typedef enum {
 	RET,
 	CALL,
 	AND,
+	OR,
 	XOR,
 	CMP,
 	TEST,
@@ -328,6 +329,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "RET", 0xC3 },
 	{ "CALL", RM(0xFF,2), RM(0xFF,2), 0xE8 },
 	{ "AND", 0x23, 0x21, RM(0x81,4), RM(0x83,4) },
+	{ "OR", 0x0B, 0x09, RM(0x81,1), RM(0x83,1) },
 	{ "XOR", 0x33, 0x31, RM(0x81,6), RM(0x83,6) },
 	{ "CMP", 0x3B, 0x39, RM(0x81,7), RM(0x83,7) },
 	{ "TEST", 0x85, 0x85/*SWP?*/, RM(0xF7,0) },
@@ -958,20 +960,15 @@ static void copy_from( jit_ctx *ctx, preg *to, vreg *from ) {
 	copy(ctx,to,fetch(from),from->size);
 }
 
-static void store_const( jit_ctx *ctx, vreg *r, int c, bool useTmpReg ) {
+static void store_const( jit_ctx *ctx, vreg *r, int c ) {
 	preg p;
 	if( r->size > 4 )
 		ASSERT(r->size);
-	if( useTmpReg ) {
-		if( c == 0 )
-			op32(ctx,XOR,alloc_cpu(ctx,r,false),alloc_cpu(ctx,r,false));
-		else
-			op32(ctx,MOV,alloc_cpu(ctx,r,false),pconst(&p,c));
-		store(ctx,r,r->current,false);
-	} else {
-		scratch(r->current);
-		op32(ctx,MOV,&r->stack,pconst(&p,c)); 
-	}
+	if( c == 0 )
+		op32(ctx,XOR,alloc_cpu(ctx,r,false),alloc_cpu(ctx,r,false));
+	else
+		op32(ctx,MOV,alloc_cpu(ctx,r,false),pconst(&p,c));
+	store(ctx,r,r->current,false);
 }
 
 static void discard_regs( jit_ctx *ctx, bool native_call ) {
@@ -1255,6 +1252,9 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OAdd: o = ADD; break;
 		case OSub: o = SUB; break;
 		case OMul: o = IMUL; break;
+		case OAnd: o = AND; break;
+		case OOr: o = OR; break;
+		case OXor: o = XOR; break;
 		case OShl:
 		case OUShr: 
 		case OSShr:
@@ -1362,7 +1362,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	return NULL;
 }
 
-static int do_jump( jit_ctx *ctx, hl_op op ) {
+static int do_jump( jit_ctx *ctx, hl_op op, bool isFloat ) {
 	int j;
 	switch( op ) {
 	case OJAlways:
@@ -1370,7 +1370,7 @@ static int do_jump( jit_ctx *ctx, hl_op op ) {
 		break;
 	case OSGte:
 	case OJSGte:
-		XJump(JSGte,j);
+		XJump(isFloat ? JUGte : JSGte,j);
 		break;
 	case OUGte:
 	case OJUGte:
@@ -1378,7 +1378,7 @@ static int do_jump( jit_ctx *ctx, hl_op op ) {
 		break;
 	case OSLt:
 	case OJSLt:
-		XJump(JSLt,j);
+		XJump(isFloat ? JULt : JSLt,j);
 		break;
 	case OULt:
 	case OJULt:
@@ -1403,11 +1403,11 @@ static int do_jump( jit_ctx *ctx, hl_op op ) {
 static void op_cmp( jit_ctx *ctx, hl_opcode *op ) {
 	int p, e;
 	op_binop(ctx,NULL,R(op->p2),R(op->p3),op);
-	p = do_jump(ctx,op->op);
-	store_const(ctx, R(op->p1), 0, false);
-	e = do_jump(ctx,OJAlways);
+	p = do_jump(ctx,op->op,IS_FLOAT(R(op->p2)));
+	store_const(ctx, R(op->p1), 0);
+	e = do_jump(ctx,OJAlways,false);
 	patch_jump(ctx,p);
-	store_const(ctx, R(op->p1), 1, false);
+	store_const(ctx, R(op->p1), 1);
 	patch_jump(ctx,e);
 }
 
@@ -1608,10 +1608,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			op_mov(ctx, R(o->p1), R(o->p2));
 			break;
 		case OInt:
-			store_const(ctx, R(o->p1), m->code->ints[o->p2], true);
+			store_const(ctx, R(o->p1), m->code->ints[o->p2]);
 			break;
 		case OBool:
-			store_const(ctx, R(o->p1), o->p2, true);
+			store_const(ctx, R(o->p1), o->p2);
 			break;
 		case OGetGlobal:
 			{
@@ -1652,6 +1652,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OShl:
 		case OSShr:
 		case OUShr:
+		case OAnd:
+		case OOr:
+		case OXor:
 			op_binop(ctx, R(o->p1), R(o->p2), R(o->p3), o);
 			break;
 		case ONeg:
@@ -1670,6 +1673,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op32(ctx,SUB,ra,rb);
 					store(ctx,R(o->p1),ra,true);
 				}
+			}
+			break;
+		case ONot:
+			{
+				vreg *r = R(o->p2);
+				preg *v = alloc_cpu(ctx,r,true);
+				op32(ctx,XOR,v,pconst(&p,1));
+				store(ctx,R(o->p1),v,true);
 			}
 			break;
 		case OSGte:
@@ -1694,11 +1705,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OJULt:
 		case OJUGte:
 			op_binop(ctx, NULL, R(o->p1), R(o->p2), o);
-			jump = do_jump(ctx,o->op);
+			jump = do_jump(ctx,o->op, IS_FLOAT(R(o->p1)));
 			register_jump(ctx,jump,(opCount + 1) + o->p3);
 			break;
 		case OJAlways:
-			jump = do_jump(ctx,o->op);
+			jump = do_jump(ctx,o->op,false);
 			register_jump(ctx,jump,(opCount + 1) + o->p1);
 			break;
 		case OToAny:
