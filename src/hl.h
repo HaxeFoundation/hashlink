@@ -100,7 +100,7 @@
 #	ifndef true
 #		define true 1
 #		define false 0
-		typedef int bool;
+		typedef unsigned char bool;
 #	endif
 #endif
 
@@ -130,8 +130,9 @@ typedef enum {
 	HFUN	= 9,
 	HOBJ	= 10,
 	HARRAY	= 11,
+	HTYPE	= 12,
 	// ---------
-	HLAST	= 12,
+	HLAST	= 13,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
@@ -275,12 +276,13 @@ typedef struct {
 	int __pad; // force align
 #	endif
 	union {
-		unsigned char b;
+		bool b;
+		char c;
+		short s;
 		int i;
 		float f;
 		double d;
-		vobj *o;
-		vclosure *c;
+		char *bytes;
 		void *ptr;
 	} v;
 } vdynamic;
@@ -292,6 +294,11 @@ typedef struct {
 struct vobj {
 	vobj_proto *proto;
 };
+
+typedef struct {
+	hl_type **t;
+	int size;
+} varray;
 
 #define CL_HAS_V32		1
 #define CL_HAS_V64		2
@@ -321,6 +328,7 @@ struct hl_runtime_obj {
 void *hl_alloc_executable_memory( int size );
 void hl_free_executable_memory( void *ptr, int size );
 
+varray *hl_alloc_array( hl_type **tt, int size );
 vdynamic *hl_alloc_dynamic( hl_type **t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );
 void *hl_alloc_bytes( int size );
@@ -333,7 +341,7 @@ vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
 vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsifdbBXPOA"
+#define TYPE_STR	"vcsifdbBXPOAT"
 
 #undef  _VOID
 #define _NO_ARG
@@ -349,6 +357,7 @@ vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
 #define _OBJ						"O"
 #define _BYTES						"B"
 #define _ARR(t)						"A" t
+#define _TYPE						"T"
 
 #define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&name); } C_FUNCTION_END

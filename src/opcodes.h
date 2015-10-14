@@ -82,7 +82,7 @@ OP_BEGIN
 	OP(OJEq,3)
 	OP(OJNeq,3)
 	OP(OJAlways,1)
-	OP(OToAny,2)
+	OP(OToDyn,2)
 	OP(OToFloat,2)
 	OP(OToInt,2)
 	OP(OLabel,0)
@@ -94,6 +94,12 @@ OP_BEGIN
 	OP(OSetThis,2)
 	OP(OThrow,1)
 	OP(OSetByte,3)
+	OP(OSetArray,3)
+	OP(OGetArray,3)
+	OP(OUnsafeCast,2)
+	OP(OArraySize,2)
+	OP(OError,1)
+	OP(OType,2)
 	// --
 	OP(OLast,0)
 OP_END

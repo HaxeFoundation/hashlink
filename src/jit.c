@@ -1770,7 +1770,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			jump = do_jump(ctx,o->op,false);
 			register_jump(ctx,jump,(opCount + 1) + o->p1);
 			break;
-		case OToAny:
+		case OToDyn:
 			{
 				vreg *r = R(o->p2);
 				int_val rt = (int_val)&f->regs[o->p1];

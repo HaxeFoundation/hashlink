@@ -118,6 +118,15 @@ vobj *hl_alloc_obj( hl_module *m, hl_type *t ) {
 	return o;
 }
 
+varray *hl_alloc_array( hl_type **t, int size ) {
+	int esize = hl_type_size(*t);
+	varray *a = (varray*)malloc(sizeof(varray) + esize*size);
+	a->t = t;
+	a->size = size;
+	memset(a+1,0,size*esize);
+	return a;
+}
+
 vclosure *hl_alloc_closure_void( hl_module *m, int_val fid ) {
 	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
 	c->t = &m->code->functions[m->functions_indexes[fid]].type;

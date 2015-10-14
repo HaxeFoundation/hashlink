@@ -1,7 +1,7 @@
 #include <hl.h>
 
 static void do_log( vdynamic *v ) {
-	switch( (*v->t)->t->kind ) {
+	switch( (*v->t)->kind ) {
 	case HI32:
 		printf("%di\n",v->v.i);
 		break;
@@ -12,14 +12,14 @@ static void do_log( vdynamic *v ) {
 		printf("void\n");
 		break;
 	case HBYTES:
-		printf("[%s]\n",(char*)v->v.ptr);
+		printf("[%s]\n",(char*)v->v.bytes);
 		break;
 	case HBOOL:
 		printf("%s\n",v->v.b ? "true" : "false");
 		break;
 	case HOBJ:
 		{
-			hl_type_obj *o = v->v.o->proto->t->obj;
+			hl_type_obj *o = ((vobj*)v)->proto->t->obj;
 			if( o->rt == NULL || o->rt->toString == NULL )
 				printf("#%s\n",o->name);
 			else

@@ -21,6 +21,7 @@ int hl_type_size( hl_type *t ) {
 		HL_WSIZE, // FUN
 		HL_WSIZE, // OBJ
 		HL_WSIZE, // ARRAY
+		HL_WSIZE, // TYPE
 	};
 	return SIZES[t->kind];
 }
