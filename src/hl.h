@@ -173,6 +173,7 @@ struct hl_type {
 		hl_type_obj *obj;
 		hl_type	*t;
 	};
+	hl_type *self;
 };
 
 typedef struct {
@@ -273,7 +274,7 @@ typedef struct vclosure vclosure;
 typedef struct {
 	hl_type **t;
 #	ifndef HL_64
-	int __pad; // force align
+	int __pad; // force align on 16 bytes for double
 #	endif
 	union {
 		bool b;
@@ -298,6 +299,7 @@ struct vobj {
 typedef struct {
 	hl_type **t;
 	int size;
+	int __pad; // force align on 16 bytes for double
 } varray;
 
 #define CL_HAS_V32		1
@@ -307,9 +309,7 @@ struct vclosure {
 	hl_type **t;
 	void *fun;
 	int bits;
-#	ifdef HL_64
 	int __pad;
-#	endif
 	union {
 		int v32;
 		int_val v64;

@@ -21,8 +21,10 @@
  */
 #include "hl.h"
 
+#ifdef _DEBUG
 //#define OP_LOG
 //#define JIT_DEBUG
+#endif
 
 typedef enum {
 	Eax = 0,
@@ -249,9 +251,10 @@ static preg *pmem( preg *r, CpuReg reg, int offset ) {
 	return r;
 }
 
-static preg *pmem2( preg *r, CpuReg reg, CpuReg reg2, int mult ) {
+static preg *pmem2( preg *r, CpuReg reg, CpuReg reg2, int mult, int offset ) {
 	r->kind = RMEM;
 	r->id = mult | (reg << 4) | (reg2 << 8);
+	r->holds = (void*)offset;
 	return r;
 }
 
@@ -614,8 +617,16 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 					W(regOrOffs);
 				}
 			} else {
-				// [eax + ebx * M]
-				ERRIF(1);
+				int offset = (int)(int_val)b->holds;
+				if( a->id > 7 ) r64 |= 4;
+				if( reg > 7 ) r64 |= 1;
+				if( regOrOffs > 7 ) r64 |= 2;
+				OP(f->r_mem);
+				MOD_RM(offset == 0 ? 0 : IS_SBYTE(offset) ? 1 : 2,a->id,4);
+				SIB(mult,regOrOffs,reg);
+				if( offset ) {
+					if( IS_SBYTE(offset) ) B(offset); else W(offset);
+				}
 			}
 		}
 		break;
@@ -681,12 +692,16 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 					W(regOrOffs);
 				}
 			} else {
+				int offset = (int)(int_val)a->holds;
 				if( b->id > 7 ) r64 |= 4;
 				if( reg > 7 ) r64 |= 1;
 				if( regOrOffs > 7 ) r64 |= 2;
 				OP(f->mem_r);
-				MOD_RM(0,b->id,4);
+				MOD_RM(offset == 0 ? 0 : IS_SBYTE(offset) ? 1 : 2,b->id,4);
 				SIB(mult,regOrOffs,reg);
+				if( offset ) {
+					if( IS_SBYTE(offset) ) B(offset); else W(offset);
+				}
 			}
 		}
 		break;
@@ -1169,7 +1184,7 @@ static void op_call_closure( jit_ctx *ctx, vreg *dst, vreg *f, int nargs, int *r
 		fake.size = 4;
 		fake.t = &ti32;
 		fake.current = alloc_reg(ctx,RCPU);
-		op32(ctx,MOV,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*3));
+		op32(ctx,MOV,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*2 + 8));
 
 		// prepare the args
 		vargs = (vreg*)hl_malloc(&ctx->falloc,sizeof(vreg)*(nargs+1));
@@ -1202,7 +1217,7 @@ static void op_call_closure( jit_ctx *ctx, vreg *dst, vreg *f, int nargs, int *r
 		fake.t = &ti64;
 		fake.current = alloc_reg(ctx,RFPU);
 
-		op64(ctx,MOVSD,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*3));
+		op64(ctx,MOVSD,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*2 + 8));
 
 		// prepare the args
 		vargs = (vreg*)hl_malloc(&ctx->falloc,sizeof(vreg)*(nargs+1));
@@ -1633,8 +1648,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	for(i=nargs;i<f->nregs;i++) {
 		vreg *r = R(i);
 		size += r->size;
-		size += hl_pad_size(size + HL_WSIZE,r->t);
-		r->stackPos = -(size + HL_WSIZE);
+		size += hl_pad_size(size,r->t);
+		r->stackPos = -size;
 	}
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
@@ -1655,6 +1670,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #		endif
 		switch( o->op ) {
 		case OMov:
+		case OUnsafeCast:
 			op_mov(ctx, R(o->p1), R(o->p2));
 			break;
 		case OInt:
@@ -1749,10 +1765,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OJFalse:
 		case OJTrue:
+		case OJNotNull:
+		case OJNull:
 			{
 				preg *r = alloc_cpu(ctx, R(o->p1), true);
-				op32(ctx, AND, r, r);
-				XJump( o->op == OJFalse ? JZero : JNotZero,jump);
+				op32(ctx, TEST, r, r);
+				XJump( o->op == OJFalse || o->op == OJNull ? JZero : JNotZero,jump);
 				register_jump(ctx,jump,(opCount + 1) + o->p2);
 			}
 			break;
@@ -1773,7 +1791,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OToDyn:
 			{
 				vreg *r = R(o->p2);
-				int_val rt = (int_val)&f->regs[o->p1];
+				int_val rt = (int_val)&r->t->self;
 				call_native_consts(ctx, hl_alloc_dynamic, &rt, 1);
 				// copy value to dynamic
 				if( IS_FLOAT(r) && !IS_64 ) {
@@ -1988,6 +2006,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				BREAK();
 			}
 			break;
+		case OError:
+			{
+				// TODO
+				op64(ctx,MOV,PEAX,pconst64(&p,(int_val)m->code->strings[o->p1]));
+				BREAK();
+			}
+			break;
 		case OLabel:
 			// NOP for now
 			discard_regs(ctx,false);
@@ -1997,7 +2022,39 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				preg *base = alloc_cpu(ctx, R(o->p1), true);
 				preg *offset = alloc_cpu(ctx, R(o->p2), true);
 				preg *value = alloc_cpu(ctx, R(o->p3), true);
-				op32(ctx,MOV8,pmem2(&p,base->id,offset->id,1),value);
+				op32(ctx,MOV8,pmem2(&p,base->id,offset->id,1,0),value);
+			}
+			break;
+		case OType:
+			{
+				vreg *r = R(o->p1);
+				op64(ctx,MOV,alloc_cpu(ctx, r, false),pconst64(&p,(int_val)&(m->code->types + o->p2)->self));
+				store(ctx,r,r->current,false);
+			}
+			break;
+		case OGetArray:
+			{
+				vreg *r = R(o->p1);
+				vreg *a = R(o->p2);
+				vreg *idx = R(o->p3);
+				op64(ctx,MOV,alloc_cpu(ctx,r,false),pmem2(&p,alloc_cpu(ctx,a,true)->id,alloc_cpu(ctx,idx,true)->id,HL_WSIZE,sizeof(varray)));
+				store(ctx,r,r->current,false);
+			}
+			break;
+		case OSetArray:
+			{
+				vreg *a = R(o->p1);
+				vreg *idx = R(o->p2);
+				vreg *v = R(o->p3);
+				op64(ctx,MOV,pmem2(&p,alloc_cpu(ctx,a,true)->id,alloc_cpu(ctx,idx,true)->id,HL_WSIZE,sizeof(varray)),alloc_cpu(ctx,v,true));
+			}
+			break;
+		case OArraySize:
+			{
+				vreg *r = R(o->p1);
+				vreg *a = R(o->p2);
+				op32(ctx,MOV,alloc_cpu(ctx,r,false),pmem(&p,alloc_cpu(ctx,a,true)->id,HL_WSIZE));
+				store(ctx,r,r->current,false);
 			}
 			break;
 		default:

@@ -131,6 +131,7 @@ static const char *hl_get_string( hl_reader *r ) {
 
 static void hl_read_type( hl_reader *r, hl_type *t ) {
 	t->kind = READ();
+	t->self = t;
 	switch( (int)t->kind ) {
 	case HFUN:
 		{

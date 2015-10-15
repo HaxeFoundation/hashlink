@@ -1,6 +1,10 @@
 #include <hl.h>
 
 static void do_log( vdynamic *v ) {
+	if( v == NULL ) {
+		printf("null\n");
+		return;
+	}
 	switch( (*v->t)->kind ) {
 	case HI32:
 		printf("%di\n",v->v.i);
