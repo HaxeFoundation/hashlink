@@ -100,6 +100,9 @@ OP_BEGIN
 	OP(OArraySize,2)
 	OP(OError,1)
 	OP(OType,2)
+	OP(ORef,2)
+	OP(OUnref,2)
+	OP(OSetref,2)
 	// --
 	OP(OLast,0)
 OP_END

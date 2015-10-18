@@ -1055,17 +1055,17 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 #endif
 	for(i=0;i<stackRegs;i++) {
 		vreg *r = vregs + args[i];
-		size += hl_pad_size(size + ctx->totalRegsSize,r->t);
+		size += hl_pad_size(size,r->t);
 		size += r->size;
 	}
-	paddedSize = pad_stack(ctx,size);
+	paddedSize = pad_stack(ctx,size + ctx->totalRegsSize) - ctx->totalRegsSize;
 	size = paddedSize - size;
 	for(i=0;i<stackRegs;i++) {
 		// RTL
 		vreg *r = vregs + args[count - (i + 1)];
 		int pad;
 		size += r->size;
-		pad = hl_pad_size(size + ctx->totalRegsSize,r->t);
+		pad = hl_pad_size(size,r->t);
 		if( (i & 7) == 0 ) jit_buf(ctx);
 		if( pad ) {
 			op64(ctx,SUB,PESP,pconst(&p,pad));
@@ -1087,8 +1087,14 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 				op64(ctx,MOVSD,pmem(&p,Esp,0),fetch(r));
 			} else if( IS_64 )
 				op64(ctx,PUSH,fetch(r),UNUSED);
-			else
-				ASSERT(r->t->kind);
+			else if( r->stack.kind == RSTACK ) {
+				scratch(r->current);
+				r->stackPos += 4;
+				op32(ctx,PUSH,&r->stack,UNUSED);
+				r->stackPos -= 4;
+				op32(ctx,PUSH,&r->stack,UNUSED);
+			} else
+				ASSERT(0);
 			break;
 		default:
 			ASSERT(r->size);
@@ -2054,6 +2060,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(o->p1);
 				vreg *a = R(o->p2);
 				op32(ctx,MOV,alloc_cpu(ctx,r,false),pmem(&p,alloc_cpu(ctx,a,true)->id,HL_WSIZE));
+				store(ctx,r,r->current,false);
+			}
+			break;
+		case ORef:
+			{
+				vreg *r = R(o->p1);
+				vreg *v = R(o->p2);
+				scratch(v->current);
+				op64(ctx,MOV,alloc_cpu(ctx,r,false),REG_AT(Ebp));
+				if( v->stackPos < 0 )
+					op64(ctx,SUB,r->current,pconst(&p,-v->stackPos));
+				else
+					op64(ctx,ADD,r->current,pconst(&p,v->stackPos));
 				store(ctx,r,r->current,false);
 			}
 			break;

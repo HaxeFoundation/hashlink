@@ -36,4 +36,18 @@ static void do_log( vdynamic *v ) {
 	}
 }
 
+static void *do_itos( int i, int *len ) {
+	char tmp[12];
+	*len = sprintf(tmp,"%d",i);
+	return hl_copy_bytes(tmp,*len + 1);
+}
+
+static void *do_ftos( double d, int *len ) {
+	char tmp[24];
+	*len = sprintf(tmp,"%.16g",d);
+	return hl_copy_bytes(tmp,*len + 1);
+}
+
 DEFINE_PRIM_WITH_NAME(_VOID,do_log,_DYN,log);
+DEFINE_PRIM_WITH_NAME(_BYTES,do_itos,_I32 _REF(_I32),itos);
+DEFINE_PRIM_WITH_NAME(_BYTES,do_ftos,_F64 _REF(_I32),ftos);

@@ -177,6 +177,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 		t->t = hl_get_type(r);
 		break;
 	case HARRAY:
+	case HREF:
 		t->t = hl_get_type(r);
 		break;
 	default:

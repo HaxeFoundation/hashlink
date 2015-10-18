@@ -143,6 +143,7 @@ static void append_type( char **p, hl_type *t ) {
 			break;
 		}
 	case HARRAY:
+	case HREF:
 		append_type(p,t->t);
 		break;
 	default:

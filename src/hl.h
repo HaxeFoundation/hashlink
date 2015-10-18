@@ -131,8 +131,9 @@ typedef enum {
 	HOBJ	= 10,
 	HARRAY	= 11,
 	HTYPE	= 12,
+	HREF	= 13,
 	// ---------
-	HLAST	= 13,
+	HLAST	= 14,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
@@ -332,6 +333,7 @@ varray *hl_alloc_array( hl_type **tt, int size );
 vdynamic *hl_alloc_dynamic( hl_type **t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );
 void *hl_alloc_bytes( int size );
+void *hl_copy_bytes( void *ptr, int size );
 
 void hl_callback_init( void *e );
 void *hl_callback( void *f, int nargs, vdynamic **args );
@@ -341,7 +343,7 @@ vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
 vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsifdbBXPOAT"
+#define TYPE_STR	"vcsifdbBXPOATR"
 
 #undef  _VOID
 #define _NO_ARG
@@ -358,6 +360,7 @@ vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
 #define _BYTES						"B"
 #define _ARR(t)						"A" t
 #define _TYPE						"T"
+#define _REF(t)						"R" t
 
 #define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&name); } C_FUNCTION_END

@@ -22,6 +22,7 @@ int hl_type_size( hl_type *t ) {
 		HL_WSIZE, // OBJ
 		HL_WSIZE, // ARRAY
 		HL_WSIZE, // TYPE
+		HL_WSIZE, // REF
 	};
 	return SIZES[t->kind];
 }
