@@ -208,6 +208,7 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 #define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,__LINE__); jit_exit(); }
 #define IS_FLOAT(r)	((r)->t->kind == HF64)
 #define RLOCK(r)		if( (r)->lock < ctx->currentPos ) (r)->lock = ctx->currentPos
+#define RUNLOCK(r)		if( (r)->lock == ctx->currentPos ) (r)->lock = 0
 
 #define BREAK()		B(0xCC)
 
@@ -1942,17 +1943,79 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OField:
 			{
 				vreg *r = R(o->p2);
-				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
-				preg *rr = alloc_cpu(ctx,r, true);
-				copy_to(ctx,R(o->p1),pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3]));
+				switch( r->t->kind ) {
+				case HOBJ:
+					{
+						hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
+						preg *rr = alloc_cpu(ctx,r, true);
+						copy_to(ctx,R(o->p1),pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3]));
+					}
+					break;
+				case HVIRTUAL:
+					{
+						preg *rr = alloc_cpu(ctx,r,true);
+						preg *ridx = alloc_reg(ctx, RCPU);
+						preg *ridx2 = IS_64 ? alloc_reg(ctx,RCPU) : ridx;
+						preg *rtmp = alloc_reg(ctx, RCPU);
+						// fetch index table
+						op64(ctx, MOV, ridx, pmem(&p, rr->id, 0));
+						// fetch index itself
+#						ifdef HL_64
+						op64(ctx, XOR, ridx2, ridx2);
+#						endif
+						op32(ctx, MOV, ridx2, pmem(&p, ridx->id, o->p3 * sizeof(int) + HL_WSIZE));
+						// fetch fields table
+						op64(ctx, MOV, rtmp, pmem(&p, rr->id, HL_WSIZE*2));
+						// add index
+						op64(ctx, ADD, rtmp, ridx2);
+						RUNLOCK(ridx);
+						// fetch field data
+						copy_to(ctx,R(o->p1), pmem(&p, rtmp->id, 0));
+					}
+					break;
+				default:
+					ASSERT(r->t->kind);
+					break;
+				}
 			}
 			break;
 		case OSetField:
 			{
 				vreg *r = R(o->p1);
-				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
-				preg *rr = alloc_cpu(ctx, r, true);
-				copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]), R(o->p3));
+				switch( r->t->kind ) {
+				case HOBJ:
+					{
+						hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
+						preg *rr = alloc_cpu(ctx, r, true);
+						copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]), R(o->p3));
+					}
+					break;
+				case HVIRTUAL:
+					{
+						preg *rr = alloc_cpu(ctx,r,true);
+						preg *ridx = alloc_reg(ctx, RCPU);
+						preg *ridx2 = IS_64 ? alloc_reg(ctx,RCPU) : ridx;
+						preg *rtmp = alloc_reg(ctx, RCPU);
+						// fetch index table
+						op64(ctx, MOV, ridx, pmem(&p, rr->id, 0));
+						// fetch index itself
+#						ifdef HL_64
+						op64(ctx, XOR, ridx2, ridx2);
+#						endif
+						op32(ctx, MOV, ridx2, pmem(&p, ridx->id, o->p2 * sizeof(int) + HL_WSIZE));
+						// fetch fields table
+						op64(ctx, MOV, rtmp, pmem(&p, rr->id, HL_WSIZE*2));
+						// add index
+						op64(ctx, ADD, rtmp, ridx2);
+						RUNLOCK(ridx);
+						// fetch field data
+						copy_from(ctx,pmem(&p, rtmp->id, 0), R(o->p3));
+					}
+					break;
+				default:
+					ASSERT(r->t->kind);
+					break;
+				}
 			}
 			break;
 		case OGetThis:
@@ -2074,6 +2137,23 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				else
 					op64(ctx,ADD,r->current,pconst(&p,v->stackPos));
 				store(ctx,r,r->current,false);
+			}
+			break;
+		case OToVirtual:
+			{
+				vreg *r = R(o->p1);
+				vreg *v = R(o->p2);
+				int size = HL_WSIZE * 2;
+				if( v->t->kind == HOBJ ) hl_get_obj_rt(ctx->m, v->t); // ensure it's initialized
+#				ifdef HL_64
+				op64(ctx,MOV,REG_AT(CALL_REGS[1]),fetch(v));
+				op64(ctx,MOV,REG_AT(CALL_REGS[0]),pconst64(&p,(int_val)r->t));
+#				else
+				op32(ctx,PUSH,fetch(v),UNUSED);
+				op32(ctx,PUSH,pconst(&p,(int)(int_val)r->t),UNUSED);
+#				endif
+				call_native(ctx,hl_to_virtual,size);
+				store(ctx,r,PEAX,true);
 			}
 			break;
 		default:

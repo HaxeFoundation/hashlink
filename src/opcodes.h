@@ -103,6 +103,7 @@ OP_BEGIN
 	OP(ORef,2)
 	OP(OUnref,2)
 	OP(OSetref,2)
+	OP(OToVirtual,2)
 	// --
 	OP(OLast,0)
 OP_END

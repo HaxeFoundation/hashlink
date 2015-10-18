@@ -30,6 +30,10 @@ static void do_log( vdynamic *v ) {
 				printf("[%s]\n",(char*)hl_callback(o->rt->toString,1,&v));
 		}
 		break;
+	case HVIRTUAL:
+		printf("virtual:");
+		do_log(((vvirtual*)v)->original);
+		break;
 	default:
 		printf(_PTR_FMT "H\n",(int_val)v->v.ptr);
 		break;

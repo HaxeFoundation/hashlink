@@ -162,3 +162,31 @@ void *hl_copy_bytes( void *ptr, int size ) {
 	memcpy(b,ptr,size);
 	return b;
 }
+
+vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
+	vvirtual *v;
+	int *indexes;
+	if( obj == NULL ) return NULL;
+	v = (vvirtual*)malloc(sizeof(vvirtual));
+	v->proto = (vvirtual_proto*)malloc(sizeof(vvirtual_proto) + sizeof(int)*vt->virt->nfields);
+	indexes = (int*)(v->proto + 1);
+	v->proto->t = vt;
+	v->original = obj;
+	switch( (*obj->t)->kind ) {
+	case HOBJ:
+		{ 
+			int i;
+			vobj *o = (vobj*)obj;
+			hl_runtime_obj *rt =o->proto->t->obj->rt;
+			v->field_data = o + 1;
+			for(i=0;i<vt->virt->nfields;i++) {
+				indexes[i] = i * 4;
+			}
+			printf("TODO!\n");
+		}
+		break;
+	default:
+		hl_error("Don't know how to virtual %d",(*obj->t)->kind);
+	}
+	return v;
+}

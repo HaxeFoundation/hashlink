@@ -132,8 +132,10 @@ typedef enum {
 	HARRAY	= 11,
 	HTYPE	= 12,
 	HREF	= 13,
+	HVIRTUAL= 14,
+	HDYNOBJ = 15,
 	// ---------
-	HLAST	= 14,
+	HLAST	= 16,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
@@ -167,11 +169,20 @@ typedef struct {
 	hl_runtime_obj *rt;
 } hl_type_obj;
 
+typedef struct {
+	int nfields;
+#	ifdef HL_64
+	int __pad;
+#	endif
+	hl_obj_field *fields; 
+} hl_type_virtual;
+
 struct hl_type {
 	hl_type_kind kind;
 	union {
 		hl_type_fun *fun;
 		hl_type_obj *obj;
+		hl_type_virtual *virt;
 		hl_type	*t;
 	};
 	hl_type *self;
@@ -291,11 +302,31 @@ typedef struct {
 
 typedef struct {
 	hl_type *t;
+	/* overridden methods indexes */
 } vobj_proto;
 
 struct vobj {
 	vobj_proto *proto;
+	/* fields data */
 };
+
+typedef struct {
+	hl_type *t;
+	/*
+		indexes into fields data
+		lower 8 bits give offset for which field table to index 
+	*/
+} vvirtual_proto;
+
+typedef struct {
+	vvirtual_proto *proto;
+	vdynamic *original;
+	void *field_data;
+	/* --- only for vobj ---
+	void *proto_data;
+	void *extra_data;
+	*/
+} vvirtual;
 
 typedef struct {
 	hl_type **t;
@@ -326,6 +357,25 @@ struct hl_runtime_obj {
 	void *toString;
 };
 
+typedef struct {
+	hl_type *t;
+	int hashed_name;
+	int field_index;
+} vdynobj_field;
+
+typedef struct {
+	hl_type *t;
+	vdynobj_field fields;
+} vdynobj_proto;
+
+typedef struct {
+	vdynobj_proto *t;
+	void *fields_data;
+	int nfields;
+	int dataSize;
+	vvirtual *virtuals;
+} vdynobj;
+
 void *hl_alloc_executable_memory( int size );
 void hl_free_executable_memory( void *ptr, int size );
 
@@ -337,6 +387,8 @@ void *hl_copy_bytes( void *ptr, int size );
 
 void hl_callback_init( void *e );
 void *hl_callback( void *f, int nargs, vdynamic **args );
+
+vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 
 vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
 vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );

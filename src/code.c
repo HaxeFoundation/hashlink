@@ -180,6 +180,20 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 	case HREF:
 		t->t = hl_get_type(r);
 		break;
+	case HVIRTUAL:
+		{
+			int i;
+			int nfields = UINDEX();
+			t->virt = (hl_type_virtual*)hl_malloc(&r->code->alloc,sizeof(hl_type_virtual));
+			t->virt->nfields = nfields;
+			t->virt->fields = (hl_obj_field*)hl_malloc(&r->code->alloc,sizeof(hl_obj_field)*nfields);
+			for(i=0;i<nfields;i++) {
+				hl_obj_field *f = t->virt->fields + i;
+				f->name = hl_get_string(r);
+				f->t = hl_get_type(r);
+			}
+		}
+		break;
 	default:
 		if( t->kind >= HLAST ) ERROR("Invalid type");
 		break;

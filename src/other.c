@@ -23,6 +23,8 @@ int hl_type_size( hl_type *t ) {
 		HL_WSIZE, // ARRAY
 		HL_WSIZE, // TYPE
 		HL_WSIZE, // REF
+		HL_WSIZE, // VIRTUAL
+		HL_WSIZE, // DYNOBJ
 	};
 	return SIZES[t->kind];
 }
@@ -30,7 +32,6 @@ int hl_type_size( hl_type *t ) {
 int hl_pad_size( int pos, hl_type *t ) {
 	int sz = hl_type_size(t);
 	int align;
-	if( sz < HL_WSIZE ) sz = HL_WSIZE;
 	align = pos & (sz - 1);
 	if( align && t->kind != HVOID )
 		return sz - align;
