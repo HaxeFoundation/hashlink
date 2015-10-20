@@ -2069,17 +2069,46 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
 			}
 			break;
+		case OMethod:
+			{
+				vreg *obj = R(o->p2);
+				switch( obj->t->kind ) {
+				case HVIRTUAL:
+					{
+#						ifdef HL_64
+						int size = pad_stack(ctx, 0);
+						op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(obj));
+						op32(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,o->p3));
+#						else
+						int size = pad_stack(ctx, HL_WSIZE + 4);
+						op32(ctx,PUSH,pconst(&p,o->p3),UNUSED);
+						op32(ctx,PUSH,fetch(obj),UNUSED);
+#						endif
+						call_native(ctx,hl_fetch_virtual_method,size);
+						store(ctx,R(o->p1),PEAX,true);
+					}
+					break;
+				default:
+					ASSERT(obj->t->kind);
+				}
+			}
+			break;
 		case OThrow:
 			{
-				// TODO
-				BREAK();
+				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,true);
+				call_native(ctx,hl_throw,size);
 			}
 			break;
 		case OError:
 			{
-				// TODO
-				op64(ctx,MOV,PEAX,pconst64(&p,(int_val)m->code->strings[o->p1]));
-				BREAK();
+#				ifdef HL_64
+				int size = pad_stack(ctx, 0);
+				op64(ctx,MOV,REG_AT(CALL_REGS[0]),pconst64(&p,(int_val)m->code->strings[o->p1]));
+#				else
+				int size = pad_stack(ctx, HL_WSIZE);
+				op32(ctx,PUSH,pconst(&p,(int)(int_val)m->code->strings[o->p1]), UNUSED);
+#				endif
+				call_native(ctx,hl_error_msg,size);
 			}
 			break;
 		case OLabel:
@@ -2143,15 +2172,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				vreg *r = R(o->p1);
 				vreg *v = R(o->p2);
-				int size = HL_WSIZE * 2;
-				if( v->t->kind == HOBJ ) hl_get_obj_rt(ctx->m, v->t); // ensure it's initialized
 #				ifdef HL_64
+				int size = pad_stack(ctx, 0);
 				op64(ctx,MOV,REG_AT(CALL_REGS[1]),fetch(v));
 				op64(ctx,MOV,REG_AT(CALL_REGS[0]),pconst64(&p,(int_val)r->t));
 #				else
+				int size = pad_stack(ctx, HL_WSIZE*2);
 				op32(ctx,PUSH,fetch(v),UNUSED);
 				op32(ctx,PUSH,pconst(&p,(int)(int_val)r->t),UNUSED);
 #				endif
+				if( v->t->kind == HOBJ ) hl_get_obj_rt(ctx->m, v->t); // ensure it's initialized
 				call_native(ctx,hl_to_virtual,size);
 				store(ctx,r,PEAX,true);
 			}

@@ -106,6 +106,7 @@
 
 typedef void (_cdecl *fptr)();
 typedef intptr_t int_val;
+typedef long long int64;
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -151,12 +152,14 @@ typedef struct {
 typedef struct {
 	const char *name;
 	hl_type *t;
+	int hashed_name;
 } hl_obj_field;
 
 typedef struct {
 	const char *name;
 	int findex;
 	int pindex;
+	int hashed_name;
 } hl_obj_proto;
 
 typedef struct {
@@ -276,8 +279,6 @@ int hl_jit_init_callback( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize );
 
-void hl_error( const char *fmt, ... );
-
 /* -------------------- RUNTIME ------------------------------ */
 
 typedef struct vobj vobj;
@@ -322,10 +323,6 @@ typedef struct {
 	vvirtual_proto *proto;
 	vdynamic *original;
 	void *field_data;
-	/* --- only for vobj ---
-	void *proto_data;
-	void *extra_data;
-	*/
 } vvirtual;
 
 typedef struct {
@@ -344,17 +341,30 @@ struct vclosure {
 	int __pad;
 	union {
 		int v32;
-		int_val v64;
+		int64 v64;
 	};
 };
 
+typedef struct {
+	hl_type *t;
+	int hashed_name;
+	int field_index; // negative or zero : index in proto
+} hl_field_lookup;
+
 struct hl_runtime_obj {
-	int nfields; // absolute
-	int nproto;  // absolute
+	hl_module *m;
+	hl_type_obj *obj;
+	// absolute
+	int nfields;
+	int nproto;
+	int nlookup;
 	int size;
 	int *fields_indexes;
+	hl_runtime_obj *parent;
 	vobj_proto *proto;
 	void *toString;
+	// relative
+	hl_field_lookup *lookup;
 };
 
 typedef struct {
@@ -385,14 +395,21 @@ vobj *hl_alloc_obj( hl_module *m, hl_type *t );
 void *hl_alloc_bytes( int size );
 void *hl_copy_bytes( void *ptr, int size );
 
+int hl_hash( const char *name );
+
 void hl_callback_init( void *e );
 void *hl_callback( void *f, int nargs, vdynamic **args );
 
+void hl_error( const char *fmt, ... );
+void hl_error_msg( const char *msg );
+void hl_throw( vdynamic *v );
+
 vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
+void *hl_fetch_virtual_method( vvirtual *v, int fid );
 
 vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
 vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
-vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int_val v64 );
+vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int64 v64 );
 
 // match GNU C++ mangling
 #define TYPE_STR	"vcsifdbBXPOATR"

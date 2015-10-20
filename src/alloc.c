@@ -144,7 +144,7 @@ vclosure *hl_alloc_closure_i32( hl_module *m, int_val fid, int v32 ) {
 	return c;
 }
 
-vclosure *hl_alloc_closure_i64( hl_module *m, int_val fid, int_val v64 ) {
+vclosure *hl_alloc_closure_i64( hl_module *m, int_val fid, int64 v64 ) {
 	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
 	c->t = &m->code->functions[m->functions_indexes[fid]].type;
 	c->fun = m->functions_ptrs[fid];
@@ -161,32 +161,4 @@ void *hl_copy_bytes( void *ptr, int size ) {
 	void *b = hl_alloc_bytes(size);
 	memcpy(b,ptr,size);
 	return b;
-}
-
-vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
-	vvirtual *v;
-	int *indexes;
-	if( obj == NULL ) return NULL;
-	v = (vvirtual*)malloc(sizeof(vvirtual));
-	v->proto = (vvirtual_proto*)malloc(sizeof(vvirtual_proto) + sizeof(int)*vt->virt->nfields);
-	indexes = (int*)(v->proto + 1);
-	v->proto->t = vt;
-	v->original = obj;
-	switch( (*obj->t)->kind ) {
-	case HOBJ:
-		{ 
-			int i;
-			vobj *o = (vobj*)obj;
-			hl_runtime_obj *rt =o->proto->t->obj->rt;
-			v->field_data = o + 1;
-			for(i=0;i<vt->virt->nfields;i++) {
-				indexes[i] = i * 4;
-			}
-			printf("TODO!\n");
-		}
-		break;
-	default:
-		hl_error("Don't know how to virtual %d",(*obj->t)->kind);
-	}
-	return v;
 }

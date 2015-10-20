@@ -38,13 +38,21 @@ int hl_pad_size( int pos, hl_type *t ) {
 	return 0;
 }
 
+void hl_throw( vdynamic *v ) {
+	*(char*)NULL = 0;
+}
+
+void hl_error_msg( const char *msg ) {
+	// TODO : throw
+	printf("throw:%s\n",msg);
+	exit(66);
+}
+
 void hl_error(const char *fmt, ...) {
 	char buf[256];
 	va_list args;
 	va_start(args, fmt);
 	vsprintf(buf,fmt, args);
 	va_end(args);
-	// TODO : throw
-	printf("throw:%s\n",buf);
-	exit(66);
+	hl_error_msg(buf);
 }
