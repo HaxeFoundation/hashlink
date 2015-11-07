@@ -1666,6 +1666,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	for(opCount=0;opCount<f->nops;opCount++) {
 		int jump;
 		hl_opcode *o = f->ops + opCount;
+		vreg *dst = R(o->p1);
+		vreg *ra = R(o->p2);
+		vreg *rb = R(o->p3);
 		ctx->currentPos = opCount + 1;
 		jit_buf(ctx);
 #		ifdef JIT_DEBUG
@@ -1678,51 +1681,51 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		switch( o->op ) {
 		case OMov:
 		case OUnsafeCast:
-			op_mov(ctx, R(o->p1), R(o->p2));
+			op_mov(ctx, dst, ra);
 			break;
 		case OInt:
-			store_const(ctx, R(o->p1), m->code->ints[o->p2]);
+			store_const(ctx, dst, m->code->ints[o->p2]);
 			break;
 		case OBool:
-			store_const(ctx, R(o->p1), o->p2);
+			store_const(ctx, dst, o->p2);
 			break;
 		case OGetGlobal:
 			{
 				void *addr = m->globals_data + m->globals_indexes[o->p2];
-				copy_to(ctx, R(o->p1), paddr(&p,addr));
+				copy_to(ctx, dst, paddr(&p,addr));
 			}
 			break;
 		case OSetGlobal:
 			{
 				void *addr = m->globals_data + m->globals_indexes[o->p1];
-				copy_from(ctx, paddr(&p,addr), R(o->p2));
+				copy_from(ctx, paddr(&p,addr), ra);
 			}
 			break;
 		case OCall3:
 			{
 				int args[3] = { o->p3, o->extra[0], o->extra[1] };
-				op_call_fun(ctx, R(o->p1), o->p2, 3, args);
+				op_call_fun(ctx, dst, o->p2, 3, args);
 			}
 			break;
 		case OCall4:
 			{
 				int args[4] = { o->p3, o->extra[0], o->extra[1], o->extra[2] };
-				op_call_fun(ctx, R(o->p1), o->p2, 4, args);
+				op_call_fun(ctx, dst, o->p2, 4, args);
 			}
 			break;
 		case OCallN:
-			op_call_fun(ctx, R(o->p1), o->p2, o->p3, o->extra);
+			op_call_fun(ctx, dst, o->p2, o->p3, o->extra);
 			break;
 		case OCall0:
-			op_call_fun(ctx, R(o->p1), o->p2, 0, NULL);
+			op_call_fun(ctx, dst, o->p2, 0, NULL);
 			break;
 		case OCall1:
-			op_call_fun(ctx, R(o->p1), o->p2, 1, &o->p3);
+			op_call_fun(ctx, dst, o->p2, 1, &o->p3);
 			break;
 		case OCall2:
 			{
 				int args[2] = { o->p3, (int)(int_val)o->extra };
-				op_call_fun(ctx, R(o->p1), o->p2, 2, args);
+				op_call_fun(ctx, dst, o->p2, 2, args);
 			}
 			break;
 		case OSub:
@@ -1736,32 +1739,30 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OAnd:
 		case OOr:
 		case OXor:
-			op_binop(ctx, R(o->p1), R(o->p2), R(o->p3), o);
+			op_binop(ctx, dst, ra, rb, o);
 			break;
 		case ONeg:
 			{
-				vreg *r = R(o->p2);
-				if( IS_FLOAT(r) ) {
-					preg *ra = alloc_reg(ctx,RFPU);
-					preg *rb = alloc_fpu(ctx,r,true);
-					op64(ctx,XORPD,ra,ra);
-					op64(ctx,SUBSD,ra,rb);
-					store(ctx,R(o->p1),ra,true);
+				if( IS_FLOAT(ra) ) {
+					preg *pa = alloc_reg(ctx,RFPU);
+					preg *pb = alloc_fpu(ctx,ra,true);
+					op64(ctx,XORPD,pa,pa);
+					op64(ctx,SUBSD,pa,pb);
+					store(ctx,dst,pa,true);
 				} else {
-					preg *ra = alloc_reg(ctx,RCPU);
-					preg *rb = alloc_cpu(ctx,r,true);
-					op32(ctx,XOR,ra,ra);
-					op32(ctx,SUB,ra,rb);
-					store(ctx,R(o->p1),ra,true);
+					preg *pa = alloc_reg(ctx,RCPU);
+					preg *pb = alloc_cpu(ctx,ra,true);
+					op32(ctx,XOR,pa,pa);
+					op32(ctx,SUB,pa,pb);
+					store(ctx,dst,pa,true);
 				}
 			}
 			break;
 		case ONot:
 			{
-				vreg *r = R(o->p2);
-				preg *v = alloc_cpu(ctx,r,true);
+				preg *v = alloc_cpu(ctx,ra,true);
 				op32(ctx,XOR,v,pconst(&p,1));
-				store(ctx,R(o->p1),v,true);
+				store(ctx,dst,v,true);
 			}
 			break;
 		case OSGte:
@@ -1775,7 +1776,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OJNotNull:
 		case OJNull:
 			{
-				preg *r = alloc_cpu(ctx, R(o->p1), true);
+				preg *r = alloc_cpu(ctx, dst, true);
 				op32(ctx, TEST, r, r);
 				XJump( o->op == OJFalse || o->op == OJNull ? JZero : JNotZero,jump);
 				register_jump(ctx,jump,(opCount + 1) + o->p2);
@@ -1787,8 +1788,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OJSGte:
 		case OJULt:
 		case OJUGte:
-			op_binop(ctx, NULL, R(o->p1), R(o->p2), o);
-			jump = do_jump(ctx,o->op, IS_FLOAT(R(o->p1)));
+			op_binop(ctx, NULL, dst, ra, o);
+			jump = do_jump(ctx,o->op, IS_FLOAT(dst));
 			register_jump(ctx,jump,(opCount + 1) + o->p3);
 			break;
 		case OJAlways:
@@ -1797,120 +1798,117 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OToDyn:
 			{
-				vreg *r = R(o->p2);
-				int_val rt = (int_val)&r->t->self;
+				int_val rt = (int_val)&ra->t->self;
 				call_native_consts(ctx, hl_alloc_dynamic, &rt, 1);
 				// copy value to dynamic
-				if( IS_FLOAT(r) && !IS_64 ) {
+				if( IS_FLOAT(ra) && !IS_64 ) {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
-					op64(ctx,MOV,tmp,&r->stack);
+					op64(ctx,MOV,tmp,&ra->stack);
 					op64(ctx,MOV,pmem(&p,Eax,8),tmp);
-					r->stackPos += 4;
-					op64(ctx,MOV,tmp,&r->stack);
+					ra->stackPos += 4;
+					op64(ctx,MOV,tmp,&ra->stack);
 					op64(ctx,MOV,pmem(&p,Eax,12),tmp);
-					r->stackPos -= 4;
+					ra->stackPos -= 4;
 				} else {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
-					op64(ctx,MOV,tmp,&r->stack);
+					op64(ctx,MOV,tmp,&ra->stack);
 					op64(ctx,MOV,pmem(&p,Eax,8),tmp);
 				}
-				store(ctx, R(o->p1), PEAX, true);
+				store(ctx, dst, PEAX, true);
 			}
 			break;
 		case OToFloat:
 			{
-				preg *r = alloc_cpu(ctx,R(o->p2),true);
-				preg *w = alloc_fpu(ctx,R(o->p1),false);
+				preg *r = alloc_cpu(ctx,ra,true);
+				preg *w = alloc_fpu(ctx,dst,false);
 				op32(ctx,CVTSI2SD,w,r);
-				store(ctx, R(o->p1), w, true);
+				store(ctx, dst, w, true);
 			}
 			break;
 		case OToInt:
 			{
-				preg *r = alloc_fpu(ctx,R(o->p2),true);
-				preg *w = alloc_cpu(ctx,R(o->p1),false);
+				preg *r = alloc_fpu(ctx,ra,true);
+				preg *w = alloc_cpu(ctx,dst,false);
 				op32(ctx,CVTSD2SI,w,r);
-				store(ctx, R(o->p1), w, true);
+				store(ctx, dst, w, true);
 			}
 			break;
 		case ORet:
-			op_ret(ctx, R(o->p1));
+			op_ret(ctx, dst);
 			break;
 		case OIncr:
 			{
-				vreg *r = R(o->p1);
-				preg *v = fetch(r);
-				if( IS_FLOAT(r) ) {
+				preg *v = fetch(dst);
+				if( IS_FLOAT(dst) ) {
 					ASSERT(0);
 				} else {
 					op32(ctx,INC,v,UNUSED);
-					if( v->kind != RSTACK ) store(ctx, r, v, false);
+					if( v->kind != RSTACK ) store(ctx, dst, v, false);
 				}
 			}
 			break;
 		case ODecr:
 			{
-				vreg *r = R(o->p1);
-				preg *v = fetch(r);
-				if( IS_FLOAT(r) ) {
+				preg *v = fetch(dst);
+				if( IS_FLOAT(dst) ) {
 					ASSERT(0);
 				} else {
 					op32(ctx,DEC,v,UNUSED);
-					if( v->kind != RSTACK ) store(ctx, r, v, false);
+					if( v->kind != RSTACK ) store(ctx, dst, v, false);
 				}
 			}
 			break;
 		case OFloat:
 			{
-				vreg *r = R(o->p1);
-				if( r->size != 8 ) ASSERT(r->size);
+				if( dst->size != 8 ) ASSERT(dst->size);
 				if( m->code->floats[o->p2] == 0 ) {
-					preg *f = alloc_fpu(ctx,r,false);
+					preg *f = alloc_fpu(ctx,dst,false);
 					op64(ctx,XORPD,f,f);
 				} else {
 #					ifdef HL_64
-					op64(ctx,MOVSD,alloc_fpu(ctx,r,false),pcodeaddr(&p,o->p2 * 8));
+					op64(ctx,MOVSD,alloc_fpu(ctx,dst,false),pcodeaddr(&p,o->p2 * 8));
 #					else
-					op64(ctx,MOVSD,alloc_fpu(ctx,r,false),paddr(&p,m->code->floats + o->p2));
+					op64(ctx,MOVSD,alloc_fpu(ctx,dst,false),paddr(&p,m->code->floats + o->p2));
 #					endif
 				}
-				store(ctx,r,r->current,false); 
+				store(ctx,dst,dst->current,false); 
 			}
 			break;
 		case OString:
 			{
-				vreg *r = R(o->p1);
-				op64(ctx,MOV,alloc_cpu(ctx, r, false),pconst64(&p,(int_val)m->code->strings[o->p2]));
-				store(ctx,r,r->current,false);
+				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)m->code->strings[o->p2]));
+				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case ONull:
 			{
-				vreg *r = R(o->p1);
-				op64(ctx,XOR,alloc_cpu(ctx, r, false),alloc_cpu(ctx, r, false));
-				store(ctx,r,r->current,false);
+				op64(ctx,XOR,alloc_cpu(ctx, dst, false),alloc_cpu(ctx, dst, false));
+				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case ONew:
-			{
-				vreg *r = R(o->p1);
-				int_val args[2] = { (int_val)m, (int_val)r->t }; 
-				if( r->t->kind != HOBJ ) ASSERT(r->t->kind);
-				call_native_consts(ctx, hl_alloc_obj, args, 2);
-				store(ctx, r, PEAX, true);
+			switch( dst->t->kind ) {
+			case HOBJ:
+				{
+					int_val args[2] = { (int_val)m, (int_val)dst->t };
+					call_native_consts(ctx, hl_alloc_obj, args, 2);
+					store(ctx, dst, PEAX, true);
+					break;
+				}
+			default:
+				ASSERT(dst->t->kind);
 			}
 			break;
 		case OGetFunction:
 			{
-				vreg *r = R(o->p1);
 				int_val args[2] = { (int_val)m, (int_val)o->p2 };
 				call_native_consts(ctx, hl_alloc_closure_void, args, 2);
-				store(ctx, r, PEAX, true);
+				store(ctx, dst, PEAX, true);
 			}
 			break;
 		case OClosure:
 			{
-				vreg *arg = R(o->p3);
+				vreg *arg = rb;
 #				ifdef HL_64
 				if( arg->size == 4 ) {
 					TODO();
@@ -1934,26 +1932,25 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 #				endif
 				discard_regs(ctx,true);
-				store(ctx, R(o->p1), PEAX, true);
+				store(ctx, dst, PEAX, true);
 			}
 			break;
 		case OCallClosure:
-			op_call_closure(ctx,R(o->p1),R(o->p2),o->p3,o->extra);
+			op_call_closure(ctx,dst,ra,o->p3,o->extra);
 			break;
 		case OField:
 			{
-				vreg *r = R(o->p2);
-				switch( r->t->kind ) {
+				switch( ra->t->kind ) {
 				case HOBJ:
 					{
-						hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
-						preg *rr = alloc_cpu(ctx,r, true);
-						copy_to(ctx,R(o->p1),pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3]));
+						hl_runtime_obj *rt = hl_get_obj_rt(m, ra->t);
+						preg *rr = alloc_cpu(ctx,ra, true);
+						copy_to(ctx,dst,pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3]));
 					}
 					break;
 				case HVIRTUAL:
 					{
-						preg *rr = alloc_cpu(ctx,r,true);
+						preg *rr = alloc_cpu(ctx,ra,true);
 						preg *ridx = alloc_reg(ctx, RCPU);
 						preg *ridx2 = IS_64 ? alloc_reg(ctx,RCPU) : ridx;
 						preg *rtmp = alloc_reg(ctx, RCPU);
@@ -1970,29 +1967,28 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						op64(ctx, ADD, rtmp, ridx2);
 						RUNLOCK(ridx);
 						// fetch field data
-						copy_to(ctx,R(o->p1), pmem(&p, rtmp->id, 0));
+						copy_to(ctx,dst, pmem(&p, rtmp->id, 0));
 					}
 					break;
 				default:
-					ASSERT(r->t->kind);
+					ASSERT(ra->t->kind);
 					break;
 				}
 			}
 			break;
 		case OSetField:
 			{
-				vreg *r = R(o->p1);
-				switch( r->t->kind ) {
+				switch( dst->t->kind ) {
 				case HOBJ:
 					{
-						hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
-						preg *rr = alloc_cpu(ctx, r, true);
-						copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]), R(o->p3));
+						hl_runtime_obj *rt = hl_get_obj_rt(m, dst->t);
+						preg *rr = alloc_cpu(ctx, dst, true);
+						copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]), rb);
 					}
 					break;
 				case HVIRTUAL:
 					{
-						preg *rr = alloc_cpu(ctx,r,true);
+						preg *rr = alloc_cpu(ctx,dst,true);
 						preg *ridx = alloc_reg(ctx, RCPU);
 						preg *ridx2 = IS_64 ? alloc_reg(ctx,RCPU) : ridx;
 						preg *rtmp = alloc_reg(ctx, RCPU);
@@ -2009,11 +2005,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						op64(ctx, ADD, rtmp, ridx2);
 						RUNLOCK(ridx);
 						// fetch field data
-						copy_from(ctx,pmem(&p, rtmp->id, 0), R(o->p3));
+						copy_from(ctx,pmem(&p, rtmp->id, 0), rb);
 					}
 					break;
 				default:
-					ASSERT(r->t->kind);
+					ASSERT(dst->t->kind);
 					break;
 				}
 			}
@@ -2023,7 +2019,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(0);
 				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
 				preg *rr = alloc_cpu(ctx,r, true);
-				copy_to(ctx,R(o->p1),pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]));
+				copy_to(ctx,dst,pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]));
 			}
 			break;
 		case OSetThis:
@@ -2031,7 +2027,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(0);
 				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
 				preg *rr = alloc_cpu(ctx, r, true);
-				copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p1]), R(o->p2));
+				copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p1]), ra);
 			}
 			break;
 		case OCallThis:
@@ -2039,7 +2035,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int nargs = o->p3 + 1;
 				int *args = (int*)hl_malloc(&ctx->falloc,sizeof(int) * nargs);
 				int size;
-				vreg *dst = R(o->p1);
 				preg *r = alloc_cpu(ctx, R(0), true);
 				preg *tmp;
 				tmp = alloc_reg(ctx, RCPU);
@@ -2057,7 +2052,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OCallMethod:
 			{
 				int size;
-				vreg *dst = R(o->p1);
 				preg *r = alloc_cpu(ctx, R(o->extra[0]), true);
 				preg *tmp;
 				tmp = alloc_reg(ctx, RCPU);
@@ -2070,27 +2064,24 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OMethod:
-			{
-				vreg *obj = R(o->p2);
-				switch( obj->t->kind ) {
-				case HVIRTUAL:
-					{
-#						ifdef HL_64
-						int size = pad_stack(ctx, 0);
-						op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(obj));
-						op32(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,o->p3));
-#						else
-						int size = pad_stack(ctx, HL_WSIZE + 4);
-						op32(ctx,PUSH,pconst(&p,o->p3),UNUSED);
-						op32(ctx,PUSH,fetch(obj),UNUSED);
-#						endif
-						call_native(ctx,hl_fetch_virtual_method,size);
-						store(ctx,R(o->p1),PEAX,true);
-					}
-					break;
-				default:
-					ASSERT(obj->t->kind);
+			switch( ra->t->kind ) {
+			case HVIRTUAL:
+				{
+#					ifdef HL_64
+					int size = pad_stack(ctx, 0);
+					op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(ra));
+					op32(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,o->p3));
+#					else
+					int size = pad_stack(ctx, HL_WSIZE + 4);
+					op32(ctx,PUSH,pconst(&p,o->p3),UNUSED);
+					op32(ctx,PUSH,fetch(ra),UNUSED);
+#					endif
+					call_native(ctx,hl_fetch_virtual_method,size);
+					store(ctx,dst,PEAX,true);
 				}
+				break;
+			default:
+				ASSERT(ra->t->kind);
 			}
 			break;
 		case OThrow:
@@ -2117,73 +2108,60 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OSetByte:
 			{
-				preg *base = alloc_cpu(ctx, R(o->p1), true);
-				preg *offset = alloc_cpu(ctx, R(o->p2), true);
-				preg *value = alloc_cpu(ctx, R(o->p3), true);
+				preg *base = alloc_cpu(ctx, dst, true);
+				preg *offset = alloc_cpu(ctx, ra, true);
+				preg *value = alloc_cpu(ctx, rb, true);
 				op32(ctx,MOV8,pmem2(&p,base->id,offset->id,1,0),value);
 			}
 			break;
 		case OType:
 			{
-				vreg *r = R(o->p1);
-				op64(ctx,MOV,alloc_cpu(ctx, r, false),pconst64(&p,(int_val)&(m->code->types + o->p2)->self));
-				store(ctx,r,r->current,false);
+				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)&(m->code->types + o->p2)->self));
+				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case OGetArray:
 			{
-				vreg *r = R(o->p1);
-				vreg *a = R(o->p2);
-				vreg *idx = R(o->p3);
-				op64(ctx,MOV,alloc_cpu(ctx,r,false),pmem2(&p,alloc_cpu(ctx,a,true)->id,alloc_cpu(ctx,idx,true)->id,HL_WSIZE,sizeof(varray)));
-				store(ctx,r,r->current,false);
+				op64(ctx,MOV,alloc_cpu(ctx,dst,false),pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu(ctx,rb,true)->id,HL_WSIZE,sizeof(varray)));
+				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case OSetArray:
 			{
-				vreg *a = R(o->p1);
-				vreg *idx = R(o->p2);
-				vreg *v = R(o->p3);
-				op64(ctx,MOV,pmem2(&p,alloc_cpu(ctx,a,true)->id,alloc_cpu(ctx,idx,true)->id,HL_WSIZE,sizeof(varray)),alloc_cpu(ctx,v,true));
+				op64(ctx,MOV,pmem2(&p,alloc_cpu(ctx,dst,true)->id,alloc_cpu(ctx,ra,true)->id,HL_WSIZE,sizeof(varray)),alloc_cpu(ctx,rb,true));
 			}
 			break;
 		case OArraySize:
 			{
-				vreg *r = R(o->p1);
-				vreg *a = R(o->p2);
-				op32(ctx,MOV,alloc_cpu(ctx,r,false),pmem(&p,alloc_cpu(ctx,a,true)->id,HL_WSIZE));
-				store(ctx,r,r->current,false);
+				op32(ctx,MOV,alloc_cpu(ctx,dst,false),pmem(&p,alloc_cpu(ctx,ra,true)->id,HL_WSIZE));
+				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case ORef:
 			{
-				vreg *r = R(o->p1);
-				vreg *v = R(o->p2);
-				scratch(v->current);
-				op64(ctx,MOV,alloc_cpu(ctx,r,false),REG_AT(Ebp));
-				if( v->stackPos < 0 )
-					op64(ctx,SUB,r->current,pconst(&p,-v->stackPos));
+				scratch(ra->current);
+				op64(ctx,MOV,alloc_cpu(ctx,dst,false),REG_AT(Ebp));
+				if( ra->stackPos < 0 )
+					op64(ctx,SUB,dst->current,pconst(&p,-ra->stackPos));
 				else
-					op64(ctx,ADD,r->current,pconst(&p,v->stackPos));
-				store(ctx,r,r->current,false);
+					op64(ctx,ADD,dst->current,pconst(&p,ra->stackPos));
+				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case OToVirtual:
 			{
-				vreg *r = R(o->p1);
-				vreg *v = R(o->p2);
 #				ifdef HL_64
 				int size = pad_stack(ctx, 0);
-				op64(ctx,MOV,REG_AT(CALL_REGS[1]),fetch(v));
-				op64(ctx,MOV,REG_AT(CALL_REGS[0]),pconst64(&p,(int_val)r->t));
+				op64(ctx,MOV,REG_AT(CALL_REGS[1]),fetch(ra));
+				op64(ctx,MOV,REG_AT(CALL_REGS[0]),pconst64(&p,(int_val)dst->t));
 #				else
 				int size = pad_stack(ctx, HL_WSIZE*2);
-				op32(ctx,PUSH,fetch(v),UNUSED);
-				op32(ctx,PUSH,pconst(&p,(int)(int_val)r->t),UNUSED);
+				op32(ctx,PUSH,fetch(ra),UNUSED);
+				op32(ctx,PUSH,pconst(&p,(int)(int_val)dst->t),UNUSED);
 #				endif
-				if( v->t->kind == HOBJ ) hl_get_obj_rt(ctx->m, v->t); // ensure it's initialized
+				if( ra->t->kind == HOBJ ) hl_get_obj_rt(ctx->m, ra->t); // ensure it's initialized
 				call_native(ctx,hl_to_virtual,size);
-				store(ctx,r,PEAX,true);
+				store(ctx,dst,PEAX,true);
 			}
 			break;
 		default:
