@@ -98,9 +98,13 @@ void hl_free_executable_memory( void *c, int size ) {
 #endif
 }
 
-vdynamic *hl_alloc_dynamic( hl_type **t ) {
-	vdynamic *d = (vdynamic*)malloc(sizeof(vdynamic));
-	d->t = t;
+void *hl_gc_alloc( int size ) {
+	return malloc(size);
+}
+
+vdynamic *hl_alloc_dynamic( hl_type *t ) {
+	vdynamic *d = (vdynamic*)hl_gc_alloc(sizeof(vdynamic));
+	d->t = &t->self;
 	d->v.ptr = NULL;
 	return d;
 }
@@ -112,23 +116,33 @@ vobj *hl_alloc_obj( hl_module *m, hl_type *t ) {
 	if( rt == NULL || rt->proto == NULL ) rt = hl_get_obj_proto(m,t);
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
-	o = (vobj*)malloc(size);
+	o = (vobj*)hl_gc_alloc(size);
 	memset(o,0,size);
 	o->proto = rt->proto;
 	return o;
 }
 
-varray *hl_alloc_array( hl_type **t, int size ) {
-	int esize = hl_type_size(*t);
-	varray *a = (varray*)malloc(sizeof(varray) + esize*size);
-	a->t = t;
+vdynobj *hl_alloc_dynobj( hl_type *t ) {
+	vdynobj *o = (vdynobj*)hl_gc_alloc(sizeof(vdynobj));
+	o->nfields = 0;
+	o->dataSize = 0;
+	o->fields_data = NULL;
+	o->virtuals = NULL;
+	o->dproto = (vdynobj_proto*)&t->self;
+	return o;
+}
+
+varray *hl_alloc_array( hl_type *t, int size ) {
+	int esize = hl_type_size(t);
+	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size);
+	a->t = &t->self;
 	a->size = size;
 	memset(a+1,0,size*esize);
 	return a;
 }
 
 vclosure *hl_alloc_closure_void( hl_module *m, int_val fid ) {
-	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
+	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
 	c->t = &m->code->functions[m->functions_indexes[fid]].type;
 	c->fun = m->functions_ptrs[fid];
 	c->bits = 0;
@@ -136,7 +150,7 @@ vclosure *hl_alloc_closure_void( hl_module *m, int_val fid ) {
 }
 
 vclosure *hl_alloc_closure_i32( hl_module *m, int_val fid, int v32 ) {
-	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
+	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
 	c->t = &m->code->functions[m->functions_indexes[fid]].type;
 	c->fun = m->functions_ptrs[fid];
 	c->bits = CL_HAS_V32;
@@ -145,7 +159,7 @@ vclosure *hl_alloc_closure_i32( hl_module *m, int_val fid, int v32 ) {
 }
 
 vclosure *hl_alloc_closure_i64( hl_module *m, int_val fid, int64 v64 ) {
-	vclosure *c = (vclosure*)malloc(sizeof(vclosure));
+	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
 	c->t = &m->code->functions[m->functions_indexes[fid]].type;
 	c->fun = m->functions_ptrs[fid];
 	c->bits = CL_HAS_V64;

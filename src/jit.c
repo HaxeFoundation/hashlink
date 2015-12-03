@@ -1798,7 +1798,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OToDyn:
 			{
-				int_val rt = (int_val)&ra->t->self;
+				int_val rt = (int_val)ra->t;
 				call_native_consts(ctx, hl_alloc_dynamic, &rt, 1);
 				// copy value to dynamic
 				if( IS_FLOAT(ra) && !IS_64 ) {
@@ -1892,6 +1892,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				{
 					int_val args[2] = { (int_val)m, (int_val)dst->t };
 					call_native_consts(ctx, hl_alloc_obj, args, 2);
+					store(ctx, dst, PEAX, true);
+					break;
+				}
+			case HDYNOBJ:
+				{
+					int_val args[1] = { (int_val)dst->t };
+					call_native_consts(ctx, hl_alloc_dynobj, args, 1);
 					store(ctx, dst, PEAX, true);
 					break;
 				}
@@ -2162,6 +2169,79 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				if( ra->t->kind == HOBJ ) hl_get_obj_rt(ctx->m, ra->t); // ensure it's initialized
 				call_native(ctx,hl_to_virtual,size);
 				store(ctx,dst,PEAX,true);
+			}
+			break;
+		case OUnVirtual:
+			{
+				preg *v = alloc_cpu(ctx,ra,true);
+				int jnz, jend;
+				op64(ctx,TEST,v,v);
+				XJump_small(JNotZero,jnz);
+				op64(ctx,XOR,alloc_cpu(ctx, dst, false),alloc_cpu(ctx, dst, false));
+				XJump_small(JAlways,jend);
+				patch_jump(ctx,jnz);
+				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pmem(&p,v->id,HL_WSIZE));
+				patch_jump(ctx,jend);
+				store(ctx,dst,dst->current,false);
+			}
+			break;
+		case ODynGet:
+			{
+				int hfield = hl_hash(m->code->strings[o->p3],false);
+#				ifdef HL_64
+				int size = pad_stack(ctx, 0);
+				op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(ra));
+				op64(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,hfield));
+				op64(ctx,MOV,REG_AT(CALL_REGS[2]),pconst64(&p,(int_val)dst->t));
+#				else
+				int size = pad_stack(ctx, HL_WSIZE*3);
+				op32(ctx,PUSH,pconst(&p,(int)dst->t),UNUSED);
+				op32(ctx,PUSH,pconst(&p,hfield),UNUSED);
+				op32(ctx,PUSH,fetch(ra),UNUSED);
+#				endif
+				if( dst->size == 8 ) {
+					call_native(ctx,hl_dyn_get64,size);
+#					ifdef HL_64
+					store(ctx,dst,PEAX,true);
+#					else
+					scratch(dst->current);
+					// mov Eax:Edx into dst
+					op32(ctx,MOV,&dst->stack,PEAX);
+					dst->stackPos += 4;
+					op32(ctx,MOV,&dst->stack,REG_AT(Edx));
+					dst->stackPos -= 4;
+#					endif
+				} else {
+					call_native(ctx,hl_dyn_get32,size);
+					store(ctx,dst,PEAX,true);
+				}
+			}
+			break;
+		case ODynSet:
+			{
+				int hfield = hl_hash(m->code->strings[o->p2],true);
+#				ifdef HL_64
+				int size = pad_stack(ctx, 0);
+				op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(dst));
+				op64(ctx,MOV,REG_AT(CALL_REGS[3]),fetch(rb));
+				op64(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,hfield));
+				op64(ctx,MOV,REG_AT(CALL_REGS[2]),pconst64(&p,(int_val)rb->t));
+#				else
+				int size = pad_stack(ctx, HL_WSIZE*3 + rb->size);
+				if( rb->size == 8 ) {
+					BREAK();
+					//op32(ctx,PUSH,fetch(rb),UNUSED);
+				} else {
+					op32(ctx,PUSH,fetch(rb),UNUSED);
+				}
+				op32(ctx,PUSH,pconst(&p,(int)rb->t), UNUSED);
+				op32(ctx,PUSH,pconst(&p,hfield),UNUSED);
+				op32(ctx,PUSH,fetch(dst),UNUSED);
+#				endif
+				if( rb->size == 8 )
+					call_native(ctx,hl_dyn_set64,size);
+				else
+					call_native(ctx,hl_dyn_set32,size);
 			}
 			break;
 		default:

@@ -104,6 +104,9 @@ OP_BEGIN
 	OP(OUnref,2)
 	OP(OSetref,2)
 	OP(OToVirtual,2)
+	OP(OUnVirtual,2)
+	OP(ODynGet,3)
+	OP(ODynSet,3)
 	// --
 	OP(OLast,0)
 OP_END

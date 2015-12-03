@@ -34,8 +34,32 @@ static void do_log( vdynamic *v ) {
 		printf("virtual:");
 		do_log(((vvirtual*)v)->original);
 		break;
+	case HDYNOBJ:
+		{
+			vdynobj *o = (vdynobj*)v;
+			int i;
+			printf("{");
+			for(i=0;i<o->nfields;i++) {
+				hl_field_lookup *f = &o->dproto->fields + i;
+				if( i ) printf(", ");
+				printf("%s : ", hl_field_name(f->hashed_name));
+				switch( f->t->kind ) {
+				case HI32:
+					printf("%d",*(int*)(o->fields_data + f->field_index));
+					break;
+				case HF64:
+					printf("%.19gf",*(double*)(o->fields_data + f->field_index));
+					break;
+				default:
+					do_log(*(vdynamic**)(o->fields_data + f->field_index));
+					break;
+				}
+			}
+			printf("}\n");
+		}
+		break;
 	default:
-		printf(_PTR_FMT "H\n",(int_val)v->v.ptr);
+		printf(_PTR_FMT "H\n",(int_val)v);
 		break;
 	}
 }

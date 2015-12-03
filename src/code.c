@@ -162,13 +162,13 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			for(i=0;i<nfields;i++) {
 				hl_obj_field *f = t->obj->fields + i;
 				f->name = hl_get_string(r);
-				f->hashed_name = hl_hash(f->name);
+				f->hashed_name = hl_hash(f->name,true);
 				f->t = hl_get_type(r);
 			}
 			for(i=0;i<nproto;i++) {
 				hl_obj_proto *p = t->obj->proto + i;
 				p->name = hl_get_string(r);
-				p->hashed_name = hl_hash(p->name);
+				p->hashed_name = hl_hash(p->name,true);
 				p->findex = UINDEX();
 				p->pindex = INDEX();
 			}
@@ -192,7 +192,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			for(i=0;i<nfields;i++) {
 				hl_obj_field *f = t->virt->fields + i;
 				f->name = hl_get_string(r);
-				f->hashed_name = hl_hash(f->name);
+				f->hashed_name = hl_hash(f->name,true);
 				f->t = hl_get_type(r);
 			}
 		}

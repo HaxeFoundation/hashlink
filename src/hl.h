@@ -319,11 +319,15 @@ typedef struct {
 	*/
 } vvirtual_proto;
 
-typedef struct {
+
+typedef struct vvirtual vvirtual;
+
+struct vvirtual {
 	vvirtual_proto *proto;
 	vdynamic *original;
 	void *field_data;
-} vvirtual;
+	vvirtual *next;
+};
 
 typedef struct {
 	hl_type **t;
@@ -369,18 +373,12 @@ struct hl_runtime_obj {
 
 typedef struct {
 	hl_type *t;
-	int hashed_name;
-	int field_index;
-} vdynobj_field;
-
-typedef struct {
-	hl_type *t;
-	vdynobj_field fields;
+	hl_field_lookup fields;
 } vdynobj_proto;
 
 typedef struct {
-	vdynobj_proto *t;
-	void *fields_data;
+	vdynobj_proto *dproto;
+	char *fields_data;
 	int nfields;
 	int dataSize;
 	vvirtual *virtuals;
@@ -389,13 +387,15 @@ typedef struct {
 void *hl_alloc_executable_memory( int size );
 void hl_free_executable_memory( void *ptr, int size );
 
-varray *hl_alloc_array( hl_type **tt, int size );
-vdynamic *hl_alloc_dynamic( hl_type **t );
+varray *hl_alloc_array( hl_type *t, int size );
+vdynamic *hl_alloc_dynamic( hl_type *t );
 vobj *hl_alloc_obj( hl_module *m, hl_type *t );
+vdynobj *hl_alloc_dynobj( hl_type *t );
 void *hl_alloc_bytes( int size );
 void *hl_copy_bytes( void *ptr, int size );
 
-int hl_hash( const char *name );
+int hl_hash( const char *name, bool cache_name );
+const char *hl_field_name( int hash );
 
 void hl_callback_init( void *e );
 void *hl_callback( void *f, int nargs, vdynamic **args );
@@ -406,10 +406,17 @@ void hl_throw( vdynamic *v );
 
 vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 void *hl_fetch_virtual_method( vvirtual *v, int fid );
+int hl_dyn_get32( vdynamic *d, int hfield, hl_type *t );
+int64 hl_dyn_get64( vdynamic *d, int hfield, hl_type *t );
+
+void hl_dyn_set32( vdynamic *d, int hfield, hl_type *t, int value );
+void hl_dyn_set64( vdynamic *d, int hfield, hl_type *t, int64 value );
 
 vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
 vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
 vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int64 v64 );
+
+void *hl_gc_alloc( int size );
 
 // match GNU C++ mangling
 #define TYPE_STR	"vcsifdbBXPOATR"
