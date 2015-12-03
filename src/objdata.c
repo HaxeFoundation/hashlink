@@ -74,6 +74,15 @@ const char *hl_field_name( int hash ) {
 	return l ? (char*)l->t : "???";
 }
 
+void hl_cache_free() {
+	int i;
+	for(i=0;i<hl_cache_count;i++)
+		free(hl_cache[i].t);
+	free(hl_cache);
+	hl_cache = NULL;
+	hl_cache_count = hl_cache_size = 0;
+}
+
 /**
 	Builds class metadata (fields indexes, etc.)
 	Does not require the JIT to be finalized.
@@ -119,7 +128,7 @@ hl_runtime_obj *hl_get_obj_rt( hl_module *m, hl_type *ot ) {
 	for(i=0;i<o->nproto;i++) {
 		hl_obj_proto *p = o->proto + i;
 		if( p->pindex >= t->nproto ) t->nproto = p->pindex + 1;
-		hl_lookup_insert(t->lookup,i + o->nfields,p->hashed_name,m->code->functions[m->functions_indexes[p->findex]].type,-i);
+		hl_lookup_insert(t->lookup,i + o->nfields,p->hashed_name,m->code->functions[m->functions_indexes[p->findex]].type,-(i+1));
 	}
 	return t;
 }
@@ -322,7 +331,7 @@ int hl_dyn_get32( vdynamic *d, int hfield, hl_type *t ) {
 				rt = rt->parent;
 			} while( rt );
 			if( f == NULL )
-				hl_error("#%s has not field %s",o->proto->t->obj->name,hl_field_name(hfield));
+				hl_error("#%s has no field %s",o->proto->t->obj->name,hl_field_name(hfield));
 			return fetch_data32(f->t,t,(char*)o + f->field_index);
 		}
 		break;
@@ -357,7 +366,7 @@ int64 hl_dyn_get64( vdynamic *d, int hfield, hl_type *t ) {
 				rt = rt->parent;
 			} while( rt );
 			if( f == NULL )
-				hl_error("#%s has not field %s",o->proto->t->obj->name,hl_field_name(hfield));
+				hl_error("#%s has no field %s",o->proto->t->obj->name,hl_field_name(hfield));
 			return fetch_data64(f->t,t,(char*)o + f->field_index);
 		}
 		break;

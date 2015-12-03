@@ -417,6 +417,18 @@ vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
 vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int64 v64 );
 
 void *hl_gc_alloc( int size );
+char *hl_gc_alloc_noptr( int size );
+
+typedef struct hl_buffer hl_buffer;
+
+hl_buffer *hl_alloc_buffer();
+void hl_buffer_val( hl_buffer *b, vdynamic *v );
+void hl_buffer_char( hl_buffer *b, unsigned char c );
+void hl_buffer_str( hl_buffer *b, const char *str );
+void hl_buffer_str_sub( hl_buffer *b, const char *str, int len );
+int hl_buffer_length( hl_buffer *b );
+char *hl_buffer_content( hl_buffer *b, int *len );
+char *hl_to_string( vdynamic *v );
 
 // match GNU C++ mangling
 #define TYPE_STR	"vcsifdbBXPOATR"
@@ -438,6 +450,7 @@ void *hl_gc_alloc( int size );
 #define _TYPE						"T"
 #define _REF(t)						"R" t
 
+#define	HL_PRIM						static
 #define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&name); } C_FUNCTION_END
 

@@ -1,10 +1,10 @@
 #include <hl.h>
 
-static void bblit( char *dst, int dpos, char *src, int spos, int len ) {
+HL_PRIM void bblit( char *dst, int dpos, char *src, int spos, int len ) {
 	memcpy(dst + dpos,src+spos,len);
 }
 
-static void ablit( varray *dst, int dpos, varray *src, int spos, int len ) {
+HL_PRIM void ablit( varray *dst, int dpos, varray *src, int spos, int len ) {
 	memcpy( (void**)(dst + 1) + dpos, (void**)(src + 1) + spos, len * sizeof(void*)); 
 }
 
