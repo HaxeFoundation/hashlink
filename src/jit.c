@@ -2223,6 +2223,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				ifdef HL_64
 				int size = pad_stack(ctx, 0);
 				op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(dst));
+				scratch(REG_AT(CALL_REGS[0]));
 				op64(ctx,MOV,REG_AT(CALL_REGS[3]),fetch(rb));
 				op64(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,hfield));
 				op64(ctx,MOV,REG_AT(CALL_REGS[2]),pconst64(&p,(int_val)rb->t));

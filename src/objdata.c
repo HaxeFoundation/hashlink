@@ -303,6 +303,16 @@ static int64 fetch_data64( hl_type *src, hl_type *dst, void *data ) {
 			return v.i;
 		}
 		default:
+#			ifdef HL_64
+			if( dst->kind == HDYN ) {
+				if( src->kind == HF64 ) {
+					vdynamic *d = hl_alloc_dynamic(src);
+					d->v.d = *(double*)data;
+					return (int64)d;
+				}
+				return (int64)hl_to_dyn(*(vdynamic**)data,src);
+			}
+#			endif
 			hl_error("Invalid dynget cast");
 		}
 	}
@@ -386,15 +396,16 @@ void hl_dyn_set32( vdynamic *d, int hfield, hl_type *t, int value ) {
 			vdynobj *o = (vdynobj*)d;
 			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
 			if( f == NULL ) {
+				int pad = hl_pad_size(o->dataSize, t);
 				int size = hl_type_size(t);
 				int index;
-				char *newData = (char*)hl_gc_alloc(o->dataSize + size);
+				char *newData = (char*)hl_gc_alloc(o->dataSize + pad + size);
 				vdynobj_proto *proto = (vdynobj_proto*)hl_gc_alloc(sizeof(vdynobj_proto) + sizeof(hl_field_lookup) * (o->nfields + 1 - 1));
 				int field_pos = hl_lookup_find_index(&o->dproto->fields, o->nfields, hfield);
 				// update data
 				memcpy(newData,o->fields_data,o->dataSize);
 				o->fields_data = newData;
-				o->dataSize += hl_pad_size(o->dataSize, t);
+				o->dataSize += pad;
 				index = o->dataSize;
 				o->dataSize += size;
 				// update field table
