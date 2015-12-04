@@ -120,7 +120,7 @@ void hl_buffer_str_sub( hl_buffer *b, const char *s, int len ) {
 }
 
 void hl_buffer_str( hl_buffer *b, const char *s ) {
-	if( s ) hl_buffer_str_sub(b,s,strlen(s));
+	if( s ) hl_buffer_str_sub(b,s,(int)strlen(s));
 }
 
 void hl_buffer_char( hl_buffer *b, unsigned char c ) {
