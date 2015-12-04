@@ -1342,6 +1342,8 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OJUGte:
 		case OJEq:
 		case OJNeq:
+		case OEq:
+		case ONotEq:
 			o = CMP;
 			break;
 		default:
@@ -1765,6 +1767,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx,dst,v,true);
 			}
 			break;
+		case OEq:
+		case ONotEq:
 		case OSGte:
 		case OSLt:
 		case OUGte:
