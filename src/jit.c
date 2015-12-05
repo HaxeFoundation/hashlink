@@ -2146,7 +2146,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OType:
 			{
-				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)&(m->code->types + o->p2)->self));
+				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)(m->code->types + o->p2)));
 				store(ctx,dst,dst->current,false);
 			}
 			break;

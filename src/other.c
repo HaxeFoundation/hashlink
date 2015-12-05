@@ -158,6 +158,32 @@ typedef struct vlist {
 	struct vlist *next;
 } vlist;
 
+static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack );
+
+static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack ) {
+	char buf[32];
+	switch( t->kind ) {
+	case HI32:
+		hl_buffer_str_sub(b,buf,sprintf(buf,"%d",*(int*)data));
+		break;
+	case HF64:
+		hl_buffer_str_sub(b,buf,sprintf(buf,"%d",*(double*)data));
+		break;
+	case HBYTES:
+		hl_buffer_str(b,*(char**)data);
+		break;
+	case HBOOL:
+		if( *(unsigned char*)data )
+			hl_buffer_str_sub(b,"true",4);
+		else
+			hl_buffer_str_sub(b,"false",5);
+		break;
+	default:
+		hl_buffer_rec(b, *(vdynamic**)data, stack);
+		break;
+	}
+}
+
 static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 	char buf[32];
 	if( v == NULL ) {
@@ -196,6 +222,32 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 	case HVIRTUAL:
 		hl_buffer_rec(b, ((vvirtual*)v)->original, stack);
 		break;
+	case HARRAY:
+		{
+			int i;
+			varray *a = (varray*)v;
+			hl_type *at = (*a->t)->t;
+			int stride = hl_type_size(at);
+			vlist l;
+			vlist *vtmp = stack;
+			while( vtmp != NULL ) {
+				if( vtmp->v == v ) {
+					hl_buffer_str_sub(b,"...",3);
+					return;
+				}
+				vtmp = vtmp->next;
+			}
+			l.v = v;
+			l.next = stack;
+			hl_buffer_char(b,'[');
+			for(i=0;i<a->size;i++) {
+				if( i )
+					hl_buffer_str_sub(b,", ",2);
+				hl_buffer_addr(b,(char*)(a + 1) + i * stride,at,&l);
+			}
+			hl_buffer_char(b,']');
+		}
+		break;
 	case HDYNOBJ:
 		{
 			vdynobj *o = (vdynobj*)v;
@@ -214,30 +266,10 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			hl_buffer_char(b, '{');
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = &o->dproto->fields + i;
-				void *data = o->fields_data + f->field_index;
 				if( i ) hl_buffer_str_sub(b,", ",2);
 				hl_buffer_str(b,hl_field_name(f->hashed_name));
 				hl_buffer_str_sub(b," : ",3);
-				switch( f->t->kind ) {
-				case HI32:
-					hl_buffer_str_sub(b,buf,sprintf(buf,"%d",*(int*)data));
-					break;
-				case HF64:
-					hl_buffer_str_sub(b,buf,sprintf(buf,"%d",*(double*)data));
-					break;
-				case HBYTES:
-					hl_buffer_str(b,*(char**)data);
-					break;
-				case HBOOL:
-					if( *(unsigned char*)data )
-						hl_buffer_str_sub(b,"true",4);
-					else
-						hl_buffer_str_sub(b,"false",5);
-					break;
-				default:
-					hl_buffer_rec(b, *(vdynamic**)data, &l);
-					break;
-				}
+				hl_buffer_addr(b, o->fields_data + f->field_index, f->t, stack);
 			}
 			hl_buffer_char(b, '}');
 		}

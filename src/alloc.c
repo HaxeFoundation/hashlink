@@ -138,8 +138,12 @@ vdynobj *hl_alloc_dynobj( hl_type *t ) {
 
 varray *hl_alloc_array( hl_type *t, int size ) {
 	int esize = hl_type_size(t);
-	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size);
-	a->t = &t->self;
+	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size + sizeof(hl_type));
+	hl_type *at = (hl_type*)(((char*)a) + sizeof(varray) + esize*size);
+	at->kind = HARRAY;
+	at->self = at;
+	at->t = t;
+	a->t = &at->self;
 	a->size = size;
 	memset(a+1,0,size*esize);
 	return a;
