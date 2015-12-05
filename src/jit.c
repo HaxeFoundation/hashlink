@@ -1354,6 +1354,8 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	switch( RTYPE(a) ) {
 	case HI32:
 #	ifndef HL_64
+	case HDYNOBJ:
+	case HVIRTUAL:
 	case HOBJ:
 	case HFUN:
 	case HBYTES:
@@ -1386,6 +1388,8 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		return out;
 #	ifdef HL_64
 	case HOBJ:
+	case HDYNOBJ:
+	case HVIRTUAL:
 	case HFUN:
 	case HBYTES:
 		switch( ID2(pa->kind, pb->kind) ) {
@@ -2117,12 +2121,27 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			// NOP for now
 			discard_regs(ctx,false);
 			break;
-		case OSetByte:
+		case OGetI32:
+			{
+				preg *base = alloc_cpu(ctx, ra, true);
+				preg *offset = alloc_cpu(ctx, rb, true);
+				store(ctx, dst, pmem2(&p,base->id,offset->id,1,0), false);
+			}
+			break;
+		case OSetI8:
 			{
 				preg *base = alloc_cpu(ctx, dst, true);
 				preg *offset = alloc_cpu(ctx, ra, true);
 				preg *value = alloc_cpu(ctx, rb, true);
 				op32(ctx,MOV8,pmem2(&p,base->id,offset->id,1,0),value);
+			}
+			break;
+		case OSetI32:
+			{
+				preg *base = alloc_cpu(ctx, dst, true);
+				preg *offset = alloc_cpu(ctx, ra, true);
+				preg *value = alloc_cpu(ctx, rb, true);
+				op32(ctx,MOV,pmem2(&p,base->id,offset->id,1,0),value);
 			}
 			break;
 		case OType:
