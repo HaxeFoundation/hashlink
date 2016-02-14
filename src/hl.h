@@ -308,12 +308,13 @@ typedef struct {
 	vvirtual *virtuals;
 } vdynobj;
 
-varray *hl_alloc_array( hl_type *t, int size );
+
+varray *hl_aalloc( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
 vobj *hl_alloc_obj( hl_type *t );
 vdynobj *hl_alloc_dynobj( hl_type *t );
-vbytes *hl_alloc_bytes( int size );
-vbytes *hl_copy_bytes( vbytes *byte, int size );
+vbytes *hl_balloc( int size );
+vbytes *hl_bcopy( vbytes *byte, int size );
 
 int hl_hash( const char *name, bool cache_name );
 const char *hl_field_name( int hash );
@@ -360,7 +361,7 @@ void hl_buffer_char( hl_buffer *b, unsigned char c );
 void hl_buffer_str( hl_buffer *b, const char *str );
 void hl_buffer_str_sub( hl_buffer *b, const char *str, int len );
 int hl_buffer_length( hl_buffer *b );
-char *hl_buffer_content( hl_buffer *b, int *len );
+vbytes *hl_buffer_content( hl_buffer *b, int *len );
 char *hl_to_string( vdynamic *v );
 
 // ----------------------- FFI ------------------------------------------------------
@@ -381,12 +382,33 @@ char *hl_to_string( vdynamic *v );
 #define _FUN(t, args)				"P" args "_" t
 #define _OBJ						"O"
 #define _BYTES						"B"
-#define _ARR(t)						"A" t
+#define _ARR						"A"
 #define _TYPE						"T"
 #define _REF(t)						"R" t
+#define _NULL(t)					"N" t
 
+#if HL_JIT
 #define	HL_PRIM						static
 #define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&name); } C_FUNCTION_END
+#else
+#define	HL_PRIM
+#define DEFINE_PRIM(t,name,args)
+#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#endif
+
+// -------------- EXTRA ------------------------------------
+
+#define hl_fatal(msg)	hl_fatal_error(msg,__FILE__,__LINE__)
+void hl_fatal_error( const char *msg, const char *file, int line );
+
+// -------------- UNICODE -----------------------------------
+
+#ifdef HL_WIN
+#	include <wchar.h>
+typedef wchar_t	uchar;
+#	define USTR(str)	L##str
+#	define usprintf		swprintf
+#endif
 
 #endif

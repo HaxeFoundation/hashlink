@@ -147,12 +147,18 @@
     <ClCompile Include="src\callback.c" />
     <ClCompile Include="src\objdata.c" />
     <ClCompile Include="src\other.c" />
+    <ClCompile Include="src\std\array.c" />
     <ClCompile Include="src\std\bytes.c" />
+    <ClCompile Include="src\std\fun.c" />
+    <ClCompile Include="src\std\maps.c" />
     <ClCompile Include="src\std\string.c" />
+    <ClCompile Include="src\std\sys.c" />
+    <ClCompile Include="src\std\types.c" />
+    <ClCompile Include="src\_main.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="hlmodule.h" />
     <ClInclude Include="src\hl.h" />
+    <ClInclude Include="src\hlmodule.h" />
     <ClInclude Include="src\opcodes.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

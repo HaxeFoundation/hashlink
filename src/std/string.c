@@ -1,19 +1,8 @@
 #include <hl.h>
 
+/*
 HL_PRIM void do_log( vdynamic *v ) {
 	printf("%s\n",hl_to_string(v));
-}
-
-HL_PRIM void *do_itos( int i, int *len ) {
-	char tmp[12];
-	*len = sprintf(tmp,"%d",i);
-	return hl_copy_bytes(tmp,*len + 1);
-}
-
-HL_PRIM void *do_ftos( double d, int *len ) {
-	char tmp[24];
-	*len = sprintf(tmp,"%.16g",d);
-	return hl_copy_bytes(tmp,*len + 1);
 }
 
 HL_PRIM int utf8length( unsigned char *s, int pos, int l ) {
@@ -41,16 +30,30 @@ HL_PRIM int utf8length( unsigned char *s, int pos, int l ) {
 	return count;
 }
 
-HL_PRIM void *value_to_string( vdynamic *d, int *len ) {
+*/
+
+HL_PRIM vbytes *hl_itos( int i, int *len ) {
+	uchar tmp[24];
+	*len = (int)usprintf(tmp,24,USTR("%d"),i);
+	return hl_bcopy((vbytes*)tmp,(*len + 1) << 1);
+}
+
+HL_PRIM vbytes *hl_ftos( double d, int *len ) {
+	uchar tmp[48];
+	*len = (int)usprintf(tmp,48,USTR("%.16g"),d);
+	return hl_bcopy((vbytes*)tmp,(*len + 1) << 1);
+}
+
+HL_PRIM vbytes *hl_value_to_string( vdynamic *d, int *len ) {
 	if( d == NULL ) {
 		*len = 4;
-		return "null";
+		return (vbytes*)USTR("null");
 	}
 	switch( d->t->kind ) {
 	case HI32:
-		return do_itos(d->v.i,len);
+		return hl_itos(d->v.i,len);
 	case HF64:
-		return do_ftos(d->v.d,len);
+		return hl_ftos(d->v.d,len);
 	default:
 		{
 			hl_buffer *b = hl_alloc_buffer();
@@ -60,8 +63,30 @@ HL_PRIM void *value_to_string( vdynamic *d, int *len ) {
 	}
 }
 
-DEFINE_PRIM_WITH_NAME(_VOID,do_log,_DYN,log);
-DEFINE_PRIM_WITH_NAME(_BYTES,do_itos,_I32 _REF(_I32),itos);
-DEFINE_PRIM_WITH_NAME(_BYTES,do_ftos,_F64 _REF(_I32),ftos);
-DEFINE_PRIM(_I32,utf8length,_BYTES _I32 _I32);
-DEFINE_PRIM(_BYTES,value_to_string,_DYN _REF(_I32));
+HL_PRIM int hl_ucs2length( vbytes *str, int pos ) {
+	hl_fatal("TODO");
+	return 0;
+}
+
+HL_PRIM vbytes* hl_utf8_to_utf16( vbytes *str, int pos, int *len ) {
+	hl_fatal("TODO");
+	return NULL;
+}
+
+HL_PRIM vbytes* hl_ucs2_upper( vbytes *str, int pos, int len ) {
+	hl_fatal("TODO");
+	return NULL;
+}
+
+HL_PRIM vbytes* hl_ucs2_lower( vbytes *str, int pos, int len ) {
+	hl_fatal("TODO");
+	return NULL;
+}
+
+DEFINE_PRIM(_BYTES,hl_itos,_I32 _REF(_I32));
+DEFINE_PRIM(_BYTES,hl_ftos,_F64 _REF(_I32));
+DEFINE_PRIM(_BYTES,hl_value_to_string,_DYN _REF(_I32));
+DEFINE_PRIM(_I32,hl_ucs2length,_BYTES _I32);
+DEFINE_PRIM(_BYTES,hl_utf8_to_utf16,_BYTES _I32 _REF(_I32));
+DEFINE_PRIM(_BYTES,hl_ucs2_upper,_BYTES _I32 _I32);
+DEFINE_PRIM(_BYTES,hl_ucs2_lower,_BYTES _I32 _I32);

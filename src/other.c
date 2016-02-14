@@ -2,6 +2,11 @@
 #include <stdarg.h>
 #include <string.h>
 
+void hl_fatal_error( const char *msg, const char *file, int line ) {
+	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
+	exit(0);
+}
+
 void hl_global_init() {
 }
 
@@ -29,6 +34,9 @@ int hl_type_size( hl_type *t ) {
 		HL_WSIZE, // REF
 		HL_WSIZE, // VIRTUAL
 		HL_WSIZE, // DYNOBJ
+		HL_WSIZE, // ABSTRACT
+		HL_WSIZE, // ENUM
+		HL_WSIZE, // NULL
 	};
 	return SIZES[t->kind];
 }
@@ -134,7 +142,7 @@ void hl_buffer_char( hl_buffer *b, unsigned char c ) {
 	buffer_append_new(b,(char*)&c,1);
 }
 
-char *hl_buffer_content( hl_buffer *b, int *len ) {
+vbytes *hl_buffer_content( hl_buffer *b, int *len ) {
 	char *buf = hl_gc_alloc_noptr(b->totlen);
 	stringitem it = b->data;
 	char *s = (char*)buf + b->totlen;

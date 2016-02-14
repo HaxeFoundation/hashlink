@@ -14,3 +14,4 @@ Release
 x64
 *.stackdump
 *.hdll
+/src/_main.c
