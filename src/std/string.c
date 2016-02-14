@@ -46,7 +46,7 @@ HL_PRIM void *value_to_string( vdynamic *d, int *len ) {
 		*len = 4;
 		return "null";
 	}
-	switch( (*d->t)->kind ) {
+	switch( d->t->kind ) {
 	case HI32:
 		return do_itos(d->v.i,len);
 	case HF64:

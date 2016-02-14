@@ -113,10 +113,8 @@ typedef long long int64;
 #include <memory.h>
 
 #define HL_VERSION	010
-#include "opcodes.h"
 
-typedef struct hl_alloc_block hl_alloc_block;
-typedef struct { hl_alloc_block *cur; } hl_alloc;
+// ---- TYPES -------------------------------------------
 
 typedef enum {
 	HVOID	= 0,
@@ -135,13 +133,24 @@ typedef enum {
 	HREF	= 13,
 	HVIRTUAL= 14,
 	HDYNOBJ = 15,
+	HABSTRACT=16,
+	HENUM	= 17,
+	HNULL	= 18,
 	// ---------
-	HLAST	= 16,
+	HLAST	= 19,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
 typedef struct hl_type hl_type;
 typedef struct hl_runtime_obj hl_runtime_obj;
+typedef struct hl_alloc_block hl_alloc_block;
+typedef struct { hl_alloc_block *cur; } hl_alloc;
+
+typedef struct {
+	hl_alloc alloc;
+	void **functions_ptrs;
+	hl_type **functions_types;
+} hl_module_context;
 
 typedef struct {
 	int nargs;
@@ -169,6 +178,7 @@ typedef struct {
 	hl_type *super;
 	hl_obj_field *fields;
 	hl_obj_proto *proto;
+	hl_module_context *m;
 	hl_runtime_obj *rt;
 } hl_type_obj;
 
@@ -188,104 +198,20 @@ struct hl_type {
 		hl_type_virtual *virt;
 		hl_type	*t;
 	};
-	hl_type *self;
 };
-
-typedef struct {
-	const char *lib;
-	const char *name;
-	hl_type *t;
-	int findex;
-} hl_native;
-
-typedef struct {
-	hl_op op;
-	int p1;
-	int p2;
-	int p3;
-	int *extra;
-} hl_opcode;
-
-typedef struct hl_ptr_list hl_ptr_list;
-
-typedef struct {
-	int findex;
-	int nregs;
-	int nops;
-	hl_type *type;
-	hl_type **regs;
-	hl_opcode *ops;
-} hl_function;
-
-typedef struct {
-	int version;
-	int nints;
-	int nfloats;
-	int nstrings;
-	int ntypes;
-	int nglobals;
-	int nnatives;
-	int nfunctions;
-	int entrypoint;
-	int*		ints;
-	double*		floats;
-	char**		strings;
-	char*		strings_data;
-	int*		strings_lens;
-	hl_type*	types;
-	hl_type**	globals;
-	hl_native*	natives;
-	hl_function*functions;
-	hl_alloc	alloc;
-} hl_code;
-
-typedef struct {
-	hl_code *code;
-	int codesize;
-	int *globals_indexes;
-	unsigned char *globals_data;
-	void **functions_ptrs;
-	int *functions_indexes;
-	void *jit_code;
-} hl_module;
-
-typedef struct jit_ctx jit_ctx;
-
-void hl_alloc_init( hl_alloc *a );
-void *hl_malloc( hl_alloc *a, int size );
-void *hl_zalloc( hl_alloc *a, int size );
-void hl_free( hl_alloc *a );
-
-void hl_global_init();
-void hl_global_free();
 
 int hl_type_size( hl_type *t );
 int hl_pad_size( int size, hl_type *t );
 
-hl_code *hl_code_read( const unsigned char *data, int size );
-void hl_code_free( hl_code *c );
-const char* hl_op_name( int op );
+hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
+hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
 
-hl_module *hl_module_alloc( hl_code *code );
-int hl_module_init( hl_module *m );
-void hl_module_free( hl_module *m );
-hl_runtime_obj *hl_get_obj_rt( hl_module *m, hl_type *ot );
-hl_runtime_obj *hl_get_obj_proto( hl_module *m, hl_type *ot );
+/* -------------------- VALUES ------------------------------ */
 
-jit_ctx *hl_jit_alloc();
-void hl_jit_free( jit_ctx *ctx );
-void hl_jit_init( jit_ctx *ctx, hl_module *m );
-int hl_jit_init_callback( jit_ctx *ctx );
-int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize );
-
-/* -------------------- RUNTIME ------------------------------ */
-
-typedef struct vobj vobj;
-typedef struct vclosure vclosure;
+typedef unsigned char vbytes;
 
 typedef struct {
-	hl_type **t;
+	hl_type *t;
 #	ifndef HL_64
 	int __pad; // force align on 16 bytes for double
 #	endif
@@ -302,26 +228,24 @@ typedef struct {
 } vdynamic;
 
 typedef struct {
-	hl_type *t;
+	hl_type t;
 	/* overridden methods indexes */
 } vobj_proto;
 
-struct vobj {
+typedef struct {
 	vobj_proto *proto;
 	/* fields data */
-};
+} vobj;
 
 typedef struct {
-	hl_type *t;
+	hl_type t;
 	/*
 		indexes into fields data
 		lower 8 bits give offset for which field table to index 
 	*/
 } vvirtual_proto;
 
-
 typedef struct vvirtual vvirtual;
-
 struct vvirtual {
 	vvirtual_proto *proto;
 	vdynamic *original;
@@ -330,7 +254,8 @@ struct vvirtual {
 };
 
 typedef struct {
-	hl_type **t;
+	hl_type *t;
+	hl_type *at;
 	int size;
 	int __pad; // force align on 16 bytes for double
 } varray;
@@ -338,8 +263,8 @@ typedef struct {
 #define CL_HAS_V32		1
 #define CL_HAS_V64		2
 
-struct vclosure {
-	hl_type **t;
+typedef struct {
+	hl_type *t;
 	void *fun;
 	int bits;
 	int __pad;
@@ -347,7 +272,7 @@ struct vclosure {
 		int v32;
 		int64 v64;
 	};
-};
+} vclosure;
 
 typedef struct {
 	hl_type *t;
@@ -356,7 +281,6 @@ typedef struct {
 } hl_field_lookup;
 
 struct hl_runtime_obj {
-	hl_module *m;
 	hl_type_obj *obj;
 	// absolute
 	int nfields;
@@ -372,7 +296,7 @@ struct hl_runtime_obj {
 };
 
 typedef struct {
-	hl_type *t;
+	hl_type t;
 	hl_field_lookup fields;
 } vdynobj_proto;
 
@@ -384,15 +308,12 @@ typedef struct {
 	vvirtual *virtuals;
 } vdynobj;
 
-void *hl_alloc_executable_memory( int size );
-void hl_free_executable_memory( void *ptr, int size );
-
 varray *hl_alloc_array( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
-vobj *hl_alloc_obj( hl_module *m, hl_type *t );
+vobj *hl_alloc_obj( hl_type *t );
 vdynobj *hl_alloc_dynobj( hl_type *t );
-void *hl_alloc_bytes( int size );
-void *hl_copy_bytes( void *ptr, int size );
+vbytes *hl_alloc_bytes( int size );
+vbytes *hl_copy_bytes( vbytes *byte, int size );
 
 int hl_hash( const char *name, bool cache_name );
 const char *hl_field_name( int hash );
@@ -412,12 +333,24 @@ int64 hl_dyn_get64( vdynamic *d, int hfield, hl_type *t );
 void hl_dyn_set32( vdynamic *d, int hfield, hl_type *t, int value );
 void hl_dyn_set64( vdynamic *d, int hfield, hl_type *t, int64 value );
 
-vclosure *hl_alloc_closure_void( hl_module *m, int_val f );
-vclosure *hl_alloc_closure_i32( hl_module *m, int_val f, int v32 );
-vclosure *hl_alloc_closure_i64( hl_module *m, int_val f, int64 v64 );
+vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
+vclosure *hl_alloc_closure_i32( hl_type *t, void *fvalue, int v32 );
+vclosure *hl_alloc_closure_i64( hl_type *t, void *fvalue, int_val v64 );
+
+// ----------------------- ALLOC --------------------------------------------------
 
 void *hl_gc_alloc( int size );
 char *hl_gc_alloc_noptr( int size );
+
+void hl_alloc_init( hl_alloc *a );
+void *hl_malloc( hl_alloc *a, int size );
+void *hl_zalloc( hl_alloc *a, int size );
+void hl_free( hl_alloc *a );
+
+void hl_global_init();
+void hl_global_free();
+
+// ----------------------- BUFFER --------------------------------------------------
 
 typedef struct hl_buffer hl_buffer;
 
@@ -429,6 +362,8 @@ void hl_buffer_str_sub( hl_buffer *b, const char *str, int len );
 int hl_buffer_length( hl_buffer *b );
 char *hl_buffer_content( hl_buffer *b, int *len );
 char *hl_to_string( vdynamic *v );
+
+// ----------------------- FFI ------------------------------------------------------
 
 // match GNU C++ mangling
 #define TYPE_STR	"vcsifdbBXPOATR"

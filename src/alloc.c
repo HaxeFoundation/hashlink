@@ -108,16 +108,16 @@ char *hl_gc_alloc_noptr( int size ) {
 
 vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	vdynamic *d = (vdynamic*)hl_gc_alloc(sizeof(vdynamic));
-	d->t = &t->self;
+	d->t = t;
 	d->v.ptr = NULL;
 	return d;
 }
 
-vobj *hl_alloc_obj( hl_module *m, hl_type *t ) {
+vobj *hl_alloc_obj( hl_type *t ) {
 	vobj *o;
 	int size;
 	hl_runtime_obj *rt = t->obj->rt;
-	if( rt == NULL || rt->proto == NULL ) rt = hl_get_obj_proto(m,t);
+	if( rt == NULL || rt->proto == NULL ) rt = hl_get_obj_proto(t);
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
 	o = (vobj*)hl_gc_alloc(size);
@@ -132,55 +132,54 @@ vdynobj *hl_alloc_dynobj( hl_type *t ) {
 	o->dataSize = 0;
 	o->fields_data = NULL;
 	o->virtuals = NULL;
-	o->dproto = (vdynobj_proto*)&t->self;
+	o->dproto = (vdynobj_proto*)t;
 	return o;
 }
 
-varray *hl_alloc_array( hl_type *t, int size ) {
-	int esize = hl_type_size(t);
+static hl_type t_array = { HARRAY };
+
+varray *hl_alloc_array( hl_type *at, int size ) {
+	int esize = hl_type_size(at);
 	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size + sizeof(hl_type));
-	hl_type *at = (hl_type*)(((char*)a) + sizeof(varray) + esize*size);
-	at->kind = HARRAY;
-	at->self = at;
-	at->t = t;
-	a->t = &at->self;
+	a->t = &t_array;
+	a->at = at;
 	a->size = size;
 	memset(a+1,0,size*esize);
 	return a;
 }
 
-vclosure *hl_alloc_closure_void( hl_module *m, int_val fid ) {
+vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue ) {
 	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
-	c->t = &m->code->functions[m->functions_indexes[fid]].type;
-	c->fun = m->functions_ptrs[fid];
+	c->t = t;
+	c->fun = fvalue;
 	c->bits = 0;
 	return c;
 }
 
-vclosure *hl_alloc_closure_i32( hl_module *m, int_val fid, int v32 ) {
+vclosure *hl_alloc_closure_i32( hl_type *t, void *fvalue, int v32 ) {
 	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
-	c->t = &m->code->functions[m->functions_indexes[fid]].type;
-	c->fun = m->functions_ptrs[fid];
+	c->t = t;
+	c->fun = fvalue;
 	c->bits = CL_HAS_V32;
 	c->v32 = v32;
 	return c;
 }
 
-vclosure *hl_alloc_closure_i64( hl_module *m, int_val fid, int64 v64 ) {
+vclosure *hl_alloc_closure_i64( hl_type *t, void *fvalue, int64 v64 ) {
 	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
-	c->t = &m->code->functions[m->functions_indexes[fid]].type;
-	c->fun = m->functions_ptrs[fid];
+	c->t = t;
+	c->fun = fvalue;
 	c->bits = CL_HAS_V64;
 	c->v64 = v64;
 	return c;
 }
 
-void *hl_alloc_bytes( int size ) {
-	return malloc(size);
+vbytes *hl_alloc_bytes( int size ) {
+	return (vbytes*)hl_gc_alloc_noptr(size);
 }
 
-void *hl_copy_bytes( void *ptr, int size ) {
-	void *b = hl_alloc_bytes(size);
+vbytes *hl_copy_bytes( vbytes *ptr, int size ) {
+	vbytes *b = hl_alloc_bytes(size);
 	memcpy(b,ptr,size);
 	return b;
 }

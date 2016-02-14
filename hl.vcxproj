@@ -145,16 +145,13 @@
   <ItemGroup>
     <ClCompile Include="src\alloc.c" />
     <ClCompile Include="src\callback.c" />
-    <ClCompile Include="src\code.c" />
-    <ClCompile Include="src\jit.c" />
-    <ClCompile Include="src\main.c" />
-    <ClCompile Include="src\module.c" />
     <ClCompile Include="src\objdata.c" />
     <ClCompile Include="src\other.c" />
     <ClCompile Include="src\std\bytes.c" />
     <ClCompile Include="src\std\string.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="hlmodule.h" />
     <ClInclude Include="src\hl.h" />
     <ClInclude Include="src\opcodes.h" />
   </ItemGroup>

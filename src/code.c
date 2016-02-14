@@ -19,7 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "hl.h"
+#include "hlmodule.h"
 
 #define OP(_,n) n,
 #define OP_BEGIN static int hl_op_nargs[] = {

@@ -190,7 +190,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		hl_buffer_str_sub(b,"null",4);
 		return;
 	}
-	switch( (*v->t)->kind ) {
+	switch( v->t->kind ) {
 	case HI32:
 		hl_buffer_str_sub(b,buf,sprintf(buf,"%d",v->v.i));
 		break;
@@ -211,7 +211,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		break;
 	case HOBJ:
 		{
-			hl_type_obj *o = ((vobj*)v)->proto->t->obj;
+			hl_type_obj *o = ((vobj*)v)->proto->t.obj;
 			if( o->rt == NULL || o->rt->toString == NULL ) {
 				hl_buffer_char(b,'#');
 				hl_buffer_str(b,o->name);
@@ -226,7 +226,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		{
 			int i;
 			varray *a = (varray*)v;
-			hl_type *at = (*a->t)->t;
+			hl_type *at = a->at;
 			int stride = hl_type_size(at);
 			vlist l;
 			vlist *vtmp = stack;
