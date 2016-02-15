@@ -4,7 +4,11 @@
 
 void hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
+#ifdef _DEBUG
+	*(int*)NULL = 0;
+#else
 	exit(0);
+#endif
 }
 
 void hl_global_init() {
@@ -54,23 +58,23 @@ void hl_throw( vdynamic *v ) {
 	*(char*)NULL = 0;
 }
 
-void hl_error_msg( const char *msg ) {
+void hl_error_msg( const uchar *msg ) {
 	// TODO : throw
-	printf("throw:%s\n",msg);
+	printf("throw:%s\n",(char*)msg);
 	exit(66);
 }
 
-void hl_error(const char *fmt, ...) {
+void hl_fatal_fmt(const char *fmt, ...) {
 	char buf[256];
 	va_list args;
 	va_start(args, fmt);
 	vsprintf(buf,fmt, args);
 	va_end(args);
-	hl_error_msg(buf);
+	hl_fatal(buf);
 }
 
 typedef struct _stringitem {
-	char *str;
+	uchar *str;
 	int size;
 	int len;
 	struct _stringitem *next;
@@ -90,22 +94,22 @@ hl_buffer *hl_alloc_buffer() {
 	return b;
 }
 
-static void buffer_append_new( hl_buffer *b, const char *s, int len ) {
+static void buffer_append_new( hl_buffer *b, const uchar *s, int len ) {
 	int size;
 	stringitem it;
 	while( b->totlen >= (b->blen << 2) )
 		b->blen <<= 1;
 	size = (len < b->blen)?b->blen:len;
 	it = (stringitem)hl_gc_alloc(sizeof(struct _stringitem));
-	it->str = hl_gc_alloc_noptr(size);
-	memcpy(it->str,s,len);
+	it->str = (uchar*)hl_gc_alloc_noptr(size<<1);
+	memcpy(it->str,s,len<<1);
 	it->size = size;
 	it->len = len;
 	it->next = b->data;
 	b->data = it;
 }
 
-void hl_buffer_str_sub( hl_buffer *b, const char *s, int len ) {
+void hl_buffer_str_sub( hl_buffer *b, const uchar *s, int len ) {
 	stringitem it;
 	if( s == NULL || len <= 0 )
 		return;
@@ -127,11 +131,11 @@ void hl_buffer_str_sub( hl_buffer *b, const char *s, int len ) {
 	buffer_append_new(b,s,len);
 }
 
-void hl_buffer_str( hl_buffer *b, const char *s ) {
-	if( s ) hl_buffer_str_sub(b,s,(int)strlen(s));
+void hl_buffer_str( hl_buffer *b, const uchar *s ) {
+	if( s ) hl_buffer_str_sub(b,s,(int)ustrlen(s));
 }
 
-void hl_buffer_char( hl_buffer *b, unsigned char c ) {
+void hl_buffer_char( hl_buffer *b, uchar c ) {
 	stringitem it;
 	b->totlen++;
 	it = b->data;
@@ -139,22 +143,23 @@ void hl_buffer_char( hl_buffer *b, unsigned char c ) {
 		it->str[it->len++] = c;
 		return;
 	}
-	buffer_append_new(b,(char*)&c,1);
+	buffer_append_new(b,(uchar*)&c,1);
 }
 
 vbytes *hl_buffer_content( hl_buffer *b, int *len ) {
-	char *buf = hl_gc_alloc_noptr(b->totlen);
+	uchar *buf = (uchar*)hl_gc_alloc_noptr((b->totlen+1)<<1);
 	stringitem it = b->data;
-	char *s = (char*)buf + b->totlen;
+	uchar *s = ((uchar*)buf) + b->totlen;
+	*s = 0;
 	while( it != NULL ) {
 		stringitem tmp;
 		s -= it->len;
-		memcpy(s,it->str,it->len);
+		memcpy(s,it->str,it->len<<1);
 		tmp = it->next;
 		it = tmp;
 	}
-	if( len ) *len = b->totlen;
-	return buf;
+	if( len ) *len = b->totlen<<1;
+	return (vbytes*)buf;
 }
 
 int hl_buffer_length( hl_buffer *b ) {
@@ -169,22 +174,22 @@ typedef struct vlist {
 static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack );
 
 static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack ) {
-	char buf[32];
+	uchar buf[32];
 	switch( t->kind ) {
 	case HI32:
-		hl_buffer_str_sub(b,buf,sprintf(buf,"%d",*(int*)data));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(int*)data));
 		break;
 	case HF64:
-		hl_buffer_str_sub(b,buf,sprintf(buf,"%d",*(double*)data));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(double*)data));
 		break;
 	case HBYTES:
-		hl_buffer_str(b,*(char**)data);
+		hl_buffer_str(b,*(uchar**)data);
 		break;
 	case HBOOL:
 		if( *(unsigned char*)data )
-			hl_buffer_str_sub(b,"true",4);
+			hl_buffer_str_sub(b,USTR("true"),4);
 		else
-			hl_buffer_str_sub(b,"false",5);
+			hl_buffer_str_sub(b,USTR("false"),5);
 		break;
 	default:
 		hl_buffer_rec(b, *(vdynamic**)data, stack);
@@ -193,29 +198,29 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 }
 
 static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
-	char buf[32];
+	uchar buf[32];
 	if( v == NULL ) {
-		hl_buffer_str_sub(b,"null",4);
+		hl_buffer_str_sub(b,USTR("null"),4);
 		return;
 	}
 	switch( v->t->kind ) {
 	case HI32:
-		hl_buffer_str_sub(b,buf,sprintf(buf,"%d",v->v.i));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.i));
 		break;
 	case HBYTES:
-		hl_buffer_str(b,v->v.bytes);
+		hl_buffer_str(b,(uchar*)v->v.bytes);
 		break;
 	case HF64:
-		hl_buffer_str_sub(b,buf,sprintf(buf,"%.19g",v->v.d));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.19g"),v->v.d));
 		break;
 	case HVOID:
-		hl_buffer_str_sub(b,"void",4);
+		hl_buffer_str_sub(b,USTR("void"),4);
 		break;
 	case HBOOL:
 		if( v->v.b )
-			hl_buffer_str_sub(b,"true",4);
+			hl_buffer_str_sub(b,USTR("true"),4);
 		else
-			hl_buffer_str_sub(b,"false",5);
+			hl_buffer_str_sub(b,USTR("false"),5);
 		break;
 	case HOBJ:
 		{
@@ -224,7 +229,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 				hl_buffer_char(b,'#');
 				hl_buffer_str(b,o->name);
 			} else
-				hl_buffer_str(b,(char*)hl_callback(o->rt->toString,1,&v));
+				hl_buffer_str(b,o->rt->toString(v));
 		}
 		break;
 	case HVIRTUAL:
@@ -240,7 +245,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			vlist *vtmp = stack;
 			while( vtmp != NULL ) {
 				if( vtmp->v == v ) {
-					hl_buffer_str_sub(b,"...",3);
+					hl_buffer_str_sub(b,USTR("..."),3);
 					return;
 				}
 				vtmp = vtmp->next;
@@ -250,7 +255,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			hl_buffer_char(b,'[');
 			for(i=0;i<a->size;i++) {
 				if( i )
-					hl_buffer_str_sub(b,", ",2);
+					hl_buffer_str_sub(b,USTR(", "),2);
 				hl_buffer_addr(b,(char*)(a + 1) + i * stride,at,&l);
 			}
 			hl_buffer_char(b,']');
@@ -264,7 +269,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			vlist *vtmp = stack;
 			while( vtmp != NULL ) {
 				if( vtmp->v == v ) {
-					hl_buffer_str_sub(b,"...",3);
+					hl_buffer_str_sub(b,USTR("..."),3);
 					return;
 				}
 				vtmp = vtmp->next;
@@ -274,16 +279,16 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			hl_buffer_char(b, '{');
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = &o->dproto->fields + i;
-				if( i ) hl_buffer_str_sub(b,", ",2);
+				if( i ) hl_buffer_str_sub(b,USTR(", "),2);
 				hl_buffer_str(b,hl_field_name(f->hashed_name));
-				hl_buffer_str_sub(b," : ",3);
+				hl_buffer_str_sub(b,USTR(" : "),3);
 				hl_buffer_addr(b, o->fields_data + f->field_index, f->t, stack);
 			}
 			hl_buffer_char(b, '}');
 		}
 		break;
 	default:
-		hl_buffer_str_sub(b, buf, sprintf(buf, _PTR_FMT "H\n",(int_val)v));
+		hl_buffer_str_sub(b, buf, usprintf(buf, 32, _PTR_FMT USTR("H\n"),(int_val)v));
 		break;
 	}
 }

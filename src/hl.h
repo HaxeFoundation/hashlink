@@ -81,9 +81,9 @@
 #	define HL_WSIZE 8
 #	define IS_64	1
 #	ifdef HL_VCC
-#		define _PTR_FMT	"%llX"
+#		define _PTR_FMT	L"%llX"
 #	else
-#		define _PTR_FMT	"%lX"
+#		define _PTR_FMT	L"%lX"
 #	endif
 #else
 #	define HL_WSIZE 4
@@ -113,6 +113,18 @@ typedef long long int64;
 #include <memory.h>
 
 #define HL_VERSION	010
+
+// -------------- UNICODE -----------------------------------
+
+#ifdef HL_WIN
+#	include <wchar.h>
+typedef wchar_t	uchar;
+#	define USTR(str)	L##str
+#	define usprintf		swprintf
+#	define uprintf		wprintf
+#	define ustrlen		wcslen
+#	define ustrdup		_wcsdup
+#endif
 
 // ---- TYPES -------------------------------------------
 
@@ -159,13 +171,13 @@ typedef struct {
 } hl_type_fun;
 
 typedef struct {
-	const char *name;
+	const uchar *name;
 	hl_type *t;
 	int hashed_name;
 } hl_obj_field;
 
 typedef struct {
-	const char *name;
+	const uchar *name;
 	int findex;
 	int pindex;
 	int hashed_name;
@@ -174,10 +186,11 @@ typedef struct {
 typedef struct {
 	int nfields;
 	int nproto;
-	const char *name;
+	const uchar *name;
 	hl_type *super;
 	hl_obj_field *fields;
 	hl_obj_proto *proto;
+	void **global_value;
 	hl_module_context *m;
 	hl_runtime_obj *rt;
 } hl_type_obj;
@@ -290,7 +303,7 @@ struct hl_runtime_obj {
 	int *fields_indexes;
 	hl_runtime_obj *parent;
 	vobj_proto *proto;
-	void *toString;
+	const uchar *(*toString)( vdynamic *obj );
 	// relative
 	hl_field_lookup *lookup;
 };
@@ -316,14 +329,11 @@ vdynobj *hl_alloc_dynobj( hl_type *t );
 vbytes *hl_balloc( int size );
 vbytes *hl_bcopy( vbytes *byte, int size );
 
-int hl_hash( const char *name, bool cache_name );
-const char *hl_field_name( int hash );
+int hl_hash( const uchar *name, bool cache_name );
+const uchar *hl_field_name( int hash );
 
-void hl_callback_init( void *e );
-void *hl_callback( void *f, int nargs, vdynamic **args );
-
-void hl_error( const char *fmt, ... );
-void hl_error_msg( const char *msg );
+#define hl_error(msg)	hl_error_msg(USTR(msg))
+void hl_error_msg( const uchar *msg );
 void hl_throw( vdynamic *v );
 
 vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
@@ -357,9 +367,9 @@ typedef struct hl_buffer hl_buffer;
 
 hl_buffer *hl_alloc_buffer();
 void hl_buffer_val( hl_buffer *b, vdynamic *v );
-void hl_buffer_char( hl_buffer *b, unsigned char c );
-void hl_buffer_str( hl_buffer *b, const char *str );
-void hl_buffer_str_sub( hl_buffer *b, const char *str, int len );
+void hl_buffer_char( hl_buffer *b, uchar c );
+void hl_buffer_str( hl_buffer *b, const uchar *str );
+void hl_buffer_str_sub( hl_buffer *b, const uchar *str, int len );
 int hl_buffer_length( hl_buffer *b );
 vbytes *hl_buffer_content( hl_buffer *b, int *len );
 char *hl_to_string( vdynamic *v );
@@ -401,14 +411,10 @@ char *hl_to_string( vdynamic *v );
 
 #define hl_fatal(msg)	hl_fatal_error(msg,__FILE__,__LINE__)
 void hl_fatal_error( const char *msg, const char *file, int line );
+void hl_fatal_fmt( const char *fmst, ... );
 
-// -------------- UNICODE -----------------------------------
+#pragma warning(disable:4101)
+#pragma warning(disable:4700)
 
-#ifdef HL_WIN
-#	include <wchar.h>
-typedef wchar_t	uchar;
-#	define USTR(str)	L##str
-#	define usprintf		swprintf
-#endif
 
 #endif

@@ -1,7 +1,7 @@
 #include <hl.h>
 
 void hl_sys_print( vbytes *msg ) {
-	printf("%s",msg);
+	uprintf(USTR("%s"),(uchar*)msg);
 }
 
 

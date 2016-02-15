@@ -12,5 +12,4 @@ HL_PRIM hl_bytes_map *hl_hballoc() {
 }
 
 HL_PRIM void hl_hbset( hl_bytes_map *m, vbytes *key, vdynamic *val ) {
-	hl_fatal("TODO");
 }

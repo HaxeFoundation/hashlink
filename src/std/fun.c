@@ -25,3 +25,24 @@ vclosure *hl_alloc_closure_i64( hl_type *t, void *fvalue, int64 v64 ) {
 	c->v64 = v64;
 	return c;
 }
+
+HL_PRIM vdynamic *hl_make_var_args( vclosure *c ) {
+	hl_fatal("TODO");
+	return NULL;
+}
+
+HL_PRIM vdynamic *hl_no_closure( vdynamic *c ) {
+	hl_fatal("TODO");
+	return NULL;
+}
+
+HL_PRIM vdynamic* hl_get_closure_value( vdynamic *c ) {
+	hl_fatal("TODO");
+	return NULL;
+}
+
+HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
+	hl_fatal("TODO");
+	return NULL;
+}
+

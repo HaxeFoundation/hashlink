@@ -144,13 +144,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\alloc.c" />
-    <ClCompile Include="src\callback.c" />
     <ClCompile Include="src\objdata.c" />
     <ClCompile Include="src\other.c" />
     <ClCompile Include="src\std\array.c" />
     <ClCompile Include="src\std\bytes.c" />
     <ClCompile Include="src\std\fun.c" />
     <ClCompile Include="src\std\maps.c" />
+    <ClCompile Include="src\std\obj.c" />
     <ClCompile Include="src\std\string.c" />
     <ClCompile Include="src\std\sys.c" />
     <ClCompile Include="src\std\types.c" />

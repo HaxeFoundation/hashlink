@@ -43,11 +43,11 @@ static int hl_cache_count = 0;
 static int hl_cache_size = 0;
 static hl_field_lookup *hl_cache = NULL;
 
-int hl_hash( const char *name, bool cache_name ) {
+int hl_hash( const uchar *name, bool cache_name ) {
 	int h = 0;
-	const char *oname = name;
+	const uchar *oname = name;
 	while( *name ) {
-		h = 223 * h + *((unsigned char*)name);
+		h = 223 * h + (unsigned)*name;
 		name++;
 	}
 	h %= 0x1FFFFF7B;
@@ -63,15 +63,15 @@ int hl_hash( const char *name, bool cache_name ) {
 				hl_cache = cache;
 				hl_cache_size = newsize;
 			}
-			hl_lookup_insert(hl_cache,hl_cache_count++,h,(hl_type*)strdup(oname),0);
+			hl_lookup_insert(hl_cache,hl_cache_count++,h,(hl_type*)ustrdup(oname),0);
 		}
 	}
 	return h;
 }
 
-const char *hl_field_name( int hash ) {
+const uchar *hl_field_name( int hash ) {
 	hl_field_lookup *l = hl_lookup_find(hl_cache, hl_cache_count, hash);
-	return l ? (char*)l->t : "???";
+	return l ? (uchar*)l->t : USTR("???");
 }
 
 void hl_cache_free() {
@@ -142,7 +142,7 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
 	hl_runtime_obj *p = NULL, *t = hl_get_obj_rt(ot);
-	hl_field_lookup *strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash("__string",false));
+	hl_field_lookup *strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash(USTR("__string"),false));
 	int i;
 	if( t->proto ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);
@@ -189,7 +189,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 					if( f != NULL ) break;
 					rtt = rtt->parent;
 				}
-				if( f == NULL ) hl_error("Cast failure: field %s is missing",vt->virt->fields[i].name);
+				if( f == NULL ) hl_fatal_fmt("Cast failure: field %s is missing",vt->virt->fields[i].name);
 				indexes[i] = f->field_index <= 0 ? 0 : f->field_index;
 			}
 		}
@@ -214,7 +214,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 			v->field_data = o->fields_data;
 			for(i=0;i<vt->virt->nfields;i++) {
 				hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,vt->virt->fields[i].hashed_name);
-				if( f == NULL ) hl_error("Cast failure: field %s is missing",vt->virt->fields[i].name);
+				if( f == NULL ) hl_fatal_fmt("Cast failure: field %s is missing",vt->virt->fields[i].name);
 				indexes[i] = f->field_index;
 			}
 			// add it to the list
@@ -223,7 +223,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 		}
 		break;
 	default:
-		hl_error("Don't know how to virtual %d",obj->t->kind);
+		hl_fatal_fmt("Don't know how to virtual %d",obj->t->kind);
 	}
 	return v;
 }
@@ -372,7 +372,7 @@ int hl_dyn_get32( vdynamic *d, int hfield, hl_type *t ) {
 				rt = rt->parent;
 			} while( rt );
 			if( f == NULL )
-				hl_error("#%s has no field %s",o->proto->t.obj->name,hl_field_name(hfield));
+				hl_fatal_fmt("#%s has no field %s",o->proto->t.obj->name,hl_field_name(hfield));
 			return fetch_data32(f->t,t,(char*)o + f->field_index);
 		}
 		break;
@@ -407,7 +407,7 @@ int64 hl_dyn_get64( vdynamic *d, int hfield, hl_type *t ) {
 				rt = rt->parent;
 			} while( rt );
 			if( f == NULL )
-				hl_error("#%s has no field %s",o->proto->t.obj->name,hl_field_name(hfield));
+				hl_fatal_fmt("#%s has no field %s",o->proto->t.obj->name,hl_field_name(hfield));
 			return fetch_data64(f->t,t,(char*)o + f->field_index);
 		}
 		break;
