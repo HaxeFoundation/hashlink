@@ -203,11 +203,24 @@ typedef struct {
 	hl_obj_field *fields; 
 } hl_type_virtual;
 
+typedef struct {
+	const uchar *name;
+	int nparams;
+	hl_type **params;
+} hl_enum_construct;
+
+typedef struct {
+	const uchar *name;
+	int nconstructs;
+	hl_enum_construct *constructs;
+} hl_type_enum;
+
 struct hl_type {
 	hl_type_kind kind;
 	union {
 		hl_type_fun *fun;
 		hl_type_obj *obj;
+		hl_type_enum *tenum;
 		hl_type_virtual *virt;
 		hl_type	*t;
 	};
@@ -235,7 +248,7 @@ typedef struct {
 		int i;
 		float f;
 		double d;
-		char *bytes;
+		vbytes *bytes;
 		void *ptr;
 	} v;
 } vdynamic;
@@ -321,15 +334,19 @@ typedef struct {
 	vvirtual *virtuals;
 } vdynobj;
 
+typedef struct _venum {
+	int index;
+} venum;
 
 varray *hl_aalloc( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
 vobj *hl_alloc_obj( hl_type *t );
-vdynobj *hl_alloc_dynobj( hl_type *t );
+vdynobj *hl_alloc_dynobj();
 vbytes *hl_balloc( int size );
 vbytes *hl_bcopy( vbytes *byte, int size );
 
-int hl_hash( const uchar *name, bool cache_name );
+int hl_hash( vbytes *name );
+int hl_hash_gen( const uchar *name, bool cache_name );
 const uchar *hl_field_name( int hash );
 
 #define hl_error(msg)	hl_error_msg(USTR(msg))
@@ -412,9 +429,5 @@ char *hl_to_string( vdynamic *v );
 #define hl_fatal(msg)	hl_fatal_error(msg,__FILE__,__LINE__)
 void hl_fatal_error( const char *msg, const char *file, int line );
 void hl_fatal_fmt( const char *fmst, ... );
-
-#pragma warning(disable:4101)
-#pragma warning(disable:4700)
-
 
 #endif

@@ -19,4 +19,7 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 	return false;
 }
 
-//HL_PRIM vvirtual *hl_to_virtual
+HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
+	hl_fatal("TODO");
+	return NULL;
+}

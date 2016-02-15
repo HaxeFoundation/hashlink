@@ -43,7 +43,11 @@ static int hl_cache_count = 0;
 static int hl_cache_size = 0;
 static hl_field_lookup *hl_cache = NULL;
 
-int hl_hash( const uchar *name, bool cache_name ) {
+int hl_hash( vbytes *b ) {
+	return hl_hash_gen((uchar*)b,true);
+}
+
+int hl_hash_gen( const uchar *name, bool cache_name ) {
 	int h = 0;
 	const uchar *oname = name;
 	while( *name ) {
@@ -142,7 +146,7 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
 	hl_runtime_obj *p = NULL, *t = hl_get_obj_rt(ot);
-	hl_field_lookup *strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash(USTR("__string"),false));
+	hl_field_lookup *strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__string"),false));
 	int i;
 	if( t->proto ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);

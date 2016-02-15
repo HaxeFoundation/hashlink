@@ -64,8 +64,7 @@ HL_PRIM vbytes *hl_value_to_string( vdynamic *d, int *len ) {
 }
 
 HL_PRIM int hl_ucs2length( vbytes *str, int pos ) {
-	hl_fatal("TODO");
-	return 0;
+	return (int)ustrlen((uchar*)(str + pos));
 }
 
 HL_PRIM vbytes* hl_utf8_to_utf16( vbytes *str, int pos, int *len ) {

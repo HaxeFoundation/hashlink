@@ -150,6 +150,7 @@
     <ClCompile Include="src\std\bytes.c" />
     <ClCompile Include="src\std\fun.c" />
     <ClCompile Include="src\std\maps.c" />
+    <ClCompile Include="src\std\math.c" />
     <ClCompile Include="src\std\obj.c" />
     <ClCompile Include="src\std\string.c" />
     <ClCompile Include="src\std\sys.c" />
@@ -158,6 +159,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\hl.h" />
+    <ClInclude Include="src\hlc.h" />
     <ClInclude Include="src\hlmodule.h" />
     <ClInclude Include="src\opcodes.h" />
   </ItemGroup>

@@ -1,9 +1,12 @@
 #include <hl.h>
 
-void hl_sys_print( vbytes *msg ) {
+HL_PRIM void hl_sys_print( vbytes *msg ) {
 	uprintf(USTR("%s"),(uchar*)msg);
 }
 
+HL_PRIM void hl_sys_exit( int code ) {
+	exit(code);
+}
 
 #ifndef HL_JIT
 
