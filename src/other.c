@@ -2,13 +2,14 @@
 #include <stdarg.h>
 #include <string.h>
 
-void hl_fatal_error( const char *msg, const char *file, int line ) {
+void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
 #ifdef _DEBUG
 	*(int*)NULL = 0;
 #else
 	exit(0);
 #endif
+	return NULL;
 }
 
 void hl_global_init() {
@@ -233,7 +234,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		}
 		break;
 	case HVIRTUAL:
-		hl_buffer_rec(b, ((vvirtual*)v)->original, stack);
+		hl_buffer_rec(b, ((vvirtual*)v)->value, stack);
 		break;
 	case HARRAY:
 		{

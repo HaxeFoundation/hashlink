@@ -1,52 +1,24 @@
 #include <hl.h>
 
-/*
-HL_PRIM void do_log( vdynamic *v ) {
-	printf("%s\n",hl_to_string(v));
-}
-
-HL_PRIM int utf8length( unsigned char *s, int pos, int l ) {
-	int count = 0;
-	s += pos;
-	while( l ) {
-		unsigned char c = *s;
-		count++;
-		if( c < 0x7F ) {
-			l--;
-			s++;
-		} else if( c < 0xC0 )
-			hl_error("Invalid utf8 string");
-		else if( c < 0xE0 ) {
-			l-=2;
-			s+=2;
-		} else if( c < 0xF0 ) {
-			l-=3;
-			s+=3;
-		} else {
-			l-=4;
-			s+=4;
-		}
-	}
-	return count;
-}
-
-*/
-
 HL_PRIM vbytes *hl_itos( int i, int *len ) {
 	uchar tmp[24];
-	*len = (int)usprintf(tmp,24,USTR("%d"),i);
-	return hl_bcopy((vbytes*)tmp,(*len + 1) << 1);
+	int k = (int)usprintf(tmp,24,USTR("%d"),i);
+	k <<= 1;
+	*len = k;
+	return hl_bcopy((vbytes*)tmp,k + 2);
 }
 
 HL_PRIM vbytes *hl_ftos( double d, int *len ) {
 	uchar tmp[48];
-	*len = (int)usprintf(tmp,48,USTR("%.16g"),d);
-	return hl_bcopy((vbytes*)tmp,(*len + 1) << 1);
+	int k = (int)usprintf(tmp,48,USTR("%.16g"),d);
+	k <<= 1;
+	*len = k;
+	return hl_bcopy((vbytes*)tmp,k+2);
 }
 
 HL_PRIM vbytes *hl_value_to_string( vdynamic *d, int *len ) {
 	if( d == NULL ) {
-		*len = 4;
+		*len = 8;
 		return (vbytes*)USTR("null");
 	}
 	switch( d->t->kind ) {

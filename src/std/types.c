@@ -1,7 +1,8 @@
 #include <hl.h>
 
-static hl_type t_array = { HARRAY };
-static hl_type t_bytes = { HBYTES };
+hl_type hlt_array = { HARRAY };
+hl_type hlt_bytes = { HBYTES };
+hl_type hlt_dynobj = { HDYNOBJ };
 
 HL_PRIM vdynamic* hl_safe_cast( vdynamic *fun, hl_type *t ) {
 	hl_fatal("TODO");
@@ -28,8 +29,8 @@ HL_PRIM vbytes* hl_type_name( hl_type *t ) {
 HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
 	varray *a = (varray*)hl_gc_alloc_noptr(sizeof(varray) + t->tenum->nconstructs * sizeof(void*));
 	int i;
-	a->t = &t_array;
-	a->at = &t_bytes;
+	a->t = &hlt_array;
+	a->at = &hlt_bytes;
 	a->size = t->tenum->nconstructs;
 	for( i=0; i<t->tenum->nconstructs;i++)
 		((void**)(a+1))[i] = (vbytes*)t->tenum->constructs[i].name;

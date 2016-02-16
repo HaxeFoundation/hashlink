@@ -88,7 +88,7 @@
 #else
 #	define HL_WSIZE 4
 #	define IS_64	0
-#	define _PTR_FMT	"%X"
+#	define _PTR_FMT	L"%X"
 #endif
 
 #ifdef __cplusplus
@@ -104,7 +104,6 @@
 #	endif
 #endif
 
-typedef void (_cdecl *fptr)();
 typedef intptr_t int_val;
 typedef long long int64;
 
@@ -124,6 +123,10 @@ typedef wchar_t	uchar;
 #	define uprintf		wprintf
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
+#else
+typedef unsigned short uchar;
+#	undef USTR
+#	define USTR(str)	u##str
 #endif
 
 // ---- TYPES -------------------------------------------
@@ -263,19 +266,12 @@ typedef struct {
 	/* fields data */
 } vobj;
 
-typedef struct {
-	hl_type t;
-	/*
-		indexes into fields data
-		lower 8 bits give offset for which field table to index 
-	*/
-} vvirtual_proto;
-
-typedef struct vvirtual vvirtual;
-struct vvirtual {
-	vvirtual_proto *proto;
-	vdynamic *original;
-	void *field_data;
+typedef struct _vvirtual vvirtual;
+struct _vvirtual{
+	hl_type *t;
+	int	*indexes;
+	char *fields_data;
+	vdynamic *value;
 	vvirtual *next;
 };
 
@@ -293,11 +289,8 @@ typedef struct {
 	hl_type *t;
 	void *fun;
 	int bits;
-	int __pad;
-	union {
-		int v32;
-		int64 v64;
-	};
+	int hasValue;
+	vdynamic *value;
 } vclosure;
 
 typedef struct {
@@ -338,6 +331,10 @@ typedef struct _venum {
 	int index;
 } venum;
 
+hl_type hlt_array;
+hl_type hlt_bytes;
+hl_type hlt_dynobj;
+
 varray *hl_aalloc( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
 vobj *hl_alloc_obj( hl_type *t );
@@ -362,8 +359,7 @@ void hl_dyn_set32( vdynamic *d, int hfield, hl_type *t, int value );
 void hl_dyn_set64( vdynamic *d, int hfield, hl_type *t, int64 value );
 
 vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
-vclosure *hl_alloc_closure_i32( hl_type *t, void *fvalue, int v32 );
-vclosure *hl_alloc_closure_i64( hl_type *t, void *fvalue, int_val v64 );
+vclosure *hl_alloc_closure_ptr( hl_type *t, void *fvalue, void *ptr );
 
 // ----------------------- ALLOC --------------------------------------------------
 
@@ -412,6 +408,7 @@ char *hl_to_string( vdynamic *v );
 #define _ARR						"A"
 #define _TYPE						"T"
 #define _REF(t)						"R" t
+#undef _NULL
 #define _NULL(t)					"N" t
 
 #if HL_JIT
@@ -427,7 +424,7 @@ char *hl_to_string( vdynamic *v );
 // -------------- EXTRA ------------------------------------
 
 #define hl_fatal(msg)	hl_fatal_error(msg,__FILE__,__LINE__)
-void hl_fatal_error( const char *msg, const char *file, int line );
+void *hl_fatal_error( const char *msg, const char *file, int line );
 void hl_fatal_fmt( const char *fmst, ... );
 
 #endif

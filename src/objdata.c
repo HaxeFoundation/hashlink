@@ -175,16 +175,14 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	case HOBJ:
 		{ 
 			int i;
-			int *indexes;
 			vobj *o = (vobj*)obj;
 			hl_runtime_obj *rt = o->proto->t.obj->rt;
 			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual));
-			v->proto = (vvirtual_proto*)hl_gc_alloc(sizeof(vvirtual_proto) + sizeof(int)*vt->virt->nfields);
-			indexes = (int*)(v->proto + 1);
-			v->proto->t = *vt; // COPY
-			v->original = obj;
+			v->t = vt;
+			v->fields_data = (char*)obj;
+			v->indexes = (int*)hl_gc_alloc(sizeof(int)*vt->virt->nfields);
+			v->value = obj;
 			v->next = NULL;
-			v->field_data = o;
 			for(i=0;i<vt->virt->nfields;i++) {
 				hl_runtime_obj *rtt = rt;
 				hl_field_lookup *f = NULL;
@@ -193,33 +191,30 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 					if( f != NULL ) break;
 					rtt = rtt->parent;
 				}
-				if( f == NULL ) hl_fatal_fmt("Cast failure: field %s is missing",vt->virt->fields[i].name);
-				indexes[i] = f->field_index <= 0 ? 0 : f->field_index;
+				v->indexes[i] = f == NULL || f->field_index <= 0 || (f->t != vt->virt->fields[i].t) ? 0 : f->field_index;
 			}
 		}
 		break;
 	case HDYNOBJ:
 		{
 			int i;
-			int *indexes;
 			vdynobj *o = (vdynobj*)obj;
 			v = o->virtuals;
 			while( v ) {
-				if( v->proto->t.virt == vt->virt )
+				if( v->t->virt == vt->virt )
 					return v;
 				v = v->next;
 			}
 			// allocate a new virtual mapping
 			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual));
-			v->proto = (vvirtual_proto*)hl_gc_alloc(sizeof(vvirtual_proto) + sizeof(int)*vt->virt->nfields);
-			indexes = (int*)(v->proto + 1);
-			v->proto->t = *vt; // COPY
-			v->original = obj;
-			v->field_data = o->fields_data;
+			v->t = vt;
+			v->fields_data = o->fields_data - sizeof(void*);
+			v->indexes = hl_gc_alloc(sizeof(int)*vt->virt->nfields);
+			v->value = obj;
 			for(i=0;i<vt->virt->nfields;i++) {
 				hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,vt->virt->fields[i].hashed_name);
 				if( f == NULL ) hl_fatal_fmt("Cast failure: field %s is missing",vt->virt->fields[i].name);
-				indexes[i] = f->field_index;
+				v->indexes[i] = f == NULL || f->t != vt->virt->fields[i].t ? 0 : f->field_index + sizeof(void*);
 			}
 			// add it to the list
 			v->next = o->virtuals;
@@ -233,11 +228,11 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 }
 
 void *hl_fetch_virtual_method( vvirtual *v, int fid ) {
-	hl_obj_field *f = v->proto->t.virt->fields + fid;
-	switch( v->original->t->kind ) {
+	hl_obj_field *f = v->t->virt->fields + fid;
+	switch( v->value->t->kind ) {
 	case HOBJ:
 		{
-			vobj *o = (vobj*)v->original;
+			vobj *o = (vobj*)v->value;
 			hl_module_context *m = o->proto->t.obj->m;
 			hl_runtime_obj *rt = o->proto->t.obj->rt;
 			while( rt ) {
@@ -246,11 +241,7 @@ void *hl_fetch_virtual_method( vvirtual *v, int fid ) {
 					int fid;
 					if( found->field_index > 0 ) return NULL;
 					fid = rt->obj->proto[-found->field_index].findex;
-#					ifdef HL_64
-					return hl_alloc_closure_i64(m->functions_types[fid], m->functions_ptrs[fid], (int_val)o);
-#					else
-					return hl_alloc_closure_i32(m->functions_types[fid], m->functions_ptrs[fid], (int)o);
-#					endif
+					return hl_alloc_closure_ptr(m->functions_types[fid], m->functions_ptrs[fid], o);
 				}
 				rt = rt->parent;
 			}
@@ -381,7 +372,7 @@ int hl_dyn_get32( vdynamic *d, int hfield, hl_type *t ) {
 		}
 		break;
 	case HVIRTUAL:
-		return hl_dyn_get32(((vvirtual*)d)->original, hfield, t);
+		return hl_dyn_get32(((vvirtual*)d)->value, hfield, t);
 	default:
 		hl_error("Invalid field access");
 		break;
@@ -416,7 +407,7 @@ int64 hl_dyn_get64( vdynamic *d, int hfield, hl_type *t ) {
 		}
 		break;
 	case HVIRTUAL:
-		return hl_dyn_get64(((vvirtual*)d)->original, hfield, t);
+		return hl_dyn_get64(((vvirtual*)d)->value, hfield, t);
 	default:
 		hl_error("Invalid field access");
 	}
@@ -441,7 +432,7 @@ void hl_dyn_set32( vdynamic *d, int hfield, hl_type *t, int value ) {
 		hl_error("TODO");
 		break;
 	case HVIRTUAL:
-		hl_dyn_set32(((vvirtual*)d)->original, hfield, t, value);
+		hl_dyn_set32(((vvirtual*)d)->value, hfield, t, value);
 		break;
 	default:
 		hl_error("Invalid field access");
@@ -463,7 +454,7 @@ void hl_dyn_set64( vdynamic *d, int hfield, hl_type *t, int64 value ) {
 		}
 		break;
 	case HVIRTUAL:
-		hl_dyn_set64(((vvirtual*)d)->original, hfield, t, value);
+		hl_dyn_set64(((vvirtual*)d)->value, hfield, t, value);
 		break;
 	case HOBJ:
 		hl_error("TODO");

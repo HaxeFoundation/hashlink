@@ -30,8 +30,14 @@
 
 #ifdef HL_64
 #	define hl_dyn_setptr(obj,hfield,t,ptr)	hl_dyn_set64(obj,hfield,t,(int64)ptr)
+#	define PAD_64_VAL	,0
 #else
 #	define hl_dyn_setptr(obj,hfield,t,ptr)	hl_dyn_set32(obj,hfield,t,(int)ptr)
+#	define PAD_64_VAL
 #endif
+
+static void hl_null_access() {
+	hl_error_msg(USTR("Null access"));
+}
 
 #endif

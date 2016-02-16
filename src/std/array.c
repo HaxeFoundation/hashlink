@@ -1,11 +1,9 @@
 #include <hl.h>
 
-static hl_type t_array = { HARRAY };
-
 HL_PRIM varray *hl_aalloc( hl_type *at, int size ) {
 	int esize = hl_type_size(at);
 	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size + sizeof(hl_type));
-	a->t = &t_array;
+	a->t = &hlt_array;
 	a->at = at;
 	a->size = size;
 	memset(a+1,0,size*esize);

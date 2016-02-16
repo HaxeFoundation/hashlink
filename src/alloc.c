@@ -126,10 +126,9 @@ vobj *hl_alloc_obj( hl_type *t ) {
 	return o;
 }
 
-static hl_type t_dynobj = { HDYNOBJ };
 vdynobj *hl_alloc_dynobj() {
 	vdynobj *o = (vdynobj*)hl_gc_alloc(sizeof(vdynobj));
-	o->dproto = (vdynobj_proto*)&t_dynobj;
+	o->dproto = (vdynobj_proto*)&hlt_dynobj;
 	o->nfields = 0;
 	o->dataSize = 0;
 	o->fields_data = NULL;
