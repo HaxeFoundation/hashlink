@@ -59,9 +59,14 @@ void hl_throw( vdynamic *v ) {
 	*(char*)NULL = 0;
 }
 
-void hl_error_msg( const uchar *msg ) {
+void hl_error_msg( const uchar *fmt, ... ) {
+	uchar buf[256];
+	va_list args;
+	va_start(args, fmt);
+	uvsprintf(buf,fmt,args);
+	va_end(args);
 	// TODO : throw
-	printf("throw:%s\n",(char*)msg);
+	uprintf(USTR("THROW:%s\n"),buf);
 	exit(66);
 }
 
@@ -119,11 +124,11 @@ void hl_buffer_str_sub( hl_buffer *b, const uchar *s, int len ) {
 	if( it ) {
 		int free = it->size - it->len;
 		if( free >= len ) {
-			memcpy(it->str + it->len,s,len);
+			memcpy(it->str + it->len,s,len<<1);
 			it->len += len;
 			return;
 		} else {
-			memcpy(it->str + it->len,s,free);
+			memcpy(it->str + it->len,s,free<<1);
 			it->len += free;
 			s += free;
 			len -= free;
@@ -147,7 +152,7 @@ void hl_buffer_char( hl_buffer *b, uchar c ) {
 	buffer_append_new(b,(uchar*)&c,1);
 }
 
-vbytes *hl_buffer_content( hl_buffer *b, int *len ) {
+uchar *hl_buffer_content( hl_buffer *b, int *len ) {
 	uchar *buf = (uchar*)hl_gc_alloc_noptr((b->totlen+1)<<1);
 	stringitem it = b->data;
 	uchar *s = ((uchar*)buf) + b->totlen;
@@ -160,7 +165,7 @@ vbytes *hl_buffer_content( hl_buffer *b, int *len ) {
 		it = tmp;
 	}
 	if( len ) *len = b->totlen<<1;
-	return (vbytes*)buf;
+	return buf;
 }
 
 int hl_buffer_length( hl_buffer *b ) {
@@ -298,7 +303,7 @@ void hl_buffer_val( hl_buffer *b, vdynamic *v ) {
 	hl_buffer_rec(b,v,NULL);
 }
 
-char *hl_to_string( vdynamic *v ) {
+uchar *hl_to_string( vdynamic *v ) {
 	hl_buffer *b = hl_alloc_buffer();
 	hl_buffer_val(b,v);
 	hl_buffer_char(b,0);

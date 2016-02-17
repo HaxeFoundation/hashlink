@@ -30,7 +30,7 @@ HL_PRIM vbytes *hl_value_to_string( vdynamic *d, int *len ) {
 		{
 			hl_buffer *b = hl_alloc_buffer();
 			hl_buffer_val(b, d);
-			return hl_buffer_content(b,len);
+			return (vbytes*)hl_buffer_content(b,len);
 		}
 	}
 }

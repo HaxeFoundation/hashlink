@@ -116,6 +116,7 @@ typedef long long int64;
 // -------------- UNICODE -----------------------------------
 
 #ifdef HL_WIN
+#	include <windows.h>
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
@@ -123,6 +124,7 @@ typedef wchar_t	uchar;
 #	define uprintf		wprintf
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
+#	define uvsprintf	wvsprintf
 #else
 typedef unsigned short uchar;
 #	undef USTR
@@ -226,6 +228,7 @@ struct hl_type {
 		hl_type_enum *tenum;
 		hl_type_virtual *virt;
 		hl_type	*t;
+		uchar *abs_name;
 	};
 };
 
@@ -347,16 +350,26 @@ int hl_hash_gen( const uchar *name, bool cache_name );
 const uchar *hl_field_name( int hash );
 
 #define hl_error(msg)	hl_error_msg(USTR(msg))
-void hl_error_msg( const uchar *msg );
+void hl_error_msg( const uchar *msg, ... );
 void hl_throw( vdynamic *v );
 
 vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 void *hl_fetch_virtual_method( vvirtual *v, int fid );
-int hl_dyn_get32( vdynamic *d, int hfield, hl_type *t );
-int64 hl_dyn_get64( vdynamic *d, int hfield, hl_type *t );
 
-void hl_dyn_set32( vdynamic *d, int hfield, hl_type *t, int value );
-void hl_dyn_set64( vdynamic *d, int hfield, hl_type *t, int64 value );
+int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
+void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
+float hl_dyn_getf( void *data, hl_type *t );
+double hl_dyn_getd( void *data, hl_type *t );
+
+int hl_dyn_casti( void *data, hl_type *t, hl_type *to );
+void *hl_dyn_castp( void *data, hl_type *t, hl_type *to );
+float hl_dyn_castf( void *data, hl_type *t );
+double hl_dyn_castd( void *data, hl_type *t );
+
+void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
+void hl_dyn_setf( vdynamic *d, int hfield, hl_type *t, float f );
+void hl_dyn_setd( vdynamic *d, int hfield, hl_type *t, double  );
+void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
 
 vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
 vclosure *hl_alloc_closure_ptr( hl_type *t, void *fvalue, void *ptr );
@@ -384,8 +397,9 @@ void hl_buffer_char( hl_buffer *b, uchar c );
 void hl_buffer_str( hl_buffer *b, const uchar *str );
 void hl_buffer_str_sub( hl_buffer *b, const uchar *str, int len );
 int hl_buffer_length( hl_buffer *b );
-vbytes *hl_buffer_content( hl_buffer *b, int *len );
-char *hl_to_string( vdynamic *v );
+uchar *hl_buffer_content( hl_buffer *b, int *len );
+uchar *hl_to_string( vdynamic *v );
+const uchar *hl_type_str( hl_type *t );
 
 // ----------------------- FFI ------------------------------------------------------
 
