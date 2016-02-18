@@ -164,7 +164,7 @@ uchar *hl_buffer_content( hl_buffer *b, int *len ) {
 		tmp = it->next;
 		it = tmp;
 	}
-	if( len ) *len = b->totlen<<1;
+	if( len ) *len = b->totlen;
 	return buf;
 }
 

@@ -3,22 +3,20 @@
 HL_PRIM vbytes *hl_itos( int i, int *len ) {
 	uchar tmp[24];
 	int k = (int)usprintf(tmp,24,USTR("%d"),i);
-	k <<= 1;
 	*len = k;
-	return hl_bcopy((vbytes*)tmp,k + 2);
+	return hl_bcopy((vbytes*)tmp,(k + 1)<<1);
 }
 
 HL_PRIM vbytes *hl_ftos( double d, int *len ) {
 	uchar tmp[48];
 	int k = (int)usprintf(tmp,48,USTR("%.16g"),d);
-	k <<= 1;
 	*len = k;
-	return hl_bcopy((vbytes*)tmp,k+2);
+	return hl_bcopy((vbytes*)tmp,(k + 1) << 1);
 }
 
 HL_PRIM vbytes *hl_value_to_string( vdynamic *d, int *len ) {
 	if( d == NULL ) {
-		*len = 8;
+		*len = 4;
 		return (vbytes*)USTR("null");
 	}
 	switch( d->t->kind ) {

@@ -34,6 +34,8 @@
 #	define PAD_64_VAL
 #endif
 
+#undef CONST
+
 static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }

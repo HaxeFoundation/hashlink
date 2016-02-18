@@ -170,9 +170,9 @@ typedef struct {
 } hl_module_context;
 
 typedef struct {
-	int nargs;
+	hl_type **args;
 	hl_type *ret;
-	hl_type *args;
+	int nargs;
 } hl_type_fun;
 
 typedef struct {
@@ -227,7 +227,7 @@ struct hl_type {
 		hl_type_obj *obj;
 		hl_type_enum *tenum;
 		hl_type_virtual *virt;
-		hl_type	*t;
+		hl_type	*tparam;
 		uchar *abs_name;
 	};
 };
@@ -334,9 +334,12 @@ typedef struct _venum {
 	int index;
 } venum;
 
+hl_type hlt_dyn;
 hl_type hlt_array;
 hl_type hlt_bytes;
 hl_type hlt_dynobj;
+
+bool hl_same_type( hl_type *a, hl_type *b );
 
 varray *hl_aalloc( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
@@ -365,6 +368,9 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to );
 void *hl_dyn_castp( void *data, hl_type *t, hl_type *to );
 float hl_dyn_castf( void *data, hl_type *t );
 double hl_dyn_castd( void *data, hl_type *t );
+
+#define hl_invalid_comparison 0xAABBCCDD
+int hl_dyn_compare( vdynamic *a, vdynamic *b );
 
 void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
 void hl_dyn_setf( vdynamic *d, int hfield, hl_type *t, float f );

@@ -3,6 +3,7 @@
 hl_type hlt_array = { HARRAY };
 hl_type hlt_bytes = { HBYTES };
 hl_type hlt_dynobj = { HDYNOBJ };
+hl_type hlt_dyn = { HDYN };
 
 static const uchar *TSTR[] = {
 	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("f32"), USTR("f64"),
@@ -10,6 +11,52 @@ static const uchar *TSTR[] = {
 	USTR("array"), USTR("type"), NULL, NULL, USTR("dynobj"), 
 	NULL, NULL, NULL
 };
+
+bool hl_same_type( hl_type *a, hl_type *b ) {
+	if( a == b )
+		return true;
+	if( a->kind != b->kind )
+		return false;
+	switch( a->kind ) {
+	case HVOID:
+	case HI8:
+	case HI16:
+	case HI32:
+	case HF32:
+	case HF64:
+	case HBOOL:
+	case HTYPE:
+	case HBYTES:
+	case HDYN:
+	case HARRAY:
+	case HDYNOBJ:
+		return true;
+	case HREF:
+	case HNULL:
+		return hl_same_type(a->tparam, b->tparam);
+	case HFUN:
+		{
+			int i;
+			if( a->fun->nargs != b->fun->nargs )
+				return false;
+			for(i=0;i<a->fun->nargs;i++)
+				if( !hl_same_type(a->fun->args[i],b->fun->args[i]) )
+					return false;
+			return hl_same_type(a->fun->ret, b->fun->ret);
+		}
+	case HOBJ:
+		return a->obj == b->obj;
+	case HVIRTUAL:
+		return a->virt == b->virt;
+	case HABSTRACT:
+		return a->abs_name == b->abs_name;
+	case HENUM:
+		return a->tenum == b->tenum;
+	default:
+		break;
+	}
+	return false;
+}
 
 static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 	const uchar *c = TSTR[t->kind];
@@ -26,7 +73,7 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 		hl_buffer_char(b,'(');
 		for(i=0; i<t->fun->nargs; i++) {
 			if( i ) hl_buffer_char(b,',');
-			hl_type_str_rec(b,t->fun->args + i);
+			hl_type_str_rec(b,t->fun->args[i]);
 		}
 		hl_buffer_char(b,')');
 		hl_buffer_char(b,')');
@@ -37,7 +84,7 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 		break;
 	case HREF:
 		hl_buffer_str(b,USTR("ref<"));
-		hl_type_str_rec(b,t->t);
+		hl_type_str_rec(b,t->tparam);
 		hl_buffer_char(b,'>');
 		break;
 	case HVIRTUAL:
@@ -64,7 +111,7 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 		break;
 	case HNULL:
 		hl_buffer_str(b,USTR("null<"));
-		hl_type_str_rec(b,t->t);
+		hl_type_str_rec(b,t->tparam);
 		hl_buffer_char(b,'>');
 		break;
 	default:

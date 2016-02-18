@@ -60,7 +60,7 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 			{
 				vdynamic *v = *(vdynamic**)data;
 				if( v == NULL ) return 0;
-				return hl_dyn_casti(&v->v,t->t,to);
+				return hl_dyn_casti(&v->v,t->tparam,to);
 			}
 		}
 		break;
@@ -103,6 +103,11 @@ double hl_dyn_castd( void *data, hl_type *t ) {
 		break;
 	}
 	return 0;
+}
+
+int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
+	hl_fatal("TODO");
+	return hl_invalid_comparison;
 }
 
 HL_PRIM vdynamic* hl_safe_cast( vdynamic *v, hl_type *t ) {

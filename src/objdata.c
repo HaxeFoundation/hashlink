@@ -336,6 +336,8 @@ void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
 				rt = rt->parent;
 			} while( rt );
 			if( f == NULL ) return NULL;
+			if( f->field_index < 0 )
+				hl_fatal("TODO:fetchmethod");
 			return fetch_p((char*)o + f->field_index,f->t,t);
 		}
 		break;
