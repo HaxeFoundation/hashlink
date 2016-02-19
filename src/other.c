@@ -210,17 +210,23 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		return;
 	}
 	switch( v->t->kind ) {
+	case HVOID:
+		hl_buffer_str_sub(b,USTR("void"),4);
+		break;
+	case HI8:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.c));
+		break;
+	case HI16:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.s));
+		break;
 	case HI32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.i));
 		break;
-	case HBYTES:
-		hl_buffer_str(b,(uchar*)v->v.bytes);
+	case HF32:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.16f"),v->v.f));
 		break;
 	case HF64:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.19g"),v->v.d));
-		break;
-	case HVOID:
-		hl_buffer_str_sub(b,USTR("void"),4);
 		break;
 	case HBOOL:
 		if( v->v.b )
@@ -228,18 +234,22 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		else
 			hl_buffer_str_sub(b,USTR("false"),5);
 		break;
+	case HBYTES:
+		hl_buffer_str(b,(uchar*)v->v.bytes);
+		break;
+	case HFUN:
+		hl_buffer_str_sub(b,USTR("function#"),9);
+		hl_buffer_str_sub(b, buf, usprintf(buf, 32, _PTR_FMT,(int_val)v));
+		break;
 	case HOBJ:
 		{
-			hl_type_obj *o = ((vobj*)v)->proto->t.obj;
+			hl_type_obj *o = v->t->obj;
 			if( o->rt == NULL || o->rt->toString == NULL ) {
 				hl_buffer_char(b,'#');
 				hl_buffer_str(b,o->name);
 			} else
 				hl_buffer_str(b,o->rt->toString(v));
 		}
-		break;
-	case HVIRTUAL:
-		hl_buffer_rec(b, ((vvirtual*)v)->value, stack);
 		break;
 	case HARRAY:
 		{
@@ -267,6 +277,16 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			hl_buffer_char(b,']');
 		}
 		break;
+	case HTYPE:
+		hl_buffer_str_sub(b, USTR("type:"), 5);
+		hl_buffer_str(b, hl_type_str((hl_type*)v->v.ptr));
+		break;
+	case HREF:
+		hl_buffer_str_sub(b, USTR("ref"), 3);
+		break;
+	case HVIRTUAL:
+		hl_buffer_rec(b, ((vvirtual*)v)->value, stack);
+		break;
 	case HDYNOBJ:
 		{
 			vdynobj *o = (vdynobj*)v;
@@ -288,13 +308,48 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 				if( i ) hl_buffer_str_sub(b,USTR(", "),2);
 				hl_buffer_str(b,hl_field_name(f->hashed_name));
 				hl_buffer_str_sub(b,USTR(" : "),3);
-				hl_buffer_addr(b, o->fields_data + f->field_index, f->t, stack);
+				hl_buffer_addr(b, o->fields_data + f->field_index, f->t, &l);
 			}
 			hl_buffer_char(b, '}');
 		}
 		break;
+	case HABSTRACT:
+		hl_buffer_char(b, '~');
+		hl_buffer_str(b, v->t->abs_name);
+		break;
+	case HENUM:
+		{
+			int i;
+			vlist l;
+			vlist *vtmp = stack;
+			hl_enum_construct *c = v->t->tenum->constructs + ((venum*)v->v.ptr)->index;
+			if( !c->nparams ) {
+				hl_buffer_str(b, c->name);
+				break;
+			}
+			while( vtmp != NULL ) {
+				if( vtmp->v == v ) {
+					hl_buffer_str_sub(b,USTR("..."),3);
+					return;
+				}
+				vtmp = vtmp->next;
+			}
+			l.v = v;
+			l.next = stack;
+			hl_buffer_str(b, c->name);
+			hl_buffer_char(b,'(');
+			for(i=0;i<c->nparams;i++) {
+				if( i ) hl_buffer_char(b,',');
+				hl_buffer_addr(b,(char*)v->v.ptr + c->offsets[i],c->params[i], &l); 
+			}
+			hl_buffer_char(b,')');
+		}
+		break;
+	case HNULL:
+		hl_buffer_str_sub(b, USTR("_null_"), 6);
+		break;
 	default:
-		hl_buffer_str_sub(b, buf, usprintf(buf, 32, _PTR_FMT USTR("H\n"),(int_val)v));
+		hl_buffer_str_sub(b, buf, usprintf(buf, 32, _PTR_FMT USTR("H"),(int_val)v));
 		break;
 	}
 }

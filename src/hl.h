@@ -173,6 +173,18 @@ typedef struct {
 	hl_type **args;
 	hl_type *ret;
 	int nargs;
+	// storage for closure
+	hl_type *parent;
+	struct {
+		hl_type_kind kind;
+		void *p;
+	} closure_type;
+	struct {
+		hl_type **args;
+		hl_type *ret;
+		int nargs;
+		hl_type *parent;
+	} closure;
 } hl_type_fun;
 
 typedef struct {
@@ -212,6 +224,7 @@ typedef struct {
 	const uchar *name;
 	int nparams;
 	hl_type **params;
+	int *offsets;
 } hl_enum_construct;
 
 typedef struct {
@@ -230,6 +243,7 @@ struct hl_type {
 		hl_type	*tparam;
 		uchar *abs_name;
 	};
+	void *vobj_proto;
 };
 
 int hl_type_size( hl_type *t );
@@ -260,12 +274,7 @@ typedef struct {
 } vdynamic;
 
 typedef struct {
-	hl_type t;
-	/* overridden methods indexes */
-} vobj_proto;
-
-typedef struct {
-	vobj_proto *proto;
+	hl_type *t;
 	/* fields data */
 } vobj;
 
@@ -285,25 +294,21 @@ typedef struct {
 	int __pad; // force align on 16 bytes for double
 } varray;
 
-#define CL_HAS_V32		1
-#define CL_HAS_V64		2
-
 typedef struct {
 	hl_type *t;
 	void *fun;
-	int bits;
 	int hasValue;
-	vdynamic *value;
+	void *value;
 } vclosure;
 
 typedef struct {
 	hl_type *t;
 	int hashed_name;
-	int field_index; // negative or zero : index in proto
+	int field_index; // negative or zero : index in methods
 } hl_field_lookup;
 
 struct hl_runtime_obj {
-	hl_type_obj *obj;
+	hl_type *t;
 	// absolute
 	int nfields;
 	int nproto;
@@ -311,10 +316,10 @@ struct hl_runtime_obj {
 	int size;
 	int *fields_indexes;
 	hl_runtime_obj *parent;
-	vobj_proto *proto;
 	const uchar *(*toString)( vdynamic *obj );
 	// relative
 	hl_field_lookup *lookup;
+	void **methods;
 };
 
 typedef struct {
@@ -378,7 +383,7 @@ void hl_dyn_setd( vdynamic *d, int hfield, hl_type *t, double  );
 void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
 
 vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
-vclosure *hl_alloc_closure_ptr( hl_type *t, void *fvalue, void *ptr );
+vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );
 
 // ----------------------- ALLOC --------------------------------------------------
 

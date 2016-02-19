@@ -1,7 +1,7 @@
 #include <hl.h>
 
 HL_PRIM vdynamic *hl_obj_get_field( vdynamic *obj, int hfield ) {
-	return hl_dyn_getp(obj,hfield,&hlt_dyn);
+	return (vdynamic*)hl_dyn_getp(obj,hfield,&hlt_dyn);
 }
 
 HL_PRIM void hl_obj_set_field( vdynamic *obj, int hfield, vdynamic *v ) {

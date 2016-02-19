@@ -52,8 +52,14 @@ vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 
 int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 	switch( TK2(t->kind,to->kind) ) {
+	case TK2(HI8,HI8):
+		return *(char*)data;
+	case TK2(HI16,HI16):
+		return *(short*)data;
 	case TK2(HI32,HI32):
 		return *(int*)data;
+	case TK2(HBOOL,HBOOL):
+		return *(bool*)data;
 	default:
 		switch( t->kind ) {
 		case HNULL:
@@ -91,7 +97,15 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 				t1 = t1->super->obj;
 			}
 		}
+	case TK2(HOBJ,HDYN):
+	case TK2(HDYNOBJ,HDYN):
+	case TK2(HFUN,HDYN):
+	case TK2(HNULL,HDYN):
+	case TK2(HARRAY,HDYN):
+		return *(void**)data;
 	}
+	if( to->kind == HDYN )
+		return hl_make_dyn(data,t);
 	hl_error_msg(USTR("Can't cast %s(%s) to %s"),hl_to_string(hl_make_dyn(data,t)),hl_type_str(t),hl_type_str(to));
 	return 0;
 }

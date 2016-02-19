@@ -89,7 +89,7 @@ void hl_cache_free() {
 
 /**
 	Builds class metadata (fields indexes, etc.)
-	Does not require the JIT to be finalized.
+	Does not require the method table to be finalized.
 **/
 hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	hl_type_obj *o = ot->obj;
@@ -100,7 +100,7 @@ hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	if( o->rt ) return o->rt;
 	if( o->super ) p = hl_get_obj_rt(o->super);
 	t = (hl_runtime_obj*)hl_malloc(alloc,sizeof(hl_runtime_obj));
-	t->obj = o;
+	t->t = ot;
 	t->nfields = o->nfields + (p ? p->nfields : 0);
 	t->nproto = p ? p->nproto : 0;
 	t->nlookup = o->nfields + o->nproto;
@@ -124,8 +124,9 @@ hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		size += hl_type_size(ft);
 	}
 	t->size = size;
-	t->proto = NULL;
+	t->methods = NULL;
 	o->rt = t;
+	ot->vobj_proto = NULL;
 
 	// fields lookup
 	size = 0;
@@ -139,29 +140,38 @@ hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 
 /**
 	Fill class prototype with method pointers.
-	Requires JIT to be finilized
+	Requires method table to be finalized
 **/
 hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_type_obj *o = ot->obj;
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
 	hl_runtime_obj *p = NULL, *t = hl_get_obj_rt(ot);
-	hl_field_lookup *strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__string"),false));
+	hl_field_lookup *strField;
 	int i;
-	if( t->proto ) return t;
+	if( ot->vobj_proto ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);
-	t->toString = strField ? m->functions_ptrs[o->proto[-(strField->field_index+1)].findex] : (p ? p->toString : NULL);
-	t->proto = (vobj_proto*)hl_malloc(alloc, sizeof(vobj_proto) + t->nproto * sizeof(void*));
-	t->proto->t = *ot; // COPY
+
+	strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__string"),false));
+	t->toString = strField ? m->functions_ptrs[o->proto[-(strField->field_index+1)].findex] : (p ? p->toString : NULL);	
+
 	if( t->nproto ) {
-		void **fptr = (void**)((unsigned char*)t->proto + sizeof(vobj_proto));
+		void **fptr = (void**)hl_malloc(alloc, sizeof(void*) * t->nproto);
+		ot->vobj_proto = fptr;
 		if( p )
-			memcpy(fptr, (unsigned char*)p->proto + sizeof(vobj_proto), p->nproto * sizeof(void*));
+			memcpy(fptr, p->t->vobj_proto, p->nproto * sizeof(void*));
 		for(i=0;i<o->nproto;i++) {
 			hl_obj_proto *p = o->proto + i;
 			if( p->pindex >= 0 ) fptr[p->pindex] = m->functions_ptrs[p->findex];
 		}
 	}
+
+	t->methods = (void**)hl_malloc(alloc, sizeof(void*) * o->nproto);
+	for(i=0;i<o->nproto;i++) {
+		hl_obj_proto *p = o->proto + i;
+		t->methods[i] = m->functions_ptrs[p->findex];
+	}
+
 	return t;
 }
 
@@ -175,8 +185,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	case HOBJ:
 		{ 
 			int i;
-			vobj *o = (vobj*)obj;
-			hl_runtime_obj *rt = o->proto->t.obj->rt;
+			hl_runtime_obj *rt = obj->t->obj->rt;
 			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual));
 			v->t = vt;
 			v->fields_data = (char*)obj;
@@ -213,7 +222,6 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 			v->value = obj;
 			for(i=0;i<vt->virt->nfields;i++) {
 				hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,vt->virt->fields[i].hashed_name);
-				if( f == NULL ) hl_fatal_fmt("Cast failure: field %s is missing",vt->virt->fields[i].name);
 				v->indexes[i] = f == NULL || f->t != vt->virt->fields[i].t ? 0 : f->field_index + sizeof(void*);
 			}
 			// add it to the list
@@ -227,14 +235,15 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	return v;
 }
 
-void *hl_fetch_virtual_method( vvirtual *v, int fid ) {
+/*
+void *hl_fetch_method( vvirtual *v, int fid ) {
 	hl_obj_field *f = v->t->virt->fields + fid;
 	switch( v->value->t->kind ) {
 	case HOBJ:
 		{
-			vobj *o = (vobj*)v->value;
-			hl_module_context *m = o->proto->t.obj->m;
-			hl_runtime_obj *rt = o->proto->t.obj->rt;
+			hl_type_obj *o = ((vobj*)v->value)->t->obj;
+			hl_module_context *m = o->m;
+			hl_runtime_obj *rt = o->rt;
 			while( rt ) {
 				hl_field_lookup *found = hl_lookup_find(rt->lookup,rt->nlookup,f->hashed_name);
 				if( found ) {
@@ -249,7 +258,7 @@ void *hl_fetch_virtual_method( vvirtual *v, int fid ) {
 		break;
 	}
 	return NULL;
-}
+}*/
 
 #define B2(t1,t2) ((t1) + ((t2) * HLAST))
 #define fetch_i(data,src,dst) src == dst ? *(int*)(data) : hl_dyn_casti(data,src,dst)
@@ -294,8 +303,7 @@ int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 		break;
 	case HOBJ:
 		{
-			vobj *o = (vobj*)d;
-			hl_runtime_obj *rt = o->proto->t.obj->rt;
+			hl_runtime_obj *rt = d->t->obj->rt;
 			hl_field_lookup *f = NULL;
 			do {
 				f = hl_lookup_find(rt->lookup,rt->nlookup,hfield);
@@ -303,7 +311,7 @@ int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 				rt = rt->parent;
 			} while( rt );
 			if( f == NULL ) return 0;
-			return fetch_i((char*)o + f->field_index,f->t,t);
+			return fetch_i((char*)d + f->field_index,f->t,t);
 		}
 		break;
 	case HVIRTUAL:
@@ -327,8 +335,7 @@ void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
 		break;
 	case HOBJ:
 		{
-			vobj *o = (vobj*)d;
-			hl_runtime_obj *rt = o->proto->t.obj->rt;
+			hl_runtime_obj *rt = d->t->obj->rt;
 			hl_field_lookup *f = NULL;
 			do {
 				f = hl_lookup_find(rt->lookup,rt->nlookup,hfield);
@@ -336,9 +343,11 @@ void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
 				rt = rt->parent;
 			} while( rt );
 			if( f == NULL ) return NULL;
-			if( f->field_index < 0 )
-				hl_fatal("TODO:fetchmethod");
-			return fetch_p((char*)o + f->field_index,f->t,t);
+			if( f->field_index < 0 ) {
+				vclosure *c = hl_alloc_closure_ptr(f->t,rt->methods[-f->field_index-1],d);
+				return hl_dyn_castp(&c,c->t,t);
+			}
+			return fetch_p((char*)d + f->field_index,f->t,t);
 		}
 		break;
 	case HVIRTUAL:

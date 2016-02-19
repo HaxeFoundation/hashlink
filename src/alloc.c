@@ -117,12 +117,12 @@ vobj *hl_alloc_obj( hl_type *t ) {
 	vobj *o;
 	int size;
 	hl_runtime_obj *rt = t->obj->rt;
-	if( rt == NULL || rt->proto == NULL ) rt = hl_get_obj_proto(t);
+	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(t);
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
 	o = (vobj*)hl_gc_alloc(size);
 	memset(o,0,size);
-	o->proto = rt->proto;
+	o->t = t;
 	return o;
 }
 
