@@ -46,9 +46,13 @@ HL_PRIM vdynamic* hl_get_closure_value( vdynamic *c ) {
 	return ((vclosure*)c)->value;
 }
 
+void *hlc_dyn_call( void *fun, hl_type *t, vdynamic **args );
+
 HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
-	void *fun = ((vclosure*)c)->fun;
-	((void(*)( vdynamic * ))fun)( *(vdynamic**)(args+1) );
-	return NULL;
+	vclosure *cl = (vclosure*)c;
+	if( cl->hasValue ) hl_error("Can't call closure with value");
+	if( args->size != cl->t->fun->nargs || args->at->kind != HDYN ) hl_error("Invalid args");
+	// TODO : cast args and returns value !
+	return (vdynamic*)hlc_dyn_call(cl->fun,cl->t,(vdynamic**)(args +1));
 }
 
