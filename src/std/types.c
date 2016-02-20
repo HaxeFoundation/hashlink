@@ -12,6 +12,41 @@ static const uchar *TSTR[] = {
 	NULL, NULL, NULL
 };
 
+
+int hl_type_size( hl_type *t ) {
+	static int SIZES[] = {
+		0, // VOID
+		1, // I8
+		2, // I16
+		4, // I32
+		4, // F32
+		8, // F64
+		1, // BOOL
+		HL_WSIZE, // BYTES
+		HL_WSIZE, // DYN
+		HL_WSIZE, // FUN
+		HL_WSIZE, // OBJ
+		HL_WSIZE, // ARRAY
+		HL_WSIZE, // TYPE
+		HL_WSIZE, // REF
+		HL_WSIZE, // VIRTUAL
+		HL_WSIZE, // DYNOBJ
+		HL_WSIZE, // ABSTRACT
+		HL_WSIZE, // ENUM
+		HL_WSIZE, // NULL
+	};
+	return SIZES[t->kind];
+}
+
+int hl_pad_size( int pos, hl_type *t ) {
+	int sz = hl_type_size(t);
+	int align;
+	align = pos & (sz - 1);
+	if( align && t->kind != HVOID )
+		return sz - align;
+	return 0;
+}
+
 bool hl_same_type( hl_type *a, hl_type *b ) {
 	if( a == b )
 		return true;

@@ -27,6 +27,15 @@
 #	include <sys/mman.h>
 #endif
 
+void hl_global_init() {
+}
+
+void hl_cache_free();
+
+void hl_global_free() {
+	hl_cache_free();
+}
+
 struct hl_alloc_block {
 	int size;
 	hl_alloc_block *next;

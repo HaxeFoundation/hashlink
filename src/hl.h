@@ -362,6 +362,7 @@ const uchar *hl_field_name( int hash );
 #define hl_error(msg)	hl_error_msg(USTR(msg))
 void hl_error_msg( const uchar *msg, ... );
 void hl_throw( vdynamic *v );
+void hl_rethrow( vdynamic *v );
 
 vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 void *hl_fetch_virtual_method( vvirtual *v, int fid );
