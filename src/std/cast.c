@@ -76,7 +76,7 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 }
 
 void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
-	if( t == to )
+	if( t == to || hl_same_type(t,to) )
 		return *(void**)data;
 	switch( TK2(t->kind,to->kind) ) {
 	case TK2(HDYN,HOBJ):

@@ -1,10 +1,10 @@
 #include <hl.h>
 
-vbytes *hl_balloc( int size ) {
+HL_PRIM vbytes *hl_balloc( int size ) {
 	return (vbytes*)hl_gc_alloc_noptr(size);
 }
 
-vbytes *hl_bcopy( vbytes *ptr, int size ) {
+HL_PRIM vbytes *hl_bcopy( vbytes *ptr, int size ) {
 	vbytes *b = hl_balloc(size);
 	memcpy(b,ptr,size);
 	return b;
@@ -91,7 +91,7 @@ memfind_rb (const void  *in_block,      /*  Block containing data            */
     return NULL;
 }
 
-int hl_bytes_find( vbytes *where, int pos, int len, vbytes *which, int wpos, int wlen ) {
+HL_PRIM int hl_bytes_find( vbytes *where, int pos, int len, vbytes *which, int wpos, int wlen ) {
 	size_t searchbuf [256];
 	bool repeat_find = false;
 	vbytes *found = (vbytes*)memfind_rb(where + pos,len,which+wpos,wlen,searchbuf,&repeat_find);
@@ -99,16 +99,48 @@ int hl_bytes_find( vbytes *where, int pos, int len, vbytes *which, int wpos, int
 	return (int)(size_t)(found - (where + pos));
 }
 
-void hl_bytes_fill( vbytes *bytes, int pos, int len, int value ) {
+HL_PRIM void hl_bytes_fill( vbytes *bytes, int pos, int len, int value ) {
 	memset(bytes+pos,value,len);
 }
 
-void hl_bsort_i32( vbytes *bytes, int pos, int len, vclosure *cmp ) {
+HL_PRIM void hl_bsort_i32( vbytes *bytes, int pos, int len, vclosure *cmp ) {
 	hl_fatal("TODO");
 }
 
-void hl_bsort_f64( vbytes *bytes, int pos, int len, vclosure *cmp ) {
+HL_PRIM void hl_bsort_f64( vbytes *bytes, int pos, int len, vclosure *cmp ) {
 	hl_fatal("TODO");
+}
+
+HL_PRIM double hl_parse_float( vbytes *bytes, int pos, int len ) {
+	uchar *str = (uchar*)(bytes+pos);
+	uchar *end = NULL;
+	double d = utod(str,&end);
+	if( end == str )
+		return hl_nan;
+	return d;
+}
+
+HL_PRIM vdynamic *hl_parse_int( vbytes *bytes, int pos, int len ) {
+	uchar *c = (uchar*)(bytes + pos), *end = NULL;
+	int h;
+	if( len >= 2 && c[0] == '0' && (c[1] == 'x' || c[1] == 'X') ) {
+		h = 0;
+		c += 2;
+		while( *c ) {
+			uchar k = *c++;
+			if( k >= '0' && k <= '9' )
+				h = (h << 4) | (k - '0');
+			else if( k >= 'A' && k <= 'F' )
+				h = (h << 4) | ((k - 'A') + 10);
+			else if( k >= 'a' && k <= 'f' )
+				h = (h << 4) | ((k - 'a') + 10);
+			else
+				return NULL;
+		}
+		return hl_alloc_i32(h);
+	}
+	h = utoi(c,&end);
+	return c == end ? NULL : hl_alloc_i32(h);
 }
 
 DEFINE_PRIM(_BYTES,hl_balloc,_I32);

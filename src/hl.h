@@ -125,6 +125,8 @@ typedef wchar_t	uchar;
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
 #	define uvsprintf	wvsprintf
+#	define utod(s,end)	wcstod(s,end)
+#	define utoi(s,end)	wcstol(s,end,10)
 #else
 typedef unsigned short uchar;
 #	undef USTR
@@ -341,10 +343,12 @@ typedef struct _venum {
 	int index;
 } venum;
 
-hl_type hlt_dyn;
-hl_type hlt_array;
-hl_type hlt_bytes;
-hl_type hlt_dynobj;
+extern hl_type hlt_i32;
+extern hl_type hlt_dyn;
+extern hl_type hlt_array;
+extern hl_type hlt_bytes;
+extern hl_type hlt_dynobj;
+extern double hl_nan;
 
 bool hl_same_type( hl_type *a, hl_type *b );
 
@@ -354,6 +358,8 @@ vobj *hl_alloc_obj( hl_type *t );
 vdynobj *hl_alloc_dynobj();
 vbytes *hl_balloc( int size );
 vbytes *hl_bcopy( vbytes *byte, int size );
+
+vdynamic *hl_alloc_i32( int i );
 
 int hl_hash( vbytes *name );
 int hl_hash_gen( const uchar *name, bool cache_name );
