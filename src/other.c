@@ -244,11 +244,11 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 	case HOBJ:
 		{
 			hl_type_obj *o = v->t->obj;
-			if( o->rt == NULL || o->rt->toString == NULL ) {
+			if( o->rt == NULL || o->rt->toStringFun == NULL ) {
 				hl_buffer_char(b,'#');
 				hl_buffer_str(b,o->name);
 			} else
-				hl_buffer_str(b,o->rt->toString(v));
+				hl_buffer_str(b,o->rt->toStringFun(v));
 		}
 		break;
 	case HARRAY:

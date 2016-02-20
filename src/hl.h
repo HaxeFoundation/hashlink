@@ -316,7 +316,9 @@ struct hl_runtime_obj {
 	int size;
 	int *fields_indexes;
 	hl_runtime_obj *parent;
-	const uchar *(*toString)( vdynamic *obj );
+	const uchar *(*toStringFun)( vdynamic *obj );
+	int (*compareFun)( vdynamic *a, vdynamic *b );
+	vdynamic (*castFun)( vdynamic *a, hl_type *t );
 	// relative
 	hl_field_lookup *lookup;
 	void **methods;

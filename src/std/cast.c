@@ -120,7 +120,51 @@ double hl_dyn_castd( void *data, hl_type *t ) {
 }
 
 int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
-	hl_fatal("TODO");
+	if( a == b )
+		return 0;
+	if( a == NULL )
+		return -1;
+	if( b == NULL )
+		return 1;
+	switch( TK2(a->t->kind,b->t->kind) ) {
+	case TK2(HI8,HI8):
+		return a->v.c - b->v.c;
+	case TK2(HI16,HI16):
+		return a->v.s - b->v.s;
+	case TK2(HI32,HI32):
+		return a->v.i - b->v.i;
+	case TK2(HF32,HF32):
+		{
+			float d = a->v.f - b->v.f;
+			if( d != d ) return hl_invalid_comparison;
+ 			return d == 0.f ? 0 : (d > 0.f ? 1 : -1);
+		}
+	case TK2(HF64,HF64):
+		{
+			double d = a->v.d - b->v.d;
+			if( d != d ) return hl_invalid_comparison;
+ 			return d == 0. ? 0 : (d > 0. ? 1 : -1);
+		}
+	case TK2(HBOOL,HBOOL):
+		return a->v.b - b->v.b;
+	case TK2(HF64, HI32):
+		{
+			double d = a->v.d - (double)b->v.i;
+			if( d != d ) return hl_invalid_comparison;
+ 			return d == 0. ? 0 : (d > 0. ? 1 : -1);
+		}
+	case TK2(HI32, HF64):
+		{
+			double d = (double)a->v.i - b->v.d;
+			if( d != d ) return hl_invalid_comparison;
+ 			return d == 0. ? 0 : (d > 0. ? 1 : -1);
+		}
+	case TK2(HOBJ,HOBJ):
+		if( a->t->obj == b->t->obj && a->t->obj->rt->compareFun )
+			return a->t->obj->rt->compareFun(a,b);
+		break;
+	}
+	uprintf(USTR("Don't know how to compare %s(%s) and %s(%s)\n"),hl_to_string(a),hl_type_str(a->t),hl_to_string(b),hl_type_str(b->t));
 	return hl_invalid_comparison;
 }
 

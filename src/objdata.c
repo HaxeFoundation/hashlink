@@ -106,7 +106,9 @@ hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	t->nlookup = o->nfields + o->nproto;
 	t->lookup = (hl_field_lookup*)hl_malloc(alloc,sizeof(hl_field_lookup) * t->nlookup);
 	t->fields_indexes = (int*)hl_malloc(alloc,sizeof(int)*t->nfields);
-	t->toString = NULL;
+	t->toStringFun = NULL;
+	t->compareFun = NULL;
+	t->castFun = NULL;
 	t->parent = p;
 
 	// fields indexes
@@ -147,13 +149,17 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
 	hl_runtime_obj *p = NULL, *t = hl_get_obj_rt(ot);
-	hl_field_lookup *strField;
+	hl_field_lookup *strField, *cmpField, *castField;
 	int i;
 	if( ot->vobj_proto ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);
 
 	strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__string"),false));
-	t->toString = strField ? m->functions_ptrs[o->proto[-(strField->field_index+1)].findex] : (p ? p->toString : NULL);	
+	cmpField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__compare"),false));
+	castField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__cast"),false));
+	t->toStringFun = strField ? m->functions_ptrs[o->proto[-(strField->field_index+1)].findex] : (p ? p->toStringFun : NULL);	
+	t->compareFun = cmpField ? m->functions_ptrs[o->proto[-(cmpField->field_index+1)].findex] : (p ? p->compareFun : NULL);	
+	t->castFun = castField ? m->functions_ptrs[o->proto[-(castField->field_index+1)].findex] : (p ? p->castFun : NULL);	
 
 	if( t->nproto ) {
 		void **fptr = (void**)hl_malloc(alloc, sizeof(void*) * t->nproto);
