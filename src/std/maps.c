@@ -1,6 +1,7 @@
 #include <hl.h>
 
 #define H_SIZE_INIT 7
+#define H_CELL_SIZE	3
 
 // successive primes that double every time
 static int H_PRIMES[] = {
@@ -8,38 +9,214 @@ static int H_PRIMES[] = {
 };
 
 typedef struct _hl_bytes_map hl_bytes_map;
+typedef struct _hl_bytes_cell hl_bytes_cell;
+
+struct _hl_bytes_cell {
+	int nvalues;
+	int hashes[H_CELL_SIZE];
+	uchar *strings[H_CELL_SIZE];
+	vdynamic *values[H_CELL_SIZE];
+	hl_bytes_cell *next;
+};
 
 struct _hl_bytes_map {
-	int _;
+	hl_bytes_cell **cells;
+	int ncells;
+	int nentries;
 };
 
 HL_PRIM hl_bytes_map *hl_hballoc() {
 	hl_bytes_map *m = (hl_bytes_map*)hl_gc_alloc(sizeof(hl_bytes_map));
+	m->ncells = H_SIZE_INIT;
+	m->nentries = 0;
+	m->cells = (hl_bytes_cell **)hl_gc_alloc(sizeof(hl_bytes_cell*)*m->ncells);
+	memset(m->cells,0,m->ncells * sizeof(void*));
 	return m;
 }
 
-HL_PRIM void hl_hbset( hl_bytes_map *m, vbytes *key, vdynamic *val ) {
+static vdynamic **hl_hbfind( hl_bytes_map *m, uchar *key ) {
+	int hash = hl_hash_gen(key,false);
+	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
+	hl_bytes_cell *c = m->cells[ckey];
+	int i;
+	while( c ) {
+		for(i=0;i<c->nvalues;i++)
+			if( c->hashes[i] == hash && ucmp(key,c->strings[i]) == 0 )
+				return c->values + i;
+		c = c->next;
+	}
+	return NULL;
 }
 
+static void hl_hbremap( hl_bytes_map *m, uchar *key, int hash, vdynamic *value, hl_bytes_cell **reuse ) {
+	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
+	hl_bytes_cell *c = m->cells[ckey];
+	if( c && c->nvalues < H_CELL_SIZE ) {
+		c->hashes[c->nvalues] = hash;
+		c->strings[c->nvalues] = key;
+		c->values[c->nvalues] = value;
+		return;
+	}
+	c = *reuse;
+	if( c )
+		*reuse = c->next;
+	else
+		c = (hl_bytes_cell*)hl_gc_alloc(sizeof(hl_bytes_cell));
+	memset(c,0,sizeof(hl_bytes_cell));
+	c->strings[0] = key;
+	c->hashes[0] = hash;
+	c->values[0] = value;
+	c->nvalues = 1;
+	c->next = m->cells[ckey];
+	m->cells[ckey] = c;
+}
+
+static bool hl_hbadd( hl_bytes_map *m, uchar *key, vdynamic *value ) {
+	int hash = hl_hash_gen(key,false);
+	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
+	hl_bytes_cell *c = m->cells[ckey];
+	hl_bytes_cell *pspace = NULL;
+	int i;
+	while( c ) {
+		for(i=0;i<c->nvalues;i++)
+			if( c->hashes[i] == hash && ucmp(key,c->strings[i]) == 0 ) {
+				c->values[i] = value;
+				return false;
+			}
+		if( !pspace && c->nvalues < H_CELL_SIZE ) pspace = c;
+		c = c->next;
+	}
+	if( pspace ) {
+		pspace->hashes[pspace->nvalues] = hash;
+		pspace->strings[pspace->nvalues] = key;
+		pspace->values[pspace->nvalues] = value;
+		pspace->nvalues++;
+		m->nentries++;
+		return false;
+	}
+	c = (hl_bytes_cell*)hl_gc_alloc(sizeof(hl_bytes_cell));
+	memset(c,0,sizeof(hl_bytes_cell));
+	c->strings[0] = key;
+	c->hashes[0] = hash;
+	c->values[0] = value;
+	c->nvalues = 1;
+	c->next = m->cells[ckey];
+	m->cells[ckey] = c;
+	m->nentries++;
+	return true;
+}
+
+static void hl_hbgrow( hl_bytes_map *m ) {
+	int i = 0;
+	int oldsize = m->ncells;
+	hl_bytes_cell **old_cells = m->cells;
+	hl_bytes_cell *reuse = NULL;
+	while( H_PRIMES[i] <= m->ncells ) i++;
+	m->ncells = H_PRIMES[i];
+	m->cells = (hl_bytes_cell **)hl_gc_alloc(sizeof(hl_bytes_cell*)*m->ncells);
+	memset(m->cells,0,m->ncells * sizeof(void*));
+	for(i=0;i<oldsize;i++) {
+		hl_bytes_cell *c = old_cells[i];
+		while( c ) {
+			hl_bytes_cell *next = c->next;
+			int j;
+			for(j=0;j<c->nvalues;j++) {
+				if( j == c->nvalues-1 ) {
+					c->next = reuse;
+					reuse = c;
+				}
+				hl_hbremap(m,c->strings[j],c->hashes[j],c->values[j],&reuse);
+			}
+			c = next;
+		}
+	}
+}
+
+HL_PRIM void hl_hbset( hl_bytes_map *m, vbytes *key, vdynamic *value ) {
+	if( hl_hbadd(m,(uchar*)key,value) && m->nentries > m->ncells * H_CELL_SIZE * 2 )
+		hl_hbgrow(m);
+}
 
 HL_PRIM bool hl_hbexists( hl_bytes_map *m, vbytes *key ) {
+	return hl_hbfind(m,(uchar*)key) != NULL;
+}
+
+HL_PRIM vdynamic* hl_hbget( hl_bytes_map *m, vbytes *key ) {
+	vdynamic **v = hl_hbfind(m,(uchar*)key);
+	if( v == NULL ) return NULL;
+	return *v;
+}
+
+HL_PRIM bool hl_hbremove( hl_bytes_map *m, vbytes *_key ) {
+	uchar *key = (uchar*)_key;
+	int hash = hl_hash_gen(key,false);
+	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
+	hl_bytes_cell *c = m->cells[ckey];
+	hl_bytes_cell *prev = NULL;
+	int i;
+	while( c ) {
+		for(i=0;i<c->nvalues;i++)
+			if( c->hashes[i] == hash && ucmp(c->strings[i],key) == 0 ) {
+				c->nvalues--;
+				if( c->nvalues ) {
+					int j;
+					for(j=i;j<c->nvalues;j++) {
+						c->hashes[j] = c->hashes[j+1];
+						c->strings[j] = c->strings[j+1];
+						c->values[j] = c->values[j+1];
+					}
+					c->strings[j] = NULL;
+					c->values[j] = NULL; // GC friendly
+				} else if( prev )
+					prev->next = c->next;
+				else
+					m->cells[ckey] = c->next;
+				return true;
+			}
+		prev = c;
+		c = c->next;
+	}
 	return false;
 }
 
-HL_PRIM vdynamic *hl_hbget( hl_bytes_map *m, vbytes *key ) {
-	return NULL;
+HL_PRIM varray* hl_hbkeys( hl_bytes_map *m ) {
+	varray *a = (varray*)hl_gc_alloc_noptr(sizeof(varray)+sizeof(uchar*)*m->nentries);
+	uchar **keys = (uchar**)(a+1);
+	int p = 0;
+	int i;
+	a->t = &hlt_array;
+	a->at = &hlt_bytes;
+	a->size = m->nentries;
+	for(i=0;i<m->ncells;i++) {
+		int j;
+		hl_bytes_cell *c = m->cells[i];
+		while( c ) {
+			for(j=0;j<c->nvalues;j++)
+				keys[p++] = c->strings[j];
+			c = c->next;
+		}
+	}
+	return a;
 }
 
-HL_PRIM bool hl_hbremove( hl_bytes_map *m, vbytes *key ) {
-	return false;
-}
-
-HL_PRIM varray *hl_hbkeys( hl_bytes_map *m ) {
-	return NULL;
-}
-
-HL_PRIM varray *hl_hbvalues( hl_bytes_map *m ) {
-	return NULL;
+HL_PRIM varray* hl_hbvalues( hl_bytes_map *m ) {
+	varray *a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*m->nentries);
+	vdynamic **values = (vdynamic**)(a+1);
+	int p = 0;
+	int i;
+	a->t = &hlt_array;
+	a->at = &hlt_dyn;
+	a->size = m->nentries;
+	for(i=0;i<m->ncells;i++) {
+		int j;
+		hl_bytes_cell *c = m->cells[i];
+		while( c ) {
+			for(j=0;j<c->nvalues;j++)
+				values[p++] = c->values[j];
+			c = c->next;
+		}
+	}
+	return a;
 }
 
 // ----- INT MAP ---------------------------------
@@ -47,12 +224,10 @@ HL_PRIM varray *hl_hbvalues( hl_bytes_map *m ) {
 typedef struct _hl_int_map hl_int_map;
 typedef struct _hl_int_cell hl_int_cell;
 
-#define ICELL_SIZE	3
-
 struct _hl_int_cell {
 	int nvalues;
-	int keys[ICELL_SIZE];
-	vdynamic *values[ICELL_SIZE];
+	int keys[H_CELL_SIZE];
+	vdynamic *values[H_CELL_SIZE];
 	hl_int_cell *next;
 };
 
@@ -84,7 +259,29 @@ static vdynamic **hl_hifind( hl_int_map *m, int key ) {
 	return NULL;
 }
 
-static bool hl_hiadd( hl_int_map *m, int key, vdynamic *value, hl_int_cell *reuse ) {
+static void hl_hiremap( hl_int_map *m, int key, vdynamic *value, hl_int_cell **reuse ) {
+	int ckey = ((unsigned)key) % ((unsigned)m->ncells);
+	hl_int_cell *c = m->cells[ckey];
+	if( c && c->nvalues < H_CELL_SIZE ) {
+		c->keys[c->nvalues] = key;
+		c->values[c->nvalues] = value;
+		c->nvalues++;
+		return;
+	}
+	c = *reuse;
+	if( c )
+		*reuse = c->next;
+	else
+		c = (hl_int_cell*)hl_gc_alloc(sizeof(hl_int_cell));
+	memset(c,0,sizeof(hl_int_cell));
+	c->keys[0] = key;
+	c->values[0] = value;
+	c->nvalues = 1;
+	c->next = m->cells[ckey];
+	m->cells[ckey] = c;
+}
+
+static bool hl_hiadd( hl_int_map *m, int key, vdynamic *value ) {
 	int ckey = ((unsigned)key) % ((unsigned)m->ncells);
 	hl_int_cell *c = m->cells[ckey];
 	hl_int_cell *pspace = NULL;
@@ -95,7 +292,7 @@ static bool hl_hiadd( hl_int_map *m, int key, vdynamic *value, hl_int_cell *reus
 				c->values[i] = value;
 				return false;
 			}
-		if( !pspace && c->nvalues < ICELL_SIZE ) pspace = c;
+		if( !pspace && c->nvalues < H_CELL_SIZE ) pspace = c;
 		c = c->next;
 	}
 	if( pspace ) {
@@ -105,10 +302,7 @@ static bool hl_hiadd( hl_int_map *m, int key, vdynamic *value, hl_int_cell *reus
 		m->nentries++;
 		return false;
 	}
-	if( reuse )
-		c = reuse;
-	else
-		c = (hl_int_cell*)hl_gc_alloc(sizeof(hl_int_cell));
+	c = (hl_int_cell*)hl_gc_alloc(sizeof(hl_int_cell));
 	memset(c,0,sizeof(hl_int_cell));
 	c->keys[0] = key;
 	c->values[0] = value;
@@ -139,8 +333,7 @@ static void hl_higrow( hl_int_map *m ) {
 					c->next = reuse;
 					reuse = c;
 				}
-				if( hl_hiadd(m,c->keys[j],c->values[j],reuse) )
-					reuse = reuse->next;
+				hl_hiremap(m,c->keys[j],c->values[j],&reuse);
 			}
 			c = next;
 		}
@@ -148,7 +341,7 @@ static void hl_higrow( hl_int_map *m ) {
 }
 
 HL_PRIM void hl_hiset( hl_int_map *m, int key, vdynamic *value ) {
-	if( hl_hiadd(m,key,value,NULL) && m->nentries > m->ncells * ICELL_SIZE * 2 )
+	if( hl_hiadd(m,key,value) && m->nentries > m->ncells * H_CELL_SIZE * 2 )
 		hl_higrow(m);
 }
 

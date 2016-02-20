@@ -96,7 +96,7 @@ HL_PRIM int hl_bytes_find( vbytes *where, int pos, int len, vbytes *which, int w
 	bool repeat_find = false;
 	vbytes *found = (vbytes*)memfind_rb(where + pos,len,which+wpos,wlen,searchbuf,&repeat_find);
 	if( found == NULL ) return -1;
-	return (int)(size_t)(found - (where + pos));
+	return (int)(size_t)(found - where);
 }
 
 HL_PRIM void hl_bytes_fill( vbytes *bytes, int pos, int len, int value ) {

@@ -127,6 +127,7 @@ typedef wchar_t	uchar;
 #	define uvsprintf	wvsprintf
 #	define utod(s,end)	wcstod(s,end)
 #	define utoi(s,end)	wcstol(s,end,10)
+#	define ucmp(a,b)	wcscmp(a,b)
 #else
 typedef unsigned short uchar;
 #	undef USTR
@@ -226,6 +227,7 @@ typedef struct {
 	const uchar *name;
 	int nparams;
 	hl_type **params;
+	int size;
 	int *offsets;
 } hl_enum_construct;
 
@@ -343,6 +345,7 @@ typedef struct _venum {
 	int index;
 } venum;
 
+extern hl_type hlt_void;
 extern hl_type hlt_i32;
 extern hl_type hlt_dyn;
 extern hl_type hlt_array;

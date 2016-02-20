@@ -5,6 +5,7 @@ hl_type hlt_bytes = { HBYTES };
 hl_type hlt_dynobj = { HDYNOBJ };
 hl_type hlt_dyn = { HDYN };
 hl_type hlt_i32 = { HI32 };
+hl_type hlt_void = { HVOID };
 
 static const uchar *TSTR[] = {
 	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("f32"), USTR("f64"),

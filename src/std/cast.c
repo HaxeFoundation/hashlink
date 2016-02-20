@@ -55,6 +55,7 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 		vdynamic *v = *((vdynamic**)data);
 		if( v == NULL ) return 0;
 		t = v->t;
+		if( !hl_is_dynamic(t) ) data = &v->v;
 	}
 	switch( TK2(t->kind,to->kind) ) {
 	case TK2(HI8,HI8):
@@ -106,15 +107,15 @@ vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to ) {
 }
 
 void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
+	if( t->kind == HDYN ) {
+		vdynamic *v = *(vdynamic**)data;
+		if( v == NULL ) return NULL;
+		t = v->t;
+		if( !hl_is_dynamic(t) ) data = &v->v;
+	}
 	if( t == to || hl_safe_cast(t,to) )
 		return *(void**)data;
 	switch( TK2(t->kind,to->kind) ) {
-	case TK2(HDYN,HOBJ):
-		{
-			vdynamic *v = *(vdynamic**)data;
-			if( v == NULL ) return NULL;
-			return hl_dyn_castp(data,v->t,to);
-		}
 	case TK2(HOBJ,HOBJ):
 		{
 			hl_type_obj *t1 = t->obj;
@@ -212,6 +213,8 @@ int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 }
 
 HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
+	if( t->kind == HDYN )
+		return v;
 	hl_fatal("TODO");
 	return NULL;
 }
