@@ -103,12 +103,34 @@ HL_PRIM void hl_bytes_fill( vbytes *bytes, int pos, int len, int value ) {
 	memset(bytes+pos,value,len);
 }
 
+
+static int ms_gcd( int m, int n ) {
+ 	while( n != 0 ) {
+		int t = m % n;
+		m=n; n=t;
+	}
+ 	return m;
+}
+
+#define TSORT int
+#define TID(t)	t##_i32
+#include "sort.h"
+#define TSORT double
+#define TID(t)	t##_f64
+#include "sort.h"
+
 HL_PRIM void hl_bsort_i32( vbytes *bytes, int pos, int len, vclosure *cmp ) {
-	hl_fatal("TODO");
+	m_sort_i32 m;
+	m.arr = (int*)(bytes + pos);
+	m.c = cmp;
+	merge_sort_rec_i32(&m,0,len);
 }
 
 HL_PRIM void hl_bsort_f64( vbytes *bytes, int pos, int len, vclosure *cmp ) {
-	hl_fatal("TODO");
+	m_sort_f64 m;
+	m.arr = (double*)(bytes + pos);
+	m.c = cmp;
+	merge_sort_rec_f64(&m,0,len);
 }
 
 HL_PRIM double hl_parse_float( vbytes *bytes, int pos, int len ) {

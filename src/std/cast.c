@@ -51,6 +51,11 @@ vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 
 
 int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
+	if( t->kind == HDYN ) {
+		vdynamic *v = *((vdynamic**)data);
+		if( v == NULL ) return 0;
+		t = v->t;
+	}
 	switch( TK2(t->kind,to->kind) ) {
 	case TK2(HI8,HI8):
 		return *(char*)data;
@@ -75,8 +80,33 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 	return 0;
 }
 
+
+#define HL_MAX_ARGS 0
+
+void *hlc_dyn_call( void *fun, hl_type *t, vdynamic **args );
+
+void *hl_wrap0( vclosure *c ) {
+	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,(vdynamic**)&c->value) : hlc_dyn_call(c->fun,c->t,NULL);
+}
+
+vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to ) {
+	static void *fptr[HL_MAX_ARGS+1] = { hl_wrap0 };
+	hl_type_fun *ct = c->t->fun;
+	int i;
+	if( ct->nargs != to->fun->nargs )
+		return NULL;
+	if( !hl_is_ptr(to->fun->ret) )
+		return NULL;
+	for(i=0;i<to->fun->nargs;i++)
+		if( !hl_is_ptr(to->fun->args[i]) )
+			return NULL;
+	if( to->fun->nargs > HL_MAX_ARGS )
+		return NULL;
+	return hl_alloc_closure_wrapper(to,fptr[to->fun->nargs],c);
+}
+
 void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
-	if( t == to || hl_same_type(t,to) )
+	if( t == to || hl_safe_cast(t,to) )
 		return *(void**)data;
 	switch( TK2(t->kind,to->kind) ) {
 	case TK2(HDYN,HOBJ):
@@ -88,7 +118,7 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	case TK2(HOBJ,HOBJ):
 		{
 			hl_type_obj *t1 = t->obj;
-			hl_type_obj *t2 = t->obj;
+			hl_type_obj *t2 = to->obj;
 			while( true ) {
 				if( t1 == t2 )
 					return *(void**)data;
@@ -96,7 +126,20 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 					break;
 				t1 = t1->super->obj;
 			}
+			if( t->obj->rt->castFun ) {
+				vdynamic *v = t->obj->rt->castFun(*(vdynamic**)data,to);
+				if( v ) return v;
+			}
+			break;
 		}
+	case TK2(HFUN,HFUN):
+		{
+			vclosure *c = *(vclosure**)data;
+			if( c == NULL ) return NULL;
+			c = hl_make_fun_wrapper(c,to);
+			if( c ) return c;
+		}
+		break;
 	case TK2(HOBJ,HDYN):
 	case TK2(HDYNOBJ,HDYN):
 	case TK2(HFUN,HDYN):
@@ -168,12 +211,17 @@ int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	return hl_invalid_comparison;
 }
 
-HL_PRIM vdynamic* hl_safe_cast( vdynamic *v, hl_type *t ) {
+HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
 	hl_fatal("TODO");
 	return NULL;
 }
 
 HL_PRIM bool hl_type_check( hl_type *t, vdynamic *value ) {
-	hl_fatal("TODO");
-	return false;
+	if( value == NULL )
+		return false;
+	if( t == value->t )
+		return true;
+	switch( TK2(t->kind,value->t->kind) ) {
+	}
+	return hl_safe_cast(value->t, t);
 }

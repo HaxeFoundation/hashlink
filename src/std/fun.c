@@ -26,7 +26,16 @@ vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) {
 	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
 	c->t = hl_get_closure_type(fullt);
 	c->fun = fvalue;
-	c->hasValue = true;
+	c->hasValue = 1;
+	c->value = v;
+	return c;
+}
+
+vclosure *hl_alloc_closure_wrapper( hl_type *t, void *fvalue, void *v ) {
+	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
+	c->t = t;
+	c->fun = fvalue;
+	c->hasValue = 2;
 	c->value = v;
 	return c;
 }
@@ -39,11 +48,15 @@ HL_PRIM vdynamic *hl_make_var_args( vclosure *c ) {
 HL_PRIM vdynamic *hl_no_closure( vdynamic *c ) {
 	vclosure *cl = (vclosure*)c;
 	if( !cl->hasValue ) return c;
+	if( cl->hasValue == 2 ) hl_fatal("TODO"); // wrapper
 	return (vdynamic*)hl_alloc_closure_void(cl->t->fun->parent,cl->fun);
 }
 
 HL_PRIM vdynamic* hl_get_closure_value( vdynamic *c ) {
-	return ((vclosure*)c)->value;
+	vclosure *cl = (vclosure*)c;
+	if( cl->hasValue == 2 )
+		return hl_get_closure_value((vdynamic*)cl->value);
+	return (vdynamic*)cl->value;
 }
 
 void *hlc_dyn_call( void *fun, hl_type *t, vdynamic **args );
@@ -52,7 +65,6 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 	vclosure *cl = (vclosure*)c;
 	if( cl->hasValue ) hl_error("Can't call closure with value");
 	if( args->size != cl->t->fun->nargs || args->at->kind != HDYN ) hl_error("Invalid args");
-	// TODO : cast args and returns value !
 	return (vdynamic*)hlc_dyn_call(cl->fun,cl->t,(vdynamic**)(args +1));
 }
 

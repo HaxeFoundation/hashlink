@@ -94,6 +94,80 @@ bool hl_same_type( hl_type *a, hl_type *b ) {
 	return false;
 }
 
+bool hl_is_dynamic( hl_type *t ) {
+	static bool T_IS_DYNAMIC[] = {
+		false, // HVOID,
+		false, // HI8
+		false, // HI16
+		false, // HI32
+		false, // HF32
+		false, // HF64
+		false, // HBOOL
+		false, // HBYTES
+		true, // HDYN
+		true, // HFUN
+		true, // HOBJ
+		true, // HARRAY
+		false, // HTYPE
+		false, // HREF
+		true, // HVIRTUAL
+		true, // HDYNOBJ
+		false, // HABSTRACT
+		false, // HENUM
+		true, // HNULL
+	};
+	return T_IS_DYNAMIC[t->kind];
+}
+
+bool hl_safe_cast( hl_type *t, hl_type *to ) {
+	if( t == to )
+		return true;
+	if( to->kind == HDYN && t->kind != HVIRTUAL )
+		return hl_is_dynamic(t);
+	if( t->kind != to->kind )
+		return false;
+	switch( t->kind ) {
+	case HVIRTUAL:
+		if( to->virt->nfields < t->virt->nfields ) {
+			int i;
+			for(i=0;i<to->virt->nfields;i++) {
+				hl_obj_field *f1 = t->virt->fields + i;
+				hl_obj_field *f2 = to->virt->fields + i;
+				if( f1->hashed_name != f2->hashed_name || !hl_same_type(f1->t,f2->t) )
+					break;
+			}
+			if( i == to->virt->nfields )
+				return true;
+		}
+		break;
+	case HOBJ:
+		{
+			hl_type_obj *o = t->obj;
+			hl_type_obj *oto = to->obj;
+			while( true ) {
+				if( o == oto ) return true;
+				if( o->super == NULL ) return false;
+				o = o->super->obj;
+			}
+		}
+	case HFUN:
+		if( t->fun->nargs == to->fun->nargs ) {
+			int i;
+			if( !hl_safe_cast(t->fun->ret,to->fun->ret) )
+				return false;
+			for(i=0;i<t->fun->nargs;i++) {
+				hl_type *t1 = t->fun->args[i];
+				hl_type *t2 = to->fun->args[i];
+				if( !hl_safe_cast(t1,t2) && (t1->kind != HDYN || !hl_is_dynamic(t2)) )
+					return false;
+			}
+			return true;
+		}
+		break;
+	}
+	return hl_same_type(t,to);
+}
+
 static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 	const uchar *c = TSTR[t->kind];
 	int i;
@@ -172,6 +246,8 @@ HL_PRIM vbytes* hl_type_name( hl_type *t ) {
 		return (vbytes*)t->obj->name;
 	case HENUM:
 		return (vbytes*)t->tenum->name;
+	case HABSTRACT:
+		return (vbytes*)t->abs_name;
 	default:
 		break;
 	}
@@ -221,7 +297,6 @@ HL_PRIM vdynamic *hl_type_get_global( hl_type *t ) {
 	return NULL;
 }
 
-DEFINE_PRIM(_DYN, hl_safe_cast, _DYN _TYPE);
 DEFINE_PRIM(_BOOL, hl_type_check, _TYPE _DYN);
 DEFINE_PRIM(_BYTES, hl_type_name, _TYPE);
 DEFINE_PRIM(_ARR, hl_type_enum_fields, _TYPE);

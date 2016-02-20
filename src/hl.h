@@ -245,7 +245,7 @@ struct hl_type {
 		hl_type	*tparam;
 		uchar *abs_name;
 	};
-	void *vobj_proto;
+	void **vobj_proto;
 };
 
 int hl_type_size( hl_type *t );
@@ -320,7 +320,7 @@ struct hl_runtime_obj {
 	hl_runtime_obj *parent;
 	const uchar *(*toStringFun)( vdynamic *obj );
 	int (*compareFun)( vdynamic *a, vdynamic *b );
-	vdynamic (*castFun)( vdynamic *a, hl_type *t );
+	vdynamic *(*castFun)( vdynamic *a, hl_type *t );
 	// relative
 	hl_field_lookup *lookup;
 	void **methods;
@@ -350,7 +350,10 @@ extern hl_type hlt_bytes;
 extern hl_type hlt_dynobj;
 extern double hl_nan;
 
+bool hl_is_dynamic( hl_type *t );
+#define hl_is_ptr(t)	((t)->kind >= HBYTES)
 bool hl_same_type( hl_type *a, hl_type *b );
+bool hl_safe_cast( hl_type *t, hl_type *to );
 
 varray *hl_aalloc( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
@@ -393,6 +396,7 @@ void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
 
 vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
 vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );
+vclosure *hl_alloc_closure_wrapper( hl_type *t, void *fvalue, void *ptr );
 
 // ----------------------- ALLOC --------------------------------------------------
 
