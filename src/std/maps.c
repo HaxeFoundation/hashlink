@@ -424,3 +424,211 @@ HL_PRIM varray* hl_hivalues( hl_int_map *m ) {
 	return a;
 }
 
+// ------- OBJ MAP --------------------------------------
+
+typedef struct _hl_obj_map hl_obj_map;
+typedef struct _hl_obj_cell hl_obj_cell;
+
+struct _hl_obj_cell {
+	int nvalues;
+	vdynamic *keys[H_CELL_SIZE];
+	vdynamic *values[H_CELL_SIZE];
+	hl_obj_cell *next;
+};
+
+struct _hl_obj_map {
+	hl_obj_cell **cells;
+	int ncells;
+	int nentries;
+};
+
+HL_PRIM hl_obj_map *hl_hoalloc() {
+	hl_obj_map *m = (hl_obj_map*)hl_gc_alloc(sizeof(hl_obj_map));
+	m->ncells = H_SIZE_INIT;
+	m->nentries = 0;
+	m->cells = (hl_obj_cell **)hl_gc_alloc(sizeof(hl_obj_cell*)*m->ncells);
+	memset(m->cells,0,m->ncells * sizeof(void*));
+	return m;
+}
+
+static vdynamic **hl_hofind( hl_obj_map *m, vdynamic *key ) {
+	int hash = (int)(int_val)key;
+	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
+	hl_obj_cell *c = m->cells[ckey];
+	int i;
+	while( c ) {
+		for(i=0;i<c->nvalues;i++)
+			if( c->keys[i] == key )
+				return c->values + i;
+		c = c->next;
+	}
+	return NULL;
+}
+
+static void hl_horemap( hl_obj_map *m, vdynamic *key, vdynamic *value, hl_obj_cell **reuse ) {
+	int hash = (int)(int_val)key;
+	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
+	hl_obj_cell *c = m->cells[ckey];
+	if( c && c->nvalues < H_CELL_SIZE ) {
+		c->keys[c->nvalues] = key;
+		c->values[c->nvalues] = value;
+		return;
+	}
+	c = *reuse;
+	if( c )
+		*reuse = c->next;
+	else
+		c = (hl_obj_cell*)hl_gc_alloc(sizeof(hl_obj_cell));
+	memset(c,0,sizeof(hl_obj_cell));
+	c->keys[0] = key;
+	c->values[0] = value;
+	c->nvalues = 1;
+	c->next = m->cells[ckey];
+	m->cells[ckey] = c;
+}
+
+static bool hl_hoadd( hl_obj_map *m, vdynamic *key, vdynamic *value ) {
+	int hash = (int)(int_val)key;
+	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
+	hl_obj_cell *c = m->cells[ckey];
+	hl_obj_cell *pspace = NULL;
+	int i;
+	while( c ) {
+		for(i=0;i<c->nvalues;i++)
+			if( c->keys[i] == key ) {
+				c->values[i] = value;
+				return false;
+			}
+		if( !pspace && c->nvalues < H_CELL_SIZE ) pspace = c;
+		c = c->next;
+	}
+	if( pspace ) {
+		pspace->keys[pspace->nvalues] = key;
+		pspace->values[pspace->nvalues] = value;
+		pspace->nvalues++;
+		m->nentries++;
+		return false;
+	}
+	c = (hl_obj_cell*)hl_gc_alloc(sizeof(hl_obj_cell));
+	memset(c,0,sizeof(hl_obj_cell));
+	c->keys[0] = key;
+	c->values[0] = value;
+	c->nvalues = 1;
+	c->next = m->cells[ckey];
+	m->cells[ckey] = c;
+	m->nentries++;
+	return true;
+}
+
+static void hl_hogrow( hl_obj_map *m ) {
+	int i = 0;
+	int oldsize = m->ncells;
+	hl_obj_cell **old_cells = m->cells;
+	hl_obj_cell *reuse = NULL;
+	while( H_PRIMES[i] <= m->ncells ) i++;
+	m->ncells = H_PRIMES[i];
+	m->cells = (hl_obj_cell **)hl_gc_alloc(sizeof(hl_obj_cell*)*m->ncells);
+	memset(m->cells,0,m->ncells * sizeof(void*));
+	for(i=0;i<oldsize;i++) {
+		hl_obj_cell *c = old_cells[i];
+		while( c ) {
+			hl_obj_cell *next = c->next;
+			int j;
+			for(j=0;j<c->nvalues;j++) {
+				if( j == c->nvalues-1 ) {
+					c->next = reuse;
+					reuse = c;
+				}
+				hl_horemap(m,c->keys[j],c->values[j],&reuse);
+			}
+			c = next;
+		}
+	}
+}
+
+HL_PRIM void hl_hoset( hl_obj_map *m, vdynamic *key, vdynamic *value ) {
+	if( hl_hoadd(m,key,value) && m->nentries > m->ncells * H_CELL_SIZE * 2 )
+		hl_hogrow(m);
+}
+
+HL_PRIM bool hl_hoexists( hl_obj_map *m, vdynamic *key ) {
+	return hl_hofind(m,key) != NULL;
+}
+
+HL_PRIM vdynamic* hl_hoget( hl_obj_map *m, vdynamic *key ) {
+	vdynamic **v = hl_hofind(m,key);
+	if( v == NULL ) return NULL;
+	return *v;
+}
+
+HL_PRIM bool hl_horemove( hl_obj_map *m, vdynamic *key ) {
+	int hash = (int)(int_val)key;
+	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
+	hl_obj_cell *c = m->cells[ckey];
+	hl_obj_cell *prev = NULL;
+	int i;
+	while( c ) {
+		for(i=0;i<c->nvalues;i++)
+			if( c->keys[i] == key ) {
+				c->nvalues--;
+				m->nentries--;
+				if( c->nvalues ) {
+					int j;
+					for(j=i;j<c->nvalues;j++) {
+						c->keys[j] = c->keys[j+1];
+						c->values[j] = c->values[j+1];
+					}
+					c->keys[j] = NULL;
+					c->values[j] = NULL; // GC friendly
+				} else if( prev )
+					prev->next = c->next;
+				else
+					m->cells[ckey] = c->next;
+				return true;
+			}
+		prev = c;
+		c = c->next;
+	}
+	return false;
+}
+
+HL_PRIM varray* hl_hokeys( hl_obj_map *m ) {
+	varray *a = (varray*)hl_gc_alloc_noptr(sizeof(varray)+sizeof(vdynamic*)*m->nentries);
+	vdynamic **keys = (vdynamic**)(a+1);
+	int p = 0;
+	int i;
+	a->t = &hlt_array;
+	a->at = &hlt_dyn;
+	a->size = m->nentries;
+	for(i=0;i<m->ncells;i++) {
+		int j;
+		hl_obj_cell *c = m->cells[i];
+		while( c ) {
+			for(j=0;j<c->nvalues;j++)
+				keys[p++] = c->keys[j];
+			c = c->next;
+		}
+	}
+	return a;
+}
+
+HL_PRIM varray* hl_hovalues( hl_obj_map *m ) {
+	varray *a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*m->nentries);
+	vdynamic **values = (vdynamic**)(a+1);
+	int p = 0;
+	int i;
+	a->t = &hlt_array;
+	a->at = &hlt_dyn;
+	a->size = m->nentries;
+	for(i=0;i<m->ncells;i++) {
+		int j;
+		hl_obj_cell *c = m->cells[i];
+		while( c ) {
+			for(j=0;j<c->nvalues;j++)
+				values[p++] = c->values[j];
+			c = c->next;
+		}
+	}
+	return a;
+}
+

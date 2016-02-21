@@ -390,8 +390,8 @@ void *hl_fetch_virtual_method( vvirtual *v, int fid );
 
 int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
 void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
-float hl_dyn_getf( void *data, hl_type *t );
-double hl_dyn_getd( void *data, hl_type *t );
+float hl_dyn_getf( void *data, int hfield );
+double hl_dyn_getd( void *data, int hfield );
 
 int hl_dyn_casti( void *data, hl_type *t, hl_type *to );
 void *hl_dyn_castp( void *data, hl_type *t, hl_type *to );
@@ -402,9 +402,9 @@ double hl_dyn_castd( void *data, hl_type *t );
 int hl_dyn_compare( vdynamic *a, vdynamic *b );
 
 void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
-void hl_dyn_setf( vdynamic *d, int hfield, hl_type *t, float f );
-void hl_dyn_setd( vdynamic *d, int hfield, hl_type *t, double  );
 void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
+void hl_dyn_setf( vdynamic *d, int hfield, float f );
+void hl_dyn_setd( vdynamic *d, int hfield, double v );
 
 vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
 vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );

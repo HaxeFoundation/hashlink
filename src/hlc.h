@@ -44,6 +44,10 @@ static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }
 
+static vdynamic *hl_oalloc( hl_type *t ) {
+	return (vdynamic*)hl_alloc_obj(t);
+}
+
 #include <setjmp.h>
 
 typedef struct _hl_trap_ctx hl_trap_ctx;

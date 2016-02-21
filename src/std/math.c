@@ -54,3 +54,35 @@ HL_PRIM int hl_math_floor( double d ) {
 	return (int)hl_math_ffloor(d);
 }
 
+HL_PRIM double hl_math_cos( double a ) {
+	return cos(a);
+}
+
+HL_PRIM double hl_math_sin( double a ) {
+	return sin(a);
+}
+
+HL_PRIM double hl_math_tan( double a ) {
+	return tan(a);
+}
+
+HL_PRIM double hl_math_acos( double a ) {
+	return acos(a);
+}
+
+HL_PRIM double hl_math_asin( double a ) {
+	return asin(a);
+}
+
+HL_PRIM double hl_math_atan( double a ) {
+	return atan(a);
+}
+
+HL_PRIM double hl_math_atan2( double a, double b ) {
+	return atan2(a,b);
+}
+
+HL_PRIM double hl_math_pow( double a, double b ) {
+	return pow(a,b);
+}
+

@@ -297,6 +297,15 @@ static hl_field_lookup *hl_dyn_alloc_field( vdynobj *o, int hfield, hl_type *t )
 	return f;
 }
 
+double hl_dyn_getd( vdynamic *d, int hfield ) {
+	hl_fatal("TODO");
+	return 0.;
+}
+
+void hl_dyn_setd( vdynamic *d, int hfield, double v ) {
+	hl_fatal("TODO");
+}
+
 int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 	switch( d->t->kind ) {
 	case HDYNOBJ:

@@ -298,6 +298,15 @@ HL_PRIM vdynamic *hl_type_get_global( hl_type *t ) {
 	return NULL;
 }
 
+bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
+	if( a == b )
+		return true;
+	if( !a || !b || a->t != b->t || a->t->kind != HENUM )
+		return false;
+	hl_fatal("TODO");
+	return true;
+}
+
 DEFINE_PRIM(_BOOL, hl_type_check, _TYPE _DYN);
 DEFINE_PRIM(_BYTES, hl_type_name, _TYPE);
 DEFINE_PRIM(_ARR, hl_type_enum_fields, _TYPE);

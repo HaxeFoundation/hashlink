@@ -64,7 +64,7 @@ HL_PRIM int hl_utf8_length( vbyte *s, int pos ) {
 	return len;
 }
 
-HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *len ) {
+HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *size ) {
 	int ulen = hl_utf8_length(str, pos);
 	uchar *s = (uchar*)hl_gc_alloc_noptr((ulen + 1)*sizeof(uchar));
 	uchar *cur = s;
@@ -74,7 +74,7 @@ HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *len ) {
 		c = (unsigned)*str++;
 		if( c == 0 )
 			break;
-		else if( c < 0x7F ) {
+		else if( c < 0x80 ) {
 			// nothing
 		} else if( c < 0xE0 ) {
 			c = ((c & 0x3F) << 6) | ((*str++)&0x7F);
@@ -93,7 +93,7 @@ HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *len ) {
 		*cur++ = (uchar)c;
 	}
 	*cur = 0;
-	*len = ulen << 1;
+	*size = ulen << 1;
 	return (vbyte*)s;
 }
 
@@ -138,7 +138,7 @@ HL_PRIM vbyte* hl_ucs2_lower( vbyte *str, int pos, int len ) {
 }
 
 // TODO : currently it is actually ucs2_to_utf8...
-HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *len ) {
+HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
 	vbyte *out;
 	uchar *c = (uchar*)(str + pos);
 	int utf8bytes = 0;
@@ -171,10 +171,114 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *len ) {
 		}
 		c++;
 	}
-	*len = utf8bytes;
+	*size = utf8bytes;
 	return out;
 }
 
+HL_PRIM vbyte *hl_url_encode( vbyte *str, int *len ) {
+	hl_buffer *b = hl_alloc_buffer();
+	uchar *cstr = (uchar*)str;
+	while( true ) {
+		static const uchar *hex = USTR("0123456789ABCDEF");
+		unsigned int c = (unsigned)*cstr++;
+		if( c == 0 ) break;
+		if( (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' )
+			hl_buffer_char(b,(uchar)c);
+		else {
+			hl_buffer_char(b,'%');
+			if( c < 0x80 ) {
+				hl_buffer_char(b,hex[c>>4]);
+				hl_buffer_char(b,hex[c&0xF]);
+			} else if( c < 0x800 ) {
+				unsigned int c1 = 0xC0|(c>>6);
+				unsigned int c2 = 0x80|(c&63);
+				hl_buffer_char(b,hex[c1>>4]);
+				hl_buffer_char(b,hex[c1&0xF]);
+				hl_buffer_char(b,'%');
+				hl_buffer_char(b,hex[c2>>4]);
+				hl_buffer_char(b,hex[c2&0xF]);
+			} else {
+				unsigned int c1 = 0xE0|(c>>12);
+				unsigned int c2 = 0x80|((c>>6)&63);
+				unsigned int c3 = 0x80|(c&63);
+				hl_buffer_char(b,hex[c1>>4]);
+				hl_buffer_char(b,hex[c1&0xF]);
+				hl_buffer_char(b,'%');
+				hl_buffer_char(b,hex[c2>>4]);
+				hl_buffer_char(b,hex[c2&0xF]);
+				hl_buffer_char(b,'%');
+				hl_buffer_char(b,hex[c3>>4]);
+				hl_buffer_char(b,hex[c3&0xF]);
+			}
+		}
+	}
+	return (vbyte*)hl_buffer_content(b,len);
+}
+
+static uchar decode_hex_char( uchar c ) {
+	if( c >= '0' && c <= '9' )
+		c -= '0';
+	else if( c >= 'a' && c <= 'f' )
+		c -= 'a' - 10;
+	else if( c >= 'A' && c <= 'F' )
+		c -= 'A' - 10;
+	else
+		return -1;
+	return c;
+}
+
+static uchar decode_hex( uchar **cstr ) {
+	uchar *c = *cstr;
+	uchar p1 = decode_hex_char(c[0]);
+	uchar p2;
+	if( p1 < 0 ) return -1;
+	p2 = decode_hex_char(c[1]);
+	if( p2 < 0 ) return -1;
+	*cstr = c + 2;
+	return (p1 << 4) | p2;
+}
+
+HL_PRIM vbyte *hl_url_decode( vbyte *str, int *len ) {
+	hl_buffer *b = hl_alloc_buffer();
+	uchar *cstr = (uchar*)str;
+	while( true ) {
+		uchar c = *cstr++;
+		if( c == 0 )
+			return (vbyte*)hl_buffer_content(b,len);
+		if( c == '+' )
+			c = ' ';
+		else if( c == '%' ) {
+			uchar p1 = decode_hex(&cstr);
+			if( p1 < 0 ) {
+				hl_buffer_char(b,'%');
+				continue;
+			}
+			if( p1 < 0x80 ) {
+				c = p1;
+			} else if( p1 < 0xE0 ) {
+				uchar p2;
+				if( *cstr++ != '%' ) break;
+				p2 = decode_hex(&cstr);
+				if( p2 < 0 ) break;
+				c = ((p1 & 0x3F) << 6) | (p2&0x7F);
+			} else if( p1 < 0xF0 ) {
+				uchar p2, p3;
+				if( *cstr++ != '%' ) break;
+				p2 = decode_hex(&cstr);
+				if( p2 < 0 ) break;
+				if( *cstr++ != '%' ) break;
+				p3 = decode_hex(&cstr);
+				if( p3 < 0 ) break;
+				c = ((p1 & 0x1F) << 12) | ((p2 & 0x7F) << 6) | (p3 & 0x7F);
+			} else
+				hl_error("TODO");
+		}
+		hl_buffer_char(b,c);
+	}
+	hl_error("Malformed URL encoded");
+	return NULL;
+}
+	
 
 DEFINE_PRIM(_BYTES,hl_itos,_I32 _REF(_I32));
 DEFINE_PRIM(_BYTES,hl_ftos,_F64 _REF(_I32));
