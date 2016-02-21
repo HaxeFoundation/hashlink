@@ -93,7 +93,7 @@ HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *len ) {
 		*cur++ = (uchar)c;
 	}
 	*cur = 0;
-	*len = ulen;
+	*len = ulen << 1;
 	return (vbyte*)s;
 }
 
