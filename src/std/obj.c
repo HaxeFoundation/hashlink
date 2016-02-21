@@ -61,7 +61,7 @@ int hl_hash_gen( const uchar *name, bool cache_name ) {
 			if( hl_cache_size == hl_cache_count ) {
 				// resize
 				int newsize = hl_cache_size ? (hl_cache_size * 3) >> 1 : 16;
-				hl_field_lookup *cache = (hl_field_lookup*)hl_gc_alloc(sizeof(hl_field_lookup) * newsize);
+				hl_field_lookup *cache = (hl_field_lookup*)malloc(sizeof(hl_field_lookup) * newsize);
 				memcpy(cache,hl_cache,sizeof(hl_field_lookup) * hl_cache_count);
 				free(hl_cache);
 				hl_cache = cache;
