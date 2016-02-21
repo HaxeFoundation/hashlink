@@ -301,7 +301,7 @@ HL_PRIM vdynamic *hl_type_get_global( hl_type *t ) {
 bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 	if( a == b )
 		return true;
-	if( !a != !b || a->t != b->t || a->t->kind != HENUM )
+	if( !a || !b || a->t != b->t || a->t->kind != HENUM )
 		return false;
 	hl_fatal("TODO");
 	return true;
