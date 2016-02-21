@@ -1,11 +1,11 @@
 #include <hl.h>
 
-HL_PRIM vbytes *hl_balloc( int size ) {
-	return (vbytes*)hl_gc_alloc_noptr(size);
+HL_PRIM vbyte *hl_balloc( int size ) {
+	return (vbyte*)hl_gc_alloc_noptr(size);
 }
 
-HL_PRIM vbytes *hl_bcopy( vbytes *ptr, int size ) {
-	vbytes *b = hl_balloc(size);
+HL_PRIM vbyte *hl_bcopy( vbyte *ptr, int size ) {
+	vbyte *b = hl_balloc(size);
 	memcpy(b,ptr,size);
 	return b;
 }
@@ -14,7 +14,7 @@ HL_PRIM void hl_bblit( char *dst, int dpos, char *src, int spos, int len ) {
 	memcpy(dst + dpos,src+spos,len);
 }
 
-HL_PRIM int hl_bytes_compare( vbytes *a, int apos, vbytes *b, int bpos, int len ) {
+HL_PRIM int hl_bytes_compare( vbyte *a, int apos, vbyte *b, int bpos, int len ) {
 	return memcmp(a+apos,b+bpos,len);
 }
 
@@ -91,15 +91,15 @@ memfind_rb (const void  *in_block,      /*  Block containing data            */
     return NULL;
 }
 
-HL_PRIM int hl_bytes_find( vbytes *where, int pos, int len, vbytes *which, int wpos, int wlen ) {
+HL_PRIM int hl_bytes_find( vbyte *where, int pos, int len, vbyte *which, int wpos, int wlen ) {
 	size_t searchbuf [256];
 	bool repeat_find = false;
-	vbytes *found = (vbytes*)memfind_rb(where + pos,len,which+wpos,wlen,searchbuf,&repeat_find);
+	vbyte *found = (vbyte*)memfind_rb(where + pos,len,which+wpos,wlen,searchbuf,&repeat_find);
 	if( found == NULL ) return -1;
 	return (int)(size_t)(found - where);
 }
 
-HL_PRIM void hl_bytes_fill( vbytes *bytes, int pos, int len, int value ) {
+HL_PRIM void hl_bytes_fill( vbyte *bytes, int pos, int len, int value ) {
 	memset(bytes+pos,value,len);
 }
 
@@ -119,21 +119,21 @@ static int ms_gcd( int m, int n ) {
 #define TID(t)	t##_f64
 #include "sort.h"
 
-HL_PRIM void hl_bsort_i32( vbytes *bytes, int pos, int len, vclosure *cmp ) {
+HL_PRIM void hl_bsort_i32( vbyte *bytes, int pos, int len, vclosure *cmp ) {
 	m_sort_i32 m;
 	m.arr = (int*)(bytes + pos);
 	m.c = cmp;
 	merge_sort_rec_i32(&m,0,len);
 }
 
-HL_PRIM void hl_bsort_f64( vbytes *bytes, int pos, int len, vclosure *cmp ) {
+HL_PRIM void hl_bsort_f64( vbyte *bytes, int pos, int len, vclosure *cmp ) {
 	m_sort_f64 m;
 	m.arr = (double*)(bytes + pos);
 	m.c = cmp;
 	merge_sort_rec_f64(&m,0,len);
 }
 
-HL_PRIM double hl_parse_float( vbytes *bytes, int pos, int len ) {
+HL_PRIM double hl_parse_float( vbyte *bytes, int pos, int len ) {
 	uchar *str = (uchar*)(bytes+pos);
 	uchar *end = NULL;
 	double d = utod(str,&end);
@@ -142,7 +142,7 @@ HL_PRIM double hl_parse_float( vbytes *bytes, int pos, int len ) {
 	return d;
 }
 
-HL_PRIM vdynamic *hl_parse_int( vbytes *bytes, int pos, int len ) {
+HL_PRIM vdynamic *hl_parse_int( vbyte *bytes, int pos, int len ) {
 	uchar *c = (uchar*)(bytes + pos), *end = NULL;
 	int h;
 	if( len >= 2 && c[0] == '0' && (c[1] == 'x' || c[1] == 'X') ) {

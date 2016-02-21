@@ -19,7 +19,7 @@ static void regexp_finalize( ereg *e ) {
 	free(e->matches);
 }
 
-HL_PRIM ereg *regexp_regexp_new_options( vbytes *str, vbytes *opts ) {
+HL_PRIM ereg *regexp_regexp_new_options( vbyte *str, vbyte *opts ) {
 	ereg *r;
 	const char *error;
 	int err_offset;
@@ -69,7 +69,7 @@ HL_PRIM ereg *regexp_regexp_new_options( vbytes *str, vbytes *opts ) {
 	return r;
 }
 
-static bool do_exec( ereg *e, vbytes *str, int len, int pos ) {
+static bool do_exec( ereg *e, vbyte *str, int len, int pos ) {
 	int res = pcre16_exec(e->p,&limit,(PCRE_SPTR16)str,len,pos,0,e->matches,e->nmatches * 3);
 	e->matched = res >= 0;
 	if( res >= 0 )
@@ -90,12 +90,12 @@ HL_PRIM int regexp_regexp_matched_pos( ereg *e, int m, int *len ) {
 	return start;
 }
 
-HL_PRIM vbytes *regexp_regexp_matched( ereg *e, int pos, int *len ) {
+HL_PRIM vbyte *regexp_regexp_matched( ereg *e, int pos, int *len ) {
 	hl_fatal("TODO");
 	return NULL;
 }
 
-HL_PRIM bool regexp_regexp_match( ereg *e, vbytes *s, int pos, int len ) {
+HL_PRIM bool regexp_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
 	return do_exec(e,s,pos+len,pos);
 }
 

@@ -241,14 +241,14 @@ const uchar *hl_type_str( hl_type *t ) {
 	return hl_buffer_content(b,NULL);
 }
 
-HL_PRIM vbytes* hl_type_name( hl_type *t ) {
+HL_PRIM vbyte* hl_type_name( hl_type *t ) {
 	switch( t->kind ) {
 	case HOBJ:
-		return (vbytes*)t->obj->name;
+		return (vbyte*)t->obj->name;
 	case HENUM:
-		return (vbytes*)t->tenum->name;
+		return (vbyte*)t->tenum->name;
 	case HABSTRACT:
-		return (vbytes*)t->abs_name;
+		return (vbyte*)t->abs_name;
 	default:
 		break;
 	}
@@ -262,7 +262,7 @@ HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
 	a->at = &hlt_bytes;
 	a->size = t->tenum->nconstructs;
 	for( i=0; i<t->tenum->nconstructs;i++)
-		((void**)(a+1))[i] = (vbytes*)t->tenum->constructs[i].name;
+		((void**)(a+1))[i] = (vbyte*)t->tenum->constructs[i].name;
 	return a;
 }
 
@@ -281,7 +281,7 @@ HL_PRIM varray *hl_type_instance_fields( hl_type *t ) {
 	o = t->obj;
 	a = hl_aalloc(&hlt_bytes,o->rt->nlookup);
 	for(i=0;i<o->rt->nlookup;i++)
-		((vbytes**)(a+1))[i] = (vbytes*)hl_field_name(o->rt->lookup[i].hashed_name);
+		((vbyte**)(a+1))[i] = (vbyte*)hl_field_name(o->rt->lookup[i].hashed_name);
 	return a;
 }
 

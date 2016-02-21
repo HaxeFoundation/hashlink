@@ -43,7 +43,7 @@ static int hl_cache_count = 0;
 static int hl_cache_size = 0;
 static hl_field_lookup *hl_cache = NULL;
 
-int hl_hash( vbytes *b ) {
+int hl_hash( vbyte *b ) {
 	return hl_hash_gen((uchar*)b,true);
 }
 

@@ -1,6 +1,6 @@
 #include <hl.h>
 
-HL_PRIM void hl_sys_print( vbytes *msg ) {
+HL_PRIM void hl_sys_print( vbyte *msg ) {
 	uprintf(USTR("%s"),(uchar*)msg);
 }
 

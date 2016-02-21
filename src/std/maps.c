@@ -132,22 +132,22 @@ static void hl_hbgrow( hl_bytes_map *m ) {
 	}
 }
 
-HL_PRIM void hl_hbset( hl_bytes_map *m, vbytes *key, vdynamic *value ) {
+HL_PRIM void hl_hbset( hl_bytes_map *m, vbyte *key, vdynamic *value ) {
 	if( hl_hbadd(m,(uchar*)key,value) && m->nentries > m->ncells * H_CELL_SIZE * 2 )
 		hl_hbgrow(m);
 }
 
-HL_PRIM bool hl_hbexists( hl_bytes_map *m, vbytes *key ) {
+HL_PRIM bool hl_hbexists( hl_bytes_map *m, vbyte *key ) {
 	return hl_hbfind(m,(uchar*)key) != NULL;
 }
 
-HL_PRIM vdynamic* hl_hbget( hl_bytes_map *m, vbytes *key ) {
+HL_PRIM vdynamic* hl_hbget( hl_bytes_map *m, vbyte *key ) {
 	vdynamic **v = hl_hbfind(m,(uchar*)key);
 	if( v == NULL ) return NULL;
 	return *v;
 }
 
-HL_PRIM bool hl_hbremove( hl_bytes_map *m, vbytes *_key ) {
+HL_PRIM bool hl_hbremove( hl_bytes_map *m, vbyte *_key ) {
 	uchar *key = (uchar*)_key;
 	int hash = hl_hash_gen(key,false);
 	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);

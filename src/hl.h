@@ -267,7 +267,7 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
 
 /* -------------------- VALUES ------------------------------ */
 
-typedef unsigned char vbytes;
+typedef unsigned char vbyte;
 
 typedef struct {
 	hl_type *t;
@@ -281,7 +281,7 @@ typedef struct {
 		int i;
 		float f;
 		double d;
-		vbytes *bytes;
+		vbyte *bytes;
 		void *ptr;
 	} v;
 } vdynamic;
@@ -371,12 +371,12 @@ varray *hl_aalloc( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
 vobj *hl_alloc_obj( hl_type *t );
 vdynobj *hl_alloc_dynobj();
-vbytes *hl_balloc( int size );
-vbytes *hl_bcopy( vbytes *byte, int size );
+vbyte *hl_balloc( int size );
+vbyte *hl_bcopy( vbyte *byte, int size );
 
 vdynamic *hl_alloc_i32( int i );
 
-int hl_hash( vbytes *name );
+int hl_hash( vbyte *name );
 int hl_hash_gen( const uchar *name, bool cache_name );
 const uchar *hl_field_name( int hash );
 
