@@ -111,8 +111,12 @@ void *hl_gc_alloc( int size ) {
 	return malloc(size);
 }
 
-char *hl_gc_alloc_noptr( int size ) {
+void *hl_gc_alloc_noptr( int size ) {
 	return (char*)malloc(size);
+}
+
+void *hl_gc_alloc_finalizer( int size ) {
+	return malloc(size);
 }
 
 vdynamic *hl_alloc_dynamic( hl_type *t ) {

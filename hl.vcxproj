@@ -66,21 +66,24 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>include\pcre;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>include/pcre;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>include/pcre;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>include/pcre;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
@@ -143,8 +146,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="include\pcre\pcre_chartables.c" />
+    <ClCompile Include="include\pcre\pcre_compile.c" />
+    <ClCompile Include="include\pcre\pcre_dfa_exec.c" />
+    <ClCompile Include="include\pcre\pcre_exec.c" />
+    <ClCompile Include="include\pcre\pcre_fullinfo.c" />
+    <ClCompile Include="include\pcre\pcre_globals.c" />
+    <ClCompile Include="include\pcre\pcre_newline.c" />
+    <ClCompile Include="include\pcre\pcre_string_utils.c" />
+    <ClCompile Include="include\pcre\pcre_tables.c" />
+    <ClCompile Include="include\pcre\pcre_xclass.c" />
     <ClCompile Include="src\alloc.c" />
-    <ClCompile Include="src\objdata.c" />
     <ClCompile Include="src\std\array.c" />
     <ClCompile Include="src\std\buffer.c" />
     <ClCompile Include="src\std\bytes.c" />
@@ -161,6 +173,10 @@
     <ClCompile Include="src\_main.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\pcre\config.h" />
+    <ClInclude Include="include\pcre\pcre.h" />
+    <ClInclude Include="include\pcre\pcre_internal.h" />
+    <ClInclude Include="include\pcre\ucp.h" />
     <ClInclude Include="src\hl.h" />
     <ClInclude Include="src\hlc.h" />
     <ClInclude Include="src\hlmodule.h" />

@@ -25,13 +25,17 @@
 #include <math.h>
 #include <hl.h>
 
-#pragma warning(disable:4101)
-#pragma warning(disable:4700)
-
 #ifdef HL_64
 #	define PAD_64_VAL	,0
 #else
 #	define PAD_64_VAL
+#endif
+
+#ifdef HL_VCC
+#	pragma warning(disable:4702) // unreachable code 
+#	pragma warning(disable:4100) // unreferenced param
+#	pragma warning(disable:4101) // unreferenced local var
+#	pragma warning(disable:4723) // potential divide by 0
 #endif
 
 #undef CONST

@@ -56,8 +56,16 @@
 
 #if defined(_MSC_VER)
 #	define HL_VCC
-// remove deprecated C API usage warnings
-#	pragma warning( disable : 4996 )
+#	pragma warning(disable:4996) // remove deprecated C API usage warnings
+#	pragma warning(disable:4055) // void* - to - function cast
+#	pragma warning(disable:4152) // void* - to - function cast
+#	pragma warning(disable:4201) // anonymous struct
+#	pragma warning(disable:4127) // while( true )
+#	pragma warning(disable:4710) // inline disabled
+#	pragma warning(disable:4711) // inline activated
+#	pragma warning(disable:4255) // windows include
+#	pragma warning(disable:4820) // windows include
+#	pragma warning(disable:4668) // windows include
 #endif
 
 #if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CYGWIN)
@@ -128,6 +136,7 @@ typedef wchar_t	uchar;
 #	define utod(s,end)	wcstod(s,end)
 #	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
+#	define strtou(out,size,str) mbstowcs(out,str,size)	
 #else
 typedef unsigned short uchar;
 #	undef USTR
@@ -404,7 +413,8 @@ vclosure *hl_alloc_closure_wrapper( hl_type *t, void *fvalue, void *ptr );
 // ----------------------- ALLOC --------------------------------------------------
 
 void *hl_gc_alloc( int size );
-char *hl_gc_alloc_noptr( int size );
+void *hl_gc_alloc_noptr( int size );
+void *hl_gc_alloc_finalizer( int size );
 
 void hl_alloc_init( hl_alloc *a );
 void *hl_malloc( hl_alloc *a, int size );
@@ -422,6 +432,7 @@ hl_buffer *hl_alloc_buffer();
 void hl_buffer_val( hl_buffer *b, vdynamic *v );
 void hl_buffer_char( hl_buffer *b, uchar c );
 void hl_buffer_str( hl_buffer *b, const uchar *str );
+void hl_buffer_cstr( hl_buffer *b, const char *str );
 void hl_buffer_str_sub( hl_buffer *b, const uchar *str, int len );
 int hl_buffer_length( hl_buffer *b );
 uchar *hl_buffer_content( hl_buffer *b, int *len );
