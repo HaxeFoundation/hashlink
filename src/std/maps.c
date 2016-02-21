@@ -158,6 +158,7 @@ HL_PRIM bool hl_hbremove( hl_bytes_map *m, vbyte *_key ) {
 		for(i=0;i<c->nvalues;i++)
 			if( c->hashes[i] == hash && ucmp(c->strings[i],key) == 0 ) {
 				c->nvalues--;
+				m->nentries--;
 				if( c->nvalues ) {
 					int j;
 					for(j=i;j<c->nvalues;j++) {

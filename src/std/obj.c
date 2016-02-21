@@ -375,7 +375,18 @@ void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 				f = hl_dyn_alloc_field(o,hfield,t);
 			else if( f->t != t )
 				hl_error("Invalid dynset cast");
-			*(int*)(o->fields_data + f->field_index) = value;
+			switch( t->kind ) {
+			case HI8:
+			case HBOOL:
+				*(char*)(o->fields_data + f->field_index) = (char)value;
+				break;
+			case HI16:
+				*(short*)(o->fields_data + f->field_index) = (short)value;
+				break;
+			default:
+				*(int*)(o->fields_data + f->field_index) = value;
+				break;
+			}
 		}
 		break;
 	case HOBJ:

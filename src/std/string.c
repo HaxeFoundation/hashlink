@@ -97,14 +97,44 @@ HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *len ) {
 	return (vbyte*)s;
 }
 
+#include "unicase.c"
+
 HL_PRIM vbyte* hl_ucs2_upper( vbyte *str, int pos, int len ) {
-	hl_fatal("TODO");
-	return NULL;
+	uchar *cstr = (uchar*)(str + pos);
+	uchar *out = (uchar*)hl_gc_alloc_noptr((len + 1) * sizeof(uchar));
+	int i;
+	uchar *cout = out;
+	memcpy(out,cstr,(len + 1) << 1);
+	for(i=0;i<len;i++) {
+		unsigned int c = *cstr++;
+		int up = c >> UL_BITS;
+		int k;
+		if( up < UMAX ) {
+			unsigned int c2 = UPPER[up][c&((1<<UL_BITS)-1)];
+			if( c2 != 0 ) *cout = (uchar)c2;
+		}
+		cout++;
+	}
+	return (vbyte*)out;
 }
 
 HL_PRIM vbyte* hl_ucs2_lower( vbyte *str, int pos, int len ) {
-	hl_fatal("TODO");
-	return NULL;
+	uchar *cstr = (uchar*)(str + pos);
+	uchar *out = (uchar*)hl_gc_alloc_noptr((len + 1) * sizeof(uchar));
+	uchar *cout = out;
+	int i;
+	memcpy(out,cstr,(len + 1) << 1);
+	for(i=0;i<len;i++) {
+		unsigned int c = *cstr++;
+		int up = c >> UL_BITS;
+		int k;
+		if( up < UMAX ) {
+			unsigned int c2 = LOWER[up][c&((1<<UL_BITS)-1)];
+			if( c2 != 0 ) *cout = (uchar)c2;
+		}
+		cout++;
+	}
+	return (vbyte*)out;
 }
 
 // TODO : currently it is actually ucs2_to_utf8...
