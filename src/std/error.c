@@ -28,13 +28,17 @@ void hl_rethrow( vdynamic *v ) {
 
 void hl_error_msg( const uchar *fmt, ... ) {
 	uchar buf[256];
+	vdynamic *d;
+	int len;
 	va_list args;
 	va_start(args, fmt);
 	uvsprintf(buf,fmt,args);
 	va_end(args);
-	// TODO : throw
-	uprintf(USTR("THROW:%s\n"),buf);
-	exit(66);
+	len = uprintf(USTR("%s"),buf);
+	d = hl_alloc_dynamic(&hlt_bytes);
+	d->v.ptr = hl_gc_alloc_noptr((len + 1) << 1);
+	memcpy(d->v.ptr,buf,(len + 1) << 1);
+	hl_throw(d);
 }
 
 void hl_fatal_fmt(const char *fmt, ...) {

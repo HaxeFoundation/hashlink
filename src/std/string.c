@@ -37,9 +37,64 @@ HL_PRIM int hl_ucs2length( vbyte *str, int pos ) {
 	return (int)ustrlen((uchar*)(str + pos));
 }
 
+HL_PRIM int hl_utf8_length( vbyte *s, int pos ) {
+	int len = 0;
+	s += pos;
+	while( true ) {
+		unsigned char c = (unsigned)*s;
+		len++;
+		if( c < 0x7F ) {
+			if( c == 0 ) {
+				len--;
+				break;
+			}
+			s++;
+		} else if( c < 0xC0 )
+			hl_error("Invalid UTF8 string");
+		else if( c < 0xE0 )
+			s+=2;
+		else if( c < 0xF0 )
+			s+=3;
+		else if( c < 0xF8 ) {
+			len++; // surrogate pair
+			s+=4;
+		} else
+			hl_error("UTF-8 string contains chars that can't be encoded in UTF-16");
+	}
+	return len;
+}
+
 HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *len ) {
-	hl_fatal("TODO");
-	return NULL;
+	int ulen = hl_utf8_length(str, pos);
+	uchar *s = (uchar*)hl_gc_alloc_noptr((ulen + 1)*sizeof(uchar));
+	uchar *cur = s;
+	unsigned int c, c2, c3;
+	str += pos;
+	while( true ) {
+		c = (unsigned)*str++;
+		if( c == 0 )
+			break;
+		else if( c < 0x7F ) {
+			// nothing
+		} else if( c < 0xE0 ) {
+			c = ((c & 0x3F) << 6) | ((*str++)&0x7F);
+		} else if( c < 0xF0 ) {
+			c2 = (unsigned)*str++;
+			c = ((c & 0x1F) << 12) | ((c2 & 0x7F) << 6) | ((*str++) & 0x7F);
+		} else {
+			c2 = (unsigned)*str++;
+			c3 = (unsigned)*str++;
+			c = ((c & 0x0F) << 18) | ((c2 & 0x7F) << 12) | ((c3 & 0x7F) << 6) | ((*str++) & 0x7F);
+			// surrogate pair
+			*cur++ = (uchar)((c >> 10) + 0xD7C0);
+			*cur++ = (uchar)((c & 0x3FF) | 0xDC00);
+			continue;
+		}
+		*cur++ = (uchar)c;
+	}
+	*cur = 0;
+	*len = ulen;
+	return (vbyte*)s;
 }
 
 HL_PRIM vbyte* hl_ucs2_upper( vbyte *str, int pos, int len ) {
@@ -52,6 +107,7 @@ HL_PRIM vbyte* hl_ucs2_lower( vbyte *str, int pos, int len ) {
 	return NULL;
 }
 
+// TODO : currently it is actually ucs2_to_utf8...
 HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *len ) {
 	vbyte *out;
 	uchar *c = (uchar*)(str + pos);
