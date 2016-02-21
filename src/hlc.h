@@ -44,4 +44,19 @@ static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }
 
+#include <setjmp.h>
+
+typedef struct _hl_trap_ctx hl_trap_ctx;
+
+struct _hl_trap_ctx {
+	jmp_buf buf;
+	hl_trap_ctx *prev;
+};
+
+extern hl_trap_ctx *current_trap;
+extern vdynamic *current_exc;
+
+#define hlc_trap(ctx,r,label) { ctx.prev = current_trap; current_trap = &ctx; if( setjmp(ctx.buf) ) { r = current_exc; goto label; } }
+#define hlc_endtrap(ctx) current_trap = ctx.prev
+
 #endif

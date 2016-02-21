@@ -1,6 +1,9 @@
-#include <hl.h>
+#include <hlc.h>
 #include <stdarg.h>
 #include <string.h>
+
+hl_trap_ctx *current_trap = NULL;
+vdynamic *current_exc = NULL;
 
 void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
@@ -13,11 +16,14 @@ void *hl_fatal_error( const char *msg, const char *file, int line ) {
 }
 
 void hl_throw( vdynamic *v ) {
-	*(char*)NULL = 0;
+	hl_trap_ctx *t = current_trap;
+	current_exc = v;
+	current_trap = t->prev;
+	longjmp(t->buf,1);
 }
 
 void hl_rethrow( vdynamic *v ) {
-	*(char*)NULL = 0;
+	hl_throw(v);
 }
 
 void hl_error_msg( const uchar *fmt, ... ) {
