@@ -206,7 +206,17 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 					if( f != NULL ) break;
 					rtt = rtt->parent;
 				}
-				v->indexes[i] = f == NULL || f->field_index <= 0 || (f->t != vt->virt->fields[i].t) ? 0 : f->field_index;
+				if( f && f->field_index < 0 ) {
+					hl_type tmp;
+					hl_type_fun tf;
+					tmp.kind = HFUN;
+					tmp.fun = &tf;
+					tf.args = f->t->fun->args + 1;
+					tf.nargs = f->t->fun->nargs - 1;
+					tf.ret = f->t->fun->ret;
+					v->indexes[i] = hl_same_type(&tmp,vt->virt->fields[i].t) ? f->field_index : 0;
+				} else
+					v->indexes[i] = f == NULL || !hl_same_type(f->t,vt->virt->fields[i].t) ? 0 : f->field_index;
 			}
 		}
 		break;
