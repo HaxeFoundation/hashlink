@@ -48,6 +48,37 @@ static vdynamic *hl_oalloc( hl_type *t ) {
 	return (vdynamic*)hl_alloc_obj(t);
 }
 
+extern vdynamic *hl_call_method( vdynamic *c, varray *args );
+
+#define HLC_DYN_MAX_ARGS 9
+static vdynamic *hlc_dyn_call_args( vclosure *c, vdynamic **args, int nargs ) {
+	struct {
+		varray a;
+		vdynamic *args[HLC_DYN_MAX_ARGS+1];
+	} tmp;
+	vclosure ctmp;
+	int i = 0;
+	if( nargs > HLC_DYN_MAX_ARGS ) hl_error("Too many arguments");
+	tmp.a.t = &hlt_array;
+	tmp.a.at = &hlt_dyn;
+	tmp.a.size = nargs;
+	if( c->hasValue ) {
+		if( c->hasValue == 2 ) hl_error("TODO");
+		ctmp.t = c->t->fun->parent;
+		ctmp.hasValue = 0;
+		ctmp.fun = c->fun;
+		c = &ctmp;
+		tmp.args[0] = hl_make_dyn(&c->value,ctmp.t->fun->args[0]);
+		tmp.a.size++;
+		for(i=0;i<nargs;i++)
+			tmp.args[i+1] = args[i];
+	} else {
+		for(i=0;i<nargs;i++)
+			tmp.args[i] = args[i];
+	}
+	return hl_call_method((vdynamic*)c,&tmp.a);
+}
+
 #include <setjmp.h>
 
 typedef struct _hl_trap_ctx hl_trap_ctx;

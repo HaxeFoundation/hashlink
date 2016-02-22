@@ -229,7 +229,7 @@ typedef struct {
 #	ifdef HL_64
 	int __pad;
 #	endif
-	hl_obj_field *fields; 
+	hl_obj_field *fields;
 } hl_type_virtual;
 
 typedef struct {
@@ -356,6 +356,7 @@ typedef struct _venum {
 
 extern hl_type hlt_void;
 extern hl_type hlt_i32;
+extern hl_type hlt_f64;
 extern hl_type hlt_dyn;
 extern hl_type hlt_array;
 extern hl_type hlt_bytes;
@@ -386,7 +387,8 @@ void hl_throw( vdynamic *v );
 void hl_rethrow( vdynamic *v );
 
 vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
-void *hl_fetch_virtual_method( vvirtual *v, int fid );
+void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
+hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash );
 
 int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
 void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
@@ -400,6 +402,7 @@ double hl_dyn_castd( void *data, hl_type *t );
 
 #define hl_invalid_comparison 0xAABBCCDD
 int hl_dyn_compare( vdynamic *a, vdynamic *b );
+vdynamic *hl_make_dyn( void *data, hl_type *t );
 
 void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
 void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );

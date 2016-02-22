@@ -64,6 +64,10 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 		return *(short*)data;
 	case TK2(HI32,HI32):
 		return *(int*)data;
+	case TK2(HF32,HI32):
+		return (int)*(float*)data;
+	case TK2(HF64,HI32):
+		return (int)*(double*)data;
 	case TK2(HBOOL,HBOOL):
 		return *(bool*)data;
 	default:
@@ -156,11 +160,20 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 
 double hl_dyn_castd( void *data, hl_type *t ) {
 	switch( t->kind ) {
+	case HF32:
+		return *(float*)data;
+	case HI8:
+		return *(char*)data;
+	case HI16:
+		return *(short*)data;
+	case HI32:
+		return *(int*)data;
+	case HBOOL:
+		return *(bool*)data;
 	default:
-		hl_error_msg(USTR("Can't cast %s(%s) to double"),hl_to_string(hl_make_dyn(data,t)),hl_type_str(t));
 		break;
 	}
-	return 0;
+	return 0.;
 }
 
 static int fcompare( float d ) {

@@ -5,6 +5,7 @@ hl_type hlt_bytes = { HBYTES };
 hl_type hlt_dynobj = { HDYNOBJ };
 hl_type hlt_dyn = { HDYN };
 hl_type hlt_i32 = { HI32 };
+hl_type hlt_f64 = { HF64 };
 hl_type hlt_void = { HVOID };
 
 static const uchar *TSTR[] = {
@@ -299,11 +300,37 @@ HL_PRIM vdynamic *hl_type_get_global( hl_type *t ) {
 }
 
 bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
+	int i;
+	venum *ea, *eb;
+	hl_enum_construct *c;
 	if( a == b )
 		return true;
 	if( !a || !b || a->t != b->t || a->t->kind != HENUM )
 		return false;
-	hl_fatal("TODO");
+	ea = (venum*)a->v.ptr;
+	eb = (venum*)b->v.ptr;
+	if( ea->index != eb->index )
+		return false;
+	c = a->t->tenum->constructs + ea->index;
+	for(i=0;i<c->nparams;i++) {
+		hl_type *t = c->params[i];
+		switch( t->kind ) {
+		case HENUM:
+			{
+				vdynamic pa, pb;
+				pa.t = pb.t = t;
+				pa.v.ptr = *(void**)((char*)ea + c->offsets[i]);
+				pb.v.ptr = *(void**)((char*)eb + c->offsets[i]);
+				if( !hl_type_enum_eq(&pa,&pb) )
+					return false;
+			}
+			break;
+		default:
+			if( hl_dyn_compare(hl_make_dyn((char*)ea + c->offsets[i],t),hl_make_dyn((char*)eb + c->offsets[i],t)) )
+				return false;
+			break;
+		}
+	}
 	return true;
 }
 

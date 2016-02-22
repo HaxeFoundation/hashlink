@@ -113,11 +113,20 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack );
 static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack ) {
 	uchar buf[32];
 	switch( t->kind ) {
+	case HI8:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(char*)data));
+		break;
+	case HI16:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(short*)data));
+		break;
 	case HI32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(int*)data));
 		break;
+	case HF32:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.16f"),*(float*)data));
+		break;
 	case HF64:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(double*)data));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.19g"),*(double*)data));
 		break;
 	case HBYTES:
 		hl_buffer_str(b,*(uchar**)data);
@@ -224,6 +233,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			int i;
 			vlist l;
 			vlist *vtmp = stack;
+			hl_field_lookup *f;
 			while( vtmp != NULL ) {
 				if( vtmp->v == v ) {
 					hl_buffer_str_sub(b,USTR("..."),3);
@@ -233,6 +243,14 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			}
 			l.v = v;
 			l.next = stack;
+			f = hl_lookup_find(&o->dproto->fields,o->nfields,hl_hash_gen(USTR("__string"),false));
+			if( f && f->t->kind == HFUN && f->t->fun->nargs == 0 && f->t->fun->ret->kind == HBYTES ) {
+				vclosure *v = *(vclosure**)(o->fields_data + f->field_index);
+				if( v ) {
+					hl_buffer_str(b, v->hasValue ? ((uchar*(*)(void*))v->fun)(v->value) : ((uchar*(*)())v->fun)());
+					break;
+				}
+			}
 			hl_buffer_char(b, '{');
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = &o->dproto->fields + i;
