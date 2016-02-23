@@ -22,6 +22,8 @@ typedef union {
 HL_PRIM bool hl_math_isfinite( double a ) {
 	qw q;
 	unsigned int h, l;
+	if( a != a )
+		return false;
 	q.d = a;
 	h = q.i.h;
 	l = q.i.l;

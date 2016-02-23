@@ -22,7 +22,7 @@ extern void hl_entry_point();
 int main() {
 	hl_trap_ctx ctx;
 	vdynamic *exc;
-	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF | _CRTDBG_LEAK_CHECK_DF /*| _CRTDBG_CHECK_ALWAYS_DF*/ );
+	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
 	hlc_trap(ctx,exc,on_exception);
 	hl_entry_point();
 	return 0;

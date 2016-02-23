@@ -159,9 +159,17 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 }
 
 double hl_dyn_castd( void *data, hl_type *t ) {
+	if( t->kind == HDYN ) {
+		vdynamic *v = *((vdynamic**)data);
+		if( v == NULL ) return 0;
+		t = v->t;
+		if( !hl_is_dynamic(t) ) data = &v->v;
+	}
 	switch( t->kind ) {
 	case HF32:
 		return *(float*)data;
+	case HF64:
+		return *(double*)data;
 	case HI8:
 		return *(char*)data;
 	case HI16:
@@ -213,7 +221,7 @@ int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	case TK2(HOBJ,HOBJ):
 		if( a->t->obj == b->t->obj && a->t->obj->rt->compareFun )
 			return a->t->obj->rt->compareFun(a,b);
-		break;
+		return a > b ? 1 : -1;
 	case TK2(HENUM,HENUM):
 	case TK2(HTYPE,HTYPE):
 	case TK2(HBYTES,HBYTES):

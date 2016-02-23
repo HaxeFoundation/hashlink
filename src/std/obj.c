@@ -386,6 +386,10 @@ double hl_dyn_getd( vdynamic *d, int hfield ) {
 	return 0.;
 }
 
+void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
+	hl_fatal("TODO");
+}
+
 void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
 	if( d == NULL ) hl_error("Invalid field access");
 	switch( d->t->kind ) {
@@ -544,7 +548,29 @@ HL_PRIM vdynamic *hl_obj_get_field( vdynamic *obj, int hfield ) {
 }
 
 HL_PRIM void hl_obj_set_field( vdynamic *obj, int hfield, vdynamic *v ) {
-	hl_dyn_setp(obj,hfield,v->t,&v);
+	switch( v->t->kind ) {
+	case HI8:
+		hl_dyn_seti(obj,hfield,v->t,v->v.c);
+		break;
+	case HI16:
+		hl_dyn_seti(obj,hfield,v->t,v->v.s);
+		break;
+	case HI32:
+		hl_dyn_seti(obj,hfield,v->t,v->v.i);
+		break;
+	case HBOOL:
+		hl_dyn_seti(obj,hfield,v->t,v->v.b);
+		break;
+	case HF32:
+		hl_dyn_setf(obj,hfield,v->v.f);
+		break;
+	case HF64:
+		hl_dyn_setd(obj,hfield,v->v.d);
+		break;
+	default:
+		hl_dyn_setp(obj,hfield,v->t,hl_is_dynamic(v->t)?v:v->v.ptr);
+		break;
+	}
 }
 
 HL_PRIM bool hl_obj_has_field( vdynamic *obj, int hfield ) {
@@ -579,6 +605,20 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 }
 
 HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
-	hl_fatal("TODO");
-	return NULL;
+	varray *a = NULL;
+	switch( obj->t->kind ) {
+	case HDYNOBJ:
+		{
+			vdynobj *o = (vdynobj*)obj;
+			int i;
+			a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*o->nfields);
+			a->t = &hlt_array;
+			a->at = &hlt_bytes;
+			a->size = o->nfields;
+			for(i=0;i<o->nfields;i++)
+				((vbyte**)(a + 1))[i] = (vbyte*)hl_field_name((&o->dproto->fields + i)->hashed_name);
+		}
+		break;
+	}
+	return a;
 }
