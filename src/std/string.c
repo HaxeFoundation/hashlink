@@ -50,7 +50,7 @@ HL_PRIM int hl_utf8_length( vbyte *s, int pos ) {
 			}
 			s++;
 		} else if( c < 0xC0 )
-			hl_error("Invalid UTF8 string");
+			return len;
 		else if( c < 0xE0 )
 			s+=2;
 		else if( c < 0xF0 )
@@ -59,7 +59,7 @@ HL_PRIM int hl_utf8_length( vbyte *s, int pos ) {
 			len++; // surrogate pair
 			s+=4;
 		} else
-			hl_error("UTF-8 string contains chars that can't be encoded in UTF-16");
+			return len;
 	}
 	return len;
 }
