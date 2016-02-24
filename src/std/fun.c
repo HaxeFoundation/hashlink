@@ -63,8 +63,33 @@ void *hlc_dyn_call( void *fun, hl_type *t, vdynamic **args );
 
 HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 	vclosure *cl = (vclosure*)c;
+	int i;
+	vdynamic **vargs = (vdynamic**)(args + 1);
 	if( cl->hasValue ) hl_error("Can't call closure with value");
 	if( args->size != cl->t->fun->nargs || args->at->kind != HDYN ) hl_error("Invalid args");
-	return (vdynamic*)hlc_dyn_call(cl->fun,cl->t,(vdynamic**)(args +1));
+	for(i=0;i<args->size;i++) {
+		vdynamic *v = vargs[i];
+		hl_type *t = cl->t->fun->args[i];
+		if( v == NULL ) {
+			if( hl_is_ptr(t) )
+				continue;
+			v = hl_alloc_dynamic(t);
+			v->v.d = 0;
+			vargs[i] = v;
+		} else if( !hl_safe_cast(v->t,t) )
+			hl_write_dyn(vargs + i, t, v);
+	}
+	return (vdynamic*)hlc_dyn_call(cl->fun,cl->t,vargs);
 }
 
+bool hl_fun_compare( vdynamic *a, vdynamic *b ) {
+	if( a == b )
+		return true;
+	if( !a || !b )
+		return false;
+	if( a->t->kind != b->t->kind || a->t->kind != HFUN )
+		return false;
+	if( ((vclosure*)a)->fun != ((vclosure*)b)->fun )
+		return false;
+	return true;
+}

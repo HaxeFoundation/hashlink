@@ -67,11 +67,11 @@ static vdynamic *hlc_dyn_call_args( vclosure *c, vdynamic **args, int nargs ) {
 		ctmp.t = c->t->fun->parent;
 		ctmp.hasValue = 0;
 		ctmp.fun = c->fun;
-		c = &ctmp;
 		tmp.args[0] = hl_make_dyn(&c->value,ctmp.t->fun->args[0]);
 		tmp.a.size++;
 		for(i=0;i<nargs;i++)
 			tmp.args[i+1] = args[i];
+		c = &ctmp;
 	} else {
 		for(i=0;i<nargs;i++)
 			tmp.args[i] = args[i];

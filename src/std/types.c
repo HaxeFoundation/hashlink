@@ -289,10 +289,9 @@ HL_PRIM varray *hl_type_instance_fields( hl_type *t ) {
 HL_PRIM vdynamic *hl_type_get_global( hl_type *t ) {
 	switch( t->kind ) {
 	case HOBJ:
-		return *(vdynamic**)t->obj->global_value;
+		return t->obj->global_value ? *(vdynamic**)t->obj->global_value : NULL;
 	case HENUM:
-		hl_fatal("TODO");
-		break;
+		return *(vdynamic**)t->tenum->global_value;
 	default:
 		break;
 	}
@@ -332,6 +331,28 @@ bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 		}
 	}
 	return true;
+}
+
+HL_PRIM vdynamic *hl_ealloc( hl_type *t, int index, varray *args ) {
+	hl_enum_construct *c = t->tenum->constructs + index;
+	venum *e;
+	vdynamic *v;
+	int i;
+	bool hasPtr = false;
+	if( c->nparams != args->size )
+		return NULL;
+	for(i=0;i<c->nparams;i++)
+		if( hl_is_ptr(c->params[i]) ) {
+			hasPtr = true;
+			break;
+		}
+	e = (venum*)(hasPtr ? hl_gc_alloc(c->size) : hl_gc_alloc_noptr(c->size));
+	e->index = index;
+	for(i=0;i<c->nparams;i++)
+		hl_write_dyn((char*)e+c->offsets[i],c->params[i],((vdynamic**)(args+1))[i]);
+	v = hl_alloc_dynamic(t);
+	v->v.ptr = e;
+	return v;
 }
 
 DEFINE_PRIM(_BOOL, hl_type_check, _TYPE _DYN);

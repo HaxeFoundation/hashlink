@@ -108,7 +108,6 @@ HL_PRIM vbyte* hl_ucs2_upper( vbyte *str, int pos, int len ) {
 	for(i=0;i<len;i++) {
 		unsigned int c = *cstr++;
 		int up = c >> UL_BITS;
-		int k;
 		if( up < UMAX ) {
 			unsigned int c2 = UPPER[up][c&((1<<UL_BITS)-1)];
 			if( c2 != 0 ) *cout = (uchar)c2;
@@ -127,7 +126,6 @@ HL_PRIM vbyte* hl_ucs2_lower( vbyte *str, int pos, int len ) {
 	for(i=0;i<len;i++) {
 		unsigned int c = *cstr++;
 		int up = c >> UL_BITS;
-		int k;
 		if( up < UMAX ) {
 			unsigned int c2 = LOWER[up][c&((1<<UL_BITS)-1)];
 			if( c2 != 0 ) *cout = (uchar)c2;

@@ -19,6 +19,10 @@ static struct tm *gmtime_r( time_t *t, struct tm *r ) {
 
 #endif
 
+HL_PRIM int hl_date_now() {
+	return (int)time(NULL);
+}
+
 HL_PRIM vbyte *hl_date_to_string( int date, int *len ) {
 	char buf[127];
 	struct tm t;

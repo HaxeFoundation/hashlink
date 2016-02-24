@@ -244,6 +244,7 @@ typedef struct {
 	const uchar *name;
 	int nconstructs;
 	hl_enum_construct *constructs;
+	void **global_value;
 } hl_type_enum;
 
 struct hl_type {
@@ -403,6 +404,7 @@ double hl_dyn_castd( void *data, hl_type *t );
 #define hl_invalid_comparison 0xAABBCCDD
 int hl_dyn_compare( vdynamic *a, vdynamic *b );
 vdynamic *hl_make_dyn( void *data, hl_type *t );
+void hl_write_dyn( void *data, hl_type *t, vdynamic *v );
 
 void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
 void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );

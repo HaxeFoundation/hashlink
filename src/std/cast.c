@@ -116,6 +116,10 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 		if( v == NULL ) return NULL;
 		t = v->t;
 		if( !hl_is_dynamic(t) ) data = &v->v;
+	} else if( hl_is_dynamic(t) ) {
+		vdynamic *v = *(vdynamic**)data;
+		if( v == NULL ) return NULL;
+		t = v->t;
 	}
 	if( t == to || hl_safe_cast(t,to) )
 		return *(void**)data;
@@ -154,6 +158,10 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	}
 	if( to->kind == HDYN )
 		return hl_make_dyn(data,t);
+	if( to->kind == HNULL ) {
+		if( to->tparam->kind == t->kind )
+			return hl_make_dyn(data,t);
+	}
 	hl_error_msg(USTR("Can't cast %s(%s) to %s"),hl_to_string(hl_make_dyn(data,t)),hl_type_str(t),hl_type_str(to));
 	return 0;
 }
@@ -182,6 +190,32 @@ double hl_dyn_castd( void *data, hl_type *t ) {
 		break;
 	}
 	return 0.;
+}
+
+float hl_dyn_castf( void *data, hl_type *t ) {
+	if( t->kind == HDYN ) {
+		vdynamic *v = *((vdynamic**)data);
+		if( v == NULL ) return 0;
+		t = v->t;
+		if( !hl_is_dynamic(t) ) data = &v->v;
+	}
+	switch( t->kind ) {
+	case HF32:
+		return *(float*)data;
+	case HF64:
+		return (float)*(double*)data;
+	case HI8:
+		return *(char*)data;
+	case HI16:
+		return *(short*)data;
+	case HI32:
+		return (float)*(int*)data;
+	case HBOOL:
+		return *(bool*)data;
+	default:
+		break;
+	}
+	return 0;
 }
 
 static int fcompare( float d ) {
@@ -233,6 +267,30 @@ int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	return hl_invalid_comparison;
 }
 
+void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
+	switch( t->kind ) {
+	case HI8:
+	case HBOOL:
+		*(char*)data = (char)hl_dyn_casti(&v,&hlt_dyn,t);
+		break;
+	case HI16:
+		*(short*)data = (short)hl_dyn_casti(&v,&hlt_dyn,t);
+		break;
+	case HI32:
+		*(int*)data = hl_dyn_casti(&v,&hlt_dyn,t);
+		break;
+	case HF32:
+		*(float*)data = hl_dyn_castf(&v,&hlt_dyn);
+		break;
+	case HF64:
+		*(double*)data = hl_dyn_castd(&v,&hlt_dyn);
+		break;
+	default:
+		*(void**)data = hl_dyn_castp(&v,&hlt_dyn,t);
+		break;
+	}
+}
+
 HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
 	if( t->kind == HDYN )
 		return v;
@@ -248,4 +306,10 @@ HL_PRIM bool hl_type_check( hl_type *t, vdynamic *value ) {
 	switch( TK2(t->kind,value->t->kind) ) {
 	}
 	return hl_safe_cast(value->t, t);
+}
+
+HL_PRIM vdynamic *hl_type_instance( hl_type *t, vdynamic *v ) {
+	if( v == NULL )
+		return v;
+	return hl_safe_cast(v->t,t) ? v : NULL;
 }
