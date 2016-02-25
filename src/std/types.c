@@ -355,6 +355,20 @@ HL_PRIM vdynamic *hl_ealloc( hl_type *t, int index, varray *args ) {
 	return v;
 }
 
+HL_PRIM varray *hl_enum_parameters( vdynamic *v ) {
+	varray *a;
+	venum *e = (venum*)v->v.ptr;
+	hl_enum_construct *c = v->t->tenum->constructs + e->index;
+	int i;
+	a = (varray*)hl_gc_alloc(sizeof(varray)+c->nparams*sizeof(void*));
+	a->t = &hlt_array;
+	a->at = &hlt_dyn;
+	a->size = c->nparams;
+	for(i=0;i<c->nparams;i++)
+		((vdynamic**)(a+1))[i] = hl_make_dyn(e+c->offsets[i],c->params[i]);
+	return a;
+}
+
 DEFINE_PRIM(_BOOL, hl_type_check, _TYPE _DYN);
 DEFINE_PRIM(_BYTES, hl_type_name, _TYPE);
 DEFINE_PRIM(_ARR, hl_type_enum_fields, _TYPE);

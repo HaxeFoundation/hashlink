@@ -39,6 +39,20 @@ HL_PRIM vbyte *hl_date_to_string( int date, int *len ) {
 	return (vbyte*)out;
 }
 
+HL_PRIM double hl_date_get_time( int date ) {
+	return date * 1000.;
+}
+
+HL_PRIM int hl_date_from_time( double time ) {
+	return (int)(time / 1000.);
+}
+
+HL_PRIM int hl_date_from_string( vbyte *b ) {
+	uchar *str = (uchar*)b;
+	hl_fatal("TODO");
+	return 0;
+}
+
 HL_PRIM int hl_date_new( int y, int mo, int d, int h, int m, int s ) {
 	struct tm t;
 	memset(&t,0,sizeof(struct tm));
