@@ -55,6 +55,7 @@ static void hl_hbremap( hl_bytes_map *m, uchar *key, int hash, vdynamic *value, 
 		c->hashes[c->nvalues] = hash;
 		c->strings[c->nvalues] = key;
 		c->values[c->nvalues] = value;
+		c->nvalues++;
 		return;
 	}
 	c = *reuse;
@@ -472,6 +473,7 @@ static void hl_horemap( hl_obj_map *m, vdynamic *key, vdynamic *value, hl_obj_ce
 	if( c && c->nvalues < H_CELL_SIZE ) {
 		c->keys[c->nvalues] = key;
 		c->values[c->nvalues] = value;
+		c->nvalues++;
 		return;
 	}
 	c = *reuse;
