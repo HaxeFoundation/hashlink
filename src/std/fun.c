@@ -83,13 +83,18 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 }
 
 bool hl_fun_compare( vdynamic *a, vdynamic *b ) {
+	vclosure *ca, *cb;
 	if( a == b )
 		return true;
 	if( !a || !b )
 		return false;
 	if( a->t->kind != b->t->kind || a->t->kind != HFUN )
 		return false;
-	if( ((vclosure*)a)->fun != ((vclosure*)b)->fun )
+	ca = (vclosure*)a;
+	cb = (vclosure*)b;
+	if( ca->fun != cb->fun )
+		return false;
+	if( ca->hasValue && ca->value != cb->value )
 		return false;
 	return true;
 }

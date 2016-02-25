@@ -299,12 +299,16 @@ HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
 }
 
 HL_PRIM bool hl_type_check( hl_type *t, vdynamic *value ) {
+	if( t->kind == HDYN )
+		return true;
 	if( value == NULL )
 		return false;
 	if( t == value->t )
 		return true;
-	switch( TK2(t->kind,value->t->kind) ) {
-	}
+	if( t->kind == HF64 && value->t->kind == HI32 )
+		return true;
+	if( t->kind == HI32 && value->t->kind == HF64 && (int)value->v.d == value->v.d )
+		return true;
 	return hl_safe_cast(value->t, t);
 }
 
