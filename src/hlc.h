@@ -78,6 +78,33 @@ static vdynamic *hlc_dyn_call_args( vclosure *c, vdynamic **args, int nargs ) {
 	return hl_call_method((vdynamic*)c,&tmp.a);
 }
 
+static vdynamic *hlc_dyn_call_obj( vdynamic *o, int hfield, vdynamic **args, int nargs ) {
+	switch( o->t->kind ) {
+	case HDYNOBJ:
+		hl_fatal("TODO");
+		break;
+	case HOBJ:
+		{
+			hl_runtime_obj *rt = o->t->obj->rt;
+			while( true ) {
+				hl_field_lookup *l = hl_lookup_find(rt->lookup,rt->nlookup, hfield);
+				if( l != NULL && l->field_index < 0 ) {
+					vclosure *ctmp = hl_alloc_closure_ptr(l->t,rt->methods[-l->field_index-1],o);
+					return hlc_dyn_call_args(ctmp,args,nargs);
+				}
+				rt = rt->parent;
+				if( rt == NULL ) break;
+			}
+			hl_error_msg(USTR("%s has no method %s"),o->t->obj->name,hl_field_name(hfield));
+		}
+		break;
+	default:
+		hl_error("Invalid field access");
+		break;
+	}
+	return NULL;
+}
+
 #include <setjmp.h>
 
 typedef struct _hl_trap_ctx hl_trap_ctx;

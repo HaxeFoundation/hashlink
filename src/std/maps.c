@@ -182,13 +182,10 @@ HL_PRIM bool hl_hbremove( hl_bytes_map *m, vbyte *_key ) {
 }
 
 HL_PRIM varray* hl_hbkeys( hl_bytes_map *m ) {
-	varray *a = (varray*)hl_gc_alloc_noptr(sizeof(varray)+sizeof(uchar*)*m->nentries);
+	varray *a = hl_aalloc(&hlt_bytes,m->nentries);
 	uchar **keys = (uchar**)(a+1);
 	int p = 0;
 	int i;
-	a->t = &hlt_array;
-	a->at = &hlt_bytes;
-	a->size = m->nentries;
 	for(i=0;i<m->ncells;i++) {
 		int j;
 		hl_bytes_cell *c = m->cells[i];
@@ -202,13 +199,10 @@ HL_PRIM varray* hl_hbkeys( hl_bytes_map *m ) {
 }
 
 HL_PRIM varray* hl_hbvalues( hl_bytes_map *m ) {
-	varray *a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*m->nentries);
+	varray *a = hl_aalloc(&hlt_dyn,m->nentries);
 	vdynamic **values = (vdynamic**)(a+1);
 	int p = 0;
 	int i;
-	a->t = &hlt_array;
-	a->at = &hlt_dyn;
-	a->size = m->nentries;
 	for(i=0;i<m->ncells;i++) {
 		int j;
 		hl_bytes_cell *c = m->cells[i];
@@ -386,13 +380,10 @@ HL_PRIM bool hl_hiremove( hl_int_map *m, int key ) {
 }
 
 HL_PRIM varray* hl_hikeys( hl_int_map *m ) {
-	varray *a = (varray*)hl_gc_alloc_noptr(sizeof(varray)+sizeof(int)*m->nentries);
+	varray *a = hl_aalloc(&hlt_i32,m->nentries);
 	int *keys = (int*)(a+1);
 	int p = 0;
 	int i;
-	a->t = &hlt_array;
-	a->at = &hlt_i32;
-	a->size = m->nentries;
 	for(i=0;i<m->ncells;i++) {
 		int j;
 		hl_int_cell *c = m->cells[i];
@@ -406,13 +397,10 @@ HL_PRIM varray* hl_hikeys( hl_int_map *m ) {
 }
 
 HL_PRIM varray* hl_hivalues( hl_int_map *m ) {
-	varray *a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*m->nentries);
+	varray *a = hl_aalloc(&hlt_dyn,m->nentries);
 	vdynamic **values = (vdynamic**)(a+1);
 	int p = 0;
 	int i;
-	a->t = &hlt_array;
-	a->at = &hlt_dyn;
-	a->size = m->nentries;
 	for(i=0;i<m->ncells;i++) {
 		int j;
 		hl_int_cell *c = m->cells[i];
@@ -595,13 +583,10 @@ HL_PRIM bool hl_horemove( hl_obj_map *m, vdynamic *key ) {
 }
 
 HL_PRIM varray* hl_hokeys( hl_obj_map *m ) {
-	varray *a = (varray*)hl_gc_alloc_noptr(sizeof(varray)+sizeof(vdynamic*)*m->nentries);
+	varray *a = hl_aalloc(&hlt_dyn,m->nentries);
 	vdynamic **keys = (vdynamic**)(a+1);
 	int p = 0;
 	int i;
-	a->t = &hlt_array;
-	a->at = &hlt_dyn;
-	a->size = m->nentries;
 	for(i=0;i<m->ncells;i++) {
 		int j;
 		hl_obj_cell *c = m->cells[i];
@@ -615,13 +600,10 @@ HL_PRIM varray* hl_hokeys( hl_obj_map *m ) {
 }
 
 HL_PRIM varray* hl_hovalues( hl_obj_map *m ) {
-	varray *a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*m->nentries);
+	varray *a = hl_aalloc(&hlt_dyn, m->nentries);
 	vdynamic **values = (vdynamic**)(a+1);
 	int p = 0;
 	int i;
-	a->t = &hlt_array;
-	a->at = &hlt_dyn;
-	a->size = m->nentries;
 	for(i=0;i<m->ncells;i++) {
 		int j;
 		hl_obj_cell *c = m->cells[i];

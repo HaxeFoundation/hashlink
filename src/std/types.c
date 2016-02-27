@@ -258,11 +258,8 @@ HL_PRIM vbyte* hl_type_name( hl_type *t ) {
 }
 
 HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
-	varray *a = (varray*)hl_gc_alloc_noptr(sizeof(varray) + t->tenum->nconstructs * sizeof(void*));
+	varray *a = hl_aalloc(&hlt_bytes,t->tenum->nconstructs);
 	int i;
-	a->t = &hlt_array;
-	a->at = &hlt_bytes;
-	a->size = t->tenum->nconstructs;
 	for( i=0; i<t->tenum->nconstructs;i++)
 		((void**)(a+1))[i] = (vbyte*)t->tenum->constructs[i].name;
 	return a;
@@ -276,14 +273,43 @@ HL_PRIM int hl_type_args_count( hl_type *t ) {
 
 HL_PRIM varray *hl_type_instance_fields( hl_type *t ) {
 	varray *a;
-	int i;
+	const uchar **names;
+	int mcount = 0;
+	int out = 0;
 	hl_type_obj *o;
+	hl_runtime_obj *rt;
 	if( t->kind != HOBJ )
 		return NULL;
 	o = t->obj;
-	a = hl_aalloc(&hlt_bytes,o->rt->nlookup);
-	for(i=0;i<o->rt->nlookup;i++)
-		((vbyte**)(a+1))[i] = (vbyte*)hl_field_name(o->rt->lookup[i].hashed_name);
+	while( true ) {
+		int i;
+		for(i=0;i<o->nproto;i++) {
+			hl_obj_proto *p = o->proto + i;
+			if( p->pindex < 0 ) mcount++;
+		}
+		if( o->super == NULL ) break;
+		o = o->super->obj;
+	}
+	rt = hl_get_obj_rt(t);
+	a = hl_aalloc(&hlt_bytes,mcount + rt->nproto + rt->nfields);
+	names = (uchar**)(a + 1);
+	o = t->obj;
+	while( true ) {
+		int i;
+		int pproto = rt->parent ? rt->parent->nproto : 0;
+		for(i=0;i<o->nproto;i++) {
+			hl_obj_proto *p = o->proto + i;
+			if( p->pindex < 0 || p->pindex >= pproto )
+				names[out++] = p->name;
+		}
+		for(i=0;i<o->nfields;i++) {
+			hl_obj_field *f = o->fields + i;
+			names[out++] = f->name;
+		}
+		if( o->super == NULL ) break;
+		o = o->super->obj;
+		rt = o->rt;
+	}
 	return a;
 }
 
@@ -361,10 +387,7 @@ HL_PRIM varray *hl_enum_parameters( vdynamic *v ) {
 	venum *e = (venum*)v->v.ptr;
 	hl_enum_construct *c = v->t->tenum->constructs + e->index;
 	int i;
-	a = (varray*)hl_gc_alloc(sizeof(varray)+c->nparams*sizeof(void*));
-	a->t = &hlt_array;
-	a->at = &hlt_dyn;
-	a->size = c->nparams;
+	a = hl_aalloc(&hlt_dyn,c->nparams);
 	for(i=0;i<c->nparams;i++)
 		((vdynamic**)(a+1))[i] = hl_make_dyn((char*)e+c->offsets[i],c->params[i]);
 	return a;

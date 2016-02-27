@@ -656,10 +656,7 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 		{
 			vdynobj *o = (vdynobj*)obj;
 			int i;
-			a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*o->nfields);
-			a->t = &hlt_array;
-			a->at = &hlt_bytes;
-			a->size = o->nfields;
+			a = hl_aalloc(&hlt_bytes,o->nfields);
 			for(i=0;i<o->nfields;i++)
 				((vbyte**)(a + 1))[i] = (vbyte*)hl_field_name((&o->dproto->fields + i)->hashed_name);
 		}
@@ -669,10 +666,7 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 			hl_type_obj *tobj = obj->t->obj;
 			hl_runtime_obj *o = tobj->rt;
 			int i, p = 0;
-			a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*o->nfields);
-			a->t = &hlt_array;
-			a->at = &hlt_bytes;
-			a->size = o->nfields;
+			a = hl_aalloc(&hlt_bytes,o->nfields);
 			while( true ) {
 				for(i=0;i<tobj->nfields;i++) {
 					hl_obj_field *f = tobj->fields + i;
