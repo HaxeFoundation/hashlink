@@ -1,7 +1,14 @@
 #include <hl.h>
 #include <math.h>
 
-double hl_nan;
+#ifndef NAN
+    static const unsigned long __nan[2] = {0xffffffff, 0x7fffffff};
+    #define NAN (*(const float *) __nan)
+#endif
+
+double hl_nan() {
+	return NAN;
+}
 
 HL_PRIM double hl_math_abs( double a ) {
 	return fabs(a);

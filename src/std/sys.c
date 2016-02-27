@@ -28,8 +28,9 @@ HL_PRIM double hl_sys_time() {
 #endif
 }
 
-HL_PRIM int hl_random() {
-	return rand();
+HL_PRIM int hl_random( int max ) {
+	if( max <= 0 ) return 0;
+	return rand() % max;
 }
 
 #ifndef HL_JIT

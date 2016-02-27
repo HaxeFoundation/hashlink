@@ -141,43 +141,43 @@ static int hl_wrap0i( vclosure *c ) {
 static int hl_wrap1i( vclosure *c, vdynamic *p1 ) {
 	vdynamic *args[] = { (vdynamic*)c->value, p1 };
 	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
-	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+	return hl_dyn_casti(&v,&hlt_dyn,c->t->fun->ret);
 }
 
 static int hl_wrap2i( vclosure *c, vdynamic *p1, vdynamic *p2 ) {
 	vdynamic *args[] = { (vdynamic*)c->value, p1, p2 };
 	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
-	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+	return hl_dyn_casti(&v,&hlt_dyn,c->t->fun->ret);
 }
 
 static int hl_wrap3i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3 ) {
 	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3 };
 	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
-	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+	return hl_dyn_casti(&v,&hlt_dyn,c->t->fun->ret);
 }
 
 static int hl_wrap4i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4 ) {
 	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4 };
 	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
-	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+	return hl_dyn_casti(&v,&hlt_dyn,c->t->fun->ret);
 }
 
 static int hl_wrap5i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5 ) {
 	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5 };
 	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
-	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+	return hl_dyn_casti(&v,&hlt_dyn,c->t->fun->ret);
 }
 
 static int hl_wrap6i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5, vdynamic *p6 ) {
 	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5, p6 };
 	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
-	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+	return hl_dyn_casti(&v,&hlt_dyn,c->t->fun->ret);
 }
 
 static int hl_wrap7i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5, vdynamic *p6, vdynamic *p7 ) {
 	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5, p6, p7 };
 	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
-	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+	return hl_dyn_casti(&v,&hlt_dyn,c->t->fun->ret);
 }
 
 vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to ) {
@@ -318,13 +318,17 @@ float hl_dyn_castf( void *data, hl_type *t ) {
 	return 0;
 }
 
-static int fcompare( float d ) {
-	if( d != d ) return hl_invalid_comparison;
+static int fcompare( float a, float b ) {
+	float d = a - b;
+	if( d != d )
+		return a == b ? 0 : hl_invalid_comparison; // +INF=+INF
  	return d == 0.f ? 0 : (d > 0.f ? 1 : -1);
 }
 
-static int dcompare( double d ) {
-	if( d != d ) return hl_invalid_comparison;
+static int dcompare( double a, double b ) {
+	double d = a - b;
+	if( d != d )
+		return a == b ? 0 : hl_invalid_comparison; // +INF=+INF
  	return d == 0. ? 0 : (d > 0. ? 1 : -1);
 }
 
@@ -343,15 +347,15 @@ int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	case TK2(HI32,HI32):
 		return a->v.i - b->v.i;
 	case TK2(HF32,HF32):
-		return fcompare(a->v.f - b->v.f);
+		return fcompare(a->v.f,b->v.f);
 	case TK2(HF64,HF64):
-		return dcompare(a->v.d - b->v.d);
+		return dcompare(a->v.d,b->v.d);
 	case TK2(HBOOL,HBOOL):
 		return a->v.b - b->v.b;
 	case TK2(HF64, HI32):
-		return dcompare(a->v.d - (double)b->v.i);
+		return dcompare(a->v.d,(double)b->v.i);
 	case TK2(HI32, HF64):
-		return dcompare((double)a->v.i - b->v.d);
+		return dcompare((double)a->v.i,b->v.d);
 	case TK2(HOBJ,HOBJ):
 		if( a->t->obj == b->t->obj && a->t->obj->rt->compareFun )
 			return a->t->obj->rt->compareFun(a,b);

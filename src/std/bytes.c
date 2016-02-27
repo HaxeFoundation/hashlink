@@ -138,7 +138,7 @@ HL_PRIM double hl_parse_float( vbyte *bytes, int pos, int len ) {
 	uchar *end = NULL;
 	double d = utod(str,&end);
 	if( end == str )
-		return hl_nan;
+		return hl_nan();
 	return d;
 }
 

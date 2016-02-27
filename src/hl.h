@@ -331,7 +331,8 @@ struct hl_runtime_obj {
 	hl_runtime_obj *parent;
 	const uchar *(*toStringFun)( vdynamic *obj );
 	int (*compareFun)( vdynamic *a, vdynamic *b );
-	vdynamic *(*castFun)( vdynamic *a, hl_type *t );
+	vdynamic *(*castFun)( vdynamic *obj, hl_type *t );
+	vdynamic *(*getFieldFun)( vdynamic *obj, int hfield );
 	// relative
 	int nlookup;
 	hl_field_lookup *lookup;
@@ -363,8 +364,8 @@ extern hl_type hlt_dyn;
 extern hl_type hlt_array;
 extern hl_type hlt_bytes;
 extern hl_type hlt_dynobj;
-extern double hl_nan;
 
+double hl_nan();
 bool hl_is_dynamic( hl_type *t );
 #define hl_is_ptr(t)	((t)->kind >= HBYTES)
 bool hl_same_type( hl_type *a, hl_type *b );

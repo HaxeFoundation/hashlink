@@ -119,6 +119,7 @@ hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	t->toStringFun = NULL;
 	t->compareFun = NULL;
 	t->castFun = NULL;
+	t->getFieldFun = NULL;
 	t->parent = p;
 
 	// fields indexes
@@ -159,7 +160,7 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
 	hl_runtime_obj *p = NULL, *t = hl_get_obj_rt(ot);
-	hl_field_lookup *strField, *cmpField, *castField;
+	hl_field_lookup *strField, *cmpField, *castField, *getField;
 	int i;
 	if( ot->vobj_proto ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);
@@ -167,9 +168,11 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__string"),false));
 	cmpField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__compare"),false));
 	castField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__cast"),false));
+	getField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__get_field"),false));
 	t->toStringFun = strField ? m->functions_ptrs[o->proto[-(strField->field_index+1)].findex] : (p ? p->toStringFun : NULL);	
 	t->compareFun = cmpField ? m->functions_ptrs[o->proto[-(cmpField->field_index+1)].findex] : (p ? p->compareFun : NULL);	
 	t->castFun = castField ? m->functions_ptrs[o->proto[-(castField->field_index+1)].findex] : (p ? p->castFun : NULL);	
+	t->getFieldFun = getField ? m->functions_ptrs[o->proto[-(getField->field_index+1)].findex] : (p ? p->getFieldFun : NULL);
 
 	if( t->nproto ) {
 		void **fptr = (void**)hl_malloc(alloc, sizeof(void*) * t->nproto);
@@ -495,7 +498,14 @@ void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
 				if( f != NULL ) break;
 				rt = rt->parent;
 			} while( rt );
-			if( f == NULL ) return NULL;
+			if( f == NULL ) {
+				rt = d->t->obj->rt;
+				if( rt->getFieldFun ) {
+					vdynamic *v = rt->getFieldFun(d,hfield);
+					if( v != NULL ) return hl_dyn_castp(&v,&hlt_dyn,t);
+				}
+				return NULL;
+			}
 			if( f->field_index < 0 ) {
 				vclosure *c = hl_alloc_closure_ptr(f->t,rt->methods[-f->field_index-1],d);
 				return hl_dyn_castp(&c,c->t,t);
@@ -662,9 +672,9 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 	case HDYNOBJ:
 		{
 			vdynobj *d = (vdynobj*)obj;
-			int i = hl_lookup_find_index(&d->dproto->fields,d->nfields,hfield);
-			if( i < 0 ) return false;
-			memcpy(&d->dproto->fields + i, &d->dproto->fields + (i + 1), sizeof(hl_field_lookup) * (d->nfields - i));
+			hl_field_lookup *f = hl_lookup_find(&d->dproto->fields,d->nfields,hfield);
+			if( f == NULL ) return false;
+			memcpy(f, f + 1, ((char*)(&d->dproto->fields + d->nfields)) - (char*)(f + 1));
 			d->nfields--;
 			// rebuild virtuals
 			{
