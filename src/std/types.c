@@ -313,6 +313,12 @@ HL_PRIM varray *hl_type_instance_fields( hl_type *t ) {
 	return a;
 }
 
+HL_PRIM hl_type *hl_type_super( hl_type *t ) {
+	if( t->kind == HOBJ && t->obj->super )
+		return t->obj->super;
+	return &hlt_void;
+}
+
 HL_PRIM vdynamic *hl_type_get_global( hl_type *t ) {
 	switch( t->kind ) {
 	case HOBJ:

@@ -131,6 +131,17 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 	case HBYTES:
 		hl_buffer_str(b,*(uchar**)data);
 		break;
+	case HENUM:
+	case HTYPE:
+	case HREF:
+	case HABSTRACT:
+		{
+			vdynamic tmp;
+			tmp.t = t;
+			tmp.v.ptr = *(void**)data;
+			hl_buffer_rec(b, tmp.v.ptr ? &tmp : NULL, stack);
+		}
+		break;
 	case HBOOL:
 		if( *(unsigned char*)data )
 			hl_buffer_str_sub(b,USTR("true"),4);

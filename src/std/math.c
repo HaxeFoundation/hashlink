@@ -88,3 +88,15 @@ HL_PRIM double hl_math_pow( double a, double b ) {
 	return pow(a,b);
 }
 
+HL_PRIM double hl_math_log( double a ) {
+	return log(a);
+}
+
+HL_PRIM double hl_math_exp( double a ) {
+	return exp(a);
+}
+
+HL_PRIM double hl_math_sqrt( double a ) {
+	return sqrt(a);
+}
+

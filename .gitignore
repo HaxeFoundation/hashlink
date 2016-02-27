@@ -17,3 +17,5 @@ x64
 /src/_main.c
 *.o
 /src/_main2.c
+/src/_main3.c
+/src/_main4.c

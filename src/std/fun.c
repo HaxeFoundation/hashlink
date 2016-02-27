@@ -79,8 +79,28 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 			v = hl_alloc_dynamic(t);
 			v->v.d = 0;
 			vargs[i] = v;
-		} else if( !hl_safe_cast(v->t,t) )
-			hl_write_dyn(vargs + i, t, v);
+		} else if( hl_is_ptr(t) )
+			vargs[i] = (vdynamic*)hl_dyn_castp(vargs + i,&hlt_dyn,t);
+		else {
+			vdynamic *v = hl_alloc_dynamic(t);
+			switch( t->kind ) {
+			case HBOOL:
+			case HI8:
+			case HI16:
+			case HI32:
+				v->v.i = hl_dyn_casti(vargs +i, &hlt_dyn,t);
+				break;
+			case HF32:
+				v->v.f = hl_dyn_castf(vargs +i, &hlt_dyn);
+				break;
+			case HF64:
+				v->v.d = hl_dyn_castd(vargs +i, &hlt_dyn);
+				break;
+			default:
+				hl_fatal("assert");
+			}
+			vargs[i] = v;
+		}
 	}
 	ret = hlc_dyn_call(cl->fun,cl->t,vargs);
 	tret = cl->t->fun->ret;

@@ -120,7 +120,7 @@ void *hl_gc_alloc_finalizer( int size ) {
 }
 
 vdynamic *hl_alloc_dynamic( hl_type *t ) {
-	vdynamic *d = (vdynamic*)hl_gc_alloc(sizeof(vdynamic));
+	vdynamic *d = (vdynamic*) ((t->kind == HENUM || t->kind == HABSTRACT) ? hl_gc_alloc(sizeof(vdynamic)) : hl_gc_alloc_noptr(sizeof(vdynamic)));
 	d->t = t;
 	d->v.ptr = NULL;
 	return d;

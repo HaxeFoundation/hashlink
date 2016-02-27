@@ -8,6 +8,30 @@ HL_PRIM void hl_sys_exit( int code ) {
 	exit(code);
 }
 
+HL_PRIM double hl_sys_time() {
+#ifdef HL_WIN
+#define EPOCH_DIFF	(134774*24*60*60.0)
+	SYSTEMTIME t;
+	FILETIME ft;
+    ULARGE_INTEGER ui;
+	GetSystemTime(&t);
+	if( !SystemTimeToFileTime(&t,&ft) )
+		return 0.;
+    ui.LowPart = ft.dwLowDateTime;
+    ui.HighPart = ft.dwHighDateTime;
+	return ((double)ui.QuadPart) / 10000000.0 - EPOCH_DIFF;
+#else
+	struct timeval tv;
+	if( gettimeofday(&tv,NULL) != 0 )
+		neko_error();
+	return tv.tv_sec + ((double)tv.tv_usec) / 1000000.0;
+#endif
+}
+
+HL_PRIM int hl_random() {
+	return rand();
+}
+
 #ifndef HL_JIT
 
 #include <hlc.h>

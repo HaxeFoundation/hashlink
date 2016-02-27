@@ -40,10 +40,14 @@ vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	case HREF:
 	case HABSTRACT:
 	case HENUM:
-		v = (vdynamic*)hl_gc_alloc(sizeof(vdynamic));
-		v->t = t;
-		v->v.ptr = *(void**)data;
-		return v;
+		{
+			void *p = *(void**)data;
+			if( p == NULL ) return NULL;
+			v = (vdynamic*)hl_gc_alloc(sizeof(vdynamic));
+			v->t = t;
+			v->v.ptr = p;
+			return v;
+		}
 	default:
 		return *(vdynamic**)data;
 	}
@@ -57,18 +61,18 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 		t = v->t;
 		if( !hl_is_dynamic(t) ) data = &v->v;
 	}
-	switch( TK2(t->kind,to->kind) ) {
-	case TK2(HI8,HI8):
+	switch( t->kind ) {
+	case HI8:
 		return *(char*)data;
-	case TK2(HI16,HI16):
+	case HI16:
 		return *(short*)data;
-	case TK2(HI32,HI32):
+	case HI32:
 		return *(int*)data;
-	case TK2(HF32,HI32):
+	case HF32:
 		return (int)*(float*)data;
-	case TK2(HF64,HI32):
+	case HF64:
 		return (int)*(double*)data;
-	case TK2(HBOOL,HBOOL):
+	case HBOOL:
 		return *(bool*)data;
 	default:
 		switch( t->kind ) {
@@ -86,28 +90,124 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 }
 
 
-#define HL_MAX_ARGS 0
+#define HL_MAX_ARGS 7
 
 void *hlc_dyn_call( void *fun, hl_type *t, vdynamic **args );
 
-void *hl_wrap0( vclosure *c ) {
+static void *hl_wrap0( vclosure *c ) {
 	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,(vdynamic**)&c->value) : hlc_dyn_call(c->fun,c->t,NULL);
 }
 
+static void *hl_wrap1( vclosure *c, vdynamic *p1 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1 };
+	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args + 1);
+}
+
+static void *hl_wrap2( vclosure *c, vdynamic *p1, vdynamic *p2 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2 };
+	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args + 1);
+}
+
+static void *hl_wrap3( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3 };
+	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args + 1);
+}
+
+static void *hl_wrap4( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4 };
+	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args + 1);
+}
+
+static void *hl_wrap5( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5 };
+	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args + 1);
+}
+
+static void *hl_wrap6( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5, vdynamic *p6 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5, p6 };
+	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args + 1);
+}
+
+static void *hl_wrap7( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5, vdynamic *p6, vdynamic *p7 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5, p6, p7 };
+	return c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args + 1);
+}
+
+static int hl_wrap0i( vclosure *c ) {
+	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,(vdynamic**)&c->value) : hlc_dyn_call(c->fun,c->t,NULL);
+	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+}
+
+static int hl_wrap1i( vclosure *c, vdynamic *p1 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1 };
+	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
+	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+}
+
+static int hl_wrap2i( vclosure *c, vdynamic *p1, vdynamic *p2 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2 };
+	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
+	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+}
+
+static int hl_wrap3i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3 };
+	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
+	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+}
+
+static int hl_wrap4i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4 };
+	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
+	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+}
+
+static int hl_wrap5i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5 };
+	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
+	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+}
+
+static int hl_wrap6i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5, vdynamic *p6 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5, p6 };
+	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
+	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+}
+
+static int hl_wrap7i( vclosure *c, vdynamic *p1, vdynamic *p2, vdynamic *p3, vdynamic *p4, vdynamic *p5, vdynamic *p6, vdynamic *p7 ) {
+	vdynamic *args[] = { (vdynamic*)c->value, p1, p2, p3, p4, p5, p6, p7 };
+	void *v = c->hasValue ? hlc_dyn_call(c->fun,c->t->fun->parent,args) : hlc_dyn_call(c->fun,c->t,args+1);
+	return hl_dyn_casti(&v,c->t->fun->ret,&hlt_i32);
+}
+
 vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to ) {
-	static void *fptr[HL_MAX_ARGS+1] = { hl_wrap0 };
+	static void *fptr_p[HL_MAX_ARGS+1] = { hl_wrap0, hl_wrap1, hl_wrap2, hl_wrap3, hl_wrap4, hl_wrap5, hl_wrap6, hl_wrap7 };
+	static void *fptr_i[HL_MAX_ARGS+1] = { hl_wrap0i, hl_wrap1i, hl_wrap2i, hl_wrap3i, hl_wrap4i, hl_wrap5i, hl_wrap6i, hl_wrap7i };
 	hl_type_fun *ct = c->t->fun;
 	int i;
 	if( ct->nargs != to->fun->nargs )
-		return NULL;
-	if( !hl_is_ptr(to->fun->ret) )
 		return NULL;
 	for(i=0;i<to->fun->nargs;i++)
 		if( !hl_is_ptr(to->fun->args[i]) )
 			return NULL;
 	if( to->fun->nargs > HL_MAX_ARGS )
 		return NULL;
-	return hl_alloc_closure_wrapper(to,fptr[to->fun->nargs],c);
+	if( hl_is_ptr(to->fun->ret) )
+		return hl_alloc_closure_wrapper(to,fptr_p[to->fun->nargs],c);
+	switch( to->fun->ret->kind ) {
+	case HI8:
+	case HI16:
+	case HI32:
+	case HBOOL:
+		return hl_alloc_closure_wrapper(to,fptr_i[to->fun->nargs],c);
+	case HF64:
+		hl_fatal("TODO");
+	case HF32:
+		hl_fatal("TODO");
+	default:
+		break;
+	}
+	return NULL;
 }
 
 void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
@@ -292,7 +392,7 @@ void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
 }
 
 HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
-	if( t->kind == HDYN )
+	if( t->kind == HDYN || v == NULL || hl_safe_cast(v->t,t) )
 		return v;
 	hl_fatal("TODO");
 	return NULL;
