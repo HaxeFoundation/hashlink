@@ -5,6 +5,7 @@ hl_type hlt_bytes = { HBYTES };
 hl_type hlt_dynobj = { HDYNOBJ };
 hl_type hlt_dyn = { HDYN };
 hl_type hlt_i32 = { HI32 };
+hl_type hlt_f32 = { HF32 };
 hl_type hlt_f64 = { HF64 };
 hl_type hlt_void = { HVOID };
 
@@ -365,7 +366,7 @@ HL_PRIM varray *hl_enum_parameters( vdynamic *v ) {
 	a->at = &hlt_dyn;
 	a->size = c->nparams;
 	for(i=0;i<c->nparams;i++)
-		((vdynamic**)(a+1))[i] = hl_make_dyn(e+c->offsets[i],c->params[i]);
+		((vdynamic**)(a+1))[i] = hl_make_dyn((char*)e+c->offsets[i],c->params[i]);
 	return a;
 }
 

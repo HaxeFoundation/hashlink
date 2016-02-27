@@ -39,6 +39,16 @@ static int hl_lookup_find_index( hl_field_lookup *l, int size, int hash ) {
 	return (min + max) >> 1;
 }
 
+static hl_field_lookup *obj_resolve_field( hl_type_obj *o, int hfield ) {
+	hl_runtime_obj *rt = o->rt;
+	do {
+		hl_field_lookup *f = hl_lookup_find(rt->lookup,rt->nlookup,hfield);
+		if( f ) return f;
+		rt = rt->parent;
+	} while( rt );
+	return NULL;
+}
+
 static int hl_cache_count = 0;
 static int hl_cache_size = 0;
 static hl_field_lookup *hl_cache = NULL;
@@ -212,13 +222,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 			v->value = obj;
 			v->next = NULL;
 			for(i=0;i<vt->virt->nfields;i++) {
-				hl_runtime_obj *rtt = rt;
-				hl_field_lookup *f = NULL;
-				while( rtt ) {
-					f = hl_lookup_find(rtt->lookup,rtt->nlookup,vt->virt->fields[i].hashed_name);
-					if( f != NULL ) break;
-					rtt = rtt->parent;
-				}
+				hl_field_lookup *f = obj_resolve_field(obj->t->obj,vt->virt->fields[i].hashed_name);
 				if( f && f->field_index < 0 ) {
 					hl_type tmp;
 					hl_type_fun tf;
@@ -366,14 +370,8 @@ double hl_dyn_getd( vdynamic *d, int hfield ) {
 		break;
 	case HOBJ:
 		{
-			hl_runtime_obj *rt = d->t->obj->rt;
-			hl_field_lookup *f = NULL;
-			do {
-				f = hl_lookup_find(rt->lookup,rt->nlookup,hfield);
-				if( f != NULL ) break;
-				rt = rt->parent;
-			} while( rt );
-			if( f == NULL ) return 0.;
+			hl_field_lookup *f = obj_resolve_field(d->t->obj,hfield);
+			if( f == NULL || f->field_index < 0 ) return 0.;
 			return fetch_d((char*)d + f->field_index,f->t);
 		}
 		break;
@@ -387,7 +385,35 @@ double hl_dyn_getd( vdynamic *d, int hfield ) {
 }
 
 void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
-	hl_fatal("TODO");
+	if( d == NULL ) hl_error("Invalid field access");
+	switch( d->t->kind ) {
+	case HDYNOBJ:
+		{
+			vdynobj *o = (vdynobj*)d;
+			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
+			if( f == NULL )
+				f = hl_dyn_alloc_field(o,hfield,&hlt_f32);
+			else if( f->t->kind != HF32 )
+				hl_dyn_change_field(o,f,&hlt_f32);
+			*(float*)(o->fields_data + f->field_index) = value;
+		}
+		break;
+	case HOBJ:
+		{
+			hl_field_lookup *l = obj_resolve_field(d->t->obj,hfield);
+			vdynamic tmp;
+			if( l == NULL || l->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
+			tmp.t = &hlt_f32;
+			tmp.v.d = value;
+			hl_write_dyn((char*)d+l->field_index,l->t,&tmp);
+		}
+		break;
+	case HVIRTUAL:
+		hl_dyn_setf(((vvirtual*)d)->value, hfield, value);
+		break;
+	default:
+		hl_error("Invalid field access");
+	}
 }
 
 void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
@@ -405,7 +431,14 @@ void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
 		}
 		break;
 	case HOBJ:
-		hl_error("TODO");
+		{
+			hl_field_lookup *l = obj_resolve_field(d->t->obj,hfield);
+			vdynamic tmp;
+			if( l == NULL || l->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
+			tmp.t = &hlt_f64;
+			tmp.v.d = value;
+			hl_write_dyn((char*)d+l->field_index,l->t,&tmp);
+		}
 		break;
 	case HVIRTUAL:
 		hl_dyn_setd(((vvirtual*)d)->value, hfield, value);
@@ -427,14 +460,8 @@ int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 		break;
 	case HOBJ:
 		{
-			hl_runtime_obj *rt = d->t->obj->rt;
-			hl_field_lookup *f = NULL;
-			do {
-				f = hl_lookup_find(rt->lookup,rt->nlookup,hfield);
-				if( f != NULL ) break;
-				rt = rt->parent;
-			} while( rt );
-			if( f == NULL ) return 0;
+			hl_field_lookup *f = obj_resolve_field(d->t->obj,hfield);
+			if( f == NULL || f->field_index < 0 ) return 0;
 			return fetch_i((char*)d + f->field_index,f->t,t);
 		}
 		break;
@@ -508,7 +535,14 @@ void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 		}
 		break;
 	case HOBJ:
-		hl_error("TODO");
+		{
+			hl_field_lookup *l = obj_resolve_field(d->t->obj,hfield);
+			vdynamic tmp;
+			if( l == NULL || l->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
+			tmp.t = t;
+			tmp.v.i = value;
+			hl_write_dyn((char*)d+l->field_index,l->t,&tmp);
+		}
 		break;
 	case HVIRTUAL:
 		hl_dyn_seti(((vvirtual*)d)->value, hfield, t, value);
@@ -536,7 +570,18 @@ void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *value ) {
 		hl_dyn_setp(((vvirtual*)d)->value, hfield, t, value);
 		break;
 	case HOBJ:
-		hl_error("TODO");
+		{
+			hl_field_lookup *l = obj_resolve_field(d->t->obj,hfield);
+			if( l == NULL || l->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
+			if( hl_is_dynamic(t) )
+				hl_write_dyn((char*)d+l->field_index,l->t,(vdynamic*)value);
+			else {
+				vdynamic tmp;
+				tmp.t = t;
+				tmp.v.ptr = value;
+				hl_write_dyn((char*)d+l->field_index,l->t,value ? &tmp : NULL);
+			}
+		}
 		break;
 	default:
 		hl_error("Invalid field access");
@@ -548,6 +593,10 @@ HL_PRIM vdynamic *hl_obj_get_field( vdynamic *obj, int hfield ) {
 }
 
 HL_PRIM void hl_obj_set_field( vdynamic *obj, int hfield, vdynamic *v ) {
+	if( v == NULL ) {
+		hl_dyn_setp(obj,hfield,&hlt_dyn,NULL);
+		return;
+	}
 	switch( v->t->kind ) {
 	case HI8:
 		hl_dyn_seti(obj,hfield,v->t,v->v.c);
@@ -578,12 +627,8 @@ HL_PRIM bool hl_obj_has_field( vdynamic *obj, int hfield ) {
 	switch( obj->t->kind ) {
 	case HOBJ:
 		{
-			hl_runtime_obj *rt = obj->t->obj->rt;
-			do {
-				hl_field_lookup *f = hl_lookup_find(rt->lookup,rt->nlookup,hfield);
-				if( f ) return f->field_index >= 0;
-				rt = rt->parent;
-			} while( rt );
+			hl_field_lookup *l = obj_resolve_field(obj->t->obj, hfield);
+			return l && l->field_index >= 0;
 		}
 		break;
 	case HDYNOBJ:
@@ -617,6 +662,25 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 			a->size = o->nfields;
 			for(i=0;i<o->nfields;i++)
 				((vbyte**)(a + 1))[i] = (vbyte*)hl_field_name((&o->dproto->fields + i)->hashed_name);
+		}
+		break;
+	case HOBJ:
+		{
+			hl_type_obj *tobj = obj->t->obj;
+			hl_runtime_obj *o = tobj->rt;
+			int i, p = 0;
+			a = (varray*)hl_gc_alloc(sizeof(varray)+sizeof(void*)*o->nfields);
+			a->t = &hlt_array;
+			a->at = &hlt_bytes;
+			a->size = o->nfields;
+			while( true ) {
+				for(i=0;i<tobj->nfields;i++) {
+					hl_obj_field *f = tobj->fields + i;
+					((vbyte**)(a + 1))[p++] =  (vbyte*)f->name;
+				}
+				if( tobj->super == NULL ) break;
+				tobj = tobj->super->obj;
+			}
 		}
 		break;
 	}

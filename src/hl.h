@@ -326,7 +326,6 @@ struct hl_runtime_obj {
 	// absolute
 	int nfields;
 	int nproto;
-	int nlookup;
 	int size;
 	int *fields_indexes;
 	hl_runtime_obj *parent;
@@ -334,6 +333,7 @@ struct hl_runtime_obj {
 	int (*compareFun)( vdynamic *a, vdynamic *b );
 	vdynamic *(*castFun)( vdynamic *a, hl_type *t );
 	// relative
+	int nlookup;
 	hl_field_lookup *lookup;
 	void **methods;
 };
@@ -358,6 +358,7 @@ typedef struct _venum {
 extern hl_type hlt_void;
 extern hl_type hlt_i32;
 extern hl_type hlt_f64;
+extern hl_type hlt_f32;
 extern hl_type hlt_dyn;
 extern hl_type hlt_array;
 extern hl_type hlt_bytes;

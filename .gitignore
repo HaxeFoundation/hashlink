@@ -16,3 +16,4 @@ x64
 *.hdll
 /src/_main.c
 *.o
+/src/_main2.c

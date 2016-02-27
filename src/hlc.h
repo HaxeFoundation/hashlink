@@ -63,7 +63,6 @@ static vdynamic *hlc_dyn_call_args( vclosure *c, vdynamic **args, int nargs ) {
 	tmp.a.at = &hlt_dyn;
 	tmp.a.size = nargs;
 	if( c->hasValue ) {
-		if( c->hasValue == 2 ) hl_error("TODO");
 		ctmp.t = c->t->fun->parent;
 		ctmp.hasValue = 0;
 		ctmp.fun = c->fun;
