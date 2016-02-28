@@ -308,12 +308,17 @@ typedef struct {
 	int __pad; // force align on 16 bytes for double
 } varray;
 
-typedef struct {
+typedef struct _vclosure {
 	hl_type *t;
 	void *fun;
 	int hasValue;
 	void *value;
 } vclosure;
+
+typedef struct {
+	struct _vclosure;
+	vclosure *wrappedFun;
+} vclosure_wrapper;
 
 typedef struct {
 	hl_type *t;
@@ -415,7 +420,8 @@ void hl_dyn_setd( vdynamic *d, int hfield, double v );
 
 vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
 vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );
-vclosure *hl_alloc_closure_wrapper( hl_type *t, void *fvalue, void *ptr );
+vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to );
+void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
 
 // ----------------------- ALLOC --------------------------------------------------
 
