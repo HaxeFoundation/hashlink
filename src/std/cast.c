@@ -128,6 +128,10 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 			if( c ) return c;
 		}
 		break;
+	case TK2(HOBJ,HVIRTUAL):
+	case TK2(HDYNOBJ,HVIRTUAL):
+	case TK2(HVIRTUAL,HVIRTUAL):
+		return hl_to_virtual(to,*(vdynamic**)data);
 	case TK2(HOBJ,HDYN):
 	case TK2(HDYNOBJ,HDYN):
 	case TK2(HFUN,HDYN):
@@ -243,10 +247,13 @@ int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	case TK2(HTYPE,HTYPE):
 	case TK2(HBYTES,HBYTES):
 		return a->v.ptr != b->v.ptr;
+	case TK2(HOBJ,HVIRTUAL):
+	case TK2(HDYNOBJ,HVIRTUAL):
+		return hl_dyn_compare(a,((vvirtual*)b)->value);
+	case TK2(HVIRTUAL,HOBJ):
+	case TK2(HVIRTUAL,HDYNOBJ):
+		return hl_dyn_compare(((vvirtual*)a)->value,b);
 	}
-#ifdef _DEBUG
-	uprintf(USTR("Don't know how to compare %s(%s) and %s(%s)\n"),hl_to_string(a),hl_type_str(a->t),hl_to_string(b),hl_type_str(b->t));
-#endif
 	return hl_invalid_comparison;
 }
 
