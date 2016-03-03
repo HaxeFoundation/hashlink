@@ -31,11 +31,6 @@ vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) {
 	return c;
 }
 
-HL_PRIM vdynamic *hl_make_var_args( vclosure *c ) {
-	hl_fatal("TODO");
-	return NULL;
-}
-
 HL_PRIM vdynamic *hl_no_closure( vdynamic *c ) {
 	vclosure *cl = (vclosure*)c;
 	if( !cl->hasValue ) return c;
@@ -137,6 +132,10 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 	return dret;
 }
 
+static void fun_var_args() {
+	hl_fatal("assert");
+}
+
 void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	vclosure_wrapper *c = (vclosure_wrapper*)_c;
 	union { double d; int i; float f; } tmp[HL_MAX_ARGS];
@@ -148,32 +147,46 @@ void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	void *pret, *aret;
 	if( ret == NULL )
 		ret = &out;
-	if( w->hasValue )
-		vargs[p++] = (vdynamic*)w->value;
-	for(i=0;i<w->t->fun->nargs;i++) {
-		hl_type *t = c->t->fun->args[i];
-		hl_type *to = w->t->fun->args[i];
-		void *v = hl_is_ptr(t) ? args + i : args[i];
-		switch( to->kind ) {
-		case HI8:
-		case HI16:
-		case HI32:
-			tmp[i].i = hl_dyn_casti(v,t,to);
-			v = &tmp[i].i;
-			break;
-		case HF32:
-			tmp[i].f = hl_dyn_castf(v,t);
-			v = &tmp[i].f;
-			break;
-		case HF64:
-			tmp[i].d = hl_dyn_castd(v,t);
-			v = &tmp[i].d;
-			break;
-		default:
-			v = hl_dyn_castp(v,t,to);
-			break;
+	if( w->fun == fun_var_args ) {
+		varray *a;
+		w = (vclosure*)w->value; // the real callback
+		a = hl_aalloc(&hlt_dyn,c->t->fun->nargs);
+		for(i=0;i<c->t->fun->nargs;i++) {
+			hl_type *t = c->t->fun->args[i];
+			void *v = hl_is_ptr(t) ? args + i : args[i];
+			*(void**)(a + 1) = hl_make_dyn(v,t);
 		}
-		vargs[p++] = v;
+		if( w->hasValue )
+			vargs[p++] = (vdynamic*)w->value;
+		vargs[p++] = (vdynamic*)a;
+	} else {
+		if( w->hasValue )
+			vargs[p++] = (vdynamic*)w->value;
+		for(i=0;i<w->t->fun->nargs;i++) {
+			hl_type *t = c->t->fun->args[i];
+			hl_type *to = w->t->fun->args[i];
+			void *v = hl_is_ptr(t) ? args + i : args[i];
+			switch( to->kind ) {
+			case HI8:
+			case HI16:
+			case HI32:
+				tmp[i].i = hl_dyn_casti(v,t,to);
+				v = &tmp[i].i;
+				break;
+			case HF32:
+				tmp[i].f = hl_dyn_castf(v,t);
+				v = &tmp[i].f;
+				break;
+			case HF64:
+				tmp[i].d = hl_dyn_castd(v,t);
+				v = &tmp[i].d;
+				break;
+			default:
+				v = hl_dyn_castp(v,t,to);
+				break;
+			}
+			vargs[p++] = v;
+		}
 	}
 	pret = hlc_static_call(w->fun,w->hasValue ? w->t->fun->parent : w->t,vargs,ret);
 	aret = hl_is_ptr(w->t->fun->ret) ? &pret : pret;
@@ -200,7 +213,7 @@ vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
 	vclosure_wrapper *c;
 	void *wrap = hlc_get_wrapper(to);
 	if( wrap == NULL ) return NULL;
-	if( v->t->fun->nargs != to->fun->nargs )
+	if( v->fun != fun_var_args && v->t->fun->nargs != to->fun->nargs )
 		return NULL;
 	c = (vclosure_wrapper*)hl_gc_alloc(sizeof(vclosure_wrapper));
 	c->t = to;
@@ -209,4 +222,13 @@ vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
 	c->value = c;
 	c->wrappedFun = v; 
 	return (vclosure*)c;
+}
+
+static hl_type hlt_var_args = { HFUN };
+static hl_type_fun hlt_var_fun = { NULL, &hlt_void, -1, &hlt_var_args, { HFUN, NULL }, { NULL, &hlt_void, -1, &hlt_var_args} };
+
+HL_PRIM vdynamic *hl_make_var_args( vclosure *c ) {
+	hlt_var_args.fun = &hlt_var_fun;
+	hlt_var_fun.closure_type.p = &hlt_var_fun;
+	return (vdynamic*)hl_alloc_closure_ptr(&hlt_var_args,fun_var_args,c);
 }
