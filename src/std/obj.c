@@ -361,134 +361,39 @@ static void hl_dyn_change_field( vdynobj *o, hl_field_lookup *f, hl_type *t ) {
 	}
 }
 
-double hl_dyn_getd( vdynamic *d, int hfield ) {
+// -------------------- DYNAMIC GET ------------------------------------
+
+static void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t ) {
 	switch( d->t->kind ) {
 	case HDYNOBJ:
 		{
 			vdynobj *o = (vdynobj*)d;
 			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
-			if( f == NULL ) return 0.;
-			return fetch_d(o->fields_data + f->field_index,f->t);
+			if( f == NULL ) return NULL;
+			*t = f->t;
+			return o->fields_data + f->field_index;
 		}
 		break;
 	case HOBJ:
 		{
 			hl_field_lookup *f = obj_resolve_field(d->t->obj,hfield);
-			if( f == NULL || f->field_index < 0 ) return 0.;
-			return fetch_d((char*)d + f->field_index,f->t);
+			if( f == NULL || f->field_index < 0 ) return NULL;
+			*t = f->t;
+			return (char*)d + f->field_index;
 		}
 		break;
 	case HVIRTUAL:
-		return hl_dyn_getd(((vvirtual*)d)->value, hfield);
+		return hl_obj_lookup(((vvirtual*)d)->value, hfield, t);
 	default:
 		hl_error("Invalid field access");
 		break;
 	}
-	return 0.;
+	return NULL;
 }
 
-void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
-	if( d == NULL )
-		hl_error("Invalid field access");
+// fetch method or dynamic field (getField)
+static vdynamic *hl_obj_lookup_extra( vdynamic *d, int hfield ) {
 	switch( d->t->kind ) {
-	case HDYNOBJ:
-		{
-			vdynobj *o = (vdynobj*)d;
-			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
-			if( f == NULL )
-				f = hl_dyn_alloc_field(o,hfield,&hlt_f32);
-			else if( f->t->kind != HF32 )
-				hl_dyn_change_field(o,f,&hlt_f32);
-			*(float*)(o->fields_data + f->field_index) = value;
-		}
-		break;
-	case HOBJ:
-		{
-			hl_field_lookup *l = obj_resolve_field(d->t->obj,hfield);
-			vdynamic tmp;
-			if( l == NULL || l->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
-			tmp.t = &hlt_f32;
-			tmp.v.d = value;
-			hl_write_dyn((char*)d+l->field_index,l->t,&tmp);
-		}
-		break;
-	case HVIRTUAL:
-		hl_dyn_setf(((vvirtual*)d)->value, hfield, value);
-		break;
-	default:
-		hl_error("Invalid field access");
-	}
-}
-
-void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
-	if( d == NULL )
-		hl_error("Invalid field access");
-	switch( d->t->kind ) {
-	case HDYNOBJ:
-		{
-			vdynobj *o = (vdynobj*)d;
-			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
-			if( f == NULL )
-				f = hl_dyn_alloc_field(o,hfield,&hlt_f64);
-			else if( f->t->kind != HF64 )
-				hl_dyn_change_field(o,f,&hlt_f64);
-			*(double*)(o->fields_data + f->field_index) = value;
-		}
-		break;
-	case HOBJ:
-		{
-			hl_field_lookup *l = obj_resolve_field(d->t->obj,hfield);
-			vdynamic tmp;
-			if( l == NULL || l->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
-			tmp.t = &hlt_f64;
-			tmp.v.d = value;
-			hl_write_dyn((char*)d+l->field_index,l->t,&tmp);
-		}
-		break;
-	case HVIRTUAL:
-		hl_dyn_setd(((vvirtual*)d)->value, hfield, value);
-		break;
-	default:
-		hl_error("Invalid field access");
-	}
-}
-
-int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
-	switch( d->t->kind ) {
-	case HDYNOBJ:
-		{
-			vdynobj *o = (vdynobj*)d;
-			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
-			if( f == NULL ) return 0;
-			return fetch_i(o->fields_data + f->field_index,f->t, t);
-		}
-		break;
-	case HOBJ:
-		{
-			hl_field_lookup *f = obj_resolve_field(d->t->obj,hfield);
-			if( f == NULL || f->field_index < 0 ) return 0;
-			return fetch_i((char*)d + f->field_index,f->t,t);
-		}
-		break;
-	case HVIRTUAL:
-		return hl_dyn_geti(((vvirtual*)d)->value, hfield, t);
-	default:
-		hl_error("Invalid field access");
-		break;
-	}
-	return 0;
-}
-
-void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
-	switch( d->t->kind ) {
-	case HDYNOBJ:
-		{
-			vdynobj *o = (vdynobj*)d;
-			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
-			if( f == NULL ) return 0;
-			return fetch_p(o->fields_data + f->field_index,f->t,t);
-		}
-		break;
 	case HOBJ:
 		{
 			hl_runtime_obj *rt = d->t->obj->rt;
@@ -498,32 +403,71 @@ void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
 				if( f != NULL ) break;
 				rt = rt->parent;
 			} while( rt );
+			if( f && f->field_index < 0 )
+				return (vdynamic*)hl_alloc_closure_ptr(f->t,rt->methods[-f->field_index-1],d);
 			if( f == NULL ) {
 				rt = d->t->obj->rt;
-				if( rt->getFieldFun ) {
-					vdynamic *v = rt->getFieldFun(d,hfield);
-					if( v != NULL ) return hl_dyn_castp(&v,&hlt_dyn,t);
-				}
-				return NULL;
+				if( rt->getFieldFun )
+					return rt->getFieldFun(d,hfield);
 			}
-			if( f->field_index < 0 ) {
-				vclosure *c = hl_alloc_closure_ptr(f->t,rt->methods[-f->field_index-1],d);
-				return hl_dyn_castp(&c,c->t,t);
-			}
-			return fetch_p((char*)d + f->field_index,f->t,t);
+			return NULL;
 		}
 		break;
 	case HVIRTUAL:
-		return hl_dyn_getp(((vvirtual*)d)->value, hfield, t);
-	default:
-		hl_error("Invalid field access");
+		return hl_obj_lookup_extra(((vvirtual*)d)->value, hfield);
 	}
-	return 0;
+	return NULL;
 }
 
-void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
-	if( d == NULL )
-		hl_error("Invalid field access");
+int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
+	hl_type *ft;
+	void *addr = hl_obj_lookup(d,hfield,&ft);
+	if( !addr ) return 0;
+	switch( ft->kind ) {
+	case HI8:
+		return *(char*)addr;
+	case HI16:
+		return *(short*)addr;
+	case HI32:
+		return *(int*)addr;
+	case HF32:
+		return (int)*(float*)addr;
+	case HF64:
+		return (int)*(double*)addr;
+	case HBOOL:
+		return *(bool*)addr;
+	default:
+		return hl_dyn_casti(addr,ft,t);
+	}
+}
+
+float hl_dyn_getf( vdynamic *d, int hfield ) {
+	hl_type *ft;
+	void *addr = hl_obj_lookup(d,hfield,&ft);
+	if( !addr ) return 0.;
+	return ft->kind == HF32 ? *(float*)addr : hl_dyn_castf(addr,ft);
+}
+
+double hl_dyn_getd( vdynamic *d, int hfield ) {
+	hl_type *ft;
+	void *addr = hl_obj_lookup(d,hfield,&ft);
+	if( !addr ) return 0.;
+	return ft->kind == HF64 ? *(double*)addr : hl_dyn_castd(addr,ft);
+}
+
+void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
+	hl_type *ft;
+	void *addr = hl_obj_lookup(d,hfield,&ft);
+	if( !addr ) {
+		d = hl_obj_lookup_extra(d,hfield);
+		return d == NULL ? NULL : hl_dyn_castp(&d,&hlt_dyn,t);
+	}
+	return hl_same_type(t,ft) ? *(void**)addr : hl_dyn_castp(addr,ft,t);
+}
+
+// -------------------- DYNAMIC SET ------------------------------------
+
+static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **ft ) {
 	switch( d->t->kind ) {
 	case HDYNOBJ:
 		{
@@ -531,76 +475,104 @@ void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
 			if( f == NULL )
 				f = hl_dyn_alloc_field(o,hfield,t);
-			else if( f->t->kind != t->kind )
+			else if( !hl_same_type(t,f->t) )
 				hl_dyn_change_field(o,f,t);
-			switch( t->kind ) {
-			case HI8:
-			case HBOOL:
-				*(char*)(o->fields_data + f->field_index) = (char)value;
-				break;
-			case HI16:
-				*(short*)(o->fields_data + f->field_index) = (short)value;
-				break;
-			default:
-				*(int*)(o->fields_data + f->field_index) = value;
-				break;
-			}
+			*ft = f->t;
+			return o->fields_data + f->field_index;
 		}
 		break;
 	case HOBJ:
 		{
-			hl_field_lookup *l = obj_resolve_field(d->t->obj,hfield);
-			vdynamic tmp;
-			if( l == NULL || l->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
-			tmp.t = t;
-			tmp.v.i = value;
-			hl_write_dyn((char*)d+l->field_index,l->t,&tmp);
+			hl_field_lookup *f = obj_resolve_field(d->t->obj,hfield);
+			if( f == NULL || f->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
+			*ft = f->t;
+			return (char*)d+f->field_index;
 		}
 		break;
 	case HVIRTUAL:
-		hl_dyn_seti(((vvirtual*)d)->value, hfield, t, value);
-		break;
+		return hl_obj_lookup_set(d, hfield, t, ft);
 	default:
 		hl_error("Invalid field access");
+		break;
+	}
+	return NULL;
+}
+
+void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
+	hl_type *ft;
+	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
+	switch( ft->kind ) {
+	case HI8:
+		*(char*)addr = (char)value;
+		break;
+	case HI16:
+		*(short*)addr = (short)value;
+		break;
+	case HI32:
+		*(int*)addr = value;
+		break;
+	case HBOOL:
+		*(bool*)addr = (bool)value;
+		break;
+	case HF32:
+		*(float*)addr = (float)value;
+		break;
+	case HF64:
+		*(double*)addr = value;
+		break;
+	default:
+		{
+			vdynamic tmp;
+			tmp.t = t;
+			tmp.v.f = value;
+			hl_write_dyn(addr,ft,&tmp);
+		}
+		break;
+	}
+}
+
+void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
+	hl_type *t;
+	void *addr = hl_obj_lookup_set(d,hfield,&hlt_f32,&t);
+	if( t->kind == HF32 )
+		*(float*)addr = value;
+	else {
+		vdynamic tmp;
+		tmp.t = &hlt_f32;
+		tmp.v.f = value;
+		hl_write_dyn(addr,t,&tmp);
+	}
+}
+
+void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
+	hl_type *t;
+	void *addr = hl_obj_lookup_set(d,hfield,&hlt_f64,&t);
+	if( t->kind == HF64 )
+		*(double*)addr = value;
+	else {
+		vdynamic tmp;
+		tmp.t = &hlt_f64;
+		tmp.v.f = value;
+		hl_write_dyn(addr,t,&tmp);
 	}
 }
 
 void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *value ) {
-	if( d == NULL )
-		hl_error("Invalid field access");
-	switch( d->t->kind ) {
-	case HDYNOBJ:
-		{
-			vdynobj *o = (vdynobj*)d;
-			hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,hfield);
-			if( f == NULL )
-				f = hl_dyn_alloc_field(o,hfield,t);
-			else if( !hl_same_type(f->t,t) )
-				hl_dyn_change_field(o,f,t);
-			*(void**)(o->fields_data + f->field_index) = value;
-		}
-		break;
-	case HVIRTUAL:
-		hl_dyn_setp(((vvirtual*)d)->value, hfield, t, value);
-		break;
-	case HOBJ:
-		{
-			hl_field_lookup *l = obj_resolve_field(d->t->obj,hfield);
-			if( l == NULL || l->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
-			if( hl_is_dynamic(t) )
-				hl_write_dyn((char*)d+l->field_index,l->t,(vdynamic*)value);
-			else {
-				vdynamic tmp;
-				tmp.t = t;
-				tmp.v.ptr = value;
-				hl_write_dyn((char*)d+l->field_index,l->t,value ? &tmp : NULL);
-			}
-		}
-		break;
-	default:
-		hl_error("Invalid field access");
+	hl_type *ft;
+	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
+	if( hl_same_type(t,ft) || value == NULL )
+		*(void**)addr = value;
+	else if( hl_is_dynamic(t) )
+		hl_write_dyn(addr,ft,(vdynamic*)value);
+	else {
+		vdynamic tmp;
+		tmp.t = t;
+		tmp.v.ptr = value;
+		hl_write_dyn(addr,ft,&tmp);
 	}
 }
+
+// -------------------- HAXE API ------------------------------------
 
 HL_PRIM vdynamic *hl_obj_get_field( vdynamic *obj, int hfield ) {
 	if( obj == NULL )
