@@ -50,7 +50,7 @@ HL_PRIM int hl_date_from_time( double time ) {
 HL_PRIM int hl_date_from_string( vbyte *b ) {
 	uchar *str = (uchar*)b;
 	hl_fatal("TODO");
-	return 0;
+	return *str;
 }
 
 HL_PRIM int hl_date_new( int y, int mo, int d, int h, int m, int s ) {

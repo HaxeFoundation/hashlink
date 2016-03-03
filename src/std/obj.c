@@ -208,7 +208,7 @@ void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 	Allocate a virtual fields mapping to a given value.
 **/
 vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
-	vvirtual *v;
+	vvirtual *v = NULL;
 	if( obj == NULL ) return NULL;
 #ifdef _DEBUG
 	if( vt->vobj_proto == NULL ) hl_fatal("virtual not initialized");
@@ -217,7 +217,6 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	case HOBJ:
 		{ 
 			int i;
-			hl_runtime_obj *rt = obj->t->obj->rt;
 			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual));
 			v->t = vt;
 			v->fields_data = (char*)obj;
@@ -415,6 +414,8 @@ static vdynamic *hl_obj_lookup_extra( vdynamic *d, int hfield ) {
 		break;
 	case HVIRTUAL:
 		return hl_obj_lookup_extra(((vvirtual*)d)->value, hfield);
+	default:
+		break;
 	}
 	return NULL;
 }
@@ -635,6 +636,8 @@ HL_PRIM bool hl_obj_has_field( vdynamic *obj, int hfield ) {
 		break;
 	case HVIRTUAL:
 		return hl_obj_has_field(((vvirtual*)obj)->value,hfield);
+	default:
+		break;
 	}
 	return false;
 }
@@ -696,6 +699,8 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 				tobj = tobj->super->obj;
 			}
 		}
+		break;
+	default:
 		break;
 	}
 	return a;

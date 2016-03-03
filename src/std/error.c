@@ -1,3 +1,4 @@
+#define HLC_NO_STATIC
 #include <hlc.h>
 #include <stdarg.h>
 #include <string.h>

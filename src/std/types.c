@@ -167,6 +167,8 @@ bool hl_safe_cast( hl_type *t, hl_type *to ) {
 			return true;
 		}
 		break;
+	default:
+		break;
 	}
 	return hl_same_type(t,to);
 }
@@ -292,7 +294,7 @@ HL_PRIM varray *hl_type_instance_fields( hl_type *t ) {
 	}
 	rt = hl_get_obj_rt(t);
 	a = hl_aalloc(&hlt_bytes,mcount + rt->nproto + rt->nfields);
-	names = (uchar**)(a + 1);
+	names = (const uchar**)(a + 1);
 	o = t->obj;
 	while( true ) {
 		int i;

@@ -96,7 +96,11 @@
 #else
 #	define HL_WSIZE 4
 #	define IS_64	0
-#	define _PTR_FMT	L"%X"
+#	ifdef HL_VCC
+#		define _PTR_FMT	L"%X"
+#	else
+#		define _PTR_FMT	u"%X"
+#	endif
 #endif
 
 #ifdef __cplusplus
@@ -138,9 +142,19 @@ typedef wchar_t	uchar;
 #	define ucmp(a,b)	wcscmp(a,b)
 #	define strtou(out,size,str) mbstowcs(out,str,size)	
 #else
+#	include <stdarg.h>
 typedef unsigned short uchar;
 #	undef USTR
 #	define USTR(str)	u##str
+extern int ustrlen( const uchar *str );
+extern uchar *ustrdup( const uchar *str );
+extern double utod( const uchar *str, uchar **end );
+extern int utoi( const uchar *str, uchar **end );
+extern int ucmp( const uchar *a, const uchar *b );
+extern int strtou( uchar *out, int out_size, const char *str ); 
+extern int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
+extern int uprintf( const uchar *fmt, ... );
+extern int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
 #endif
 
 // ---- TYPES -------------------------------------------
@@ -316,7 +330,7 @@ typedef struct _vclosure {
 } vclosure;
 
 typedef struct {
-	struct _vclosure;
+	vclosure cl;
 	vclosure *wrappedFun;
 } vclosure_wrapper;
 
@@ -400,8 +414,8 @@ hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash );
 
 int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
 void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
-float hl_dyn_getf( void *data, int hfield );
-double hl_dyn_getd( void *data, int hfield );
+float hl_dyn_getf( vdynamic *d, int hfield );
+double hl_dyn_getd( vdynamic *d, int hfield );
 
 int hl_dyn_casti( void *data, hl_type *t, hl_type *to );
 void *hl_dyn_castp( void *data, hl_type *t, hl_type *to );

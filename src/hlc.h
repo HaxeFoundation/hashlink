@@ -40,6 +40,8 @@
 
 #undef CONST
 
+#ifndef HLC_NO_STATIC
+
 static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }
@@ -104,6 +106,8 @@ static vdynamic *hlc_dyn_call_obj( vdynamic *o, int hfield, vdynamic **args, int
 	}
 	return NULL;
 }
+
+#endif
 
 #include <setjmp.h>
 

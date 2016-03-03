@@ -138,6 +138,7 @@ static void fun_var_args() {
 
 void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	vclosure_wrapper *c = (vclosure_wrapper*)_c;
+	hl_type_fun *tfun = c->cl.t->fun;
 	union { double d; int i; float f; } tmp[HL_MAX_ARGS];
 	void *vargs[HL_MAX_ARGS+1];
 	vdynamic out;
@@ -150,9 +151,9 @@ void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	if( w->fun == fun_var_args ) {
 		varray *a;
 		w = (vclosure*)w->value; // the real callback
-		a = hl_aalloc(&hlt_dyn,c->t->fun->nargs);
-		for(i=0;i<c->t->fun->nargs;i++) {
-			hl_type *t = c->t->fun->args[i];
+		a = hl_aalloc(&hlt_dyn,tfun->nargs);
+		for(i=0;i<tfun->nargs;i++) {
+			hl_type *t = tfun->args[i];
 			void *v = hl_is_ptr(t) ? args + i : args[i];
 			*(void**)(a + 1) = hl_make_dyn(v,t);
 		}
@@ -163,7 +164,7 @@ void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 		if( w->hasValue )
 			vargs[p++] = (vdynamic*)w->value;
 		for(i=0;i<w->t->fun->nargs;i++) {
-			hl_type *t = c->t->fun->args[i];
+			hl_type *t = tfun->args[i];
 			hl_type *to = w->t->fun->args[i];
 			void *v = hl_is_ptr(t) ? args + i : args[i];
 			switch( to->kind ) {
@@ -190,11 +191,11 @@ void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	}
 	pret = hlc_static_call(w->fun,w->hasValue ? w->t->fun->parent : w->t,vargs,ret);
 	aret = hl_is_ptr(w->t->fun->ret) ? &pret : pret;
-	switch( c->t->fun->ret->kind ) {
+	switch( tfun->ret->kind ) {
 	case HI8:
 	case HI16:
 	case HI32:
-		ret->v.i = hl_dyn_casti(aret,w->t->fun->ret,c->t->fun->ret);
+		ret->v.i = hl_dyn_casti(aret,w->t->fun->ret,tfun->ret);
 		break;
 	case HF32:
 		ret->v.f = hl_dyn_castf(aret,w->t->fun->ret);
@@ -203,7 +204,7 @@ void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 		ret->v.d = hl_dyn_castd(aret,w->t->fun->ret);
 		break;
 	default:
-		pret = hl_dyn_castp(aret,w->t->fun->ret,c->t->fun->ret);
+		pret = hl_dyn_castp(aret,w->t->fun->ret,tfun->ret);
 		break;
 	}
 	return pret;
@@ -216,10 +217,10 @@ vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
 	if( v->fun != fun_var_args && v->t->fun->nargs != to->fun->nargs )
 		return NULL;
 	c = (vclosure_wrapper*)hl_gc_alloc(sizeof(vclosure_wrapper));
-	c->t = to;
-	c->fun = wrap;
-	c->hasValue = 2;
-	c->value = c;
+	c->cl.t = to;
+	c->cl.fun = wrap;
+	c->cl.hasValue = 2;
+	c->cl.value = c;
 	c->wrappedFun = v; 
 	return (vclosure*)c;
 }

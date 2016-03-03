@@ -1,7 +1,9 @@
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre
 LFLAGS =
 
-SRC = src/alloc.c src/callback.c src/code.c src/jit.c src/main.c src/module.c src/other.c src/std/misc.c
+SRC = src/alloc.c src/std/array.c src/std/buffer.c src/std/bytes.c src/std/cast.c src/std/date.c src/std/error.c \
+	src/std/fun.c src/std/maps.c src/std/math.c src/std/obj.c src/std/regexp.c src/std/string.c src/std/sys.c \
+	src/std/types.c
 
 # Cygwin
 ifeq ($(OS),Windows_NT)

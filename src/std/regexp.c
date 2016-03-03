@@ -70,9 +70,6 @@ HL_PRIM ereg *regexp_regexp_new_options( vbyte *str, vbyte *opts ) {
 	return r;
 }
 
-static bool do_exec( ereg *e, vbyte *str, int len, int pos ) {
-}
-
 HL_PRIM int regexp_regexp_matched_pos( ereg *e, int m, int *len ) {
 	int start;
 	if( !e->matched )

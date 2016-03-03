@@ -1,5 +1,10 @@
 #include <hl.h>
 
+#ifndef HL_WIN
+#	include <sys/time.h>
+#	include <sys/times.h>
+#endif
+
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	uprintf(USTR("%s"),(uchar*)msg);
 }
@@ -23,7 +28,7 @@ HL_PRIM double hl_sys_time() {
 #else
 	struct timeval tv;
 	if( gettimeofday(&tv,NULL) != 0 )
-		neko_error();
+		return 0.;
 	return tv.tv_sec + ((double)tv.tv_usec) / 1000000.0;
 #endif
 }
@@ -35,6 +40,7 @@ HL_PRIM int hl_random( int max ) {
 
 #ifndef HL_JIT
 
+#define HLC_NO_STATIC
 #include <hlc.h>
 #if defined(HL_VCC) && defined(_DEBUG)
 #	include <crtdbg.h>
