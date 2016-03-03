@@ -74,15 +74,13 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 		return (int)*(double*)data;
 	case HBOOL:
 		return *(bool*)data;
-	default:
-		switch( t->kind ) {
-		case HNULL:
-			{
-				vdynamic *v = *(vdynamic**)data;
-				if( v == NULL ) return 0;
-				return hl_dyn_casti(&v->v,t->tparam,to);
-			}
+	case HNULL:
+		{
+			vdynamic *v = *(vdynamic**)data;
+			if( v == NULL ) return 0;
+			return hl_dyn_casti(&v->v,t->tparam,to);
 		}
+	default:
 		break;
 	}
 	hl_error_msg(USTR("Can't cast %s(%s) to %s"),hl_to_string(hl_make_dyn(data,t)),hl_type_str(t),hl_type_str(to));
@@ -90,7 +88,7 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 }
 
 void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
-	if( t->kind == HDYN ) {
+	if( t->kind == HDYN || t->kind == HNULL ) {
 		vdynamic *v = *(vdynamic**)data;
 		if( v == NULL ) return NULL;
 		t = v->t;
@@ -169,6 +167,12 @@ double hl_dyn_castd( void *data, hl_type *t ) {
 		return *(int*)data;
 	case HBOOL:
 		return *(bool*)data;
+	case HNULL:
+		{
+			vdynamic *v = *(vdynamic**)data;
+			if( v == NULL ) return 0;
+			return hl_dyn_castd(&v->v,t->tparam);
+		}
 	default:
 		break;
 	}
@@ -195,6 +199,12 @@ float hl_dyn_castf( void *data, hl_type *t ) {
 		return (float)*(int*)data;
 	case HBOOL:
 		return *(bool*)data;
+	case HNULL:
+		{
+			vdynamic *v = *(vdynamic**)data;
+			if( v == NULL ) return 0;
+			return hl_dyn_castf(&v->v,t->tparam);
+		}
 	default:
 		break;
 	}

@@ -524,7 +524,7 @@ void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 		{
 			vdynamic tmp;
 			tmp.t = t;
-			tmp.v.f = value;
+			tmp.v.i = value;
 			hl_write_dyn(addr,ft,&tmp);
 		}
 		break;
@@ -552,7 +552,7 @@ void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
 	else {
 		vdynamic tmp;
 		tmp.t = &hlt_f64;
-		tmp.v.f = value;
+		tmp.v.d = value;
 		hl_write_dyn(addr,t,&tmp);
 	}
 }
