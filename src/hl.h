@@ -91,7 +91,7 @@
 #	ifdef HL_VCC
 #		define _PTR_FMT	L"%llX"
 #	else
-#		define _PTR_FMT	L"%lX"
+#		define _PTR_FMT	u"%lX"
 #	endif
 #else
 #	define HL_WSIZE 4
