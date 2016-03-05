@@ -7,6 +7,8 @@
 #	pragma warning(disable:4711) // inline activated
 #	pragma warning(disable:4242) // loss of data
 #	pragma warning(disable:4244) // loss of data
+#else
+#	pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
 /* The value of PARENS_NEST_LIMIT specifies the maximum depth of nested

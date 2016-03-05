@@ -1,9 +1,17 @@
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre
 LFLAGS =
 
-SRC = src/alloc.o src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o \
+PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/pcre_dfa_exec.o \
+	include/pcre/pcre_exec.o include/pcre/pcre_fullinfo.o include/pcre/pcre_globals.o \
+	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o 
+
+RUNTIME = src/alloc.o
+
+STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o \
 	src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/regexp.o src/std/string.o src/std/sys.o \
 	src/std/types.o src/std/ucs2.o
+	
+LIB = ${PCRE} ${RUNTIME} ${STD}
 
 BOOT = src/_main.o
 	
@@ -46,8 +54,8 @@ hl32lib:
 hl64lib:
 	make ARCH=64 clean_o lib
 
-lib: ${SRC}
-	${AR} rcs hl${ARCH}lib.a ${SRC}
+lib: ${LIB}
+	${AR} rcs hl${ARCH}lib.a ${LIB}
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} ${LFLAGS} -o hlc${ARCH} ${BOOT} hl${ARCH}lib.a
@@ -61,7 +69,7 @@ build: ${SRC}
 	${CC} ${CFLAGS} -o $@ -c $<
 	
 clean_o:
-	rm -rf ${SRC} ${BOOT}
+	rm -rf ${STD} ${BOOT} ${RUNTIME} ${PCRE}
 	
 clean: clean_o
 	
