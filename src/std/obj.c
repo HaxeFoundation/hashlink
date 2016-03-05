@@ -272,11 +272,6 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	return v;
 }
 
-#define B2(t1,t2) ((t1) + ((t2) * HLAST))
-#define fetch_i(data,src,dst) src == dst ? *(int*)(data) : hl_dyn_casti(data,src,dst)
-#define fetch_d(data,src) src->kind == HF64 ? *(double*)(data) : hl_dyn_castd(data,src)
-#define fetch_p(data,src,dst) src == dst ? *(void**)(data) : hl_dyn_castp(data,src,dst)
-
 static hl_field_lookup *hl_dyn_alloc_field( vdynobj *o, int hfield, hl_type *t ) {
 	int pad = hl_pad_size(o->dataSize, t);
 	int size = hl_type_size(t);

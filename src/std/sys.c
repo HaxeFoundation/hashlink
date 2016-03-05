@@ -40,7 +40,6 @@ HL_PRIM int hl_random( int max ) {
 
 #ifndef HL_JIT
 
-#define HLC_NO_STATIC
 #include <hlc.h>
 #if defined(HL_VCC) && defined(_DEBUG)
 #	include <crtdbg.h>

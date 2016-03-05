@@ -31,16 +31,25 @@
 #	define PAD_64_VAL
 #endif
 
+#ifdef HLC_BOOT
+
+// undefine some commonly used names that can clash with class/var name
+#undef CONST
+
+// disable some warnings triggered by HLC code generator
+
 #ifdef HL_VCC
 #	pragma warning(disable:4702) // unreachable code 
 #	pragma warning(disable:4100) // unreferenced param
 #	pragma warning(disable:4101) // unreferenced local var
 #	pragma warning(disable:4723) // potential divide by 0
+#else
+#	pragma GCC diagnostic ignored "-Wunused-variable"
+#	pragma GCC diagnostic ignored "-Wunused-function"
+#	pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#	pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#	pragma GCC diagnostic ignored "-Wcomment" // comment in comment
 #endif
-
-#undef CONST
-
-#ifndef HLC_NO_STATIC
 
 static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));

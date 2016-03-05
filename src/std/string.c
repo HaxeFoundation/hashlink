@@ -9,7 +9,7 @@ HL_PRIM vbyte *hl_itos( int i, int *len ) {
 
 HL_PRIM vbyte *hl_ftos( double d, int *len ) {
 	uchar tmp[48];
-	int k = (int)usprintf(tmp,48,USTR("%.16g"),d);
+	int k = (int)usprintf(tmp,48,USTR("%.16g"),d); // don't use the last digit (eg 5.1 = 5.09999..996)
 	*len = k;
 	return hl_bcopy((vbyte*)tmp,(k + 1) << 1);
 }

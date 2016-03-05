@@ -114,19 +114,19 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 	uchar buf[32];
 	switch( t->kind ) {
 	case HI8:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(char*)data));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),(int)*(char*)data));
 		break;
 	case HI16:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(short*)data));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),(int)*(short*)data));
 		break;
 	case HI32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(int*)data));
 		break;
 	case HF32:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.16f"),*(float*)data));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.9f"),*(float*)data));
 		break;
 	case HF64:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.19g"),*(double*)data));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.17g"),*(double*)data));
 		break;
 	case HBYTES:
 		hl_buffer_str(b,*(uchar**)data);
@@ -174,10 +174,10 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.i));
 		break;
 	case HF32:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.16f"),v->v.f));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.9f"),v->v.f));
 		break;
 	case HF64:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.19g"),v->v.d));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.17g"),v->v.d));
 		break;
 	case HBOOL:
 		if( v->v.b )

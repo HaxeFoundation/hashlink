@@ -132,6 +132,7 @@ typedef long long int64;
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
+#	define HL_NATIVE_WCHAR_FUN
 #	define usprintf		swprintf
 #	define uprintf		wprintf
 #	define ustrlen		wcslen
@@ -141,6 +142,7 @@ typedef wchar_t	uchar;
 #	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
 #	define strtou(out,size,str) mbstowcs(out,str,size)	
+#	define utostr(out,size,str) wcstombs(out,str,size)	
 #else
 #	include <stdarg.h>
 typedef unsigned short uchar;
@@ -152,9 +154,10 @@ extern double utod( const uchar *str, uchar **end );
 extern int utoi( const uchar *str, uchar **end );
 extern int ucmp( const uchar *a, const uchar *b );
 extern int strtou( uchar *out, int out_size, const char *str ); 
+extern int utostr( char *out, int out_size, const uchar *str ); 
 extern int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
-extern int uprintf( const uchar *fmt, ... );
 extern int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
+extern void uprintf( const uchar *fmt, const uchar *str );
 #endif
 
 // ---- TYPES -------------------------------------------

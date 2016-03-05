@@ -52,7 +52,7 @@ HL_PRIM ereg *regexp_regexp_new_options( vbyte *str, vbyte *opts ) {
 	if( p == NULL ) {
 		hl_buffer *b = hl_alloc_buffer();
 		hl_buffer_str(b,USTR("Regexp compilation error : "));
-		hl_buffer_cstr(b,"abcde");
+		hl_buffer_cstr(b,error);
 		hl_buffer_str(b,USTR(" in "));
 		hl_buffer_str(b,(uchar*)str);
 		hl_error_msg(USTR("%s"),hl_buffer_content(b,NULL));

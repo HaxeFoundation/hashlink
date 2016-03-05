@@ -1,10 +1,12 @@
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre
 LFLAGS =
 
-SRC = src/alloc.c src/std/array.c src/std/buffer.c src/std/bytes.c src/std/cast.c src/std/date.c src/std/error.c \
-	src/std/fun.c src/std/maps.c src/std/math.c src/std/obj.c src/std/regexp.c src/std/string.c src/std/sys.c \
-	src/std/types.c
+SRC = src/alloc.o src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o \
+	src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/regexp.o src/std/string.o src/std/sys.o \
+	src/std/types.o src/std/ucs2.o
 
+BOOT = src/_main.o
+	
 # Cygwin
 ifeq ($(OS),Windows_NT)
 
@@ -22,27 +24,45 @@ LFLAGS += -Wl,--export-dynamic
 
 endif
 
-all: hl32 hl64
+all: libs hlc32 clean hlc64
 
+libs: hl32lib hl64lib clean
+
+hlc32:
+	make ARCH=32 clean_o hlc
+
+hlc64:
+	make ARCH=64 clean_o hlc
+	
 hl32:
 	make ARCH=32 build
 	
 hl64:
 	make ARCH=64 build
-
-bench:
-	(cd bench && haxe --interp -main Bench)
 	
-use: all
-	cp hl32.exe Release/hl.exe
-	cp hl64.exe x64/Release/hl.exe
+hl32lib:
+	make ARCH=32 clean_o lib
+	
+hl64lib:
+	make ARCH=64 clean_o lib
 
-build: $(SRC)
-	${CC} ${CFLAGS} ${LFLAGS} -o hl$(ARCH) ${SRC}
+lib: ${SRC}
+	${AR} rcs hl${ARCH}lib.a ${SRC}
+
+hlc: ${BOOT}
+	${CC} ${CFLAGS} ${LFLAGS} -o hlc${ARCH} ${BOOT} hl${ARCH}lib.a
+	
+build: ${SRC}
+	${CC} ${CFLAGS} ${LFLAGS} -o hl${ARCH} ${SRC}
 	
 .SUFFIXES : .c .o
 
 .c.o :
 	${CC} ${CFLAGS} -o $@ -c $<
 	
-.PHONY: hl32 hl64 bench
+clean_o:
+	rm -rf ${SRC} ${BOOT}
+	
+clean: clean_o
+	
+.PHONY: hl32 hl64 hlc32 hlc64 hlc

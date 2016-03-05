@@ -171,6 +171,7 @@
     <ClCompile Include="src\std\string.c" />
     <ClCompile Include="src\std\sys.c" />
     <ClCompile Include="src\std\types.c" />
+    <ClCompile Include="src\std\ucs2.c" />
     <ClCompile Include="src\_main.c" />
   </ItemGroup>
   <ItemGroup>

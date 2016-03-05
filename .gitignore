@@ -21,3 +21,4 @@ x64
 /src/_main4.c
 /src/_main5.c
 /src/_main6.c
+*.a
