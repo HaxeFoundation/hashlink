@@ -167,6 +167,7 @@
     <ClCompile Include="src\std\cast.c" />
     <ClCompile Include="src\std\date.c" />
     <ClCompile Include="src\std\error.c" />
+    <ClCompile Include="src\std\file.c" />
     <ClCompile Include="src\std\fun.c" />
     <ClCompile Include="src\std\maps.c" />
     <ClCompile Include="src\std\math.c" />

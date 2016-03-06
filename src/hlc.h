@@ -1,5 +1,5 @@
 /*
- * Copyright (C)2015 Haxe Foundation
+ * Copyright (C)2005-2016 Haxe Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,9 @@
 
 // undefine some commonly used names that can clash with class/var name
 #undef CONST
+#undef stdin
+#undef stdout
+#undef stderr
 
 // disable some warnings triggered by HLC code generator
 
