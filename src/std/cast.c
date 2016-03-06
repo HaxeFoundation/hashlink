@@ -130,6 +130,11 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	case TK2(HDYNOBJ,HVIRTUAL):
 	case TK2(HVIRTUAL,HVIRTUAL):
 		return hl_to_virtual(to,*(vdynamic**)data);
+	case TK2(HVIRTUAL,HOBJ):
+		{
+			vvirtual *v = *(vvirtual**)data;
+			return hl_dyn_castp( &v->value, v->value->t, to);
+		}
 	case TK2(HOBJ,HDYN):
 	case TK2(HDYNOBJ,HDYN):
 	case TK2(HFUN,HDYN):
@@ -294,26 +299,10 @@ void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
 HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
 	if( t->kind == HDYN || v == NULL || hl_safe_cast(v->t,t) )
 		return v;
-	hl_fatal("TODO");
+	hl_error_msg(USTR("Can't cast %s to %s"),hl_to_string(v),hl_type_str(t));
 	return NULL;
 }
 
-HL_PRIM bool hl_type_check( hl_type *t, vdynamic *value ) {
-	if( t->kind == HDYN )
-		return true;
-	if( value == NULL )
-		return false;
-	if( t == value->t )
-		return true;
-	if( t->kind == HF64 && value->t->kind == HI32 )
-		return true;
-	if( t->kind == HI32 && value->t->kind == HF64 && (int)value->v.d == value->v.d )
-		return true;
-	return hl_safe_cast(value->t, t);
-}
-
-HL_PRIM vdynamic *hl_type_instance( hl_type *t, vdynamic *v ) {
-	if( v == NULL )
-		return v;
-	return hl_safe_cast(v->t,t) ? v : NULL;
+HL_PRIM bool hl_type_safe_cast( hl_type *a, hl_type *b ) {
+	return hl_safe_cast(a,b);
 }

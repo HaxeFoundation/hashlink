@@ -401,6 +401,5 @@ HL_PRIM varray *hl_enum_parameters( vdynamic *v ) {
 	return a;
 }
 
-DEFINE_PRIM(_BOOL, hl_type_check, _TYPE _DYN);
 DEFINE_PRIM(_BYTES, hl_type_name, _TYPE);
 DEFINE_PRIM(_ARR, hl_type_enum_fields, _TYPE);
