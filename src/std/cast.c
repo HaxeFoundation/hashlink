@@ -168,6 +168,28 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	if( to->kind == HNULL ) {
 		if( to->tparam->kind == t->kind )
 			return hl_make_dyn(data,t);
+		switch( to->tparam->kind ) {
+		case HI8:
+		case HI16:
+		case HI32:
+		case HBOOL:
+			{
+				int v = hl_dyn_casti(data,t,to->tparam);
+				return hl_make_dyn(&v,to->tparam);
+			}
+		case HF32:
+			{
+				float f = hl_dyn_castf(data,t);
+				return hl_make_dyn(&f,to->tparam);
+			}
+		case HF64:
+			{
+				double d = hl_dyn_castd(data,t);
+				return hl_make_dyn(&d,to->tparam);
+			}
+		default:
+			break;
+		}
 	}
 	hl_error_msg(USTR("Can't cast %s(%s) to %s"),hl_to_string(hl_make_dyn(data,t)),hl_type_str(t),hl_type_str(to));
 	return 0;

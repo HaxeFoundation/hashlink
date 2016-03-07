@@ -102,7 +102,8 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 	vdynamic *dret;
 	vdynamic out;
 	int i;
-	if( cl->hasValue ) hl_error("Can't call closure with value");
+	if( cl->hasValue )
+		hl_error("Can't call closure with value");
 	if( args->size != cl->t->fun->nargs || args->at->kind != HDYN )
 		hl_error("Invalid args");
 	for(i=0;i<args->size;i++) {

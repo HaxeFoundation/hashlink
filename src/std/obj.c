@@ -507,7 +507,7 @@ static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **f
 		}
 		break;
 	case HVIRTUAL:
-		return hl_obj_lookup_set(d, hfield, t, ft);
+		return hl_obj_lookup_set(((vvirtual*)d)->value, hfield, t, ft);
 	default:
 		hl_error("Invalid field access");
 		break;
