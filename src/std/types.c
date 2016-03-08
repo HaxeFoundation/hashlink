@@ -281,10 +281,10 @@ HL_PRIM vbyte* hl_type_name( hl_type *t ) {
 }
 
 HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
-	varray *a = hl_aalloc(&hlt_bytes,t->tenum->nconstructs);
+	varray *a = hl_alloc_array(&hlt_bytes,t->tenum->nconstructs);
 	int i;
 	for( i=0; i<t->tenum->nconstructs;i++)
-		((void**)(a+1))[i] = (vbyte*)t->tenum->constructs[i].name;
+		hl_aptr(a,vbyte*)[i] = (vbyte*)t->tenum->constructs[i].name;
 	return a;
 }
 
@@ -314,8 +314,8 @@ HL_PRIM varray *hl_type_instance_fields( hl_type *t ) {
 		o = o->super->obj;
 	}
 	rt = hl_get_obj_rt(t);
-	a = hl_aalloc(&hlt_bytes,mcount + rt->nproto + rt->nfields);
-	names = (const uchar**)(a + 1);
+	a = hl_alloc_array(&hlt_bytes,mcount + rt->nproto + rt->nfields);
+	names = hl_aptr(a,const uchar*);
 	o = t->obj;
 	while( true ) {
 		int i;
@@ -405,7 +405,7 @@ HL_PRIM vdynamic *hl_ealloc( hl_type *t, int index, varray *args ) {
 	e = (venum*)(hasPtr ? hl_gc_alloc(c->size) : hl_gc_alloc_noptr(c->size));
 	e->index = index;
 	for(i=0;i<c->nparams;i++)
-		hl_write_dyn((char*)e+c->offsets[i],c->params[i],((vdynamic**)(args+1))[i]);
+		hl_write_dyn((char*)e+c->offsets[i],c->params[i],hl_aptr(args,vdynamic*)[i]);
 	v = hl_alloc_dynamic(t);
 	v->v.ptr = e;
 	return v;
@@ -416,9 +416,9 @@ HL_PRIM varray *hl_enum_parameters( vdynamic *v ) {
 	venum *e = (venum*)v->v.ptr;
 	hl_enum_construct *c = v->t->tenum->constructs + e->index;
 	int i;
-	a = hl_aalloc(&hlt_dyn,c->nparams);
+	a = hl_alloc_array(&hlt_dyn,c->nparams);
 	for(i=0;i<c->nparams;i++)
-		((vdynamic**)(a+1))[i] = hl_make_dyn((char*)e+c->offsets[i],c->params[i]);
+		hl_aptr(a,vdynamic*)[i] = hl_make_dyn((char*)e+c->offsets[i],c->params[i]);
 	return a;
 }
 

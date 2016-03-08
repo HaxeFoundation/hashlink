@@ -203,8 +203,8 @@ HL_PRIM bool hl_hbremove( hl_bytes_map *m, vbyte *_key ) {
 }
 
 HL_PRIM varray* hl_hbkeys( hl_bytes_map *m ) {
-	varray *a = hl_aalloc(&hlt_bytes,m->nentries);
-	uchar **keys = (uchar**)(a+1);
+	varray *a = hl_alloc_array(&hlt_bytes,m->nentries);
+	uchar **keys = hl_aptr(a,uchar*);
 	int p = 0;
 	int i;
 	for(i=0;i<m->ncells;i++) {
@@ -220,8 +220,8 @@ HL_PRIM varray* hl_hbkeys( hl_bytes_map *m ) {
 }
 
 HL_PRIM varray* hl_hbvalues( hl_bytes_map *m ) {
-	varray *a = hl_aalloc(&hlt_dyn,m->nentries);
-	vdynamic **values = (vdynamic**)(a+1);
+	varray *a = hl_alloc_array(&hlt_dyn,m->nentries);
+	vdynamic **values = hl_aptr(a,vdynamic*);
 	int p = 0;
 	int i;
 	for(i=0;i<m->ncells;i++) {
@@ -401,8 +401,8 @@ HL_PRIM bool hl_hiremove( hl_int_map *m, int key ) {
 }
 
 HL_PRIM varray* hl_hikeys( hl_int_map *m ) {
-	varray *a = hl_aalloc(&hlt_i32,m->nentries);
-	int *keys = (int*)(a+1);
+	varray *a = hl_alloc_array(&hlt_i32,m->nentries);
+	int *keys = hl_aptr(a,int);
 	int p = 0;
 	int i;
 	for(i=0;i<m->ncells;i++) {
@@ -418,8 +418,8 @@ HL_PRIM varray* hl_hikeys( hl_int_map *m ) {
 }
 
 HL_PRIM varray* hl_hivalues( hl_int_map *m ) {
-	varray *a = hl_aalloc(&hlt_dyn,m->nentries);
-	vdynamic **values = (vdynamic**)(a+1);
+	varray *a = hl_alloc_array(&hlt_dyn,m->nentries);
+	vdynamic **values = hl_aptr(a,vdynamic*);
 	int p = 0;
 	int i;
 	for(i=0;i<m->ncells;i++) {
@@ -604,8 +604,8 @@ HL_PRIM bool hl_horemove( hl_obj_map *m, vdynamic *key ) {
 }
 
 HL_PRIM varray* hl_hokeys( hl_obj_map *m ) {
-	varray *a = hl_aalloc(&hlt_dyn,m->nentries);
-	vdynamic **keys = (vdynamic**)(a+1);
+	varray *a = hl_alloc_array(&hlt_dyn,m->nentries);
+	vdynamic **keys = hl_aptr(a,vdynamic*);
 	int p = 0;
 	int i;
 	for(i=0;i<m->ncells;i++) {
@@ -621,8 +621,8 @@ HL_PRIM varray* hl_hokeys( hl_obj_map *m ) {
 }
 
 HL_PRIM varray* hl_hovalues( hl_obj_map *m ) {
-	varray *a = hl_aalloc(&hlt_dyn, m->nentries);
-	vdynamic **values = (vdynamic**)(a+1);
+	varray *a = hl_alloc_array(&hlt_dyn, m->nentries);
+	vdynamic **values = hl_aptr(a,vdynamic*);
 	int p = 0;
 	int i;
 	for(i=0;i<m->ncells;i++) {

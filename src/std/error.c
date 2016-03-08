@@ -56,8 +56,7 @@ void hl_error_msg( const uchar *fmt, ... ) {
 	len = uvsprintf(buf,fmt,args);
 	va_end(args);
 	d = hl_alloc_dynamic(&hlt_bytes);
-	d->v.ptr = hl_gc_alloc_noptr((len + 1) << 1);
-	memcpy(d->v.ptr,buf,(len + 1) << 1);
+	d->v.ptr = hl_copy_bytes((vbyte*)buf,(len + 1) << 1);
 	hl_throw(d);
 }
 

@@ -393,12 +393,14 @@ bool hl_is_dynamic( hl_type *t );
 bool hl_same_type( hl_type *a, hl_type *b );
 bool hl_safe_cast( hl_type *t, hl_type *to );
 
-varray *hl_aalloc( hl_type *t, int size );
+#define hl_aptr(a,t)	((t*)(((varray*)(a))+1))
+
+varray *hl_alloc_array( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
 vobj *hl_alloc_obj( hl_type *t );
 vdynobj *hl_alloc_dynobj();
-vbyte *hl_balloc( int size );
-vbyte *hl_bcopy( vbyte *byte, int size );
+vbyte *hl_alloc_bytes( int size );
+vbyte *hl_copy_bytes( vbyte *byte, int size );
 
 vdynamic *hl_alloc_i32( int i );
 

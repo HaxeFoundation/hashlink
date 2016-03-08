@@ -244,7 +244,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			for(i=0;i<a->size;i++) {
 				if( i )
 					hl_buffer_str_sub(b,USTR(", "),2);
-				hl_buffer_addr(b,(char*)(a + 1) + i * stride,at,&l);
+				hl_buffer_addr(b,hl_aptr(a,char) + i * stride,at,&l);
 			}
 			hl_buffer_char(b,']');
 		}

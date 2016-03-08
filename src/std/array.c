@@ -21,18 +21,18 @@
  */
 #include <hl.h>
 
-HL_PRIM varray *hl_aalloc( hl_type *at, int size ) {
+HL_PRIM varray *hl_alloc_array( hl_type *at, int size ) {
 	int esize = hl_type_size(at);
 	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size + sizeof(hl_type));
 	a->t = &hlt_array;
 	a->at = at;
 	a->size = size;
-	memset(a+1,0,size*esize);
+	memset(hl_aptr(a,void*),0,size*esize);
 	return a;
 }
 
 HL_PRIM void hl_ablit( varray *dst, int dpos, varray *src, int spos, int len ) {
-	memcpy( (void**)(dst + 1) + dpos, (void**)(src + 1) + spos, len * sizeof(void*)); 
+	memcpy( hl_aptr(dst,void*) + dpos, hl_aptr(src,void*) + spos, len * sizeof(void*)); 
 }
 
 HL_PRIM hl_type *hl_atype( varray *a ) {

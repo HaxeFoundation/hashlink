@@ -695,9 +695,9 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 		{
 			vdynobj *o = (vdynobj*)obj;
 			int i;
-			a = hl_aalloc(&hlt_bytes,o->nfields);
+			a = hl_alloc_array(&hlt_bytes,o->nfields);
 			for(i=0;i<o->nfields;i++)
-				((vbyte**)(a + 1))[i] = (vbyte*)hl_field_name((&o->dproto->fields + i)->hashed_name);
+				hl_aptr(a,vbyte*)[i] = (vbyte*)hl_field_name((&o->dproto->fields + i)->hashed_name);
 		}
 		break;
 	case HOBJ:
@@ -705,11 +705,11 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 			hl_type_obj *tobj = obj->t->obj;
 			hl_runtime_obj *o = tobj->rt;
 			int i, p = 0;
-			a = hl_aalloc(&hlt_bytes,o->nfields);
+			a = hl_alloc_array(&hlt_bytes,o->nfields);
 			while( true ) {
 				for(i=0;i<tobj->nfields;i++) {
 					hl_obj_field *f = tobj->fields + i;
-					((vbyte**)(a + 1))[p++] =  (vbyte*)f->name;
+					hl_aptr(a,vbyte*)[p++] =  (vbyte*)f->name;
 				}
 				if( tobj->super == NULL ) break;
 				tobj = tobj->super->obj;

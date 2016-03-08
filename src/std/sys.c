@@ -79,8 +79,7 @@ typedef uchar pchar;
 static pchar *pstrdup( const pchar *s, int len ) {
 	pchar *ret;
 	if( len < 0 ) len = (int)pstrlen(s);
-	ret = (pchar*)hl_gc_alloc_noptr(sizeof(pchar)*(len+1));
-	memcpy(ret,s,len*sizeof(pchar));
+	ret = (pchar*)hl_copy_bytes((vbyte*)s,sizeof(pchar)*(len+1));;
 	ret[len] = 0;
 	return ret;
 }
@@ -183,9 +182,9 @@ varray *hl_sys_env() {
 		}
 		count++;
 	}
-	a = hl_aalloc(&hlt_bytes,count*2);
+	a = hl_alloc_array(&hlt_bytes,count*2);
 	e = environ;
-	arr = (pchar**)(a+1);
+	arr = hl_aptr(a,pchar*);
 	while( *e ) {
 		pchar *x = pstrchr(*e,'=');
 		if( x == NULL ) {
@@ -283,8 +282,8 @@ varray *hl_sys_stat( vbyte *path ) {
 	int *i;
 	if( stat((pchar*)path,&s) != 0 )
 		return NULL;
-	a = hl_aalloc(&hlt_i32,12);
-	i = (int*)(a+1);
+	a = hl_alloc_array(&hlt_i32,12);
+	i = hl_aptr(a,int);
 	*i++ = s.st_gid;
 	*i++ = s.st_uid;
 	*i++ = s.st_atime;
@@ -373,8 +372,8 @@ varray *hl_sys_read_dir( vbyte *_path ) {
 		if( d.cFileName[0] != '.' || (d.cFileName[1] != 0 && (d.cFileName[1] != '.' || d.cFileName[2] != 0)) ) {
 			if( pos == count ) {
 				int ncount = count == 0 ? 16 : count * 2;
-				varray *narr = hl_aalloc(&hlt_bytes,count);
-				pchar **ncur = (pchar**)(narr+1);
+				varray *narr = hl_alloc_array(&hlt_bytes,count);
+				pchar **ncur = hl_aptr(narr,pchar*);
 				memcpy(ncur,current,count*sizeof(void*));
 				current = ncur;
 				a = narr;
@@ -402,7 +401,7 @@ varray *hl_sys_read_dir( vbyte *_path ) {
 		if( pos == count ) {
 			int ncount = count == 0 ? 16 : count * 2;
 			varray *narr = hl_aalloc(&hlt_bytes,count);
-			pchar **ncur = (pchar**)(narr+1);
+			pchar **ncur = hl_aptr(narr,pchar*);
 			memcpy(ncur,current,count*sizeof(void*));
 			current = ncur;
 			a = narr;
@@ -412,7 +411,7 @@ varray *hl_sys_read_dir( vbyte *_path ) {
 	}
 	closedir(d);
 #endif
-	if( a == NULL ) a = hl_aalloc(&hlt_bytes,0);
+	if( a == NULL ) a = hl_alloc_array(&hlt_bytes,0);
 	a->size = pos;
 	return a;
 }
@@ -489,9 +488,26 @@ int hl_sys_get_char( bool b ) {
 
 extern void hl_entry_point();
 
-int main() {
+static pchar **sys_args;
+static int sys_nargs;
+
+varray *hl_sys_args() {
+	varray *a = hl_alloc_array(&hlt_bytes,sys_nargs);
+	int i;
+	for(i=0;i<sys_nargs;i++)
+		hl_aptr(a,pchar*)[i] = sys_args[i];
+	return a;
+}
+
+#ifdef HL_WIN
+int wmain( int argc, uchar *argv[] ) {
+#else
+int main( int argc, char *argv[] ) {
+#endif
 	hl_trap_ctx ctx;
 	vdynamic *exc;
+	sys_args = argv + 1;
+	sys_nargs = argc - 1;
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
 	hlc_trap(ctx,exc,on_exception);
 	hl_entry_point();

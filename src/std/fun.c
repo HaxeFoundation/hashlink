@@ -94,7 +94,7 @@ extern void *hlc_get_wrapper( hl_type *t );
 
 HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 	vclosure *cl = (vclosure*)c;
-	vdynamic **vargs = (vdynamic**)(args + 1);
+	vdynamic **vargs = hl_aptr(args,vdynamic*);
 	void *pargs[HL_MAX_ARGS];
 	void *ret;
 	union { double d; int i; float f; } tmp[HL_MAX_ARGS];
@@ -173,11 +173,11 @@ void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	if( w->fun == fun_var_args ) {
 		varray *a;
 		w = (vclosure*)w->value; // the real callback
-		a = hl_aalloc(&hlt_dyn,tfun->nargs);
+		a = hl_alloc_array(&hlt_dyn,tfun->nargs);
 		for(i=0;i<tfun->nargs;i++) {
 			hl_type *t = tfun->args[i];
 			void *v = hl_is_ptr(t) ? args + i : args[i];
-			*(void**)(a + 1) = hl_make_dyn(v,t);
+			hl_aptr(a,void*)[i] = hl_make_dyn(v,t);
 		}
 		if( w->hasValue )
 			vargs[p++] = (vdynamic*)w->value;

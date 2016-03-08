@@ -21,12 +21,12 @@
  */
 #include <hl.h>
 
-HL_PRIM vbyte *hl_balloc( int size ) {
+HL_PRIM vbyte *hl_alloc_bytes( int size ) {
 	return (vbyte*)hl_gc_alloc_noptr(size);
 }
 
-HL_PRIM vbyte *hl_bcopy( vbyte *ptr, int size ) {
-	vbyte *b = hl_balloc(size);
+HL_PRIM vbyte *hl_copy_bytes( vbyte *ptr, int size ) {
+	vbyte *b = hl_alloc_bytes(size);
 	memcpy(b,ptr,size);
 	return b;
 }

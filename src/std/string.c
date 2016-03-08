@@ -25,14 +25,14 @@ HL_PRIM vbyte *hl_itos( int i, int *len ) {
 	uchar tmp[24];
 	int k = (int)usprintf(tmp,24,USTR("%d"),i);
 	*len = k;
-	return hl_bcopy((vbyte*)tmp,(k + 1)<<1);
+	return hl_copy_bytes((vbyte*)tmp,(k + 1)<<1);
 }
 
 HL_PRIM vbyte *hl_ftos( double d, int *len ) {
 	uchar tmp[48];
 	int k = (int)usprintf(tmp,48,USTR("%.16g"),d); // don't use the last digit (eg 5.1 = 5.09999..996)
 	*len = k;
-	return hl_bcopy((vbyte*)tmp,(k + 1) << 1);
+	return hl_copy_bytes((vbyte*)tmp,(k + 1) << 1);
 }
 
 HL_PRIM vbyte *hl_value_to_string( vdynamic *d, int *len ) {

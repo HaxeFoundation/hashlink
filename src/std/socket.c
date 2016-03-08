@@ -192,14 +192,9 @@ vbyte *hl_host_reverse( int ip ) {
 
 vbyte *hl_host_local() {
 	char buf[256];
-	vbyte *mem;
-	int size;
 	if( gethostname(buf,256) == SOCKET_ERROR )
 		return NULL;
-	size = (int)strlen(buf)+1;
-	mem = (vbyte*)hl_gc_alloc_noptr(size);
-	memcpy(mem,buf,size);
-	return mem;
+	return hl_copy_bytes((vbyte*)buf,(int)strlen(buf)+1);
 }
 
 bool hl_socket_connect( hl_socket *s, int host, int port ) {
