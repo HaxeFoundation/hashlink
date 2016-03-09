@@ -381,6 +381,7 @@ HL_PRIM bool hl_hiremove( hl_int_map *m, int key ) {
 		for(i=0;i<c->nvalues;i++)
 			if( c->keys[i] == key ) {
 				c->nvalues--;
+				m->nentries--;
 				if( c->nvalues ) {
 					int j;
 					for(j=i;j<c->nvalues;j++) {
