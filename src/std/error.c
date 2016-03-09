@@ -23,8 +23,8 @@
 #include <stdarg.h>
 #include <string.h>
 
-hl_trap_ctx *current_trap = NULL;
-vdynamic *current_exc = NULL;
+hl_trap_ctx *hl_current_trap = NULL;
+vdynamic *hl_current_exc = NULL;
 
 void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
@@ -37,9 +37,12 @@ void *hl_fatal_error( const char *msg, const char *file, int line ) {
 }
 
 void hl_throw( vdynamic *v ) {
-	hl_trap_ctx *t = current_trap;
-	current_exc = v;
-	current_trap = t->prev;
+	hl_trap_ctx *t = hl_current_trap;
+	hl_current_exc = v;
+	hl_current_trap = t->prev;
+#ifdef _DEBUG
+	if( hl_current_trap == NULL ) *(int*)NULL = 0; // Uncaught exception
+#endif
 	longjmp(t->buf,1);
 }
 

@@ -349,6 +349,8 @@ struct hl_runtime_obj {
 	int nfields;
 	int nproto;
 	int size;
+	int nmethods;
+	void **methods;
 	int *fields_indexes;
 	hl_runtime_obj *parent;
 	const uchar *(*toStringFun)( vdynamic *obj );
@@ -358,7 +360,6 @@ struct hl_runtime_obj {
 	// relative
 	int nlookup;
 	hl_field_lookup *lookup;
-	void **methods;
 };
 
 typedef struct {
@@ -401,8 +402,6 @@ vobj *hl_alloc_obj( hl_type *t );
 vdynobj *hl_alloc_dynobj();
 vbyte *hl_alloc_bytes( int size );
 vbyte *hl_copy_bytes( vbyte *byte, int size );
-
-vdynamic *hl_alloc_i32( int i );
 
 int hl_hash( vbyte *name );
 int hl_hash_gen( const uchar *name, bool cache_name );

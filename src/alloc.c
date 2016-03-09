@@ -148,10 +148,3 @@ vdynobj *hl_alloc_dynobj() {
 	o->virtuals = NULL;
 	return o;
 }
-
-vdynamic *hl_alloc_i32( int i ) {
-	vdynamic *d = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
-	d->t = &hlt_i32;
-	d->v.i = i;
-	return d;
-}

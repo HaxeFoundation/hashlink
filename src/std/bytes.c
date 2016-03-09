@@ -180,10 +180,10 @@ HL_PRIM vdynamic *hl_parse_int( vbyte *bytes, int pos, int len ) {
 			else
 				return NULL;
 		}
-		return hl_alloc_i32(h);
+		return hl_make_dyn(&h,&hlt_i32);
 	}
 	h = utoi(c,&end);
-	return c == end ? NULL : hl_alloc_i32(h);
+	return c == end ? NULL : hl_make_dyn(&h,&hlt_i32);
 }
 
 DEFINE_PRIM(_BYTES,hl_balloc,_I32);

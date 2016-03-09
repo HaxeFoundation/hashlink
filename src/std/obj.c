@@ -127,14 +127,26 @@ hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
 	hl_runtime_obj *p = NULL, *t;
-	int i, size, start;
+	int i, size, start, nlookup;
 	if( o->rt ) return o->rt;
 	if( o->super ) p = hl_get_obj_rt(o->super);
 	t = (hl_runtime_obj*)hl_malloc(alloc,sizeof(hl_runtime_obj));
 	t->t = ot;
 	t->nfields = o->nfields + (p ? p->nfields : 0);
 	t->nproto = p ? p->nproto : 0;
-	t->nlookup = o->nfields + o->nproto;
+	t->nlookup = o->nfields;
+
+	if( !p )
+		t->nlookup += o->nproto;
+	else {
+		for(i=0;i<o->nproto;i++) {
+			hl_obj_proto *pr = o->proto + i;
+			if( pr->pindex >= 0 && pr->pindex < p->nproto )
+				continue;
+			t->nlookup++;
+		}
+	}
+
 	t->lookup = (hl_field_lookup*)hl_malloc(alloc,sizeof(hl_field_lookup) * t->nlookup);
 	t->fields_indexes = (int*)hl_malloc(alloc,sizeof(int)*t->nfields);
 	t->toStringFun = NULL;
@@ -158,16 +170,24 @@ hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		size += hl_type_size(ft);
 	}
 	t->size = size;
+	t->nmethods = p ? p->nmethods : o->nproto;
 	t->methods = NULL;
 	o->rt = t;
 	ot->vobj_proto = NULL;
 
 	// fields lookup
-	size = 0;
+	nlookup = o->nfields;
 	for(i=0;i<o->nproto;i++) {
-		hl_obj_proto *p = o->proto + i;
-		if( p->pindex >= t->nproto ) t->nproto = p->pindex + 1;
-		hl_lookup_insert(t->lookup,i + o->nfields,p->hashed_name,m->functions_types[p->findex],-(i+1));
+		hl_obj_proto *pr = o->proto + i;
+		int method_index;
+		if( p ) {
+			if( pr->pindex >= 0 && pr->pindex < p->nproto )
+				continue;
+			method_index = t->nmethods++;
+		} else
+			method_index = i;
+		if( pr->pindex >= t->nproto ) t->nproto = pr->pindex + 1;
+		hl_lookup_insert(t->lookup,nlookup++,pr->hashed_name,m->functions_types[pr->findex],-(method_index+1));
 	}
 	return t;
 }
@@ -183,17 +203,9 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_runtime_obj *p = NULL, *t = hl_get_obj_rt(ot);
 	hl_field_lookup *strField, *cmpField, *castField, *getField;
 	int i;
+	int nmethods;
 	if( ot->vobj_proto ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);
-
-	strField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__string"),false));
-	cmpField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__compare"),false));
-	castField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__cast"),false));
-	getField = hl_lookup_find(t->lookup,t->nlookup,hl_hash_gen(USTR("__get_field"),false));
-	t->toStringFun = strField ? m->functions_ptrs[o->proto[-(strField->field_index+1)].findex] : (p ? p->toStringFun : NULL);	
-	t->compareFun = cmpField ? m->functions_ptrs[o->proto[-(cmpField->field_index+1)].findex] : (p ? p->compareFun : NULL);	
-	t->castFun = castField ? m->functions_ptrs[o->proto[-(castField->field_index+1)].findex] : (p ? p->castFun : NULL);	
-	t->getFieldFun = getField ? m->functions_ptrs[o->proto[-(getField->field_index+1)].findex] : (p ? p->getFieldFun : NULL);
 
 	if( t->nproto ) {
 		void **fptr = (void**)hl_malloc(alloc, sizeof(void*) * t->nproto);
@@ -206,11 +218,31 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 		}
 	}
 
-	t->methods = (void**)hl_malloc(alloc, sizeof(void*) * o->nproto);
+	t->methods = (void**)hl_malloc(alloc, sizeof(void*) * t->nmethods);
+	if( p ) memcpy(t->methods,p->methods,p->nmethods * sizeof(void*));
+	
+	nmethods = p ? p->nmethods : 0;
 	for(i=0;i<o->nproto;i++) {
-		hl_obj_proto *p = o->proto + i;
-		t->methods[i] = m->functions_ptrs[p->findex];
+		hl_obj_proto *pr = o->proto + i;
+		int method_index;
+		if( p ) {
+			if( pr->pindex >= 0 && pr->pindex < p->nproto )
+				method_index = -obj_resolve_field(o->super->obj,pr->hashed_name)->field_index-1;
+			else
+				method_index = nmethods++;
+		} else
+			method_index = i;
+		t->methods[method_index] = m->functions_ptrs[pr->findex];
 	}
+
+	strField = obj_resolve_field(o,hl_hash_gen(USTR("__string"),false));
+	cmpField = obj_resolve_field(o,hl_hash_gen(USTR("__compare"),false));
+	castField = obj_resolve_field(o,hl_hash_gen(USTR("__cast"),false));
+	getField = obj_resolve_field(o,hl_hash_gen(USTR("__get_field"),false));
+	t->toStringFun = strField ? t->methods[-(strField->field_index+1)] : NULL;	
+	t->compareFun = cmpField ? t->methods[-(cmpField->field_index+1)] : NULL;
+	t->castFun = castField ? t->methods[-(castField->field_index+1)] : NULL;	
+	t->getFieldFun = getField ? t->methods[-(getField->field_index+1)] : (p ? p->getFieldFun : NULL);
 
 	return t;
 }

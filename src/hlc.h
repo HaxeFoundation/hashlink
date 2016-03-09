@@ -130,10 +130,10 @@ struct _hl_trap_ctx {
 	hl_trap_ctx *prev;
 };
 
-extern hl_trap_ctx *current_trap;
-extern vdynamic *current_exc;
+extern hl_trap_ctx *hl_current_trap;
+extern vdynamic *hl_current_exc;
 
-#define hlc_trap(ctx,r,label) { ctx.prev = current_trap; current_trap = &ctx; if( setjmp(ctx.buf) ) { r = current_exc; goto label; } }
-#define hlc_endtrap(ctx) current_trap = ctx.prev
+#define hlc_trap(ctx,r,label) { ctx.prev = hl_current_trap; hl_current_trap = &ctx; if( setjmp(ctx.buf) ) { r = hl_current_exc; goto label; } }
+#define hlc_endtrap(ctx) hl_current_trap = ctx.prev
 
 #endif
