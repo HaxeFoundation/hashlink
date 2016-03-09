@@ -310,13 +310,13 @@ typedef struct {
 } vobj;
 
 typedef struct _vvirtual vvirtual;
-struct _vvirtual{
+struct _vvirtual {
 	hl_type *t;
-	int	*indexes;
-	char *fields_data;
 	vdynamic *value;
 	vvirtual *next;
 };
+
+#define hl_vfields(v) ((void**)(((vvirtual*)(v))+1))
 
 typedef struct {
 	hl_type *t;

@@ -270,10 +270,8 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	case HOBJ:
 		{ 
 			int i;
-			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual));
+			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual) + sizeof(void*)*vt->virt->nfields);
 			v->t = vt;
-			v->fields_data = (char*)obj;
-			v->indexes = (int*)hl_gc_alloc(sizeof(int)*vt->virt->nfields);
 			v->value = obj;
 			v->next = NULL;
 			for(i=0;i<vt->virt->nfields;i++) {
@@ -286,9 +284,9 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 					tf.args = f->t->fun->args + 1;
 					tf.nargs = f->t->fun->nargs - 1;
 					tf.ret = f->t->fun->ret;
-					v->indexes[i] = hl_same_type(&tmp,vt->virt->fields[i].t) ? f->field_index : 0;
+					hl_vfields(v)[i] = hl_same_type(&tmp,vt->virt->fields[i].t) ? obj->t->obj->rt->methods[-f->field_index-1] : NULL;
 				} else
-					v->indexes[i] = f == NULL || !hl_same_type(f->t,vt->virt->fields[i].t) ? 0 : f->field_index;
+					hl_vfields(v)[i] = f == NULL || !hl_same_type(f->t,vt->virt->fields[i].t) ? NULL : (char*)obj + f->field_index;
 			}
 		}
 		break;
@@ -303,14 +301,12 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 				v = v->next;
 			}
 			// allocate a new virtual mapping
-			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual));
+			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual) + sizeof(void*) * vt->virt->nfields);
 			v->t = vt;
-			v->fields_data = o->fields_data - sizeof(void*);
-			v->indexes = hl_gc_alloc(sizeof(int)*vt->virt->nfields);
 			v->value = obj;
 			for(i=0;i<vt->virt->nfields;i++) {
 				hl_field_lookup *f = hl_lookup_find(&o->dproto->fields,o->nfields,vt->virt->fields[i].hashed_name);
-				v->indexes[i] = f == NULL || !hl_same_type(f->t,vt->virt->fields[i].t) ? 0 : f->field_index + sizeof(void*);
+				hl_vfields(v)[i] = f == NULL || !hl_same_type(f->t,vt->virt->fields[i].t) ? NULL : o->fields_data + f->field_index;
 			}
 			// add it to the list
 			v->next = o->virtuals;
@@ -329,6 +325,7 @@ static hl_field_lookup *hl_dyn_alloc_field( vdynobj *o, int hfield, hl_type *t )
 	int pad = hl_pad_size(o->dataSize, t);
 	int size = hl_type_size(t);
 	int index;
+	char *oldData = o->fields_data;
 	char *newData = (char*)hl_gc_alloc(o->dataSize + pad + size);
 	vdynobj_proto *proto = (vdynobj_proto*)hl_gc_alloc(sizeof(vdynobj_proto) + sizeof(hl_field_lookup) * (o->nfields + 1 - 1));
 	int field_pos = hl_lookup_find_index(&o->dproto->fields, o->nfields, hfield);
@@ -354,9 +351,12 @@ static hl_field_lookup *hl_dyn_alloc_field( vdynobj *o, int hfield, hl_type *t )
 		vvirtual *v = o->virtuals;
 		while( v ) {
 			hl_field_lookup *vf = hl_lookup_find((hl_field_lookup*)v->t->vobj_proto,v->t->virt->nfields,hfield);
+			int i;
+			for(i=0;i<v->t->virt->nfields;i++)
+				if( hl_vfields(v)[i] )
+					((char**)hl_vfields(v))[i] += (char*)newData - (char*)oldData;
 			if( vf && hl_same_type(vf->t,t) )
-				v->indexes[vf->field_index] = f->field_index + sizeof(void*);
-			v->fields_data = newData - sizeof(void*);
+				hl_vfields(v)[vf->field_index] = newData + f->field_index;
 			v = v->next;
 		}
 	}
@@ -367,7 +367,8 @@ static void hl_dyn_change_field( vdynobj *o, hl_field_lookup *f, hl_type *t ) {
 	int i, index, total_size;
 	int size = hl_type_size(t);
 	int old_size = hl_type_size(f->t);
-	char *newData;
+	char *oldData = o->fields_data;
+	char *newData = oldData;
 	if( size <= old_size ) {
 		// don't remap, let's keep hole
 		f->t = t;
@@ -400,9 +401,13 @@ static void hl_dyn_change_field( vdynobj *o, hl_field_lookup *f, hl_type *t ) {
 		vvirtual *v = o->virtuals;
 		while( v ) {
 			hl_field_lookup *vf = hl_lookup_find((hl_field_lookup*)v->t->vobj_proto,v->t->virt->nfields,f->hashed_name);
+			int i;
+			if( newData != oldData )
+				for(i=0;i<v->t->virt->nfields;i++)
+					if( hl_vfields(v)[i] )
+						((char**)hl_vfields(v))[i] += (char*)newData - (char*)oldData;
 			if( vf )
-				v->indexes[vf->field_index] = hl_same_type(vf->t,t) ? f->field_index + sizeof(void*) : 0;
-			v->fields_data = o->fields_data - sizeof(void*);
+				hl_vfields(v)[vf->field_index] = hl_same_type(vf->t,t) ? newData + f->field_index : NULL;
 			v = v->next;
 		}
 	}
@@ -699,7 +704,7 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 				while( v ) {
 					hl_field_lookup *vf = hl_lookup_find((hl_field_lookup*)v->t->vobj_proto,v->t->virt->nfields,hfield);
 					if( vf )
-						v->indexes[vf->field_index] = 0;
+						hl_vfields(v)[vf->field_index] = NULL;
 					v = v->next;
 				}
 			}
