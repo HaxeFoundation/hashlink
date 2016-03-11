@@ -302,7 +302,7 @@ bool hl_sys_is_dir( vbyte *path ) {
 	pstat s;
 	if( stat((pchar*)path,&s) != 0 )
 		return false;
-	return s.st_mode & S_IFDIR != 0;
+	return (s.st_mode & S_IFDIR) != 0;
 }
 
 bool hl_sys_create_dir( vbyte *path, int mode ) {
@@ -357,7 +357,7 @@ varray *hl_sys_read_dir( vbyte *_path ) {
 	WIN32_FIND_DATAW d;
 	HANDLE handle;
 	hl_buffer *b = hl_alloc_buffer();
-	int len = pstrlen(path);
+	int len = (int)pstrlen(path);
 	hl_buffer_str(b,path);
 	if( len && path[len-1] != '/' && path[len-1] != '\\' )
 		hl_buffer_str(b,USTR("/*.*"));

@@ -262,7 +262,6 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			int i;
 			vlist l;
 			vlist *vtmp = stack;
-			hl_field_lookup *f;
 			if( vv->value ) {
 				hl_buffer_rec(b, vv->value, stack);
 				return;
