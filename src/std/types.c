@@ -146,7 +146,7 @@ bool hl_is_dynamic( hl_type *t ) {
 bool hl_safe_cast( hl_type *t, hl_type *to ) {
 	if( t == to )
 		return true;
-	if( to->kind == HDYN && t->kind != HVIRTUAL )
+	if( to->kind == HDYN )
 		return hl_is_dynamic(t);
 	if( t->kind != to->kind )
 		return false;
@@ -389,7 +389,7 @@ bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 	return true;
 }
 
-HL_PRIM vdynamic *hl_ealloc( hl_type *t, int index, varray *args ) {
+HL_PRIM vdynamic *hl_alloc_enum( hl_type *t, int index, varray *args ) {
 	hl_enum_construct *c = t->tenum->constructs + index;
 	venum *e;
 	vdynamic *v;

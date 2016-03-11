@@ -126,7 +126,7 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	return d;
 }
 
-vobj *hl_alloc_obj( hl_type *t ) {
+vdynamic *hl_alloc_obj( hl_type *t ) {
 	vobj *o;
 	int size;
 	hl_runtime_obj *rt = t->obj->rt;
@@ -136,7 +136,7 @@ vobj *hl_alloc_obj( hl_type *t ) {
 	o = (vobj*)hl_gc_alloc(size);
 	memset(o,0,size);
 	o->t = t;
-	return o;
+	return (vdynamic*)o;
 }
 
 vdynobj *hl_alloc_dynobj() {
@@ -147,4 +147,18 @@ vdynobj *hl_alloc_dynobj() {
 	o->fields_data = NULL;
 	o->virtuals = NULL;
 	return o;
+}
+
+vvirtual *hl_alloc_virtual( hl_type *t ) {
+	vvirtual *v = (vvirtual*)hl_gc_alloc(t->virt->dataSize + sizeof(vvirtual) + sizeof(void*) * t->virt->nfields);
+	void **fields = (void**)(v + 1);
+	char *vdata = (char*)(fields + t->virt->nfields);
+	int i;
+	v->t = t;
+	v->value = NULL;
+	v->next = NULL;
+	for(i=0;i<t->virt->nfields;i++)
+		fields[i] = (char*)v + t->virt->indexes[i];
+	memset(vdata,0,t->virt->dataSize);
+	return v;
 }

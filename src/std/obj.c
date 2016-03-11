@@ -249,12 +249,44 @@ hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 
 void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 	int i;
+	int vsize = sizeof(vvirtual) + sizeof(void*) * vt->virt->nfields;
+	int size = vsize;
 	hl_field_lookup *l = (hl_field_lookup*)hl_malloc(&ctx->alloc,sizeof(hl_field_lookup)*vt->virt->nfields);
+	int *indexes = (int*)hl_malloc(&ctx->alloc,sizeof(int)*vt->virt->nfields);
 	for(i=0;i<vt->virt->nfields;i++) {
 		hl_obj_field *f = vt->virt->fields + i;
 		hl_lookup_insert(l,i,f->hashed_name,f->t,i);
+		size += hl_pad_size(size, f->t);
+		indexes[i] = size;
+		size += hl_type_size(f->t);
 	}
-	vt->vobj_proto = (void**)l;
+	vt->virt->lookup = l;
+	vt->virt->indexes = indexes;
+	vt->virt->dataSize = size - vsize;
+}
+
+vdynamic *hl_virtual_make_value( vvirtual *v ) {
+	vdynobj *o;
+	int i, nfields;
+	int hsize;
+	if( v->value )
+		return v->value;
+	nfields = v->t->virt->nfields;
+	hsize = sizeof(vvirtual) + nfields * sizeof(void*);
+	o = hl_alloc_dynobj();
+	o->fields_data = (char*)v + hsize;
+	o->nfields = nfields;
+	o->dataSize = v->t->virt->dataSize;
+	o->dproto = (vdynobj_proto*)hl_gc_alloc(sizeof(vdynobj_proto) + sizeof(hl_field_lookup) * (nfields - 1));
+	o->dproto->t = hlt_dynobj;
+	memcpy(&o->dproto->fields,v->t->virt->lookup,nfields * sizeof(hl_field_lookup));
+	for(i=0;i<nfields;i++) {
+		hl_field_lookup *f = (&o->dproto->fields) + i;
+		f->field_index = v->t->virt->indexes[f->field_index] - hsize;
+	}
+	o->virtuals = v;
+	v->value = (vdynamic*)o;
+	return v->value;
 }
 
 /**
@@ -264,7 +296,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	vvirtual *v = NULL;
 	if( obj == NULL ) return NULL;
 #ifdef _DEBUG
-	if( vt->vobj_proto == NULL ) hl_fatal("virtual not initialized");
+	if( vt->virt->lookup == NULL ) hl_fatal("virtual not initialized");
 #endif
 	switch( obj->t->kind ) {
 	case HOBJ:
@@ -314,7 +346,8 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 		}
 		break;
 	case HVIRTUAL:
-		return hl_to_virtual(vt,((vvirtual*)obj)->value);
+		if( hl_safe_cast(obj->t, vt) ) return (vvirtual*)obj;
+		return hl_to_virtual(vt,hl_virtual_make_value((vvirtual*)obj));
 	default:
 		hl_fatal_fmt("Don't know how to virtual %d",obj->t->kind);
 	}
@@ -350,7 +383,7 @@ static hl_field_lookup *hl_dyn_alloc_field( vdynobj *o, int hfield, hl_type *t )
 	{
 		vvirtual *v = o->virtuals;
 		while( v ) {
-			hl_field_lookup *vf = hl_lookup_find((hl_field_lookup*)v->t->vobj_proto,v->t->virt->nfields,hfield);
+			hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,hfield);
 			int i;
 			for(i=0;i<v->t->virt->nfields;i++)
 				if( hl_vfields(v)[i] )
@@ -400,7 +433,7 @@ static void hl_dyn_change_field( vdynobj *o, hl_field_lookup *f, hl_type *t ) {
 	{
 		vvirtual *v = o->virtuals;
 		while( v ) {
-			hl_field_lookup *vf = hl_lookup_find((hl_field_lookup*)v->t->vobj_proto,v->t->virt->nfields,f->hashed_name);
+			hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,f->hashed_name);
 			int i;
 			if( newData != oldData )
 				for(i=0;i<v->t->virt->nfields;i++)
@@ -435,7 +468,16 @@ static void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t ) {
 		}
 		break;
 	case HVIRTUAL:
-		return hl_obj_lookup(((vvirtual*)d)->value, hfield, t);
+		{
+			vdynamic *v = ((vvirtual*)d)->value;
+			hl_field_lookup *f;
+			if( v )
+				return hl_obj_lookup(v, hfield, t);
+			f = hl_lookup_find(d->t->virt->lookup,d->t->virt->nfields,hfield);
+			if( f == NULL ) return NULL;
+			*t = f->t;
+			return (char*)d + d->t->virt->indexes[f->field_index];
+		}
 	default:
 		hl_error("Invalid field access");
 		break;
@@ -460,7 +502,11 @@ static vdynamic *hl_obj_lookup_extra( vdynamic *d, int hfield ) {
 		}
 		break;
 	case HVIRTUAL:
-		return hl_obj_lookup_extra(((vvirtual*)d)->value, hfield);
+		{
+			vdynamic *v = ((vvirtual*)d)->value;
+			if( v ) return hl_obj_lookup_extra(v, hfield);
+		}
+		break;
 	default:
 		break;
 	}
@@ -534,11 +580,20 @@ static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **f
 			hl_field_lookup *f = obj_resolve_field(d->t->obj,hfield);
 			if( f == NULL || f->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
 			*ft = f->t;
-			return (char*)d+f->field_index;
+			return (char*)d + f->field_index;
 		}
 		break;
 	case HVIRTUAL:
-		return hl_obj_lookup_set(((vvirtual*)d)->value, hfield, t, ft);
+		{
+			vvirtual *v = (vvirtual*)d;
+			hl_field_lookup *f;
+			if( v->value ) return hl_obj_lookup_set(v->value, hfield, t, ft);
+			f = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,hfield);
+			if( f == NULL || !hl_safe_cast(t,f->t) )
+				return hl_obj_lookup_set(hl_virtual_make_value(v), hfield, t, ft);
+			*ft = f->t;
+			return (char*)v + v->t->virt->indexes[f->field_index];
+		}
 	default:
 		hl_error("Invalid field access");
 		break;
@@ -682,7 +737,11 @@ HL_PRIM bool hl_obj_has_field( vdynamic *obj, int hfield ) {
 		}
 		break;
 	case HVIRTUAL:
-		return hl_obj_has_field(((vvirtual*)obj)->value,hfield);
+		{
+			vvirtual *v = (vvirtual*)obj;
+			if( v->value ) return hl_obj_has_field(v->value,hfield);
+			return hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,hfield) != NULL;
+		}
 	default:
 		break;
 	}
@@ -702,7 +761,7 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 			{
 				vvirtual *v = d->virtuals;
 				while( v ) {
-					hl_field_lookup *vf = hl_lookup_find((hl_field_lookup*)v->t->vobj_proto,v->t->virt->nfields,hfield);
+					hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,hfield);
 					if( vf )
 						hl_vfields(v)[vf->field_index] = NULL;
 					v = v->next;
@@ -712,7 +771,12 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 		}
 		break;
 	case HVIRTUAL:
-		return hl_obj_delete_field(((vvirtual*)obj)->value,hfield);
+		{
+			vvirtual *v = (vvirtual*)obj;
+			if( v->value ) return hl_obj_delete_field(v->value,hfield);
+			if( hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,hfield) == NULL ) return false;
+			return hl_obj_delete_field(hl_virtual_make_value(v),hfield);
+		}
 	default:
 		break;
 	}
@@ -747,6 +811,16 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 			}
 		}
 		break;
+	case HVIRTUAL:
+		{
+			vvirtual *v = (vvirtual*)obj;
+			int i;
+			if( v->value ) return hl_obj_fields(v->value);
+			a = hl_alloc_array(&hlt_bytes,v->t->virt->nfields);
+			for(i=0;i<v->t->virt->nfields;i++)
+				hl_aptr(a,vbyte*)[i] = (vbyte*)v->t->virt->fields[i].name;
+		}
+		break;
 	default:
 		break;
 	}
@@ -772,8 +846,22 @@ HL_PRIM vdynamic *hl_obj_copy( vdynamic *obj ) {
 			return (vdynamic*)c;
 		}
 		break;
+	case HVIRTUAL:
+		{
+			vvirtual *v = (vvirtual*)obj;
+			vvirtual *v2;
+			if( v->value )
+				return hl_obj_copy(v->value);
+			v2 = hl_alloc_virtual(v->t);
+			memcpy((void**)(v2 + 1) + v->t->virt->nfields * sizeof(void*), (void**)(v + 1) + v->t->virt->nfields * sizeof(void*), v->t->virt->dataSize);
+			return (vdynamic*)v2;
+		}
 	default:
 		break;
 	}
 	return NULL;
+}
+
+HL_PRIM vdynamic *hl_get_virtual_value( vdynamic *v ) {
+	return ((vvirtual*)v)->value;
 }

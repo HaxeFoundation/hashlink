@@ -31,7 +31,7 @@ HL_PRIM vbyte *hl_copy_bytes( vbyte *ptr, int size ) {
 	return b;
 }
 
-HL_PRIM void hl_bblit( char *dst, int dpos, char *src, int spos, int len ) {
+HL_PRIM void hl_bytes_blit( char *dst, int dpos, char *src, int spos, int len ) {
 	memcpy(dst + dpos,src+spos,len);
 }
 

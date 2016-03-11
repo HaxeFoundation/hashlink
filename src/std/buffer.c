@@ -257,7 +257,35 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		hl_buffer_str_sub(b, USTR("ref"), 3);
 		break;
 	case HVIRTUAL:
-		hl_buffer_rec(b, ((vvirtual*)v)->value, stack);
+		{
+			vvirtual *vv = (vvirtual*)v;
+			int i;
+			vlist l;
+			vlist *vtmp = stack;
+			hl_field_lookup *f;
+			if( vv->value ) {
+				hl_buffer_rec(b, vv->value, stack);
+				return;
+			}
+			while( vtmp != NULL ) {
+				if( vtmp->v == v ) {
+					hl_buffer_str_sub(b,USTR("..."),3);
+					return;
+				}
+				vtmp = vtmp->next;
+			}
+			l.v = v;
+			l.next = stack;
+			hl_buffer_char(b, '{');
+			for(i=0;i<vv->t->virt->nfields;i++) {
+				hl_field_lookup *f = vv->t->virt->lookup + i;
+				if( i ) hl_buffer_str_sub(b,USTR(", "),2);
+				hl_buffer_str(b,hl_field_name(f->hashed_name));
+				hl_buffer_str_sub(b,USTR(" : "),3);
+				hl_buffer_addr(b, (char*)v + vv->t->virt->indexes[f->field_index], f->t, &l);
+			}
+			hl_buffer_char(b, '}');
+		}
 		break;
 	case HDYNOBJ:
 		{

@@ -558,22 +558,27 @@ static void hl_hogrow( hl_obj_map *m ) {
 	}
 }
 
+static vdynamic *no_virtual( vdynamic *k ) {
+	return k && k->t->kind == HVIRTUAL ? hl_virtual_make_value((vvirtual*)k) : k;
+}
+
 HL_PRIM void hl_hoset( hl_obj_map *m, vdynamic *key, vdynamic *value ) {
-	if( hl_hoadd(m,key,value) && m->nentries > m->ncells * H_CELL_SIZE * 2 )
+	if( hl_hoadd(m,no_virtual(key),value) && m->nentries > m->ncells * H_CELL_SIZE * 2 )
 		hl_hogrow(m);
 }
 
 HL_PRIM bool hl_hoexists( hl_obj_map *m, vdynamic *key ) {
-	return hl_hofind(m,key) != NULL;
+	return hl_hofind(m,no_virtual(key)) != NULL;
 }
 
 HL_PRIM vdynamic* hl_hoget( hl_obj_map *m, vdynamic *key ) {
-	vdynamic **v = hl_hofind(m,key);
+	vdynamic **v = hl_hofind(m,no_virtual(key));
 	if( v == NULL ) return NULL;
 	return *v;
 }
 
-HL_PRIM bool hl_horemove( hl_obj_map *m, vdynamic *key ) {
+HL_PRIM bool hl_horemove( hl_obj_map *m, vdynamic *_key ) {
+	vdynamic *key = no_virtual(_key);
 	int hash = (int)(int_val)key;
 	int ckey = ((unsigned)hash) % ((unsigned)m->ncells);
 	hl_obj_cell *c = m->cells[ckey];

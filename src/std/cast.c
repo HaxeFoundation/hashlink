@@ -154,6 +154,7 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	case TK2(HVIRTUAL,HOBJ):
 		{
 			vvirtual *v = *(vvirtual**)data;
+			if( v->value == NULL ) break;
 			return hl_dyn_castp( &v->value, v->value->t, to);
 		}
 	case TK2(HOBJ,HDYN):

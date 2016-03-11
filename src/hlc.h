@@ -58,10 +58,6 @@ static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }
 
-static vdynamic *hl_oalloc( hl_type *t ) {
-	return (vdynamic*)hl_alloc_obj(t);
-}
-
 extern vdynamic *hl_call_method( vdynamic *c, varray *args );
 
 #define HLC_DYN_MAX_ARGS 9

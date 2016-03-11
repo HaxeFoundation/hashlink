@@ -54,7 +54,11 @@
 #	define HL_CYGWIN
 #endif
 
-#if defined(_MSC_VER)
+#if defined(__llvm__)
+#	define HL_LLVM
+#endif
+
+#if defined(_MSC_VER) && !defined(HL_LLVM)
 #	define HL_VCC
 #	pragma warning(disable:4996) // remove deprecated C API usage warnings
 #	pragma warning(disable:4055) // void* - to - function cast
@@ -127,7 +131,7 @@ typedef long long int64;
 
 // -------------- UNICODE -----------------------------------
 
-#ifdef HL_WIN
+#if defined(HL_WIN) && !defined(HL_LLVM)
 #	include <windows.h>
 #	include <wchar.h>
 typedef wchar_t	uchar;
@@ -191,6 +195,7 @@ typedef struct hl_type hl_type;
 typedef struct hl_runtime_obj hl_runtime_obj;
 typedef struct hl_alloc_block hl_alloc_block;
 typedef struct { hl_alloc_block *cur; } hl_alloc;
+typedef struct _hl_field_lookup hl_field_lookup;
 
 typedef struct {
 	hl_alloc alloc;
@@ -242,11 +247,12 @@ typedef struct {
 } hl_type_obj;
 
 typedef struct {
-	int nfields;
-#	ifdef HL_64
-	int __pad;
-#	endif
 	hl_obj_field *fields;
+	int nfields;
+	// runtime
+	int dataSize;
+	int *indexes;
+	hl_field_lookup *lookup;
 } hl_type_virtual;
 
 typedef struct {
@@ -337,11 +343,11 @@ typedef struct {
 	vclosure *wrappedFun;
 } vclosure_wrapper;
 
-typedef struct {
+struct _hl_field_lookup {
 	hl_type *t;
 	int hashed_name;
 	int field_index; // negative or zero : index in methods
-} hl_field_lookup;
+};
 
 struct hl_runtime_obj {
 	hl_type *t;
@@ -398,10 +404,12 @@ bool hl_safe_cast( hl_type *t, hl_type *to );
 
 varray *hl_alloc_array( hl_type *t, int size );
 vdynamic *hl_alloc_dynamic( hl_type *t );
-vobj *hl_alloc_obj( hl_type *t );
+vdynamic *hl_alloc_obj( hl_type *t );
+vvirtual *hl_alloc_virtual( hl_type *t );
 vdynobj *hl_alloc_dynobj();
 vbyte *hl_alloc_bytes( int size );
 vbyte *hl_copy_bytes( vbyte *byte, int size );
+vdynamic *hl_virtual_make_value( vvirtual *v );
 
 int hl_hash( vbyte *name );
 int hl_hash_gen( const uchar *name, bool cache_name );
