@@ -52,11 +52,12 @@ typedef struct _stat32 pstat;
 #	include <sys/time.h>
 #	include <sys/times.h>
 #	include <sys/wait.h>
-#	include <xlocale.h>
+#	include <locale.h>
 #	define HL_UTF8PATH
+typedef struct stat pstat;
 #endif
 
-#ifdef HL_UF8PATH
+#ifdef HL_UTF8PATH
 typedef char pchar;
 #define pstrchr strchr
 #define pstrlen	strlen
@@ -93,15 +94,15 @@ HL_PRIM bool hl_sys_utf8_path() {
 }
 
 HL_PRIM vbyte *hl_sys_string() {
-#if defined(HL_WIN)
+#if defined(HL_WIN) || defined(HL_CYGWIN) || defined(HL_MINGW)
 	return (vbyte*)USTR("Windows");
-#elif defined(NEKO_GNUKBSD)
+#elif defined(HL_GNUKBSD)
 	return (vbyte*)USTR("GNU/kFreeBSD");
-#elif defined(NEKO_LINUX)
+#elif defined(HL_LINUX)
 	return (vbyte*)USTR("Linux");
-#elif defined(NEKO_BSD)
+#elif defined(HL_BSD)
 	return (vbyte*)USTR("BSD");
-#elif defined(NEKO_MAC)
+#elif defined(HL_MAC)
 	return (vbyte*)USTR("Mac");
 #else
 #error Unknow system string
@@ -400,7 +401,7 @@ varray *hl_sys_read_dir( vbyte *_path ) {
 			continue;
 		if( pos == count ) {
 			int ncount = count == 0 ? 16 : count * 2;
-			varray *narr = hl_aalloc(&hlt_bytes,count);
+			varray *narr = hl_alloc_array(&hlt_bytes,count);
 			pchar **ncur = hl_aptr(narr,pchar*);
 			memcpy(ncur,current,count*sizeof(void*));
 			current = ncur;
