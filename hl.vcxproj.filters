@@ -1,0 +1,114 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="src\alloc.c" />
+    <ClCompile Include="src\_main.c" />
+    <ClCompile Include="include\pcre\pcre_xclass.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_chartables.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_compile.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_dfa_exec.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_exec.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_fullinfo.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_globals.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_newline.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_string_utils.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pcre\pcre_tables.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\array.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\fun.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\buffer.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\bytes.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\cast.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\date.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\error.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\file.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\maps.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\obj.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\math.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\regexp.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\types.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\socket.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\string.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\sys.c">
+      <Filter>std</Filter>
+    </ClCompile>
+    <ClCompile Include="src\std\ucs2.c">
+      <Filter>std</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\hl.h" />
+    <ClInclude Include="src\hlc.h" />
+    <ClInclude Include="src\hlmodule.h" />
+    <ClInclude Include="src\opcodes.h" />
+    <ClInclude Include="include\pcre\pcre.h">
+      <Filter>pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pcre\pcre_internal.h">
+      <Filter>pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pcre\config.h">
+      <Filter>pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pcre\ucp.h">
+      <Filter>pcre</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="pcre">
+      <UniqueIdentifier>{39677e22-d3ec-4045-b5b1-3ab742946791}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="std">
+      <UniqueIdentifier>{7e253825-89b6-4013-9015-12ff52742fbb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

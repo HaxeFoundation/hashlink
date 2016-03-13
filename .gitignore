@@ -2,7 +2,6 @@
 *.sdf
 *.suo
 *.ipch
-*.filters
 *.hl
 *.obj
 *.exe
