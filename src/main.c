@@ -19,7 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "hlmodule.h"
+#include <hlc.h>
 
 #ifdef HL_VCC
 #	include <crtdbg.h>
@@ -27,13 +27,33 @@
 #	define _CrtSetDbgFlag(x)
 #endif
 
-int main( int argc, char *argv[] ) {
-	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF );
+
+#ifdef HL_WIN
+int wmain(int argc, uchar *argv[]) {
+#else
+int main(int argc, char *argv[]) {
+#endif
+	hl_trap_ctx ctx;
+	vdynamic *exc;
+	hl_global_init();
+	hlc_setup(hlc_static_call, hlc_get_wrapper);
+	hl_sys_init(argv + 1,argc - 1);
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/);
+	hlc_trap(ctx, exc, on_exception);
+	hl_entry_point();
+	hl_global_free();
+	return 0;
+on_exception:
+	uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
+	hl_global_free();
+	return 1;
+}
+
+/*
 	if( argc == 1 ) {
 		printf("HLVM %d.%d.%d (c)2015 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION/100,(HL_VERSION/10)%10,HL_VERSION%10);
 		return 1;
 	}
-	hl_global_init();
 	{
 		hl_code *code;
 		hl_module *m;
@@ -72,6 +92,4 @@ int main( int argc, char *argv[] ) {
 		hl_module_free(m);
 		hl_free(&code->alloc);
 	}
-	hl_global_free();
-	return 0;
-}
+*/

@@ -21,14 +21,14 @@
  */
 #include <hl.h>
 
-hl_type hlt_array = { HARRAY };
-hl_type hlt_bytes = { HBYTES };
-hl_type hlt_dynobj = { HDYNOBJ };
-hl_type hlt_dyn = { HDYN };
-hl_type hlt_i32 = { HI32 };
-hl_type hlt_f32 = { HF32 };
-hl_type hlt_f64 = { HF64 };
-hl_type hlt_void = { HVOID };
+HL_PRIM hl_type hlt_array = { HARRAY };
+HL_PRIM hl_type hlt_bytes = { HBYTES };
+HL_PRIM hl_type hlt_dynobj = { HDYNOBJ };
+HL_PRIM hl_type hlt_dyn = { HDYN };
+HL_PRIM hl_type hlt_i32 = { HI32 };
+HL_PRIM hl_type hlt_f32 = { HF32 };
+HL_PRIM hl_type hlt_f64 = { HF64 };
+HL_PRIM hl_type hlt_void = { HVOID };
 
 static const uchar *TSTR[] = {
 	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("f32"), USTR("f64"),
@@ -72,7 +72,7 @@ int hl_pad_size( int pos, hl_type *t ) {
 	return 0;
 }
 
-bool hl_same_type( hl_type *a, hl_type *b ) {
+HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 	if( a == b )
 		return true;
 	if( a->kind != b->kind )
@@ -118,7 +118,7 @@ bool hl_same_type( hl_type *a, hl_type *b ) {
 	return false;
 }
 
-bool hl_is_dynamic( hl_type *t ) {
+HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 	static bool T_IS_DYNAMIC[] = {
 		false, // HVOID,
 		false, // HI8
@@ -143,7 +143,7 @@ bool hl_is_dynamic( hl_type *t ) {
 	return T_IS_DYNAMIC[t->kind];
 }
 
-bool hl_safe_cast( hl_type *t, hl_type *to ) {
+HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 	if( t == to )
 		return true;
 	if( to->kind == HDYN )
@@ -256,7 +256,7 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 	}
 }
 
-const uchar *hl_type_str( hl_type *t ) {
+HL_PRIM const uchar *hl_type_str( hl_type *t ) {
 	const uchar *c = TSTR[t->kind];
 	hl_buffer *b;
 	if( c != NULL )
@@ -354,7 +354,7 @@ HL_PRIM vdynamic *hl_type_get_global( hl_type *t ) {
 	return NULL;
 }
 
-bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
+HL_PRIM bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 	int i;
 	venum *ea, *eb;
 	hl_enum_construct *c;

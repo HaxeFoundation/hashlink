@@ -58,7 +58,7 @@ static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }
 
-extern vdynamic *hl_call_method( vdynamic *c, varray *args );
+HL_API vdynamic *hl_call_method( vdynamic *c, varray *args );
 
 #define HLC_DYN_MAX_ARGS 9
 static vdynamic *hlc_dyn_call_args( vclosure *c, vdynamic **args, int nargs ) {
@@ -126,10 +126,14 @@ struct _hl_trap_ctx {
 	hl_trap_ctx *prev;
 };
 
-extern hl_trap_ctx *hl_current_trap;
-extern vdynamic *hl_current_exc;
+HL_API hl_trap_ctx *hl_current_trap;
+HL_API vdynamic *hl_current_exc;
 
 #define hlc_trap(ctx,r,label) { ctx.prev = hl_current_trap; hl_current_trap = &ctx; if( setjmp(ctx.buf) ) { r = hl_current_exc; goto label; } }
 #define hlc_endtrap(ctx) hl_current_trap = ctx.prev
+
+extern void *hlc_static_call(void *fun, hl_type *t, void **args, vdynamic *out);
+extern void *hlc_get_wrapper(hl_type *t);
+HL_API void hlc_setup(void *sc, void *gw);
 
 #endif

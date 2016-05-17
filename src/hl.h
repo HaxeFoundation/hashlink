@@ -22,6 +22,8 @@
 #ifndef HL_H
 #define HL_H
 
+#define HL_VERSION	010
+
 #ifdef _WIN32
 #	define HL_WIN
 #endif
@@ -127,7 +129,11 @@ typedef long long int64;
 #include <stdio.h>
 #include <memory.h>
 
-#define HL_VERSION	010
+#ifdef HLDLL_EXPORTS
+#define HL_API extern EXPORT
+#else
+#define	HL_API IMPORT
+#endif
 
 // -------------- UNICODE -----------------------------------
 
@@ -152,16 +158,16 @@ typedef wchar_t	uchar;
 typedef unsigned short uchar;
 #	undef USTR
 #	define USTR(str)	u##str
-extern int ustrlen( const uchar *str );
-extern uchar *ustrdup( const uchar *str );
-extern double utod( const uchar *str, uchar **end );
-extern int utoi( const uchar *str, uchar **end );
-extern int ucmp( const uchar *a, const uchar *b );
-extern int strtou( uchar *out, int out_size, const char *str ); 
-extern int utostr( char *out, int out_size, const uchar *str ); 
-extern int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
-extern int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
-extern void uprintf( const uchar *fmt, const uchar *str );
+HL_API int ustrlen( const uchar *str );
+HL_API uchar *ustrdup( const uchar *str );
+HL_API double utod( const uchar *str, uchar **end );
+HL_API int utoi( const uchar *str, uchar **end );
+HL_API int ucmp( const uchar *a, const uchar *b );
+HL_API int strtou( uchar *out, int out_size, const char *str );
+HL_API int utostr( char *out, int out_size, const uchar *str );
+HL_API int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
+HL_API int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
+HL_API void uprintf( const uchar *fmt, const uchar *str );
 #endif
 
 // ---- TYPES -------------------------------------------
@@ -385,103 +391,104 @@ typedef struct _venum {
 	int index;
 } venum;
 
-extern hl_type hlt_void;
-extern hl_type hlt_i32;
-extern hl_type hlt_f64;
-extern hl_type hlt_f32;
-extern hl_type hlt_dyn;
-extern hl_type hlt_array;
-extern hl_type hlt_bytes;
-extern hl_type hlt_dynobj;
+HL_API hl_type hlt_void;
+HL_API hl_type hlt_i32;
+HL_API hl_type hlt_f64;
+HL_API hl_type hlt_f32;
+HL_API hl_type hlt_dyn;
+HL_API hl_type hlt_array;
+HL_API hl_type hlt_bytes;
+HL_API hl_type hlt_dynobj;
 
-double hl_nan();
-bool hl_is_dynamic( hl_type *t );
+HL_API double hl_nan();
+HL_API bool hl_is_dynamic( hl_type *t );
 #define hl_is_ptr(t)	((t)->kind >= HBYTES)
-bool hl_same_type( hl_type *a, hl_type *b );
-bool hl_safe_cast( hl_type *t, hl_type *to );
+HL_API bool hl_same_type( hl_type *a, hl_type *b );
+HL_API bool hl_safe_cast( hl_type *t, hl_type *to );
 
 #define hl_aptr(a,t)	((t*)(((varray*)(a))+1))
 
-varray *hl_alloc_array( hl_type *t, int size );
-vdynamic *hl_alloc_dynamic( hl_type *t );
-vdynamic *hl_alloc_obj( hl_type *t );
-vvirtual *hl_alloc_virtual( hl_type *t );
-vdynobj *hl_alloc_dynobj();
-vbyte *hl_alloc_bytes( int size );
-vbyte *hl_copy_bytes( vbyte *byte, int size );
-vdynamic *hl_virtual_make_value( vvirtual *v );
+HL_API varray *hl_alloc_array( hl_type *t, int size );
+HL_API vdynamic *hl_alloc_dynamic( hl_type *t );
+HL_API vdynamic *hl_alloc_obj( hl_type *t );
+HL_API vvirtual *hl_alloc_virtual( hl_type *t );
+HL_API vdynobj *hl_alloc_dynobj();
+HL_API vbyte *hl_alloc_bytes( int size );
+HL_API vbyte *hl_copy_bytes( vbyte *byte, int size );
+HL_API char *hl_to_utf8( uchar *bytes );
+HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
 
-int hl_hash( vbyte *name );
-int hl_hash_gen( const uchar *name, bool cache_name );
-const uchar *hl_field_name( int hash );
+HL_API int hl_hash( vbyte *name );
+HL_API int hl_hash_gen( const uchar *name, bool cache_name );
+HL_API const uchar *hl_field_name( int hash );
 
 #define hl_error(msg)	hl_error_msg(USTR(msg))
-void hl_error_msg( const uchar *msg, ... );
-void hl_throw( vdynamic *v );
-void hl_rethrow( vdynamic *v );
+HL_API void hl_error_msg( const uchar *msg, ... );
+HL_API void hl_throw( vdynamic *v );
+HL_API void hl_rethrow( vdynamic *v );
 
-vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
-void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
-hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash );
+HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
+HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
+HL_API hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash );
 
-int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
-void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
-float hl_dyn_getf( vdynamic *d, int hfield );
-double hl_dyn_getd( vdynamic *d, int hfield );
+HL_API int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
+HL_API void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
+HL_API float hl_dyn_getf( vdynamic *d, int hfield );
+HL_API double hl_dyn_getd( vdynamic *d, int hfield );
 
-int hl_dyn_casti( void *data, hl_type *t, hl_type *to );
-void *hl_dyn_castp( void *data, hl_type *t, hl_type *to );
-float hl_dyn_castf( void *data, hl_type *t );
-double hl_dyn_castd( void *data, hl_type *t );
+HL_API int hl_dyn_casti( void *data, hl_type *t, hl_type *to );
+HL_API void *hl_dyn_castp( void *data, hl_type *t, hl_type *to );
+HL_API float hl_dyn_castf( void *data, hl_type *t );
+HL_API double hl_dyn_castd( void *data, hl_type *t );
 
 #define hl_invalid_comparison 0xAABBCCDD
-int hl_dyn_compare( vdynamic *a, vdynamic *b );
-vdynamic *hl_make_dyn( void *data, hl_type *t );
-void hl_write_dyn( void *data, hl_type *t, vdynamic *v );
+HL_API int hl_dyn_compare( vdynamic *a, vdynamic *b );
+HL_API vdynamic *hl_make_dyn( void *data, hl_type *t );
+HL_API void hl_write_dyn( void *data, hl_type *t, vdynamic *v );
 
-void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
-void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
-void hl_dyn_setf( vdynamic *d, int hfield, float f );
-void hl_dyn_setd( vdynamic *d, int hfield, double v );
+HL_API void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
+HL_API void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
+HL_API void hl_dyn_setf( vdynamic *d, int hfield, float f );
+HL_API void hl_dyn_setd( vdynamic *d, int hfield, double v );
 
-vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
-vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );
-vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to );
-void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
+HL_API vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
+HL_API vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );
+HL_API vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to );
+HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
 
 // ----------------------- ALLOC --------------------------------------------------
 
-void *hl_gc_alloc( int size );
-void *hl_gc_alloc_noptr( int size );
-void *hl_gc_alloc_finalizer( int size );
+HL_API void *hl_gc_alloc( int size );
+HL_API void *hl_gc_alloc_noptr( int size );
+HL_API void *hl_gc_alloc_finalizer( int size );
 
-void hl_alloc_init( hl_alloc *a );
-void *hl_malloc( hl_alloc *a, int size );
-void *hl_zalloc( hl_alloc *a, int size );
-void hl_free( hl_alloc *a );
+HL_API void hl_alloc_init( hl_alloc *a );
+HL_API void *hl_malloc( hl_alloc *a, int size );
+HL_API void *hl_zalloc( hl_alloc *a, int size );
+HL_API void hl_free( hl_alloc *a );
 
-void hl_global_init();
-void hl_global_free();
+HL_API void hl_global_init();
+HL_API void hl_global_free();
 
 // ----------------------- BUFFER --------------------------------------------------
 
 typedef struct hl_buffer hl_buffer;
 
-hl_buffer *hl_alloc_buffer();
-void hl_buffer_val( hl_buffer *b, vdynamic *v );
-void hl_buffer_char( hl_buffer *b, uchar c );
-void hl_buffer_str( hl_buffer *b, const uchar *str );
-void hl_buffer_cstr( hl_buffer *b, const char *str );
-void hl_buffer_str_sub( hl_buffer *b, const uchar *str, int len );
-int hl_buffer_length( hl_buffer *b );
-uchar *hl_buffer_content( hl_buffer *b, int *len );
-uchar *hl_to_string( vdynamic *v );
-const uchar *hl_type_str( hl_type *t );
+HL_API hl_buffer *hl_alloc_buffer();
+HL_API void hl_buffer_val( hl_buffer *b, vdynamic *v );
+HL_API void hl_buffer_char( hl_buffer *b, uchar c );
+HL_API void hl_buffer_str( hl_buffer *b, const uchar *str );
+HL_API void hl_buffer_cstr( hl_buffer *b, const char *str );
+HL_API void hl_buffer_str_sub( hl_buffer *b, const uchar *str, int len );
+HL_API int hl_buffer_length( hl_buffer *b );
+HL_API uchar *hl_buffer_content( hl_buffer *b, int *len );
+HL_API uchar *hl_to_string( vdynamic *v );
+HL_API const uchar *hl_type_str( hl_type *t );
 
 // ----------------------- FFI ------------------------------------------------------
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsifdbBXPOATR"
+#define TYPE_STR	"vcsifdbBDPOATR"
 
 #undef  _VOID
 #define _NO_ARG
@@ -492,30 +499,44 @@ const uchar *hl_type_str( hl_type *t );
 #define _F32						"f"
 #define _F64						"d"
 #define _BOOL						"b"
-#define _DYN						"X"
+#define _DYN						"D"
 #define _FUN(t, args)				"P" args "_" t
-#define _OBJ						"O"
+#define _OBJ(fields)				"O" fields "_"
 #define _BYTES						"B"
 #define _ARR						"A"
 #define _TYPE						"T"
 #define _REF(t)						"R" t
 #undef _NULL
 #define _NULL(t)					"N" t
+#define _ABSTRACT(name)				"X" #name "_"
 
-#if HL_JIT
-#define	HL_PRIM						static
-#define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
-#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&name); } C_FUNCTION_END
-#else
-#define	HL_PRIM
+#define _STRING						_OBJ(_BYTES _I32)
+
+typedef struct {
+	uchar *bytes;
+	int length;
+} vstring;
+
+#ifndef HL_NAME
+#	ifdef HLDLL_EXPORTS
+#		define HL_PRIM				EXPORT
+#	else
+#		define HL_PRIM
+#	endif
+#define HL_NAME(p)					p
 #define DEFINE_PRIM(t,name,args)
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#else
+#define	HL_PRIM						EXPORT
+#define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
+#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 #endif
 
 // -------------- EXTRA ------------------------------------
 
 #define hl_fatal(msg)	hl_fatal_error(msg,__FILE__,__LINE__)
-void *hl_fatal_error( const char *msg, const char *file, int line );
-void hl_fatal_fmt( const char *fmst, ... );
+HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
+HL_API void hl_fatal_fmt( const char *fmst, ... );
+HL_API void hl_sys_init(void **args, int nargs);
 
 #endif

@@ -23,8 +23,8 @@
 #include <stdarg.h>
 #include <string.h>
 
-hl_trap_ctx *hl_current_trap = NULL;
-vdynamic *hl_current_exc = NULL;
+HL_PRIM hl_trap_ctx *hl_current_trap = NULL;
+HL_PRIM vdynamic *hl_current_exc = NULL;
 
 void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);

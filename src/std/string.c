@@ -194,6 +194,12 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
 	return out;
 }
 
+HL_PRIM char *hl_to_utf8( uchar *bytes ) {
+	int size;
+	return hl_utf16_to_utf8((vbyte*)bytes, 0, &size);
+}
+
+
 HL_PRIM vbyte *hl_url_encode( vbyte *str, int *len ) {
 	hl_buffer *b = hl_alloc_buffer();
 	uchar *cstr = (uchar*)str;

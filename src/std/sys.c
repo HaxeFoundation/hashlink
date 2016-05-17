@@ -142,11 +142,11 @@ HL_PRIM int hl_random( int max ) {
 	return rand() % max;
 }
 
-vbyte *hl_sys_get_env( vbyte *v ) {
+HL_PRIM vbyte *hl_sys_get_env( vbyte *v ) {
 	return (vbyte*)getenv((pchar*)v);
 }
 
-bool hl_sys_put_env( vbyte *e, vbyte *v ) {
+HL_PRIM bool hl_sys_put_env( vbyte *e, vbyte *v ) {
 #ifdef HL_WIN
 	hl_buffer *b = hl_alloc_buffer();
 	hl_buffer_str(b,(uchar*)e);
@@ -170,7 +170,7 @@ bool hl_sys_put_env( vbyte *e, vbyte *v ) {
 extern char **environ;
 #endif
 
-varray *hl_sys_env() {
+HL_PRIM varray *hl_sys_env() {
 	varray *a;
 	pchar **e = environ;
 	pchar **arr;
@@ -200,7 +200,7 @@ varray *hl_sys_env() {
 }
 
 
-void hl_sys_sleep( double f ) {
+HL_PRIM void hl_sys_sleep( double f ) {
 #ifdef HL_WIN
 	Sleep((DWORD)(f * 1000));
 #else
@@ -211,7 +211,7 @@ void hl_sys_sleep( double f ) {
 #endif
 }
 
-bool hl_sys_set_time_locale( vbyte *l ) {
+HL_PRIM bool hl_sys_set_time_locale( vbyte *l ) {
 #ifdef HL_POSIX
 	locale_t lc, old;
 	lc = newlocale(LC_TIME_MASK,(char*)l,NULL);
@@ -230,7 +230,7 @@ bool hl_sys_set_time_locale( vbyte *l ) {
 }
 
 
-vbyte *hl_sys_get_cwd() {
+HL_PRIM vbyte *hl_sys_get_cwd() {
 	pchar buf[256];
 	int l;
 	if( getcwd(buf,256) == NULL )
@@ -243,11 +243,11 @@ vbyte *hl_sys_get_cwd() {
 	return (vbyte*)pstrdup(buf,-1);
 }
 
-bool hl_sys_set_cwd( vbyte *dir ) {
+HL_PRIM bool hl_sys_set_cwd( vbyte *dir ) {
 	return chdir((pchar*)dir) == 0;
 }
 
-bool hl_sys_is64() {
+HL_PRIM bool hl_sys_is64() {
 #ifdef HL_64
 	return true;
 #else
@@ -255,7 +255,7 @@ bool hl_sys_is64() {
 #endif
 }
 
-int hl_sys_command( vbyte *cmd ) {
+HL_PRIM int hl_sys_command( vbyte *cmd ) {
 #ifdef HL_WIN
 	return system((pchar*)cmd);
 #else
@@ -264,20 +264,20 @@ int hl_sys_command( vbyte *cmd ) {
 #endif
 }
 
-bool hl_sys_exists( vbyte *path ) {
+HL_PRIM bool hl_sys_exists( vbyte *path ) {
 	pstat st;
 	return stat((pchar*)path,&st) == 0;
 }
 
-bool hl_sys_delete( vbyte *path ) {
+HL_PRIM bool hl_sys_delete( vbyte *path ) {
 	return unlink((pchar*)path) == 0;
 }
 
-bool hl_sys_rename( vbyte *path, vbyte *newname ) {
+HL_PRIM bool hl_sys_rename( vbyte *path, vbyte *newname ) {
 	return rename((pchar*)path,(pchar*)newname) == 0;
 }
 
-varray *hl_sys_stat( vbyte *path ) {
+HL_PRIM varray *hl_sys_stat( vbyte *path ) {
 	pstat s;
 	varray *a;
 	int *i;
@@ -299,22 +299,22 @@ varray *hl_sys_stat( vbyte *path ) {
 	return a;
 }
 
-bool hl_sys_is_dir( vbyte *path ) {
+HL_PRIM bool hl_sys_is_dir( vbyte *path ) {
 	pstat s;
 	if( stat((pchar*)path,&s) != 0 )
 		return false;
 	return (s.st_mode & S_IFDIR) != 0;
 }
 
-bool hl_sys_create_dir( vbyte *path, int mode ) {
+HL_PRIM bool hl_sys_create_dir( vbyte *path, int mode ) {
 	return mkdir((pchar*)path,mode) == 0;
 }
 
-bool hl_sys_remove_dir( vbyte *path ) {
+HL_PRIM bool hl_sys_remove_dir( vbyte *path ) {
 	return rmdir((pchar*)path) == 0;
 }
 
-double hl_sys_cpu_time() {
+HL_PRIM double hl_sys_cpu_time() {
 #ifdef HL_WIN
 	FILETIME unused;
 	FILETIME stime;
@@ -329,7 +329,7 @@ double hl_sys_cpu_time() {
 #endif
 }
 
-double hl_sys_thread_cpu_time() {
+HL_PRIM double hl_sys_thread_cpu_time() {
 #if defined(HL_WIN)
 	FILETIME unused;
 	FILETIME utime;
@@ -347,7 +347,7 @@ double hl_sys_thread_cpu_time() {
 #endif
 }
 
-varray *hl_sys_read_dir( vbyte *_path ) {
+HL_PRIM varray *hl_sys_read_dir( vbyte *_path ) {
 	pchar *path = (pchar*)_path;
 	int count = 0;
 	int pos = 0;
@@ -417,7 +417,7 @@ varray *hl_sys_read_dir( vbyte *_path ) {
 	return a;
 }
 
-vbyte *hl_sys_full_path( vbyte *path ) {
+HL_PRIM vbyte *hl_sys_full_path( vbyte *path ) {
 #ifdef HL_WIN
 	pchar buf[MAX_PATH+1];
 	if( GetFullPathNameW((pchar*)path,MAX_PATH+1,buf,NULL) == 0 )
@@ -431,7 +431,7 @@ vbyte *hl_sys_full_path( vbyte *path ) {
 #endif
 }
 
-vbyte *hl_sys_exe_path() {
+HL_PRIM vbyte *hl_sys_exe_path() {
 #if defined(HL_WIN)
 	pchar path[MAX_PATH];
 	if( GetModuleFileNameW(NULL,path,MAX_PATH) == 0 )
@@ -458,7 +458,7 @@ vbyte *hl_sys_exe_path() {
 #endif
 }
 
-int hl_sys_get_char( bool b ) {
+HL_PRIM int hl_sys_get_char( bool b ) {
 #	ifdef HL_WIN
 	return b?getche():getch();
 #	else
@@ -478,21 +478,10 @@ int hl_sys_get_char( bool b ) {
 #	endif
 }
 
-#ifndef HL_JIT
-
-#include <hlc.h>
-#if defined(HL_VCC) && defined(_DEBUG)
-#	include <crtdbg.h>
-#else
-#	define _CrtSetDbgFlag(x)
-#endif
-
-extern void hl_entry_point();
-
 static pchar **sys_args;
 static int sys_nargs;
 
-varray *hl_sys_args() {
+HL_PRIM varray *hl_sys_args() {
 	varray *a = hl_alloc_array(&hlt_bytes,sys_nargs);
 	int i;
 	for(i=0;i<sys_nargs;i++)
@@ -500,22 +489,7 @@ varray *hl_sys_args() {
 	return a;
 }
 
-#ifdef HL_WIN
-int wmain( int argc, uchar *argv[] ) {
-#else
-int main( int argc, char *argv[] ) {
-#endif
-	hl_trap_ctx ctx;
-	vdynamic *exc;
-	sys_args = argv + 1;
-	sys_nargs = argc - 1;
-	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
-	hlc_trap(ctx,exc,on_exception);
-	hl_entry_point();
-	return 0;
-on_exception:
-	uprintf(USTR("Uncaught exception: %s\n"),hl_to_string(exc));
-	return 1;
+HL_PRIM void hl_sys_init(void **args, int nargs) {
+	sys_args = (pchar**)args;
+	sys_nargs = nargs;
 }
-
-#endif
