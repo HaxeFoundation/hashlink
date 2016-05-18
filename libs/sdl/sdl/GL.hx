@@ -249,7 +249,7 @@ class GL {
 	public static function uniform1i( u : Uniform, i : Int ) {
 	}
 
-	public static function uniform4fv( u : Uniform, buffer : Array<hl.types.F32>, bufPos = 0, count = -1 ) {
+	public static function uniform4fv( u : Uniform, buffer : hl.types.Bytes, bufPos : Int, count : Int ) {
 	}
 
 	// draw

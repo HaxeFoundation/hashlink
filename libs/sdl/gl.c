@@ -37,6 +37,8 @@ int GLLoadAPI() {
 }
 #endif
 
+#define ZIDX(val) ((val)?(val)->v.i:0)
+
 // globals
 HL_PRIM bool HL_NAME(gl_init)() {
 	return GLLoadAPI() == 0;
@@ -180,7 +182,7 @@ HL_PRIM int HL_NAME(gl_get_attrib_location)( vdynamic *p, vstring *name ) {
 }
 
 HL_PRIM void HL_NAME(gl_use_program)( vdynamic *p ) {
-	glUseProgram(p->v.i);
+	glUseProgram(ZIDX(p));
 }
 
 // shader
@@ -240,7 +242,7 @@ HL_PRIM void HL_NAME(gl_active_texture)( int t ) {
 }
 
 HL_PRIM void HL_NAME(gl_bind_texture)( int t, vdynamic *texture ) {
-	glBindTexture(t, texture->v.i);
+	glBindTexture(t, ZIDX(texture));
 }
 
 HL_PRIM void HL_NAME(gl_tex_parameteri)( int t, int key, int value ) {
@@ -248,7 +250,7 @@ HL_PRIM void HL_NAME(gl_tex_parameteri)( int t, int key, int value ) {
 }
 
 HL_PRIM void HL_NAME(gl_tex_image2d)( int target, int level, int internalFormat, int width, int height, int border, int format, int type, vbyte *image ) {
-	glTexImage2D(target, level, internalFormat, width, height, border, format, type, NULL);
+	glTexImage2D(target, level, internalFormat, width, height, border, format, type, image);
 }
 
 HL_PRIM void HL_NAME(gl_generate_mipmap)( int t ) {
@@ -315,7 +317,7 @@ HL_PRIM vdynamic *HL_NAME(gl_create_buffer)() {
 }
 
 HL_PRIM void HL_NAME(gl_bind_buffer)( int target, vdynamic *b ) {
-	glBindBuffer(target, b->v.i);
+	glBindBuffer(target, ZIDX(b));
 }
 
 HL_PRIM void HL_NAME(gl_buffer_data_size)( int target, int size, int param ) {
