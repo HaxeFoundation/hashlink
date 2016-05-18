@@ -271,7 +271,7 @@ HL_PRIM vdynamic *HL_NAME(gl_create_framebuffer)() {
 }
 
 HL_PRIM void HL_NAME(gl_bind_framebuffer)( int target, vdynamic *f ) {
-	glBindFramebuffer(target, f->v.i);
+	glBindFramebuffer(target, ZIDX(f));
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_texture2d)( int target, int attach, int texTarget, vdynamic *t, int level ) {
