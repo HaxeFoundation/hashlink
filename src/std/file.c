@@ -37,7 +37,7 @@ static void fdesc_finalize( hl_fdesc *f ) {
 	if( f->f ) fclose(f->f);
 }
 
-hl_fdesc *hl_file_open( vbyte *name, int mode, bool binary ) {
+HL_PRIM hl_fdesc *hl_file_open( vbyte *name, int mode, bool binary ) {
 #	ifdef HL_UFOPEN
 	static const uchar *MODES[] = { USTR("r"), USTR("w"), USTR("a"), NULL, USTR("rb"), USTR("wb"), USTR("ab") };
 	FILE *f = fopen((uchar*)name,MODES[mode|(binary?4:0)]);
@@ -53,49 +53,49 @@ hl_fdesc *hl_file_open( vbyte *name, int mode, bool binary ) {
 	return fd;
 }
 
-void hl_file_close( hl_fdesc *f ) {	
+HL_PRIM void hl_file_close( hl_fdesc *f ) {
 	if( f->f ) fclose(f->f);
 	f->f = NULL;
 }
 
-int hl_file_write( hl_fdesc *f, vbyte *buf, int pos, int len ) {
+HL_PRIM int hl_file_write( hl_fdesc *f, vbyte *buf, int pos, int len ) {
 	return (int)fwrite(buf+pos,1,len,f->f);
 }
 
-int hl_file_read( hl_fdesc *f, vbyte *buf, int pos, int len ) {
+HL_PRIM int hl_file_read( hl_fdesc *f, vbyte *buf, int pos, int len ) {
 	return (int)fread((char*)buf+pos,1,len,f->f);
 }
 
-bool hl_file_write_char( hl_fdesc *f, int c ) {
+HL_PRIM bool hl_file_write_char( hl_fdesc *f, int c ) {
 	unsigned char cc = (unsigned char)c;
 	return fwrite(&cc,1,1,f->f) == 1;
 }
 
-int hl_file_read_char( hl_fdesc *f ) {
+HL_PRIM int hl_file_read_char( hl_fdesc *f ) {
 	unsigned char cc;
 	if( fread(&cc,1,1,f->f) != 1 )
 		return -2;
 	return cc;
 }
 
-bool hl_file_seek( hl_fdesc *f, int pos, int kind ) {
+HL_PRIM bool hl_file_seek( hl_fdesc *f, int pos, int kind ) {
 	return fseek(f->f,pos,kind) == 0;
 }
 
-int hl_file_tell( hl_fdesc *f ) {
+HL_PRIM int hl_file_tell( hl_fdesc *f ) {
 	return ftell(f->f);
 }
 
-bool hl_file_eof( hl_fdesc *f ) {
+HL_PRIM bool hl_file_eof( hl_fdesc *f ) {
 	return feof(f->f);
 }
 
-bool hl_file_flush( hl_fdesc *f ) {
+HL_PRIM bool hl_file_flush( hl_fdesc *f ) {
 	return fflush( f->f ) == 0;
 }
 
 #define MAKE_STDIO(k) \
-	hl_fdesc *hl_file_##k() { \
+	HL_PRIM hl_fdesc *hl_file_##k() { \
 		hl_fdesc *f; \
 		f = (hl_fdesc*)hl_gc_alloc_noptr(sizeof(hl_fdesc)); \
 		f->f = k; \
@@ -107,7 +107,7 @@ MAKE_STDIO(stdin);
 MAKE_STDIO(stdout);
 MAKE_STDIO(stderr);
 
-vbyte *hl_file_contents( vbyte *name, int *size ) {
+HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
 	int len;
 	int p = 0;
 	vbyte *content;

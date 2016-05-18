@@ -38,7 +38,7 @@ static void hl_lookup_insert( hl_field_lookup *l, int size, int hash, hl_type *t
 	l[pos].t = t;
 }
 
-hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash ) {
+HL_PRIM hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash ) {
 	int min = 0;
 	int max = size;
 	while( min < max ) {
@@ -74,11 +74,11 @@ static int hl_cache_count = 0;
 static int hl_cache_size = 0;
 static hl_field_lookup *hl_cache = NULL;
 
-int hl_hash( vbyte *b ) {
+HL_PRIM int hl_hash( vbyte *b ) {
 	return hl_hash_gen((uchar*)b,true);
 }
 
-int hl_hash_gen( const uchar *name, bool cache_name ) {
+HL_PRIM int hl_hash_gen( const uchar *name, bool cache_name ) {
 	int h = 0;
 	const uchar *oname = name;
 	while( *name ) {
@@ -104,12 +104,12 @@ int hl_hash_gen( const uchar *name, bool cache_name ) {
 	return h;
 }
 
-const uchar *hl_field_name( int hash ) {
+HL_PRIM const uchar *hl_field_name( int hash ) {
 	hl_field_lookup *l = hl_lookup_find(hl_cache, hl_cache_count, hash);
 	return l ? (uchar*)l->t : USTR("???");
 }
 
-void hl_cache_free() {
+HL_PRIM void hl_cache_free() {
 	int i;
 	for(i=0;i<hl_cache_count;i++)
 		free(hl_cache[i].t);
@@ -513,7 +513,7 @@ static vdynamic *hl_obj_lookup_extra( vdynamic *d, int hfield ) {
 	return NULL;
 }
 
-int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
+HL_PRIM int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) return 0;
@@ -535,21 +535,21 @@ int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 	}
 }
 
-float hl_dyn_getf( vdynamic *d, int hfield ) {
+HL_PRIM float hl_dyn_getf( vdynamic *d, int hfield ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) return 0.;
 	return ft->kind == HF32 ? *(float*)addr : hl_dyn_castf(addr,ft);
 }
 
-double hl_dyn_getd( vdynamic *d, int hfield ) {
+HL_PRIM double hl_dyn_getd( vdynamic *d, int hfield ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) return 0.;
 	return ft->kind == HF64 ? *(double*)addr : hl_dyn_castd(addr,ft);
 }
 
-void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
+HL_PRIM void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) {
@@ -601,7 +601,7 @@ static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **f
 	return NULL;
 }
 
-void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
+HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
 	switch( ft->kind ) {
@@ -634,7 +634,7 @@ void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 	}
 }
 
-void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
+HL_PRIM void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
 	hl_type *t;
 	void *addr = hl_obj_lookup_set(d,hfield,&hlt_f32,&t);
 	if( t->kind == HF32 )
@@ -647,7 +647,7 @@ void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
 	}
 }
 
-void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
+HL_PRIM void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
 	hl_type *t;
 	void *addr = hl_obj_lookup_set(d,hfield,&hlt_f64,&t);
 	if( t->kind == HF64 )
@@ -660,7 +660,7 @@ void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
 	}
 }
 
-void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *value ) {
+HL_PRIM void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *value ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
 	if( hl_same_type(t,ft) || value == NULL )

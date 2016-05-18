@@ -513,6 +513,7 @@ HL_API const uchar *hl_type_str( hl_type *t );
 #define _STRING						_OBJ(_BYTES _I32)
 
 typedef struct {
+	hl_type *t;
 	uchar *bytes;
 	int length;
 } vstring;

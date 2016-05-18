@@ -21,7 +21,7 @@
  */
 #include <hl.h>
 
-vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue ) {
+HL_PRIM vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue ) {
 	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
 	c->t = t;
 	c->fun = fvalue;
@@ -43,7 +43,7 @@ static hl_type *hl_get_closure_type( hl_type *t ) {
 	return (hl_type*)&ft->closure_type;
 }
 
-vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) {
+HL_PRIM vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) {
 	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
 	c->t = hl_get_closure_type(fullt);
 	c->fun = fvalue;
@@ -67,7 +67,7 @@ HL_PRIM vdynamic* hl_get_closure_value( vdynamic *c ) {
 	return (vdynamic*)cl->value;
 }
 
-bool hl_fun_compare( vdynamic *a, vdynamic *b ) {
+HL_PRIM bool hl_fun_compare( vdynamic *a, vdynamic *b ) {
 	vclosure *ca, *cb;
 	if( a == b )
 		return true;
@@ -166,7 +166,7 @@ static void fun_var_args() {
 	hl_fatal("assert");
 }
 
-void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
+HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	vclosure_wrapper *c = (vclosure_wrapper*)_c;
 	hl_type_fun *tfun = c->cl.t->fun;
 	union { double d; int i; float f; } tmp[HL_MAX_ARGS];
@@ -240,7 +240,7 @@ void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	return pret;
 }
 
-vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
+HL_PRIM vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
 	vclosure_wrapper *c;
 	void *wrap = hlc_get_wrapper(to);
 	if( wrap == NULL ) return NULL;

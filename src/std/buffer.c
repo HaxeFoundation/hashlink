@@ -34,7 +34,7 @@ struct hl_buffer {
 	stringitem data;
 };
 
-hl_buffer *hl_alloc_buffer() {
+HL_PRIM hl_buffer *hl_alloc_buffer() {
 	hl_buffer *b = (hl_buffer*)hl_gc_alloc(sizeof(hl_buffer));
 	b->totlen = 0;
 	b->blen = 16;
@@ -57,7 +57,7 @@ static void buffer_append_new( hl_buffer *b, const uchar *s, int len ) {
 	b->data = it;
 }
 
-void hl_buffer_str_sub( hl_buffer *b, const uchar *s, int len ) {
+HL_PRIM void hl_buffer_str_sub( hl_buffer *b, const uchar *s, int len ) {
 	stringitem it;
 	if( s == NULL || len <= 0 )
 		return;
@@ -79,11 +79,11 @@ void hl_buffer_str_sub( hl_buffer *b, const uchar *s, int len ) {
 	buffer_append_new(b,s,len);
 }
 
-void hl_buffer_str( hl_buffer *b, const uchar *s ) {
+HL_PRIM void hl_buffer_str( hl_buffer *b, const uchar *s ) {
 	if( s ) hl_buffer_str_sub(b,s,(int)ustrlen(s)); else hl_buffer_str_sub(b,USTR("NULL"),4);
 }
 
-void hl_buffer_cstr( hl_buffer *b, const char *s ) {
+HL_PRIM void hl_buffer_cstr( hl_buffer *b, const char *s ) {
 	if( s ) {
 		int len = (int)strlen(s);
 		uchar *out = (uchar*)malloc(sizeof(uchar)*(len+1));
@@ -93,7 +93,7 @@ void hl_buffer_cstr( hl_buffer *b, const char *s ) {
 	} else hl_buffer_str_sub(b,USTR("NULL"),4);
 }
 
-void hl_buffer_char( hl_buffer *b, uchar c ) {
+HL_PRIM void hl_buffer_char( hl_buffer *b, uchar c ) {
 	stringitem it;
 	b->totlen++;
 	it = b->data;
@@ -104,7 +104,7 @@ void hl_buffer_char( hl_buffer *b, uchar c ) {
 	buffer_append_new(b,(uchar*)&c,1);
 }
 
-uchar *hl_buffer_content( hl_buffer *b, int *len ) {
+HL_PRIM uchar *hl_buffer_content( hl_buffer *b, int *len ) {
 	uchar *buf = (uchar*)hl_gc_alloc_noptr((b->totlen+1)<<1);
 	stringitem it = b->data;
 	uchar *s = ((uchar*)buf) + b->totlen;
@@ -362,11 +362,11 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 	}
 }
 
-void hl_buffer_val( hl_buffer *b, vdynamic *v ) {
+HL_PRIM void hl_buffer_val( hl_buffer *b, vdynamic *v ) {
 	hl_buffer_rec(b,v,NULL);
 }
 
-uchar *hl_to_string( vdynamic *v ) {
+HL_PRIM uchar *hl_to_string( vdynamic *v ) {
 	hl_buffer *b = hl_alloc_buffer();
 	hl_buffer_val(b,v);
 	hl_buffer_char(b,0);

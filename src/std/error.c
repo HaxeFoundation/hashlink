@@ -26,7 +26,7 @@
 HL_PRIM hl_trap_ctx *hl_current_trap = NULL;
 HL_PRIM vdynamic *hl_current_exc = NULL;
 
-void *hl_fatal_error( const char *msg, const char *file, int line ) {
+HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
 #ifdef _DEBUG
 	*(int*)NULL = 0;
@@ -36,21 +36,21 @@ void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	return NULL;
 }
 
-void hl_throw( vdynamic *v ) {
+HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_trap_ctx *t = hl_current_trap;
 	hl_current_exc = v;
 	hl_current_trap = t->prev;
 #ifdef _DEBUG
-	if( hl_current_trap == NULL ) *(int*)NULL = 0; // Uncaught exception
+//	if( hl_current_trap == NULL ) *(int*)NULL = 0; // Uncaught exception
 #endif
 	longjmp(t->buf,1);
 }
 
-void hl_rethrow( vdynamic *v ) {
+HL_PRIM void hl_rethrow( vdynamic *v ) {
 	hl_throw(v);
 }
 
-void hl_error_msg( const uchar *fmt, ... ) {
+HL_PRIM void hl_error_msg( const uchar *fmt, ... ) {
 	uchar buf[256];
 	vdynamic *d;
 	int len;
@@ -63,7 +63,7 @@ void hl_error_msg( const uchar *fmt, ... ) {
 	hl_throw(d);
 }
 
-void hl_fatal_fmt(const char *fmt, ...) {
+HL_PRIM void hl_fatal_fmt(const char *fmt, ...) {
 	char buf[256];
 	va_list args;
 	va_start(args, fmt);

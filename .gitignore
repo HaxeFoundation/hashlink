@@ -13,13 +13,9 @@ Release
 x64
 *.stackdump
 *.hdll
-/src/_main.c
+/src/_main*
 *.o
-/src/_main2.c
-/src/_main3.c
-/src/_main4.c
-/src/_main5.c
-/src/_main6.c
 *.a
 *.opendb
+*.VC.db
 /include/sdl

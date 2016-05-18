@@ -27,7 +27,7 @@
     #define NAN (*(const float *) __nan)
 #endif
 
-double hl_nan() {
+HL_PRIM double hl_nan() {
 	return NAN;
 }
 

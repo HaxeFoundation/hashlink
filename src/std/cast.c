@@ -23,7 +23,7 @@
 
 #define TK2(a,b)		((a) | ((b)<<5))
 
-vdynamic *hl_make_dyn( void *data, hl_type *t ) {
+HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	vdynamic *v;
 	switch( t->kind ) {
 	case HI8:
@@ -75,7 +75,7 @@ vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 }
 
 
-int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
+HL_PRIM int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 	if( t->kind == HDYN ) {
 		vdynamic *v = *((vdynamic**)data);
 		if( v == NULL ) return 0;
@@ -108,7 +108,7 @@ int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 	return 0;
 }
 
-void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
+HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	if( t->kind == HDYN || t->kind == HNULL ) {
 		vdynamic *v = *(vdynamic**)data;
 		if( v == NULL ) return NULL;
@@ -196,7 +196,7 @@ void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	return 0;
 }
 
-double hl_dyn_castd( void *data, hl_type *t ) {
+HL_PRIM double hl_dyn_castd( void *data, hl_type *t ) {
 	if( t->kind == HDYN ) {
 		vdynamic *v = *((vdynamic**)data);
 		if( v == NULL ) return 0;
@@ -228,7 +228,7 @@ double hl_dyn_castd( void *data, hl_type *t ) {
 	return 0.;
 }
 
-float hl_dyn_castf( void *data, hl_type *t ) {
+HL_PRIM float hl_dyn_castf( void *data, hl_type *t ) {
 	if( t->kind == HDYN ) {
 		vdynamic *v = *((vdynamic**)data);
 		if( v == NULL ) return 0;
@@ -274,7 +274,7 @@ static int dcompare( double a, double b ) {
  	return d == 0. ? 0 : (d > 0. ? 1 : -1);
 }
 
-int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
+HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	if( a == b )
 		return 0;
 	if( a == NULL )
@@ -316,7 +316,7 @@ int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	return hl_invalid_comparison;
 }
 
-void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
+HL_PRIM void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
 	switch( t->kind ) {
 	case HI8:
 	case HBOOL:
