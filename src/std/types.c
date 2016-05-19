@@ -182,7 +182,7 @@ HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 			for(i=0;i<t->fun->nargs;i++) {
 				hl_type *t1 = t->fun->args[i];
 				hl_type *t2 = to->fun->args[i];
-				if( !hl_safe_cast(t1,t2) && (t1->kind != HDYN || !hl_is_dynamic(t2)) )
+				if( !hl_safe_cast(t2,t1) && (t1->kind != HDYN || !hl_is_dynamic(t2)) )
 					return false;
 			}
 			return true;

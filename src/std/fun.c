@@ -22,7 +22,7 @@
 #include <hl.h>
 
 static void fun_var_args() {
-	hl_fatal("assert");
+	hl_error("Variable fun args was not cast to typed function");
 }
 
 HL_PRIM vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue ) {
