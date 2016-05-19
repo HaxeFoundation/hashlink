@@ -426,6 +426,7 @@ HL_API const uchar *hl_field_name( int hash );
 HL_API void hl_error_msg( const uchar *msg, ... );
 HL_API void hl_throw( vdynamic *v );
 HL_API void hl_rethrow( vdynamic *v );
+HL_API varray *hl_exception_stack();
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );

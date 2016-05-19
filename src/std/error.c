@@ -23,8 +23,21 @@
 #include <stdarg.h>
 #include <string.h>
 
+#ifdef _WIN32
+#	pragma warning(disable:4091)
+#	include <DbgHelp.h>
+#	pragma comment(lib, "Dbghelp.lib")
+#endif
+
 HL_PRIM hl_trap_ctx *hl_current_trap = NULL;
 HL_PRIM vdynamic *hl_current_exc = NULL;
+
+static vdynamic *stack_last_exc = NULL;
+static void *stack_trace[0x1000];
+static int stack_count = 0;
+#ifdef _WIN32
+static HANDLE stack_process_handle = NULL;
+#endif
 
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
@@ -36,17 +49,68 @@ HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	return NULL;
 }
 
+static void hl_on_uncaught( const uchar *v ) {
+#	ifdef _DEBUG
+//	*(int*)0 = 0;
+#	endif
+}
+
 HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_trap_ctx *t = hl_current_trap;
+#ifdef _WIN32
+	if( v != stack_last_exc ) {
+		stack_last_exc = v;
+		stack_count = CaptureStackBackTrace(1, 0x1000, stack_trace, NULL) - 8; // 8 startup
+	}
+#endif
 	hl_current_exc = v;
 	hl_current_trap = t->prev;
-#ifdef _DEBUG
-//	if( hl_current_trap == NULL ) *(int*)NULL = 0; // Uncaught exception
-#endif
+	if( hl_current_trap == NULL ) hl_on_uncaught((uchar*)v->v.bytes);
 	longjmp(t->buf,1);
 }
 
+static uchar *hl_resolve_symbol( void *addr ) {
+#ifdef _WIN32
+	DWORD64 index;
+	uchar tmp[256];
+	struct {
+		SYMBOL_INFOW sym;
+		uchar buffer[256];
+	} data;
+	data.sym.SizeOfStruct = sizeof(data.sym);
+	data.sym.MaxNameLen = 255;
+	if( SymFromAddrW(stack_process_handle,(DWORD64)addr,&index,&data.sym) ) {
+		int size = usprintf(tmp,256,USTR("%s at %d"),data.sym.Name,(int)index);
+		return (uchar*)hl_copy_bytes((vbyte*)tmp,sizeof(uchar)*(size+1));
+	}
+#endif
+	return NULL;
+}
+
+HL_PRIM varray *hl_exception_stack() {
+	varray *a = hl_alloc_array(&hlt_bytes, stack_count);
+	int i;
+	uchar tmp[32];
+#ifdef _WIN32
+	if( !stack_process_handle ) {
+		stack_process_handle = GetCurrentProcess();
+		SymInitialize(stack_process_handle,NULL,TRUE);
+	}
+#endif
+	for(i=0;i<stack_count;i++) {
+		void *addr = stack_trace[i];
+		uchar *str = hl_resolve_symbol(addr);
+		if( str == NULL ) {
+			int size = usprintf(tmp,32,USTR("@0x%X"),(int)addr);
+			str = (uchar*)hl_copy_bytes((vbyte*)tmp,sizeof(uchar)*(size+1));
+		}
+		hl_aptr(a,vbyte*)[i] = (vbyte*)str;
+	}
+	return a;
+}
+
 HL_PRIM void hl_rethrow( vdynamic *v ) {
+	stack_last_exc = v;
 	hl_throw(v);
 }
 
@@ -54,6 +118,7 @@ HL_PRIM void hl_error_msg( const uchar *fmt, ... ) {
 	uchar buf[256];
 	vdynamic *d;
 	int len;
+	if( !hl_current_trap->prev ) hl_on_uncaught(fmt);
 	va_list args;
 	va_start(args, fmt);
 	len = uvsprintf(buf,fmt,args);
@@ -65,6 +130,7 @@ HL_PRIM void hl_error_msg( const uchar *fmt, ... ) {
 
 HL_PRIM void hl_fatal_fmt(const char *fmt, ...) {
 	char buf[256];
+	if( !hl_current_trap->prev ) hl_on_uncaught(USTR(""));
 	va_list args;
 	va_start(args, fmt);
 	vsprintf(buf,fmt, args);

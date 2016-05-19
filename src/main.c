@@ -44,7 +44,13 @@ int main(int argc, char *argv[]) {
 	hl_global_free();
 	return 0;
 on_exception:
-	uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
+	{
+		varray *a = hl_exception_stack();
+		int i;
+		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
+		for(i=0;i<a->size;i++)
+			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
+	}
 	hl_global_free();
 	return 1;
 }
