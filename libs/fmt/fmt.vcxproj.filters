@@ -1,0 +1,173 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="fmt.c" />
+    <ClCompile Include="..\..\include\turbojpeg\jaricom.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcapimin.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcapistd.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcarith.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jccoefct.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jccolor.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcdctmgr.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jchuff.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcinit.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcmainct.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcmarker.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcmaster.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcomapi.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcparam.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcphuff.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcprepct.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jcsample.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jctrans.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdapimin.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdapistd.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdarith.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdatadst.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdatadst-tj.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdatasrc.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdatasrc-tj.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdcoefct.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdcolor.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jddctmgr.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdhuff.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdinput.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdmainct.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdmarker.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdmaster.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdmerge.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdphuff.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdpostct.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdsample.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jdtrans.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jerror.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jfdctflt.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jfdctfst.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jfdctint.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jidctflt.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jidctfst.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jidctint.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jidctred.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jmemmgr.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jmemnobs.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jquant1.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jquant2.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jutils.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\transupp.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\jsimd.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\turbojpeg\turbojpeg.c">
+      <Filter>turbojpeg</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="turbojpeg">
+      <UniqueIdentifier>{7c911b77-37c7-4ceb-a8ff-e9b3f0c4b21c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
