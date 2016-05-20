@@ -168,7 +168,7 @@ HL_PRIM vbyte *HL_NAME(gl_get_program_info_bytes)( vdynamic *p ) {
 	char log[4096];
 	*log = 0;
 	glGetProgramInfoLog(p->v.i, 4096, NULL, log);
-	return hl_copy_bytes(log,strlen(log) + 1);
+	return hl_copy_bytes(log,(int)strlen(log) + 1);
 }
 
 HL_PRIM vdynamic *HL_NAME(gl_get_uniform_location)( vdynamic *p, vstring *name ) {
@@ -206,7 +206,7 @@ HL_PRIM vbyte *HL_NAME(gl_get_shader_info_bytes)( vdynamic *s ) {
 	char log[4096];
 	*log = 0;
 	glGetShaderInfoLog(s->v.i, 4096, NULL, log);
-	return hl_copy_bytes(log, strlen(log)+1);
+	return hl_copy_bytes(log, (int)strlen(log)+1);
 }
 
 HL_PRIM vdynamic *HL_NAME(gl_get_shader_parameter)( vdynamic *s, int param ) {
@@ -341,7 +341,7 @@ HL_PRIM void HL_NAME(gl_disable_vertex_attrib_array)( int attrib ) {
 }
 
 HL_PRIM void HL_NAME(gl_vertex_attrib_pointer)( int index, int size, int type, bool normalized, int stride, int position ) {
-	glVertexAttribPointer(index, size, type, normalized, stride, (void*)position);
+	glVertexAttribPointer(index, size, type, normalized, stride, (void*)(int_val)position);
 }
 
 HL_PRIM void HL_NAME(gl_delete_buffer)( vdynamic *b ) {
@@ -362,5 +362,5 @@ HL_PRIM void HL_NAME(gl_uniform4fv)( vdynamic *u, vbyte *buffer, int bufPos, int
 // draw
 
 HL_PRIM void HL_NAME(gl_draw_elements)( int mode, int count, int type, int start ) {
-	glDrawElements(mode, count, type, (void*)start);
+	glDrawElements(mode, count, type, (void*)(int_val)start);
 }

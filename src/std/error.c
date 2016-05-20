@@ -101,7 +101,7 @@ HL_PRIM varray *hl_exception_stack() {
 		void *addr = stack_trace[i];
 		uchar *str = hl_resolve_symbol(addr);
 		if( str == NULL ) {
-			int size = usprintf(tmp,32,USTR("@0x%X"),(int)addr);
+			int size = usprintf(tmp,32,USTR("@0x%X"),(int)(int_val)addr);
 			str = (uchar*)hl_copy_bytes((vbyte*)tmp,sizeof(uchar)*(size+1));
 		}
 		hl_aptr(a,vbyte*)[i] = (vbyte*)str;
