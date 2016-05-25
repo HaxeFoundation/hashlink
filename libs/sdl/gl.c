@@ -292,7 +292,7 @@ HL_PRIM vdynamic *HL_NAME(gl_create_renderbuffer)() {
 }
 
 HL_PRIM void HL_NAME(gl_bind_renderbuffer)( int target, vdynamic *r ) {
-	glBindRenderbuffer(target, r->v.i);
+	glBindRenderbuffer(target, ZIDX(r));
 }
 
 HL_PRIM void HL_NAME(gl_renderbuffer_storage)( int target, int format, int width, int height ) {
