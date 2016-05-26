@@ -125,7 +125,7 @@ HL_PRIM vbyte* hl_ucs2_upper( vbyte *str, int pos, int len ) {
 	uchar *out = (uchar*)hl_gc_alloc_noptr((len + 1) * sizeof(uchar));
 	int i;
 	uchar *cout = out;
-	memcpy(out,cstr,(len + 1) << 1);
+	memcpy(out,cstr,len << 1);
 	for(i=0;i<len;i++) {
 		unsigned int c = *cstr++;
 		int up = c >> UL_BITS;
@@ -135,6 +135,7 @@ HL_PRIM vbyte* hl_ucs2_upper( vbyte *str, int pos, int len ) {
 		}
 		cout++;
 	}
+	*cout = 0;
 	return (vbyte*)out;
 }
 
@@ -143,7 +144,7 @@ HL_PRIM vbyte* hl_ucs2_lower( vbyte *str, int pos, int len ) {
 	uchar *out = (uchar*)hl_gc_alloc_noptr((len + 1) * sizeof(uchar));
 	uchar *cout = out;
 	int i;
-	memcpy(out,cstr,(len + 1) << 1);
+	memcpy(out,cstr,len << 1);
 	for(i=0;i<len;i++) {
 		unsigned int c = *cstr++;
 		int up = c >> UL_BITS;
@@ -153,6 +154,7 @@ HL_PRIM vbyte* hl_ucs2_lower( vbyte *str, int pos, int len ) {
 		}
 		cout++;
 	}
+	*cout = 0;
 	return (vbyte*)out;
 }
 
