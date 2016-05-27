@@ -135,5 +135,6 @@ HL_API vdynamic *hl_current_exc;
 extern void *hlc_static_call(void *fun, hl_type *t, void **args, vdynamic *out);
 extern void *hlc_get_wrapper(hl_type *t);
 HL_API void hlc_setup(void *sc, void *gw);
+extern void hl_entry_point();
 
 #endif

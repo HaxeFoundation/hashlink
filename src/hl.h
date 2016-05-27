@@ -170,6 +170,12 @@ HL_API int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
 HL_API void uprintf( const uchar *fmt, const uchar *str );
 #endif
 
+#ifdef HL_VCC
+#	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
+#else
+#	define hl_debug_break() hl_fatal("debugbreak")
+#endif
+
 // ---- TYPES -------------------------------------------
 
 typedef enum {
@@ -459,16 +465,30 @@ HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
 
 // ----------------------- ALLOC --------------------------------------------------
 
-HL_API void *hl_gc_alloc( int size );
-HL_API void *hl_gc_alloc_noptr( int size );
-HL_API void *hl_gc_alloc_finalizer( int size );
+#define MEM_HAS_PTR(kind)	(!((kind)&2))
+#define MEM_KIND_DYNAMIC	0
+#define MEM_KIND_RAW		1
+#define MEM_KIND_NOPTR		2
+#define MEM_KIND_FINALIZER	3
+#define MEM_ALIGN_DOUBLE	128
+
+HL_API void *hl_gc_alloc_gen( int size, int flags );
+HL_API void hl_add_root( void **ptr );
+HL_API void hl_remove_root( void **ptr );
+HL_API void hl_gc_major();
+HL_API bool hl_is_gc_ptr( void *ptr );
+
+#define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(size,MEM_KIND_NOPTR)
+#define hl_gc_alloc(size)			hl_gc_alloc_gen(size,MEM_KIND_DYNAMIC)
+#define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(size,MEM_KIND_RAW)
+#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(size,MEM_KIND_FINALIZER)
 
 HL_API void hl_alloc_init( hl_alloc *a );
 HL_API void *hl_malloc( hl_alloc *a, int size );
 HL_API void *hl_zalloc( hl_alloc *a, int size );
 HL_API void hl_free( hl_alloc *a );
 
-HL_API void hl_global_init();
+HL_API void hl_global_init( void *stack_top );
 HL_API void hl_global_free();
 
 // ----------------------- BUFFER --------------------------------------------------

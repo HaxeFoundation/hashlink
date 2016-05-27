@@ -25,6 +25,7 @@
 #	include <crtdbg.h>
 #else
 #	define _CrtSetDbgFlag(x)
+#	define _CrtCheckMemory()
 #endif
 
 
@@ -35,10 +36,12 @@ int main(int argc, char *argv[]) {
 #endif
 	hl_trap_ctx ctx;
 	vdynamic *exc;
-	hl_global_init();
+	hl_global_init(&ctx);
 	hlc_setup(hlc_static_call, hlc_get_wrapper);
 	hl_sys_init(argv + 1,argc - 1);
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/);
+#	ifdef _DEBUG
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
+#	endif
 	hlc_trap(ctx, exc, on_exception);
 	hl_entry_point();
 	hl_global_free();
@@ -50,6 +53,10 @@ on_exception:
 		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
 		for(i=0;i<a->size;i++)
 			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
+#		ifdef _DEBUG
+		_CrtCheckMemory();
+#		endif
+		hl_debug_break();
 	}
 	hl_global_free();
 	return 1;

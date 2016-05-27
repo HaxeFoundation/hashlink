@@ -22,12 +22,562 @@
 #include "hl.h"
 #ifdef HL_WIN
 #	include <windows.h>
+#	include <intrin.h>
+static unsigned int __inline TRAILING_ONES( unsigned int x ) {
+	DWORD msb = 0;
+	if( _BitScanForward( &msb, ~x ) )
+		return msb;
+	return 32;
+}
+static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
+	DWORD msb = 0;
+	if( _BitScanForward( &msb, x ) )
+		return msb;
+	return 32;
+}
 #else
 #	include <sys/types.h>
 #	include <sys/mman.h>
+#	define TRAILING_ONES(x)		(~(x)?__builtin_ctz(~(x)):0)
+#	define TRAILING_ZEROES(x)	(x?__builtin_ctz(x):32)
+#endif
+#	define MZERO(ptr,size)		memset(ptr,0,size)	
+
+// GC
+
+#define	GC_ALIGN_BITS	2
+#define	GC_ALIGN		(1 << GC_ALIGN_BITS)
+#define GC_ALL_PAGES	(GC_PARTITIONS << PAGE_KIND_BITS)
+
+#define GC_PAGE_BITS	16
+#define GC_PAGE_SIZE	(1 << GC_PAGE_BITS)
+
+#ifndef HL_64
+#	define GC_MASK_BITS			16
+#	define GC_LEVEL0_BITS		8
+#	define GC_LEVEL1_BITS		8
+#	define GC_GET_LEVEL1(ptr)	hl_gc_page_map[((unsigned int)(ptr))>>(GC_MASK_BITS+GC_LEVEL1_BITS)]
+#	define GC_GET_PAGE(ptr)		GC_GET_LEVEL1(ptr)[(((unsigned int)(ptr))>>GC_MASK_BITS)&GC_LEVEL1_MASK]
+#endif
+#define GC_LEVEL1_MASK		((1 << GC_LEVEL1_BITS) - 1)
+
+#define PAGE_KIND_BITS		2
+#define PAGE_KIND_MASK		((1 << PAGE_KIND_BITS) - 1)
+
+typedef struct _gc_pheader gc_pheader;
+
+struct _gc_pheader {
+	// const
+	int page_size;
+	int page_kind;
+	int block_size;
+	int max_blocks;
+	int first_block;
+	// mutable
+	int next_block;
+	int free_blocks;
+	unsigned char *sizes;
+	unsigned char *bmp;
+	gc_pheader *next_page;
+	gc_pheader *next_free;
+};
+
+#define GC_PARTITIONS	9
+#define GC_PART_BITS	4
+#define GC_FIXED_PARTS	5
+static const int GC_SBITS[GC_PARTITIONS] = {0,0,0,0,0,		3,6,14,22};
+static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
+
+static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
+static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
+static gc_pheader *gc_level1_null[1<<GC_LEVEL1_BITS] = {NULL};
+HL_PRIM gc_pheader **hl_gc_page_map[1<<GC_LEVEL0_BITS] = {NULL};
+
+static struct { 
+	int64 total_requested;
+	int64 total_allocated;
+	int64 last_mark;
+	int64 pages_total_memory;
+	int64 debug;
+	int64 allocation_count;
+	int pages_count;
+	int pages_allocated;
+	int mark_bytes;
+} gc_stats = {0};
+
+// -------------------------  ROOTS ----------------------------------------------------------
+
+static void ***gc_roots = NULL;
+static int gc_roots_count = 0;
+static int gc_roots_max = 0;
+
+HL_PRIM void hl_add_root( void **r ) {
+	if( gc_roots_count == gc_roots_max ) {
+		int nroots = gc_roots_max ? (gc_roots_max << 1) : 16;
+		void ***roots = (void***)malloc(sizeof(void*)*nroots);
+		memcpy(roots,gc_roots,sizeof(void*)*gc_roots_count);
+		free(gc_roots);
+		gc_roots = roots;
+		gc_roots_max = nroots;
+	}
+	gc_roots[gc_roots_count++] = r;
+}
+
+HL_PRIM void hl_remove_root( void **v ) {
+	int i;
+	for(i=0;i<gc_roots_count;i++)
+		if( gc_roots[i] == v ) {
+			gc_roots_count--;
+			memcpy(gc_roots + i, gc_roots + (i+1), gc_roots_count - i);
+			break;
+		}
+}
+
+// -------------------------  ALLOCATOR ----------------------------------------------------------
+
+static void *gc_alloc_page_memory( int size );
+static void gc_free_page_memory( void *ptr, int size );
+
+static gc_pheader *gc_alloc_new_page( int block, int size, bool varsize ) {
+	int m, i;
+	unsigned char *base = (unsigned char*)gc_alloc_page_memory(size);
+	gc_pheader *p = (gc_pheader*)base;
+	int start_pos;
+#	ifdef _DEBUG
+	memset(base,0xDD,size);
+#	endif
+	p->page_size = size;
+	p->block_size = block;
+	p->max_blocks = size / block;
+	p->sizes = NULL;
+	p->bmp = NULL;
+	start_pos = sizeof(gc_pheader);
+	if( varsize ) {
+		p->sizes = base + start_pos;
+		start_pos += p->max_blocks;
+		MZERO(p->sizes,p->max_blocks);
+	}
+	m = start_pos % block;
+	if( m ) start_pos += block - m;
+	p->first_block = start_pos / block;
+	p->next_block = p->first_block;
+	p->free_blocks = p->max_blocks - p->first_block;
+	
+	// update stats
+	gc_stats.pages_count++;
+	gc_stats.pages_allocated++;
+	gc_stats.pages_total_memory += size;
+	gc_stats.mark_bytes += (p->max_blocks + 7) >> 3;
+
+	// register page in page map
+	for(i=0;i<size>>GC_MASK_BITS;i++) {
+		void *ptr = (unsigned char*)p + (i<<GC_MASK_BITS);
+		if( GC_GET_LEVEL1(ptr) == gc_level1_null ) {
+			gc_pheader **level = (gc_pheader**)malloc(sizeof(void*) * (1<<GC_LEVEL1_BITS));
+			MZERO(level,sizeof(void*) * (1<<GC_LEVEL1_BITS));
+			GC_GET_LEVEL1(ptr) = level;
+		}
+		GC_GET_PAGE(ptr) = p;
+	}
+	return p;
+}
+
+static void *gc_alloc_fixed( int part, int kind ) {
+	int pid = (part << PAGE_KIND_BITS) | kind;
+	gc_pheader *p = gc_free_pages[pid];
+	unsigned char *ptr;
+	while( p ) {
+		if( p->bmp ) {
+			int next = p->next_block;
+			while( true ) {
+				unsigned int fetch_bits = ((unsigned int*)p->bmp)[next >> 5];
+				int ones = TRAILING_ONES(fetch_bits >> (next&31));
+				next += ones;
+				if( (next&31) == 0 && ones ) {
+					if( next >= p->max_blocks ) {
+						p->next_block = next;
+						break;
+					}
+					continue;
+				}
+				p->next_block = next;
+				if( next >= p->max_blocks )
+					break;
+				goto alloc_fixed;
+			}
+		} else if( p->next_block < p->max_blocks )
+			break;
+		p = p->next_page;
+		gc_free_pages[pid] = p;
+	}
+	if( p == NULL ) {
+		p = gc_alloc_new_page(GC_SIZES[part], GC_PAGE_SIZE, false);
+		p->page_kind = kind;
+		p->next_page = gc_pages[pid];
+		p->next_free = NULL;
+		gc_pages[pid] = p;
+		gc_free_pages[pid] = p;
+	}
+alloc_fixed:
+	ptr = (unsigned char*)p + p->next_block * p->block_size;
+#	ifdef _DEBUG
+	{
+		int i;
+		if( p->next_block < p->first_block || p->next_block >= p->max_blocks )
+			hl_fatal("assert");
+		if( p->bmp && (p->bmp[p->next_block>>3]&(1<<(p->next_block&7))) != 0 )
+			hl_fatal("Alloc on marked bit");
+		for(i=0;i<p->block_size;i++)
+			if( ptr[i] != 0xDD )
+				hl_fatal("assert");
+	}
+#	endif
+	p->next_block++;
+	gc_stats.total_allocated += p->block_size;
+	return ptr;
+}
+
+static void *gc_alloc_var( int part, int size, int kind ) {
+	int pid = (part << PAGE_KIND_BITS) | kind;
+	gc_pheader *p = gc_pages[pid];
+	unsigned char *ptr;
+	int nblocks = size >> GC_SBITS[part];
+loop:
+	while( p ) {
+		if( p->bmp ) {
+			int next, avail = 0;
+			if( p->free_blocks >= nblocks ) {
+				p->next_block = p->first_block;
+				p->free_blocks = 0;
+			}
+			next = p->next_block;
+			if( next + nblocks > p->max_blocks ) {
+				gc_stats.debug++;
+				p = p->next_page;
+				continue;
+			}
+			while( true ) {
+				int fid = next >> 5;
+				unsigned int fetch_bits = ((unsigned int*)p->bmp)[fid];
+				int bits;
+resume:
+				bits = TRAILING_ONES(fetch_bits >> (next&31));
+				if( bits ) {
+					if( avail > p->free_blocks ) p->free_blocks = avail;
+					avail = 0;
+					next += bits - 1;
+					next += p->sizes[next];
+					if( (next>>5) != fid ) {
+						if( next + nblocks > p->max_blocks ) {
+							p->next_block = next;
+							p = p->next_page;
+							goto loop;
+						}
+						continue;
+					}
+					goto resume;
+				}
+				bits = TRAILING_ZEROES( (next & 31) ? (fetch_bits >> (next&31)) | (1<<(32-(next&31))) : fetch_bits );
+				avail += bits;
+				next += bits;
+				if( avail >= nblocks ) {
+					if( next > p->max_blocks ) {
+						avail -= next - p->max_blocks;
+						next = p->max_blocks;
+						if( avail < nblocks ) break;
+					}
+					p->next_block = next - avail;
+					goto alloc_var;
+				}
+				if( next & 31 ) goto resume; 
+			}
+			if( avail > p->free_blocks ) p->free_blocks = avail;
+			p->next_block = next;
+		} else if( p->next_block + nblocks <= p->max_blocks )
+			break;
+		p = p->next_page;
+	}
+	if( p == NULL ) {
+		int psize = GC_PAGE_SIZE;
+		while( psize < size + 1024 )
+			psize <<= 1;
+		p = gc_alloc_new_page(GC_SIZES[part], psize, true);
+		p->page_kind = kind;
+		p->next_page = gc_pages[pid];
+		gc_pages[pid] = p;
+	}
+alloc_var:
+	ptr = (unsigned char*)p + p->next_block * p->block_size;
+#	ifdef _DEBUG
+	{
+		int i;
+		if( p->next_block < p->first_block || p->next_block + nblocks > p->max_blocks )
+			hl_fatal("assert");
+		for(i=0;i<size;i++)
+			if( ptr[i] != 0xDD )
+				hl_fatal("assert");
+	}
+#	endif
+	if( p->bmp ) {
+		int i;
+		int bid = p->next_block;
+		int mark = 1;
+		for(i=0;i<nblocks;i++) {
+#			ifdef _DEBUG
+			if( (p->bmp[bid>>3]&(1<<(bid&7))) != 0 ) hl_fatal("Alloc on marked block");
+#			endif
+			p->bmp[bid>>3] &= ~(1<<(bid&7));
+			bid++;
+		}
+		bid = p->next_block;
+		p->bmp[bid>>3] |= 1<<(bid&7);
+	}
+	if( nblocks > 1 ) MZERO(p->sizes + p->next_block, nblocks);
+	p->sizes[p->next_block] = nblocks;
+	p->next_block += nblocks;
+	gc_stats.total_allocated += size + 1;
+	return ptr;
+}
+
+static void *gc_alloc_gen( int size, int flags ) {
+	int m = size & (GC_ALIGN - 1);
+	int p, bestP = 0;
+	gc_stats.allocation_count++;
+	gc_stats.total_requested += size;
+	if( m ) size += GC_ALIGN - m;
+	if( size <= 0 )
+		return NULL;
+	if( size <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & MEM_ALIGN_DOUBLE) == 0 )
+		return gc_alloc_fixed( (size >> GC_ALIGN_BITS) - 1, flags & PAGE_KIND_MASK);
+	for(p=GC_FIXED_PARTS;p<GC_PARTITIONS;p++) {
+		int block = GC_SIZES[p];
+		int m = size & (block - 1);
+		if( m ) size += block - m;
+		if( size < block * 255 )
+			return gc_alloc_var(p, size, flags & PAGE_KIND_MASK);
+	}
+	hl_error("Required memory allocation too big");
+	return NULL;
+}
+
+static void gc_check_mark();
+
+//#define HL_BUMP_ALLOC
+
+#ifdef HL_BUMP_ALLOC
+static unsigned char *alloc_all = NULL;
+static unsigned char *alloc_end = NULL;
 #endif
 
-void hl_global_init() {
+void *hl_gc_alloc_gen( int size, int flags ) {
+	void *ptr;
+#ifdef HL_BUMP_ALLOC
+	if( !alloc_all ) {
+		int tot = 3<<29;
+		alloc_all = gc_alloc_page_memory(tot);
+		if( !alloc_all ) hl_fatal("Failed to allocate bump memory");
+		alloc_end = alloc_all + tot;
+	}
+	ptr = alloc_all;
+	alloc_all += size;
+	if( alloc_all > alloc_end ) hl_fatal("Out of memory");
+#else
+	gc_check_mark();
+	ptr = gc_alloc_gen(size, flags);
+#	ifdef _DEBUG
+	memset(ptr,0xCD,size);
+#	endif
+#endif
+	return ptr;
+}
+
+// -------------------------  MARKING ----------------------------------------------------------
+
+static float gc_mark_threshold = 0.5;
+static void *gc_stack_top = NULL;
+static int mark_size = 0;
+static unsigned char *mark_data = NULL;
+static void **cur_mark_stack = NULL;
+static void **mark_stack_end = NULL;
+static int mark_stack_size = 0;
+
+#define GC_PUSH_GEN(ptr,page,bid) \
+	if( MEM_HAS_PTR((page)->page_kind) ) { \
+		if( mark_stack == mark_stack_end ) mark_stack = hl_gc_mark_grow(mark_stack); \
+		*mark_stack++ = ptr; \
+		*mark_stack++ = ((unsigned char*)page) + bid; \
+	}
+
+HL_PRIM void **hl_gc_mark_grow( void **stack ) {
+	int nsize = mark_stack_size ? (((mark_stack_size * 3) >> 1) & ~1) : 256;
+	void **nstack = (void**)malloc(sizeof(void**) * nsize);
+	void **base_stack = mark_stack_end - mark_stack_size;
+	cur_mark_stack = stack;
+	memcpy(nstack, base_stack, (unsigned char*)cur_mark_stack - (unsigned char*)base_stack);
+	free(base_stack);
+	mark_stack_size = nsize;
+	mark_stack_end = nstack + nsize;
+	cur_mark_stack = nstack + (cur_mark_stack - base_stack);
+	if( base_stack == NULL ) {
+		*cur_mark_stack++ = 0;
+		*cur_mark_stack++ = 0;
+	}
+	return cur_mark_stack;
+}
+
+static void gc_flush_mark() {
+	register void **mark_stack = cur_mark_stack;
+	while( true ) {
+		unsigned char *page_bid = *--mark_stack;
+		void **block = (void**)*--mark_stack;
+		gc_pheader *page = (gc_pheader*)((int_val)page_bid & ~(GC_PAGE_SIZE - 1));
+		int bid = ((int)(int_val)page_bid) & (GC_PAGE_SIZE - 1);
+		int size, nwords;
+		if( !block ) {
+			mark_stack += 2;
+			break;
+		}
+		size = page->sizes ? page->sizes[bid] * page->block_size : page->block_size;
+		nwords = size / HL_WSIZE;
+		while( nwords-- ) {
+			void *p = *block++;
+			page = GC_GET_PAGE(p);
+			if( !page || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
+			bid = ((unsigned char*)p - (unsigned char*)page) / page->block_size;
+			if( page->sizes && page->sizes[bid] == 0 ) continue;
+			if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
+				page->bmp[bid>>3] |= 1<<(bid&7);
+				GC_PUSH_GEN(p,page,bid);
+			}
+		}
+	}
+	cur_mark_stack = mark_stack;
+}
+
+#ifdef _DEBUG
+static void gc_clear_unmarked_mem() {
+	int i;
+	for(i=0;i<GC_ALL_PAGES;i++) {
+		gc_pheader *p = gc_pages[i];
+		while( p ) {
+			int bid;
+			for(bid=p->first_block;bid<p->max_blocks;bid++) {
+				if( p->sizes && !p->sizes[bid] ) continue;
+				if( (p->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
+					int size = p->sizes ? p->sizes[bid] * p->block_size : p->block_size;
+					unsigned char *ptr = (unsigned char*)p + bid * p->block_size;
+					if( bid * p->block_size + size > p->page_size ) hl_fatal("invalid block size"); 
+					memset(ptr,0xDD,size);
+					if( p->sizes ) p->sizes[bid] = 0;
+				}
+			}
+			p = p->next_page;
+		}
+	}
+}
+#endif
+
+static void gc_mark() {
+	// prepare mark bits
+	jmp_buf tmp;
+	void **stack_head;
+	void **stack_top = (void**)gc_stack_top;
+	void **mark_stack = cur_mark_stack;
+	int mark_bytes = gc_stats.mark_bytes;
+	int pid, i;
+	unsigned char *mark_cur;
+	setjmp(tmp); // save registers
+	if( mark_bytes > mark_size ) {
+		gc_free_page_memory(mark_data, mark_size);
+		if( mark_size == 0 ) mark_size = GC_PAGE_SIZE;
+		while( mark_size < mark_bytes )
+			mark_size <<= 1;
+		mark_data = gc_alloc_page_memory(mark_size);
+	}
+	mark_cur = mark_data;
+	MZERO(mark_data,mark_bytes);
+	for(pid=0;pid<GC_ALL_PAGES;pid++) {
+		gc_pheader *p = gc_pages[pid];
+		gc_free_pages[pid] = p;
+		while( p ) {
+			p->bmp = mark_cur;
+			p->next_block = p->first_block;
+			p->free_blocks = 0;
+			p->next_free = p->next_page;
+			mark_cur += (p->max_blocks + 7) >> 3;
+			p = p->next_page;
+		}
+	}
+	// push roots
+	for(i=0;i<gc_roots_count;i++) {
+		void *p = *gc_roots[i];
+		gc_pheader *page;
+		if( !p ) continue;
+		page = GC_GET_PAGE(p);
+		// don't check if valid ptr : it's a manual added root, so should be valid
+		int bid = ((unsigned char*)p - (unsigned char*)page) / page->block_size;
+		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
+			page->bmp[bid>>3] |= 1<<(bid&7);
+			GC_PUSH_GEN(p,page,bid);
+		}
+	}
+	// scan stack
+	stack_head = (void**)&stack_head;
+	while( stack_head <= stack_top ) {
+		void *p = *stack_head++;
+		gc_pheader *page = GC_GET_PAGE(p);
+		int bid;
+		if( !page || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
+		bid = ((unsigned char*)p - (unsigned char*)page) / page->block_size;
+		if( page->sizes && !page->sizes[bid] ) continue; // inner pointer
+		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
+			page->bmp[bid>>3] |= 1<<(bid&7);
+			GC_PUSH_GEN(p,page,bid);
+		}
+	}
+	cur_mark_stack = mark_stack;
+	if( mark_stack ) gc_flush_mark();
+#	ifdef _DEBUG
+	gc_clear_unmarked_mem();
+#	endif
+}
+
+HL_API void hl_gc_major() {
+	gc_stats.last_mark = gc_stats.total_allocated;
+	gc_mark();
+}
+
+HL_API bool hl_is_gc_ptr( void *ptr ) {
+	gc_pheader *page = GC_GET_PAGE(ptr);
+	int bid;
+	if( !page ) return false;
+	if( ((unsigned char*)ptr - (unsigned char*)page) % page->block_size != 0 ) return false;
+	bid = ((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
+	if( bid < page->first_block ) return false;
+	if( page->sizes && page->sizes[bid] == 0 ) return false;
+	return true;
+}
+
+static void gc_check_mark() {
+	int64 m = gc_stats.total_allocated - gc_stats.last_mark;
+	if( m > gc_stats.pages_total_memory * gc_mark_threshold ) hl_gc_major();
+}
+
+static void hl_gc_init( void *stack_top ) {
+	int i;
+	gc_stack_top = stack_top;
+	for(i=0;i<1<<GC_LEVEL0_BITS;i++)
+		hl_gc_page_map[i] = gc_level1_null;
+	if( TRAILING_ONES(0x080003FF) != 10 || TRAILING_ONES(0) != 0 || TRAILING_ONES(0xFFFFFFFF) != 32 )
+		hl_fatal("Invalid builtin tl1");
+	if( TRAILING_ZEROES(~0x080003FF) != 10 || TRAILING_ZEROES(0) != 32 || TRAILING_ZEROES(0xFFFFFFFF) != 0 )
+		hl_fatal("Invalid builtin tl0");
+}
+
+// ---- UTILITIES ----------------------
+
+void hl_global_init( void *stack_top ) {
+	hl_gc_init(stack_top);
 }
 
 void hl_cache_free();
@@ -69,7 +619,7 @@ void *hl_malloc( hl_alloc *a, int size ) {
 
 void *hl_zalloc( hl_alloc *a, int size ) {
 	void *p = hl_malloc(a,size);
-	if( p ) memset(p,0,size);
+	if( p ) MZERO(p,size);
 	return p;
 }
 
@@ -107,20 +657,24 @@ void hl_free_executable_memory( void *c, int size ) {
 #endif
 }
 
-void *hl_gc_alloc( int size ) {
+static void *gc_alloc_page_memory( int size ) {
+#ifdef HL_WIN
+	return VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
+#else
 	return malloc(size);
+#endif
 }
 
-void *hl_gc_alloc_noptr( int size ) {
-	return (char*)malloc(size);
-}
-
-void *hl_gc_alloc_finalizer( int size ) {
-	return malloc(size);
+static void gc_free_page_memory( void *ptr, int size ) {
+#ifdef HL_WIN
+	VirtualFree(ptr, size, MEM_RELEASE);
+#else
+	free(ptr);
+#endif
 }
 
 vdynamic *hl_alloc_dynamic( hl_type *t ) {
-	vdynamic *d = (vdynamic*) ((t->kind == HENUM || t->kind == HABSTRACT) ? hl_gc_alloc(sizeof(vdynamic)) : hl_gc_alloc_noptr(sizeof(vdynamic)));
+	vdynamic *d = (vdynamic*) (hl_is_ptr(t) ? hl_gc_alloc(sizeof(vdynamic)) : hl_gc_alloc_noptr(sizeof(vdynamic)));
 	d->t = t;
 	d->v.ptr = NULL;
 	return d;
@@ -134,7 +688,7 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
 	o = (vobj*)hl_gc_alloc(size);
-	memset(o,0,size);
+	MZERO(o,size);
 	o->t = t;
 	return (vdynamic*)o;
 }
@@ -159,6 +713,6 @@ vvirtual *hl_alloc_virtual( hl_type *t ) {
 	v->next = NULL;
 	for(i=0;i<t->virt->nfields;i++)
 		fields[i] = (char*)v + t->virt->indexes[i];
-	memset(vdata,0,t->virt->dataSize);
+	MZERO(vdata,t->virt->dataSize);
 	return v;
 }
