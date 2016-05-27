@@ -47,10 +47,10 @@ struct _hl_bytes_map {
 };
 
 HL_PRIM hl_bytes_map *hl_hballoc() {
-	hl_bytes_map *m = (hl_bytes_map*)hl_gc_alloc(sizeof(hl_bytes_map));
+	hl_bytes_map *m = (hl_bytes_map*)hl_gc_alloc_raw(sizeof(hl_bytes_map));
 	m->ncells = H_SIZE_INIT;
 	m->nentries = 0;
-	m->cells = (hl_bytes_cell **)hl_gc_alloc(sizeof(hl_bytes_cell*)*m->ncells);
+	m->cells = (hl_bytes_cell **)hl_gc_alloc_raw(sizeof(hl_bytes_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
 	return m;
 }
@@ -83,7 +83,7 @@ static void hl_hbremap( hl_bytes_map *m, uchar *key, int hash, vdynamic *value, 
 	if( c )
 		*reuse = c->next;
 	else
-		c = (hl_bytes_cell*)hl_gc_alloc(sizeof(hl_bytes_cell));
+		c = (hl_bytes_cell*)hl_gc_alloc_raw(sizeof(hl_bytes_cell));
 	memset(c,0,sizeof(hl_bytes_cell));
 	c->strings[0] = key;
 	c->hashes[0] = hash;
@@ -116,7 +116,7 @@ static bool hl_hbadd( hl_bytes_map *m, uchar *key, vdynamic *value ) {
 		m->nentries++;
 		return false;
 	}
-	c = (hl_bytes_cell*)hl_gc_alloc(sizeof(hl_bytes_cell));
+	c = (hl_bytes_cell*)hl_gc_alloc_raw(sizeof(hl_bytes_cell));
 	memset(c,0,sizeof(hl_bytes_cell));
 	c->strings[0] = key;
 	c->hashes[0] = hash;
@@ -135,7 +135,7 @@ static void hl_hbgrow( hl_bytes_map *m ) {
 	hl_bytes_cell *reuse = NULL;
 	while( H_PRIMES[i] <= m->ncells ) i++;
 	m->ncells = H_PRIMES[i];
-	m->cells = (hl_bytes_cell **)hl_gc_alloc(sizeof(hl_bytes_cell*)*m->ncells);
+	m->cells = (hl_bytes_cell **)hl_gc_alloc_raw(sizeof(hl_bytes_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
 	for(i=0;i<oldsize;i++) {
 		hl_bytes_cell *c = old_cells[i];
@@ -255,10 +255,10 @@ struct _hl_int_map {
 };
 
 HL_PRIM hl_int_map *hl_hialloc() {
-	hl_int_map *m = (hl_int_map*)hl_gc_alloc(sizeof(hl_int_map));
+	hl_int_map *m = (hl_int_map*)hl_gc_alloc_raw(sizeof(hl_int_map));
 	m->ncells = H_SIZE_INIT;
 	m->nentries = 0;
-	m->cells = (hl_int_cell **)hl_gc_alloc(sizeof(hl_int_cell*)*m->ncells);
+	m->cells = (hl_int_cell **)hl_gc_alloc_raw(sizeof(hl_int_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
 	return m;
 }
@@ -289,7 +289,7 @@ static void hl_hiremap( hl_int_map *m, int key, vdynamic *value, hl_int_cell **r
 	if( c )
 		*reuse = c->next;
 	else
-		c = (hl_int_cell*)hl_gc_alloc(sizeof(hl_int_cell));
+		c = (hl_int_cell*)hl_gc_alloc_raw(sizeof(hl_int_cell));
 	memset(c,0,sizeof(hl_int_cell));
 	c->keys[0] = key;
 	c->values[0] = value;
@@ -319,7 +319,7 @@ static bool hl_hiadd( hl_int_map *m, int key, vdynamic *value ) {
 		m->nentries++;
 		return false;
 	}
-	c = (hl_int_cell*)hl_gc_alloc(sizeof(hl_int_cell));
+	c = (hl_int_cell*)hl_gc_alloc_raw(sizeof(hl_int_cell));
 	memset(c,0,sizeof(hl_int_cell));
 	c->keys[0] = key;
 	c->values[0] = value;
@@ -337,9 +337,8 @@ static void hl_higrow( hl_int_map *m ) {
 	hl_int_cell *reuse = NULL;
 	while( H_PRIMES[i] <= m->ncells ) i++;
 	m->ncells = H_PRIMES[i];
-	m->cells = (hl_int_cell **)hl_gc_alloc(sizeof(hl_int_cell*)*m->ncells);
+	m->cells = (hl_int_cell **)hl_gc_alloc_raw(sizeof(hl_int_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
-	m->nentries = 0;
 	for(i=0;i<oldsize;i++) {
 		hl_int_cell *c = old_cells[i];
 		while( c ) {
@@ -454,10 +453,10 @@ struct _hl_obj_map {
 };
 
 HL_PRIM hl_obj_map *hl_hoalloc() {
-	hl_obj_map *m = (hl_obj_map*)hl_gc_alloc(sizeof(hl_obj_map));
+	hl_obj_map *m = (hl_obj_map*)hl_gc_alloc_raw(sizeof(hl_obj_map));
 	m->ncells = H_SIZE_INIT;
 	m->nentries = 0;
-	m->cells = (hl_obj_cell **)hl_gc_alloc(sizeof(hl_obj_cell*)*m->ncells);
+	m->cells = (hl_obj_cell **)hl_gc_alloc_raw(sizeof(hl_obj_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
 	return m;
 }
@@ -490,7 +489,7 @@ static void hl_horemap( hl_obj_map *m, vdynamic *key, vdynamic *value, hl_obj_ce
 	if( c )
 		*reuse = c->next;
 	else
-		c = (hl_obj_cell*)hl_gc_alloc(sizeof(hl_obj_cell));
+		c = (hl_obj_cell*)hl_gc_alloc_raw(sizeof(hl_obj_cell));
 	memset(c,0,sizeof(hl_obj_cell));
 	c->keys[0] = key;
 	c->values[0] = value;
@@ -521,7 +520,7 @@ static bool hl_hoadd( hl_obj_map *m, vdynamic *key, vdynamic *value ) {
 		m->nentries++;
 		return false;
 	}
-	c = (hl_obj_cell*)hl_gc_alloc(sizeof(hl_obj_cell));
+	c = (hl_obj_cell*)hl_gc_alloc_raw(sizeof(hl_obj_cell));
 	memset(c,0,sizeof(hl_obj_cell));
 	c->keys[0] = key;
 	c->values[0] = value;
@@ -539,7 +538,7 @@ static void hl_hogrow( hl_obj_map *m ) {
 	hl_obj_cell *reuse = NULL;
 	while( H_PRIMES[i] <= m->ncells ) i++;
 	m->ncells = H_PRIMES[i];
-	m->cells = (hl_obj_cell **)hl_gc_alloc(sizeof(hl_obj_cell*)*m->ncells);
+	m->cells = (hl_obj_cell **)hl_gc_alloc_raw(sizeof(hl_obj_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
 	for(i=0;i<oldsize;i++) {
 		hl_obj_cell *c = old_cells[i];

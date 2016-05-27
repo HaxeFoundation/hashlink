@@ -35,7 +35,7 @@ struct hl_buffer {
 };
 
 HL_PRIM hl_buffer *hl_alloc_buffer() {
-	hl_buffer *b = (hl_buffer*)hl_gc_alloc(sizeof(hl_buffer));
+	hl_buffer *b = (hl_buffer*)hl_gc_alloc_raw(sizeof(hl_buffer));
 	b->totlen = 0;
 	b->blen = 16;
 	b->data = NULL;
@@ -48,7 +48,7 @@ static void buffer_append_new( hl_buffer *b, const uchar *s, int len ) {
 	while( b->totlen >= (b->blen << 2) )
 		b->blen <<= 1;
 	size = (len < b->blen)?b->blen:len;
-	it = (stringitem)hl_gc_alloc(sizeof(struct _stringitem));
+	it = (stringitem)hl_gc_alloc_raw(sizeof(struct _stringitem));
 	it->str = (uchar*)hl_gc_alloc_noptr(size<<1);
 	memcpy(it->str,s,len<<1);
 	it->size = size;

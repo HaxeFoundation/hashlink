@@ -41,18 +41,9 @@ static HANDLE stack_process_handle = NULL;
 
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
-#ifdef _DEBUG
-	*(int*)NULL = 0;
-#else
-	exit(0);
-#endif
+	hl_debug_break();
+	exit(1);
 	return NULL;
-}
-
-static void hl_on_uncaught( const uchar *v ) {
-#	ifdef _DEBUG
-//	*(int*)0 = 0;
-#	endif
 }
 
 HL_PRIM void hl_throw( vdynamic *v ) {
@@ -65,7 +56,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 #endif
 	hl_current_exc = v;
 	hl_current_trap = t->prev;
-	if( hl_current_trap == NULL ) hl_on_uncaught((uchar*)v->v.bytes);
+	if( hl_current_trap == NULL ) hl_debug_break();
 	longjmp(t->buf,1);
 }
 
@@ -118,7 +109,6 @@ HL_PRIM void hl_error_msg( const uchar *fmt, ... ) {
 	uchar buf[256];
 	vdynamic *d;
 	int len;
-	if( !hl_current_trap->prev ) hl_on_uncaught(fmt);
 	va_list args;
 	va_start(args, fmt);
 	len = uvsprintf(buf,fmt,args);
@@ -130,7 +120,6 @@ HL_PRIM void hl_error_msg( const uchar *fmt, ... ) {
 
 HL_PRIM void hl_fatal_fmt(const char *fmt, ...) {
 	char buf[256];
-	if( !hl_current_trap->prev ) hl_on_uncaught(USTR(""));
 	va_list args;
 	va_start(args, fmt);
 	vsprintf(buf,fmt, args);
