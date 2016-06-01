@@ -398,39 +398,34 @@ static hl_field_lookup *hl_dyn_alloc_field( vdynobj *o, int hfield, hl_type *t )
 }
 
 static void hl_dyn_change_field( vdynobj *o, hl_field_lookup *f, hl_type *t ) {
-	int i, index, total_size;
 	int size = hl_type_size(t);
 	int old_size = hl_type_size(f->t);
 	char *oldData = o->fields_data;
 	char *newData = oldData;
 	if( size <= old_size ) {
 		// don't remap, let's keep hole
-		f->t = t;
 	} else {
-		int wsize = 0;
-		index = hl_lookup_find_index(&o->dproto->fields,o->nfields,f->hashed_name);
-		total_size = f->field_index;
-		for(i=index+1;i<o->nfields;i++) {
-			hl_field_lookup *f = &o->dproto->fields + i;
-			int fsize = hl_type_size(f->t);
-			total_size += hl_pad_size(total_size,f->t);
-			memcpy(o->fields_data + total_size, o->fields_data + f->field_index, fsize);
-			f->field_index = total_size;
-			total_size += fsize;
+		// we want to only remap this field because we don't want to have to rebuild all virtuals
+		// let's see if we have enough place already in case we have a hole after.
+		int i;
+		for(i=0;i<o->nfields;i++) {
+			hl_field_lookup *f2 = &o->dproto->fields + i;
+			if( f2->field_index > f->field_index && f2->field_index < f->field_index + size ) break;
 		}
-		wsize = total_size;
-		total_size += hl_pad_size(total_size,t);
-		f->field_index = total_size;
-		if( t->kind == HDYNOBJ ) t = &hlt_dynobj; // can't store gc ptr in fields
-		f->t = t;
-		total_size += size;
-		if( total_size > o->dataSize ) {
-			newData = (char*)hl_gc_alloc_noptr(total_size);
-			memcpy(newData,o->fields_data,wsize);
+		// not enough space, expand and move at end of data
+		if( i < o->nfields ) {
+			int pad = hl_pad_size(o->dataSize, t);
+			newData = (char*)hl_gc_alloc_raw(o->dataSize + pad + size);
+			memcpy(newData,o->fields_data,o->dataSize);
 			o->fields_data = newData;
-			o->dataSize = total_size;
+			o->dataSize += pad;
+			f->field_index = o->dataSize;
+			o->dataSize += size;
 		}
 	}
+	// update type
+	if( t->kind == HDYNOBJ ) t = &hlt_dynobj; // can't store gc ptr in fields
+	f->t = t;
 	// rebuild virtuals
 	{
 		vvirtual *v = o->virtuals;
