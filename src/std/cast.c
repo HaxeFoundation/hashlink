@@ -350,3 +350,7 @@ HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
 HL_PRIM bool hl_type_safe_cast( hl_type *a, hl_type *b ) {
 	return hl_safe_cast(a,b);
 }
+
+DEFINE_PRIM(_I32, dyn_compare, _DYN _DYN);
+DEFINE_PRIM(_DYN, value_cast, _DYN _TYPE);
+DEFINE_PRIM(_BOOL, type_safe_cast, _TYPE _TYPE);

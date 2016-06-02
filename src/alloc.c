@@ -821,7 +821,7 @@ void hl_free( hl_alloc *a ) {
 		a->cur = NULL;
 }
 
-void *hl_alloc_executable_memory( int size ) {
+HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #ifdef HL_WIN
 	return VirtualAlloc(NULL,size,MEM_COMMIT,PAGE_EXECUTE_READWRITE);
 #else
@@ -831,7 +831,7 @@ void *hl_alloc_executable_memory( int size ) {
 #endif
 }
 
-void hl_free_executable_memory( void *c, int size ) {
+HL_PRIM void hl_free_executable_memory( void *c, int size ) {
 #ifdef HL_WIN
 	VirtualFree(c,0,MEM_RELEASE);
 #else

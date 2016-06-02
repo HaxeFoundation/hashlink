@@ -40,7 +40,7 @@ static void regexp_finalize( ereg *e ) {
 	free(e->matches);
 }
 
-HL_PRIM ereg *regexp_regexp_new_options( vbyte *str, vbyte *opts ) {
+HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	ereg *r;
 	const char *error;
 	int err_offset;
@@ -91,7 +91,7 @@ HL_PRIM ereg *regexp_regexp_new_options( vbyte *str, vbyte *opts ) {
 	return r;
 }
 
-HL_PRIM int regexp_regexp_matched_pos( ereg *e, int m, int *len ) {
+HL_PRIM int hl_regexp_matched_pos( ereg *e, int m, int *len ) {
 	int start;
 	if( !e->matched )
 		hl_error("Calling matchedPos() on an unmatched regexp"); 
@@ -102,7 +102,7 @@ HL_PRIM int regexp_regexp_matched_pos( ereg *e, int m, int *len ) {
 	return start;
 }
 
-HL_PRIM bool regexp_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
+HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
 	int res = pcre16_exec(e->p,&limit,(PCRE_SPTR16)s,pos+len,pos,0,e->matches,e->nmatches * 3);
 	e->matched = res >= 0;
 	if( res >= 0 )
@@ -111,4 +111,9 @@ HL_PRIM bool regexp_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
 		hl_error("An error occured while running pcre_exec");
 	return false;
 }
+
+#define _EREG _ABSTRACT(ereg)
+DEFINE_PRIM( _EREG, regexp_new_options, _BYTES _BYTES);
+DEFINE_PRIM( _I32, regexp_matched_pos, _EREG _I32 _REF(_I32));
+DEFINE_PRIM( _BOOL, regexp_match, _EREG _BYTES _I32 _I32);
 

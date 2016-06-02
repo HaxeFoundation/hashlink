@@ -77,6 +77,7 @@ typedef struct {
 	void **functions_ptrs;
 	int *functions_indexes;
 	void *jit_code;
+	hl_module_context ctx;
 } hl_module;
 
 typedef struct jit_ctx jit_ctx;

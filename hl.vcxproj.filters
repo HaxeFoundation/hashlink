@@ -3,6 +3,9 @@
   <ItemGroup>
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\code.c" />
+    <ClCompile Include="src\module.c" />
+    <ClCompile Include="src\jit.c" />
+    <ClCompile Include="src\callback.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\hlmodule.h" />

@@ -8,11 +8,11 @@ class Sdl {
 	public static function init() {
 		if( initDone ) return;
 		initDone = true;
-		initOnce();
+		if( !initOnce() ) throw "Failed to init SDL";
 		isWin32 = detectWin32();
 	}
 
-	static function initOnce() {}
+	static function initOnce() return false;
 	static function eventLoop( e : Event ) return false;
 
 	public static function loop( callb : Void -> Void, ?onEvent : Event -> Void ) {

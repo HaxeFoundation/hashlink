@@ -642,3 +642,29 @@ HL_PRIM varray* hl_hovalues( hl_obj_map *m ) {
 	return a;
 }
 
+#define _BMAP _ABSTRACT(hl_bytes_map)
+DEFINE_PRIM( _BMAP, hballoc, _NO_ARG );
+DEFINE_PRIM( _VOID, hbset, _BMAP _BYTES _DYN );
+DEFINE_PRIM( _BOOL, hbexists, _BMAP _BYTES );
+DEFINE_PRIM( _DYN, hbget, _BMAP _BYTES );
+DEFINE_PRIM( _BOOL, hbremove, _BMAP _BYTES );
+DEFINE_PRIM( _ARR, hbkeys, _BMAP );
+DEFINE_PRIM( _ARR, hbvalues, _BMAP );
+
+#define _IMAP _ABSTRACT(hl_int_map)
+DEFINE_PRIM( _IMAP, hialloc, _NO_ARG );
+DEFINE_PRIM( _VOID, hiset, _IMAP _I32 _DYN );
+DEFINE_PRIM( _BOOL, hiexists, _IMAP _I32 );
+DEFINE_PRIM( _DYN, higet, _IMAP _I32 );
+DEFINE_PRIM( _BOOL, hiremove, _IMAP _I32 );
+DEFINE_PRIM( _ARR, hikeys, _IMAP );
+DEFINE_PRIM( _ARR, hivalues, _IMAP );
+
+#define _OMAP _ABSTRACT(hl_obj_map)
+DEFINE_PRIM( _OMAP, hoalloc, _NO_ARG );
+DEFINE_PRIM( _VOID, hoset, _OMAP _DYN _DYN );
+DEFINE_PRIM( _BOOL, hoexists, _OMAP _DYN );
+DEFINE_PRIM( _DYN, hoget, _OMAP _DYN );
+DEFINE_PRIM( _BOOL, horemove, _OMAP _DYN );
+DEFINE_PRIM( _ARR, hokeys, _OMAP );
+DEFINE_PRIM( _ARR, hovalues, _OMAP );

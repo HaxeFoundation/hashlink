@@ -493,3 +493,33 @@ HL_PRIM void hl_sys_init(void **args, int nargs) {
 	sys_args = (pchar**)args;
 	sys_nargs = nargs;
 }
+
+DEFINE_PRIM(_BOOL, sys_utf8_path, _NO_ARG);
+DEFINE_PRIM(_BYTES, sys_string, _NO_ARG);
+DEFINE_PRIM(_VOID, sys_print, _BYTES);
+DEFINE_PRIM(_VOID, sys_exit, _I32);
+DEFINE_PRIM(_F64, sys_time, _NO_ARG);
+DEFINE_PRIM(_I32, random, _I32);
+DEFINE_PRIM(_BYTES, sys_get_env, _BYTES);
+DEFINE_PRIM(_BOOL, sys_put_env, _BYTES _BYTES);
+DEFINE_PRIM(_ARR, sys_env, _NO_ARG);
+DEFINE_PRIM(_VOID, sys_sleep, _F64);
+DEFINE_PRIM(_BOOL, sys_set_time_locale, _BYTES);
+DEFINE_PRIM(_BYTES, sys_get_cwd, _NO_ARG);
+DEFINE_PRIM(_BOOL, sys_set_cwd, _BYTES);
+DEFINE_PRIM(_BOOL, sys_is64, _NO_ARG);
+DEFINE_PRIM(_I32, sys_command, _BYTES);
+DEFINE_PRIM(_BOOL, sys_exists, _BYTES);
+DEFINE_PRIM(_BOOL, sys_delete, _BYTES);
+DEFINE_PRIM(_BOOL, sys_rename, _BYTES _BYTES);
+DEFINE_PRIM(_ARR, sys_stat, _BYTES);
+DEFINE_PRIM(_BOOL, sys_is_dir, _BYTES);
+DEFINE_PRIM(_BOOL, sys_create_dir, _BYTES _I32);
+DEFINE_PRIM(_BOOL, sys_remove_dir, _BYTES);
+DEFINE_PRIM(_F64, sys_cpu_time, _NO_ARG);
+DEFINE_PRIM(_F64, sys_thread_cpu_time, _NO_ARG);
+DEFINE_PRIM(_ARR, sys_read_dir, _BYTES);
+DEFINE_PRIM(_BYTES, sys_full_path, _BYTES);
+DEFINE_PRIM(_BYTES, sys_exe_path, _NO_ARG);
+DEFINE_PRIM(_I32, sys_get_char, _BOOL);
+DEFINE_PRIM(_ARR, sys_args, _NO_ARG);

@@ -68,7 +68,7 @@ HL_PRIM int hl_date_from_time( double time ) {
 	return (int)(time / 1000.);
 }
 
-HL_PRIM int hl_date_from_string( vbyte *b ) {
+HL_PRIM int hl_date_from_string( vbyte *b, int len ) {
 	uchar *str = (uchar*)b;
 	hl_fatal("TODO");
 	return *str;
@@ -100,3 +100,11 @@ HL_PRIM void hl_date_get_inf( int date, int *y, int *mo, int *day, int *h, int *
 	if( s ) *s = t.tm_sec;
 	if( wday ) *wday = t.tm_wday;
 }
+
+DEFINE_PRIM(_I32, date_now, _NO_ARG);
+DEFINE_PRIM(_BYTES, date_to_string, _I32 _REF(_I32));
+DEFINE_PRIM(_F64, date_get_time, _I32);
+DEFINE_PRIM(_I32, date_from_time, _F64);
+DEFINE_PRIM(_I32, date_from_string, _BYTES _I32);
+DEFINE_PRIM(_I32, date_new, _I32 _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, date_get_inf, _I32 _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));

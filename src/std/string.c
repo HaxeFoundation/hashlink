@@ -201,7 +201,6 @@ HL_PRIM char *hl_to_utf8( uchar *bytes ) {
 	return hl_utf16_to_utf8((vbyte*)bytes, 0, &size);
 }
 
-
 HL_PRIM vbyte *hl_url_encode( vbyte *str, int *len ) {
 	hl_buffer *b = hl_alloc_buffer();
 	uchar *cstr = (uchar*)str;
@@ -305,12 +304,15 @@ HL_PRIM vbyte *hl_url_decode( vbyte *str, int *len ) {
 	hl_error("Malformed URL encoded");
 	return NULL;
 }
-	
 
-DEFINE_PRIM(_BYTES,hl_itos,_I32 _REF(_I32));
-DEFINE_PRIM(_BYTES,hl_ftos,_F64 _REF(_I32));
-DEFINE_PRIM(_BYTES,hl_value_to_string,_DYN _REF(_I32));
-DEFINE_PRIM(_I32,hl_ucs2length,_BYTES _I32);
-DEFINE_PRIM(_BYTES,hl_utf8_to_utf16,_BYTES _I32 _REF(_I32));
-DEFINE_PRIM(_BYTES,hl_ucs2_upper,_BYTES _I32 _I32);
-DEFINE_PRIM(_BYTES,hl_ucs2_lower,_BYTES _I32 _I32);
+DEFINE_PRIM(_BYTES,itos,_I32 _REF(_I32));
+DEFINE_PRIM(_BYTES,ftos,_F64 _REF(_I32));
+DEFINE_PRIM(_BYTES,value_to_string,_DYN _REF(_I32));
+DEFINE_PRIM(_I32,ucs2length,_BYTES _I32);
+DEFINE_PRIM(_BYTES,utf8_to_utf16,_BYTES _I32 _REF(_I32));
+DEFINE_PRIM(_BYTES,utf16_to_utf8,_BYTES _I32 _REF(_I32));
+DEFINE_PRIM(_BYTES,ucs2_upper,_BYTES _I32 _I32);
+DEFINE_PRIM(_BYTES,ucs2_lower,_BYTES _I32 _I32);
+DEFINE_PRIM(_BYTES,url_encode,_BYTES _REF(_I32));
+DEFINE_PRIM(_BYTES,url_decode,_BYTES _REF(_I32));
+

@@ -301,3 +301,26 @@ HL_PRIM bool hl_socket_set_fast_send( hl_socket *s, bool b ) {
 	int fast = b;
 	return setsockopt(s->sock,IPPROTO_TCP,TCP_NODELAY,(char*)&fast,sizeof(fast)) == 0;
 }
+
+#define _SOCK	_ABSTRACT(hl_socket)
+DEFINE_PRIM(_VOID,socket_init,_NO_ARG);
+DEFINE_PRIM(_SOCK,socket_new,_BOOL);
+DEFINE_PRIM(_VOID,socket_close,_SOCK);
+DEFINE_PRIM(_I32,socket_send_char,_SOCK _I32);
+DEFINE_PRIM(_I32,socket_send,_SOCK _BYTES _I32 _I32 );
+DEFINE_PRIM(_I32,socket_recv,_SOCK _BYTES _I32 _I32 );
+DEFINE_PRIM(_I32,socket_recv_char, _SOCK);
+DEFINE_PRIM(_I32,host_resolve,_BYTES);
+DEFINE_PRIM(_BYTES,host_to_string,_I32);
+DEFINE_PRIM(_BYTES,host_reverse,_I32);
+DEFINE_PRIM(_BYTES,host_local,_NO_ARG);
+DEFINE_PRIM(_BOOL,socket_connect,_SOCK _I32 _I32);
+DEFINE_PRIM(_BOOL,socket_listen,_SOCK _I32);
+DEFINE_PRIM(_BOOL,socket_bind,_SOCK _I32 _I32);
+DEFINE_PRIM(_SOCK,socket_accept,_SOCK);
+DEFINE_PRIM(_BOOL,socket_peer,_SOCK _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_BOOL,socket_host,_SOCK _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_BOOL,socket_set_timeout,_SOCK _F64);
+DEFINE_PRIM(_BOOL,socket_shutdown,_SOCK _BOOL _BOOL);
+DEFINE_PRIM(_BOOL,socket_set_blocking,_SOCK _BOOL);
+DEFINE_PRIM(_BOOL,socket_set_fast_send,_SOCK _BOOL);

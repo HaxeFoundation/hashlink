@@ -299,11 +299,11 @@ struct hl_type {
 	void **vobj_proto;
 };
 
-int hl_type_size( hl_type *t );
-int hl_pad_size( int size, hl_type *t );
+HL_API int hl_type_size( hl_type *t );
+HL_API int hl_pad_size( int size, hl_type *t );
 
-hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
-hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
+HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
+HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
 
 /* -------------------- VALUES ------------------------------ */
 
@@ -520,7 +520,7 @@ HL_API const uchar *hl_type_str( hl_type *t );
 // ----------------------- FFI ------------------------------------------------------
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsifdbBDPOATR"
+#define TYPE_STR	"vcsifdbBDPOATR??X?N"
 
 #undef  _VOID
 #define _NO_ARG
@@ -531,16 +531,16 @@ HL_API const uchar *hl_type_str( hl_type *t );
 #define _F32						"f"
 #define _F64						"d"
 #define _BOOL						"b"
+#define _BYTES						"B"
 #define _DYN						"D"
 #define _FUN(t, args)				"P" args "_" t
 #define _OBJ(fields)				"O" fields "_"
-#define _BYTES						"B"
 #define _ARR						"A"
 #define _TYPE						"T"
 #define _REF(t)						"R" t
+#define _ABSTRACT(name)				"X" #name "_"
 #undef _NULL
 #define _NULL(t)					"N" t
-#define _ABSTRACT(name)				"X" #name "_"
 
 #define _STRING						_OBJ(_BYTES _I32)
 
@@ -550,26 +550,34 @@ typedef struct {
 	int length;
 } vstring;
 
+#define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
+#define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
+
 #ifndef HL_NAME
+#	define HL_NAME(p)					p
 #	ifdef HLDLL_EXPORTS
 #		define HL_PRIM				EXPORT
+#		undef DEFINE_PRIM
+#		define DEFINE_PRIM(t,name,args)						_DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
+#		define DEFINE_PRIM_WITH_NAME						_DEFINE_PRIM_WITH_NAME
 #	else
 #		define HL_PRIM
+#		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #	endif
-#define HL_NAME(p)					p
-#define DEFINE_PRIM(t,name,args)
-#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #else
 #define	HL_PRIM						EXPORT
-#define DEFINE_PRIM(t,name,args)	DEFINE_PRIM_WITH_NAME(t,name,args,name)
-#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
+#define DEFINE_PRIM_WITH_NAME		_DEFINE_PRIM_WITH_NAME
 #endif
 
 // -------------- EXTRA ------------------------------------
 
-#define hl_fatal(msg)	hl_fatal_error(msg,__FILE__,__LINE__)
+#define hl_fatal(msg)			hl_fatal_error(msg,__FILE__,__LINE__)
+#define hl_fatal1(msg,p0)		hl_fatal_fmt(__FILE__,__LINE__,msg,p0)
+#define hl_fatal2(msg,p0,p1)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1)
+#define hl_fatal3(msg,p0,p1,p2)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1,p2)
+#define hl_fatal4(msg,p0,p1,p2,p3)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1,p2,p3)
 HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
-HL_API void hl_fatal_fmt( const char *fmst, ... );
+HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
 HL_API void hl_sys_init(void **args, int nargs);
 
 #endif

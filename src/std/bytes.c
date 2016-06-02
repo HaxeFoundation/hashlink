@@ -186,10 +186,12 @@ HL_PRIM vdynamic *hl_parse_int( vbyte *bytes, int pos, int len ) {
 	return c == end ? NULL : hl_make_dyn(&h,&hlt_i32);
 }
 
-DEFINE_PRIM(_BYTES,hl_balloc,_I32);
-DEFINE_PRIM(_VOID,hl_bblit,_BYTES _I32 _BYTES _I32 _I32);
-DEFINE_PRIM(_I32,hl_bytes_compare,_BYTES _I32 _BYTES _I32 _I32);
-DEFINE_PRIM(_I32,hl_bytes_find,_BYTES _I32 _I32 _BYTES _I32 _I32);
-DEFINE_PRIM(_VOID,hl_bytes_fill,_BYTES _I32 _I32 _I32);
-DEFINE_PRIM(_VOID,hl_bsort_i32,_BYTES _I32 _I32 _FUN(_I32,_I32 _I32));
-DEFINE_PRIM(_VOID,hl_bsort_f64,_BYTES _I32 _I32 _FUN(_I32,_F64 _F64));
+DEFINE_PRIM(_BYTES,alloc_bytes,_I32);
+DEFINE_PRIM(_VOID,bytes_blit,_BYTES _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_I32,bytes_compare,_BYTES _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_I32,bytes_find,_BYTES _I32 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,bytes_fill,_BYTES _I32 _I32 _I32);
+DEFINE_PRIM(_F64, parse_float,_BYTES _I32 _I32);
+DEFINE_PRIM(_NULL(_I32), parse_int, _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,bsort_i32,_BYTES _I32 _I32 _FUN(_I32,_I32 _I32));
+DEFINE_PRIM(_VOID,bsort_f64,_BYTES _I32 _I32 _FUN(_I32,_F64 _F64));

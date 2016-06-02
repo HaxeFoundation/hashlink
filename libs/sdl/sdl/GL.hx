@@ -226,7 +226,7 @@ class GL {
 	public static function bufferDataSize( target : Int, size : Int, param : Int ) {
 	}
 
-	public static function bufferData( target : Int, data : hl.types.Bytes, param : Int ) {
+	public static function bufferData( target : Int, size : Int, data : hl.types.Bytes, param : Int ) {
 	}
 
 	public static function bufferSubData( target : Int, offset : Int, data : hl.types.Bytes, srcOffset : Int, srcLength : Int ) {

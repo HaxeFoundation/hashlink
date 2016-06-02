@@ -274,3 +274,9 @@ HL_PRIM vdynamic *hl_make_var_args( vclosure *c ) {
 	hlt_var_fun.closure_type.p = &hlt_var_fun;
 	return (vdynamic*)hl_alloc_closure_ptr(&hlt_var_args,fun_var_args,c);
 }
+
+DEFINE_PRIM(_DYN, no_closure, _DYN);
+DEFINE_PRIM(_DYN, get_closure_value, _DYN);
+DEFINE_PRIM(_BOOL, fun_compare, _DYN _DYN);
+DEFINE_PRIM(_DYN, make_var_args, _FUN(_DYN,_ARR));
+DEFINE_PRIM(_DYN, call_method, _DYN _ARR);

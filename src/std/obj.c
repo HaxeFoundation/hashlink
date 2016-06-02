@@ -123,7 +123,7 @@ HL_PRIM void hl_cache_free() {
 	Builds class metadata (fields indexes, etc.)
 	Does not require the method table to be finalized.
 **/
-hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
+HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	hl_type_obj *o = ot->obj;
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
@@ -197,7 +197,7 @@ hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	Fill class prototype with method pointers.
 	Requires method table to be finalized
 **/
-hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
+HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_type_obj *o = ot->obj;
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
@@ -350,7 +350,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 		if( hl_safe_cast(obj->t, vt) ) return (vvirtual*)obj;
 		return hl_to_virtual(vt,hl_virtual_make_value((vvirtual*)obj));
 	default:
-		hl_fatal_fmt("Don't know how to virtual %d",obj->t->kind);
+		hl_fatal1("Don't know how to virtual %d",obj->t->kind);
 	}
 	return v;
 }
@@ -863,3 +863,13 @@ HL_PRIM vdynamic *hl_obj_copy( vdynamic *obj ) {
 HL_PRIM vdynamic *hl_get_virtual_value( vdynamic *v ) {
 	return ((vvirtual*)v)->value;
 }
+
+DEFINE_PRIM(_DYN, alloc_obj, _TYPE);
+DEFINE_PRIM(_DYN, obj_get_field, _DYN _I32);
+DEFINE_PRIM(_VOID, obj_set_field, _DYN _I32 _DYN);
+DEFINE_PRIM(_BOOL, obj_has_field, _DYN _I32);
+DEFINE_PRIM(_BOOL, obj_delete_field, _DYN _I32);
+DEFINE_PRIM(_ARR, obj_fields, _DYN);
+DEFINE_PRIM(_DYN, obj_copy, _DYN);
+DEFINE_PRIM(_DYN, get_virtual_value, _DYN);
+DEFINE_PRIM(_I32, hash, _BYTES);

@@ -136,3 +136,19 @@ HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
 	fclose(f);
 	return content;
 }
+
+#define _FILE _ABSTRACT(hl_fdesc)
+DEFINE_PRIM(_FILE, file_open, _BYTES _I32 _BOOL);
+DEFINE_PRIM(_VOID, file_close, _FILE);
+DEFINE_PRIM(_I32, file_write, _FILE _BYTES _I32 _I32);
+DEFINE_PRIM(_I32, file_read, _FILE _BYTES _I32 _I32);
+DEFINE_PRIM(_BOOL, file_write_char, _FILE _I32);
+DEFINE_PRIM(_I32, file_read_char, _FILE);
+DEFINE_PRIM(_BOOL, file_seek, _FILE _I32 _I32);
+DEFINE_PRIM(_I32, file_tell, _FILE);
+DEFINE_PRIM(_BOOL, file_eof, _FILE);
+DEFINE_PRIM(_BOOL, file_flush, _FILE);
+DEFINE_PRIM(_FILE, file_stdin, _NO_ARG);
+DEFINE_PRIM(_FILE, file_stdout, _NO_ARG);
+DEFINE_PRIM(_FILE, file_stderr, _NO_ARG);
+DEFINE_PRIM(_BYTES, file_contents, _BYTES _REF(_I32));

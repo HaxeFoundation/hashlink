@@ -19,9 +19,9 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "hl.h"
+#include <hlmodule.h>
 
-#ifdef _DEBUG
+#ifdef HL_DEBUG
 //#define OP_LOG
 //#define JIT_DEBUG
 #endif
@@ -1271,12 +1271,12 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OSub: o = SUBSD; break;
 		case OMul: o = MULSD; break;
 		case OSDiv: o = DIVSD; break;
-		case OSGte:
-		case OSLt:
 		case OJSLt:
 		case OJSGte:
+		case OJSLte:
+		case OJSGt:
 		case OJEq:
-		case OJNeq:
+		case OJNotEq:
 			o = COMISD;
 			break;
 		default:
@@ -1332,18 +1332,14 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 			}
 			if( dst ) store(ctx, dst, PEAX, true);
 			return PEAX;
-		case OSGte:
-		case OSLt:
 		case OJSLt:
 		case OJSGte:
-		case OUGte:
-		case OULt:
+		case OJSLte:
+		case OJSGt:
 		case OJULt:
 		case OJUGte:
 		case OJEq:
-		case OJNeq:
-		case OEq:
-		case ONotEq:
+		case OJNotEq:
 			o = CMP;
 			break;
 		default:
@@ -1446,28 +1442,28 @@ static int do_jump( jit_ctx *ctx, hl_op op, bool isFloat ) {
 	case OJAlways:
 		XJump(JAlways,j);
 		break;
-	case OSGte:
 	case OJSGte:
 		XJump(isFloat ? JUGte : JSGte,j);
 		break;
-	case OUGte:
+	case OJSGt:
+		XJump(isFloat ? JUGt : JSGt,j);
+		break;
 	case OJUGte:
 		XJump(JUGte,j);
 		break;
-	case OSLt:
 	case OJSLt:
 		XJump(isFloat ? JULt : JSLt,j);
 		break;
-	case OULt:
+	case OJSLte:
+		XJump(isFloat ? JULte : JSLte,j);
+		break;
 	case OJULt:
 		XJump(JULt,j);
 		break;
-	case OEq:
 	case OJEq:
 		XJump(JEq,j);
 		break;
-	case ONotEq:
-	case OJNeq:
+	case OJNotEq:
 		XJump(JNeq,j);
 		break;
 	default:
@@ -1476,17 +1472,6 @@ static int do_jump( jit_ctx *ctx, hl_op op, bool isFloat ) {
 		break;
 	}
 	return j;
-}
-
-static void op_cmp( jit_ctx *ctx, hl_opcode *op ) {
-	int p, e;
-	op_binop(ctx,NULL,R(op->p2),R(op->p3),op);
-	p = do_jump(ctx,op->op,IS_FLOAT(R(op->p2)));
-	store_const(ctx, R(op->p1), 0);
-	e = do_jump(ctx,OJAlways,false);
-	patch_jump(ctx,p);
-	store_const(ctx, R(op->p1), 1);
-	patch_jump(ctx,e);
 }
 
 static void register_jump( jit_ctx *ctx, int pos, int target ) {
@@ -1771,14 +1756,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx,dst,v,true);
 			}
 			break;
-		case OEq:
-		case ONotEq:
-		case OSGte:
-		case OSLt:
-		case OUGte:
-		case OULt:
-			op_cmp(ctx, o);
-			break;
 		case OJFalse:
 		case OJTrue:
 		case OJNotNull:
@@ -1791,9 +1768,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OJEq:
-		case OJNeq:
+		case OJNotEq:
 		case OJSLt:
 		case OJSGte:
+		case OJSLte:
+		case OJSGt:
 		case OJULt:
 		case OJUGte:
 			op_binop(ctx, NULL, dst, ra, o);
@@ -1825,7 +1804,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, PEAX, true);
 			}
 			break;
-		case OToFloat:
+		case OToSFloat:
 			{
 				preg *r = alloc_cpu(ctx,ra,true);
 				preg *w = alloc_fpu(ctx,dst,false);
@@ -1914,7 +1893,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				ASSERT(dst->t->kind);
 			}
 			break;
-		case OGetFunction:
+/*		case OGetFunction:
 			{
 				int_val args[2] = { (int_val)m, (int_val)o->p2 };
 				call_native_consts(ctx, hl_alloc_closure_void, args, 2);
@@ -1950,7 +1929,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, PEAX, true);
 			}
 			break;
-		case OCallClosure:
+*/		case OCallClosure:
 			op_call_closure(ctx,dst,ra,o->p3,o->extra);
 			break;
 		case OField:
@@ -1958,7 +1937,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				switch( ra->t->kind ) {
 				case HOBJ:
 					{
-						hl_runtime_obj *rt = hl_get_obj_rt(m, ra->t);
+						hl_runtime_obj *rt = hl_get_obj_rt(ra->t);
 						preg *rr = alloc_cpu(ctx,ra, true);
 						copy_to(ctx,dst,pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3]));
 					}
@@ -1996,7 +1975,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				switch( dst->t->kind ) {
 				case HOBJ:
 					{
-						hl_runtime_obj *rt = hl_get_obj_rt(m, dst->t);
+						hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
 						preg *rr = alloc_cpu(ctx, dst, true);
 						copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]), rb);
 					}
@@ -2032,7 +2011,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OGetThis:
 			{
 				vreg *r = R(0);
-				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
+				hl_runtime_obj *rt = hl_get_obj_rt(r->t);
 				preg *rr = alloc_cpu(ctx,r, true);
 				copy_to(ctx,dst,pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]));
 			}
@@ -2040,7 +2019,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OSetThis:
 			{
 				vreg *r = R(0);
-				hl_runtime_obj *rt = hl_get_obj_rt(m, r->t);
+				hl_runtime_obj *rt = hl_get_obj_rt(r->t);
 				preg *rr = alloc_cpu(ctx, r, true);
 				copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p1]), ra);
 			}
@@ -2078,7 +2057,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
 			}
 			break;
-		case OMethod:
+/*		case OMethod:
 			switch( ra->t->kind ) {
 			case HVIRTUAL:
 				{
@@ -2099,22 +2078,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				ASSERT(ra->t->kind);
 			}
 			break;
-		case OThrow:
+*/		case OThrow:
 			{
 				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,true);
 				call_native(ctx,hl_throw,size);
-			}
-			break;
-		case OError:
-			{
-#				ifdef HL_64
-				int size = pad_stack(ctx, 0);
-				op64(ctx,MOV,REG_AT(CALL_REGS[0]),pconst64(&p,(int_val)m->code->strings[o->p1]));
-#				else
-				int size = pad_stack(ctx, HL_WSIZE);
-				op32(ctx,PUSH,pconst(&p,(int)(int_val)m->code->strings[o->p1]), UNUSED);
-#				endif
-				call_native(ctx,hl_error_msg,size);
 			}
 			break;
 		case OLabel:
@@ -2189,28 +2156,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx,PUSH,fetch(ra),UNUSED);
 				op32(ctx,PUSH,pconst(&p,(int)(int_val)dst->t),UNUSED);
 #				endif
-				if( ra->t->kind == HOBJ ) hl_get_obj_rt(ctx->m, ra->t); // ensure it's initialized
+				if( ra->t->kind == HOBJ ) hl_get_obj_rt(ra->t); // ensure it's initialized
 				call_native(ctx,hl_to_virtual,size);
 				store(ctx,dst,PEAX,true);
 			}
 			break;
-		case OUnVirtual:
+/*		case ODynGet:
 			{
-				preg *v = alloc_cpu(ctx,ra,true);
-				int jnz, jend;
-				op64(ctx,TEST,v,v);
-				XJump_small(JNotZero,jnz);
-				op64(ctx,XOR,alloc_cpu(ctx, dst, false),alloc_cpu(ctx, dst, false));
-				XJump_small(JAlways,jend);
-				patch_jump(ctx,jnz);
-				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pmem(&p,v->id,HL_WSIZE));
-				patch_jump(ctx,jend);
-				store(ctx,dst,dst->current,false);
-			}
-			break;
-		case ODynGet:
-			{
-				int hfield = hl_hash(m->code->strings[o->p3],false);
+				int hfield = hl_hash_gen(m->code->ustrings[o->p3],false);
 #				ifdef HL_64
 				int size = pad_stack(ctx, 0);
 				op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(ra));
@@ -2223,7 +2176,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx,PUSH,fetch(ra),UNUSED);
 #				endif
 				if( dst->size == 8 ) {
-					call_native(ctx,hl_dyn_get64,size);
+					call_native(ctx,hl_dyn_getd,size);
 #					ifdef HL_64
 					store(ctx,dst,PEAX,true);
 #					else
@@ -2268,7 +2221,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					call_native(ctx,hl_dyn_set32,size);
 			}
 			break;
-		default:
+*/		default:
 			printf("Don't know how to jit %s\n",hl_op_name(o->op));
 			break;
 		}

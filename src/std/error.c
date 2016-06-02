@@ -164,11 +164,11 @@ HL_PRIM void hl_error_msg( const uchar *fmt, ... ) {
 	hl_throw(d);
 }
 
-HL_PRIM void hl_fatal_fmt(const char *fmt, ...) {
+HL_PRIM void hl_fatal_fmt( const char *file, int line, const char *fmt, ...) {
 	char buf[256];
 	va_list args;
 	va_start(args, fmt);
 	vsprintf(buf,fmt, args);
 	va_end(args);
-	hl_fatal(buf);
+	hl_fatal_error(buf,file,line);
 }

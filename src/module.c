@@ -19,7 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "hl.h"
+#include <hlmodule.h>
 
 #ifdef HL_WIN
 #	include <windows.h>
@@ -55,12 +55,16 @@ hl_module *hl_module_alloc( hl_code *c ) {
 	memset(m->globals_data,0,gsize);
 	m->functions_ptrs = (void**)malloc(sizeof(void*)*(c->nfunctions + c->nnatives));
 	m->functions_indexes = (int*)malloc(sizeof(int)*(c->nfunctions + c->nnatives));
-	if( m->functions_ptrs == NULL || m->functions_indexes == NULL ) {
+	m->ctx.functions_types = (hl_type**)malloc(sizeof(void*)*(c->nfunctions + c->nnatives));
+	if( m->functions_ptrs == NULL || m->functions_indexes == NULL || m->ctx.functions_types == NULL ) {
 		hl_module_free(m);
 		return NULL;
 	}
 	memset(m->functions_ptrs,0,sizeof(void*)*(c->nfunctions + c->nnatives));
 	memset(m->functions_indexes,0xFF,sizeof(int)*(c->nfunctions + c->nnatives));
+	memset(m->ctx.functions_types,0,sizeof(void*)*(c->nfunctions + c->nnatives));
+	hl_alloc_init(&m->ctx.alloc);
+	m->ctx.functions_ptrs = m->functions_ptrs;
 	return m;
 }
 
@@ -75,14 +79,26 @@ static void append_type( char **p, hl_type *t ) {
 		{
 			int i;
 			for(i=0;i<t->fun->nargs;i++)
-				append_type(p,(&t->fun->args)[i]);
+				append_type(p,t->fun->args[i]);
 			*(*p)++ = '_';
 			append_type(p,t->fun->ret);
 			break;
 		}
-	case HARRAY:
 	case HREF:
-		append_type(p,t->t);
+	case HNULL:
+		append_type(p,t->tparam);
+		break;
+	case HOBJ:
+		{
+			int i;
+			for(i=0;i<t->obj->nfields;i++)
+				append_type(p,t->obj->fields[i].t);
+			*(*p)++ = '_';
+		}
+		break;
+	case HABSTRACT:
+		*p += utostr(*p,100,t->abs_name);
+		*(*p)++ = '_';
 		break;
 	default:
 		break;
@@ -95,7 +111,7 @@ int hl_module_init( hl_module *m ) {
 	// RESET globals
 	for(i=0;i<m->code->nglobals;i++) {
 		hl_type *t = m->code->globals[i];
-		if( t->kind == HFUN ) *(fptr*)(m->globals_data + m->globals_indexes[i]) = null_function;
+		if( t->kind == HFUN ) *(void**)(m->globals_data + m->globals_indexes[i]) = null_function;
 	}
 	// INIT natives
 	{
@@ -114,9 +130,9 @@ int hl_module_init( hl_module *m ) {
 #				else
 				strcpy(tmp+strlen(tmp),".hdll");
 #				endif
-				libHandler = dlopen(memcmp(n->lib,"std",4) == 0 ? NULL : tmp,RTLD_LAZY);
+				libHandler = dlopen(tmp,RTLD_LAZY);
 				if( libHandler == NULL )
-					hl_error("Failed to load library %s",tmp);
+					hl_fatal1("Failed to load library %s",tmp);
 			}
 			strcpy(p,"hlp_");
 			p += 4;
@@ -125,23 +141,29 @@ int hl_module_init( hl_module *m ) {
 			*p++ = 0;
 			f = dlsym(libHandler,tmp);
 			if( f == NULL )
-				hl_error("Failed to load function %s@%s",n->lib,n->name);
+				hl_fatal2("Failed to load function %s@%s",n->lib,n->name);
 			m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
 			p = tmp;
 			append_type(&p,n->t);
 			*p++ = 0;
 			if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
-				hl_error("Invalid signature for function %s@%s : %s should be %s",n->lib,n->name,tmp,sign);
+				hl_fatal4("Invalid signature for function %s@%s : %s required but %s found",n->lib,n->name,tmp,sign);
 		}
 	}
 	// INIT indexes
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_indexes[f->findex] = i;
+		m->ctx.functions_types[f->findex] = f->type;
 	}
 	for(i=0;i<m->code->nnatives;i++) {
 		hl_native *n = m->code->natives + i;
 		m->functions_indexes[n->findex] = i + m->code->nfunctions;
+		m->ctx.functions_types[n->findex] = n->t;
+	}
+	for(i=0;i<m->code->ntypes;i++) {
+		hl_type *t = m->code->types + i;
+		if( t->kind == HOBJ ) t->obj->m = &m->ctx;
 	}
 	// JIT
 	ctx = hl_jit_alloc();
@@ -169,9 +191,11 @@ int hl_module_init( hl_module *m ) {
 }
 
 void hl_module_free( hl_module *m ) {
+	hl_free(&m->ctx.alloc);
 	hl_free_executable_memory(m->code, m->codesize);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
+	free(m->ctx.functions_types);
 	free(m->globals_indexes);
 	free(m->globals_data);
 	free(m);

@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
 #endif
 	struct {
 		hl_code *code;
-//		hl_module *m;
+		hl_module *m;
 		vdynamic *exc;
 	} ctx;
 	if( argc == 1 ) {
@@ -90,15 +90,13 @@ int main(int argc, char *argv[]) {
 	ctx.code = load_code(argv[1]);
 	if( ctx.code == NULL )
 		return 1;
-/*
-	m = hl_module_alloc(code);
-	if( m == NULL )
-		return 4;
-	if( !hl_module_init(m) )
-		return 5;
-	hl_callback(m->functions_ptrs[m->code->entrypoint],0,NULL);
-	hl_module_free(m);
-*/
+	ctx.m = hl_module_alloc(ctx.code);
+	if( ctx.m == NULL )
+		return 2;
+	if( !hl_module_init(ctx.m) )
+		return 3;
+	hl_callback(ctx.m->functions_ptrs[ctx.m->code->entrypoint],0,NULL);
+	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
 	hl_global_free();
 	return 0;

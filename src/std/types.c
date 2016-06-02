@@ -38,7 +38,7 @@ static const uchar *TSTR[] = {
 };
 
 
-int hl_type_size( hl_type *t ) {
+HL_PRIM int hl_type_size( hl_type *t ) {
 	static int SIZES[] = {
 		0, // VOID
 		1, // I8
@@ -63,7 +63,7 @@ int hl_type_size( hl_type *t ) {
 	return SIZES[t->kind];
 }
 
-int hl_pad_size( int pos, hl_type *t ) {
+HL_PRIM int hl_pad_size( int pos, hl_type *t ) {
 	int sz = hl_type_size(t);
 	int align;
 	align = pos & (sz - 1);
@@ -422,5 +422,13 @@ HL_PRIM varray *hl_enum_parameters( vdynamic *v ) {
 	return a;
 }
 
-DEFINE_PRIM(_BYTES, hl_type_name, _TYPE);
-DEFINE_PRIM(_ARR, hl_type_enum_fields, _TYPE);
+DEFINE_PRIM(_BYTES, type_str, _TYPE);
+DEFINE_PRIM(_BYTES, type_name, _TYPE);
+DEFINE_PRIM(_I32, type_args_count, _TYPE);
+DEFINE_PRIM(_ARR, type_instance_fields, _TYPE);
+DEFINE_PRIM(_TYPE, type_super, _TYPE);
+DEFINE_PRIM(_DYN, type_get_global, _TYPE);
+DEFINE_PRIM(_ARR, type_enum_fields, _TYPE);
+DEFINE_PRIM(_BOOL, type_enum_eq, _DYN _DYN);
+DEFINE_PRIM(_DYN, alloc_enum, _TYPE _I32 _ARR);
+DEFINE_PRIM(_ARR, enum_parameters, _DYN);

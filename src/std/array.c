@@ -39,6 +39,6 @@ HL_PRIM hl_type *hl_array_type( varray *a ) {
 	return a->at;
 }
 
-DEFINE_PRIM(_ARR(_DYN),hl_aalloc,_TYPE _I32);
-DEFINE_PRIM(_VOID,hl_ablit,_ARR(_DYN) _I32 _ARR(_DYN) _I32 _I32);
-DEFINE_PRIM(_TYPE,hl_atype,_ARR);
+DEFINE_PRIM(_ARR,alloc_array,_TYPE _I32);
+DEFINE_PRIM(_VOID,array_blit,_ARR _I32 _ARR _I32 _I32);
+DEFINE_PRIM(_TYPE,array_type,_ARR);
