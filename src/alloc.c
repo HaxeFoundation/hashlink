@@ -546,15 +546,16 @@ static void gc_clear_unmarked_mem() {
 #endif
 
 static void gc_mark() {
-	// prepare mark bits
-	jmp_buf tmp;
+	jmp_buf regs;
 	void **stack_head;
 	void **stack_top = (void**)gc_stack_top;
 	void **mark_stack = cur_mark_stack;
 	int mark_bytes = gc_stats.mark_bytes;
 	int pid, i;
 	unsigned char *mark_cur;
-	setjmp(tmp); // save registers
+	// save registers
+	setjmp(regs);
+	// prepare mark bits
 	if( mark_bytes > mark_size ) {
 		gc_free_page_memory(mark_data, mark_size);
 		if( mark_size == 0 ) mark_size = GC_PAGE_SIZE;
@@ -590,6 +591,7 @@ static void gc_mark() {
 	}
 	// scan stack
 	stack_head = (void**)&stack_head;
+	if( stack_head > (void**)&regs ) stack_head = (void**)&regs; // fix for compilers that might inverse variables
 	while( stack_head <= stack_top ) {
 		void *p = *stack_head++;
 		gc_pheader *page = GC_GET_PAGE(p);
