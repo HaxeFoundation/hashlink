@@ -22,7 +22,7 @@
 #include "hl.h"
 #include <string.h>
 
-static void hl_lookup_insert( hl_field_lookup *l, int size, int hash, hl_type *t, int index ) {
+HL_PRIM hl_field_lookup *hl_lookup_insert( hl_field_lookup *l, int size, int hash, hl_type *t, int index ) {
 	int min = 0;
 	int max = size;
 	int pos;
@@ -36,6 +36,7 @@ static void hl_lookup_insert( hl_field_lookup *l, int size, int hash, hl_type *t
 	l[pos].field_index = index;
 	l[pos].hashed_name = hash;
 	l[pos].t = t;
+	return l + pos;
 }
 
 HL_PRIM hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash ) {

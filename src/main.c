@@ -40,7 +40,8 @@ int main(int argc, char *argv[]) {
 	hlc_setup(hlc_static_call, hlc_get_wrapper);
 	hl_sys_init(argv + 1,argc - 1);
 #	ifdef _DEBUG
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
+//	disable crt debug since it will prevent reusing our address space
+//	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
 #	endif
 	hlc_trap(ctx, exc, on_exception);
 	hl_entry_point();

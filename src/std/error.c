@@ -46,6 +46,45 @@ HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	return NULL;
 }
 
+static hl_field_lookup *stack_hashes = NULL;
+static int stack_hashes_count = 0;
+static int stack_hashes_size = 0;
+
+HL_PRIM void **hl_stack_from_hash( int hash, int *count ) {
+	hl_field_lookup *f = hl_lookup_find(stack_hashes,stack_hashes_count,hash);
+	if( !f ) {
+		*count = 0;
+		return NULL;
+	}
+	*count = f->field_index;
+	return (void**)f->t;
+}
+
+HL_PRIM int hl_get_stack_hash() {
+	void *stack[16], **nstack;
+	int hash = 0;
+	int count = 0;
+#ifdef _WIN32
+	count = CaptureStackBackTrace(1, 16, stack, &hash);
+#endif
+	// lookup if we already know this hash
+	if( hl_lookup_find(stack_hashes,stack_hashes_count,hash) != NULL )
+		return hash;
+	if( stack_hashes_count == stack_hashes_size ) {
+		int nsize = stack_hashes_size ? stack_hashes_size << 1 : 128;
+		hl_field_lookup *ns = (hl_field_lookup*)malloc(sizeof(hl_field_lookup)*nsize);
+		memcpy(ns,stack_hashes,stack_hashes_size*sizeof(hl_field_lookup));
+		free(stack_hashes);
+		stack_hashes = ns;
+		stack_hashes_size = nsize;
+	}
+	nstack = (void**)malloc(sizeof(void*)*count);
+	memcpy(nstack,stack,count*sizeof(void*));
+	hl_lookup_insert(stack_hashes,stack_hashes_count,hash,(hl_type*)nstack,count);
+	stack_hashes_count++;
+	return hash;
+}
+
 HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_trap_ctx *t = hl_current_trap;
 #ifdef _WIN32
@@ -60,10 +99,9 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	longjmp(t->buf,1);
 }
 
-static uchar *hl_resolve_symbol( void *addr ) {
+HL_PRIM uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 #ifdef _WIN32
 	DWORD64 index;
-	uchar tmp[512];
 	IMAGEHLP_LINEW64 line;
 	struct {
 		SYMBOL_INFOW sym;
@@ -72,14 +110,13 @@ static uchar *hl_resolve_symbol( void *addr ) {
 	data.sym.SizeOfStruct = sizeof(data.sym);
 	data.sym.MaxNameLen = 255;
 	if( SymFromAddrW(stack_process_handle,(DWORD64)addr,&index,&data.sym) ) {
-		int size;
 		DWORD offset = 0;
 		line.SizeOfStruct = sizeof(line);
 		line.FileName = USTR("\\?");
 		line.LineNumber = 0;
 		SymGetLineFromAddrW64(stack_process_handle, (DWORD64)addr, &offset, &line);
-		size = usprintf(tmp,512,USTR("%s(%s) line %d"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,line.LineNumber);
-		return (uchar*)hl_copy_bytes((vbyte*)tmp,sizeof(uchar)*(size+1));
+		*outSize = usprintf(out,*outSize,USTR("%s(%s) line %d"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,line.LineNumber);
+		return out;
 	}
 #endif
 	return NULL;
@@ -88,7 +125,6 @@ static uchar *hl_resolve_symbol( void *addr ) {
 HL_PRIM varray *hl_exception_stack() {
 	varray *a = hl_alloc_array(&hlt_bytes, stack_count);
 	int i;
-	uchar tmp[32];
 #ifdef _WIN32
 	if( !stack_process_handle ) {
 		stack_process_handle = GetCurrentProcess();
@@ -98,12 +134,14 @@ HL_PRIM varray *hl_exception_stack() {
 #endif
 	for(i=0;i<stack_count;i++) {
 		void *addr = stack_trace[i];
-		uchar *str = hl_resolve_symbol(addr);
+		uchar sym[512];
+		int size = 512;
+		uchar *str = hl_resolve_symbol(addr, sym, &size);
 		if( str == NULL ) {
-			int size = usprintf(tmp,32,USTR("@0x%X"),(int)(int_val)addr);
-			str = (uchar*)hl_copy_bytes((vbyte*)tmp,sizeof(uchar)*(size+1));
+			str = sym;
+			size = usprintf(str,512,USTR("@0x%X"),(int)(int_val)addr);
 		}
-		hl_aptr(a,vbyte*)[i] = (vbyte*)str;
+		hl_aptr(a,vbyte*)[i] = hl_copy_bytes((vbyte*)str,sizeof(uchar)*(size+1));
 	}
 	return a;
 }

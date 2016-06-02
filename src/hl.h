@@ -78,6 +78,10 @@
 #	define HL_WIN_CALL
 #endif
 
+#ifdef _DEBUG
+#	define HL_DEBUG
+#endif
+
 #include <stddef.h>
 #ifndef HL_VCC
 #	include <stdint.h>
@@ -432,11 +436,16 @@ HL_API const uchar *hl_field_name( int hash );
 HL_API void hl_error_msg( const uchar *msg, ... );
 HL_API void hl_throw( vdynamic *v );
 HL_API void hl_rethrow( vdynamic *v );
+
 HL_API varray *hl_exception_stack();
+HL_API int hl_get_stack_hash();
+HL_API void **hl_stack_from_hash( int hash, int *count );
+HL_API uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize );
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
 HL_API hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash );
+HL_API hl_field_lookup *hl_lookup_insert( hl_field_lookup *l, int size, int hash, hl_type *t, int index );
 
 HL_API int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
 HL_API void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
@@ -477,6 +486,7 @@ HL_API void hl_add_root( void **ptr );
 HL_API void hl_remove_root( void **ptr );
 HL_API void hl_gc_major();
 HL_API bool hl_is_gc_ptr( void *ptr );
+HL_API void hl_gc_dump();
 
 #define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(size,MEM_KIND_NOPTR)
 #define hl_gc_alloc(size)			hl_gc_alloc_gen(size,MEM_KIND_DYNAMIC)
