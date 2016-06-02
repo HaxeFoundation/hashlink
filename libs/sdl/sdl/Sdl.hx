@@ -26,7 +26,7 @@ class Sdl {
 				if( onEvent != null ) onEvent(event);
 			}
 			callb();
-			//@:privateAccess haxe.Timer.sync();
+			@:privateAccess haxe.Timer.sync();
         }
 	}
 

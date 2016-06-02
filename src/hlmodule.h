@@ -61,6 +61,7 @@ typedef struct {
 	char**		strings;
 	char*		strings_data;
 	int*		strings_lens;
+	uchar**		ustrings;
 	hl_type*	types;
 	hl_type**	globals;
 	hl_native*	natives;

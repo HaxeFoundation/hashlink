@@ -294,7 +294,7 @@ struct hl_type {
 		hl_type_enum *tenum;
 		hl_type_virtual *virt;
 		hl_type	*tparam;
-		uchar *abs_name;
+		const uchar *abs_name;
 	};
 	void **vobj_proto;
 };
@@ -425,6 +425,7 @@ HL_API vvirtual *hl_alloc_virtual( hl_type *t );
 HL_API vdynobj *hl_alloc_dynobj();
 HL_API vbyte *hl_alloc_bytes( int size );
 HL_API vbyte *hl_copy_bytes( vbyte *byte, int size );
+HL_API int hl_utf8_length( vbyte *s, int pos );
 HL_API char *hl_to_utf8( uchar *bytes );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
 
