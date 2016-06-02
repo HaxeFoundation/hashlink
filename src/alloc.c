@@ -658,11 +658,14 @@ void hl_free_executable_memory( void *c, int size ) {
 }
 
 static void *gc_alloc_page_memory( int size ) {
+	void *ptr;
 #ifdef HL_WIN
-	return VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
+	ptr = VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
-	return malloc(size);
+	ptr = malloc(size);
 #endif
+	if( !ptr ) hl_fatal("Out of memory");
+	return ptr;
 }
 
 static void gc_free_page_memory( void *ptr, int size ) {
