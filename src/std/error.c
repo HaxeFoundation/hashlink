@@ -63,7 +63,8 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 static uchar *hl_resolve_symbol( void *addr ) {
 #ifdef _WIN32
 	DWORD64 index;
-	uchar tmp[256];
+	uchar tmp[512];
+	IMAGEHLP_LINEW64 line;
 	struct {
 		SYMBOL_INFOW sym;
 		uchar buffer[256];
@@ -71,7 +72,13 @@ static uchar *hl_resolve_symbol( void *addr ) {
 	data.sym.SizeOfStruct = sizeof(data.sym);
 	data.sym.MaxNameLen = 255;
 	if( SymFromAddrW(stack_process_handle,(DWORD64)addr,&index,&data.sym) ) {
-		int size = usprintf(tmp,256,USTR("%s at %d"),data.sym.Name,(int)index);
+		int size;
+		DWORD offset = 0;
+		line.SizeOfStruct = sizeof(line);
+		line.FileName = USTR("\\?");
+		line.LineNumber = 0;
+		SymGetLineFromAddrW64(stack_process_handle, (DWORD64)addr, &offset, &line);
+		size = usprintf(tmp,512,USTR("%s(%s) line %d"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,line.LineNumber);
 		return (uchar*)hl_copy_bytes((vbyte*)tmp,sizeof(uchar)*(size+1));
 	}
 #endif
@@ -85,6 +92,7 @@ HL_PRIM varray *hl_exception_stack() {
 #ifdef _WIN32
 	if( !stack_process_handle ) {
 		stack_process_handle = GetCurrentProcess();
+		SymSetOptions(SYMOPT_LOAD_LINES);
 		SymInitialize(stack_process_handle,NULL,TRUE);
 	}
 #endif
