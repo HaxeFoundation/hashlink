@@ -14,9 +14,12 @@ class Sdl {
 
 	static function initOnce() return false;
 	static function eventLoop( e : Event ) return false;
+	
+	public static var defaultEventHandler : Event -> Void;
 
 	public static function loop( callb : Void -> Void, ?onEvent : Event -> Void ) {
 		var event = new Event();
+		if( onEvent == null ) onEvent = defaultEventHandler;
 		while( true ) {
 			while( true ) {
 				if( !eventLoop(event) )
@@ -26,7 +29,6 @@ class Sdl {
 				if( onEvent != null ) onEvent(event);
 			}
 			callb();
-			@:privateAccess haxe.Timer.sync();
         }
 	}
 
