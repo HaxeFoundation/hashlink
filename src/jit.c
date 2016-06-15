@@ -73,6 +73,7 @@ typedef enum {
 	DEC,
 	// SSE
 	MOVSD,
+	MOVSS,
 	COMISD,
 	ADDSD,
 	SUBSD,
@@ -81,6 +82,7 @@ typedef enum {
 	XORPD,
 	CVTSI2SD,
 	CVTSD2SI,
+	CVTPD2PS,
 	// 8 bits
 	MOV8,
 	// --
@@ -355,6 +357,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "DEC", IS_64 ? RM(0xFF,1) : 0x48, RM(0xFF,1) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
+	{ "MOVSS", 0xF30F10, 0xF30F11  },
 	{ "COMISD", 0x660F2F },
 	{ "ADDSD", 0xF20F58 },
 	{ "SUBSD", 0xF20F5C },
@@ -363,6 +366,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "XORPD", 0x660F57 },
 	{ "CVTSI2SD", 0xF20F2A },
 	{ "CVTSD2SI", 0xF20F2D },
+	{ "CVTPD2PS", 0x660F5A },
 	// 8 bits,
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
 };
@@ -837,7 +841,7 @@ static void load( jit_ctx *ctx, preg *r, vreg *v ) {
 static preg *alloc_fpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
 	preg *p = fetch(r);
 	if( p->kind != RFPU ) {
-		if( r->size != 8 ) ASSERT(r->size);
+		if( r->t->kind != HF32 && r->t->kind != HF64 ) ASSERT(r->t->kind);
 		p = alloc_reg(ctx, RFPU);
 		if( andLoad )
 			load(ctx,p,r);
@@ -906,6 +910,10 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 		switch( size ) {
 		case 8:
 			op64(ctx,MOVSD,to,from);
+			break;
+		case 4:
+			BREAK();
+			op32(ctx,MOVSS,to,from);
 			break;
 		default:
 			ASSERT(size);
@@ -1077,9 +1085,10 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 		case 4:
 		case 1:
 		case 2:
-			if( !IS_64 )
+			if( !IS_64 ) {
+				if( r->current != NULL && r->current->kind == RFPU ) scratch(r->current);
 				op32(ctx,PUSH,fetch(r),UNUSED);
-			else {
+			} else {
 				// pseudo push32 (not available)
 				op64(ctx,SUB,PESP,pconst(&p,4));
 				op32(ctx,MOV,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
@@ -1358,6 +1367,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HOBJ:
 	case HFUN:
 	case HBYTES:
+	case HNULL:
 #	endif
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
@@ -1391,6 +1401,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HVIRTUAL:
 	case HFUN:
 	case HBYTES:
+	case HNULL:
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
 		case ID2(RCPU,RSTACK):
@@ -1808,20 +1819,30 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OToSFloat:
-			{
+			if( ra->t->kind == HI32 && dst->t->kind == HF64 ) {
 				preg *r = alloc_cpu(ctx,ra,true);
 				preg *w = alloc_fpu(ctx,dst,false);
 				op32(ctx,CVTSI2SD,w,r);
 				store(ctx, dst, w, true);
-			}
+			} else if( ra->t->kind == HF64 && dst->t->kind == HF32 ) {
+				preg *r = alloc_fpu(ctx,ra,true);
+				preg *w = alloc_fpu(ctx,dst,false);
+				BREAK();
+				op32(ctx,CVTPD2PS,w,r);
+				store(ctx, dst, w, true);
+			} else
+				ASSERT(0);
 			break;
 		case OToInt:
-			{
+			if( ra->t->kind == HF64 ) {
 				preg *r = alloc_fpu(ctx,ra,true);
 				preg *w = alloc_cpu(ctx,dst,false);
 				op32(ctx,CVTSD2SI,w,r);
 				store(ctx, dst, w, true);
-			}
+			} else if (ra->t->kind == HF32) {
+				ASSERT(0);
+			} else
+				op_mov(ctx, dst, ra);
 			break;
 		case ORet:
 			op_ret(ctx, dst);
