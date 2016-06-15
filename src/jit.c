@@ -243,6 +243,7 @@ struct jit_ctx {
 };
 
 static void jit_exit() {
+	hl_debug_break();
 	exit(-1);
 }
 
@@ -1074,6 +1075,8 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 		}
 		switch( r->size ) {
 		case 4:
+		case 1:
+		case 2:
 			if( !IS_64 )
 				op32(ctx,PUSH,fetch(r),UNUSED);
 			else {
@@ -1873,7 +1876,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx,dst,dst->current,false);
 			}
 			break;
-		case ONew:
+/*		case ONew:
 			switch( dst->t->kind ) {
 			case HOBJ:
 				{
