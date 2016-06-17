@@ -29,6 +29,22 @@
 #	include <dlfcn.h>
 #endif
 
+static void hl_init_enum( hl_type_enum *e ) {
+	int i, j;
+	for(i=0;i<e->nconstructs;i++) {
+		hl_enum_construct *c = &e->constructs[i];
+		c->hasptr = false;
+		c->size = sizeof(int); // index
+		for(j=0;j<c->nparams;j++) {
+			hl_type *t = c->params[j];
+			c->size += hl_pad_size(c->size,t);
+			c->offsets[j] = c->size;
+			if( hl_is_gc_ptr(t) ) c->hasptr = true;
+			c->size += hl_type_size(t);
+		}
+	}
+}
+
 hl_module *hl_module_alloc( hl_code *c ) {
 	int i;
 	int gsize = 0;
@@ -163,7 +179,14 @@ int hl_module_init( hl_module *m ) {
 	}
 	for(i=0;i<m->code->ntypes;i++) {
 		hl_type *t = m->code->types + i;
-		if( t->kind == HOBJ ) t->obj->m = &m->ctx;
+		switch( t->kind ) {
+		case HOBJ:
+			t->obj->m = &m->ctx;
+			break;
+		case HENUM:
+			hl_init_enum(t->tenum);
+			break;
+		}
 	}
 	// JIT
 	ctx = hl_jit_alloc();

@@ -23,7 +23,7 @@
 
 #ifdef HL_DEBUG
 //#define OP_LOG
-//#define JIT_DEBUG
+#define JIT_DEBUG
 #endif
 
 typedef enum {
@@ -208,7 +208,7 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 #define ID2(a,b)	((a) | ((b)<<8))
 #define R(id)		(ctx->vregs + (id))
 #define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,__LINE__); jit_exit(); }
-#define IS_FLOAT(r)	((r)->t->kind == HF64)
+#define IS_FLOAT(r)	((r)->t->kind == HF64 || (r)->t->kind == HF32)
 #define RLOCK(r)		if( (r)->lock < ctx->currentPos ) (r)->lock = ctx->currentPos
 #define RUNLOCK(r)		if( (r)->lock == ctx->currentPos ) (r)->lock = 0
 
@@ -242,12 +242,11 @@ struct jit_ctx {
 	jlist *calls;
 	hl_alloc falloc; // cleared per-function
 	hl_alloc galloc;
+	vclosure *closure_list;
 };
 
-static void jit_exit() {
-	hl_debug_break();
-	exit(-1);
-}
+#define jit_exit() { hl_debug_break(); exit(-1); }
+#define jit_error(msg)	_jit_error(ctx,msg,__LINE__)
 
 static preg *pmem( preg *r, CpuReg reg, int offset ) {
 	r->kind = RMEM;
@@ -833,6 +832,10 @@ static void load( jit_ctx *ctx, preg *r, vreg *v ) {
 	preg *from = fetch(v);
 	if( from == r || v->size == 0 ) return;
 	if( r->holds ) r->holds->current = NULL;
+	if( v->current ) {
+		v->current->holds = NULL;
+		from = r;
+	}
 	r->holds = v;
 	v->current = r;
 	copy(ctx,r,from,v->size);
@@ -841,7 +844,7 @@ static void load( jit_ctx *ctx, preg *r, vreg *v ) {
 static preg *alloc_fpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
 	preg *p = fetch(r);
 	if( p->kind != RFPU ) {
-		if( r->t->kind != HF32 && r->t->kind != HF64 ) ASSERT(r->t->kind);
+		if( !IS_FLOAT(r) ) ASSERT(r->t->kind);
 		p = alloc_reg(ctx, RFPU);
 		if( andLoad )
 			load(ctx,p,r);
@@ -851,7 +854,8 @@ static preg *alloc_fpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
 			r->current = p;
 			p->holds = r;
 		}
-	}
+	} else
+		RLOCK(p);
 	return p;
 }
 
@@ -870,7 +874,8 @@ static preg *alloc_cpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
 			r->current = p;
 			p->holds = r;
 		}
-	}
+	} else
+		RLOCK(p);
 	return p;
 }
 
@@ -890,6 +895,33 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 		case 1:
 			op32(ctx,MOV8,to,from);
 			break;
+		case 2:
+			{
+				preg rtmp;
+				switch( ID2(to->kind,from->kind) ) {
+				case ID2(RCPU,RSTACK):
+					BREAK();
+					op32(ctx,MOV,to,from);
+					op32(ctx,AND,to,pconst(&rtmp,0xFFFF));
+					break;
+				case ID2(RSTACK,RCPU):
+					BREAK();
+					op32(ctx,MOV8,to,from);
+					{
+						preg *r = alloc_reg(ctx,RCPU);
+						op32(ctx,MOV,r,from);
+						op32(ctx,SAR,r,pconst(&rtmp,8));
+						R(to->id)->stackPos++;
+						op32(ctx,MOV8,to,r);
+						R(to->id)->stackPos--;
+					}
+					break;
+				default:
+					ASSERT(size);
+					break;
+				}
+				break;
+			}
 		case 4:
 			op32(ctx,MOV,to,from);
 			break;
@@ -932,6 +964,7 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 #	ifndef HL_64
 	case ID2(RMEM,RADDR):
 	case ID2(RSTACK,RADDR):
+	case ID2(RADDR,RSTACK):
 #	endif
 		{
 			preg *tmp;
@@ -1361,6 +1394,9 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	}
 	switch( RTYPE(a) ) {
 	case HI32:
+	case HI16:
+	case HI8:
+	case HBOOL:
 #	ifndef HL_64
 	case HDYNOBJ:
 	case HVIRTUAL:
@@ -1368,6 +1404,9 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HFUN:
 	case HBYTES:
 	case HNULL:
+	case HENUM:
+	case HDYN:
+	case HTYPE:
 #	endif
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
@@ -1377,7 +1416,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 			out = pa;
 			break;
 		case ID2(RSTACK,RCPU):
-			if( dst == a ) {
+			if( dst == a && o != IMUL ) {
 				op32(ctx, o, pa, pb);
 				dst = NULL;
 				out = pa;
@@ -1402,6 +1441,9 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HFUN:
 	case HBYTES:
 	case HNULL:
+	case HENUM:
+	case HDYN:
+	case HTYPE:
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
 		case ID2(RCPU,RSTACK):
@@ -1430,6 +1472,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		return out;
 #	endif
 	case HF64:
+	case HF32:
 		pa = alloc_fpu(ctx, a, true);
 		pb = alloc_fpu(ctx, b, true);
 		switch( ID2(pa->kind, pb->kind) ) {
@@ -1510,6 +1553,26 @@ static void call_native_consts( jit_ctx *ctx, void *nativeFun, int_val *args, in
 		op32(ctx, PUSH, pconst64(&p, args[i]), UNUSED);
 #	endif
 	call_native(ctx, nativeFun, size);
+}
+
+static void on_jit_error( const char *msg, int_val line ) {
+	char buf[256];
+	sprintf(buf,"%s (line %d)",msg,(int)line);
+#ifdef HL_WIN
+	MessageBoxA(NULL,buf,"JIT ERROR",MB_OK);
+#else
+	printf("%s\n",buf);
+#endif
+	hl_debug_break();
+}
+
+static void hl_null_access() {
+	hl_error_msg(USTR("Null access"));
+}
+
+static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
+	int_val args[2] = { (int_val)msg, (int_val)line };
+	call_native_consts(ctx,on_jit_error,args,2);
 }
 
 jit_ctx *hl_jit_alloc() {
@@ -1612,6 +1675,22 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	while( BUF_POS() & 15 )
 		op32(ctx, NOP, UNUSED, UNUSED);
 	return pos;
+}
+
+static void *get_dyncast( hl_type *t ) {
+	switch( t->kind ) {
+	case HF32:
+		return hl_dyn_castf;
+	case HF64:
+		return hl_dyn_castd;
+	case HI32:
+	case HI16:
+	case HI8:
+	case HBOOL:
+		return hl_dyn_casti;
+	default:
+		return hl_dyn_castp;
+	}
 }
 
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
@@ -1830,6 +1909,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				BREAK();
 				op32(ctx,CVTPD2PS,w,r);
 				store(ctx, dst, w, true);
+			} else if( ra->t->kind == HF32 && dst->t->kind == HF64 ) {
+				jit_error("TODO");
+			} else if( ra->t->kind == HI32 && dst->t->kind == HF32 ) {
+				jit_error("TODO");
 			} else
 				ASSERT(0);
 			break;
@@ -1871,16 +1954,23 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OFloat:
 			{
-				if( dst->size != 8 ) ASSERT(dst->size);
 				if( m->code->floats[o->p2] == 0 ) {
 					preg *f = alloc_fpu(ctx,dst,false);
 					op64(ctx,XORPD,f,f);
-				} else {
+				} else switch( dst->t->kind ) {
+				case HF64:
 #					ifdef HL_64
 					op64(ctx,MOVSD,alloc_fpu(ctx,dst,false),pcodeaddr(&p,o->p2 * 8));
 #					else
 					op64(ctx,MOVSD,alloc_fpu(ctx,dst,false),paddr(&p,m->code->floats + o->p2));
 #					endif
+					break;
+				case HF32:
+					BREAK();
+					op32(ctx,MOVSS,alloc_fpu(ctx,dst,false),paddr(&p,m->code->floats + o->p2));
+					break;
+				default:
+					ASSERT(dst->t->kind);
 				}
 				store(ctx,dst,dst->current,false); 
 			}
@@ -1897,24 +1987,27 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx,dst,dst->current,false);
 			}
 			break;
-/*		case ONew:
-			switch( dst->t->kind ) {
-			case HOBJ:
-				{
-					int_val args[2] = { (int_val)m, (int_val)dst->t };
-					call_native_consts(ctx, hl_alloc_obj, args, 2);
-					store(ctx, dst, PEAX, true);
+		case ONew:
+			{
+				int_val args[] = { (int_val)dst->t };
+				void *allocFun;
+				int nargs = 1;
+				switch( dst->t->kind ) {
+				case HOBJ: 
+					allocFun = hl_alloc_obj;
 					break;
-				}
-			case HDYNOBJ:
-				{
-					int_val args[1] = { (int_val)dst->t };
-					call_native_consts(ctx, hl_alloc_dynobj, args, 1);
-					store(ctx, dst, PEAX, true);
+				case HDYNOBJ:
+					allocFun = hl_alloc_dynobj;
+					nargs = 0;
 					break;
+				case HVIRTUAL:
+					allocFun = hl_alloc_virtual;
+					break;
+				default:
+					ASSERT(dst->t->kind);
 				}
-			default:
-				ASSERT(dst->t->kind);
+				call_native_consts(ctx, allocFun, args, nargs);
+				store(ctx, dst, PEAX, true);
 			}
 			break;
 /*		case OGetFunction:
@@ -1956,6 +2049,17 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 */		case OCallClosure:
 			op_call_closure(ctx,dst,ra,o->p3,o->extra);
 			break;
+		case OStaticClosure:
+			{
+				// todo : share duplicates ?
+				vclosure *c = hl_malloc(&m->ctx.alloc,sizeof(vclosure));
+				c->t = dst->t;
+				c->fun = (void*)(int_val)o->p1;
+				c->hasValue = 0;
+				c->value = ctx->closure_list;
+				ctx->closure_list = c;
+			}
+			break;
 		case OField:
 			{
 				switch( ra->t->kind ) {
@@ -1968,6 +2072,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					break;
 				case HVIRTUAL:
 					{
+						jit_error("TODO");
+/*
 						preg *rr = alloc_cpu(ctx,ra,true);
 						preg *ridx = alloc_reg(ctx, RCPU);
 						preg *ridx2 = IS_64 ? alloc_reg(ctx,RCPU) : ridx;
@@ -1985,7 +2091,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						op64(ctx, ADD, rtmp, ridx2);
 						RUNLOCK(ridx);
 						// fetch field data
-						copy_to(ctx,dst, pmem(&p, rtmp->id, 0));
+						copy_to(ctx,dst, pmem(&p, rtmp->id, 0));*/
 					}
 					break;
 				default:
@@ -2154,7 +2260,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OArraySize:
 			{
-				op32(ctx,MOV,alloc_cpu(ctx,dst,false),pmem(&p,alloc_cpu(ctx,ra,true)->id,HL_WSIZE));
+				op32(ctx,MOV,alloc_cpu(ctx,dst,false),pmem(&p,alloc_cpu(ctx,ra,true)->id,HL_WSIZE*2));
 				store(ctx,dst,dst->current,false);
 			}
 			break;
@@ -2245,8 +2351,67 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					call_native(ctx,hl_dyn_set32,size);
 			}
 			break;
-*/		default:
-			printf("Don't know how to jit %s\n",hl_op_name(o->op));
+*/		
+		case OMakeEnum:
+			{
+				hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
+				int_val args[] = { c->size, c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR };
+				int i;
+				call_native_consts(ctx, hl_gc_alloc_gen, args, 2);
+				store(ctx, dst, PEAX, true);
+				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
+				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));
+				for(i=0;i<c->nparams;i++) {
+					preg *r = fetch(R(o->extra[i]));
+					copy(ctx, pmem(&p,Eax,c->offsets[i]),r, R(o->extra[i])->size);
+					RUNLOCK(fetch(R(o->extra[i])));
+				}
+			}
+			break;
+		case ONullCheck:
+			{
+				int jz;
+				preg *r = alloc_cpu(ctx,dst,true);
+				op32(ctx,TEST,r,r);
+				XJump_small(JNotZero,jz);
+				call_native_consts(ctx,hl_null_access,NULL,0);
+				patch_jump(ctx,jz);
+			}
+			break;
+		case OSafeCast:
+			{
+				int size;
+#				ifdef HL_64
+
+#				else
+				switch( dst->t->kind ) {
+				case HF32:
+				case HF64:
+					jit_error("TODO");
+					break;
+				default:
+					size = pad_stack(ctx, HL_WSIZE*3);
+					op32(ctx,PUSH,pconst64(&p,(int_val)dst->t),UNUSED);
+					op32(ctx,PUSH,pconst64(&p,(int_val)ra->t),UNUSED);
+					op32(ctx,MOV,PEAX,REG_AT(Ebp));
+					op32(ctx,ADD,PEAX,pconst(&p,ra->stackPos));
+					op32(ctx,PUSH,PEAX,UNUSED);
+					call_native(ctx,get_dyncast(dst->t),size);
+					store(ctx, dst, PEAX, true);
+					break;
+				}
+#				endif
+			}
+			break;
+		default:
+			{
+				static bool TRACES[OLast] = {false};
+				if( !TRACES[o->op] ) {
+					TRACES[o->op] = true;
+					printf("Don't know how to jit %s\n",hl_op_name(o->op));
+				}
+				jit_error(hl_op_name(o->op));
+			}
 			break;
 		}
 		// we are landing at this position, assume we have lost our registers
@@ -2292,6 +2457,17 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
 		int fpos = (int)(int_val)m->functions_ptrs[c->target];
 		*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
 		c = c->next;
+	}
+	// patch closures
+	{
+		vclosure *c = ctx->closure_list;
+		while( c ) {
+			vclosure *next;
+			c->fun = m->functions_ptrs[(int)(int_val)c->fun];
+			next = (vclosure*)c->value;
+			c->value = NULL;
+			c = next;
+		}
 	}
 	return code;
 }

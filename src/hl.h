@@ -276,6 +276,7 @@ typedef struct {
 	int nparams;
 	hl_type **params;
 	int size;
+	bool hasPtr;
 	int *offsets;
 } hl_enum_construct;
 
