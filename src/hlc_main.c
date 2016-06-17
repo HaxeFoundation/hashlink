@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
 //	disable crt debug since it will prevent reusing our address space
 //	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
 #	endif
-	hlc_trap(ctx, exc, on_exception);
+	hl_trap(ctx, exc, on_exception);
 	hl_entry_point();
 	hl_global_free();
 	return 0;

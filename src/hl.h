@@ -431,6 +431,7 @@ HL_API char *hl_to_utf8( uchar *bytes );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
 
 HL_API int hl_hash( vbyte *name );
+HL_API int hl_hash_utf8( const char *str ); // no cache
 HL_API int hl_hash_gen( const uchar *name, bool cache_name );
 HL_API const uchar *hl_field_name( int hash );
 
@@ -580,5 +581,16 @@ typedef struct {
 HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
 HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
 HL_API void hl_sys_init(void **args, int nargs);
+
+#include <setjmp.h>
+typedef struct _hl_trap_ctx hl_trap_ctx;
+struct _hl_trap_ctx {
+	jmp_buf buf;
+	hl_trap_ctx *prev;
+};
+HL_API hl_trap_ctx *hl_current_trap;
+HL_API vdynamic *hl_current_exc;
+#define hl_trap(ctx,r,label) { ctx.prev = hl_current_trap; hl_current_trap = &ctx; if( setjmp(ctx.buf) ) { r = hl_current_exc; goto label; } }
+#define hl_endtrap(ctx)	hl_current_trap = ctx.prev
 
 #endif

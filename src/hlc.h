@@ -117,21 +117,6 @@ static vdynamic *hlc_dyn_call_obj( vdynamic *o, int hfield, vdynamic **args, int
 
 #endif
 
-#include <setjmp.h>
-
-typedef struct _hl_trap_ctx hl_trap_ctx;
-
-struct _hl_trap_ctx {
-	jmp_buf buf;
-	hl_trap_ctx *prev;
-};
-
-HL_API hl_trap_ctx *hl_current_trap;
-HL_API vdynamic *hl_current_exc;
-
-#define hlc_trap(ctx,r,label) { ctx.prev = hl_current_trap; hl_current_trap = &ctx; if( setjmp(ctx.buf) ) { r = hl_current_exc; goto label; } }
-#define hlc_endtrap(ctx) hl_current_trap = ctx.prev
-
 extern void *hlc_static_call(void *fun, hl_type *t, void **args, vdynamic *out);
 extern void *hlc_get_wrapper(hl_type *t);
 HL_API void hlc_setup(void *sc, void *gw);

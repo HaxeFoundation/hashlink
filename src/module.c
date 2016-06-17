@@ -186,6 +186,9 @@ int hl_module_init( hl_module *m ) {
 		case HENUM:
 			hl_init_enum(t->tenum);
 			break;
+		case HVIRTUAL:
+			hl_init_virtual(t,&m->ctx);
+			break;
 		}
 	}
 	// JIT

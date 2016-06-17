@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
 		hl_module *m;
 		vdynamic *exc;
 	} ctx;
+	hl_trap_ctx trap;
 	if( argc == 1 ) {
 		printf("HLVM %d.%d.%d (c)2015-2016 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION/100,(HL_VERSION/10)%10,HL_VERSION%10);
 		return 1;
@@ -95,12 +96,13 @@ int main(int argc, char *argv[]) {
 		return 2;
 	if( !hl_module_init(ctx.m) )
 		return 3;
+	hl_trap(trap, ctx.exc, on_exception);
 	hl_callback(ctx.m->functions_ptrs[ctx.m->code->entrypoint],0,NULL);
 	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
 	hl_global_free();
 	return 0;
-//on_exception:
+on_exception:
 	{
 		varray *a = hl_exception_stack();
 		int i;

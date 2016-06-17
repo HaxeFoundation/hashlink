@@ -1693,6 +1693,22 @@ static void *get_dyncast( hl_type *t ) {
 	}
 }
 
+static void *get_dynset( hl_type *t ) {
+	switch( t->kind ) {
+	case HF32:
+		return hl_dyn_setf;
+	case HF64:
+		return hl_dyn_setd;
+	case HI32:
+	case HI16:
+	case HI8:
+	case HBOOL:
+		return hl_dyn_seti;
+	default:
+		return hl_dyn_setp;
+	}
+} 
+
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0, opCount;
 	int codePos = BUF_POS();
@@ -2071,28 +2087,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					}
 					break;
 				case HVIRTUAL:
-					{
-						jit_error("TODO");
-/*
-						preg *rr = alloc_cpu(ctx,ra,true);
-						preg *ridx = alloc_reg(ctx, RCPU);
-						preg *ridx2 = IS_64 ? alloc_reg(ctx,RCPU) : ridx;
-						preg *rtmp = alloc_reg(ctx, RCPU);
-						// fetch index table
-						op64(ctx, MOV, ridx, pmem(&p, rr->id, 0));
-						// fetch index itself
-#						ifdef HL_64
-						op64(ctx, XOR, ridx2, ridx2);
-#						endif
-						op32(ctx, MOV, ridx2, pmem(&p, ridx->id, o->p3 * sizeof(int) + HL_WSIZE));
-						// fetch fields table
-						op64(ctx, MOV, rtmp, pmem(&p, rr->id, HL_WSIZE*2));
-						// add index
-						op64(ctx, ADD, rtmp, ridx2);
-						RUNLOCK(ridx);
-						// fetch field data
-						copy_to(ctx,dst, pmem(&p, rtmp->id, 0));*/
-					}
+					jit_error("TODO");
 					break;
 				default:
 					ASSERT(ra->t->kind);
@@ -2111,26 +2106,20 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					}
 					break;
 				case HVIRTUAL:
+					// ASM for --> if( hl_vfields(o)[f] ) *hl_vfields(o)[f] = v; else hl_dyn_set(o,hash(field),vt,v)
 					{
-						preg *rr = alloc_cpu(ctx,dst,true);
-						preg *ridx = alloc_reg(ctx, RCPU);
-						preg *ridx2 = IS_64 ? alloc_reg(ctx,RCPU) : ridx;
-						preg *rtmp = alloc_reg(ctx, RCPU);
-						// fetch index table
-						op64(ctx, MOV, ridx, pmem(&p, rr->id, 0));
-						// fetch index itself
-#						ifdef HL_64
-						op64(ctx, XOR, ridx2, ridx2);
-#						endif
-						op32(ctx, MOV, ridx2, pmem(&p, ridx->id, o->p2 * sizeof(int) + HL_WSIZE));
-						// fetch fields table
-						op64(ctx, MOV, rtmp, pmem(&p, rr->id, HL_WSIZE*2));
-						// add index
-						op64(ctx, ADD, rtmp, ridx2);
-						RUNLOCK(ridx);
-						// fetch field data
-						copy_from(ctx,pmem(&p, rtmp->id, 0), rb);
-					}
+						int jhasfield, jend;
+						preg *v = alloc_cpu(ctx,dst,true);
+						preg *r = alloc_reg(ctx,RCPU);
+						op64(ctx,MOV,r,pmem(&p,v->id,sizeof(vvirtual)+HL_WSIZE*o->p2));
+						op64(ctx,TEST,r,r);
+						XJump_small(JNotZero,jhasfield);
+						jit_error("TODO");
+						XJump_small(JAlways,jend);
+						patch_jump(ctx,jhasfield);
+						copy_from(ctx, pmem(&p,(CpuReg)r->id,0), rb);
+						patch_jump(ctx,jend);
+					}	
 					break;
 				default:
 					ASSERT(dst->t->kind);
@@ -2323,36 +2312,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 			}
 			break;
-		case ODynSet:
-			{
-				int hfield = hl_hash(m->code->strings[o->p2],true);
-#				ifdef HL_64
-				int size = pad_stack(ctx, 0);
-				op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(dst));
-				scratch(REG_AT(CALL_REGS[0]));
-				op64(ctx,MOV,REG_AT(CALL_REGS[3]),fetch(rb));
-				op64(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,hfield));
-				op64(ctx,MOV,REG_AT(CALL_REGS[2]),pconst64(&p,(int_val)rb->t));
-#				else
-				int size = pad_stack(ctx, HL_WSIZE*3 + rb->size);
-				if( rb->size == 8 ) {
-					BREAK();
-					//op32(ctx,PUSH,fetch(rb),UNUSED);
-				} else {
-					op32(ctx,PUSH,fetch(rb),UNUSED);
-				}
-				op32(ctx,PUSH,pconst(&p,(int)rb->t), UNUSED);
-				op32(ctx,PUSH,pconst(&p,hfield),UNUSED);
-				op32(ctx,PUSH,fetch(dst),UNUSED);
-#				endif
-				if( rb->size == 8 )
-					call_native(ctx,hl_dyn_set64,size);
-				else
-					call_native(ctx,hl_dyn_set32,size);
-			}
-			break;
-*/		
-		case OMakeEnum:
+*/		case OMakeEnum:
 			{
 				hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
 				int_val args[] = { c->size, c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR };
@@ -2382,7 +2342,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				int size;
 #				ifdef HL_64
-
+				jit_error("TODO");
 #				else
 				switch( dst->t->kind ) {
 				case HF32:
@@ -2402,6 +2362,59 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 #				endif
 			}
+			break;
+		case ODynSet:
+			{
+				int size;
+#				ifdef HL_64
+				jit_error("TODO");
+#				else
+				switch( dst->t->kind ) {
+				case HF32:
+				case HF64:
+					jit_error("TODO");
+					break;
+				default:
+					size = pad_stack(ctx, HL_WSIZE*4);
+					scratch(PEAX);
+					op32(ctx,MOV,PEAX,REG_AT(Ebp));
+					op32(ctx,ADD,PEAX,pconst(&p,rb->stackPos));
+					op32(ctx,PUSH,PEAX,UNUSED);
+					op32(ctx,PUSH,pconst64(&p,(int_val)rb->t),UNUSED);
+					op32(ctx,PUSH,pconst64(&p,hl_hash_utf8(m->code->strings[o->p2])),UNUSED);
+					op32(ctx,PUSH,fetch(dst),UNUSED);
+					call_native(ctx,get_dynset(rb->t),size);
+					break;
+				}
+#				endif
+			}
+			break;
+		case OTrap:
+			{
+				int size, jenter, jtrap;
+				int trap_size = (sizeof(hl_trap_ctx) + 15) & 0xFFF0;
+				// trap pad
+				op64(ctx,SUB,PESP,pconst(&p,trap_size - sizeof(hl_trap_ctx)));
+				op64(ctx,MOV,PEAX,paddr(&p,&hl_current_trap));
+				op64(ctx,PUSH,PEAX,UNUSED);
+				op64(ctx,SUB,PESP,pconst(&p,sizeof(hl_trap_ctx) - HL_WSIZE));
+				op64(ctx,MOV,PEAX,PESP);
+				op64(ctx,MOV,paddr(&p,&hl_current_trap),PEAX);
+				size = pad_stack(ctx, HL_WSIZE);
+				op64(ctx,PUSH,PEAX,UNUSED);
+				call_native(ctx,setjmp,size);
+				op64(ctx,TEST,PEAX,PEAX);
+				XJump_small(JZero,jenter);
+				op64(ctx,ADD,PESP,pconst(&p,trap_size));
+				op64(ctx,MOV,PEAX,paddr(&p,&hl_current_exc));
+				store(ctx,dst,PEAX,false);
+				jtrap = do_jump(ctx,OJAlways,false);
+				register_jump(ctx,jtrap,(opCount + 1) + o->p2);
+				patch_jump(ctx,jenter);
+			}
+			break;
+		case OEndTrap:
+			jit_error("TODO");
 			break;
 		default:
 			{

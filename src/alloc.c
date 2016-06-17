@@ -82,10 +82,13 @@ struct _gc_pheader {
 	int free_blocks;
 	unsigned char *sizes;
 	unsigned char *bmp;
+	gc_pheader *next_page;
 #ifdef HL_TRACK_ALLOC
 	int *alloc_hashes;
 #endif
-	gc_pheader *next_page;
+#ifdef HL_DEBUG
+	int page_id;
+#endif
 };
 
 #define GC_PARTITIONS	9
@@ -185,6 +188,8 @@ static void gc_flush_empty_pages() {
 	}
 }
 
+static int PAGE_ID = 0;
+
 static gc_pheader *gc_alloc_new_page( int block, int size, bool varsize ) {
 	int m, i;
 	unsigned char *base;
@@ -200,6 +205,7 @@ static gc_pheader *gc_alloc_new_page( int block, int size, bool varsize ) {
 	}
 #	ifdef HL_DEBUG
 	memset(base,0xDD,size);
+	p->page_id = PAGE_ID++;
 #	endif
 	if( ((int_val)base) & ((1<<GC_MASK_BITS) - 1) )
 		hl_fatal("Page memory is not correctly aligned");

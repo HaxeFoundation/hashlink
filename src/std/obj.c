@@ -79,6 +79,17 @@ HL_PRIM int hl_hash( vbyte *b ) {
 	return hl_hash_gen((uchar*)b,true);
 }
 
+HL_PRIM int hl_hash_utf8( const char *name ) {
+	int h = 0;
+	// ASCII should be enough
+	while( *name ) {
+		h = 223 * h + (unsigned)*name;
+		name++;
+	}
+	h %= 0x1FFFFF7B;
+	return h;
+}
+
 HL_PRIM int hl_hash_gen( const uchar *name, bool cache_name ) {
 	int h = 0;
 	const uchar *oname = name;
