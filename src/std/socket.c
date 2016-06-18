@@ -119,8 +119,8 @@ HL_PRIM void hl_socket_close( hl_socket *s ) {
 }
 
 HL_PRIM int hl_socket_send_char( hl_socket *s, int c ) {
-	unsigned char cc;
-	cc = (unsigned char)c;
+	char cc;
+	cc = (char)(unsigned char)c;
 	if( send(s->sock,&cc,1,MSG_NOSIGNAL) == SOCKET_ERROR )
 		return block_error();
 	return 1;
@@ -128,7 +128,7 @@ HL_PRIM int hl_socket_send_char( hl_socket *s, int c ) {
 
 HL_PRIM int hl_socket_send( hl_socket *s, vbyte *buf, int pos, int len ) {
 	int r = send(s->sock, (char*)buf + pos, len, MSG_NOSIGNAL);
-	if( len == SOCKET_ERROR )
+	if( r == SOCKET_ERROR )
 		return block_error();
 	return len;
 }
@@ -142,11 +142,11 @@ HL_PRIM int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len ) {
 }
 
 HL_PRIM int hl_socket_recv_char( hl_socket *s ) {
-	unsigned char cc;
+	char cc;
 	int ret = recv(s->sock,&cc,1,MSG_NOSIGNAL);
 	if( ret == SOCKET_ERROR || ret == 0 )
 		return block_error();
-	return cc;
+	return (unsigned char)cc;
 }
 
 HL_PRIM int hl_host_resolve( vbyte *host ) {
@@ -201,7 +201,7 @@ HL_PRIM bool hl_socket_connect( hl_socket *s, int host, int port ) {
 	struct sockaddr_in addr;
 	memset(&addr,0,sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
+	addr.sin_port = htons((unsigned short)port);
 	*(int*)&addr.sin_addr.s_addr = host;
 	if( connect(s->sock,(struct sockaddr*)&addr,sizeof(addr)) != 0 ) {
 		int err = block_error();
@@ -216,13 +216,13 @@ HL_PRIM bool hl_socket_listen( hl_socket *s, int n ) {
 }
 
 HL_PRIM bool hl_socket_bind( hl_socket *s, int host, int port ) {
-	int opt = 1;
 	struct sockaddr_in addr;
 	memset(&addr,0,sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
+	addr.sin_port = htons((unsigned short)port);
 	*(int*)&addr.sin_addr.s_addr = host;
 	#ifndef HL_WIN
+	int opt = 1;
 	setsockopt(s->sock,SOL_SOCKET,SO_REUSEADDR,(char*)&opt,sizeof(opt));
 	#endif
 	return bind(s->sock,(struct sockaddr*)&addr,sizeof(addr)) != SOCKET_ERROR;
@@ -230,7 +230,7 @@ HL_PRIM bool hl_socket_bind( hl_socket *s, int host, int port ) {
 
 HL_PRIM hl_socket *hl_socket_accept( hl_socket *s ) {
 	struct sockaddr_in addr;
-	unsigned int addrlen = sizeof(addr);
+	int addrlen = sizeof(addr);
 	SOCKET nsock;
 	hl_socket *hs;
 	nsock = accept(s->sock,(struct sockaddr*)&addr,&addrlen);
@@ -243,7 +243,7 @@ HL_PRIM hl_socket *hl_socket_accept( hl_socket *s ) {
 
 HL_PRIM bool hl_socket_peer( hl_socket *s, int *host, int *port ) {
 	struct sockaddr_in addr;
-	unsigned int addrlen = sizeof(addr);
+	int addrlen = sizeof(addr);
 	if( getpeername(s->sock,(struct sockaddr*)&addr,&addrlen) == SOCKET_ERROR )
 		return false;
 	*host = *(int*)&addr.sin_addr;
@@ -253,7 +253,7 @@ HL_PRIM bool hl_socket_peer( hl_socket *s, int *host, int *port ) {
 
 HL_PRIM bool hl_socket_host( hl_socket *s, int *host, int *port ) {
 	struct sockaddr_in addr;
-	unsigned int addrlen = sizeof(addr);
+	int addrlen = sizeof(addr);
 	if( getsockname(s->sock,(struct sockaddr*)&addr,&addrlen) == SOCKET_ERROR )
 		return false;
 	*host = *(int*)&addr.sin_addr;

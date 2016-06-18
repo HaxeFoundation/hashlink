@@ -29,6 +29,8 @@
 #	include <dlfcn.h>
 #endif
 
+extern void hl_callback_init( void *e );
+
 static void hl_init_enum( hl_type_enum *e ) {
 	int i, j;
 	for(i=0;i<e->nconstructs;i++) {

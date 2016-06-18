@@ -99,7 +99,7 @@
 #	define HL_WSIZE 8
 #	define IS_64	1
 #	ifdef HL_VCC
-#		define _PTR_FMT	L"%llX"
+#		define _PTR_FMT	L"%IX"
 #	else
 #		define _PTR_FMT	u"%lX"
 #	endif
@@ -107,7 +107,7 @@
 #	define HL_WSIZE 4
 #	define IS_64	0
 #	ifdef HL_VCC
-#		define _PTR_FMT	L"%X"
+#		define _PTR_FMT	L"%IX"
 #	else
 #		define _PTR_FMT	u"%X"
 #	endif

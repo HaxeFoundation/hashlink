@@ -106,7 +106,7 @@ typedef enum {
 #define JZero		JEq
 #define JNotZero	JNeq
 
-#define B(bv)	*ctx->buf.b++ = bv
+#define B(bv)	*ctx->buf.b++ = (unsigned char)(bv)
 #define W(wv)	*ctx->buf.w++ = wv
 
 #ifdef HL_64
@@ -207,7 +207,7 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 
 #define ID2(a,b)	((a) | ((b)<<8))
 #define R(id)		(ctx->vregs + (id))
-#define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,__LINE__); jit_exit(); }
+#define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,(int)__LINE__); jit_exit(); }
 #define IS_FLOAT(r)	((r)->t->kind == HF64 || (r)->t->kind == HF32)
 #define RLOCK(r)		if( (r)->lock < ctx->currentPos ) (r)->lock = ctx->currentPos
 #define RUNLOCK(r)		if( (r)->lock == ctx->currentPos ) (r)->lock = 0
@@ -1165,7 +1165,7 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 
 static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *args ) {
 	int fid = findex < 0 ? -1 : ctx->m->functions_indexes[findex];
-	int isNative = fid >= ctx->m->code->nfunctions;
+	bool isNative = fid >= ctx->m->code->nfunctions;
 	int size = prepare_call_args(ctx,count,args,ctx->vregs,isNative);
 	preg p;
 	if( fid < 0 ) {
@@ -1193,102 +1193,6 @@ static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *ar
 		discard_regs(ctx, false);
 	}
 	if( size ) op64(ctx,ADD,PESP,pconst(&p,size));
-	store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
-}
-
-static void op_call_closure( jit_ctx *ctx, vreg *dst, vreg *f, int nargs, int *rargs ) {
-	/*
-		We don't know in avance what is the size of the first argument of the closure, so we need 
-		a dynamic check here.
-		
-		Note : sizes != 4/8 and closures of natives functions are directly handled into the compiler
-		by creating a trampoline function.
-	*/
-	preg p;
-	preg *r = alloc_cpu(ctx, f, true);
-	preg *tmp;
-	int i, has_param, double_param, end1, end2;
-	tmp = alloc_reg(ctx, RCPU);
-	// read bits
-	op32(ctx,MOV,tmp,pmem(&p,(CpuReg)r->id,HL_WSIZE*2));
-	op32(ctx,CMP,tmp,pconst(&p,0));
-	XJump(JNeq,has_param);
-	{
-		// no argument call
-		int size = prepare_call_args(ctx,nargs,rargs,ctx->vregs,false);
-		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,HL_WSIZE),UNUSED);
-		if( size ) op64(ctx,ADD,PESP,pconst(&p,size));
-		XJump(JAlways,end1);
-	}
-	patch_jump(ctx,has_param);
-	op32(ctx,CMP,tmp,pconst(&p,1));
-	XJump(JNeq,double_param);
-	{
-		// int32 argument call
-		int *args;
-		vreg *vargs;
-		int size;
-
-		// load our first arg into a fake vreg
-		vreg fake;
-		hl_type ti32;
-		ti32.kind = HI32;
-		fake.size = 4;
-		fake.t = &ti32;
-		fake.current = alloc_reg(ctx,RCPU);
-		op32(ctx,MOV,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*2 + 8));
-
-		// prepare the args
-		vargs = (vreg*)hl_malloc(&ctx->falloc,sizeof(vreg)*(nargs+1));
-		args = (int*)hl_malloc(&ctx->falloc,sizeof(int)*(nargs+1));
-		vargs[0] = fake;
-		args[0] = 0;
-		for(i=0;i<nargs;i++) {
-			vargs[i+1] = ctx->vregs[rargs[i]];
-			args[i+1] = i + 1;
-		}
-
-		// call
-		size = prepare_call_args(ctx,nargs+1,args,vargs,false);
-		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,HL_WSIZE),UNUSED);
-		op64(ctx,ADD,PESP,pconst(&p,size));
-		XJump(JAlways,end2);
-	}
-	patch_jump(ctx,double_param);
-	{
-		// int64 argument call
-		int *args;
-		vreg *vargs;
-		int size;
-
-		// load our first arg into a fake vreg
-		vreg fake;
-		hl_type ti64;
-		ti64.kind = HF64;
-		fake.size = 8;
-		fake.t = &ti64;
-		fake.current = alloc_reg(ctx,RFPU);
-
-		op64(ctx,MOVSD,fake.current,pmem(&p,(CpuReg)r->id,HL_WSIZE*2 + 8));
-
-		// prepare the args
-		vargs = (vreg*)hl_malloc(&ctx->falloc,sizeof(vreg)*(nargs+1));
-		args = (int*)hl_malloc(&ctx->falloc,sizeof(int)*(nargs+1));
-		vargs[0] = fake;
-		args[0] = 0;
-		for(i=0;i<nargs;i++) {
-			vargs[i+1] = ctx->vregs[rargs[i]];
-			args[i+1] = i + 1;
-		}
-
-		// call
-		size = prepare_call_args(ctx,nargs+1,args,vargs,false);
-		op64(ctx,CALL,pmem(&p,(CpuReg)r->id,HL_WSIZE),UNUSED);
-		op64(ctx,ADD,PESP,pconst(&p,size));
-	}
-	patch_jump(ctx,end1);
-	patch_jump(ctx,end2);
-	discard_regs(ctx, false);
 	store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
 }
 
@@ -1557,7 +1461,8 @@ static void call_native_consts( jit_ctx *ctx, void *nativeFun, int_val *args, in
 
 static void on_jit_error( const char *msg, int_val line ) {
 	char buf[256];
-	sprintf(buf,"%s (line %d)",msg,(int)line);
+	int iline = (int)line;
+	sprintf(buf,"%s (line %d)",msg,iline);
 #ifdef HL_WIN
 	MessageBoxA(NULL,buf,"JIT ERROR",MB_OK);
 #else
@@ -2062,9 +1967,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, PEAX, true);
 			}
 			break;
-*/		case OCallClosure:
-			op_call_closure(ctx,dst,ra,o->p3,o->extra);
-			break;
+*/
 		case OStaticClosure:
 			{
 				// todo : share duplicates ?
@@ -2087,7 +1990,20 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					}
 					break;
 				case HVIRTUAL:
-					jit_error("TODO");
+					// ASM for --> if( hl_vfields(o)[f] ) r = *hl_vfields(o)[f]; else r = hl_dyn_get(o,hash(field),vt)
+					{
+						int jhasfield, jend;
+						preg *v = alloc_cpu(ctx,ra,true);
+						preg *r = alloc_reg(ctx,RCPU);
+						op64(ctx,MOV,r,pmem(&p,v->id,sizeof(vvirtual)+HL_WSIZE*o->p3));
+						op64(ctx,TEST,r,r);
+						XJump_small(JNotZero,jhasfield);
+						jit_error("TODO");
+						XJump_small(JAlways,jend);
+						patch_jump(ctx,jhasfield);
+						copy_to(ctx, dst, pmem(&p,(CpuReg)r->id,0));
+						patch_jump(ctx,jend);
+					}
 					break;
 				default:
 					ASSERT(ra->t->kind);

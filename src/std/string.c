@@ -198,7 +198,7 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
 
 HL_PRIM char *hl_to_utf8( uchar *bytes ) {
 	int size;
-	return hl_utf16_to_utf8((vbyte*)bytes, 0, &size);
+	return (char*)hl_utf16_to_utf8((vbyte*)bytes, 0, &size);
 }
 
 HL_PRIM vbyte *hl_url_encode( vbyte *str, int *len ) {
@@ -249,7 +249,7 @@ static uchar decode_hex_char( uchar c ) {
 	else if( c >= 'A' && c <= 'F' )
 		c -= 'A' - 10;
 	else
-		return -1;
+		return (uchar)-1;
 	return c;
 }
 
@@ -257,9 +257,9 @@ static uchar decode_hex( uchar **cstr ) {
 	uchar *c = *cstr;
 	uchar p1 = decode_hex_char(c[0]);
 	uchar p2;
-	if( p1 < 0 ) return -1;
+	if( p1 == (uchar)-1 ) return p1;
 	p2 = decode_hex_char(c[1]);
-	if( p2 < 0 ) return -1;
+	if( p2 == (uchar)-1 ) return p2;
 	*cstr = c + 2;
 	return (p1 << 4) | p2;
 }
@@ -275,7 +275,7 @@ HL_PRIM vbyte *hl_url_decode( vbyte *str, int *len ) {
 			c = ' ';
 		else if( c == '%' ) {
 			uchar p1 = decode_hex(&cstr);
-			if( p1 < 0 ) {
+			if( p1 == (uchar)-1 ) {
 				hl_buffer_char(b,'%');
 				continue;
 			}

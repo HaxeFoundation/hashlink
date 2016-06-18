@@ -39,6 +39,8 @@ typedef char pchar;
 #define pfopen fopen
 #endif
 
+extern void *hl_callback( void *f, int nargs, vdynamic **args );
+
 static hl_code *load_code( const pchar *file ) {
 	hl_code *code;
 	FILE *f = pfopen(file,"rb");

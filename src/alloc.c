@@ -392,7 +392,6 @@ alloc_var:
 	if( p->bmp ) {
 		int i;
 		int bid = p->next_block;
-		int mark = 1;
 		for(i=0;i<nblocks;i++) {
 #			ifdef HL_DEBUG
 			if( (p->bmp[bid>>3]&(1<<(bid&7))) != 0 ) hl_fatal("Alloc on marked block");
@@ -407,7 +406,7 @@ alloc_var:
 	p->alloc_hashes[p->next_block] = hl_get_stack_hash();
 #	endif
 	if( nblocks > 1 ) MZERO(p->sizes + p->next_block, nblocks);
-	p->sizes[p->next_block] = nblocks;
+	p->sizes[p->next_block] = (unsigned char)nblocks;
 	p->next_block += nblocks;
 	gc_stats.total_allocated += size + 1;
 	return ptr;
@@ -415,7 +414,7 @@ alloc_var:
 
 static void *gc_alloc_gen( int size, int flags ) {
 	int m = size & (GC_ALIGN - 1);
-	int p, bestP = 0;
+	int p;
 	gc_stats.allocation_count++;
 	gc_stats.total_requested += size;
 	if( m ) size += GC_ALIGN - m;
@@ -758,7 +757,7 @@ static void hl_gc_init( void *stack_top ) {
 		hl_gc_page_map[i] = gc_level1_null;
 	if( TRAILING_ONES(0x080003FF) != 10 || TRAILING_ONES(0) != 0 || TRAILING_ONES(0xFFFFFFFF) != 32 )
 		hl_fatal("Invalid builtin tl1");
-	if( TRAILING_ZEROES(~0x080003FF) != 10 || TRAILING_ZEROES(0) != 32 || TRAILING_ZEROES(0xFFFFFFFF) != 0 )
+	if( TRAILING_ZEROES((unsigned)~0x080003FF) != 10 || TRAILING_ZEROES(0) != 32 || TRAILING_ZEROES(0xFFFFFFFF) != 0 )
 		hl_fatal("Invalid builtin tl0");
 }
 

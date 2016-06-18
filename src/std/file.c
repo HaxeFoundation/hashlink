@@ -87,7 +87,7 @@ HL_PRIM int hl_file_tell( hl_fdesc *f ) {
 }
 
 HL_PRIM bool hl_file_eof( hl_fdesc *f ) {
-	return feof(f->f);
+	return (bool)feof(f->f);
 }
 
 HL_PRIM bool hl_file_flush( hl_fdesc *f ) {
