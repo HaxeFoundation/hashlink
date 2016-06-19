@@ -372,7 +372,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 
 #ifdef OP_LOG
 
-static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" }; 
+static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
 static const char *JUMP_NAMES[] = { "JOVERFLOW", "J???", "JLT", "JGTE", "JEQ", "JNEQ", "JLTE", "JGT", "J?8", "J?9", "J?A", "J?B", "JSLT", "JSGTE", "JSLTE", "JSGT" };
 
 static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
@@ -402,7 +402,7 @@ static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 	case RMEM:
 		{
 			int mult = r->id & 0xF;
-			int regOrOffs = mult == 15 ? r->id >> 4 : r->id >> 8;  
+			int regOrOffs = mult == 15 ? r->id >> 4 : r->id >> 8;
 			CpuReg reg = (r->id >> 4) & 0xF;
 			if( mult == 15 ) {
 				sprintf(buf,"%s ptr[%c%Xh]",mode64 ? "qword" : "dword", regOrOffs<0?'-':'+',regOrOffs<0?-regOrOffs:regOrOffs);
@@ -478,7 +478,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		if( a->id > 7 ) r64 |= 1;
 		if( GET_RM(f->r_mem) > 0 ) {
 			OP(f->r_mem);
-			MOD_RM(3, GET_RM(f->r_mem)-1, a->id); 
+			MOD_RM(3, GET_RM(f->r_mem)-1, a->id);
 		} else
 			OP(f->r_mem + (a->id&7));
 		break;
@@ -561,7 +561,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		ERRIF( f->mem_r == 0 );
 		{
 			int mult = a->id & 0xF;
-			int regOrOffs = mult == 15 ? a->id >> 4 : a->id >> 8;  
+			int regOrOffs = mult == 15 ? a->id >> 4 : a->id >> 8;
 			CpuReg reg = (a->id >> 4) & 0xF;
 			if( mult == 15 ) {
 				ERRIF(1);
@@ -591,7 +591,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		ERRIF( f->r_mem == 0 );
 		{
 			int mult = b->id & 0xF;
-			int regOrOffs = mult == 15 ? b->id >> 4 : b->id >> 8;  
+			int regOrOffs = mult == 15 ? b->id >> 4 : b->id >> 8;
 			CpuReg reg = (b->id >> 4) & 0xF;
 			if( mult == 15 ) {
 				int pos;
@@ -666,7 +666,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		ERRIF( f->mem_r == 0 );
 		{
 			int mult = a->id & 0xF;
-			int regOrOffs = mult == 15 ? a->id >> 4 : a->id >> 8;  
+			int regOrOffs = mult == 15 ? a->id >> 4 : a->id >> 8;
 			CpuReg reg = (a->id >> 4) & 0xF;
 			if( mult == 15 ) {
 				int pos;
@@ -1071,10 +1071,10 @@ static int pad_stack( jit_ctx *ctx, int size ) {
 	return size;
 }
 
-static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, bool isNative ) {
+static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, bool isNative, int extraSize ) {
 	int i;
 	int stackRegs = count;
-	int size = 0, paddedSize;
+	int size = extraSize, paddedSize;
 	preg p;
 #ifdef HL_64
 	if( isNative ) {
@@ -1166,7 +1166,7 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *args ) {
 	int fid = findex < 0 ? -1 : ctx->m->functions_indexes[findex];
 	bool isNative = fid >= ctx->m->code->nfunctions;
-	int size = prepare_call_args(ctx,count,args,ctx->vregs,isNative);
+	int size = prepare_call_args(ctx,count,args,ctx->vregs,isNative,0);
 	preg p;
 	if( fid < 0 ) {
 		ASSERT(fid);
@@ -1241,7 +1241,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OOr: o = OR; break;
 		case OXor: o = XOR; break;
 		case OShl:
-		case OUShr: 
+		case OUShr:
 		case OSShr:
 			if( !b->current || b->current->kind != RCPU || b->current->id != Ecx ) {
 				scratch(REG_AT(Ecx));
@@ -1563,7 +1563,7 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	op64(ctx,PUSH,pmem(&p,Edx,0),UNUSED);
 	op64(ctx,ADD,REG_AT(Edx),pconst(&p,HL_WSIZE));
 	op64(ctx,SUB,REG_AT(R8),pconst(&p,1));
-	
+
 	patch_jump(ctx, jstart);
 	op64(ctx,CMP,REG_AT(R8),pconst(&p,0));
 	XJump(JNeq,jcall);
@@ -1612,7 +1612,7 @@ static void *get_dynset( hl_type *t ) {
 	default:
 		return hl_dyn_setp;
 	}
-} 
+}
 
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0, opCount;
@@ -1893,12 +1893,20 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				default:
 					ASSERT(dst->t->kind);
 				}
-				store(ctx,dst,dst->current,false); 
+				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case OString:
 			{
-				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)m->code->strings[o->p2]));
+				uchar *str = m->code->ustrings[o->p2];
+				if( !str ) {
+					int i = o->p2;
+					int size = hl_utf8_length((vbyte*)m->code->strings[i],0);
+					str = hl_malloc(&m->code->alloc,(size+1)<<1);
+					strtou(str,size+1,m->code->strings[i]);
+					m->code->ustrings[i] = str;
+				}
+				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)str));
 				store(ctx,dst,dst->current,false);
 			}
 			break;
@@ -1914,7 +1922,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				void *allocFun;
 				int nargs = 1;
 				switch( dst->t->kind ) {
-				case HOBJ: 
+				case HOBJ:
 					allocFun = hl_alloc_obj;
 					break;
 				case HDYNOBJ:
@@ -1968,15 +1976,41 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 */
+		case OCallClosure:
+			if( ra->t->kind == HDYN ) {
+				jit_error("TODO");
+			} else {
+				int jhasvalue, jend, size;
+				// ASM for  if( c->hasValue ) c->fun(value,args) else c->fun(args)
+				preg *r = alloc_cpu(ctx,ra,true);
+				preg *tmp = alloc_reg(ctx, RCPU);
+				op64(ctx,MOV,tmp,pmem(&p,r->id,HL_WSIZE*2));
+				op64(ctx,TEST,tmp,tmp);
+				XJump_small(JNotZero,jhasvalue);
+				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
+				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
+				op64(ctx, CALL, pmem(&p,r->id,HL_WSIZE), UNUSED);
+				XJump_small(JAlways,jend);
+				patch_jump(ctx,jhasvalue);
+				jit_error("TODO");
+				patch_jump(ctx,jend);
+				discard_regs(ctx,false);
+				op64(ctx,ADD,PESP,pconst(&p,size));
+				store(ctx,dst,IS_FLOAT(dst) ? PXMM(0) : PEAX,true);
+			}
+			break;
 		case OStaticClosure:
 			{
 				// todo : share duplicates ?
 				vclosure *c = hl_malloc(&m->ctx.alloc,sizeof(vclosure));
+				preg *r = alloc_reg(ctx, RCPU);
 				c->t = dst->t;
-				c->fun = (void*)(int_val)o->p1;
+				c->fun = (void*)(int_val)o->p2;
 				c->hasValue = 0;
 				c->value = ctx->closure_list;
 				ctx->closure_list = c;
+				op64(ctx, MOV, r, pconst64(&p,(int_val)c));
+				store(ctx,dst,r,true);
 			}
 			break;
 		case OField:
@@ -2035,7 +2069,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						patch_jump(ctx,jhasfield);
 						copy_from(ctx, pmem(&p,(CpuReg)r->id,0), rb);
 						patch_jump(ctx,jend);
-					}	
+					}
 					break;
 				default:
 					ASSERT(dst->t->kind);
@@ -2071,7 +2105,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				args[0] = 0;
 				for(i=1;i<nargs;i++)
 					args[i] = o->extra[i-1];
-				size = prepare_call_args(ctx,nargs,args,ctx->vregs,false);
+				size = prepare_call_args(ctx,nargs,args,ctx->vregs,false,0);
 				op64(ctx,CALL,pmem(&p,tmp->id,(o->p2 + 1)*HL_WSIZE),UNUSED);
 				discard_regs(ctx, false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
@@ -2085,7 +2119,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				preg *tmp;
 				tmp = alloc_reg(ctx, RCPU);
 				op64(ctx,MOV,tmp,pmem(&p,r->id,0)); // read proto
-				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false);
+				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
 				op64(ctx,CALL,pmem(&p,tmp->id,(o->p2 + 1)*HL_WSIZE),UNUSED);
 				discard_regs(ctx, false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
@@ -2115,7 +2149,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 */		case OThrow:
 			{
-				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,true);
+				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,true,0);
 				call_native(ctx,hl_throw,size);
 			}
 			break;
@@ -2392,7 +2426,8 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
 		vclosure *c = ctx->closure_list;
 		while( c ) {
 			vclosure *next;
-			c->fun = m->functions_ptrs[(int)(int_val)c->fun];
+			int fpos = (int)(int_val)m->functions_ptrs[(int)(int_val)c->fun];
+			c->fun = code + fpos;
 			next = (vclosure*)c->value;
 			c->value = NULL;
 			c = next;
