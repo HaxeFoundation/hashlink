@@ -1149,6 +1149,10 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 	return paddedSize;
 }
 
+static void hl_null_access() {
+	hl_error_msg(USTR("Null access"));
+}
+
 static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	preg p;
 #	if defined(HL_WIN_CALL) && defined(HL_64)
@@ -1159,6 +1163,8 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	// native function, already resolved
 	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
 	op64(ctx,CALL,PEAX,UNUSED);
+	if( nativeFun == hl_null_access || nativeFun == hl_throw )
+		return;
 	discard_regs(ctx, true);
 	op64(ctx,ADD,PESP,pconst(&p,size));
 }
@@ -1205,7 +1211,7 @@ static void op_enter( jit_ctx *ctx ) {
 
 static void op_ret( jit_ctx *ctx, vreg *r ) {
 	preg p;
-	load(ctx, IS_FLOAT(r) ? PXMM(0) : PEAX, r);
+	op64(ctx, MOV, IS_FLOAT(r) ? PXMM(0) : PEAX, fetch(r));
 	if( ctx->totalRegsSize ) op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
 	op64(ctx, POP, PEBP, UNUSED);
 	op64(ctx, RET, UNUSED, UNUSED);
@@ -1471,10 +1477,6 @@ static void on_jit_error( const char *msg, int_val line ) {
 	hl_debug_break();
 }
 
-static void hl_null_access() {
-	hl_error_msg(USTR("Null access"));
-}
-
 static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
 	int_val args[2] = { (int_val)msg, (int_val)line };
 	call_native_consts(ctx,on_jit_error,args,2);
@@ -1611,6 +1613,22 @@ static void *get_dynset( hl_type *t ) {
 		return hl_dyn_seti;
 	default:
 		return hl_dyn_setp;
+	}
+}
+
+static void *get_dynget( hl_type *t ) {
+	switch( t->kind ) {
+	case HF32:
+		return hl_dyn_getf;
+	case HF64:
+		return hl_dyn_getd;
+	case HI32:
+	case HI16:
+	case HI8:
+	case HBOOL:
+		return hl_dyn_geti;
+	default:
+		return hl_dyn_getp;
 	}
 }
 
