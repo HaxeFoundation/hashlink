@@ -893,6 +893,8 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 #	endif
 		switch( size ) {
 		case 1:
+			if( to->kind == RCPU )
+				op64(ctx,XOR,to,to);
 			op32(ctx,MOV8,to,from);
 			break;
 		case 2:
@@ -1101,7 +1103,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 		size += hl_pad_size(size,r->t);
 		size += r->size;
 	}
-	paddedSize = pad_stack(ctx,size + ctx->totalRegsSize) - ctx->totalRegsSize;
+	paddedSize = pad_stack(ctx,size);
 	size = paddedSize - size;
 	for(i=0;i<stackRegs;i++) {
 		// RTL
@@ -1686,6 +1688,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	ctx->functionPos = BUF_POS();
 	op_enter(ctx);
 	ctx->opsPos[0] = 0;
+
 	for(opCount=0;opCount<f->nops;opCount++) {
 		int jump;
 		hl_opcode *o = f->ops + opCount;
@@ -1957,43 +1960,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, PEAX, true);
 			}
 			break;
-/*		case OGetFunction:
-			{
-				int_val args[2] = { (int_val)m, (int_val)o->p2 };
-				call_native_consts(ctx, hl_alloc_closure_void, args, 2);
-				store(ctx, dst, PEAX, true);
-			}
-			break;
-		case OClosure:
-			{
-				vreg *arg = rb;
-#				ifdef HL_64
-				if( arg->size == 4 ) {
-					TODO();
-				} else {
-					int size = pad_stack(ctx, 0);
-					if( arg->current && arg->current->kind == RFPU ) scratch(arg->current);
-					op64(ctx,MOV,REG_AT(CALL_REGS[2]),fetch(arg));
-					op64(ctx,MOV,REG_AT(CALL_REGS[0]),pconst64(&p,(int_val)m));
-					op64(ctx,MOV,REG_AT(CALL_REGS[1]),pconst64(&p,(int_val)o->p2));
-					call_native(ctx,hl_alloc_closure_i64,size);
-				}
-#				else
-				if( arg->size == 8 ) {
-					TODO();
-				} else {
-					int size = pad_stack(ctx, HL_WSIZE*2 + 4);
-					op64(ctx,PUSH,fetch(arg),UNUSED);
-					op64(ctx,PUSH,pconst(&p,o->p2),UNUSED);
-					op64(ctx,PUSH,pconst(&p,(int)m),UNUSED);
-					call_native(ctx,hl_alloc_closure_i32,size);
-				}
-#				endif
-				discard_regs(ctx,true);
-				store(ctx, dst, PEAX, true);
-			}
-			break;
-*/
 		case OCallClosure:
 			if( ra->t->kind == HDYN ) {
 				jit_error("TODO");
@@ -2044,13 +2010,24 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				case HVIRTUAL:
 					// ASM for --> if( hl_vfields(o)[f] ) r = *hl_vfields(o)[f]; else r = hl_dyn_get(o,hash(field),vt)
 					{
-						int jhasfield, jend;
+						int jhasfield, jend, size;
 						preg *v = alloc_cpu(ctx,ra,true);
 						preg *r = alloc_reg(ctx,RCPU);
 						op64(ctx,MOV,r,pmem(&p,v->id,sizeof(vvirtual)+HL_WSIZE*o->p3));
 						op64(ctx,TEST,r,r);
 						XJump_small(JNotZero,jhasfield);
+#						ifdef HL_64
 						jit_error("TODO");
+#						else
+						size = pad_stack(ctx,HL_WSIZE*3);
+						op64(ctx,MOV,r,pconst64(&p,(int_val)dst->t));
+						op64(ctx,PUSH,r,UNUSED);
+						op64(ctx,MOV,r,pconst64(&p,(int_val)ra->t->virt->fields[o->p3].hashed_name));
+						op64(ctx,PUSH,r,UNUSED);
+						op64(ctx,PUSH,v,UNUSED);
+						call_native(ctx,get_dynget(dst->t),size);
+						store(ctx,dst,IS_FLOAT(dst) ? PXMM(0) : PEAX,true);
+#						endif
 						XJump_small(JAlways,jend);
 						patch_jump(ctx,jhasfield);
 						copy_to(ctx, dst, pmem(&p,(CpuReg)r->id,0));
