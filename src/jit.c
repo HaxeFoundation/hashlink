@@ -1833,7 +1833,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					ra->stackPos -= 4;
 				} else {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
-					op64(ctx,MOV,tmp,&ra->stack);
+					copy_from(ctx,tmp,ra);
 					op64(ctx,MOV,pmem(&p,Eax,8),tmp);
 				}
 				store(ctx, dst, PEAX, true);
@@ -2096,7 +2096,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				preg *r = alloc_cpu(ctx, R(0), true);
 				preg *tmp;
 				tmp = alloc_reg(ctx, RCPU);
-				op64(ctx,MOV,tmp,pmem(&p,r->id,0)); // read proto
+				op64(ctx,MOV,tmp,pmem(&p,r->id,0)); // read type
+				op64(ctx,MOV,tmp,pmem(&p,tmp->id,HL_WSIZE*2)); // read proto
 				args[0] = 0;
 				for(i=1;i<nargs;i++)
 					args[i] = o->extra[i-1];
@@ -2108,17 +2109,24 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OCallMethod:
-			{
+			switch( R(o->extra[0])->t->kind ) {
+			case HOBJ: {
 				int size;
 				preg *r = alloc_cpu(ctx, R(o->extra[0]), true);
 				preg *tmp;
 				tmp = alloc_reg(ctx, RCPU);
-				op64(ctx,MOV,tmp,pmem(&p,r->id,0)); // read proto
+				op64(ctx,MOV,tmp,pmem(&p,r->id,0)); // read type
+				op64(ctx,MOV,tmp,pmem(&p,tmp->id,HL_WSIZE*2)); // read proto
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
 				op64(ctx,CALL,pmem(&p,tmp->id,(o->p2 + 1)*HL_WSIZE),UNUSED);
 				discard_regs(ctx, false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
 				store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+				break;
+			}
+			case HVIRTUAL:
+				jit_error("todo");
+				break;
 			}
 			break;
 /*		case OMethod:
@@ -2179,6 +2187,21 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)(m->code->types + o->p2)));
 				store(ctx,dst,dst->current,false);
+			}
+			break;
+		case OGetType:
+			{
+				int jnext, jend;
+				preg *r = alloc_cpu(ctx, ra, true);
+				preg *tmp = alloc_reg(ctx, RCPU);
+				op64(ctx,TEST,r,r);
+				XJump_small(JNotZero,jnext);
+				op64(ctx,MOV, tmp, pconst64(&p,(int_val)&hlt_void));
+				XJump_small(JAlways,jend);
+				patch_jump(ctx,jnext);
+				op64(ctx, MOV, tmp, pmem(&p,r->id,0));
+				patch_jump(ctx,jend);
+				store(ctx,dst,tmp,true);
 			}
 			break;
 		case OGetArray:
@@ -2292,7 +2315,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				switch( dst->t->kind ) {
 				case HF32:
 				case HF64:
-					jit_error("TODO");
+					size = pad_stack(ctx, HL_WSIZE*2);
+					op32(ctx,PUSH,pconst64(&p,(int_val)ra->t),UNUSED);
+					op32(ctx,MOV,PEAX,REG_AT(Ebp));
+					op32(ctx,ADD,PEAX,pconst(&p,ra->stackPos));
+					op32(ctx,PUSH,PEAX,UNUSED);
+					call_native(ctx,get_dyncast(dst->t),size);
+					store(ctx, dst, PXMM(0), true);
 					break;
 				default:
 					size = pad_stack(ctx, HL_WSIZE*3);
@@ -2360,6 +2389,22 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OEndTrap:
 			jit_error("TODO");
+			break;
+		case OEnumIndex:
+			switch( ra->t->kind ) {
+			case HENUM:
+				{
+					preg *r = alloc_reg(ctx,RCPU);
+					op64(ctx,MOV,r,pmem(&p,alloc_cpu(ctx,ra,true)->id,0));
+					store(ctx,dst,r,true);
+					break;
+				}
+			case HDYN:
+				jit_error("TODO");
+				break;
+			default:
+				jit_error("assert");
+			}
 			break;
 		default:
 			{
