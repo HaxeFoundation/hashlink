@@ -1683,6 +1683,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		size += hl_pad_size(size,r->t);
 		r->stackPos = -size;
 	}
+	size += hl_pad_size(size,&hlt_dyn); // align on word size
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
 	ctx->functionPos = BUF_POS();
@@ -1976,7 +1977,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx, CALL, pmem(&p,r->id,HL_WSIZE), UNUSED);
 				XJump_small(JAlways,jend);
 				patch_jump(ctx,jhasvalue);
+#				ifdef HL_64
 				jit_error("TODO");
+#				else
+				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,4);
+				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
+				op64(ctx, PUSH,pmem(&p,r->id,HL_WSIZE*3),UNUSED); // push closure value
+				op64(ctx, CALL, pmem(&p,r->id,HL_WSIZE), UNUSED);
+#				endif
 				patch_jump(ctx,jend);
 				discard_regs(ctx,false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
@@ -2102,7 +2110,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				for(i=1;i<nargs;i++)
 					args[i] = o->extra[i-1];
 				size = prepare_call_args(ctx,nargs,args,ctx->vregs,false,0);
-				op64(ctx,CALL,pmem(&p,tmp->id,(o->p2 + 1)*HL_WSIZE),UNUSED);
+				op64(ctx,CALL,pmem(&p,tmp->id,o->p2*HL_WSIZE),UNUSED);
 				discard_regs(ctx, false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
 				store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
@@ -2118,7 +2126,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOV,tmp,pmem(&p,r->id,0)); // read type
 				op64(ctx,MOV,tmp,pmem(&p,tmp->id,HL_WSIZE*2)); // read proto
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
-				op64(ctx,CALL,pmem(&p,tmp->id,(o->p2 + 1)*HL_WSIZE),UNUSED);
+				op64(ctx,CALL,pmem(&p,tmp->id,o->p2*HL_WSIZE),UNUSED);
 				discard_regs(ctx, false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
 				store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
@@ -2129,28 +2137,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				break;
 			}
 			break;
-/*		case OMethod:
-			switch( ra->t->kind ) {
-			case HVIRTUAL:
-				{
-#					ifdef HL_64
-					int size = pad_stack(ctx, 0);
-					op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(ra));
-					op32(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,o->p3));
-#					else
-					int size = pad_stack(ctx, HL_WSIZE + 4);
-					op32(ctx,PUSH,pconst(&p,o->p3),UNUSED);
-					op32(ctx,PUSH,fetch(ra),UNUSED);
-#					endif
-					call_native(ctx,hl_fetch_virtual_method,size);
-					store(ctx,dst,PEAX,true);
-				}
-				break;
-			default:
-				ASSERT(ra->t->kind);
-			}
-			break;
-*/		case OThrow:
+		case OThrow:
 			{
 				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,true,0);
 				call_native(ctx,hl_throw,size);
@@ -2159,6 +2146,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OLabel:
 			// NOP for now
 			discard_regs(ctx,false);
+			break;
+		case OGetI8:
+			{
+				preg *base = alloc_cpu(ctx, ra, true);
+				preg *offset = alloc_cpu(ctx, rb, true);
+				preg *r = alloc_reg(ctx,RCPU);
+				op64(ctx,XOR,r,r);
+				op64(ctx,MOV8,r,pmem2(&p,base->id,offset->id,1,0));
+				store(ctx, dst, r, true);
+			}
 			break;
 		case OGetI32:
 			{
@@ -2248,39 +2245,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx,dst,PEAX,true);
 			}
 			break;
-/*		case ODynGet:
-			{
-				int hfield = hl_hash_gen(m->code->ustrings[o->p3],false);
-#				ifdef HL_64
-				int size = pad_stack(ctx, 0);
-				op64(ctx,MOV,REG_AT(CALL_REGS[0]),fetch(ra));
-				op64(ctx,MOV,REG_AT(CALL_REGS[1]),pconst(&p,hfield));
-				op64(ctx,MOV,REG_AT(CALL_REGS[2]),pconst64(&p,(int_val)dst->t));
-#				else
-				int size = pad_stack(ctx, HL_WSIZE*3);
-				op32(ctx,PUSH,pconst(&p,(int)dst->t),UNUSED);
-				op32(ctx,PUSH,pconst(&p,hfield),UNUSED);
-				op32(ctx,PUSH,fetch(ra),UNUSED);
-#				endif
-				if( dst->size == 8 ) {
-					call_native(ctx,hl_dyn_getd,size);
-#					ifdef HL_64
-					store(ctx,dst,PEAX,true);
-#					else
-					scratch(dst->current);
-					// mov Eax:Edx into dst
-					op32(ctx,MOV,&dst->stack,PEAX);
-					dst->stackPos += 4;
-					op32(ctx,MOV,&dst->stack,REG_AT(Edx));
-					dst->stackPos -= 4;
-#					endif
-				} else {
-					call_native(ctx,hl_dyn_get32,size);
-					store(ctx,dst,PEAX,true);
-				}
-			}
-			break;
-*/		case OMakeEnum:
+		case OMakeEnum:
 			{
 				hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
 				int_val args[] = { c->size, c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR };
@@ -2332,6 +2297,33 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op32(ctx,PUSH,PEAX,UNUSED);
 					call_native(ctx,get_dyncast(dst->t),size);
 					store(ctx, dst, PEAX, true);
+					break;
+				}
+#				endif
+			}
+			break;
+		case ODynGet:
+			{
+				int size;
+				preg *r;
+#				ifdef HL_64
+				jit_error("TODO");
+#				else
+				switch( dst->t->kind ) {
+				case HF32:
+				case HF64:
+					jit_error("TODO");
+					break;
+				default:
+					r = alloc_reg(ctx,RCPU);
+					size = pad_stack(ctx,HL_WSIZE*3);
+					op64(ctx,MOV,r,pconst64(&p,(int_val)dst->t));
+					op64(ctx,PUSH,r,UNUSED);
+					op64(ctx,MOV,r,pconst64(&p,(int_val)hl_hash_utf8(m->code->strings[o->p3])));
+					op64(ctx,PUSH,r,UNUSED);
+					op64(ctx,PUSH,fetch(ra),UNUSED);
+					call_native(ctx,get_dynget(dst->t),size);
+					store(ctx,dst,IS_FLOAT(dst) ? PXMM(0) : PEAX,true);
 					break;
 				}
 #				endif
@@ -2400,8 +2392,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					break;
 				}
 			case HDYN:
-				jit_error("TODO");
-				break;
+				{
+					preg *r = alloc_reg(ctx,RCPU);
+					op64(ctx,MOV,r,pmem(&p,alloc_cpu(ctx,ra,true)->id,8)); // read dynamic ptr
+					op64(ctx,MOV,r,pmem(&p,r->id,0)); // read index
+					store(ctx,dst,r,true);
+					break;
+				}
 			default:
 				jit_error("assert");
 			}
