@@ -1,0 +1,9 @@
+-cp classes
+-main Main
+-hl ../../../src/_main.c
+
+--next
+
+-cp classes
+-main Main
+-hl bin/test.b

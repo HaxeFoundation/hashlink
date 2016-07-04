@@ -403,6 +403,7 @@ typedef struct _venum {
 } venum;
 
 HL_API hl_type hlt_void;
+HL_API hl_type hlt_bool;
 HL_API hl_type hlt_i32;
 HL_API hl_type hlt_f64;
 HL_API hl_type hlt_f32;

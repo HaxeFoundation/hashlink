@@ -29,6 +29,7 @@ HL_PRIM hl_type hlt_i32 = { HI32 };
 HL_PRIM hl_type hlt_f32 = { HF32 };
 HL_PRIM hl_type hlt_f64 = { HF64 };
 HL_PRIM hl_type hlt_void = { HVOID };
+HL_PRIM hl_type hlt_bool = { HBOOL };
 
 static const uchar *TSTR[] = {
 	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("f32"), USTR("f64"),
