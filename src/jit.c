@@ -1589,6 +1589,18 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	return pos;
 }
 
+int hl_jit_init_get_wrapper( jit_ctx *ctx ) {
+	int pos = BUF_POS();
+	jit_buf(ctx);
+	
+	BREAK();
+	jit_buf(ctx);
+	while( BUF_POS() & 15 )
+		op32(ctx, NOP, UNUSED, UNUSED);
+
+	return pos;
+}
+
 static void *get_dyncast( hl_type *t ) {
 	switch( t->kind ) {
 	case HF32:

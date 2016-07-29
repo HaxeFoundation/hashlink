@@ -581,6 +581,7 @@ typedef struct {
 HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
 HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
 HL_API void hl_sys_init(void **args, int nargs);
+HL_API void hl_setup_callbacks(void *sc, void *gw);
 
 #include <setjmp.h>
 typedef struct _hl_trap_ctx hl_trap_ctx;

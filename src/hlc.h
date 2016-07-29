@@ -119,7 +119,6 @@ static vdynamic *hlc_dyn_call_obj( vdynamic *o, int hfield, vdynamic **args, int
 
 extern void *hlc_static_call(void *fun, hl_type *t, void **args, vdynamic *out);
 extern void *hlc_get_wrapper(hl_type *t);
-HL_API void hlc_setup(void *sc, void *gw);
 extern void hl_entry_point();
 
 #endif

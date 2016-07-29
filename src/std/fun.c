@@ -99,7 +99,7 @@ typedef void *(*fptr_get_wrapper)(hl_type *t);
 static fptr_static_call hlc_static_call = NULL;
 static fptr_get_wrapper hlc_get_wrapper = NULL;
 
-HL_PRIM void hlc_setup( void *c, void *w ) {
+HL_PRIM void hl_setup_callbacks( void *c, void *w ) {
 	hlc_static_call = (fptr_static_call)c;
 	hlc_get_wrapper = (fptr_get_wrapper)w;
 }

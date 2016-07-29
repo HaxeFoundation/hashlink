@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 	hl_trap_ctx ctx;
 	vdynamic *exc;
 	hl_global_init(&ctx);
-	hlc_setup(hlc_static_call, hlc_get_wrapper);
+	hl_setup_callbacks(hlc_static_call, hlc_get_wrapper);
 	hl_sys_init(argv + 1,argc - 1);
 #	ifdef _DEBUG
 //	disable crt debug since it will prevent reusing our address space
