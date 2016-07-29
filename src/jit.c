@@ -2387,7 +2387,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int trap_size = (sizeof(hl_trap_ctx) + 15) & 0xFFF0;
 				preg *r = alloc_reg(ctx, RCPU);
 				hl_trap_ctx *tmp = NULL;
-				BREAK();
 				op64(ctx, MOV, r, paddr(&p,&hl_current_trap));
 				op64(ctx, MOV, r, pmem(&p,r->id,(int)(int_val)&tmp->prev));
 				op64(ctx, MOV, paddr(&p,&hl_current_trap), r);
