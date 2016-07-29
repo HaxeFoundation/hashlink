@@ -71,6 +71,7 @@ typedef enum {
 	SAR,
 	INC,
 	DEC,
+	JMP,
 	// SSE
 	MOVSD,
 	MOVSS,
@@ -240,6 +241,7 @@ struct jit_ctx {
 	hl_function *f;
 	jlist *jumps;
 	jlist *calls;
+	jlist *switchs;
 	hl_alloc falloc; // cleared per-function
 	hl_alloc galloc;
 	vclosure *closure_list;
@@ -354,6 +356,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "SAR", RM(0xD3,7), 0, 0, RM(0xC1,7) },
 	{ "INC", IS_64 ? RM(0xFF,0) : 0x40, RM(0xFF,0) },
 	{ "DEC", IS_64 ? RM(0xFF,1) : 0x48, RM(0xFF,1) },
+	{ "JMP", RM(0xFF,4) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
@@ -1688,7 +1691,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	jit_buf(ctx);
 	ctx->functionPos = BUF_POS();
 	op_enter(ctx);
-	ctx->opsPos[0] = 0;
+	ctx->opsPos[0] = BUF_POS();
 
 	for(opCount=0;opCount<f->nops;opCount++) {
 		int jump;
@@ -2380,7 +2383,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OEndTrap:
-			jit_error("TODO");
+			{
+				int trap_size = (sizeof(hl_trap_ctx) + 15) & 0xFFF0;
+				preg *r = alloc_reg(ctx, RCPU);
+				hl_trap_ctx *tmp = NULL;
+				BREAK();
+				op64(ctx, MOV, r, paddr(&p,&hl_current_trap));
+				op64(ctx, MOV, r, pmem(&p,r->id,(int)(int_val)&tmp->prev));
+				op64(ctx, MOV, paddr(&p,&hl_current_trap), r);
+				op64(ctx,ADD,PESP,pconst(&p,trap_size));
+			}
 			break;
 		case OEnumIndex:
 			switch( ra->t->kind ) {
@@ -2402,6 +2414,36 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			default:
 				jit_error("assert");
 			}
+			break;
+		case OSwitch:
+			{
+				int jdefault;
+				int i;
+				preg *r = alloc_cpu(ctx, dst, true);
+				preg *r2 = alloc_reg(ctx, RCPU);
+				op32(ctx, CMP, r, pconst(&p,o->p2));
+				XJump(JUGte,jdefault);
+				// r2 = r * 5 + eip
+				op32(ctx, MOV, r2, r); 
+				op32(ctx, SHL, r2, pconst(&p,2));
+				op32(ctx, ADD, r2, r);
+				op64(ctx, ADD, r2, pconst64(&p,0));
+				{
+					jlist *s = (jlist*)hl_malloc(&ctx->galloc, sizeof(jlist));
+					s->pos = BUF_POS() - sizeof(void*);
+					s->next = ctx->switchs;
+					ctx->switchs = s;
+				}
+				op64(ctx, JMP, r2, UNUSED);
+				for(i=0;i<o->p2;i++) {
+					int j = do_jump(ctx,OJAlways,false);
+					register_jump(ctx,j,(opCount + 1) + o->extra[i]);
+				}
+				patch_jump(ctx, jdefault);
+			}
+			break;
+		case OGetTID:
+			op32(ctx, MOV, alloc_cpu(ctx,dst,false), pmem(&p,alloc_cpu(ctx,ra,true)->id,0));
 			break;
 		default:
 			{
@@ -2456,6 +2498,12 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
 	while( c ) {
 		int fpos = (int)(int_val)m->functions_ptrs[c->target];
 		*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
+		c = c->next;
+	}
+	// patch switchs
+	c = ctx->switchs;
+	while( c ) {
+		*(void**)(code + c->pos) = code + c->pos + 6;
 		c = c->next;
 	}
 	// patch closures

@@ -289,10 +289,11 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 			{
 				int i;
 				o->p1 = UINDEX();
-				o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * o->p1);
-				for(i=0;i<o->p1;i++)
-					o->extra[i] = UINDEX();
 				o->p2 = UINDEX();
+				o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * o->p2);
+				for(i=0;i<o->p2;i++)
+					o->extra[i] = UINDEX();
+				o->p3 = UINDEX();
 			}
 			break;
 		default:
