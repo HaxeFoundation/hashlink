@@ -167,7 +167,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			int i;
 			const uchar *name = hl_get_ustring(r);
 			int super = INDEX();
-			int global = INDEX();
+			int global = UINDEX();
 			int nfields = UINDEX();
 			int nproto = UINDEX();
 			t->obj = (hl_type_obj*)hl_malloc(&r->code->alloc,sizeof(hl_type_obj));
@@ -220,9 +220,9 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			int i,j;
 			t->tenum = hl_malloc(&r->code->alloc,sizeof(hl_type_enum));
 			t->tenum->name = hl_get_ustring(r);
+			t->tenum->global_value = (void**)(int_val)UINDEX();
 			t->tenum->nconstructs = READ();
 			t->tenum->constructs = (hl_enum_construct*)hl_malloc(&r->code->alloc, sizeof(hl_enum_construct)*t->tenum->nconstructs);
-			t->tenum->global_value = NULL;
 			for(i=0;i<t->tenum->nconstructs;i++) {
 				hl_enum_construct *c = t->tenum->constructs + i;
 				c->name = hl_get_ustring(r);
