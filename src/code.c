@@ -167,11 +167,13 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			int i;
 			const uchar *name = hl_get_ustring(r);
 			int super = INDEX();
+			int global = INDEX();
 			int nfields = UINDEX();
 			int nproto = UINDEX();
 			t->obj = (hl_type_obj*)hl_malloc(&r->code->alloc,sizeof(hl_type_obj));
 			t->obj->name = name;
 			t->obj->super = super < 0 ? NULL : r->code->types + super;
+			t->obj->global_value = (void**)(int_val)global;
 			t->obj->nfields = nfields;
 			t->obj->nproto = nproto;
 			t->obj->fields = (hl_obj_field*)hl_malloc(&r->code->alloc,sizeof(hl_obj_field)*nfields);

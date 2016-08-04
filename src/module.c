@@ -184,6 +184,7 @@ int hl_module_init( hl_module *m ) {
 		switch( t->kind ) {
 		case HOBJ:
 			t->obj->m = &m->ctx;
+			t->obj->global_value = ((int)t->obj->global_value) < 0 ? NULL : m->globals_data + m->globals_indexes[(int)t->obj->global_value];
 			break;
 		case HENUM:
 			hl_init_enum(t->tenum);
