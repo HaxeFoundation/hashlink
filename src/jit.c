@@ -2069,6 +2069,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						patch_jump(ctx,jhasfield);
 						copy_to(ctx, dst, pmem(&p,(CpuReg)r->id,0));
 						patch_jump(ctx,jend);
+						scratch(dst->current);
 					}
 					break;
 				default:
@@ -2298,6 +2299,21 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, PEAX, true);
 				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
 				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));
+			}
+			break;
+		case OEnumField:
+			{
+				hl_enum_construct *c = &ra->t->tenum->constructs[o->p3];
+				int i;
+				int fid = (int)(int_val)o->extra;
+				int pos = sizeof(int);
+				preg *r = alloc_cpu(ctx,ra,true);
+				for(i=0;i<fid;i++) {
+					hl_type *t = c->params[i];
+					pos += hl_pad_size(pos,t);
+					pos += hl_type_size(t);
+				}
+				copy_to(ctx,dst,pmem(&p,r->id,pos));
 			}
 			break;
 		case OSetEnumField:
