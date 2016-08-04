@@ -10,5 +10,6 @@
   <ItemGroup>
     <ClInclude Include="src\hlmodule.h" />
     <ClInclude Include="src\opcodes.h" />
+    <ClInclude Include="src\hl.h" />
   </ItemGroup>
 </Project>
