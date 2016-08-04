@@ -461,6 +461,7 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 	memset(ptr,0xCD,size);
 #	endif
 #endif
+	if( flags & MEM_ZERO ) memset(ptr,0,size);
 	return ptr;
 }
 

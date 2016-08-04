@@ -123,13 +123,8 @@ static void append_type( char **p, hl_type *t ) {
 	}
 }
 
-static void *module_wrapper_func;
-static void *module_get_wrapper( hl_type * t ) {
-	return module_wrapper_func;
-}
-
 int hl_module_init( hl_module *m ) {
-	int i, entry, wrapper;
+	int i, entry;
 	jit_ctx *ctx;
 	// RESET globals
 	for(i=0;i<m->code->nglobals;i++) {
@@ -204,7 +199,6 @@ int hl_module_init( hl_module *m ) {
 		return 0;
 	hl_jit_init(ctx, m);
 	entry = hl_jit_init_callback(ctx);
-	wrapper = hl_jit_init_get_wrapper(ctx);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		int fpos = hl_jit_function(ctx, m, f);
@@ -219,9 +213,7 @@ int hl_module_init( hl_module *m ) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
 	}
-	module_wrapper_func = ((unsigned char*)m->jit_code) + wrapper;
 	hl_callback_init(((unsigned char*)m->jit_code) + entry);
-	hl_setup_callbacks(NULL, module_get_wrapper);
 	hl_jit_free(ctx);
 	return 1;
 }

@@ -25,61 +25,127 @@
 
 static void *hl_callback_entry = NULL;
 
-void hl_callback_init( void *e ) {
-	hl_callback_entry = e;
-}
-
-void *hl_callback( void *f, int nargs, vdynamic **args ) {
+void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	union {
-		unsigned char b[MAX_ARGS * HL_WSIZE];
+		unsigned char b[MAX_ARGS * 8];
+		unsigned short s[MAX_ARGS * 4];
+		int i[MAX_ARGS * 2];
 		double d[MAX_ARGS];
-		int i[MAX_ARGS];
-		int_val i64[MAX_ARGS];
-	} stack;
+		void *p[MAX_ARGS * 8 / HL_WSIZE];
+	} stack;	
 	/*
 		Same as jit(prepare_call_args) but writes values to the stack var
 	*/
 	int i, size = 0, pad = 0, pos = 0;
-	for(i=0;i<nargs;i++) {
-		vdynamic *d = args[i];
-		hl_type *dt = d->t;
-		size += hl_pad_size(size,dt);
-		size += hl_type_size(dt);
+	for(i=0;i<t->fun->nargs;i++) {
+		hl_type *at = t->fun->args[i];
+		size += hl_pad_size(size,at);
+		size += hl_type_size(at);
 	}
 	if( size & 15 )
 		pad = 16 - (size&15);
 	size = pos = pad;
-	for(i=0;i<nargs;i++) {
+	for(i=0;i<t->fun->nargs;i++) {
 		// RTL
-		vdynamic *d = args[i];
-		hl_type *dt = d->t;
+		hl_type *at = t->fun->args[i];
+		void *v = args[i];
 		int pad;
-		int tsize = hl_type_size(dt);
+		int tsize = hl_type_size(at);
 		size += tsize;
-		pad = hl_pad_size(size,dt);
+		pad = hl_pad_size(size,at);
 		if( pad ) {
 			pos += pad;
 			size += pad;
 		}
-		switch( tsize ) {
+		if( hl_is_ptr(at) )
+			stack.p[pos/HL_WSIZE] = v;
+		else switch( tsize ) {
 		case 0:
 			continue;
 		case 1:
-			stack.b[pos] = d->v.b;
+			stack.b[pos] = *(char*)v;
+			break;
+		case 2:
+			stack.s[pos>>1] = *(short*)v;
 			break;
 		case 4:
-			stack.i[pos>>2] = (IS_64 && dt->kind == HI32) ? d->v.i : (int)(int_val)d;
+			stack.i[pos>>2] = *(int*)v;
 			break;
 		case 8:
-			if( !IS_64 || dt->kind == HF64 ) 
-				stack.d[pos>>3] = d->v.d;
-			else
-				stack.i64[pos>>3] = (int_val)d;
+			stack.d[pos>>3] = *(double*)v;
 			break;
 		default:
 			hl_error("Invalid callback arg");
 		}
 		pos += tsize;
 	}
-	return ((void *(*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+	switch( t->fun->ret->kind ) {
+	case HI8:
+	case HI16:
+	case HI32:
+		ret->v.i = ((int (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+		return &ret->v.i;
+	case HF32:
+		ret->v.f = ((float (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+		return &ret->v.f;
+	case HF64:
+		ret->v.d = ((double (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+		return &ret->v.d;
+	default:
+		return ((void *(*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+	}
+}
+
+static void *hl_call_wrapper_ptr( vclosure_wrapper *c ) {
+	hl_debug_break();
+	return NULL;
+}
+
+static void *hl_call_wrapper_all_ptr( vclosure_wrapper *c ) {
+	return hl_wrapper_call(c,&c + 1, NULL);
+}
+
+static void *hl_get_wrapper( hl_type *t ) {
+#	ifndef HL_64
+	int i;
+	for(i=0;i<t->fun->nargs;i++)
+		if( !hl_is_ptr(t->fun->args[i]) )
+			break;
+	if( i == t->fun->nargs ) {
+		switch( t->fun->ret->kind ) {
+		case HF32:
+		case HF64:
+			hl_error("TODO");
+			break;
+		case HI8:
+		case HI16:
+		case HI32:
+			hl_error("TODO");
+			break;			
+		default:
+			return hl_call_wrapper_all_ptr;
+		}
+	} else 
+#	endif
+	{
+		switch( t->fun->ret->kind ) {
+		case HF32:
+		case HF64:
+			hl_error("TODO");
+			break;
+		case HI8:
+		case HI16:
+		case HI32:
+			hl_error("TODO");
+			break;			
+		default:
+			return hl_call_wrapper_ptr;
+		}
+	}
+	return NULL;
+}
+
+void hl_callback_init( void *e ) {
+	hl_callback_entry = e;
+	hl_setup_callbacks(hl_callback, hl_get_wrapper);
 }

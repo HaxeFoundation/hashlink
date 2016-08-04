@@ -97,7 +97,6 @@ jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_init_callback( jit_ctx *ctx );
-int hl_jit_init_get_wrapper( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize );
 

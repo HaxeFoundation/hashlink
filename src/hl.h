@@ -483,6 +483,7 @@ HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
 #define MEM_KIND_NOPTR		2
 #define MEM_KIND_FINALIZER	3
 #define MEM_ALIGN_DOUBLE	128
+#define MEM_ZERO			256
 
 HL_API void *hl_gc_alloc_gen( int size, int flags );
 HL_API void hl_add_root( void **ptr );

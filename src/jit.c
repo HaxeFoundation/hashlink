@@ -86,6 +86,7 @@ typedef enum {
 	CVTPD2PS,
 	// 8 bits
 	MOV8,
+	TEST8,
 	// --
 	_CPU_LAST
 } CpuOp;
@@ -371,6 +372,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CVTPD2PS", 0x660F5A },
 	// 8 bits,
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
+	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
 };
 
 #ifdef OP_LOG
@@ -1589,18 +1591,6 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	return pos;
 }
 
-int hl_jit_init_get_wrapper( jit_ctx *ctx ) {
-	int pos = BUF_POS();
-	jit_buf(ctx);
-	
-	BREAK();
-	jit_buf(ctx);
-	while( BUF_POS() & 15 )
-		op32(ctx, NOP, UNUSED, UNUSED);
-
-	return pos;
-}
-
 static void *get_dyncast( hl_type *t ) {
 	switch( t->kind ) {
 	case HF32:
@@ -1813,7 +1803,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OJNull:
 			{
 				preg *r = alloc_cpu(ctx, dst, true);
-				op32(ctx, TEST, r, r);
+				op32(ctx, dst->t->kind == HBOOL ? TEST8 : TEST, r, r);
 				XJump( o->op == OJFalse || o->op == OJNull ? JZero : JNotZero,jump);
 				register_jump(ctx,jump,(opCount + 1) + o->p2);
 			}
@@ -1974,6 +1964,30 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 				call_native_consts(ctx, allocFun, args, nargs);
 				store(ctx, dst, PEAX, true);
+			}
+			break;
+		case OInstanceClosure:
+			{
+#				ifdef HL_64
+				jit_error("TODO");
+#				else
+				preg *r = alloc_cpu(ctx, rb, true);
+				jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
+				size = pad_stack(ctx,HL_WSIZE*3);
+				op64(ctx,PUSH,r,UNUSED);
+
+				j->pos = BUF_POS();
+				j->target = o->p2;
+				j->next = ctx->calls;
+				ctx->calls = j;
+
+				op64(ctx,MOV,r,pconst64(&p,0));
+				op64(ctx,PUSH,r,UNUSED);
+				op64(ctx,MOV,r,pconst64(&p,(int_val)m->code->functions[m->functions_indexes[o->p2]].type));
+				op64(ctx,PUSH,r,UNUSED);
+				call_native(ctx,hl_alloc_closure_ptr,size);
+				store(ctx,dst,PEAX,true);
+#				endif
 			}
 			break;
 		case OCallClosure:
@@ -2276,6 +2290,40 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 			}
 			break;
+		case OEnumAlloc:
+			{
+				hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
+				int_val args[] = { c->size, (c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR) | MEM_ZERO };
+				call_native_consts(ctx, hl_gc_alloc_gen, args, 2);
+				store(ctx, dst, PEAX, true);
+				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
+				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));
+			}
+			break;
+		case OSetEnumField:
+			{
+				hl_enum_construct *c = &dst->t->tenum->constructs[0];
+				int i;
+				int pos = sizeof(int);
+				preg *r = alloc_cpu(ctx,dst,true);
+				for(i=0;i<o->p2;i++) {
+					hl_type *t = c->params[i];
+					pos += hl_pad_size(pos,t);
+					pos += hl_type_size(t);
+				}
+				switch( rb->t->kind ) {
+				case HF64:
+					{
+						preg *d = alloc_fpu(ctx,rb,true);
+						copy(ctx,pmem(&p,r->id,pos),d,8);
+						break;
+					}
+				default:
+					copy(ctx,pmem(&p,r->id,pos),alloc_cpu(ctx,rb,true),hl_type_size(c->params[o->p2]));
+					break;
+				}
+			}
+			break;
 		case ONullCheck:
 			{
 				int jz;
@@ -2508,7 +2556,10 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
 	c = ctx->calls;
 	while( c ) {
 		int fpos = (int)(int_val)m->functions_ptrs[c->target];
-		*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
+		if( code[c->pos] == 0xB8 ) // MOV : absolute
+			*(int_val*)(code + c->pos + 1) = (int_val)(code + fpos);
+		else
+			*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
 		c = c->next;
 	}
 	// patch switchs

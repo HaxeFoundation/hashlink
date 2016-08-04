@@ -91,6 +91,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	if( v != stack_last_exc ) {
 		stack_last_exc = v;
 		stack_count = CaptureStackBackTrace(1, 0x1000, stack_trace, NULL) - 8; // 8 startup
+		if( stack_count < 0 ) stack_count = 0;
 	}
 #endif
 	hl_current_exc = v;

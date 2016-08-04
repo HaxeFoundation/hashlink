@@ -39,7 +39,7 @@ typedef char pchar;
 #define pfopen fopen
 #endif
 
-extern void *hl_callback( void *f, int nargs, vdynamic **args );
+extern void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret );
 
 static hl_code *load_code( const pchar *file ) {
 	hl_code *code;
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
 	if( !hl_module_init(ctx.m) )
 		return 3;
 	hl_trap(trap, ctx.exc, on_exception);
-	hl_callback(ctx.m->functions_ptrs[ctx.m->code->entrypoint],0,NULL);
+	hl_callback(ctx.m->functions_ptrs[ctx.m->code->entrypoint],ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type,NULL,NULL);
 	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
 	hl_global_free();
