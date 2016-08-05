@@ -474,6 +474,7 @@ HL_API vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
 HL_API vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );
 HL_API vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to );
 HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
+HL_API void *hl_dyn_call_obj( vdynamic *obj, hl_type *ft, int hfield, void **args, vdynamic *ret );
 
 // ----------------------- ALLOC --------------------------------------------------
 

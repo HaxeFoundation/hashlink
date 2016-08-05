@@ -251,6 +251,44 @@ HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	return pret;
 }
 
+HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args, vdynamic *ret ) {
+	switch( o->t->kind ) {
+	case HDYNOBJ:
+		hl_fatal("TODO");
+		break;
+	case HOBJ:
+		{
+			hl_runtime_obj *rt = o->t->obj->rt;
+			while( true ) {
+				hl_field_lookup *l = hl_lookup_find(rt->lookup,rt->nlookup, hfield);
+				if( l != NULL && l->field_index < 0 ) {
+					vclosure tmp;
+					vclosure_wrapper w;
+					tmp.t = hl_get_closure_type(l->t);
+					tmp.fun = rt->methods[-l->field_index-1];
+					tmp.hasValue = 1;
+					tmp.value = o;
+					w.cl.t = ft;
+					w.cl.fun = hlc_get_wrapper(ft);
+					w.cl.hasValue = 2;
+					w.cl.value = &w;
+					w.wrappedFun = &tmp;
+					return hl_wrapper_call(&w,args,ret);
+				}
+				rt = rt->parent;
+				if( rt == NULL ) break;
+			}
+			hl_error_msg(USTR("%s has no method %s"),o->t->obj->name,hl_field_name(hfield));
+		}
+		break;
+	default:
+		hl_error("Invalid field access");
+		break;
+	}
+	return NULL;
+}
+
+
 HL_PRIM vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
 	vclosure_wrapper *c;
 	void *wrap = hlc_get_wrapper(to);
