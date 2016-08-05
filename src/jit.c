@@ -1258,6 +1258,7 @@ static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
 	int_val args[2] = { (int_val)msg, (int_val)line };
 	call_native_consts(ctx,on_jit_error,args,2);
 }
+
 static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op ) {
 	preg *pa = fetch(a), *pb = fetch(b), *out = NULL;
 	CpuOp o;
@@ -1336,47 +1337,11 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OJUGte:
 		case OJEq:
 		case OJNotEq:
-			if( a->t->kind == HDYN || b->t->kind == HDYN ) {
-				jit_error("TODO");
-				return PEAX;
-			}
 			switch( a->t->kind ) {
 			case HI8:
 			case HBOOL:
 				o = CMP8;
 				break;
-			case HI16:
-				jit_error("TODO");
-				return PEAX;
-			case HTYPE:
-				jit_error("TODO");
-				return PEAX;
-			case HNULL:
-				jit_error("TODO");
-				return PEAX;
-			case HVIRTUAL:
-				if( b->t->kind == HOBJ ) {
-					jit_error("TODO");
-					return PEAX;
-				}
-			case HI32:
-			case HENUM:
-			case HDYNOBJ:
-			case HFUN:
-				o = CMP;
-				break;
-			case HOBJ:
-				if( b->t->kind == HVIRTUAL ) {
-					jit_error("TODO");
-					return PEAX;
-				}
-				if( hl_get_obj_rt(a->t)->compareFun ) {
-					jit_error("TODO");
-					return PEAX;
-				} else {
-					o = CMP;
-					break;
-				}
 			default:
 				o = CMP;
 				break;
@@ -1534,6 +1499,96 @@ static void register_jump( jit_ctx *ctx, int pos, int target ) {
 	ctx->jumps = j;
 	if( target != 0 && ctx->opsPos[target] == 0 )
 		ctx->opsPos[target] = -1;
+}
+
+static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPos ) {
+	preg p;
+	if( a->t->kind == HDYN || b->t->kind == HDYN ) {
+		jit_error("TODO");
+		return;
+	}
+	switch( a->t->kind ) {
+	case HI16:
+		jit_error("TODO");
+		return;
+	case HTYPE:
+		{
+			int args[] = { a->stack.id, b->stack.id };
+			int size = prepare_call_args(ctx,2,args,ctx->vregs,true,0);
+			preg p;
+			call_native(ctx,hl_same_type,size);
+			op64(ctx,CMP8,PEAX,pconst(&p,0));
+		}
+		break;
+	case HNULL:
+		{
+			preg *pa = alloc_cpu(ctx,a,true);
+			preg *pb = alloc_cpu(ctx,b,true);
+			if( op->op == OJEq )
+				jit_error("TODO");
+			else if( op->op == OJNotEq ) {
+				int jsame, jazero, jbzero;
+				// if( a != b && (!a || !b || a->v != b->v) ) goto
+				op64(ctx,CMP,pa,pb);
+				XJump_small(JEq,jsame);						
+				op64(ctx,TEST,pa,pa);
+				XJump_small(JZero,jazero);
+				op64(ctx,TEST,pb,pb);
+				XJump_small(JZero,jbzero);
+				switch( a->t->tparam->kind ) {
+				case HI8:
+				case HBOOL:
+					jit_error("TODO");
+					break;
+				case HI16:
+					jit_error("TODO");
+					break;
+				case HI32:
+					op32(ctx,MOV,pa,pmem(&p,pa->id,8));
+					op32(ctx,MOV,pb,pmem(&p,pb->id,8));
+					op64(ctx,CMP,pa,pb);
+					break;
+				case HF32:
+					jit_error("TODO");
+					break;
+				case HF64:
+					jit_error("TODO");
+					break;
+				default:
+					jit_error("TODO");
+					break;
+				}
+				scratch(pa);
+				scratch(pb);
+				patch_jump(ctx,jsame);
+				patch_jump(ctx,jazero);
+				patch_jump(ctx,jbzero);
+			} else 
+				jit_error("TODO");
+			return;
+		}
+	case HVIRTUAL:
+		if( b->t->kind == HOBJ ) {
+			jit_error("TODO");
+			return;
+		}
+		jit_error("TODO");
+		return;
+	case HOBJ:
+		if( b->t->kind == HVIRTUAL ) {
+			jit_error("TODO");
+			return;
+		}
+		if( hl_get_obj_rt(a->t)->compareFun ) {
+			jit_error("TODO");
+			return;
+		}
+		// fallthrough		
+	default:
+		op_binop(ctx,NULL,a,b,op);
+		break;
+	}
+	register_jump(ctx,do_jump(ctx,op->op, false),targetPos);
 }
 
 jit_ctx *hl_jit_alloc() {
@@ -1863,9 +1918,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OJSGt:
 		case OJULt:
 		case OJUGte:
-			op_binop(ctx, NULL, dst, ra, o);
-			jump = do_jump(ctx,o->op, IS_FLOAT(dst));
-			register_jump(ctx,jump,(opCount + 1) + o->p3);
+			op_jump(ctx,dst,ra,o,(opCount + 1) + o->p3);
 			break;
 		case OJAlways:
 			jump = do_jump(ctx,o->op,false);
