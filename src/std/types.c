@@ -394,15 +394,9 @@ HL_PRIM vdynamic *hl_alloc_enum( hl_type *t, int index, varray *args ) {
 	venum *e;
 	vdynamic *v;
 	int i;
-	bool hasPtr = false;
 	if( c->nparams != args->size )
 		return NULL;
-	for(i=0;i<c->nparams;i++)
-		if( hl_is_ptr(c->params[i]) ) {
-			hasPtr = true;
-			break;
-		}
-	e = (venum*)(hasPtr ? hl_gc_alloc_raw(c->size) : hl_gc_alloc_noptr(c->size));
+	e = (venum*)(c->hasptr ? hl_gc_alloc_raw(c->size) : hl_gc_alloc_noptr(c->size));
 	e->index = index;
 	for(i=0;i<c->nparams;i++)
 		hl_write_dyn((char*)e+c->offsets[i],c->params[i],hl_aptr(args,vdynamic*)[i]);
