@@ -47,8 +47,9 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	size = pos = pad;
 	for(i=0;i<t->fun->nargs;i++) {
 		// RTL
-		hl_type *at = t->fun->args[i];
-		void *v = args[i];
+		int j = t->fun->nargs - 1 - i;
+		hl_type *at = t->fun->args[j];
+		void *v = args[j];
 		int pad;
 		int tsize = hl_type_size(at);
 		size += tsize;

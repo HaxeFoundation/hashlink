@@ -50,6 +50,7 @@ typedef enum {
 
 typedef enum {
 	MOV,
+	LEA,
 	PUSH,
 	ADD,
 	SUB,
@@ -86,6 +87,7 @@ typedef enum {
 	CVTPD2PS,
 	// 8 bits
 	MOV8,
+	CMP8,
 	TEST8,
 	// --
 	_CPU_LAST
@@ -336,6 +338,7 @@ typedef struct {
 
 static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOV", 0x8B, 0x89, 0xB8, 0, RM(0xC7,0) },
+	{ "LEA", 0x8D },
 	{ "PUSH", 0x50, RM(0xFF,6), 0x68, 0x6A },
 	{ "ADD", 0x03, 0x01, RM(0x81,0), RM(0x83,0) },
 	{ "SUB", 0x2B, 0x29, RM(0x81,5), RM(0x83,5) },
@@ -372,6 +375,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CVTPD2PS", 0x660F5A },
 	// 8 bits,
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
+	{ "CMP", 0x3A, 0x38, RM(0x80,7), 0 },
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
 };
 
@@ -1224,6 +1228,36 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 	op64(ctx, RET, UNUSED, UNUSED);
 }
 
+static void call_native_consts( jit_ctx *ctx, void *nativeFun, int_val *args, int nargs ) {
+	int size = pad_stack(ctx, IS_64 ? 0 : HL_WSIZE*nargs);
+	preg p;
+	int i;
+#	ifdef HL_64
+	for(i=0;i<nargs;i++)
+		op64(ctx, MOV, REG_AT(CALL_REGS[i]), pconst64(&p, args[i]));
+#	else
+	for(i=nargs-1;i>=0;i--)
+		op32(ctx, PUSH, pconst64(&p, args[i]), UNUSED);
+#	endif
+	call_native(ctx, nativeFun, size);
+}
+
+static void on_jit_error( const char *msg, int_val line ) {
+	char buf[256];
+	int iline = (int)line;
+	sprintf(buf,"%s (line %d)",msg,iline);
+#ifdef HL_WIN
+	MessageBoxA(NULL,buf,"JIT ERROR",MB_OK);
+#else
+	printf("%s\n",buf);
+#endif
+	hl_debug_break();
+}
+
+static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
+	int_val args[2] = { (int_val)msg, (int_val)line };
+	call_native_consts(ctx,on_jit_error,args,2);
+}
 static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op ) {
 	preg *pa = fetch(a), *pb = fetch(b), *out = NULL;
 	CpuOp o;
@@ -1302,7 +1336,51 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OJUGte:
 		case OJEq:
 		case OJNotEq:
-			o = CMP;
+			if( a->t->kind == HDYN || b->t->kind == HDYN ) {
+				jit_error("TODO");
+				return PEAX;
+			}
+			switch( a->t->kind ) {
+			case HI8:
+			case HBOOL:
+				o = CMP8;
+				break;
+			case HI16:
+				jit_error("TODO");
+				return PEAX;
+			case HTYPE:
+				jit_error("TODO");
+				return PEAX;
+			case HNULL:
+				jit_error("TODO");
+				return PEAX;
+			case HVIRTUAL:
+				if( b->t->kind == HOBJ ) {
+					jit_error("TODO");
+					return PEAX;
+				}
+			case HI32:
+			case HENUM:
+			case HDYNOBJ:
+			case HFUN:
+				o = CMP;
+				break;
+			case HOBJ:
+				if( b->t->kind == HVIRTUAL ) {
+					jit_error("TODO");
+					return PEAX;
+				}
+				if( hl_get_obj_rt(a->t)->compareFun ) {
+					jit_error("TODO");
+					return PEAX;
+				} else {
+					o = CMP;
+					break;
+				}
+			default:
+				o = CMP;
+				break;
+			}
 			break;
 		default:
 			printf("%s\n", hl_op_name(op->op));
@@ -1456,37 +1534,6 @@ static void register_jump( jit_ctx *ctx, int pos, int target ) {
 	ctx->jumps = j;
 	if( target != 0 && ctx->opsPos[target] == 0 )
 		ctx->opsPos[target] = -1;
-}
-
-static void call_native_consts( jit_ctx *ctx, void *nativeFun, int_val *args, int nargs ) {
-	int size = pad_stack(ctx, IS_64 ? 0 : HL_WSIZE*nargs);
-	preg p;
-	int i;
-#	ifdef HL_64
-	for(i=0;i<nargs;i++)
-		op64(ctx, MOV, REG_AT(CALL_REGS[i]), pconst64(&p, args[i]));
-#	else
-	for(i=nargs-1;i>=0;i--)
-		op32(ctx, PUSH, pconst64(&p, args[i]), UNUSED);
-#	endif
-	call_native(ctx, nativeFun, size);
-}
-
-static void on_jit_error( const char *msg, int_val line ) {
-	char buf[256];
-	int iline = (int)line;
-	sprintf(buf,"%s (line %d)",msg,iline);
-#ifdef HL_WIN
-	MessageBoxA(NULL,buf,"JIT ERROR",MB_OK);
-#else
-	printf("%s\n",buf);
-#endif
-	hl_debug_break();
-}
-
-static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
-	int_val args[2] = { (int_val)msg, (int_val)line };
-	call_native_consts(ctx,on_jit_error,args,2);
 }
 
 jit_ctx *hl_jit_alloc() {
@@ -2163,7 +2210,66 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				break;
 			}
 			case HVIRTUAL:
-				jit_error("todo");
+				// ASM for --> if( hl_vfields(o)[f] ) dst = *hl_vfields(o)[f](o,args...); else dst = hl_dyn_call_obj(o->value,field,args,&ret)
+				{
+					int size;
+					int paramsSize;
+					int jhasfield, jend;
+					vreg *obj = R(o->extra[0]);
+					preg *v = alloc_cpu(ctx,obj, true);
+					preg *r = alloc_reg(ctx,RCPU);
+					op64(ctx,MOV,r,pmem(&p,v->id,sizeof(vvirtual)+HL_WSIZE*o->p2));
+					op64(ctx,TEST,r,r);
+					XJump_small(JNotZero,jhasfield);
+
+					paramsSize = (o->p3 - 1) * HL_WSIZE;
+					if( paramsSize & 15 ) paramsSize += 16 - (paramsSize&15);
+					op64(ctx,SUB,PESP,pconst(&p,paramsSize));
+					op64(ctx,MOV,r,PESP);
+
+					for(i=0;i<o->p3-1;i++) {
+						vreg *a = R(o->extra[i+1]);
+						if( hl_is_ptr(a->t) ) {
+							op64(ctx,MOV,pmem(&p,r->id,i*HL_WSIZE),alloc_cpu(ctx,a,true));
+							if( a->current != v ) RUNLOCK(a->current);
+						} else {
+							preg *r2 = alloc_reg(ctx,RCPU);
+							op64(ctx,LEA,r2,&a->stack);
+							op64(ctx,MOV,pmem(&p,r->id,i*HL_WSIZE),r2);
+							if( r2 != v ) RUNLOCK(r2);
+						}
+					}
+
+					size = pad_stack(ctx,HL_WSIZE*4);
+
+					if( hl_is_ptr(dst->t) || dst->t->kind == HVOID )
+						op64(ctx,PUSH,pconst(&p,0),UNUSED);
+					else 
+						jit_error("TODO");
+
+					op64(ctx,PUSH,r,UNUSED);
+					op64(ctx,PUSH,pconst(&p,obj->t->virt->fields[o->p2].hashed_name),UNUSED); // fid
+					op64(ctx,PUSH,pconst64(&p,(int_val)obj->t->virt->fields[o->p2].t),UNUSED); // ftype
+					op64(ctx,PUSH,pmem(&p,v->id,HL_WSIZE),UNUSED); // o->value
+
+					op64(ctx,MOV,PEAX,pconst64(&p,(int_val)hl_dyn_call_obj));
+
+					op64(ctx,CALL,PEAX,UNUSED);
+					discard_regs(ctx,true);
+
+					op64(ctx,ADD,PESP,pconst(&p,size + paramsSize));
+
+					BREAK();
+					
+					XJump_small(JAlways,jend);
+					patch_jump(ctx,jhasfield);
+					size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
+					op64(ctx,CALL,r,UNUSED);
+					discard_regs(ctx, false);
+					op64(ctx,ADD,PESP,pconst(&p,size));
+					store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+					patch_jump(ctx,jend);
+				}				
 				break;
 			}
 			break;
