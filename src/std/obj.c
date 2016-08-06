@@ -139,7 +139,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	hl_module_context *m = o->m;
 	hl_alloc *alloc = &m->alloc;
 	hl_runtime_obj *p = NULL, *t;
-	int i, size, start, nlookup;
+	int i, size, start, nlookup, compareHash;
 	if( o->rt ) return o->rt;
 	if( o->super ) p = hl_get_obj_rt(o->super);
 	t = (hl_runtime_obj*)hl_malloc(alloc,sizeof(hl_runtime_obj));
@@ -188,6 +188,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	ot->vobj_proto = NULL;
 
 	// fields lookup
+	compareHash = hl_hash_gen(USTR("__compare"),false);
 	nlookup = o->nfields;
 	for(i=0;i<o->nproto;i++) {
 		hl_obj_proto *pr = o->proto + i;
@@ -200,6 +201,9 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 			method_index = i;
 		if( pr->pindex >= t->nproto ) t->nproto = pr->pindex + 1;
 		hl_lookup_insert(t->lookup,nlookup++,pr->hashed_name,m->functions_types[pr->findex],-(method_index+1));
+		// tell if we have a compare fun (req for JIT)
+		if( pr->hashed_name == compareHash )
+			t->compareFun = (void*)pr->findex;
 	}
 	return t;
 }

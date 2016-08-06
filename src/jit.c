@@ -375,7 +375,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CVTPD2PS", 0x660F5A },
 	// 8 bits,
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
-	{ "CMP", 0x3A, 0x38, RM(0x80,7), 0 },
+	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
 };
 
@@ -1210,7 +1210,7 @@ static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *ar
 		discard_regs(ctx, false);
 	}
 	if( size ) op64(ctx,ADD,PESP,pconst(&p,size));
-	store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+	if( dst ) store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
 }
 
 static void op_enter( jit_ctx *ctx ) {
@@ -1517,7 +1517,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 			int size = prepare_call_args(ctx,2,args,ctx->vregs,true,0);
 			preg p;
 			call_native(ctx,hl_same_type,size);
-			op64(ctx,CMP8,PEAX,pconst(&p,0));
+			op64(ctx,CMP8,PEAX,pconst(&p,1));
 		}
 		break;
 	case HNULL:
@@ -1527,18 +1527,21 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 			if( op->op == OJEq )
 				jit_error("TODO");
 			else if( op->op == OJNotEq ) {
-				int jsame, jazero, jbzero;
+				int jeq, ja, jb, jcmp;
 				// if( a != b && (!a || !b || a->v != b->v) ) goto
 				op64(ctx,CMP,pa,pb);
-				XJump_small(JEq,jsame);						
+				XJump_small(JEq,jeq);
 				op64(ctx,TEST,pa,pa);
-				XJump_small(JZero,jazero);
+				XJump_small(JZero,ja);
 				op64(ctx,TEST,pb,pb);
-				XJump_small(JZero,jbzero);
+				XJump_small(JZero,jb);
+
 				switch( a->t->tparam->kind ) {
 				case HI8:
 				case HBOOL:
-					jit_error("TODO");
+					op32(ctx,MOV8,pa,pmem(&p,pa->id,8));
+					op32(ctx,MOV8,pb,pmem(&p,pb->id,8));
+					op64(ctx,CMP8,pa,pb);
 					break;
 				case HI16:
 					jit_error("TODO");
@@ -1558,11 +1561,14 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 					jit_error("TODO");
 					break;
 				}
+				XJump_small(JZero,jcmp);
 				scratch(pa);
 				scratch(pb);
-				patch_jump(ctx,jsame);
-				patch_jump(ctx,jazero);
-				patch_jump(ctx,jbzero);
+				patch_jump(ctx,ja);
+				patch_jump(ctx,jb);
+				register_jump(ctx,do_jump(ctx,OJNotEq,false),targetPos);
+				patch_jump(ctx,jcmp);
+				patch_jump(ctx,jeq);
 			} else 
 				jit_error("TODO");
 			return;
@@ -1580,7 +1586,37 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 			return;
 		}
 		if( hl_get_obj_rt(a->t)->compareFun ) {
-			jit_error("TODO");
+			preg *pa = alloc_cpu(ctx,a,true);
+			preg *pb = alloc_cpu(ctx,b,true);
+			int jeq, ja, jb, jcmp, size;
+			int args[] = { a->stack.id, b->stack.id };
+			switch( op->op ) {
+			case OJEq:
+				jit_error("TODO");
+				break;
+			case OJNotEq:
+				// if( a != b && (!a || !b || cmp(a,b) != 0) ) goto
+				op64(ctx,CMP,pa,pb);
+				XJump_small(JEq,jeq);
+				op64(ctx,TEST,pa,pa);
+				XJump_small(JZero,ja);
+				op64(ctx,TEST,pb,pb);
+				XJump_small(JZero,jb);
+
+				op_call_fun(ctx,NULL,(int)a->t->obj->rt->compareFun,2,args);
+				op64(ctx,TEST,PEAX,PEAX);
+				XJump_small(JZero,jcmp);
+
+				patch_jump(ctx,ja);
+				patch_jump(ctx,jb);
+				register_jump(ctx,do_jump(ctx,OJNotEq,false),targetPos);
+				patch_jump(ctx,jcmp);
+				patch_jump(ctx,jeq);
+				break;
+			default:
+				jit_error("TODO");
+				break;
+			}
 			return;
 		}
 		// fallthrough		
@@ -2293,7 +2329,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						}
 					}
 
-					size = pad_stack(ctx,HL_WSIZE*4);
+					size = pad_stack(ctx,HL_WSIZE*5);
 
 					if( hl_is_ptr(dst->t) || dst->t->kind == HVOID )
 						op64(ctx,PUSH,pconst(&p,0),UNUSED);
@@ -2305,15 +2341,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,PUSH,pconst64(&p,(int_val)obj->t->virt->fields[o->p2].t),UNUSED); // ftype
 					op64(ctx,PUSH,pmem(&p,v->id,HL_WSIZE),UNUSED); // o->value
 
-					op64(ctx,MOV,PEAX,pconst64(&p,(int_val)hl_dyn_call_obj));
+					call_native(ctx,hl_dyn_call_obj,size + paramsSize);
 
-					op64(ctx,CALL,PEAX,UNUSED);
-					discard_regs(ctx,true);
-
-					op64(ctx,ADD,PESP,pconst(&p,size + paramsSize));
-
-					BREAK();
-					
 					XJump_small(JAlways,jend);
 					patch_jump(ctx,jhasfield);
 					size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
