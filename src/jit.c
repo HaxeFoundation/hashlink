@@ -1527,14 +1527,14 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 			if( op->op == OJEq )
 				jit_error("TODO");
 			else if( op->op == OJNotEq ) {
-				int jeq, ja, jb, jcmp;
+				int jeq, jcmp;
 				// if( a != b && (!a || !b || a->v != b->v) ) goto
 				op64(ctx,CMP,pa,pb);
 				XJump_small(JEq,jeq);
 				op64(ctx,TEST,pa,pa);
-				XJump_small(JZero,ja);
+				register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
 				op64(ctx,TEST,pb,pb);
-				XJump_small(JZero,jb);
+				register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
 
 				switch( a->t->tparam->kind ) {
 				case HI8:
@@ -1564,8 +1564,6 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				XJump_small(JZero,jcmp);
 				scratch(pa);
 				scratch(pb);
-				patch_jump(ctx,ja);
-				patch_jump(ctx,jb);
 				register_jump(ctx,do_jump(ctx,OJNotEq,false),targetPos);
 				patch_jump(ctx,jcmp);
 				patch_jump(ctx,jeq);
@@ -1588,27 +1586,39 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		if( hl_get_obj_rt(a->t)->compareFun ) {
 			preg *pa = alloc_cpu(ctx,a,true);
 			preg *pb = alloc_cpu(ctx,b,true);
-			int jeq, ja, jb, jcmp, size;
+			int jeq, ja, jb, jcmp;
 			int args[] = { a->stack.id, b->stack.id };
 			switch( op->op ) {
 			case OJEq:
-				jit_error("TODO");
-				break;
-			case OJNotEq:
-				// if( a != b && (!a || !b || cmp(a,b) != 0) ) goto
+				// if( a == b || (a && b && cmp(a,b) == 0) ) goto
 				op64(ctx,CMP,pa,pb);
 				XJump_small(JEq,jeq);
 				op64(ctx,TEST,pa,pa);
 				XJump_small(JZero,ja);
 				op64(ctx,TEST,pb,pb);
 				XJump_small(JZero,jb);
+				op_call_fun(ctx,NULL,(int)a->t->obj->rt->compareFun,2,args);
+				op64(ctx,TEST,PEAX,PEAX);
+				XJump_small(JNotZero,jcmp);
+				patch_jump(ctx,jeq);
+				register_jump(ctx,do_jump(ctx,OJAlways,false),targetPos);
+				patch_jump(ctx,ja);
+				patch_jump(ctx,jb);
+				patch_jump(ctx,jcmp);
+				break;
+			case OJNotEq:
+				// if( a != b && (!a || !b || cmp(a,b) != 0) ) goto
+				op64(ctx,CMP,pa,pb);
+				XJump_small(JEq,jeq);
+				op64(ctx,TEST,pa,pa);
+				register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
+				op64(ctx,TEST,pb,pb);
+				register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
 
 				op_call_fun(ctx,NULL,(int)a->t->obj->rt->compareFun,2,args);
 				op64(ctx,TEST,PEAX,PEAX);
 				XJump_small(JZero,jcmp);
 
-				patch_jump(ctx,ja);
-				patch_jump(ctx,jb);
 				register_jump(ctx,do_jump(ctx,OJNotEq,false),targetPos);
 				patch_jump(ctx,jcmp);
 				patch_jump(ctx,jeq);
@@ -2228,12 +2238,31 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					// ASM for --> if( hl_vfields(o)[f] ) *hl_vfields(o)[f] = v; else hl_dyn_set(o,hash(field),vt,v)
 					{
 						int jhasfield, jend;
-						preg *v = alloc_cpu(ctx,dst,true);
+						preg *obj = alloc_cpu(ctx,dst,true);
 						preg *r = alloc_reg(ctx,RCPU);
-						op64(ctx,MOV,r,pmem(&p,v->id,sizeof(vvirtual)+HL_WSIZE*o->p2));
+						op64(ctx,MOV,r,pmem(&p,obj->id,sizeof(vvirtual)+HL_WSIZE*o->p2));
 						op64(ctx,TEST,r,r);
 						XJump_small(JNotZero,jhasfield);
+#						ifdef HL_64
 						jit_error("TODO");
+#						else
+						switch( rb->t->kind ) {
+						case HF64:
+							jit_error("TODO");
+							break;
+						default:
+							size = HL_WSIZE * 4;
+							pad_stack(ctx,HL_WSIZE*4);
+							op64(ctx,PUSH,fetch(rb),UNUSED);
+							op64(ctx,MOV,r,pconst64(&p,(int_val)rb->t));
+							break;
+						}
+						op64(ctx,PUSH,r,UNUSED);
+						op64(ctx,MOV,r,pconst64(&p,(int_val)dst->t->virt->fields[o->p2].hashed_name));
+						op64(ctx,PUSH,r,UNUSED);
+						op64(ctx,PUSH,obj,UNUSED);
+						call_native(ctx,get_dynset(rb->t),size);
+#						endif
 						XJump_small(JAlways,jend);
 						patch_jump(ctx,jhasfield);
 						copy_from(ctx, pmem(&p,(CpuReg)r->id,0), rb);
