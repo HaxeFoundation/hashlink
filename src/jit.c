@@ -2328,7 +2328,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				break;
 			}
 			case HVIRTUAL:
-				// ASM for --> if( hl_vfields(o)[f] ) dst = *hl_vfields(o)[f](o,args...); else dst = hl_dyn_call_obj(o->value,field,args,&ret)
+				// ASM for --> if( hl_vfields(o)[f] ) dst = *hl_vfields(o)[f](o->value,args...); else dst = hl_dyn_call_obj(o->value,field,args,&ret)
 				{
 					int size;
 					int paramsSize;
@@ -2374,6 +2374,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 
 					XJump_small(JAlways,jend);
 					patch_jump(ctx,jhasfield);
+
+					/*
+						o = o->value hack
+					*/
+					obj->current = v;
+					v->holds = obj;
+					op64(ctx,MOV,v,pmem(&p,v->id,HL_WSIZE));
+
 					size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
 					op64(ctx,CALL,r,UNUSED);
 					discard_regs(ctx, false);
@@ -2631,17 +2639,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				ifdef HL_64
 				jit_error("TODO");
 #				else
-				switch( dst->t->kind ) {
+				switch( rb->t->kind ) {
 				case HF32:
 				case HF64:
 					jit_error("TODO");
 					break;
 				default:
 					size = pad_stack(ctx, HL_WSIZE*4);
-					scratch(PEAX);
-					op32(ctx,MOV,PEAX,REG_AT(Ebp));
-					op32(ctx,ADD,PEAX,pconst(&p,rb->stackPos));
-					op32(ctx,PUSH,PEAX,UNUSED);
+					op32(ctx,PUSH,fetch(rb),UNUSED);
 					op32(ctx,PUSH,pconst64(&p,(int_val)rb->t),UNUSED);
 					op32(ctx,PUSH,pconst64(&p,hl_hash_utf8(m->code->strings[o->p2])),UNUSED);
 					op32(ctx,PUSH,fetch(dst),UNUSED);
