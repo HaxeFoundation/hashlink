@@ -253,6 +253,7 @@ struct jit_ctx {
 #define jit_exit() { hl_debug_break(); exit(-1); }
 #define jit_error(msg)	_jit_error(ctx,msg,__LINE__)
 static void _jit_error( jit_ctx *ctx, const char *msg, int line );
+static void on_jit_error( const char *msg, int_val line );
 
 static preg *pmem( preg *r, CpuReg reg, int offset ) {
 	r->kind = RMEM;
@@ -1114,7 +1115,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 		size += r->size;
 	}
 	paddedSize = pad_stack(ctx,size);
-	size = paddedSize - size;
+	size = ctx->totalRegsSize + (paddedSize - size);
 	for(i=0;i<stackRegs;i++) {
 		// RTL
 		vreg *r = vregs + args[count - (i + 1)];
@@ -1182,7 +1183,7 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	// native function, already resolved
 	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
 	op64(ctx,CALL,PEAX,UNUSED);
-	if( nativeFun == hl_null_access || nativeFun == hl_throw )
+	if( nativeFun == hl_null_access || nativeFun == hl_throw || nativeFun == on_jit_error )
 		return;
 	discard_regs(ctx, true);
 	op64(ctx,ADD,PESP,pconst(&p,size));
@@ -1232,6 +1233,15 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 	preg p;
 	op64(ctx, MOV, IS_FLOAT(r) ? PXMM(0) : PEAX, fetch(r));
 	if( ctx->totalRegsSize ) op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
+#	ifdef HL_DEBUG
+	{
+		int jeq;
+		op64(ctx, CMP, PESP, PEBP);
+		XJump_small(JEq,jeq);
+		jit_error("invalid ESP");
+		patch_jump(ctx,jeq);
+	}
+#	endif
 	op64(ctx, POP, PEBP, UNUSED);
 	op64(ctx, RET, UNUSED, UNUSED);
 }
