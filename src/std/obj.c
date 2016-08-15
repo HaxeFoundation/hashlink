@@ -203,7 +203,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		hl_lookup_insert(t->lookup,nlookup++,pr->hashed_name,m->functions_types[pr->findex],-(method_index+1));
 		// tell if we have a compare fun (req for JIT)
 		if( pr->hashed_name == compareHash )
-			t->compareFun = (void*)pr->findex;
+			t->compareFun = (void*)(int_val)pr->findex;
 	}
 	return t;
 }
