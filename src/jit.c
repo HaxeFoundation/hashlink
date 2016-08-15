@@ -85,10 +85,11 @@ typedef enum {
 	CVTSI2SD,
 	CVTSD2SI,
 	CVTPD2PS,
-	// 8 bits
+	// 8-16 bits
 	MOV8,
 	CMP8,
 	TEST8,
+	MOV16,
 	// --
 	_CPU_LAST
 } CpuOp;
@@ -379,6 +380,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
 	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
+	{ "MOV16", LONG_OP(0x668B), LONG_OP(0x6689), LONG_OP(0x66B8) },
 };
 
 #ifdef OP_LOG
@@ -834,6 +836,7 @@ static void scratch( preg *r ) {
 	if( r && r->holds ) {
 		r->holds->current = NULL;
 		r->holds = NULL;
+		r->lock = 0;
 	}
 }
 
@@ -913,21 +916,11 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 				preg rtmp;
 				switch( ID2(to->kind,from->kind) ) {
 				case ID2(RCPU,RSTACK):
-					BREAK();
 					op32(ctx,MOV,to,from);
 					op32(ctx,AND,to,pconst(&rtmp,0xFFFF));
 					break;
 				case ID2(RSTACK,RCPU):
-					BREAK();
-					op32(ctx,MOV8,to,from);
-					{
-						preg *r = alloc_reg(ctx,RCPU);
-						op32(ctx,MOV,r,from);
-						op32(ctx,SAR,r,pconst(&rtmp,8));
-						R(to->id)->stackPos++;
-						op32(ctx,MOV8,to,r);
-						R(to->id)->stackPos--;
-					}
+					op32(ctx,MOV16,to,from);
 					break;
 				default:
 					ASSERT(size);
@@ -1134,7 +1127,9 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 			RUNLOCK(r->current);
 			break;
 		case 2:
-			BREAK();
+			op64(ctx,SUB,PESP,pconst(&p,2));
+			op32(ctx,MOV16,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
+			RUNLOCK(r->current);
 			break;
 		case 4:
 			if( !IS_64 ) {
@@ -1179,6 +1174,17 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	// MSVC requires 32bytes of free space here
 	op64(ctx,SUB,PESP,pconst(&p,32));
 	size += 32;
+#	endif
+#	ifdef HL_DEBUG
+	if( nativeFun != on_jit_error && ctx->f->findex != 0x29D && ctx->f->findex != 0x3A && ctx->f->findex != 0x3E5 && ctx->f->findex != 0x2C6 && ctx->f->findex != 0xA57 ) {
+		int j;
+		op64(ctx,MOV,PEAX,PESP);
+		op64(ctx,AND,PEAX,pconst(&p,15));
+		op64(ctx,TEST,PEAX,PEAX);
+		XJump_small(JZero,j);
+		jit_error("ESP % 16 != 0 in native call");
+		patch_jump(ctx,j);
+	}
 #	endif
 	// native function, already resolved
 	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
@@ -2186,6 +2192,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				preg *tmp = alloc_reg(ctx, RCPU);
 				op64(ctx,MOV,tmp,pmem(&p,r->id,HL_WSIZE*2));
 				op64(ctx,TEST,tmp,tmp);
+				scratch(tmp);
 				XJump_small(JNotZero,jhasvalue);
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
 				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
@@ -2195,7 +2202,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				ifdef HL_64
 				jit_error("TODO");
 #				else
-				scratch(tmp);
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,4);
 				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
 				op64(ctx, PUSH,pmem(&p,r->id,HL_WSIZE*3),UNUSED); // push closure value
@@ -2466,6 +2472,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				preg *offset = alloc_cpu(ctx, ra, true);
 				preg *value = alloc_cpu(ctx, rb, true);
 				op32(ctx,MOV8,pmem2(&p,base->id,offset->id,1,0),value);
+			}
+			break;
+		case OSetI16:
+			{
+				preg *base = alloc_cpu(ctx, dst, true);
+				preg *offset = alloc_cpu(ctx, ra, true);
+				preg *value = alloc_cpu(ctx, rb, true);
+				op32(ctx,MOV16,pmem2(&p,base->id,offset->id,1,0),value);
 			}
 			break;
 		case OSetI32:
