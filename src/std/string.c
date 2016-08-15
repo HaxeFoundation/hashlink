@@ -29,9 +29,23 @@ HL_PRIM vbyte *hl_itos( int i, int *len ) {
 }
 
 HL_PRIM vbyte *hl_ftos( double d, int *len ) {
-	uchar tmp[48];
-	int k = (int)usprintf(tmp,48,USTR("%.16g"),d); // don't use the last digit (eg 5.1 = 5.09999..996)
+	uchar tmp[24];
+	int k;
+#	if defined(HL_VCC) && !defined(HL_64)
+	/*
+		For some unknown reason, we reach here with some conditional bits set in FPU status,
+		leading to a crash in sprintf (reproducible with -1.0 value).
+		Let's then make sure to save/restore FPU state
+	*/
+	__declspec(align(16)) char fpu[512];
+	_fxsave(fpu);
+	__asm { finit };
+#	endif
+	k = (int)usprintf(tmp,24,USTR("%.16g"),d); // don't use the last digit (eg 5.1 = 5.09999..996)
 	*len = k;
+#	if defined(HL_VCC) && !defined(HL_64)
+	_fxrstor(fpu);
+#	endif
 	return hl_copy_bytes((vbyte*)tmp,(k + 1) << 1);
 }
 
