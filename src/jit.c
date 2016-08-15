@@ -2219,10 +2219,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vclosure *c = hl_malloc(&m->ctx.alloc,sizeof(vclosure));
 				preg *r = alloc_reg(ctx, RCPU);
 				c->t = dst->t;
-				c->fun = (void*)(int_val)o->p2;
 				c->hasValue = 0;
-				c->value = ctx->closure_list;
-				ctx->closure_list = c;
+				if( ctx->m->functions_indexes[o->p2] >= ctx->m->code->nfunctions ) {
+					// native
+					c->fun = ctx->m->functions_ptrs[o->p2];
+					c->value = NULL;
+				} else {
+					c->fun = (void*)(int_val)o->p2;
+					c->value = ctx->closure_list;
+					ctx->closure_list = c;
+				}
 				op64(ctx, MOV, r, pconst64(&p,(int_val)c));
 				store(ctx,dst,r,true);
 			}
@@ -2849,7 +2855,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
 	c = ctx->calls;
 	while( c ) {
 		int fpos = (int)(int_val)m->functions_ptrs[c->target];
-		if( code[c->pos] == 0xB8 ) // MOV : absolute
+		if( (code[c->pos]&~3) == 0xB8 ) // MOV : absolute
 			*(int_val*)(code + c->pos + 1) = (int_val)(code + fpos);
 		else
 			*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
