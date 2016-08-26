@@ -44,6 +44,7 @@ typedef struct {
 	hl_type *type;
 	hl_type **regs;
 	hl_opcode *ops;
+	int *debug;
 } hl_function;
 
 typedef struct {
@@ -56,11 +57,14 @@ typedef struct {
 	int nnatives;
 	int nfunctions;
 	int entrypoint;
+	int ndebugfiles;
+	bool hasdebug;
 	int*		ints;
 	double*		floats;
 	char**		strings;
-	char*		strings_data;
 	int*		strings_lens;
+	char**		debugfiles;
+	int*		debugfiles_lens;
 	uchar**		ustrings;
 	hl_type*	types;
 	hl_type**	globals;
@@ -77,6 +81,7 @@ typedef struct {
 	void **functions_ptrs;
 	int *functions_indexes;
 	void *jit_code;
+	int **jit_debug;
 	hl_module_context ctx;
 } hl_module;
 
@@ -98,5 +103,5 @@ void hl_jit_free( jit_ctx *ctx );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_init_callback( jit_ctx *ctx );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize );
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, int ***debug );
 

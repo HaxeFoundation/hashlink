@@ -343,12 +343,76 @@ const char *hl_op_name( int op ) {
 	return hl_op_names[op];
 }
 
+static char **hl_read_strings( hl_reader *r, int nstrings, int **out_lens ) {
+	int size = hl_read_i32(r);
+	hl_code *c = r->code;
+	char *sdata = (char*)hl_malloc(&c->alloc,sizeof(char) * size);
+	char **strings;
+	int *lens;
+	int i;
+	hl_read_bytes(r, sdata, size);
+	ALLOC(strings, char*, nstrings);
+	ALLOC(lens, int, nstrings);
+	for(i=0;i<nstrings;i++) {
+		int sz = UINDEX();
+		strings[i] = sdata;
+		lens[i] = sz;
+		sdata += sz;
+		if( sdata >= sdata + size || *sdata )
+			EXIT("Invalid string");
+		sdata++;
+	}
+	*out_lens = lens;
+	return strings;
+}
+
+static int *hl_read_debug_infos( hl_reader *r, int nops ) {
+	int curfile = -1, curline = 0;
+	hl_code *code = r->code;
+	int *debug = (int*)hl_malloc(&code->alloc, sizeof(int) * nops * 2);
+	int i = 0;	
+	while( i < nops ) {
+		int c = READ();
+		if( c & 1 ) {
+			c >>= 1;
+			curfile = (c << 8) | READ();
+			if( curfile >= code->ndebugfiles )
+				ERROR("Invalid debug file");
+		} else if( c & 2 ) {
+			int delta = c >> 6;
+			int count = (c >> 2) & 15;
+			if( i + count > nops )
+				ERROR("Outside range");
+			while( count-- ) {
+				debug[i<<1] = curfile;
+				debug[(i<<1)|1] = curline;
+				i++;
+			}
+			curline += delta;
+		} else if( c & 4 ) {
+			curline += c >> 3;
+			debug[i<<1] = curfile;
+			debug[(i<<1)|1] = curline;
+			i++;
+		} else {
+			unsigned char b2 = READ();
+			unsigned char b3 = READ();
+			curline = (c >> 3) | (b2 << 5) | (b3 << 13);
+			debug[i<<1] = curfile;
+			debug[(i<<1)|1] = curline;
+			i++;
+		}
+	}
+	return debug;
+}
+
 hl_code *hl_code_read( const unsigned char *data, int size ) {
 	hl_reader _r = { data, size, 0, 0, NULL };	
 	hl_reader *r = &_r;
 	hl_code *c;
 	hl_alloc alloc;
 	int i;
+	int flags;
 	hl_alloc_init(&alloc);
 	c = hl_zalloc(&alloc,sizeof(hl_code));
 	c->alloc = alloc;
@@ -360,6 +424,7 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 		printf("VER=%d\n",c->version);
 		EXIT("Unsupported version");
 	}
+	flags = UINDEX();
 	c->nints = UINDEX();
 	c->nfloats = UINDEX();
 	c->nstrings = UINDEX();
@@ -368,6 +433,7 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	c->nnatives = UINDEX();
 	c->nfunctions = UINDEX();
 	c->entrypoint = UINDEX();	
+	c->hasdebug = flags & 1;
 	CHK_ERROR();
 	ALLOC(c->ints, int, c->nints);
 	for(i=0;i<c->nints;i++)
@@ -377,27 +443,14 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	for(i=0;i<c->nfloats;i++)
 		c->floats[i] = hl_read_double(r);
 	CHK_ERROR();
-	{
-		int size = hl_read_i32(r);
-		char *sdata;
-		CHK_ERROR();
-		sdata = (char*)hl_malloc(&c->alloc,sizeof(char) * size);
-		hl_read_bytes(r, sdata, size);
-		c->strings_data = sdata;
-		ALLOC(c->strings, char*, c->nstrings);
-		ALLOC(c->strings_lens, int, c->nstrings);
-		ALLOC(c->ustrings, uchar*, c->nstrings);
-		for(i=0;i<c->nstrings;i++) {
-			int sz = UINDEX();
-			c->strings[i] = sdata;
-			c->strings_lens[i] = sz;
-			sdata += sz;
-			if( sdata >= c->strings_data + size || *sdata )
-				EXIT("Invalid string");
-			sdata++;
-		}
-	}
+	c->strings = hl_read_strings(r, c->nstrings, &c->strings_lens);
+	ALLOC(c->ustrings,uchar*,c->nstrings);
 	CHK_ERROR();
+	if( c->hasdebug ) {
+		c->ndebugfiles = UINDEX();
+		c->debugfiles = hl_read_strings(r, c->ndebugfiles, &c->debugfiles_lens);
+		CHK_ERROR();
+	}
 	ALLOC(c->types, hl_type, c->ntypes);
 	for(i=0;i<c->ntypes;i++) {
 		hl_read_type(r, c->types + i);
@@ -420,6 +473,8 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	for(i=0;i<c->nfunctions;i++) {
 		hl_read_function(r,c->functions+i);
 		CHK_ERROR();
+		if( c->hasdebug )
+			c->functions[i].debug = hl_read_debug_infos(r,c->functions[i].nops);
 	}
 	CHK_ERROR();
 	return c;

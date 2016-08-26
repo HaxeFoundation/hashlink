@@ -35,7 +35,17 @@ static hl_module *cur_module;
 static void *stack_top;
 
 static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
-	return NULL;
+	int pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code)) >> 2;
+	int *debug_addr = cur_module->jit_debug[pos];
+	int file, line;
+	int size = *outSize;
+	if( !debug_addr )
+		return NULL;
+	file = debug_addr[0];
+	line = debug_addr[1];
+	*outSize = strtou(out,*outSize,cur_module->code->debugfiles[file]);
+	*outSize += usprintf(out + *outSize, size - *outSize, USTR(" line %d"), line);
+	return out;
 }
 
 static int module_capture_stack( void **stack, int size ) {
@@ -54,6 +64,7 @@ static int module_capture_stack( void **stack, int size ) {
 			}
 		}
 	}
+	if( count ) count--;
 	return count;
 }
 
@@ -236,7 +247,7 @@ int hl_module_init( hl_module *m ) {
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
 	}
-	m->jit_code = hl_jit_code(ctx, m, &m->codesize);
+	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);

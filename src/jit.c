@@ -249,6 +249,7 @@ struct jit_ctx {
 	hl_alloc falloc; // cleared per-function
 	hl_alloc galloc;
 	vclosure *closure_list;
+	int **debug;
 };
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
@@ -319,6 +320,16 @@ static void jit_buf( jit_ctx *ctx ) {
 		ctx->startBuf = nbuf;
 		ctx->buf.b = nbuf + curpos;
 		ctx->bufSize = nsize;
+		if( ctx->m->code->hasdebug ) {
+			int **ndebug = (int**)malloc(sizeof(int**) * (nsize >> 2));
+			if( ndebug == NULL ) ASSERT(nsize);
+			if( ctx->debug ) {
+				memcpy(ndebug,ctx->debug,(curpos>>2) * sizeof(int*));
+				free(ctx->debug);
+			}
+			memset(ndebug + (curpos>>2), 0, ((nsize - curpos) >> 2) * sizeof(int*));
+			ctx->debug = ndebug;
+		}
 	}
 }
 
@@ -725,6 +736,10 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		break;
 	default:
 		ERRIF(1);
+	}
+	if( ctx->debug && o == CALL && ctx->f ) {
+		int pos = BUF_POS() >> 2;
+		ctx->debug[pos] = ctx->f->debug + (ctx->currentPos - 1) * 2;
 	}
 }
 
@@ -2838,7 +2853,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	return codePos;
 }
 
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, int ***debug ) {
 	jlist *c;
 	int size = BUF_POS();
 	unsigned char *code;
@@ -2847,6 +2862,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize ) {
 	if( code == NULL ) return NULL;
 	memcpy(code,ctx->startBuf,BUF_POS());
 	*codesize = size;
+	*debug = ctx->debug;
 	// patch calls
 	c = ctx->calls;
 	while( c ) {
