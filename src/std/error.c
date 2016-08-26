@@ -85,20 +85,6 @@ HL_PRIM int hl_get_stack_hash() {
 	return hash;
 }
 
-HL_PRIM void hl_throw( vdynamic *v ) {
-	hl_trap_ctx *t = hl_current_trap;
-#ifdef _WIN32
-	if( v != stack_last_exc ) {
-		stack_last_exc = v;
-		stack_count = CaptureStackBackTrace(1, 0x1000, stack_trace, NULL) - 8; // 8 startup
-		if( stack_count < 0 ) stack_count = 0;
-	}
-#endif
-	hl_current_exc = v;
-	hl_current_trap = t->prev;
-	if( hl_current_trap == NULL ) hl_debug_break();
-	longjmp(t->buf,1);
-}
 
 HL_PRIM uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 #ifdef _WIN32
@@ -110,6 +96,11 @@ HL_PRIM uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	} data;
 	data.sym.SizeOfStruct = sizeof(data.sym);
 	data.sym.MaxNameLen = 255;
+	if( !stack_process_handle ) {
+		stack_process_handle = GetCurrentProcess();
+		SymSetOptions(SYMOPT_LOAD_LINES);
+		SymInitialize(stack_process_handle,NULL,TRUE);
+	}
 	if( SymFromAddrW(stack_process_handle,(DWORD64)(int_val)addr,&index,&data.sym) ) {
 		DWORD offset = 0;
 		line.SizeOfStruct = sizeof(line);
@@ -123,21 +114,46 @@ HL_PRIM uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	return NULL;
 }
 
+static int hl_capture_stack( void **stack, int size ) {
+	int count = 0;
+#	ifdef _WIN32
+	count = CaptureStackBackTrace(2, size, stack, NULL) - 8; // 8 startup
+	if( count < 0 ) count = 0;
+#	endif
+	return count;
+}
+
+typedef uchar *(*resolve_symbol_type)( void *addr, uchar *out, int *outSize );
+typedef int (*capture_stack_type)( void **stack, int size );
+
+static resolve_symbol_type resolve_symbol_func = hl_resolve_symbol;
+static capture_stack_type capture_stack_func = hl_capture_stack;
+
+HL_PRIM void hl_exception_setup( void *resolve_symbol, void *capture_stack ) {
+	resolve_symbol_func = resolve_symbol;
+	capture_stack_func = capture_stack;
+}
+
+HL_PRIM void hl_throw( vdynamic *v ) {
+	hl_trap_ctx *t = hl_current_trap;
+	if( v != stack_last_exc ) {
+		stack_last_exc = v;
+		stack_count = capture_stack_func(stack_trace, 0x1000);
+	}
+	hl_current_exc = v;
+	hl_current_trap = t->prev;
+	if( hl_current_trap == NULL ) hl_debug_break();
+	longjmp(t->buf,1);
+}
+
 HL_PRIM varray *hl_exception_stack() {
 	varray *a = hl_alloc_array(&hlt_bytes, stack_count);
 	int i;
-#ifdef _WIN32
-	if( !stack_process_handle ) {
-		stack_process_handle = GetCurrentProcess();
-		SymSetOptions(SYMOPT_LOAD_LINES);
-		SymInitialize(stack_process_handle,NULL,TRUE);
-	}
-#endif
 	for(i=0;i<stack_count;i++) {
 		void *addr = stack_trace[i];
 		uchar sym[512];
 		int size = 512;
-		uchar *str = hl_resolve_symbol(addr, sym, &size);
+		uchar *str = resolve_symbol_func(addr, sym, &size);
 		if( str == NULL ) {
 			int iaddr = (int)(int_val)addr;
 			str = sym;

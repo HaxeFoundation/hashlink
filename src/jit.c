@@ -1066,7 +1066,7 @@ static void discard_regs( jit_ctx *ctx, bool native_call ) {
 	}
 }
 
-static int pad_stack( jit_ctx *ctx, int size ) {
+static int pad_before_call( jit_ctx *ctx, int size ) {
 	int total = size + ctx->totalRegsSize + HL_WSIZE * 2; // EIP+EBP
 	if( total & 15 ) {
 		int pad = 16 - (total & 15);
@@ -1104,22 +1104,13 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 #endif
 	for(i=count - stackRegs;i<count;i++) {
 		vreg *r = vregs + args[i];
-		size += hl_pad_size(size,r->t);
 		size += r->size;
 	}
-	paddedSize = pad_stack(ctx,size);
-	size = ctx->totalRegsSize + (paddedSize - size);
+	paddedSize = pad_before_call(ctx,size);
 	for(i=0;i<stackRegs;i++) {
 		// RTL
 		vreg *r = vregs + args[count - (i + 1)];
-		int pad;
-		size += r->size;
-		pad = hl_pad_size(size,r->t);
 		if( (i & 7) == 0 ) jit_buf(ctx);
-		if( pad ) {
-			op64(ctx,SUB,PESP,pconst(&p,pad));
-			size += pad;
-		}
 		switch( r->size ) {
 		case 1:
 			op64(ctx,SUB,PESP,pconst(&p,1));
@@ -1253,7 +1244,7 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 }
 
 static void call_native_consts( jit_ctx *ctx, void *nativeFun, int_val *args, int nargs ) {
-	int size = pad_stack(ctx, IS_64 ? 0 : HL_WSIZE*nargs);
+	int size = pad_before_call(ctx, IS_64 ? 0 : HL_WSIZE*nargs);
 	preg p;
 	int i;
 #	ifdef HL_64
@@ -1300,6 +1291,9 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OJNotEq:
 			o = COMISD;
 			break;
+		case OSMod:
+			jit_error("TODO:fmod call");
+			return PXMM(0);
 		default:
 			printf("%s\n", hl_op_name(op->op));
 			ASSERT(op->op);
@@ -1330,13 +1324,15 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 			return pa;
 		case OSDiv:
 		case OUDiv:
+		case OSMod:			
 			{
+				preg *out = op->op == OSMod ? REG_AT(Edx) : PEAX;
 				preg *r = alloc_cpu(ctx,b,true);
 				int jz, jend;
 				// integer div 0 => 0
 				op32(ctx,TEST,r,r);
 				XJump_small(JNotZero,jz);
-				op32(ctx,XOR,PEAX,PEAX);
+				op32(ctx,XOR,out,out);
 				XJump_small(JAlways,jend);
 				patch_jump(ctx,jz);
 				if( pa->kind != RCPU || pa->id != Eax ) {
@@ -1348,11 +1344,11 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 					op32(ctx, XOR, REG_AT(Edx), REG_AT(Edx));
 				else
 					op32(ctx, CDQ, UNUSED, UNUSED); // sign-extend Eax into Eax:Edx
-				op32(ctx, op->op == OUDiv ? DIV : IDIV, pb, UNUSED);
+				op32(ctx, op->op == OUDiv ? DIV : IDIV, fetch(b), UNUSED);
 				patch_jump(ctx, jend);
+				if( dst ) store(ctx, dst, out, true);
+				return out;
 			}
-			if( dst ) store(ctx, dst, PEAX, true);
-			return PEAX;
 		case OJSLt:
 		case OJSGte:
 		case OJSLte:
@@ -1871,7 +1867,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	size = 0;
 	for(i=0;i<nargs;i++) {
 		vreg *r = R(i);
-		size += hl_pad_size(size,r->t);
 		r->stackPos = size + HL_WSIZE * 2;
 		size += r->size;
 	}
@@ -1965,6 +1960,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OAnd:
 		case OOr:
 		case OXor:
+		case OSMod:
 			op_binop(ctx, dst, ra, rb, o);
 			break;
 		case ONeg:
@@ -2165,7 +2161,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				else
 				preg *r = alloc_cpu(ctx, rb, true);
 				jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
-				size = pad_stack(ctx,HL_WSIZE*3);
+				size = pad_before_call(ctx,HL_WSIZE*3);
 				op64(ctx,PUSH,r,UNUSED);
 
 				j->pos = BUF_POS();
@@ -2255,7 +2251,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #						ifdef HL_64
 						jit_error("TODO");
 #						else
-						size = pad_stack(ctx,HL_WSIZE*3);
+						size = pad_before_call(ctx,HL_WSIZE*3);
 						op64(ctx,MOV,r,pconst64(&p,(int_val)dst->t));
 						op64(ctx,PUSH,r,UNUSED);
 						op64(ctx,MOV,r,pconst64(&p,(int_val)ra->t->virt->fields[o->p3].hashed_name));
@@ -2305,7 +2301,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 							break;
 						default:
 							size = HL_WSIZE * 4;
-							pad_stack(ctx,HL_WSIZE*4);
+							pad_before_call(ctx,HL_WSIZE*4);
 							op64(ctx,PUSH,fetch(rb),UNUSED);
 							op64(ctx,MOV,r,pconst64(&p,(int_val)rb->t));
 							break;
@@ -2411,7 +2407,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						}
 					}
 
-					size = pad_stack(ctx,HL_WSIZE*5);
+					size = pad_before_call(ctx,HL_WSIZE*5);
 
 					if( hl_is_ptr(dst->t) || dst->t->kind == HVOID )
 						op64(ctx,PUSH,pconst(&p,0),UNUSED);
@@ -2548,11 +2544,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OToVirtual:
 			{
 #				ifdef HL_64
-				int size = pad_stack(ctx, 0);
+				int size = pad_before_call(ctx, 0);
 				op64(ctx,MOV,REG_AT(CALL_REGS[1]),fetch(ra));
 				op64(ctx,MOV,REG_AT(CALL_REGS[0]),pconst64(&p,(int_val)dst->t));
 #				else
-				int size = pad_stack(ctx, HL_WSIZE*2);
+				int size = pad_before_call(ctx, HL_WSIZE*2);
 				op32(ctx,PUSH,fetch(ra),UNUSED);
 				op32(ctx,PUSH,pconst(&p,(int)(int_val)dst->t),UNUSED);
 #				endif
@@ -2645,7 +2641,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				switch( dst->t->kind ) {
 				case HF32:
 				case HF64:
-					size = pad_stack(ctx, HL_WSIZE*2);
+					size = pad_before_call(ctx, HL_WSIZE*2);
 					op32(ctx,PUSH,pconst64(&p,(int_val)ra->t),UNUSED);
 					op32(ctx,MOV,PEAX,REG_AT(Ebp));
 					op32(ctx,ADD,PEAX,pconst(&p,ra->stackPos));
@@ -2654,7 +2650,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					store(ctx, dst, PXMM(0), true);
 					break;
 				default:
-					size = pad_stack(ctx, HL_WSIZE*3);
+					size = pad_before_call(ctx, HL_WSIZE*3);
 					op32(ctx,PUSH,pconst64(&p,(int_val)dst->t),UNUSED);
 					op32(ctx,PUSH,pconst64(&p,(int_val)ra->t),UNUSED);
 					op32(ctx,MOV,PEAX,REG_AT(Ebp));
@@ -2681,7 +2677,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					break;
 				default:
 					r = alloc_reg(ctx,RCPU);
-					size = pad_stack(ctx,HL_WSIZE*3);
+					size = pad_before_call(ctx,HL_WSIZE*3);
 					op64(ctx,MOV,r,pconst64(&p,(int_val)dst->t));
 					op64(ctx,PUSH,r,UNUSED);
 					op64(ctx,MOV,r,pconst64(&p,(int_val)hl_hash_utf8(m->code->strings[o->p3])));
@@ -2706,7 +2702,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					jit_error("TODO");
 					break;
 				default:
-					size = pad_stack(ctx, HL_WSIZE*4);
+					size = pad_before_call(ctx, HL_WSIZE*4);
 					op32(ctx,PUSH,fetch(rb),UNUSED);
 					op32(ctx,PUSH,pconst64(&p,(int_val)rb->t),UNUSED);
 					op32(ctx,PUSH,pconst64(&p,hl_hash_utf8(m->code->strings[o->p2])),UNUSED);
@@ -2728,7 +2724,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,SUB,PESP,pconst(&p,sizeof(hl_trap_ctx) - HL_WSIZE));
 				op64(ctx,MOV,PEAX,PESP);
 				op64(ctx,MOV,paddr(&p,&hl_current_trap),PEAX);
-				size = pad_stack(ctx, HL_WSIZE);
+				size = pad_before_call(ctx, HL_WSIZE);
 				op64(ctx,PUSH,PEAX,UNUSED);
 				call_native(ctx,setjmp,size);
 				op64(ctx,TEST,PEAX,PEAX);

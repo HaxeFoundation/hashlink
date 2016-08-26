@@ -31,6 +31,32 @@
 
 extern void hl_callback_init( void *e );
 
+static hl_module *cur_module;
+static void *stack_top;
+
+static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
+	return NULL;
+}
+
+static int module_capture_stack( void **stack, int size ) {
+	void **stack_ptr = (void**)&stack;
+	void *stack_bottom = stack_ptr;
+	int count = 0;
+	unsigned char *code = cur_module->jit_code;
+	int code_size = cur_module->codesize;
+	while( stack_ptr < (void**)stack_top ) {
+		void *stack_addr = *stack_ptr++; // EBP
+		if( stack_addr > stack_bottom && stack_addr < stack_top ) {
+			void *module_addr = *stack_ptr; // EIP
+			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
+				if( count == size ) break;
+				stack[count++] = module_addr;
+			}
+		}
+	}
+	return count;
+}
+
 static void hl_init_enum( hl_type_enum *e ) {
 	int i, j;
 	for(i=0;i<e->nconstructs;i++) {
@@ -216,6 +242,9 @@ int hl_module_init( hl_module *m ) {
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
 	}
 	hl_callback_init(((unsigned char*)m->jit_code) + entry);
+	cur_module = m;
+	stack_top = &m;
+	hl_exception_setup(module_resolve_symbol, module_capture_stack);
 	hl_jit_free(ctx);
 	return 1;
 }
