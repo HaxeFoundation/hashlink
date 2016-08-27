@@ -120,10 +120,10 @@ HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
 		return NULL;
 	fseek(f,0,SEEK_END);
 	len = ftell(f);
-	*size = len;
+	if( size ) *size = len;
 	fseek(f,0,SEEK_SET);
-	content = (vbyte*)hl_gc_alloc_noptr(len+1);
-	content[len] = 0; // final 0 for UTF8
+	content = (vbyte*)hl_gc_alloc_noptr(size ? len : len+1);
+	if( !size ) content[len] = 0; // final 0 for UTF8
 	while( len > 0 ) {
 		int d = (int)fread((char*)content + p,1,len,f);
 		if( d <= 0 ) {

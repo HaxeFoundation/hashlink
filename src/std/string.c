@@ -206,7 +206,7 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
 		}
 		c++;
 	}
-	*size = utf8bytes;
+	if( size ) *size = utf8bytes;
 	return out;
 }
 
