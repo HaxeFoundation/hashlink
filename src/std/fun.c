@@ -233,9 +233,12 @@ HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	aret = hl_is_ptr(w->t->fun->ret) ? &pret : pret;
 	if( aret == NULL ) aret = &pret;
 	switch( tfun->ret->kind ) {
+	case HVOID:
+		return NULL;
 	case HI8:
 	case HI16:
 	case HI32:
+	case HBOOL:
 		ret->v.i = hl_dyn_casti(aret,w->t->fun->ret,tfun->ret);
 		break;
 	case HF32:

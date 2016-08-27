@@ -2453,6 +2453,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					int size;
 					int paramsSize;
 					int jhasfield, jend;
+					bool need_dyn;
 					vreg *obj = R(o->extra[0]);
 					preg *v = alloc_cpu(ctx,obj, true);
 					preg *r = alloc_reg(ctx,RCPU);
@@ -2460,7 +2461,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,TEST,r,r);
 					XJump_small(JNotZero,jhasfield);
 
+					need_dyn = !hl_is_ptr(dst->t) && dst->t->kind != HVOID;
 					paramsSize = (o->p3 - 1) * HL_WSIZE;
+					if( need_dyn ) paramsSize += sizeof(vdynamic);
 					if( paramsSize & 15 ) paramsSize += 16 - (paramsSize&15);
 					op64(ctx,SUB,PESP,pconst(&p,paramsSize));
 					op64(ctx,MOV,r,PESP);
@@ -2480,10 +2483,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 
 					size = pad_before_call(ctx,HL_WSIZE*5);
 
-					if( hl_is_ptr(dst->t) || dst->t->kind == HVOID )
+					if( !need_dyn )
 						op64(ctx,PUSH,pconst(&p,0),UNUSED);
-					else 
-						op64(ctx,PUSH,pconst(&p,0x0000CAFE),UNUSED); // TODO
+					else {
+						preg *rtmp = alloc_reg(ctx,RCPU);
+						op64(ctx,LEA,rtmp,pmem(&p,Esp,paramsSize - sizeof(vdynamic) + (size - HL_WSIZE*5)));
+						op64(ctx,PUSH,rtmp,UNUSED);
+						RUNLOCK(rtmp);
+					}
 
 					op64(ctx,PUSH,r,UNUSED);
 					op64(ctx,PUSH,pconst(&p,obj->t->virt->fields[o->p2].hashed_name),UNUSED); // fid
@@ -2491,6 +2498,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,PUSH,pmem(&p,v->id,HL_WSIZE),UNUSED); // o->value
 
 					call_native(ctx,hl_dyn_call_obj,size + paramsSize);
+					if( need_dyn ) {
+						if( IS_FLOAT(dst) )
+							jit_error("TODO");
+						// v->v
+						copy(ctx,PEAX,pmem(&p,Esp,8 - sizeof(vdynamic)),dst->size);
+					}
 
 					XJump_small(JAlways,jend);
 					patch_jump(ctx,jhasfield);

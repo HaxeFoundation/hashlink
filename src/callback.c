@@ -77,6 +77,7 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	case HI8:
 	case HI16:
 	case HI32:
+	case HBOOL:
 		ret->v.i = ((int (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
 		return &ret->v.i;
 	case HF32:
