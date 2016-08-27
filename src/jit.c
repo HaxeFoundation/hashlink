@@ -19,6 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#include <math.h>
 #include <hlmodule.h>
 
 #ifdef HL_DEBUG
@@ -85,8 +86,10 @@ typedef enum {
 	DIVSD,
 	XORPD,
 	CVTSI2SD,
+	CVTSI2SS,
 	CVTSD2SI,
-	CVTPD2PS,
+	CVTSD2SS,
+	CVTSS2SD,
 	// 8-16 bits
 	MOV8,
 	CMP8,
@@ -389,8 +392,10 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "DIVSD", 0xF20F5E },
 	{ "XORPD", 0x660F57 },
 	{ "CVTSI2SD", 0xF20F2A },
+	{ "CVTSI2SS", 0xF30F2A },
 	{ "CVTSD2SI", 0xF20F2D },
-	{ "CVTPD2PS", 0x660F5A },
+	{ "CVTSD2SS", 0xF20F5A },
+	{ "CVTSS2SD", 0xF30F5A },
 	// 8 bits,
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
 	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
@@ -971,7 +976,6 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 			op64(ctx,MOVSD,to,from);
 			break;
 		case 4:
-			BREAK();
 			op32(ctx,MOVSS,to,from);
 			break;
 		default:
@@ -1107,11 +1111,51 @@ static int pad_before_call( jit_ctx *ctx, int size ) {
 	return size;
 }
 
+static void push_reg( jit_ctx *ctx, vreg *r ) {
+	preg p;
+	switch( r->size ) {
+	case 1:
+		op64(ctx,SUB,PESP,pconst(&p,1));
+		op32(ctx,MOV8,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
+		break;
+	case 2:
+		op64(ctx,SUB,PESP,pconst(&p,2));
+		op32(ctx,MOV16,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
+		break;
+	case 4:
+		if( !IS_64 ) {
+			if( r->current != NULL && r->current->kind == RFPU ) scratch(r->current);
+			op32(ctx,PUSH,fetch(r),UNUSED);
+		} else {
+			// pseudo push32 (not available)
+			op64(ctx,SUB,PESP,pconst(&p,4));
+			op32(ctx,MOV,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
+		}
+		break;
+	case 8:
+		if( fetch(r)->kind == RFPU ) {
+			op64(ctx,SUB,PESP,pconst(&p,8));
+			op64(ctx,MOVSD,pmem(&p,Esp,0),fetch(r));
+		} else if( IS_64 )
+			op64(ctx,PUSH,fetch(r),UNUSED);
+		else if( r->stack.kind == RSTACK ) {
+			scratch(r->current);
+			r->stackPos += 4;
+			op32(ctx,PUSH,&r->stack,UNUSED);
+			r->stackPos -= 4;
+			op32(ctx,PUSH,&r->stack,UNUSED);
+		} else
+			ASSERT(0);
+		break;
+	default:
+		ASSERT(r->size);
+	}
+}
+
 static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, bool isNative, int extraSize ) {
 	int i;
 	int stackRegs = count;
 	int size = extraSize, paddedSize;
-	preg p;
 #ifdef HL_64
 	if( isNative ) {
 		for(i=0;i<count;i++) {
@@ -1141,46 +1185,8 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 		// RTL
 		vreg *r = vregs + args[count - (i + 1)];
 		if( (i & 7) == 0 ) jit_buf(ctx);
-		switch( r->size ) {
-		case 1:
-			op64(ctx,SUB,PESP,pconst(&p,1));
-			op32(ctx,MOV8,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
-			RUNLOCK(r->current);
-			break;
-		case 2:
-			op64(ctx,SUB,PESP,pconst(&p,2));
-			op32(ctx,MOV16,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
-			RUNLOCK(r->current);
-			break;
-		case 4:
-			if( !IS_64 ) {
-				if( r->current != NULL && r->current->kind == RFPU ) scratch(r->current);
-				op32(ctx,PUSH,fetch(r),UNUSED);
-			} else {
-				// pseudo push32 (not available)
-				op64(ctx,SUB,PESP,pconst(&p,4));
-				op32(ctx,MOV,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
-				RUNLOCK(r->current);
-			}
-			break;
-		case 8:
-			if( fetch(r)->kind == RFPU ) {
-				op64(ctx,SUB,PESP,pconst(&p,8));
-				op64(ctx,MOVSD,pmem(&p,Esp,0),fetch(r));
-			} else if( IS_64 )
-				op64(ctx,PUSH,fetch(r),UNUSED);
-			else if( r->stack.kind == RSTACK ) {
-				scratch(r->current);
-				r->stackPos += 4;
-				op32(ctx,PUSH,&r->stack,UNUSED);
-				r->stackPos -= 4;
-				op32(ctx,PUSH,&r->stack,UNUSED);
-			} else
-				ASSERT(0);
-			break;
-		default:
-			ASSERT(r->size);
-		}
+		push_reg(ctx,r);
+		if( r->current ) RUNLOCK(r->current);
 	}
 	return paddedSize;
 }
@@ -1338,8 +1344,13 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 			o = COMISD;
 			break;
 		case OSMod:
-			jit_error("TODO:fmod call");
-			return PXMM(0);
+			{
+				int args[] = { a->stack.id, b->stack.id };
+				int size = prepare_call_args(ctx,2,args,ctx->vregs,true,0);
+				call_native(ctx,a->t->kind == HF32 ? (void*)fmodf : (void*)fmod,size);
+				store_native_result(ctx,dst);
+				return fetch(dst);
+			}
 		default:
 			printf("%s\n", hl_op_name(op->op));
 			ASSERT(op->op);
@@ -1665,8 +1676,9 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 			jit_error("TODO");
 			return;
 		}
-		jit_error("TODO");
-		return;
+		// physical comparison
+		op_binop(ctx,NULL,a,b,op);
+		break;
 	case HOBJ:
 		if( b->t->kind == HVIRTUAL ) {
 			jit_error("TODO");
@@ -1723,7 +1735,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		op_binop(ctx,NULL,a,b,op);
 		break;
 	}
-	register_jump(ctx,do_jump(ctx,op->op, false),targetPos);
+	register_jump(ctx,do_jump(ctx,op->op, IS_FLOAT(a)),targetPos);
 }
 
 jit_ctx *hl_jit_alloc() {
@@ -2062,6 +2074,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OToDyn:
 			{
 				int_val rt = (int_val)ra->t;
+				int jskip;
+				if( hl_is_ptr(ra->t) ) {
+					int jnz;
+					preg *a = alloc_cpu(ctx,ra,true);
+					op64(ctx,TEST,a,a);
+					XJump_small(JNotZero,jnz);
+					store(ctx,dst,a,true);
+					XJump_small(JAlways,jskip);
+					patch_jump(ctx,jnz);
+				}
 				call_native_consts(ctx, hl_alloc_dynamic, &rt, 1);
 				// copy value to dynamic
 				if( IS_FLOAT(ra) && !IS_64 ) {
@@ -2078,24 +2100,25 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,MOV,pmem(&p,Eax,8),tmp);
 				}
 				store(ctx, dst, PEAX, true);
+				if( hl_is_ptr(ra->t) ) patch_jump(ctx,jskip);
 			}
 			break;
 		case OToSFloat:
-			if( ra->t->kind == HI32 && dst->t->kind == HF64 ) {
+			if( ra->t->kind == HI32 ) {
 				preg *r = alloc_cpu(ctx,ra,true);
 				preg *w = alloc_fpu(ctx,dst,false);
-				op32(ctx,CVTSI2SD,w,r);
+				op32(ctx,dst->t->kind == HF64 ? CVTSI2SD : CVTSI2SS,w,r);
 				store(ctx, dst, w, true);
 			} else if( ra->t->kind == HF64 && dst->t->kind == HF32 ) {
 				preg *r = alloc_fpu(ctx,ra,true);
 				preg *w = alloc_fpu(ctx,dst,false);
-				BREAK();
-				op32(ctx,CVTPD2PS,w,r);
+				op32(ctx,CVTSD2SS,w,r);
 				store(ctx, dst, w, true);
 			} else if( ra->t->kind == HF32 && dst->t->kind == HF64 ) {
-				jit_error("TODO");
-			} else if( ra->t->kind == HI32 && dst->t->kind == HF32 ) {
-				jit_error("TODO");
+				preg *r = alloc_fpu(ctx,ra,true);
+				preg *w = alloc_fpu(ctx,dst,false);
+				op32(ctx,CVTSS2SD,w,r);
+				store(ctx, dst, w, true);
 			} else
 				ASSERT(0);
 			break;
@@ -2460,7 +2483,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					if( hl_is_ptr(dst->t) || dst->t->kind == HVOID )
 						op64(ctx,PUSH,pconst(&p,0),UNUSED);
 					else 
-						jit_error("TODO");
+						op64(ctx,PUSH,pconst(&p,0x0000CAFE),UNUSED); // TODO
 
 					op64(ctx,PUSH,r,UNUSED);
 					op64(ctx,PUSH,pconst(&p,obj->t->virt->fields[o->p2].hashed_name),UNUSED); // fid
@@ -2510,6 +2533,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OGetI32:
+		case OGetF32:
+		case OGetF64:
 			{
 				preg *base = alloc_cpu(ctx, ra, true);
 				preg *offset = alloc_cpu(ctx, rb, true);
@@ -2538,6 +2563,22 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				preg *offset = alloc_cpu(ctx, ra, true);
 				preg *value = alloc_cpu(ctx, rb, true);
 				op32(ctx,MOV,pmem2(&p,base->id,offset->id,1,0),value);
+			}
+			break;
+		case OSetF32:
+			{
+				preg *base = alloc_cpu(ctx, dst, true);
+				preg *offset = alloc_cpu(ctx, ra, true);
+				preg *value = alloc_fpu(ctx, rb, true);
+				op32(ctx,MOVSS,pmem2(&p,base->id,offset->id,1,0),value);
+			}
+			break;
+		case OSetF64:
+			{
+				preg *base = alloc_cpu(ctx, dst, true);
+				preg *offset = alloc_cpu(ctx, ra, true);
+				preg *value = alloc_fpu(ctx, rb, true);
+				op32(ctx,MOVSD,pmem2(&p,base->id,offset->id,1,0),value);
 			}
 			break;
 		case OType:
@@ -2614,6 +2655,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, PEAX, true);
 				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
 				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));
+				RLOCK(PEAX);
 				for(i=0;i<c->nparams;i++) {
 					preg *r = fetch(R(o->extra[i]));
 					copy(ctx, pmem(&p,Eax,c->offsets[i]),r, R(o->extra[i])->size);
@@ -2746,8 +2788,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				else
 				switch( rb->t->kind ) {
 				case HF32:
-				case HF64:
 					jit_error("TODO");
+					break;
+				case HF64:
+					size = pad_before_call(ctx, HL_WSIZE*2 + sizeof(double));
+					push_reg(ctx,rb);
+					op32(ctx,PUSH,pconst64(&p,hl_hash_utf8(m->code->strings[o->p2])),UNUSED);
+					op32(ctx,PUSH,fetch(dst),UNUSED);
+					call_native(ctx,get_dynset(rb->t),size);
 					break;
 				default:
 					size = pad_before_call(ctx, HL_WSIZE*4);
