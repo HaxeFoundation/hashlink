@@ -1182,7 +1182,7 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	size += 32;
 #	endif
 #	ifdef HL_DEBUG
-	if( nativeFun != on_jit_error && ctx->f->findex != 0x29D && ctx->f->findex != 0x3A && ctx->f->findex != 0x3E5 && ctx->f->findex != 0x2C6 && ctx->f->findex != 0xA57 ) {
+/*	if( nativeFun != on_jit_error ) {
 		int j;
 		op64(ctx,MOV,PEAX,PESP);
 		op64(ctx,AND,PEAX,pconst(&p,15));
@@ -1190,7 +1190,7 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 		XJump_small(JZero,j);
 		jit_error("ESP % 16 != 0 in native call");
 		patch_jump(ctx,j);
-	}
+	}*/
 #	endif
 	// native function, already resolved
 	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
@@ -1352,6 +1352,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				patch_jump(ctx,jz);
 				if( pa->kind != RCPU || pa->id != Eax ) {
 					scratch(PEAX);
+					scratch(pa);
 					load(ctx,PEAX,a);
 				}
 				scratch(REG_AT(Edx));
