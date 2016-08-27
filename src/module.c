@@ -35,7 +35,7 @@ static hl_module *cur_module;
 static void *stack_top;
 
 static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
-	int pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code)) >> 2;
+	int pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code)) >> JIT_CALL_PRECISION;
 	int *debug_addr = cur_module->jit_debug[pos];
 	int file, line;
 	int size = *outSize;

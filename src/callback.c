@@ -39,7 +39,6 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	int i, size = 0, pad = 0, pos = 0;
 	for(i=0;i<t->fun->nargs;i++) {
 		hl_type *at = t->fun->args[i];
-		size += hl_pad_size(size,at);
 		size += hl_type_size(at);
 	}
 	if( size & 15 )
@@ -50,16 +49,10 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		int j = t->fun->nargs - 1 - i;
 		hl_type *at = t->fun->args[j];
 		void *v = args[j];
-		int pad;
 		int tsize = hl_type_size(at);
 		size += tsize;
-		pad = hl_pad_size(size,at);
-		if( pad ) {
-			pos += pad;
-			size += pad;
-		}
 		if( hl_is_ptr(at) )
-			stack.p[pos/HL_WSIZE] = v;
+			*(void**)&stack.b[pos] = v;
 		else switch( tsize ) {
 		case 0:
 			continue;
@@ -67,13 +60,13 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 			stack.b[pos] = *(char*)v;
 			break;
 		case 2:
-			stack.s[pos>>1] = *(short*)v;
+			*(short*)&stack.b[pos] = *(short*)v;
 			break;
 		case 4:
-			stack.i[pos>>2] = *(int*)v;
+			*(int*)&stack.b[pos] = *(int*)v;
 			break;
 		case 8:
-			stack.d[pos>>3] = *(double*)v;
+			*(double*)&stack.b[pos] = *(double*)v;
 			break;
 		default:
 			hl_error("Invalid callback arg");

@@ -73,6 +73,8 @@ typedef enum {
 	INC,
 	DEC,
 	JMP,
+	// FPU
+	FSTP,
 	// SSE
 	MOVSD,
 	MOVSS,
@@ -321,13 +323,13 @@ static void jit_buf( jit_ctx *ctx ) {
 		ctx->buf.b = nbuf + curpos;
 		ctx->bufSize = nsize;
 		if( ctx->m->code->hasdebug ) {
-			int **ndebug = (int**)malloc(sizeof(int**) * (nsize >> 2));
+			int **ndebug = (int**)malloc(sizeof(int**) * (nsize >> JIT_CALL_PRECISION));
 			if( ndebug == NULL ) ASSERT(nsize);
 			if( ctx->debug ) {
-				memcpy(ndebug,ctx->debug,(curpos>>2) * sizeof(int*));
+				memcpy(ndebug,ctx->debug,(curpos>>JIT_CALL_PRECISION) * sizeof(int*));
 				free(ctx->debug);
 			}
-			memset(ndebug + (curpos>>2), 0, ((nsize - curpos) >> 2) * sizeof(int*));
+			memset(ndebug + (curpos>>JIT_CALL_PRECISION), 0, ((nsize - curpos) >> JIT_CALL_PRECISION) * sizeof(int*));
 			ctx->debug = ndebug;
 		}
 	}
@@ -375,6 +377,8 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "INC", IS_64 ? RM(0xFF,0) : 0x40, RM(0xFF,0) },
 	{ "DEC", IS_64 ? RM(0xFF,1) : 0x48, RM(0xFF,1) },
 	{ "JMP", RM(0xFF,4) },
+	// FPU
+	{ "FSTP", 0, RM(0xDD,3) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
@@ -738,8 +742,10 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		ERRIF(1);
 	}
 	if( ctx->debug && o == CALL && ctx->f ) {
-		int pos = BUF_POS() >> 2;
+		int pos = BUF_POS() >> JIT_CALL_PRECISION;
+		preg p;
 		ctx->debug[pos] = ctx->f->debug + (ctx->currentPos - 1) * 2;
+		op(ctx,MOV,pmem(&p,Esp,-HL_WSIZE),PEBP,true); // erase EIP (clean stack report)
 	}
 }
 
@@ -1039,6 +1045,15 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 	}
 }
 
+static void store_native_result( jit_ctx *ctx, vreg *r ) {
+	if( !IS_FLOAT(r) ) {
+		store(ctx,r,PEAX,true);
+		return;
+	}
+	scratch(r->current);
+	op64(ctx,FSTP,&r->stack,UNUSED);
+}
+
 static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
 	preg *r = fetch(from);
 	store(ctx, to, r, true);
@@ -1231,7 +1246,12 @@ static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *ar
 		discard_regs(ctx, false);
 	}
 	if( size ) op64(ctx,ADD,PESP,pconst(&p,size));
-	if( dst ) store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+	if( dst ) {
+		if( isNative )
+			store_native_result(ctx,dst);
+		else
+			store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+	}
 }
 
 static void op_enter( jit_ctx *ctx ) {
@@ -1243,7 +1263,17 @@ static void op_enter( jit_ctx *ctx ) {
 
 static void op_ret( jit_ctx *ctx, vreg *r ) {
 	preg p;
-	op64(ctx, MOV, IS_FLOAT(r) ? PXMM(0) : PEAX, fetch(r));
+	switch( r->t->kind ) {
+	case HF32:
+		jit_error("TODO");
+		break;
+	case HF64:
+		op64(ctx, MOVSD, PXMM(0), fetch(r));
+		break;
+	default:
+		op64(ctx, MOV, PEAX, fetch(r));
+		break;
+	}
 	if( ctx->totalRegsSize ) op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
 #	ifdef HL_DEBUG
 	{
@@ -1282,6 +1312,7 @@ static void on_jit_error( const char *msg, int_val line ) {
 	printf("%s\n",buf);
 #endif
 	hl_debug_break();
+	hl_throw(NULL);
 }
 
 static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
@@ -2209,6 +2240,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
 				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
 				op64(ctx, CALL, pmem(&p,r->id,HL_WSIZE), UNUSED);
+				op64(ctx,ADD,PESP,pconst(&p,size));
 				XJump_small(JAlways,jend);
 				patch_jump(ctx,jhasvalue);
 #				ifdef HL_64
@@ -2219,9 +2251,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx, PUSH,pmem(&p,r->id,HL_WSIZE*3),UNUSED); // push closure value
 				op64(ctx, CALL, pmem(&p,r->id,HL_WSIZE), UNUSED);
 #				endif
-				patch_jump(ctx,jend);
 				discard_regs(ctx,false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
+				patch_jump(ctx,jend);
 				store(ctx,dst,IS_FLOAT(dst) ? PXMM(0) : PEAX,true);
 			}
 			break;
@@ -2663,7 +2695,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op32(ctx,ADD,PEAX,pconst(&p,ra->stackPos));
 					op32(ctx,PUSH,PEAX,UNUSED);
 					call_native(ctx,get_dyncast(dst->t),size);
-					store(ctx, dst, PXMM(0), true);
+					store_native_result(ctx, dst);
 					break;
 				default:
 					size = pad_before_call(ctx, HL_WSIZE*3);
@@ -2700,7 +2732,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,PUSH,r,UNUSED);
 					op64(ctx,PUSH,fetch(ra),UNUSED);
 					call_native(ctx,get_dynget(dst->t),size);
-					store(ctx,dst,IS_FLOAT(dst) ? PXMM(0) : PEAX,true);
+					store_native_result(ctx,dst);
 					break;
 				}
 #				endif
