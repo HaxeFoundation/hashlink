@@ -2371,8 +2371,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 							jit_error("TODO");
 							break;
 						default:
-							size = HL_WSIZE * 4;
-							pad_before_call(ctx,HL_WSIZE*4);
+							size = pad_before_call(ctx,HL_WSIZE*4);
 							op64(ctx,PUSH,fetch(rb),UNUSED);
 							op64(ctx,MOV,r,pconst64(&p,(int_val)rb->t));
 							break;
@@ -2525,6 +2524,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				break;
 			}
 			break;
+		case ORethrow: // TODO
 		case OThrow:
 			{
 				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,true,0);
@@ -2536,12 +2536,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			discard_regs(ctx,false);
 			break;
 		case OGetI8:
+		case OGetI16:
 			{
 				preg *base = alloc_cpu(ctx, ra, true);
 				preg *offset = alloc_cpu(ctx, rb, true);
 				preg *r = alloc_reg(ctx,RCPU);
 				op64(ctx,XOR,r,r);
-				op64(ctx,MOV8,r,pmem2(&p,base->id,offset->id,1,0));
+				op64(ctx, o->op == OGetI8 ? MOV8 : MOV16,r,pmem2(&p,base->id,offset->id,1,0));
 				store(ctx, dst, r, true);
 			}
 			break;
@@ -2689,16 +2690,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OEnumField:
 			{
 				hl_enum_construct *c = &ra->t->tenum->constructs[o->p3];
-				int i;
-				int fid = (int)(int_val)o->extra;
-				int pos = sizeof(int);
 				preg *r = alloc_cpu(ctx,ra,true);
-				for(i=0;i<fid;i++) {
-					hl_type *t = c->params[i];
-					pos += hl_pad_size(pos,t);
-					pos += hl_type_size(t);
-				}
-				copy_to(ctx,dst,pmem(&p,r->id,pos));
+				copy_to(ctx,dst,pmem(&p,r->id,c->offsets[(int)(int_val)o->extra]));
 			}
 			break;
 		case OSetEnumField:
@@ -2907,16 +2900,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OGetTID:
 			op32(ctx, MOV, alloc_cpu(ctx,dst,false), pmem(&p,alloc_cpu(ctx,ra,true)->id,0));
+			store(ctx,dst,dst->current,false);
 			break;
 		default:
-			{
-				static bool TRACES[OLast] = {false};
-				if( !TRACES[o->op] ) {
-					TRACES[o->op] = true;
-					printf("Don't know how to jit %s\n",hl_op_name(o->op));
-				}
-				jit_error(hl_op_name(o->op));
-			}
+			jit_error(hl_op_name(o->op));
 			break;
 		}
 		// we are landing at this position, assume we have lost our registers
