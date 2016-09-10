@@ -865,6 +865,10 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	vdynamic *d = (vdynamic*) (hl_is_ptr(t) ? hl_gc_alloc(sizeof(vdynamic)) : hl_gc_alloc_noptr(sizeof(vdynamic)));
 	d->t = t;
 	d->v.ptr = NULL;
+#	ifdef HL_DEBUG
+	if( t->kind == HVOID )
+		hl_error("alloc_dynamic(VOID)");
+#	endif
 	return d;
 }
 

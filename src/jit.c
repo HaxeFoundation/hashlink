@@ -1326,6 +1326,7 @@ static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
 	call_native_consts(ctx,on_jit_error,args,2);
 }
 
+
 static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op ) {
 	preg *pa = fetch(a), *pb = fetch(b), *out = NULL;
 	CpuOp o;
@@ -1347,7 +1348,9 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 			{
 				int args[] = { a->stack.id, b->stack.id };
 				int size = prepare_call_args(ctx,2,args,ctx->vregs,true,0);
-				call_native(ctx,a->t->kind == HF32 ? (void*)fmodf : (void*)fmod,size);
+				void *mod_fun;
+				if( a->t->kind == HF32 ) mod_fun = fmodf; else mod_fun = fmod; 
+				call_native(ctx,mod_fun,size);
 				store_native_result(ctx,dst);
 				return fetch(dst);
 			}
@@ -1888,6 +1891,37 @@ static void *get_dynget( hl_type *t ) {
 	}
 }
 
+static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
+	int size;
+	preg p;
+#ifdef HL_64
+	jit_error("TODO");
+#else
+	switch( dst->t->kind ) {
+	case HF32:
+	case HF64:
+		size = pad_before_call(ctx, HL_WSIZE*2);
+		op32(ctx,PUSH,pconst64(&p,(int_val)v->t),UNUSED);
+		op32(ctx,MOV,PEAX,REG_AT(Ebp));
+		op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
+		op32(ctx,PUSH,PEAX,UNUSED);
+		call_native(ctx,get_dyncast(dst->t),size);
+		store_native_result(ctx, dst);
+		break;
+	default:
+		size = pad_before_call(ctx, HL_WSIZE*3);
+		op32(ctx,PUSH,pconst64(&p,(int_val)dst->t),UNUSED);
+		op32(ctx,PUSH,pconst64(&p,(int_val)v->t),UNUSED);
+		op32(ctx,MOV,PEAX,REG_AT(Ebp));
+		op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
+		op32(ctx,PUSH,PEAX,UNUSED);
+		call_native(ctx,get_dyncast(dst->t),size);
+		store(ctx, dst, PEAX, true);
+		break;
+	}
+#endif
+}
+
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0, opCount;
 	int codePos = BUF_POS();
@@ -2250,7 +2284,36 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OCallClosure:
 			if( ra->t->kind == HDYN ) {
-				jit_error("TODO");
+				// ASM for {
+				//	vdynamic *args[] = {args};
+				//  vdynamic *ret = hl_dyn_call(closure,args,nargs);
+				//  dst = hl_dyncast(ret,t_dynamic,t_dst);
+				// }
+				int size;
+				int offset = o->p3 * HL_WSIZE;
+				preg *r = alloc_reg(ctx, RCPU);
+				if( offset & 15 ) offset += 16 - (offset & 15);
+				op64(ctx,SUB,PESP,pconst(&p,offset));
+				op64(ctx,MOV,r,PESP);
+				for(i=0;i<o->p3;i++) {
+					vreg *a = R(o->extra[i]);
+					if( hl_is_dynamic(a->t) ) {
+						preg *v = alloc_cpu(ctx,a,true);
+						op64(ctx,MOV,pmem(&p,r->id,i * HL_WSIZE),v);
+						RUNLOCK(v);
+					} else {
+						jit_error("TODO");
+					}
+				}
+				size = pad_before_call(ctx,HL_WSIZE*2 + sizeof(int) + offset);
+				op64(ctx,PUSH,pconst(&p,o->p3),UNUSED);
+				op64(ctx,PUSH,r,UNUSED);
+				op64(ctx,PUSH,alloc_cpu(ctx,ra,true),UNUSED);
+				call_native(ctx,hl_dyn_call,size);
+				if( dst->t->kind != HVOID ) {
+					store(ctx,dst,PEAX,true);
+					make_dyn_cast(ctx,dst,dst);
+				}
 			} else {
 				int jhasvalue, jend, size;
 				// ASM for  if( c->hasValue ) c->fun(value,args) else c->fun(args)
@@ -2729,35 +2792,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OSafeCast:
-			{
-				int size;
-#				ifdef HL_64
-				jit_error("TODO");
-#				else
-				switch( dst->t->kind ) {
-				case HF32:
-				case HF64:
-					size = pad_before_call(ctx, HL_WSIZE*2);
-					op32(ctx,PUSH,pconst64(&p,(int_val)ra->t),UNUSED);
-					op32(ctx,MOV,PEAX,REG_AT(Ebp));
-					op32(ctx,ADD,PEAX,pconst(&p,ra->stackPos));
-					op32(ctx,PUSH,PEAX,UNUSED);
-					call_native(ctx,get_dyncast(dst->t),size);
-					store_native_result(ctx, dst);
-					break;
-				default:
-					size = pad_before_call(ctx, HL_WSIZE*3);
-					op32(ctx,PUSH,pconst64(&p,(int_val)dst->t),UNUSED);
-					op32(ctx,PUSH,pconst64(&p,(int_val)ra->t),UNUSED);
-					op32(ctx,MOV,PEAX,REG_AT(Ebp));
-					op32(ctx,ADD,PEAX,pconst(&p,ra->stackPos));
-					op32(ctx,PUSH,PEAX,UNUSED);
-					call_native(ctx,get_dyncast(dst->t),size);
-					store(ctx, dst, PEAX, true);
-					break;
-				}
-#				endif
-			}
+			make_dyn_cast(ctx, dst, ra);
 			break;
 		case ODynGet:
 			{

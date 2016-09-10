@@ -163,7 +163,10 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 	ret = hlc_static_call(cl->fun,cl->t,pargs,&out);
 	tret = cl->t->fun->ret;
 	if( !hl_is_ptr(tret) ) {
-		vdynamic *r = hl_alloc_dynamic(tret);
+		vdynamic *r;
+		if( tret->kind == HVOID )
+			return NULL;
+		r = hl_alloc_dynamic(tret);
 		r->t = tret;
 		r->v.d = out.v.d; // copy
 		return r;
