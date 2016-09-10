@@ -58,36 +58,6 @@ static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }
 
-HL_API vdynamic *hl_call_method( vdynamic *c, varray *args );
-
-#define HLC_DYN_MAX_ARGS 9
-static vdynamic *hlc_dyn_call_args( vclosure *c, vdynamic **args, int nargs ) {
-	struct {
-		varray a;
-		vdynamic *args[HLC_DYN_MAX_ARGS+1];
-	} tmp;
-	vclosure ctmp;
-	int i = 0;
-	if( nargs > HLC_DYN_MAX_ARGS ) hl_error("Too many arguments");
-	tmp.a.t = &hlt_array;
-	tmp.a.at = &hlt_dyn;
-	tmp.a.size = nargs;
-	if( c->hasValue && c->t->fun->nargs >= 0 ) {
-		ctmp.t = c->t->fun->parent;
-		ctmp.hasValue = 0;
-		ctmp.fun = c->fun;
-		tmp.args[0] = hl_make_dyn(&c->value,ctmp.t->fun->args[0]);
-		tmp.a.size++;
-		for(i=0;i<nargs;i++)
-			tmp.args[i+1] = args[i];
-		c = &ctmp;
-	} else {
-		for(i=0;i<nargs;i++)
-			tmp.args[i] = args[i];
-	}
-	return hl_call_method((vdynamic*)c,&tmp.a);
-}
-
 #endif
 
 extern void *hlc_static_call(void *fun, hl_type *t, void **args, vdynamic *out);

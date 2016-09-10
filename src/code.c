@@ -282,7 +282,7 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 				o->p1 = INDEX();
 				o->p2 = INDEX();
 				o->p3 = READ();
-				o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * o->p3);
+				o->extra = (int*)hl_malloc(&r->code->falloc,sizeof(int) * o->p3);
 				for(i=0;i<o->p3;i++)
 					o->extra[i] = INDEX();
 			}
@@ -292,7 +292,7 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 				int i;
 				o->p1 = UINDEX();
 				o->p2 = UINDEX();
-				o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * o->p2);
+				o->extra = (int*)hl_malloc(&r->code->falloc,sizeof(int) * o->p2);
 				for(i=0;i<o->p2;i++)
 					o->extra[i] = UINDEX();
 				o->p3 = UINDEX();
@@ -309,7 +309,7 @@ static void hl_read_opcode( hl_reader *r, hl_function *f, hl_opcode *o ) {
 			o->p1 = INDEX();
 			o->p2 = INDEX();
 			o->p3 = INDEX();
-			o->extra = (int*)hl_malloc(&r->code->alloc,sizeof(int) * size);
+			o->extra = (int*)hl_malloc(&r->code->falloc,sizeof(int) * size);
 			for(i=0;i<size;i++)
 				o->extra[i] = INDEX();
 		}
@@ -323,11 +323,11 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 	f->findex = UINDEX();
 	f->nregs = UINDEX();
 	f->nops = UINDEX();
-	f->regs = (hl_type**)hl_malloc(&r->code->alloc, f->nregs * sizeof(hl_type*));
+	f->regs = (hl_type**)hl_malloc(&r->code->falloc, f->nregs * sizeof(hl_type*));
 	for(i=0;i<f->nregs;i++)
 		f->regs[i] = hl_get_type(r);
 	CHK_ERROR();
-	f->ops = (hl_opcode*)hl_malloc(&r->code->alloc, f->nops * sizeof(hl_opcode));
+	f->ops = (hl_opcode*)hl_malloc(&r->code->falloc, f->nops * sizeof(hl_opcode));
 	for(i=0;i<f->nops;i++)
 		hl_read_opcode(r, f, f->ops+i);
 }
@@ -416,6 +416,7 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	hl_alloc_init(&alloc);
 	c = hl_zalloc(&alloc,sizeof(hl_code));
 	c->alloc = alloc;
+	hl_alloc_init(&c->falloc);
 	if( READ() != 'H' || READ() != 'L' || READ() != 'B' )
 		EXIT("Invalid header");
 	r->code = c;
@@ -478,4 +479,8 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	}
 	CHK_ERROR();
 	return c;
+}
+
+void hl_code_free( hl_code *c ) {
+	hl_free(&c->falloc);
 }

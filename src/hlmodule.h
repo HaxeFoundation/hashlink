@@ -71,6 +71,7 @@ typedef struct {
 	hl_native*	natives;
 	hl_function*functions;
 	hl_alloc	alloc;
+	hl_alloc	falloc;
 } hl_code;
 
 typedef struct {

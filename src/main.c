@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
 		return 2;
 	if( !hl_module_init(ctx.m) )
 		return 3;
+	hl_code_free(ctx.code);
 	hl_trap(trap, ctx.exc, on_exception);
 	hl_callback(ctx.m->functions_ptrs[ctx.m->code->entrypoint],ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type,NULL,NULL);
 	hl_module_free(ctx.m);
