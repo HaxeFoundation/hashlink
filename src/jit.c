@@ -1600,10 +1600,22 @@ static void dyn_value_compare( jit_ctx *ctx, preg *a, preg *b, hl_type *t ) {
 		op64(ctx,CMP,a,b);
 		break;
 	case HF32:
-		jit_error("TODO");
+		{
+			preg *fa = alloc_reg(ctx, RFPU);
+			preg *fb = alloc_reg(ctx, RFPU);
+			op64(ctx,MOVSS,fa,pmem(&p,a->id,8));
+			op64(ctx,MOVSS,fb,pmem(&p,b->id,8));
+			op64(ctx,COMISD,fa,fb);
+		}
 		break;
 	case HF64:
-		jit_error("TODO");
+		{
+			preg *fa = alloc_reg(ctx, RFPU);
+			preg *fb = alloc_reg(ctx, RFPU);
+			op64(ctx,MOVSD,fa,pmem(&p,a->id,8));
+			op64(ctx,MOVSD,fb,pmem(&p,b->id,8));
+			op64(ctx,COMISD,fa,fb);
+		}
 		break;
 	default:
 		jit_error("TODO");
@@ -1903,7 +1915,10 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 		size = pad_before_call(ctx, HL_WSIZE*2);
 		op32(ctx,PUSH,pconst64(&p,(int_val)v->t),UNUSED);
 		op32(ctx,MOV,PEAX,REG_AT(Ebp));
-		op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
+		if( v->stackPos >= 0 )
+			op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
+		else
+			op32(ctx,SUB,PEAX,pconst(&p,-v->stackPos));
 		op32(ctx,PUSH,PEAX,UNUSED);
 		call_native(ctx,get_dyncast(dst->t),size);
 		store_native_result(ctx, dst);
@@ -1913,7 +1928,10 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 		op32(ctx,PUSH,pconst64(&p,(int_val)dst->t),UNUSED);
 		op32(ctx,PUSH,pconst64(&p,(int_val)v->t),UNUSED);
 		op32(ctx,MOV,PEAX,REG_AT(Ebp));
-		op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
+		if( v->stackPos >= 0 )
+			op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
+		else
+			op32(ctx,SUB,PEAX,pconst(&p,-v->stackPos));
 		op32(ctx,PUSH,PEAX,UNUSED);
 		call_native(ctx,get_dyncast(dst->t),size);
 		store(ctx, dst, PEAX, true);
@@ -2276,6 +2294,35 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOV,r,pconst64(&p,0));
 				op64(ctx,PUSH,r,UNUSED);
 				op64(ctx,MOV,r,pconst64(&p,(int_val)m->code->functions[m->functions_indexes[o->p2]].type));
+				op64(ctx,PUSH,r,UNUSED);
+				call_native(ctx,hl_alloc_closure_ptr,size);
+				store(ctx,dst,PEAX,true);
+#				endif
+			}
+			break;
+		case OVirtualClosure:
+			{
+#				ifdef HL_64
+				jit_error("TODO");
+#				else
+				int size, i;
+				preg *r = alloc_cpu(ctx, ra, true);
+				hl_type *t = NULL;
+				for(i=0;i<ra->t->obj->nproto;i++) {
+					hl_obj_proto *pp = ra->t->obj->proto + i;
+					if( pp->pindex == o->p3 ) {
+						t = m->code->functions[m->functions_indexes[pp->findex]].type;
+						break;
+					}
+				}
+				size = pad_before_call(ctx,HL_WSIZE*3);
+				op64(ctx,PUSH,r,UNUSED);
+				// read r->type->vobj_proto[i] for function address
+				op64(ctx,MOV,r,pmem(&p,r->id,0));
+				op64(ctx,MOV,r,pmem(&p,r->id,HL_WSIZE*2));
+				op64(ctx,MOV,r,pmem(&p,r->id,HL_WSIZE*o->p3));
+				op64(ctx,PUSH,r,UNUSED);
+				op64(ctx,MOV,r,pconst64(&p,(int_val)t));
 				op64(ctx,PUSH,r,UNUSED);
 				call_native(ctx,hl_alloc_closure_ptr,size);
 				store(ctx,dst,PEAX,true);
@@ -2760,23 +2807,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OSetEnumField:
 			{
 				hl_enum_construct *c = &dst->t->tenum->constructs[0];
-				int i;
-				int pos = sizeof(int);
 				preg *r = alloc_cpu(ctx,dst,true);
-				for(i=0;i<o->p2;i++) {
-					hl_type *t = c->params[i];
-					pos += hl_pad_size(pos,t);
-					pos += hl_type_size(t);
-				}
 				switch( rb->t->kind ) {
 				case HF64:
 					{
 						preg *d = alloc_fpu(ctx,rb,true);
-						copy(ctx,pmem(&p,r->id,pos),d,8);
+						copy(ctx,pmem(&p,r->id,c->offsets[o->p2]),d,8);
 						break;
 					}
 				default:
-					copy(ctx,pmem(&p,r->id,pos),alloc_cpu(ctx,rb,true),hl_type_size(c->params[o->p2]));
+					copy(ctx,pmem(&p,r->id,c->offsets[o->p2]),alloc_cpu(ctx,rb,true),hl_type_size(c->params[o->p2]));
 					break;
 				}
 			}

@@ -92,8 +92,36 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 }
 
 static void *hl_call_wrapper_ptr( vclosure_wrapper *c ) {
-	hl_debug_break();
-	return NULL;
+	char *stack = (char*)&c;
+	vdynamic *args[MAX_ARGS];
+	void *ret;
+	hl_type *tret;
+	int i;
+	int nargs = c->cl.t->fun->nargs;
+	stack += HL_WSIZE;
+	for(i=0;i<nargs;i++) {
+		hl_type *t = c->cl.t->fun->args[i];
+		if( hl_is_dynamic(t) )
+			args[i] = *(vdynamic**)stack;
+		else
+			args[i] = hl_make_dyn(stack,t);
+		stack += hl_type_size(t);
+	}
+	tret = c->cl.t->fun->ret;
+	if( tret->kind != HVOID )
+		hl_debug_break();
+	ret = hl_dyn_call(c->wrappedFun,args,nargs);
+	switch( tret->kind ) {
+	case HVOID:
+		return NULL;
+	case HI8:
+	case HI16:
+	case HI32:
+	case HBOOL:
+		return (void*)(int_val)hl_dyn_casti(ret,&hlt_dyn,tret);
+	default:
+		return hl_dyn_castp(ret,&hlt_dyn,tret);
+	}
 }
 
 static void *hl_call_wrapper_all_ptr( vclosure_wrapper *c ) {
@@ -112,11 +140,6 @@ static void *hl_get_wrapper( hl_type *t ) {
 		case HF64:
 			hl_error("TODO");
 			break;
-		case HI8:
-		case HI16:
-		case HI32:
-			hl_error("TODO");
-			break;			
 		default:
 			return hl_call_wrapper_all_ptr;
 		}
@@ -128,11 +151,6 @@ static void *hl_get_wrapper( hl_type *t ) {
 		case HF64:
 			hl_error("TODO");
 			break;
-		case HI8:
-		case HI16:
-		case HI32:
-			hl_error("TODO");
-			break;			
 		default:
 			return hl_call_wrapper_ptr;
 		}
