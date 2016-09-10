@@ -39,18 +39,17 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	int i, size = 0, pad = 0, pos = 0;
 	for(i=0;i<t->fun->nargs;i++) {
 		hl_type *at = t->fun->args[i];
-		size += hl_type_size(at);
+		size += hl_stack_size(at);
 	}
 	if( size & 15 )
 		pad = 16 - (size&15);
-	size = pos = pad;
+	pos = pad;
 	for(i=0;i<t->fun->nargs;i++) {
 		// RTL
 		int j = t->fun->nargs - 1 - i;
 		hl_type *at = t->fun->args[j];
 		void *v = args[j];
-		int tsize = hl_type_size(at);
-		size += tsize;
+		int tsize = hl_stack_size(at);
 		if( hl_is_ptr(at) )
 			*(void**)&stack.b[pos] = v;
 		else switch( tsize ) {
@@ -63,7 +62,18 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 			*(short*)&stack.b[pos] = *(short*)v;
 			break;
 		case 4:
-			*(int*)&stack.b[pos] = *(int*)v;
+			switch( at->kind ) {
+			case HBOOL:
+			case HI8:
+				*(int*)&stack.b[pos] = *(unsigned char*)v;
+				break;
+			case HI16:
+				*(int*)&stack.b[pos] = *(unsigned short*)v;
+				break;
+			default:
+				*(int*)&stack.b[pos] = *(int*)v;
+				break;
+			}
 			break;
 		case 8:
 			*(double*)&stack.b[pos] = *(double*)v;
@@ -105,7 +115,7 @@ static void *hl_call_wrapper_ptr( vclosure_wrapper *c ) {
 			args[i] = *(vdynamic**)stack;
 		else
 			args[i] = hl_make_dyn(stack,t);
-		stack += hl_type_size(t);
+		stack += hl_stack_size(t);
 	}
 	tret = c->cl.t->fun->ret;
 	if( tret->kind != HVOID )

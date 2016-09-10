@@ -1113,7 +1113,7 @@ static int pad_before_call( jit_ctx *ctx, int size ) {
 
 static void push_reg( jit_ctx *ctx, vreg *r ) {
 	preg p;
-	switch( r->size ) {
+	switch( hl_stack_size(r->t) ) {
 	case 1:
 		op64(ctx,SUB,PESP,pconst(&p,1));
 		op32(ctx,MOV8,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
@@ -1123,6 +1123,8 @@ static void push_reg( jit_ctx *ctx, vreg *r ) {
 		op32(ctx,MOV16,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
 		break;
 	case 4:
+		if( r->size < 4 )
+			alloc_cpu(ctx,r,true); // force fetch (higher bits set to 0)
 		if( !IS_64 ) {
 			if( r->current != NULL && r->current->kind == RFPU ) scratch(r->current);
 			op32(ctx,PUSH,fetch(r),UNUSED);
@@ -1178,7 +1180,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 #endif
 	for(i=count - stackRegs;i<count;i++) {
 		vreg *r = vregs + args[i];
-		size += r->size;
+		size += hl_stack_size(r->t);
 	}
 	paddedSize = pad_before_call(ctx,size);
 	for(i=0;i<stackRegs;i++) {
@@ -1979,13 +1981,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	for(i=0;i<nargs;i++) {
 		vreg *r = R(i);
 		r->stackPos = size + HL_WSIZE * 2;
-		size += r->size;
+		size += hl_stack_size(r->t);
 	}
 	size = 0;
 	for(i=nargs;i<f->nregs;i++) {
 		vreg *r = R(i);
 		size += r->size;
-		size += hl_pad_size(size,r->t);
+		size += hl_pad_size(size,r->t); // align local vars
 		r->stackPos = -size;
 	}
 	size += hl_pad_size(size,&hlt_dyn); // align on word size

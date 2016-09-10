@@ -37,30 +37,41 @@ static const uchar *TSTR[] = {
 	NULL, NULL, NULL
 };
 
+static int T_SIZES[] = {
+	0, // VOID
+	1, // I8
+	2, // I16
+	4, // I32
+	4, // F32
+	8, // F64
+	1, // BOOL
+	HL_WSIZE, // BYTES
+	HL_WSIZE, // DYN
+	HL_WSIZE, // FUN
+	HL_WSIZE, // OBJ
+	HL_WSIZE, // ARRAY
+	HL_WSIZE, // TYPE
+	HL_WSIZE, // REF
+	HL_WSIZE, // VIRTUAL
+	HL_WSIZE, // DYNOBJ
+	HL_WSIZE, // ABSTRACT
+	HL_WSIZE, // ENUM
+	HL_WSIZE, // NULL
+};
 
 HL_PRIM int hl_type_size( hl_type *t ) {
-	static int SIZES[] = {
-		0, // VOID
-		1, // I8
-		2, // I16
-		4, // I32
-		4, // F32
-		8, // F64
-		1, // BOOL
-		HL_WSIZE, // BYTES
-		HL_WSIZE, // DYN
-		HL_WSIZE, // FUN
-		HL_WSIZE, // OBJ
-		HL_WSIZE, // ARRAY
-		HL_WSIZE, // TYPE
-		HL_WSIZE, // REF
-		HL_WSIZE, // VIRTUAL
-		HL_WSIZE, // DYNOBJ
-		HL_WSIZE, // ABSTRACT
-		HL_WSIZE, // ENUM
-		HL_WSIZE, // NULL
-	};
-	return SIZES[t->kind];
+	return T_SIZES[t->kind];
+}
+
+HL_PRIM int hl_stack_size( hl_type *t ) {
+	switch( t->kind ) {
+	case HI8:
+	case HI16:
+	case HBOOL:
+		return sizeof(int);
+	default:
+		return T_SIZES[t->kind];
+	}
 }
 
 HL_PRIM int hl_pad_size( int pos, hl_type *t ) {

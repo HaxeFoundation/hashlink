@@ -302,6 +302,7 @@ struct hl_type {
 
 HL_API int hl_type_size( hl_type *t );
 HL_API int hl_pad_size( int size, hl_type *t );
+HL_API int hl_stack_size( hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
 HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
