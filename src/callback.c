@@ -77,6 +77,12 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 			break;
 		case 8:
 			*(double*)&stack.b[pos] = *(double*)v;
+			{
+				// SWAP (we push in reverse order in hl_callback_entry !
+				int i = *(int*)&stack.b[pos];
+				*(int*)&stack.b[pos] = *(int*)&stack.b[pos + 4];
+				*(int*)&stack.b[pos + 4] = i;
+			}
 			break;
 		default:
 			hl_error("Invalid callback arg");
@@ -88,16 +94,16 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	case HI16:
 	case HI32:
 	case HBOOL:
-		ret->v.i = ((int (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+		ret->v.i = ((int (*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), false);
 		return &ret->v.i;
 	case HF32:
-		ret->v.f = ((float (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+		ret->v.f = ((float (*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), true);
 		return &ret->v.f;
 	case HF64:
-		ret->v.d = ((double (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+		ret->v.d = ((double (*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), true);
 		return &ret->v.d;
 	default:
-		return ((void *(*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
+		return ((void *(*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), false);
 	}
 }
 

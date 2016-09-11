@@ -76,6 +76,7 @@ typedef enum {
 	JMP,
 	// FPU
 	FSTP,
+	FLD,
 	// SSE
 	MOVSD,
 	MOVSS,
@@ -382,6 +383,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "JMP", RM(0xFF,4) },
 	// FPU
 	{ "FSTP", 0, RM(0xDD,3) },
+	{ "FLD", 0, RM(0xDD,0) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
@@ -1804,7 +1806,7 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	CpuReg R8 = Eax;
 #	endif
 	int pos = BUF_POS();
-	int jstart, jcall, jloop;
+	int jstart, jcall, jloop, jfp;
 	preg p;
 
 	jit_buf(ctx);
@@ -1845,6 +1847,14 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	patch_jump_to(ctx, jcall, jloop);
 
 	op64(ctx,CALL,REG_AT(Ecx),UNUSED);
+
+	// if want return float, move XMM0 to x87 stack
+	op64(ctx,MOV,REG_AT(Ecx),pmem(&p,Ebp,HL_WSIZE*5));
+	op64(ctx,TEST,REG_AT(Ecx),REG_AT(Ecx));
+	XJump_small(JZero,jfp);
+	op64(ctx,MOVSD,pmem(&p,Ebp,-8),PXMM(0));
+	op64(ctx,FLD,pmem(&p,Ebp,-8),UNUSED);
+	patch_jump(ctx, jfp);
 
 	// cleanup and ret
 	op64(ctx,MOV,PESP,PEBP);
@@ -2441,7 +2451,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						op64(ctx,PUSH,r,UNUSED);
 						op64(ctx,PUSH,v,UNUSED);
 						call_native(ctx,get_dynget(dst->t),size);
-						store(ctx,dst,IS_FLOAT(dst) ? PXMM(0) : PEAX,true);
+						store_native_result(ctx,dst);
 #						endif
 						XJump_small(JAlways,jend);
 						patch_jump(ctx,jhasfield);
