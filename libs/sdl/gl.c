@@ -458,7 +458,7 @@ HL_PRIM void HL_NAME(gl_uniform4fv)( vdynamic *u, vbyte *buffer, int bufPos, int
 			fprintf(gl_log_out,"%g",((float*)buffer)[bufPos + i]);
 			if( i < count-1 ) {
 				fprintf(gl_log_out,",");
-				if( ((i+1) & 4) == 0 ) fprintf(gl_log_out,"\n\t");
+				if( ((i+1) & 3) == 0 ) fprintf(gl_log_out,"\n\t");
 			}
 		}
 		fprintf(gl_log_out,"\n");
