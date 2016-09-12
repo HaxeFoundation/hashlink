@@ -21,6 +21,7 @@
  */
 #include <hl.h>
 #include <hlmodule.h>
+#include <fenv.h>
 
 #ifdef HL_VCC
 #	include <crtdbg.h>
@@ -90,6 +91,7 @@ int main(int argc, char *argv[]) {
 #	endif
 	hl_global_init(&ctx);
 	hl_sys_init(argv + 2,argc - 2);
+	fesetround(FE_TOWARDZERO);
 	ctx.code = load_code(argv[1]);
 	if( ctx.code == NULL )
 		return 1;
