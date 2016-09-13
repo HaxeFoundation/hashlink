@@ -1277,7 +1277,7 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 	preg p;
 	switch( r->t->kind ) {
 	case HF32:
-		jit_error("TODO");
+		op64(ctx, MOVSS, PXMM(0), fetch(r));
 		break;
 	case HF64:
 		op64(ctx, MOVSD, PXMM(0), fetch(r));
@@ -2148,7 +2148,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OToDyn:
 			{
 				int_val rt = (int_val)ra->t;
-				int jskip;
+				int jskip = 0;
 				if( hl_is_ptr(ra->t) ) {
 					int jnz;
 					preg *a = alloc_cpu(ctx,ra,true);

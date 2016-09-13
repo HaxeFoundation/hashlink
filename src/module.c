@@ -78,7 +78,7 @@ static void hl_init_enum( hl_type_enum *e ) {
 			hl_type *t = c->params[j];
 			c->size += hl_pad_size(c->size,t);
 			c->offsets[j] = c->size;
-			if( hl_is_gc_ptr(t) ) c->hasptr = true;
+			if( hl_is_ptr(t) ) c->hasptr = true;
 			c->size += hl_type_size(t);
 		}
 	}
@@ -167,6 +167,8 @@ int hl_module_init( hl_module *m ) {
 	for(i=0;i<m->code->nglobals;i++) {
 		hl_type *t = m->code->globals[i];
 		if( t->kind == HFUN ) *(void**)(m->globals_data + m->globals_indexes[i]) = null_function;
+		if( hl_is_ptr(t) )
+			hl_add_root((void**)(m->globals_data+m->globals_indexes[i]));
 	}
 	// INIT natives
 	{
