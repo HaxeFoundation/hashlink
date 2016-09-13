@@ -29,12 +29,12 @@ HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	case HUI8:
 		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
 		v->t = t;
-		v->v.ui8 = *(unsigned char*)data;
+		v->v.i = *(unsigned char*)data;
 		return v;
 	case HUI16:
 		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
 		v->t = t;
-		v->v.ui16 = *(unsigned short*)data;
+		v->v.i = *(unsigned short*)data;
 		return v;
 	case HI32:
 		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
