@@ -184,8 +184,8 @@ HL_API void uprintf( const uchar *fmt, const uchar *str );
 
 typedef enum {
 	HVOID	= 0,
-	HI8		= 1,
-	HI16	= 2,
+	HUI8	= 1,
+	HUI16	= 2,
 	HI32	= 3,
 	HF32	= 4,
 	HF64	= 5,
@@ -318,8 +318,8 @@ typedef struct {
 #	endif
 	union {
 		bool b;
-		char c;
-		short s;
+		unsigned char ui8;
+		unsigned short ui16;
 		int i;
 		float f;
 		double d;

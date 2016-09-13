@@ -96,6 +96,7 @@ typedef enum {
 	CMP8,
 	TEST8,
 	MOV16,
+	CMP16,
 	// --
 	_CPU_LAST
 } CpuOp;
@@ -403,6 +404,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
 	{ "MOV16", LONG_OP(0x668B), LONG_OP(0x6689), LONG_OP(0x66B8) },
+	{ "CMP16", LONG_OP(0x663B), LONG_OP(0x6639) },
 };
 
 #ifdef OP_LOG
@@ -1423,9 +1425,12 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OJEq:
 		case OJNotEq:
 			switch( a->t->kind ) {
-			case HI8:
+			case HUI8:
 			case HBOOL:
 				o = CMP8;
+				break;
+			case HUI16:
+				o = CMP16;
 				break;
 			default:
 				o = CMP;
@@ -1439,8 +1444,8 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	}
 	switch( RTYPE(a) ) {
 	case HI32:
-	case HI16:
-	case HI8:
+	case HUI8:
+	case HUI16:
 	case HBOOL:
 #	ifndef HL_64
 	case HDYNOBJ:
@@ -1589,14 +1594,16 @@ static void register_jump( jit_ctx *ctx, int pos, int target ) {
 static void dyn_value_compare( jit_ctx *ctx, preg *a, preg *b, hl_type *t ) {
 	preg p;
 	switch( t->kind ) {
-	case HI8:
+	case HUI8:
 	case HBOOL:
 		op32(ctx,MOV8,a,pmem(&p,a->id,8));
 		op32(ctx,MOV8,b,pmem(&p,b->id,8));
 		op64(ctx,CMP8,a,b);
 		break;
-	case HI16:
-		jit_error("TODO");
+	case HUI16:
+		op32(ctx,MOV16,a,pmem(&p,a->id,8));
+		op32(ctx,MOV16,b,pmem(&p,b->id,8));
+		op64(ctx,CMP16,a,b);
 		break;
 	case HI32:
 		op32(ctx,MOV,a,pmem(&p,a->id,8));
@@ -1632,15 +1639,18 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		int args[] = { a->stack.id, b->stack.id };
 		int size = prepare_call_args(ctx,2,args,ctx->vregs,true,0);
 		call_native(ctx,hl_dyn_compare,size);
-		op32(ctx,TEST,PEAX,PEAX);
 		if( op->op == OJSGt || op->op == OJSGte ) {
-			jit_error("TODO");
+			preg p;
+			int jinvalid;
+			op32(ctx,CMP,PEAX,pconst(&p,hl_invalid_comparison));
+			XJump_small(JEq,jinvalid);
+			op32(ctx,TEST,PEAX,PEAX);
+			register_jump(ctx,do_jump(ctx,op->op, IS_FLOAT(a)),targetPos);
+			patch_jump(ctx,jinvalid);
 			return;
 		}
+		op32(ctx,TEST,PEAX,PEAX);
 	} else switch( a->t->kind ) {
-	case HI16:
-		jit_error("TODO");
-		return;
 	case HTYPE:
 		{
 			int args[] = { a->stack.id, b->stack.id };
@@ -1874,8 +1884,8 @@ static void *get_dyncast( hl_type *t ) {
 	case HF64:
 		return hl_dyn_castd;
 	case HI32:
-	case HI16:
-	case HI8:
+	case HUI16:
+	case HUI8:
 	case HBOOL:
 		return hl_dyn_casti;
 	default:
@@ -1890,8 +1900,8 @@ static void *get_dynset( hl_type *t ) {
 	case HF64:
 		return hl_dyn_setd;
 	case HI32:
-	case HI16:
-	case HI8:
+	case HUI16:
+	case HUI8:
 	case HBOOL:
 		return hl_dyn_seti;
 	default:
@@ -1906,8 +1916,8 @@ static void *get_dynget( hl_type *t ) {
 	case HF64:
 		return hl_dyn_getd;
 	case HI32:
-	case HI16:
-	case HI8:
+	case HUI16:
+	case HUI8:
 	case HBOOL:
 		return hl_dyn_geti;
 	default:

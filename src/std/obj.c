@@ -531,10 +531,10 @@ HL_PRIM int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) return 0;
 	switch( ft->kind ) {
-	case HI8:
-		return *(char*)addr;
-	case HI16:
-		return *(short*)addr;
+	case HUI8:
+		return *(unsigned char*)addr;
+	case HUI16:
+		return *(unsigned short*)addr;
 	case HI32:
 		return *(int*)addr;
 	case HF32:
@@ -618,17 +618,17 @@ HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
 	switch( ft->kind ) {
-	case HI8:
-		*(char*)addr = (char)value;
+	case HUI8:
+		*(unsigned char*)addr = (unsigned char)value;
 		break;
-	case HI16:
-		*(short*)addr = (short)value;
+	case HUI16:
+		*(unsigned short*)addr = (unsigned short)value;
 		break;
 	case HI32:
 		*(int*)addr = value;
 		break;
 	case HBOOL:
-		*(bool*)addr = (bool)value;
+		*(bool*)addr = value != 0;
 		break;
 	case HF32:
 		*(float*)addr = (float)value;
@@ -709,11 +709,11 @@ HL_PRIM void hl_obj_set_field( vdynamic *obj, int hfield, vdynamic *v ) {
 		return;
 	}
 	switch( v->t->kind ) {
-	case HI8:
-		hl_dyn_seti(obj,hfield,v->t,v->v.c);
+	case HUI8:
+		hl_dyn_seti(obj,hfield,v->t,v->v.ui8);
 		break;
-	case HI16:
-		hl_dyn_seti(obj,hfield,v->t,v->v.s);
+	case HUI16:
+		hl_dyn_seti(obj,hfield,v->t,v->v.ui16);
 		break;
 	case HI32:
 		hl_dyn_seti(obj,hfield,v->t,v->v.i);

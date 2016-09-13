@@ -26,15 +26,15 @@
 HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	vdynamic *v;
 	switch( t->kind ) {
-	case HI8:
+	case HUI8:
 		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
 		v->t = t;
-		v->v.c = *(char*)data;
+		v->v.ui8 = *(unsigned char*)data;
 		return v;
-	case HI16:
+	case HUI16:
 		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
 		v->t = t;
-		v->v.s = *(short*)data;
+		v->v.ui16 = *(unsigned short*)data;
 		return v;
 	case HI32:
 		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
@@ -83,10 +83,10 @@ HL_PRIM int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 		if( !hl_is_dynamic(t) ) data = &v->v;
 	}
 	switch( t->kind ) {
-	case HI8:
-		return *(char*)data;
-	case HI16:
-		return *(short*)data;
+	case HUI8:
+		return *(unsigned char*)data;
+	case HUI16:
+		return *(unsigned short*)data;
 	case HI32:
 		return *(int*)data;
 	case HF32:
@@ -170,8 +170,8 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 		if( to->tparam->kind == t->kind )
 			return hl_make_dyn(data,t);
 		switch( to->tparam->kind ) {
-		case HI8:
-		case HI16:
+		case HUI8:
+		case HUI16:
 		case HI32:
 		case HBOOL:
 			{
@@ -208,10 +208,10 @@ HL_PRIM double hl_dyn_castd( void *data, hl_type *t ) {
 		return *(float*)data;
 	case HF64:
 		return *(double*)data;
-	case HI8:
-		return *(char*)data;
-	case HI16:
-		return *(short*)data;
+	case HUI8:
+		return *(unsigned char*)data;
+	case HUI16:
+		return *(unsigned short*)data;
 	case HI32:
 		return *(int*)data;
 	case HBOOL:
@@ -240,10 +240,10 @@ HL_PRIM float hl_dyn_castf( void *data, hl_type *t ) {
 		return *(float*)data;
 	case HF64:
 		return (float)*(double*)data;
-	case HI8:
-		return *(char*)data;
-	case HI16:
-		return *(short*)data;
+	case HUI8:
+		return *(unsigned char*)data;
+	case HUI16:
+		return *(unsigned short*)data;
 	case HI32:
 		return (float)*(int*)data;
 	case HBOOL:
@@ -282,18 +282,21 @@ HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	if( b == NULL )
 		return 1;
 	switch( TK2(a->t->kind,b->t->kind) ) {
-	case TK2(HI8,HI8):
-		return a->v.c - b->v.c;
-	case TK2(HI16,HI16):
-		return a->v.s - b->v.s;
+	case TK2(HUI8,HUI8):
+		return (int)a->v.ui8 - (int)b->v.ui8;
+	case TK2(HUI16,HUI16):
+		return (int)a->v.ui16 - (int)b->v.ui16;
 	case TK2(HI32,HI32):
-		return a->v.i - b->v.i;
+		{
+			int d = a->v.i - b->v.i;
+			return d == hl_invalid_comparison ? -1 : d;
+		}
 	case TK2(HF32,HF32):
 		return fcompare(a->v.f,b->v.f);
 	case TK2(HF64,HF64):
 		return dcompare(a->v.d,b->v.d);
 	case TK2(HBOOL,HBOOL):
-		return a->v.b - b->v.b;
+		return (int)a->v.b - (int)b->v.b;
 	case TK2(HF64, HI32):
 		return dcompare(a->v.d,(double)b->v.i);
 	case TK2(HI32, HF64):
@@ -318,12 +321,14 @@ HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 
 HL_PRIM void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
 	switch( t->kind ) {
-	case HI8:
-	case HBOOL:
-		*(char*)data = (char)hl_dyn_casti(&v,&hlt_dyn,t);
+	case HUI8:
+		*(unsigned char*)data = (unsigned char)hl_dyn_casti(&v,&hlt_dyn,t);
 		break;
-	case HI16:
-		*(short*)data = (short)hl_dyn_casti(&v,&hlt_dyn,t);
+	case HBOOL:
+		*(bool*)data = hl_dyn_casti(&v,&hlt_dyn,t) != 0;
+		break;
+	case HUI16:
+		*(unsigned short*)data = (unsigned short)hl_dyn_casti(&v,&hlt_dyn,t);
 		break;
 	case HI32:
 		*(int*)data = hl_dyn_casti(&v,&hlt_dyn,t);

@@ -65,8 +65,8 @@ HL_PRIM int hl_type_size( hl_type *t ) {
 
 HL_PRIM int hl_stack_size( hl_type *t ) {
 	switch( t->kind ) {
-	case HI8:
-	case HI16:
+	case HUI8:
+	case HUI16:
 	case HBOOL:
 		return sizeof(int);
 	default:
@@ -90,8 +90,8 @@ HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 		return false;
 	switch( a->kind ) {
 	case HVOID:
-	case HI8:
-	case HI16:
+	case HUI8:
+	case HUI16:
 	case HI32:
 	case HF32:
 	case HF64:

@@ -134,11 +134,11 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack );
 static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack ) {
 	uchar buf[32];
 	switch( t->kind ) {
-	case HI8:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),(int)*(char*)data));
+	case HUI8:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),(int)*(unsigned char*)data));
 		break;
-	case HI16:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),(int)*(short*)data));
+	case HUI16:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),(int)*(unsigned short*)data));
 		break;
 	case HI32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(int*)data));
@@ -185,11 +185,11 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 	case HVOID:
 		hl_buffer_str_sub(b,USTR("void"),4);
 		break;
-	case HI8:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.c));
+	case HUI8:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.ui8));
 		break;
-	case HI16:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.s));
+	case HUI16:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.ui16));
 		break;
 	case HI32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.i));

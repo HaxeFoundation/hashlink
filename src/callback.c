@@ -26,13 +26,7 @@
 static void *hl_callback_entry = NULL;
 
 void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
-	union {
-		unsigned char b[MAX_ARGS * 8];
-		unsigned short s[MAX_ARGS * 4];
-		int i[MAX_ARGS * 2];
-		double d[MAX_ARGS];
-		void *p[MAX_ARGS * 8 / HL_WSIZE];
-	} stack;	
+	unsigned char stack[MAX_ARGS * 8];	
 	/*
 		Same as jit(prepare_call_args) but writes values to the stack var
 	*/
@@ -51,37 +45,37 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		void *v = args[j];
 		int tsize = hl_stack_size(at);
 		if( hl_is_ptr(at) )
-			*(void**)&stack.b[pos] = v;
+			*(void**)&stack[pos] = v;
 		else switch( tsize ) {
 		case 0:
 			continue;
 		case 1:
-			stack.b[pos] = *(char*)v;
+			stack[pos] = *(unsigned char*)v;
 			break;
 		case 2:
-			*(short*)&stack.b[pos] = *(short*)v;
+			*(unsigned short*)&stack[pos] = *(unsigned short*)v;
 			break;
 		case 4:
 			switch( at->kind ) {
 			case HBOOL:
-			case HI8:
-				*(int*)&stack.b[pos] = *(unsigned char*)v;
+			case HUI8:
+				*(int*)&stack[pos] = *(unsigned char*)v;
 				break;
-			case HI16:
-				*(int*)&stack.b[pos] = *(unsigned short*)v;
+			case HUI16:
+				*(int*)&stack[pos] = *(unsigned short*)v;
 				break;
 			default:
-				*(int*)&stack.b[pos] = *(int*)v;
+				*(int*)&stack[pos] = *(int*)v;
 				break;
 			}
 			break;
 		case 8:
-			*(double*)&stack.b[pos] = *(double*)v;
+			*(double*)&stack[pos] = *(double*)v;
 			{
 				// SWAP (we push in reverse order in hl_callback_entry !
-				int i = *(int*)&stack.b[pos];
-				*(int*)&stack.b[pos] = *(int*)&stack.b[pos + 4];
-				*(int*)&stack.b[pos + 4] = i;
+				int i = *(int*)&stack[pos];
+				*(int*)&stack[pos] = *(int*)&stack[pos + 4];
+				*(int*)&stack[pos + 4] = i;
 			}
 			break;
 		default:
@@ -90,8 +84,8 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		pos += tsize;
 	}
 	switch( t->fun->ret->kind ) {
-	case HI8:
-	case HI16:
+	case HUI8:
+	case HUI16:
 	case HI32:
 	case HBOOL:
 		ret->v.i = ((int (*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), false);
@@ -130,8 +124,8 @@ static void *hl_call_wrapper_ptr( vclosure_wrapper *c ) {
 	switch( tret->kind ) {
 	case HVOID:
 		return NULL;
-	case HI8:
-	case HI16:
+	case HUI8:
+	case HUI16:
 	case HI32:
 	case HBOOL:
 		return (void*)(int_val)hl_dyn_casti(ret,&hlt_dyn,tret);

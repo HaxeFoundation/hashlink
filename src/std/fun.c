@@ -140,8 +140,8 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 			}
 		} else switch( t->kind ) {
 		case HBOOL:
-		case HI8:
-		case HI16:
+		case HUI8:
+		case HUI16:
 		case HI32:
 			tmp[i].i = hl_dyn_casti(vargs + i, &hlt_dyn,t);
 			p = &tmp[i].i;
@@ -237,8 +237,8 @@ HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 			hl_type *to = w->t->fun->args[i];
 			void *v = hl_is_ptr(t) ? args + i : args[i];
 			switch( to->kind ) {
-			case HI8:
-			case HI16:
+			case HUI8:
+			case HUI16:
 			case HI32:
 			case HBOOL:
 				tmp[i].i = hl_dyn_casti(v,t,to);
@@ -265,8 +265,8 @@ HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 	switch( tfun->ret->kind ) {
 	case HVOID:
 		return NULL;
-	case HI8:
-	case HI16:
+	case HUI8:
+	case HUI16:
 	case HI32:
 	case HBOOL:
 		ret->v.i = hl_dyn_casti(aret,w->t->fun->ret,tfun->ret);
