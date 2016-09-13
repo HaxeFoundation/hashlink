@@ -2632,8 +2632,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					if( need_dyn ) {
 						if( IS_FLOAT(dst) )
 							jit_error("TODO");
-						// v->v
-						copy(ctx,PEAX,pmem(&p,Esp,8 - sizeof(vdynamic)),dst->size);
+						else
+							copy(ctx,PEAX,pmem(&p,Esp,8 - sizeof(vdynamic)),dst->size);
 					}
 
 					XJump_small(JAlways,jend);
