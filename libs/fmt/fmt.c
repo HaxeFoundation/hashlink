@@ -1,5 +1,6 @@
 #define HL_NAME(n) fmt_##n
 #include <turbojpeg.h>
+#include <zlib.h>
 #include <hl.h>
 
 typedef struct {
@@ -56,5 +57,110 @@ HL_PRIM void HL_NAME(img_scale)( vbyte *out, int outPos, int outStride, int outW
 	}
 }
 
+typedef struct _fmt_zip fmt_zip;
+struct _fmt_zip {
+	void (*finalize)( fmt_zip * );
+	z_stream *z;
+	int flush;
+};
+
+static void free_stream_inf( fmt_zip *v ) {
+	inflateEnd(v->z); // no error
+	free(v->z);
+	v->z = NULL;
+}
+
+static void zlib_error( z_stream *z, int err ) {
+	hl_buffer *b = hl_alloc_buffer();
+	vdynamic *d;
+	hl_buffer_cstr(b, "ZLib Error : ");
+	if( z && z->msg ) {
+		hl_buffer_cstr(b,z->msg);
+		hl_buffer_cstr(b," (");
+	}
+	d = hl_alloc_dynamic(&hlt_i32);
+	d->v.i = err;
+	hl_buffer_val(b,d);
+	if( z && z->msg )
+		hl_buffer_char(b,')');
+	d = hl_alloc_dynamic(&hlt_bytes);
+	d->v.ptr = hl_buffer_content(b,NULL);
+	hl_throw(d);
+}
+
+HL_PRIM fmt_zip *HL_NAME(inflate_init)( int wbits ) {
+	z_stream *z;
+	int err;
+	fmt_zip *s;
+	if( wbits == 0 )
+		wbits = MAX_WBITS;
+	z = (z_stream*)malloc(sizeof(z_stream));
+	memset(z,0,sizeof(z_stream));
+	if( (err = inflateInit2(z,wbits)) != Z_OK ) {
+		free(z);
+		zlib_error(NULL,err);
+	}
+	s = (fmt_zip*)hl_gc_alloc_finalizer(sizeof(fmt_zip));
+	s->finalize = free_stream_inf;
+	s->flush = Z_NO_FLUSH;
+	s->z = z;
+	return s;
+}
+
+HL_PRIM void HL_NAME(inflate_end)( fmt_zip *z ) {
+	free_stream_inf(z);
+}
+
+HL_PRIM void HL_NAME(inflate_flush_mode)( fmt_zip *z, int flush ) {
+	switch( flush ) {
+	case 0:
+		z->flush = Z_NO_FLUSH;
+		break;
+	case 1:
+		z->flush = Z_SYNC_FLUSH;
+		break;
+	case 2:
+		z->flush = Z_FULL_FLUSH;
+		break;
+	case 3:
+		z->flush = Z_FINISH;
+		break;
+	case 4:
+		z->flush = Z_BLOCK;
+		break;
+	default:
+		hl_error_msg(USTR("Invalid flush mode %d"),flush);
+		break;
+	}
+}
+
+
+HL_PRIM bool HL_NAME(inflate_buffer)( fmt_zip *zip, vbyte *src, int srcpos, int srclen, vbyte *dst, int dstpos, int dstlen, int *read, int *write ) {
+	int slen, dlen, err;
+	z_stream *z = zip->z;
+	slen = srclen - srcpos;
+	dlen = dstlen - dstpos;
+	if( srcpos < 0 || dstpos < 0 || slen < 0 || dlen < 0 )
+		hl_error("Out of range");
+	z->next_in = (Bytef*)(src + srcpos);
+	z->next_out = (Bytef*)(dst + dstpos);
+	z->avail_in = slen;
+	z->avail_out = dlen;
+	if( (err = inflate(z,zip->flush)) < 0 )
+		zlib_error(z,err);
+	z->next_in = NULL;
+	z->next_out = NULL;
+	*read = slen - z->avail_in;
+	*write = dlen - z->avail_out;
+	return err == Z_STREAM_END;
+}
+
+#define _INFL _ABSTRACT(fmt_inflater)
+
+DEFINE_PRIM(_INFL, inflate_init, _I32);
+DEFINE_PRIM(_VOID, inflate_end, _INFL);
+DEFINE_PRIM(_VOID, inflate_flush_mode, _INFL _I32);
+DEFINE_PRIM(_BOOL, inflate_buffer, _INFL _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_BOOL, jpg_decode, _BYTES _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, img_scale, _BYTES _I32 _I32 _I32 _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
+

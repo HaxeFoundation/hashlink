@@ -2776,6 +2776,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx,dst,dst->current,false);
 			}
 			break;
+		case OUnref:
+			BREAK();
+			copy_to(ctx,dst,pmem(&p,alloc_cpu(ctx,ra,true)->id,0));
+			break;
 		case OToVirtual:
 			{
 #				ifdef HL_64

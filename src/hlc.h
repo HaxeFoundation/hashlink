@@ -38,6 +38,8 @@
 #undef stdin
 #undef stdout
 #undef stderr
+#undef DELETE
+#undef NO_ERROR
 
 // disable some warnings triggered by HLC code generator
 
