@@ -83,17 +83,6 @@ int ucmp( const uchar *a, const uchar *b ) {
 	}
 }
 
-int strtou( uchar *out, int out_size, const char *str ) {
-	uchar *start = out;
-	if( out_size <= 0 ) return -1;
-	while( out_size-- ) {
-		if( *str == 0 ) break;
-		*out++ = *str++;
-	}
-	*out = 0;
-	return (int)(out - start);
-}
-
 int uvsprintf( uchar *out, const uchar *fmt, va_list arglist ) {
 	uchar *start = out;
 	char cfmt[20];

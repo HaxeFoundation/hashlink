@@ -141,7 +141,7 @@ static const uchar *hl_get_ustring( hl_reader *r ) {
 	if( str == NULL ) {
 		int size = hl_utf8_length((vbyte*)r->code->strings[i],0);
 		str = hl_malloc(&r->code->alloc,(size+1)<<1);
-		strtou(str,size+1,r->code->strings[i]);
+		hl_from_utf8(str,size+1,r->code->strings[i]);
 		r->code->ustrings[i] = str;
 	}
 	return str;

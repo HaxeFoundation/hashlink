@@ -2298,7 +2298,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					int i = o->p2;
 					int size = hl_utf8_length((vbyte*)m->code->strings[i],0);
 					str = hl_malloc(&m->code->alloc,(size+1)<<1);
-					strtou(str,size+1,m->code->strings[i]);
+					hl_from_utf8(str,size+1,m->code->strings[i]);
 					m->code->ustrings[i] = str;
 				}
 				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)str));

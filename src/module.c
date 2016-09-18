@@ -43,7 +43,7 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 		return NULL;
 	file = debug_addr[0];
 	line = debug_addr[1];
-	*outSize = strtou(out,*outSize,cur_module->code->debugfiles[file]);
+	*outSize = hl_from_utf8(out,*outSize,cur_module->code->debugfiles[file]);
 	*outSize += usprintf(out + *outSize, size - *outSize, USTR(" line %d"), line);
 	return out;
 }

@@ -155,7 +155,6 @@ typedef wchar_t	uchar;
 #	define utod(s,end)	wcstod(s,end)
 #	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
-#	define strtou(out,size,str) mbstowcs(out,str,size)	
 #	define utostr(out,size,str) wcstombs(out,str,size)	
 #else
 #	include <stdarg.h>
@@ -167,7 +166,6 @@ HL_API uchar *ustrdup( const uchar *str );
 HL_API double utod( const uchar *str, uchar **end );
 HL_API int utoi( const uchar *str, uchar **end );
 HL_API int ucmp( const uchar *a, const uchar *b );
-HL_API int strtou( uchar *out, int out_size, const char *str );
 HL_API int utostr( char *out, int out_size, const uchar *str );
 HL_API int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
 HL_API int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
@@ -426,9 +424,10 @@ HL_API vdynamic *hl_alloc_obj( hl_type *t );
 HL_API vvirtual *hl_alloc_virtual( hl_type *t );
 HL_API vdynobj *hl_alloc_dynobj();
 HL_API vbyte *hl_alloc_bytes( int size );
-HL_API vbyte *hl_copy_bytes( vbyte *byte, int size );
-HL_API int hl_utf8_length( vbyte *s, int pos );
-HL_API char *hl_to_utf8( uchar *bytes );
+HL_API vbyte *hl_copy_bytes( const vbyte *byte, int size );
+HL_API int hl_utf8_length( const vbyte *s, int pos );
+HL_API int hl_from_utf8( uchar *out, int outLen, const char *str );
+HL_API char *hl_to_utf8( const uchar *bytes );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
 
 HL_API int hl_hash( vbyte *name );

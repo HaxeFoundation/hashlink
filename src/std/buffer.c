@@ -85,9 +85,9 @@ HL_PRIM void hl_buffer_str( hl_buffer *b, const uchar *s ) {
 
 HL_PRIM void hl_buffer_cstr( hl_buffer *b, const char *s ) {
 	if( s ) {
-		int len = (int)strlen(s);
+		int len = (int)hl_utf8_length((vbyte*)s,0);
 		uchar *out = (uchar*)malloc(sizeof(uchar)*(len+1));
-		strtou(out,len,s);
+		hl_from_utf8(out,len,s);
 		hl_buffer_str_sub(b,out,len);
 		free(out);
 	} else hl_buffer_str_sub(b,USTR("NULL"),4);
