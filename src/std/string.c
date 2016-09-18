@@ -85,12 +85,15 @@ HL_PRIM int hl_utf8_length( vbyte *s, int pos ) {
 			}
 			s++;
 		} else if( c < 0xC0 )
-			return len;
-		else if( c < 0xE0 )
-			s+=2;
-		else if( c < 0xF0 )
+			return len - 1;
+		else if( c < 0xE0 ) {
+			if( (s[1]&0x80) == 0 ) return len - 1;
+			s += 2;
+		} else if( c < 0xF0 ) {
+			if( ((s[1]&s[2])&0x80) == 0 ) return len - 1;
 			s+=3;
-		else if( c < 0xF8 ) {
+		} else if( c < 0xF8 ) {
+			if( ((s[1]&s[2]&s[3])&0x80) == 0 ) return len - 1;
 			len++; // surrogate pair
 			s+=4;
 		} else
@@ -103,13 +106,12 @@ HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *size ) {
 	int ulen = hl_utf8_length(str, pos);
 	uchar *s = (uchar*)hl_gc_alloc_noptr((ulen + 1)*sizeof(uchar));
 	uchar *cur = s;
+	int p = 0;
 	unsigned int c, c2, c3;
 	str += pos;
-	while( true ) {
+	while( p++ < ulen ) {
 		c = (unsigned)*str++;
-		if( c == 0 )
-			break;
-		else if( c < 0x80 ) {
+		if( c < 0x80 ) {
 			// nothing
 		} else if( c < 0xE0 ) {
 			c = ((c & 0x3F) << 6) | ((*str++)&0x7F);
