@@ -40,6 +40,7 @@
 #undef stderr
 #undef DELETE
 #undef NO_ERROR
+#undef EOF
 
 // disable some warnings triggered by HLC code generator
 

@@ -424,9 +424,13 @@ static void hl_dyn_change_field( vdynobj *o, hl_field_lookup *f, hl_type *t ) {
 		// we want to only remap this field because we don't want to have to rebuild all virtuals
 		// let's see if we have enough place already in case we have a hole after.
 		int i;
-		for(i=0;i<o->nfields;i++) {
-			hl_field_lookup *f2 = &o->dproto->fields + i;
-			if( f2->field_index > f->field_index && f2->field_index < f->field_index + size ) break;
+		if( f->field_index + size > o->dataSize )
+			i = -1;
+		else {
+			for(i=0;i<o->nfields;i++) {
+				hl_field_lookup *f2 = &o->dproto->fields + i;
+				if( f2->field_index > f->field_index && f2->field_index < f->field_index + size ) break;
+			}
 		}
 		// not enough space, expand and move at end of data
 		if( i < o->nfields ) {
