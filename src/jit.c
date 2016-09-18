@@ -144,7 +144,7 @@ static int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
 #	define XJump_small(how,local)		AddJump_small(how,local)
 #endif
 
-#define MAX_OP_SIZE				64
+#define MAX_OP_SIZE				256
 
 #define TODO()					printf("TODO(jit.c:%d)\n",__LINE__)
 
@@ -1074,6 +1074,8 @@ static void store_native_result( jit_ctx *ctx, vreg *r ) {
 
 static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
 	preg *r = fetch(from);
+	if( from->t->kind == HF32 && r->kind != RFPU ) 
+		r = alloc_fpu(ctx,from,true);
 	store(ctx, to, r, true);
 }
 
@@ -2679,10 +2681,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 							jit_error("TODO");
 						else {
 							copy(ctx,PEAX,pmem(&p,Esp,8 - sizeof(vdynamic)),dst->size);
-							store(ctx, dst, PEAX, true);
+							store(ctx, dst, PEAX, false);
 						}
 					} else
-						store(ctx, dst, PEAX, true);
+						store(ctx, dst, PEAX, false);
 
 					XJump_small(JAlways,jend);
 					patch_jump(ctx,jhasfield);
@@ -2690,6 +2692,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					/*
 						o = o->value hack
 					*/
+					if( v->holds ) v->holds->current = NULL;
 					obj->current = v;
 					v->holds = obj;
 					op64(ctx,MOV,v,pmem(&p,v->id,HL_WSIZE));
