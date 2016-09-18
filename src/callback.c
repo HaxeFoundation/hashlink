@@ -118,8 +118,6 @@ static void *hl_call_wrapper_ptr( vclosure_wrapper *c ) {
 		stack += hl_stack_size(t);
 	}
 	tret = c->cl.t->fun->ret;
-	if( tret->kind != HVOID )
-		hl_debug_break();
 	ret = hl_dyn_call(c->wrappedFun,args,nargs);
 	switch( tret->kind ) {
 	case HVOID:

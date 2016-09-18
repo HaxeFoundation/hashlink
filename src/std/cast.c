@@ -109,6 +109,8 @@ HL_PRIM int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 }
 
 HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
+	if( to->kind == HDYN && hl_is_dynamic(t) )
+		return *(vdynamic**)data;
 	if( t->kind == HDYN || t->kind == HNULL ) {
 		vdynamic *v = *(vdynamic**)data;
 		if( v == NULL ) return NULL;
