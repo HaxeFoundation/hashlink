@@ -174,7 +174,6 @@ HL_PRIM vbyte* hl_ucs2_lower( vbyte *str, int pos, int len ) {
 	return (vbyte*)out;
 }
 
-// TODO : currently it is actually ucs2_to_utf8...
 HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
 	vbyte *out;
 	uchar *c = (uchar*)(str + pos);
@@ -187,7 +186,10 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
 			utf8bytes++;
 		else if( v < 0x800 )
 			utf8bytes += 2;
-		else
+		else if( v >= 0xD800 && v <= 0xDFFF ) {
+			utf8bytes += 4;
+			c++;
+		} else
 			utf8bytes += 3;
 		c++;
 	}
@@ -201,6 +203,12 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
 		} else if( v < 0x800 ) {
 			out[p++] = (vbyte)(0xC0|(v>>6));
 			out[p++] = (vbyte)(0x80|(v&63));
+		} else if( v >= 0xD800 && v <= 0xDFFF ) {
+			int k = ((((int)v - 0xD800) << 10) | (((int)*++c) - 0xDC00)) + 0x10000;
+			out[p++] = (vbyte)(0xF0|(k>>18));
+			out[p++] = (vbyte)(0x80 | ((k >> 12) & 63));
+			out[p++] = (vbyte)(0x80 | ((k >> 6) & 63));
+			out[p++] = (vbyte)(0x80 | (k & 63));
 		} else {
 			out[p++] = (vbyte)(0xE0|(v>>12));
 			out[p++] = (vbyte)(0x80|((v>>6)&63));
