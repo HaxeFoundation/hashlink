@@ -1331,7 +1331,7 @@ static void on_jit_error( const char *msg, int_val line ) {
 #ifdef HL_WIN
 	MessageBoxA(NULL,buf,"JIT ERROR",MB_OK);
 #else
-	printf("%s\n",buf);
+	printf("JIT ERROR : %s\n",buf);
 #endif
 	hl_debug_break();
 	hl_throw(NULL);
@@ -1400,9 +1400,10 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 			return pa;
 		case OSDiv:
 		case OUDiv:
-		case OSMod:			
+		case OSMod:
+		case OUMod:
 			{
-				preg *out = op->op == OSMod ? REG_AT(Edx) : PEAX;
+				preg *out = op->op == OSMod || op->op == OUMod ? REG_AT(Edx) : PEAX;
 				preg *r = alloc_cpu(ctx,b,true);
 				int jz, jend;
 				// integer div 0 => 0
@@ -1417,11 +1418,11 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 					load(ctx,PEAX,a);
 				}
 				scratch(REG_AT(Edx));
-				if( op->op == OUDiv )
+				if( op->op == OUDiv || op->op == OUMod )
 					op32(ctx, XOR, REG_AT(Edx), REG_AT(Edx));
 				else
 					op32(ctx, CDQ, UNUSED, UNUSED); // sign-extend Eax into Eax:Edx
-				op32(ctx, op->op == OUDiv ? DIV : IDIV, fetch(b), UNUSED);
+				op32(ctx, op->op == OUDiv || op->op == OUMod ? DIV : IDIV, fetch(b), UNUSED);
 				patch_jump(ctx, jend);
 				if( dst ) store(ctx, dst, out, true);
 				return out;
@@ -1726,6 +1727,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		if( hl_get_obj_rt(a->t)->compareFun ) {
 			preg *pa = alloc_cpu(ctx,a,true);
 			preg *pb = alloc_cpu(ctx,b,true);
+			preg p;
 			int jeq, ja, jb, jcmp;
 			int args[] = { a->stack.id, b->stack.id };
 			switch( op->op ) {
@@ -1764,7 +1766,16 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				patch_jump(ctx,jeq);
 				break;
 			default:
-				jit_error("TODO");
+				// if( a && b && cmp(a,b) ?? 0 ) goto
+				op64(ctx,TEST,pa,pa);
+				XJump_small(JZero,ja);
+				op64(ctx,TEST,pb,pb);
+				XJump_small(JZero,jb);
+				op_call_fun(ctx,NULL,(int)a->t->obj->rt->compareFun,2,args);
+				op64(ctx,CMP,PEAX,pconst(&p,0));
+				register_jump(ctx,do_jump(ctx,op->op,false),targetPos);
+				patch_jump(ctx,ja);
+				patch_jump(ctx,jb);
 				break;
 			}
 			return;
@@ -1933,6 +1944,10 @@ static void *get_dynget( hl_type *t ) {
 	default:
 		return hl_dyn_getp;
 	}
+}
+
+static double uint_to_double( unsigned int v ) {
+	return v;
 }
 
 static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
@@ -2104,6 +2119,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OOr:
 		case OXor:
 		case OSMod:
+		case OUMod:
 			op_binop(ctx, dst, ra, rb, o);
 			break;
 		case ONeg:
@@ -2208,6 +2224,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			} else
 				ASSERT(0);
 			break;
+		case OToUFloat:
+			{
+				int size;
+				size = prepare_call_args(ctx,1,&o->p2,ctx->vregs,true,0);
+				call_native(ctx,uint_to_double,size);
+				store_native_result(ctx,dst);
+			}
+			break;
 		case OToInt:
 			if( ra->t->kind == HF64 ) {
 				preg *r = alloc_fpu(ctx,ra,true);
@@ -2280,6 +2304,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)str));
 				store(ctx,dst,dst->current,false);
 			}
+			break;
+		case OBytes:
+			op64(ctx,MOV,alloc_cpu(ctx,dst,false),pconst64(&p,(int_val)m->code->strings[o->p2]));
+			store(ctx,dst,dst->current,false);
 			break;
 		case ONull:
 			{
@@ -2512,16 +2540,21 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #						else
 						switch( rb->t->kind ) {
 						case HF64:
-							jit_error("TODO");
+							size = pad_before_call(ctx,HL_WSIZE*2 + sizeof(double));
+							push_reg(ctx,rb);
+							break;
+						case HF32:
+							size = pad_before_call(ctx,HL_WSIZE*2 + sizeof(float));
+							push_reg(ctx,rb);
 							break;
 						default:
 							size = pad_before_call(ctx,HL_WSIZE*4);
 							op64(ctx,PUSH,fetch(rb),UNUSED);
 							op64(ctx,MOV,r,pconst64(&p,(int_val)rb->t));
+							op64(ctx,PUSH,r,UNUSED);
 							break;
 						}
-						op64(ctx,PUSH,r,UNUSED);
-						op64(ctx,MOV,r,pconst64(&p,(int_val)dst->t->virt->fields[o->p2].hashed_name));
+						op32(ctx,MOV,r,pconst(&p,dst->t->virt->fields[o->p2].hashed_name));
 						op64(ctx,PUSH,r,UNUSED);
 						op64(ctx,PUSH,obj,UNUSED);
 						call_native(ctx,get_dynset(rb->t),size);
@@ -2644,9 +2677,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					if( need_dyn ) {
 						if( IS_FLOAT(dst) )
 							jit_error("TODO");
-						else
+						else {
 							copy(ctx,PEAX,pmem(&p,Esp,8 - sizeof(vdynamic)),dst->size);
-					}
+							store(ctx, dst, PEAX, true);
+						}
+					} else
+						store(ctx, dst, PEAX, true);
 
 					XJump_small(JAlways,jend);
 					patch_jump(ctx,jhasfield);
@@ -2789,8 +2825,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OUnref:
-			BREAK();
 			copy_to(ctx,dst,pmem(&p,alloc_cpu(ctx,ra,true)->id,0));
+			break;
+		case OSetref:
+			copy_from(ctx,pmem(&p,alloc_cpu(ctx,dst,true)->id,0),ra);
 			break;
 		case OToVirtual:
 			{
@@ -2879,23 +2917,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				ifdef HL_64
 				jit_error("TODO");
 #				else
-				switch( dst->t->kind ) {
-				case HF32:
-				case HF64:
-					jit_error("TODO");
-					break;
-				default:
-					r = alloc_reg(ctx,RCPU);
+				r = alloc_reg(ctx,RCPU);
+				if( IS_FLOAT(dst) ) {
+					size = pad_before_call(ctx,HL_WSIZE*2);
+				} else {
 					size = pad_before_call(ctx,HL_WSIZE*3);
 					op64(ctx,MOV,r,pconst64(&p,(int_val)dst->t));
 					op64(ctx,PUSH,r,UNUSED);
-					op64(ctx,MOV,r,pconst64(&p,(int_val)hl_hash_utf8(m->code->strings[o->p3])));
-					op64(ctx,PUSH,r,UNUSED);
-					op64(ctx,PUSH,fetch(ra),UNUSED);
-					call_native(ctx,get_dynget(dst->t),size);
-					store_native_result(ctx,dst);
-					break;
 				}
+				op64(ctx,MOV,r,pconst64(&p,(int_val)hl_hash_utf8(m->code->strings[o->p3])));
+				op64(ctx,PUSH,r,UNUSED);
+				op64(ctx,PUSH,fetch(ra),UNUSED);
+				call_native(ctx,get_dynget(dst->t),size);
+				store_native_result(ctx,dst);
 #				endif
 			}
 			break;
