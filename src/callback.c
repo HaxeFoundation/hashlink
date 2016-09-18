@@ -126,9 +126,9 @@ static void *hl_call_wrapper_ptr( vclosure_wrapper *c ) {
 	case HUI16:
 	case HI32:
 	case HBOOL:
-		return (void*)(int_val)hl_dyn_casti(ret,&hlt_dyn,tret);
+		return (void*)(int_val)hl_dyn_casti(&ret,&hlt_dyn,tret);
 	default:
-		return hl_dyn_castp(ret,&hlt_dyn,tret);
+		return hl_dyn_castp(&ret,&hlt_dyn,tret);
 	}
 }
 
