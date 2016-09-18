@@ -76,6 +76,7 @@ typedef enum {
 	JMP,
 	// FPU
 	FSTP,
+	FSTP32,
 	FLD,
 	// SSE
 	MOVSD,
@@ -384,6 +385,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "JMP", RM(0xFF,4) },
 	// FPU
 	{ "FSTP", 0, RM(0xDD,3) },
+	{ "FSTP32", 0, RM(0xD9,3) },
 	{ "FLD", 0, RM(0xDD,0) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
@@ -1058,8 +1060,16 @@ static void store_native_result( jit_ctx *ctx, vreg *r ) {
 		store(ctx,r,PEAX,true);
 		return;
 	}
-	scratch(r->current);
-	op64(ctx,FSTP,&r->stack,UNUSED);
+	switch( r->t->kind ) {
+	case HF64:
+		scratch(r->current);
+		op64(ctx,FSTP,&r->stack,UNUSED);
+		break;
+	case HF32:
+		scratch(r->current);
+		op64(ctx,FSTP32,&r->stack,UNUSED);
+		break;
+	}
 }
 
 static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
@@ -2164,10 +2174,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
 					op64(ctx,MOV,tmp,&ra->stack);
 					op64(ctx,MOV,pmem(&p,Eax,8),tmp);
-					ra->stackPos += 4;
-					op64(ctx,MOV,tmp,&ra->stack);
-					op64(ctx,MOV,pmem(&p,Eax,12),tmp);
-					ra->stackPos -= 4;
+					if( ra->t->kind == HF64 ) {
+						ra->stackPos += 4;
+						op64(ctx,MOV,tmp,&ra->stack);
+						op64(ctx,MOV,pmem(&p,Eax,12),tmp);
+						ra->stackPos -= 4;
+					}
 				} else {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
 					copy_from(ctx,tmp,ra);
@@ -2802,7 +2814,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int_val args[] = { c->size, c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR };
 				int i;
 				call_native_consts(ctx, hl_gc_alloc_gen, args, 2);
-				store(ctx, dst, PEAX, true);
 				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
 				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));
 				RLOCK(PEAX);
@@ -2811,6 +2822,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					copy(ctx, pmem(&p,Eax,c->offsets[i]),r, R(o->extra[i])->size);
 					RUNLOCK(fetch(R(o->extra[i])));
 				}
+				store(ctx, dst, PEAX, true);
 			}
 			break;
 		case OEnumAlloc:
