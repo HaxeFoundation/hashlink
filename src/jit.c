@@ -1392,7 +1392,8 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				op32(ctx,MOV,REG_AT(Ecx),pb);
 				RLOCK(REG_AT(Ecx));
 				pa = fetch(a);
-			}
+			} else
+				RLOCK(b->current);
 			if( pa->kind != RCPU ) {
 				pa = alloc_reg(ctx, RCPU);
 				op32(ctx,MOV,pa,fetch(a));
