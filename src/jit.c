@@ -92,6 +92,8 @@ typedef enum {
 	CVTSD2SI,
 	CVTSD2SS,
 	CVTSS2SD,
+	STMXCSR,
+	LDMXCSR,
 	// 8-16 bits
 	MOV8,
 	CMP8,
@@ -354,9 +356,10 @@ typedef struct {
 } opform;
 
 #define RM(op,id) ((op) | (((id)+1)<<8))
-#define GET_RM(op)	(((op) >> 8) & 15)
+#define GET_RM(op)	(((op) >> ((op) < 0 ? 24 : 8)) & 15)
 #define SBYTE(op) ((op) << 16)
 #define LONG_OP(op)	((op) | 0x80000000)
+#define LONG_RM(op,id)	LONG_OP(op | (((id) + 1) << 24))
 
 static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOV", 0x8B, 0x89, 0xB8, 0, RM(0xC7,0) },
@@ -401,6 +404,8 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CVTSD2SI", 0xF20F2D },
 	{ "CVTSD2SS", 0xF20F5A },
 	{ "CVTSS2SD", 0xF30F5A },
+	{ "STMXCSR", 0, LONG_RM(0x0FAE,3) },
+	{ "LDMXCSR", 0, LONG_RM(0x0FAE,2) },
 	// 8 bits,
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
 	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
@@ -2239,7 +2244,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			if( ra->t->kind == HF64 ) {
 				preg *r = alloc_fpu(ctx,ra,true);
 				preg *w = alloc_cpu(ctx,dst,false);
+				preg *tmp = alloc_reg(ctx,RCPU);
+				op32(ctx,STMXCSR,pmem(&p,Esp,-4),UNUSED);
+				op32(ctx,MOV,tmp,&p);
+				op32(ctx,OR,tmp,pconst(&p,0x6000)); // set round towards 0
+				op32(ctx,MOV,pmem(&p,Esp,-8),tmp);
+				op32(ctx,LDMXCSR,&p,UNUSED);
 				op32(ctx,CVTSD2SI,w,r);
+				op32(ctx,LDMXCSR,pmem(&p,Esp,-4),UNUSED);
 				store(ctx, dst, w, true);
 			} else if (ra->t->kind == HF32) {
 				ASSERT(0);
