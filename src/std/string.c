@@ -31,6 +31,10 @@ HL_PRIM vbyte *hl_itos( int i, int *len ) {
 HL_PRIM vbyte *hl_ftos( double d, int *len ) {
 	uchar tmp[24];
 	int k;
+	if( d != d ) {
+		*len = 3;
+		return hl_copy_bytes((vbyte*)USTR("NaN"),8);
+	}
 #	if defined(HL_VCC) && !defined(HL_64)
 	/*
 		For some unknown reason, we reach here with some conditional bits set in FPU status,

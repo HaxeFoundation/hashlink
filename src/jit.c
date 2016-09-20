@@ -112,6 +112,8 @@ typedef enum {
 #define JNeq		0x85
 #define JULte		0x86
 #define JUGt		0x87
+#define JParity		0x8A
+#define JNParity	0x8B
 #define JSLt		0x8C
 #define JSGte		0x8D
 #define JSLte		0x8E
@@ -417,7 +419,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 #ifdef OP_LOG
 
 static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
-static const char *JUMP_NAMES[] = { "JOVERFLOW", "J???", "JLT", "JGTE", "JEQ", "JNEQ", "JLTE", "JGT", "J?8", "J?9", "J?A", "J?B", "JSLT", "JSGTE", "JSLTE", "JSGT" };
+static const char *JUMP_NAMES[] = { "JOVERFLOW", "J???", "JLT", "JGTE", "JEQ", "JNEQ", "JLTE", "JGT", "J?8", "J?9", "JP, "JNP", "JSLT", "JSGTE", "JSLTE", "JSGT" };
 
 static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 	static char buf[64];
@@ -1547,6 +1549,38 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RFPU,RFPU):
 			op64(ctx,o,pa,pb);
+			if( o == COMISD && op->op != OJSGt ) {
+				int jnotnan;
+				XJump_small(JNParity,jnotnan);
+				switch( op->op ) {
+				case OJSLt:
+					{
+						preg *r = alloc_reg(ctx,RCPU);
+						// set CF=0, ZF=1
+						op64(ctx,XOR,r,r);
+						RUNLOCK(r);
+						break;
+					}
+				case OJSGte:
+					{
+						preg *r = alloc_reg(ctx,RCPU);
+						// set ZF=0, CF=1
+						op64(ctx,XOR,r,r);
+						op64(ctx,CMP,r,PESP);
+						RUNLOCK(r);
+						break;
+					}
+					break;
+				case OJNotEq:
+				case OJEq:
+					// set ZF=0, CF=?
+				case OJSLte:
+					// set ZF=0, CF=0
+					op64(ctx,TEST,PESP,PESP);
+					break;
+				}
+				patch_jump(ctx,jnotnan);
+			}
 			scratch(pa);
 			out = pa;
 			break;
