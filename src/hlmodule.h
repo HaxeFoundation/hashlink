@@ -90,6 +90,7 @@ typedef struct jit_ctx jit_ctx;
 
 hl_code *hl_code_read( const unsigned char *data, int size );
 void hl_code_free( hl_code *c );
+const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
 
 hl_module *hl_module_alloc( hl_code *code );

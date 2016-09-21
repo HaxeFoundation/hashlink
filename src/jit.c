@@ -2222,7 +2222,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					preg *a = alloc_cpu(ctx,ra,true);
 					op64(ctx,TEST,a,a);
 					XJump_small(JNotZero,jnz);
-					store(ctx,dst,a,true);
+					op64(ctx,XOR,PEAX,PEAX); // will replace the result of alloc_dynamic at jump land
 					XJump_small(JAlways,jskip);
 					patch_jump(ctx,jnz);
 				}
@@ -2243,8 +2243,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					copy_from(ctx,tmp,ra);
 					op64(ctx,MOV,pmem(&p,Eax,8),tmp);
 				}
-				store(ctx, dst, PEAX, true);
 				if( hl_is_ptr(ra->t) ) patch_jump(ctx,jskip);
+				store(ctx, dst, PEAX, true);
 			}
 			break;
 		case OToSFloat:
@@ -2341,18 +2341,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OString:
-			{
-				uchar *str = m->code->ustrings[o->p2];
-				if( !str ) {
-					int i = o->p2;
-					int size = hl_utf8_length((vbyte*)m->code->strings[i],0);
-					str = hl_malloc(&m->code->alloc,(size+1)<<1);
-					hl_from_utf8(str,size+1,m->code->strings[i]);
-					m->code->ustrings[i] = str;
-				}
-				op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)str));
-				store(ctx,dst,dst->current,false);
-			}
+			op64(ctx,MOV,alloc_cpu(ctx, dst, false),pconst64(&p,(int_val)hl_get_ustring(m->code,o->p2)));
+			store(ctx,dst,dst->current,false);
 			break;
 		case OBytes:
 			op64(ctx,MOV,alloc_cpu(ctx,dst,false),pconst64(&p,(int_val)m->code->strings[o->p2]));
@@ -2996,7 +2986,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				case HF64:
 					size = pad_before_call(ctx, HL_WSIZE*2 + sizeof(double));
 					push_reg(ctx,rb);
-					op32(ctx,PUSH,pconst64(&p,hl_hash_utf8(m->code->strings[o->p2])),UNUSED);
+					op32(ctx,PUSH,pconst64(&p,hl_hash_gen(hl_get_ustring(m->code,o->p2),true)),UNUSED);
 					op32(ctx,PUSH,fetch(dst),UNUSED);
 					call_native(ctx,get_dynset(rb->t),size);
 					break;
@@ -3004,7 +2994,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					size = pad_before_call(ctx, HL_WSIZE*4);
 					op32(ctx,PUSH,fetch(rb),UNUSED);
 					op32(ctx,PUSH,pconst64(&p,(int_val)rb->t),UNUSED);
-					op32(ctx,PUSH,pconst64(&p,hl_hash_utf8(m->code->strings[o->p2])),UNUSED);
+					op32(ctx,PUSH,pconst64(&p,hl_hash_gen(hl_get_ustring(m->code,o->p2),true)),UNUSED);
 					op32(ctx,PUSH,fetch(dst),UNUSED);
 					call_native(ctx,get_dynset(rb->t),size);
 					break;

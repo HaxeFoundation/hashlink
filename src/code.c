@@ -121,7 +121,7 @@ static hl_type *hl_get_type( hl_reader *r ) {
 	return r->code->types + i;
 }
 
-static const char *hl_get_string( hl_reader *r ) {
+static const char *hl_read_string( hl_reader *r ) {
 	int i = INDEX();
 	if( i < 0 || i >= r->code->nstrings ) {
 		ERROR("Invalid string index");
@@ -130,21 +130,24 @@ static const char *hl_get_string( hl_reader *r ) {
 	return r->code->strings[i];
 }
 
-static const uchar *hl_get_ustring( hl_reader *r ) {
+const uchar *hl_get_ustring( hl_code *code, int index ) {
+	uchar *str = code->ustrings[index];
+	if( str == NULL ) {
+		int size = hl_utf8_length((vbyte*)code->strings[index],0);
+		str = hl_malloc(&code->alloc,(size+1)<<1);
+		hl_from_utf8(str,size+1,code->strings[index]);
+		code->ustrings[index] = str;
+	}
+	return str;
+}
+
+static const uchar *hl_read_ustring( hl_reader *r ) {
 	int i = INDEX();
-	uchar *str;
 	if( i < 0 || i >= r->code->nstrings ) {
 		ERROR("Invalid string index");
 		i = 0;
 	}
-	str = r->code->ustrings[i];
-	if( str == NULL ) {
-		int size = hl_utf8_length((vbyte*)r->code->strings[i],0);
-		str = hl_malloc(&r->code->alloc,(size+1)<<1);
-		hl_from_utf8(str,size+1,r->code->strings[i]);
-		r->code->ustrings[i] = str;
-	}
-	return str;
+	return hl_get_ustring(r->code,i);
 }
 
 static void hl_read_type( hl_reader *r, hl_type *t ) {
@@ -165,7 +168,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 	case HOBJ:
 		{
 			int i;
-			const uchar *name = hl_get_ustring(r);
+			const uchar *name = hl_read_ustring(r);
 			int super = INDEX();
 			int global = UINDEX();
 			int nfields = UINDEX();
@@ -181,13 +184,13 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			t->obj->rt = NULL;
 			for(i=0;i<nfields;i++) {
 				hl_obj_field *f = t->obj->fields + i;
-				f->name = hl_get_ustring(r);
+				f->name = hl_read_ustring(r);
 				f->hashed_name = hl_hash_gen(f->name,true);
 				f->t = hl_get_type(r);
 			}
 			for(i=0;i<nproto;i++) {
 				hl_obj_proto *p = t->obj->proto + i;
-				p->name = hl_get_ustring(r);
+				p->name = hl_read_ustring(r);
 				p->hashed_name = hl_hash_gen(p->name,true);
 				p->findex = UINDEX();
 				p->pindex = INDEX();
@@ -206,26 +209,26 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			t->virt->fields = (hl_obj_field*)hl_malloc(&r->code->alloc,sizeof(hl_obj_field)*nfields);
 			for(i=0;i<nfields;i++) {
 				hl_obj_field *f = t->virt->fields + i;
-				f->name = hl_get_ustring(r);
+				f->name = hl_read_ustring(r);
 				f->hashed_name = hl_hash_gen(f->name,true);
 				f->t = hl_get_type(r);
 			}
 		}
 		break;
 	case HABSTRACT:
-		t->abs_name = hl_get_ustring(r);
+		t->abs_name = hl_read_ustring(r);
 		break;
 	case HENUM:
 		{
 			int i,j;
 			t->tenum = hl_malloc(&r->code->alloc,sizeof(hl_type_enum));
-			t->tenum->name = hl_get_ustring(r);
+			t->tenum->name = hl_read_ustring(r);
 			t->tenum->global_value = (void**)(int_val)UINDEX();
 			t->tenum->nconstructs = READ();
 			t->tenum->constructs = (hl_enum_construct*)hl_malloc(&r->code->alloc, sizeof(hl_enum_construct)*t->tenum->nconstructs);
 			for(i=0;i<t->tenum->nconstructs;i++) {
 				hl_enum_construct *c = t->tenum->constructs + i;
-				c->name = hl_get_ustring(r);
+				c->name = hl_read_ustring(r);
 				c->nparams = UINDEX();
 				c->params = (hl_type**)hl_malloc(&r->code->alloc,sizeof(hl_type*)*c->nparams);
 				c->offsets = (int*)hl_malloc(&r->code->alloc,sizeof(int)*c->nparams);
@@ -464,8 +467,8 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	ALLOC(c->natives, hl_native, c->nnatives);
 	for(i=0;i<c->nnatives;i++) {
 		hl_native *n = c->natives + i;
-		n->lib = hl_get_string(r);
-		n->name = hl_get_string(r);
+		n->lib = hl_read_string(r);
+		n->name = hl_read_string(r);
 		n->t = hl_get_type(r);
 		n->findex = UINDEX();
 	}

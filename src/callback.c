@@ -136,6 +136,12 @@ static void *hl_call_wrapper_all_ptr( vclosure_wrapper *c ) {
 	return hl_wrapper_call(c,&c + 1, NULL);
 }
 
+static int hl_call_wrapper_all_ptr_i( vclosure_wrapper *c ) {
+	vdynamic d;
+	hl_wrapper_call(c,&c + 1, &d);
+	return d.v.i;
+}
+
 static void *hl_get_wrapper( hl_type *t ) {
 #	ifndef HL_64
 	int i;
@@ -148,6 +154,11 @@ static void *hl_get_wrapper( hl_type *t ) {
 		case HF64:
 			hl_error("TODO");
 			break;
+		case HUI8:
+		case HUI16:
+		case HI32:
+		case HBOOL:
+			return hl_call_wrapper_all_ptr_i;
 		default:
 			return hl_call_wrapper_all_ptr;
 		}
