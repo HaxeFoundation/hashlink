@@ -365,7 +365,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 		if( hl_safe_cast(obj->t, vt) ) return (vvirtual*)obj;
 		return hl_to_virtual(vt,hl_virtual_make_value((vvirtual*)obj));
 	default:
-		hl_fatal1("Don't know how to virtual %d",obj->t->kind);
+		hl_error_msg(USTR("Can't cast %s to %s"), hl_type_str(obj->t), vt);
 	}
 	return v;
 }
