@@ -1,5 +1,6 @@
 #define HL_NAME(n) sdl_##n
 #include <hl.h>
+#include <SDL.h>
 
 #ifdef __APPLE__
 #	include <OpenGL/glu.h>
@@ -8,34 +9,15 @@
 #endif
 
 #include <glext.h>
+#define GL_IMPORT(fun, t) PFNGL##t##PROC fun
+#include "GLImports.h"
+#undef GL_IMPORT
+#define GL_IMPORT(fun,t)	fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) return 1
 
-#ifdef _WIN32
-#	define GL_IMPORT(fun, t) PFNGL##t##PROC fun
+static int GLLoadAPI() {
 #	include "GLImports.h"
-	HMODULE module = NULL;
-
-#	undef GL_IMPORT
-#	define GL_IMPORT(fun,t)	fun = (PFNGL##t##PROC)glLoad(#fun); if( fun == NULL ) return 1
-
-	void *glLoad(const char * name) {
-		void * fun = (void *)wglGetProcAddress(name);
-		if (fun == (void *)1 || fun == (void *)2 || fun == (void *)3 || fun == (void *)-1) fun = NULL;
-		if (fun == NULL) fun = GetProcAddress(module, name);
-		if (fun == NULL) MessageBoxA(NULL, "Failed to load GL function", name, MB_ICONERROR);
-		return fun;
-	}
-
-	int GLLoadAPI() {
-		if (module != NULL) return 0;
-		module = LoadLibraryA("opengl32.dll");
-#		include "GLImports.h"
-		return 0;
-	}
-#else
-int GLLoadAPI() {
 	return 0;
 }
-#endif
 
 #ifdef GL_LOG
 #	define GLOG(fmt,...)	if( gl_log_active ) fprintf(gl_log_out, __FUNCTION__ "(" fmt ")\n", __VA_ARGS__)
