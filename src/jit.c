@@ -150,8 +150,6 @@ static int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
 
 #define MAX_OP_SIZE				256
 
-#define TODO()					printf("TODO(jit.c:%d)\n",__LINE__)
-
 #define BUF_POS()				((int)(ctx->buf.b - ctx->startBuf))
 #define RTYPE(r)				r->t->kind
 
@@ -1682,8 +1680,11 @@ static void dyn_value_compare( jit_ctx *ctx, preg *a, preg *b, hl_type *t ) {
 		}
 		break;
 	default:
-		jit_error("TODO");
-		break;
+		// ptr comparison
+		op64(ctx,MOV,a,pmem(&p,a->id,8));
+		op64(ctx,MOV,b,pmem(&p,b->id,8));
+		op64(ctx,CMP,a,b);
+		break;	
 	}
 }
 
@@ -1754,16 +1755,99 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 			return;
 		}
 	case HVIRTUAL:
-		if( b->t->kind == HOBJ ) {
-			jit_error("TODO");
+		{
+			preg p;
+			preg *pa = alloc_cpu(ctx,a,true);
+			preg *pb = alloc_cpu(ctx,b,true);
+			int ja,jb,jav,jbv,jvalue;
+			if( b->t->kind == HOBJ ) {
+				if( op->op == OJEq ) {
+					// if( a ? (b && a->value == b) : (b == NULL) ) goto
+					op64(ctx,TEST,pa,pa);
+					XJump_small(JZero,ja);
+					op64(ctx,TEST,pb,pb);
+					XJump_small(JZero,jb);
+					op64(ctx,MOV,pa,pmem(&p,pa->id,HL_WSIZE));
+					op64(ctx,CMP,pa,pb);
+					XJump_small(JAlways,jvalue);
+					patch_jump(ctx,ja);
+					op64(ctx,TEST,pb,pb);
+					patch_jump(ctx,jvalue);
+					register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
+					patch_jump(ctx,jb);
+				} else if( op->op == OJNotEq ) {
+					// if( a ? (b == NULL || a->value != b) : (b != NULL) ) goto
+					op64(ctx,TEST,pa,pa);
+					XJump_small(JZero,ja);
+					op64(ctx,TEST,pb,pb);
+					register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
+					op64(ctx,MOV,pa,pmem(&p,pa->id,HL_WSIZE));
+					op64(ctx,CMP,pa,pb);
+					XJump_small(JAlways,jvalue);
+					patch_jump(ctx,ja);
+					op64(ctx,TEST,pb,pb);
+					patch_jump(ctx,jvalue);
+					register_jump(ctx,do_jump(ctx,OJNotEq,false),targetPos);
+				} else
+					ASSERT(op->op);
+				scratch(pa);
+				return;
+			}
+			op64(ctx,CMP,pa,pb);
+			if( op->op == OJEq ) {
+				// if( a == b || (a && b && a->value && b->value && a->value == b->value) ) goto
+				register_jump(ctx,do_jump(ctx,OJEq, false),targetPos);
+				op64(ctx,TEST,pa,pa);
+				XJump_small(JZero,ja);
+				op64(ctx,TEST,pb,pb);
+				XJump_small(JZero,jb);
+				op64(ctx,MOV,pa,pmem(&p,pa->id,HL_WSIZE));
+				op64(ctx,TEST,pa,pa);
+				XJump_small(JZero,jav);
+				op64(ctx,MOV,pb,pmem(&p,pb->id,HL_WSIZE));
+				op64(ctx,TEST,pb,pb);
+				XJump_small(JZero,jbv);
+				op64(ctx,CMP,pa,pb);
+				XJump_small(JNeq,jvalue);
+				register_jump(ctx,do_jump(ctx,OJEq, false),targetPos);
+				patch_jump(ctx,ja);
+				patch_jump(ctx,jb);
+				patch_jump(ctx,jav);
+				patch_jump(ctx,jbv);
+				patch_jump(ctx,jvalue);
+			} else if( op->op == OJNotEq ) {
+				int jnext;
+				// if( a != b && (!a || !b || !a->value || !b->value || a->value != b->value) ) goto
+				XJump_small(JEq,jnext);
+				op64(ctx,TEST,pa,pa);
+				XJump_small(JZero,ja);
+				op64(ctx,TEST,pb,pb);
+				XJump_small(JZero,jb);
+				op64(ctx,MOV,pa,pmem(&p,pa->id,HL_WSIZE));
+				op64(ctx,TEST,pa,pa);
+				XJump_small(JZero,jav);
+				op64(ctx,MOV,pb,pmem(&p,pb->id,HL_WSIZE));
+				op64(ctx,TEST,pb,pb);
+				XJump_small(JZero,jbv);
+				op64(ctx,CMP,pa,pb);
+				XJump_small(JEq,jvalue);
+				patch_jump(ctx,ja);
+				patch_jump(ctx,jb);
+				patch_jump(ctx,jav);
+				patch_jump(ctx,jbv);
+				register_jump(ctx,do_jump(ctx,OJEq, false),targetPos);
+				patch_jump(ctx,jnext);
+				patch_jump(ctx,jvalue);
+			} else
+				ASSERT(op->op);
+			scratch(pa);
+			scratch(pb);
 			return;
 		}
-		// physical comparison
-		op_binop(ctx,NULL,a,b,op);
 		break;
 	case HOBJ:
 		if( b->t->kind == HVIRTUAL ) {
-			jit_error("TODO");
+			op_jump(ctx,b,a,op,targetPos); // inverse
 			return;
 		}
 		if( hl_get_obj_rt(a->t)->compareFun ) {
@@ -2981,7 +3065,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				else
 				switch( rb->t->kind ) {
 				case HF32:
-					jit_error("TODO");
+					size = pad_before_call(ctx, HL_WSIZE*2 + sizeof(float));
+					push_reg(ctx,rb);
+					op32(ctx,PUSH,pconst64(&p,hl_hash_gen(hl_get_ustring(m->code,o->p2),true)),UNUSED);
+					op32(ctx,PUSH,fetch(dst),UNUSED);
+					call_native(ctx,get_dynset(rb->t),size);
 					break;
 				case HF64:
 					size = pad_before_call(ctx, HL_WSIZE*2 + sizeof(double));
@@ -3055,7 +3143,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					break;
 				}
 			default:
-				jit_error("assert");
+				ASSERT(ra->t->kind);
 			}
 			break;
 		case OSwitch:
