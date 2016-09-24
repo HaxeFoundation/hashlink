@@ -11,6 +11,10 @@ class Sdl {
 		if( !initOnce() ) throw "Failed to init SDL";
 		isWin32 = detectWin32();
 	}
+	
+	static function __init__() {
+		hl.types.Api.setErrorHandler(function(e) reportError(e));
+	}
 
 	static function initOnce() return false;
 	static function eventLoop( e : Event ) return false;
@@ -26,10 +30,38 @@ class Sdl {
 					break;
 				if( event.type == Quit )
 					return;
-				if( onEvent != null ) onEvent(event);
+				if( onEvent != null ) {
+					try {
+						onEvent(event);
+					} catch( e : Dynamic ) {
+						reportError(e);
+					}
+				}
 			}
-			callb();
+			try {
+				callb();
+			} catch( e : Dynamic ) {
+				reportError(e);
+			}
         }
+	}
+	
+	public dynamic static function reportError( e : Dynamic ) {
+		var f = new hl.UI.WinLog("Uncaught Exception", 400, 300);
+		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
+		var err = try Std.string(e) catch( _ : Dynamic ) "????";
+		Sys.println(err + stack);
+		f.setTextContent(err+"\n"+stack);
+		var but = new hl.UI.Button(f, "Continue");
+		but.onClick = function() {
+			hl.UI.stopLoop();
+		};
+		var but = new hl.UI.Button(f, "Exit");
+		but.onClick = function() {
+			Sys.exit(0);
+		};
+		while( hl.UI.loop(true) != Quit ) {};
+		f.destroy();
 	}
 
 	public static function quit() {
