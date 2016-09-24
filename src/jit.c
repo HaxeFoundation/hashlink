@@ -2076,6 +2076,29 @@ static double uint_to_double( unsigned int v ) {
 	return v;
 }
 
+static vclosure *alloc_static_closure( jit_ctx *ctx, int fid, hl_runtime_obj *obj, int field ) {
+	hl_module *m = ctx->m;
+	vclosure *c = hl_malloc(&m->ctx.alloc,sizeof(vclosure));
+	int fidx = m->functions_indexes[fid];
+	c->hasValue = 0;
+	if( fidx >= m->code->nfunctions ) {
+		// native
+		c->t = m->code->natives[fidx - m->code->nfunctions].t;
+		c->fun = m->functions_ptrs[fid];
+		c->value = NULL;
+	} else {
+		c->t = m->code->functions[fidx].type;
+		c->fun = (void*)(int_val)fid;
+		c->value = ctx->closure_list;
+		ctx->closure_list = c;
+		if( obj ) {
+			m->code->functions[fidx].obj = obj->t->obj;
+			m->code->functions[fidx].field = obj->t->obj->fields[field - (obj->parent?obj->parent->nfields:0)].name;
+		}
+	}
+	return c;
+}
+
 static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 	int size;
 	preg p;
@@ -2577,22 +2600,20 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OStaticClosure:
 			{
-				// todo : share duplicates ?
-				vclosure *c = hl_malloc(&m->ctx.alloc,sizeof(vclosure));
+				vclosure *c = alloc_static_closure(ctx,o->p2,NULL,0);
 				preg *r = alloc_reg(ctx, RCPU);
-				c->t = dst->t;
-				c->hasValue = 0;
-				if( ctx->m->functions_indexes[o->p2] >= ctx->m->code->nfunctions ) {
-					// native
-					c->fun = ctx->m->functions_ptrs[o->p2];
-					c->value = NULL;
-				} else {
-					c->fun = (void*)(int_val)o->p2;
-					c->value = ctx->closure_list;
-					ctx->closure_list = c;
-				}
 				op64(ctx, MOV, r, pconst64(&p,(int_val)c));
 				store(ctx,dst,r,true);
+			}
+			break;
+		case OSetMethod:
+			{
+				hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
+				vclosure *c = alloc_static_closure(ctx,o->p3,rt,o->p2);
+				preg *r = alloc_reg(ctx, RCPU);
+				preg *ro = alloc_cpu(ctx, dst, true);
+				op64(ctx, MOV, r, pconst64(&p,(int_val)c));
+				op64(ctx, MOV, pmem(&p,(CpuReg)ro->id, rt->fields_indexes[o->p2]), r);
 			}
 			break;
 		case OField:

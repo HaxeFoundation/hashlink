@@ -45,6 +45,9 @@ typedef struct {
 	hl_type **regs;
 	hl_opcode *ops;
 	int *debug;
+
+	hl_type_obj *obj;
+	const uchar *field;
 } hl_function;
 
 typedef struct {

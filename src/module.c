@@ -35,16 +35,37 @@ static hl_module *cur_module;
 static void *stack_top;
 
 static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
-	int pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code)) >> JIT_CALL_PRECISION;
-	int *debug_addr = cur_module->jit_debug[pos];
+	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code)) >> JIT_CALL_PRECISION;
+	int *debug_addr = cur_module->jit_debug[code_pos];
 	int file, line;
 	int size = *outSize;
+	int pos = 0;
+	hl_function *fdebug;
 	if( !debug_addr )
 		return NULL;
+	{
+		// resolve function from its debug addr
+		int min = 0;
+		int max = cur_module->code->nfunctions;
+		while( min < max ) {
+			int mid = (min + max) >> 1;
+			hl_function *f = cur_module->code->functions + mid;
+			if( debug_addr < f->debug )
+				max = mid;
+			else
+				min = mid + 1;
+		}
+		fdebug = cur_module->code->functions + (((min + max) >> 1) - 1);
+	}
 	file = debug_addr[0];
 	line = debug_addr[1];
-	*outSize = hl_from_utf8(out,*outSize,cur_module->code->debugfiles[file]);
-	*outSize += usprintf(out + *outSize, size - *outSize, USTR(" line %d"), line);
+	if( fdebug->obj )
+		pos += usprintf(out,size - pos,USTR("%s.%s("),fdebug->obj->name,fdebug->field);
+	else
+		pos += usprintf(out,size - pos,USTR("fun$%d("),fdebug->findex);
+	pos += hl_from_utf8(out + pos,size - pos,cur_module->code->debugfiles[file]);
+	pos += usprintf(out + pos, size - pos, USTR(":%d)"), line);
+	*outSize = pos;
 	return out;
 }
 
@@ -224,6 +245,15 @@ int hl_module_init( hl_module *m ) {
 		case HOBJ:
 			t->obj->m = &m->ctx;
 			t->obj->global_value = ((int)t->obj->global_value) ? (void**)(m->globals_data + m->globals_indexes[(int)t->obj->global_value-1]) : NULL;
+			{
+				int j;
+				for(j=0;j<t->obj->nproto;j++) {
+					hl_obj_proto *p = t->obj->proto + j;
+					hl_function *f = m->code->functions + m->functions_indexes[p->findex];
+					f->obj = t->obj;
+					f->field = p->name;
+				}
+			}
 			break;
 		case HENUM:
 			hl_init_enum(t->tenum);

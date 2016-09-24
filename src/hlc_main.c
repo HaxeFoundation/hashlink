@@ -56,7 +56,7 @@ static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 		line.FileName = USTR("\\?");
 		line.LineNumber = 0;
 		SymGetLineFromAddrW64(stack_process_handle, (DWORD64)(int_val)addr, &offset, &line);
-		*outSize = usprintf(out,*outSize,USTR("%s(%s) line %d"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,(int)line.LineNumber);
+		*outSize = usprintf(out,*outSize,USTR("%s(%s:%d)"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,(int)line.LineNumber);
 		return out;
 	}
 #endif
