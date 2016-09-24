@@ -128,10 +128,21 @@ typedef int (*capture_stack_type)( void **stack, int size );
 
 static resolve_symbol_type resolve_symbol_func = hl_resolve_symbol;
 static capture_stack_type capture_stack_func = hl_capture_stack;
+static vclosure *hl_error_handler = NULL;
 
 HL_PRIM void hl_exception_setup( void *resolve_symbol, void *capture_stack ) {
 	resolve_symbol_func = resolve_symbol;
 	capture_stack_func = capture_stack;
+}
+
+HL_PRIM void hl_set_error_handler( vclosure *d ) {
+	if( d == hl_error_handler )
+		return;
+	hl_error_handler = d;
+	if( d )
+		hl_add_root(&hl_error_handler);
+	else
+		hl_remove_root(&hl_error_handler);
 }
 
 HL_PRIM void hl_throw( vdynamic *v ) {
@@ -142,7 +153,10 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	}
 	hl_current_exc = v;
 	hl_current_trap = t->prev;
-	if( hl_current_trap == NULL ) hl_debug_break();
+	if( hl_current_trap == NULL ) {
+		hl_debug_break();
+		if( hl_error_handler ) hl_dyn_call(hl_error_handler,&v,1);
+	}
 	longjmp(t->buf,1);
 }
 
@@ -190,3 +204,6 @@ HL_PRIM void hl_fatal_fmt( const char *file, int line, const char *fmt, ...) {
 	va_end(args);
 	hl_fatal_error(buf,file,line);
 }
+
+DEFINE_PRIM(_ARR,exception_stack,_NO_ARG);
+DEFINE_PRIM(_VOID,set_error_handler,_FUN(_VOID,_DYN));

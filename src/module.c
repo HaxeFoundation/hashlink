@@ -204,7 +204,7 @@ int hl_module_init( hl_module *m ) {
 			append_type(&p,n->t);
 			*p++ = 0;
 			if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
-				hl_fatal4("Invalid signature for function %s@%s : %s required but %s found",n->lib,n->name,tmp,sign);
+				hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
 		}
 	}
 	// INIT indexes

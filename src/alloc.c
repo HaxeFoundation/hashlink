@@ -588,6 +588,7 @@ static void gc_mark() {
 		gc_pheader *page;
 		if( !p ) continue;
 		page = GC_GET_PAGE(p);
+		if( !page ) continue; // the value was set to a not gc allocated ptr
 		// don't check if valid ptr : it's a manual added root, so should be valid
 		int bid = ((unsigned char*)p - (unsigned char*)page) / page->block_size;
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
