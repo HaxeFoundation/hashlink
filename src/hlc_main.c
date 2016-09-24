@@ -21,6 +21,12 @@
  */
 #include <hlc.h>
 
+#ifdef _WIN32
+#	pragma warning(disable:4091)
+#	include <DbgHelp.h>
+#	pragma comment(lib, "Dbghelp.lib")
+#endif
+
 #ifdef HL_VCC
 #	include <crtdbg.h>
 #else
@@ -28,6 +34,43 @@
 #	define _CrtCheckMemory()
 #endif
 
+static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
+#ifdef _WIN32
+	static HANDLE stack_process_handle = NULL;
+	DWORD64 index;
+	IMAGEHLP_LINEW64 line;
+	struct {
+		SYMBOL_INFOW sym;
+		uchar buffer[256];
+	} data;
+	data.sym.SizeOfStruct = sizeof(data.sym);
+	data.sym.MaxNameLen = 255;
+	if( !stack_process_handle ) {
+		stack_process_handle = GetCurrentProcess();
+		SymSetOptions(SYMOPT_LOAD_LINES);
+		SymInitialize(stack_process_handle,NULL,TRUE);
+	}
+	if( SymFromAddrW(stack_process_handle,(DWORD64)(int_val)addr,&index,&data.sym) ) {
+		DWORD offset = 0;
+		line.SizeOfStruct = sizeof(line);
+		line.FileName = USTR("\\?");
+		line.LineNumber = 0;
+		SymGetLineFromAddrW64(stack_process_handle, (DWORD64)(int_val)addr, &offset, &line);
+		*outSize = usprintf(out,*outSize,USTR("%s(%s) line %d"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,(int)line.LineNumber);
+		return out;
+	}
+#endif
+	return NULL;
+}
+
+static int hlc_capture_stack( void **stack, int size ) {
+	int count = 0;
+#	ifdef _WIN32
+	count = CaptureStackBackTrace(2, size, stack, NULL) - 8; // 8 startup
+	if( count < 0 ) count = 0;
+#	endif
+	return count;
+}
 
 #ifdef HL_WIN
 int wmain(int argc, uchar *argv[]) {
@@ -37,6 +80,7 @@ int main(int argc, char *argv[]) {
 	hl_trap_ctx ctx;
 	vdynamic *exc;
 	hl_global_init(&ctx);
+	hl_setup_exception(hlc_resolve_symbol,hlc_capture_stack);
 	hl_setup_callbacks(hlc_static_call, hlc_get_wrapper);
 	hl_sys_init(argv + 1,argc - 1);
 #	ifdef _DEBUG

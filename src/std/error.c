@@ -23,21 +23,12 @@
 #include <stdarg.h>
 #include <string.h>
 
-#ifdef _WIN32
-#	pragma warning(disable:4091)
-#	include <DbgHelp.h>
-#	pragma comment(lib, "Dbghelp.lib")
-#endif
-
 HL_PRIM hl_trap_ctx *hl_current_trap = NULL;
 HL_PRIM vdynamic *hl_current_exc = NULL;
 
 static vdynamic *stack_last_exc = NULL;
 static void *stack_trace[0x1000];
 static int stack_count = 0;
-#ifdef _WIN32
-static HANDLE stack_process_handle = NULL;
-#endif
 
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
@@ -46,91 +37,14 @@ HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	return NULL;
 }
 
-static hl_field_lookup *stack_hashes = NULL;
-static int stack_hashes_count = 0;
-static int stack_hashes_size = 0;
-
-HL_PRIM void **hl_stack_from_hash( int hash, int *count ) {
-	hl_field_lookup *f = hl_lookup_find(stack_hashes,stack_hashes_count,hash);
-	if( !f ) {
-		*count = 0;
-		return NULL;
-	}
-	*count = f->field_index;
-	return (void**)f->t;
-}
-
-HL_PRIM int hl_get_stack_hash() {
-	void *stack[16], **nstack;
-	int hash = 0;
-	int count = 0;
-#ifdef _WIN32
-	count = CaptureStackBackTrace(1, 16, stack, (PDWORD)&hash);
-#endif
-	// lookup if we already know this hash
-	if( hl_lookup_find(stack_hashes,stack_hashes_count,hash) != NULL )
-		return hash;
-	if( stack_hashes_count == stack_hashes_size ) {
-		int nsize = stack_hashes_size ? stack_hashes_size << 1 : 128;
-		hl_field_lookup *ns = (hl_field_lookup*)malloc(sizeof(hl_field_lookup)*nsize);
-		memcpy(ns,stack_hashes,stack_hashes_size*sizeof(hl_field_lookup));
-		free(stack_hashes);
-		stack_hashes = ns;
-		stack_hashes_size = nsize;
-	}
-	nstack = (void**)malloc(sizeof(void*)*count);
-	memcpy(nstack,stack,count*sizeof(void*));
-	hl_lookup_insert(stack_hashes,stack_hashes_count,hash,(hl_type*)nstack,count);
-	stack_hashes_count++;
-	return hash;
-}
-
-
-HL_PRIM uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize ) {
-#ifdef _WIN32
-	DWORD64 index;
-	IMAGEHLP_LINEW64 line;
-	struct {
-		SYMBOL_INFOW sym;
-		uchar buffer[256];
-	} data;
-	data.sym.SizeOfStruct = sizeof(data.sym);
-	data.sym.MaxNameLen = 255;
-	if( !stack_process_handle ) {
-		stack_process_handle = GetCurrentProcess();
-		SymSetOptions(SYMOPT_LOAD_LINES);
-		SymInitialize(stack_process_handle,NULL,TRUE);
-	}
-	if( SymFromAddrW(stack_process_handle,(DWORD64)(int_val)addr,&index,&data.sym) ) {
-		DWORD offset = 0;
-		line.SizeOfStruct = sizeof(line);
-		line.FileName = USTR("\\?");
-		line.LineNumber = 0;
-		SymGetLineFromAddrW64(stack_process_handle, (DWORD64)(int_val)addr, &offset, &line);
-		*outSize = usprintf(out,*outSize,USTR("%s(%s) line %d"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,(int)line.LineNumber);
-		return out;
-	}
-#endif
-	return NULL;
-}
-
-static int hl_capture_stack( void **stack, int size ) {
-	int count = 0;
-#	ifdef _WIN32
-	count = CaptureStackBackTrace(2, size, stack, NULL) - 8; // 8 startup
-	if( count < 0 ) count = 0;
-#	endif
-	return count;
-}
-
 typedef uchar *(*resolve_symbol_type)( void *addr, uchar *out, int *outSize );
 typedef int (*capture_stack_type)( void **stack, int size );
 
-static resolve_symbol_type resolve_symbol_func = hl_resolve_symbol;
-static capture_stack_type capture_stack_func = hl_capture_stack;
+static resolve_symbol_type resolve_symbol_func = NULL;
+static capture_stack_type capture_stack_func = NULL;
 static vclosure *hl_error_handler = NULL;
 
-HL_PRIM void hl_exception_setup( void *resolve_symbol, void *capture_stack ) {
+HL_PRIM void hl_setup_exception( void *resolve_symbol, void *capture_stack ) {
 	resolve_symbol_func = resolve_symbol;
 	capture_stack_func = capture_stack;
 }

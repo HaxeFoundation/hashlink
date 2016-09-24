@@ -257,7 +257,7 @@ int hl_module_init( hl_module *m ) {
 	hl_callback_init(((unsigned char*)m->jit_code) + entry);
 	cur_module = m;
 	stack_top = &m;
-	hl_exception_setup(module_resolve_symbol, module_capture_stack);
+	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_jit_free(ctx);
 	return 1;
 }
