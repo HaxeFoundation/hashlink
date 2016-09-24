@@ -23,7 +23,7 @@
 
 HL_PRIM varray *hl_alloc_array( hl_type *at, int size ) {
 	int esize = hl_type_size(at);
-	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size + sizeof(hl_type));
+	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size);
 	a->t = &hlt_array;
 	a->at = at;
 	a->size = size;

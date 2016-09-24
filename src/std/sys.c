@@ -373,7 +373,7 @@ HL_PRIM varray *hl_sys_read_dir( vbyte *_path ) {
 		if( d.cFileName[0] != '.' || (d.cFileName[1] != 0 && (d.cFileName[1] != '.' || d.cFileName[2] != 0)) ) {
 			if( pos == count ) {
 				int ncount = count == 0 ? 16 : count * 2;
-				varray *narr = hl_alloc_array(&hlt_bytes,count);
+				varray *narr = hl_alloc_array(&hlt_bytes,ncount);
 				pchar **ncur = hl_aptr(narr,pchar*);
 				memcpy(ncur,current,count*sizeof(void*));
 				current = ncur;
