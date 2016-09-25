@@ -1835,7 +1835,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				patch_jump(ctx,jb);
 				patch_jump(ctx,jav);
 				patch_jump(ctx,jbv);
-				register_jump(ctx,do_jump(ctx,OJEq, false),targetPos);
+				register_jump(ctx,do_jump(ctx,OJAlways, false),targetPos);
 				patch_jump(ctx,jnext);
 				patch_jump(ctx,jvalue);
 			} else
