@@ -137,11 +137,6 @@ HL_PRIM double hl_sys_time() {
 #endif
 }
 
-HL_PRIM int hl_random( int max ) {
-	if( max <= 0 ) return 0;
-	return rand() % max;
-}
-
 HL_PRIM vbyte *hl_sys_get_env( vbyte *v ) {
 	return (vbyte*)getenv((pchar*)v);
 }
@@ -499,7 +494,6 @@ DEFINE_PRIM(_BYTES, sys_string, _NO_ARG);
 DEFINE_PRIM(_VOID, sys_print, _BYTES);
 DEFINE_PRIM(_VOID, sys_exit, _I32);
 DEFINE_PRIM(_F64, sys_time, _NO_ARG);
-DEFINE_PRIM(_I32, random, _I32);
 DEFINE_PRIM(_BYTES, sys_get_env, _BYTES);
 DEFINE_PRIM(_BOOL, sys_put_env, _BYTES _BYTES);
 DEFINE_PRIM(_ARR, sys_env, _NO_ARG);

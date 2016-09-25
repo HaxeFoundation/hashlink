@@ -189,6 +189,7 @@
     <ClCompile Include="src\std\maps.c" />
     <ClCompile Include="src\std\math.c" />
     <ClCompile Include="src\std\obj.c" />
+    <ClCompile Include="src\std\random.c" />
     <ClCompile Include="src\std\regexp.c" />
     <ClCompile Include="src\std\socket.c" />
     <ClCompile Include="src\std\string.c" />
