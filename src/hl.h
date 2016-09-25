@@ -440,11 +440,7 @@ HL_API void hl_error_msg( const uchar *msg, ... );
 HL_API void hl_throw( vdynamic *v );
 HL_API void hl_rethrow( vdynamic *v );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
-
 HL_API varray *hl_exception_stack();
-HL_API int hl_get_stack_hash();
-HL_API void **hl_stack_from_hash( int hash, int *count );
-HL_API uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize );
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );

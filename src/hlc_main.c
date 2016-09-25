@@ -72,6 +72,17 @@ static int hlc_capture_stack( void **stack, int size ) {
 	return count;
 }
 
+#ifdef HL_VCC
+static int throw_handler( int code ) {
+	switch( code ) {
+	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
+	case EXCEPTION_STACK_OVERFLOW: hl_error("Stack overflow");
+	default: hl_error("Unknown runtime error");
+	}
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
+
 #ifdef HL_WIN
 int wmain(int argc, uchar *argv[]) {
 #else
@@ -83,12 +94,14 @@ int main(int argc, char *argv[]) {
 	hl_setup_exception(hlc_resolve_symbol,hlc_capture_stack);
 	hl_setup_callbacks(hlc_static_call, hlc_get_wrapper);
 	hl_sys_init(argv + 1,argc - 1);
-#	ifdef _DEBUG
-//	disable crt debug since it will prevent reusing our address space
-//	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
-#	endif
 	hl_trap(ctx, exc, on_exception);
+#	ifdef HL_VCC
+	__try {
+#	endif
 	hl_entry_point();
+#	ifdef HL_VCC
+	} __except( throw_handler(GetExceptionCode()) ) {}
+#	endif
 	hl_global_free();
 	return 0;
 on_exception:
@@ -98,9 +111,6 @@ on_exception:
 		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
 		for(i=0;i<a->size;i++)
 			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
-#		ifdef _DEBUG
-		_CrtCheckMemory();
-#		endif
 		hl_debug_break();
 	}
 	hl_global_free();

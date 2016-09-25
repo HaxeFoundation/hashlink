@@ -69,6 +69,17 @@ static hl_code *load_code( const pchar *file ) {
 	return code;
 }
 
+#ifdef HL_VCC
+static int throw_handler( int code ) {
+	switch( code ) {
+	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
+	case EXCEPTION_STACK_OVERFLOW: hl_error("Stack overflow");
+	default: hl_error("Unknown runtime error");
+	}
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
+
 #ifdef HL_WIN
 int wmain(int argc, uchar *argv[]) {
 #else
@@ -84,10 +95,6 @@ int main(int argc, char *argv[]) {
 		printf("HLVM %d.%d.%d (c)2015-2016 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION/100,(HL_VERSION/10)%10,HL_VERSION%10);
 		return 1;
 	}
-#	ifdef _DEBUG
-//	disable crt debug since it will prevent reusing our address space
-//	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_DELAY_FREE_MEM_DF /*| _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF*/ );
-#	endif
 	hl_global_init(&ctx);
 	hl_sys_init(argv + 2,argc - 2);
 	ctx.code = load_code(argv[1]);
@@ -100,7 +107,13 @@ int main(int argc, char *argv[]) {
 		return 3;
 	hl_code_free(ctx.code);
 	hl_trap(trap, ctx.exc, on_exception);
-	hl_callback(ctx.m->functions_ptrs[ctx.m->code->entrypoint],ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type,NULL,NULL);
+#	ifdef HL_VCC
+	__try {
+#	endif
+		hl_callback(ctx.m->functions_ptrs[ctx.m->code->entrypoint],ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type,NULL,NULL);
+#	ifdef HL_VCC
+	} __except( throw_handler(GetExceptionCode()) ) {}
+#	endif
 	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
 	hl_global_free();
@@ -112,9 +125,6 @@ on_exception:
 		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ctx.exc));
 		for(i=0;i<a->size;i++)
 			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
-#		ifdef _DEBUG
-		_CrtCheckMemory();
-#		endif
 		hl_debug_break();
 	}
 	hl_global_free();
