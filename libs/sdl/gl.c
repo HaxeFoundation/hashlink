@@ -343,6 +343,11 @@ HL_PRIM void HL_NAME(gl_delete_framebuffer)( vdynamic *f ) {
 	glDeleteFramebuffers(1, &ff);
 }
 
+HL_PRIM void HL_NAME(gl_read_pixels)( int x, int y, int width, int height, int format, int type, vbyte *data ) {
+	GLOG("%d,%d,%d,%d,%d,%d,%X",x,y,width,height,format,type,(int)(int_val)data);
+	glReadPixels(x, y, width, height, format, type, data);
+}
+
 // renderbuffer
 
 HL_PRIM vdynamic *HL_NAME(gl_create_renderbuffer)() {
@@ -503,6 +508,7 @@ DEFINE_PRIM(_NULL(_I32),gl_create_framebuffer,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_framebuffer,_I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_framebuffer_texture2d,_I32 _I32 _I32 _NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_delete_framebuffer,_NULL(_I32));
+DEFINE_PRIM(_VOID,gl_read_pixels,_I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_NULL(_I32),gl_create_renderbuffer,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_renderbuffer,_I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_renderbuffer_storage,_I32 _I32 _I32 _I32);
