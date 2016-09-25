@@ -35,6 +35,10 @@ HL_PRIM void hl_bytes_blit( char *dst, int dpos, char *src, int spos, int len ) 
 	memcpy(dst + dpos,src+spos,len);
 }
 
+HL_PRIM vbyte *hl_bytes_offset( vbyte *src, int offset ) {
+	return src + offset;
+}
+
 HL_PRIM int hl_bytes_compare( vbyte *a, int apos, vbyte *b, int bpos, int len ) {
 	return memcmp(a+apos,b+bpos,len);
 }
@@ -195,3 +199,4 @@ DEFINE_PRIM(_F64, parse_float,_BYTES _I32 _I32);
 DEFINE_PRIM(_NULL(_I32), parse_int, _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,bsort_i32,_BYTES _I32 _I32 _FUN(_I32,_I32 _I32));
 DEFINE_PRIM(_VOID,bsort_f64,_BYTES _I32 _I32 _FUN(_I32,_F64 _F64));
+DEFINE_PRIM(_BYTES,bytes_offset, _BYTES _I32);
