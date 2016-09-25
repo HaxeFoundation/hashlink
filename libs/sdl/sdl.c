@@ -16,11 +16,11 @@ typedef enum {
 	WindowState,
 	KeyDown,
 	KeyUp,
-	PadAdded,
-	PadRemoved,
-	PadDown,
-	PadUp,
-	PadAxis
+	GControllerAdded,
+	GControllerRemoved,
+	GControllerDown,
+	GControllerUp,
+	GControllerAxis
 } event_type;
 
 typedef enum {
@@ -49,7 +49,7 @@ typedef struct {
 	ws_change state;
 	int keyCode;
 	bool keyRepeat;
-	int pad;
+	int controller;
 	int value;
 } event_data;
 
@@ -158,26 +158,26 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			// skip
 			continue;
 		case SDL_CONTROLLERDEVICEADDED:
-			event->type = PadAdded;
-			event->pad = e.jdevice.which;
+			event->type = GControllerAdded;
+			event->controller = e.jdevice.which;
 			break;
 		case SDL_CONTROLLERDEVICEREMOVED:
-			event->type = PadRemoved;
-			event->pad = e.jdevice.which;
+			event->type = GControllerRemoved;
+			event->controller = e.jdevice.which;
 			break;
 		case SDL_CONTROLLERBUTTONDOWN:
-			event->type = PadDown;
-			event->pad = e.cbutton.which;
+			event->type = GControllerDown;
+			event->controller = e.cbutton.which;
 			event->button = e.cbutton.button;
 			break;
 		case SDL_CONTROLLERBUTTONUP:
-			event->type = PadUp;
-			event->pad = e.cbutton.which;
+			event->type = GControllerUp;
+			event->controller = e.cbutton.which;
 			event->button = e.cbutton.button;
 			break;
 		case SDL_CONTROLLERAXISMOTION:
-			event->type = PadAxis;
-			event->pad = e.caxis.which;
+			event->type = GControllerAxis;
+			event->controller = e.caxis.which;
 			event->button = e.caxis.axis;
 			event->value = e.caxis.value;
 			break;
@@ -291,41 +291,41 @@ DEFINE_PRIM(_VOID, win_destroy, TWIN TGL);
 
 // 
 
-HL_PRIM int HL_NAME(pad_count)() {
+HL_PRIM int HL_NAME(gctrl_count)() {
 	return SDL_NumJoysticks();
 }
 
-HL_PRIM SDL_GameController *HL_NAME(pad_open)(int idx) {
+HL_PRIM SDL_GameController *HL_NAME(gctrl_open)(int idx) {
 	if (SDL_IsGameController(idx))
 		return SDL_GameControllerOpen(idx);
 	return NULL;
 }
 
-HL_PRIM void HL_NAME(pad_close)(SDL_GameController *controller) {
+HL_PRIM void HL_NAME(gctrl_close)(SDL_GameController *controller) {
 	SDL_GameControllerClose(controller);
 }
 
-HL_PRIM int HL_NAME(pad_get_axis)(SDL_GameController *controller, int axisIdx ){
+HL_PRIM int HL_NAME(gctrl_get_axis)(SDL_GameController *controller, int axisIdx ){
 	return SDL_GameControllerGetAxis(controller, axisIdx);
 }
 
-HL_PRIM bool HL_NAME(pad_get_button)(SDL_GameController *controller, int btnIdx) {
+HL_PRIM bool HL_NAME(gctrl_get_button)(SDL_GameController *controller, int btnIdx) {
 	return SDL_GameControllerGetButton(controller, btnIdx) == 1;
 }
 
-HL_PRIM int HL_NAME(pad_get_id)(SDL_GameController *controller) {
+HL_PRIM int HL_NAME(gctrl_get_id)(SDL_GameController *controller) {
 	return SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller));
 }
 
-HL_PRIM vbyte *HL_NAME(pad_get_name)(SDL_GameController *controller) {
+HL_PRIM vbyte *HL_NAME(gctrl_get_name)(SDL_GameController *controller) {
 	return (vbyte*)SDL_GameControllerName(controller);
 }
 
-#define TPAD _ABSTRACT(sdl_gamecontroller)
-DEFINE_PRIM(_I32, pad_count, _NO_ARG);
-DEFINE_PRIM(TPAD, pad_open, _I32);
-DEFINE_PRIM(_VOID, pad_close, TPAD);
-DEFINE_PRIM(_I32, pad_get_axis, TPAD _I32);
-DEFINE_PRIM(_BOOL, pad_get_button, TPAD _I32);
-DEFINE_PRIM(_I32, pad_get_id, TPAD);
-DEFINE_PRIM(_BYTES, pad_get_name, TPAD);
+#define TGCTRL _ABSTRACT(sdl_gamecontroller)
+DEFINE_PRIM(_I32, gctrl_count, _NO_ARG);
+DEFINE_PRIM(TGCTRL, gctrl_open, _I32);
+DEFINE_PRIM(_VOID, gctrl_close, TGCTRL);
+DEFINE_PRIM(_I32, gctrl_get_axis, TGCTRL _I32);
+DEFINE_PRIM(_BOOL, gctrl_get_button, TGCTRL _I32);
+DEFINE_PRIM(_I32, gctrl_get_id, TGCTRL);
+DEFINE_PRIM(_BYTES, gctrl_get_name, TGCTRL);

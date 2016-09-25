@@ -9,7 +9,7 @@ package sdl;
 	public var state : WindowStateChange;
 	public var keyCode : Int;
 	public var keyRepeat : Bool;
-	public var pad : Int;
+	public var controller : Int;
 	public var value : Int;
 	public function new() {
 	}
@@ -25,11 +25,11 @@ package sdl;
 	var WindowState	= 6;
 	var KeyDown		= 7;
 	var KeyUp		= 8;
-	var PadAdded	= 9;
-	var PadRemoved	= 10;
-	var PadDown		= 11;
-	var PadUp		= 12;
-	var PadAxis 	= 13;
+	var GControllerAdded	= 9;
+	var GControllerRemoved	= 10;
+	var GControllerDown		= 11;
+	var GControllerUp		= 12;
+	var GControllerAxis 	= 13;
 }
 
 @:enum abstract WindowStateChange(Int) {
