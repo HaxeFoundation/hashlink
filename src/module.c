@@ -36,27 +36,16 @@ static void *stack_top;
 
 static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code)) >> JIT_CALL_PRECISION;
-	int *debug_addr = cur_module->jit_debug[code_pos];
+	int debug_pos = cur_module->jit_debug[code_pos];
+	int *debug_addr;
 	int file, line;
 	int size = *outSize;
 	int pos = 0;
 	hl_function *fdebug;
-	if( !debug_addr )
+	if( !debug_pos )
 		return NULL;
-	{
-		// resolve function from its debug addr
-		int min = 0;
-		int max = cur_module->code->nfunctions;
-		while( min < max ) {
-			int mid = (min + max) >> 1;
-			hl_function *f = cur_module->code->functions + mid;
-			if( debug_addr < f->debug )
-				max = mid;
-			else
-				min = mid + 1;
-		}
-		fdebug = cur_module->code->functions + (((min + max) >> 1) - 1);
-	}
+	fdebug = cur_module->code->functions + cur_module->functions_indexes[((unsigned)debug_pos)>>16];
+	debug_addr = fdebug->debug + ((debug_pos&0xFFFF) * 2);
 	file = debug_addr[0];
 	line = debug_addr[1];
 	if( fdebug->obj )

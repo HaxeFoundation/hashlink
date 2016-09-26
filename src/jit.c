@@ -259,7 +259,7 @@ struct jit_ctx {
 	hl_alloc falloc; // cleared per-function
 	hl_alloc galloc;
 	vclosure *closure_list;
-	int **debug;
+	int *debug;
 };
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
@@ -331,13 +331,13 @@ static void jit_buf( jit_ctx *ctx ) {
 		ctx->buf.b = nbuf + curpos;
 		ctx->bufSize = nsize;
 		if( ctx->m->code->hasdebug ) {
-			int **ndebug = (int**)malloc(sizeof(int**) * (nsize >> JIT_CALL_PRECISION));
+			int *ndebug = (int*)malloc(sizeof(int) * (nsize >> JIT_CALL_PRECISION));
 			if( ndebug == NULL ) ASSERT(nsize);
 			if( ctx->debug ) {
-				memcpy(ndebug,ctx->debug,(curpos>>JIT_CALL_PRECISION) * sizeof(int*));
+				memcpy(ndebug,ctx->debug,(curpos>>JIT_CALL_PRECISION) * sizeof(int));
 				free(ctx->debug);
 			}
-			memset(ndebug + (curpos>>JIT_CALL_PRECISION), 0, ((nsize - curpos) >> JIT_CALL_PRECISION) * sizeof(int*));
+			memset(ndebug + (curpos>>JIT_CALL_PRECISION), 0, ((nsize - curpos) >> JIT_CALL_PRECISION) * sizeof(int));
 			ctx->debug = ndebug;
 		}
 	}
@@ -760,7 +760,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	if( ctx->debug && o == CALL && ctx->f ) {
 		int pos = BUF_POS() >> JIT_CALL_PRECISION;
 		preg p;
-		ctx->debug[pos] = ctx->f->debug + (ctx->currentPos - 1) * 2;
+		ctx->debug[pos] = (ctx->f->findex<<16) | ((ctx->currentPos - 1)&0xFFFF);
 		op(ctx,MOV,pmem(&p,Esp,-HL_WSIZE),PEBP,true); // erase EIP (clean stack report)
 	}
 }
@@ -1219,7 +1219,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 #	pragma optimize( "", off )
 #endif
 
-static void hl_null_access( uchar *str ) {
+static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }
 
@@ -3239,7 +3239,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	return codePos;
 }
 
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, int ***debug ) {
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, int **debug ) {
 	jlist *c;
 	int size = BUF_POS();
 	unsigned char *code;
