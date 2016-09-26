@@ -1214,9 +1214,18 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, b
 	return paddedSize;
 }
 
-static void hl_null_access() {
+#ifdef HL_VCC
+// prevent remove of push ebp which would prevent our stack from being correctly reported
+#	pragma optimize( "", off )
+#endif
+
+static void hl_null_access( uchar *str ) {
 	hl_error_msg(USTR("Null access"));
 }
+
+#ifdef HL_VCC
+#	pragma optimize( "", on )
+#endif
 
 static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	preg p;

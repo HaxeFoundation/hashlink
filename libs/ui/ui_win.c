@@ -94,7 +94,7 @@ HL_PRIM wref *HL_NAME(ui_winlog_new)( const uchar *title, int width, int height 
 		(dtop.bottom - rc.bottom) / 2,
 		rc.right - rc.left,
 		rc.bottom - rc.top,
-		NULL,
+		GetActiveWindow(),
 		NULL,
 		GetModuleHandle(NULL),
 		NULL
