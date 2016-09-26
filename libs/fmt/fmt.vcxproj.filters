@@ -182,6 +182,12 @@
     <ClCompile Include="..\..\include\zlib\zutil.c">
       <Filter>zlib</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\zlib\deflate.c">
+      <Filter>zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\zlib\trees.c">
+      <Filter>zlib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="turbojpeg">
@@ -211,6 +217,12 @@
       <Filter>zlib</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\zlib\crc32.h">
+      <Filter>zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\zlib\deflate.h">
+      <Filter>zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\zlib\trees.h">
       <Filter>zlib</Filter>
     </ClInclude>
   </ItemGroup>

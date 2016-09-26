@@ -62,10 +62,14 @@ struct _fmt_zip {
 	void (*finalize)( fmt_zip * );
 	z_stream *z;
 	int flush;
+	bool inflate;
 };
 
 static void free_stream_inf( fmt_zip *v ) {
-	inflateEnd(v->z); // no error
+	if( v->inflate )
+		inflateEnd(v->z); // no error
+	else
+		deflateEnd(v->z);
 	free(v->z);
 	v->z = NULL;
 }
@@ -104,14 +108,33 @@ HL_PRIM fmt_zip *HL_NAME(inflate_init)( int wbits ) {
 	s->finalize = free_stream_inf;
 	s->flush = Z_NO_FLUSH;
 	s->z = z;
+	s->inflate = true;
 	return s;
 }
 
-HL_PRIM void HL_NAME(inflate_end)( fmt_zip *z ) {
+HL_PRIM fmt_zip *HL_NAME(deflate_init)( int level ) {
+	z_stream *z;
+	int err;
+	fmt_zip *s;
+	z = (z_stream*)malloc(sizeof(z_stream));
+	memset(z,0,sizeof(z_stream));
+	if( (err = deflateInit(z,level)) != Z_OK ) {
+		free(z);
+		zlib_error(NULL,err);
+	}
+	s = (fmt_zip*)hl_gc_alloc_finalizer(sizeof(fmt_zip));
+	s->finalize = free_stream_inf;
+	s->flush = Z_NO_FLUSH;
+	s->z = z;
+	s->inflate = false;
+	return s;
+}
+
+HL_PRIM void HL_NAME(zip_end)( fmt_zip *z ) {
 	free_stream_inf(z);
 }
 
-HL_PRIM void HL_NAME(inflate_flush_mode)( fmt_zip *z, int flush ) {
+HL_PRIM void HL_NAME(zip_flush_mode)( fmt_zip *z, int flush ) {
 	switch( flush ) {
 	case 0:
 		z->flush = Z_NO_FLUSH;
@@ -134,7 +157,6 @@ HL_PRIM void HL_NAME(inflate_flush_mode)( fmt_zip *z, int flush ) {
 	}
 }
 
-
 HL_PRIM bool HL_NAME(inflate_buffer)( fmt_zip *zip, vbyte *src, int srcpos, int srclen, vbyte *dst, int dstpos, int dstlen, int *read, int *write ) {
 	int slen, dlen, err;
 	z_stream *z = zip->z;
@@ -155,12 +177,40 @@ HL_PRIM bool HL_NAME(inflate_buffer)( fmt_zip *zip, vbyte *src, int srcpos, int 
 	return err == Z_STREAM_END;
 }
 
-#define _INFL _ABSTRACT(fmt_inflater)
+HL_PRIM bool HL_NAME(deflate_buffer)( fmt_zip *zip, vbyte *src, int srcpos, int srclen, vbyte *dst, int dstpos, int dstlen, int *read, int *write ) {
+	int slen, dlen, err;
+	z_stream *z = zip->z;
+	slen = srclen - srcpos;
+	dlen = dstlen - dstpos;
+	if( srcpos < 0 || dstpos < 0 || slen < 0 || dlen < 0 )
+		hl_error("Out of range");
+	z->next_in = (Bytef*)(src + srcpos);
+	z->next_out = (Bytef*)(dst + dstpos);
+	z->avail_in = slen;
+	z->avail_out = dlen;
+	if( (err = deflate(z,zip->flush)) < 0 )
+		zlib_error(z,err);
+	z->next_in = NULL;
+	z->next_out = NULL;
+	*read = slen - z->avail_in;
+	*write = dlen - z->avail_out;
+	return err == Z_STREAM_END;
+}
 
-DEFINE_PRIM(_INFL, inflate_init, _I32);
-DEFINE_PRIM(_VOID, inflate_end, _INFL);
-DEFINE_PRIM(_VOID, inflate_flush_mode, _INFL _I32);
-DEFINE_PRIM(_BOOL, inflate_buffer, _INFL _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
+HL_PRIM int HL_NAME(deflate_bound)( fmt_zip *zip, int size ) {
+	return deflateBound(zip->z,size);
+}
+
+#define _ZIP _ABSTRACT(fmt_zip)
+
+DEFINE_PRIM(_ZIP, inflate_init, _I32);
+DEFINE_PRIM(_ZIP, deflate_init, _I32);
+DEFINE_PRIM(_I32, deflate_bound, _ZIP _I32);
+DEFINE_PRIM(_VOID, zip_end, _ZIP);
+DEFINE_PRIM(_VOID, zip_flush_mode, _ZIP _I32);
+DEFINE_PRIM(_BOOL, inflate_buffer, _ZIP _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_BOOL, deflate_buffer, _ZIP _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
+
 DEFINE_PRIM(_BOOL, jpg_decode, _BYTES _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, img_scale, _BYTES _I32 _I32 _I32 _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
 

@@ -75,18 +75,22 @@
     <ClCompile Include="..\..\include\turbojpeg\turbojpeg.c" />
     <ClCompile Include="..\..\include\zlib\adler32.c" />
     <ClCompile Include="..\..\include\zlib\crc32.c" />
+    <ClCompile Include="..\..\include\zlib\deflate.c" />
     <ClCompile Include="..\..\include\zlib\inffast.c" />
     <ClCompile Include="..\..\include\zlib\inflate.c" />
     <ClCompile Include="..\..\include\zlib\inftrees.c" />
+    <ClCompile Include="..\..\include\zlib\trees.c" />
     <ClCompile Include="..\..\include\zlib\zutil.c" />
     <ClCompile Include="fmt.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\zlib\crc32.h" />
+    <ClInclude Include="..\..\include\zlib\deflate.h" />
     <ClInclude Include="..\..\include\zlib\inffast.h" />
     <ClInclude Include="..\..\include\zlib\inffixed.h" />
     <ClInclude Include="..\..\include\zlib\inflate.h" />
     <ClInclude Include="..\..\include\zlib\inftrees.h" />
+    <ClInclude Include="..\..\include\zlib\trees.h" />
     <ClInclude Include="..\..\include\zlib\zconf.h" />
     <ClInclude Include="..\..\include\zlib\zlib.h" />
   </ItemGroup>
