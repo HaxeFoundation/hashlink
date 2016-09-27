@@ -178,6 +178,8 @@ HL_API void uprintf( const uchar *fmt, const uchar *str );
 #	define hl_debug_break() hl_fatal("debugbreak")
 #endif
 
+#define DADDR(v)	((int)((int_val)(v))&0xFFFF)
+
 // ---- TYPES -------------------------------------------
 
 typedef enum {
