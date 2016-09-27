@@ -65,7 +65,7 @@ static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
 #define PAGE_KIND_MASK		((1 << PAGE_KIND_BITS) - 1)
 
 #ifdef HL_DEBUG
-//#	define GC_DEBUG
+#	define GC_DEBUG
 #endif
 
 typedef struct _gc_pheader gc_pheader;
