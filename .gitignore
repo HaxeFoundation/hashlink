@@ -19,3 +19,4 @@ x64
 *.opendb
 *.VC.db
 /include/sdl
+ReleaseStatic
