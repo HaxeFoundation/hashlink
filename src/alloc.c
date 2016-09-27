@@ -65,7 +65,7 @@ static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
 #define PAGE_KIND_MASK		((1 << PAGE_KIND_BITS) - 1)
 
 #ifdef HL_DEBUG
-//#	define HL_TRACK_ALLOC
+//#	define GC_DEBUG
 #endif
 
 typedef struct _gc_pheader gc_pheader;
@@ -86,7 +86,7 @@ struct _gc_pheader {
 #ifdef HL_TRACK_ALLOC
 	int *alloc_hashes;
 #endif
-#ifdef HL_DEBUG
+#ifdef GC_DEBUG
 	int page_id;
 #endif
 };
@@ -198,12 +198,12 @@ static gc_pheader *gc_alloc_new_page( int block, int size, bool varsize ) {
 	base = (unsigned char*)gc_alloc_page_memory(size);
 	p = (gc_pheader*)base;
 	if( !base ) {
-#		ifdef HL_DEBUG
+#		ifdef GC_DEBUG
 		hl_gc_dump();
 #		endif
 		hl_fatal("Out of memory");
 	}
-#	ifdef HL_DEBUG
+#	ifdef GC_DEBUG
 	memset(base,0xDD,size);
 	p->page_id = PAGE_ID++;
 #	endif
@@ -285,7 +285,7 @@ static void *gc_alloc_fixed( int part, int kind ) {
 	}
 alloc_fixed:
 	ptr = (unsigned char*)p + p->next_block * p->block_size;
-#	ifdef HL_DEBUG
+#	ifdef GC_DEBUG
 	{
 		int i;
 		if( p->next_block < p->first_block || p->next_block >= p->max_blocks )
@@ -334,7 +334,7 @@ resume:
 					if( avail > p->free_blocks ) p->free_blocks = avail;
 					avail = 0;
 					next += bits - 1;
-#					ifdef HL_DEBUG
+#					ifdef GC_DEBUG
 					if( p->sizes[next] == 0 ) hl_fatal("assert");
 #					endif
 					next += p->sizes[next];
@@ -379,7 +379,7 @@ resume:
 	}
 alloc_var:
 	ptr = (unsigned char*)p + p->next_block * p->block_size;
-#	ifdef HL_DEBUG
+#	ifdef GC_DEBUG
 	{
 		int i;
 		if( p->next_block < p->first_block || p->next_block + nblocks > p->max_blocks )
@@ -393,7 +393,7 @@ alloc_var:
 		int i;
 		int bid = p->next_block;
 		for(i=0;i<nblocks;i++) {
-#			ifdef HL_DEBUG
+#			ifdef GC_DEBUG
 			if( (p->bmp[bid>>3]&(1<<(bid&7))) != 0 ) hl_fatal("Alloc on marked block");
 #			endif
 			p->bmp[bid>>3] &= ~(1<<(bid&7));
@@ -457,7 +457,7 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 #else
 	gc_check_mark();
 	ptr = gc_alloc_gen(size, flags);
-#	ifdef HL_DEBUG
+#	ifdef GC_DEBUG
 	memset(ptr,0xCD,size);
 #	endif
 #endif
@@ -528,7 +528,7 @@ static void gc_flush_mark() {
 	cur_mark_stack = mark_stack;
 }
 
-#ifdef HL_DEBUG
+#ifdef GC_DEBUG
 static void gc_clear_unmarked_mem() {
 	int i;
 	for(i=0;i<GC_ALL_PAGES;i++) {
@@ -613,7 +613,7 @@ static void gc_mark() {
 	}
 	cur_mark_stack = mark_stack;
 	if( mark_stack ) gc_flush_mark();
-#	ifdef HL_DEBUG
+#	ifdef GC_DEBUG
 	gc_clear_unmarked_mem();
 #	endif
 	gc_flush_empty_pages();
@@ -866,7 +866,7 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	vdynamic *d = (vdynamic*) (hl_is_ptr(t) ? hl_gc_alloc(sizeof(vdynamic)) : hl_gc_alloc_noptr(sizeof(vdynamic)));
 	d->t = t;
 	d->v.ptr = NULL;
-#	ifdef HL_DEBUG
+#	ifdef GC_DEBUG
 	if( t->kind == HVOID )
 		hl_error("alloc_dynamic(VOID)");
 #	endif

@@ -23,8 +23,7 @@
 #include <hlmodule.h>
 
 #ifdef HL_DEBUG
-//#define OP_LOG
-#define JIT_DEBUG
+#	define JIT_DEBUG
 #endif
 
 typedef enum {
@@ -1234,17 +1233,6 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	op64(ctx,SUB,PESP,pconst(&p,32));
 	size += 32;
 #	endif
-#	ifdef HL_DEBUG
-/*	if( nativeFun != on_jit_error ) {
-		int j;
-		op64(ctx,MOV,PEAX,PESP);
-		op64(ctx,AND,PEAX,pconst(&p,15));
-		op64(ctx,TEST,PEAX,PEAX);
-		XJump_small(JZero,j);
-		jit_error("ESP % 16 != 0 in native call");
-		patch_jump(ctx,j);
-	}*/
-#	endif
 	// native function, already resolved
 	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
 	op64(ctx,CALL,PEAX,UNUSED);
@@ -1313,7 +1301,7 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 		break;
 	}
 	if( ctx->totalRegsSize ) op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
-#	ifdef HL_DEBUG
+#	ifdef JIT_DEBUG
 	{
 		int jeq;
 		op64(ctx, CMP, PESP, PEBP);
