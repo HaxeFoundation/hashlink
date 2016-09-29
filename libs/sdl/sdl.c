@@ -15,7 +15,12 @@ typedef enum {
 	MouseWheel,
 	WindowState,
 	KeyDown,
-	KeyUp
+	KeyUp,
+	GControllerAdded,
+	GControllerRemoved,
+	GControllerDown,
+	GControllerUp,
+	GControllerAxis
 } event_type;
 
 typedef enum {
@@ -44,6 +49,8 @@ typedef struct {
 	ws_change state;
 	int keyCode;
 	bool keyRepeat;
+	int controller;
+	int value;
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
@@ -150,6 +157,30 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 		case SDL_TEXTINPUT:
 			// skip
 			continue;
+		case SDL_CONTROLLERDEVICEADDED:
+			event->type = GControllerAdded;
+			event->controller = e.jdevice.which;
+			break;
+		case SDL_CONTROLLERDEVICEREMOVED:
+			event->type = GControllerRemoved;
+			event->controller = e.jdevice.which;
+			break;
+		case SDL_CONTROLLERBUTTONDOWN:
+			event->type = GControllerDown;
+			event->controller = e.cbutton.which;
+			event->button = e.cbutton.button;
+			break;
+		case SDL_CONTROLLERBUTTONUP:
+			event->type = GControllerUp;
+			event->controller = e.cbutton.which;
+			event->button = e.cbutton.button;
+			break;
+		case SDL_CONTROLLERAXISMOTION:
+			event->type = GControllerAxis;
+			event->controller = e.caxis.which;
+			event->button = e.caxis.axis;
+			event->value = e.caxis.value;
+			break;
 		default:
 			//printf("Unknown event type 0x%X\\n", e.type);
 			continue;
@@ -198,7 +229,7 @@ HL_PRIM bool HL_NAME(detect_win32)() {
 }
 
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
-DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL) );
+DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32) );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
@@ -257,3 +288,44 @@ DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_swap_window, TWIN);
 DEFINE_PRIM(_VOID, win_render_to, TWIN TGL);
 DEFINE_PRIM(_VOID, win_destroy, TWIN TGL);
+
+// 
+
+HL_PRIM int HL_NAME(gctrl_count)() {
+	return SDL_NumJoysticks();
+}
+
+HL_PRIM SDL_GameController *HL_NAME(gctrl_open)(int idx) {
+	if (SDL_IsGameController(idx))
+		return SDL_GameControllerOpen(idx);
+	return NULL;
+}
+
+HL_PRIM void HL_NAME(gctrl_close)(SDL_GameController *controller) {
+	SDL_GameControllerClose(controller);
+}
+
+HL_PRIM int HL_NAME(gctrl_get_axis)(SDL_GameController *controller, int axisIdx ){
+	return SDL_GameControllerGetAxis(controller, axisIdx);
+}
+
+HL_PRIM bool HL_NAME(gctrl_get_button)(SDL_GameController *controller, int btnIdx) {
+	return SDL_GameControllerGetButton(controller, btnIdx) == 1;
+}
+
+HL_PRIM int HL_NAME(gctrl_get_id)(SDL_GameController *controller) {
+	return SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller));
+}
+
+HL_PRIM vbyte *HL_NAME(gctrl_get_name)(SDL_GameController *controller) {
+	return (vbyte*)SDL_GameControllerName(controller);
+}
+
+#define TGCTRL _ABSTRACT(sdl_gamecontroller)
+DEFINE_PRIM(_I32, gctrl_count, _NO_ARG);
+DEFINE_PRIM(TGCTRL, gctrl_open, _I32);
+DEFINE_PRIM(_VOID, gctrl_close, TGCTRL);
+DEFINE_PRIM(_I32, gctrl_get_axis, TGCTRL _I32);
+DEFINE_PRIM(_BOOL, gctrl_get_button, TGCTRL _I32);
+DEFINE_PRIM(_I32, gctrl_get_id, TGCTRL);
+DEFINE_PRIM(_BYTES, gctrl_get_name, TGCTRL);
