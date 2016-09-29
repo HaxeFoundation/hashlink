@@ -1,0 +1,12 @@
+language: c
+
+os:
+  - linux
+  - osx
+
+sudo: required
+dist: trusty
+osx_image: xcode6.4
+
+script:
+  - make hl32lib
