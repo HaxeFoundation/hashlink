@@ -34,6 +34,7 @@
 
 #if defined(linux) || defined(__linux__)
 #	define HL_LINUX
+#	define _GNU_SOURCE
 #endif
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
