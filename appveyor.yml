@@ -1,0 +1,21 @@
+version: "{build}"
+
+image:
+  - Visual Studio 2015
+
+platform: Win32
+configuration: Release
+
+install:
+  - appveyor DownloadFile https://www.libsdl.org/release/SDL2-devel-2.0.4-VC.zip
+  - 7z x SDL2-devel-2.0.4-VC.zip
+  - move SDL2-2.0.4 include/sdl
+
+build_script:
+  - msbuild hldll.vcxproj         /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild hl.vcxproj            /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild libs/fmt/fmt.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild libs/sdl/sdl.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild libs/ui/ui.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+
+test: off
