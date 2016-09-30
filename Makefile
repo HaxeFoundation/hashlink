@@ -36,7 +36,7 @@ else
 
 # Linux
 CFLAGS += -m$(ARCH)
-LFLAGS += -Wl,--export-dynamic
+LFLAGS += -lm -Wl,--export-dynamic
 
 endif
 
