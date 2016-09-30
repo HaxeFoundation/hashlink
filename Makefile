@@ -9,12 +9,14 @@ RUNTIME = src/alloc.o
 
 STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o \
 	src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/regexp.o src/std/string.o src/std/sys.o \
-	src/std/types.o src/std/ucs2.o
+	src/std/types.o src/std/ucs2.o src/std/random.o
 	
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
-BOOT = src/_main.o
-	
+BOOT = src/hlc_main.o src/_main.o
+
+UNAME := $(shell uname)
+
 # Cygwin
 ifeq ($(OS),Windows_NT)
 
@@ -23,6 +25,12 @@ CFLAGS += -Wl,--export-all-symbols
 ifeq ($(ARCH),32)
 CC=i686-pc-cygwin-gcc 
 endif
+
+else ifeq ($(UNAME),Darwin)
+
+# Mac
+CFLAGS += -m$(ARCH)
+LFLAGS += -Wl,-export_dynamic
 
 else
 

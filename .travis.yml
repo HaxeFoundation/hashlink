@@ -1,4 +1,5 @@
-language: c
+language: haxe
+haxe: development
 
 os:
   - linux
@@ -13,6 +14,8 @@ install:
     sudo apt-get update -y;
     sudo apt-get install gcc-multilib -y;
     fi
+  - make hl32lib
 
 script:
-  - make hl32lib
+  - haxe -hl src/_main.c -cp tests/helloworld -main HelloWorld -D interp
+  - haxe -hl src/_main.c -cp tests/helloworld -main HelloWorld && make hlc32
