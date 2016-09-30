@@ -66,10 +66,10 @@ lib: ${LIB}
 	${AR} rcs hl${ARCH}lib.a ${LIB}
 
 hlc: ${BOOT}
-	${CC} ${CFLAGS} ${LFLAGS} -o hlc${ARCH} ${BOOT} hl${ARCH}lib.a
+	${CC} ${CFLAGS} -o hlc${ARCH} ${BOOT} hl${ARCH}lib.a ${LFLAGS}
 	
 build: ${SRC}
-	${CC} ${CFLAGS} ${LFLAGS} -o hl${ARCH} ${SRC}
+	${CC} ${CFLAGS} -o hl${ARCH} ${SRC} ${LFLAGS}
 	
 .SUFFIXES : .c .o
 
