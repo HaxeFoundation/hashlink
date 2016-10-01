@@ -107,7 +107,6 @@ static struct {
 	int64 total_allocated;
 	int64 last_mark;
 	int64 pages_total_memory;
-	int64 debug;
 	int64 allocation_count;
 	int pages_count;
 	int pages_allocated;
@@ -320,7 +319,6 @@ loop:
 			}
 			next = p->next_block;
 			if( next + nblocks > p->max_blocks ) {
-				gc_stats.debug++;
 				p = p->next_page;
 				continue;
 			}
