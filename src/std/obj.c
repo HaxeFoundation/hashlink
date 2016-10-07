@@ -174,11 +174,15 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		memcpy(t->fields_indexes, p->fields_indexes, sizeof(int)*p->nfields);
 	}
 	size = p ? p->size : HL_WSIZE; // hl_type*
+	nlookup = 0;
 	for(i=0;i<o->nfields;i++) {
 		hl_type *ft = o->fields[i].t;
 		size += hl_pad_size(size,ft);
 		t->fields_indexes[i+start] = size;
-		hl_lookup_insert(t->lookup,i,o->fields[i].hashed_name,o->fields[i].t,size);
+		if( *o->fields[i].name )
+			hl_lookup_insert(t->lookup,nlookup++,o->fields[i].hashed_name,o->fields[i].t,size);
+		else
+			t->nlookup--;
 		size += hl_type_size(ft);
 	}
 	t->size = size;
@@ -189,7 +193,6 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 
 	// fields lookup
 	compareHash = hl_hash_gen(USTR("__compare"),false);
-	nlookup = o->nfields;
 	for(i=0;i<o->nproto;i++) {
 		hl_obj_proto *pr = o->proto + i;
 		int method_index;
