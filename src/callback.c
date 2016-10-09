@@ -24,13 +24,6 @@
 #define MAX_ARGS	16
 
 static void *hl_callback_entry = NULL;
-#ifndef HL_64
-static void (*hl_callback_fd)(double) = NULL;
-static void (*hl_callback_ff)(float) = NULL;
-#else
-#	define hl_callback_fd(_)
-#	define hl_callback_ff(_)
-#endif
 
 void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	unsigned char stack[MAX_ARGS * 8];	
@@ -95,16 +88,16 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	case HUI16:
 	case HI32:
 	case HBOOL:
-		ret->v.i = ((int (*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), false);
+		ret->v.i = ((int (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
 		return &ret->v.i;
 	case HF32:
-		ret->v.f = ((float (*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), true);
+		ret->v.f = ((float (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
 		return &ret->v.f;
 	case HF64:
-		ret->v.d = ((double (*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), true);
+		ret->v.d = ((double (*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
 		return &ret->v.d;
 	default:
-		return ((void *(*)(void *, void *, int, bool))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2), false);
+		return ((void *(*)(void *, void *, int))hl_callback_entry)(f, &stack, (IS_64?pos>>3:pos>>2));
 	}
 }
 
@@ -144,7 +137,6 @@ static float hl_call_wrapper_ptr_f( vclosure_wrapper *c ) {
 	vdynamic *args[MAX_ARGS];
 	void *ret;
 	int i;
-	float f;
 	int nargs = c->cl.t->fun->nargs;
 	stack += HL_WSIZE;
 	for(i=0;i<nargs;i++) {
@@ -156,9 +148,7 @@ static float hl_call_wrapper_ptr_f( vclosure_wrapper *c ) {
 		stack += hl_stack_size(t);
 	}
 	ret = hl_dyn_call(c->wrappedFun,args,nargs);
-	f = hl_dyn_castf(&ret,&hlt_dyn);
-	hl_callback_ff(f);
-	return f;
+	return hl_dyn_castf(&ret,&hlt_dyn);
 }
 
 static double hl_call_wrapper_ptr_d( vclosure_wrapper *c ) {
@@ -166,7 +156,6 @@ static double hl_call_wrapper_ptr_d( vclosure_wrapper *c ) {
 	vdynamic *args[MAX_ARGS];
 	void *ret;
 	int i;
-	double d;
 	int nargs = c->cl.t->fun->nargs;
 	stack += HL_WSIZE;
 	for(i=0;i<nargs;i++) {
@@ -177,9 +166,7 @@ static double hl_call_wrapper_ptr_d( vclosure_wrapper *c ) {
 			args[i] = hl_make_dyn(stack,t);
 		stack += hl_stack_size(t);
 	}
-	d = hl_dyn_castd(&ret,&hlt_dyn);
-	hl_callback_fd(d);
-	return d;
+	return hl_dyn_castd(&ret,&hlt_dyn);
 }
 
 static void *hl_call_wrapper_all_ptr( vclosure_wrapper *c ) {
@@ -195,14 +182,12 @@ static int hl_call_wrapper_all_ptr_i( vclosure_wrapper *c ) {
 static float hl_call_wrapper_all_ptr_f( vclosure_wrapper *c ) {
 	vdynamic d;
 	hl_wrapper_call(c,&c + 1, &d);
-	hl_callback_ff(d.v.f);
 	return d.v.f;
 }
 
 static double hl_call_wrapper_all_ptr_d( vclosure_wrapper *c ) {
 	vdynamic d;
 	hl_wrapper_call(c,&c + 1, &d);
-	hl_callback_fd(d.v.d);
 	return d.v.d;
 }
 
@@ -241,11 +226,7 @@ static void *hl_get_wrapper( hl_type *t ) {
 	return NULL;
 }
 
-void hl_callback_init( void *e, void *ff, void *fd ) {
+void hl_callback_init( void *e ) {
 	hl_callback_entry = e;
-#	ifndef HL_64
-	hl_callback_ff = ff;
-	hl_callback_fd = fd;
-#	endif
 	hl_setup_callbacks(hl_callback, hl_get_wrapper);
 }

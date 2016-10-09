@@ -77,6 +77,7 @@ typedef enum {
 	FSTP,
 	FSTP32,
 	FLD,
+	FLD32,
 	// SSE
 	MOVSD,
 	MOVSS,
@@ -389,6 +390,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "FSTP", 0, RM(0xDD,3) },
 	{ "FSTP32", 0, RM(0xD9,3) },
 	{ "FLD", 0, RM(0xDD,0) },
+	{ "FLD32", 0, RM(0xD9,0) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
@@ -756,11 +758,14 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	default:
 		ERRIF(1);
 	}
-	if( ctx->debug && o == CALL && ctx->f ) {
+	if( ctx->debug && ctx->f ) {
 		int pos = BUF_POS() >> JIT_CALL_PRECISION;
-		preg p;
-		ctx->debug[pos] = (ctx->f->findex<<16) | ((ctx->currentPos - 1)&0xFFFF);
-		op(ctx,MOV,pmem(&p,Esp,-HL_WSIZE),PEBP,true); // erase EIP (clean stack report)
+		if( o == CALL || !ctx->debug[pos] )
+			ctx->debug[pos] = (ctx->f->findex<<16) | ((ctx->currentPos - 1)&0xFFFF);
+		if( o == CALL ) {
+			preg p;
+			op(ctx,MOV,pmem(&p,Esp,-HL_WSIZE),PEBP,true); // erase EIP (clean stack report)
+		}
 	}
 }
 
@@ -1059,11 +1064,7 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 	}
 }
 
-static void store_native_result( jit_ctx *ctx, vreg *r ) {
-	if( !IS_FLOAT(r) ) {
-		store(ctx,r,PEAX,true);
-		return;
-	}
+static void store_result( jit_ctx *ctx, vreg *r ) {
 	switch( r->t->kind ) {
 	case HF64:
 		scratch(r->current);
@@ -1072,6 +1073,9 @@ static void store_native_result( jit_ctx *ctx, vreg *r ) {
 	case HF32:
 		scratch(r->current);
 		op64(ctx,FSTP32,&r->stack,UNUSED);
+		break;
+	default:
+		store(ctx,r,PEAX,true);
 		break;
 	}
 }
@@ -1272,12 +1276,8 @@ static void op_call_fun( jit_ctx *ctx, vreg *dst, int findex, int count, int *ar
 		discard_regs(ctx, false);
 	}
 	if( size ) op64(ctx,ADD,PESP,pconst(&p,size));
-	if( dst ) {
-		if( isNative )
-			store_native_result(ctx,dst);
-		else
-			store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
-	}
+	if( dst )
+		store_result(ctx,dst);
 }
 
 static void op_enter( jit_ctx *ctx ) {
@@ -1291,10 +1291,18 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 	preg p;
 	switch( r->t->kind ) {
 	case HF32:
+#		ifdef HL_64
 		op64(ctx, MOVSS, PXMM(0), fetch(r));
+#		else
+		op64(ctx,FLD32,&r->stack,UNUSED);
+#		endif
 		break;
 	case HF64:
+#		ifdef HL_64
 		op64(ctx, MOVSD, PXMM(0), fetch(r));
+#		else
+		op64(ctx,FLD,&r->stack,UNUSED);
+#		endif
 		break;
 	default:
 		op64(ctx, MOV, PEAX, fetch(r));
@@ -1371,7 +1379,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				void *mod_fun;
 				if( a->t->kind == HF32 ) mod_fun = fmodf; else mod_fun = fmod; 
 				call_native(ctx,mod_fun,size);
-				store_native_result(ctx,dst);
+				store_result(ctx,dst);
 				return fetch(dst);
 			}
 		default:
@@ -1960,7 +1968,7 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	CpuReg R8 = Eax;
 #	endif
 	int pos = BUF_POS();
-	int jstart, jcall, jloop, jfp;
+	int jstart, jcall, jloop;
 	preg p;
 
 	jit_buf(ctx);
@@ -2002,14 +2010,6 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 
 	op64(ctx,CALL,REG_AT(Ecx),UNUSED);
 
-	// if want return float, move XMM0 to x87 stack
-	op64(ctx,MOV,REG_AT(Ecx),pmem(&p,Ebp,HL_WSIZE*5));
-	op64(ctx,TEST,REG_AT(Ecx),REG_AT(Ecx));
-	XJump_small(JZero,jfp);
-	op64(ctx,MOVSD,pmem(&p,Ebp,-8),PXMM(0));
-	op64(ctx,FLD,pmem(&p,Ebp,-8),UNUSED);
-	patch_jump(ctx, jfp);
-
 	// cleanup and ret
 	op64(ctx,MOV,PESP,PEBP);
 	op64(ctx,POP,PEBP, UNUSED);
@@ -2019,23 +2019,6 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	while( BUF_POS() & 15 )
 		op32(ctx, NOP, UNUSED, UNUSED);
 	return pos;
-}
-
-void hl_jit_init_setfp( jit_ctx *ctx, int *ff, int *fd ) {
-	preg p;
-	// set XMM(0) to stack double or float parameter
-	*ff = BUF_POS();
-	op64(ctx,MOVSS,PXMM(0),pmem(&p,Esp,HL_WSIZE));
-	op64(ctx,RET,UNUSED,UNUSED);
-	jit_buf(ctx);
-	while( BUF_POS() & 15 )
-		op32(ctx, NOP, UNUSED, UNUSED);
-	*fd = BUF_POS();
-	op64(ctx,MOVSD,PXMM(0),pmem(&p,Esp,HL_WSIZE));
-	op64(ctx,RET,UNUSED,UNUSED);
-	jit_buf(ctx);
-	while( BUF_POS() & 15 )
-		op32(ctx, NOP, UNUSED, UNUSED);
 }
 
 static void *get_dyncast( hl_type *t ) {
@@ -2124,29 +2107,21 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 	case HF64:
 		size = pad_before_call(ctx, HL_WSIZE*2);
 		op32(ctx,PUSH,pconst64(&p,(int_val)v->t),UNUSED);
-		op32(ctx,MOV,PEAX,REG_AT(Ebp));
-		if( v->stackPos >= 0 )
-			op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
-		else
-			op32(ctx,SUB,PEAX,pconst(&p,-v->stackPos));
-		op32(ctx,PUSH,PEAX,UNUSED);
-		call_native(ctx,get_dyncast(dst->t),size);
-		store_native_result(ctx, dst);
 		break;
 	default:
 		size = pad_before_call(ctx, HL_WSIZE*3);
 		op32(ctx,PUSH,pconst64(&p,(int_val)dst->t),UNUSED);
 		op32(ctx,PUSH,pconst64(&p,(int_val)v->t),UNUSED);
-		op32(ctx,MOV,PEAX,REG_AT(Ebp));
-		if( v->stackPos >= 0 )
-			op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
-		else
-			op32(ctx,SUB,PEAX,pconst(&p,-v->stackPos));
-		op32(ctx,PUSH,PEAX,UNUSED);
-		call_native(ctx,get_dyncast(dst->t),size);
-		store(ctx, dst, PEAX, true);
 		break;
 	}
+	op32(ctx,MOV,PEAX,REG_AT(Ebp));
+	if( v->stackPos >= 0 )
+		op32(ctx,ADD,PEAX,pconst(&p,v->stackPos));
+	else
+		op32(ctx,SUB,PEAX,pconst(&p,-v->stackPos));
+	op32(ctx,PUSH,PEAX,UNUSED);
+	call_native(ctx,get_dyncast(dst->t),size);
+	store_result(ctx, dst);
 #endif
 }
 
@@ -2392,7 +2367,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int size;
 				size = prepare_call_args(ctx,1,&o->p2,ctx->vregs,true,0);
 				call_native(ctx,uint_to_double,size);
-				store_native_result(ctx,dst);
+				store_result(ctx,dst);
 			}
 			break;
 		case OToInt:
@@ -2609,7 +2584,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				discard_regs(ctx,false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
 				patch_jump(ctx,jend);
-				store(ctx,dst,IS_FLOAT(dst) ? PXMM(0) : PEAX,true);
+				store_result(ctx, dst);
 			}
 			break;
 		case OStaticClosure:
@@ -2659,7 +2634,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						op64(ctx,PUSH,r,UNUSED);
 						op64(ctx,PUSH,v,UNUSED);
 						call_native(ctx,get_dynget(dst->t),size);
-						store_native_result(ctx,dst);
+						store_result(ctx,dst);
 #						endif
 						XJump_small(JAlways,jend);
 						patch_jump(ctx,jhasfield);
@@ -2762,7 +2737,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,CALL,pmem(&p,tmp->id,o->p2*HL_WSIZE),UNUSED);
 				discard_regs(ctx, false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
-				store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+				store_result(ctx, dst);
 			}
 			break;
 		case OCallMethod:
@@ -2778,7 +2753,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,CALL,pmem(&p,tmp->id,o->p2*HL_WSIZE),UNUSED);
 				discard_regs(ctx, false);
 				op64(ctx,ADD,PESP,pconst(&p,size));
-				store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+				store_result(ctx, dst);
 				break;
 			}
 			case HVIRTUAL:
@@ -2857,7 +2832,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,CALL,r,UNUSED);
 					discard_regs(ctx, false);
 					op64(ctx,ADD,PESP,pconst(&p,size));
-					store(ctx, dst, IS_FLOAT(dst) ? PXMM(0) : PEAX, true);
+					store_result(ctx, dst);
 					patch_jump(ctx,jend);
 				}				
 				break;
@@ -3088,7 +3063,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,PUSH,r,UNUSED);
 				op64(ctx,PUSH,fetch(ra),UNUSED);
 				call_native(ctx,get_dynget(dst->t),size);
-				store_native_result(ctx,dst);
+				store_result(ctx,dst);
 #				endif
 			}
 			break;

@@ -29,7 +29,7 @@
 #	include <dlfcn.h>
 #endif
 
-extern void hl_callback_init( void *e, void *ff, void *fd );
+extern void hl_callback_init( void *e );
 
 static hl_module *cur_module;
 static void *stack_top;
@@ -171,7 +171,7 @@ static void append_type( char **p, hl_type *t ) {
 }
 
 int hl_module_init( hl_module *m ) {
-	int i, entry, setff, setfd;
+	int i, entry;
 	jit_ctx *ctx;
 	// RESET globals
 	for(i=0;i<m->code->nglobals;i++) {
@@ -259,7 +259,6 @@ int hl_module_init( hl_module *m ) {
 		return 0;
 	hl_jit_init(ctx, m);
 	entry = hl_jit_init_callback(ctx);
-	hl_jit_init_setfp(ctx,&setff,&setfd);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		int fpos = hl_jit_function(ctx, m, f);
@@ -274,7 +273,7 @@ int hl_module_init( hl_module *m ) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
 	}
-	hl_callback_init(((unsigned char*)m->jit_code) + entry, ((unsigned char*)m->jit_code) + setff, ((unsigned char*)m->jit_code) + setfd);
+	hl_callback_init(((unsigned char*)m->jit_code) + entry);
 	cur_module = m;
 	stack_top = &m;
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
