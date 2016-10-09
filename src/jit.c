@@ -2021,6 +2021,23 @@ int hl_jit_init_callback( jit_ctx *ctx ) {
 	return pos;
 }
 
+void hl_jit_init_setfp( jit_ctx *ctx, int *ff, int *fd ) {
+	preg p;
+	// set XMM(0) to stack double or float parameter
+	*ff = BUF_POS();
+	op64(ctx,MOVSS,PXMM(0),pmem(&p,Esp,HL_WSIZE));
+	op64(ctx,RET,UNUSED,UNUSED);
+	jit_buf(ctx);
+	while( BUF_POS() & 15 )
+		op32(ctx, NOP, UNUSED, UNUSED);
+	*fd = BUF_POS();
+	op64(ctx,MOVSD,PXMM(0),pmem(&p,Esp,HL_WSIZE));
+	op64(ctx,RET,UNUSED,UNUSED);
+	jit_buf(ctx);
+	while( BUF_POS() & 15 )
+		op32(ctx, NOP, UNUSED, UNUSED);
+}
+
 static void *get_dyncast( hl_type *t ) {
 	switch( t->kind ) {
 	case HF32:
