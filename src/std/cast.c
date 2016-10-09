@@ -104,7 +104,7 @@ HL_PRIM int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 	default:
 		break;
 	}
-	hl_error_msg(USTR("Can't cast %s(%s) to %s"),hl_to_string(hl_make_dyn(data,t)),hl_type_str(t),hl_type_str(to));
+	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(t),hl_type_str(to));
 	return 0;
 }
 
@@ -194,7 +194,7 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 			break;
 		}
 	}
-	hl_error_msg(USTR("Can't cast %s(%s) to %s"),hl_to_string(hl_make_dyn(data,t)),hl_type_str(t),hl_type_str(to));
+	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(t),hl_type_str(to));
 	return 0;
 }
 
@@ -350,7 +350,7 @@ HL_PRIM void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
 HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
 	if( t->kind == HDYN || v == NULL || hl_safe_cast(v->t,t) )
 		return v;
-	hl_error_msg(USTR("Can't cast %s to %s"),hl_to_string(v),hl_type_str(t));
+	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(v->t),hl_type_str(t));
 	return NULL;
 }
 

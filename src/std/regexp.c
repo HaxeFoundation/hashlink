@@ -72,11 +72,13 @@ HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	p = pcre16_compile2((PCRE_SPTR16)str,options,&errorcode,&error,&err_offset,NULL);
 	if( p == NULL ) {
 		hl_buffer *b = hl_alloc_buffer();
+		vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
 		hl_buffer_str(b,USTR("Regexp compilation error : "));
 		hl_buffer_cstr(b,error);
 		hl_buffer_str(b,USTR(" in "));
 		hl_buffer_str(b,(uchar*)str);
-		hl_error_msg(USTR("%s"),hl_buffer_content(b,NULL));
+		d->v.bytes = (vbyte*)hl_buffer_content(b,NULL);
+		hl_throw(d);
 	}
 	r = (ereg*)hl_gc_alloc_finalizer(sizeof(ereg));
 	r->finalize = regexp_finalize;
