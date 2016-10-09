@@ -5,21 +5,34 @@ class Sdl {
 
 	static var initDone = false;
 	static var isWin32 = false;
+	static var sentinel : hl.UI.Sentinel;
 	public static function init() {
 		if( initDone ) return;
 		initDone = true;
 		if( !initOnce() ) throw "Failed to init SDL";
 		isWin32 = detectWin32();
 	}
-	
+
+	static function onTimeout() {
+		throw "Program timeout (infinite loop?)";
+	}
+
 	static function __init__() {
 		hl.types.Api.setErrorHandler(function(e) reportError(e));
+		sentinel = new hl.UI.Sentinel(30,onTimeout);
 	}
 
 	static function initOnce() return false;
 	static function eventLoop( e : Event ) return false;
-	
+
 	public static var defaultEventHandler : Event -> Void;
+
+	/**
+		Prevent the program from reporting timeout infinite loop.
+	**/
+	public static function tick() {
+		sentinel.tick();
+	}
 
 	public static function loop( callb : Void -> Void, ?onEvent : Event -> Void ) {
 		var event = new Event();
@@ -43,9 +56,10 @@ class Sdl {
 			} catch( e : Dynamic ) {
 				reportError(e);
 			}
+			tick();
         }
 	}
-	
+
 	public dynamic static function reportError( e : Dynamic ) {
 		var f = new hl.UI.WinLog("Uncaught Exception", 400, 300);
 		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
@@ -60,7 +74,8 @@ class Sdl {
 		but.onClick = function() {
 			Sys.exit(0);
 		};
-		while( hl.UI.loop(true) != Quit ) {};
+		while( hl.UI.loop(true) != Quit )
+			tick();
 		f.destroy();
 	}
 

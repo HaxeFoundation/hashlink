@@ -122,6 +122,7 @@ HL_PRIM wref *HL_NAME(ui_winlog_new)( const uchar *title, int width, int height 
 	text = CreateWindowEx(WS_EX_CLIENTEDGE,USTR("RICHEDIT20A"),USTR(""),ES_MULTILINE | ES_DISABLENOSCROLL | ES_READONLY | WS_VSCROLL | WS_VISIBLE | WS_CHILD,5,5,width - 10,height - 50,wnd,NULL,NULL,NULL);
 	SendMessage(text,WM_SETFONT,(WPARAM)font,TRUE);
 	SetProp(wnd,PTEXT,text);
+	SetTimer(wnd,0,1000,NULL); // prevent lock in ui_loop
 	ShowWindow(wnd,SW_SHOW);
 	ref = alloc_ref(wnd);
 	ref->width = width;
@@ -189,7 +190,59 @@ HL_PRIM void HL_NAME(ui_stop_loop)() {
 	PostQuitMessage(0);
 }
 
+typedef struct {
+	HANDLE thread;
+	HANDLE original;
+	void *callback;
+	double timeout;
+	int ticks;
+} vsentinel;
+
+static DWORD WINAPI sentinel_loop( vsentinel *s ) {
+	int time_ms = (int)((s->timeout * 1000.) / 16.);
+	while( true ) {
+		int k = 0;
+		int tick = s->ticks;
+		while( true ) {
+			Sleep(time_ms);
+			if( tick != s->ticks ) break;
+			k++;
+			if( k == 16 ) {
+				// Wakeup
+				CONTEXT ctx;
+				ctx.ContextFlags = CONTEXT_FULL;
+				SuspendThread(s->original);
+				GetThreadContext(s->original,&ctx);
+				// simulate a call
+				*--((int*)ctx.Esp) = ctx.Eip;
+				*--((int*)ctx.Esp) = ctx.Esp;
+				ctx.Eip = (DWORD)s->callback;
+				SetThreadContext(s->original,&ctx);
+				ResumeThread(s->original);
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
+HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
+	vsentinel *s = (vsentinel*)malloc(sizeof(vsentinel));
+	if( c->hasValue ) hl_error("Cannot set sentinel on closure callback");
+	s->timeout = timeout;
+	s->ticks = 0;
+	s->original = OpenThread(THREAD_ALL_ACCESS,FALSE,GetCurrentThreadId());
+	s->callback = c->fun;
+	s->thread = CreateThread(NULL,0,sentinel_loop,s,0,NULL);
+	return s;
+}
+
+HL_PRIM void HL_NAME(ui_sentinel_tick)( vsentinel *s ) {
+	s->ticks++;
+}
+
 #define _WIN _ABSTRACT(ui_window)
+#define _SENTINEL _ABSTRACT(ui_sentinel)
 
 DEFINE_PRIM(_VOID, ui_init, _NO_ARG);
 DEFINE_PRIM(_I32, ui_dialog, _BYTES _BYTES _I32);
@@ -201,3 +254,6 @@ DEFINE_PRIM(_VOID, ui_win_set_enable, _WIN _BOOL);
 DEFINE_PRIM(_VOID, ui_win_destroy, _WIN);
 DEFINE_PRIM(_I32, ui_loop, _BOOL);
 DEFINE_PRIM(_VOID, ui_stop_loop, _NO_ARG);
+
+DEFINE_PRIM(_SENTINEL, ui_start_sentinel, _F64 _FUN(_VOID,_NO_ARG));
+DEFINE_PRIM(_VOID, ui_sentinel_tick, _SENTINEL);
