@@ -289,7 +289,7 @@ DEFINE_PRIM(_VOID, win_swap_window, TWIN);
 DEFINE_PRIM(_VOID, win_render_to, TWIN TGL);
 DEFINE_PRIM(_VOID, win_destroy, TWIN TGL);
 
-// 
+// game controller
 
 HL_PRIM int HL_NAME(gctrl_count)() {
 	return SDL_NumJoysticks();
@@ -329,3 +329,47 @@ DEFINE_PRIM(_I32, gctrl_get_axis, TGCTRL _I32);
 DEFINE_PRIM(_BOOL, gctrl_get_button, TGCTRL _I32);
 DEFINE_PRIM(_I32, gctrl_get_id, TGCTRL);
 DEFINE_PRIM(_BYTES, gctrl_get_name, TGCTRL);
+
+// surface
+
+
+HL_PRIM SDL_Surface *HL_NAME(surface_from)( vbyte *ptr, int width, int height, int depth, int pitch, int rmask, int gmask, int bmask, int amask ) {
+	return SDL_CreateRGBSurfaceFrom(ptr,width,height,depth,pitch,rmask,gmask,bmask,amask);
+}
+
+HL_PRIM void HL_NAME(free_surface)( SDL_Surface *s ) {
+	SDL_FreeSurface(s);
+}
+
+#define _SURF	_ABSTRACT(sdl_surface)
+DEFINE_PRIM(_SURF, surface_from, _BYTES _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, free_surface, _SURF);
+
+// cursor
+
+HL_PRIM void HL_NAME(show_cursor)( bool b ) {
+	SDL_ShowCursor(b?SDL_ENABLE:SDL_DISABLE);
+}
+
+HL_PRIM SDL_Cursor *HL_NAME(cursor_create)( SDL_Surface *s, int hotX, int hotY ) {
+	return SDL_CreateColorCursor(s,hotX,hotY);
+}
+
+HL_PRIM SDL_Cursor *HL_NAME(cursor_create_system)( int kind ) {
+	return SDL_CreateSystemCursor(kind);
+}
+
+HL_PRIM void HL_NAME(free_cursor)( SDL_Cursor *c ) {
+	SDL_FreeCursor(c);
+}
+
+HL_PRIM void HL_NAME(set_cursor)( SDL_Cursor *c ) {
+	SDL_SetCursor(c);
+}
+
+#define _CURSOR _ABSTRACT(sdl_cursor)
+DEFINE_PRIM(_VOID, show_cursor, _BOOL);
+DEFINE_PRIM(_CURSOR, cursor_create, _SURF _I32 _I32);
+DEFINE_PRIM(_CURSOR, cursor_create_system, _I32);
+DEFINE_PRIM(_VOID, free_cursor, _CURSOR);
+DEFINE_PRIM(_VOID, set_cursor, _CURSOR);
