@@ -38,6 +38,7 @@ endif
 else ifeq ($(UNAME),Darwin)
 
 # Mac
+LIBEXT=dylib
 CFLAGS += -m$(ARCH)
 LFLAGS += -Wl,-export_dynamic
 
