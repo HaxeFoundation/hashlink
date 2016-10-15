@@ -32,7 +32,7 @@ HL_PRIM hl_field_lookup *hl_lookup_insert( hl_field_lookup *l, int size, int has
 		if( h < hash ) min = mid + 1; else max = mid;
 	}
 	pos = (min + max) >> 1;
-	memcpy(l + pos + 1, l + pos, (size - pos) * sizeof(hl_field_lookup));
+	memmove(l + pos + 1, l + pos, (size - pos) * sizeof(hl_field_lookup));
 	l[pos].field_index = index;
 	l[pos].hashed_name = hash;
 	l[pos].t = t;
@@ -775,7 +775,7 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 			vdynobj *d = (vdynobj*)obj;
 			hl_field_lookup *f = hl_lookup_find(&d->dproto->fields,d->nfields,hfield);
 			if( f == NULL ) return false;
-			memcpy(f, f + 1, ((char*)(&d->dproto->fields + d->nfields)) - (char*)(f + 1));
+			memmove(f, f + 1, ((char*)(&d->dproto->fields + d->nfields)) - (char*)(f + 1));
 			d->nfields--;
 			// rebuild virtuals
 			{

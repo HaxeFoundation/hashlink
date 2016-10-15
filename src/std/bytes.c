@@ -32,7 +32,7 @@ HL_PRIM vbyte *hl_copy_bytes( const vbyte *ptr, int size ) {
 }
 
 HL_PRIM void hl_bytes_blit( char *dst, int dpos, char *src, int spos, int len ) {
-	memcpy(dst + dpos,src+spos,len);
+	memmove(dst + dpos,src+spos,len);
 }
 
 HL_PRIM vbyte *hl_bytes_offset( vbyte *src, int offset ) {

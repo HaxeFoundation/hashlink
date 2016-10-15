@@ -166,7 +166,7 @@ HL_PRIM int hl_host_resolve( vbyte *host ) {
 #	endif
 		if( h == NULL )
 			return 0;
-		ip = *((unsigned int*)h->h_addr);
+		ip = *((unsigned int*)h->h_addr_list[0]);
 	}
 	return ip;
 }
