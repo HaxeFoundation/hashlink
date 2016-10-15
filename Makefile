@@ -1,6 +1,6 @@
 CFLAGS = -g -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D HLDLL_EXPORTS
 LFLAGS = -L. -lhl -ldl
-LIBFLAGS = -Wl,-Bsymbolic
+LIBFLAGS =
 LIBEXT = so
 
 ifndef ARCH
