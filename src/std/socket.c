@@ -19,7 +19,6 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include <string.h>
 #ifdef _WIN32
 #	define _WINSOCKAPI_
 #	include <hl.h>
@@ -29,6 +28,8 @@
 #	define SHUT_RD		SD_RECEIVE
 #	define SHUT_RDWR	SD_BOTH
 #else
+#	define _GNU_SOURCE
+#	include <string.h>
 #	include <sys/types.h>
 #	include <sys/socket.h>
 #	include <sys/time.h>
@@ -232,7 +233,7 @@ HL_PRIM bool hl_socket_bind( hl_socket *s, int host, int port ) {
 
 HL_PRIM hl_socket *hl_socket_accept( hl_socket *s ) {
 	struct sockaddr_in addr;
-	int addrlen = sizeof(addr);
+	unsigned int addrlen = sizeof(addr);
 	SOCKET nsock;
 	hl_socket *hs;
 	nsock = accept(s->sock,(struct sockaddr*)&addr,&addrlen);
@@ -245,7 +246,7 @@ HL_PRIM hl_socket *hl_socket_accept( hl_socket *s ) {
 
 HL_PRIM bool hl_socket_peer( hl_socket *s, int *host, int *port ) {
 	struct sockaddr_in addr;
-	int addrlen = sizeof(addr);
+	unsigned int addrlen = sizeof(addr);
 	if( getpeername(s->sock,(struct sockaddr*)&addr,&addrlen) == SOCKET_ERROR )
 		return false;
 	*host = *(int*)&addr.sin_addr;
@@ -255,7 +256,7 @@ HL_PRIM bool hl_socket_peer( hl_socket *s, int *host, int *port ) {
 
 HL_PRIM bool hl_socket_host( hl_socket *s, int *host, int *port ) {
 	struct sockaddr_in addr;
-	int addrlen = sizeof(addr);
+	unsigned int addrlen = sizeof(addr);
 	if( getsockname(s->sock,(struct sockaddr*)&addr,&addrlen) == SOCKET_ERROR )
 		return false;
 	*host = *(int*)&addr.sin_addr;

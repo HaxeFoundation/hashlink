@@ -45,7 +45,7 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		void *v = args[j];
 		int tsize = hl_stack_size(at);
 		if( hl_is_ptr(at) )
-			*(void**)&stack[pos] = v;
+			*(void**)(stack + pos) = v;
 		else switch( tsize ) {
 		case 0:
 			continue;
@@ -53,29 +53,29 @@ void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret ) {
 			stack[pos] = *(unsigned char*)v;
 			break;
 		case 2:
-			*(unsigned short*)&stack[pos] = *(unsigned short*)v;
+			*(unsigned short*)(stack + pos) = *(unsigned short*)v;
 			break;
 		case 4:
 			switch( at->kind ) {
 			case HBOOL:
 			case HUI8:
-				*(int*)&stack[pos] = *(unsigned char*)v;
+				*(int*)(stack + pos) = *(unsigned char*)v;
 				break;
 			case HUI16:
-				*(int*)&stack[pos] = *(unsigned short*)v;
+				*(int*)(stack + pos) = *(unsigned short*)v;
 				break;
 			default:
-				*(int*)&stack[pos] = *(int*)v;
+				*(int*)(stack + pos) = *(int*)v;
 				break;
 			}
 			break;
 		case 8:
-			*(double*)&stack[pos] = *(double*)v;
+			*(double*)(stack + pos) = *(double*)v;
 			{
 				// SWAP (we push in reverse order in hl_callback_entry !
-				int i = *(int*)&stack[pos];
-				*(int*)&stack[pos] = *(int*)&stack[pos + 4];
-				*(int*)&stack[pos + 4] = i;
+				int i = *(int*)(stack + pos);
+				*(int*)(stack + pos) = *(int*)(stack + pos + 4);
+				*(int*)(stack + pos + 4) = i;
 			}
 			break;
 		default:

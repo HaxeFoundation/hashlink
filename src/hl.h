@@ -176,7 +176,7 @@ HL_API void uprintf( const uchar *fmt, const uchar *str );
 #ifdef HL_VCC
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
 #else
-#	define hl_debug_break() hl_fatal("debugbreak")
+#	define hl_debug_break()
 #endif
 
 #define DADDR(v)	((int)((int_val)(v))&0xFFFF)

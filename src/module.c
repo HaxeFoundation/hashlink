@@ -192,14 +192,22 @@ int hl_module_init( hl_module *m ) {
 			if( curlib != n->lib ) {
 				curlib = n->lib;
 				strcpy(tmp,n->lib);
-#				ifdef HL_64
-				strcpy(tmp+strlen(tmp),"64.hdll");
-#				else
-				strcpy(tmp+strlen(tmp),".hdll");
+#				ifndef HL_WIN
+				if( strcmp(n->lib,"std") == 0 )
+					libHandler = RTLD_DEFAULT;
+				else {
 #				endif
-				libHandler = dlopen(tmp,RTLD_LAZY);
-				if( libHandler == NULL )
-					hl_fatal1("Failed to load library %s",tmp);
+#					ifdef HL_64
+					strcpy(tmp+strlen(tmp),"64.hdll");
+#					else
+					strcpy(tmp+strlen(tmp),".hdll");
+#					endif
+					libHandler = dlopen(tmp,RTLD_LAZY);
+					if( libHandler == NULL )
+						hl_fatal1("Failed to load library %s",tmp);
+#				ifndef HL_WIN
+				}
+#				endif
 			}
 			strcpy(p,"hlp_");
 			p += 4;

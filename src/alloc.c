@@ -36,9 +36,10 @@ static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
 	return 32;
 }
 #else
+#	include <malloc.h>
 #	include <sys/types.h>
 #	include <sys/mman.h>
-#	define TRAILING_ONES(x)		(~(x)?__builtin_ctz(~(x)):0)
+#	define TRAILING_ONES(x)		(~(x)?__builtin_ctz(~(x)):32)
 #	define TRAILING_ZEROES(x)	(x?__builtin_ctz(x):32)
 #endif
 #	define MZERO(ptr,size)		memset(ptr,0,size)	
@@ -850,7 +851,7 @@ static void *gc_alloc_page_memory( int size ) {
 #ifdef HL_WIN
 	return VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
-	return malloc(size);
+	return memalign(GC_PAGE_SIZE,size);
 #endif
 }
 

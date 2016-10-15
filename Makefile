@@ -1,7 +1,11 @@
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre
-LFLAGS = -L. -lhl
+CFLAGS = -g -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D HLDLL_EXPORTS
+LFLAGS = -L. -lhl -ldl
 LIBFLAGS = -Wl,-Bsymbolic
 LIBEXT = so
+
+ifndef ARCH
+ARCH=32
+endif
 
 PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/pcre_dfa_exec.o \
 	include/pcre/pcre_exec.o include/pcre/pcre_fullinfo.o include/pcre/pcre_globals.o \
@@ -50,7 +54,7 @@ all: libhl hl
 libs: fmt ui sdl 
 
 libhl: ${LIB}
-	${CC} -o libhl.$(LIBEXT) ${LIBFLAGS} -shared ${LIB}
+	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB}
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} hl${ARCH}lib.a ${LFLAGS}
@@ -64,7 +68,7 @@ hl: ${HL}
 	${CC} ${CFLAGS} -o $@ -c $<
 	
 clean_o:
-	rm -rf ${STD} ${BOOT} ${RUNTIME} ${PCRE}
+	rm -rf ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL}
 	
 clean: clean_o 
 
