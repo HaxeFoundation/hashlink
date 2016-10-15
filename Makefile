@@ -57,7 +57,7 @@ libhl: ${LIB}
 	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB}
 
 hlc: ${BOOT}
-	${CC} ${CFLAGS} -o hlc ${BOOT} hl${ARCH}lib.a ${LFLAGS}
+	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
 	
 hl: ${HL}
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS}
