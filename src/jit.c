@@ -418,7 +418,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 #ifdef OP_LOG
 
 static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
-static const char *JUMP_NAMES[] = { "JOVERFLOW", "J???", "JLT", "JGTE", "JEQ", "JNEQ", "JLTE", "JGT", "J?8", "J?9", "JP, "JNP", "JSLT", "JSGTE", "JSLTE", "JSGT" };
+static const char *JUMP_NAMES[] = { "JOVERFLOW", "J???", "JLT", "JGTE", "JEQ", "JNEQ", "JLTE", "JGT", "J?8", "J?9", "JP", "JNP", "JSLT", "JSGTE", "JSLTE", "JSGT" };
 
 static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
 	static char buf[64];
@@ -1581,6 +1581,8 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 					// set ZF=0, CF=0
 					op64(ctx,TEST,PESP,PESP);
 					break;
+				default:
+					ASSERT(op->op);
 				}
 				patch_jump(ctx,jnotnan);
 			}
@@ -2835,6 +2837,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					store_result(ctx, dst);
 					patch_jump(ctx,jend);
 				}				
+				break;
+			default:
+				ASSERT(0);
 				break;
 			}
 			break;

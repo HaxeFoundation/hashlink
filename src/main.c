@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	hl_global_init(&ctx);
-	hl_sys_init(argv + 2,argc - 2);
+	hl_sys_init((void**)(argv + 2),argc - 2);
 	ctx.code = load_code(argv[1]);
 	if( ctx.code == NULL )
 		return 1;

@@ -166,28 +166,29 @@ static double hl_call_wrapper_ptr_d( vclosure_wrapper *c ) {
 			args[i] = hl_make_dyn(stack,t);
 		stack += hl_stack_size(t);
 	}
+	ret = hl_dyn_call(c->wrappedFun,args,nargs);
 	return hl_dyn_castd(&ret,&hlt_dyn);
 }
 
 static void *hl_call_wrapper_all_ptr( vclosure_wrapper *c ) {
-	return hl_wrapper_call(c,&c + 1, NULL);
+	return hl_wrapper_call(c,(void**)(&c + 1), NULL);
 }
 
 static int hl_call_wrapper_all_ptr_i( vclosure_wrapper *c ) {
 	vdynamic d;
-	hl_wrapper_call(c,&c + 1, &d);
+	hl_wrapper_call(c,(void**)(&c + 1), &d);
 	return d.v.i;
 }
 
 static float hl_call_wrapper_all_ptr_f( vclosure_wrapper *c ) {
 	vdynamic d;
-	hl_wrapper_call(c,&c + 1, &d);
+	hl_wrapper_call(c,(void**)(&c + 1), &d);
 	return d.v.f;
 }
 
 static double hl_call_wrapper_all_ptr_d( vclosure_wrapper *c ) {
 	vdynamic d;
-	hl_wrapper_call(c,&c + 1, &d);
+	hl_wrapper_call(c,(void**)(&c + 1), &d);
 	return d.v.d;
 }
 

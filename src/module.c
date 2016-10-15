@@ -251,6 +251,8 @@ int hl_module_init( hl_module *m ) {
 		case HVIRTUAL:
 			hl_init_virtual(t,&m->ctx);
 			break;
+		default:
+			break;
 		}
 	}
 	// JIT
