@@ -1,5 +1,7 @@
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre
-LFLAGS =
+LFLAGS = -L. -lhl
+LIBFLAGS = -Wl,-Bsymbolic
+LIBEXT = so
 
 PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/pcre_dfa_exec.o \
 	include/pcre/pcre_exec.o include/pcre/pcre_fullinfo.o include/pcre/pcre_globals.o \
@@ -8,8 +10,10 @@ PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/p
 RUNTIME = src/alloc.o
 
 STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o \
-	src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/regexp.o src/std/string.o src/std/sys.o \
-	src/std/types.o src/std/ucs2.o src/std/random.o
+	src/std/file.o src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/random.o src/std/regexp.o \
+	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o
+
+HL = src/callback.o src/code.o src/jit.o src/main.o src/module.o
 	
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -20,7 +24,8 @@ UNAME := $(shell uname)
 # Cygwin
 ifeq ($(OS),Windows_NT)
 
-CFLAGS += -Wl,--export-all-symbols
+LIBFLAGS += -Wl,--export-all-symbols
+LIBEXT = dll
 
 ifeq ($(ARCH),32)
 CC=i686-pc-cygwin-gcc 
@@ -40,36 +45,18 @@ LFLAGS += -lm -Wl,--export-dynamic
 
 endif
 
-all: libs hlc32 clean hlc64
+all: libhl hl
 
-libs: hl32lib hl64lib clean
+libs: fmt ui sdl 
 
-hlc32:
-	make ARCH=32 clean_o hlc
-
-hlc64:
-	make ARCH=64 clean_o hlc
-	
-hl32:
-	make ARCH=32 build
-	
-hl64:
-	make ARCH=64 build
-	
-hl32lib:
-	make ARCH=32 clean_o lib
-	
-hl64lib:
-	make ARCH=64 clean_o lib
-
-lib: ${LIB}
-	${AR} rcs hl${ARCH}lib.a ${LIB}
+libhl: ${LIB}
+	${CC} -o libhl.$(LIBEXT) ${LIBFLAGS} -shared ${LIB}
 
 hlc: ${BOOT}
-	${CC} ${CFLAGS} -o hlc${ARCH} ${BOOT} hl${ARCH}lib.a ${LFLAGS}
+	${CC} ${CFLAGS} -o hlc ${BOOT} hl${ARCH}lib.a ${LFLAGS}
 	
-build: ${SRC}
-	${CC} ${CFLAGS} -o hl${ARCH} ${SRC} ${LFLAGS}
+hl: ${HL}
+	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS}
 	
 .SUFFIXES : .c .o
 
@@ -79,6 +66,8 @@ build: ${SRC}
 clean_o:
 	rm -rf ${STD} ${BOOT} ${RUNTIME} ${PCRE}
 	
-clean: clean_o
-	
-.PHONY: hl32 hl64 hlc32 hlc64 hlc
+clean: clean_o 
+
+.PHONY: libhl hl hlc
+
+

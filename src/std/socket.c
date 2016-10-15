@@ -20,16 +20,14 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <string.h>
-#define _WINSOCKAPI_
-#include <hl.h>
-#ifdef HL_WIN
+#ifdef _WIN32
+#	define _WINSOCKAPI_
+#	include <hl.h>
 #	include <winsock2.h>
 #	define FDSIZE(n)	(sizeof(u_int) + (n) * sizeof(SOCKET))
 #	define SHUT_WR		SD_SEND
 #	define SHUT_RD		SD_RECEIVE
 #	define SHUT_RDWR	SD_BOTH
-	static bool init_done = false;
-	static WSADATA init_data;
 #else
 #	include <sys/types.h>
 #	include <sys/socket.h>
@@ -60,6 +58,8 @@
 #	define EPOLLOUT 0x004
 #endif
 
+#include <hl.h>
+
 #if defined(HL_WIN) || defined(HL_MAC)
 #	define MSG_NOSIGNAL 0
 #endif
@@ -81,6 +81,8 @@ static int block_error() {
 
 HL_PRIM void hl_socket_init() {
 #ifdef HL_WIN
+	static bool init_done = false;
+	static WSADATA init_data;
 	if( !init_done ) {
 		WSAStartup(MAKEWORD(2,0),&init_data);
 		init_done = true;
@@ -154,7 +156,7 @@ HL_PRIM int hl_host_resolve( vbyte *host ) {
 	ip = inet_addr((char*)host);
 	if( ip == INADDR_NONE ) {
 		struct hostent *h;
-#	if defined(HL_WIN) || defined(HL_MAC)
+#	if defined(HL_WIN) || defined(HL_MAC) || defined (HL_CYGWIN)
 		h = gethostbyname((char*)host);
 #	else
 		struct hostent hbase;
@@ -177,7 +179,7 @@ HL_PRIM vbyte *hl_host_to_string( int ip ) {
 
 HL_PRIM vbyte *hl_host_reverse( int ip ) {
 	struct hostent *h;
-#	if defined(HL_WIN) || defined(HL_MAC)
+#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_CYGWIN)
 	h = gethostbyaddr((char *)&ip,4,AF_INET);
 #	else
 	struct hostent htmp;
@@ -261,6 +263,11 @@ HL_PRIM bool hl_socket_host( hl_socket *s, int *host, int *port ) {
 	return true;
 }
 
+static void init_timeval( double f, struct timeval *t ) {
+	t->tv_usec = (int)((f - (int)f) * 1000000);
+	t->tv_sec = (int)f;
+}
+
 HL_PRIM bool hl_socket_set_timeout( hl_socket *s, double t ) {
 #ifdef HL_WIN
 	int time = (int)(t * 1000);
@@ -293,7 +300,7 @@ HL_PRIM bool hl_socket_set_blocking( hl_socket *s, bool b ) {
 		rights &= ~O_NONBLOCK;
 	else
 		rights |= O_NONBLOCK;
-	return fcntl(val_sock(o),F_SETFL,rights) != -1;
+	return fcntl(s->sock,F_SETFL,rights) != -1;
 #endif
 }
 

@@ -187,7 +187,9 @@ static void gc_flush_empty_pages() {
 	}
 }
 
+#ifdef GC_DEBUG
 static int PAGE_ID = 0;
+#endif
 
 static gc_pheader *gc_alloc_new_page( int block, int size, bool varsize ) {
 	int m, i;
