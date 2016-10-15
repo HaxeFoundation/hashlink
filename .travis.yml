@@ -17,5 +17,5 @@ install:
   - make hl32lib
 
 script:
-  - haxe -hl src/_main.c -cp tests/helloworld -main HelloWorld -D interp
-  - haxe -hl src/_main.c -cp tests/helloworld -main HelloWorld && make hlc32
+  - haxe -hl src/_main.c -cp other/tests/helloworld -main HelloWorld -D interp
+  - haxe -hl src/_main.c -cp other/tests/helloworld -main HelloWorld && make hlc32
