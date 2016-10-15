@@ -18,6 +18,6 @@ install:
   - sudo cp libhl.so /usr/lib
 
 script:
-  - haxe -hl hello.hl -cp other/tests/helloworld -main HelloWorld -D interp
+  - haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
   - hl hello.hl
-  - haxe -hl src/_main.c -cp other/tests/helloworld -main HelloWorld && make hlc
+  - haxe -hl src/_main.c -cp other/tests -main HelloWorld && make hlc
