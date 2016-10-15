@@ -52,6 +52,9 @@ endif
 
 all: libhl hl
 
+install_lib:
+	cp libhl.${LIBEXT) /usr/local/lib
+
 libs: fmt ui sdl 
 
 libhl: ${LIB}

@@ -15,8 +15,8 @@ install:
     sudo apt-get install gcc-multilib -y;
     fi
   - make ARCH=32 all
-  - sudo cp libhl.so /usr/local/lib
-
+  - sudo make install_lib
+  
 script:
   - haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
   - ./hl hello.hl
