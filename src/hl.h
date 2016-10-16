@@ -22,7 +22,7 @@
 #ifndef HL_H
 #define HL_H
 
-#define HL_VERSION	010
+#define HL_VERSION	0x010
 
 #ifdef _WIN32
 #	define HL_WIN

@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 	} ctx;
 	hl_trap_ctx trap;
 	if( argc == 1 ) {
-		printf("HLVM %d.%d.%d (c)2015-2016 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION/100,(HL_VERSION/10)%10,HL_VERSION%10);
+		printf("HL/JIT %d.%d.%d (c)2015-2016 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
 		return 1;
 	}
 	hl_global_init(&ctx);
