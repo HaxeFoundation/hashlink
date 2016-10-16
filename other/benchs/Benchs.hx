@@ -14,9 +14,12 @@ class Benchs {
 		Sys.println(v);
 		#elseif flash
 
+		var t = flash.Lib.getTimer();
 		var f = new flash.filesystem.File(flash.filesystem.File.applicationDirectory.nativePath + "/flashout.txt");
 		var o = new flash.filesystem.FileStream();
 		o.open(f, flash.filesystem.FileMode.WRITE);
+		o.endian = flash.utils.Endian.LITTLE_ENDIAN;
+		o.writeFloat(t/1000.);
 		o.writeUTFBytes(Std.string(v));
 		o.close();
 
@@ -103,16 +106,18 @@ class Benchs {
 							return;
 						}
 						var et = haxe.Timer.stamp() - t0;
-						totT += et;
-						count++;
-						if( t.name == "swf" )
-							r = StringTools.trim(sys.io.File.getContent("flashout.txt"));
-						else
+						if( t.name == "swf" ) {
+							var bytes = sys.io.File.getBytes("flashout.txt");
+							et = bytes.getFloat(0);
+							r = StringTools.trim(bytes.sub(4,bytes.length-4).toString());
+						} else
 							r = StringTools.trim(p.stdout.readAll().toString());
 						if( r != result ) {
 							Sys.println(t.name+" result "+r+" but expected "+result);
 							return;
 						}
+						totT += et;
+						count++;
 					}
 
 					var et = totT / count;
