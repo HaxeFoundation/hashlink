@@ -53,12 +53,29 @@ static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
 #define GC_PAGE_SIZE	(1 << GC_PAGE_BITS)
 
 #ifndef HL_64
-#	define GC_MASK_BITS			16
+#	define gc_hash(ptr)			((unsigned int)(ptr))
 #	define GC_LEVEL0_BITS		8
 #	define GC_LEVEL1_BITS		8
-#	define GC_GET_LEVEL1(ptr)	hl_gc_page_map[((unsigned int)(ptr))>>(GC_MASK_BITS+GC_LEVEL1_BITS)]
-#	define GC_GET_PAGE(ptr)		GC_GET_LEVEL1(ptr)[(((unsigned int)(ptr))>>GC_MASK_BITS)&GC_LEVEL1_MASK]
+#else
+#	define GC_LEVEL0_BITS		10
+#	define GC_LEVEL1_BITS		10
+
+static unsigned int gc_hash( void *ptr ) {
+	int_val key = (int_val)ptr;
+	key = (~key) + (key << 18);
+	key = key ^ (((unsigned)key) >> 31);
+	key = key * 21;
+	key = key ^ (((unsigned)key) >> 11);
+	key = key + (key << 6);
+	key = key ^ (((unsigned)key) >> 22);
+	return (unsigned int)key;
+}
+
 #endif
+
+#define GC_MASK_BITS		16
+#define GC_GET_LEVEL1(ptr)	hl_gc_page_map[gc_hash(ptr)>>(GC_MASK_BITS+GC_LEVEL1_BITS)]
+#define GC_GET_PAGE(ptr)	GC_GET_LEVEL1(ptr)[(gc_hash(ptr)>>GC_MASK_BITS)&GC_LEVEL1_MASK]
 #define GC_LEVEL1_MASK		((1 << GC_LEVEL1_BITS) - 1)
 
 #define PAGE_KIND_BITS		2
@@ -100,7 +117,7 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_level1_null[1<<GC_LEVEL1_BITS] = {NULL};
-HL_PRIM gc_pheader **hl_gc_page_map[1<<GC_LEVEL0_BITS] = {NULL};
+static gc_pheader **hl_gc_page_map[1<<GC_LEVEL0_BITS] = {NULL};
 
 static struct { 
 	int64 total_requested;
@@ -204,6 +221,17 @@ static gc_pheader *gc_alloc_new_page( int block, int size, bool varsize ) {
 #		endif
 		hl_fatal("Out of memory");
 	}
+
+#	ifdef HL_64
+	for(i=0;i<size>>GC_MASK_BITS;i++) {
+		void *ptr = (unsigned char*)p + (i<<GC_MASK_BITS);
+		if( GC_GET_PAGE(ptr) ) {
+			printf("GC Page HASH collide %lX %lX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
+			return gc_alloc_new_page(block,size,varsize);
+		}
+	}
+#endif
+
 #	ifdef GC_DEBUG
 	memset(base,0xDD,size);
 	p->page_id = PAGE_ID++;
