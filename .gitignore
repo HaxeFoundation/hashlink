@@ -20,6 +20,6 @@ x64
 *.VC.db
 /include/sdl
 ReleaseStatic
-/other/benchs/*.c
-/other/benchs/bench.js
+/other/benchs/bench.*
 /other/benchs/cpp
+/other/benchs/flashout.txt
