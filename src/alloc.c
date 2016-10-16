@@ -60,17 +60,11 @@ static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
 #	define GC_LEVEL0_BITS		10
 #	define GC_LEVEL1_BITS		10
 
-static unsigned int gc_hash( void *ptr ) {
-	int_val key = (int_val)ptr;
-	key = (~key) + (key << 18);
-	key = key ^ (((unsigned)key) >> 31);
-	key = key * 21;
-	key = key ^ (((unsigned)key) >> 11);
-	key = key + (key << 6);
-	key = key ^ (((unsigned)key) >> 22);
-	return (unsigned int)key;
-}
+// we currently discard the higher bits 
+// we should instead have some special handling for them
+// in x86-64 user space grows up to 0x8000-00000000 (16 bits base + 31 bits page id)
 
+#	define gc_hash(ptr)			((int_val)(ptr)&0x0000000FFFFFFFFF)
 #endif
 
 #define GC_MASK_BITS		16
@@ -549,7 +543,7 @@ static void gc_flush_mark() {
 			void *p = *block++;
 			page = GC_GET_PAGE(p);
 			if( !page || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
-			bid = ((unsigned char*)p - (unsigned char*)page) / page->block_size;
+			bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 			if( page->sizes && page->sizes[bid] == 0 ) continue;
 			if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 				page->bmp[bid>>3] |= 1<<(bid&7);
@@ -622,7 +616,7 @@ static void gc_mark() {
 		page = GC_GET_PAGE(p);
 		if( !page ) continue; // the value was set to a not gc allocated ptr
 		// don't check if valid ptr : it's a manual added root, so should be valid
-		int bid = ((unsigned char*)p - (unsigned char*)page) / page->block_size;
+		int bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
 			GC_PUSH_GEN(p,page,bid);
@@ -636,7 +630,7 @@ static void gc_mark() {
 		gc_pheader *page = GC_GET_PAGE(p);
 		int bid;
 		if( !page || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
-		bid = ((unsigned char*)p - (unsigned char*)page) / page->block_size;
+		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 		if( page->sizes && !page->sizes[bid] ) continue; // inner pointer
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
@@ -773,7 +767,7 @@ HL_API bool hl_is_gc_ptr( void *ptr ) {
 	int bid;
 	if( !page ) return false;
 	if( ((unsigned char*)ptr - (unsigned char*)page) % page->block_size != 0 ) return false;
-	bid = ((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
+	bid = (int)((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
 	if( bid < page->first_block ) return false;
 	if( page->sizes && page->sizes[bid] == 0 ) return false;
 	return true;

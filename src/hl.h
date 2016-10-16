@@ -24,7 +24,7 @@
 
 #define HL_VERSION	0x010
 
-#ifdef _WINDOWS
+#ifdef _WIN32
 #	define HL_WIN
 #endif
 
