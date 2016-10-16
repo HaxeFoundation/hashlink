@@ -94,7 +94,7 @@ class Benchs {
 					var totT = 0., count = 0;
 					var r = null;
 
-					while( totT < 0.5 ) {
+					while( totT < 1. ) {
 						var t0 = haxe.Timer.stamp();
 						var p = new sys.io.Process(t.cmd.split("$name").join(name),t.args);
 						var code = p.exitCode();
@@ -121,7 +121,7 @@ class Benchs {
 					else
 						et -= t.startup;
 
-					Sys.println("\t" + t.name+"=" + Std.int(et*100)/100);
+					Sys.println("\t" + StringTools.rpad(t.name," ",5) + Std.int(et*100)/100);
 				}
 				run();
 			}
