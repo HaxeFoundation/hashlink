@@ -214,9 +214,15 @@ static DWORD WINAPI sentinel_loop( vsentinel *s ) {
 				SuspendThread(s->original);
 				GetThreadContext(s->original,&ctx);
 				// simulate a call
+#				ifdef HL_64
+				*--((int_val*)ctx.Rsp) = ctx.Rip;
+				*--((int_val*)ctx.Rsp) = ctx.Rsp;
+				ctx.Rip = (int_val)s->callback;
+#				else
 				*--((int*)ctx.Esp) = ctx.Eip;
 				*--((int*)ctx.Esp) = ctx.Esp;
 				ctx.Eip = (DWORD)s->callback;
+#				endif
 				SetThreadContext(s->original,&ctx);
 				ResumeThread(s->original);
 				break;

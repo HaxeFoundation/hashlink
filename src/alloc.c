@@ -226,7 +226,11 @@ static gc_pheader *gc_alloc_new_page( int block, int size, bool varsize ) {
 	for(i=0;i<size>>GC_MASK_BITS;i++) {
 		void *ptr = (unsigned char*)p + (i<<GC_MASK_BITS);
 		if( GC_GET_PAGE(ptr) ) {
+#			ifdef HL_VCC
+			printf("GC Page HASH collide %IX %IX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
+#			else
 			printf("GC Page HASH collide %lX %lX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
+#			endif
 			return gc_alloc_new_page(block,size,varsize);
 		}
 	}
