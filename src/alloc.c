@@ -45,7 +45,6 @@ static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
 
 // GC
 
-#define	GC_ALIGN_BITS	2
 #define	GC_ALIGN		(1 << GC_ALIGN_BITS)
 #define GC_ALL_PAGES	(GC_PARTITIONS << PAGE_KIND_BITS)
 
@@ -56,9 +55,11 @@ static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
 #	define gc_hash(ptr)			((unsigned int)(ptr))
 #	define GC_LEVEL0_BITS		8
 #	define GC_LEVEL1_BITS		8
+#	define GC_ALIGN_BITS		2
 #else
 #	define GC_LEVEL0_BITS		10
 #	define GC_LEVEL1_BITS		10
+#	define GC_ALIGN_BITS		3
 
 // we currently discard the higher bits 
 // we should instead have some special handling for them
@@ -106,7 +107,12 @@ struct _gc_pheader {
 #define GC_PART_BITS	4
 #define GC_FIXED_PARTS	5
 static const int GC_SBITS[GC_PARTITIONS] = {0,0,0,0,0,		3,6,14,22};
+
+#ifdef HL_64
+static const int GC_SIZES[GC_PARTITIONS] = {8,16,24,32,40,	8,64,1<<14,1<<22};
+#else
 static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
+#endif
 
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};

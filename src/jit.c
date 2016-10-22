@@ -276,7 +276,7 @@ static preg *pmem( preg *r, CpuReg reg, int offset ) {
 static preg *pmem2( preg *r, CpuReg reg, CpuReg reg2, int mult, int offset ) {
 	r->kind = RMEM;
 	r->id = mult | (reg << 4) | (reg2 << 8);
-	r->holds = (void*)offset;
+	r->holds = (void*)(int_val)offset;
 	return r;
 }
 
@@ -1872,7 +1872,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				XJump_small(JZero,ja);
 				op64(ctx,TEST,pb,pb);
 				XJump_small(JZero,jb);
-				op_call_fun(ctx,NULL,(int)a->t->obj->rt->compareFun,2,args);
+				op_call_fun(ctx,NULL,(int)(int_val)a->t->obj->rt->compareFun,2,args);
 				op32(ctx,TEST,PEAX,PEAX);
 				XJump_small(JNotZero,jcmp);
 				patch_jump(ctx,jeq);
@@ -1890,7 +1890,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				op64(ctx,TEST,pb,pb);
 				register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
 
-				op_call_fun(ctx,NULL,(int)a->t->obj->rt->compareFun,2,args);
+				op_call_fun(ctx,NULL,(int)(int_val)a->t->obj->rt->compareFun,2,args);
 				op32(ctx,TEST,PEAX,PEAX);
 				XJump_small(JZero,jcmp);
 
@@ -1904,7 +1904,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				XJump_small(JZero,ja);
 				op64(ctx,TEST,pb,pb);
 				XJump_small(JZero,jb);
-				op_call_fun(ctx,NULL,(int)a->t->obj->rt->compareFun,2,args);
+				op_call_fun(ctx,NULL,(int)(int_val)a->t->obj->rt->compareFun,2,args);
 				op64(ctx,CMP,PEAX,pconst(&p,0));
 				register_jump(ctx,do_jump(ctx,op->op,false),targetPos);
 				patch_jump(ctx,ja);
