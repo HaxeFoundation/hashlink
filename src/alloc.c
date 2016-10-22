@@ -38,8 +38,12 @@ static unsigned int __inline TRAILING_ZEROES( unsigned int x ) {
 #else
 #	include <sys/types.h>
 #	include <sys/mman.h>
-#	define TRAILING_ONES(x)		(~(x)?__builtin_ctz(~(x)):32)
-#	define TRAILING_ZEROES(x)	(x?__builtin_ctz(x):32)
+static inline unsigned int TRAILING_ONES( unsigned int x ) {
+	return (~x) ? __builtin_ctz(~x) : 32;
+}
+static inline unsigned int TRAILING_ZEROES( unsigned int x ) {
+	return x ? __builtin_ctz(x) : 32;
+}
 #endif
 #	define MZERO(ptr,size)		memset(ptr,0,size)	
 
