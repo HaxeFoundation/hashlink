@@ -866,8 +866,7 @@ void hl_free( hl_alloc *a ) {
 
 HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #ifdef __APPLE__
-    #ifdef MAP_ANONYMOUS 
-    #else
+    #ifndef MAP_ANONYMOUS
         #define MAP_ANONYMOUS MAP_ANON
     #endif
 #endif
