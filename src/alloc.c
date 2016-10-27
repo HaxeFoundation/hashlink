@@ -865,6 +865,11 @@ void hl_free( hl_alloc *a ) {
 }
 
 HL_PRIM void *hl_alloc_executable_memory( int size ) {
+#ifdef __APPLE__
+#  	ifndef MAP_ANONYMOUS
+#     		define MAP_ANONYMOUS MAP_ANON
+#       endif
+#endif
 #ifdef HL_WIN
 	return VirtualAlloc(NULL,size,MEM_COMMIT,PAGE_EXECUTE_READWRITE);
 #else
