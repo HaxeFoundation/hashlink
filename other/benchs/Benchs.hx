@@ -86,7 +86,9 @@ class Benchs {
 
 				if( t.cmd == "hlc" ) {
 					// build
-					if( Sys.command('$gcc -O3 ${is32?'-m32':''} -std=c11 -o hlc -I ../../src -L ../.. -lhl bench.c ../../src/hlc_main.c') != 0 ) {
+					var cmd = '$gcc -O3 ${is32?'-m32':''} -std=c11 -o hlc -I ../../src -L ../.. -lhl bench.c ../../src/hlc_main.c';
+					if( Sys.command(cmd) != 0 ) {
+						Sys.println("Failed to run "+cmd);
 						Sys.println(t.name+" failed to compile");
 						continue;
 					}
