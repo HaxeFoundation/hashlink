@@ -554,6 +554,9 @@ static void gc_flush_mark() {
 			page = GC_GET_PAGE(p);
 			if( !page || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
 			bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
+#			ifdef HL_64
+			if( bid < page->first_block || bid >= page->max_blocks ) continue;
+#			endif
 			if( page->sizes && page->sizes[bid] == 0 ) continue;
 			if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 				page->bmp[bid>>3] |= 1<<(bid&7);
@@ -627,6 +630,9 @@ static void gc_mark() {
 		if( !page ) continue; // the value was set to a not gc allocated ptr
 		// don't check if valid ptr : it's a manual added root, so should be valid
 		int bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
+#		ifdef HL_64
+		if( bid < page->first_block || bid >= page->max_blocks ) continue;
+#		endif
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
 			GC_PUSH_GEN(p,page,bid);
@@ -641,6 +647,9 @@ static void gc_mark() {
 		int bid;
 		if( !page || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
 		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
+#		ifdef HL_64
+		if( bid < page->first_block || bid >= page->max_blocks ) continue;
+#		endif
 		if( page->sizes && !page->sizes[bid] ) continue; // inner pointer
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
@@ -778,7 +787,7 @@ HL_API bool hl_is_gc_ptr( void *ptr ) {
 	if( !page ) return false;
 	if( ((unsigned char*)ptr - (unsigned char*)page) % page->block_size != 0 ) return false;
 	bid = (int)((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
-	if( bid < page->first_block ) return false;
+	if( bid < page->first_block || bid >= page->max_blocks ) return false;
 	if( page->sizes && page->sizes[bid] == 0 ) return false;
 	return true;
 }
