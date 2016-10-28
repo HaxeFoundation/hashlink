@@ -33,16 +33,30 @@ class Benchs {
 
 	static function main() {
 
-
-		var selected = Sys.args()[0];
+		var isWin = Sys.systemName() == "Windows";
+		var args = Sys.args();
+		var is32 = false;
+		
+		while( args.length > 0 ) {
+			switch( args[0] ) {
+			case "-32": 
+				is32 = true;
+			default:
+				break;
+			}
+			args.shift();
+		}
+		
+		var selected = args.shift();
 		var targets : Array<Target> = [
-			{ name : "cpp", out : "cpp", cmd : "cpp/$name.exe", args : [], extraArgs : "-D HXCPP_SILENT" },
+			{ name : "cpp", out : "cpp", cmd : "cpp/$name" + (isWin ? ".exe" : ""), args : [], extraArgs : "-D HXCPP_SILENT" },
 			{ name : "hl", out : "bench.hl", cmd : "hl", args : ["bench.hl"] },
 			{ name : "hlc", out : "bench.c", cmd : "hlc", args : [] },
 			{ name : "js", out : "bench.js", cmd : "node", args : ["bench.js"] },
 			{ name : "neko", out : "bench.n", cmd : "neko", args : ["bench.n"] },
-			{ name : "swf", out : "bench.swf", cmd : "adl", args : ["bench.air"], extraArgs : "-lib air3" },
 		];
+		if( isWin )
+			targets.push({ name : "swf", out : "bench.swf", cmd : "adl", args : ["bench.air"], extraArgs : "-lib air3" });
 
 		var all = [for( f in sys.FileSystem.readDirectory(".") ) if( StringTools.endsWith(f, ".hx") ) f];
 		all.sort(Reflect.compare);
@@ -50,8 +64,7 @@ class Benchs {
 			all.unshift(all.pop());
 
 		var gcc = "gcc";
-		var is32 = false;
-		if( Sys.systemName() == "Windows" && is32 )
+		if( isWin && is32 )
 			gcc = "i686-pc-cygwin-gcc";
 
 		for( f in all ) {
