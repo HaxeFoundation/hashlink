@@ -45,7 +45,7 @@ LFLAGS += -Wl,-export_dynamic
 else
 
 # Linux
-CFLAGS += -m$(ARCH)
+CFLAGS += -m$(ARCH) -fPIC
 LFLAGS += -lm -Wl,--export-dynamic
 
 endif
