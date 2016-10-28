@@ -241,7 +241,7 @@ int hl_module_init( hl_module *m ) {
 		switch( t->kind ) {
 		case HOBJ:
 			t->obj->m = &m->ctx;
-			t->obj->global_value = ((int)t->obj->global_value) ? (void**)(int_val)(m->globals_data + m->globals_indexes[(int)t->obj->global_value-1]) : NULL;
+			t->obj->global_value = ((int)(int_val)t->obj->global_value) ? (void**)(int_val)(m->globals_data + m->globals_indexes[(int)(int_val)t->obj->global_value-1]) : NULL;
 			{
 				int j;
 				for(j=0;j<t->obj->nproto;j++) {
@@ -254,7 +254,7 @@ int hl_module_init( hl_module *m ) {
 			break;
 		case HENUM:
 			hl_init_enum(t->tenum);
-			t->tenum->global_value = ((int)t->tenum->global_value) ? (void**)(int_val)(m->globals_data + m->globals_indexes[(int)t->tenum->global_value-1]) : NULL;
+			t->tenum->global_value = ((int)(int_val)t->tenum->global_value) ? (void**)(int_val)(m->globals_data + m->globals_indexes[(int)(int_val)t->tenum->global_value-1]) : NULL;
 			break;
 		case HVIRTUAL:
 			hl_init_virtual(t,&m->ctx);
