@@ -115,7 +115,7 @@ class Benchs {
 					while( totT < 1. ) {
 						var t0 = haxe.Timer.stamp();
 						var p = new sys.io.Process(t.cmd.split("$name").join(name),t.args);
-						var code = p.exitCode();
+						var code = try p.exitCode() catch( e : Dynamic ) -99;
 						if( code != 0 ) {
 							Sys.println(t.name+" errored with code "+code);
 							return;
