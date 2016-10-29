@@ -251,7 +251,7 @@ static gc_pheader *gc_alloc_new_page( int pid, int block, int size, bool varsize
 #			else
 			printf("GC Page HASH collide %lX %lX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
 #			endif
-			return gc_alloc_new_page(block,size,varsize);
+			return gc_alloc_new_page(pid,block,size,varsize);
 		}
 	}
 #endif
