@@ -143,7 +143,7 @@ static void ***gc_roots = NULL;
 static int gc_roots_count = 0;
 static int gc_roots_max = 0;
 
-HL_PRIM void hl_add_root( void **r ) {
+HL_PRIM void hl_add_root( void *r ) {
 	if( gc_roots_count == gc_roots_max ) {
 		int nroots = gc_roots_max ? (gc_roots_max << 1) : 16;
 		void ***roots = (void***)malloc(sizeof(void*)*nroots);
@@ -152,13 +152,17 @@ HL_PRIM void hl_add_root( void **r ) {
 		gc_roots = roots;
 		gc_roots_max = nroots;
 	}
-	gc_roots[gc_roots_count++] = r;
+	gc_roots[gc_roots_count++] = (void**)r;
 }
 
-HL_PRIM void hl_remove_root( void **v ) {
+HL_PRIM void hl_pop_root() {
+	gc_roots_count--;
+}
+
+HL_PRIM void hl_remove_root( void *v ) {
 	int i;
 	for(i=0;i<gc_roots_count;i++)
-		if( gc_roots[i] == v ) {
+		if( gc_roots[i] == (void**)v ) {
 			gc_roots_count--;
 			memmove(gc_roots + i, gc_roots + (i+1), gc_roots_count - i);
 			break;

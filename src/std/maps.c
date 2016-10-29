@@ -134,6 +134,7 @@ static void hl_hbgrow( hl_bytes_map *m ) {
 	hl_bytes_cell **old_cells = m->cells;
 	hl_bytes_cell *reuse = NULL;
 	while( H_PRIMES[i] <= m->ncells ) i++;
+	hl_add_root(&old_cells);
 	m->ncells = H_PRIMES[i];
 	m->cells = (hl_bytes_cell **)hl_gc_alloc_raw(sizeof(hl_bytes_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
@@ -152,6 +153,7 @@ static void hl_hbgrow( hl_bytes_map *m ) {
 			c = next;
 		}
 	}
+	hl_pop_root();
 }
 
 HL_PRIM void hl_hbset( hl_bytes_map *m, vbyte *key, vdynamic *value ) {
@@ -336,6 +338,7 @@ static void hl_higrow( hl_int_map *m ) {
 	hl_int_cell **old_cells = m->cells;
 	hl_int_cell *reuse = NULL;
 	while( H_PRIMES[i] <= m->ncells ) i++;
+	hl_add_root(&old_cells);
 	m->ncells = H_PRIMES[i];
 	m->cells = (hl_int_cell **)hl_gc_alloc_raw(sizeof(hl_int_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
@@ -354,6 +357,7 @@ static void hl_higrow( hl_int_map *m ) {
 			c = next;
 		}
 	}
+	hl_pop_root();
 }
 
 HL_PRIM void hl_hiset( hl_int_map *m, int key, vdynamic *value ) {
@@ -537,6 +541,7 @@ static void hl_hogrow( hl_obj_map *m ) {
 	hl_obj_cell **old_cells = m->cells;
 	hl_obj_cell *reuse = NULL;
 	while( H_PRIMES[i] <= m->ncells ) i++;
+	hl_add_root(&old_cells);
 	m->ncells = H_PRIMES[i];
 	m->cells = (hl_obj_cell **)hl_gc_alloc_raw(sizeof(hl_obj_cell*)*m->ncells);
 	memset(m->cells,0,m->ncells * sizeof(void*));
@@ -555,6 +560,7 @@ static void hl_hogrow( hl_obj_map *m ) {
 			c = next;
 		}
 	}
+	hl_pop_root();
 }
 
 static vdynamic *no_virtual( vdynamic *k ) {

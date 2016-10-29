@@ -488,8 +488,9 @@ HL_API vdynamic *hl_dyn_call( vclosure *c, vdynamic **args, int nargs );
 #define MEM_ZERO			256
 
 HL_API void *hl_gc_alloc_gen( int size, int flags );
-HL_API void hl_add_root( void **ptr );
-HL_API void hl_remove_root( void **ptr );
+HL_API void hl_add_root( void *ptr );
+HL_API void hl_pop_root();
+HL_API void hl_remove_root( void *ptr );
 HL_API void hl_gc_major();
 HL_API bool hl_is_gc_ptr( void *ptr );
 HL_API void hl_gc_dump();

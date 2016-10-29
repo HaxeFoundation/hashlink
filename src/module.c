@@ -178,7 +178,7 @@ int hl_module_init( hl_module *m ) {
 		hl_type *t = m->code->globals[i];
 		if( t->kind == HFUN ) *(void**)(m->globals_data + m->globals_indexes[i]) = null_function;
 		if( hl_is_ptr(t) )
-			hl_add_root((void**)(m->globals_data+m->globals_indexes[i]));
+			hl_add_root(m->globals_data+m->globals_indexes[i]);
 	}
 	// INIT natives
 	{

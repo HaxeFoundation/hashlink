@@ -54,9 +54,9 @@ HL_PRIM void hl_set_error_handler( vclosure *d ) {
 		return;
 	hl_error_handler = d;
 	if( d )
-		hl_add_root((void**)&hl_error_handler);
+		hl_add_root(&hl_error_handler);
 	else
-		hl_remove_root((void**)&hl_error_handler);
+		hl_remove_root(&hl_error_handler);
 }
 
 HL_PRIM void hl_throw( vdynamic *v ) {
