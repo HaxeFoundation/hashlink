@@ -338,6 +338,11 @@ static void hl_higrow( hl_int_map *m ) {
 	hl_int_cell **old_cells = m->cells;
 	hl_int_cell *reuse = NULL;
 	while( H_PRIMES[i] <= m->ncells ) i++;
+	/*
+		GCC will store [old_cells+i] into a register, which will make the GC
+		not able to find anymore the base address. Let's make sure it doesn't
+		get collected until we're done.
+	*/
 	hl_add_root(&old_cells);
 	m->ncells = H_PRIMES[i];
 	m->cells = (hl_int_cell **)hl_gc_alloc_raw(sizeof(hl_int_cell*)*m->ncells);
