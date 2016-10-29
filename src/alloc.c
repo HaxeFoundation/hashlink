@@ -118,6 +118,8 @@ static const int GC_SIZES[GC_PARTITIONS] = {8,16,24,32,40,	8,64,1<<14,1<<22};
 static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 #endif
 
+#define INPAGE(ptr,page) ((void*)(ptr) < (void*)(page) || (unsigned char*)(ptr) >= (unsigned char*)(page) + (page)->page_size)
+
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_level1_null[1<<GC_LEVEL1_BITS] = {NULL};
@@ -553,10 +555,10 @@ static void gc_flush_mark() {
 			void *p = *block++;
 			page = GC_GET_PAGE(p);
 			if( !page || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
-			bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 #			ifdef HL_64
-			if( bid < page->first_block || bid >= page->max_blocks ) continue;
+			if( !INPAGE(p,page) ) continue;
 #			endif
+			bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 			if( page->sizes && page->sizes[bid] == 0 ) continue;
 			if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 				page->bmp[bid>>3] |= 1<<(bid&7);
@@ -625,14 +627,12 @@ static void gc_mark() {
 	for(i=0;i<gc_roots_count;i++) {
 		void *p = *gc_roots[i];
 		gc_pheader *page;
+		int bid;
 		if( !p ) continue;
 		page = GC_GET_PAGE(p);
 		if( !page ) continue; // the value was set to a not gc allocated ptr
 		// don't check if valid ptr : it's a manual added root, so should be valid
-		int bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
-#		ifdef HL_64
-		if( bid < page->first_block || bid >= page->max_blocks ) continue;
-#		endif
+		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
 			GC_PUSH_GEN(p,page,bid);
@@ -646,10 +646,10 @@ static void gc_mark() {
 		gc_pheader *page = GC_GET_PAGE(p);
 		int bid;
 		if( !page || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
-		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 #		ifdef HL_64
-		if( bid < page->first_block || bid >= page->max_blocks ) continue;
+		if( !INPAGE(p,page) ) continue;
 #		endif
+		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 		if( page->sizes && !page->sizes[bid] ) continue; // inner pointer
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
