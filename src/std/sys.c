@@ -86,7 +86,7 @@ static pchar *pstrdup( const pchar *s, int len ) {
 }
 
 HL_PRIM bool hl_sys_utf8_path() {
-#ifdef HL_UTF8_PATH
+#ifdef HL_UTF8PATH
 	return true;
 #else
 	return false;
