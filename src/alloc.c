@@ -118,7 +118,7 @@ static const int GC_SIZES[GC_PARTITIONS] = {8,16,24,32,40,	8,64,1<<14,1<<22};
 static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 #endif
 
-#define INPAGE(ptr,page) ((void*)(ptr) < (void*)(page) || (unsigned char*)(ptr) >= (unsigned char*)(page) + (page)->page_size)
+#define INPAGE(ptr,page) ((void*)(ptr) > (void*)(page) && (unsigned char*)(ptr) < (unsigned char*)(page) + (page)->page_size)
 
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static int gc_free_blocks[GC_ALL_PAGES] = {0};
@@ -163,6 +163,15 @@ HL_PRIM void hl_remove_root( void **v ) {
 			memmove(gc_roots + i, gc_roots + (i+1), gc_roots_count - i);
 			break;
 		}
+}
+
+HL_PRIM gc_pheader *hl_gc_get_page( void *v ) {
+	gc_pheader *page = GC_GET_PAGE(v);
+#	ifdef HL_64
+	if( page && !INPAGE(v,page) )
+		page = NULL;
+#	endif
+	return page;
 }
 
 // -------------------------  ALLOCATOR ----------------------------------------------------------
