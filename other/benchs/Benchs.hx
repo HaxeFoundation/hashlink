@@ -51,7 +51,7 @@ class Benchs {
 		var targets : Array<Target> = [
 			{ name : "cpp", out : "cpp", cmd : "cpp/$name" + (isWin ? ".exe" : ""), args : [], extraArgs : "-D HXCPP_SILENT" },
 			{ name : "hl", out : "bench.hl", cmd : "hl", args : ["bench.hl"] },
-			{ name : "hlc", out : "bench.c", cmd : "hlc", args : [] },
+			{ name : "hlc", out : "bench.c", cmd : isWin ? "hlc":"./hlc", args : [] },
 			{ name : "js", out : "bench.js", cmd : "node", args : ["bench.js"] },
 			{ name : "neko", out : "bench.n", cmd : "neko", args : ["bench.n"] },
 		];
@@ -97,7 +97,7 @@ class Benchs {
 					continue;
 				}
 
-				if( t.cmd == "hlc" ) {
+				if( t.name == "hlc" ) {
 					// build
 					var cmd = '$gcc -O3 ${is32?'-m32':''} -std=c11 -o hlc -I ../../src -L ../.. bench.c ../../src/hlc_main.c -lhl -lm';
 					if( Sys.command(cmd) != 0 ) {
