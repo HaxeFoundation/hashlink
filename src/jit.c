@@ -1649,31 +1649,33 @@ static void register_jump( jit_ctx *ctx, int pos, int target ) {
 		ctx->opsPos[target] = -1;
 }
 
+#define HDYN_VALUE 8
+
 static void dyn_value_compare( jit_ctx *ctx, preg *a, preg *b, hl_type *t ) {
 	preg p;
 	switch( t->kind ) {
 	case HUI8:
 	case HBOOL:
-		op32(ctx,MOV8,a,pmem(&p,a->id,8));
-		op32(ctx,MOV8,b,pmem(&p,b->id,8));
+		op32(ctx,MOV8,a,pmem(&p,a->id,HDYN_VALUE));
+		op32(ctx,MOV8,b,pmem(&p,b->id,HDYN_VALUE));
 		op64(ctx,CMP8,a,b);
 		break;
 	case HUI16:
-		op32(ctx,MOV16,a,pmem(&p,a->id,8));
-		op32(ctx,MOV16,b,pmem(&p,b->id,8));
+		op32(ctx,MOV16,a,pmem(&p,a->id,HDYN_VALUE));
+		op32(ctx,MOV16,b,pmem(&p,b->id,HDYN_VALUE));
 		op64(ctx,CMP16,a,b);
 		break;
 	case HI32:
-		op32(ctx,MOV,a,pmem(&p,a->id,8));
-		op32(ctx,MOV,b,pmem(&p,b->id,8));
+		op32(ctx,MOV,a,pmem(&p,a->id,HDYN_VALUE));
+		op32(ctx,MOV,b,pmem(&p,b->id,HDYN_VALUE));
 		op64(ctx,CMP,a,b);
 		break;
 	case HF32:
 		{
 			preg *fa = alloc_reg(ctx, RFPU);
 			preg *fb = alloc_reg(ctx, RFPU);
-			op64(ctx,MOVSS,fa,pmem(&p,a->id,8));
-			op64(ctx,MOVSS,fb,pmem(&p,b->id,8));
+			op64(ctx,MOVSS,fa,pmem(&p,a->id,HDYN_VALUE));
+			op64(ctx,MOVSS,fb,pmem(&p,b->id,HDYN_VALUE));
 			op64(ctx,COMISD,fa,fb);
 		}
 		break;
@@ -1681,15 +1683,15 @@ static void dyn_value_compare( jit_ctx *ctx, preg *a, preg *b, hl_type *t ) {
 		{
 			preg *fa = alloc_reg(ctx, RFPU);
 			preg *fb = alloc_reg(ctx, RFPU);
-			op64(ctx,MOVSD,fa,pmem(&p,a->id,8));
-			op64(ctx,MOVSD,fb,pmem(&p,b->id,8));
+			op64(ctx,MOVSD,fa,pmem(&p,a->id,HDYN_VALUE));
+			op64(ctx,MOVSD,fb,pmem(&p,b->id,HDYN_VALUE));
 			op64(ctx,COMISD,fa,fb);
 		}
 		break;
 	default:
 		// ptr comparison
-		op64(ctx,MOV,a,pmem(&p,a->id,8));
-		op64(ctx,MOV,b,pmem(&p,b->id,8));
+		op64(ctx,MOV,a,pmem(&p,a->id,HDYN_VALUE));
+		op64(ctx,MOV,b,pmem(&p,b->id,HDYN_VALUE));
 		op64(ctx,CMP,a,b);
 		break;	
 	}
@@ -2329,17 +2331,17 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				if( IS_FLOAT(ra) && !IS_64 ) {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
 					op64(ctx,MOV,tmp,&ra->stack);
-					op64(ctx,MOV,pmem(&p,Eax,8),tmp);
+					op32(ctx,MOV,pmem(&p,Eax,HDYN_VALUE),tmp);
 					if( ra->t->kind == HF64 ) {
 						ra->stackPos += 4;
 						op64(ctx,MOV,tmp,&ra->stack);
-						op64(ctx,MOV,pmem(&p,Eax,12),tmp);
+						op32(ctx,MOV,pmem(&p,Eax,HDYN_VALUE+4),tmp);
 						ra->stackPos -= 4;
 					}
 				} else {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
 					copy_from(ctx,tmp,ra);
-					op64(ctx,MOV,pmem(&p,Eax,8),tmp);
+					op64(ctx,MOV,pmem(&p,Eax,HDYN_VALUE),tmp);
 				}
 				if( hl_is_ptr(ra->t) ) patch_jump(ctx,jskip);
 				store(ctx, dst, PEAX, true);
@@ -2813,7 +2815,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						if( IS_FLOAT(dst) )
 							jit_error("TODO");
 						else {
-							copy(ctx,PEAX,pmem(&p,Esp,8 - sizeof(vdynamic)),dst->size);
+							copy(ctx,PEAX,pmem(&p,Esp,HDYN_VALUE - sizeof(vdynamic)),dst->size);
 							store(ctx, dst, PEAX, false);
 						}
 					} else
@@ -3152,7 +3154,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			case HDYN:
 				{
 					preg *r = alloc_reg(ctx,RCPU);
-					op64(ctx,MOV,r,pmem(&p,alloc_cpu(ctx,ra,true)->id,8)); // read dynamic ptr
+					op64(ctx,MOV,r,pmem(&p,alloc_cpu(ctx,ra,true)->id,HDYN_VALUE)); // read dynamic ptr
 					op64(ctx,MOV,r,pmem(&p,r->id,0)); // read index
 					store(ctx,dst,r,true);
 					break;
