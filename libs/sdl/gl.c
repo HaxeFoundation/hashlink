@@ -333,8 +333,8 @@ HL_PRIM void HL_NAME(gl_bind_framebuffer)( int target, vdynamic *f ) {
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_texture2d)( int target, int attach, int texTarget, vdynamic *t, int level ) {
-	GLOG("%d,%d,%d,%d,%d",target,attach,texTarget,t->v.i,level);
-	glFramebufferTexture2D(target, attach, texTarget, t->v.i, level);
+	GLOG("%d,%d,%d,%d,%d",target,attach,texTarget,ZIDX(t),level);
+	glFramebufferTexture2D(target, attach, texTarget, ZIDX(t), level);
 }
 
 HL_PRIM void HL_NAME(gl_delete_framebuffer)( vdynamic *f ) {
@@ -346,6 +346,11 @@ HL_PRIM void HL_NAME(gl_delete_framebuffer)( vdynamic *f ) {
 HL_PRIM void HL_NAME(gl_read_pixels)( int x, int y, int width, int height, int format, int type, vbyte *data ) {
 	GLOG("%d,%d,%d,%d,%d,%d,%X",x,y,width,height,format,type,(int)(int_val)data);
 	glReadPixels(x, y, width, height, format, type, data);
+}
+
+HL_PRIM void HL_NAME(gl_draw_buffers)( int count, int *buffers) {
+	GLOG("%d",count);
+	glDrawBuffers(count, buffers);
 }
 
 // renderbuffer
@@ -509,6 +514,7 @@ DEFINE_PRIM(_VOID,gl_bind_framebuffer,_I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_framebuffer_texture2d,_I32 _I32 _I32 _NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_delete_framebuffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_read_pixels,_I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_draw_buffers,_I32 _BYTES);
 DEFINE_PRIM(_NULL(_I32),gl_create_renderbuffer,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_renderbuffer,_I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_renderbuffer_storage,_I32 _I32 _I32 _I32);
