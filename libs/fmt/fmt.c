@@ -72,6 +72,7 @@ static void free_stream_inf( fmt_zip *v ) {
 		deflateEnd(v->z);
 	free(v->z);
 	v->z = NULL;
+	v->finalize = NULL;
 }
 
 static void zlib_error( z_stream *z, int err ) {

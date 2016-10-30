@@ -135,7 +135,14 @@ static struct {
 	int pages_count;
 	int pages_allocated;
 	int mark_bytes;
+	int mark_time;
 } gc_stats = {0};
+
+#ifdef HL_WIN
+#	define TIMESTAMP() ((int)GetTickCount())
+#else
+#	define TIMESTAMP() 0
+#endif
 
 // -------------------------  ROOTS ----------------------------------------------------------
 
@@ -494,7 +501,7 @@ static void *gc_alloc_gen( int size, int flags ) {
 	if( m ) size += GC_ALIGN - m;
 	if( size <= 0 )
 		return NULL;
-	if( size <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & MEM_ALIGN_DOUBLE) == 0 )
+	if( size <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & MEM_ALIGN_DOUBLE) == 0 && flags != MEM_KIND_FINALIZER )
 		return gc_alloc_fixed( (size >> GC_ALIGN_BITS) - 1, flags & PAGE_KIND_MASK);
 	for(p=GC_FIXED_PARTS;p<GC_PARTITIONS;p++) {
 		int block = GC_SIZES[p];
@@ -628,6 +635,31 @@ static void gc_clear_unmarked_mem() {
 }
 #endif
 
+static void gc_call_finalizers(){ 
+	int i;
+	for(i=MEM_KIND_FINALIZER;i<GC_ALL_PAGES;i+=1<<PAGE_KIND_BITS) {
+		gc_pheader *p = gc_pages[i];
+		while( p ) {
+			int bid;
+			for(bid=p->first_block;bid<p->max_blocks;bid++) {
+				int size = p->sizes[bid]; 
+				if( !size ) continue;
+				if( (p->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
+					unsigned char *ptr = (unsigned char*)p + bid * p->block_size;
+					void *finalizer = *(void**)ptr;
+					p->sizes[bid] = 0;
+					if( finalizer )
+						((void(*)(void *))finalizer)(ptr);
+#					ifdef GC_DEBUG
+					memset(ptr,0xDD,size*p->block_size);
+#					endif
+				}
+			}
+			p = p->next_page;
+		}
+	}
+}
+
 static void gc_mark() {
 	jmp_buf regs;
 	void **stack_head;
@@ -695,6 +727,7 @@ static void gc_mark() {
 	}
 	cur_mark_stack = mark_stack;
 	if( mark_stack ) gc_flush_mark();
+	gc_call_finalizers();
 #	ifdef GC_DEBUG
 	gc_clear_unmarked_mem();
 #	endif
@@ -814,8 +847,11 @@ HL_API void hl_gc_dump() {
 }
 
 HL_API void hl_gc_major() {
+	int time = TIMESTAMP();
 	gc_stats.last_mark = gc_stats.total_allocated;
 	gc_mark();
+	gc_stats.mark_time += TIMESTAMP() - time;
+	//printf("MARK %d\n",gc_stats.mark_time);
 }
 
 HL_API bool hl_is_gc_ptr( void *ptr ) {

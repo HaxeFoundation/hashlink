@@ -56,6 +56,7 @@ HL_PRIM hl_fdesc *hl_file_open( vbyte *name, int mode, bool binary ) {
 HL_PRIM void hl_file_close( hl_fdesc *f ) {
 	if( f->f ) fclose(f->f);
 	f->f = NULL;
+	f->finalize = NULL;
 }
 
 HL_PRIM int hl_file_write( hl_fdesc *f, vbyte *buf, int pos, int len ) {
