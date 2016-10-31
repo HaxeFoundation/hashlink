@@ -194,6 +194,38 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 			break;
 		}
 	}
+	if( to->kind == HREF ) {
+		switch( to->tparam->kind ) {
+		case HUI8:
+		case HUI16:
+		case HI32:
+		case HBOOL:
+			{
+				int *v = (int*)hl_gc_alloc_raw(sizeof(int));
+				*v = hl_dyn_casti(data,t,to->tparam);
+				return v;
+			}
+		case HF32:
+			{
+				float *f = (float*)hl_gc_alloc_raw(sizeof(float));
+				*f = hl_dyn_castf(data,t);
+				return f;
+			}
+		case HF64:
+			{
+				double *d = (double*)hl_gc_alloc_raw(sizeof(double));
+				*d = hl_dyn_castd(data,t);
+				return d;
+			}
+		default:
+			{
+				void **p = (void**)hl_gc_alloc_raw(sizeof(void*));
+				*p = hl_dyn_castp(data,t,to->tparam);
+				return p;
+			}
+			break;
+		}
+	}
 	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(t),hl_type_str(to));
 	return 0;
 }
