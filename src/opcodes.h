@@ -142,6 +142,7 @@ OP_BEGIN
 	OP(OSetEnumField,3)
 
 	OP(ODump,1)
+	OP(ONop,0)
 	// --
 	OP(OLast,0)
 OP_END

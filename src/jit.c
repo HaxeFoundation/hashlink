@@ -3194,6 +3194,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			op32(ctx, MOV, alloc_cpu(ctx,dst,false), pmem(&p,alloc_cpu(ctx,ra,true)->id,0));
 			store(ctx,dst,dst->current,false);
 			break;
+		case ONop:
+			break;
 		default:
 			jit_error(hl_op_name(o->op));
 			break;
