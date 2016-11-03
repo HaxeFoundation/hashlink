@@ -61,7 +61,18 @@ class Sdl {
 	}
 
 	public dynamic static function reportError( e : Dynamic ) {
-		var f = new hl.UI.WinLog("Uncaught Exception", 400, 300);
+
+		var wasFS = null;
+		for( w in @:privateAccess Window.windows ) {
+			if( w.fullScreen ) {
+				// SDL full screen does not play well with error dialog
+				w.fullScreen = false;
+				wasFS = w;
+				break;
+			}
+		}
+
+		var f = new hl.UI.WinLog("Uncaught Exception", 500, 400);
 		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
 		var err = try Std.string(e) catch( _ : Dynamic ) "????";
 		Sys.println(err + stack);
@@ -74,9 +85,14 @@ class Sdl {
 		but.onClick = function() {
 			Sys.exit(0);
 		};
+
+
 		while( hl.UI.loop(true) != Quit )
 			tick();
 		f.destroy();
+
+		if( wasFS != null )
+			wasFS.fullScreen = true;
 	}
 
 	public static function quit() {

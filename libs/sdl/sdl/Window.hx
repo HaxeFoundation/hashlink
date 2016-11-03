@@ -81,6 +81,18 @@ class Window {
 		windows.remove(this);
 	}
 
+	public function maximize() {
+		winResize(win, 0);
+	}
+
+	public function minimize() {
+		winResize(win, 1);
+	}
+
+	public function restore() {
+		winResize(win, 2);
+	}
+
 	static function winCreate( title : hl.types.Bytes, width : Int, height : Int ) : WinPtr {
 		return null;
 	}
@@ -97,6 +109,9 @@ class Window {
 	}
 
 	static function winSetSize( win : WinPtr, width : Int, height : Int ) {
+	}
+
+	static function winResize( win : WinPtr, mode : Int ) {
 	}
 
 	static function winGetSize( win : WinPtr, width : hl.types.Ref<Int>, height : hl.types.Ref<Int> ) {

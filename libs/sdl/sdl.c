@@ -265,6 +265,23 @@ HL_PRIM void HL_NAME(win_get_size)(SDL_Window *win, int *width, int *height) {
 	SDL_GetWindowSize(win, width, height);
 }
 
+HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
+	switch( mode ) {
+	case 0:
+		SDL_MaximizeWindow(win);
+		break;
+	case 1:
+		SDL_MinimizeWindow(win);
+		break;
+	case 2:
+		SDL_RestoreWindow(win);
+		break;
+	default:
+		break;
+	}
+}
+
+
 HL_PRIM void HL_NAME(win_swap_window)(SDL_Window *win) {
 	SDL_GL_SwapWindow(win);
 }
@@ -283,6 +300,7 @@ HL_PRIM void HL_NAME(win_destroy)(SDL_Window *win, SDL_GLContext gl) {
 DEFINE_PRIM(TWIN, win_create, _BYTES _I32 _I32);
 DEFINE_PRIM(TGL, win_get_glcontext, TWIN);
 DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _BOOL);
+DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_swap_window, TWIN);
