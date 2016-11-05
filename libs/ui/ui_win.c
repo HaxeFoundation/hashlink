@@ -235,6 +235,9 @@ static DWORD WINAPI sentinel_loop( vsentinel *s ) {
 HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 	vsentinel *s = (vsentinel*)malloc(sizeof(vsentinel));
 	if( c->hasValue ) hl_error("Cannot set sentinel on closure callback");
+#	ifdef HL_DEBUG
+	timeout *= 2;
+#	endif
 	s->timeout = timeout;
 	s->ticks = 0;
 	s->original = OpenThread(THREAD_ALL_ACCESS,FALSE,GetCurrentThreadId());
