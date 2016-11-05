@@ -16,11 +16,14 @@ matrix:
 
 install:
   - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
-    sudo apt-get update -y;
-    sudo apt-get install gcc-multilib -y;
+      sudo apt-get update -y;
+      sudo apt-get install gcc-multilib -y;
     fi
   - make ARCH=32 all
   - sudo make install_lib
+  - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
+      sudo ldconfig;
+    fi
   
 script:
   - haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
