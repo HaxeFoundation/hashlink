@@ -188,6 +188,51 @@
     <ClCompile Include="..\..\include\zlib\trees.c">
       <Filter>zlib</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\png\png.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngerror.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngget.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngmem.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngpread.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngread.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngrio.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngrtran.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngrutil.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngset.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngtrans.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngwio.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngwrite.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngwtran.c">
+      <Filter>png</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\png\pngwutil.c">
+      <Filter>png</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="turbojpeg">
@@ -195,6 +240,9 @@
     </Filter>
     <Filter Include="zlib">
       <UniqueIdentifier>{cc205701-f7b7-43f9-abac-942df6a44718}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="png">
+      <UniqueIdentifier>{4db0a874-5bbe-47bd-b1ec-e642ab7f5737}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -224,6 +272,27 @@
     </ClInclude>
     <ClInclude Include="..\..\include\zlib\trees.h">
       <Filter>zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\png\png.h">
+      <Filter>png</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\png\pngconf.h">
+      <Filter>png</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\png\pngdebug.h">
+      <Filter>png</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\png\pnginfo.h">
+      <Filter>png</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\png\pnglibconf.h">
+      <Filter>png</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\png\pngpriv.h">
+      <Filter>png</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\png\pngstruct.h">
+      <Filter>png</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

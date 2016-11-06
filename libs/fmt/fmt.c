@@ -2,6 +2,9 @@
 #include <turbojpeg.h>
 #include <zlib.h>
 #include <hl.h>
+#include <png.h>
+
+/* ------------------------------------------------- IMG --------------------------------------------------- */
 
 typedef struct {
 	unsigned char a,r,g,b;
@@ -13,6 +16,50 @@ HL_PRIM bool HL_NAME(jpg_decode)( vbyte *data, int dataLen, vbyte *out, int widt
 	result = tjDecompress2(h,data,dataLen,out,width,stride,height,format,(flags & 1 ? TJFLAG_BOTTOMUP : 0));
 	tjDestroy(h);
 	return result == 0;
+}
+
+HL_PRIM bool HL_NAME(png_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
+	png_image img;
+	memset(&img, 0, sizeof(img));
+	img.version = PNG_IMAGE_VERSION;
+	if( png_image_begin_read_from_memory(&img,data,dataLen) == 0 ) {
+		png_image_free(&img);
+		return false;
+	}
+	switch( format ) {
+	case 0:
+		img.format = PNG_FORMAT_RGB;
+		break;
+	case 1:
+		img.format = PNG_FORMAT_BGR;
+		break;
+	case 7:
+		img.format = PNG_FORMAT_RGBA;
+		break;
+	case 8:
+		img.format = PNG_FORMAT_BGRA;
+		break;
+	case 9:
+		img.format = PNG_FORMAT_ABGR;
+		break;
+	case 10:
+		img.format = PNG_FORMAT_ARGB;
+		break;
+	default:
+		png_image_free(&img);
+		hl_error("Unsupported format");
+		break;
+	}
+	if( img.width != width || img.height != height ) {
+		png_image_free(&img);
+		return false;
+	}
+	if( png_image_finish_read(&img,NULL,out,stride * (flags & 1 ? -1 : 1),NULL) == 0 ) {
+		png_image_free(&img);
+		return false;
+	}
+	png_image_free(&img);
+	return true;
 }
 
 HL_PRIM void HL_NAME(img_scale)( vbyte *out, int outPos, int outStride, int outWidth, int outHeight, vbyte *in, int inPos, int inStride, int inWidth, int inHeight, int flags ) {
@@ -56,6 +103,14 @@ HL_PRIM void HL_NAME(img_scale)( vbyte *out, int outPos, int outStride, int outW
 		out += outStride - (outWidth << 2);
 	}
 }
+
+
+DEFINE_PRIM(_BOOL, jpg_decode, _BYTES _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_BOOL, png_decode, _BYTES _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, img_scale, _BYTES _I32 _I32 _I32 _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
+
+
+/* ------------------------------------------------- ZLIB --------------------------------------------------- */
 
 typedef struct _fmt_zip fmt_zip;
 struct _fmt_zip {
@@ -211,7 +266,3 @@ DEFINE_PRIM(_VOID, zip_end, _ZIP);
 DEFINE_PRIM(_VOID, zip_flush_mode, _ZIP _I32);
 DEFINE_PRIM(_BOOL, inflate_buffer, _ZIP _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_BOOL, deflate_buffer, _ZIP _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
-
-DEFINE_PRIM(_BOOL, jpg_decode, _BYTES _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
-DEFINE_PRIM(_VOID, img_scale, _BYTES _I32 _I32 _I32 _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
-
