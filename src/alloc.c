@@ -120,6 +120,7 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 
 #define INPAGE(ptr,page) ((void*)(ptr) > (void*)(page) && (unsigned char*)(ptr) < (unsigned char*)(page) + (page)->page_size)
 
+static bool gc_profile;
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static int gc_free_blocks[GC_ALL_PAGES] = {0};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
@@ -847,11 +848,12 @@ HL_API void hl_gc_dump() {
 }
 
 HL_API void hl_gc_major() {
-	int time = TIMESTAMP();
+	int time = TIMESTAMP(), dt;
 	gc_stats.last_mark = gc_stats.total_allocated;
 	gc_mark();
-	gc_stats.mark_time += TIMESTAMP() - time;
-	//printf("MARK %d\n",gc_stats.mark_time);
+	dt = TIMESTAMP() - time;
+	gc_stats.mark_time += dt;
+	if( gc_profile ) printf("GC-MARK %d(%d)\n",dt,gc_stats.mark_time);
 }
 
 HL_API bool hl_is_gc_ptr( void *ptr ) {
@@ -879,6 +881,7 @@ static void hl_gc_init( void *stack_top ) {
 		hl_fatal("Invalid builtin tl1");
 	if( TRAILING_ZEROES((unsigned)~0x080003FF) != 10 || TRAILING_ZEROES(0) != 32 || TRAILING_ZEROES(0xFFFFFFFF) != 0 )
 		hl_fatal("Invalid builtin tl0");
+	gc_profile = getenv("HL_GC_PROFILE") != NULL;
 }
 
 // ---- UTILITIES ----------------------
