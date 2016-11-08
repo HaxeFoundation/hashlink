@@ -1431,6 +1431,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 					load(ctx,PEAX,a);
 				}
 				scratch(REG_AT(Edx));
+				scratch(REG_AT(Eax));
 				if( op->op == OUDiv || op->op == OUMod )
 					op32(ctx, XOR, REG_AT(Edx), REG_AT(Edx));
 				else
