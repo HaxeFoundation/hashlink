@@ -30,12 +30,6 @@ static int GLLoadAPI() {
 #	define GLOGR(ret,v,fmt,...)	if( gl_log_active ) fprintf(gl_log_out, __FUNCTION__ "(" fmt ") = " ret "\n", __VA_ARGS__, v)
 static FILE *gl_log_out;
 static bool gl_log_active = true;
-#else
-#	define GLOG(...)
-#	define GLOGR(...)
-#endif
-
-#define ZIDX(val) ((val)?(val)->v.i:0)
 
 static char *hexlog( vbyte *b, int size ) {
 	static char tmp[1024];
@@ -52,6 +46,13 @@ static char *hexlog( vbyte *b, int size ) {
 	tmp[pos] = 0;
 	return tmp;
 }
+
+#else
+#	define GLOG(...)
+#	define GLOGR(...)
+#endif
+
+#define ZIDX(val) ((val)?(val)->v.i:0)
 
 // globals
 HL_PRIM bool HL_NAME(gl_init)() {
@@ -244,7 +245,7 @@ HL_PRIM vdynamic *HL_NAME(gl_create_shader)( int type ) {
 }
 
 HL_PRIM void HL_NAME(gl_shader_source)( vdynamic *s, vstring *src ) {
-	char *c = hl_to_utf8(src->bytes);
+	GLchar *c = (GLchar*)hl_to_utf8(src->bytes);
 	GLOG("%d,%s",s->v.i,c);
 	glShaderSource(s->v.i, 1, &c, NULL);
 }
@@ -259,7 +260,7 @@ HL_PRIM vbyte *HL_NAME(gl_get_shader_info_bytes)( vdynamic *s ) {
 	*log = 0;
 	glGetShaderInfoLog(s->v.i, 4096, NULL, log);
 	GLOGR("%s",log,"%d",s->v.i);
-	return hl_copy_bytes(log, (int)strlen(log)+1);
+	return hl_copy_bytes((vbyte*)log, (int)strlen(log)+1);
 }
 
 HL_PRIM vdynamic *HL_NAME(gl_get_shader_parameter)( vdynamic *s, int param ) {
@@ -354,7 +355,7 @@ HL_PRIM void HL_NAME(gl_read_pixels)( int x, int y, int width, int height, int f
 	glReadPixels(x, y, width, height, format, type, data);
 }
 
-HL_PRIM void HL_NAME(gl_draw_buffers)( int count, int *buffers) {
+HL_PRIM void HL_NAME(gl_draw_buffers)( int count, unsigned int *buffers) {
 	GLOG("%d",count);
 	glDrawBuffers(count, buffers);
 }

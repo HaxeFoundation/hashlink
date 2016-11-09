@@ -223,7 +223,7 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 
 
 HL_PRIM void HL_NAME(message_box)(vbyte *title, vbyte *text, bool error) {
-	SDL_ShowSimpleMessageBox(error ? SDL_MESSAGEBOX_ERROR : 0, (unsigned char*)title, (unsigned char*)text, NULL);
+	SDL_ShowSimpleMessageBox(error ? SDL_MESSAGEBOX_ERROR : 0, (char*)title, (char*)text, NULL);
 }
 
 HL_PRIM void HL_NAME(set_vsync)(bool v) {
@@ -256,7 +256,7 @@ HL_PRIM SDL_Window *HL_NAME(win_create)(vbyte *title, int width, int height) {
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	return SDL_CreateWindow((unsigned char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	return SDL_CreateWindow((char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 }
 
 HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {
