@@ -19,6 +19,7 @@ HL_PRIM bool HL_NAME(jpg_decode)( vbyte *data, int dataLen, vbyte *out, int widt
 }
 
 HL_PRIM bool HL_NAME(png_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
+#	ifdef PNG_IMAGE_VERSION
 	png_image img;
 	memset(&img, 0, sizeof(img));
 	img.version = PNG_IMAGE_VERSION;
@@ -59,6 +60,9 @@ HL_PRIM bool HL_NAME(png_decode)( vbyte *data, int dataLen, vbyte *out, int widt
 		return false;
 	}
 	png_image_free(&img);
+#	else
+	hl_error("PNG support is missing for this libPNG version");
+#	endif
 	return true;
 }
 
