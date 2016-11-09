@@ -82,9 +82,10 @@ sdl: ${SDL}
 	${CC} ${CFLAGS} -o $@ -c $<
 	
 clean_o:
-	rm -rf ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL}
 	
 clean: clean_o 
+	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
 
 .PHONY: libhl hl hlc fmt sdl libs
 
