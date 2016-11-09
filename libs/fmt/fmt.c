@@ -1,8 +1,8 @@
 #define HL_NAME(n) fmt_##n
+#include <png.h>
 #include <turbojpeg.h>
 #include <zlib.h>
 #include <hl.h>
-#include <png.h>
 
 /* ------------------------------------------------- IMG --------------------------------------------------- */
 
