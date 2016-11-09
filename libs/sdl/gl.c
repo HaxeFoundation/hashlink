@@ -211,7 +211,7 @@ HL_PRIM vbyte *HL_NAME(gl_get_program_info_bytes)( vdynamic *p ) {
 	*log = 0;
 	glGetProgramInfoLog(p->v.i, 4096, NULL, log);
 	GLOGR("%s",log,"%d",p->v.i);
-	return hl_copy_bytes(log,(int)strlen(log) + 1);
+	return hl_copy_bytes((vbyte*)log,(int)strlen(log) + 1);
 }
 
 HL_PRIM vdynamic *HL_NAME(gl_get_uniform_location)( vdynamic *p, vstring *name ) {

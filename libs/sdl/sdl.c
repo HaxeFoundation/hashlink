@@ -62,8 +62,10 @@ typedef struct {
 HL_PRIM bool HL_NAME(init_once)() {
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
 		return false;
+#	ifdef _WIN32
 	// Set the internal windows timer period to 1ms (will give accurate sleep for vsync)
 	timeBeginPeriod(1);
+#	endif
 	return true;
 }
 
@@ -198,7 +200,9 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 
 HL_PRIM void HL_NAME(quit)() {
 	SDL_Quit();
+#	ifdef _WIN32
 	timeEndPeriod(1);
+#	endif
 }
 
 HL_PRIM void HL_NAME(delay)( int time ) {
@@ -219,7 +223,7 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 
 
 HL_PRIM void HL_NAME(message_box)(vbyte *title, vbyte *text, bool error) {
-	SDL_ShowSimpleMessageBox(error ? SDL_MESSAGEBOX_ERROR : 0, title, text, NULL);
+	SDL_ShowSimpleMessageBox(error ? SDL_MESSAGEBOX_ERROR : 0, (unsigned char*)title, (unsigned char*)text, NULL);
 }
 
 HL_PRIM void HL_NAME(set_vsync)(bool v) {
@@ -252,7 +256,7 @@ HL_PRIM SDL_Window *HL_NAME(win_create)(vbyte *title, int width, int height) {
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	return SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	return SDL_CreateWindow((unsigned char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 }
 
 HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {
