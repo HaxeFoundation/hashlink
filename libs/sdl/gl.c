@@ -245,7 +245,7 @@ HL_PRIM vdynamic *HL_NAME(gl_create_shader)( int type ) {
 }
 
 HL_PRIM void HL_NAME(gl_shader_source)( vdynamic *s, vstring *src ) {
-	GLchar *c = (GLchar*)hl_to_utf8(src->bytes);
+	const GLchar *c = (GLchar*)hl_to_utf8(src->bytes);
 	GLOG("%d,%s",s->v.i,c);
 	glShaderSource(s->v.i, 1, &c, NULL);
 }
