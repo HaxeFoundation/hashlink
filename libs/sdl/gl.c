@@ -1,14 +1,20 @@
 #define HL_NAME(n) sdl_##n
 #include <hl.h>
-#include <SDL.h>
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
+#	include <SDL2/SDL.h>
 #	include <OpenGL/glu.h>
-#else
+#	include <OpenGL/glext.h>
+#elif defined(_WIN32)
+#	include <SDL.h>
 #	include <GL/GLU.h>
+#	include <glext.h>
+#else
+#	include <SDL2/SDL.h>
+#	include <GL/glu.h>
+#	include <GL/glext.h>
 #endif
 
-#include <glext.h>
 #define GL_IMPORT(fun, t) PFNGL##t##PROC fun
 #include "GLImports.h"
 #undef GL_IMPORT

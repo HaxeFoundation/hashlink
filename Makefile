@@ -18,6 +18,10 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o
 
 HL = src/callback.o src/code.o src/jit.o src/main.o src/module.o
+
+FMT = libs/fmt/fmt.o
+
+SDL = libs/sdl/sdl.o libs/sdl/gl.o 
 	
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -55,7 +59,7 @@ all: libhl hl
 install_lib:
 	cp libhl.${LIBEXT} /usr/local/lib
 
-libs: fmt ui sdl 
+libs: fmt sdl 
 
 libhl: ${LIB}
 	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB}
@@ -65,6 +69,12 @@ hlc: ${BOOT}
 	
 hl: ${HL}
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS}
+
+fmt: ${FMT}
+	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -lpng -ljpeg-turbo -lz
+	
+sdl: ${SDL}
+	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -lSDL2
 	
 .SUFFIXES : .c .o
 
@@ -76,6 +86,6 @@ clean_o:
 	
 clean: clean_o 
 
-.PHONY: libhl hl hlc
+.PHONY: libhl hl hlc fmt sdl libs
 
 

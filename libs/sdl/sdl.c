@@ -1,7 +1,13 @@
 #define HL_NAME(n) sdl_##n
 
 #include <hl.h>
-#include <SDL.h>
+
+#ifdef _WIN32
+#	include <SDL.h>
+#else
+#	include <SDL2/SDL.h>
+#endif
+
 #ifndef _SDL_H
 #	error "SDL2 SDK not found in hl/include/sdl/"
 #endif
