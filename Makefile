@@ -1,6 +1,10 @@
 
 LBITS := $(shell getconf LONG_BIT)
 
+ifndef ARCH
+	ARCH = $(LBITS)
+endif
+
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D HLDLL_EXPORTS
 LFLAGS = -L. -lhl -ldl
 LIBFLAGS =
@@ -35,7 +39,7 @@ ifeq ($(OS),Windows_NT)
 LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
 
-ifeq ($(LBITS),32)
+ifeq ($(ARCH),32)
 CC=i686-pc-cygwin-gcc
 endif
 
@@ -43,13 +47,13 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(LBITS)
+CFLAGS += -m$(ARCH)
 LFLAGS += -Wl,-export_dynamic
 
 else
 
 # Linux
-CFLAGS += -m$(LBITS) -fPIC
+CFLAGS += -m$(ARCH) -fPIC
 LFLAGS += -lm -Wl,--export-dynamic -Wl,--no-undefined
 
 # otherwise ld will link to the .a and complain about missing -fPIC (Ubuntu 14)
@@ -65,12 +69,13 @@ install_lib:
 libs: fmt sdl
 
 libhl: ${LIB}
-	${CC} -o libhl.$(LIBEXT) -m${LBITS} ${LIBFLAGS} -shared ${LIB}
+	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB}
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
 
 hl: ${HL}
+	echo $(ARCH)
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS}
 
 fmt: ${FMT}
