@@ -412,6 +412,7 @@ HL_API hl_type hlt_dyn;
 HL_API hl_type hlt_array;
 HL_API hl_type hlt_bytes;
 HL_API hl_type hlt_dynobj;
+HL_API hl_type hlt_bool;
 
 HL_API double hl_nan();
 HL_API bool hl_is_dynamic( hl_type *t );
