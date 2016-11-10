@@ -1,16 +1,19 @@
+
+LBITS := $(shell getconf LONG_BIT)
+
+ifndef ARCH
+	ARCH = $(LBITS)
+endif
+
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D HLDLL_EXPORTS
 LFLAGS = -L. -lhl -ldl
 LIBFLAGS =
 LIBEXT = so
 LIBTURBOJPEG = -lturbojpeg
 
-ifndef ARCH
-ARCH=32
-endif
-
 PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/pcre_dfa_exec.o \
 	include/pcre/pcre_exec.o include/pcre/pcre_fullinfo.o include/pcre/pcre_globals.o \
-	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o 
+	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o
 
 RUNTIME = src/alloc.o
 
@@ -22,8 +25,8 @@ HL = src/callback.o src/code.o src/jit.o src/main.o src/module.o
 
 FMT = libs/fmt/fmt.o
 
-SDL = libs/sdl/sdl.o libs/sdl/gl.o 
-	
+SDL = libs/sdl/sdl.o libs/sdl/gl.o
+
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
 BOOT = src/hlc_main.o src/_main.o
@@ -37,7 +40,7 @@ LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
 
 ifeq ($(ARCH),32)
-CC=i686-pc-cygwin-gcc 
+CC=i686-pc-cygwin-gcc
 endif
 
 else ifeq ($(UNAME),Darwin)
@@ -67,34 +70,33 @@ all: libhl hl libs
 install_lib:
 	cp libhl.${LIBEXT} /usr/local/lib
 
-libs: fmt sdl 
+libs: fmt sdl
 
 libhl: ${LIB}
 	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB}
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
-	
+
 hl: ${HL}
+	echo $(ARCH)
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS}
 
 fmt: ${FMT}
 	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -lpng $(LIBTURBOJPEG) -lz
-	
+
 sdl: ${SDL}
 	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -lSDL2
-	
+
 .SUFFIXES : .c .o
 
 .c.o :
 	${CC} ${CFLAGS} -o $@ -c $<
-	
+
 clean_o:
 	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL}
-	
-clean: clean_o 
+
+clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
 
 .PHONY: libhl hl hlc fmt sdl libs
-
-
