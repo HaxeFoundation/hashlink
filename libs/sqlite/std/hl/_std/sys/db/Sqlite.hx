@@ -32,11 +32,13 @@ private class SqliteLib
 	public static function close( c : SqliteConnectionHandle ) : Void { }
 	public static function request( c : SqliteConnectionHandle, sql : hl.types.Bytes ) : SqliteResultHandle { return null; }
 	public static function last_id( c : SqliteConnectionHandle ) : Int { return 0; }
+	
 	public static function result_next( c : SqliteResultHandle ) : hl.types.NativeArray<Dynamic> { return null; }
-	public static function result_get( c : SqliteResultHandle, n : Int ) : hl.types.Bytes { return null; }
-	public static function result_get_int( c : SqliteResultHandle, n : Int ) : Int { return 0; }
-	public static function result_get_float( c : SqliteResultHandle, n : Int ) : Float { return .0; }
-	public static function result_get_length( c : SqliteResultHandle ) : Int { return 0; }
+	
+	public static function result_get( c : SqliteResultHandle, n : Int ) : Null<hl.types.Bytes> { return null; }
+	public static function result_get_int( c : SqliteResultHandle, n : Int ) : Null<Int> { return 0; }
+	public static function result_get_float( c : SqliteResultHandle, n : Int ) : Null<Float> { return .0; }
+	public static function result_get_length( c : SqliteResultHandle ) : Null<Int> { return 0; }
 	public static function result_get_nfields( c : SqliteResultHandle ) : Int { return 0; }
 	public static function result_get_fields( c : SqliteResultHandle ) : hl.types.NativeArray<hl.types.Bytes> { return null; }
 }
@@ -230,7 +232,11 @@ private class SqliteResultSet implements ResultSet
 	
 	public function getResult( n : Int ) : String
 	{
-		return String.fromUCS2(SqliteLib.result_get(r, n));
+		var bytes = SqliteLib.result_get(r, n);
+		if ( bytes == null )
+			return null;
+		
+		return String.fromUCS2(bytes);
 	}
 	
 	public function getIntResult( n : Int ) : Int

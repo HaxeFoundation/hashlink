@@ -48,7 +48,7 @@ static void HL_NAME(finalize_request)(sqlite_result *r, bool exc ) {
 	if( r->ncols == 0 )
 		r->count = sqlite3_changes(r->db->db);
 	if( sqlite3_finalize(r->r) != SQLITE_OK && exc )
-    hl_error("SQLite error: Could not finalize request");
+		hl_error("SQLite error: Could not finalize request");
 	r->r = NULL;
 	r->db->last = NULL;
 	r->db = NULL;
@@ -309,7 +309,6 @@ DEFINE_PRIM(_ARR,          result_next,      _RESULT);
 DEFINE_PRIM(_NULL(_BYTES), result_get,       _RESULT _I32);
 DEFINE_PRIM(_NULL(_I32),   result_get_int,   _RESULT _I32);
 DEFINE_PRIM(_NULL(_F64),   result_get_float, _RESULT _I32);
-
-DEFINE_PRIM(_I32, result_get_length, _RESULT);
-DEFINE_PRIM(_I32, result_get_nfields, _RESULT);
-DEFINE_PRIM(_ARR, result_get_fields, _RESULT);
+DEFINE_PRIM(_NULL(_I32),   result_get_length, _RESULT);
+DEFINE_PRIM(_I32,          result_get_nfields, _RESULT);
+DEFINE_PRIM(_ARR,          result_get_fields, _RESULT);
