@@ -2,6 +2,7 @@ CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D HLDLL_
 LFLAGS = -L. -lhl -ldl
 LIBFLAGS =
 LIBEXT = so
+LIBTURBOJPEG = -lturbojpeg
 
 ifndef ARCH
 ARCH=32
@@ -50,11 +51,14 @@ else
 
 # Linux
 CFLAGS += -m$(ARCH) -fPIC
-LFLAGS += -lm -Wl,--export-dynamic
+LFLAGS += -lm -Wl,--export-dynamic -Wl,--no-undefined
+
+# otherwise ld will link to the .a and complain about missing -fPIC (Ubuntu 14)
+LIBTURBOJPEG = -l:libturbojpeg.so.0
 
 endif
 
-all: libhl hl
+all: libhl hl libs
 
 install_lib:
 	cp libhl.${LIBEXT} /usr/local/lib
@@ -71,7 +75,7 @@ hl: ${HL}
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS}
 
 fmt: ${FMT}
-	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -lpng -ljpeg-turbo -lz
+	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -lpng $(LIBTURBOJPEG) -lz
 	
 sdl: ${SDL}
 	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -lSDL2
