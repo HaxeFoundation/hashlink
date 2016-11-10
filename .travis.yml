@@ -18,6 +18,8 @@ install:
   - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
       sudo apt-get update -y;
       sudo apt-get install gcc-multilib -y;
+      sudo apt-get install libz-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 -y;
+	  ln -s /usr/lib/i386-linux-gnu/libSDL2-2.0.so.0 /usr/lib/i386-linux-gnu/libSDL2.so;
     fi
   - make ARCH=32 all
   - sudo make install_lib
