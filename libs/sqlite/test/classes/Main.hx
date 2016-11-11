@@ -1,5 +1,6 @@
 package;
 
+
 class Main
 {
 	public static function main( ) : Void
@@ -7,6 +8,7 @@ class Main
 		var r = new haxe.unit.TestRunner();
 		r.add(new BasicTestCase());
 		r.add(new ResulSetTestCase());
+		r.add(new ExceptionTestCase());
 		r.run();
 	}
 	/*
