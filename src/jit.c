@@ -242,6 +242,7 @@ struct jit_ctx {
 	} buf;
 	vreg *vregs;
 	preg pregs[REG_COUNT];
+	vreg *savedRegs[REG_COUNT];
 	int *opsPos;
 	int maxRegs;
 	int maxOps;
@@ -306,6 +307,25 @@ static preg *paddr( preg *r, void *p ) {
 	r->kind = RADDR;
 	r->holds = (vreg*)p;
 	return r;
+}
+
+static void save_regs( jit_ctx *ctx ) {
+	int i;
+	for(i=0;i<REG_COUNT;i++)
+		ctx->savedRegs[i] = ctx->pregs[i].holds;
+}
+
+static void restore_regs( jit_ctx *ctx ) {
+	int i;
+	for(i=0;i<ctx->maxRegs;i++)
+		ctx->vregs[i].current = NULL;
+	for(i=0;i<REG_COUNT;i++) {
+		vreg *r = ctx->savedRegs[i];
+		preg *p = ctx->pregs + i;
+		p->holds = r;
+		p->lock = -1;
+		if( r ) r->current = p;	
+	}
 }
 
 static void jit_buf( jit_ctx *ctx ) {
@@ -2572,6 +2592,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,TEST,tmp,tmp);
 				scratch(tmp);
 				XJump_small(JNotZero,jhasvalue);
+				save_regs(ctx);
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,0);
 				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
 				op64(ctx, CALL, pmem(&p,r->id,HL_WSIZE), UNUSED);
@@ -2581,6 +2602,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				ifdef HL_64
 				jit_error("TODO");
 #				else
+				restore_regs(ctx);
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,4);
 				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
 				op64(ctx, PUSH,pmem(&p,r->id,HL_WSIZE*3),UNUSED); // push closure value
@@ -2773,6 +2795,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					preg *r = alloc_reg(ctx,RCPU);
 					op64(ctx,MOV,r,pmem(&p,v->id,sizeof(vvirtual)+HL_WSIZE*o->p2));
 					op64(ctx,TEST,r,r);
+					save_regs(ctx);
 					XJump_small(JNotZero,jhasfield);
 
 					need_dyn = !hl_is_ptr(dst->t) && dst->t->kind != HVOID;
@@ -2824,6 +2847,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 
 					XJump_small(JAlways,jend);
 					patch_jump(ctx,jhasfield);
+					restore_regs(ctx);
 
 					/*
 						o = o->value hack
