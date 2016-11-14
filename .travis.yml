@@ -19,6 +19,9 @@ install:
       sudo dpkg --add-architecture i386;
       sudo apt-get update -y;
       sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 -y;
+    elif [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+      brew update;
+      brew install jpeg-turbo sdl2;
     fi
   - make ARCH=32 all
   - sudo make install_lib
