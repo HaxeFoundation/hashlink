@@ -47,8 +47,9 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(ARCH)
-LFLAGS += -Wl,-export_dynamic
+CFLAGS += -m$(ARCH) -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include
+LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
+LIBFLAGS += -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib
 
 else
 

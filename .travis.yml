@@ -1,35 +1,45 @@
 language: haxe
 
 sudo: required
-
 matrix:
   include:
     - haxe: development
       os: linux
       dist: trusty
+      env: ARCH=32
+      before_install:
+        - sudo dpkg --add-architecture i386
+        - sudo apt-get update -y
+        - sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 -y
+      before_script:
+        - sudo ldconfig
+    - haxe: development
+      os: linux
+      dist: trusty
+      env: ARCH=64
+      before_install:
+        - sudo apt-get update -y
+        - sudo apt-get install libz-dev zlib1g-dev libturbojpeg libpng-dev libsdl2-dev -y
+      before_script:
+        - sudo ldconfig
     - haxe: development
       os: osx
       osx_image: xcode8
+      before_install:
+        - brew update
+        - brew install jpeg-turbo sdl2
     - haxe: development
       os: osx
       osx_image: xcode7.1
+      before_install:
+        - brew update
+        - brew install jpeg-turbo sdl2
 
 install:
-  - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
-      sudo dpkg --add-architecture i386;
-      sudo apt-get update -y;
-      sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 -y;
-    elif [ "${TRAVIS_OS_NAME}" = "osx" ]; then
-      brew update;
-      brew install jpeg-turbo sdl2;
-    fi
-  - make ARCH=32 all
+  - make all
   - sudo make install_lib
-  - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
-      sudo ldconfig;
-    fi
-  
+
 script:
   - haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
   - ./hl hello.hl
-  - haxe -hl src/_main.c -cp other/tests -main HelloWorld && make ARCH=32 hlc
+  - haxe -hl src/_main.c -cp other/tests -main HelloWorld && make hlc
