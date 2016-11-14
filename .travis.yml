@@ -2,6 +2,9 @@ language: haxe
 
 sudo: required
 matrix:
+  allow_failures:
+    - os: osx
+    - env: ARCH=64
   include:
     - haxe: development
       os: linux
