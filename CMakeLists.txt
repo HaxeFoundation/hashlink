@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 2.8.12)
 include(GNUInstallDirs)
 project(hashlink C)
 
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+
 if (CMAKE_VERSION VERSION_LESS "3.1")
     set (CMAKE_C_FLAGS "-std=c11 ${CMAKE_C_FLAGS}")
 else ()
@@ -108,11 +110,42 @@ find_program(
 )
 
 add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
-    COMMAND haxe -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+    COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
 )
 add_custom_target(hello.hl ALL
     DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
 )
+
+if (WIN32)
+    set(SDL2_PATH ${CMAKE_SOURCE_DIR}/include/sdl)
+endif()
+find_package(SDL2 REQUIRED)
+
+add_library(sdl.hdll MODULE
+    libs/sdl/sdl.c
+    libs/sdl/gl.c
+)
+set_target_properties(sdl.hdll
+    PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME sdl
+    SUFFIX .hdll
+)
+target_include_directories(sdl.hdll
+	PRIVATE
+	${SDL2_INCLUDE_DIR}
+    include/gl
+)
+target_link_libraries(sdl.hdll
+    libhl
+    ${SDL2_LIBRARY}
+)
+
+if(WIN32)
+    target_link_libraries(sdl.hdll
+        opengl32
+    )
+endif()
 
 include(CTest)
 add_test(NAME hello.hl
