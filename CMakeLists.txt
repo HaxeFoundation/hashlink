@@ -98,6 +98,8 @@ target_link_libraries(hl libhl)
 if(WIN32)
 	target_link_libraries(libhl ws2_32 user32)
 	target_link_libraries(hl user32)
+else()
+    target_link_libraries(libhl m dl)
 endif()
 
 find_program(
