@@ -99,3 +99,20 @@ if(WIN32)
 	target_link_libraries(libhl ws2_32 user32)
 	target_link_libraries(hl user32)
 endif()
+
+find_program(
+    HAXE_COMPILER
+    haxe
+)
+
+add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
+    COMMAND haxe -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+)
+add_custom_target(hello.hl ALL
+    DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
+)
+
+include(CTest)
+add_test(NAME hello.hl
+	COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
+)
