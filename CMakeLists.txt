@@ -169,29 +169,6 @@ if(WIN32)
         find_library(TurboJPEG_LIBRARIES simd PATHS include/turbojpeg/x86)
     endif()
 
-    file(GLOB zlib_srcs
-        include/zlib/*.c
-    )
-
-    file(GLOB png_srcs
-        include/png/*.c
-    )
-
-    file(GLOB turbojpeg_srcs
-        include/turbojpeg/*.c
-    )
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        file(GLOB turbojpeg_srcs
-            include/turbojpeg/*.c
-            include/turbojpeg/x64/*.c
-        )
-    else()
-        file(GLOB turbojpeg_srcs
-            include/turbojpeg/*.c
-            include/turbojpeg/x86/*.c
-        )
-    endif()
-
     add_library(fmt.hdll MODULE
         include/png/png.c
         include/png/pngerror.c
