@@ -8,14 +8,21 @@ configuration: Release
 
 environment:
   matrix:
-    - builder: vc
     - builder: cmake
+    - builder: vc
 
 install:
   - appveyor DownloadFile https://www.libsdl.org/release/SDL2-devel-2.0.4-VC.zip
   - 7z x SDL2-devel-2.0.4-VC.zip
   - move SDL2-2.0.4 include/sdl
-  # - appveyor DownloadFile http://hxbuilds.s3-website-us-east-1.amazonaws.com/builds/haxe/windows/haxe_latest.tar.gz
+  # install neko and haxe
+  - cinst neko -y
+  - appveyor DownloadFile http://hxbuilds.s3-website-us-east-1.amazonaws.com/builds/haxe/windows/haxe_latest.tar.gz
+  - 7z x "haxe_latest.tar.gz" -so | 7z x -aoa -si -ttar
+  - RefreshEnv
+  - set PATH=%APPVEYOR_BUILD_FOLDER%\haxe-3.0.0-rc1;%PATH%
+  - neko -version
+  - haxe -version 
 
 build_script:
   # if "%builder%"=="vc" 
