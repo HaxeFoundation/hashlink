@@ -380,8 +380,8 @@ HL_PRIM void HL_NAME(gl_renderbuffer_storage)( int target, int format, int width
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_renderbuffer)( int frameTarget, int attach, int renderTarget, vdynamic *b ) {
-	GLOG("%d,%d,%d,%d",frameTarget,attach,renderTarget,b->v.i);
-	glFramebufferRenderbuffer(frameTarget, attach, renderTarget, b->v.i);
+	GLOG("%d,%d,%d,%d",frameTarget,attach,renderTarget,ZIDX(b));
+	glFramebufferRenderbuffer(frameTarget, attach, renderTarget, ZIDX(b));
 }
 
 HL_PRIM void HL_NAME(gl_delete_renderbuffer)( vdynamic *b ) {
