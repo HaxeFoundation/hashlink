@@ -143,6 +143,7 @@ target_link_libraries(sdl.hdll
 
 if(WIN32)
     target_link_libraries(sdl.hdll
+        winmm
         opengl32
     )
 endif()
