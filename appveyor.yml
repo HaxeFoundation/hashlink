@@ -6,16 +6,29 @@ image:
 platform: Win32
 configuration: Release
 
+environment:
+  matrix:
+    - builder: vc
+    - builder: cmake
+
 install:
   - appveyor DownloadFile https://www.libsdl.org/release/SDL2-devel-2.0.4-VC.zip
   - 7z x SDL2-devel-2.0.4-VC.zip
   - move SDL2-2.0.4 include/sdl
+  # - appveyor DownloadFile http://hxbuilds.s3-website-us-east-1.amazonaws.com/builds/haxe/windows/haxe_latest.tar.gz
 
 build_script:
-  - msbuild hldll.vcxproj         /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild hl.vcxproj            /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild libs/fmt/fmt.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild libs/sdl/sdl.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild libs/ui/ui.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  # if "%builder%"=="vc" 
+  - if "%builder%"=="vc"      msbuild hldll.vcxproj         /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild hl.vcxproj            /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libs/fmt/fmt.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libs/sdl/sdl.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libs/ui/ui.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  # if "%builder%"=="cmake"
+  - if "%builder%"=="cmake"   cmake -G "Visual Studio 14 2015"
+  - if "%builder%"=="cmake"   msbuild ALL_BUILD.vcxproj     /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="cmake"   msbuild RUN_TESTS.vcxproj     /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
 
 test: off
+# test_script:
+#   - if "%builder%"=="cmake"   msbuild RUN_TESTS.vcxproj     /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"

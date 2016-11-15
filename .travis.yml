@@ -9,7 +9,20 @@ matrix:
     - haxe: development
       os: linux
       dist: trusty
-      env: ARCH=32
+      env: ARCH=32 BUILD=cmake
+      before_install:
+        - sudo dpkg --add-architecture i386
+        - sudo apt-get update -y
+        - sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 -y
+      install:
+        - cmake -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake
+        - make
+      script:
+        - make test ARGS="-V"
+    - haxe: development
+      os: linux
+      dist: trusty
+      env: ARCH=32 BUILD=make
       before_install:
         - sudo dpkg --add-architecture i386
         - sudo apt-get update -y
