@@ -41,15 +41,41 @@ matrix:
     - haxe: development
       os: osx
       osx_image: xcode8
+      env: BUILD=make
+      before_install:
+        - brew update
+        - brew install jpeg-turbo sdl2
+    - haxe: development
+      os: osx
+      osx_image: xcode8
+      env: BUILD=cmake
+      before_install:
+        - brew update
+        - brew install jpeg-turbo sdl2
+      install:
+        - cmake .
+        - make
+      script:
+        - make test ARGS="-V"
+    - haxe: development
+      os: osx
+      osx_image: xcode7.1
+      env: BUILD=make
       before_install:
         - brew update
         - brew install jpeg-turbo sdl2
     - haxe: development
       os: osx
       osx_image: xcode7.1
+      env: BUILD=cmake
       before_install:
         - brew update
         - brew install jpeg-turbo sdl2
+      install:
+        - cmake .
+        - make
+      script:
+        - make test ARGS="-V"
 
 install:
   - make all

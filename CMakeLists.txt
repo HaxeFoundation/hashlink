@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 
+cmake_policy(SET CMP0042 NEW)
+
 include(GNUInstallDirs)
 project(hashlink C)
 
@@ -151,6 +153,18 @@ if(WIN32)
     target_link_libraries(sdl.hdll
         winmm
         opengl32
+    )
+endif()
+
+if (APPLE)
+    find_package(OPENGL REQUIRED)
+    target_include_directories(sdl.hdll
+        PRIVATE
+        ${OPENGL_INCLUDE_DIR}
+    )
+    target_link_libraries(sdl.hdll
+        libhl
+        ${OPENGL_gl_LIBRARY}
     )
 endif()
 

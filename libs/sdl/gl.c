@@ -3,8 +3,7 @@
 
 #if defined(__APPLE__)
 #	include <SDL2/SDL.h>
-#	include <OpenGL/glu.h>
-#	include <OpenGL/glext.h>
+#	include <OpenGL/gl.h>
 #elif defined(_WIN32)
 #	include <SDL.h>
 #	include <GL/GLU.h>
