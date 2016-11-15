@@ -195,10 +195,10 @@ class GL {
 
 	public static function deleteFramebuffer( f : Framebuffer ) {
 	}
-	
+
 	public static function readPixels( x : Int, y : Int, width : Int, height : Int, format : Int, type : Int, data : hl.types.Bytes ) {
 	}
-	
+
 	public static function drawBuffers( n : Int, buffers : hl.types.Bytes ) {
 	}
 
@@ -635,6 +635,7 @@ class GL {
 	public static inline var RGB5_A1                        = 0x8057;
 	public static inline var RGB565                         = 0x8D62;
 	public static inline var DEPTH_COMPONENT16              = 0x81A5;
+	public static inline var DEPTH_COMPONENT24              = 0x81A6;
 	public static inline var STENCIL_INDEX                  = 0x1901;
 	public static inline var STENCIL_INDEX8                 = 0x8D48;
 	public static inline var DEPTH_STENCIL                  = 0x84F9;
