@@ -23,3 +23,5 @@ ReleaseStatic
 /other/benchs/bench.*
 /other/benchs/cpp
 /other/benchs/flashout.txt
+
+/bin*
