@@ -455,6 +455,8 @@ class GL {
 	public static inline var UNSIGNED_INT                   = 0x1405;
 	public static inline var FLOAT                          = 0x1406;
 
+	public static inline var HALF_FLOAT                     = 0x140B;
+
 	/* PixelFormat */
 	public static inline var DEPTH_COMPONENT                = 0x1902;
 	public static inline var ALPHA                          = 0x1906;
@@ -463,11 +465,24 @@ class GL {
 	public static inline var LUMINANCE                      = 0x1909;
 	public static inline var LUMINANCE_ALPHA                = 0x190A;
 
+
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
 	public static inline var UNSIGNED_SHORT_4_4_4_4         = 0x8033;
 	public static inline var UNSIGNED_SHORT_5_5_5_1         = 0x8034;
 	public static inline var UNSIGNED_SHORT_5_6_5           = 0x8363;
+
+	public static inline var SRGB							= 0x8C40;
+	public static inline var SRGB8							= 0x8C41;
+	public static inline var SRGB_ALPHA						= 0x8C42;
+	public static inline var SRGB8_ALPHA					= 0x8C43;
+	public static inline var FRAMEBUFFER_SRGB				= 0x8DB9;
+
+	public static inline var RGBA32F                        = 0x8814;
+	public static inline var RGB32F                         = 0x8815;
+	public static inline var RGBA16F                        = 0x881A;
+	public static inline var RGB16F                         = 0x881B;
+
 
 	/* Shaders */
 	public static inline var FRAGMENT_SHADER                  = 0x8B30;
