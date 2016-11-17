@@ -1,0 +1,10 @@
+-cp classes
+-cp ../std/
+-main Main
+-hl bin/_main.c
+
+--next
+
+-cp classes
+-main Main
+-hl bin/test.b
