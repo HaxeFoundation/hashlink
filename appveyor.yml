@@ -26,7 +26,7 @@ install:
 
 build_script:
   # if "%builder%"=="vc" 
-  - if "%builder%"=="vc"      msbuild hldll.vcxproj         /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libhl.vcxproj         /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild hl.vcxproj            /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild libs/fmt/fmt.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild libs/sdl/sdl.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
