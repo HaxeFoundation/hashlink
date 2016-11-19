@@ -244,7 +244,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>../../$(Configuration)/$(TargetName).hdll</OutputFile>
-      <AdditionalDependencies>std.lib;simd.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;simd.lib</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -260,7 +260,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>std.lib;simd.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;simd.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -280,7 +280,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>../../$(Configuration)/$(TargetName).hdll</OutputFile>
-      <AdditionalDependencies>std.lib;simd.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;simd.lib</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -301,7 +301,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>../../$(Configuration)/$(TargetName).hdll</OutputFile>
-      <AdditionalDependencies>std.lib;simd.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;simd.lib</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -321,7 +321,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>std.lib;simd.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;simd.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStatic|x64'">
@@ -340,7 +340,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>std.lib;simd.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;simd.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

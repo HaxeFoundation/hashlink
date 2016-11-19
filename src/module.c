@@ -192,10 +192,13 @@ int hl_module_init( hl_module *m ) {
 			if( curlib != n->lib ) {
 				curlib = n->lib;
 				strcpy(tmp,n->lib);
-#				ifndef HL_WIN
 				if( strcmp(n->lib,"std") == 0 )
+#				ifndef HL_WIN
 					libHandler = RTLD_DEFAULT;
 				else {
+#				else
+					strcpy(tmp, "libhl.dll");
+				else
 #				endif
 #					ifdef HL_64
 					strcpy(tmp+strlen(tmp),"64.hdll");

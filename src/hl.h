@@ -73,6 +73,7 @@
 #	pragma warning(disable:4255) // windows include
 #	pragma warning(disable:4820) // windows include
 #	pragma warning(disable:4668) // windows include
+#	pragma warning(disable:4738) // return float bad performances
 #endif
 
 #if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CYGWIN)
@@ -134,7 +135,7 @@ typedef long long int64;
 #include <stdio.h>
 #include <memory.h>
 
-#ifdef HLDLL_EXPORTS
+#ifdef LIBHL_EXPORTS
 #define HL_API extern EXPORT
 #else
 #define	HL_API IMPORT
@@ -510,6 +511,9 @@ HL_API void hl_free( hl_alloc *a );
 HL_API void hl_global_init( void *stack_top );
 HL_API void hl_global_free();
 
+HL_API void *hl_alloc_executable_memory( int size );
+HL_API void hl_free_executable_memory( void *ptr, int size );
+
 // ----------------------- BUFFER --------------------------------------------------
 
 typedef struct hl_buffer hl_buffer;
@@ -563,7 +567,7 @@ typedef struct {
 
 #ifndef HL_NAME
 #	define HL_NAME(p)					p
-#	ifdef HLDLL_EXPORTS
+#	ifdef LIBHL_EXPORTS
 #		define HL_PRIM				EXPORT
 #		undef DEFINE_PRIM
 #		define DEFINE_PRIM(t,name,args)						_DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)

@@ -100,9 +100,6 @@ hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m );
 void hl_module_free( hl_module *m );
 
-void *hl_alloc_executable_memory( int size );
-void hl_free_executable_memory( void *ptr, int size );
-
 #define JIT_CALL_PRECISION 3
 
 jit_ctx *hl_jit_alloc();
