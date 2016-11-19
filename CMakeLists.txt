@@ -72,8 +72,8 @@ add_library(libhl SHARED
 if(WIN32)
     set_target_properties(libhl
         PROPERTIES
-        OUTPUT_NAME std
-        SUFFIX .hdll
+        PREFIX lib
+        OUTPUT_NAME hl
     )
 else()
     set_target_properties(libhl
@@ -86,7 +86,7 @@ set_target_properties(libhl
 	PROPERTIES
 	VERSION ${HL_VERSION}
 	SOVERSION ${HL_VERSION_MAJOR}
-	COMPILE_DEFINITIONS "_USRDLL;HLDLL_EXPORTS"
+	COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
 )
 
 add_executable(hl
