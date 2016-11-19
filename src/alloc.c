@@ -137,7 +137,14 @@ static struct {
 	int pages_allocated;
 	int mark_bytes;
 	int mark_time;
+	int alloc_time; // only measured if gc_profile active
 } gc_stats = {0};
+
+static struct {
+	int64 total_allocated;
+	int64 allocation_count;
+	int alloc_time;
+} last_profile;
 
 #ifdef HL_WIN
 #	define TIMESTAMP() ((int)GetTickCount())
@@ -526,6 +533,7 @@ static unsigned char *alloc_end = NULL;
 
 void *hl_gc_alloc_gen( int size, int flags ) {
 	void *ptr;
+	int time = 0;
 #ifdef HL_BUMP_ALLOC
 	if( !alloc_all ) {
 		int tot = 3<<29;
@@ -538,7 +546,9 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 	if( alloc_all > alloc_end ) hl_fatal("Out of memory");
 #else
 	gc_check_mark();
+	if( gc_profile ) time = TIMESTAMP();
 	ptr = gc_alloc_gen(size, flags);
+	if( gc_profile ) gc_stats.alloc_time += TIMESTAMP() - time;
 #	ifdef GC_DEBUG
 	memset(ptr,0xCD,size);
 #	endif
@@ -853,7 +863,19 @@ HL_API void hl_gc_major() {
 	gc_mark();
 	dt = TIMESTAMP() - time;
 	gc_stats.mark_time += dt;
-	if( gc_profile ) printf("GC-MARK %d(%d)\n",dt,gc_stats.mark_time);
+	if( gc_profile ) {
+		printf("GC-PROFILE\n\tmark-time %.3g\n\talloc-time %.3g\n\ttotal-mark-time %.3g\n\ttotal-alloc-time %.3g\n\tallocated %d (%dKB)\n",
+			dt/1000.,
+			(gc_stats.alloc_time - last_profile.alloc_time)/1000.,
+			gc_stats.mark_time/1000.,
+			gc_stats.alloc_time/1000.,
+			(int)(gc_stats.allocation_count - last_profile.allocation_count),
+			(int)((gc_stats.total_allocated - last_profile.total_allocated)>>10)
+		);
+		last_profile.allocation_count = gc_stats.allocation_count;
+		last_profile.alloc_time = gc_stats.alloc_time;
+		last_profile.total_allocated = gc_stats.total_allocated;
+	}
 }
 
 HL_API bool hl_is_gc_ptr( void *ptr ) {
@@ -867,9 +889,11 @@ HL_API bool hl_is_gc_ptr( void *ptr ) {
 	return true;
 }
 
+static bool gc_is_active = true;
+
 static void gc_check_mark() {
 	int64 m = gc_stats.total_allocated - gc_stats.last_mark;
-	if( m > gc_stats.pages_total_memory * gc_mark_threshold ) hl_gc_major();
+	if( m > gc_stats.pages_total_memory * gc_mark_threshold && gc_is_active ) hl_gc_major();
 }
 
 static void hl_gc_init( void *stack_top ) {
@@ -1038,3 +1062,22 @@ vvirtual *hl_alloc_virtual( hl_type *t ) {
 	MZERO(vdata,t->virt->dataSize);
 	return v;
 }
+
+HL_API void hl_gc_stats( double *total_allocated, double *allocation_count, double *current_memory ) {
+	*total_allocated = (double)gc_stats.total_allocated;
+	*allocation_count = (double)gc_stats.allocation_count;
+	*current_memory = (double)gc_stats.pages_total_memory;
+}
+
+HL_API void hl_gc_enable( bool b ) {
+	gc_is_active = b;
+}
+
+HL_API void hl_gc_profile( bool b ) {
+	gc_profile = b;
+}
+
+DEFINE_PRIM(_VOID, gc_major, _NO_ARG);
+DEFINE_PRIM(_VOID, gc_enable, _BOOL);
+DEFINE_PRIM(_VOID, gc_profile, _BOOL);
+DEFINE_PRIM(_VOID, gc_stats, _REF(_F64) _REF(_F64) _REF(_F64));
