@@ -18,7 +18,7 @@ class Sdl {
 	}
 
 	static function __init__() {
-		hl.types.Api.setErrorHandler(function(e) reportError(e));
+		hl.Api.setErrorHandler(function(e) reportError(e));
 		sentinel = new hl.UI.Sentinel(30,onTimeout);
 	}
 
@@ -114,7 +114,7 @@ class Sdl {
 		@:privateAccess messageBox(title.toUtf8(), text.toUtf8(), error);
 	}
 
-	static function messageBox( title : hl.types.Bytes, text : hl.types.Bytes, error : Bool ) {
+	static function messageBox( title : hl.Bytes, text : hl.Bytes, error : Bool ) {
 	}
 
 	static function detectWin32() {

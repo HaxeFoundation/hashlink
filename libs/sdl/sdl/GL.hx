@@ -112,7 +112,7 @@ class GL {
 		return @:privateAccess String.fromUTF8(getProgramInfoBytes(p));
 	}
 
-	static function getProgramInfoBytes( p : Program ) : hl.types.Bytes {
+	static function getProgramInfoBytes( p : Program ) : hl.Bytes {
 		return null;
 	}
 
@@ -144,7 +144,7 @@ class GL {
 		return @:privateAccess String.fromUTF8(getShaderInfoBytes(s));
 	}
 
-	static function getShaderInfoBytes( s : Shader ) : hl.types.Bytes {
+	static function getShaderInfoBytes( s : Shader ) : hl.Bytes {
 		return null;
 	}
 
@@ -171,7 +171,7 @@ class GL {
 	}
 
 	@:hlNative("sdl","gl_tex_image2d")
-	public static function texImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, format : Int, type : Int, image : hl.types.Bytes ) {
+	public static function texImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
 	}
 
 	public static function generateMipmap( t : Int ) {
@@ -196,10 +196,10 @@ class GL {
 	public static function deleteFramebuffer( f : Framebuffer ) {
 	}
 
-	public static function readPixels( x : Int, y : Int, width : Int, height : Int, format : Int, type : Int, data : hl.types.Bytes ) {
+	public static function readPixels( x : Int, y : Int, width : Int, height : Int, format : Int, type : Int, data : hl.Bytes ) {
 	}
 
-	public static function drawBuffers( n : Int, buffers : hl.types.Bytes ) {
+	public static function drawBuffers( n : Int, buffers : hl.Bytes ) {
 	}
 
 	// renderbuffer
@@ -232,10 +232,10 @@ class GL {
 	public static function bufferDataSize( target : Int, size : Int, param : Int ) {
 	}
 
-	public static function bufferData( target : Int, size : Int, data : hl.types.Bytes, param : Int ) {
+	public static function bufferData( target : Int, size : Int, data : hl.Bytes, param : Int ) {
 	}
 
-	public static function bufferSubData( target : Int, offset : Int, data : hl.types.Bytes, srcOffset : Int, srcLength : Int ) {
+	public static function bufferSubData( target : Int, offset : Int, data : hl.Bytes, srcOffset : Int, srcLength : Int ) {
 	}
 
 	public static function enableVertexAttribArray( attrib : Int ) {
@@ -255,7 +255,7 @@ class GL {
 	public static function uniform1i( u : Uniform, i : Int ) {
 	}
 
-	public static function uniform4fv( u : Uniform, buffer : hl.types.Bytes, bufPos : Int, count : Int ) {
+	public static function uniform4fv( u : Uniform, buffer : hl.Bytes, bufPos : Int, count : Int ) {
 	}
 
 	// draw

@@ -1,7 +1,7 @@
 package sdl;
 
-private typedef WinPtr = hl.types.NativeAbstract<"sdl_window">;
-private typedef GLContext = hl.types.NativeAbstract<"sdl_gl">;
+private typedef WinPtr = hl.Abstract<"sdl_window">;
+private typedef GLContext = hl.Abstract<"sdl_gl">;
 
 @:hlNative("sdl")
 class Window {
@@ -93,7 +93,7 @@ class Window {
 		winResize(win, 2);
 	}
 
-	static function winCreate( title : hl.types.Bytes, width : Int, height : Int ) : WinPtr {
+	static function winCreate( title : hl.Bytes, width : Int, height : Int ) : WinPtr {
 		return null;
 	}
 
@@ -114,7 +114,7 @@ class Window {
 	static function winResize( win : WinPtr, mode : Int ) {
 	}
 
-	static function winGetSize( win : WinPtr, width : hl.types.Ref<Int>, height : hl.types.Ref<Int> ) {
+	static function winGetSize( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
 	}
 
 	static function winRenderTo( win : WinPtr, gl : GLContext ) {
