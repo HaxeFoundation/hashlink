@@ -2530,12 +2530,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int size, i;
 				preg *r = alloc_cpu(ctx, ra, true);
 				hl_type *t = NULL;
-				for(i=0;i<ra->t->obj->nproto;i++) {
-					hl_obj_proto *pp = ra->t->obj->proto + i;
-					if( pp->pindex == o->p3 ) {
-						t = m->code->functions[m->functions_indexes[pp->findex]].type;
-						break;
+				hl_type *ot = ra->t;
+				while( t == NULL ) {
+					for(i=0;i<ot->obj->nproto;i++) {
+						hl_obj_proto *pp = ot->obj->proto + i;
+						if( pp->pindex == o->p3 ) {
+							t = m->code->functions[m->functions_indexes[pp->findex]].type;
+							break;
+						}
 					}
+					ot = ot->obj->super;
 				}
 				size = pad_before_call(ctx,HL_WSIZE*3);
 				op64(ctx,PUSH,r,UNUSED);
