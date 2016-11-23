@@ -119,5 +119,10 @@ HL_PRIM void hl_fatal_fmt( const char *file, int line, const char *fmt, ...) {
 	hl_fatal_error(buf,file,line);
 }
 
+HL_PRIM void hl_breakpoint() {
+	hl_debug_break();
+}
+
 DEFINE_PRIM(_ARR,exception_stack,_NO_ARG);
 DEFINE_PRIM(_VOID,set_error_handler,_FUN(_VOID,_DYN));
+DEFINE_PRIM(_VOID,breakpoint,_NO_ARG);
