@@ -418,14 +418,13 @@ resume:
 					if( p->sizes[next] == 0 ) hl_fatal("assert");
 #					endif
 					next += p->sizes[next];
-					if( (next>>5) != fid ) {
-						if( next + nblocks > p->max_blocks ) {
-							p->next_block = next;
-							p = p->next_page;
-							goto loop;
-						}
-						continue;
+					if( next + nblocks > p->max_blocks ) {
+						p->next_block = next;
+						p = p->next_page;
+						goto loop;
 					}
+					if( (next>>5) != fid ) 
+						continue;
 					goto resume;
 				}
 				bits = TRAILING_ZEROES( (next & 31) ? (fetch_bits >> (next&31)) | (1<<(32-(next&31))) : fetch_bits );
