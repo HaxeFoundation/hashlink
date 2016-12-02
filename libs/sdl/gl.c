@@ -114,6 +114,11 @@ HL_PRIM void HL_NAME(gl_pixel_storei)( int key, int value ) {
 	glPixelStorei(key, value);
 }
 
+HL_PRIM vbyte *HL_NAME(gl_get_string)(int name) {
+	GLOG("%d", name);
+	return (vbyte*)glGetString(name);
+}
+
 // state changes
 
 HL_PRIM void HL_NAME(gl_enable)( int feature ) {
@@ -164,6 +169,21 @@ HL_PRIM void HL_NAME(gl_depth_func)( int f ) {
 HL_PRIM void HL_NAME(gl_color_mask)( bool r, bool g, bool b, bool a ) {
 	GLOG("%d,%d,%d,%d",r,g,b,a);
 	glColorMask(r, g, b, a);
+}
+
+HL_PRIM void HL_NAME(gl_stencil_mask_separate)(int face, int mask) {
+	GLOG("%d,%d",face,mask);
+	glStencilMaskSeparate(face, mask);
+}
+
+HL_PRIM void HL_NAME(gl_stencil_func_separate)(int face, int func, int ref, int mask ) {
+	GLOG("%d,%d,%d,%d",face,func,ref,mask);
+	glStencilFuncSeparate(face, func, ref, mask);
+}
+
+HL_PRIM void HL_NAME(gl_stencil_op_separate)(int face, int sfail, int dpfail, int dppass) {
+	GLOG("%d,%d,%d,%d",face,sfail,dpfail,dppass);
+	glStencilOpSeparate(face, sfail, dpfail, dppass);
 }
 
 // program
@@ -484,6 +504,7 @@ DEFINE_PRIM(_VOID,gl_clear_stencil,_I32);
 DEFINE_PRIM(_VOID,gl_viewport,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_finish,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_pixel_storei,_I32 _I32);
+DEFINE_PRIM(_BYTES,gl_get_string,_I32);
 DEFINE_PRIM(_VOID,gl_enable,_I32);
 DEFINE_PRIM(_VOID,gl_disable,_I32);
 DEFINE_PRIM(_VOID,gl_cull_face,_I32);
@@ -494,6 +515,9 @@ DEFINE_PRIM(_VOID,gl_blend_equation_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_depth_mask,_BOOL);
 DEFINE_PRIM(_VOID,gl_depth_func,_I32);
 DEFINE_PRIM(_VOID,gl_color_mask,_BOOL _BOOL _BOOL _BOOL);
+DEFINE_PRIM(_VOID,gl_stencil_mask_separate,_I32 _I32);
+DEFINE_PRIM(_VOID,gl_stencil_func_separate,_I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_stencil_op_separate,_I32  _I32 _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_program,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_attach_shader,_NULL(_I32) _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_link_program,_NULL(_I32));
