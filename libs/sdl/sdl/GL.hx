@@ -59,6 +59,20 @@ class GL {
 
 	public static function pixelStorei( key : Int, value : Int ) {
 	}
+	
+	public static function getParameter( name : Int ) : Dynamic {
+		switch( name ){
+			case VENDOR, VERSION, RENDERER, SHADING_LANGUAGE_VERSION:
+				return @:privateAccess String.fromUTF8(getString(name));
+			case _:
+				throw "Not implemented";
+				return null;
+		}
+	}
+
+	static function getString( name : Int ) : hl.Bytes {
+		return null;
+	}
 
 	// state changes
 
@@ -90,6 +104,15 @@ class GL {
 	}
 
 	public static function colorMask( r : Bool, g : Bool, b : Bool, a : Bool ) {
+	}
+
+	public static function stencilMaskSeparate( face : Int, mask : Int ){
+	}
+
+	public static function stencilFuncSeparate( face : Int, func : Int, ref : Int, mask : Int ){
+	}
+
+	public static function stencilOpSeparate( face : Int, sfail : Int, dpfail : Int, dppas : Int ){
 	}
 
 	// program
