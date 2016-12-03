@@ -110,14 +110,14 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs ) {
 		argv = (char**)malloc(sizeof(char*)*4);
 		argv[0] = "/bin/sh";
 		argv[1] = "-c";
-		argv[2] = cmd;
+		argv[2] = (char*)cmd;
 		argv[3] = NULL;
 	} else {
 		int i;
 		if( vargs->at->kind != HBYTES )
 			return NULL;
 		argv = (char**)malloc(sizeof(char*)*(vargs->size+2));
-		argv[0] = cmd;
+		argv[0] = (char*)cmd;
 		for(i=0;i<vargs->size;i++)
 			argv[i+1] = hl_aptr(vargs,char*)[i];
 		argv[i+1] = NULL;
