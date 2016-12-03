@@ -6,8 +6,9 @@ ifndef ARCH
 endif
 
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D LIBHL_EXPORTS
-LFLAGS = -L. -lhl -ldl
-LIBFLAGS =
+LFLAGS = -L. -lhl
+LIBFLAGS = -lpthread
+HLFLAGS = -ldl
 LIBEXT = so
 LIBTURBOJPEG = -lturbojpeg
 
@@ -19,9 +20,9 @@ RUNTIME = src/alloc.o
 
 STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o \
 	src/std/file.o src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/random.o src/std/regexp.o \
-	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o
+	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o
 
-HL = src/callback.o src/code.o src/jit.o src/main.o src/module.o
+HL = src/callback.o src/code.o src/jit.o src/main.o src/module.o src/debugger.o
 
 FMT = libs/fmt/fmt.o
 
@@ -81,7 +82,7 @@ hlc: ${BOOT}
 
 hl: ${HL}
 	echo $(ARCH)
-	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS}
+	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
 
 fmt: ${FMT}
 	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -lpng $(LIBTURBOJPEG) -lz
