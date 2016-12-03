@@ -106,25 +106,24 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs ) {
 	CloseHandle(sinf.hStdInput);
 #	else
 	char **argv;
-	if (isRaw) {
+	if( !vargs ) {
 		argv = (char**)malloc(sizeof(char*)*4);
 		argv[0] = "/bin/sh";
 		argv[1] = "-c";
-		argv[2] = val_string(cmd);
+		argv[2] = cmd;
 		argv[3] = NULL;
 	} else {
-		argv = (char**)malloc(sizeof(char*)*(val_array_size(vargs)+2));
-		argv[0] = val_string(cmd);
-		for(i=0;i<val_array_size(vargs);i++) {
-			value v = val_array_ptr(vargs)[i];
-			val_check(v,string);
-			argv[i+1] = val_string(v);
-		}
+		if( vargs->at->kind != HBYTES )
+			return NULL;
+		argv = (char**)malloc(sizeof(char*)*(vargs->size+2));
+		argv[0] = cmd;
+		for(i=0;i<vargs->size;i++)
+			argv[i+1] = hl_aptr(vargs,char*)[i];
 		argv[i+1] = NULL;
 	}
 	int input[2], output[2], error[2];
 	if( pipe(input) || pipe(output) || pipe(error) )
-		neko_error();
+		return NULL;
 	p = (vprocess*)hl_gc_alloc_finalizer(sizeof(vprocess));
 	p->pid = fork();
 	if( p->pid == -1 ) {
