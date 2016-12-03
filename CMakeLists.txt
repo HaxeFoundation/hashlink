@@ -61,6 +61,8 @@ file(GLOB std_srcs
     src/std/sys.c
     src/std/types.c
     src/std/ucs2.c
+	src/std/thread.c
+	src/std/process.c
 )
 
 add_library(libhl SHARED
@@ -95,6 +97,7 @@ add_executable(hl
     src/jit.c
     src/main.c
     src/module.c
+	src/debugger.c
 )
 
 target_link_libraries(hl libhl)
