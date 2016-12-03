@@ -7,7 +7,7 @@ endif
 
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
-LIBFLAGS = -lpthread
+LIBFLAGS =
 HLFLAGS = -ldl
 LIBEXT = so
 LIBTURBOJPEG = -lturbojpeg
@@ -75,7 +75,7 @@ install_lib:
 libs: fmt sdl
 
 libhl: ${LIB}
-	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB}
+	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
