@@ -57,6 +57,8 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 		else
 			max = mid;
 	}
+	if( min == 0 )
+		return NULL; // hl_callback
 	dbg = cur_module->jit_debug + (min - 1);
 	fdebug = cur_module->code->functions + (min - 1);
 	// lookup inside function
@@ -71,6 +73,8 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 		else
 			max = mid;
 	}
+	if( min == 0 )
+		return NULL; // ???
 	code_pos = min - 1;
 	// extract debug info
 	debug_addr = fdebug->debug + ((code_pos&0xFFFF) * 2);
@@ -92,6 +96,11 @@ static int module_capture_stack( void **stack, int size ) {
 	int count = 0;
 	unsigned char *code = cur_module->jit_code;
 	int code_size = cur_module->codesize;
+	if( cur_module->jit_debug ) {
+		int s = cur_module->jit_debug[0].start;
+		code += s;
+		code_size -= s;
+	}
 	while( stack_ptr < (void**)stack_top ) {
 		void *stack_addr = *stack_ptr++; // EBP
 		if( stack_addr > stack_bottom && stack_addr < stack_top ) {
