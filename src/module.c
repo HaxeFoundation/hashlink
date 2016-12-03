@@ -35,17 +35,45 @@ static hl_module *cur_module;
 static void *stack_top;
 
 static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
-	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code)) >> JIT_CALL_PRECISION;
-	int debug_pos = cur_module->jit_debug[code_pos];
+	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code));
+	int min, max;
+	hl_debug_infos *dbg;
+	hl_function *fdebug;
 	int *debug_addr;
 	int file, line;
 	int size = *outSize;
 	int pos = 0;
-	hl_function *fdebug;
-	if( !debug_pos )
+
+	if( cur_module->jit_debug == NULL )
 		return NULL;
-	fdebug = cur_module->code->functions + cur_module->functions_indexes[((unsigned)debug_pos)>>16];
-	debug_addr = fdebug->debug + ((debug_pos&0xFFFF) * 2);
+	// lookup function from code pos
+	min = 0;
+	max = cur_module->code->nfunctions;
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		hl_debug_infos *p = cur_module->jit_debug + mid;
+		if( p->start <= code_pos )
+			min = mid + 1;
+		else
+			max = mid;
+	}
+	dbg = cur_module->jit_debug + (min - 1);
+	fdebug = cur_module->code->functions + (min - 1);
+	// lookup inside function
+	min = 0;
+	max = fdebug->nops;
+	code_pos -= dbg->start;
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		int offset = dbg->large ? ((int*)dbg->offsets)[mid] : ((unsigned short*)dbg->offsets)[mid];
+		if( offset <= code_pos )
+			min = mid + 1;
+		else
+			max = mid;
+	}
+	code_pos = min - 1;
+	// extract debug info
+	debug_addr = fdebug->debug + ((code_pos&0xFFFF) * 2);
 	file = debug_addr[0];
 	line = debug_addr[1];
 	if( fdebug->obj )
@@ -302,5 +330,11 @@ void hl_module_free( hl_module *m ) {
 	free(m->ctx.functions_types);
 	free(m->globals_indexes);
 	free(m->globals_data);
+	if( m->jit_debug ) {
+		int i;
+		for(i=0;i<m->code->nfunctions;i++)
+			free(m->jit_debug[i].offsets);
+		free(m->jit_debug);
+	}
 	free(m);
 }

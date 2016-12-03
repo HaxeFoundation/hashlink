@@ -260,7 +260,7 @@ struct jit_ctx {
 	hl_alloc falloc; // cleared per-function
 	hl_alloc galloc;
 	vclosure *closure_list;
-	int *debug;
+	hl_debug_infos *debug;
 };
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
@@ -350,16 +350,6 @@ static void jit_buf( jit_ctx *ctx ) {
 		ctx->startBuf = nbuf;
 		ctx->buf.b = nbuf + curpos;
 		ctx->bufSize = nsize;
-		if( ctx->m->code->hasdebug ) {
-			int *ndebug = (int*)malloc(sizeof(int) * (nsize >> JIT_CALL_PRECISION));
-			if( ndebug == NULL ) ASSERT(nsize);
-			if( ctx->debug ) {
-				memcpy(ndebug,ctx->debug,(curpos>>JIT_CALL_PRECISION) * sizeof(int));
-				free(ctx->debug);
-			}
-			memset(ndebug + (curpos>>JIT_CALL_PRECISION), 0, ((nsize - curpos) >> JIT_CALL_PRECISION) * sizeof(int));
-			ctx->debug = ndebug;
-		}
 	}
 }
 
@@ -778,14 +768,9 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	default:
 		ERRIF(1);
 	}
-	if( ctx->debug && ctx->f ) {
-		int pos = BUF_POS() >> JIT_CALL_PRECISION;
-		if( o == CALL || !ctx->debug[pos] )
-			ctx->debug[pos] = (ctx->f->findex<<16) | ((ctx->currentPos - 1)&0xFFFF);
-		if( o == CALL ) {
-			preg p;
-			op(ctx,MOV,pmem(&p,Esp,-HL_WSIZE),PEBP,true); // erase EIP (clean stack report)
-		}
+	if( ctx->debug && ctx->f && o == CALL ) {
+		preg p;
+		op(ctx,MOV,pmem(&p,Esp,-HL_WSIZE),PEBP,true); // erase EIP (clean stack report)
 	}
 }
 
@@ -1976,6 +1961,8 @@ void hl_jit_free( jit_ctx *ctx ) {
 void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	int i;
 	ctx->m = m;
+	if( m->code->hasdebug )
+		ctx->debug = (hl_debug_infos*)malloc(sizeof(hl_debug_infos) * m->code->nfunctions);
 	for(i=0;i<m->code->nfloats;i++) {
 		jit_buf(ctx);
 		*ctx->buf.d++ = m->code->floats[i];
@@ -2154,6 +2141,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0, opCount;
 	int codePos = BUF_POS();
 	int nargs = f->type->fun->nargs;
+	unsigned short *debug16 = NULL;
+	int *debug32 = NULL;
 	preg p;
 	ctx->f = f;
 	ctx->allocOffset = 0;
@@ -2202,6 +2191,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
 	ctx->functionPos = BUF_POS();
+	if( ctx->m->code->hasdebug ) {
+		debug16 = (unsigned short*)malloc(sizeof(unsigned short) * (f->nops + 1));
+		debug16[0] = 0;
+	}
 	op_enter(ctx);
 	ctx->opsPos[0] = BUF_POS();
 
@@ -2220,6 +2213,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			op64(ctx, ADD, PESP, pconst(&p,HL_WSIZE));
 		}
 #		endif
+		// emit code
 		switch( o->op ) {
 		case OMov:
 		case OUnsafeCast:
@@ -3233,6 +3227,18 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		if( ctx->opsPos[opCount+1] == -1 )
 			discard_regs(ctx,true);
 		ctx->opsPos[opCount+1] = BUF_POS();
+
+		// write debug infos
+		size = BUF_POS() - codePos;
+		if( debug16 && size > 0xFF00 ) {
+			debug32 = malloc(sizeof(int) * (f->nops + 1));
+			for(i=0;i<ctx->currentPos;i++)
+				debug32[i] = debug16[i];
+			free(debug16);
+			debug16 = NULL;
+		}
+		if( debug16 ) debug16[ctx->currentPos] = (unsigned short)size; else if( debug32 ) debug32[ctx->currentPos] = size;
+
 	}
 	// patch jumps
 	{
@@ -3252,12 +3258,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		r->holds = NULL;
 		r->lock = 0;
 	}
+	// save debug infos
+	{
+		int fid = f - m->code->functions;
+		ctx->debug[fid].start = codePos;
+		ctx->debug[fid].offsets = debug32 ? (void*)debug32 : (void*)debug16;
+		ctx->debug[fid].large = debug32 != NULL;
+	}
 	// reset tmp allocator
 	hl_free(&ctx->falloc);
 	return codePos;
 }
 
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, int **debug ) {
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug ) {
 	jlist *c;
 	int size = BUF_POS();
 	unsigned char *code;
