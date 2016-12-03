@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sdl", "libs\sdl\sdl.vcxproj", "{12049F27-EA26-4A33-ADF8-E542C4167C00}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -39,6 +39,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sqlite", "libs\sqlite\sqlite.vcxproj", "{43AAD9DB-4708-46B6-AAE8-A5DB95A0B573}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "libs", "libs", "{0EC4330B-6B61-45F8-B297-CA7097AFFD98}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssl", "libs\ssl\ssl.vcxproj", "{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -134,6 +136,18 @@ Global
 		{43AAD9DB-4708-46B6-AAE8-A5DB95A0B573}.ReleaseStatic|Win32.Build.0 = Release|Win32
 		{43AAD9DB-4708-46B6-AAE8-A5DB95A0B573}.ReleaseStatic|x64.ActiveCfg = Release|x64
 		{43AAD9DB-4708-46B6-AAE8-A5DB95A0B573}.ReleaseStatic|x64.Build.0 = Release|x64
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.Debug|Win32.Build.0 = Debug|Win32
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.Debug|x64.ActiveCfg = Debug|x64
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.Debug|x64.Build.0 = Debug|x64
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.Release|Win32.ActiveCfg = Release|Win32
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.Release|Win32.Build.0 = Release|Win32
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.Release|x64.ActiveCfg = Release|x64
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.Release|x64.Build.0 = Release|x64
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.ReleaseStatic|Win32.ActiveCfg = ReleaseStatic|Win32
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.ReleaseStatic|Win32.Build.0 = ReleaseStatic|Win32
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.ReleaseStatic|x64.ActiveCfg = ReleaseStatic|x64
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.ReleaseStatic|x64.Build.0 = ReleaseStatic|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -143,5 +157,6 @@ Global
 		{7DDA1414-6675-45C7-8254-42057901F865} = {0EC4330B-6B61-45F8-B297-CA7097AFFD98}
 		{6534D221-34DF-404A-AFCD-6DEC9BBC9798} = {0EC4330B-6B61-45F8-B297-CA7097AFFD98}
 		{43AAD9DB-4708-46B6-AAE8-A5DB95A0B573} = {0EC4330B-6B61-45F8-B297-CA7097AFFD98}
+		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2} = {0EC4330B-6B61-45F8-B297-CA7097AFFD98}
 	EndGlobalSection
 EndGlobal
