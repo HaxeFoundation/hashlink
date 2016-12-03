@@ -113,6 +113,7 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs ) {
 		argv[2] = cmd;
 		argv[3] = NULL;
 	} else {
+		int i;
 		if( vargs->at->kind != HBYTES )
 			return NULL;
 		argv = (char**)malloc(sizeof(char*)*(vargs->size+2));
