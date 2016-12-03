@@ -177,6 +177,7 @@ HL_PRIM varray *hl_sys_env() {
 			continue;
 		}
 		count++;
+		e++;
 	}
 	a = hl_alloc_array(&hlt_bytes,count*2);
 	e = environ;
@@ -188,7 +189,7 @@ HL_PRIM varray *hl_sys_env() {
 			continue;
 		}
 		*arr++ = pstrdup(*e,(int)(x - *e));
-		*arr++ = pstrdup(x,-1);
+		*arr++ = pstrdup(x+1,-1);
 		e++;
 	}
 	return a;
