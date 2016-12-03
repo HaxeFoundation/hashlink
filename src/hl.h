@@ -480,6 +480,13 @@ HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
 HL_API void *hl_dyn_call_obj( vdynamic *obj, hl_type *ft, int hfield, void **args, vdynamic *ret );
 HL_API vdynamic *hl_dyn_call( vclosure *c, vdynamic **args, int nargs );
 
+// ----------------------- THREADS --------------------------------------------------
+
+struct _hl_thread;
+typedef struct _hl_thread hl_thread;
+HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
+HL_API hl_thread *hl_thread_current();
+
 // ----------------------- ALLOC --------------------------------------------------
 
 #define MEM_HAS_PTR(kind)	(!((kind)&2))

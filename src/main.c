@@ -33,10 +33,16 @@
 typedef uchar pchar;
 #define pprintf(str,file)	uprintf(USTR(str),file)
 #define pfopen(file,ext) _wfopen(file,USTR(ext))
+#define pcompare wcscmp
+#define ptoi(s)	wcstol(s,NULL,10) 
+#define PSTR(x) USTR(x)
 #else
 typedef char pchar;
 #define pprintf printf
 #define pfopen fopen
+#define pcompare strcmp
+#define ptoi atoi
+#define PSTR(x) x
 #endif
 
 extern void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret );
@@ -81,23 +87,37 @@ static int throw_handler( int code ) {
 #endif
 
 #ifdef HL_WIN
-int wmain(int argc, uchar *argv[]) {
+int wmain(int argc, pchar *argv[]) {
 #else
-int main(int argc, char *argv[]) {
+int main(int argc, pchar *argv[]) {
 #endif
+	pchar *file = NULL;
+	int debug_port = -1;
 	struct {
 		hl_code *code;
 		hl_module *m;
 		vdynamic *exc;
 	} ctx;
 	hl_trap_ctx trap;
-	if( argc == 1 ) {
-		printf("HL/JIT %d.%d.%d (c)2015-2016 Haxe Foundation\n  Usage : hl <file>\n",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
+	argv++;
+	argc--;
+	while( argc-- ) {
+		pchar *arg = *argv++;
+		if( pcompare(arg,PSTR("--debug")) == 0 ) {
+			if( argc-- == 0 ) break;
+			debug_port = ptoi(*argv++);
+			continue;
+		}
+		file = arg;
+		break;
+	}
+	if( file == NULL ) {
+		printf("HL/JIT %d.%d.%d (c)2015-2016 Haxe Foundation\n  Usage : hl [--debug <port>] <file>\n",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
 		return 1;
 	}
 	hl_global_init(&ctx);
-	hl_sys_init((void**)(argv + 2),argc - 2);
-	ctx.code = load_code(argv[1]);
+	hl_sys_init((void**)argv,argc);
+	ctx.code = load_code(file);
 	if( ctx.code == NULL )
 		return 1;
 	ctx.m = hl_module_alloc(ctx.code);
@@ -106,6 +126,10 @@ int main(int argc, char *argv[]) {
 	if( !hl_module_init(ctx.m) )
 		return 3;
 	hl_code_free(ctx.code);
+	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port) ) {
+		fprintf(stderr,"Could not start debugger on port %d",debug_port);
+		return 4;
+	}
 	hl_trap(trap, ctx.exc, on_exception);
 #	ifdef HL_VCC
 	__try {

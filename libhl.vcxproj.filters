@@ -94,6 +94,9 @@
     <ClCompile Include="src\std\random.c">
       <Filter>std</Filter>
     </ClCompile>
+    <ClCompile Include="src\std\thread.c">
+      <Filter>std</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\pcre\config.h">

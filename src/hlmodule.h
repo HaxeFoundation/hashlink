@@ -105,6 +105,7 @@ const char* hl_op_name( int op );
 hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m );
 void hl_module_free( hl_module *m );
+bool hl_module_debug( hl_module *m, int port );
 
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );

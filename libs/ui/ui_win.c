@@ -198,7 +198,7 @@ typedef struct {
 	int ticks;
 } vsentinel;
 
-static DWORD WINAPI sentinel_loop( vsentinel *s ) {
+static void sentinel_loop( vsentinel *s ) {
 	int time_ms = (int)((s->timeout * 1000.) / 16.);
 	while( true ) {
 		int k = 0;
@@ -229,7 +229,6 @@ static DWORD WINAPI sentinel_loop( vsentinel *s ) {
 			}
 		}
 	}
-	return 0;
 }
 
 HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
@@ -240,9 +239,9 @@ HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 #	endif
 	s->timeout = timeout;
 	s->ticks = 0;
-	s->original = OpenThread(THREAD_ALL_ACCESS,FALSE,GetCurrentThreadId());
+	s->original = hl_thread_current();
 	s->callback = c->fun;
-	s->thread = CreateThread(NULL,0,sentinel_loop,s,0,NULL);
+	s->thread = hl_thread_start(sentinel_loop,s,false);
 	return s;
 }
 
