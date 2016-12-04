@@ -85,7 +85,7 @@ static int ssl_error(int ret) {
 	char buf[128];
 	uchar buf16[128];
 	mbedtls_strerror(ret, buf, sizeof(buf));
-	hl_from_utf8(buf16, strlen(buf) + 1, buf);
+	hl_from_utf8(buf16, (int)strlen(buf) + 1, buf);
 	hl_error_msg(buf16);
 	return ret;
 }
@@ -118,11 +118,11 @@ HL_PRIM int HL_NAME(ssl_handshake)(mbedtls_ssl_context *ssl) {
 }
 
 int net_read(void *fd, unsigned char *buf, size_t len) {
-	return recv((SOCKET)(int_val)fd, (char *)buf, len, 0);
+	return recv((SOCKET)(int_val)fd, (char *)buf, (int)len, 0);
 }
 
 int net_write(void *fd, const unsigned char *buf, size_t len) {
-	return send((SOCKET)(int_val)fd, (char *)buf, len, 0);
+	return send((SOCKET)(int_val)fd, (char *)buf, (int)len, 0);
 }
 
 HL_PRIM void HL_NAME(ssl_set_socket)(mbedtls_ssl_context *ssl, hl_socket *socket) {
@@ -609,6 +609,7 @@ HL_PRIM vbyte *HL_NAME(dgst_sign)(vbyte *data, int len, hl_ssl_pkey *key, vbyte 
 	int r = -1;
 	vbyte *out;
 	unsigned char hash[MBEDTLS_MD_MAX_SIZE];
+	size_t ssize = size ? *size : 0;
 
 	md = mbedtls_md_info_from_string(alg);
 	if (md == NULL) {
@@ -622,10 +623,11 @@ HL_PRIM vbyte *HL_NAME(dgst_sign)(vbyte *data, int len, hl_ssl_pkey *key, vbyte 
 	}
 
 	out = hl_gc_alloc_noptr(MBEDTLS_MPI_MAX_SIZE);
-	if ((r = mbedtls_pk_sign(key->k, mbedtls_md_get_type(md), hash, 0, out, size, mbedtls_ctr_drbg_random, &ctr_drbg)) != 0){
+	if ((r = mbedtls_pk_sign(key->k, mbedtls_md_get_type(md), hash, 0, out, (size ? &ssize : NULL), mbedtls_ctr_drbg_random, &ctr_drbg)) != 0){
 		ssl_error(r);
 		return NULL;
 	}
+	if( size ) *size = (int)ssize;
 	return out;
 }
 
