@@ -214,18 +214,27 @@ HL_PRIM bool hl_process_stdin_close( vprocess *p ) {
 	return true;
 }
 
-HL_PRIM int hl_process_exit( vprocess *p ) {
+HL_PRIM int hl_process_exit( vprocess *p, bool *running ) {
 #	ifdef HL_WIN
 	DWORD rval;
-	WaitForSingleObject(p->pinf.hProcess,INFINITE);
+	if( !running )
+		WaitForSingleObject(p->pinf.hProcess,INFINITE);
 	if( !GetExitCodeProcess(p->pinf.hProcess,&rval) )
 		return -1;
+	if( running ) {
+		*running = rval == STILL_ACTIVE;
+		if( *running ) rval = 0;
+	}
 	return rval;
 #	else
 	int rval;
-	while( waitpid(p->pid,&rval,0) != p->pid ) {
-		if( errno == EINTR )
-			continue;
+	int wret = waitpid(p->pid,&rval,running ? WNOHANG : 0);
+	if( running ) *running = false;
+	if( wret != p->pid ) {
+		if( running && wret == 0 ) {
+			*running = true;
+			return 0;
+		}
 		return -1;
 	}
 	if( !WIFEXITED(rval) ) {
@@ -266,7 +275,7 @@ DEFINE_PRIM( _I32, process_stdout_read, _PROCESS _BYTES _I32 _I32);
 DEFINE_PRIM( _I32, process_stderr_read, _PROCESS _BYTES _I32 _I32);
 DEFINE_PRIM( _BOOL, process_stdin_close, _PROCESS);
 DEFINE_PRIM( _I32, process_stdin_write, _PROCESS _BYTES _I32 _I32);
-DEFINE_PRIM( _I32, process_exit, _PROCESS);
+DEFINE_PRIM( _I32, process_exit, _PROCESS _REF(_BOOL));
 DEFINE_PRIM( _I32, process_pid, _PROCESS);
 DEFINE_PRIM( _VOID, process_close, _PROCESS);
 DEFINE_PRIM( _VOID, process_kill, _PROCESS);
