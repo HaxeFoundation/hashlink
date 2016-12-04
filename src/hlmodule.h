@@ -105,13 +105,14 @@ const char* hl_op_name( int op );
 hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m );
 void hl_module_free( hl_module *m );
-bool hl_module_debug( hl_module *m, int port );
+bool hl_module_debug( hl_module *m, int port, bool wait );
 
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_init_callback( jit_ctx *ctx );
-void hl_jit_init_setfp( jit_ctx *ctx, int *ff, int *fd );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug );
 
+int hl_module_capture_stack( void **stack, int size, void **stack_ptr );
+bool hl_module_resolve_pos( void *addr, int *fidx, int *fpos );

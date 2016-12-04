@@ -34,18 +34,13 @@ extern void hl_callback_init( void *e );
 static hl_module *cur_module;
 static void *stack_top;
 
-static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
+bool hl_module_resolve_pos( void *addr, int *fidx, int *fpos ) {
 	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code));
 	int min, max;
 	hl_debug_infos *dbg;
 	hl_function *fdebug;
-	int *debug_addr;
-	int file, line;
-	int size = *outSize;
-	int pos = 0;
-
 	if( cur_module->jit_debug == NULL )
-		return NULL;
+		return false;
 	// lookup function from code pos
 	min = 0;
 	max = cur_module->code->nfunctions;
@@ -58,7 +53,8 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 			max = mid;
 	}
 	if( min == 0 )
-		return NULL; // hl_callback
+		return false; // hl_callback
+	*fidx = (min - 1);
 	dbg = cur_module->jit_debug + (min - 1);
 	fdebug = cur_module->code->functions + (min - 1);
 	// lookup inside function
@@ -74,10 +70,23 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 			max = mid;
 	}
 	if( min == 0 )
-		return NULL; // ???
-	code_pos = min - 1;
+		return false; // ???
+	*fpos = min - 1;
+	return true;
+}
+
+static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
+	int *debug_addr;
+	int file, line;
+	int size = *outSize;
+	int pos = 0;
+	int fidx, fpos;
+	hl_function *fdebug;
+	if( !hl_module_resolve_pos(addr,&fidx,&fpos) )
+		return NULL;
 	// extract debug info
-	debug_addr = fdebug->debug + ((code_pos&0xFFFF) * 2);
+	fdebug = cur_module->code->functions + fidx;
+	debug_addr = fdebug->debug + ((fpos&0xFFFF) * 2);
 	file = debug_addr[0];
 	line = debug_addr[1];
 	if( fdebug->obj )
@@ -90,8 +99,7 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	return out;
 }
 
-static int module_capture_stack( void **stack, int size ) {
-	void **stack_ptr = (void**)&stack;
+int hl_module_capture_stack( void **stack, int size, void **stack_ptr ) {
 	void *stack_bottom = stack_ptr;
 	int count = 0;
 	unsigned char *code = cur_module->jit_code;
@@ -113,6 +121,10 @@ static int module_capture_stack( void **stack, int size ) {
 	}
 	if( count ) count--;
 	return count;
+}
+
+static int module_capture_stack( void **stack, int size ) {
+	return hl_module_capture_stack(stack,size,(void**)&stack);
 }
 
 static void hl_init_enum( hl_type_enum *e ) {

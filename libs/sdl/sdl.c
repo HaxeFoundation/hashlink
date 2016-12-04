@@ -251,12 +251,17 @@ DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 // Window
 
 HL_PRIM SDL_Window *HL_NAME(win_create)(vbyte *title, int width, int height) {
+	SDL_Window *w;
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	return SDL_CreateWindow((char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	w = SDL_CreateWindow((char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	// force window to show even if the debugger force process windows to be hidden
+	SDL_HideWindow(w);
+	SDL_ShowWindow(w);
+	return w;
 }
 
 HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {

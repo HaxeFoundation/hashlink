@@ -191,8 +191,8 @@ HL_PRIM void HL_NAME(ui_stop_loop)() {
 }
 
 typedef struct {
-	HANDLE thread;
-	HANDLE original;
+	hl_thread *thread;
+	hl_thread *original;
 	void *callback;
 	double timeout;
 	int ticks;
@@ -200,6 +200,9 @@ typedef struct {
 
 static void sentinel_loop( vsentinel *s ) {
 	int time_ms = (int)((s->timeout * 1000.) / 16.);
+	hl_thread_registers *regs = (hl_thread_registers*)malloc(sizeof(int_val) * hl_thread_context_size());
+	int eip = hl_thread_context_index("eip");
+	int esp = hl_thread_context_index("esp");
 	while( true ) {
 		int k = 0;
 		int tick = s->ticks;
@@ -208,23 +211,16 @@ static void sentinel_loop( vsentinel *s ) {
 			if( tick != s->ticks ) break;
 			k++;
 			if( k == 16 ) {
-				// Wakeup
-				CONTEXT ctx;
-				ctx.ContextFlags = CONTEXT_FULL;
-				SuspendThread(s->original);
-				GetThreadContext(s->original,&ctx);
+				// pause
+				hl_thread_pause(s->original, true);
+				hl_thread_get_context(s->original,regs);
 				// simulate a call
-#				ifdef HL_64
-				*--((int_val*)ctx.Rsp) = ctx.Rip;
-				*--((int_val*)ctx.Rsp) = ctx.Rsp;
-				ctx.Rip = (int_val)s->callback;
-#				else
-				*--((int*)ctx.Esp) = ctx.Eip;
-				*--((int*)ctx.Esp) = ctx.Esp;
-				ctx.Eip = (DWORD)s->callback;
-#				endif
-				SetThreadContext(s->original,&ctx);
-				ResumeThread(s->original);
+				*--(int_val*)regs[esp] = regs[eip];
+				*--(int_val*)regs[esp] = regs[esp];
+				regs[eip] = (int_val)s->callback;
+				// resume
+				hl_thread_set_context(s->original,regs);
+				hl_thread_pause(s->original, false);
 				break;
 			}
 		}
