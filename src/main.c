@@ -93,6 +93,7 @@ int main(int argc, pchar *argv[]) {
 #endif
 	pchar *file = NULL;
 	int debug_port = -1;
+	bool debug_wait = false;
 	struct {
 		hl_code *code;
 		hl_module *m;
@@ -106,6 +107,10 @@ int main(int argc, pchar *argv[]) {
 		if( pcompare(arg,PSTR("--debug")) == 0 ) {
 			if( argc-- == 0 ) break;
 			debug_port = ptoi(*argv++);
+			continue;
+		}
+		if( pcompare(arg,PSTR("--debug-wait")) == 0 ) {
+			debug_wait = true;
 			continue;
 		}
 		file = arg;
@@ -126,7 +131,7 @@ int main(int argc, pchar *argv[]) {
 	if( !hl_module_init(ctx.m) )
 		return 3;
 	hl_code_free(ctx.code);
-	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port) ) {
+	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
 		fprintf(stderr,"Could not start debugger on port %d",debug_port);
 		return 4;
 	}

@@ -55,3 +55,80 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 	return (hl_thread*)t;
 #	endif
 }
+
+HL_PRIM bool hl_thread_pause( hl_thread *t, bool pause ) {
+#	ifdef HL_WIN
+	bool ret;
+	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)t);
+	if( pause ) 
+		ret = ((int)SuspendThread(h)) >= 0;
+	else {
+		int r;
+		while( (r = (int)ResumeThread(h)) > 0 ) {
+		}
+		ret = r == 0;
+	}
+	CloseHandle(h);
+	return ret;
+#	else
+	// TODO : use libthread_db
+	return false;
+#	endif
+}
+
+HL_PRIM int hl_thread_context_size() {
+#	ifdef HL_WIN
+	return (sizeof(CONTEXT) + sizeof(int_val) - 1) / sizeof(int_val);
+#	else
+	return 0;
+#	endif
+}
+
+HL_API int hl_thread_context_index( const char *name ) {
+#	ifdef HL_WIN
+	CONTEXT *c = NULL;
+#	define _ADDR(__r) (((int_val)&c->__r) / sizeof(int_val))
+#	ifdef HL_64
+#		define ADDR(_,r) _ADDR(r)
+#	else
+#		define ADDR(r,_) _ADDR(r)
+#	endif
+	if( strcmp(name,"eip") == 0 )
+		return ADDR(Eip,Rip);
+	if( strcmp(name,"esp") == 0 )
+		return ADDR(Esp,Rsp);
+	return -1;
+#	else
+	return -1;
+#	endif
+#	undef ADDR
+#	undef _ADDR
+}
+
+HL_API bool hl_thread_get_context( hl_thread *t, hl_thread_registers *regs ) {
+#	ifdef HL_WIN
+	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)t);
+	bool ret;
+	CONTEXT *c = (CONTEXT*)regs;
+	c->ContextFlags = CONTEXT_FULL;
+	ret = (bool)GetThreadContext(h,c);
+	CloseHandle(h);
+	return ret;
+#	else
+	return false;
+#	endif
+}
+
+HL_API bool hl_thread_set_context( hl_thread *t, hl_thread_registers *regs ) {
+#	ifdef HL_WIN
+	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)t);
+	bool ret;
+	CONTEXT *c = (CONTEXT*)regs;
+	c->ContextFlags = CONTEXT_FULL;
+	ret = (bool)SetThreadContext(h,c);
+	CloseHandle(h);
+	return ret;
+#	else
+	return false;
+#	endif
+}
