@@ -251,6 +251,7 @@
     <ClCompile Include="src\std\bytes.c" />
     <ClCompile Include="src\std\cast.c" />
     <ClCompile Include="src\std\date.c" />
+    <ClCompile Include="src\std\debug.c" />
     <ClCompile Include="src\std\error.c" />
     <ClCompile Include="src\std\file.c" />
     <ClCompile Include="src\std\fun.c" />
