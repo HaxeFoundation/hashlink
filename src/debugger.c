@@ -58,17 +58,25 @@ static void hl_debug_loop( hl_module *m ) {
 		send("HLD0",4);
 		send(&flags,4);
 		send(&stack_top,sizeof(void*));
-		send(&m->jit_debug,sizeof(void*));
+		send(&m->jit_code,sizeof(void*));
 		send(&m->codesize,4);
 		send(&m->code->nfunctions,4);
+
 		for(i=0;i<m->code->nfunctions;i++) {
 			hl_function *f = m->code->functions + i;
 			hl_debug_infos *d = m->jit_debug + i;
-			send(&f->nops,4);
-			send(&d->start,4);
-			send(&d->large,1);
-			send(&d->offsets, (d->large ? sizeof(int) : sizeof(unsigned short)) * (f->nops + 1));
+			struct {
+				int nops;
+				int start;
+				unsigned char large;
+			} fdata;
+			fdata.nops = f->nops;
+			fdata.start = d->start;
+			fdata.large = (unsigned char)d->large;
+			send(&fdata,9);
+			send(d->offsets,(d->large ? sizeof(int) : sizeof(unsigned short)) * (f->nops + 1));
 		}
+
 		// wait answer
 		hl_socket_recv(s,&cmd,0,1);
 		hl_socket_close(s);
