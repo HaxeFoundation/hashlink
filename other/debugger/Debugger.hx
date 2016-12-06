@@ -6,16 +6,23 @@
 	public var Error = 3;
 }
 
+@:enum abstract Register(Int) {
+	public var Esp = 0;
+	public var Eip = 1;
+	public var EFlags = 2;
+}
+
 extern class DebugApi {
 	@:hlNative("std", "debug_start") public static function startDebugProcess( pid : Int ) : Bool;
 	@:hlNative("std", "debug_stop") public static function stopDebugProcess( pid : Int ) : Void;
 	@:hlNative("std", "debug_breakpoint") public static function breakpoint( pid : Int ) : Bool;
 	@:hlNative("std", "debug_read") public static function read( pid : Int, ptr : hl.Bytes, buffer : hl.Bytes, size : Int ) : Bool;
 	@:hlNative("std", "debug_write") public static function write( pid : Int, ptr : hl.Bytes, buffer : hl.Bytes, size : Int ) : Bool;
-	@:hlNative("std", "debug_address") public static function address( low : Int, high : Int ) : hl.Bytes;
 	@:hlNative("std", "debug_flush") public static function flush( pid : Int, ptr : hl.Bytes, size : Int ) : Bool;
 	@:hlNative("std", "debug_wait") public static function wait( pid : Int, threadId : hl.Ref<Int>, timeout : Int ) : WaitResult;
 	@:hlNative("std", "debug_resume") public static function resume( pid : Int, tid : Int ) : Bool;
+	@:hlNative("std", "debug_read_register") public static function readRegister( pid : Int, tid : Int, register : Register ) : hl.Bytes;
+	@:hlNative("std", "debug_write_register") public static function writeRegister( pid : Int, tid : Int, register : Register, v : Pointer ) : Bool;
 }
 
 enum DebugFlag {
@@ -23,16 +30,28 @@ enum DebugFlag {
 	Bool4; // bool = 4 bytes (instead of 1)
 }
 
-abstract Pointer(hl.Bytes) {
+abstract Pointer(hl.Bytes) to hl.Bytes {
 
 	static var TMP = new hl.Bytes(8);
 
-	public inline function new(low, high) {
-		this = DebugApi.address(low, high);
+	public inline function new(b) {
+		this = b;
 	}
 
 	public inline function offset(pos:Int) : Pointer {
-		return cast this.offset(pos);
+		return new Pointer(this.offset(pos));
+	}
+
+	public inline function sub( p : Pointer ) {
+		return this.subtract(p);
+	}
+
+	public inline function or( v : Int ) {
+		return new Pointer(hl.Bytes.fromAddress(this.address() | v));
+	}
+
+	public inline function and( v : Int ) {
+		return new Pointer(hl.Bytes.fromAddress(this.address() & v));
 	}
 
 	public function readByte( offset : Int ) {
@@ -49,6 +68,21 @@ abstract Pointer(hl.Bytes) {
 
 	public function flush( pos : Int ) {
 		DebugApi.flush(Debugger.PID, this.offset(pos), 1);
+	}
+
+	public function toString() {
+		var i = this.address();
+		if( i.high == 0 )
+			return "0x" + StringTools.hex(i.low);
+		return "0x" + StringTools.hex(i.high) + StringTools.hex(i.low, 8);
+	}
+
+	public static function ofPtr( p : hl.Bytes ) : Pointer {
+		return cast p;
+	}
+
+	public static function make( low : Int, high : Int ) {
+		return new Pointer(hl.Bytes.fromAddress(haxe.Int64.make(high, low)));
 	}
 
 }
@@ -123,8 +157,8 @@ class Debugger {
 
 	function readPointer() : Pointer {
 		if( flags.has(Is64) )
-			return new Pointer(sock.input.readInt32(), sock.input.readInt32());
-		return new Pointer(sock.input.readInt32(),0);
+			return Pointer.make(sock.input.readInt32(), sock.input.readInt32());
+		return Pointer.make(sock.input.readInt32(),0);
 	}
 
 	function readDebugInfos() {
@@ -144,6 +178,7 @@ class Debugger {
 			codeSize : sock.input.readInt32(),
 			functions : [],
 		};
+
 		var nfunctions = sock.input.readInt32();
 		if( nfunctions != code.functions.length )
 			return false;
@@ -203,7 +238,40 @@ class Debugger {
 		var cmd = Timeout;
 		while( true ) {
 			cmd = DebugApi.wait(PID, tid, 1000);
-			if( cmd != Timeout ) break;
+			switch( cmd ) {
+			case Timeout:
+				// continue
+			case Breakpoint:
+				var eip = getReg(tid, Eip);
+				var codePos = eip.sub(debugInfos.codeStart) - 1;
+				for( b in breakPoints ) {
+					if( b.codePos == codePos ) {
+						// restore code
+						setCode(codePos, b.oldByte);
+						// move backward
+						setReg(tid, Eip, eip.offset(-1));
+						// set EFLAGS to single step
+						var r = getReg(tid, EFlags);
+						setReg(tid, EFlags, r.or(256));
+						break;
+					}
+				}
+				break;
+			case SingleStep:
+				// restore our breakpoint
+				var eip = getReg(tid, Eip);
+				var codePos = eip.sub(debugInfos.codeStart) - 1;
+				for( b in breakPoints )
+					if( b.codePos == codePos ) {
+						// restore breakpoint
+						setCode(codePos, 0xCC);
+						break;
+					}
+				stoppedThread = tid;
+				resume();
+			default:
+				break;
+			}
 		}
 		stoppedThread = tid;
 		return cmd;
@@ -289,6 +357,15 @@ class Debugger {
 	function setCode( pos : Int, byte : Int ) {
 		debugInfos.codeStart.writeByte(pos, byte);
 		debugInfos.codeStart.flush(pos);
+	}
+
+	function getReg(tid, reg) {
+		return Pointer.ofPtr(DebugApi.readRegister(PID, tid, reg));
+	}
+
+	function setReg(tid, reg, value) {
+		if( !DebugApi.writeRegister(PID, tid, reg, value) )
+			throw "Failed to set register " + reg;
 	}
 
 	// ---------------- hldebug commandline interface / GDB like ------------------------

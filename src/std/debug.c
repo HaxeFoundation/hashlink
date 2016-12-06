@@ -22,8 +22,9 @@
 #include <hl.h>
 
 #ifdef HL_WIN
-static HANDLE last_process = NULL;
+static HANDLE last_process = NULL, last_thread = NULL;
 static int last_pid = -1;
+static int last_tid = -1;
 static HANDLE OpenPID( int pid ) {
 	if( pid == last_pid )
 		return last_process;
@@ -32,17 +33,23 @@ static HANDLE OpenPID( int pid ) {
 	last_process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
 	return last_process;
 }
-#endif
-
-HL_API void *hl_debug_address( int low, int high ) {
-#	ifdef HL_64
-	return (void*)((int_val)low | (((int_val)high)<<32));
-#	else
-	if( high != 0 )
-		return NULL;
-	return (void*)low;
-#	endif
+static HANDLE OpenTID( int tid ) {
+	if( tid == last_tid )
+		return last_thread;
+	CloseHandle(last_thread);
+	last_tid = tid;
+	last_thread = OpenThread(THREAD_ALL_ACCESS, FALSE, tid);
+	return last_thread;
 }
+static void CleanHandles() {
+	last_pid = -1;
+	last_tid = -1;
+	CloseHandle(last_process);
+	CloseHandle(last_thread);
+	last_process = NULL;
+	last_thread = NULL;
+}
+#endif
 
 HL_API bool hl_debug_start( int pid ) {
 #	ifdef HL_WIN
@@ -56,9 +63,7 @@ HL_API bool hl_debug_start( int pid ) {
 HL_API bool hl_debug_stop( int pid ) {
 #	ifdef HL_WIN
 	BOOL b = DebugActiveProcessStop(pid);
-	last_pid = -1;
-	CloseHandle(last_process);
-	last_process = NULL;
+	CleanHandles();
 	return (bool)b;
 #	else
 	return false;
@@ -132,12 +137,62 @@ HL_API bool hl_debug_resume( int pid, int thread ) {
 #	endif
 }
 
+#ifdef HL_WIN
+#	ifdef HL_64
+#		define GET_REG(x)	&c->R##x
+#		define REGDATA		DWORD64
+#	else
+#		define GET_REG(x)	&c->E##x
+#		define REGDATA		DWORD
+#	endif
+REGDATA *GetContextReg( CONTEXT *c, int reg ) {
+	switch( reg ) {
+	case 0: return GET_REG(sp);
+	case 1: return GET_REG(ip);
+	default: return GET_REG(ax);
+	}
+}
+#endif
+
+HL_API void *hl_debug_read_register( int pit, int thread, int reg ) {
+#	ifdef HL_WIN
+	CONTEXT c;
+	memset(&c,0xFF,sizeof(c));
+	c.ContextFlags = CONTEXT_FULL;
+	if( !GetThreadContext(OpenTID(thread),&c) )
+		return NULL;
+	if( reg == 2 )
+		return (void*)(int_val)c.EFlags;
+	return (void*)*GetContextReg(&c,reg);
+#	else
+	return NULL;
+#	endif
+}
+
+HL_API bool hl_debug_write_register( int pit, int thread, int reg, void *value ) {
+#	ifdef HL_WIN
+	CONTEXT c;
+	c.ContextFlags = CONTEXT_FULL;
+	if( !GetThreadContext(OpenTID(thread),&c) )
+		return false;
+	if( reg == 2 )
+		c.EFlags = (int)(int_val)value;
+	else
+		*GetContextReg(&c,reg) = (REGDATA)value;
+	return (bool)SetThreadContext(OpenTID(thread),&c);
+#	else
+	return false;
+#	endif
+}
+
 DEFINE_PRIM(_BOOL, debug_start, _I32);
 DEFINE_PRIM(_VOID, debug_stop, _I32);
 DEFINE_PRIM(_BOOL, debug_breakpoint, _I32);
-DEFINE_PRIM(_BYTES, debug_address, _I32 _I32);
 DEFINE_PRIM(_BOOL, debug_read, _I32 _BYTES _BYTES _I32);
 DEFINE_PRIM(_BOOL, debug_write, _I32 _BYTES _BYTES _I32);
 DEFINE_PRIM(_BOOL, debug_flush, _I32 _BYTES _I32);
 DEFINE_PRIM(_I32, debug_wait, _I32 _REF(_I32) _I32);
 DEFINE_PRIM(_BOOL, debug_resume, _I32 _I32);
+DEFINE_PRIM(_BYTES, debug_read_register, _I32 _I32 _I32);
+DEFINE_PRIM(_BOOL, debug_write_register, _I32 _I32 _I32 _BYTES);
+
