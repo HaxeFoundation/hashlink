@@ -124,7 +124,6 @@ static int module_capture_stack( void **stack, int size ) {
 			}
 		}
 	}
-	if( count ) count--;
 	return count;
 }
 
