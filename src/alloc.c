@@ -577,7 +577,7 @@ HL_PRIM void **hl_gc_mark_grow( void **stack ) {
 	int nsize = mark_stack_size ? (((mark_stack_size * 3) >> 1) & ~1) : 256;
 	void **nstack = (void**)malloc(sizeof(void**) * nsize);
 	void **base_stack = mark_stack_end - mark_stack_size;
-	int avail = stack - base_stack;
+	int avail = (int)(stack - base_stack);
 	memcpy(nstack, base_stack, avail * sizeof(void*));
 	free(base_stack);
 	mark_stack_size = nsize;

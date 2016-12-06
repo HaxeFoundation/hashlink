@@ -27,7 +27,7 @@
 
 HL_PRIM hl_thread *hl_thread_current() {
 #	ifdef HL_WIN
-	return (hl_thread*)GetCurrentThreadId();
+	return (hl_thread*)(int_val)GetCurrentThreadId();
 #	else
 	return (hl_thread*)pthread_self();
 #	endif
@@ -41,7 +41,7 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 	if( h == NULL )
 		return NULL;
 	CloseHandle(h);
-	return (hl_thread*)tid;
+	return (hl_thread*)(int_val)tid;
 #	else
 	pthread_t t;
 	pthread_attr_t attr;
@@ -59,7 +59,7 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 HL_PRIM bool hl_thread_pause( hl_thread *t, bool pause ) {
 #	ifdef HL_WIN
 	bool ret;
-	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)t);
+	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)(int_val)t);
 	if( pause ) 
 		ret = ((int)SuspendThread(h)) >= 0;
 	else {
@@ -87,7 +87,7 @@ HL_PRIM int hl_thread_context_size() {
 HL_API int hl_thread_context_index( const char *name ) {
 #	ifdef HL_WIN
 	CONTEXT *c = NULL;
-#	define _ADDR(__r) (((int_val)&c->__r) / sizeof(int_val))
+#	define _ADDR(__r) (int)(((int_val)&c->__r) / sizeof(int_val))
 #	ifdef HL_64
 #		define ADDR(_,r) _ADDR(r)
 #	else
@@ -107,7 +107,7 @@ HL_API int hl_thread_context_index( const char *name ) {
 
 HL_API bool hl_thread_get_context( hl_thread *t, hl_thread_registers *regs ) {
 #	ifdef HL_WIN
-	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)t);
+	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)(int_val)t);
 	bool ret;
 	CONTEXT *c = (CONTEXT*)regs;
 	c->ContextFlags = CONTEXT_FULL;
@@ -121,7 +121,7 @@ HL_API bool hl_thread_get_context( hl_thread *t, hl_thread_registers *regs ) {
 
 HL_API bool hl_thread_set_context( hl_thread *t, hl_thread_registers *regs ) {
 #	ifdef HL_WIN
-	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)t);
+	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)(int_val)t);
 	bool ret;
 	CONTEXT *c = (CONTEXT*)regs;
 	c->ContextFlags = CONTEXT_FULL;

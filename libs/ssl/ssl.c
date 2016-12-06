@@ -469,7 +469,7 @@ HL_PRIM hl_ssl_cert *HL_NAME(cert_add_pem)(hl_ssl_cert *cert, vbyte *data) {
 		crt = (mbedtls_x509_crt*)malloc(sizeof(mbedtls_x509_crt));
 		mbedtls_x509_crt_init(crt);
 	}
-	len = strlen(data) + 1;
+	len = (int)strlen(data) + 1;
 	buf = (unsigned char *)malloc(len);
 	memcpy(buf, (char*)data, len - 1);
 	buf[len - 1] = '\0';
@@ -557,7 +557,7 @@ HL_PRIM hl_ssl_pkey *HL_NAME(key_from_pem)(vbyte *data, bool pub, vbyte *pass) {
 	unsigned char *buf;
 	mbedtls_pk_context *pk = (mbedtls_pk_context *)malloc(sizeof(mbedtls_pk_context));
 	mbedtls_pk_init(pk);
-	len = strlen((char*)data) + 1;
+	len = (int)strlen((char*)data) + 1;
 	buf = (unsigned char *)malloc(len);
 	memcpy(buf, (char*)data, len - 1);
 	buf[len - 1] = '\0';
