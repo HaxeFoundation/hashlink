@@ -3260,7 +3260,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	}
 	// save debug infos
 	{
-		int fid = f - m->code->functions;
+		int fid = (int)(f - m->code->functions);
 		ctx->debug[fid].start = codePos;
 		ctx->debug[fid].offsets = debug32 ? (void*)debug32 : (void*)debug16;
 		ctx->debug[fid].large = debug32 != NULL;
