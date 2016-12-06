@@ -157,7 +157,6 @@ REGDATA *GetContextReg( CONTEXT *c, int reg ) {
 HL_API void *hl_debug_read_register( int pit, int thread, int reg ) {
 #	ifdef HL_WIN
 	CONTEXT c;
-	memset(&c,0xFF,sizeof(c));
 	c.ContextFlags = CONTEXT_FULL;
 	if( !GetThreadContext(OpenTID(thread),&c) )
 		return NULL;

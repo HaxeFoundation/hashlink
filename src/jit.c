@@ -2191,11 +2191,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
 	ctx->functionPos = BUF_POS();
+	op_enter(ctx);
 	if( ctx->m->code->hasdebug ) {
 		debug16 = (unsigned short*)malloc(sizeof(unsigned short) * (f->nops + 1));
-		debug16[0] = 0;
+		debug16[0] = (unsigned short)(BUF_POS() - codePos);
 	}
-	op_enter(ctx);
 	ctx->opsPos[0] = BUF_POS();
 
 	for(opCount=0;opCount<f->nops;opCount++) {
