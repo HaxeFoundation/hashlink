@@ -35,10 +35,6 @@ HL_PRIM void hl_bytes_blit( char *dst, int dpos, char *src, int spos, int len ) 
 	memmove(dst + dpos,src+spos,len);
 }
 
-HL_PRIM vbyte *hl_bytes_offset( vbyte *src, int offset ) {
-	return src + offset;
-}
-
 HL_PRIM int hl_bytes_compare( vbyte *a, int apos, vbyte *b, int bpos, int len ) {
 	return memcmp(a+apos,b+bpos,len);
 }
@@ -190,6 +186,33 @@ HL_PRIM vdynamic *hl_parse_int( vbyte *bytes, int pos, int len ) {
 	return c == end ? NULL : hl_make_dyn(&h,&hlt_i32);
 }
 
+// pointer manipulation
+
+HL_PRIM vbyte *hl_bytes_offset( vbyte *src, int offset ) {
+	return src + offset;
+}
+
+HL_PRIM int hl_bytes_subtract( vbyte *a, vbyte *b ) {
+	return (int)(a - b);
+}
+
+HL_PRIM int hl_bytes_address( vbyte *a, int *high ) {
+#	ifdef HL_64
+	*high = (int)(((size_t)a)>>32);
+#	else
+	*high = 0;
+#	endif
+	return (int)(int_val)a;
+}
+
+HL_PRIM vbyte *hl_bytes_from_address( int low, int high ) {
+#	ifdef HL_64
+	return (vbyte*)(low | (((int_val)high)<<32));
+#	else
+	return (vbyte*)low;
+#	endif
+}
+
 DEFINE_PRIM(_BYTES,alloc_bytes,_I32);
 DEFINE_PRIM(_VOID,bytes_blit,_BYTES _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_I32,bytes_compare,_BYTES _I32 _BYTES _I32 _I32);
@@ -200,3 +223,6 @@ DEFINE_PRIM(_NULL(_I32), parse_int, _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,bsort_i32,_BYTES _I32 _I32 _FUN(_I32,_I32 _I32));
 DEFINE_PRIM(_VOID,bsort_f64,_BYTES _I32 _I32 _FUN(_I32,_F64 _F64));
 DEFINE_PRIM(_BYTES,bytes_offset, _BYTES _I32);
+DEFINE_PRIM(_I32,bytes_subtract, _BYTES _BYTES);
+DEFINE_PRIM(_I32,bytes_address, _BYTES _REF(_I32));
+DEFINE_PRIM(_BYTES,bytes_from_address, _I32 _I32);
