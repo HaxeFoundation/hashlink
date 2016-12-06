@@ -70,6 +70,10 @@ abstract Pointer(hl.Bytes) to hl.Bytes {
 		DebugApi.flush(Debugger.PID, this.offset(pos), 1);
 	}
 
+	public function toInt() {
+		return this.address().low;
+	}
+
 	public function toString() {
 		var i = this.address();
 		if( i.high == 0 )
@@ -101,12 +105,14 @@ class Debugger {
 
 	var flags : haxe.EnumFlags<DebugFlag>;
 	var debugInfos : {
+		var mainThread : Int;
 		var stackTop : Pointer;
 		var codeStart : Pointer;
 		var codeSize : Int;
 		var functions : Array<{ start : Int, large : Bool, offsets : haxe.io.Bytes }>;
 	};
 
+	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int }>;
 	public var stoppedThread : Null<Int>;
 
 	public function new() {
@@ -173,6 +179,7 @@ class Debugger {
 			return false;
 
 		debugInfos = {
+			mainThread : sock.input.readInt32(),
 			stackTop : readPointer(),
 			codeStart : readPointer(),
 			codeSize : sock.input.readInt32(),
@@ -274,6 +281,7 @@ class Debugger {
 			}
 		}
 		stoppedThread = tid;
+		currentStack = null;
 		return cmd;
 	}
 
@@ -284,7 +292,87 @@ class Debugger {
 	}
 
 	public function getBackTrace() : Array<{ file : String, line : Int }> {
-		throw "TODO";
+		if( currentStack == null )
+			makeStack();
+		return [for( e in currentStack ) resolveSymbol(e.fidx, e.fpos)];
+	}
+
+	function resolveSymbol( fidx : Int, fpos : Int ) {
+		var f = code.functions[fidx];
+		var fid = f.debug[fpos << 1];
+		var fline = f.debug[(fpos << 1) + 1];
+		return { file : code.debugFiles[fid], line : fline };
+	}
+
+	function makeStack() {
+		if( stoppedThread != debugInfos.mainThread ) {
+			currentStack = [];
+			return;
+		}
+
+		var stack = [];
+		var esp = getReg(stoppedThread, Esp);
+		var size = debugInfos.stackTop.sub(esp);
+		var mem = new hl.Bytes(size);
+		DebugApi.read(PID, esp, mem, size);
+
+		if( flags.has(Is64) ) throw "TODO";
+
+		var codePos = getReg(stoppedThread, Eip).sub(debugInfos.codeStart);
+		var e = resolvePos(codePos);
+		if( e != null ) stack.push(e);
+
+		// similar to module/module_capture_stack
+		var stackBottom = esp.toInt();
+		var stackTop = debugInfos.stackTop.toInt();
+		var codeBegin = debugInfos.codeStart.toInt();
+		var codeEnd = codeBegin + debugInfos.codeSize;
+		var codeStart = codeBegin + debugInfos.functions[0].start;
+		for( i in 1...size >> 2 ) {
+			var val = mem.getI32(i << 2);
+			if( val > stackBottom && val < stackTop ) {
+				var prev = mem.getI32((i + 1) << 2);
+				if( prev >= codeStart && prev < codeEnd ) {
+					var codePos = prev - codeBegin;
+					var e = resolvePos(codePos);
+					if( e != null ) stack.push(e);
+				}
+			}
+		}
+		currentStack = stack;
+	}
+
+	function resolvePos( codePos : Int ) {
+		var absPos = codePos;
+		var min = 0;
+		var max = debugInfos.functions.length;
+		while( min < max ) {
+			var mid = (min + max) >> 1;
+			var p = debugInfos.functions[mid];
+			if( p.start <= codePos )
+				min = mid + 1;
+			else
+				max = mid;
+		}
+		if( min == 0 )
+			return null;
+		var fidx = (min - 1);
+		var dbg = debugInfos.functions[fidx];
+		var fdebug = code.functions[fidx];
+		min = 0;
+		max = fdebug.debug.length>>1;
+		codePos -= dbg.start;
+		while( min < max ) {
+			var mid = (min + max) >> 1;
+			var offset = dbg.large ? dbg.offsets.getInt32(mid * 4) : dbg.offsets.getUInt16(mid * 2);
+			if( offset <= codePos )
+				min = mid + 1;
+			else
+				max = mid;
+		}
+		if( min == 0 )
+			return null; // ???
+		return { fidx : fidx, fpos : min - 1, codePos : absPos };
 	}
 
 	public function addBreakPoint( file : String, line : Int ) {

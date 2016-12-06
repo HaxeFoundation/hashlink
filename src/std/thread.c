@@ -33,6 +33,14 @@ HL_PRIM hl_thread *hl_thread_current() {
 #	endif
 }
 
+HL_PRIM int hl_thread_id() {
+#	ifdef HL_WIN
+	return (int)GetCurrentThreadId();
+#	else
+	return (int)gettid();
+#	endif
+}
+
 HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 	if( withGC ) hl_error("Threads with garbage collector are currently not supported");
 #	ifdef HL_WIN
