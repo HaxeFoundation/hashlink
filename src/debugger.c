@@ -53,7 +53,7 @@ static void hl_debug_loop( hl_module *m ) {
 #	endif
 	if( sizeof(bool) == 4 ) flags |= 2;
 	while( true ) {
-		int i, sz;
+		int i;
 		vbyte cmd;
 		hl_socket *s = hl_socket_accept(debug_socket);
 		client_socket = s;
@@ -65,8 +65,6 @@ static void hl_debug_loop( hl_module *m ) {
 		send(&m->jit_code,sizeof(void*));
 		send(&m->codesize,4);
 		send(&m->code->types,sizeof(void*));
-		sz = sizeof(hl_type);
-		send(&sz, 4);
 		send(&m->code->nfunctions,4);
 
 		for(i=0;i<m->code->nfunctions;i++) {
