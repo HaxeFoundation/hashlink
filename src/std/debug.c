@@ -148,7 +148,14 @@ HL_API bool hl_debug_resume( int pid, int thread ) {
 REGDATA *GetContextReg( CONTEXT *c, int reg ) {
 	switch( reg ) {
 	case 0: return GET_REG(sp);
-	case 1: return GET_REG(ip);
+	case 1: return GET_REG(bp);
+	case 2: return GET_REG(ip);
+	case 4: return &c->Dr0;
+	case 5: return &c->Dr1;
+	case 6: return &c->Dr2;
+	case 7: return &c->Dr3;
+	case 8: return &c->Dr6;
+	case 9: return &c->Dr7;
 	default: return GET_REG(ax);
 	}
 }
@@ -157,10 +164,10 @@ REGDATA *GetContextReg( CONTEXT *c, int reg ) {
 HL_API void *hl_debug_read_register( int pit, int thread, int reg ) {
 #	ifdef HL_WIN
 	CONTEXT c;
-	c.ContextFlags = CONTEXT_FULL;
+	c.ContextFlags = CONTEXT_FULL | CONTEXT_DEBUG_REGISTERS;
 	if( !GetThreadContext(OpenTID(thread),&c) )
 		return NULL;
-	if( reg == 2 )
+	if( reg == 3 )
 		return (void*)(int_val)c.EFlags;
 	return (void*)*GetContextReg(&c,reg);
 #	else
@@ -171,10 +178,10 @@ HL_API void *hl_debug_read_register( int pit, int thread, int reg ) {
 HL_API bool hl_debug_write_register( int pit, int thread, int reg, void *value ) {
 #	ifdef HL_WIN
 	CONTEXT c;
-	c.ContextFlags = CONTEXT_FULL;
+	c.ContextFlags = CONTEXT_FULL | CONTEXT_DEBUG_REGISTERS;
 	if( !GetThreadContext(OpenTID(thread),&c) )
 		return false;
-	if( reg == 2 )
+	if( reg == 3 )
 		c.EFlags = (int)(int_val)value;
 	else
 		*GetContextReg(&c,reg) = (REGDATA)value;
