@@ -10,8 +10,15 @@ import HLReader;
 
 @:enum abstract Register(Int) {
 	public var Esp = 0;
-	public var Eip = 1;
-	public var EFlags = 2;
+	public var Ebp = 1;
+	public var Eip = 2;
+	public var EFlags = 3;
+	public var Dr0 = 4;
+	public var Dr1 = 5;
+	public var Dr2 = 6;
+	public var Dr3 = 7;
+	public var Dr6 = 8;
+	public var Dr7 = 9;
 }
 
 extern class DebugApi {
@@ -143,9 +150,12 @@ class Debugger {
 
 	var globalTable : GlobalAccess;
 	var globalsOffsets : Array<Int>;
-	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int }>;
+	var currentFrame : Int;
+	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int, ebp : Pointer }>;
 	var protoCache : Map<String,DebugObj>;
 	var nextStep : Int;
+	var ptrSize : Int;
+	var functionRegsCache : Array<Array<{ t : HLType, offset : Int }>>;
 
 	public var stoppedThread : Null<Int>;
 
@@ -234,6 +244,7 @@ class Debugger {
 
 		// init objects
 		protoCache = new Map();
+		functionRegsCache = [];
 	}
 
 	function typeStr( t : HLType ) {
@@ -291,6 +302,7 @@ class Debugger {
 		if( version > 0 )
 			return false;
 		flags = haxe.EnumFlags.ofInt(sock.input.readInt32());
+		ptrSize = flags.has(Is64) ? 8 : 4;
 
 		if( flags.has(Is64) != hl.Api.is64() )
 			return false;
@@ -416,7 +428,8 @@ class Debugger {
 			}
 		}
 		stoppedThread = tid;
-		currentStack = null;
+		currentFrame = 0;
+		currentStack = (tid == debugInfos.mainThread) ? makeStack(tid) : [];
 		return cmd;
 	}
 
@@ -427,8 +440,6 @@ class Debugger {
 	}
 
 	public function getBackTrace() : Array<{ file : String, line : Int }> {
-		if( currentStack == null )
-			makeStack();
 		return [for( e in currentStack ) resolveSymbol(e.fidx, e.fpos)];
 	}
 
@@ -439,22 +450,21 @@ class Debugger {
 		return { file : code.debugFiles[fid], line : fline };
 	}
 
-	function makeStack() {
-		if( stoppedThread != debugInfos.mainThread ) {
-			currentStack = [];
-			return;
-		}
-
+	function makeStack(tid) {
 		var stack = [];
-		var esp = getReg(stoppedThread, Esp);
+		var esp = getReg(tid, Esp);
 		var size = debugInfos.stackTop.sub(esp);
 		var mem = readMem(esp, size);
 
 		if( flags.has(Is64) ) throw "TODO";
 
-		var codePos = getReg(stoppedThread, Eip).sub(debugInfos.codeStart);
+		var codePos = getReg(tid, Eip).sub(debugInfos.codeStart);
 		var e = resolvePos(codePos);
-		if( e != null ) stack.push(e);
+
+		if( e != null ) {
+			e.ebp = getReg(tid, Ebp);
+			stack.push(e);
+		}
 
 		// similar to module/module_capture_stack
 		var stackBottom = esp.toInt();
@@ -469,11 +479,14 @@ class Debugger {
 				if( prev >= codeStart && prev < codeEnd ) {
 					var codePos = prev - codeBegin;
 					var e = resolvePos(codePos);
-					if( e != null ) stack.push(e);
+					if( e != null ) {
+						e.ebp = esp.offset(i << 2);
+						stack.push(e);
+					}
 				}
 			}
 		}
-		currentStack = stack;
+		return stack;
 	}
 
 	function resolvePos( codePos : Int ) {
@@ -506,7 +519,7 @@ class Debugger {
 		}
 		if( min == 0 )
 			return null; // ???
-		return { fidx : fidx, fpos : min - 1, codePos : absPos };
+		return { fidx : fidx, fpos : min - 1, codePos : absPos, ebp : null };
 	}
 
 	public function addBreakPoint( file : String, line : Int ) {
@@ -585,6 +598,37 @@ class Debugger {
 		return Pointer.ofPtr(DebugApi.readRegister(PID, tid, reg));
 	}
 
+	function readReg(frame, index) {
+		var c = currentStack[frame];
+		if( c == null )
+			return null;
+		var regs = functionRegsCache[c.fidx];
+		if( regs == null ) {
+			var f = code.functions[c.fidx];
+			var nargs = switch( f.t ) { case HFun(f): f.args.length; default: throw "assert"; };
+			regs = [];
+			var size = ptrSize * 2;
+			for( i in 0...nargs ) {
+				var t = f.regs[i];
+				regs[i] = { t : t, offset : size };
+				size += typeSize(t);
+			}
+			size = 0;
+			for( i in nargs...f.regs.length ) {
+				var t = f.regs[i];
+				var sz = typeSize(t);
+				size += sz;
+				size = align(size, sz);
+				regs[i] = { t : t, offset : -size };
+			}
+			functionRegsCache[c.fidx] = regs;
+		}
+		var r = regs[index];
+		if( r == null )
+			return null;
+		return { t : r.t, v : readVal(c.ebp.offset(r.offset), r.t) };
+	}
+
 	function setReg(tid, reg, value) {
 		if( !DebugApi.writeRegister(PID, tid, reg, value) )
 			throw "Failed to set register " + reg;
@@ -598,33 +642,49 @@ class Debugger {
 	}
 
 	public function eval( name : String ) {
-		if( name == null )
+		if( name == null || name == "" )
 			return null;
 		var path = name.split(".");
 		// TODO : look in locals
 
-		var t = globalTable;
-		while( path.length > 0 ) {
-			if( t.sub == null ) break;
-			var p = path[0];
-			var n = t.sub.get(p);
-			if( n == null ) break;
-			path.shift();
-			t = n;
+		var t, v;
+
+
+		if( ~/^\$[0-9]+$/.match(path[0]) ) {
+
+			// register
+			var r = readReg(currentFrame, Std.parseInt(path.shift().substr(1)));
+			if( r == null )
+				return null;
+			t = r.t;
+			v = r.v;
+
+		} else {
+
+			// global
+			var g = globalTable;
+			while( path.length > 0 ) {
+				if( g.sub == null ) break;
+				var p = path[0];
+				var n = g.sub.get(p);
+				if( n == null ) break;
+				path.shift();
+				g = n;
+			}
+			if( g.gid == null )
+				return null;
+
+
+			var gid = g.gid;
+			t = code.globals[gid];
+			v = readVal(debugInfos.globals.offset(globalsOffsets[gid]), t);
 		}
-		if( t.gid == null )
-			return null;
-
-
-		var gid = t.gid;
-		var t = code.globals[gid];
-		var v = readVar(debugInfos.globals.offset(globalsOffsets[gid]), t);
 
 		for( p in path ) {
 			var ptr = switch( v ) {
 			case VUndef: null;
 			case VPointer(p): p;
-			default: throw "assert";
+			default: throw "assert "+valueStr(v);
 			}
 			switch( t ) {
 			case HObj(o):
@@ -632,7 +692,7 @@ class Debugger {
 				if( f == null )
 					return null;
 				t = f.t;
-				v = p == null ? VUndef : readVar(ptr.offset(f.offset), t);
+				v = p == null ? VUndef : readVal(ptr.offset(f.offset), t);
 			case HDyn, HDynobj, HVirtual(_):
 				throw "TODO";
 			default:
@@ -650,7 +710,7 @@ class Debugger {
 			return p;
 
 		var parent = o.tsuper == null ? null : switch( o.tsuper ) { case HObj(o): getObjectProto(o); default: throw "assert"; };
-		var size = parent == null ? 0 : parent.size;
+		var size = parent == null ? ptrSize : parent.size;
 		var fields = parent == null ? new Map() : [for( k in parent.fields.keys() ) k => parent.fields.get(k)];
 
 		for( f in o.fields ) {
@@ -672,7 +732,7 @@ class Debugger {
 		return p;
 	}
 
-	public function readVar( p : Pointer, t : HLType ) {
+	public function readVal( p : Pointer, t : HLType ) {
 		switch( t ) {
 		case HVoid:
 			return VNull;
@@ -698,23 +758,21 @@ class Debugger {
 			var m = readMemPointer(p);
 			if( m == null )
 				return VNull;
-			return readVar(m.offset(8), t);
+			return readVal(m.offset(8), t);
 		case HRef(t):
 			var m = readMemPointer(p);
 			if( m == null )
 				return VNull;
-			return readVar(m, t);
+			return readVal(m, t);
 		default:
 			return VPointer(readMemPointer(p));
 		}
 	}
 
 	function readMemPointer( p : Pointer ) {
-		if( flags.has(Is64) ) {
-			var m = readMem(p, 8);
+		var m = readMem(p, ptrSize);
+		if( flags.has(Is64) )
 			return Pointer.make(m.getI32(0), m.getI32(4));
-		}
-		var m = readMem(p, 4);
 		return Pointer.make(m.getI32(0), 0);
 	}
 
