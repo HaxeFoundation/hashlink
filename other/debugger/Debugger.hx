@@ -34,14 +34,24 @@ extern class DebugApi {
 	@:hlNative("std", "debug_write_register") public static function writeRegister( pid : Int, tid : Int, register : Register, v : Pointer ) : Bool;
 }
 
-enum DebugValue {
+enum DebugValueRepr {
 	VUndef;
 	VNull;
 	VInt( i : Int );
 	VFloat( v : Float );
 	VBool( b : Bool );
 	VPointer( v : Pointer );
+	VString( v : String );
+	VClosure( p : DebugFunRepr, d : DebugValue );
+	VFunction( p : DebugFunRepr );
 }
+
+enum DebugFunRepr {
+	FUnknown( p : Pointer );
+	FIndex( i : Int );
+}
+
+typedef DebugValue = { v : DebugValueRepr, t : HLType };
 
 enum DebugFlag {
 	Is64; // runs in 64 bit mode
@@ -145,6 +155,8 @@ class Debugger {
 		var codeStart : Pointer;
 		var globals : Pointer;
 		var codeSize : Int;
+		var allTypes : Pointer;
+		var typeSize : Int;
 		var functions : Array<{ start : Int, large : Bool, offsets : haxe.io.Bytes }>;
 	};
 
@@ -153,9 +165,10 @@ class Debugger {
 	var currentFrame : Int;
 	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int, ebp : Pointer }>;
 	var protoCache : Map<String,DebugObj>;
-	var nextStep : Int;
+	var nextStep : Int = -1;
 	var ptrSize : Int;
 	var functionRegsCache : Array<Array<{ t : HLType, offset : Int }>>;
+	var functionByCodePos : Map<Int,Int>;
 
 	public var stoppedThread : Null<Int>;
 
@@ -276,7 +289,7 @@ class Debugger {
 			"hl.Ref<" + typeStr(t) + ">";
 		case HVirtual(fl):
 			"{ " + [for( f in fl ) f.name+" : " + typeStr(f.t)].join(", ") + " }";
-		case HDynobj:
+		case HDynObj:
 			"hl.DynObj";
 		case HAbstract(name):
 			"hl.NativeAbstract<" + name+">";
@@ -287,12 +300,6 @@ class Debugger {
 		case HAt(_):
 			throw "assert";
 		}
-	}
-
-	function readPointer() : Pointer {
-		if( flags.has(Is64) )
-			return Pointer.make(sock.input.readInt32(), sock.input.readInt32());
-		return Pointer.make(sock.input.readInt32(),0);
 	}
 
 	function readDebugInfos() {
@@ -307,18 +314,29 @@ class Debugger {
 		if( flags.has(Is64) != hl.Api.is64() )
 			return false;
 
+		function readPointer() : Pointer {
+			if( flags.has(Is64) )
+				return Pointer.make(sock.input.readInt32(), sock.input.readInt32());
+			return Pointer.make(sock.input.readInt32(),0);
+		}
+
 		debugInfos = {
 			mainThread : sock.input.readInt32(),
 			globals : readPointer(),
 			stackTop : readPointer(),
 			codeStart : readPointer(),
 			codeSize : sock.input.readInt32(),
+			allTypes : readPointer(),
+			typeSize : sock.input.readInt32(),
 			functions : [],
 		};
 
 		var nfunctions = sock.input.readInt32();
 		if( nfunctions != code.functions.length )
 			return false;
+
+
+		functionByCodePos = new Map();
 		for( i in 0...nfunctions ) {
 			var nops = sock.input.readInt32();
 			if( code.functions[i].debug.length >> 1 != nops )
@@ -326,6 +344,7 @@ class Debugger {
 			var start = sock.input.readInt32();
 			var large = sock.input.readByte() != 0;
 			var offsets = sock.input.read((nops + 1) * (large ? 4 : 2));
+			functionByCodePos.set(start, i);
 			debugInfos.functions.push({
 				start : start,
 				large : large,
@@ -417,9 +436,9 @@ class Debugger {
 				break;
 			case SingleStep:
 				// restore our breakpoint
-				if( nextStep > 0 ) {
+				if( nextStep >= 0 ) {
 					setCode(nextStep, 0xCC);
-					nextStep = 0;
+					nextStep = -1;
 				}
 				stoppedThread = tid;
 				resume();
@@ -441,6 +460,11 @@ class Debugger {
 
 	public function getBackTrace() : Array<{ file : String, line : Int }> {
 		return [for( e in currentStack ) resolveSymbol(e.fidx, e.fpos)];
+	}
+
+	public function getFrame() {
+		var f = currentStack[currentFrame];
+		return f == null ? {file:"???",line:0} : resolveSymbol(f.fidx, f.fpos);
 	}
 
 	function resolveSymbol( fidx : Int, fpos : Int ) {
@@ -522,14 +546,14 @@ class Debugger {
 		return { fidx : fidx, fpos : min - 1, codePos : absPos, ebp : null };
 	}
 
-	public function addBreakPoint( file : String, line : Int ) {
+	function getBreaks( file : String, line : Int ) {
 		var ifile = fileIndexes.get(file);
 		if( ifile == null )
 			ifile = fileIndexes.get(file.split("\\").join("//").toLowerCase());
 
 		var functions = functionsByFile.get(ifile);
 		if( ifile == null || functions == null )
-			throw "File not part of compiled code: " + file;
+			return null;
 
 		var breaks = [];
 		for( f in functions ) {
@@ -561,8 +585,32 @@ class Debugger {
 				}
 			}
 		}
+		return breaks;
+	}
 
+	public function removeBreakpoint( file : String, line : Int ) {
+		var breaks = getBreaks(file, line);
+		if( breaks == null )
+			return false;
+		var rem = false;
+		for( b in breaks )
+			for( a in breakPoints )
+				if( a.fid == b.ifun && a.pos == b.pos ) {
+					rem = true;
+					breakPoints.remove(a);
+					setCode(a.codePos, a.oldByte);
+					if( nextStep == a.codePos ) nextStep = -1;
+					break;
+				}
+		return rem;
+	}
+
+	public function addBreakpoint( file : String, line : Int ) {
+		var breaks = getBreaks(file, line);
+		if( breaks == null )
+			return false;
 		// check already defined
+		var set = false;
 		for( b in breaks.copy() ) {
 			var found = false;
 			for( a in breakPoints ) {
@@ -577,7 +625,9 @@ class Debugger {
 			var old = getCode(codePos);
 			setCode(codePos, INT3);
 			breakPoints.push({ fid : b.ifun, pos : b.pos, oldByte : old, codePos : codePos });
+			set = true;
 		}
+		return set;
 	}
 
 	function getCodePos( fidx : Int, pos : Int ) {
@@ -626,7 +676,7 @@ class Debugger {
 		var r = regs[index];
 		if( r == null )
 			return null;
-		return { t : r.t, v : readVal(c.ebp.offset(r.offset), r.t) };
+		return readVal(c.ebp.offset(r.offset), r.t);
 	}
 
 	function setReg(tid, reg, value) {
@@ -647,17 +697,14 @@ class Debugger {
 		var path = name.split(".");
 		// TODO : look in locals
 
-		var t, v;
-
+		var v;
 
 		if( ~/^\$[0-9]+$/.match(path[0]) ) {
 
 			// register
-			var r = readReg(currentFrame, Std.parseInt(path.shift().substr(1)));
-			if( r == null )
+			v = readReg(currentFrame, Std.parseInt(path.shift().substr(1)));
+			if( v == null )
 				return null;
-			t = r.t;
-			v = r.v;
 
 		} else {
 
@@ -676,31 +723,75 @@ class Debugger {
 
 
 			var gid = g.gid;
-			t = code.globals[gid];
+			var t = code.globals[gid];
 			v = readVal(debugInfos.globals.offset(globalsOffsets[gid]), t);
 		}
 
-		for( p in path ) {
-			var ptr = switch( v ) {
-			case VUndef: null;
-			case VPointer(p): p;
-			default: throw "assert "+valueStr(v);
-			}
-			switch( t ) {
-			case HObj(o):
-				var f = getObjectProto(o).fields.get(p);
-				if( f == null )
-					return null;
-				t = f.t;
-				v = p == null ? VUndef : readVal(ptr.offset(f.offset), t);
-			case HDyn, HDynobj, HVirtual(_):
-				throw "TODO";
-			default:
-				return null;
-			}
-		}
+		for( p in path )
+			v = readField(v, p);
+		return v;
+	}
 
-		return { v : v, t : t };
+	function readField( v : DebugValue, name : String ) : DebugValue {
+		var ptr = switch( v.v ) {
+		case VUndef, VNull: null;
+		case VPointer(p): p;
+		default:
+			return null;
+		}
+		switch( v.t ) {
+		case HObj(o):
+			var f = getObjectProto(o).fields.get(name);
+			if( f == null )
+				return null;
+			return ptr == null ? { v : VUndef, t : f.t } : readVal(ptr.offset(f.offset), f.t);
+		case HVirtual(fl):
+			for( i in 0...fl.length )
+				if( fl[i].name == name ) {
+					var t = fl[i].t;
+					if( ptr == null )
+						return { v : VUndef, t : t };
+					var addr = readMemPointer(ptr.offset(ptrSize * (3 + i)));
+					if( addr != null )
+						return readVal(addr, t);
+					var realValue = readMemPointer(ptr.offset(ptrSize));
+					if( realValue == null )
+						return null;
+					return readField({ v : VPointer(realValue), t : HDyn }, name);
+				}
+			return null;
+		case HDynObj:
+			if( ptr == null )
+				return { v : VUndef, t : HDyn };
+			var lookup = readMemPointer(ptr).offset(debugInfos.typeSize);
+			var data = readMemPointer(ptr.offset(ptrSize));
+			var nfields = readI32(ptr.offset(ptrSize * 2));
+			// lookup, similar to hl_lookup_find
+			var hash = HLTools.hash(name);
+			var min = 0;
+			var max = nfields;
+			while( min < max ) {
+				var mid = (min + max) >> 1;
+				var lid = lookup.offset(mid * (ptrSize + 8));
+				var h = readI32(lid.offset(ptrSize)/*hashed_name*/);
+				if( h < hash )
+					min = mid + 1;
+				else if( h > hash )
+					max = mid;
+				else {
+					var t = readMemType(lid);
+					var offset = readI32(lid.offset(ptrSize + 4));
+					return readVal(data.offset(offset), t);
+				}
+			}
+			return null;
+		case HDyn:
+			if( ptr == null )
+				return { v : VUndef, t  : HDyn };
+			return readField({ v : v.v, t : readMemType(ptr) }, name);
+		default:
+			return null;
+		}
 	}
 
 	function getObjectProto( o : ObjPrototype ) : DebugObj {
@@ -732,41 +823,117 @@ class Debugger {
 		return p;
 	}
 
-	public function readVal( p : Pointer, t : HLType ) {
-		switch( t ) {
+	function readMemType( p : Pointer ) {
+		var p = readMemPointer(p);
+		switch( readI32(p) ) {
+		case 0:
+			return HVoid;
+		case 1:
+			return HUi8;
+		case 2:
+			return HUi16;
+		case 3:
+			return HI32;
+		case 4:
+			return HF32;
+		case 5:
+			return HF64;
+		case 6:
+			return HBool;
+		case 7:
+			return HBytes;
+		case 8:
+			return HDyn;
+		case 9:
+			// HFun
+			throw "TODO";
+		case 11:
+			return HArray;
+		case 12:
+			return HType;
+		case 13:
+			return HRef(readMemType(p.offset(ptrSize)));
+		case 15:
+			return HDynObj;
+		case 10, 14, 16, 17: // HObj, HVirtual, HAbstract, HEnum
+			var tid = Std.int( p.sub(debugInfos.allTypes) / debugInfos.typeSize );
+			return code.types[tid];
+		case 18:
+			return HNull(readMemType(p.offset(ptrSize)));
+		case x:
+			throw "Unknown type #" + x;
+		}
+	}
+
+	public function readVal( p : Pointer, t : HLType ) : DebugValue {
+		var v = switch( t ) {
 		case HVoid:
-			return VNull;
+			VNull;
 		case HUi8:
 			var m = readMem(p, 1);
-			return VInt(m.getUI8(0));
+			VInt(m.getUI8(0));
 		case HUi16:
 			var m = readMem(p, 2);
-			return VInt(m.getUI16(0));
+			VInt(m.getUI16(0));
 		case HI32:
-			var m = readMem(p, 4);
-			return VInt(m.getI32(0));
+			VInt(readI32(p));
 		case HF32:
 			var m = readMem(p, 4);
-			return VFloat(m.getF32(0));
+			VFloat(m.getF32(0));
 		case HF64:
 			var m = readMem(p, 8);
-			return VFloat(m.getF64(0));
+			VFloat(m.getF64(0));
 		case HBool:
 			var m = readMem(p, 1);
-			return VBool(m.getUI8(0) != 0);
-		case HNull(t):
-			var m = readMemPointer(p);
-			if( m == null )
-				return VNull;
-			return readVal(m.offset(8), t);
-		case HRef(t):
-			var m = readMemPointer(p);
-			if( m == null )
-				return VNull;
-			return readVal(m, t);
+			VBool(m.getUI8(0) != 0);
 		default:
-			return VPointer(readMemPointer(p));
+			p = readMemPointer(p);
+			return valueCast(p, t);
+		};
+		return { v : v, t : t };
+	}
+
+	function valueCast( p : Pointer, t : HLType ) {
+		if( p == null )
+			return { v : VNull, t : t };
+		var v = VPointer(p);
+		switch( t ) {
+		case HObj(o):
+			t = readMemType(p);
+			switch( o.name ) {
+			case "String":
+				var bytes = readMemPointer(p.offset(ptrSize));
+				var length = readI32(p.offset(ptrSize * 2));
+				var mem = readMem(bytes, (length + 1) * 2);
+				v = VString(@:privateAccess String.fromUCS2(mem));
+			default:
+			}
+		case HVirtual(_):
+			var v = readMemPointer(p.offset(ptrSize));
+			if( v != null )
+				return valueCast(v, HDyn);
+		case HDyn:
+			var t = readMemType(p);
+			if( HLTools.isDynamic(t) )
+				return valueCast(p, t);
+			v = readVal(p.offset(8), t).v;
+		case HNull(t):
+			v = readVal(p.offset(8), t).v;
+		case HRef(t):
+			v = readVal(p, t).v;
+		case HFun(_):
+			var funPtr = readMemPointer(p.offset(ptrSize));
+			var hasValue = readI32(p.offset(ptrSize * 2));
+			var fidx = functionByCodePos.get(funPtr.sub(debugInfos.codeStart));
+			var fval = fidx == null ? FUnknown(funPtr) : FIndex(fidx);
+			if( hasValue == 1 ) {
+				var value = readVal(p.offset(ptrSize * 3), HDyn);
+				v = VClosure(fval, value);
+			} else
+				v = VFunction(fval);
+		default:
 		}
+		return { v : v, t : t };
 	}
 
 	function readMemPointer( p : Pointer ) {
@@ -776,15 +943,34 @@ class Debugger {
 		return Pointer.make(m.getI32(0), 0);
 	}
 
+	function readI32( p : Pointer ) {
+		return readMem(p, 4).getI32(0);
+	}
+
 	public function valueStr( v : DebugValue ) {
-		return switch( v ) {
+		return switch( v.v ) {
 		case VUndef: "undef"; // null read / outside bounds
 		case VNull: "null";
 		case VInt(i): "" + i;
 		case VFloat(v): "" + v;
 		case VBool(b): b?"true":"false";
 		case VPointer(v): v.toString();
+		case VString(s): s;
+		case VClosure(f, d): funStr(f) + "[" + valueStr(d) + "]";
+		case VFunction(f): funStr(f);
 		}
+	}
+
+	function funStr( f : DebugFunRepr ) {
+		return switch( f ) {
+		case FUnknown(p): "fun(" + p.toString() + ")";
+		case FIndex(i): "fun(" + getFunctionName(i) + ")";
+		}
+	}
+
+	function getFunctionName( idx : Int ) {
+		var s = resolveSymbol(idx, 0);
+		return s.file+":" + s.line;
 	}
 
 	// ---------------- hldebug commandline interface / GDB like ------------------------
@@ -835,6 +1021,7 @@ class Debugger {
 		}
 
 		var dbg = new Debugger();
+		var breaks = [];
 		dbg.loadCode(file);
 
 		if( !dbg.startDebug(pid, debugPort) ) {
@@ -842,7 +1029,23 @@ class Debugger {
 			error("Failed to access process #" + pid+" on port "+debugPort+" for debugging");
 		}
 
+		function frameStr( f : { file : String, line : Int } ) {
+			return f.file+":" + f.line;
+		}
+
+		function clearBP() {
+			var count = breaks.length;
+			for( b in breaks )
+				dbg.removeBreakpoint(b.file, b.line);
+			breaks = [];
+			Sys.println(count + " breakpoints removed");
+		}
+
 		var stdin = Sys.stdin();
+
+		dbg.addBreakpoint("GlDriver", 748);
+		dbg.run();
+
 		while( true ) {
 
 			if( process != null ) {
@@ -873,17 +1076,32 @@ class Debugger {
 					throw "assert";
 				}
 			case "bt", "backtrace":
-				for( b in dbg.getBackTrace() )
-					Sys.println(b.file+":" + b.line);
+				for( f in dbg.getBackTrace() )
+					Sys.println(frameStr(f));
+			case "where":
+				Sys.println(frameStr(dbg.getFrame()));
+			case "frame","f":
+				if( args.length == 1 )
+					dbg.currentFrame = Std.parseInt(args[0]);
+				Sys.println(frameStr(dbg.getFrame()));
+			case "up":
+				dbg.currentFrame += args.length == 0 ? 1 : Std.parseInt(args[0]);
+				if( dbg.currentFrame >= dbg.currentStack.length )
+					dbg.currentFrame = dbg.currentStack.length - 1;
+				Sys.println(frameStr(dbg.getFrame()));
+			case "down":
+				dbg.currentFrame -= args.length == 0 ? 1 : Std.parseInt(args[0]);
+				if( dbg.currentFrame < 0 )
+					dbg.currentFrame = 0;
+				Sys.println(frameStr(dbg.getFrame()));
 			case "b", "break":
 				var file = args.shift();
 				var line = Std.parseInt(args.shift());
-				try {
-					dbg.addBreakPoint(file, line);
+				if( dbg.addBreakpoint(file, line) ) {
+					breaks.push({file:file, line:line});
 					Sys.println("Breakpoint set");
-				} catch( e : Dynamic ) {
-					Sys.println(e);
-				}
+				} else
+					Sys.println("No breakpoint set");
 			case "p", "print":
 				var path = args.shift();
 				if( path == null ) {
@@ -895,7 +1113,26 @@ class Debugger {
 					Sys.println("Unknown var " + path);
 					continue;
 				}
-				Sys.println(dbg.valueStr(v.v)+" : "+dbg.typeStr(v.t));
+				Sys.println(dbg.valueStr(v) + " : " + dbg.typeStr(v.t));
+			case "clear":
+				switch( args.length ) {
+				case 0:
+					clearBP();
+				case 1:
+					var file = args[1];
+					var line = Std.parseInt(file);
+					var count = 0;
+					for( b in breaks.copy() )
+						if( b.file == file || (line != null && b.line == line) ) {
+							dbg.removeBreakpoint(b.file, b.line);
+							breaks.remove(b);
+							count++;
+						}
+					Sys.println(count + " breakpoints removed");
+				}
+
+			case "delete", "d":
+				clearBP();
 			default:
 				Sys.println("Unknown command " + r);
 			}
