@@ -50,12 +50,12 @@ typedef ObjPrototype = {
 	var tsuper : HLType;
 	var fields : Array<{ name : String, t : HLType }>;
 	var proto : Array<{ name : String, findex : Int, pindex : Int }>;
-	var globalValue : Int;
+	var globalValue : Null<Int>;
 }
 
 typedef EnumPrototype = {
 	var name : String;
-	var globalValue : Int;
+	var globalValue : Null<Int>;
 	var constructs : Array<{ name : String, params : Array<HLType> }>;
 }
 
@@ -291,14 +291,15 @@ class HLReader {
 				tsuper : null,
 				fields : [],
 				proto : [],
-				globalValue : 0,
+				globalValue : null,
 			};
 			var sup = index();
 			if( sup >= 0 ) {
 				p.tsuper = types[sup];
 				if( p.tsuper == null ) throw "assert";
 			}
-			p.globalValue = uindex();
+			p.globalValue = uindex() - 1;
+			if( p.globalValue < 0 ) p.globalValue = null;
 			var nfields = uindex();
 			var nproto = uindex();
 			p.fields = [for( i in 0...nfields ) { name : getString(), t : HAt(uindex()) }];
@@ -317,9 +318,11 @@ class HLReader {
 		case 16:
 			return HAbstract(getString());
 		case 17:
+			var name = getString();
+			var global = uindex() - 1;
 			return HEnum({
-				name : getString(),
-				globalValue : uindex(),
+				name : name,
+				globalValue : global < 0 ? null : global,
 				constructs : [for( i in 0...uindex() ) { name : getString(), params : [for( i in 0...uindex() ) HAt(uindex())] }],
 			});
 		case 18:

@@ -60,6 +60,7 @@ static void hl_debug_loop( hl_module *m ) {
 		send("HLD0",4);
 		send(&flags,4);
 		send(&main_thread_id,4);
+		send(&m->globals_data,sizeof(void*));
 		send(&stack_top,sizeof(void*));
 		send(&m->jit_code,sizeof(void*));
 		send(&m->codesize,4);

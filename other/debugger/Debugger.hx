@@ -1,3 +1,5 @@
+import HLReader;
+
 @:enum abstract WaitResult(Int) {
 	public var Timeout = -1;
 	public var Exit = 0;
@@ -25,9 +27,30 @@ extern class DebugApi {
 	@:hlNative("std", "debug_write_register") public static function writeRegister( pid : Int, tid : Int, register : Register, v : Pointer ) : Bool;
 }
 
+enum DebugValue {
+	VUndef;
+	VNull;
+	VInt( i : Int );
+	VFloat( v : Float );
+	VBool( b : Bool );
+	VPointer( v : Pointer );
+}
+
 enum DebugFlag {
 	Is64; // runs in 64 bit mode
 	Bool4; // bool = 4 bytes (instead of 1)
+}
+
+typedef DebugObj = {
+	var name : String;
+	var size :  Int;
+	var fieldNames : Array<String>;
+	var parent : DebugObj;
+	var fields : Map<String,{
+		var name : String;
+		var t : HLType;
+		var offset : Int;
+	}>;
 }
 
 abstract Pointer(hl.Bytes) to hl.Bytes {
@@ -91,14 +114,19 @@ abstract Pointer(hl.Bytes) to hl.Bytes {
 
 }
 
+typedef GlobalAccess = {
+	var sub : Map<String,GlobalAccess>;
+	var gid : Null<Int>;
+}
+
 class Debugger {
 
 	public static var PID = 0;
 	static inline var INT3 = 0xCC;
 
-	var code : HLReader.HLCode;
+	var code : HLCode;
 	var fileIndexes : Map<String, Int>;
-	var functionsByFile : Map<Int, Array<{ f : HLReader.HLFunction, ifun : Int, lmin : Int, lmax : Int }>>;
+	var functionsByFile : Map<Int, Array<{ f : HLFunction, ifun : Int, lmin : Int, lmax : Int }>>;
 	var breakPoints : Array<{ fid : Int, pos : Int, codePos : Int, oldByte : Int }>;
 
 	var sock : sys.net.Socket;
@@ -108,11 +136,17 @@ class Debugger {
 		var mainThread : Int;
 		var stackTop : Pointer;
 		var codeStart : Pointer;
+		var globals : Pointer;
 		var codeSize : Int;
 		var functions : Array<{ start : Int, large : Bool, offsets : haxe.io.Bytes }>;
 	};
 
+	var globalTable : GlobalAccess;
+	var globalsOffsets : Array<Int>;
 	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int }>;
+	var protoCache : Map<String,DebugObj>;
+	var nextStep : Int;
+
 	public var stoppedThread : Null<Int>;
 
 	public function new() {
@@ -123,6 +157,7 @@ class Debugger {
 		var content = sys.io.File.getBytes(file);
 		code = new HLReader(false).read(new haxe.io.BytesInput(content));
 
+		// init files
 		fileIndexes = new Map();
 		for( i in 0...code.debugFiles.length ) {
 			var f = code.debugFiles[i];
@@ -159,6 +194,88 @@ class Debugger {
 				if( dline > inf.lmax ) inf.lmax = dline;
 			}
 		}
+
+		// init globals
+		var globalsPos = 0;
+		globalsOffsets = [];
+		for( g in code.globals ) {
+			globalsOffsets.push(globalsPos);
+			var sz = typeSize(g);
+			globalsPos = align(globalsPos, sz);
+			globalsPos += sz;
+		}
+
+		globalTable = {
+			sub : new Map(),
+			gid : null,
+		};
+		function addGlobal( path : Array<String>, gid : Int ) {
+			var t = globalTable;
+			for( p in path ) {
+				if( t.sub == null )
+					t.sub = new Map();
+				var next = t.sub.get(p);
+				if( next == null ) {
+					next = { sub : null, gid : null };
+					t.sub.set(p, next);
+				}
+				t = next;
+			}
+			t.gid = gid;
+		}
+		for( t in code.types )
+			switch( t ) {
+			case HObj(o) if( o.globalValue != null ):
+				addGlobal(o.name.split("."), o.globalValue);
+			case HEnum(e) if( e.globalValue != null ):
+				addGlobal(e.name.split("."), e.globalValue);
+			default:
+			}
+
+		// init objects
+		protoCache = new Map();
+	}
+
+	function typeStr( t : HLType ) {
+		inline function fstr(t) {
+			return switch(t) {
+			case HFun(_): "(" + typeStr(t) + ")";
+			default: typeStr(t);
+			}
+		};
+		return switch( t ) {
+		case HVoid: "Void";
+		case HUi8: "hl.UI8";
+		case HUi16: "hl.UI16";
+		case HI32: "Int";
+		case HF32: "Single";
+		case HF64: "Float";
+		case HBool: "Bool";
+		case HBytes: "hl.Bytes";
+		case HDyn: "Dynamic";
+		case HFun(f):
+			if( f.args.length == 0 ) "Void -> " + fstr(f.ret) else [for( a in f.args ) fstr(a)].join(" -> ") + " -> " + fstr(f.ret);
+		case HObj(o):
+			o.name;
+		case HArray:
+			"hl.NativeArray";
+		case HType:
+			"hl.Type";
+		case HRef(t):
+			"hl.Ref<" + typeStr(t) + ">";
+		case HVirtual(fl):
+			"{ " + [for( f in fl ) f.name+" : " + typeStr(f.t)].join(", ") + " }";
+		case HDynobj:
+			"hl.DynObj";
+		case HAbstract(name):
+			"hl.NativeAbstract<" + name+">";
+		case HEnum(e):
+			e.name;
+		case HNull(t):
+			"Null<" + typeStr(t) + ">";
+		case HAt(_):
+			throw "assert";
+		}
 	}
 
 	function readPointer() : Pointer {
@@ -180,6 +297,7 @@ class Debugger {
 
 		debugInfos = {
 			mainThread : sock.input.readInt32(),
+			globals : readPointer(),
 			stackTop : readPointer(),
 			codeStart : readPointer(),
 			codeSize : sock.input.readInt32(),
@@ -203,6 +321,26 @@ class Debugger {
 			});
 		}
 		return true;
+	}
+
+	function typeSize( t : HLType ) {
+		return switch( t ) {
+		case HVoid: 0;
+		case HUi8: 1;
+		case HUi16: 2;
+		case HI32, HF32: 4;
+		case HF64: 8;
+		case HBool:
+			return flags.has(Bool4) ? 4 : 1;
+		default:
+			return flags.has(Is64) ? 8 : 4;
+		}
+	}
+
+	inline function align( v : Int, size : Int ) {
+		var d = v & (size - 1);
+		if( d != 0 ) v += size - d;
+		return v;
 	}
 
 	public function startDebug( pid : Int, port : Int ) {
@@ -260,20 +398,17 @@ class Debugger {
 						// set EFLAGS to single step
 						var r = getReg(tid, EFlags);
 						setReg(tid, EFlags, r.or(256));
+						nextStep = codePos;
 						break;
 					}
 				}
 				break;
 			case SingleStep:
 				// restore our breakpoint
-				var eip = getReg(tid, Eip);
-				var codePos = eip.sub(debugInfos.codeStart) - 1;
-				for( b in breakPoints )
-					if( b.codePos == codePos ) {
-						// restore breakpoint
-						setCode(codePos, 0xCC);
-						break;
-					}
+				if( nextStep > 0 ) {
+					setCode(nextStep, 0xCC);
+					nextStep = 0;
+				}
 				stoppedThread = tid;
 				resume();
 			default:
@@ -313,8 +448,7 @@ class Debugger {
 		var stack = [];
 		var esp = getReg(stoppedThread, Esp);
 		var size = debugInfos.stackTop.sub(esp);
-		var mem = new hl.Bytes(size);
-		DebugApi.read(PID, esp, mem, size);
+		var mem = readMem(esp, size);
 
 		if( flags.has(Is64) ) throw "TODO";
 
@@ -456,6 +590,145 @@ class Debugger {
 			throw "Failed to set register " + reg;
 	}
 
+	function readMem( p : Pointer, size : Int ) {
+		var mem = new hl.Bytes(size);
+		if( !DebugApi.read(PID, p, mem, size) )
+			throw "Failed to read memory @" + p.toString() + "[" + size+"]";
+		return mem;
+	}
+
+	public function eval( name : String ) {
+		if( name == null )
+			return null;
+		var path = name.split(".");
+		// TODO : look in locals
+
+		var t = globalTable;
+		while( path.length > 0 ) {
+			if( t.sub == null ) break;
+			var p = path[0];
+			var n = t.sub.get(p);
+			if( n == null ) break;
+			path.shift();
+			t = n;
+		}
+		if( t.gid == null )
+			return null;
+
+
+		var gid = t.gid;
+		var t = code.globals[gid];
+		var v = readVar(debugInfos.globals.offset(globalsOffsets[gid]), t);
+
+		for( p in path ) {
+			var ptr = switch( v ) {
+			case VUndef: null;
+			case VPointer(p): p;
+			default: throw "assert";
+			}
+			switch( t ) {
+			case HObj(o):
+				var f = getObjectProto(o).fields.get(p);
+				if( f == null )
+					return null;
+				t = f.t;
+				v = p == null ? VUndef : readVar(ptr.offset(f.offset), t);
+			case HDyn, HDynobj, HVirtual(_):
+				throw "TODO";
+			default:
+				return null;
+			}
+		}
+
+		return { v : v, t : t };
+	}
+
+	function getObjectProto( o : ObjPrototype ) : DebugObj {
+
+		var p = protoCache.get(o.name);
+		if( p != null )
+			return p;
+
+		var parent = o.tsuper == null ? null : switch( o.tsuper ) { case HObj(o): getObjectProto(o); default: throw "assert"; };
+		var size = parent == null ? 0 : parent.size;
+		var fields = parent == null ? new Map() : [for( k in parent.fields.keys() ) k => parent.fields.get(k)];
+
+		for( f in o.fields ) {
+			var sz = typeSize(f.t);
+			size = align(size, sz);
+			fields.set(f.name, { name : f.name, t : f.t, offset : size });
+			size += sz;
+		}
+
+		p = {
+			name : o.name,
+			size : size,
+			parent : parent,
+			fields : fields,
+			fieldNames : [for( o in o.fields ) o.name],
+		};
+		protoCache.set(p.name, p);
+
+		return p;
+	}
+
+	public function readVar( p : Pointer, t : HLType ) {
+		switch( t ) {
+		case HVoid:
+			return VNull;
+		case HUi8:
+			var m = readMem(p, 1);
+			return VInt(m.getUI8(0));
+		case HUi16:
+			var m = readMem(p, 2);
+			return VInt(m.getUI16(0));
+		case HI32:
+			var m = readMem(p, 4);
+			return VInt(m.getI32(0));
+		case HF32:
+			var m = readMem(p, 4);
+			return VFloat(m.getF32(0));
+		case HF64:
+			var m = readMem(p, 8);
+			return VFloat(m.getF64(0));
+		case HBool:
+			var m = readMem(p, 1);
+			return VBool(m.getUI8(0) != 0);
+		case HNull(t):
+			var m = readMemPointer(p);
+			if( m == null )
+				return VNull;
+			return readVar(m.offset(8), t);
+		case HRef(t):
+			var m = readMemPointer(p);
+			if( m == null )
+				return VNull;
+			return readVar(m, t);
+		default:
+			return VPointer(readMemPointer(p));
+		}
+	}
+
+	function readMemPointer( p : Pointer ) {
+		if( flags.has(Is64) ) {
+			var m = readMem(p, 8);
+			return Pointer.make(m.getI32(0), m.getI32(4));
+		}
+		var m = readMem(p, 4);
+		return Pointer.make(m.getI32(0), 0);
+	}
+
+	public function valueStr( v : DebugValue ) {
+		return switch( v ) {
+		case VUndef: "undef"; // null read / outside bounds
+		case VNull: "null";
+		case VInt(i): "" + i;
+		case VFloat(v): "" + v;
+		case VBool(b): b?"true":"false";
+		case VPointer(v): v.toString();
+		}
+	}
+
 	// ---------------- hldebug commandline interface / GDB like ------------------------
 
 	static function error( msg ) {
@@ -553,6 +826,18 @@ class Debugger {
 				} catch( e : Dynamic ) {
 					Sys.println(e);
 				}
+			case "p", "print":
+				var path = args.shift();
+				if( path == null ) {
+					Sys.println("Requires variable name");
+					continue;
+				}
+				var v = dbg.eval(path);
+				if( v == null ) {
+					Sys.println("Unknown var " + path);
+					continue;
+				}
+				Sys.println(dbg.valueStr(v.v)+" : "+dbg.typeStr(v.t));
 			default:
 				Sys.println("Unknown command " + r);
 			}
