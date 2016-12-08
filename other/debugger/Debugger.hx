@@ -606,10 +606,6 @@ class Debugger extends DebugValue.DebugValueReader {
 		}
 
 		var stdin = Sys.stdin();
-
-		dbg.addBreakpoint("GlDriver", 748);
-		dbg.run();
-
 		while( true ) {
 
 			if( process != null ) {
