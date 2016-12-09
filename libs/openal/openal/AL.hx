@@ -1,12 +1,12 @@
 package hl;
 
-abstract Buffer(Null<UInt>) { }
-abstract Source(Null<UInt>) { }
+abstract Buffer(UInt) { }
+abstract Source(UInt) { }
 
 class AL {
-    public static function dopplerFactor   (value : Float) {}
-    public static function dopplerVelocity (value : Float) {}
-    public static function speedOfSound    (value : Float) {}
+    public static function dopplerFactor   (value : hl.F32) {}
+    public static function dopplerVelocity (value : hl.F32) {}
+    public static function speedOfSound    (value : hl.F32) {}
     public static function distanceModel   (distanceModel : Int) {}
 
     /* Renderer State management */
@@ -23,8 +23,8 @@ class AL {
     public static function getString   (param : Int) : hl.Bytes; { return null; }
     public static function getBoolean  (param : Int) : Bool      { return false; }
     public static function getInteger  (param : Int) : Int       { return 0; }
-    public static function getFloat    (param : Int) : Float     { return 0.0; }
-    public static function getDouble   (param : Int) : Float     { return 0.0; }
+    public static function getFloat    (param : Int) : hl.F32    { return 0.0; }
+    public static function getDouble   (param : Int) : hl.F64    { return 0.0; }
 
     /* Error retrieval */
     public static function getError() : Int;
@@ -35,8 +35,8 @@ class AL {
     //public static function getProcAddress     (fname   : hl.Bytes) : Void;
     
     /* Set Listener parameters */
-    public static function listenerf  (param : Int, value  : Float) {}
-    public static function listener3f (param : Int, value1 : Float, value2 : Float, value3 : Float) {}
+    public static function listenerf  (param : Int, value  : hl.F32) {}
+    public static function listener3f (param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) {}
     public static function listenerfv (param : Int, values : hl.Bytes) {}
     public static function listeneri  (param : Int, value  : Int) {}
     public static function listener3i (param : Int, value1 : Int, value2 : Int, value3 : Int) {}
@@ -56,8 +56,8 @@ class AL {
     public static function isSource      (source : Source) : Bool { return false; }
 
     /* Set Source parameters */
-    public static function sourcef  (source : Source, param : Int, value  : Float) {}
-    public static function source3f (source : Source, param : Int, value1 : Float, value2 : Float, value3 : Float) {}
+    public static function sourcef  (source : Source, param : Int, value  : hl.F32) {}
+    public static function source3f (source : Source, param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) {}
     public static function sourcefv (source : Source, param : Int, values : hl.Bytes) {}
     public static function sourcei  (source : Source, param : Int, value  : Int) {}
     public static function source3i (source : Source, param : Int, value1 : Int, value2 : Int, value3 : Int) {}
@@ -77,7 +77,6 @@ class AL {
     public static function sourceRewindv (n : Int, sources : hl.Bytes) {}
     public static function sourcePausev  (n : Int, sources : hl.Bytes) {}
 
-    /** Play, replay, or resume a Source */
     public static function sourcePlay   (source : Source) {}
     public static function sourceStop   (source : Source) {}
     public static function sourceRewind (source : Source) {}
@@ -94,8 +93,8 @@ class AL {
     public static function bufferData    (buffer : Buffer, format : Int, data : hl.Bytes, size : Int, freq : Int) {}
 
     /* Set Buffer parameters */
-    public static function bufferf  (buffer : Buffer, param : Int, value  : Float) {}
-    public static function buffer3f (buffer : Buffer, param : Int, value1 : Float, value2 : Float, value3 : Float) {}
+    public static function bufferf  (buffer : Buffer, param : Int, value  : hl.F32) {}
+    public static function buffer3f (buffer : Buffer, param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) {}
     public static function bufferfv (buffer : Buffer, param : Int, values : hl.Bytes) {}
     public static function bufferi  (buffer : Buffer, param : Int, value  : Int) {}
     public static function buffer3i (buffer : Buffer, param : Int, value1 : Int, value2 : Int, value3 : Int) {}
