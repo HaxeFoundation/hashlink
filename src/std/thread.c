@@ -23,6 +23,7 @@
 
 #ifndef HL_WIN
 #	include <pthread.h>
+#	include <sys/syscall.h>
 #endif
 
 HL_PRIM hl_thread *hl_thread_current() {
@@ -37,7 +38,12 @@ HL_PRIM int hl_thread_id() {
 #	ifdef HL_WIN
 	return (int)GetCurrentThreadId();
 #	else
-	return (int)gettid();
+#	ifdef SYS_gettid
+	return syscall(SYS_gettid);
+#	else
+	hl_error("hl_thread_id() not available for this platform");
+	return -1;
+#	endif
 #	endif
 }
 
