@@ -11,7 +11,7 @@
 // Context management
 
 HL_PRIM ALCcontext* HL_NAME(alc_create_context)(ALCdevice *device, vbyte *attrlist) {
-	return alcCreateContext(device, attrlist);
+	return alcCreateContext(device, (ALCint*)attrlist);
 }
 
 HL_PRIM bool HL_NAME(alc_make_context_current)(ALCcontext *context) {
@@ -69,7 +69,7 @@ HL_PRIM int HL_NAME(alc_get_enum_value)(ALCdevice *device, vbyte *enumname) {
 // Query function
 
 HL_PRIM vbyte* HL_NAME(alc_get_string)(ALCdevice *device, int param) {
-	return alcGetString(device, param);
+	return (vbyte*)alcGetString(device, param);
 }
 
 HL_PRIM void HL_NAME(alc_get_integerv)(ALCdevice *device, int param, int size, vbyte *values) {
@@ -101,30 +101,30 @@ HL_PRIM void HL_NAME(alc_capture_samples)(ALCdevice *device, vbyte *buffer, int 
 #define TDEVICE  _ABSTRACT(alc_device)
 #define TCONTEXT _ABSTRACT(alc_context)
 
-DEFINE_PRIM(TCONTEXT, alc_create_context,       TDEVICE, _BYTES);
+DEFINE_PRIM(TCONTEXT, alc_create_context,       TDEVICE _BYTES);
 DEFINE_PRIM(_BOOL,    alc_make_context_current, TCONTEXT);
 DEFINE_PRIM(_VOID,    alc_process_context,      TCONTEXT);
 DEFINE_PRIM(_VOID,    alc_suspend_context,      TCONTEXT);
 DEFINE_PRIM(_VOID,    alc_destroy_context,      TCONTEXT);
-DEFINE_PRIM(TCONTEXT, alc_get_current_context   _NO_ARG);
+DEFINE_PRIM(TCONTEXT, alc_get_current_context,  _NO_ARG);
 DEFINE_PRIM(TDEVICE,  alc_get_contexts_device,  TCONTEXT);
 
 DEFINE_PRIM(TDEVICE,  alc_open_device,  _BYTES); 
 DEFINE_PRIM(_BOOL,    alc_close_device, TDEVICE);
 
-DEFINE_PRIM(_I32,     alc_get_error, TDEVICE, _NO_ARG);
+DEFINE_PRIM(_I32,     alc_get_error, TDEVICE _NO_ARG);
 
-DEFINE_PRIM(_BOOL,    alc_is_extension_present, TDEVICE, _BYTES);
-DEFINE_PRIM(_I32,     alc_get_enum_value,       TDEVICE, _BYTES); 
+DEFINE_PRIM(_BOOL,    alc_is_extension_present, TDEVICE _BYTES);
+DEFINE_PRIM(_I32,     alc_get_enum_value,       TDEVICE _BYTES); 
 
-DEFINE_PRIM(_BYTES,   alc_get_string,   TDEVICE, _I32);
-DEFINE_PRIM(_VOID,    alc_get_integerv, TDEVICE, _I32, _I32, _BYTES);
+DEFINE_PRIM(_BYTES,   alc_get_string,   TDEVICE _I32);
+DEFINE_PRIM(_VOID,    alc_get_integerv, TDEVICE _I32 _I32 _BYTES);
 
-DEFINE_PRIM(TDEVICE,  alc_capture_open_device,  _BYTES, _I32, _I32, _I32);
+DEFINE_PRIM(TDEVICE,  alc_capture_open_device,  _BYTES _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL,    alc_capture_close_device, TDEVICE);
 DEFINE_PRIM(_VOID,    alc_capture_start,        TDEVICE);
 DEFINE_PRIM(_VOID,    alc_capture_stop,         TDEVICE);
-DEFINE_PRIM(_VOID,    alc_capture_samples,      TDEVICE, _BYTES, _I32);
+DEFINE_PRIM(_VOID,    alc_capture_samples,      TDEVICE _BYTES _I32);
 
 // ----------------------------------------------------------------------------
 // AL
@@ -142,7 +142,7 @@ HL_PRIM void HL_NAME(al_speed_of_sound)(float value) {
 	alSpeedOfSound(value);
 }
 
-HL_PRIM void HL_NAME(al_distance_model)(float value) {
+HL_PRIM void HL_NAME(al_distance_model)(int value) {
 	alDistanceModel(value);
 }
 
@@ -207,7 +207,7 @@ HL_PRIM int HL_NAME(al_get_error)() {
 // Extension support
 
 HL_PRIM bool HL_NAME(al_is_extension_present)(vbyte *extname) {
-	return alGetError(extname) == AL_TRUE;
+	return alIsExtensionPresent(extname) == AL_TRUE;
 }
 
 HL_PRIM int HL_NAME(al_get_enum_value)(vbyte *ename) {
@@ -269,11 +269,11 @@ HL_PRIM void HL_NAME(al_get_listeneriv)(int param, vbyte *values) {
 // Source management
 
 HL_PRIM void HL_NAME(al_gen_sources)(int n, vbyte *sources) {
-	alGenSources(param, (ALuint*)sources);
+	alGenSources(n, (ALuint*)sources);
 }
 
 HL_PRIM void HL_NAME(al_delete_sources)(int n, vbyte *sources) {
-	alDeleteSources(param, (ALuint*)sources);
+	alDeleteSources(n, (ALuint*)sources);
 }
 
 HL_PRIM bool HL_NAME(al_is_source)(unsigned source) {
@@ -373,7 +373,7 @@ HL_PRIM void HL_NAME(al_source_queue_buffers)(unsigned source, int nb, vbyte *bu
 }
 
 HL_PRIM void HL_NAME(al_source_unqueue_buffers)(unsigned source, int nb, vbyte *buffers) {
-	sourceUnqueueBuffers(source, nb, (ALuint*)buffers);
+	alSourceUnqueueBuffers(source, nb, (ALuint*)buffers);
 }
 
 // Buffer management
@@ -453,12 +453,12 @@ DEFINE_PRIM(_VOID, al_distance_model  , _I32);
 
 DEFINE_PRIM(_VOID, al_enable,    _I32);
 DEFINE_PRIM(_VOID, al_disable,   _I32);
-DEFINE_PRIM(_BOOL, al_isEnabled, _I32);
+DEFINE_PRIM(_BOOL, al_is_enabled, _I32);
 
-DEFINE_PRIM(_VOID, al_get_booleanv, _I32, _BYTES);
-DEFINE_PRIM(_VOID, al_get_integerv, _I32, _BYTES);
-DEFINE_PRIM(_VOID, al_get_floatv,   _I32, _BYTES);
-DEFINE_PRIM(_VOID, al_get_doublev,  _I32, _BYTES);
+DEFINE_PRIM(_VOID, al_get_booleanv, _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_get_integerv, _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_get_floatv,   _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_get_doublev,  _I32 _BYTES);
 
 DEFINE_PRIM(_BYTES, al_get_string,  _I32);
 DEFINE_PRIM(_BOOL,  al_get_boolean, _I32);
@@ -470,16 +470,65 @@ DEFINE_PRIM(_I32,   al_get_error,   _NO_ARG);
 DEFINE_PRIM(_BOOL, al_is_extension_present, _BYTES);
 DEFINE_PRIM(_I32,  al_get_enum_value,       _BYTES);
 
-DEFINE_PRIM(_VOID, al_listenerf,  _I32, _F32);
-DEFINE_PRIM(_VOID, al_listener3f, _I32, _F32, _F32, F32);
-DEFINE_PRIM(_VOID, al_listenerfv, _I32, _BYTES);
-DEFINE_PRIM(_VOID, al_listeneri,  _I32, _I32);
-DEFINE_PRIM(_VOID, al_listener3i, _I32, _I32, _I32, _I32);
-DEFINE_PRIM(_VOID, al_listeneriv, _I32, _BYTES);
+DEFINE_PRIM(_VOID, al_listenerf,  _I32 _F32);
+DEFINE_PRIM(_VOID, al_listener3f, _I32 _F32 _F32 _F32);
+DEFINE_PRIM(_VOID, al_listenerfv, _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_listeneri,  _I32 _I32);
+DEFINE_PRIM(_VOID, al_listener3i, _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, al_listeneriv, _I32 _BYTES);
 
-DEFINE_PRIM(_VOID, al_get_listenerf,   _I32, _REF(_F32));
-DEFINE_PRIM(_VOID, al_get_llistener3f, _I32, _REF(_F32), _REF(_F32), _REF(F32));
-DEFINE_PRIM(_VOID, al_get_llistenerfv, _I32, _BYTES);
-DEFINE_PRIM(_VOID, al_get_llisteneri,  _I32, _REF(_I32));
-DEFINE_PRIM(_VOID, al_get_llistener3i, _I32, _REF(_I32), _REF(_I32), _REF(_I32));
-DEFINE_PRIM(_VOID, al_get_llisteneriv, _I32, _BYTES);
+DEFINE_PRIM(_VOID, al_get_listenerf,  _I32 _REF(_F32));
+DEFINE_PRIM(_VOID, al_get_listener3f, _I32 _REF(_F32) _REF(_F32) _REF(_F32));
+DEFINE_PRIM(_VOID, al_get_listenerfv, _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_get_listeneri,  _I32 _REF(_I32));
+DEFINE_PRIM(_VOID, al_get_listener3i, _I32 _REF(_I32) _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, al_get_listeneriv, _I32 _BYTES);
+
+DEFINE_PRIM(_VOID, al_gen_sources,    _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_delete_sources, _I32 _BYTES);
+DEFINE_PRIM(_BOOL, al_is_source,      _I32);
+
+DEFINE_PRIM(_VOID, al_sourcef,  _I32 _I32 _F32);
+DEFINE_PRIM(_VOID, al_source3f, _I32 _I32 _F32 _F32 _F32);
+DEFINE_PRIM(_VOID, al_sourcefv, _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_sourcei,  _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, al_source3i, _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, al_sourceiv, _I32 _I32 _BYTES);
+
+DEFINE_PRIM(_VOID, al_get_sourcef,  _I32 _I32 _F32);
+DEFINE_PRIM(_VOID, al_get_source3f, _I32 _I32 _REF(_F32) _REF(_F32) _REF(_F32));
+DEFINE_PRIM(_VOID, al_get_sourcefv, _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_get_sourcei,  _I32 _I32 _REF(_I32));
+DEFINE_PRIM(_VOID, al_get_source3i, _I32 _I32 _REF(_I32) _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, al_get_sourceiv, _I32 _I32 _BYTES);
+
+DEFINE_PRIM(_VOID, al_source_playv,   _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_source_stopv,   _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_source_rewindv, _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_source_pausev,  _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_source_play,    _I32);
+DEFINE_PRIM(_VOID, al_source_stop,    _I32);
+DEFINE_PRIM(_VOID, al_source_rewind,  _I32);
+DEFINE_PRIM(_VOID, al_source_pause,   _I32);
+
+DEFINE_PRIM(_VOID, al_source_queue_buffers,   _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_source_unqueue_buffers, _I32 _I32 _BYTES);
+
+DEFINE_PRIM(_VOID, al_gen_buffers,    _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_delete_buffers, _I32 _BYTES);
+DEFINE_PRIM(_BOOL, al_is_buffer,      _I32);
+DEFINE_PRIM(_VOID, al_buffer_data,    _I32 _I32 _BYTES _I32 _I32);
+
+DEFINE_PRIM(_VOID, al_bufferf,  _I32 _I32 _F32);
+DEFINE_PRIM(_VOID, al_buffer3f, _I32 _I32 _F32 _F32 _F32);
+DEFINE_PRIM(_VOID, al_bufferfv, _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_bufferi,  _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, al_buffer3i, _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, al_bufferiv, _I32 _I32 _BYTES);
+
+DEFINE_PRIM(_VOID, al_get_bufferf,  _I32 _I32 _F32);
+DEFINE_PRIM(_VOID, al_get_buffer3f, _I32 _I32 _REF(_F32) _REF(_F32) _REF(_F32));
+DEFINE_PRIM(_VOID, al_get_bufferfv, _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID, al_get_bufferi,  _I32 _I32 _REF(_I32));
+DEFINE_PRIM(_VOID, al_get_buffer3i, _I32 _I32 _REF(_I32) _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, al_get_bufferiv, _I32 _I32 _BYTES);
