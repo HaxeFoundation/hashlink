@@ -1,113 +1,113 @@
 package openal;
 
-abstract Buffer(UInt) { }
-abstract Source(UInt) { }
+abstract Buffer(Int) to Int {}
+abstract Source(Int) to Int {}
 
 @:hlNative("openal","al_")
-/*extern*/ class AL {
-	public static function dopplerFactor   (value : hl.F32) {}
-	public static function dopplerVelocity (value : hl.F32) {}
-	public static function speedOfSound    (value : hl.F32) {}
-	public static function distanceModel   (distanceModel : Int) {}
+extern class AL {
+	public static function dopplerFactor   (value : hl.F32) : Void;
+	public static function dopplerVelocity (value : hl.F32) : Void;
+	public static function speedOfSound    (value : hl.F32) : Void;
+	public static function distanceModel   (distanceModel : Int) : Void;
 
 	// Renderer State management
-	public static function enable    (capability : Int) {}
-	public static function disable   (capability : Int) {}
-	public static function isEnabled (capability : Int) : Bool { return false; }
+	public static function enable    (capability : Int) : Void;
+	public static function disable   (capability : Int) : Void;
+	public static function isEnabled (capability : Int) : Bool;
 
 	// State retrieval
-	public static function getBooleanv (param : Int, values : hl.Bytes) {}
-	public static function getIntegerv (param : Int, values : hl.Bytes) {}
-	public static function getFloatv   (param : Int, values : hl.Bytes) {}
-	public static function getDoublev  (param : Int, values : hl.Bytes) {}
+	public static function getBooleanv (param : Int, values : hl.Bytes) : Void;
+	public static function getIntegerv (param : Int, values : hl.Bytes) : Void;
+	public static function getFloatv   (param : Int, values : hl.Bytes) : Void;
+	public static function getDoublev  (param : Int, values : hl.Bytes) : Void;
 
-	public static function getString   (param : Int) : hl.Bytes  { return null; }
-	public static function getBoolean  (param : Int) : Bool      { return false; }
-	public static function getInteger  (param : Int) : Int       { return 0; }
-	public static function getFloat    (param : Int) : hl.F32    { return 0.0; }
-	public static function getDouble   (param : Int) : hl.F64    { return 0.0; }
+	public static function getString   (param : Int) : hl.Bytes;
+	public static function getBoolean  (param : Int) : Bool;
+	public static function getInteger  (param : Int) : Int;
+	public static function getFloat    (param : Int) : hl.F32;
+	public static function getDouble   (param : Int) : hl.F64;
 
 	// Error retrieval
-	public static function getError() : Int { return 0; }
+	public static function getError() : Int;
 
 	// Extension support
-	public static function isExtensionPresent (extname : hl.Bytes) : Bool { return false; }
-	public static function getEnumValue       (ename   : hl.Bytes) : Int  { return 0; }
+	public static function isExtensionPresent (extname : hl.Bytes) : Bool;
+	public static function getEnumValue       (ename   : hl.Bytes) : Int;
 	//public static function getProcAddress     (fname   : hl.Bytes) : Void*;
 	
 	// Set Listener parameters
-	public static function listenerf  (param : Int, value  : hl.F32) {}
-	public static function listener3f (param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) {}
-	public static function listenerfv (param : Int, values : hl.Bytes) {}
-	public static function listeneri  (param : Int, value  : Int) {}
-	public static function listener3i (param : Int, value1 : Int, value2 : Int, value3 : Int) {}
-	public static function listeneriv (param : Int, values : hl.Bytes) {}
+	public static function listenerf  (param : Int, value  : hl.F32) : Void;
+	public static function listener3f (param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) : Void;
+	public static function listenerfv (param : Int, values : hl.Bytes) : Void;
+	public static function listeneri  (param : Int, value  : Int) : Void;
+	public static function listener3i (param : Int, value1 : Int, value2 : Int, value3 : Int) : Void;
+	public static function listeneriv (param : Int, values : hl.Bytes) : Void;
 
 	// Get Listener parameters
-	public static function getListenerf  (param : Int, value  : hl.Ref<hl.F32>) {}
-	public static function getListener3f (param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) {}
-	public static function getListenerfv (param : Int, values : hl.Bytes) {}
-	public static function getListeneri  (param : Int, value  : hl.Ref<Int>) {}
-	public static function getListener3i (param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) {}
-	public static function getListeneriv (param : Int, values : hl.Bytes) {}
+	public static function getListenerf  (param : Int, value  : hl.Ref<hl.F32>) : Void;
+	public static function getListener3f (param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) : Void;
+	public static function getListenerfv (param : Int, values : hl.Bytes) : Void;
+	public static function getListeneri  (param : Int, value  : hl.Ref<Int>) : Void;
+	public static function getListener3i (param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) : Void;
+	public static function getListeneriv (param : Int, values : hl.Bytes) : Void;
 
 	// Source management
-	public static function genSources    (n : Int, sources : hl.Bytes) {}
-	public static function deleteSources (n : Int, sources : hl.Bytes) {}
-	public static function isSource      (source : Source) : Bool { return false; }
+	public static function genSources    (n : Int, sources : hl.Bytes) : Void;
+	public static function deleteSources (n : Int, sources : hl.Bytes) : Void;
+	public static function isSource      (source : Source) : Bool;
 
 	// Set Source parameters
-	public static function sourcef  (source : Source, param : Int, value  : hl.F32) {}
-	public static function source3f (source : Source, param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) {}
-	public static function sourcefv (source : Source, param : Int, values : hl.Bytes) {}
-	public static function sourcei  (source : Source, param : Int, value  : Int) {}
-	public static function source3i (source : Source, param : Int, value1 : Int, value2 : Int, value3 : Int) {}
-	public static function sourceiv (source : Source, param : Int, values : hl.Bytes) {}
+	public static function sourcef  (source : Source, param : Int, value  : hl.F32) : Void;
+	public static function source3f (source : Source, param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) : Void;
+	public static function sourcefv (source : Source, param : Int, values : hl.Bytes) : Void;
+	public static function sourcei  (source : Source, param : Int, value  : Int) : Void;
+	public static function source3i (source : Source, param : Int, value1 : Int, value2 : Int, value3 : Int) : Void;
+	public static function sourceiv (source : Source, param : Int, values : hl.Bytes) : Void;
 
 	// Get Source parameters
-	public static function getSourcef  (source : Source, param : Int, value  : hl.Ref<hl.F32>) {}
-	public static function getSource3f (source : Source, param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) {}
-	public static function getSourcefv (source : Source, param : Int, values : hl.Bytes) {}
-	public static function getSourcei  (source : Source, param : Int, value  : hl.Ref<Int>) {}
-	public static function getSource3i (source : Source, param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) {}
-	public static function getSourceiv (source : Source, param : Int, values : hl.Bytes) {}
+	public static function getSourcef  (source : Source, param : Int, value  : hl.Ref<hl.F32>) : Void;
+	public static function getSource3f (source : Source, param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) : Void;
+	public static function getSourcefv (source : Source, param : Int, values : hl.Bytes) : Void;
+	public static function getSourcei  (source : Source, param : Int, value  : hl.Ref<Int>) : Void;
+	public static function getSource3i (source : Source, param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) : Void;
+	public static function getSourceiv (source : Source, param : Int, values : hl.Bytes) : Void;
 
 	// Source controls
-	public static function sourcePlayv   (n : Int, sources : hl.Bytes) {}
-	public static function sourceStopv   (n : Int, sources : hl.Bytes) {}
-	public static function sourceRewindv (n : Int, sources : hl.Bytes) {}
-	public static function sourcePausev  (n : Int, sources : hl.Bytes) {}
+	public static function sourcePlayv   (n : Int, sources : hl.Bytes) : Void;
+	public static function sourceStopv   (n : Int, sources : hl.Bytes) : Void;
+	public static function sourceRewindv (n : Int, sources : hl.Bytes) : Void;
+	public static function sourcePausev  (n : Int, sources : hl.Bytes) : Void;
 
-	public static function sourcePlay   (source : Source) {}
-	public static function sourceStop   (source : Source) {}
-	public static function sourceRewind (source : Source) {}
-	public static function sourcePause  (source : Source) {}
+	public static function sourcePlay   (source : Source) : Void;
+	public static function sourceStop   (source : Source) : Void;
+	public static function sourceRewind (source : Source) : Void;
+	public static function sourcePause  (source : Source) : Void;
 
 	// Queue buffers onto a source
-	public static function sourceQueueBuffers   (source : Source, nb : Int, buffers : hl.Bytes) {}
-	public static function sourceUnqueueBuffers (source : Source, nb : Int, buffers : hl.Bytes) {}
+	public static function sourceQueueBuffers   (source : Source, nb : Int, buffers : hl.Bytes) : Void;
+	public static function sourceUnqueueBuffers (source : Source, nb : Int, buffers : hl.Bytes) : Void;
 
 	// Buffer management
-	public static function genBuffers    (n : Int, buffers : hl.Bytes) {}
-	public static function deleteBuffers (n : Int, buffers : hl.Bytes) {}
-	public static function isBuffer      (buffer : Buffer) : Bool { return false; }
-	public static function bufferData    (buffer : Buffer, format : Int, data : hl.Bytes, size : Int, freq : Int) {}
+	public static function genBuffers    (n : Int, buffers : hl.Bytes) : Void;
+	public static function deleteBuffers (n : Int, buffers : hl.Bytes) : Void;
+	public static function isBuffer      (buffer : Buffer) : Bool;
+	public static function bufferData    (buffer : Buffer, format : Int, data : hl.Bytes, size : Int, freq : Int) : Void;
 
 	// Set Buffer parameters
-	public static function bufferf  (buffer : Buffer, param : Int, value  : hl.F32) {}
-	public static function buffer3f (buffer : Buffer, param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) {}
-	public static function bufferfv (buffer : Buffer, param : Int, values : hl.Bytes) {}
-	public static function bufferi  (buffer : Buffer, param : Int, value  : Int) {}
-	public static function buffer3i (buffer : Buffer, param : Int, value1 : Int, value2 : Int, value3 : Int) {}
-	public static function bufferiv (buffer : Buffer, param : Int, values : hl.Bytes) {}
+	public static function bufferf  (buffer : Buffer, param : Int, value  : hl.F32) : Void;
+	public static function buffer3f (buffer : Buffer, param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) : Void;
+	public static function bufferfv (buffer : Buffer, param : Int, values : hl.Bytes) : Void;
+	public static function bufferi  (buffer : Buffer, param : Int, value  : Int) : Void;
+	public static function buffer3i (buffer : Buffer, param : Int, value1 : Int, value2 : Int, value3 : Int) : Void;
+	public static function bufferiv (buffer : Buffer, param : Int, values : hl.Bytes) : Void;
 
 	// Get Buffer parameters
-	public static function getBufferf  (buffer : Buffer, param : Int, value  : hl.Ref<hl.F32>) {}
-	public static function getBuffer3f (buffer : Buffer, param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) {}
-	public static function getBufferfv (buffer : Buffer, param : Int, values : hl.Bytes) {}
-	public static function getBufferi  (buffer : Buffer, param : Int, value  : hl.Ref<Int>) {}
-	public static function getBuffer3i (buffer : Buffer, param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) {}
-	public static function getBufferiv (buffer : Buffer, param : Int, values : hl.Bytes) {}
+	public static function getBufferf  (buffer : Buffer, param : Int, value  : hl.Ref<hl.F32>) : Void;
+	public static function getBuffer3f (buffer : Buffer, param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) : Void;
+	public static function getBufferfv (buffer : Buffer, param : Int, values : hl.Bytes) : Void;
+	public static function getBufferi  (buffer : Buffer, param : Int, value  : hl.Ref<Int>) : Void;
+	public static function getBuffer3i (buffer : Buffer, param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) : Void;
+	public static function getBufferiv (buffer : Buffer, param : Int, values : hl.Bytes) : Void;
 
 	// ------------------------------------------------------------------------
 	// Constants
@@ -191,16 +191,16 @@ abstract Source(UInt) { }
 	public static inline var EXTENSIONS                 = 0xB004;
 
 	// Context values
-	public static inline var  DOPPLER_FACTOR            = 0xC000;
-	public static inline var  DOPPLER_VELOCITY          = 0xC001;
-	public static inline var  SPEED_OF_SOUND            = 0xC003;
-	public static inline var  DISTANCE_MODEL            = 0xD000;
+	public static inline var DOPPLER_FACTOR            = 0xC000;
+	public static inline var DOPPLER_VELOCITY          = 0xC001;
+	public static inline var SPEED_OF_SOUND            = 0xC003;
+	public static inline var DISTANCE_MODEL            = 0xD000;
 
 	// Distance model values
-	public static inline var  INVERSE_DISTANCE          = 0xD001;
-	public static inline var  INVERSE_DISTANCE_CLAMPED  = 0xD002;
-	public static inline var  LINEAR_DISTANCE           = 0xD003;
-	public static inline var  LINEAR_DISTANCE_CLAMPED   = 0xD004;
-	public static inline var  EXPONENT_DISTANCE         = 0xD005;
-	public static inline var  EXPONENT_DISTANCE_CLAMPED = 0xD006;
+	public static inline var INVERSE_DISTANCE          = 0xD001;
+	public static inline var INVERSE_DISTANCE_CLAMPED  = 0xD002;
+	public static inline var LINEAR_DISTANCE           = 0xD003;
+	public static inline var LINEAR_DISTANCE_CLAMPED   = 0xD004;
+	public static inline var EXPONENT_DISTANCE         = 0xD005;
+	public static inline var EXPONENT_DISTANCE_CLAMPED = 0xD006;
 }

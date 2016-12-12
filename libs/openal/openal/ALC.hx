@@ -1,41 +1,41 @@
 package openal;
 
-@:hlNative("openal","alc_")
-class ALC {
-	private typedef ALCdevice  = hl.Abstract<"alc_device">;
-	private typedef ALCcontext = hl.Abstract<"alc_context">;
+typedef Device  = hl.Abstract<"alc_device">;
+typedef Context = hl.Abstract<"alc_context">;
 
+@:hlNative("openal","alc_")
+extern class ALC {
 	// Context management
-	public static function alcCreateContext      (device  : ALCdevice, attrlist : hl.Bytes) : ALContext { return null; }
-	public static function alcMakeContextCurrent (context : ALCcontext) : Bool { return false; }
-	public static function alcProcessContext     (context : ALCcontext) {}
-	public static function alcSuspendContext     (context : ALCcontext) {}
-	public static function alcDestroyContext     (context : ALCcontext) {}
-	public static function alcGetCurrentContext  () : ALCcontext  { return null; }
-	public static function alcGetContextsDevice  (context : ALCcontext) : ALCDevice { return null; }
+	public static function createContext      (device  : Device, attrlist : hl.Bytes) : Context;
+	public static function makeContextCurrent (context : Context) : Bool;
+	public static function processContext     (context : Context) : Void;
+	public static function suspendContext     (context : Context) : Void;
+	public static function destroyContext     (context : Context) : Void;
+	public static function getCurrentContext  () : Context;
+	public static function getContextsDevice  (context : Context) : Device;
 
 	// Device management
-	public static function alcOpenDevice  (devicename : hl.Bytes) : ALCDevice { return null; }
-	public static function alcCloseDevice (device : ALCDevice) : Bool { return false; }
+	public static function openDevice  (devicename : hl.Bytes) : Device;
+	public static function closeDevice (device : Device) : Bool;
 
 	// Error support
-	public static function alcGetError (device : ALCDevice) : Int { return 0; }
+	public static function getError (device : Device) : Int;
 
 	// Extension support
-	public static function alcIsExtensionPresent (device : ALCDevice, extname : hl.Bytes)  : Bool { return false; }
-	public static function alcGetEnumValue       (device : ALCDevice, enumname : hl.Bytes) : Int  { return 0; }
-	// public static function alcGetProcAddress(device : ALCDevice, const ALCchar *funcname);
+	public static function isExtensionPresent (device : Device, extname : hl.Bytes)  : Bool;
+	public static function getEnumValue       (device : Device, enumname : hl.Bytes) : Int;
+	// public static function alcGetProcAddress(device : Device, const ALCchar *funcname);
 
 	// Query function
-	public static function alcGetString   (device : ALCDevice, param : Int) : hl.Bytes { return null; }
-	public static function alcGetIntegerv (device : ALCDevice, param : Int, size : Int, values : hl.Bytes) {}
+	public static function getString   (device : Device, param : Int) : hl.Bytes;
+	public static function getIntegerv (device : Device, param : Int, size : Int, values : hl.Bytes) : Void;
 
 	// Capture function
-	public static function alcCaptureOpenDevice  (devicename : hl.Bytes, frequency : Int, format : Int, buffersize : Int) : ALCDevice { return null; }
-	public static function alcCaptureCloseDevice (device : ALCDevice) : Bool { return false; }
-	public static function alcCaptureStart       (device : ALCDevice) {}
-	public static function alcCaptureStop        (device : ALCDevice) {}
-	public static function alcCaptureSamples     (device : ALCDevice, buffer : hl.Bytes, samples : Int) {}
+	public static function captureOpenDevice  (devicename : hl.Bytes, frequency : Int, format : Int, buffersize : Int) : Device;
+	public static function captureCloseDevice (device : Device) : Bool;
+	public static function captureStart       (device : Device) : Void;
+	public static function captureStop        (device : Device) : Void;
+	public static function captureSamples     (device : Device, buffer : hl.Bytes, samples : Int) : Void;
 
 	// ------------------------------------------------------------------------
 	// Constants
