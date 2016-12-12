@@ -222,7 +222,7 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 
 #define ID2(a,b)	((a) | ((b)<<8))
 #define R(id)		(ctx->vregs + (id))
-#define ASSERT(i)	{ printf("JIT ERROR %d (jic.c line %d)\n",i,(int)__LINE__); jit_exit(); }
+#define ASSERT(i)	{ printf("JIT ERROR %d (jit.c line %d)\n",i,(int)__LINE__); jit_exit(); }
 #define IS_FLOAT(r)	((r)->t->kind == HF64 || (r)->t->kind == HF32)
 #define RLOCK(r)		if( (r)->lock < ctx->currentPos ) (r)->lock = ctx->currentPos
 #define RUNLOCK(r)		if( (r)->lock == ctx->currentPos ) (r)->lock = 0
