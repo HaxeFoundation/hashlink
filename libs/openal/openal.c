@@ -495,7 +495,7 @@ DEFINE_PRIM(_VOID, al_sourcei,  _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_source3i, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_sourceiv, _I32 _I32 _BYTES);
 
-DEFINE_PRIM(_VOID, al_get_sourcef,  _I32 _I32 _F32);
+DEFINE_PRIM(_VOID, al_get_sourcef,  _I32 _I32 _REF(_F32));
 DEFINE_PRIM(_VOID, al_get_source3f, _I32 _I32 _REF(_F32) _REF(_F32) _REF(_F32));
 DEFINE_PRIM(_VOID, al_get_sourcefv, _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID, al_get_sourcei,  _I32 _I32 _REF(_I32));
@@ -526,7 +526,7 @@ DEFINE_PRIM(_VOID, al_bufferi,  _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_buffer3i, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_bufferiv, _I32 _I32 _BYTES);
 
-DEFINE_PRIM(_VOID, al_get_bufferf,  _I32 _I32 _F32);
+DEFINE_PRIM(_VOID, al_get_bufferf,  _I32 _I32 _REF(_F32));
 DEFINE_PRIM(_VOID, al_get_buffer3f, _I32 _I32 _REF(_F32) _REF(_F32) _REF(_F32));
 DEFINE_PRIM(_VOID, al_get_bufferfv, _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID, al_get_bufferi,  _I32 _I32 _REF(_I32));

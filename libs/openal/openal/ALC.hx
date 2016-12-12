@@ -1,4 +1,4 @@
-#package openal;
+package openal;
 
 @:hlNative("openal","alc_")
 class ALC {

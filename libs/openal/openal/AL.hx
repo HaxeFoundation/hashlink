@@ -4,7 +4,7 @@ abstract Buffer(UInt) { }
 abstract Source(UInt) { }
 
 @:hlNative("openal","al_")
-class AL {
+/*extern*/ class AL {
 	public static function dopplerFactor   (value : hl.F32) {}
 	public static function dopplerVelocity (value : hl.F32) {}
 	public static function speedOfSound    (value : hl.F32) {}
@@ -21,14 +21,14 @@ class AL {
 	public static function getFloatv   (param : Int, values : hl.Bytes) {}
 	public static function getDoublev  (param : Int, values : hl.Bytes) {}
 
-	public static function getString   (param : Int) : hl.Bytes; { return null; }
+	public static function getString   (param : Int) : hl.Bytes  { return null; }
 	public static function getBoolean  (param : Int) : Bool      { return false; }
 	public static function getInteger  (param : Int) : Int       { return 0; }
 	public static function getFloat    (param : Int) : hl.F32    { return 0.0; }
 	public static function getDouble   (param : Int) : hl.F64    { return 0.0; }
 
 	// Error retrieval
-	public static function getError() : Int;
+	public static function getError() : Int { return 0; }
 
 	// Extension support
 	public static function isExtensionPresent (extname : hl.Bytes) : Bool { return false; }
