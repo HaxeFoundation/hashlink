@@ -557,6 +557,7 @@ class Debugger extends DebugValue.DebugValueReader {
 				if( param == null || (debugPort = Std.parseInt(param)) == 0 )
 					error("Require port int value");
 			case "-attach":
+				param = args.shift();
 				if( param == null || (pid = Std.parseInt(param)) == null )
 					error("Require attach process id value");
 			default:
