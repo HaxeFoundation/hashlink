@@ -100,6 +100,11 @@ HL_PRIM int hl_hash_gen( const uchar *name, bool cache_name ) {
 	h %= 0x1FFFFF7B;
 	if( cache_name ) {
 		hl_field_lookup *l = hl_lookup_find(hl_cache, hl_cache_count, h);
+		// check for potential conflict (see haxe#5572)
+		while( l && ucmp((uchar*)l->t,oname) != 0 ) {
+			h++;
+			l = hl_lookup_find(hl_cache, hl_cache_count, h);
+		}
 		if( l == NULL ) {
 			if( hl_cache_size == hl_cache_count ) {
 				// resize
