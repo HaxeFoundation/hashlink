@@ -42,6 +42,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "libs", "libs", "{0EC4330B-6
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssl", "libs\ssl\ssl.vcxproj", "{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "openal", "libs\openal\openal.vcxproj", "{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -148,6 +150,18 @@ Global
 		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.ReleaseStatic|Win32.Build.0 = ReleaseStatic|Win32
 		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.ReleaseStatic|x64.ActiveCfg = ReleaseStatic|x64
 		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}.ReleaseStatic|x64.Build.0 = ReleaseStatic|x64
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.Debug|Win32.Build.0 = Debug|Win32
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.Debug|x64.ActiveCfg = Debug|x64
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.Debug|x64.Build.0 = Debug|x64
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.Release|Win32.ActiveCfg = Release|Win32
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.Release|Win32.Build.0 = Release|Win32
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.Release|x64.ActiveCfg = Release|x64
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.Release|x64.Build.0 = Release|x64
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.ReleaseStatic|Win32.ActiveCfg = ReleaseStatic|Win32
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.ReleaseStatic|Win32.Build.0 = ReleaseStatic|Win32
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.ReleaseStatic|x64.ActiveCfg = ReleaseStatic|x64
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0}.ReleaseStatic|x64.Build.0 = ReleaseStatic|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -158,5 +172,6 @@ Global
 		{6534D221-34DF-404A-AFCD-6DEC9BBC9798} = {0EC4330B-6B61-45F8-B297-CA7097AFFD98}
 		{43AAD9DB-4708-46B6-AAE8-A5DB95A0B573} = {0EC4330B-6B61-45F8-B297-CA7097AFFD98}
 		{F4D939D6-88D6-4FF2-874A-7BECF75A01C2} = {0EC4330B-6B61-45F8-B297-CA7097AFFD98}
+		{3D5C4255-60D5-44A1-9529-20BAABBDDCD0} = {0EC4330B-6B61-45F8-B297-CA7097AFFD98}
 	EndGlobalSection
 EndGlobal

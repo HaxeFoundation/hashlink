@@ -19,6 +19,7 @@ x64
 *.opendb
 *.VC.db
 /include/sdl
+/include/openal-soft
 ReleaseStatic
 /other/benchs/bench.*
 /other/benchs/cpp
