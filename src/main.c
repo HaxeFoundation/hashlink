@@ -132,7 +132,7 @@ int main(int argc, pchar *argv[]) {
 	ctx.m = hl_module_alloc(ctx.code);
 	if( ctx.m == NULL )
 		return 2;
-	if( !hl_module_init(ctx.m) )
+	if( !hl_module_init(ctx.m, &argc) )
 		return 3;
 	hl_code_free(ctx.code);
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
