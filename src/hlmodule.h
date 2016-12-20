@@ -103,7 +103,7 @@ const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
 
 hl_module *hl_module_alloc( hl_code *code );
-int hl_module_init( hl_module *m );
+int hl_module_init( hl_module *m, void *stack_top );
 void hl_module_free( hl_module *m );
 bool hl_module_debug( hl_module *m, int port, bool wait );
 void *hl_module_stack_top();

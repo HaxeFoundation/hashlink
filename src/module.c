@@ -219,7 +219,7 @@ static void append_type( char **p, hl_type *t ) {
 	}
 }
 
-int hl_module_init( hl_module *m ) {
+int hl_module_init( hl_module *m, void *stack_top_val ) {
 	int i, entry;
 	jit_ctx *ctx;
 	// RESET globals
@@ -337,7 +337,7 @@ int hl_module_init( hl_module *m ) {
 	}
 	hl_callback_init(((unsigned char*)m->jit_code) + entry);
 	cur_module = m;
-	stack_top = &m;
+	stack_top = stack_top_val;
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_jit_free(ctx);
 	return 1;
