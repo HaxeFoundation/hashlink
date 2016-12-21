@@ -2816,6 +2816,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						}
 					}
 
+					jit_buf(ctx);
+
 					size = pad_before_call(ctx,HL_WSIZE*5);
 
 					if( !need_dyn )
@@ -3023,6 +3025,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					preg *r = fetch(R(o->extra[i]));
 					copy(ctx, pmem(&p,Eax,c->offsets[i]),r, R(o->extra[i])->size);
 					RUNLOCK(fetch(R(o->extra[i])));
+					if ((i & 15) == 0) jit_buf(ctx);
 				}
 				store(ctx, dst, PEAX, true);
 			}
@@ -3209,6 +3212,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				for(i=0;i<o->p2;i++) {
 					int j = do_jump(ctx,OJAlways,false);
 					register_jump(ctx,j,(opCount + 1) + o->extra[i]);
+					if( (i & 15) == 0 ) jit_buf(ctx);
 				}
 				patch_jump(ctx, jdefault);
 			}
