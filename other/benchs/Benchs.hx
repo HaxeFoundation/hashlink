@@ -49,11 +49,11 @@ class Benchs {
 		
 		var selected = args.shift();
 		var targets : Array<Target> = [
-			{ name : "cpp", out : "cpp", cmd : "cpp/$name" + (isWin ? ".exe" : ""), args : [], extraArgs : "-D HXCPP_SILENT" },
 			{ name : "hl", out : "bench.hl", cmd : "hl", args : ["bench.hl"] },
 			{ name : "hlc", out : "bench.c", cmd : isWin ? "hlc.exe":"./hlc", args : [] },
 			{ name : "js", out : "bench.js", cmd : "node", args : ["bench.js"] },
 			{ name : "neko", out : "bench.n", cmd : "neko", args : ["bench.n"] },
+			{ name : "cpp", out : "cpp", cmd : "cpp/$name" + (isWin ? ".exe" : ""), args : [], extraArgs : "-D HXCPP_SILENT" },
 		];
 		if( isWin )
 			targets.push({ name : "swf", out : "bench.swf", cmd : "adl", args : ["bench.air"], extraArgs : "-lib air3" });
@@ -115,7 +115,7 @@ class Benchs {
 					// build
 					var cmd;
 					if( useMSVC )
-						cmd = 'cl.exe /nologo /Ox /I ../../src /o hlc.exe bench.c ../../src/hlc_main.c ../../Release/std.lib';
+						cmd = 'cl.exe /nologo /Ox /I ../../src /Fehlc.exe bench.c ../../src/hlc_main.c ../../Release/libhl.lib';
 					else
 						cmd = '$gcc -O3 ${is32?'-m32':''} -std=c11 -o hlc -I ../../src -L ../.. bench.c ../../src/hlc_main.c -lhl -lm';
 					if( Sys.command(cmd) != 0 ) {
