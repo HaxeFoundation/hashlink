@@ -958,22 +958,10 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 			op32(ctx,MOV8,to,from);
 			break;
 		case 2:
-			{
-				preg rtmp;
-				switch( ID2(to->kind,from->kind) ) {
-				case ID2(RCPU,RSTACK):
-					op32(ctx,MOV,to,from);
-					op32(ctx,AND,to,pconst(&rtmp,0xFFFF));
-					break;
-				case ID2(RSTACK,RCPU):
-					op32(ctx,MOV16,to,from);
-					break;
-				default:
-					ASSERT(size);
-					break;
-				}
-				break;
-			}
+			if( to->kind == RCPU )
+				op64(ctx,XOR,to,to);
+			op32(ctx,MOV16,to,from);
+			break;
 		case 4:
 			op32(ctx,MOV,to,from);
 			break;
@@ -2404,8 +2392,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, w, true);
 			} else if (ra->t->kind == HF32) {
 				ASSERT(0);
-			} else
-				op_mov(ctx, dst, ra);
+			} else {
+				preg *r = alloc_cpu(ctx,dst,false);
+				copy(ctx, r, fetch(ra), ra->size);
+				store(ctx, dst, r, true);
+			}
 			break;
 		case ORet:
 			op_ret(ctx, dst);
