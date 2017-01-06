@@ -3,7 +3,7 @@ package openal;
 abstract Buffer(Int) to Int {}
 abstract Source(Int) to Int {}
 
-@:hlNative("openal","al_")
+@:hlNative("sdl","al_")
 extern class AL {
 	public static function dopplerFactor   (value : hl.F32) : Void;
 	public static function dopplerVelocity (value : hl.F32) : Void;
@@ -34,7 +34,7 @@ extern class AL {
 	public static function isExtensionPresent (extname : hl.Bytes) : Bool;
 	public static function getEnumValue       (ename   : hl.Bytes) : Int;
 	//public static function getProcAddress     (fname   : hl.Bytes) : Void*;
-	
+
 	// Set Listener parameters
 	public static function listenerf  (param : Int, value  : hl.F32) : Void;
 	public static function listener3f (param : Int, value1 : hl.F32, value2 : hl.F32, value3 : hl.F32) : Void;

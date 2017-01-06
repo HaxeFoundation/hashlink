@@ -3,7 +3,7 @@ package openal;
 typedef Device  = hl.Abstract<"alc_device">;
 typedef Context = hl.Abstract<"alc_context">;
 
-@:hlNative("openal","alc_")
+@:hlNative("sdl","alc_")
 extern class ALC {
 	// Context management
 	public static function createContext      (device  : Device, attrlist : hl.Bytes) : Context;
