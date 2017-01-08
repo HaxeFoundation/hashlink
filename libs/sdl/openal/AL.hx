@@ -1,7 +1,13 @@
 package openal;
 
-abstract Buffer(Int) to Int {}
-abstract Source(Int) to Int {}
+abstract Buffer(Int) {
+	public inline function toInt() : Int { return this; }
+	public static inline function ofInt( v : Int ) : Buffer { return cast v; }
+}
+abstract Source(Int) {
+	public inline function toInt() : Int { return this; }
+	public static inline function ofInt( v : Int ) : Source { return cast v; }
+}
 
 @:hlNative("sdl","al_")
 extern class AL {
@@ -44,10 +50,10 @@ extern class AL {
 	public static function listeneriv (param : Int, values : hl.Bytes) : Void;
 
 	// Get Listener parameters
-	public static function getListenerf  (param : Int, value  : hl.Ref<hl.F32>) : Void;
+	public static function getListenerf  (param : Int) : hl.F32;
 	public static function getListener3f (param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) : Void;
 	public static function getListenerfv (param : Int, values : hl.Bytes) : Void;
-	public static function getListeneri  (param : Int, value  : hl.Ref<Int>) : Void;
+	public static function getListeneri  (param : Int) : Int;
 	public static function getListener3i (param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) : Void;
 	public static function getListeneriv (param : Int, values : hl.Bytes) : Void;
 
@@ -65,10 +71,10 @@ extern class AL {
 	public static function sourceiv (source : Source, param : Int, values : hl.Bytes) : Void;
 
 	// Get Source parameters
-	public static function getSourcef  (source : Source, param : Int, value  : hl.Ref<hl.F32>) : Void;
+	public static function getSourcef  (source : Source, param : Int) : hl.F32;
 	public static function getSource3f (source : Source, param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) : Void;
 	public static function getSourcefv (source : Source, param : Int, values : hl.Bytes) : Void;
-	public static function getSourcei  (source : Source, param : Int, value  : hl.Ref<Int>) : Void;
+	public static function getSourcei  (source : Source, param : Int) : Int;
 	public static function getSource3i (source : Source, param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) : Void;
 	public static function getSourceiv (source : Source, param : Int, values : hl.Bytes) : Void;
 
@@ -102,10 +108,10 @@ extern class AL {
 	public static function bufferiv (buffer : Buffer, param : Int, values : hl.Bytes) : Void;
 
 	// Get Buffer parameters
-	public static function getBufferf  (buffer : Buffer, param : Int, value  : hl.Ref<hl.F32>) : Void;
+	public static function getBufferf  (buffer : Buffer, param : Int) : hl.F32;
 	public static function getBuffer3f (buffer : Buffer, param : Int, value1 : hl.Ref<hl.F32>, value2 : hl.Ref<hl.F32>, value3 : hl.Ref<hl.F32>) : Void;
 	public static function getBufferfv (buffer : Buffer, param : Int, values : hl.Bytes) : Void;
-	public static function getBufferi  (buffer : Buffer, param : Int, value  : hl.Ref<Int>) : Void;
+	public static function getBufferi  (buffer : Buffer, param : Int) : Int;
 	public static function getBuffer3i (buffer : Buffer, param : Int, value1 : hl.Ref<Int>, value2 : hl.Ref<Int>, value3 : hl.Ref<Int>) : Void;
 	public static function getBufferiv (buffer : Buffer, param : Int, values : hl.Bytes) : Void;
 

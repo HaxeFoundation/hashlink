@@ -242,8 +242,10 @@ HL_PRIM void HL_NAME(al_listeneriv)(int param, vbyte *values) {
 
 // Get Listener parameters
 
-HL_PRIM void HL_NAME(al_get_listenerf)(int param, float *value) {
-	alGetListenerf(param, value);
+HL_PRIM float HL_NAME(al_get_listenerf)(int param) {
+	float value;
+	alGetListenerf(param, &value);
+	return value;
 }
 
 HL_PRIM void HL_NAME(al_get_listener3f)(int param, float *value1, float *value2, float *value3) {
@@ -254,8 +256,10 @@ HL_PRIM void HL_NAME(al_get_listenerfv)(int param, vbyte *values) {
 	alGetListenerfv(param, (ALfloat*)values);
 }
 
-HL_PRIM void HL_NAME(al_get_listeneri)(int param, int *value) {
-	alGetListeneri(param, value);
+HL_PRIM int HL_NAME(al_get_listeneri)(int param) {
+	int value;
+	alGetListeneri(param, &value);
+	return value;
 }
 
 HL_PRIM void HL_NAME(al_get_listener3i)(int param, int *value1, int *value2, int *value3) {
@@ -308,8 +312,10 @@ HL_PRIM void HL_NAME(al_sourceiv)(unsigned source, int param, vbyte *values) {
 
 // Get Source parameters
 
-HL_PRIM void HL_NAME(al_get_sourcef)(unsigned source, int param, float *value) {
-	alGetSourcef(source, param, value);
+HL_PRIM float HL_NAME(al_get_sourcef)(unsigned source, int param) {
+	float value;
+	alGetSourcef(source, param, &value);
+	return value;
 }
 
 HL_PRIM void HL_NAME(al_get_source3f)(unsigned source, int param, float *value1, float *value2, float *value3) {
@@ -320,8 +326,10 @@ HL_PRIM void HL_NAME(al_get_sourcefv)(unsigned source, int param, vbyte *values)
 	alGetSourcefv(source, param, (ALfloat*)values);
 }
 
-HL_PRIM void HL_NAME(al_get_sourcei)(unsigned source, int param, int *value) {
-	alGetSourcei(source, param, value);
+HL_PRIM int HL_NAME(al_get_sourcei)(unsigned source, int param) {
+	int value;
+	alGetSourcei(source, param, &value);
+	return value;
 }
 
 HL_PRIM void HL_NAME(al_get_source3i)(unsigned source, int param, int *value1, int *value2, int *value3) {
@@ -422,8 +430,10 @@ HL_PRIM void HL_NAME(al_bufferiv)(unsigned buffer, int param, vbyte *values) {
 
 // Get Buffer parameters
 
-HL_PRIM void HL_NAME(al_get_bufferf)(unsigned buffer, int param, float *value) {
-	alGetBufferf(buffer, param, value);
+HL_PRIM float HL_NAME(al_get_bufferf)(unsigned buffer, int param) {
+	float value;
+	alGetBufferf(buffer, param, &value);
+	return value;
 }
 
 HL_PRIM void HL_NAME(al_get_buffer3f)(unsigned buffer, int param, float *value1, float *value2, float *value3) {
@@ -434,8 +444,10 @@ HL_PRIM void HL_NAME(al_get_bufferfv)(unsigned buffer, int param, vbyte *values)
 	alGetBufferfv(buffer, param, (ALfloat*)values);
 }
 
-HL_PRIM void HL_NAME(al_get_bufferi)(unsigned buffer, int param, int *value) {
-	alGetBufferi(buffer, param, value);
+HL_PRIM int HL_NAME(al_get_bufferi)(unsigned buffer, int param) {
+	int value;
+	alGetBufferi(buffer, param, &value);
+	return value;
 }
 
 HL_PRIM void HL_NAME(al_get_buffer3i)(unsigned buffer, int param, int *value1, int *value2, int *value3) {
@@ -477,10 +489,10 @@ DEFINE_PRIM(_VOID, al_listeneri,  _I32 _I32);
 DEFINE_PRIM(_VOID, al_listener3i, _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_listeneriv, _I32 _BYTES);
 
-DEFINE_PRIM(_VOID, al_get_listenerf,  _I32 _REF(_F32));
+DEFINE_PRIM(_F32, al_get_listenerf,  _I32);
 DEFINE_PRIM(_VOID, al_get_listener3f, _I32 _REF(_F32) _REF(_F32) _REF(_F32));
 DEFINE_PRIM(_VOID, al_get_listenerfv, _I32 _BYTES);
-DEFINE_PRIM(_VOID, al_get_listeneri,  _I32 _REF(_I32));
+DEFINE_PRIM(_I32, al_get_listeneri,  _I32);
 DEFINE_PRIM(_VOID, al_get_listener3i, _I32 _REF(_I32) _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, al_get_listeneriv, _I32 _BYTES);
 
@@ -495,10 +507,10 @@ DEFINE_PRIM(_VOID, al_sourcei,  _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_source3i, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_sourceiv, _I32 _I32 _BYTES);
 
-DEFINE_PRIM(_VOID, al_get_sourcef,  _I32 _I32 _REF(_F32));
+DEFINE_PRIM(_F32, al_get_sourcef,  _I32 _I32);
 DEFINE_PRIM(_VOID, al_get_source3f, _I32 _I32 _REF(_F32) _REF(_F32) _REF(_F32));
 DEFINE_PRIM(_VOID, al_get_sourcefv, _I32 _I32 _BYTES);
-DEFINE_PRIM(_VOID, al_get_sourcei,  _I32 _I32 _REF(_I32));
+DEFINE_PRIM(_I32, al_get_sourcei,  _I32 _I32);
 DEFINE_PRIM(_VOID, al_get_source3i, _I32 _I32 _REF(_I32) _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, al_get_sourceiv, _I32 _I32 _BYTES);
 
@@ -526,9 +538,9 @@ DEFINE_PRIM(_VOID, al_bufferi,  _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_buffer3i, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, al_bufferiv, _I32 _I32 _BYTES);
 
-DEFINE_PRIM(_VOID, al_get_bufferf,  _I32 _I32 _REF(_F32));
+DEFINE_PRIM(_F32, al_get_bufferf,  _I32 _I32);
 DEFINE_PRIM(_VOID, al_get_buffer3f, _I32 _I32 _REF(_F32) _REF(_F32) _REF(_F32));
 DEFINE_PRIM(_VOID, al_get_bufferfv, _I32 _I32 _BYTES);
-DEFINE_PRIM(_VOID, al_get_bufferi,  _I32 _I32 _REF(_I32));
+DEFINE_PRIM(_I32, al_get_bufferi,  _I32 _I32);
 DEFINE_PRIM(_VOID, al_get_buffer3i, _I32 _I32 _REF(_I32) _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, al_get_bufferiv, _I32 _I32 _BYTES);
