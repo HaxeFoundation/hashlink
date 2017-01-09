@@ -96,6 +96,28 @@
     <ClCompile Include="..\..\include\turbojpeg\jutils.c" />
     <ClCompile Include="..\..\include\turbojpeg\transupp.c" />
     <ClCompile Include="..\..\include\turbojpeg\turbojpeg.c" />
+    <ClCompile Include="..\..\include\vorbis\bitrate.c" />
+    <ClCompile Include="..\..\include\vorbis\bitwise.c" />
+    <ClCompile Include="..\..\include\vorbis\block.c" />
+    <ClCompile Include="..\..\include\vorbis\codebook.c" />
+    <ClCompile Include="..\..\include\vorbis\envelope.c" />
+    <ClCompile Include="..\..\include\vorbis\floor0.c" />
+    <ClCompile Include="..\..\include\vorbis\floor1.c" />
+    <ClCompile Include="..\..\include\vorbis\framing.c" />
+    <ClCompile Include="..\..\include\vorbis\info.c" />
+    <ClCompile Include="..\..\include\vorbis\lookup.c" />
+    <ClCompile Include="..\..\include\vorbis\lpc.c" />
+    <ClCompile Include="..\..\include\vorbis\lsp.c" />
+    <ClCompile Include="..\..\include\vorbis\mapping0.c" />
+    <ClCompile Include="..\..\include\vorbis\mdct.c" />
+    <ClCompile Include="..\..\include\vorbis\psy.c" />
+    <ClCompile Include="..\..\include\vorbis\registry.c" />
+    <ClCompile Include="..\..\include\vorbis\res0.c" />
+    <ClCompile Include="..\..\include\vorbis\sharedbook.c" />
+    <ClCompile Include="..\..\include\vorbis\smallft.c" />
+    <ClCompile Include="..\..\include\vorbis\synthesis.c" />
+    <ClCompile Include="..\..\include\vorbis\vorbisfile.c" />
+    <ClCompile Include="..\..\include\vorbis\window.c" />
     <ClCompile Include="..\..\include\zlib\adler32.c" />
     <ClCompile Include="..\..\include\zlib\crc32.c" />
     <ClCompile Include="..\..\include\zlib\deflate.c" />
@@ -114,6 +136,25 @@
     <ClInclude Include="..\..\include\png\pnglibconf.h" />
     <ClInclude Include="..\..\include\png\pngpriv.h" />
     <ClInclude Include="..\..\include\png\pngstruct.h" />
+    <ClInclude Include="..\..\include\vorbis\backends.h" />
+    <ClInclude Include="..\..\include\vorbis\bitrate.h" />
+    <ClInclude Include="..\..\include\vorbis\codebook.h" />
+    <ClInclude Include="..\..\include\vorbis\codec_internal.h" />
+    <ClInclude Include="..\..\include\vorbis\envelope.h" />
+    <ClInclude Include="..\..\include\vorbis\highlevel.h" />
+    <ClInclude Include="..\..\include\vorbis\lookup.h" />
+    <ClInclude Include="..\..\include\vorbis\lookup_data.h" />
+    <ClInclude Include="..\..\include\vorbis\lpc.h" />
+    <ClInclude Include="..\..\include\vorbis\lsp.h" />
+    <ClInclude Include="..\..\include\vorbis\masking.h" />
+    <ClInclude Include="..\..\include\vorbis\mdct.h" />
+    <ClInclude Include="..\..\include\vorbis\misc.h" />
+    <ClInclude Include="..\..\include\vorbis\os.h" />
+    <ClInclude Include="..\..\include\vorbis\psy.h" />
+    <ClInclude Include="..\..\include\vorbis\registry.h" />
+    <ClInclude Include="..\..\include\vorbis\scales.h" />
+    <ClInclude Include="..\..\include\vorbis\smallft.h" />
+    <ClInclude Include="..\..\include\vorbis\window.h" />
     <ClInclude Include="..\..\include\zlib\crc32.h" />
     <ClInclude Include="..\..\include\zlib\deflate.h" />
     <ClInclude Include="..\..\include\zlib\inffast.h" />
@@ -199,36 +240,36 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;../../x64/$(Configuration);../../include/turbojpeg/x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStatic|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;../../x64/$(Configuration);../../include/turbojpeg/x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStatic|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;../../$(Configuration);../../include/turbojpeg/x64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
