@@ -2090,6 +2090,8 @@ static vclosure *alloc_static_closure( jit_ctx *ctx, int fid, hl_runtime_obj *ob
 		ctx->closure_list = c;
 		if( obj ) {
 			m->code->functions[fidx].obj = obj->t->obj;
+			while( field < obj->nfields - obj->t->obj->nfields )
+				obj = obj->parent;
 			m->code->functions[fidx].field = obj->t->obj->fields[field - (obj->parent?obj->parent->nfields:0)].name;
 		}
 	}
