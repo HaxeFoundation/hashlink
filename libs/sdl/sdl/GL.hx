@@ -59,7 +59,7 @@ class GL {
 
 	public static function pixelStorei( key : Int, value : Int ) {
 	}
-	
+
 	public static function getParameter( name : Int ) : Dynamic {
 		switch( name ){
 			case VENDOR, VERSION, RENDERER, SHADING_LANGUAGE_VERSION:
@@ -506,6 +506,8 @@ class GL {
 	public static inline var RGBA16F                        = 0x881A;
 	public static inline var RGB16F                         = 0x881B;
 
+	public static inline var ALPHA16F                       = 0x881C;
+	public static inline var ALPHA32F                       = 0x8816;
 
 	/* Shaders */
 	public static inline var FRAGMENT_SHADER                  = 0x8B30;
