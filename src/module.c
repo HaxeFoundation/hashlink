@@ -347,6 +347,7 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 	cur_module = m;
 	stack_top = stack_top_val;
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
+	hl_gc_set_dump_types(hl_module_types_dump);
 	hl_jit_free(ctx);
 	return 1;
 }
