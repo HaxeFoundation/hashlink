@@ -143,6 +143,14 @@ static void hl_init_enum( hl_type_enum *e ) {
 	}
 }
 
+static void hl_module_types_dump( void (*fdump)( void *, int) ) {
+	int ntypes = cur_module->code->ntypes;
+	int i;
+	fdump(&ntypes,4);
+	for(i=0;i<ntypes;i++)
+		fdump(&cur_module->code->types[i],sizeof(void*));
+}
+
 hl_module *hl_module_alloc( hl_code *c ) {
 	int i;
 	int gsize = 0;
