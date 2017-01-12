@@ -1094,6 +1094,7 @@ HL_API void hl_gc_set_dump_types( hl_types_dump tdump ) {
 
 HL_API void hl_gc_dump_memory( const char *filename ) {
 	int i;
+	gc_mark();
 	fdump = fopen(filename,"wb");
 	// header
 	fdump_d("HMD0",4);
@@ -1109,9 +1110,11 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 			fdump_i(p->block_size);
 			fdump_i(p->first_block);
 			fdump_i(p->max_blocks);
+			fdump_i(p->next_block);
 			fdump_d(p,p->page_size);
-			fdump_p(p->bmp);
+			fdump_i((p->bmp ? 1 :0) | (p->sizes?2:0));
 			if( p->bmp ) fdump_d(p->bmp,(p->max_blocks + 7) >> 3);
+			if( p->sizes ) fdump_d(p->sizes,p->max_blocks);
 			p = p->next_page;
 		}
 		fdump_p(NULL);
