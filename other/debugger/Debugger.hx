@@ -1,4 +1,4 @@
-import HLReader;
+import format.hl.Data;
 import DebugApi;
 import DebugValue;
 
@@ -43,7 +43,7 @@ class Debugger extends DebugValue.DebugValueReader {
 
 	public function loadCode( file : String ) {
 		var content = sys.io.File.getBytes(file);
-		code = new HLReader(false).read(new haxe.io.BytesInput(content));
+		code = new format.hl.Reader(false).read(new haxe.io.BytesInput(content));
 
 		// init files
 		fileIndexes = new Map();

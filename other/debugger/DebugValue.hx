@@ -1,4 +1,5 @@
-import HLReader;
+import format.hl.Data;
+using format.hl.Tools;
 import DebugApi.Pointer;
 
 enum DebugValueRepr {
@@ -41,7 +42,7 @@ enum DebugFlag {
 
 class DebugValueReader {
 
-	var code : HLCode;
+	var code : format.hl.Data;
 	var protoCache : Map<String,DebugObj>;
 	var flags : haxe.EnumFlags<DebugFlag>;
 	var ptrSize : Int;
@@ -206,7 +207,7 @@ class DebugValueReader {
 			var data = readMemPointer(ptr.offset(ptrSize));
 			var nfields = readI32(ptr.offset(ptrSize * 2));
 			// lookup, similar to hl_lookup_find
-			var hash = HLTools.hash(name);
+			var hash = name.hash();
 			var min = 0;
 			var max = nfields;
 			while( min < max ) {
@@ -323,7 +324,7 @@ class DebugValueReader {
 				return valueCast(v, HDyn);
 		case HDyn:
 			var t = readMemType(p);
-			if( HLTools.isDynamic(t) )
+			if( t.isDynamic() )
 				return valueCast(p, t);
 			v = readVal(p.offset(8), t).v;
 		case HNull(t):
