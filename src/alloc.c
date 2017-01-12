@@ -243,6 +243,8 @@ static void gc_flush_empty_pages() {
 static int PAGE_ID = 0;
 #endif
 
+HL_API void hl_gc_dump_memory( const char *filename );
+
 static gc_pheader *gc_alloc_new_page( int pid, int block, int size, bool varsize ) {
 	int m, i;
 	unsigned char *base;
@@ -264,9 +266,7 @@ static gc_pheader *gc_alloc_new_page( int pid, int block, int size, bool varsize
 	base = (unsigned char*)gc_alloc_page_memory(size);
 	p = (gc_pheader*)base;
 	if( !base ) {
-#		ifdef GC_DEBUG
-		hl_gc_dump();
-#		endif
+		hl_gc_dump_memory("hlmemory.dump");
 		hl_fatal("Out of memory");
 	}
 
@@ -1076,7 +1076,67 @@ HL_API void hl_gc_profile( bool b ) {
 	gc_profile = b;
 }
 
+static FILE *fdump;
+static void fdump_i( int i ) {
+	fwrite(&i,1,4,fdump);
+}
+static void fdump_p( void *p ) {
+	fwrite(&p,1,sizeof(void*),fdump);
+}
+static void fdump_d( void *p, int size ) {
+	fwrite(p,1,size,fdump);
+}
+
+static hl_types_dump gc_types_dump = NULL;
+HL_API void hl_gc_set_dump_types( hl_types_dump tdump ) {
+	gc_types_dump = tdump;
+}
+
+HL_API void hl_gc_dump_memory( const char *filename ) {
+	int i;
+	fdump = fopen(filename,"wb");
+	// header
+	fdump_d("HMD0",4);
+	fdump_i((sizeof(void*) == 8));
+	// pages
+	fdump_i(GC_ALL_PAGES);	
+	for(i=0;i<GC_ALL_PAGES;i++) {
+		gc_pheader *p = gc_pages[i];
+		while( p != NULL ) {
+			fdump_p(p);
+			fdump_i(p->page_kind);
+			fdump_i(p->page_size);
+			fdump_i(p->block_size);
+			fdump_i(p->first_block);
+			fdump_i(p->max_blocks);
+			fdump_d(p,p->page_size);
+			fdump_p(p->bmp);
+			if( p->bmp ) fdump_d(p->bmp,(p->max_blocks + 7) >> 3);
+			p = p->next_page;
+		}
+		fdump_p(NULL);
+	}
+	// roots
+	fdump_i(gc_roots_count);
+	for(i=0;i<gc_roots_count;i++)
+		fdump_p(*gc_roots[i]);
+	// stacks
+	fdump_i(1);
+	fdump_p(gc_stack_top);
+	{
+		void **stack_head = (void**)&stack_head;
+		int size = (int)((void**)gc_stack_top - stack_head);
+		fdump_i(size);
+		fdump_d(stack_head,size*sizeof(void*));
+	}
+	// types
+	if( gc_types_dump ) gc_types_dump(fdump_d);
+	fclose(fdump);
+	fdump = NULL;
+}
+
 DEFINE_PRIM(_VOID, gc_major, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_enable, _BOOL);
 DEFINE_PRIM(_VOID, gc_profile, _BOOL);
 DEFINE_PRIM(_VOID, gc_stats, _REF(_F64) _REF(_F64) _REF(_F64));
+DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);

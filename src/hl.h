@@ -510,7 +510,9 @@ HL_API void hl_pop_root();
 HL_API void hl_remove_root( void *ptr );
 HL_API void hl_gc_major();
 HL_API bool hl_is_gc_ptr( void *ptr );
-HL_API void hl_gc_dump();
+
+typedef void (*hl_types_dump)( void (*)( void *, int) );
+HL_API void hl_set_types_dump( hl_types_dump tdump );
 
 #define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(size,MEM_KIND_NOPTR)
 #define hl_gc_alloc(size)			hl_gc_alloc_gen(size,MEM_KIND_DYNAMIC)
