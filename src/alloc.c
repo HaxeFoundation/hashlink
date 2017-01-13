@@ -998,7 +998,7 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	fdump = fopen(filename,"wb");
 	// header
 	fdump_d("HMD0",4);
-	fdump_i((sizeof(void*) == 8));
+	fdump_i(((sizeof(void*) == 8)?1:0) | ((sizeof(bool) == 4)?2:0));
 	// pages
 	fdump_i(GC_ALL_PAGES);	
 	for(i=0;i<GC_ALL_PAGES;i++) {
