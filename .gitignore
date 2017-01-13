@@ -26,3 +26,4 @@ ReleaseStatic
 /other/benchs/flashout.txt
 
 /bin*
+/other/memory/*.dump
