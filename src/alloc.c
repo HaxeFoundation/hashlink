@@ -932,7 +932,7 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(t);
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
-	o = (vobj*)hl_gc_alloc(size);
+	o = (vobj*)hl_gc_alloc_gen(size, rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR);
 	MZERO(o,size);
 	o->t = t;
 	return (vdynamic*)o;
@@ -1033,6 +1033,16 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 		fdump_d(stack_head,size*sizeof(void*));
 	}
 	// types
+#	define fdump_t(t)	fdump_i(t.kind); fdump_p(&t);
+	fdump_t(hlt_i32);
+	fdump_t(hlt_f32);
+	fdump_t(hlt_f64);
+	fdump_t(hlt_dyn);
+	fdump_t(hlt_array);
+	fdump_t(hlt_bytes);
+	fdump_t(hlt_dynobj);
+	fdump_t(hlt_bool);
+	fdump_i(-1);
 	if( gc_types_dump ) gc_types_dump(fdump_d);
 	fclose(fdump);
 	fdump = NULL;
