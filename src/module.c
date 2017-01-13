@@ -145,10 +145,21 @@ static void hl_init_enum( hl_type_enum *e ) {
 
 static void hl_module_types_dump( void (*fdump)( void *, int) ) {
 	int ntypes = cur_module->code->ntypes;
-	int i;
+	int i, fcount = 0;
 	fdump(&ntypes,4);
-	for(i=0;i<ntypes;i++)
-		fdump(&cur_module->code->types[i],sizeof(void*));
+	for(i=0;i<ntypes;i++) {
+		hl_type *t = cur_module->code->types + i;
+		fdump(&t,sizeof(void*));
+		if( t->kind == HFUN ) fcount++;
+	}
+	fdump(&fcount,4);
+	for(i=0;i<ntypes;i++) {
+		hl_type *t = cur_module->code->types + i;
+		if( t->kind == HFUN ) {
+			hl_type *ct = (hl_type*)&t->fun->closure_type;
+			fdump(&ct,sizeof(void*));
+		}
+	}
 }
 
 hl_module *hl_module_alloc( hl_code *c ) {
