@@ -37,6 +37,11 @@
   <!-- Paths to exclude from the Project Explorer tree -->
   <hiddenPaths>
     <hidden path="obj" />
+    <hidden path="part.txt" />
+    <hidden path="run.bat" />
+    <hidden path="test.hl" />
+    <hidden path="memory.hl" />
+    <hidden path="hlmemory.dump" />
   </hiddenPaths>
   <!-- Executed before build -->
   <preBuildCommand>haxe -hl memory.hl -main Memory -lib format</preBuildCommand>

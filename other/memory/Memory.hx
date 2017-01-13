@@ -1,233 +1,6 @@
 import format.hl.Data;
 using format.hl.Tools;
-
-abstract Pointer(Int) {
-	public inline function isNull() {
-		return this == 0;
-	}
-	public inline function offset( i : Int ) : Pointer {
-		return cast (this + i);
-	}
-	public inline function sub( p : Pointer ) : Int {
-		return this - cast(p);
-	}
-	public inline function pageAddress() : Pointer {
-		return cast (this & ~0xFFFF);
-	}
-	public inline function toString() {
-		return "0x"+StringTools.hex(this, 8);
-	}
-}
-
-@:enum abstract PageKind(Int) {
-	var PDynamic = 0;
-	var PRaw = 1;
-	var PNoPtr = 2;
-	var PFinalizer = 3;
-}
-
-class Page {
-	var memory : Memory;
-	public var addr : Pointer;
-	public var kind : PageKind;
-	public var size : Int;
-	public var blockSize : Int;
-	public var firstBlock : Int;
-	public var maxBlocks : Int;
-	public var nextBlock : Int;
-	public var dataPosition : Int;
-	public var bmp : haxe.io.Bytes;
-	public var sizes : haxe.io.Bytes;
-
-	public function new(m) {
-		memory = m;
-	}
-
-	public function isLiveBlock( bid : Int ) {
-		if( sizes != null && sizes.get(bid) == 0 ) return false;
-		return (bmp.get(bid >> 3) & (1 << (bid & 7))) != 0;
-	}
-
-	public function getBlockSize( bid : Int ) {
-		return sizes == null ? 1 : sizes.get(bid);
-	}
-
-	public function goto( bid : Int ) {
-		memory.memoryDump.seek(dataPosition + bid * blockSize, SeekBegin);
-	}
-
-	public function getPointer( bid : Int ) {
-		return addr.offset(bid * blockSize);
-	}
-
-}
-
-class Stack {
-	public var base : Pointer;
-	public var contents : Array<Pointer>;
-	public function new() {
-	}
-}
-
-class Block {
-	public var page : Page;
-	public var bid : Int;
-	public var owner : Block;
-	public var type(default,set) : TType;
-
-	public var subs : Array<Block>; // can be null
-	public var parents : Array<Block>; // if multiple owners
-
-	public function new() {
-	}
-
-	public inline function getPointer() {
-		return page.getPointer(bid);
-	}
-	public inline function getMemSize() {
-		return page.getBlockSize(bid) * page.blockSize;
-	}
-
-	function set_type( t : TType ) {
-		if( t != null && t.t == HF64 && page.kind != PNoPtr )
-			throw "!";
-		return type = t;
-	}
-
-	public function addParent(b:Block) {
-
-//		if( b.type != null && b.type.t == HF64 )
-//			throw "!";
-
-		if( owner == null ) {
-			owner = b;
-		} else {
-			if( parents == null ) parents = [owner];
-			parents.push(b);
-		}
-		if( b.subs == null ) b.subs = [];
-		b.subs.push(this);
-	}
-
-	function removeParent( p : Block ) {
-		if( parents != null ) {
-			parents.remove(p);
-			if( parents.length == 0 ) parents = null;
-		}
-		if( owner == p )
-			owner = parents == null ? null : parents[0];
-	}
-
-	public function removeChildren() {
-		if( subs != null ) {
-			for( s in subs )
-				s.removeParent(this);
-			subs = null;
-		}
-	}
-
-}
-
-
-class TType {
-	public var tid : Int;
-	public var t : HLType;
-	public var closure : HLType;
-	public var bmp : hl.Bytes;
-	public var hasPtr : Bool;
-	public var isDyn : Bool;
-	public var fields : Array<TType>;
-	public var constructs : Array<Array<TType>>;
-	public var nullWrap : TType;
-
-	public var falsePositive = 0;
-	public var falsePositiveIndexes = [];
-
-	public function new(tid, t, ?cl) {
-		this.tid = tid;
-		this.t = t;
-		this.closure = cl;
-		isDyn = t.isDynamic();
-		switch( t ) {
-		case HFun(_):
-			hasPtr = cl != null && cl.isPtr();
-		default:
-			hasPtr = t.containsPointer();
-		}
-	}
-
-	public function buildTypes( m : Memory ) {
-		if( !hasPtr ) return;
-
-		// layout of data inside memory
-
-		switch( t ) {
-		case HObj(p):
-			var protos = [p];
-			while( p.tsuper != null )
-				switch( p.tsuper ) {
-				case HObj(p2):
-					protos.unshift(p2);
-					p = p2;
-				default:
-				}
-
-			fields = [];
-			var pos = 1 << m.ptrBits; // type
-			for( p in protos )
-				for( f in p.fields ) {
-					var size = m.typeSize(f.t);
-					pos = align(pos, size);
-					fields[pos>>m.ptrBits] = m.getType(f.t);
-					pos += size;
-				}
-		case HEnum(e):
-			constructs = [];
-			for( c in e.constructs ) {
-				var pos = 4; // index
-				var fields = [];
-				for( t in c.params ) {
-					var size = m.typeSize(t);
-					pos = align(pos, size);
-					fields[pos>>m.ptrBits] = m.getType(t);
-					pos += size;
-				}
-				constructs.push(fields);
-			}
-		case HVirtual(fl):
-			fields = [
-				null, // type
-				m.getType(HDyn), // obj
-				m.getType(HDyn), // next
-			];
-			var pos = (fl.length + 3) << m.ptrBits;
-			for( f in fl ) {
-				var size = m.typeSize(f.t);
-				pos = align(pos, size);
-				fields[pos >> m.ptrBits] = m.getType(f.t);
-			}
-		case HNull(t):
-			if( m.is64 )
-				fields = [null, m.getType(t)];
-			else
-				fields = [null, null, m.getType(t)];
-		case HFun(_):
-			fields = [null, null, null, m.getType(closure)];
-		default:
-		}
-	}
-
-	inline function align(pos, size) {
-		var d = pos & (size - 1);
-		if( d != 0 ) pos += size - d;
-		return pos;
-	}
-
-	public function toString() {
-		return t.toString();
-	}
-
-}
+import Block;
 
 class Memory {
 
@@ -315,8 +88,6 @@ class Memory {
 		var flags = readInt();
 		is64 = (flags & 1) != 0;
 		bool32 = (flags & 2) != 0;
-
-		throw bool32;
 
 		ptrBits = is64 ? 3 : 2;
 		if( is64 ) throw "64 bit not supported";
@@ -471,8 +242,9 @@ class Memory {
 		}
 		log(blocks.length + " live blocks " + MB(used) + " used, " + MB(free) + " free, "+MB(gc)+" gc");
 
+		var tvoid = getType(HVoid);
 		for( t in types )
-			t.buildTypes(this);
+			t.buildTypes(this, tvoid);
 
 		tdynObj = getType(HDynObj);
 		toProcess = blocks.copy();
@@ -547,14 +319,12 @@ class Memory {
 		falses.sort(function(t1, t2) return t1.falsePositive - t2.falsePositive);
 		for( f in falses )
 			log("  False positive " + f + " " + f.falsePositive+" "+f.falsePositiveIndexes+" "+f.fields);
-
-		/*
+/*
 		var all = [for( k in byT ) k];
 		all.sort(function(i1, i2) return i1.count - i2.count);
 		for( a in all )
 			log("Unknown "+a.count + " count, " + MB(a.mem)+" "+a.t.toString());
-		*/
-
+*/
 		log("Hierarchy built, "+unk+" unknown ("+MB(unkMem)+")");
 	}
 
@@ -607,7 +377,7 @@ class Memory {
 					b.type.falsePositiveIndexes[i]++;
 					continue;
 				}
-				if( bs.type == null && ft != null ) {
+				/*if( bs.type == null && ft != null ) {
 					if( ft.t == HDyn ) {
 						dynObjCandidates.push(bs);
 						bs.type = tdynObj;
@@ -616,7 +386,7 @@ class Memory {
 					bs.type = ft;
 					if( bs.subs != null )
 						toProcess.push(bs);
-				}
+				}*/
 			}
 		}
 	}
@@ -634,14 +404,14 @@ class Memory {
 			var dataSize = readInt();
 
 			var bt = pointerBlock.get(btptr);
-			if( bt == null ) {
-				log("  Not a dynobj " + b.getPointer().toString());
-				continue;
+			if( bt != null ) {
+				goto(bt);
+				var tid = readInt();
+				if( tid != 15 ) bt = null;
 			}
-			goto(bt);
-			var tid = readInt();
-			if( tid != 15 ) {
-				log("  Not a dynobj " + b.getPointer().toString());
+
+			if( bt == null ) {
+				log("  Not a dynobj " + b.getPointer().toString()+" "+b.owner);
 				continue;
 			}
 
