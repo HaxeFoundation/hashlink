@@ -26,7 +26,7 @@ static void fun_var_args() {
 }
 
 HL_PRIM vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue ) {
-	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
+	vclosure *c = (vclosure*)hl_gc_alloc_noptr(sizeof(vclosure));
 	c->t = t;
 	c->fun = fvalue;
 	c->hasValue = false;
