@@ -509,7 +509,7 @@ alloc_var:
 	return ptr;
 }
 
-static void *gc_alloc_gen( int size, int flags ) {
+static void *gc_alloc_gen( int size, int flags, int *allocated ) {
 	int m = size & (GC_ALIGN - 1);
 	int p;
 	gc_stats.allocation_count++;
@@ -517,14 +517,20 @@ static void *gc_alloc_gen( int size, int flags ) {
 	if( m ) size += GC_ALIGN - m;
 	if( size <= 0 )
 		return NULL;
-	if( size <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & MEM_ALIGN_DOUBLE) == 0 && flags != MEM_KIND_FINALIZER )
+	if( size <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & MEM_ALIGN_DOUBLE) == 0 && flags != MEM_KIND_FINALIZER ) {
+		*allocated = size;
 		return gc_alloc_fixed( (size >> GC_ALIGN_BITS) - 1, flags & PAGE_KIND_MASK);
+	}
 	for(p=GC_FIXED_PARTS;p<GC_PARTITIONS;p++) {
 		int block = GC_SIZES[p];
-		int m = size & (block - 1);
-		if( m ) size += block - m;
-		if( size < block * 255 )
-			return gc_alloc_var(p, size, flags & PAGE_KIND_MASK);
+		int query = size;
+		int m = query & (block - 1);
+		if( m ) query += block - m;
+		if( query < block * 255 ) {
+			void *ptr = gc_alloc_var(p, query, flags & PAGE_KIND_MASK);
+			*allocated = query;
+			return ptr;
+		}
 	}
 	hl_error("Required memory allocation too big");
 	return NULL;
@@ -542,6 +548,7 @@ static unsigned char *alloc_end = NULL;
 void *hl_gc_alloc_gen( int size, int flags ) {
 	void *ptr;
 	int time = 0;
+	int allocated;
 #ifdef HL_BUMP_ALLOC
 	if( !alloc_all ) {
 		int tot = 3<<29;
@@ -555,13 +562,16 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 #else
 	gc_check_mark();
 	if( gc_profile ) time = TIMESTAMP();
-	ptr = gc_alloc_gen(size, flags);
+	ptr = gc_alloc_gen(size, flags, &allocated);
 	if( gc_profile ) gc_stats.alloc_time += TIMESTAMP() - time;
 #	ifdef GC_DEBUG
 	memset(ptr,0xCD,size);
 #	endif
 #endif
-	if( flags & MEM_ZERO ) memset(ptr,0,size);
+	if( flags & MEM_ZERO )
+		MZERO(ptr,allocated);
+	else if( MEM_HAS_PTR(flags) && allocated != size )
+		MZERO((char*)ptr+size,allocated-size); // erase possible pointers after data
 	return ptr;
 }
 
@@ -917,7 +927,10 @@ static void gc_free_page_memory( void *ptr, int size ) {
 vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	vdynamic *d = (vdynamic*) (hl_is_ptr(t) ? hl_gc_alloc(sizeof(vdynamic)) : hl_gc_alloc_noptr(sizeof(vdynamic)));
 	d->t = t;
-	d->v.ptr = NULL;
+#	ifndef HL_64
+	d->__pad = 0;
+#	endif
+	d->v.d = 0.;
 #	ifdef GC_DEBUG
 	if( t->kind == HVOID )
 		hl_error("alloc_dynamic(VOID)");
@@ -932,8 +945,7 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(t);
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
-	o = (vobj*)hl_gc_alloc_gen(size, rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR);
-	MZERO(o,size);
+	o = (vobj*)hl_gc_alloc_gen(size, (rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 	o->t = t;
 	return (vdynamic*)o;
 }
