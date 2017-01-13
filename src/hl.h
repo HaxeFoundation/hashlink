@@ -376,6 +376,7 @@ struct hl_runtime_obj {
 	int nproto;
 	int size;
 	int nmethods;
+	bool hasPtr;
 	void **methods;
 	int *fields_indexes;
 	hl_runtime_obj *parent;

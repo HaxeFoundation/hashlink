@@ -152,6 +152,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	t->nfields = o->nfields + (p ? p->nfields : 0);
 	t->nproto = p ? p->nproto : 0;
 	t->nlookup = o->nfields;
+	t->hasPtr = p ? p->hasPtr : false;
 
 	if( !p )
 		t->nlookup += o->nproto;
@@ -189,6 +190,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		else
 			t->nlookup--;
 		size += hl_type_size(ft);
+		if( !t->hasPtr && hl_is_ptr(ft) ) t->hasPtr = true;
 	}
 	t->size = size;
 	t->nmethods = p ? p->nmethods : o->nproto;
