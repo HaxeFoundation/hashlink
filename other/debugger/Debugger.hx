@@ -1,6 +1,8 @@
 import format.hl.Data;
+using format.hl.Tools;
 import DebugApi;
 import DebugValue;
+
 
 typedef GlobalAccess = {
 	var sub : Map<String,GlobalAccess>;
@@ -674,7 +676,7 @@ class Debugger extends DebugValue.DebugValueReader {
 					Sys.println("Unknown var " + path);
 					continue;
 				}
-				Sys.println(dbg.valueStr(v) + " : " + dbg.typeStr(v.t));
+				Sys.println(dbg.valueStr(v) + " : " + v.t.toString());
 			case "clear":
 				switch( args.length ) {
 				case 0:
