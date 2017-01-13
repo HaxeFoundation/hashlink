@@ -130,48 +130,6 @@ class DebugValueReader {
 		return { file : code.debugFiles[fid], line : fline };
 	}
 
-	function typeStr( t : HLType ) {
-		inline function fstr(t) {
-			return switch(t) {
-			case HFun(_): "(" + typeStr(t) + ")";
-			default: typeStr(t);
-			}
-		};
-		return switch( t ) {
-		case HVoid: "Void";
-		case HUi8: "hl.UI8";
-		case HUi16: "hl.UI16";
-		case HI32: "Int";
-		case HF32: "Single";
-		case HF64: "Float";
-		case HBool: "Bool";
-		case HBytes: "hl.Bytes";
-		case HDyn: "Dynamic";
-		case HFun(f):
-			if( f.args.length == 0 ) "Void -> " + fstr(f.ret) else [for( a in f.args ) fstr(a)].join(" -> ") + " -> " + fstr(f.ret);
-		case HObj(o):
-			o.name;
-		case HArray:
-			"hl.NativeArray";
-		case HType:
-			"hl.Type";
-		case HRef(t):
-			"hl.Ref<" + typeStr(t) + ">";
-		case HVirtual(fl):
-			"{ " + [for( f in fl ) f.name+" : " + typeStr(f.t)].join(", ") + " }";
-		case HDynObj:
-			"hl.DynObj";
-		case HAbstract(name):
-			"hl.NativeAbstract<" + name+">";
-		case HEnum(e):
-			e.name;
-		case HNull(t):
-			"Null<" + typeStr(t) + ">";
-		case HAt(_):
-			throw "assert";
-		}
-	}
-
 	function readField( v : DebugValue, name : String ) : DebugValue {
 		var ptr = switch( v.v ) {
 		case VUndef, VNull: null;
