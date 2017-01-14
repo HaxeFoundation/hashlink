@@ -177,6 +177,7 @@ endif()
 if(WIN32)
     set(ZLIB_INCLUDE_DIRS include/zlib)
     set(PNG_INCLUDE_DIRS include/png)
+    set(Vorbis_INCLUDE_DIRS include/vorbis)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8) 
         set(TurboJPEG_INCLUDE_DIRS include/turbojpeg include/turbojpeg/x64)
@@ -264,6 +265,28 @@ if(WIN32)
         include/zlib/inftrees.c
         include/zlib/trees.c
         include/zlib/zutil.c
+        include/vorbis/bitrate.c
+        include/vorbis/bitwise.c
+        include/vorbis/block.c
+        include/vorbis/codebook.c
+        include/vorbis/envelope.c
+        include/vorbis/floor0.c
+        include/vorbis/floor1.c
+        include/vorbis/framing.c
+        include/vorbis/info.c
+        include/vorbis/lookup.c
+        include/vorbis/lpc.c
+        include/vorbis/lsp.c
+        include/vorbis/mapping0.c
+        include/vorbis/mdct.c
+        include/vorbis/psy.c
+        include/vorbis/registry.c
+        include/vorbis/res0.c
+        include/vorbis/sharedbook.c
+        include/vorbis/smallft.c
+        include/vorbis/synthesis.c
+        include/vorbis/vorbisfile.c
+        include/vorbis/window.c
         libs/fmt/fmt.c
     )
 else()
@@ -288,12 +311,14 @@ target_include_directories(fmt.hdll
 	${ZLIB_INCLUDE_DIRS}
 	${PNG_INCLUDE_DIRS}
 	${TurboJPEG_INCLUDE_DIRS}
+	${Vorbis_INCLUDE_DIRS}
 )
 target_link_libraries(fmt.hdll
     libhl
     ${ZLIB_LIBRARIES}
     ${PNG_LIBRARIES}
     ${TurboJPEG_LIBRARIES}
+    ${Vorbis_LIBRARIES}
 )
 target_compile_definitions(fmt.hdll
     PRIVATE
