@@ -21,6 +21,9 @@ abstract Framebuffer(Null<Int>) {
 abstract Renderbuffer(Null<Int>) {
 }
 
+abstract Query(Null<Int>) {
+}
+
 @:hlNative("sdl","gl_")
 class GL {
 
@@ -284,6 +287,32 @@ class GL {
 	// draw
 
 	public static function drawElements( mode : Int, count : Int, type : Int, start : Int ) {
+	}
+
+	// queries
+
+	public static function createQuery() : Query {
+		return null;
+	}
+
+	public static function deleteQuery( q : Query ) {
+	}
+
+	public static function beginQuery( target : Int, q : Query ) {
+	}
+
+	public static function endQuery( target : Int ) {
+	}
+
+	public static function queryResultAvailable( q : Query ) {
+		return false;
+	}
+
+	public static function queryResult( q : Query ) : Float {
+		return 0.;
+	}
+
+	public static function queryCounter( q : Query, target : Int ) {
 	}
 
 	// ----- CONSTANTS -----
@@ -720,5 +749,9 @@ class GL {
 	public static inline var CONTEXT_LOST_WEBGL             = 0x9242;
 	public static inline var UNPACK_COLORSPACE_CONVERSION_WEBGL = 0x9243;
 	public static inline var BROWSER_DEFAULT_WEBGL          = 0x9244;
+
+	/* Queries */
+	public static inline var SAMPLES_PASSED					= 0x8914;
+	public static inline var TIMESTAMP						= 0x8E28;
 
 }

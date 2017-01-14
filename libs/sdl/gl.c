@@ -492,6 +492,43 @@ HL_PRIM void HL_NAME(gl_draw_elements)( int mode, int count, int type, int start
 	glDrawElements(mode, count, type, (void*)(int_val)start);
 }
 
+// queries
+
+HL_PRIM vdynamic *HL_NAME(gl_create_query)() {
+	unsigned int t = 0;
+	glGenQueries(1, &t);
+	GLOGR("%d",t,"");
+	return alloc_i32(t);
+}
+
+HL_PRIM void HL_NAME(gl_delete_query)( vdynamic *q ) {
+	GLOG("%d",q->v.i);
+	glDeleteQueries(1,&q->v.i);
+}
+
+HL_PRIM void HL_NAME(gl_begin_query)( int target, vdynamic *q ) {
+	glBeginQuery(target,q->v.i);
+}
+
+HL_PRIM void HL_NAME(gl_end_query)( int target ) {
+	glEndQuery(target);
+}
+
+HL_PRIM bool HL_NAME(gl_query_result_available)( vdynamic *q ) {
+	int v = 0;
+	glGetQueryObjectiv(q->v.i, GL_QUERY_RESULT_AVAILABLE, &v);
+	return v == GL_TRUE;
+}
+
+HL_PRIM double HL_NAME(gl_query_result)( vdynamic *q ) {
+	GLuint64 v = -1;
+	glGetQueryObjectui64v(q->v.i, GL_QUERY_RESULT, &v);
+	return (double)v;
+}
+
+HL_PRIM void HL_NAME(gl_query_counter)( vdynamic *q, int target ) {
+	glQueryCounter(q->v.i, target);
+}
 
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
@@ -562,3 +599,12 @@ DEFINE_PRIM(_VOID,gl_delete_buffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_uniform1i,_NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_uniform4fv,_NULL(_I32) _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_elements,_I32 _I32 _I32 _I32);
+
+
+DEFINE_PRIM(_NULL(_I32), gl_create_query, _NO_ARG);
+DEFINE_PRIM(_VOID, gl_delete_query, _NULL(_I32));
+DEFINE_PRIM(_VOID, gl_begin_query, _I32 _NULL(_I32));
+DEFINE_PRIM(_VOID, gl_end_query, _I32);
+DEFINE_PRIM(_BOOL, gl_query_result_available, _NULL(_I32));
+DEFINE_PRIM(_VOID, gl_query_counter, _NULL(_I32) _I32);
+DEFINE_PRIM(_F64, gl_query_result, _NULL(_I32));
