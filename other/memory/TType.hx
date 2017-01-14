@@ -32,6 +32,19 @@ class TType {
 		if( !hasPtr ) return;
 
 		// layout of data inside memory
+		inline function fill(fields:Array<TType>, pos:Int) {
+			if( m.is64 ) {
+				for( i in 0...pos >> m.ptrBits )
+					if( fields[i] == null )
+						fields[i] = tvoid;
+			} else {
+				// fill two slots for 64bit data
+				var i = pos >> m.ptrBits;
+				while( --i >= 0 )
+					if( fields[i] == null )
+						fields[i] = (fields[i-1] == null || fields[i-1].t != HF64) ? tvoid : fields[i-1];
+			}
+		}
 
 		switch( t ) {
 		case HObj(p):
@@ -53,9 +66,7 @@ class TType {
 					fields[pos>>m.ptrBits] = m.getType(f.t);
 					pos += size;
 				}
-			for( i in 0...pos >> m.ptrBits )
-				if( fields[i] == null )
-					fields[i] = tvoid;
+			fill(fields, pos);
 		case HEnum(e):
 			constructs = [];
 			for( c in e.constructs ) {
@@ -67,9 +78,7 @@ class TType {
 					fields[pos>>m.ptrBits] = m.getType(t);
 					pos += size;
 				}
-				for( i in 0...pos >> m.ptrBits )
-					if( fields[i] == null )
-						fields[i] = tvoid;
+				fill(fields, pos);
 				constructs.push(fields);
 			}
 		case HVirtual(fl):
@@ -85,14 +94,15 @@ class TType {
 				fields[pos >> m.ptrBits] = m.getType(f.t);
 				pos += size;
 			}
-			for( i in 0...pos >> m.ptrBits )
-				if( fields[i] == null )
-					fields[i] = tvoid;
+			fill(fields, pos);
+			// keep null our fields pointers since they might point to a DynObj data head
+			for( i in 0...fl.length )
+				fields[i+3] = null;
 		case HNull(t):
 			if( m.is64 )
 				fields = [tvoid, m.getType(t)];
 			else
-				fields = [tvoid, tvoid, m.getType(t)];
+				fields = [tvoid, tvoid, m.getType(t), tvoid];
 		case HFun(_):
 			fields = [tvoid, tvoid, tvoid, m.getType(closure)];
 		default:
