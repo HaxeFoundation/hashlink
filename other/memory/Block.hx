@@ -66,11 +66,21 @@ class Stack {
 	}
 }
 
+enum BlockTypeKind {
+	KHeader;
+	KRoot;
+	KAbstractData;
+	KInferred( t : TType, k : BlockTypeKind );
+	KDynObj( t : TType, k : BlockTypeKind );
+	KDynObjData( k : BlockTypeKind );
+}
+
 class Block {
 	public var page : Page;
 	public var bid : Int;
 	public var owner : Block;
-	public var type(default,set) : TType;
+	public var type(default, set) : TType;
+	public var typeKind : BlockTypeKind;
 
 	public var subs : Array<Block>; // can be null
 	public var parents : Array<Block>; // if multiple owners
@@ -92,10 +102,6 @@ class Block {
 	}
 
 	public function addParent(b:Block) {
-
-//		if( b.type != null && b.type.t == HF64 )
-//			throw "!";
-
 		if( owner == null ) {
 			owner = b;
 		} else {
@@ -104,6 +110,29 @@ class Block {
 		}
 		if( b.subs == null ) b.subs = [];
 		b.subs.push(this);
+	}
+
+	public function finalize() {
+		if( parents == null ) return;
+
+		inline function getPriority(b:Block) {
+			if( b.type == null ) return -2;
+			if( !b.type.hasPtr ) return -1; // false positive
+			return switch( b.type.t ) {
+			case HFun(_): 0;
+			case HVirtual(_): 1;
+			default: 2;
+			}
+		}
+
+		var pbest = getPriority(owner);
+		for( p in parents ) {
+			var prio = getPriority(p);
+			if( prio > pbest ) {
+				owner = p;
+				prio = pbest;
+			}
+		}
 	}
 
 	function removeParent( p : Block ) {
