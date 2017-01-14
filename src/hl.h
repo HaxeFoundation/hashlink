@@ -163,6 +163,7 @@ typedef wchar_t	uchar;
 typedef unsigned short uchar;
 #	undef USTR
 #	define USTR(str)	u##str
+C_FUNCTION_BEGIN
 HL_API int ustrlen( const uchar *str );
 HL_API uchar *ustrdup( const uchar *str );
 HL_API double utod( const uchar *str, uchar **end );
@@ -172,6 +173,7 @@ HL_API int utostr( char *out, int out_size, const uchar *str );
 HL_API int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
 HL_API int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
 HL_API void uprintf( const uchar *fmt, const uchar *str );
+C_FUNCTION_END
 #endif
 
 #ifdef HL_VCC
@@ -301,6 +303,8 @@ struct hl_type {
 	};
 	void **vobj_proto;
 };
+
+C_FUNCTION_BEGIN
 
 HL_API int hl_type_size( hl_type *t );
 HL_API int hl_pad_size( int size, hl_type *t );
@@ -620,5 +624,7 @@ HL_API hl_trap_ctx *hl_current_trap;
 HL_API vdynamic *hl_current_exc;
 #define hl_trap(ctx,r,label) { ctx.prev = hl_current_trap; hl_current_trap = &ctx; if( setjmp(ctx.buf) ) { r = hl_current_exc; goto label; } }
 #define hl_endtrap(ctx)	hl_current_trap = ctx.prev
+
+C_FUNCTION_END
 
 #endif
