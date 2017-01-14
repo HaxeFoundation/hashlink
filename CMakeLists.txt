@@ -177,6 +177,7 @@ endif()
 if(WIN32)
     set(ZLIB_INCLUDE_DIRS include/zlib)
     set(PNG_INCLUDE_DIRS include/png)
+    set(Vorbis_INCLUDE_DIRS include/vorbis)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8) 
         set(TurboJPEG_INCLUDE_DIRS include/turbojpeg include/turbojpeg/x64)
@@ -264,6 +265,7 @@ if(WIN32)
         include/zlib/inftrees.c
         include/zlib/trees.c
         include/zlib/zutil.c
+        include/vorbis/*.c
         libs/fmt/fmt.c
     )
 else()
@@ -288,12 +290,14 @@ target_include_directories(fmt.hdll
 	${ZLIB_INCLUDE_DIRS}
 	${PNG_INCLUDE_DIRS}
 	${TurboJPEG_INCLUDE_DIRS}
+	${Vorbis_INCLUDE_DIRS}
 )
 target_link_libraries(fmt.hdll
     libhl
     ${ZLIB_LIBRARIES}
     ${PNG_LIBRARIES}
     ${TurboJPEG_LIBRARIES}
+    ${Vorbis_LIBRARIES}
 )
 target_compile_definitions(fmt.hdll
     PRIVATE
