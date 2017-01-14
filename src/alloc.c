@@ -515,8 +515,10 @@ static void *gc_alloc_gen( int size, int flags, int *allocated ) {
 	gc_stats.allocation_count++;
 	gc_stats.total_requested += size;
 	if( m ) size += GC_ALIGN - m;
-	if( size <= 0 )
+	if( size <= 0 ) {
+		*allocated = 0;
 		return NULL;
+	}
 	if( size <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & MEM_ALIGN_DOUBLE) == 0 && flags != MEM_KIND_FINALIZER ) {
 		*allocated = size;
 		return gc_alloc_fixed( (size >> GC_ALIGN_BITS) - 1, flags & PAGE_KIND_MASK);
@@ -565,7 +567,7 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 	ptr = gc_alloc_gen(size, flags, &allocated);
 	if( gc_profile ) gc_stats.alloc_time += TIMESTAMP() - time;
 #	ifdef GC_DEBUG
-	memset(ptr,0xCD,size);
+	memset(ptr,0xCD,allocated);
 #	endif
 #endif
 	if( flags & MEM_ZERO )
