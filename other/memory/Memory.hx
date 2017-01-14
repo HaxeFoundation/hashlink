@@ -363,8 +363,8 @@ class Memory {
 		log("Hierarchy built, "+unk+" unknown ("+MB(unkMem)+"), "+falseCount+" false positives");
 	}
 
-	function printFalsePositives() {
-		var falses = [for( t in types ) if( t.falsePositive > 0 ) t];
+	function printFalsePositives( ?typeStr : String ) {
+		var falses = [for( t in types ) if( t.falsePositive > 0 && (typeStr == null || t.toString().indexOf(typeStr) >= 0) ) t];
 		falses.sort(function(t1, t2) return t1.falsePositive - t2.falsePositive);
 		for( f in falses )
 			log(f.falsePositive+" count " + f + " "+f.falsePositiveIndexes+"\n    "+f.fields);
@@ -627,7 +627,7 @@ class Memory {
 			case "stats":
 				m.printStats();
 			case "false":
-				m.printFalsePositives();
+				m.printFalsePositives(args.shift());
 			case "unknown":
 				m.printUnknown();
 			case "locate":
