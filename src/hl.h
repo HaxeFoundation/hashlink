@@ -148,7 +148,7 @@ typedef long long int64;
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
-#	define HL_NATIVE_WCHAR_FUN
+#	define HL_NATIVE_UCHAR_FUN
 #	define usprintf		swprintf
 #	define uprintf		wprintf
 #	define ustrlen		wcslen
@@ -157,12 +157,15 @@ typedef wchar_t	uchar;
 #	define utod(s,end)	wcstod(s,end)
 #	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
-#	define utostr(out,size,str) wcstombs(out,str,size)	
+#	define utostr(out,size,str) wcstombs(out,str,size)
 #else
 #	include <stdarg.h>
 typedef unsigned short uchar;
 #	undef USTR
 #	define USTR(str)	u##str
+#endif
+
+#ifndef HL_NATIVE_UCHAR_FUN
 C_FUNCTION_BEGIN
 HL_API int ustrlen( const uchar *str );
 HL_API uchar *ustrdup( const uchar *str );
