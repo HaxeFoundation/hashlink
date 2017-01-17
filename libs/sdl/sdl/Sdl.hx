@@ -6,6 +6,8 @@ class Sdl {
 	static var initDone = false;
 	static var isWin32 = false;
 	static var sentinel : hl.UI.Sentinel;
+	static var dismissErrors = false;
+
 	public static function init() {
 		if( initDone ) return;
 		initDone = true;
@@ -62,6 +64,13 @@ class Sdl {
 
 	public dynamic static function reportError( e : Dynamic ) {
 
+		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
+		var err = try Std.string(e) catch( _ : Dynamic ) "????";
+		Sys.println(err + stack);
+
+		if( dismissErrors )
+			return;
+
 		var wasFS = null;
 		for( w in @:privateAccess Window.windows ) {
 			if( w.fullScreen ) {
@@ -73,19 +82,22 @@ class Sdl {
 		}
 
 		var f = new hl.UI.WinLog("Uncaught Exception", 500, 400);
-		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
-		var err = try Std.string(e) catch( _ : Dynamic ) "????";
-		Sys.println(err + stack);
 		f.setTextContent(err+"\n"+stack);
 		var but = new hl.UI.Button(f, "Continue");
 		but.onClick = function() {
 			hl.UI.stopLoop();
 		};
+
+		var but = new hl.UI.Button(f, "Dismiss all");
+		but.onClick = function() {
+			dismissErrors = true;
+			hl.UI.stopLoop();
+		};
+
 		var but = new hl.UI.Button(f, "Exit");
 		but.onClick = function() {
 			Sys.exit(0);
 		};
-
 
 		while( hl.UI.loop(true) != Quit )
 			tick();
