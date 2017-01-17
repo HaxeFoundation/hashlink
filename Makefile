@@ -26,7 +26,7 @@ HL = src/callback.o src/code.o src/jit.o src/main.o src/module.o src/debugger.o
 
 FMT = libs/fmt/fmt.o
 
-SDL = libs/sdl/sdl.o libs/sdl/gl.o
+SDL = libs/sdl/sdl.o libs/sdl/gl.o libs/sdl/openal.o
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -48,9 +48,10 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(ARCH) -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include
+CFLAGS += -m$(ARCH) -I /opt/libjpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
-LIBFLAGS += -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib
+LIBFLAGS += -L/opt/libjpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
+LIBOPENGL = -framework OpenGL
 
 else
 
@@ -85,10 +86,10 @@ hl: ${HL}
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
 
 fmt: ${FMT}
-	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -lpng $(LIBTURBOJPEG) -lz
+	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
 sdl: ${SDL}
-	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -lSDL2
+	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -lhl -lSDL2 -lopenal $(LIBOPENGL)
 
 .SUFFIXES : .c .o
 

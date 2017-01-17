@@ -14,10 +14,12 @@ x64
 *.stackdump
 *.hdll
 /src/_main*
+*.dylib
 *.o
 *.a
 *.opendb
 *.VC.db
+/hl
 /include/sdl
 /include/openal
 ReleaseStatic
