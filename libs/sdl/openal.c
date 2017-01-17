@@ -1,4 +1,4 @@
-#define HL_NAME(n) openal_##n
+#define HL_NAME(n) sdl_##n
 #include <hl.h>
 
 #include <AL/al.h>
