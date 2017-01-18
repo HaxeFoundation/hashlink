@@ -943,12 +943,17 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 vdynamic *hl_alloc_obj( hl_type *t ) {
 	vobj *o;
 	int size;
+	int i;
 	hl_runtime_obj *rt = t->obj->rt;
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(t);
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
 	o = (vobj*)hl_gc_alloc_gen(size, (rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 	o->t = t;
+	for(i=0;i<rt->nbindings;i++) {
+		hl_runtime_binding *b = rt->bindings + i;
+		*(void**)(((char*)o) + rt->fields_indexes[b->fid]) = b->closure ? hl_alloc_closure_ptr(b->closure,b->ptr,o) : b->ptr;
+	}
 	return (vdynamic*)o;
 }
 

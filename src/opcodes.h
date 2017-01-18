@@ -79,7 +79,6 @@ OP_BEGIN
 	OP(OSetThis,2)
 	OP(ODynGet,3)
 	OP(ODynSet,3)
-	OP(OSetMethod,3)
 
 	OP(OJTrue,2)
 	OP(OJFalse,2)

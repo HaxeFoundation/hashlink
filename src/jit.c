@@ -2073,7 +2073,7 @@ static double uint_to_double( unsigned int v ) {
 	return v;
 }
 
-static vclosure *alloc_static_closure( jit_ctx *ctx, int fid, hl_runtime_obj *obj, int field ) {
+static vclosure *alloc_static_closure( jit_ctx *ctx, int fid ) {
 	hl_module *m = ctx->m;
 	vclosure *c = hl_malloc(&m->ctx.alloc,sizeof(vclosure));
 	int fidx = m->functions_indexes[fid];
@@ -2088,12 +2088,6 @@ static vclosure *alloc_static_closure( jit_ctx *ctx, int fid, hl_runtime_obj *ob
 		c->fun = (void*)(int_val)fid;
 		c->value = ctx->closure_list;
 		ctx->closure_list = c;
-		if( obj ) {
-			m->code->functions[fidx].obj = obj->t->obj;
-			while( field < obj->nfields - obj->t->obj->nfields )
-				obj = obj->parent;
-			m->code->functions[fidx].field = obj->t->obj->fields[field - (obj->parent?obj->parent->nfields:0)].name;
-		}
 	}
 	return c;
 }
@@ -2607,20 +2601,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OStaticClosure:
 			{
-				vclosure *c = alloc_static_closure(ctx,o->p2,NULL,0);
+				vclosure *c = alloc_static_closure(ctx,o->p2);
 				preg *r = alloc_reg(ctx, RCPU);
 				op64(ctx, MOV, r, pconst64(&p,(int_val)c));
 				store(ctx,dst,r,true);
-			}
-			break;
-		case OSetMethod:
-			{
-				hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
-				vclosure *c = alloc_static_closure(ctx,o->p3,rt,o->p2);
-				preg *r = alloc_reg(ctx, RCPU);
-				preg *ro = alloc_cpu(ctx, dst, true);
-				op64(ctx, MOV, r, pconst64(&p,(int_val)c));
-				op64(ctx, MOV, pmem(&p,(CpuReg)ro->id, rt->fields_indexes[o->p2]), r);
 			}
 			break;
 		case OField:
