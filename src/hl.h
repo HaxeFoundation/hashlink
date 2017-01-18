@@ -260,10 +260,12 @@ typedef struct {
 typedef struct {
 	int nfields;
 	int nproto;
+	int nbindings;
 	const uchar *name;
 	hl_type *super;
 	hl_obj_field *fields;
 	hl_obj_proto *proto;
+	int *bindings;
 	void **global_value;
 	hl_module_context *m;
 	hl_runtime_obj *rt;
@@ -376,6 +378,12 @@ struct _hl_field_lookup {
 	int field_index; // negative or zero : index in methods
 };
 
+typedef struct {
+	void *ptr;
+	hl_type *closure;
+	int fid;
+} hl_runtime_binding;
+
 struct hl_runtime_obj {
 	hl_type *t;
 	// absolute
@@ -383,9 +391,11 @@ struct hl_runtime_obj {
 	int nproto;
 	int size;
 	int nmethods;
+	int nbindings;
 	bool hasPtr;
 	void **methods;
 	int *fields_indexes;
+	hl_runtime_binding *bindings;
 	hl_runtime_obj *parent;
 	const uchar *(*toStringFun)( vdynamic *obj );
 	int (*compareFun)( vdynamic *a, vdynamic *b );
@@ -443,6 +453,7 @@ HL_API int hl_from_utf8( uchar *out, int outLen, const char *str );
 HL_API char *hl_to_utf8( const uchar *bytes );
 HL_API uchar *hl_to_utf16( const char *str );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
+HL_API hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid );
 
 HL_API int hl_hash( vbyte *name );
 HL_API int hl_hash_utf8( const char *str ); // no cache

@@ -321,6 +321,23 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 					f->obj = t->obj;
 					f->field = p->name;
 				}
+				for(j=0;j<t->obj->nbindings;j++) {
+					int fid = t->obj->bindings[j<<1];
+					int mid = t->obj->bindings[(j<<1)|1];
+					hl_obj_field *of = hl_obj_field_fetch(t,fid);
+					switch( of->t->kind ) {
+					case HFUN:
+					case HDYN:
+						{
+							hl_function *f = m->code->functions + m->functions_indexes[mid];
+							f->obj = t->obj;
+							f->field = of->name;
+						}
+						break;
+					default:
+						break;
+					}
+				}
 			}
 			break;
 		case HENUM:

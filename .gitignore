@@ -27,3 +27,7 @@ ReleaseStatic
 
 /bin*
 /other/memory/*.dump
+/src/_std
+/src/hl
+/src/haxe
+/src/Makefile

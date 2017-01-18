@@ -135,6 +135,18 @@ HL_PRIM void hl_cache_free() {
 	hl_cache_count = hl_cache_size = 0;
 }
 
+HL_PRIM hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid ) {
+	hl_runtime_obj *rt;
+	if( t->kind != HOBJ )
+		return NULL;
+	rt = hl_get_obj_rt(t);
+	if( fid < 0 || fid >= rt->nfields )
+		return NULL;
+	while( rt->parent && fid < rt->parent->nfields )
+		rt = rt->parent;
+	return rt->t->obj->fields + (fid - (rt->parent?rt->parent->nfields:0));
+}
+
 /**
 	Builds class metadata (fields indexes, etc.)
 	Does not require the method table to be finalized.
@@ -152,21 +164,35 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	t->nfields = o->nfields + (p ? p->nfields : 0);
 	t->nproto = p ? p->nproto : 0;
 	t->nlookup = o->nfields;
+	t->nbindings = p ? p->nbindings : 0;
 	t->hasPtr = p ? p->hasPtr : false;
 
-	if( !p )
+	if( !p ) {
 		t->nlookup += o->nproto;
-	else {
+		t->nbindings += o->nbindings;
+	} else {
 		for(i=0;i<o->nproto;i++) {
 			hl_obj_proto *pr = o->proto + i;
 			if( pr->pindex >= 0 && pr->pindex < p->nproto )
 				continue;
 			t->nlookup++;
 		}
+		for(i=0;i<o->nbindings;i++) {
+			int j;
+			bool found = false;
+			for(j=0;j<p->nbindings;j++)
+				if( o->bindings[i<<1] == p->bindings[j].fid ) {
+					found = true;
+					break;
+				}
+			if( !found )
+				t->nbindings++;
+		}
 	}
 
 	t->lookup = (hl_field_lookup*)hl_malloc(alloc,sizeof(hl_field_lookup) * t->nlookup);
 	t->fields_indexes = (int*)hl_malloc(alloc,sizeof(int)*t->nfields);
+	t->bindings = (hl_runtime_binding*)hl_malloc(alloc,sizeof(hl_runtime_binding)*t->nbindings);
 	t->toStringFun = NULL;
 	t->compareFun = NULL;
 	t->castFun = NULL;
@@ -229,7 +255,7 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_runtime_obj *p = NULL, *t = hl_get_obj_rt(ot);
 	hl_field_lookup *strField, *cmpField, *castField, *getField;
 	int i;
-	int nmethods;
+	int nmethods, nbindings;
 	if( ot->vobj_proto ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);
 
@@ -259,6 +285,53 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 		} else
 			method_index = i;
 		t->methods[method_index] = m->functions_ptrs[pr->findex];
+	}
+
+	// bindings
+	if( p ) {
+		nbindings = p->nbindings;
+		memcpy(t->bindings,p->bindings,p->nbindings*sizeof(hl_runtime_binding));
+	} else
+		nbindings = 0;
+	for(i=0;i<o->nbindings;i++) {
+		int fid = o->bindings[i<<1];
+		int mid = o->bindings[(i<<1)|1];
+		hl_runtime_binding *b = NULL;
+		hl_type *ft;
+		if( p ) {
+			int j;
+			for(j=0;j<p->nbindings;j++)
+				if( p->bindings[j].fid == fid ) {
+					b = t->bindings + j;
+					break;
+				}
+		}
+		if( b == NULL )
+			b = t->bindings + nbindings++;
+		b->fid = fid;
+		ft = hl_obj_field_fetch(t->t, fid)->t;
+		switch( ft->kind ) {
+		case HFUN:
+			if( ft->fun->nargs == m->functions_types[mid]->fun->nargs ) {
+				// static fun
+				vclosure *c = (vclosure*)hl_malloc(alloc,sizeof(vclosure));
+				c->fun = m->functions_ptrs[mid];
+				c->t = m->functions_types[mid];
+				c->hasValue = false;
+				c->value = NULL;
+				b->closure = NULL;
+				b->ptr = c;
+				break;
+			}
+			// fallthrough
+		case HDYN: // __constructor__ is defined as dynamic in Class
+			b->closure = m->functions_types[mid];
+			b->ptr = m->functions_ptrs[mid];
+			break;
+		default:
+			hl_fatal("invalid bind field");
+			break;
+		}
 	}
 
 	strField = obj_resolve_field(o,hl_hash_gen(USTR("__string"),false));

@@ -2,7 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\_main.c" />
-    <ClCompile Include="src\hlc_main.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\hlc.h" />
