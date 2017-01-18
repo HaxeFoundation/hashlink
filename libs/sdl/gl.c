@@ -3,7 +3,7 @@
 
 #if defined(__APPLE__)
 #	include <SDL2/SDL.h>
-#	include <OpenGL/gl.h>
+#	include <OpenGL/gl3.h>
 #elif defined(_WIN32)
 #	include <SDL.h>
 #	include <GL/GLU.h>
@@ -536,6 +536,27 @@ HL_PRIM void HL_NAME(gl_query_counter)( vdynamic *q, int target ) {
 	glQueryCounter(q->v.i, target);
 }
 
+// vertex array
+
+HL_PRIM vdynamic *HL_NAME(gl_create_vertex_array)() {
+	unsigned int f = 0;
+	glGenVertexArrays(1, &f);
+	GLOGR("%d",f,"");
+	return alloc_i32(f);
+}
+
+HL_PRIM void HL_NAME(gl_bind_vertex_array)( vdynamic *b ) {
+	unsigned int bb = (unsigned)b->v.i;
+	GLOG("%d",bb);
+	glBindVertexArray(bb);
+}
+
+HL_PRIM void HL_NAME(gl_delete_vertex_array)( vdynamic *b ) {
+	unsigned int bb = (unsigned)b->v.i;
+	GLOG("%d",bb);
+	glDeleteVertexArrays(1, &bb);
+}
+
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_clear,_I32);
@@ -606,6 +627,9 @@ DEFINE_PRIM(_VOID,gl_delete_buffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_uniform1i,_NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_uniform4fv,_NULL(_I32) _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_elements,_I32 _I32 _I32 _I32);
+DEFINE_PRIM(_I32,gl_create_vertex_array,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_bind_vertex_array,_I32);
+DEFINE_PRIM(_VOID,gl_delete_vertex_array,_I32);
 
 
 DEFINE_PRIM(_NULL(_I32), gl_create_query, _NO_ARG);
