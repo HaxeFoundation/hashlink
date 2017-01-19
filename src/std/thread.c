@@ -98,7 +98,7 @@ HL_PRIM int hl_thread_context_size() {
 #	endif
 }
 
-HL_API int hl_thread_context_index( const char *name ) {
+HL_PRIM int hl_thread_context_index( const char *name ) {
 #	ifdef HL_WIN
 	CONTEXT *c = NULL;
 #	define _ADDR(__r) (int)(((int_val)&c->__r) / sizeof(int_val))
@@ -119,7 +119,7 @@ HL_API int hl_thread_context_index( const char *name ) {
 #	undef _ADDR
 }
 
-HL_API bool hl_thread_get_context( hl_thread *t, hl_thread_registers *regs ) {
+HL_PRIM bool hl_thread_get_context( hl_thread *t, hl_thread_registers *regs ) {
 #	ifdef HL_WIN
 	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)(int_val)t);
 	bool ret;
@@ -133,7 +133,7 @@ HL_API bool hl_thread_get_context( hl_thread *t, hl_thread_registers *regs ) {
 #	endif
 }
 
-HL_API bool hl_thread_set_context( hl_thread *t, hl_thread_registers *regs ) {
+HL_PRIM bool hl_thread_set_context( hl_thread *t, hl_thread_registers *regs ) {
 #	ifdef HL_WIN
 	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)(int_val)t);
 	bool ret;
