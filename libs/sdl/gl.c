@@ -627,9 +627,9 @@ DEFINE_PRIM(_VOID,gl_delete_buffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_uniform1i,_NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_uniform4fv,_NULL(_I32) _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_elements,_I32 _I32 _I32 _I32);
-DEFINE_PRIM(_I32,gl_create_vertex_array,_NO_ARG);
-DEFINE_PRIM(_VOID,gl_bind_vertex_array,_I32);
-DEFINE_PRIM(_VOID,gl_delete_vertex_array,_I32);
+DEFINE_PRIM(_NULL(_I32),gl_create_vertex_array,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_bind_vertex_array,_NULL(_I32));
+DEFINE_PRIM(_VOID,gl_delete_vertex_array,_NULL(_I32));
 
 
 DEFINE_PRIM(_NULL(_I32), gl_create_query, _NO_ARG);
