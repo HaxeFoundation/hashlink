@@ -124,6 +124,9 @@ class GL {
 		return null;
 	}
 
+	public static function bindFragDataLocation( p : Program, colorNumber : Int, name : String ) : Void {
+	}
+
 	public static function attachShader( p : Program, s : Shader ) {
 	}
 

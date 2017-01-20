@@ -202,6 +202,12 @@ HL_PRIM vdynamic *HL_NAME(gl_create_program)() {
 	return alloc_i32(v);
 }
 
+HL_PRIM void HL_NAME(gl_bind_frag_data_location)( vdynamic *p, int colNum, vstring *name ) {
+	char *cname = hl_to_utf8(name->bytes);
+	GLOG("%d,%d,%n",p->v.i,colNum,cname);
+	glBindFragDataLocation(p->v.i, colNum, cname);
+}
+
 HL_PRIM void HL_NAME(gl_attach_shader)( vdynamic *p, vdynamic *s ) {
 	GLOG("%d,%d",p->v.i,s->v.i);
 	glAttachShader(p->v.i, s->v.i);
@@ -556,6 +562,7 @@ DEFINE_PRIM(_VOID,gl_stencil_mask_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_func_separate,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_op_separate,_I32  _I32 _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_program,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_bind_frag_data_location,_NULL(_I32) _I32 _STRING);
 DEFINE_PRIM(_VOID,gl_attach_shader,_NULL(_I32) _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_link_program,_NULL(_I32));
 DEFINE_PRIM(_DYN,gl_get_program_parameter,_NULL(_I32) _I32);
