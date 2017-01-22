@@ -135,8 +135,10 @@ typedef long long int64;
 #include <stdio.h>
 #include <memory.h>
 
-#ifdef LIBHL_EXPORTS
+#if defined(LIBHL_EXPORTS)
 #define HL_API extern EXPORT
+#elif defined(LIBHL_STATIC)
+#define HL_API extern
 #else
 #define	HL_API IMPORT
 #endif
@@ -600,7 +602,7 @@ typedef struct {
 #define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 
-#ifndef HL_NAME
+#if !defined(HL_NAME)
 #	define HL_NAME(p)					p
 #	ifdef LIBHL_EXPORTS
 #		define HL_PRIM				EXPORT
@@ -611,6 +613,9 @@ typedef struct {
 #		define HL_PRIM
 #		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #	endif
+#elif defined(LIBHL_STATIC)
+#define	HL_PRIM						
+#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #else
 #define	HL_PRIM						EXPORT
 #define DEFINE_PRIM_WITH_NAME		_DEFINE_PRIM_WITH_NAME
