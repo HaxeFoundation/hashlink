@@ -179,12 +179,17 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		}
 		for(i=0;i<o->nbindings;i++) {
 			int j;
+			int fid = o->bindings[i<<1];
 			bool found = false;
-			for(j=0;j<p->nbindings;j++)
-				if( o->bindings[i<<1] == p->bindings[j].fid ) {
-					found = true;
-					break;
-				}
+			hl_type_obj *pp = p ? p->t->obj : NULL;
+			while( pp && !found ) {
+				for(j=0;j<pp->nbindings;j++)
+					if( pp->bindings[j<<1] == fid ) {
+						found = true;
+						break;
+					}
+				pp = pp->super ? pp->super->obj : NULL;
+			}
 			if( !found )
 				t->nbindings++;
 		}
