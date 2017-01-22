@@ -127,22 +127,6 @@ static int module_capture_stack( void **stack, int size ) {
 	return count;
 }
 
-static void hl_init_enum( hl_type_enum *e ) {
-	int i, j;
-	for(i=0;i<e->nconstructs;i++) {
-		hl_enum_construct *c = &e->constructs[i];
-		c->hasptr = false;
-		c->size = sizeof(int); // index
-		for(j=0;j<c->nparams;j++) {
-			hl_type *t = c->params[j];
-			c->size += hl_pad_size(c->size,t);
-			c->offsets[j] = c->size;
-			if( hl_is_ptr(t) ) c->hasptr = true;
-			c->size += hl_type_size(t);
-		}
-	}
-}
-
 static void hl_module_types_dump( void (*fdump)( void *, int) ) {
 	int ntypes = cur_module->code->ntypes;
 	int i, fcount = 0;

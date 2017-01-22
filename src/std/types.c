@@ -292,6 +292,22 @@ HL_PRIM vbyte* hl_type_name( hl_type *t ) {
 	return NULL;
 }
 
+HL_PRIM void hl_init_enum( hl_type *et ) {
+	int i, j;
+	for(i=0;i<et->tenum->nconstructs;i++) {
+		hl_enum_construct *c = et->tenum->constructs + i;
+		c->hasptr = false;
+		c->size = sizeof(int); // index
+		for(j=0;j<c->nparams;j++) {
+			hl_type *t = c->params[j];
+			c->size += hl_pad_size(c->size,t);
+			c->offsets[j] = c->size;
+			if( hl_is_ptr(t) ) c->hasptr = true;
+			c->size += hl_type_size(t);
+		}
+	}
+}
+
 HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
 	varray *a = hl_alloc_array(&hlt_bytes,t->tenum->nconstructs);
 	int i;

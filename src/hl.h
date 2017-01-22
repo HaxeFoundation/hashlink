@@ -319,6 +319,7 @@ HL_API int hl_stack_size( hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
 HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
+HL_API void hl_init_enum( hl_type *et );
 
 /* -------------------- VALUES ------------------------------ */
 
