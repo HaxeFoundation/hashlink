@@ -325,7 +325,7 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 			}
 			break;
 		case HENUM:
-			hl_init_enum(t->tenum);
+			hl_init_enum(t);
 			t->tenum->global_value = ((int)(int_val)t->tenum->global_value) ? (void**)(int_val)(m->globals_data + m->globals_indexes[(int)(int_val)t->tenum->global_value-1]) : NULL;
 			break;
 		case HVIRTUAL:
