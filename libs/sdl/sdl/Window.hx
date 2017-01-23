@@ -69,7 +69,6 @@ class Window {
 			var spent = haxe.Timer.stamp() - lastFrame;
 			if( spent < 0.005 ) Sys.sleep(0.005 - spent);
 		}
-		GL.finish();
 		winSwapWindow(win);
 		lastFrame = haxe.Timer.stamp();
 	}
