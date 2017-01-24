@@ -24,6 +24,9 @@ abstract Renderbuffer(Null<Int>) {
 abstract Query(Null<Int>) {
 }
 
+abstract VertexArray(Null<Int>) {
+}
+
 @:hlNative("sdl","gl_")
 class GL {
 
@@ -122,6 +125,9 @@ class GL {
 
 	public static function createProgram() : Program {
 		return null;
+	}
+
+	public static function bindFragDataLocation( p : Program, colorNumber : Int, name : String ) : Void {
 	}
 
 	public static function attachShader( p : Program, s : Shader ) {
@@ -313,6 +319,17 @@ class GL {
 	}
 
 	public static function queryCounter( q : Query, target : Int ) {
+	}
+
+	// vertexarray
+	public static function createVertexArray() : VertexArray {
+		return null;
+	}
+
+	public static function bindVertexArray( a : VertexArray ) : Void {
+	}
+
+	public static function deleteVertexArray( a : VertexArray ) : Void {
 	}
 
 	// ----- CONSTANTS -----
