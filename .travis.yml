@@ -44,14 +44,14 @@ matrix:
       env: BUILD=make
       before_install:
         - brew update
-        - brew install jpeg-turbo sdl2
+        - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft
     - haxe: development
       os: osx
       osx_image: xcode8
       env: BUILD=cmake
       before_install:
         - brew update
-        - brew install jpeg-turbo sdl2
+        - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft
       install:
         - cmake .
         - make
@@ -63,14 +63,14 @@ matrix:
       env: BUILD=make
       before_install:
         - brew update
-        - brew install jpeg-turbo sdl2
+        - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft
     - haxe: development
       os: osx
       osx_image: xcode7.1
       env: BUILD=cmake
       before_install:
         - brew update
-        - brew install jpeg-turbo sdl2
+        - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft
       install:
         - cmake .
         - make

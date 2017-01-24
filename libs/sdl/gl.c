@@ -3,7 +3,7 @@
 
 #if defined(__APPLE__)
 #	include <SDL2/SDL.h>
-#	include <OpenGL/gl.h>
+#	include <OpenGL/gl3.h>
 #elif defined(_WIN32)
 #	include <SDL.h>
 #	include <GL/GLU.h>
@@ -200,6 +200,12 @@ HL_PRIM vdynamic *HL_NAME(gl_create_program)() {
 	GLOGR("%d",v,"");
 	if( v == 0 ) return NULL;
 	return alloc_i32(v);
+}
+
+HL_PRIM void HL_NAME(gl_bind_frag_data_location)( vdynamic *p, int colNum, vstring *name ) {
+	char *cname = hl_to_utf8(name->bytes);
+	GLOG("%d,%d,%n",p->v.i,colNum,cname);
+	glBindFragDataLocation(p->v.i, colNum, cname);
 }
 
 HL_PRIM void HL_NAME(gl_attach_shader)( vdynamic *p, vdynamic *s ) {
@@ -530,6 +536,27 @@ HL_PRIM void HL_NAME(gl_query_counter)( vdynamic *q, int target ) {
 	glQueryCounter(q->v.i, target);
 }
 
+// vertex array
+
+HL_PRIM vdynamic *HL_NAME(gl_create_vertex_array)() {
+	unsigned int f = 0;
+	glGenVertexArrays(1, &f);
+	GLOGR("%d",f,"");
+	return alloc_i32(f);
+}
+
+HL_PRIM void HL_NAME(gl_bind_vertex_array)( vdynamic *b ) {
+	unsigned int bb = (unsigned)b->v.i;
+	GLOG("%d",bb);
+	glBindVertexArray(bb);
+}
+
+HL_PRIM void HL_NAME(gl_delete_vertex_array)( vdynamic *b ) {
+	unsigned int bb = (unsigned)b->v.i;
+	GLOG("%d",bb);
+	glDeleteVertexArrays(1, &bb);
+}
+
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_clear,_I32);
@@ -556,6 +583,7 @@ DEFINE_PRIM(_VOID,gl_stencil_mask_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_func_separate,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_op_separate,_I32  _I32 _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_program,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_bind_frag_data_location,_NULL(_I32) _I32 _STRING);
 DEFINE_PRIM(_VOID,gl_attach_shader,_NULL(_I32) _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_link_program,_NULL(_I32));
 DEFINE_PRIM(_DYN,gl_get_program_parameter,_NULL(_I32) _I32);
@@ -599,6 +627,9 @@ DEFINE_PRIM(_VOID,gl_delete_buffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_uniform1i,_NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_uniform4fv,_NULL(_I32) _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_elements,_I32 _I32 _I32 _I32);
+DEFINE_PRIM(_NULL(_I32),gl_create_vertex_array,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_bind_vertex_array,_NULL(_I32));
+DEFINE_PRIM(_VOID,gl_delete_vertex_array,_NULL(_I32));
 
 
 DEFINE_PRIM(_NULL(_I32), gl_create_query, _NO_ARG);

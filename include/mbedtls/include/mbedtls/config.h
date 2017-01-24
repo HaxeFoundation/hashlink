@@ -25,6 +25,7 @@
  *  This file is part of mbed TLS (https://tls.mbed.org)
  */
 
+
 #ifndef MBEDTLS_CONFIG_H
 #define MBEDTLS_CONFIG_H
 
@@ -1274,7 +1275,9 @@
  *
  * Uncomment this to allow your own alternate threading implementation.
  */
+#ifdef _WIN32
 #define MBEDTLS_THREADING_ALT
+#endif
 
 /**
  * \def MBEDTLS_THREADING_PTHREAD
@@ -1285,7 +1288,9 @@
  *
  * Uncomment this to enable pthread mutexes.
  */
-//#define MBEDTLS_THREADING_PTHREAD
+#ifndef _WIN32
+#define MBEDTLS_THREADING_PTHREAD
+#endif
 
 /**
  * \def MBEDTLS_VERSION_FEATURES
