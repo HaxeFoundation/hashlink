@@ -5,7 +5,7 @@ ifndef ARCH
 	ARCH = $(LBITS)
 endif
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mbedtls/include -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 LIBFLAGS =
 HLFLAGS = -ldl
