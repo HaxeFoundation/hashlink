@@ -7,6 +7,8 @@ platform: Win32
 configuration: Release
 
 environment:
+  global:
+    HAXELIB_ROOT: C:\projects\haxelib
   matrix:
     - builder: cmake
     - builder: vc
@@ -21,13 +23,14 @@ install:
   - 7z x openal-soft-1.17.2-bin.zip
   - move openal-soft-1.17.2-bin include/openal
   # install neko and haxe
-  #- cinst neko -y
-  - appveyor DownloadFile http://hxbuilds.s3-website-us-east-1.amazonaws.com/builds/haxe/windows/haxe_latest.tar.gz
-  - 7z x "haxe_latest.tar.gz" -so | 7z x -aoa -si -ttar
+  - cinst neko -y
+  - cinst haxe --prerelease --ignore-dependencies -s 'https://ci.appveyor.com/nuget/haxe' -y
   - RefreshEnv
-  - set PATH=%APPVEYOR_BUILD_FOLDER%\haxe-3.4.0-rc2;%PATH%
-  #- neko -version
-  - haxe -version 
+  - neko -version
+  - haxe -version
+  # setup haxelib
+  - mkdir "%HAXELIB_ROOT%"
+  - haxelib setup "%HAXELIB_ROOT%"
 
 build_script:
   # if "%builder%"=="vc" 
