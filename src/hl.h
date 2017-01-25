@@ -631,7 +631,7 @@ typedef struct {
 #define hl_fatal4(msg,p0,p1,p2,p3)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1,p2,p3)
 HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
 HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
-HL_API void hl_sys_init(void **args, int nargs);
+HL_API void hl_sys_init(void **args, int nargs, void *hlfile);
 HL_API void hl_setup_callbacks(void *sc, void *gw);
 
 #include <setjmp.h>

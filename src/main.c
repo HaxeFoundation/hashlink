@@ -125,7 +125,7 @@ int main(int argc, pchar *argv[]) {
 	exit(1);
 #	endif
 	hl_global_init(&ctx);
-	hl_sys_init((void**)argv,argc);
+	hl_sys_init((void**)argv,argc,file);
 	ctx.code = load_code(file);
 	if( ctx.code == NULL )
 		return 1;

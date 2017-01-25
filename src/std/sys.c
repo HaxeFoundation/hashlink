@@ -527,11 +527,20 @@ HL_PRIM varray *hl_sys_args() {
 	return a;
 }
 
-HL_PRIM void hl_sys_init(void **args, int nargs) {
+static void *hl_file = NULL;
+
+HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 	sys_args = (pchar**)args;
 	sys_nargs = nargs;
+	hl_file = hlfile;
 }
 
+HL_PRIM vbyte *hl_sys_hl_file() {
+	return hl_file;
+}
+
+
+DEFINE_PRIM(_BYTES, sys_hl_file, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_utf8_path, _NO_ARG);
 DEFINE_PRIM(_BYTES, sys_string, _NO_ARG);
 DEFINE_PRIM(_VOID, sys_print, _BYTES);
