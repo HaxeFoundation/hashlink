@@ -117,8 +117,14 @@ int main(int argc, pchar *argv[]) {
 		break;
 	}
 	if( file == NULL ) {
-		printf("HL/JIT %d.%d.%d (c)2015-2016 Haxe Foundation\n  Usage : hl [--debug <port>] <file>\n",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
-		return 1;
+		FILE *fchk;
+		file = PSTR("hlboot.dat");
+		fchk = pfopen(file,"rb");
+		if( fchk == NULL ) {
+			printf("HL/JIT %d.%d.%d (c)2015-2016 Haxe Foundation\n  Usage : hl [--debug <port>] <file>\n",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
+			return 1;
+		}
+		fclose(fchk);
 	}
 #	ifdef HL_64
 	fprintf(stderr,"HL/JIT is currently not supported when compiled to 64 bits, use make ARCH=32 to compile to 32 bits\n");
