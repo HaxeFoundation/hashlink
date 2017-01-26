@@ -82,10 +82,15 @@ typedef enum {
 	MOVSD,
 	MOVSS,
 	COMISD,
+	COMISS,
 	ADDSD,
 	SUBSD,
 	MULSD,
 	DIVSD,
+	ADDSS,
+	SUBSS,
+	MULSS,
+	DIVSS,
 	XORPD,
 	CVTSI2SD,
 	CVTSI2SS,
@@ -405,10 +410,15 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
 	{ "COMISD", 0x660F2F },
+	{ "COMISS", LONG_OP(0x0F2F) },
 	{ "ADDSD", 0xF20F58 },
 	{ "SUBSD", 0xF20F5C },
 	{ "MULSD", 0xF20F59 },
 	{ "DIVSD", 0xF20F5E },
+	{ "ADDSS", 0xF30F58 },
+	{ "SUBSS", 0xF30F5C },
+	{ "MULSS", 0xF30F59 },
+	{ "DIVSS", 0xF30F5E },
 	{ "XORPD", 0x660F57 },
 	{ "CVTSI2SD", 0xF20F2A },
 	{ "CVTSI2SS", 0xF30F2A },
@@ -1352,25 +1362,26 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	preg *pa = fetch(a), *pb = fetch(b), *out = NULL;
 	CpuOp o;
 	if( IS_FLOAT(a) ) {
+		bool isf32 = a->t->kind == HF32;
 		switch( op->op ) {
-		case OAdd: o = ADDSD; break;
-		case OSub: o = SUBSD; break;
-		case OMul: o = MULSD; break;
-		case OSDiv: o = DIVSD; break;
+		case OAdd: o = isf32 ? ADDSS : ADDSD; break;
+		case OSub: o = isf32 ? SUBSS : SUBSD; break;
+		case OMul: o = isf32 ? MULSS : MULSD; break;
+		case OSDiv: o = isf32 ? DIVSS : DIVSD; break;
 		case OJSLt:
 		case OJSGte:
 		case OJSLte:
 		case OJSGt:
 		case OJEq:
 		case OJNotEq:
-			o = COMISD;
+			o = isf32 ? COMISS : COMISD;
 			break;
 		case OSMod:
 			{
 				int args[] = { a->stack.id, b->stack.id };
 				int size = prepare_call_args(ctx,2,args,ctx->vregs,true,0);
 				void *mod_fun;
-				if( a->t->kind == HF32 ) mod_fun = fmodf; else mod_fun = fmod; 
+				if( isf32 ) mod_fun = fmodf; else mod_fun = fmod; 
 				call_native(ctx,mod_fun,size);
 				store_result(ctx,dst);
 				return fetch(dst);
