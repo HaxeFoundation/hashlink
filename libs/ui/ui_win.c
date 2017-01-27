@@ -245,6 +245,10 @@ HL_PRIM void HL_NAME(ui_sentinel_tick)( vsentinel *s ) {
 	s->ticks++;
 }
 
+HL_PRIM void HL_NAME(ui_close_console)() {
+	FreeConsole();
+}
+
 #define _WIN _ABSTRACT(ui_window)
 #define _SENTINEL _ABSTRACT(ui_sentinel)
 
@@ -258,6 +262,7 @@ DEFINE_PRIM(_VOID, ui_win_set_enable, _WIN _BOOL);
 DEFINE_PRIM(_VOID, ui_win_destroy, _WIN);
 DEFINE_PRIM(_I32, ui_loop, _BOOL);
 DEFINE_PRIM(_VOID, ui_stop_loop, _NO_ARG);
+DEFINE_PRIM(_VOID, ui_close_console, _NO_ARG);
 
 DEFINE_PRIM(_SENTINEL, ui_start_sentinel, _F64 _FUN(_VOID,_NO_ARG));
 DEFINE_PRIM(_VOID, ui_sentinel_tick, _SENTINEL);
