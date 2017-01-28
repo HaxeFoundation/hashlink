@@ -248,6 +248,7 @@ struct jit_ctx {
 	vreg *vregs;
 	preg pregs[REG_COUNT];
 	vreg *savedRegs[REG_COUNT];
+	int savedLocks[REG_COUNT];
 	int *opsPos;
 	int maxRegs;
 	int maxOps;
@@ -316,8 +317,10 @@ static preg *paddr( preg *r, void *p ) {
 
 static void save_regs( jit_ctx *ctx ) {
 	int i;
-	for(i=0;i<REG_COUNT;i++)
+	for(i=0;i<REG_COUNT;i++) {
 		ctx->savedRegs[i] = ctx->pregs[i].holds;
+		ctx->savedLocks[i] = ctx->pregs[i].lock;
+	}
 }
 
 static void restore_regs( jit_ctx *ctx ) {
@@ -328,7 +331,7 @@ static void restore_regs( jit_ctx *ctx ) {
 		vreg *r = ctx->savedRegs[i];
 		preg *p = ctx->pregs + i;
 		p->holds = r;
-		p->lock = -1;
+		p->lock = ctx->savedLocks[i];
 		if( r ) r->current = p;	
 	}
 }
