@@ -1489,6 +1489,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HENUM:
 	case HDYN:
 	case HTYPE:
+	case HABSTRACT:
 #	endif
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
@@ -1526,6 +1527,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HENUM:
 	case HDYN:
 	case HTYPE:
+	case HABSTRACT:
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
 		case ID2(RCPU,RSTACK):
