@@ -385,7 +385,7 @@ static void make_array_result( fd_set *set, varray *a ) {
 		hl_socket *s = aptr[i];
 		if( s == NULL )
 			break;
-		if( FD_ISSET(set,s->sock) )
+		if( FD_ISSET(s->sock,set) )
 			aptr[pos++] = s;
 	}
 	if( pos < a->size )
