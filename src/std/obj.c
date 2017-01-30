@@ -955,12 +955,9 @@ HL_PRIM vdynamic *hl_obj_copy( vdynamic *obj ) {
 		{
 			vvirtual *v = (vvirtual*)obj;
 			vvirtual *v2;
-			int i;
 			if( v->value )
 				return hl_obj_copy(v->value);
 			v2 = hl_alloc_virtual(v->t);
-			for(i=0;i<v->t->virt->nfields;i++)
-				((void**)(v2 + 1))[i] = ((vvirtual**)(v + 1))[i] + (v2 - v);
 			memcpy((void**)(v2 + 1) + v->t->virt->nfields, (void**)(v + 1) + v->t->virt->nfields, v->t->virt->dataSize);
 			return (vdynamic*)v2;
 		}
