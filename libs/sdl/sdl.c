@@ -4,6 +4,7 @@
 
 #ifdef _WIN32
 #	include <SDL.h>
+#	include <SDL_syswm.h>
 #else
 #	include <SDL2/SDL.h>
 #endif
@@ -11,6 +12,14 @@
 #ifndef _SDL_H
 #	error "SDL2 SDK not found in hl/include/sdl/"
 #endif
+
+typedef struct {
+	int x;
+	int y;
+	int w;
+	int h;
+	int style;
+} wsave_pos;
 
 typedef enum {
 	Quit,
@@ -278,8 +287,55 @@ HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {
 	return SDL_GL_CreateContext(win);
 }
 
-HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, bool b) {
-	return SDL_SetWindowFullscreen(win, b ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) == 0;
+HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
+#	ifdef HL_WIN
+	wsave_pos *save = SDL_GetWindowData(win,"save");
+	SDL_SysWMinfo info;
+	HWND wnd;
+	SDL_VERSION(&info.version);
+	SDL_GetWindowWMInfo(win,&info);
+	wnd = info.info.win.window;
+	if( save && mode != 2 ) {
+		// exit borderless
+		SetWindowLong(wnd,GWL_STYLE,save->style);
+		SetWindowPos(wnd,NULL,save->x,save->y,save->w,save->h,0);
+		free(save);
+		SDL_SetWindowData(win,"save",NULL);
+		save = NULL;
+	}
+#	endif
+	switch( mode ) {
+	case 0: // WINDOWED
+		return SDL_SetWindowFullscreen(win, 0) == 0;
+	case 1: // FULLSCREEN
+		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0;
+	case 2: // BORDERLESS
+#		ifdef _WIN32
+		{
+			HMONITOR hmon = MonitorFromWindow(wnd,MONITOR_DEFAULTTONEAREST);
+			MONITORINFO mi = { sizeof(mi) };
+			RECT r;
+			if( !GetMonitorInfo(hmon, &mi) )
+				return false;
+			GetWindowRect(wnd,&r);
+			save = (wsave_pos*)malloc(sizeof(wsave_pos));
+			save->x = r.left;
+			save->y = r.top;
+			save->w = r.right - r.left;
+			save->h = r.bottom - r.top;
+			save->style = GetWindowLong(wnd,GWL_STYLE);
+			SDL_SetWindowData(win,"save",save);
+			SetWindowLong(wnd,GWL_STYLE, WS_POPUP | WS_VISIBLE);
+			SetWindowPos(wnd,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top + 1 /* prevent opengl driver to use exclusive mode !*/,0);
+			return true;
+		}
+#	else
+		break;
+#	endif
+	case 3:
+		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN) == 0;
+	}
+	return false;
 }
 
 HL_PRIM void HL_NAME(win_set_size)(SDL_Window *win, int width, int height) {
@@ -324,7 +380,7 @@ HL_PRIM void HL_NAME(win_destroy)(SDL_Window *win, SDL_GLContext gl) {
 #define TGL _ABSTRACT(sdl_gl)
 DEFINE_PRIM(TWIN, win_create, _BYTES _I32 _I32);
 DEFINE_PRIM(TGL, win_get_glcontext, TWIN);
-DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _BOOL);
+DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _I32);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));

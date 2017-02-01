@@ -3,6 +3,16 @@ package sdl;
 private typedef WinPtr = hl.Abstract<"sdl_window">;
 private typedef GLContext = hl.Abstract<"sdl_gl">;
 
+@:enum abstract DisplayMode(Int) {
+	var Windowed = 0;
+	var Fullscreen = 1;
+	/**
+		Fullscreen not exclusive.
+	**/
+	var Borderless = 2;
+	var FullscreenResize = 3;
+}
+
 @:hlNative("sdl")
 class Window {
 
@@ -14,7 +24,7 @@ class Window {
 	public var vsync(default, set) : Bool;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
-	public var fullScreen(default, set) : Bool;
+	public var displayMode(default, set) : DisplayMode;
 
 	public function new( title : String, width : Int, height : Int ) {
 		win = winCreate(@:privateAccess title.toUtf8(), width, height);
@@ -26,12 +36,12 @@ class Window {
 		vsync = true;
 	}
 
-	function set_fullScreen(b) {
-		if( b == fullScreen )
-			return b;
-		if( winSetFullscreen(win, b) )
-			fullScreen = b;
-		return fullScreen;
+	function set_displayMode(mode) {
+		if( mode == displayMode )
+			return mode;
+		if( winSetFullscreen(win, cast mode) )
+			displayMode = mode;
+		return displayMode;
 	}
 
 	public function resize( width : Int, height : Int ) {
@@ -103,7 +113,7 @@ class Window {
 	static function winSwapWindow( win : WinPtr ) {
 	}
 
-	static function winSetFullscreen( win : WinPtr, b : Bool ) {
+	static function winSetFullscreen( win : WinPtr, mode : DisplayMode ) {
 		return false;
 	}
 

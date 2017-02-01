@@ -71,13 +71,13 @@ class Sdl {
 		if( dismissErrors )
 			return;
 
-		var wasFS = null;
+		var wasFS = [];
 		for( w in @:privateAccess Window.windows ) {
-			if( w.fullScreen ) {
-				// SDL full screen does not play well with error dialog
-				w.fullScreen = false;
-				wasFS = w;
-				break;
+			switch( w.displayMode ) {
+			case Windowed, Borderless:
+			default:
+				wasFS.push({ w : w, mode : w.displayMode });
+				w.displayMode = Windowed;
 			}
 		}
 
@@ -103,8 +103,8 @@ class Sdl {
 			tick();
 		f.destroy();
 
-		if( wasFS != null )
-			wasFS.fullScreen = true;
+		for( w in wasFS )
+			w.w.displayMode = w.mode;
 	}
 
 	public static function quit() {
