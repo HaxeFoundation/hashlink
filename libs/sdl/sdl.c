@@ -326,7 +326,7 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 			save->style = GetWindowLong(wnd,GWL_STYLE);
 			SDL_SetWindowData(win,"save",save);
 			SetWindowLong(wnd,GWL_STYLE, WS_POPUP | WS_VISIBLE);
-			SetWindowPos(wnd,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top + 1 /* prevent opengl driver to use exclusive mode !*/,0);
+			SetWindowPos(wnd,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top + 2 /* prevent opengl driver to use exclusive mode !*/,0);
 			return true;
 		}
 #	else
