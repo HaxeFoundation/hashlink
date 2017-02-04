@@ -33,3 +33,4 @@ ReleaseStatic
 /src/hl
 /src/haxe
 /src/Makefile
+/include/ffmpeg
