@@ -1,5 +1,33 @@
 language: haxe
 
+linux32_before_install: &linux32_before_install
+    - sudo dpkg --add-architecture i386
+    - sudo apt-get update -y
+    - sudo apt-get install -y
+        gcc-multilib
+        libz-dev:i386
+        zlib1g-dev:i386
+        libturbojpeg:i386
+        libpng-dev:i386
+        libsdl2-dev:i386
+        libvorbis-dev:i386
+        libalut-dev:i386
+
+linux64_before_install: &linux64_before_install
+    - sudo apt-get update -y
+    - sudo apt-get install -y
+        libz-dev
+        zlib1g-dev
+        libturbojpeg
+        libpng-dev
+        libsdl2-dev
+        libvorbis-dev
+        libalut-dev
+
+mac_before_install: &mac_before_install
+  - brew update
+  - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft mbedtls
+
 sudo: required
 matrix:
   allow_failures:
@@ -10,10 +38,7 @@ matrix:
       os: linux
       dist: trusty
       env: ARCH=32 BUILD=cmake
-      before_install:
-        - sudo dpkg --add-architecture i386
-        - sudo apt-get update -y
-        - sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 libvorbis-dev:i386 libalut-dev:i386 -y
+      before_install: *linux32_before_install
       install:
         - cmake -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake
         - make
@@ -23,35 +48,26 @@ matrix:
       os: linux
       dist: trusty
       env: ARCH=32 BUILD=make
-      before_install:
-        - sudo dpkg --add-architecture i386
-        - sudo apt-get update -y
-        - sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 libvorbis-dev:i386 libalut-dev:i386 -y
+      before_install: *linux32_before_install
       before_script:
         - sudo ldconfig
     - haxe: development
       os: linux
       dist: trusty
-      env: ARCH=64
-      before_install:
-        - sudo apt-get update -y
-        - sudo apt-get install libz-dev zlib1g-dev libturbojpeg libpng-dev libsdl2-dev libvorbis-dev libalut-dev -y
+      env: ARCH=64 BUILD=make
+      before_install: *linux64_before_install
       before_script:
         - sudo ldconfig
     - haxe: development
       os: osx
       osx_image: xcode8
       env: BUILD=make
-      before_install:
-        - brew update
-        - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft
+      before_install: *mac_before_install
     - haxe: development
       os: osx
       osx_image: xcode8
       env: BUILD=cmake
-      before_install:
-        - brew update
-        - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft
+      before_install: *mac_before_install
       install:
         - cmake .
         - make
@@ -61,16 +77,12 @@ matrix:
       os: osx
       osx_image: xcode7.1
       env: BUILD=make
-      before_install:
-        - brew update
-        - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft
+      before_install: *mac_before_install
     - haxe: development
       os: osx
       osx_image: xcode7.1
       env: BUILD=cmake
-      before_install:
-        - brew update
-        - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft
+      before_install: *mac_before_install
       install:
         - cmake .
         - make
