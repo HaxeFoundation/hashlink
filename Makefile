@@ -54,6 +54,7 @@ CFLAGS += -m$(ARCH) -I /opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/i
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
 LIBFLAGS += -L/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
 LIBOPENGL = -framework OpenGL
+LIBOPENAL = -framework OpenAL
 LIBSSL = -framework Security -framework CoreFoundation
 
 
@@ -69,6 +70,8 @@ LIBTURBOJPEG = -l:libturbojpeg.so.0
 ifeq ($(ARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
 endif
+
+LIBOPENAL = -lopenal
 
 endif
 
@@ -93,10 +96,10 @@ fmt: ${FMT} libhl
 	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
 sdl: ${SDL} libhl
-	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 -lopenal $(LIBOPENGL)
+	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENAL) $(LIBOPENGL)
 
 ssl: ${SSL} libhl
-	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl $(LIBSSL)
+	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
 
 .SUFFIXES : .c .o
 
