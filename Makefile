@@ -5,7 +5,7 @@ ifndef ARCH
 	ARCH = $(LBITS)
 endif
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mbedtls/include -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 LIBFLAGS =
 HLFLAGS = -ldl
@@ -29,30 +29,6 @@ FMT = libs/fmt/fmt.o
 SDL = libs/sdl/sdl.o libs/sdl/gl.o libs/sdl/openal.o
 
 SSL = libs/ssl/ssl.o
-
-MBEDTLS = include/mbedtls/library/ssl_srv.o include/mbedtls/library/sha512.o include/mbedtls/library/sha256.o \
-	include/mbedtls/library/pk_wrap.o include/mbedtls/library/pem.o include/mbedtls/library/pkwrite.o \
-	include/mbedtls/library/xtea.o include/mbedtls/library/gcm.o include/mbedtls/library/des.o \
-	include/mbedtls/library/ssl_cli.o include/mbedtls/library/aes.o include/mbedtls/library/ecp_curves.o \
-	include/mbedtls/library/aesni.o include/mbedtls/library/blowfish.o include/mbedtls/library/ssl_cookie.o \
-	include/mbedtls/library/ecp.o include/mbedtls/library/ecdh.o include/mbedtls/library/x509_create.o \
-	include/mbedtls/library/timing.o include/mbedtls/library/pk.o include/mbedtls/library/md.o \
-	include/mbedtls/library/pkcs5.o include/mbedtls/library/oid.o include/mbedtls/library/pkcs11.o \
-	include/mbedtls/library/error.o include/mbedtls/library/ccm.o include/mbedtls/library/ssl_ticket.o \
-	include/mbedtls/library/asn1write.o include/mbedtls/library/certs.o include/mbedtls/library/threading.o \
-	include/mbedtls/library/padlock.o include/mbedtls/library/x509_crl.o include/mbedtls/library/debug.o \
-	include/mbedtls/library/platform.o include/mbedtls/library/dhm.o include/mbedtls/library/pkcs12.o \
-	include/mbedtls/library/ssl_ciphersuites.o include/mbedtls/library/cipher_wrap.o \
-	include/mbedtls/library/base64.o include/mbedtls/library/x509write_csr.o include/mbedtls/library/ripemd160.o \
-	include/mbedtls/library/rsa.o include/mbedtls/library/entropy_poll.o include/mbedtls/library/x509write_crt.o \
-	include/mbedtls/library/pkparse.o include/mbedtls/library/ssl_cache.o include/mbedtls/library/x509_crt.o \
-	include/mbedtls/library/ecdsa.o include/mbedtls/library/md_wrap.o include/mbedtls/library/md5.o \
-	include/mbedtls/library/version.o include/mbedtls/library/arc4.o include/mbedtls/library/ctr_drbg.o \
-	include/mbedtls/library/ecjpake.o include/mbedtls/library/entropy.o include/mbedtls/library/sha1.o \
-	include/mbedtls/library/x509.o include/mbedtls/library/camellia.o include/mbedtls/library/cipher.o \
-	include/mbedtls/library/memory_buffer_alloc.o include/mbedtls/library/hmac_drbg.o include/mbedtls/library/ssl_tls.o \
-	include/mbedtls/library/havege.o include/mbedtls/library/version_features.o include/mbedtls/library/asn1parse.o \
-	include/mbedtls/library/bignum.o include/mbedtls/library/x509_csr.o
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -119,8 +95,8 @@ fmt: ${FMT} libhl
 sdl: ${SDL} libhl
 	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 -lopenal $(LIBOPENGL)
 
-ssl: ${MBEDTLS} ${SSL} libhl
-	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${MBEDTLS} ${LIBFLAGS} -L. -lhl $(LIBSSL)
+ssl: ${SSL} libhl
+	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl $(LIBSSL)
 
 .SUFFIXES : .c .o
 
@@ -128,7 +104,7 @@ ssl: ${MBEDTLS} ${SSL} libhl
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${MBEDTLS} ${SSL}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL}
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
