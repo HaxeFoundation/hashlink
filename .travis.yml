@@ -13,7 +13,7 @@ matrix:
       before_install:
         - sudo dpkg --add-architecture i386
         - sudo apt-get update -y
-        - sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 -y
+        - sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 libvorbis-dev:i386 -y
       install:
         - cmake -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake
         - make
@@ -26,7 +26,7 @@ matrix:
       before_install:
         - sudo dpkg --add-architecture i386
         - sudo apt-get update -y
-        - sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 -y
+        - sudo apt-get install gcc-multilib libz-dev:i386 zlib1g-dev:i386 libturbojpeg:i386 libpng-dev:i386 libsdl2-dev:i386 libvorbis-dev:i386 -y
       before_script:
         - sudo ldconfig
     - haxe: development
@@ -35,7 +35,7 @@ matrix:
       env: ARCH=64
       before_install:
         - sudo apt-get update -y
-        - sudo apt-get install libz-dev zlib1g-dev libturbojpeg libpng-dev libsdl2-dev -y
+        - sudo apt-get install libz-dev zlib1g-dev libturbojpeg libpng-dev libsdl2-dev libvorbis-dev -y
       before_script:
         - sudo ldconfig
     - haxe: development
