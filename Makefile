@@ -109,18 +109,18 @@ libhl: ${LIB}
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
 
-hl: ${HL}
+hl: ${HL} libhl
 	echo $(ARCH)
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
 
-fmt: ${FMT}
-	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
+fmt: ${FMT} libhl
+	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
-sdl: ${SDL}
-	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -lhl -lSDL2 -lopenal $(LIBOPENGL)
+sdl: ${SDL} libhl
+	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 -lopenal $(LIBOPENGL)
 
-ssl: ${MBEDTLS} ${SSL}
-	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${MBEDTLS} ${LIBFLAGS} -lhl $(LIBSSL)
+ssl: ${MBEDTLS} ${SSL} libhl
+	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${MBEDTLS} ${LIBFLAGS} -L. -lhl $(LIBSSL)
 
 .SUFFIXES : .c .o
 
