@@ -12,6 +12,15 @@ linux32_before_install: &linux32_before_install
         libsdl2-dev:i386
         libvorbis-dev:i386
         libalut-dev:i386
+    # install mbedtls
+    - mkdir ~/mbedtls
+    - pushd ~/mbedtls
+    -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
+    -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
+    -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
+    -   SHARED=1 make lib
+    -   sudo make install
+    - popd
 
 linux64_before_install: &linux64_before_install
     - sudo apt-get update -y
@@ -23,6 +32,15 @@ linux64_before_install: &linux64_before_install
         libsdl2-dev
         libvorbis-dev
         libalut-dev
+    # install mbedtls
+    - mkdir ~/mbedtls
+    - pushd ~/mbedtls
+    -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
+    -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
+    -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
+    -   SHARED=1 make lib
+    -   sudo make install
+    - popd
 
 mac_before_install: &mac_before_install
   - brew update
