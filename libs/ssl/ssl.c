@@ -8,6 +8,7 @@
 #else
 #include <sys/socket.h>
 #include <strings.h>
+#include <errno.h>
 typedef int SOCKET;
 #endif
 
