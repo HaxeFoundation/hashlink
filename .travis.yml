@@ -18,7 +18,7 @@ linux32_before_install: &linux32_before_install
   -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
   -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
   -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
-  -   SHARED=1 make lib
+  -   SHARED=1 CFLAGS="-O2 -m32" make lib
   -   sudo make install
   - popd
   - haxelib install hashlink
