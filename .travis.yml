@@ -1,50 +1,53 @@
 language: haxe
 
 linux32_before_install: &linux32_before_install
-    - sudo dpkg --add-architecture i386
-    - sudo apt-get update -y
-    - sudo apt-get install -y
-        gcc-multilib
-        libz-dev:i386
-        zlib1g-dev:i386
-        libturbojpeg:i386
-        libpng-dev:i386
-        libsdl2-dev:i386
-        libvorbis-dev:i386
-        libalut-dev:i386
-    # install mbedtls
-    - mkdir ~/mbedtls
-    - pushd ~/mbedtls
-    -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
-    -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
-    -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
-    -   SHARED=1 make lib
-    -   sudo make install
-    - popd
+  - sudo dpkg --add-architecture i386
+  - sudo apt-get update -y
+  - sudo apt-get install -y
+      gcc-multilib
+      libz-dev:i386
+      zlib1g-dev:i386
+      libturbojpeg:i386
+      libpng-dev:i386
+      libsdl2-dev:i386
+      libvorbis-dev:i386
+      libalut-dev:i386
+  # install mbedtls
+  - mkdir ~/mbedtls
+  - pushd ~/mbedtls
+  -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
+  -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
+  -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
+  -   SHARED=1 make lib
+  -   sudo make install
+  - popd
+  - haxelib install hashlink
 
 linux64_before_install: &linux64_before_install
-    - sudo apt-get update -y
-    - sudo apt-get install -y
-        libz-dev
-        zlib1g-dev
-        libturbojpeg
-        libpng-dev
-        libsdl2-dev
-        libvorbis-dev
-        libalut-dev
-    # install mbedtls
-    - mkdir ~/mbedtls
-    - pushd ~/mbedtls
-    -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
-    -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
-    -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
-    -   SHARED=1 make lib
-    -   sudo make install
-    - popd
+  - sudo apt-get update -y
+  - sudo apt-get install -y
+      libz-dev
+      zlib1g-dev
+      libturbojpeg
+      libpng-dev
+      libsdl2-dev
+      libvorbis-dev
+      libalut-dev
+  # install mbedtls
+  - mkdir ~/mbedtls
+  - pushd ~/mbedtls
+  -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
+  -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
+  -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
+  -   SHARED=1 make lib
+  -   sudo make install
+  - popd
+  - haxelib install hashlink
 
 mac_before_install: &mac_before_install
   - brew update
   - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft mbedtls
+  - haxelib install hashlink
 
 sudo: required
 matrix:
