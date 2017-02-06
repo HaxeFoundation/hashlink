@@ -53,7 +53,6 @@ sudo: required
 matrix:
   allow_failures:
     - os: osx
-    - env: ARCH=64
   include:
     - haxe: development
       os: linux
@@ -82,12 +81,12 @@ matrix:
     - haxe: development
       os: osx
       osx_image: xcode8
-      env: BUILD=make
+      env: ARCH=64 BUILD=make
       before_install: *mac_before_install
     - haxe: development
       os: osx
       osx_image: xcode8
-      env: BUILD=cmake
+      env: ARCH=64 BUILD=cmake
       before_install: *mac_before_install
       install:
         - cmake .
@@ -97,12 +96,12 @@ matrix:
     - haxe: development
       os: osx
       osx_image: xcode7.1
-      env: BUILD=make
+      env: ARCH=64 BUILD=make
       before_install: *mac_before_install
     - haxe: development
       os: osx
       osx_image: xcode7.1
-      env: BUILD=cmake
+      env: ARCH=64 BUILD=cmake
       before_install: *mac_before_install
       install:
         - cmake .
@@ -115,6 +114,8 @@ install:
   - sudo make install_lib
 
 script:
-  - haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
+  - if [ "$ARCH" = "32" ]; then
+      haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp;
+    fi
   - ./hl hello.hl
-  - haxe -hl src/_main.c -cp other/tests -main HelloWorld && make hlc
+  - haxe -hl src/_main.c -cp other/tests -main HelloWorld && make hlc && ./hlc
