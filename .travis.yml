@@ -115,7 +115,9 @@ install:
 
 script:
   - if [ "$ARCH" = "32" ]; then
-      haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp;
+      haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
+      ./hl hello.hl;
     fi
-  - ./hl hello.hl
-  - haxe -hl src/_main.c -cp other/tests -main HelloWorld && make hlc && ./hlc
+  - haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
+    make hlc &&
+    ./hlc
