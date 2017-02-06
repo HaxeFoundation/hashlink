@@ -32,7 +32,7 @@ SSL = libs/ssl/ssl.o
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
-BOOT = src/hlc_main.o src/_main.o
+BOOT = src/_main.o
 
 UNAME := $(shell uname)
 
