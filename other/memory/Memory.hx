@@ -200,6 +200,13 @@ class Memory {
 	function getTypeNull( t : TType ) {
 		if( t.nullWrap != null )
 			return t.nullWrap;
+		for( t2 in types )
+			switch( t2.t ) {
+			case HNull(base) if( base == t.t ):
+				t.nullWrap = t2;
+				return t2;
+			default:
+			}
 		var r = new TType(types.length, HNull(t.t));
 		t.nullWrap = r;
 		types.push(r);
