@@ -36,6 +36,18 @@ class Sdl {
 		sentinel.tick();
 	}
 
+	public static function processEvents() {
+		var event = new Event();
+		while( true ) {
+			if( !eventLoop(event) )
+				break;
+			if( event.type == Quit )
+				return false;
+			defaultEventHandler(event);
+		}
+		return true;
+	}
+
 	public static function loop( callb : Void -> Void, ?onEvent : Event -> Void ) {
 		var event = new Event();
 		if( onEvent == null ) onEvent = defaultEventHandler;
