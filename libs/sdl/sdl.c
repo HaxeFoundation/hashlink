@@ -275,10 +275,10 @@ HL_PRIM SDL_Window *HL_NAME(win_create)(vbyte *title, int width, int height) {
 	w = SDL_CreateWindow((char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
-	SDL_HideWindow(w);
-	SDL_ShowWindow(w);
-	HWND console = GetConsoleWindow();
-	if( console ) ShowWindow(console, SW_MINIMIZE);
+	if( (SDL_GetWindowFlags(w) & SDL_WINDOW_INPUT_FOCUS) == 0 ) {
+		SDL_HideWindow(w);
+		SDL_ShowWindow(w);
+	}
 #	endif
 	return w;
 }
