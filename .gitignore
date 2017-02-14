@@ -34,3 +34,4 @@ ReleaseStatic
 /src/haxe
 /src/Makefile
 /include/ffmpeg
+shiroLibs
