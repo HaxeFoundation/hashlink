@@ -120,7 +120,10 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 
 #define INPAGE(ptr,page) ((void*)(ptr) > (void*)(page) && (unsigned char*)(ptr) < (unsigned char*)(page) + (page)->page_size)
 
-static bool gc_profile;
+#define GC_PROFILE		1
+#define GC_DUMP_MEM		2
+
+static int gc_flags = 0;
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static int gc_free_blocks[GC_ALL_PAGES] = {0};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
@@ -274,7 +277,7 @@ retry:
 		int pages = gc_stats.pages_allocated;
 		hl_gc_major();
 		if( pages != gc_stats.pages_allocated ) goto retry;
-		hl_gc_dump_memory("hlmemory.dump");
+		if( gc_flags & GC_DUMP_MEM ) hl_gc_dump_memory("hlmemory.dump");
 		hl_fatal("Out of memory");
 	}
 
@@ -563,9 +566,9 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 	if( alloc_all > alloc_end ) hl_fatal("Out of memory");
 #else
 	gc_check_mark();
-	if( gc_profile ) time = TIMESTAMP();
+	if( gc_flags & GC_PROFILE ) time = TIMESTAMP();
 	ptr = gc_alloc_gen(size, flags, &allocated);
-	if( gc_profile ) gc_stats.alloc_time += TIMESTAMP() - time;
+	if( gc_flags & GC_PROFILE ) gc_stats.alloc_time += TIMESTAMP() - time;
 #	ifdef GC_DEBUG
 	memset(ptr,0xCD,allocated);
 #	endif
@@ -772,7 +775,7 @@ HL_API void hl_gc_major() {
 	gc_mark();
 	dt = TIMESTAMP() - time;
 	gc_stats.mark_time += dt;
-	if( gc_profile ) {
+	if( gc_flags & GC_PROFILE ) {
 		printf("GC-PROFILE\n\tmark-time %.3g\n\talloc-time %.3g\n\ttotal-mark-time %.3g\n\ttotal-alloc-time %.3g\n\tallocated %d (%dKB)\n",
 			dt/1000.,
 			(gc_stats.alloc_time - last_profile.alloc_time)/1000.,
@@ -816,7 +819,10 @@ static void hl_gc_init( void *stack_top ) {
 		hl_fatal("Invalid builtin tl1");
 	if( TRAILING_ZEROES((unsigned)~0x080003FF) != 10 || TRAILING_ZEROES(0) != 32 || TRAILING_ZEROES(0xFFFFFFFF) != 0 )
 		hl_fatal("Invalid builtin tl0");
-	gc_profile = getenv("HL_GC_PROFILE") != NULL;
+	if( getenv("HL_GC_PROFILE") )
+		gc_flags |= GC_PROFILE;
+	if( getenv("HL_DUMP_MEMORY") )
+		gc_flags |= GC_DUMP_MEM;
 }
 
 // ---- UTILITIES ----------------------
@@ -991,8 +997,19 @@ HL_API void hl_gc_enable( bool b ) {
 	gc_is_active = b;
 }
 
+HL_API int hl_gc_get_flags() {
+	return gc_flags;
+}
+
+HL_API void hl_gc_set_flags( int f ) {
+	gc_flags = f;
+}
+
 HL_API void hl_gc_profile( bool b ) {
-	gc_profile = b;
+	if( b ) 
+		gc_flags |= GC_PROFILE;
+	else
+		gc_flags &= GC_PROFILE;
 }
 
 static FILE *fdump;
@@ -1072,3 +1089,5 @@ DEFINE_PRIM(_VOID, gc_enable, _BOOL);
 DEFINE_PRIM(_VOID, gc_profile, _BOOL);
 DEFINE_PRIM(_VOID, gc_stats, _REF(_F64) _REF(_F64) _REF(_F64));
 DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);
+DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
+DEFINE_PRIM(_VOID, gc_set_flags, _I32);
