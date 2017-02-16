@@ -466,9 +466,25 @@ HL_PRIM void HL_NAME(set_cursor)( SDL_Cursor *c ) {
 	SDL_SetCursor(c);
 }
 
+#define MAX_DEVICES 16
+HL_PRIM varray *HL_NAME(get_devices)() {
+	varray *a = hl_alloc_array(&hlt_bytes, MAX_DEVICES);
+#	ifdef _WIN32
+	int i=0;
+	DISPLAY_DEVICE inf;
+	inf.cb = sizeof(inf);
+	while( i < MAX_DEVICES && EnumDisplayDevices(NULL,i,&inf,0) ) {
+		hl_aptr(a,vbyte*)[i] = hl_copy_bytes((vbyte*)inf.DeviceString,(wcslen(inf.DeviceString) + 1)*2);
+		i++;
+	}
+#	endif
+	return a;
+}
+
 #define _CURSOR _ABSTRACT(sdl_cursor)
 DEFINE_PRIM(_VOID, show_cursor, _BOOL);
 DEFINE_PRIM(_CURSOR, cursor_create, _SURF _I32 _I32);
 DEFINE_PRIM(_CURSOR, cursor_create_system, _I32);
 DEFINE_PRIM(_VOID, free_cursor, _CURSOR);
 DEFINE_PRIM(_VOID, set_cursor, _CURSOR);
+DEFINE_PRIM(_ARR, get_devices, _NO_ARG);
