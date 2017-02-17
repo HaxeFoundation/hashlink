@@ -202,6 +202,11 @@ HL_PRIM vdynamic *HL_NAME(gl_create_program)() {
 	return alloc_i32(v);
 }
 
+HL_PRIM void HL_NAME(gl_delete_program)( vdynamic *s ) {
+	GLOG("%d",s->v.i);
+	glDeleteProgram(s->v.i);
+}
+
 HL_PRIM void HL_NAME(gl_bind_frag_data_location)( vdynamic *p, int colNum, vstring *name ) {
 	char *cname = hl_to_utf8(name->bytes);
 	GLOG("%d,%d,%n",p->v.i,colNum,cname);
@@ -292,7 +297,7 @@ HL_PRIM vdynamic *HL_NAME(gl_get_shader_parameter)( vdynamic *s, int param ) {
 	switch( param ) {
 	case 0x8B81/*COMPILE_STATUS*/:
 	case 0x8B4F/*SHADER_TYPE*/:
-	case 0x8B80/*DELETE_STATUS*/: 
+	case 0x8B80/*DELETE_STATUS*/:
 	{
 		int ret = 0;
 		glGetShaderiv(s->v.i, param, &ret);
@@ -583,6 +588,7 @@ DEFINE_PRIM(_VOID,gl_stencil_mask_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_func_separate,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_op_separate,_I32  _I32 _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_program,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_delete_program,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_bind_frag_data_location,_NULL(_I32) _I32 _STRING);
 DEFINE_PRIM(_VOID,gl_attach_shader,_NULL(_I32) _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_link_program,_NULL(_I32));

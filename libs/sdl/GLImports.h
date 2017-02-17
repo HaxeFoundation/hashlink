@@ -1,5 +1,6 @@
 #ifndef __APPLE__
 GL_IMPORT(glCreateProgram, CREATEPROGRAM);
+GL_IMPORT(glDeleteProgram, DELETEPROGRAM);
 GL_IMPORT(glLinkProgram, LINKPROGRAM);
 GL_IMPORT(glAttachShader, ATTACHSHADER);
 GL_IMPORT(glGetProgramInfoLog, GETPROGRAMINFOLOG);
