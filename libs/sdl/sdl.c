@@ -75,7 +75,28 @@ HL_PRIM bool HL_NAME(init_once)() {
 	// Set the internal windows timer period to 1ms (will give accurate sleep for vsync)
 	timeBeginPeriod(1);
 #	endif
+
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	#ifdef HL_MAC
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+	#else
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+	#endif
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
 	return true;
+}
+
+HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, int flags ) {
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depth);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencil);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, (flags&1));
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, (flags&2) ? SDL_GL_CONTEXT_PROFILE_CORE : (flags&4) ? SDL_GL_CONTEXT_PROFILE_ES : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY );
 }
 
 HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
@@ -248,6 +269,7 @@ HL_PRIM bool HL_NAME(detect_win32)() {
 }
 
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
+DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32) );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
@@ -261,17 +283,6 @@ DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 
 HL_PRIM SDL_Window *HL_NAME(win_create)(vbyte *title, int width, int height) {
 	SDL_Window *w;
-	#ifdef HL_MAC
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-	#else
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
-	#endif
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 	w = SDL_CreateWindow((char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
