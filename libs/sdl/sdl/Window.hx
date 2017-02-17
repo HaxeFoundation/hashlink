@@ -30,8 +30,10 @@ class Window {
 		win = winCreate(@:privateAccess title.toUtf8(), width, height);
 		if( win == null ) throw "Failed to create window";
 		glctx = winGetGLContext(win);
-		if( glctx == null ) throw "Failed to init GL Context (OpenGL 2.1 required)";
-		if( !GL.init() ) throw "Failed to init GL API";
+		if( glctx == null )
+			throw "Failed to init GL Context (OpenGL 3.2+ required)";
+		if( !GL.init() )
+			throw "Failed to init GL API";
 		windows.push(this);
 		vsync = true;
 	}

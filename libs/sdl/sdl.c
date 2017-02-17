@@ -75,14 +75,10 @@ HL_PRIM bool HL_NAME(init_once)() {
 	// Set the internal windows timer period to 1ms (will give accurate sleep for vsync)
 	timeBeginPeriod(1);
 #	endif
-
+	// default GL parameters
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	#ifdef HL_MAC
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-	#else
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-	#endif
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
@@ -96,7 +92,14 @@ HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, 
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depth);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencil);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, (flags&1));
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, (flags&2) ? SDL_GL_CONTEXT_PROFILE_CORE : (flags&4) ? SDL_GL_CONTEXT_PROFILE_ES : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY );
+	if( flags&2 )
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	else if( flags&4 )
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	else if( flags&8 )
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	else
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, 0); // auto
 }
 
 HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
