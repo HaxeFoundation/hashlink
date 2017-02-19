@@ -109,6 +109,16 @@ HL_PRIM vbyte *hl_sys_string() {
 #endif
 }
 
+HL_PRIM vbyte *hl_sys_locale() {
+#ifdef HL_WIN
+	wchar_t loc[LOCALE_NAME_MAX_LENGTH];
+	int len = GetSystemDefaultLocaleName(loc,LOCALE_NAME_MAX_LENGTH);
+	return len == 0 ? NULL : hl_copy_bytes((vbyte*)loc,(len+1)*2);
+#else
+	return (vbytes*)setlocale(LC_ALL, NULL);
+#endif
+}
+
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	uprintf(USTR("%s"),(uchar*)msg);
 }
@@ -543,6 +553,7 @@ HL_PRIM vbyte *hl_sys_hl_file() {
 DEFINE_PRIM(_BYTES, sys_hl_file, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_utf8_path, _NO_ARG);
 DEFINE_PRIM(_BYTES, sys_string, _NO_ARG);
+DEFINE_PRIM(_BYTES, sys_locale, _NO_ARG);
 DEFINE_PRIM(_VOID, sys_print, _BYTES);
 DEFINE_PRIM(_VOID, sys_exit, _I32);
 DEFINE_PRIM(_F64, sys_time, _NO_ARG);
