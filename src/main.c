@@ -84,6 +84,11 @@ static int throw_handler( int code ) {
 	}
 	return EXCEPTION_CONTINUE_SEARCH;
 }
+
+// this allows some runtime detection to switch to high performance mode
+__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+
 #endif
 
 #ifdef HL_WIN
