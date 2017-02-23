@@ -115,7 +115,7 @@ HL_PRIM vbyte *hl_sys_locale() {
 	int len = GetSystemDefaultLocaleName(loc,LOCALE_NAME_MAX_LENGTH);
 	return len == 0 ? NULL : hl_copy_bytes((vbyte*)loc,(len+1)*2);
 #else
-	return (vbytes*)setlocale(LC_ALL, NULL);
+	return (vbyte*)setlocale(LC_ALL, NULL);
 #endif
 }
 
