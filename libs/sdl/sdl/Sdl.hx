@@ -155,7 +155,7 @@ class Sdl {
 		var dnames = new Map();
 		for( v in arr ) {
 			if( v == null ) break;
-			var d = @:privateAccess String.fromUCS2(v);
+			var d = StringTools.trim(@:privateAccess String.fromUCS2(v));
 			if( dnames.exists(d) || StringTools.startsWith(d,"RDP") /* RemoteDesktop */ ) continue;
 			dnames.set(d, true);
 			a.push(d);
