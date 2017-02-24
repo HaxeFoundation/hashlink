@@ -534,6 +534,8 @@ class GL {
 	public static inline var LUMINANCE                      = 0x1909;
 	public static inline var LUMINANCE_ALPHA                = 0x190A;
 
+	public static inline var BGRA							= 0x80E1;
+	public static inline var RGBA8							= 0x8058;
 
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
