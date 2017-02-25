@@ -35,3 +35,4 @@ ReleaseStatic
 /src/Makefile
 /include/ffmpeg
 shiroLibs
+ReleaseVS2013
