@@ -122,6 +122,7 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 
 #define GC_PROFILE		1
 #define GC_DUMP_MEM		2
+#define GC_TRACK		4
 
 static int gc_flags = 0;
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
@@ -550,6 +551,8 @@ static unsigned char *alloc_all = NULL;
 static unsigned char *alloc_end = NULL;
 #endif
 
+static void hl_gc_check_track();
+
 void *hl_gc_alloc_gen( int size, int flags ) {
 	void *ptr;
 	int time = 0;
@@ -577,6 +580,7 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 		MZERO(ptr,allocated);
 	else if( MEM_HAS_PTR(flags) && allocated != size )
 		MZERO((char*)ptr+size,allocated-size); // erase possible pointers after data
+	if( gc_flags & GC_TRACK ) hl_gc_check_track();
 	return ptr;
 }
 
@@ -798,6 +802,8 @@ HL_API bool hl_is_gc_ptr( void *ptr ) {
 	bid = (int)((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
 	if( bid < page->first_block || bid >= page->max_blocks ) return false;
 	if( page->sizes && page->sizes[bid] == 0 ) return false;
+	// not live (only available if we haven't allocate since then)
+	if( page->bmp && page->next_block == page->first_block && (page->bmp[bid>>3]&(1<<(bid&7))) == 0 ) return false; 
 	return true;
 }
 
@@ -1091,3 +1097,114 @@ DEFINE_PRIM(_VOID, gc_stats, _REF(_F64) _REF(_F64) _REF(_F64));
 DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);
 DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
+
+// ------- TRACKING ------------------------
+
+typedef struct {
+	int_val obj;
+	int_val old_value;
+	void **value;
+	vclosure *callb;
+} hl_track;
+
+static hl_track *tracked = NULL;
+static int tracked_count = 0;
+static int tracked_max = 0;
+
+#define hide_ptr(v)		(((int_val)(v))^1)
+
+static void hl_gc_check_track() {
+	int i;
+	for(i=0;i<tracked_count;i++) {
+		hl_track *tr = tracked + i;
+		if( !tr->value ) continue;
+		if( !hl_is_gc_ptr((void*)hide_ptr(tr->obj)) /*GC'ed!*/ ) {
+			hl_is_gc_ptr((void*)hide_ptr(tr->obj));
+			tr->value = NULL;
+		} else {
+			int_val v = hide_ptr(*tr->value);
+			if( v == tr->old_value ) continue;
+			tr->old_value = v;
+		}
+		hl_dyn_call(tr->callb,NULL,0);
+	}
+}
+
+HL_API bool hl_gc_track( vdynamic *dobj, int fid, vclosure *callb ) {
+	void *obj = NULL, **value = NULL;
+	hl_track *tr;
+	if( dobj == NULL )
+		return false;
+	switch( dobj->t->kind ) {
+	case HENUM:
+		{
+			int cid = *(int*)dobj->v.ptr;
+			hl_enum_construct *c = dobj->t->tenum->constructs + cid;
+			if( fid >= c->nparams ) return false;
+			obj = (void*)dobj->v.ptr;
+			value = (void**)((char*)obj + c->offsets[fid]);
+		}
+		break;
+	default:
+		return false;
+	}
+	if( value == NULL )
+		return false;
+
+	if( !hl_is_gc_ptr(obj) )
+		return false;
+
+	if( tracked_count == tracked_max ) {
+		hl_track *newt;
+		tracked_max = tracked_max ? tracked_max << 1 : 16;
+		newt = hl_gc_alloc_raw(sizeof(hl_track)*tracked_max);
+		if( tracked ) {
+			memcpy(newt,tracked,tracked_count*sizeof(hl_track));
+		} else {
+			hl_add_root(&tracked);
+		}
+		tracked = newt;
+	}
+	tr = tracked + tracked_count++;
+	tr->callb = callb;
+	tr->value = value;
+	tr->old_value = hide_ptr(*value);
+	tr->obj = hide_ptr(obj);
+	return true;
+}
+
+HL_API bool hl_gc_untrack( vdynamic *obj ) {
+	int_val oval;
+	int i;
+	if( obj == NULL )
+		return false;
+	if( obj->t->kind == HENUM )
+		obj = (vdynamic*)obj->v.ptr;
+	oval = hide_ptr(obj);
+	for(i=0;i<tracked_count;i++) {
+		hl_track *tr = tracked + i;
+		if( tr->obj == oval ) {
+			tracked_count--;
+			memmove(tracked + i, tracked + i + 1, (tracked_count - i) * sizeof(hl_track));
+			memset(tracked + tracked_count, 0, sizeof(hl_track));
+			return true;
+		}
+	}
+	return false;
+}
+
+HL_API void hl_gc_untrack_all() {
+	if( tracked_count == 0 ) return;
+	memset(tracked, 0, sizeof(hl_track) * tracked_count);
+	tracked_count = 0;
+}
+
+HL_API int hl_gc_track_count() {
+	return tracked_count;
+}
+
+DEFINE_PRIM(_BOOL, gc_track, _DYN _I32 _FUN(_VOID, _NO_ARG));
+DEFINE_PRIM(_BOOL, gc_untrack, _DYN);
+DEFINE_PRIM(_VOID, gc_untrack_all, _NO_ARG);
+DEFINE_PRIM(_I32, gc_track_count, _NO_ARG);
+
