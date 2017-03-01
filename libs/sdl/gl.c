@@ -385,6 +385,11 @@ HL_PRIM void HL_NAME(gl_read_pixels)( int x, int y, int width, int height, int f
 	glReadPixels(x, y, width, height, format, type, data);
 }
 
+HL_PRIM void HL_NAME(gl_read_buffer)( int mode ) {
+	GLOG("%d",mode);
+	glReadBuffer(mode);
+}
+
 HL_PRIM void HL_NAME(gl_draw_buffers)( int count, unsigned int *buffers) {
 	GLOG("%d",count);
 	glDrawBuffers(count, buffers);
@@ -615,6 +620,7 @@ DEFINE_PRIM(_VOID,gl_bind_framebuffer,_I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_framebuffer_texture2d,_I32 _I32 _I32 _NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_delete_framebuffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_read_pixels,_I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_read_buffer,_I32);
 DEFINE_PRIM(_VOID,gl_draw_buffers,_I32 _BYTES);
 DEFINE_PRIM(_NULL(_I32),gl_create_renderbuffer,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_renderbuffer,_I32 _NULL(_I32));
