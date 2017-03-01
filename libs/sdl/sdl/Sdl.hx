@@ -15,6 +15,8 @@ class Sdl {
 		isWin32 = detectWin32();
 	}
 
+	//public static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int ) {}
+
 	static function onTimeout() {
 		throw "Program timeout (infinite loop?)";
 	}
