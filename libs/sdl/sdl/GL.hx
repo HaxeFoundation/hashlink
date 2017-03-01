@@ -228,6 +228,9 @@ class GL {
 	public static function deleteFramebuffer( f : Framebuffer ) {
 	}
 
+	public static function readBuffer( mode : Int ) {
+	}
+
 	public static function readPixels( x : Int, y : Int, width : Int, height : Int, format : Int, type : Int, data : hl.Bytes ) {
 	}
 
