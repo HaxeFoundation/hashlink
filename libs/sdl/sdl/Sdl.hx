@@ -8,6 +8,9 @@ class Sdl {
 	static var sentinel : hl.UI.Sentinel;
 	static var dismissErrors = false;
 
+	public static var requiredGLMajor(default,null) = 3;
+	public static var requiredGLMinor(default,null) = 2;
+
 	public static function init() {
 		if( initDone ) return;
 		initDone = true;
@@ -15,7 +18,29 @@ class Sdl {
 		isWin32 = detectWin32();
 	}
 
-	//public static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int ) {}
+	public static function setGLOptions( major : Int = 3, minor : Int = 2, depth : Int = 24, stencil : Int = 8, flags : Int = 1 ) {
+		requiredGLMajor = major;
+		requiredGLMinor = minor;
+		glOptions(major, minor, depth, stencil, flags);
+	}
+
+
+	public static dynamic function onGlContextRetry() {
+		return false;
+	}
+
+	public static dynamic function onGlContextError() {
+		var devices = Sdl.getDevices();
+		var device = devices[0];
+		if( device == null ) device = "Unknown";
+		var flags = new haxe.EnumFlags<hl.UI.DialogFlags>();
+		flags.set(IsError);
+		var msg = 'The application was unable to create an OpenGL context\nfor your $device video card.\nOpenGL ${requiredGLMajor}.{$requiredGLMinor}+ is required, please update your driver.';
+		hl.UI.dialog("OpenGL Error", msg, flags);
+		Sys.exit( -1);
+	}
+
+	static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int ) {}
 
 	static function onTimeout() {
 		throw "Program timeout (infinite loop?)";
