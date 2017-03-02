@@ -27,26 +27,19 @@ class Window {
 	public var displayMode(default, set) : DisplayMode;
 
 	public function new( title : String, width : Int, height : Int ) {
-		win = winCreate(@:privateAccess title.toUtf8(), width, height);
-		if( win == null ) throw "Failed to create window";
-		glctx = winGetGLContext(win);
-		if( glctx == null || !GL.init() ) {
-			destroy();
-			onGlContextError();
+		while( true ) {
+			win = winCreate(@:privateAccess title.toUtf8(), width, height);
+			if( win == null ) throw "Failed to create window";
+			glctx = winGetGLContext(win);
+			if( glctx == null || !GL.init() ) {
+				destroy();
+				if( Sdl.onGlContextRetry() ) continue;
+				Sdl.onGlContextError();
+			}
+			break;
 		}
 		windows.push(this);
 		vsync = true;
-	}
-
-	public static dynamic function onGlContextError() {
-		var devices = Sdl.getDevices();
-		var device = devices[0];
-		if( device == null ) device = "Unknown";
-		var flags = new haxe.EnumFlags<hl.UI.DialogFlags>();
-		flags.set(IsError);
-		var msg = 'The application was unable to create an OpenGL context\nfor your $device video card.\nOpenGL 3.2+ is required, please update your driver.';
-		hl.UI.dialog("OpenGL Error", msg, flags);
-		Sys.exit(-1);
 	}
 
 	function set_displayMode(mode) {
