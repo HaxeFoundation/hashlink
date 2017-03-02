@@ -1115,23 +1115,26 @@ static int tracked_max = 0;
 
 static void hl_gc_check_track() {
 	int i;
-	vdynamic p;
-	vdynamic *pptr = &p;
-	p.t = &hlt_bool;
+	vdynamic b;	
+	vdynamic *pptr[2];
+	pptr[1] = &b;
+	b.t = &hlt_bool;
 	for(i=0;i<tracked_count;i++) {
 		hl_track *tr = tracked + i;
+		vdynamic *obj = (vdynamic*)hide_ptr(tr->obj);
 		if( !tr->value ) continue;
-		if( !hl_is_gc_ptr((void*)hide_ptr(tr->obj)) /*GC'ed!*/ ) {
-			hl_is_gc_ptr((void*)hide_ptr(tr->obj));
+		if( !hl_is_gc_ptr(obj) /*GC'ed!*/ ) {
 			tr->value = NULL;
-			p.v.b = true;
+			b.v.b = true;
 		} else {
 			int_val v = hide_ptr(*tr->value);
 			if( v == tr->old_value ) continue;
 			tr->old_value = v;
-			p.v.b = false;
+			b.v.b = false;
 		}
-		hl_dyn_call(tr->callb,&pptr,1);
+		pptr[0] = obj;
+		hl_dyn_call(tr->callb,pptr,2);
+		pptr[0] = NULL;
 	}
 }
 
@@ -1222,7 +1225,7 @@ HL_API int hl_gc_track_count() {
 	return tracked_count;
 }
 
-DEFINE_PRIM(_BOOL, gc_track, _DYN _I32 _FUN(_VOID, _BOOL));
+DEFINE_PRIM(_BOOL, gc_track, _DYN _I32 _FUN(_VOID, _DYN _BOOL));
 DEFINE_PRIM(_BOOL, gc_untrack, _DYN);
 DEFINE_PRIM(_VOID, gc_untrack_all, _NO_ARG);
 DEFINE_PRIM(_I32, gc_track_count, _NO_ARG);
