@@ -143,6 +143,7 @@ static struct {
 	int pages_blocks;
 	int mark_bytes;
 	int mark_time;
+	int mark_count;
 	int alloc_time; // only measured if gc_profile active
 } gc_stats = {0};
 
@@ -778,9 +779,11 @@ HL_API void hl_gc_major() {
 	gc_stats.last_mark_allocs = gc_stats.allocation_count;
 	gc_mark();
 	dt = TIMESTAMP() - time;
+	gc_stats.mark_count++;
 	gc_stats.mark_time += dt;
 	if( gc_flags & GC_PROFILE ) {
-		printf("GC-PROFILE\n\tmark-time %.3g\n\talloc-time %.3g\n\ttotal-mark-time %.3g\n\ttotal-alloc-time %.3g\n\tallocated %d (%dKB)\n",
+		printf("GC-PROFILE %d\n\tmark-time %.3g\n\talloc-time %.3g\n\ttotal-mark-time %.3g\n\ttotal-alloc-time %.3g\n\tallocated %d (%dKB)\n",
+			gc_stats.mark_count,
 			dt/1000.,
 			(gc_stats.alloc_time - last_profile.alloc_time)/1000.,
 			gc_stats.mark_time/1000.,
