@@ -1116,24 +1116,41 @@ static int tracked_max = 0;
 
 #define hide_ptr(v)		(((int_val)(v))^1)
 
+static uchar *hl_gc_reason( void *ptr ) {
+	gc_pheader *page = GC_GET_PAGE(ptr);
+	int bid;
+	if( !page ) return USTR("NoPage");
+	if( ((unsigned char*)ptr - (unsigned char*)page) % page->block_size != 0 ) return USTR("Unaligned");
+	bid = (int)((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
+	if( bid < page->first_block || bid >= page->max_blocks ) return USTR("OutPage");
+	if( page->sizes && page->sizes[bid] == 0 ) return USTR("ZeroSize");
+	// not live (only available if we haven't allocate since then)
+	if( page->bmp && page->next_block == page->first_block && (page->bmp[bid>>3]&(1<<(bid&7))) == 0 ) {
+		if( gc_stats.last_mark_allocs > gc_stats.allocation_count + 1 )
+			return USTR("MaybeUnref");
+		return USTR("Unref"); 
+	}
+	return USTR("IsBlock");
+}
+
 static void hl_gc_check_track() {
 	int i;
 	vdynamic b;	
 	vdynamic *pptr[2];
 	pptr[1] = &b;
-	b.t = &hlt_bool;
+	b.t = &hlt_bytes;
 	for(i=0;i<tracked_count;i++) {
 		hl_track *tr = tracked + i;
 		vdynamic *obj = (vdynamic*)hide_ptr(tr->obj);
 		if( !tr->value ) continue;
 		if( !hl_is_gc_ptr(obj) /*GC'ed!*/ ) {
 			tr->value = NULL;
-			b.v.b = true;
+			b.v.ptr = hl_gc_reason(obj);
 		} else {
 			int_val v = hide_ptr(*tr->value);
 			if( v == tr->old_value ) continue;
 			tr->old_value = v;
-			b.v.b = false;
+			b.v.ptr = USTR("Changed");
 		}
 		pptr[0] = obj;
 		hl_dyn_call(tr->callb,pptr,2);
@@ -1228,7 +1245,7 @@ HL_API int hl_gc_track_count() {
 	return tracked_count;
 }
 
-DEFINE_PRIM(_BOOL, gc_track, _DYN _I32 _FUN(_VOID, _DYN _BOOL));
+DEFINE_PRIM(_BOOL, gc_track, _DYN _I32 _FUN(_VOID, _DYN _BYTES));
 DEFINE_PRIM(_BOOL, gc_untrack, _DYN);
 DEFINE_PRIM(_VOID, gc_untrack_all, _NO_ARG);
 DEFINE_PRIM(_I32, gc_track_count, _NO_ARG);
