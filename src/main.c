@@ -21,6 +21,7 @@
  */
 #include <hl.h>
 #include <hlmodule.h>
+#include <locale.h>
 
 #ifdef HL_VCC
 #	include <crtdbg.h>
@@ -34,7 +35,7 @@ typedef uchar pchar;
 #define pprintf(str,file)	uprintf(USTR(str),file)
 #define pfopen(file,ext) _wfopen(file,USTR(ext))
 #define pcompare wcscmp
-#define ptoi(s)	wcstol(s,NULL,10) 
+#define ptoi(s)	wcstol(s,NULL,10)
 #define PSTR(x) USTR(x)
 #else
 typedef char pchar;
@@ -135,6 +136,7 @@ int main(int argc, pchar *argv[]) {
 	fprintf(stderr,"HL/JIT is currently not supported when compiled to 64 bits, use make ARCH=32 to compile to 32 bits\n");
 	exit(1);
 #	endif
+	setlocale(LC_ALL,"");
 	hl_global_init(&ctx);
 	hl_sys_init((void**)argv,argc,file);
 	ctx.code = load_code(file);
