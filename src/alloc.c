@@ -1119,6 +1119,8 @@ static int tracked_max = 0;
 static uchar *hl_gc_reason( void *ptr ) {
 	gc_pheader *page = GC_GET_PAGE(ptr);
 	int bid;
+	if( !hl_is_ptr(&hlt_dyn) ) return USTR("BrokenDyn");
+	if( cur_mark_stack != mark_stack_end - mark_stack_size + 2 ) return USTR("MarkStack");
 	if( !page ) return USTR("NoPage");
 	if( ((unsigned char*)ptr - (unsigned char*)page) % page->block_size != 0 ) return USTR("Unaligned");
 	bid = (int)((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
