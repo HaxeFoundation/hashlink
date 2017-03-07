@@ -137,7 +137,7 @@ int main(int argc, pchar *argv[]) {
 	exit(1);
 #	endif
 #	ifdef HL_WIN
-	setlocale(LC_ALL,"");
+	setlocale(LC_CTYPE,""); // printf to current locale
 #	endif
 	hl_global_init(&ctx);
 	hl_sys_init((void**)argv,argc,file);
