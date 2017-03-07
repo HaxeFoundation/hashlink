@@ -854,6 +854,7 @@ HL_PRIM bool hl_obj_has_field( vdynamic *obj, int hfield ) {
 }
 
 HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
+	if( obj == NULL ) return false;
 	switch( obj->t->kind ) {
 	case HDYNOBJ:
 		{
@@ -890,6 +891,7 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 
 HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 	varray *a = NULL;
+	if( obj == NULL ) return NULL;
 	switch( obj->t->kind ) {
 	case HDYNOBJ:
 		{
