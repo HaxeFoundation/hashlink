@@ -196,6 +196,7 @@ typedef struct {
 	void *callback;
 	double timeout;
 	int ticks;
+	bool pause;
 } vsentinel;
 
 static void sentinel_loop( vsentinel *s ) {
@@ -208,7 +209,7 @@ static void sentinel_loop( vsentinel *s ) {
 		int tick = s->ticks;
 		while( true ) {
 			Sleep(time_ms);
-			if( tick != s->ticks ) break;
+			if( tick != s->ticks || s->pause ) break;
 			k++;
 			if( k == 16 ) {
 				// pause
@@ -235,6 +236,7 @@ HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 #	endif
 	s->timeout = timeout;
 	s->ticks = 0;
+	s->pause = false;
 	s->original = hl_thread_current();
 	s->callback = c->fun;
 	s->thread = hl_thread_start(sentinel_loop,s,false);
@@ -243,6 +245,10 @@ HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 
 HL_PRIM void HL_NAME(ui_sentinel_tick)( vsentinel *s ) {
 	s->ticks++;
+}
+
+HL_PRIM void HL_NAME(ui_sentinel_pause)( vsentinel *s, bool pause ) {
+	s->pause = pause;
 }
 
 HL_PRIM void HL_NAME(ui_close_console)() {
@@ -266,3 +272,4 @@ DEFINE_PRIM(_VOID, ui_close_console, _NO_ARG);
 
 DEFINE_PRIM(_SENTINEL, ui_start_sentinel, _F64 _FUN(_VOID,_NO_ARG));
 DEFINE_PRIM(_VOID, ui_sentinel_tick, _SENTINEL);
+DEFINE_PRIM(_VOID, ui_sentinel_pause, _SENTINEL _BOOL);
