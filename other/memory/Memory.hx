@@ -231,7 +231,17 @@ class Memory {
 			case HFun(f):
 				var tid = types.length;
 				var args = f.args.copy();
-				var ct = new TType(tid, HFun({ args : args, ret : f.ret }), args.shift());
+				var clparam = args.shift();
+				if( clparam == null ) {
+					cid++;
+					continue;
+				}
+				switch( clparam ) {
+				case HEnum(p) if( p.name == "" ):
+					p.name = '<closure$i context>';
+				default:
+				}
+				var ct = new TType(tid, HFun({ args : args, ret : f.ret }), clparam);
 				types.push(ct);
 				pointerType.set(closuresPointers[cid++], ct);
 			default:
@@ -429,8 +439,11 @@ class Memory {
 			goto(b);
 			var fields = null;
 			var start = 0;
+			var noPtrBits = 0, noPtrBits2 = 0;
 			if( b.type != null ) {
 				fields = b.type.fields;
+				noPtrBits = b.type.noPtrBits;
+				noPtrBits2 = b.type.noPtrBits2;
 				// enum
 				if( b.type.constructs != null ) {
 					start++;
@@ -441,6 +454,13 @@ class Memory {
 
 			for( i in start...(b.getMemSize() >> ptrBits) ) {
 				var r = readPointer();
+/*
+				if( i < 32 ) {
+					if( (noPtrBits >>> i) & 1 != 0 ) continue;
+				} else if( i < 64 ) {
+					if( (noPtrBits2 >>> (i - 32)) & 1 != 0 ) continue;
+				}
+*/
 				var bs = pointerBlock.get(r);
 				if( bs == null ) continue;
 				var ft = fields != null ? fields[i] : null;
@@ -450,6 +470,7 @@ class Memory {
 					b.type.falsePositiveIndexes[i]++;
 					continue;
 				}
+
 				if( bs.type == null && ft != null ) {
 					if( ft.t == HDyn ) {
 						if( bs.typeKind == null ) {
@@ -568,10 +589,23 @@ class Memory {
 				var tl = [];
 				var owner = b.owner;
 				if( owner != null ) {
+					var ol = [owner];
 					tl.push(owner.type == null ? 0 : owner.type.tid);
 					var k : Int = up;
 					while( owner.owner != null && k-- > 0 ) {
+						var prev = owner;
 						owner = owner.owner;
+						if( ol.indexOf(owner) >= 0 && prev.parents != null ) {
+							var found = false;
+							for( p in prev.parents )
+								if( ol.indexOf(p) < 0 ) {
+									owner = p;
+									found = true;
+									break;
+								}
+							if( !found ) break;
+						}
+						ol.push(owner);
 						tl.unshift(owner.type == null ? 0 : owner.type.tid);
 					}
 				}
