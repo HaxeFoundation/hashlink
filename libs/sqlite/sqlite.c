@@ -53,6 +53,10 @@ static void HL_NAME(finalize_request)(sqlite_result *r, bool exc ) {
 	r->r = NULL;
 	r->db->last = NULL;
 	r->db = NULL;
+	free(r->names);
+	free(r->bools);
+	r->names = NULL;
+	r->bools = NULL;
 }
 static void HL_NAME(finalize_result)(sqlite_result *r ) {
 	if (r) HL_NAME(finalize_request)(r, false);
@@ -122,8 +126,8 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 	}
 
 	r->ncols = sqlite3_column_count(r->r);
-	r->names = (int*)hl_gc_alloc(sizeof(int)*r->ncols);
-	r->bools = (int*)hl_gc_alloc(sizeof(int)*r->ncols);
+	r->names = (int*)malloc(sizeof(int)*r->ncols);
+	r->bools = (int*)malloc(sizeof(int)*r->ncols);
 	r->first = 1;
 	r->done = 0;
 	for(i=0;i<r->ncols;i++) {
