@@ -11,6 +11,8 @@ class TType {
 	public var fields : Array<TType>;
 	public var constructs : Array<Array<TType>>;
 	public var nullWrap : TType;
+	public var noPtrBits : Int;
+	public var noPtrBits2 : Int;
 
 	public var falsePositive = 0;
 	public var falsePositiveIndexes = [];
@@ -63,9 +65,16 @@ class TType {
 				for( f in p.fields ) {
 					var size = m.typeSize(f.t);
 					pos = align(pos, size);
-					fields[pos>>m.ptrBits] = m.getType(f.t);
+					fields[pos >> m.ptrBits] = m.getType(f.t);
+					if( f.t.isPtr() ) {
+						var p = pos >> m.ptrBits;
+						if( p < 32 ) noPtrBits |= 1 << p;
+						else if( p < 64 ) noPtrBits2 |= 1 << (p - 32);
+					}
 					pos += size;
 				}
+			noPtrBits = ~noPtrBits;
+			noPtrBits2 = ~noPtrBits2;
 			fill(fields, pos);
 		case HEnum(e):
 			constructs = [];
@@ -76,11 +85,18 @@ class TType {
 					var size = m.typeSize(t);
 					pos = align(pos, size);
 					fields[pos>>m.ptrBits] = m.getType(t);
+					if( t.isPtr() ) {
+						var p = pos >> m.ptrBits;
+						if( p < 32 ) noPtrBits |= 1 << p;
+						else if( p < 64 ) noPtrBits2 |= 1 << (p - 32);
+					}
 					pos += size;
 				}
 				fill(fields, pos);
 				constructs.push(fields);
 			}
+			noPtrBits = ~noPtrBits;
+			noPtrBits2 = ~noPtrBits2;
 		case HVirtual(fl):
 			fields = [
 				tvoid, // type
@@ -88,12 +104,20 @@ class TType {
 				m.getType(HDyn), // next
 			];
 			var pos = (fl.length + 3) << m.ptrBits;
+			noPtrBits = 6;
 			for( f in fl ) {
 				var size = m.typeSize(f.t);
 				pos = align(pos, size);
 				fields[pos >> m.ptrBits] = m.getType(f.t);
+				if( f.t.isPtr() ) {
+					var p = pos >> m.ptrBits;
+					if( p < 32 ) noPtrBits |= 1 << p;
+					else if( p < 64 ) noPtrBits2 |= 1 << (p - 32);
+				}
 				pos += size;
 			}
+			noPtrBits = ~noPtrBits;
+			noPtrBits2 = ~noPtrBits2;
 			fill(fields, pos);
 			// keep null our fields pointers since they might point to a DynObj data head
 			for( i in 0...fl.length )
