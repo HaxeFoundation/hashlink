@@ -443,6 +443,28 @@ DEFINE_PRIM(_BOOL, gctrl_get_button, TGCTRL _I32);
 DEFINE_PRIM(_I32, gctrl_get_id, TGCTRL);
 DEFINE_PRIM(_BYTES, gctrl_get_name, TGCTRL);
 
+HL_PRIM SDL_Haptic *HL_NAME(haptic_open)(SDL_GameController *controller) {
+	return SDL_HapticOpenFromJoystick(SDL_GameControllerGetJoystick(controller));
+}
+
+HL_PRIM void HL_NAME(haptic_close)(SDL_Haptic *haptic) {
+	SDL_HapticClose(haptic);
+}
+
+HL_PRIM int HL_NAME(haptic_rumble_init)(SDL_Haptic *haptic) {
+	return SDL_HapticRumbleInit(haptic);
+}
+
+HL_PRIM int HL_NAME(haptic_rumble_play)(SDL_Haptic *haptic, double strength, int length) {
+	return SDL_HapticRumblePlay(haptic, strength, length);
+}
+#define THAPTIC _ABSTRACT(sdl_haptic)
+DEFINE_PRIM(THAPTIC, haptic_open, TGCTRL);
+DEFINE_PRIM(_VOID, haptic_close, THAPTIC);
+DEFINE_PRIM(_I32, haptic_rumble_init, THAPTIC);
+DEFINE_PRIM(_I32, haptic_rumble_play, THAPTIC _F64 _I32);
+
+
 // surface
 
 
