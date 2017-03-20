@@ -3,6 +3,7 @@
 #include <turbojpeg.h>
 #include <zlib.h>
 #include <hl.h>
+#include <vorbis/vorbisfile.h>
 
 /* ------------------------------------------------- IMG --------------------------------------------------- */
 
@@ -270,3 +271,115 @@ DEFINE_PRIM(_VOID, zip_end, _ZIP);
 DEFINE_PRIM(_VOID, zip_flush_mode, _ZIP _I32);
 DEFINE_PRIM(_BOOL, inflate_buffer, _ZIP _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_BOOL, deflate_buffer, _ZIP _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
+
+/* ------------------------------------------------- SOUND --------------------------------------------------- */
+
+typedef struct _fmt_ogg fmt_ogg;
+struct _fmt_ogg {
+	void (*finalize)( fmt_ogg * );
+	OggVorbis_File f;
+	char *bytes;
+	int pos;
+	int size;
+	int section;
+};
+
+static void ogg_finalize( fmt_ogg *o ) {
+	ov_clear(&o->f);
+}
+
+static size_t ogg_memread( void *ptr, int size, int count, fmt_ogg *o ) {
+	int len = size * count;
+	if( o->pos + len > o->size )
+		len = o->size - o->pos;
+	memcpy(ptr, o->bytes + o->pos, len);
+	o->pos += len;
+	return len;
+}
+
+static int ogg_memseek( fmt_ogg *o, ogg_int64_t _offset, int mode ) {
+	int offset = (int)_offset;
+	switch( mode ) {
+	case SEEK_SET:
+		if( offset < 0 || offset > o->size ) return 1;
+		o->pos = offset;
+		break;
+	case SEEK_CUR:
+		if( o->pos + offset < 0 || o->pos + offset > o->size ) return 1;
+		o->pos += offset;
+		break;
+	case SEEK_END:
+		if( offset < 0 || offset > o->size ) return 1;
+		o->pos = o->size - offset;
+		break;
+	}
+	return 0;
+}
+
+static long ogg_memtell( fmt_ogg *o ) {
+	return o->pos;
+}
+
+static ov_callbacks OV_CALLBACKS_MEMORY = {
+  (size_t (*)(void *, size_t, size_t, void *))  ogg_memread,
+  (int (*)(void *, ogg_int64_t, int))           ogg_memseek,
+  (int (*)(void *))                             NULL,
+  (long (*)(void *))                            ogg_memtell
+};
+
+HL_PRIM fmt_ogg *HL_NAME(ogg_open)( char *bytes, int size ) {
+	fmt_ogg *o = (fmt_ogg*)hl_gc_alloc_finalizer(sizeof(fmt_ogg));
+	o->finalize = NULL;
+	o->bytes = bytes;
+	o->size = size;
+	o->pos = 0;
+	if( ov_open_callbacks(o,&o->f,NULL,0,OV_CALLBACKS_MEMORY) != 0 )
+		return NULL;
+	o->finalize = ogg_finalize;
+	return o;
+}
+
+HL_PRIM void HL_NAME(ogg_info)( fmt_ogg *o, int *bitrate, int *freq, int *samples, int *channels ) {
+	vorbis_info *i = ov_info(&o->f,-1);
+	*bitrate = i->bitrate_nominal;
+	*freq = i->rate;
+	*channels = i->channels;
+	*samples = (int)ov_pcm_total(&o->f, -1);
+}
+
+HL_PRIM int HL_NAME(ogg_tell)( fmt_ogg *o ) {
+	return (int)ov_pcm_tell(&o->f); // overflow at 12 hours @48 Khz
+}
+
+HL_PRIM bool HL_NAME(ogg_seek)( fmt_ogg *o, int sample ) {
+	return ov_pcm_seek(&o->f,sample) == 0;
+}
+
+#define OGGFMT_I8			1
+#define OGGFMT_I16			2
+//#define OGGFMT_F32		3
+#define OGGFMT_BIGENDIAN	128
+#define OGGFMT_UNSIGNED		256
+
+HL_PRIM int HL_NAME(ogg_read)( fmt_ogg *o, char *output, int size, int format ) {
+	switch( format&127 ) {
+	case OGGFMT_I8:
+	case OGGFMT_I16:
+		return ov_read(&o->f, output, size, (format & OGGFMT_BIGENDIAN) != 0, format&3, (format & OGGFMT_UNSIGNED) == 0, &o->section);
+//	case OGGFMT_F32:
+//		-- this decodes separates channels instead of mixed single buffer one
+//		return ov_read_float(&o->f, output, size, (format & OGGFMT_BIGENDIAN) != 0, format&3, (format & OGGFMT_UNSIGNED) == 0, &o->section);
+	default:
+		break;
+	}
+	return -1;
+}
+
+#define _OGG _ABSTRACT(fmt_ogg)
+
+DEFINE_PRIM(_OGG, ogg_open, _BYTES _I32);
+DEFINE_PRIM(_VOID, ogg_info, _OGG _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_I32, ogg_tell, _OGG);
+DEFINE_PRIM(_BOOL, ogg_seek, _OGG _I32);
+DEFINE_PRIM(_I32, ogg_read, _OGG _BYTES _I32 _I32);
+

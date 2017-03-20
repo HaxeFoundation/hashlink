@@ -1,31 +1,123 @@
 language: haxe
 
-sudo: required
+linux32_before_install: &linux32_before_install
+  - sudo dpkg --add-architecture i386
+  - sudo apt-get update -y
+  - sudo apt-get install -y
+      gcc-multilib
+      libz-dev:i386
+      zlib1g-dev:i386
+      libturbojpeg:i386
+      libpng-dev:i386
+      libsdl2-dev:i386
+      libvorbis-dev:i386
+      libalut-dev:i386
+  # install mbedtls
+  - mkdir ~/mbedtls
+  - pushd ~/mbedtls
+  -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
+  -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
+  -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
+  -   make lib           SHARED=1 CFLAGS="-O2 -m32" LDFLAGS="-m32"
+  -   sudo make install  SHARED=1 CFLAGS="-O2 -m32" LDFLAGS="-m32"
+  - popd
+  - haxelib install hashlink
 
+linux64_before_install: &linux64_before_install
+  - sudo apt-get update -y
+  - sudo apt-get install -y
+      libz-dev
+      zlib1g-dev
+      libturbojpeg
+      libpng-dev
+      libsdl2-dev
+      libvorbis-dev
+      libalut-dev
+  # install mbedtls
+  - mkdir ~/mbedtls
+  - pushd ~/mbedtls
+  -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
+  -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
+  -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
+  -   SHARED=1 make lib
+  -   sudo make install
+  - popd
+  - haxelib install hashlink
+
+mac_before_install: &mac_before_install
+  - brew update
+  - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft mbedtls
+  - haxelib install hashlink
+
+sudo: required
 matrix:
+  allow_failures:
+    - os: osx
   include:
     - haxe: development
       os: linux
       dist: trusty
+      env: ARCH=32 BUILD=cmake
+      before_install: *linux32_before_install
+      install:
+        - cmake -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake
+        - make
+      script:
+        - make test ARGS="-V"
+    - haxe: development
+      os: linux
+      dist: trusty
+      env: ARCH=32 BUILD=make
+      before_install: *linux32_before_install
+      before_script:
+        - sudo ldconfig
+    - haxe: development
+      os: linux
+      dist: trusty
+      env: ARCH=64 BUILD=make
+      before_install: *linux64_before_install
+      before_script:
+        - sudo ldconfig
     - haxe: development
       os: osx
       osx_image: xcode8
+      env: ARCH=64 BUILD=make
+      before_install: *mac_before_install
+    - haxe: development
+      os: osx
+      osx_image: xcode8
+      env: ARCH=64 BUILD=cmake
+      before_install: *mac_before_install
+      install:
+        - cmake .
+        - make
+      script:
+        - make test ARGS="-V"
     - haxe: development
       os: osx
       osx_image: xcode7.1
+      env: ARCH=64 BUILD=make
+      before_install: *mac_before_install
+    - haxe: development
+      os: osx
+      osx_image: xcode7.1
+      env: ARCH=64 BUILD=cmake
+      before_install: *mac_before_install
+      install:
+        - cmake .
+        - make
+      script:
+        - make test ARGS="-V"
 
 install:
-  - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
-      sudo apt-get update -y;
-      sudo apt-get install gcc-multilib -y;
-    fi
-  - make ARCH=32 all
+  - make all
   - sudo make install_lib
-  - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
-      sudo ldconfig;
-    fi
-  
+
 script:
-  - haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
-  - ./hl hello.hl
-  - haxe -hl src/_main.c -cp other/tests -main HelloWorld && make hlc
+  - if [ "$ARCH" = "32" ]; then
+      haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
+      ./hl hello.hl;
+    fi
+  - haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
+    make hlc &&
+    ./hlc

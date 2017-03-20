@@ -20,13 +20,28 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
-#ifndef HL_NATIVE_WCHAR_FUN
+#ifndef HL_NATIVE_UCHAR_FUN
 #include <stdarg.h>
 
 int ustrlen( const uchar *str ) {
 	const uchar *p = str;
 	while( *p ) p++;
 	return (int)(p - str);
+}
+
+int ustrlen_utf8( const uchar *str ) {
+	int size = 0;
+	while(1) {
+		uchar c = *str++;
+		if( c == 0 ) break;
+		if( c < 0x80 )
+			size++;
+		else if( c < 0x800 )
+			size += 2;
+		else
+			size += 3;
+	}
+	return size;
 }
 
 uchar *ustrdup( const uchar *str ) {
@@ -182,14 +197,14 @@ int utostr( char *out, int out_size, const uchar *str ) {
 		unsigned int c = *str++;
 		if( c == 0 ) break;
 		if( c < 0x80 )
-			*out++ = c;
+			*out++ = (char)c;
 		else if( c < 0x800 ) {
 			if( out + 2 > end ) break;
-			*out++ = 0xC0|(c>>6);
+			*out++ = (char)(0xC0|(c>>6));
 			*out++ = 0x80|(c&63);
 		} else {
 			if( out + 3 > end ) break;
-			*out++ = 0xE0|(c>>12);
+			*out++ = (char)(0xE0|(c>>12));
 			*out++ = 0x80|((c>>6)&63);
 			*out++ = 0x80|(c&63);
 		}
@@ -199,7 +214,7 @@ int utostr( char *out, int out_size, const uchar *str ) {
 }
 
 static char *utos( const uchar *s ) {
-	int len = ustrlen(s);
+	int len = ustrlen_utf8(s);
 	char *out = (char*)malloc(len + 1);
 	if( utostr(out,len+1,s) < 0 )
 		*out = 0;

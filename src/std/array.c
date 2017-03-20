@@ -23,11 +23,10 @@
 
 HL_PRIM varray *hl_alloc_array( hl_type *at, int size ) {
 	int esize = hl_type_size(at);
-	varray *a = (varray*)hl_gc_alloc(sizeof(varray) + esize*size);
+	varray *a = (varray*)hl_gc_alloc_gen(sizeof(varray) + esize*size, (hl_is_ptr(at) ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 	a->t = &hlt_array;
 	a->at = at;
 	a->size = size;
-	memset(hl_aptr(a,void*),0,size*esize);
 	return a;
 }
 

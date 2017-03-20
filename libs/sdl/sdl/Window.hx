@@ -1,7 +1,17 @@
 package sdl;
 
-private typedef WinPtr = hl.types.NativeAbstract<"sdl_window">;
-private typedef GLContext = hl.types.NativeAbstract<"sdl_gl">;
+private typedef WinPtr = hl.Abstract<"sdl_window">;
+private typedef GLContext = hl.Abstract<"sdl_gl">;
+
+@:enum abstract DisplayMode(Int) {
+	var Windowed = 0;
+	var Fullscreen = 1;
+	/**
+		Fullscreen not exclusive.
+	**/
+	var Borderless = 2;
+	var FullscreenResize = 3;
+}
 
 @:hlNative("sdl")
 class Window {
@@ -14,24 +24,66 @@ class Window {
 	public var vsync(default, set) : Bool;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
-	public var fullScreen(default, set) : Bool;
+	public var displayMode(default, set) : DisplayMode;
 
 	public function new( title : String, width : Int, height : Int ) {
-		win = winCreate(@:privateAccess title.toUtf8(), width, height);
-		if( win == null ) throw "Failed to create window";
-		glctx = winGetGLContext(win);
-		if( glctx == null ) throw "Failed to init GL Context (OpenGL 2.1 required)";
-		if( !GL.init() ) throw "Failed to init GL API";
+		while( true ) {
+			win = winCreate(@:privateAccess title.toUtf8(), width, height);
+			if( win == null ) throw "Failed to create window";
+			glctx = winGetGLContext(win);
+			if( glctx == null || !GL.init() || !testGL() ) {
+				destroy();
+				if( Sdl.onGlContextRetry() ) continue;
+				Sdl.onGlContextError();
+			}
+			break;
+		}
 		windows.push(this);
 		vsync = true;
 	}
 
-	function set_fullScreen(b) {
-		if( b == fullScreen )
-			return b;
-		if( winSetFullscreen(win, b) )
-			fullScreen = b;
-		return fullScreen;
+	function testGL() {
+		try {
+
+			var reg = ~/[0-9]+\.[0-9]+/;
+			var v : String = GL.getParameter(GL.SHADING_LANGUAGE_VERSION);
+			var shaderVersion = 130;
+			if( reg.match(v) )
+				shaderVersion = hxd.Math.imin( 150, Math.round( Std.parseFloat(reg.matched(0)) * 100 ) );
+
+			var vertex = GL.createShader(GL.VERTEX_SHADER);
+			GL.shaderSource(vertex, ["#version " + shaderVersion, "void main() { gl_Position = vec4(1.0); }"].join("\n"));
+			GL.compileShader(vertex);
+			if( GL.getShaderParameter(vertex, GL.COMPILE_STATUS) != 1 ) throw "Failed to compile VS ("+GL.getShaderInfoLog(vertex)+")";
+
+			var fragment = GL.createShader(GL.FRAGMENT_SHADER);
+			GL.shaderSource(fragment, ["#version " + shaderVersion, "out vec4 color; void main() { color = vec4(1.0); }"].join("\n"));
+			GL.compileShader(fragment);
+			if( GL.getShaderParameter(fragment, GL.COMPILE_STATUS) != 1 ) throw "Failed to compile FS ("+GL.getShaderInfoLog(fragment)+")";
+
+			var p = GL.createProgram();
+			GL.attachShader(p, vertex);
+			GL.attachShader(p, fragment);
+			GL.linkProgram(p);
+
+			if( GL.getProgramParameter(p, GL.LINK_STATUS) != 1 ) throw "Failed to link ("+GL.getProgramInfoLog(p)+")";
+
+			GL.deleteShader(vertex);
+			GL.deleteShader(fragment);
+
+		} catch( e : Dynamic ) {
+
+			return false;
+		}
+		return true;
+	}
+
+	function set_displayMode(mode) {
+		if( mode == displayMode )
+			return mode;
+		if( winSetFullscreen(win, cast mode) )
+			displayMode = mode;
+		return displayMode;
 	}
 
 	public function resize( width : Int, height : Int ) {
@@ -69,7 +121,6 @@ class Window {
 			var spent = haxe.Timer.stamp() - lastFrame;
 			if( spent < 0.005 ) Sys.sleep(0.005 - spent);
 		}
-		GL.finish();
 		winSwapWindow(win);
 		lastFrame = haxe.Timer.stamp();
 	}
@@ -93,7 +144,7 @@ class Window {
 		winResize(win, 2);
 	}
 
-	static function winCreate( title : hl.types.Bytes, width : Int, height : Int ) : WinPtr {
+	static function winCreate( title : hl.Bytes, width : Int, height : Int ) : WinPtr {
 		return null;
 	}
 
@@ -104,7 +155,7 @@ class Window {
 	static function winSwapWindow( win : WinPtr ) {
 	}
 
-	static function winSetFullscreen( win : WinPtr, b : Bool ) {
+	static function winSetFullscreen( win : WinPtr, mode : DisplayMode ) {
 		return false;
 	}
 
@@ -114,7 +165,7 @@ class Window {
 	static function winResize( win : WinPtr, mode : Int ) {
 	}
 
-	static function winGetSize( win : WinPtr, width : hl.types.Ref<Int>, height : hl.types.Ref<Int> ) {
+	static function winGetSize( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
 	}
 
 	static function winRenderTo( win : WinPtr, gl : GLContext ) {

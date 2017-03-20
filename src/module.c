@@ -34,18 +34,63 @@ extern void hl_callback_init( void *e );
 static hl_module *cur_module;
 static void *stack_top;
 
+void *hl_module_stack_top() {
+	return stack_top;
+}
+
+static bool module_resolve_pos( void *addr, int *fidx, int *fpos ) {
+	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code));
+	int min, max;
+	hl_debug_infos *dbg;
+	hl_function *fdebug;
+	if( cur_module->jit_debug == NULL )
+		return false;
+	// lookup function from code pos
+	min = 0;
+	max = cur_module->code->nfunctions;
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		hl_debug_infos *p = cur_module->jit_debug + mid;
+		if( p->start <= code_pos )
+			min = mid + 1;
+		else
+			max = mid;
+	}
+	if( min == 0 )
+		return false; // hl_callback
+	*fidx = (min - 1);
+	dbg = cur_module->jit_debug + (min - 1);
+	fdebug = cur_module->code->functions + (min - 1);
+	// lookup inside function
+	min = 0;
+	max = fdebug->nops;
+	code_pos -= dbg->start;
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		int offset = dbg->large ? ((int*)dbg->offsets)[mid] : ((unsigned short*)dbg->offsets)[mid];
+		if( offset <= code_pos )
+			min = mid + 1;
+		else
+			max = mid;
+	}
+	if( min == 0 )
+		return false; // ???
+	*fpos = min - 1;
+	return true;
+}
+
 static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
-	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code)) >> JIT_CALL_PRECISION;
-	int debug_pos = cur_module->jit_debug[code_pos];
 	int *debug_addr;
 	int file, line;
 	int size = *outSize;
 	int pos = 0;
+	int fidx, fpos;
 	hl_function *fdebug;
-	if( !debug_pos )
+	if( !module_resolve_pos(addr,&fidx,&fpos) )
 		return NULL;
-	fdebug = cur_module->code->functions + cur_module->functions_indexes[((unsigned)debug_pos)>>16];
-	debug_addr = fdebug->debug + ((debug_pos&0xFFFF) * 2);
+	// extract debug info
+	fdebug = cur_module->code->functions + fidx;
+	debug_addr = fdebug->debug + ((fpos&0xFFFF) * 2);
 	file = debug_addr[0];
 	line = debug_addr[1];
 	if( fdebug->obj )
@@ -64,6 +109,11 @@ static int module_capture_stack( void **stack, int size ) {
 	int count = 0;
 	unsigned char *code = cur_module->jit_code;
 	int code_size = cur_module->codesize;
+	if( cur_module->jit_debug ) {
+		int s = cur_module->jit_debug[0].start;
+		code += s;
+		code_size -= s;
+	}
 	while( stack_ptr < (void**)stack_top ) {
 		void *stack_addr = *stack_ptr++; // EBP
 		if( stack_addr > stack_bottom && stack_addr < stack_top ) {
@@ -74,22 +124,24 @@ static int module_capture_stack( void **stack, int size ) {
 			}
 		}
 	}
-	if( count ) count--;
 	return count;
 }
 
-static void hl_init_enum( hl_type_enum *e ) {
-	int i, j;
-	for(i=0;i<e->nconstructs;i++) {
-		hl_enum_construct *c = &e->constructs[i];
-		c->hasptr = false;
-		c->size = sizeof(int); // index
-		for(j=0;j<c->nparams;j++) {
-			hl_type *t = c->params[j];
-			c->size += hl_pad_size(c->size,t);
-			c->offsets[j] = c->size;
-			if( hl_is_ptr(t) ) c->hasptr = true;
-			c->size += hl_type_size(t);
+static void hl_module_types_dump( void (*fdump)( void *, int) ) {
+	int ntypes = cur_module->code->ntypes;
+	int i, fcount = 0;
+	fdump(&ntypes,4);
+	for(i=0;i<ntypes;i++) {
+		hl_type *t = cur_module->code->types + i;
+		fdump(&t,sizeof(void*));
+		if( t->kind == HFUN ) fcount++;
+	}
+	fdump(&fcount,4);
+	for(i=0;i<ntypes;i++) {
+		hl_type *t = cur_module->code->types + i;
+		if( t->kind == HFUN ) {
+			hl_type *ct = (hl_type*)&t->fun->closure_type;
+			fdump(&ct,sizeof(void*));
 		}
 	}
 }
@@ -170,7 +222,7 @@ static void append_type( char **p, hl_type *t ) {
 	}
 }
 
-int hl_module_init( hl_module *m ) {
+int hl_module_init( hl_module *m, void *stack_top_val ) {
 	int i, entry;
 	jit_ctx *ctx;
 	// RESET globals
@@ -192,10 +244,13 @@ int hl_module_init( hl_module *m ) {
 			if( curlib != n->lib ) {
 				curlib = n->lib;
 				strcpy(tmp,n->lib);
-#				ifndef HL_WIN
 				if( strcmp(n->lib,"std") == 0 )
+#				ifndef HL_WIN
 					libHandler = RTLD_DEFAULT;
 				else {
+#				else
+					strcpy(tmp, "libhl.dll");
+				else
 #				endif
 #					ifdef HL_64
 					strcpy(tmp+strlen(tmp),"64.hdll");
@@ -250,10 +305,27 @@ int hl_module_init( hl_module *m ) {
 					f->obj = t->obj;
 					f->field = p->name;
 				}
+				for(j=0;j<t->obj->nbindings;j++) {
+					int fid = t->obj->bindings[j<<1];
+					int mid = t->obj->bindings[(j<<1)|1];
+					hl_obj_field *of = hl_obj_field_fetch(t,fid);
+					switch( of->t->kind ) {
+					case HFUN:
+					case HDYN:
+						{
+							hl_function *f = m->code->functions + m->functions_indexes[mid];
+							f->obj = t->obj;
+							f->field = of->name;
+						}
+						break;
+					default:
+						break;
+					}
+				}
 			}
 			break;
 		case HENUM:
-			hl_init_enum(t->tenum);
+			hl_init_enum(t);
 			t->tenum->global_value = ((int)(int_val)t->tenum->global_value) ? (void**)(int_val)(m->globals_data + m->globals_indexes[(int)(int_val)t->tenum->global_value-1]) : NULL;
 			break;
 		case HVIRTUAL:
@@ -285,8 +357,9 @@ int hl_module_init( hl_module *m ) {
 	}
 	hl_callback_init(((unsigned char*)m->jit_code) + entry);
 	cur_module = m;
-	stack_top = &m;
+	stack_top = stack_top_val;
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
+	hl_gc_set_dump_types(hl_module_types_dump);
 	hl_jit_free(ctx);
 	return 1;
 }
@@ -299,5 +372,11 @@ void hl_module_free( hl_module *m ) {
 	free(m->ctx.functions_types);
 	free(m->globals_indexes);
 	free(m->globals_data);
+	if( m->jit_debug ) {
+		int i;
+		for(i=0;i<m->code->nfunctions;i++)
+			free(m->jit_debug[i].offsets);
+		free(m->jit_debug);
+	}
 	free(m);
 }

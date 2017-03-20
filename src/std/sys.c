@@ -109,6 +109,16 @@ HL_PRIM vbyte *hl_sys_string() {
 #endif
 }
 
+HL_PRIM vbyte *hl_sys_locale() {
+#ifdef HL_WIN
+	wchar_t loc[LOCALE_NAME_MAX_LENGTH];
+	int len = GetSystemDefaultLocaleName(loc,LOCALE_NAME_MAX_LENGTH);
+	return len == 0 ? NULL : hl_copy_bytes((vbyte*)loc,(len+1)*2);
+#else
+	return (vbyte*)setlocale(LC_ALL, NULL);
+#endif
+}
+
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	uprintf(USTR("%s"),(uchar*)msg);
 }
@@ -177,6 +187,7 @@ HL_PRIM varray *hl_sys_env() {
 			continue;
 		}
 		count++;
+		e++;
 	}
 	a = hl_alloc_array(&hlt_bytes,count*2);
 	e = environ;
@@ -188,7 +199,7 @@ HL_PRIM varray *hl_sys_env() {
 			continue;
 		}
 		*arr++ = pstrdup(*e,(int)(x - *e));
-		*arr++ = pstrdup(x,-1);
+		*arr++ = pstrdup(x+1,-1);
 		e++;
 	}
 	return a;
@@ -414,10 +425,52 @@ HL_PRIM varray *hl_sys_read_dir( vbyte *_path ) {
 
 HL_PRIM vbyte *hl_sys_full_path( vbyte *path ) {
 #ifdef HL_WIN
-	pchar buf[MAX_PATH+1];
-	if( GetFullPathNameW((pchar*)path,MAX_PATH+1,buf,NULL) == 0 )
+	pchar out[MAX_PATH+1];
+	int len, i, last;
+	HANDLE handle;
+	WIN32_FIND_DATA data;
+	const char sep = '\\';
+	if( GetFullPathNameW((pchar*)path,MAX_PATH+1,out,NULL) == 0 )
 		return NULL;
-	return (vbyte*)pstrdup(buf,-1);
+	len = ustrlen(out);
+	i = 0;
+
+	if (len >= 2 && out[1] == ':') {
+		// convert drive letter to uppercase
+		if (out[0] >= 'a' && out[0] <= 'z')
+			out[0] += (pchar)('A' - 'a');
+		if (len >= 3 && out[2] == sep)
+			i = 3;
+		else
+			i = 2;
+	}
+
+	last = i;
+
+	while (i < len) {
+		// skip until separator
+		while (i < len && out[i] != sep)
+			i++;
+
+		// temporarily strip string to last found component
+		out[i] = 0;
+
+		// get actual file/dir name with proper case
+		if ((handle = FindFirstFileW(out, &data)) != INVALID_HANDLE_VALUE) {
+			// replace the component with proper case
+			memcpy(out + last, data.cFileName, i - last);
+			FindClose(handle);
+		}
+
+		// if we're not at the end, restore the path
+		if (i < len)
+			out[i] = sep;
+
+		// advance
+		i++;
+		last = i;
+	}
+	return (vbyte*)pstrdup(out,len);
 #else
 	pchar buf[PATH_MAX];
 	if( realpath((pchar*)path,buf) == NULL )
@@ -484,13 +537,23 @@ HL_PRIM varray *hl_sys_args() {
 	return a;
 }
 
-HL_PRIM void hl_sys_init(void **args, int nargs) {
+static void *hl_file = NULL;
+
+HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 	sys_args = (pchar**)args;
 	sys_nargs = nargs;
+	hl_file = hlfile;
 }
 
+HL_PRIM vbyte *hl_sys_hl_file() {
+	return hl_file;
+}
+
+
+DEFINE_PRIM(_BYTES, sys_hl_file, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_utf8_path, _NO_ARG);
 DEFINE_PRIM(_BYTES, sys_string, _NO_ARG);
+DEFINE_PRIM(_BYTES, sys_locale, _NO_ARG);
 DEFINE_PRIM(_VOID, sys_print, _BYTES);
 DEFINE_PRIM(_VOID, sys_exit, _I32);
 DEFINE_PRIM(_F64, sys_time, _NO_ARG);

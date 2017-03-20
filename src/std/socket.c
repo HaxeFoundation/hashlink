@@ -20,6 +20,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #ifdef _WIN32
+
+#define FD_SETSIZE	65536
+#pragma warning(disable:4548)
+
 #	include <string.h>
 #	define _WINSOCKAPI_
 #	include <hl.h>
@@ -120,6 +124,7 @@ HL_PRIM hl_socket *hl_socket_new( bool udp ) {
 }
 
 HL_PRIM void hl_socket_close( hl_socket *s ) {
+	if( !s ) return;
 	closesocket(s->sock);
 	s->sock = INVALID_SOCKET;
 }
@@ -127,13 +132,18 @@ HL_PRIM void hl_socket_close( hl_socket *s ) {
 HL_PRIM int hl_socket_send_char( hl_socket *s, int c ) {
 	char cc;
 	cc = (char)(unsigned char)c;
+	if( !s )
+		return -2;
 	if( send(s->sock,&cc,1,MSG_NOSIGNAL) == SOCKET_ERROR )
 		return block_error();
 	return 1;
 }
 
 HL_PRIM int hl_socket_send( hl_socket *s, vbyte *buf, int pos, int len ) {
-	int r = send(s->sock, (char*)buf + pos, len, MSG_NOSIGNAL);
+	int r;
+	if( !s )
+		return -2;
+	r = send(s->sock, (char*)buf + pos, len, MSG_NOSIGNAL);
 	if( r == SOCKET_ERROR )
 		return block_error();
 	return len;
@@ -141,7 +151,10 @@ HL_PRIM int hl_socket_send( hl_socket *s, vbyte *buf, int pos, int len ) {
 
 
 HL_PRIM int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len ) {
-	int	ret = recv(s->sock, (char*)buf + pos, len, MSG_NOSIGNAL);
+	int	ret;
+	if( !s )
+		return -2;
+	ret = recv(s->sock, (char*)buf + pos, len, MSG_NOSIGNAL);
 	if( ret == SOCKET_ERROR )
 		return block_error();
 	return ret;
@@ -149,7 +162,9 @@ HL_PRIM int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len ) {
 
 HL_PRIM int hl_socket_recv_char( hl_socket *s ) {
 	char cc;
-	int ret = recv(s->sock,&cc,1,MSG_NOSIGNAL);
+	int ret;
+	if( !s ) return -2;
+	ret = recv(s->sock,&cc,1,MSG_NOSIGNAL);
 	if( ret == SOCKET_ERROR || ret == 0 )
 		return block_error();
 	return (unsigned char)cc;
@@ -209,6 +224,7 @@ HL_PRIM bool hl_socket_connect( hl_socket *s, int host, int port ) {
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons((unsigned short)port);
 	*(int*)&addr.sin_addr.s_addr = host;
+	if( !s ) return false;
 	if( connect(s->sock,(struct sockaddr*)&addr,sizeof(addr)) != 0 ) {
 		int err = block_error();
 		if( err == -1 ) return true; // in progress
@@ -218,11 +234,13 @@ HL_PRIM bool hl_socket_connect( hl_socket *s, int host, int port ) {
 }
 
 HL_PRIM bool hl_socket_listen( hl_socket *s, int n ) {
+	if( !s ) return false;
 	return listen(s->sock,n) != SOCKET_ERROR;
 }
 
 HL_PRIM bool hl_socket_bind( hl_socket *s, int host, int port ) {
 	struct sockaddr_in addr;
+	if( !s ) return false;
 	memset(&addr,0,sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons((unsigned short)port);
@@ -239,6 +257,7 @@ HL_PRIM hl_socket *hl_socket_accept( hl_socket *s ) {
 	_sockaddr addrlen = sizeof(addr);
 	SOCKET nsock;
 	hl_socket *hs;
+	if( !s ) return NULL;
 	nsock = accept(s->sock,(struct sockaddr*)&addr,&addrlen);
 	if( nsock == INVALID_SOCKET )
 		return NULL;
@@ -250,7 +269,7 @@ HL_PRIM hl_socket *hl_socket_accept( hl_socket *s ) {
 HL_PRIM bool hl_socket_peer( hl_socket *s, int *host, int *port ) {
 	struct sockaddr_in addr;
 	_sockaddr addrlen = sizeof(addr);
-	if( getpeername(s->sock,(struct sockaddr*)&addr,&addrlen) == SOCKET_ERROR )
+	if( !s || getpeername(s->sock,(struct sockaddr*)&addr,&addrlen) == SOCKET_ERROR )
 		return false;
 	*host = *(int*)&addr.sin_addr;
 	*port = ntohs(addr.sin_port);
@@ -260,7 +279,7 @@ HL_PRIM bool hl_socket_peer( hl_socket *s, int *host, int *port ) {
 HL_PRIM bool hl_socket_host( hl_socket *s, int *host, int *port ) {
 	struct sockaddr_in addr;
 	_sockaddr addrlen = sizeof(addr);
-	if( getsockname(s->sock,(struct sockaddr*)&addr,&addrlen) == SOCKET_ERROR )
+	if( !s || getsockname(s->sock,(struct sockaddr*)&addr,&addrlen) == SOCKET_ERROR )
 		return false;
 	*host = *(int*)&addr.sin_addr;
 	*port = ntohs(addr.sin_port);
@@ -279,6 +298,7 @@ HL_PRIM bool hl_socket_set_timeout( hl_socket *s, double t ) {
 	struct timeval time;
 	init_timeval(t,&time);
 #endif
+	if( !s ) return false;
 	if( setsockopt(s->sock,SOL_SOCKET,SO_SNDTIMEO,(char*)&time,sizeof(time)) != 0 )
 		return false;
 	if( setsockopt(s->sock,SOL_SOCKET,SO_RCVTIMEO,(char*)&time,sizeof(time)) != 0 )
@@ -287,6 +307,8 @@ HL_PRIM bool hl_socket_set_timeout( hl_socket *s, double t ) {
 }
 
 HL_PRIM bool hl_socket_shutdown( hl_socket *s, bool r, bool w ) {
+	if( !s )
+		return false;
 	if( !r && !w )
 		return true;
 	return shutdown(s->sock,r?(w?SHUT_RDWR:SHUT_RD):SHUT_WR) == 0;
@@ -295,9 +317,12 @@ HL_PRIM bool hl_socket_shutdown( hl_socket *s, bool r, bool w ) {
 HL_PRIM bool hl_socket_set_blocking( hl_socket *s, bool b ) {
 #ifdef HL_WIN
 	unsigned long arg = b?0:1;
+	if( !s ) return false;
 	return ioctlsocket(s->sock,FIONBIO,&arg) == 0;
 #else
-	int rights = fcntl(s->sock,F_GETFL);
+	int rights;
+	if( !s ) return false;
+	rights = fcntl(s->sock,F_GETFL);
 	if( rights == -1 )
 		return false;
 	if( b )
@@ -310,7 +335,108 @@ HL_PRIM bool hl_socket_set_blocking( hl_socket *s, bool b ) {
 
 HL_PRIM bool hl_socket_set_fast_send( hl_socket *s, bool b ) {
 	int fast = b;
+	if( !s ) return false;
 	return setsockopt(s->sock,IPPROTO_TCP,TCP_NODELAY,(char*)&fast,sizeof(fast)) == 0;
+}
+
+HL_PRIM int hl_socket_send_to( hl_socket *s, char *data, int len, int host, int port ) {
+	struct sockaddr_in addr;
+	if( !s ) return -2;
+	memset(&addr,0,sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons((unsigned short)port);
+	*(int*)&addr.sin_addr.s_addr = host;
+	len = sendto(s->sock, data, len, MSG_NOSIGNAL, (struct sockaddr*)&addr, sizeof(addr));
+	if( len == SOCKET_ERROR )
+		return block_error();
+	return len;
+}
+
+HL_PRIM int hl_socket_recv_from( hl_socket *s, char *data, int len, int *host, int *port ) {
+	struct sockaddr_in saddr;
+	int slen = sizeof(saddr);
+	if( !s ) return -2;
+	len = recvfrom(s->sock, data, len, MSG_NOSIGNAL, (struct sockaddr*)&saddr, &slen);
+	if( len == SOCKET_ERROR ) {
+#ifdef	HL_WIN
+		if( WSAGetLastError() == WSAECONNRESET )
+			len = 0;
+		else
+#endif
+		return block_error();
+	}
+	*host = *(int*)&saddr.sin_addr;
+	*port = ntohs(saddr.sin_port);
+	return len;
+}
+
+HL_PRIM int hl_socket_fd_size( int size ) {
+	if( size > FD_SETSIZE )
+		return -1;
+#	ifdef HL_WIN
+	return FDSIZE(size);
+#	else
+	return sizeof(fd_set);
+#	endif
+}
+
+static fd_set *make_socket_set( varray *a, char **tmp, int *tmp_size, unsigned int *max ) {
+	fd_set *set = (fd_set*)*tmp;
+	int i, req;
+	if( a == NULL )
+		return set;
+	req = hl_socket_fd_size(a->size);
+	if( *tmp_size < req )
+		return NULL;
+	*tmp_size -= req;
+	FD_ZERO(set);
+	for(i=0;i<a->size;i++) {
+		hl_socket *s= hl_aptr(a,hl_socket*)[i];
+		if( s== NULL ) break;
+		if( s->sock > *max ) *max = s->sock;
+		FD_SET(s->sock,set);
+	}
+	return set;
+}
+
+static void make_array_result( fd_set *set, varray *a ) {
+	int i;
+	int pos = 0;
+	hl_socket **aptr = hl_aptr(a,hl_socket*);
+	if( a == NULL )
+		return;
+	for(i=0;i<a->size;i++) {
+		hl_socket *s = aptr[i];
+		if( s == NULL )
+			break;
+		if( FD_ISSET(s->sock,set) )
+			aptr[pos++] = s;
+	}
+	if( pos < a->size )
+		aptr[pos++] = NULL;
+}
+
+HL_PRIM bool hl_socket_select( varray *ra, varray *wa, varray *ea, char *tmp, int tmp_size, double timeout ) {
+	struct timeval tval, *tt;
+	fd_set *rs, *ws, *es;
+	unsigned int max = 0;
+	rs = make_socket_set(ra,&tmp,&tmp_size,&max);
+	ws = make_socket_set(wa,&tmp,&tmp_size,&max);
+	es = make_socket_set(ea,&tmp,&tmp_size,&max);
+	if( rs == NULL || ws == NULL || es == NULL )
+		return false;
+	if( timeout < 0 )
+		tt = NULL;
+	else {
+		tt = &tval;
+		init_timeval(timeout,tt);
+	}
+	if( select((int)(max+1),ra?rs:NULL,wa?ws:NULL,ea?es:NULL,tt) == SOCKET_ERROR )
+		return false;
+	make_array_result(rs,ra);
+	make_array_result(ws,wa);
+	make_array_result(es,ea);
+	return true;
 }
 
 #define _SOCK	_ABSTRACT(hl_socket)
@@ -335,3 +461,8 @@ DEFINE_PRIM(_BOOL,socket_set_timeout,_SOCK _F64);
 DEFINE_PRIM(_BOOL,socket_shutdown,_SOCK _BOOL _BOOL);
 DEFINE_PRIM(_BOOL,socket_set_blocking,_SOCK _BOOL);
 DEFINE_PRIM(_BOOL,socket_set_fast_send,_SOCK _BOOL);
+
+DEFINE_PRIM(_I32, socket_send_to, _SOCK _BYTES _I32 _I32 _I32);
+DEFINE_PRIM(_I32, socket_recv_from, _SOCK _BYTES _I32 _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_I32, socket_fd_size, _I32 );
+DEFINE_PRIM(_BOOL, socket_select, _ARR _ARR _ARR _BYTES _I32 _F64);

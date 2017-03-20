@@ -191,45 +191,41 @@ HL_PRIM void HL_NAME(ui_stop_loop)() {
 }
 
 typedef struct {
-	HANDLE thread;
-	HANDLE original;
+	hl_thread *thread;
+	hl_thread *original;
 	void *callback;
 	double timeout;
 	int ticks;
+	bool pause;
 } vsentinel;
 
-static DWORD WINAPI sentinel_loop( vsentinel *s ) {
+static void sentinel_loop( vsentinel *s ) {
 	int time_ms = (int)((s->timeout * 1000.) / 16.);
+	hl_thread_registers *regs = (hl_thread_registers*)malloc(sizeof(int_val) * hl_thread_context_size());
+	int eip = hl_thread_context_index("eip");
+	int esp = hl_thread_context_index("esp");
 	while( true ) {
 		int k = 0;
 		int tick = s->ticks;
 		while( true ) {
 			Sleep(time_ms);
-			if( tick != s->ticks ) break;
+			if( tick != s->ticks || s->pause ) break;
 			k++;
 			if( k == 16 ) {
-				// Wakeup
-				CONTEXT ctx;
-				ctx.ContextFlags = CONTEXT_FULL;
-				SuspendThread(s->original);
-				GetThreadContext(s->original,&ctx);
+				// pause
+				hl_thread_pause(s->original, true);
+				hl_thread_get_context(s->original,regs);
 				// simulate a call
-#				ifdef HL_64
-				*--((int_val*)ctx.Rsp) = ctx.Rip;
-				*--((int_val*)ctx.Rsp) = ctx.Rsp;
-				ctx.Rip = (int_val)s->callback;
-#				else
-				*--((int*)ctx.Esp) = ctx.Eip;
-				*--((int*)ctx.Esp) = ctx.Esp;
-				ctx.Eip = (DWORD)s->callback;
-#				endif
-				SetThreadContext(s->original,&ctx);
-				ResumeThread(s->original);
+				*--(int_val*)regs[esp] = regs[eip];
+				*--(int_val*)regs[esp] = regs[esp];
+				regs[eip] = (int_val)s->callback;
+				// resume
+				hl_thread_set_context(s->original,regs);
+				hl_thread_pause(s->original, false);
 				break;
 			}
 		}
 	}
-	return 0;
 }
 
 HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
@@ -240,14 +236,23 @@ HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 #	endif
 	s->timeout = timeout;
 	s->ticks = 0;
-	s->original = OpenThread(THREAD_ALL_ACCESS,FALSE,GetCurrentThreadId());
+	s->pause = false;
+	s->original = hl_thread_current();
 	s->callback = c->fun;
-	s->thread = CreateThread(NULL,0,sentinel_loop,s,0,NULL);
+	s->thread = hl_thread_start(sentinel_loop,s,false);
 	return s;
 }
 
 HL_PRIM void HL_NAME(ui_sentinel_tick)( vsentinel *s ) {
 	s->ticks++;
+}
+
+HL_PRIM void HL_NAME(ui_sentinel_pause)( vsentinel *s, bool pause ) {
+	s->pause = pause;
+}
+
+HL_PRIM void HL_NAME(ui_close_console)() {
+	FreeConsole();
 }
 
 #define _WIN _ABSTRACT(ui_window)
@@ -263,6 +268,8 @@ DEFINE_PRIM(_VOID, ui_win_set_enable, _WIN _BOOL);
 DEFINE_PRIM(_VOID, ui_win_destroy, _WIN);
 DEFINE_PRIM(_I32, ui_loop, _BOOL);
 DEFINE_PRIM(_VOID, ui_stop_loop, _NO_ARG);
+DEFINE_PRIM(_VOID, ui_close_console, _NO_ARG);
 
 DEFINE_PRIM(_SENTINEL, ui_start_sentinel, _F64 _FUN(_VOID,_NO_ARG));
 DEFINE_PRIM(_VOID, ui_sentinel_tick, _SENTINEL);
+DEFINE_PRIM(_VOID, ui_sentinel_pause, _SENTINEL _BOOL);

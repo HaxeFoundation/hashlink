@@ -4,6 +4,7 @@
 
 #ifdef _WIN32
 #	include <SDL.h>
+#	include <SDL_syswm.h>
 #else
 #	include <SDL2/SDL.h>
 #endif
@@ -11,6 +12,14 @@
 #ifndef _SDL_H
 #	error "SDL2 SDK not found in hl/include/sdl/"
 #endif
+
+typedef struct {
+	int x;
+	int y;
+	int w;
+	int h;
+	int style;
+} wsave_pos;
 
 typedef enum {
 	Quit,
@@ -66,7 +75,31 @@ HL_PRIM bool HL_NAME(init_once)() {
 	// Set the internal windows timer period to 1ms (will give accurate sleep for vsync)
 	timeBeginPeriod(1);
 #	endif
+	// default GL parameters
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
 	return true;
+}
+
+HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, int flags ) {
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depth);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencil);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, (flags&1));
+	if( flags&2 )
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	else if( flags&4 )
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	else if( flags&8 )
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	else
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, 0); // auto
 }
 
 HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
@@ -239,6 +272,7 @@ HL_PRIM bool HL_NAME(detect_win32)() {
 }
 
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
+DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32) );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
@@ -251,20 +285,71 @@ DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 // Window
 
 HL_PRIM SDL_Window *HL_NAME(win_create)(vbyte *title, int width, int height) {
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	return SDL_CreateWindow((char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	SDL_Window *w;
+	w = SDL_CreateWindow((char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+#	ifdef HL_WIN
+	// force window to show even if the debugger force process windows to be hidden
+	if( (SDL_GetWindowFlags(w) & SDL_WINDOW_INPUT_FOCUS) == 0 ) {
+		SDL_HideWindow(w);
+		SDL_ShowWindow(w);
+	}
+#	endif
+	return w;
 }
 
 HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {
 	return SDL_GL_CreateContext(win);
 }
 
-HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, bool b) {
-	return SDL_SetWindowFullscreen(win, b ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) == 0;
+HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
+#	ifdef HL_WIN
+	wsave_pos *save = SDL_GetWindowData(win,"save");
+	SDL_SysWMinfo info;
+	HWND wnd;
+	SDL_VERSION(&info.version);
+	SDL_GetWindowWMInfo(win,&info);
+	wnd = info.info.win.window;
+	if( save && mode != 2 ) {
+		// exit borderless
+		SetWindowLong(wnd,GWL_STYLE,save->style);
+		SetWindowPos(wnd,NULL,save->x,save->y,save->w,save->h,0);
+		free(save);
+		SDL_SetWindowData(win,"save",NULL);
+		save = NULL;
+	}
+#	endif
+	switch( mode ) {
+	case 0: // WINDOWED
+		return SDL_SetWindowFullscreen(win, 0) == 0;
+	case 1: // FULLSCREEN
+		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0;
+	case 2: // BORDERLESS
+#		ifdef _WIN32
+		{
+			HMONITOR hmon = MonitorFromWindow(wnd,MONITOR_DEFAULTTONEAREST);
+			MONITORINFO mi = { sizeof(mi) };
+			RECT r;
+			if( !GetMonitorInfo(hmon, &mi) )
+				return false;
+			GetWindowRect(wnd,&r);
+			save = (wsave_pos*)malloc(sizeof(wsave_pos));
+			save->x = r.left;
+			save->y = r.top;
+			save->w = r.right - r.left;
+			save->h = r.bottom - r.top;
+			save->style = GetWindowLong(wnd,GWL_STYLE);
+			SDL_SetWindowData(win,"save",save);
+			SetWindowLong(wnd,GWL_STYLE, WS_POPUP | WS_VISIBLE);
+			SetWindowPos(wnd,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top + 2 /* prevent opengl driver to use exclusive mode !*/,0);
+			return true;
+		}
+#	else
+		break;
+#	endif
+	case 3:
+		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN) == 0;
+	}
+	return false;
 }
 
 HL_PRIM void HL_NAME(win_set_size)(SDL_Window *win, int width, int height) {
@@ -309,7 +394,7 @@ HL_PRIM void HL_NAME(win_destroy)(SDL_Window *win, SDL_GLContext gl) {
 #define TGL _ABSTRACT(sdl_gl)
 DEFINE_PRIM(TWIN, win_create, _BYTES _I32 _I32);
 DEFINE_PRIM(TGL, win_get_glcontext, TWIN);
-DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _BOOL);
+DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _I32);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
@@ -395,9 +480,25 @@ HL_PRIM void HL_NAME(set_cursor)( SDL_Cursor *c ) {
 	SDL_SetCursor(c);
 }
 
+#define MAX_DEVICES 16
+HL_PRIM varray *HL_NAME(get_devices)() {
+	varray *a = hl_alloc_array(&hlt_bytes, MAX_DEVICES);
+#	ifdef _WIN32
+	int i=0;
+	DISPLAY_DEVICE inf;
+	inf.cb = sizeof(inf);
+	while( i < MAX_DEVICES && EnumDisplayDevices(NULL,i,&inf,0) ) {
+		hl_aptr(a,vbyte*)[i] = hl_copy_bytes((vbyte*)inf.DeviceString,(wcslen(inf.DeviceString) + 1)*2);
+		i++;
+	}
+#	endif
+	return a;
+}
+
 #define _CURSOR _ABSTRACT(sdl_cursor)
 DEFINE_PRIM(_VOID, show_cursor, _BOOL);
 DEFINE_PRIM(_CURSOR, cursor_create, _SURF _I32 _I32);
 DEFINE_PRIM(_CURSOR, cursor_create_system, _I32);
 DEFINE_PRIM(_VOID, free_cursor, _CURSOR);
 DEFINE_PRIM(_VOID, set_cursor, _CURSOR);
+DEFINE_PRIM(_ARR, get_devices, _NO_ARG);

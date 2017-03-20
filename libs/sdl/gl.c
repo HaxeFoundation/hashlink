@@ -3,8 +3,7 @@
 
 #if defined(__APPLE__)
 #	include <SDL2/SDL.h>
-#	include <OpenGL/glu.h>
-#	include <OpenGL/glext.h>
+#	include <OpenGL/gl3.h>
 #elif defined(_WIN32)
 #	include <SDL.h>
 #	include <GL/GLU.h>
@@ -115,6 +114,11 @@ HL_PRIM void HL_NAME(gl_pixel_storei)( int key, int value ) {
 	glPixelStorei(key, value);
 }
 
+HL_PRIM vbyte *HL_NAME(gl_get_string)(int name) {
+	GLOG("%d", name);
+	return (vbyte*)glGetString(name);
+}
+
 // state changes
 
 HL_PRIM void HL_NAME(gl_enable)( int feature ) {
@@ -167,6 +171,21 @@ HL_PRIM void HL_NAME(gl_color_mask)( bool r, bool g, bool b, bool a ) {
 	glColorMask(r, g, b, a);
 }
 
+HL_PRIM void HL_NAME(gl_stencil_mask_separate)(int face, int mask) {
+	GLOG("%d,%d",face,mask);
+	glStencilMaskSeparate(face, mask);
+}
+
+HL_PRIM void HL_NAME(gl_stencil_func_separate)(int face, int func, int ref, int mask ) {
+	GLOG("%d,%d,%d,%d",face,func,ref,mask);
+	glStencilFuncSeparate(face, func, ref, mask);
+}
+
+HL_PRIM void HL_NAME(gl_stencil_op_separate)(int face, int sfail, int dpfail, int dppass) {
+	GLOG("%d,%d,%d,%d",face,sfail,dpfail,dppass);
+	glStencilOpSeparate(face, sfail, dpfail, dppass);
+}
+
 // program
 
 static vdynamic *alloc_i32(int v) {
@@ -181,6 +200,17 @@ HL_PRIM vdynamic *HL_NAME(gl_create_program)() {
 	GLOGR("%d",v,"");
 	if( v == 0 ) return NULL;
 	return alloc_i32(v);
+}
+
+HL_PRIM void HL_NAME(gl_delete_program)( vdynamic *s ) {
+	GLOG("%d",s->v.i);
+	glDeleteProgram(s->v.i);
+}
+
+HL_PRIM void HL_NAME(gl_bind_frag_data_location)( vdynamic *p, int colNum, vstring *name ) {
+	char *cname = hl_to_utf8(name->bytes);
+	GLOG("%d,%d,%n",p->v.i,colNum,cname);
+	glBindFragDataLocation(p->v.i, colNum, cname);
 }
 
 HL_PRIM void HL_NAME(gl_attach_shader)( vdynamic *p, vdynamic *s ) {
@@ -267,7 +297,7 @@ HL_PRIM vdynamic *HL_NAME(gl_get_shader_parameter)( vdynamic *s, int param ) {
 	switch( param ) {
 	case 0x8B81/*COMPILE_STATUS*/:
 	case 0x8B4F/*SHADER_TYPE*/:
-	case 0x8B80/*DELETE_STATUS*/: 
+	case 0x8B80/*DELETE_STATUS*/:
 	{
 		int ret = 0;
 		glGetShaderiv(s->v.i, param, &ret);
@@ -355,6 +385,11 @@ HL_PRIM void HL_NAME(gl_read_pixels)( int x, int y, int width, int height, int f
 	glReadPixels(x, y, width, height, format, type, data);
 }
 
+HL_PRIM void HL_NAME(gl_read_buffer)( int mode ) {
+	GLOG("%d",mode);
+	glReadBuffer(mode);
+}
+
 HL_PRIM void HL_NAME(gl_draw_buffers)( int count, unsigned int *buffers) {
 	GLOG("%d",count);
 	glDrawBuffers(count, buffers);
@@ -380,8 +415,8 @@ HL_PRIM void HL_NAME(gl_renderbuffer_storage)( int target, int format, int width
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_renderbuffer)( int frameTarget, int attach, int renderTarget, vdynamic *b ) {
-	GLOG("%d,%d,%d,%d",frameTarget,attach,renderTarget,b->v.i);
-	glFramebufferRenderbuffer(frameTarget, attach, renderTarget, b->v.i);
+	GLOG("%d,%d,%d,%d",frameTarget,attach,renderTarget,ZIDX(b));
+	glFramebufferRenderbuffer(frameTarget, attach, renderTarget, ZIDX(b));
 }
 
 HL_PRIM void HL_NAME(gl_delete_renderbuffer)( vdynamic *b ) {
@@ -473,6 +508,64 @@ HL_PRIM void HL_NAME(gl_draw_elements)( int mode, int count, int type, int start
 	glDrawElements(mode, count, type, (void*)(int_val)start);
 }
 
+// queries
+
+HL_PRIM vdynamic *HL_NAME(gl_create_query)() {
+	unsigned int t = 0;
+	glGenQueries(1, &t);
+	GLOGR("%d",t,"");
+	return alloc_i32(t);
+}
+
+HL_PRIM void HL_NAME(gl_delete_query)( vdynamic *q ) {
+	GLOG("%d",q->v.i);
+	glDeleteQueries(1,&q->v.i);
+}
+
+HL_PRIM void HL_NAME(gl_begin_query)( int target, vdynamic *q ) {
+	glBeginQuery(target,q->v.i);
+}
+
+HL_PRIM void HL_NAME(gl_end_query)( int target ) {
+	glEndQuery(target);
+}
+
+HL_PRIM bool HL_NAME(gl_query_result_available)( vdynamic *q ) {
+	int v = 0;
+	glGetQueryObjectiv(q->v.i, GL_QUERY_RESULT_AVAILABLE, &v);
+	return v == GL_TRUE;
+}
+
+HL_PRIM double HL_NAME(gl_query_result)( vdynamic *q ) {
+	GLuint64 v = -1;
+	glGetQueryObjectui64v(q->v.i, GL_QUERY_RESULT, &v);
+	return (double)v;
+}
+
+HL_PRIM void HL_NAME(gl_query_counter)( vdynamic *q, int target ) {
+	glQueryCounter(q->v.i, target);
+}
+
+// vertex array
+
+HL_PRIM vdynamic *HL_NAME(gl_create_vertex_array)() {
+	unsigned int f = 0;
+	glGenVertexArrays(1, &f);
+	GLOGR("%d",f,"");
+	return alloc_i32(f);
+}
+
+HL_PRIM void HL_NAME(gl_bind_vertex_array)( vdynamic *b ) {
+	unsigned int bb = (unsigned)b->v.i;
+	GLOG("%d",bb);
+	glBindVertexArray(bb);
+}
+
+HL_PRIM void HL_NAME(gl_delete_vertex_array)( vdynamic *b ) {
+	unsigned int bb = (unsigned)b->v.i;
+	GLOG("%d",bb);
+	glDeleteVertexArrays(1, &bb);
+}
 
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
@@ -485,6 +578,7 @@ DEFINE_PRIM(_VOID,gl_clear_stencil,_I32);
 DEFINE_PRIM(_VOID,gl_viewport,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_finish,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_pixel_storei,_I32 _I32);
+DEFINE_PRIM(_BYTES,gl_get_string,_I32);
 DEFINE_PRIM(_VOID,gl_enable,_I32);
 DEFINE_PRIM(_VOID,gl_disable,_I32);
 DEFINE_PRIM(_VOID,gl_cull_face,_I32);
@@ -495,7 +589,12 @@ DEFINE_PRIM(_VOID,gl_blend_equation_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_depth_mask,_BOOL);
 DEFINE_PRIM(_VOID,gl_depth_func,_I32);
 DEFINE_PRIM(_VOID,gl_color_mask,_BOOL _BOOL _BOOL _BOOL);
+DEFINE_PRIM(_VOID,gl_stencil_mask_separate,_I32 _I32);
+DEFINE_PRIM(_VOID,gl_stencil_func_separate,_I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_stencil_op_separate,_I32  _I32 _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_program,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_delete_program,_NULL(_I32));
+DEFINE_PRIM(_VOID,gl_bind_frag_data_location,_NULL(_I32) _I32 _STRING);
 DEFINE_PRIM(_VOID,gl_attach_shader,_NULL(_I32) _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_link_program,_NULL(_I32));
 DEFINE_PRIM(_DYN,gl_get_program_parameter,_NULL(_I32) _I32);
@@ -521,6 +620,7 @@ DEFINE_PRIM(_VOID,gl_bind_framebuffer,_I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_framebuffer_texture2d,_I32 _I32 _I32 _NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_delete_framebuffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_read_pixels,_I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_read_buffer,_I32);
 DEFINE_PRIM(_VOID,gl_draw_buffers,_I32 _BYTES);
 DEFINE_PRIM(_NULL(_I32),gl_create_renderbuffer,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_renderbuffer,_I32 _NULL(_I32));
@@ -539,3 +639,15 @@ DEFINE_PRIM(_VOID,gl_delete_buffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_uniform1i,_NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_uniform4fv,_NULL(_I32) _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_elements,_I32 _I32 _I32 _I32);
+DEFINE_PRIM(_NULL(_I32),gl_create_vertex_array,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_bind_vertex_array,_NULL(_I32));
+DEFINE_PRIM(_VOID,gl_delete_vertex_array,_NULL(_I32));
+
+
+DEFINE_PRIM(_NULL(_I32), gl_create_query, _NO_ARG);
+DEFINE_PRIM(_VOID, gl_delete_query, _NULL(_I32));
+DEFINE_PRIM(_VOID, gl_begin_query, _I32 _NULL(_I32));
+DEFINE_PRIM(_VOID, gl_end_query, _I32);
+DEFINE_PRIM(_BOOL, gl_query_result_available, _NULL(_I32));
+DEFINE_PRIM(_VOID, gl_query_counter, _NULL(_I32) _I32);
+DEFINE_PRIM(_F64, gl_query_result, _NULL(_I32));

@@ -1,6 +1,6 @@
 package sdl;
 
-private typedef SurfacePtr = hl.types.NativeAbstract<"sdl_surface">;
+private typedef SurfacePtr = hl.Abstract<"sdl_surface">;
 
 @:hlNative("sdl")
 abstract Surface(SurfacePtr) {
@@ -18,7 +18,7 @@ abstract Surface(SurfacePtr) {
 	}
 
 	@:hlNative("sdl","surface_from")
-	public static function from( pixels : hl.types.Bytes,  width : Int, height : Int, depth : Int, pitch : Int, rmask : Int, gmask : Int, bmask : Int, amask : Int ) : Surface {
+	public static function from( pixels : hl.Bytes,  width : Int, height : Int, depth : Int, pitch : Int, rmask : Int, gmask : Int, bmask : Int, amask : Int ) : Surface {
 		return null;
 	}
 

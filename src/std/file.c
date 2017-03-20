@@ -54,44 +54,52 @@ HL_PRIM hl_fdesc *hl_file_open( vbyte *name, int mode, bool binary ) {
 }
 
 HL_PRIM void hl_file_close( hl_fdesc *f ) {
+	if( !f ) return;
 	if( f->f ) fclose(f->f);
 	f->f = NULL;
 	f->finalize = NULL;
 }
 
 HL_PRIM int hl_file_write( hl_fdesc *f, vbyte *buf, int pos, int len ) {
+	if( !f ) return -1;
 	return (int)fwrite(buf+pos,1,len,f->f);
 }
 
 HL_PRIM int hl_file_read( hl_fdesc *f, vbyte *buf, int pos, int len ) {
+	if( !f ) return -1;
 	return (int)fread((char*)buf+pos,1,len,f->f);
 }
 
 HL_PRIM bool hl_file_write_char( hl_fdesc *f, int c ) {
 	unsigned char cc = (unsigned char)c;
+	if( !f ) return false;
 	return fwrite(&cc,1,1,f->f) == 1;
 }
 
 HL_PRIM int hl_file_read_char( hl_fdesc *f ) {
 	unsigned char cc;
-	if( fread(&cc,1,1,f->f) != 1 )
+	if( !f || fread(&cc,1,1,f->f) != 1 )
 		return -2;
 	return cc;
 }
 
 HL_PRIM bool hl_file_seek( hl_fdesc *f, int pos, int kind ) {
+	if( !f ) return false;
 	return fseek(f->f,pos,kind) == 0;
 }
 
 HL_PRIM int hl_file_tell( hl_fdesc *f ) {
+	if( !f ) return -1;
 	return ftell(f->f);
 }
 
 HL_PRIM bool hl_file_eof( hl_fdesc *f ) {
+	if( !f ) return true;
 	return (bool)feof(f->f);
 }
 
 HL_PRIM bool hl_file_flush( hl_fdesc *f ) {
+	if( !f ) return false;
 	return fflush( f->f ) == 0;
 }
 

@@ -6,16 +6,46 @@ image:
 platform: Win32
 configuration: Release
 
+environment:
+  global:
+    HAXELIB_ROOT: C:\projects\haxelib
+  matrix:
+    - builder: cmake
+    - builder: vc
+
 install:
-  - appveyor DownloadFile https://www.libsdl.org/release/SDL2-devel-2.0.4-VC.zip
-  - 7z x SDL2-devel-2.0.4-VC.zip
-  - move SDL2-2.0.4 include/sdl
+  # install sdl
+  - appveyor DownloadFile https://www.libsdl.org/release/SDL2-devel-2.0.5-VC.zip
+  - 7z x SDL2-devel-2.0.5-VC.zip
+  - move SDL2-2.0.5 include/sdl
+  # install openal
+  - appveyor DownloadFile http://openal-soft.org/openal-binaries/openal-soft-1.17.2-bin.zip
+  - 7z x openal-soft-1.17.2-bin.zip
+  - move openal-soft-1.17.2-bin include/openal
+  # install neko and haxe
+  - cinst neko -y
+  - cinst haxe --prerelease --ignore-dependencies -s 'https://ci.appveyor.com/nuget/haxe' -y
+  - RefreshEnv
+  - neko -version
+  - haxe -version
+  # setup haxelib
+  - mkdir "%HAXELIB_ROOT%"
+  - haxelib setup "%HAXELIB_ROOT%"
 
 build_script:
-  - msbuild hldll.vcxproj         /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild hl.vcxproj            /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild libs/fmt/fmt.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild libs/sdl/sdl.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - msbuild libs/ui/ui.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  # if "%builder%"=="vc" 
+  - if "%builder%"=="vc"      msbuild libhl.vcxproj         /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild hl.vcxproj            /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libs/fmt/fmt.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libs/sdl/sdl.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libs/ui/ui.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libs/sqlite/sqlite.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="vc"      msbuild libs/ssl/ssl.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  # if "%builder%"=="cmake"
+  - if "%builder%"=="cmake"   cmake -G "Visual Studio 14 2015"
+  - if "%builder%"=="cmake"   msbuild ALL_BUILD.vcxproj     /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="cmake"   msbuild RUN_TESTS.vcxproj     /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
 
 test: off
+# test_script:
+#   - if "%builder%"=="cmake"   msbuild RUN_TESTS.vcxproj     /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"

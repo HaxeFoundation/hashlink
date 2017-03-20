@@ -78,6 +78,12 @@ typedef struct {
 } hl_code;
 
 typedef struct {
+	void *offsets;
+	int start;
+	bool large;
+} hl_debug_infos;
+
+typedef struct {
 	hl_code *code;
 	int codesize;
 	int *globals_indexes;
@@ -85,7 +91,7 @@ typedef struct {
 	void **functions_ptrs;
 	int *functions_indexes;
 	void *jit_code;
-	int *jit_debug;
+	hl_debug_infos *jit_debug;
 	hl_module_context ctx;
 } hl_module;
 
@@ -97,19 +103,14 @@ const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
 
 hl_module *hl_module_alloc( hl_code *code );
-int hl_module_init( hl_module *m );
+int hl_module_init( hl_module *m, void *stack_top );
 void hl_module_free( hl_module *m );
-
-void *hl_alloc_executable_memory( int size );
-void hl_free_executable_memory( void *ptr, int size );
-
-#define JIT_CALL_PRECISION 3
+bool hl_module_debug( hl_module *m, int port, bool wait );
+void *hl_module_stack_top();
 
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_init_callback( jit_ctx *ctx );
-void hl_jit_init_setfp( jit_ctx *ctx, int *ff, int *fd );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, int **debug );
-
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug );

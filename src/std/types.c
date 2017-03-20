@@ -29,6 +29,7 @@ HL_PRIM hl_type hlt_i32 = { HI32 };
 HL_PRIM hl_type hlt_f32 = { HF32 };
 HL_PRIM hl_type hlt_f64 = { HF64 };
 HL_PRIM hl_type hlt_void = { HVOID };
+HL_PRIM hl_type hlt_bool = { HBOOL };
 
 static const uchar *TSTR[] = {
 	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("f32"), USTR("f64"),
@@ -291,11 +292,43 @@ HL_PRIM vbyte* hl_type_name( hl_type *t ) {
 	return NULL;
 }
 
+HL_PRIM void hl_init_enum( hl_type *et ) {
+	int i, j;
+	for(i=0;i<et->tenum->nconstructs;i++) {
+		hl_enum_construct *c = et->tenum->constructs + i;
+		c->hasptr = false;
+		c->size = sizeof(int); // index
+		for(j=0;j<c->nparams;j++) {
+			hl_type *t = c->params[j];
+			c->size += hl_pad_size(c->size,t);
+			c->offsets[j] = c->size;
+			if( hl_is_ptr(t) ) c->hasptr = true;
+			c->size += hl_type_size(t);
+		}
+	}
+}
+
 HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
 	varray *a = hl_alloc_array(&hlt_bytes,t->tenum->nconstructs);
 	int i;
 	for( i=0; i<t->tenum->nconstructs;i++)
 		hl_aptr(a,vbyte*)[i] = (vbyte*)t->tenum->constructs[i].name;
+	return a;
+}
+
+HL_PRIM varray* hl_type_enum_values( hl_type *t ) {
+	varray *a = hl_alloc_array(&hlt_dyn,t->tenum->nconstructs);
+	int i;
+	for( i=0; i<t->tenum->nconstructs;i++) {
+		hl_enum_construct *c = t->tenum->constructs + i;
+		if(c->nparams == 0) {
+			venum *e = hl_gc_alloc_noptr(c->size);
+			vdynamic *v = hl_alloc_dynamic(t);
+			e->index = i;
+			v->v.ptr = e;
+			hl_aptr(a,vdynamic*)[i] = v;
+		}
+	}
 	return a;
 }
 
@@ -365,6 +398,26 @@ HL_PRIM vdynamic *hl_type_get_global( hl_type *t ) {
 	return NULL;
 }
 
+HL_PRIM bool hl_type_set_global( hl_type *t, vdynamic *v ) {
+	switch( t->kind ) {
+	case HOBJ:
+		if( t->obj->global_value ) {
+			*(vdynamic**)t->obj->global_value = v;
+			return true;
+		}
+		break;
+	case HENUM:
+		if( t->tenum->global_value ) {
+			*(vdynamic**)t->tenum->global_value = v;
+			return true;
+		}
+		break;
+	default:
+		break;
+	}
+	return false;
+}
+
 HL_PRIM bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 	int i;
 	venum *ea, *eb;
@@ -400,12 +453,12 @@ HL_PRIM bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 	return true;
 }
 
-HL_PRIM vdynamic *hl_alloc_enum( hl_type *t, int index, varray *args ) {
+HL_PRIM vdynamic *hl_alloc_enum( hl_type *t, int index, varray *args, int nargs ) {
 	hl_enum_construct *c = t->tenum->constructs + index;
 	venum *e;
 	vdynamic *v;
 	int i;
-	if( c->nparams != args->size )
+	if( c->nparams != nargs || args->size < nargs )
 		return NULL;
 	e = (venum*)(c->hasptr ? hl_gc_alloc_raw(c->size) : hl_gc_alloc_noptr(c->size));
 	e->index = index;
@@ -434,6 +487,8 @@ DEFINE_PRIM(_ARR, type_instance_fields, _TYPE);
 DEFINE_PRIM(_TYPE, type_super, _TYPE);
 DEFINE_PRIM(_DYN, type_get_global, _TYPE);
 DEFINE_PRIM(_ARR, type_enum_fields, _TYPE);
+DEFINE_PRIM(_ARR, type_enum_values, _TYPE);
 DEFINE_PRIM(_BOOL, type_enum_eq, _DYN _DYN);
-DEFINE_PRIM(_DYN, alloc_enum, _TYPE _I32 _ARR);
+DEFINE_PRIM(_DYN, alloc_enum, _TYPE _I32 _ARR _I32);
 DEFINE_PRIM(_ARR, enum_parameters, _DYN);
+DEFINE_PRIM(_BOOL, type_set_global, _TYPE _DYN);

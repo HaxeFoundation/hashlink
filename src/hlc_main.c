@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
 	hl_global_init(&ctx);
 	hl_setup_exception(hlc_resolve_symbol,hlc_capture_stack);
 	hl_setup_callbacks(hlc_static_call, hlc_get_wrapper);
-	hl_sys_init((void**)(argv + 1),argc - 1);
+	hl_sys_init((void**)(argv + 1),argc - 1,NULL);
 	hl_trap(ctx, exc, on_exception);
 #	ifdef HL_VCC
 	__try {

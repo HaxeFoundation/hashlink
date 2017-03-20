@@ -26,9 +26,9 @@
 HL_PRIM hl_trap_ctx *hl_current_trap = NULL;
 HL_PRIM vdynamic *hl_current_exc = NULL;
 
-static vdynamic *stack_last_exc = NULL;
 static void *stack_trace[0x1000];
 static int stack_count = 0;
+static bool exc_rethrow = false;
 
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
@@ -61,10 +61,10 @@ HL_PRIM void hl_set_error_handler( vclosure *d ) {
 
 HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_trap_ctx *t = hl_current_trap;
-	if( v != stack_last_exc ) {
-		stack_last_exc = v;
+	if( exc_rethrow )
+		exc_rethrow = false;
+	else
 		stack_count = capture_stack_func(stack_trace, 0x1000);
-	}
 	hl_current_exc = v;
 	hl_current_trap = t->prev;
 	if( hl_current_trap == NULL ) {
@@ -93,7 +93,7 @@ HL_PRIM varray *hl_exception_stack() {
 }
 
 HL_PRIM void hl_rethrow( vdynamic *v ) {
-	stack_last_exc = v;
+	exc_rethrow = true;
 	hl_throw(v);
 }
 
@@ -119,5 +119,10 @@ HL_PRIM void hl_fatal_fmt( const char *file, int line, const char *fmt, ...) {
 	hl_fatal_error(buf,file,line);
 }
 
+HL_PRIM void hl_breakpoint() {
+	hl_debug_break();
+}
+
 DEFINE_PRIM(_ARR,exception_stack,_NO_ARG);
 DEFINE_PRIM(_VOID,set_error_handler,_FUN(_VOID,_DYN));
+DEFINE_PRIM(_VOID,breakpoint,_NO_ARG);

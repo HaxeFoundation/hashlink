@@ -21,6 +21,12 @@ abstract Framebuffer(Null<Int>) {
 abstract Renderbuffer(Null<Int>) {
 }
 
+abstract Query(Null<Int>) {
+}
+
+abstract VertexArray(Null<Int>) {
+}
+
 @:hlNative("sdl","gl_")
 class GL {
 
@@ -60,6 +66,20 @@ class GL {
 	public static function pixelStorei( key : Int, value : Int ) {
 	}
 
+	public static function getParameter( name : Int ) : Dynamic {
+		switch( name ){
+			case VENDOR, VERSION, RENDERER, SHADING_LANGUAGE_VERSION:
+				return @:privateAccess String.fromUTF8(getString(name));
+			case _:
+				throw "Not implemented";
+				return null;
+		}
+	}
+
+	static function getString( name : Int ) : hl.Bytes {
+		return null;
+	}
+
 	// state changes
 
 	public static function enable( feature : Int ) {
@@ -92,10 +112,22 @@ class GL {
 	public static function colorMask( r : Bool, g : Bool, b : Bool, a : Bool ) {
 	}
 
+	public static function stencilMaskSeparate( face : Int, mask : Int ){
+	}
+
+	public static function stencilFuncSeparate( face : Int, func : Int, ref : Int, mask : Int ){
+	}
+
+	public static function stencilOpSeparate( face : Int, sfail : Int, dpfail : Int, dppas : Int ){
+	}
+
 	// program
 
 	public static function createProgram() : Program {
 		return null;
+	}
+
+	public static function bindFragDataLocation( p : Program, colorNumber : Int, name : String ) : Void {
 	}
 
 	public static function attachShader( p : Program, s : Shader ) {
@@ -112,7 +144,7 @@ class GL {
 		return @:privateAccess String.fromUTF8(getProgramInfoBytes(p));
 	}
 
-	static function getProgramInfoBytes( p : Program ) : hl.types.Bytes {
+	static function getProgramInfoBytes( p : Program ) : hl.Bytes {
 		return null;
 	}
 
@@ -144,7 +176,7 @@ class GL {
 		return @:privateAccess String.fromUTF8(getShaderInfoBytes(s));
 	}
 
-	static function getShaderInfoBytes( s : Shader ) : hl.types.Bytes {
+	static function getShaderInfoBytes( s : Shader ) : hl.Bytes {
 		return null;
 	}
 
@@ -171,7 +203,7 @@ class GL {
 	}
 
 	@:hlNative("sdl","gl_tex_image2d")
-	public static function texImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, format : Int, type : Int, image : hl.types.Bytes ) {
+	public static function texImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
 	}
 
 	public static function generateMipmap( t : Int ) {
@@ -195,11 +227,14 @@ class GL {
 
 	public static function deleteFramebuffer( f : Framebuffer ) {
 	}
-	
-	public static function readPixels( x : Int, y : Int, width : Int, height : Int, format : Int, type : Int, data : hl.types.Bytes ) {
+
+	public static function readBuffer( mode : Int ) {
 	}
-	
-	public static function drawBuffers( n : Int, buffers : hl.types.Bytes ) {
+
+	public static function readPixels( x : Int, y : Int, width : Int, height : Int, format : Int, type : Int, data : hl.Bytes ) {
+	}
+
+	public static function drawBuffers( n : Int, buffers : hl.Bytes ) {
 	}
 
 	// renderbuffer
@@ -232,10 +267,10 @@ class GL {
 	public static function bufferDataSize( target : Int, size : Int, param : Int ) {
 	}
 
-	public static function bufferData( target : Int, size : Int, data : hl.types.Bytes, param : Int ) {
+	public static function bufferData( target : Int, size : Int, data : hl.Bytes, param : Int ) {
 	}
 
-	public static function bufferSubData( target : Int, offset : Int, data : hl.types.Bytes, srcOffset : Int, srcLength : Int ) {
+	public static function bufferSubData( target : Int, offset : Int, data : hl.Bytes, srcOffset : Int, srcLength : Int ) {
 	}
 
 	public static function enableVertexAttribArray( attrib : Int ) {
@@ -255,12 +290,49 @@ class GL {
 	public static function uniform1i( u : Uniform, i : Int ) {
 	}
 
-	public static function uniform4fv( u : Uniform, buffer : hl.types.Bytes, bufPos : Int, count : Int ) {
+	public static function uniform4fv( u : Uniform, buffer : hl.Bytes, bufPos : Int, count : Int ) {
 	}
 
 	// draw
 
 	public static function drawElements( mode : Int, count : Int, type : Int, start : Int ) {
+	}
+
+	// queries
+
+	public static function createQuery() : Query {
+		return null;
+	}
+
+	public static function deleteQuery( q : Query ) {
+	}
+
+	public static function beginQuery( target : Int, q : Query ) {
+	}
+
+	public static function endQuery( target : Int ) {
+	}
+
+	public static function queryResultAvailable( q : Query ) {
+		return false;
+	}
+
+	public static function queryResult( q : Query ) : Float {
+		return 0.;
+	}
+
+	public static function queryCounter( q : Query, target : Int ) {
+	}
+
+	// vertexarray
+	public static function createVertexArray() : VertexArray {
+		return null;
+	}
+
+	public static function bindVertexArray( a : VertexArray ) : Void {
+	}
+
+	public static function deleteVertexArray( a : VertexArray ) : Void {
 	}
 
 	// ----- CONSTANTS -----
@@ -455,6 +527,8 @@ class GL {
 	public static inline var UNSIGNED_INT                   = 0x1405;
 	public static inline var FLOAT                          = 0x1406;
 
+	public static inline var HALF_FLOAT                     = 0x140B;
+
 	/* PixelFormat */
 	public static inline var DEPTH_COMPONENT                = 0x1902;
 	public static inline var ALPHA                          = 0x1906;
@@ -463,11 +537,28 @@ class GL {
 	public static inline var LUMINANCE                      = 0x1909;
 	public static inline var LUMINANCE_ALPHA                = 0x190A;
 
+	public static inline var BGRA							= 0x80E1;
+	public static inline var RGBA8							= 0x8058;
+
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
 	public static inline var UNSIGNED_SHORT_4_4_4_4         = 0x8033;
 	public static inline var UNSIGNED_SHORT_5_5_5_1         = 0x8034;
 	public static inline var UNSIGNED_SHORT_5_6_5           = 0x8363;
+
+	public static inline var SRGB							= 0x8C40;
+	public static inline var SRGB8							= 0x8C41;
+	public static inline var SRGB_ALPHA						= 0x8C42;
+	public static inline var SRGB8_ALPHA					= 0x8C43;
+	public static inline var FRAMEBUFFER_SRGB				= 0x8DB9;
+
+	public static inline var RGBA32F                        = 0x8814;
+	public static inline var RGB32F                         = 0x8815;
+	public static inline var RGBA16F                        = 0x881A;
+	public static inline var RGB16F                         = 0x881B;
+
+	public static inline var ALPHA16F                       = 0x881C;
+	public static inline var ALPHA32F                       = 0x8816;
 
 	/* Shaders */
 	public static inline var FRAGMENT_SHADER                  = 0x8B30;
@@ -635,6 +726,7 @@ class GL {
 	public static inline var RGB5_A1                        = 0x8057;
 	public static inline var RGB565                         = 0x8D62;
 	public static inline var DEPTH_COMPONENT16              = 0x81A5;
+	public static inline var DEPTH_COMPONENT24              = 0x81A6;
 	public static inline var STENCIL_INDEX                  = 0x1901;
 	public static inline var STENCIL_INDEX8                 = 0x8D48;
 	public static inline var DEPTH_STENCIL                  = 0x84F9;
@@ -679,5 +771,9 @@ class GL {
 	public static inline var CONTEXT_LOST_WEBGL             = 0x9242;
 	public static inline var UNPACK_COLORSPACE_CONVERSION_WEBGL = 0x9243;
 	public static inline var BROWSER_DEFAULT_WEBGL          = 0x9244;
+
+	/* Queries */
+	public static inline var SAMPLES_PASSED					= 0x8914;
+	public static inline var TIMESTAMP						= 0x8E28;
 
 }

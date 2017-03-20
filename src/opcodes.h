@@ -79,7 +79,6 @@ OP_BEGIN
 	OP(OSetThis,2)
 	OP(ODynGet,3)
 	OP(ODynSet,3)
-	OP(OSetMethod,3)
 
 	OP(OJTrue,2)
 	OP(OJFalse,2)
@@ -141,7 +140,6 @@ OP_BEGIN
 	OP(OEnumField,4)
 	OP(OSetEnumField,3)
 
-	OP(ODump,1)
 	OP(ONop,0)
 	// --
 	OP(OLast,0)

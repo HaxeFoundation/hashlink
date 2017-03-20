@@ -1,6 +1,6 @@
 package sdl;
 
-private typedef CursorPtr = hl.types.NativeAbstract<"sdl_cursor">;
+private typedef CursorPtr = hl.Abstract<"sdl_cursor">;
 
 @:enum abstract CursorKind(Int) {
 	var Arrow = 0;

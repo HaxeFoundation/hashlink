@@ -22,7 +22,7 @@
 #ifndef HL_H
 #define HL_H
 
-#define HL_VERSION	0x010
+#define HL_VERSION	0x110
 
 #ifdef _WIN32
 #	define HL_WIN
@@ -73,6 +73,7 @@
 #	pragma warning(disable:4255) // windows include
 #	pragma warning(disable:4820) // windows include
 #	pragma warning(disable:4668) // windows include
+#	pragma warning(disable:4738) // return float bad performances
 #endif
 
 #if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CYGWIN)
@@ -134,8 +135,10 @@ typedef long long int64;
 #include <stdio.h>
 #include <memory.h>
 
-#ifdef HLDLL_EXPORTS
+#if defined(LIBHL_EXPORTS)
 #define HL_API extern EXPORT
+#elif defined(LIBHL_STATIC)
+#define HL_API extern
 #else
 #define	HL_API IMPORT
 #endif
@@ -147,7 +150,7 @@ typedef long long int64;
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
-#	define HL_NATIVE_WCHAR_FUN
+#	define HL_NATIVE_UCHAR_FUN
 #	define usprintf		swprintf
 #	define uprintf		wprintf
 #	define ustrlen		wcslen
@@ -156,12 +159,16 @@ typedef wchar_t	uchar;
 #	define utod(s,end)	wcstod(s,end)
 #	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
-#	define utostr(out,size,str) wcstombs(out,str,size)	
+#	define utostr(out,size,str) wcstombs(out,str,size)
 #else
 #	include <stdarg.h>
 typedef unsigned short uchar;
 #	undef USTR
 #	define USTR(str)	u##str
+#endif
+
+#ifndef HL_NATIVE_UCHAR_FUN
+C_FUNCTION_BEGIN
 HL_API int ustrlen( const uchar *str );
 HL_API uchar *ustrdup( const uchar *str );
 HL_API double utod( const uchar *str, uchar **end );
@@ -171,6 +178,7 @@ HL_API int utostr( char *out, int out_size, const uchar *str );
 HL_API int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
 HL_API int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
 HL_API void uprintf( const uchar *fmt, const uchar *str );
+C_FUNCTION_END
 #endif
 
 #ifdef HL_VCC
@@ -254,10 +262,12 @@ typedef struct {
 typedef struct {
 	int nfields;
 	int nproto;
+	int nbindings;
 	const uchar *name;
 	hl_type *super;
 	hl_obj_field *fields;
 	hl_obj_proto *proto;
+	int *bindings;
 	void **global_value;
 	hl_module_context *m;
 	hl_runtime_obj *rt;
@@ -301,12 +311,15 @@ struct hl_type {
 	void **vobj_proto;
 };
 
+C_FUNCTION_BEGIN
+
 HL_API int hl_type_size( hl_type *t );
 HL_API int hl_pad_size( int size, hl_type *t );
 HL_API int hl_stack_size( hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
 HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
+HL_API void hl_init_enum( hl_type *et );
 
 /* -------------------- VALUES ------------------------------ */
 
@@ -368,6 +381,12 @@ struct _hl_field_lookup {
 	int field_index; // negative or zero : index in methods
 };
 
+typedef struct {
+	void *ptr;
+	hl_type *closure;
+	int fid;
+} hl_runtime_binding;
+
 struct hl_runtime_obj {
 	hl_type *t;
 	// absolute
@@ -375,8 +394,11 @@ struct hl_runtime_obj {
 	int nproto;
 	int size;
 	int nmethods;
+	int nbindings;
+	bool hasPtr;
 	void **methods;
 	int *fields_indexes;
+	hl_runtime_binding *bindings;
 	hl_runtime_obj *parent;
 	const uchar *(*toStringFun)( vdynamic *obj );
 	int (*compareFun)( vdynamic *a, vdynamic *b );
@@ -412,6 +434,7 @@ HL_API hl_type hlt_dyn;
 HL_API hl_type hlt_array;
 HL_API hl_type hlt_bytes;
 HL_API hl_type hlt_dynobj;
+HL_API hl_type hlt_bool;
 
 HL_API double hl_nan();
 HL_API bool hl_is_dynamic( hl_type *t );
@@ -433,6 +456,7 @@ HL_API int hl_from_utf8( uchar *out, int outLen, const char *str );
 HL_API char *hl_to_utf8( const uchar *bytes );
 HL_API uchar *hl_to_utf16( const char *str );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
+HL_API hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid );
 
 HL_API int hl_hash( vbyte *name );
 HL_API int hl_hash_utf8( const char *str ); // no cache
@@ -478,6 +502,20 @@ HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
 HL_API void *hl_dyn_call_obj( vdynamic *obj, hl_type *ft, int hfield, void **args, vdynamic *ret );
 HL_API vdynamic *hl_dyn_call( vclosure *c, vdynamic **args, int nargs );
 
+// ----------------------- THREADS --------------------------------------------------
+
+struct _hl_thread;
+typedef struct _hl_thread hl_thread;
+typedef int_val hl_thread_registers;
+
+HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
+HL_API hl_thread *hl_thread_current();
+HL_API bool hl_thread_pause( hl_thread *t, bool pause );
+HL_API int hl_thread_context_size();
+HL_API int hl_thread_context_index( const char *name );
+HL_API bool hl_thread_get_context( hl_thread *t, hl_thread_registers *regs );
+HL_API bool hl_thread_set_context( hl_thread *t, hl_thread_registers *regs );
+
 // ----------------------- ALLOC --------------------------------------------------
 
 #define MEM_HAS_PTR(kind)	(!((kind)&2))
@@ -494,7 +532,9 @@ HL_API void hl_pop_root();
 HL_API void hl_remove_root( void *ptr );
 HL_API void hl_gc_major();
 HL_API bool hl_is_gc_ptr( void *ptr );
-HL_API void hl_gc_dump();
+
+typedef void (*hl_types_dump)( void (*)( void *, int) );
+HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
 
 #define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(size,MEM_KIND_NOPTR)
 #define hl_gc_alloc(size)			hl_gc_alloc_gen(size,MEM_KIND_DYNAMIC)
@@ -508,6 +548,9 @@ HL_API void hl_free( hl_alloc *a );
 
 HL_API void hl_global_init( void *stack_top );
 HL_API void hl_global_free();
+
+HL_API void *hl_alloc_executable_memory( int size );
+HL_API void hl_free_executable_memory( void *ptr, int size );
 
 // ----------------------- BUFFER --------------------------------------------------
 
@@ -560,9 +603,9 @@ typedef struct {
 #define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 
-#ifndef HL_NAME
+#if !defined(HL_NAME)
 #	define HL_NAME(p)					p
-#	ifdef HLDLL_EXPORTS
+#	ifdef LIBHL_EXPORTS
 #		define HL_PRIM				EXPORT
 #		undef DEFINE_PRIM
 #		define DEFINE_PRIM(t,name,args)						_DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
@@ -571,6 +614,9 @@ typedef struct {
 #		define HL_PRIM
 #		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #	endif
+#elif defined(LIBHL_STATIC)
+#define	HL_PRIM						
+#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #else
 #define	HL_PRIM						EXPORT
 #define DEFINE_PRIM_WITH_NAME		_DEFINE_PRIM_WITH_NAME
@@ -585,7 +631,7 @@ typedef struct {
 #define hl_fatal4(msg,p0,p1,p2,p3)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1,p2,p3)
 HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
 HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
-HL_API void hl_sys_init(void **args, int nargs);
+HL_API void hl_sys_init(void **args, int nargs, void *hlfile);
 HL_API void hl_setup_callbacks(void *sc, void *gw);
 
 #include <setjmp.h>
@@ -598,5 +644,7 @@ HL_API hl_trap_ctx *hl_current_trap;
 HL_API vdynamic *hl_current_exc;
 #define hl_trap(ctx,r,label) { ctx.prev = hl_current_trap; hl_current_trap = &ctx; if( setjmp(ctx.buf) ) { r = hl_current_exc; goto label; } }
 #define hl_endtrap(ctx)	hl_current_trap = ctx.prev
+
+C_FUNCTION_END
 
 #endif

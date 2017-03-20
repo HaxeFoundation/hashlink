@@ -173,14 +173,17 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			int global = UINDEX();
 			int nfields = UINDEX();
 			int nproto = UINDEX();
+			int nbindings = UINDEX();
 			t->obj = (hl_type_obj*)hl_malloc(&r->code->alloc,sizeof(hl_type_obj));
 			t->obj->name = name;
 			t->obj->super = super < 0 ? NULL : r->code->types + super;
 			t->obj->global_value = (void**)(int_val)global;
 			t->obj->nfields = nfields;
 			t->obj->nproto = nproto;
+			t->obj->nbindings = nbindings;
 			t->obj->fields = (hl_obj_field*)hl_malloc(&r->code->alloc,sizeof(hl_obj_field)*nfields);
 			t->obj->proto = (hl_obj_proto*)hl_malloc(&r->code->alloc,sizeof(hl_obj_proto)*nproto);
+			t->obj->bindings = (int*)hl_malloc(&r->code->alloc,sizeof(int)*nbindings*2);
 			t->obj->rt = NULL;
 			for(i=0;i<nfields;i++) {
 				hl_obj_field *f = t->obj->fields + i;
@@ -194,6 +197,10 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 				p->hashed_name = hl_hash_gen(p->name,true);
 				p->findex = UINDEX();
 				p->pindex = INDEX();
+			}
+			for(i=0;i<nbindings;i++) {
+				t->obj->bindings[i<<1] = UINDEX();
+				t->obj->bindings[(i<<1)|1] = UINDEX();
 			}
 		}
 		break;
