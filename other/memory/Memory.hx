@@ -58,8 +58,8 @@ class Memory {
 	var all : Block;
 
 	var toProcess : Array<Block>;
-	var dynObjCandidates : Array<Block>;
 	var tdynObj : TType;
+	var tdynObjData : TType;
 	var pointerBlock : Map<Pointer, Block>;
 	var pointerType : Map<Pointer, TType>;
 
@@ -279,8 +279,11 @@ class Memory {
 				b.page = p;
 				b.bid = bid;
 
+				// NoPtr page can also have a type ptr
 				goto(b);
 				b.type = pointerType.get(readPointer());
+				if( b.type != null && b.type.hasPtr && p.kind == PNoPtr )
+					b.type = null; // false positive
 				if( b.type != null && !b.type.isDyn )
 					b.type = getTypeNull(b.type);
 				if( b.type != null )
@@ -324,12 +327,12 @@ class Memory {
 			t.buildTypes(this, tvoid);
 
 		tdynObj = getType(HDynObj);
+		tdynObjData = new TType(types.length, HAbstract("dynobjdata"));
+		types.push(tdynObjData);
+
 		toProcess = blocks.copy();
-		dynObjCandidates = [];
-		while( toProcess.length > 0 ) {
+		while( toProcess.length > 0 )
 			buildHierarchy();
-			buildDynObjs();
-		}
 
 		// look in stacks (low priority of ownership)
 		var tstacks = new TType(types.length, HAbstract("stack"));
@@ -348,10 +351,12 @@ class Memory {
 		for( b in blocks )
 			b.finalize();
 
-		var unk = 0, unkMem = 0;
+		var unk = 0, unkMem = 0, unRef = 0;
 		for( b in blocks ) {
 			if( b.owner == null ) {
-				log("  "+b.getPointer().toString() + " is not referenced");
+				unRef++;
+				if( unRef < 100 )
+					log("  "+b.getPointer().toString() + " is not referenced");
 				continue;
 			}
 
@@ -377,7 +382,7 @@ class Memory {
 		for( t in types )
 			falseCount += t.falsePositive;
 
-		log("Hierarchy built, "+unk+" unknown ("+MB(unkMem)+"), "+falseCount+" false positives");
+		log("Hierarchy built, "+unk+" unknown ("+MB(unkMem)+"), "+falseCount+" false positives, "+unRef+" unreferenced");
 	}
 
 	function printFalsePositives( ?typeStr : String ) {
@@ -439,11 +444,10 @@ class Memory {
 			goto(b);
 			var fields = null;
 			var start = 0;
-			var noPtrBits = 0, noPtrBits2 = 0;
+			var ptrTags = null;
 			if( b.type != null ) {
 				fields = b.type.fields;
-				noPtrBits = b.type.noPtrBits;
-				noPtrBits2 = b.type.noPtrBits2;
+				ptrTags = b.type.ptrTags;
 				// enum
 				if( b.type.constructs != null ) {
 					start++;
@@ -454,17 +458,23 @@ class Memory {
 
 			for( i in start...(b.getMemSize() >> ptrBits) ) {
 				var r = readPointer();
-/*
-				if( i < 32 ) {
-					if( (noPtrBits >>> i) & 1 != 0 ) continue;
-				} else if( i < 64 ) {
-					if( (noPtrBits2 >>> (i - 32)) & 1 != 0 ) continue;
-				}
-*/
+
+				//if( ptrTags != null && ((ptrTags.get(i >> 5) >>> (i & 31)) & 1) == 0 ) continue;
+
 				var bs = pointerBlock.get(r);
 				if( bs == null ) continue;
 				var ft = fields != null ? fields[i] : null;
 				bs.addParent(b);
+
+				if( b.type == tdynObj && (i == 1 || i == 2) ) {
+					if( bs.typeKind != KHeader && (bs.typeKind != null || bs.type != null) )
+						trace(bs.typeKind, bs.type);
+					else {
+						bs.type = tdynObjData;
+						bs.typeKind = KDynObjData;
+					}
+				}
+
 				if( ft != null && !ft.t.isPtr() ) {
 					b.type.falsePositive++;
 					b.type.falsePositiveIndexes[i]++;
@@ -472,13 +482,6 @@ class Memory {
 				}
 
 				if( bs.type == null && ft != null ) {
-					if( ft.t == HDyn ) {
-						if( bs.typeKind == null ) {
-							dynObjCandidates.push(bs);
-							bs.typeKind = KDynObj(b.type, b.typeKind);
-						}
-						continue;
-					}
 					if( ft.t.isDynamic() ) {
 						trace(b.typeKind, b.getPointer().toString(), b.type.toString(), ft.toString());
 						continue;
@@ -491,78 +494,6 @@ class Memory {
 			}
 		}
 	}
-
-	function buildDynObjs() {
-		var blocks = dynObjCandidates;
-		dynObjCandidates = [];
-		for( b in blocks ) {
-
-			if( b.type != null ) {
-				//log("  Skip dynobj " + b.typeKind);
-				continue;
-			}
-
-			// most likely a DynObj (which have a dynamicaly allocated hl_type*)
-			// let's check
-			goto(b);
-			var btptr = readPointer();
-			var bdptr = readPointer();
-			var nfields = readInt();
-			var dataSize = readInt();
-
-			var bt = pointerBlock.get(btptr);
-			if( bt != null ) {
-				goto(bt);
-				var tid = readInt();
-				if( tid != 15 ) bt = null;
-			}
-
-			if( bt == null ) {
-				log("  Not a dynobj " + b.getPointer().toString()+" "+b.owner);
-				continue;
-			}
-
-			b.type = bt.type = tdynObj;
-			bt.typeKind = KDynObjData(b.typeKind);
-
-			var bd = pointerBlock.get(bdptr);
-			if( bd == null )
-				continue;
-
-			if( bd.type != null )
-				log("  Overwriting dynobj data " + bd.getPointer().toString()+" "+bd.type);
-
-			bd.type = b.type; // dynobj data
-
-			// read remaining dynobj
-			if( is64 ) readInt();
-			readPointer();
-			readPointer();
-
-			var fields = [for( i in 0...nfields ) {
-				t : pointerType.get(readPointer()),
-				name : readInt(),
-				index : readInt(),
-			}];
-
-			goto(bd);
-
-			// assign types to dynobj fields
-			var pos = 0;
-			for( i in 0...(bd.getMemSize() >> ptrBits) ) {
-				var bv = pointerBlock.get(readPointer());
-				if( bv != null )
-					for( f in fields )
-						if( f.index == pos && bv.type == null ) {
-							bv.type = f.t;
-							if( bv.subs != null ) toProcess.push(bv);
-							break;
-						}
-				pos += 1 << ptrBits;
-			}
-		}
-	}
-
 
 	function printByType() {
 		var ctx = new Stats(this);

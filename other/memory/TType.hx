@@ -11,8 +11,7 @@ class TType {
 	public var fields : Array<TType>;
 	public var constructs : Array<Array<TType>>;
 	public var nullWrap : TType;
-	public var noPtrBits : Int;
-	public var noPtrBits2 : Int;
+	public var ptrTags : haxe.io.Bytes;
 
 	public var falsePositive = 0;
 	public var falsePositiveIndexes = [];
@@ -28,6 +27,16 @@ class TType {
 		default:
 			hasPtr = t.containsPointer();
 		}
+	}
+
+	function tagPtr( pos : Int ) {
+		var p = pos >> 5;
+		if( ptrTags == null || ptrTags.length <= p ) {
+			var nc = haxe.io.Bytes.alloc(p + 1);
+			if( ptrTags != null ) nc.blit(0, ptrTags, 0, ptrTags.length);
+			ptrTags = nc;
+		}
+		ptrTags.set(p, ptrTags.get(p) | (1 << (pos & 31)));
 	}
 
 	public function buildTypes( m : Memory, tvoid : TType ) {
@@ -60,21 +69,21 @@ class TType {
 				}
 
 			fields = [];
+
+			var fcount = 0;
+			for( p in protos )
+				fcount += p.fields.length;
+
 			var pos = 1 << m.ptrBits; // type
 			for( p in protos )
 				for( f in p.fields ) {
 					var size = m.typeSize(f.t);
 					pos = align(pos, size);
 					fields[pos >> m.ptrBits] = m.getType(f.t);
-					if( f.t.isPtr() ) {
-						var p = pos >> m.ptrBits;
-						if( p < 32 ) noPtrBits |= 1 << p;
-						else if( p < 64 ) noPtrBits2 |= 1 << (p - 32);
-					}
+					if( f.t.isPtr() ) tagPtr(pos >> m.ptrBits);
 					pos += size;
 				}
-			noPtrBits = ~noPtrBits;
-			noPtrBits2 = ~noPtrBits2;
+
 			fill(fields, pos);
 		case HEnum(e):
 			constructs = [];
@@ -85,18 +94,12 @@ class TType {
 					var size = m.typeSize(t);
 					pos = align(pos, size);
 					fields[pos>>m.ptrBits] = m.getType(t);
-					if( t.isPtr() ) {
-						var p = pos >> m.ptrBits;
-						if( p < 32 ) noPtrBits |= 1 << p;
-						else if( p < 64 ) noPtrBits2 |= 1 << (p - 32);
-					}
+					if( t.isPtr() ) tagPtr(pos >> m.ptrBits);
 					pos += size;
 				}
 				fill(fields, pos);
 				constructs.push(fields);
 			}
-			noPtrBits = ~noPtrBits;
-			noPtrBits2 = ~noPtrBits2;
 		case HVirtual(fl):
 			fields = [
 				tvoid, // type
@@ -104,20 +107,16 @@ class TType {
 				m.getType(HDyn), // next
 			];
 			var pos = (fl.length + 3) << m.ptrBits;
-			noPtrBits = 6;
+			tagPtr(1);
+			tagPtr(2);
 			for( f in fl ) {
 				var size = m.typeSize(f.t);
 				pos = align(pos, size);
 				fields[pos >> m.ptrBits] = m.getType(f.t);
-				if( f.t.isPtr() ) {
-					var p = pos >> m.ptrBits;
-					if( p < 32 ) noPtrBits |= 1 << p;
-					else if( p < 64 ) noPtrBits2 |= 1 << (p - 32);
-				}
+				if( f.t.isPtr() ) tagPtr(pos >> m.ptrBits);
 				pos += size;
 			}
-			noPtrBits = ~noPtrBits;
-			noPtrBits2 = ~noPtrBits2;
+
 			fill(fields, pos);
 			// keep null our fields pointers since they might point to a DynObj data head
 			for( i in 0...fl.length )

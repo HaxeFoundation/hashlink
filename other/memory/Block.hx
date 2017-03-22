@@ -70,9 +70,8 @@ enum BlockTypeKind {
 	KHeader;
 	KRoot;
 	KAbstractData;
+	KDynObjData;
 	KInferred( t : TType, k : BlockTypeKind );
-	KDynObj( t : TType, k : BlockTypeKind );
-	KDynObjData( k : BlockTypeKind );
 }
 
 class Block {
