@@ -488,7 +488,7 @@ HL_PRIM varray *HL_NAME(get_devices)() {
 	DISPLAY_DEVICE inf;
 	inf.cb = sizeof(inf);
 	while( i < MAX_DEVICES && EnumDisplayDevices(NULL,i,&inf,0) ) {
-		hl_aptr(a,vbyte*)[i] = hl_copy_bytes((vbyte*)inf.DeviceString,(wcslen(inf.DeviceString) + 1)*2);
+		hl_aptr(a,vbyte*)[i] = hl_copy_bytes((vbyte*)inf.DeviceString,((int)wcslen(inf.DeviceString) + 1)*2);
 		i++;
 	}
 #	endif
