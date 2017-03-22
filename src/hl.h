@@ -310,7 +310,7 @@ struct hl_type {
 		const uchar *abs_name;
 	};
 	void **vobj_proto;
-	uint64 no_ptr_bits;
+	unsigned int *mark_bits;
 };
 
 C_FUNCTION_BEGIN
@@ -321,7 +321,7 @@ HL_API int hl_stack_size( hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
 HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
-HL_API void hl_init_enum( hl_type *et );
+HL_API void hl_init_enum( hl_type *et, hl_module_context *m );
 
 /* -------------------- VALUES ------------------------------ */
 
