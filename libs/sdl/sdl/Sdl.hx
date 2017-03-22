@@ -191,4 +191,12 @@ class Sdl {
 		return a;
 	}
 
+	static function detect_keyboard_layout() : hl.Bytes {
+		return null;
+	}
+
+	public static function detectKeyboardLayout(){
+		return @:privateAccess String.fromUTF8(detect_keyboard_layout());
+	}
+
 }
