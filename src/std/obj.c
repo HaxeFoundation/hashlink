@@ -147,6 +147,11 @@ HL_PRIM hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid ) {
 	return rt->t->obj->fields + (fid - (rt->parent?rt->parent->nfields:0));
 }
 
+HL_PRIM int hl_mark_size( int data_size ) {
+	int ptr_count = (data_size + HL_WSIZE - 1) / HL_WSIZE;
+	return ((ptr_count + 31) >> 5) * sizeof(int);
+}
+
 /**
 	Builds class metadata (fields indexes, etc.)
 	Does not require the method table to be finalized.
@@ -245,6 +250,20 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		// tell if we have a compare fun (req for JIT)
 		if( pr->hashed_name == compareHash )
 			t->compareFun = (void*)(int_val)pr->findex;
+	}
+
+	// mark bits
+	if( t->hasPtr ) {
+		unsigned int *mark = (unsigned int*)hl_zalloc(alloc,hl_mark_size(t->size));
+		ot->mark_bits = mark;
+		if( p && p->t->mark_bits ) memcpy(mark, p->t->mark_bits, hl_mark_size(p->size));
+		for(i=0;i<o->nfields;i++) {
+			hl_type *ft = o->fields[i].t;
+			if( hl_is_ptr(ft) ) {
+				int pos = t->fields_indexes[i + start] / HL_WSIZE;
+				mark[pos >> 5] |= 1 << (pos & 31);
+			}
+		}
 	}
 	return t;
 }
@@ -357,6 +376,7 @@ void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 	int size = vsize;
 	hl_field_lookup *l = (hl_field_lookup*)hl_malloc(&ctx->alloc,sizeof(hl_field_lookup)*vt->virt->nfields);
 	int *indexes = (int*)hl_malloc(&ctx->alloc,sizeof(int)*vt->virt->nfields);
+	unsigned int *mark;
 	for(i=0;i<vt->virt->nfields;i++) {
 		hl_obj_field *f = vt->virt->fields + i;
 		hl_lookup_insert(l,i,f->hashed_name,f->t,i);
@@ -367,6 +387,16 @@ void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 	vt->virt->lookup = l;
 	vt->virt->indexes = indexes;
 	vt->virt->dataSize = size - vsize;
+	mark = (unsigned int*)hl_zalloc(&ctx->alloc, hl_mark_size(size));
+	vt->mark_bits = mark;
+	mark[0] = 2 | 4; // value | next
+	for(i=0;i<vt->virt->nfields;i++) {
+		hl_obj_field *f = vt->virt->fields + i;
+		if( hl_is_ptr(f->t) ) {
+			int pos = indexes[i] / HL_WSIZE;
+			mark[pos >> 5] |= 1 << (pos & 31);
+		}
+	}
 }
 
 vdynamic *hl_virtual_make_value( vvirtual *v ) {

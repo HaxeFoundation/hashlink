@@ -292,8 +292,12 @@ HL_PRIM vbyte* hl_type_name( hl_type *t ) {
 	return NULL;
 }
 
-HL_PRIM void hl_init_enum( hl_type *et ) {
+HL_PRIM int hl_mark_size( int data_size );
+
+HL_PRIM void hl_init_enum( hl_type *et, hl_module_context *m ) {
 	int i, j;
+	int max_size = 0;
+	unsigned int *mark;
 	for(i=0;i<et->tenum->nconstructs;i++) {
 		hl_enum_construct *c = et->tenum->constructs + i;
 		c->hasptr = false;
@@ -305,7 +309,19 @@ HL_PRIM void hl_init_enum( hl_type *et ) {
 			if( hl_is_ptr(t) ) c->hasptr = true;
 			c->size += hl_type_size(t);
 		}
+		if( c->size > max_size && c->hasptr ) max_size = c->size;
 	}
+	mark = (unsigned int*)hl_zalloc(&m->alloc,hl_mark_size(max_size));
+	for(i=0;i<et->tenum->nconstructs;i++) {
+		hl_enum_construct *c = et->tenum->constructs + i;
+		if( !c->hasptr ) continue;
+		for(j=0;j<c->nparams;j++)
+			if( hl_is_ptr(c->params[j]) ) {
+				int pos = c->offsets[j];
+				mark[pos >> 5] |= 1 << (pos & 31);
+			}
+	}
+	et->mark_bits = mark;
 }
 
 HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {

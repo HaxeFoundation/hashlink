@@ -658,15 +658,40 @@ static void gc_flush_mark() {
 		void **block = (void**)*--mark_stack;
 		gc_pheader *page = (gc_pheader*)((int_val)page_bid & ~(GC_PAGE_SIZE - 1));
 		int bid = ((int)(int_val)page_bid) & (GC_PAGE_SIZE - 1);
-		int size, nwords;
+		unsigned int *mark_bits = NULL;
+		int pos = 0, size, nwords;
 		if( !block ) {
 			mark_stack += 2;
 			break;
 		}
 		size = page->sizes ? page->sizes[bid] * page->block_size : page->block_size;
 		nwords = size / HL_WSIZE;
-		while( nwords-- ) {
-			void *p = *block++;
+#		ifdef GC_PRECISE
+		if( page->page_kind == MEM_KIND_DYNAMIC ) {
+			hl_type *t = *(hl_type**)block;
+#			ifdef GC_DEBUG
+#				ifdef HL_64
+				if( (int_val)t == 0xDDDDDDDDDDDDDDDD ) continue;
+#				else
+				if( (int_val)t == 0xDDDDDDDD ) continue;
+#				endif
+#			endif
+			if( t && t->kind != HFUN && t->mark_bits ) {
+				mark_bits = t->mark_bits;
+				block++;
+				pos++;
+			}
+		}
+#		endif
+		while( pos < nwords ) {
+			void *p;
+			if( mark_bits && (mark_bits[pos >> 5] & (1 << pos)) == 0 ) { // &31 implicit
+				pos++;
+				block++;
+				continue;
+			}
+			p = *block++;
+			pos++;
 			page = GC_GET_PAGE(p);
 			if( !page || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
 #			ifdef HL_64
@@ -891,6 +916,7 @@ void hl_alloc_init( hl_alloc *a ) {
 void *hl_malloc( hl_alloc *a, int size ) {
 	hl_alloc_block *b = a->cur;
 	void *p;
+	if( !size ) return NULL;
 	if( b == NULL || b->size <= size ) {
 		int alloc = size < 4096-sizeof(hl_alloc_block) ? 4096-sizeof(hl_alloc_block) : size;
 		b = (hl_alloc_block *)malloc(sizeof(hl_alloc_block) + alloc);
