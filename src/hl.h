@@ -130,6 +130,7 @@
 
 typedef intptr_t int_val;
 typedef long long int64;
+typedef unsigned long long uint64;
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -309,6 +310,7 @@ struct hl_type {
 		const uchar *abs_name;
 	};
 	void **vobj_proto;
+	uint64 no_ptr_bits;
 };
 
 C_FUNCTION_BEGIN
@@ -410,12 +412,8 @@ struct hl_runtime_obj {
 };
 
 typedef struct {
-	hl_type t;
-	hl_field_lookup fields;
-} vdynobj_proto;
-
-typedef struct {
-	vdynobj_proto *dproto;
+	hl_type *t;
+	hl_field_lookup *lookup;
 	char *fields_data;
 	int nfields;
 	int dataSize;
