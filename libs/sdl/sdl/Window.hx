@@ -126,7 +126,7 @@ class Window {
 	}
 
 	public function destroy() {
-		winDestroy(win, glctx);
+		try winDestroy(win, glctx) catch( e : Dynamic ) {};
 		win = null;
 		glctx = null;
 		windows.remove(this);
