@@ -651,6 +651,8 @@ HL_PRIM void **hl_gc_mark_grow( void **stack ) {
 	return cur_mark_stack;
 }
 
+#define GC_PRECISE
+
 static void gc_flush_mark() {
 	register void **mark_stack = cur_mark_stack;
 	while( true ) {
@@ -660,6 +662,10 @@ static void gc_flush_mark() {
 		int bid = ((int)(int_val)page_bid) & (GC_PAGE_SIZE - 1);
 		unsigned int *mark_bits = NULL;
 		int pos = 0, size, nwords;
+#		ifdef GC_DEBUG
+		vdynamic *ptr = (vdynamic*)block;
+		ptr += 0;
+#		endif
 		if( !block ) {
 			mark_stack += 2;
 			break;
@@ -698,7 +704,10 @@ static void gc_flush_mark() {
 			if( !INPAGE(p,page) ) continue;
 #			endif
 			bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
-			if( page->sizes && page->sizes[bid] == 0 ) continue;
+			if( page->sizes ) {
+				if( page->sizes[bid] == 0 ) continue;
+			} else if( bid < page->first_block )
+				continue;
 			if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 				page->bmp[bid>>3] |= 1<<(bid&7);
 				GC_PUSH_GEN(p,page,bid);
@@ -815,7 +824,10 @@ static void gc_mark() {
 		if( !INPAGE(p,page) ) continue;
 #		endif
 		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
-		if( page->sizes && !page->sizes[bid] ) continue; // inner pointer
+		if( page->sizes ) {
+			if( page->sizes[bid] == 0 ) continue;
+		} else if( bid < page->first_block )
+			continue;
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
 			GC_PUSH_GEN(p,page,bid);
