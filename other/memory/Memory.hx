@@ -62,6 +62,7 @@ class Memory {
 	var tdynObjData : TType;
 	var pointerBlock : Map<Pointer, Block>;
 	var pointerType : Map<Pointer, TType>;
+	var falseCandidates : Array<{ b : Block, f : Block, idx : Int }>;
 
 	function new() {
 	}
@@ -331,6 +332,7 @@ class Memory {
 		types.push(tdynObjData);
 
 		toProcess = blocks.copy();
+		falseCandidates = [];
 		while( toProcess.length > 0 )
 			buildHierarchy();
 
@@ -347,6 +349,13 @@ class Memory {
 					b.addParent(bstack);
 			}
 		}
+
+		for( f in falseCandidates )
+			if( f.f.owner == null ) {
+				f.f.addParent(f.b);
+				f.b.type.falsePositive++;
+				f.b.type.falsePositiveIndexes[f.idx]++;
+			}
 
 		for( b in blocks )
 			b.finalize();
@@ -464,7 +473,6 @@ class Memory {
 				var bs = pointerBlock.get(r);
 				if( bs == null ) continue;
 				var ft = fields != null ? fields[i] : null;
-				bs.addParent(b);
 
 				if( b.type == tdynObj && (i == 1 || i == 2) ) {
 					if( bs.typeKind != KHeader && (bs.typeKind != null || bs.type != null) )
@@ -476,10 +484,10 @@ class Memory {
 				}
 
 				if( ft != null && !ft.t.isPtr() ) {
-					b.type.falsePositive++;
-					b.type.falsePositiveIndexes[i]++;
+					falseCandidates.push({ b : b, f:bs, idx : i });
 					continue;
 				}
+				bs.addParent(b);
 
 				if( bs.type == null && ft != null ) {
 					if( ft.t.isDynamic() ) {
