@@ -84,6 +84,8 @@ static inline unsigned int TRAILING_ZEROES( unsigned int x ) {
 #	define GC_DEBUG
 #endif
 
+#define out_of_memory()		hl_fatal("Out of Memory")
+
 typedef struct _gc_pheader gc_pheader;
 
 struct _gc_pheader {
@@ -280,7 +282,7 @@ retry:
 		hl_gc_major();
 		if( pages != gc_stats.pages_allocated ) goto retry;
 		if( gc_flags & GC_DUMP_MEM ) hl_gc_dump_memory("hlmemory.dump");
-		hl_fatal("Out of memory");
+		out_of_memory();
 	}
 
 #	ifdef HL_64
@@ -567,7 +569,7 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 	}
 	ptr = alloc_all;
 	alloc_all += size;
-	if( alloc_all > alloc_end ) hl_fatal("Out of memory");
+	if( alloc_all > alloc_end ) out_of_memory();
 #else
 	gc_check_mark();
 	if( gc_flags & GC_PROFILE ) time = TIMESTAMP();
@@ -609,7 +611,7 @@ HL_PRIM void **hl_gc_mark_grow( void **stack ) {
 	int avail = (int)(stack - base_stack);
 	if( nstack == NULL ) {
 		// try to recover / eliminate fully scanned elements
-		void **st = base_stack + 2;
+/*		void **st = base_stack + 2;
 		void **out = st;
 		while( st < stack ) {
 			void **block = (void**)*st++;
@@ -635,9 +637,9 @@ HL_PRIM void **hl_gc_mark_grow( void **stack ) {
 				}
 			}
 		}
-		if( out == mark_stack_end )
-			hl_fatal("Out of memory");
-		return out;
+		if( out == mark_stack_end )*/
+			out_of_memory();
+		return NULL;
 	}
 	memcpy(nstack, base_stack, avail * sizeof(void*));
 	free(base_stack);
@@ -782,6 +784,7 @@ static void gc_mark() {
 		while( mark_size < mark_bytes )
 			mark_size <<= 1;
 		mark_data = gc_alloc_page_memory(mark_size);
+		if( mark_data == NULL ) out_of_memory();
 	}
 	mark_cur = mark_data;
 	MZERO(mark_data,mark_bytes);
@@ -897,10 +900,12 @@ static void hl_gc_init( void *stack_top ) {
 		hl_fatal("Invalid builtin tl1");
 	if( TRAILING_ZEROES((unsigned)~0x080003FF) != 10 || TRAILING_ZEROES(0) != 32 || TRAILING_ZEROES(0xFFFFFFFF) != 0 )
 		hl_fatal("Invalid builtin tl0");
+#	ifndef HL_PS
 	if( getenv("HL_GC_PROFILE") )
 		gc_flags |= GC_PROFILE;
 	if( getenv("HL_DUMP_MEMORY") )
 		gc_flags |= GC_DUMP_MEM;
+#	endif
 }
 
 // ---- UTILITIES ----------------------
@@ -932,10 +937,7 @@ void *hl_malloc( hl_alloc *a, int size ) {
 	if( b == NULL || b->size <= size ) {
 		int alloc = size < 4096-sizeof(hl_alloc_block) ? 4096-sizeof(hl_alloc_block) : size;
 		b = (hl_alloc_block *)malloc(sizeof(hl_alloc_block) + alloc);
-		if( b == NULL ) {
-			printf("Out of memory");
-			exit(99);
-		}
+		if( b == NULL ) out_of_memory();
 		b->p = ((unsigned char*)b) + sizeof(hl_alloc_block);
 		b->size = alloc;
 		b->next = a->cur;
@@ -975,8 +977,10 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #     		define MAP_ANONYMOUS MAP_ANON
 #       endif
 #endif
-#ifdef HL_WIN
+#if defined(HL_WIN)
 	return VirtualAlloc(NULL,size,MEM_COMMIT,PAGE_EXECUTE_READWRITE);
+#elif defined(HL_PS)
+	return NULL;
 #else
 	void *p;
 	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,(MAP_PRIVATE|MAP_ANONYMOUS),-1,0);
@@ -985,15 +989,15 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 }
 
 HL_PRIM void hl_free_executable_memory( void *c, int size ) {
-#ifdef HL_WIN
+#if defined(HL_WIN)
 	VirtualFree(c,0,MEM_RELEASE);
-#else
+#elif !defined(HL_PS)
 	munmap(c, size);
 #endif
 }
 
 static void *gc_alloc_page_memory( int size ) {
-#ifdef HL_WIN
+#if defined(HL_WIN)
 	return VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #else
 	void *ptr;

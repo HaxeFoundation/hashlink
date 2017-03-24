@@ -46,12 +46,14 @@ typedef struct _stat32 pstat;
 #else
 #	include <errno.h>
 #	include <unistd.h>
-#	include <dirent.h>
 #	include <limits.h>
-#	include <termios.h>
 #	include <sys/time.h>
+#ifndef HL_PS
+#	include <dirent.h>
+#	include <termios.h>
 #	include <sys/times.h>
 #	include <sys/wait.h>
+#endif
 #	include <locale.h>
 #	define HL_UTF8PATH
 typedef struct stat pstat;
@@ -75,6 +77,14 @@ typedef uchar pchar;
 
 #ifndef CLK_TCK
 #	define CLK_TCK	100
+#endif
+
+#ifdef HL_PS
+#include <kernel.h>
+int	gettimeofday(struct timeval *t, struct timezone *tz) {
+	HL_PS_API(Kernel,Gettimeofday)(t);
+	return 0;
+}
 #endif
 
 static pchar *pstrdup( const pchar *s, int len ) {
@@ -104,6 +114,8 @@ HL_PRIM vbyte *hl_sys_string() {
 	return (vbyte*)USTR("BSD");
 #elif defined(HL_MAC)
 	return (vbyte*)USTR("Mac");
+#elif defined(HL_PS)
+	return (vbyte*)USTR("PS");
 #else
 #error Unknow system string
 #endif
@@ -148,16 +160,22 @@ HL_PRIM double hl_sys_time() {
 }
 
 HL_PRIM vbyte *hl_sys_get_env( vbyte *v ) {
+#	ifdef HL_PS
+	return NULL;
+#	else
 	return (vbyte*)getenv((pchar*)v);
+#	endif
 }
 
 HL_PRIM bool hl_sys_put_env( vbyte *e, vbyte *v ) {
-#ifdef HL_WIN
+#if defined(HL_WIN)
 	hl_buffer *b = hl_alloc_buffer();
 	hl_buffer_str(b,(uchar*)e);
 	hl_buffer_char(b,'=');
 	if( v ) hl_buffer_str(b,(uchar*)v);
 	return putenv(hl_buffer_content(b,NULL)) == 0;
+#elif defined(HL_PS)
+	return false;
 #else
 	if( v == NULL ) return unsetenv((char*)e) == 0;
 	return setenv((char*)e,(char*)v,1) == 0;
@@ -176,6 +194,9 @@ extern char **environ;
 #endif
 
 HL_PRIM varray *hl_sys_env() {
+#ifdef HL_PS
+	return hl_alloc_array(&hlt_bytes,0);
+#else
 	varray *a;
 	pchar **e = environ;
 	pchar **arr;
@@ -203,12 +224,15 @@ HL_PRIM varray *hl_sys_env() {
 		e++;
 	}
 	return a;
+#endif
 }
 
 
 HL_PRIM void hl_sys_sleep( double f ) {
-#ifdef HL_WIN
+#if defined(HL_WIN)
 	Sleep((DWORD)(f * 1000));
+#elif defined(HL_PS)
+	// nothing
 #else
 	struct timespec t;
 	t.tv_sec = (int)f;
@@ -237,6 +261,9 @@ HL_PRIM bool hl_sys_set_time_locale( vbyte *l ) {
 
 
 HL_PRIM vbyte *hl_sys_get_cwd() {
+#	ifdef HL_PS
+	return (vbyte*)"";
+#	else
 	pchar buf[256];
 	int l;
 	if( getcwd(buf,256) == NULL )
@@ -247,10 +274,15 @@ HL_PRIM vbyte *hl_sys_get_cwd() {
 		buf[l+1] = 0;
 	}
 	return (vbyte*)pstrdup(buf,-1);
+#	endif
 }
 
 HL_PRIM bool hl_sys_set_cwd( vbyte *dir ) {
+#ifdef HL_PS
+	return false;
+#else
 	return chdir((pchar*)dir) == 0;
+#endif
 }
 
 HL_PRIM bool hl_sys_is64() {
@@ -262,8 +294,10 @@ HL_PRIM bool hl_sys_is64() {
 }
 
 HL_PRIM int hl_sys_command( vbyte *cmd ) {
-#ifdef HL_WIN
+#if defined(HL_WIN)
 	return system((pchar*)cmd);
+#elif defined(HL_PS)
+	return -1;
 #else
 	int status = system((pchar*)cmd);
 	return WEXITSTATUS(status) | (WTERMSIG(status) << 8);
@@ -271,19 +305,34 @@ HL_PRIM int hl_sys_command( vbyte *cmd ) {
 }
 
 HL_PRIM bool hl_sys_exists( vbyte *path ) {
+#if defined(HL_PS)
+	return false;
+#else
 	pstat st;
 	return stat((pchar*)path,&st) == 0;
+#endif
 }
 
 HL_PRIM bool hl_sys_delete( vbyte *path ) {
+#if defined(HL_PS)
+	return false;
+#else
 	return unlink((pchar*)path) == 0;
+#endif
 }
 
 HL_PRIM bool hl_sys_rename( vbyte *path, vbyte *newname ) {
+#if defined(HL_PS)
+	return false;
+#else
 	return rename((pchar*)path,(pchar*)newname) == 0;
+#endif
 }
 
 HL_PRIM varray *hl_sys_stat( vbyte *path ) {
+#if defined(HL_PS)
+	return NULL;
+#else
 	pstat s;
 	varray *a;
 	int *i;
@@ -303,31 +352,46 @@ HL_PRIM varray *hl_sys_stat( vbyte *path ) {
 	*i++ = s.st_rdev;
 	*i++ = s.st_mode;
 	return a;
+#endif
 }
 
 HL_PRIM bool hl_sys_is_dir( vbyte *path ) {
+#if defined(HL_PS)
+	return false;
+#else
 	pstat s;
 	if( stat((pchar*)path,&s) != 0 )
 		return false;
 	return (s.st_mode & S_IFDIR) != 0;
+#endif
 }
 
 HL_PRIM bool hl_sys_create_dir( vbyte *path, int mode ) {
+#if defined(HL_PS)
+	return false;
+#else
 	return mkdir((pchar*)path,mode) == 0;
+#endif
 }
 
 HL_PRIM bool hl_sys_remove_dir( vbyte *path ) {
+#if defined(HL_PS)
+	return false;
+#else
 	return rmdir((pchar*)path) == 0;
+#endif
 }
 
 HL_PRIM double hl_sys_cpu_time() {
-#ifdef HL_WIN
+#if defined(HL_WIN)
 	FILETIME unused;
 	FILETIME stime;
 	FILETIME utime;
 	if( !GetProcessTimes(GetCurrentProcess(),&unused,&unused,&stime,&utime) )
 		return 0.;
 	return ((double)(utime.dwHighDateTime+stime.dwHighDateTime)) * 65.536 * 6.5536 + (((double)utime.dwLowDateTime + (double)stime.dwLowDateTime) / 10000000);
+#elif defined(HL_PS)
+	return 0.;
 #else
 	struct tms t;
 	times(&t);
@@ -342,8 +406,8 @@ HL_PRIM double hl_sys_thread_cpu_time() {
 	if( !GetThreadTimes(GetCurrentThread(),&unused,&unused,&unused,&utime) )
 		return 0.;
 	return ((double)utime.dwHighDateTime) * 65.536 * 6.5536 + (((double)utime.dwLowDateTime) / 10000000);
-#elif defined(HL_MAC)
-	hl_error("sys_thread_cpu_time not implemented on OSX");
+#elif defined(HL_MAC) || defined(HL_PS)
+	hl_error("sys_thread_cpu_time not implemented on this platform");
 	return 0.;
 #else
 	struct timespec t;
@@ -392,6 +456,8 @@ HL_PRIM varray *hl_sys_read_dir( vbyte *_path ) {
 			break;
 	}
 	FindClose(handle);
+#elif defined(HL_PS)
+	return NULL;
 #else
 	DIR *d;
 	struct dirent *e;
@@ -424,7 +490,7 @@ HL_PRIM varray *hl_sys_read_dir( vbyte *_path ) {
 }
 
 HL_PRIM vbyte *hl_sys_full_path( vbyte *path ) {
-#ifdef HL_WIN
+#if defined(HL_WIN)
 	pchar out[MAX_PATH+1];
 	int len, i, last;
 	HANDLE handle;
@@ -471,6 +537,8 @@ HL_PRIM vbyte *hl_sys_full_path( vbyte *path ) {
 		last = i;
 	}
 	return (vbyte*)pstrdup(out,len);
+#elif defined(HL_PS)
+	return NULL;
 #else
 	pchar buf[PATH_MAX];
 	if( realpath((pchar*)path,buf) == NULL )
@@ -491,6 +559,8 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 	if( _NSGetExecutablePath(path, &path_len) )
 		return NULL;
 	return (vbyte*)pstrdup(path,-1);
+#elif defined(HL_PS)
+	return NULL;
 #else
 	const pchar *p = getenv("_");
 	if( p != NULL )
@@ -507,8 +577,10 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 }
 
 HL_PRIM int hl_sys_get_char( bool b ) {
-#	ifdef HL_WIN
+#	if defined(HL_WIN)
 	return b?getche():getch();
+#	elif defined(HL_PS)
+	return -1;
 #	else
 	// took some time to figure out how to do that
 	// without relying on ncurses, which clear the

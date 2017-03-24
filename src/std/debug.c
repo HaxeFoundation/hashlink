@@ -98,6 +98,7 @@ HL_API bool hl_debug_flush( int pid, vbyte *addr, int size ) {
 #	ifdef HL_WIN
 	return (bool)FlushInstructionCache(OpenPID(pid),addr,size);
 #	else
+	return false;
 #	endif
 }
 
