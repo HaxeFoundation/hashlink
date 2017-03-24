@@ -22,6 +22,15 @@
 #include <hl.h>
 #include <time.h>
 
+#ifdef HL_PS
+static struct tm *localtime_r( const time_t *clock, struct tm *result ) {
+	struct tm *tt = localtime(clock);
+	if( !tt ) return NULL;
+	*result = *tt;
+	return result;
+}
+#endif
+
 #ifdef HL_WIN
 
 static struct tm *localtime_r( time_t *t, struct tm *r ) {

@@ -37,7 +37,12 @@
 #	define _GNU_SOURCE
 #endif
 
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#ifdef __ORBIS__
+#	define HL_PS
+#	define HL_PS_API(name,fun)	sce##name##fun
+#endif
+
+#if (defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(HL_PS)
 #	define HL_BSD
 #endif
 
@@ -59,6 +64,10 @@
 
 #if defined(__llvm__)
 #	define HL_LLVM
+#endif
+
+#if defined(__clang__)
+#	define HL_CLANG
 #endif
 
 #if defined(_MSC_VER) && !defined(HL_LLVM)
@@ -182,8 +191,10 @@ HL_API void uprintf( const uchar *fmt, const uchar *str );
 C_FUNCTION_END
 #endif
 
-#ifdef HL_VCC
+#if defined(HL_VCC)
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
+#elif defined(HL_PS)
+#	define hl_debug_break()	__debugbreak()
 #else
 #	define hl_debug_break()
 #endif
@@ -590,6 +601,7 @@ HL_API const uchar *hl_type_str( hl_type *t );
 #undef _NULL
 #define _NULL(t)					"N" t
 
+#undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)
 
 typedef struct {

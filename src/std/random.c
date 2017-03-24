@@ -31,6 +31,10 @@
 #	include <unistd.h>
 #endif
 
+#ifdef HL_PS
+#define getpid() 0
+#endif
+
 #define NSEEDS	25
 #define MAX		7
 

@@ -54,9 +54,13 @@
 #else
 #	pragma GCC diagnostic ignored "-Wunused-variable"
 #	pragma GCC diagnostic ignored "-Wunused-function"
+#	pragma GCC diagnostic ignored "-Wcomment" // comment in comment
+#	ifdef HL_CLANG
+#	pragma GCC diagnostic ignored "-Wreturn-type"
+#else
 #	pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #	pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#	pragma GCC diagnostic ignored "-Wcomment" // comment in comment
+#	endif
 #endif
 
 static void hl_null_access() {
