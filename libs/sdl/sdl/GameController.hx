@@ -8,6 +8,7 @@ class GameController {
 
 	var ptr : GameControllerPtr;
 	var haptic : HapticPtr;
+	var rumbleInitialized : Bool = false;
 
 	public var id(get,never) : Int;
 	public var name(get,never) : String;
@@ -32,21 +33,15 @@ class GameController {
 		return @:privateAccess String.fromUTF8( gctrlGetName(ptr) );
 	}
 
-	public function rumbleInit() : Bool {
-		if( haptic == null ){
+	public function rumble( strength : Float, length : Int ) : Bool {
+		if( haptic == null && !rumbleInitialized ){
+			rumbleInitialized = true;
 			haptic = hapticOpen(ptr);
-			if( haptic == null )
-			 	return false;
-			if( hapticRumbleInit(haptic) != 0 ){
+			if( haptic != null && hapticRumbleInit(haptic) != 0 ){
 				hapticClose(haptic);
 				haptic = null;
-				return false;
 			}
 		}
-		return true;
-	}
-
-	public function rumble( strength : Float, length : Int ) : Bool {
 		if( haptic == null ) return false;
 		return hapticRumblePlay( haptic, strength, length ) == 0;
 	}
@@ -54,6 +49,7 @@ class GameController {
 	public function close(){
 		if( haptic != null )
 			hapticClose(haptic);
+		haptic = null;
 		gctrlClose( ptr );
 		ptr = null;
 	}
