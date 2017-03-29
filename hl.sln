@@ -31,12 +31,21 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ui", "libs\ui\ui.vcxproj", 
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sqlite", "libs\sqlite\sqlite.vcxproj", "{43AAD9DB-4708-46B6-AAE8-A5DB95A0B573}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "libs", "libs", "{0EC4330B-6B61-45F8-B297-CA7097AFFD98}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssl", "libs\ssl\ssl.vcxproj", "{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "uv", "libs\uv\uv.vcxproj", "{76E4DB00-8114-4B96-BA76-39D800F8D5EE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
