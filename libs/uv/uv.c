@@ -14,7 +14,7 @@
 
 typedef struct {
 	vclosure *events[EVT_MAX + 1];
-	uv_buf_t buf;
+	void *write_data;
 } events_data;
 
 #define UV_DATA(h)		((events_data*)((h)->data))
@@ -52,7 +52,10 @@ static void trigger_callb( uv_handle_t *h, int event_kind, vdynamic **args, int 
 }
 
 static void on_close( uv_handle_t *h ) {
+	events_data *ev = UV_DATA(h);
+	if( !ev ) return;
 	trigger_callb(h, EVT_CLOSE, NULL, 0, false);
+	free(ev->write_data);
 	hl_remove_root(&h->data);
 	h->data = NULL;
 	free(h);
@@ -62,7 +65,7 @@ static void free_handle( void *h ) {
 	if( h ) uv_close((uv_handle_t*)h, on_close);
 }
 
-HL_PRIM void HL_NAME(close_handle)( uv_handle_t *h, vclosure *c ) {	
+HL_PRIM void HL_NAME(close_handle)( uv_handle_t *h, vclosure *c ) {
 	register_callb(h, c, EVT_CLOSE);
 	free_handle(h);
 }
@@ -83,10 +86,14 @@ static void on_write( uv_write_t *wr, int status ) {
 HL_PRIM bool HL_NAME(stream_write)( uv_stream_t *s, vbyte *b, int size, vclosure *c ) {
 	uv_write_t *wr = UV_ALLOC(uv_write_t);
 	events_data *d = init_hl_data((uv_handle_t*)wr);
-	d->buf.base = b;
-	d->buf.len = size;
+	// keep a copy of the data
+	uv_buf_t buf;
+	d->write_data = malloc(size);
+	memcpy(d->write_data,b,size);
+	buf.base = d->write_data;
+	buf.len = size;
 	register_callb((uv_handle_t*)wr,c,EVT_WRITE);
-	if( uv_write(wr,s,&d->buf,1,on_write) < 0 ) {
+	if( uv_write(wr,s,&buf,1,on_write) < 0 ) {
 		on_close((uv_handle_t*)wr);
 		return false;
 	}
@@ -95,7 +102,7 @@ HL_PRIM bool HL_NAME(stream_write)( uv_stream_t *s, vbyte *b, int size, vclosure
 
 static void on_alloc( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
 	*buf = uv_buf_init(malloc(size), size);
-} 
+}
 
 static void on_read( uv_stream_t *s, ssize_t nread, const uv_buf_t *buf ) {
 	vdynamic bytes;
@@ -118,7 +125,7 @@ HL_PRIM bool HL_NAME(stream_read_start)( uv_stream_t *s, vclosure *c ) {
 
 HL_PRIM void HL_NAME(stream_read_stop)( uv_stream_t *s ) {
 	uv_read_stop(s);
-	clear_callb((uv_handle_t*)s,EVT_READ); // clear callback	
+	clear_callb((uv_handle_t*)s,EVT_READ); // clear callback
 }
 
 static void on_listen( uv_stream_t *s, int status ) {
