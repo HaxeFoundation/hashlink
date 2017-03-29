@@ -68,10 +68,10 @@ static void process_finalize( vprocess *p ) {
 #	endif
 }
 
-HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs ) {
+HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 	vprocess *p;
 #	ifdef HL_WIN
-	SECURITY_ATTRIBUTES sattr;		
+	SECURITY_ATTRIBUTES sattr;
 	STARTUPINFO sinf;
 	HANDLE proc = GetCurrentProcess();
 	HANDLE oread,eread,iwrite;
@@ -81,29 +81,37 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs ) {
 	p->finalize = process_finalize;
 	// startup process
 	sattr.nLength = sizeof(sattr);
-	sattr.bInheritHandle = TRUE;
+	sattr.bInheritHandle = detached ? FALSE : TRUE;
 	sattr.lpSecurityDescriptor = NULL;
 	memset(&sinf,0,sizeof(sinf));
 	sinf.cb = sizeof(sinf);
-	sinf.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+	sinf.dwFlags = detached ? 0 : STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	sinf.wShowWindow = SW_HIDE;
-	CreatePipe(&oread,&sinf.hStdOutput,&sattr,0);
-	CreatePipe(&eread,&sinf.hStdError,&sattr,0);
-	CreatePipe(&sinf.hStdInput,&iwrite,&sattr,0);
-	DuplicateHandle(proc,oread,proc,&p->oread,0,FALSE,DUPLICATE_SAME_ACCESS);
-	DuplicateHandle(proc,eread,proc,&p->eread,0,FALSE,DUPLICATE_SAME_ACCESS);
-	DuplicateHandle(proc,iwrite,proc,&p->iwrite,0,FALSE,DUPLICATE_SAME_ACCESS);
-	CloseHandle(oread);
-	CloseHandle(eread);
-	CloseHandle(iwrite);
-	if( !CreateProcess(NULL,(uchar*)cmd,NULL,NULL,TRUE,0,NULL,NULL,&sinf,&p->pinf) ) {
+	if( !detached ) {
+		CreatePipe(&oread,&sinf.hStdOutput,&sattr,0);
+		CreatePipe(&eread,&sinf.hStdError,&sattr,0);
+		CreatePipe(&sinf.hStdInput,&iwrite,&sattr,0);
+		DuplicateHandle(proc,oread,proc,&p->oread,0,FALSE,DUPLICATE_SAME_ACCESS);
+		DuplicateHandle(proc,eread,proc,&p->eread,0,FALSE,DUPLICATE_SAME_ACCESS);
+		DuplicateHandle(proc,iwrite,proc,&p->iwrite,0,FALSE,DUPLICATE_SAME_ACCESS);
+		CloseHandle(oread);
+		CloseHandle(eread);
+		CloseHandle(iwrite);
+	} else {
+		p->oread = NULL;
+		p->eread = NULL;
+		p->iwrite = NULL;
+	}
+	if( !CreateProcess(NULL,(uchar*)cmd,NULL,NULL,detached?FALSE:TRUE,detached?CREATE_NEW_CONSOLE:0,NULL,NULL,&sinf,&p->pinf) ) {
 		// handles will be finalized
 		return NULL;
-	}		
+	}
 	// close unused pipes
-	CloseHandle(sinf.hStdOutput);
-	CloseHandle(sinf.hStdError);
-	CloseHandle(sinf.hStdInput);
+	if( !detached ) {
+		CloseHandle(sinf.hStdOutput);
+		CloseHandle(sinf.hStdError);
+		CloseHandle(sinf.hStdInput);
+	}
 #	else
 	char **argv;
 	if( !vargs ) {
@@ -270,7 +278,7 @@ HL_PRIM void hl_process_kill( vprocess *p ) {
 
 #define _PROCESS _ABSTRACT(hl_process)
 
-DEFINE_PRIM( _PROCESS, process_run, _BYTES _ARR);
+DEFINE_PRIM( _PROCESS, process_run, _BYTES _ARR _BOOL);
 DEFINE_PRIM( _I32, process_stdout_read, _PROCESS _BYTES _I32 _I32);
 DEFINE_PRIM( _I32, process_stderr_read, _PROCESS _BYTES _I32 _I32);
 DEFINE_PRIM( _BOOL, process_stdin_close, _PROCESS);
