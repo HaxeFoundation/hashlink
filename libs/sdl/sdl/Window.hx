@@ -21,6 +21,7 @@ class Window {
 	var win : WinPtr;
 	var glctx : GLContext;
 	var lastFrame : Float;
+	public var title(default, set) : String;
 	public var vsync(default, set) : Bool;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
@@ -28,7 +29,7 @@ class Window {
 
 	public function new( title : String, width : Int, height : Int ) {
 		while( true ) {
-			win = winCreate(@:privateAccess title.toUtf8(), width, height);
+			win = winCreate(width, height);
 			if( win == null ) throw "Failed to create window";
 			glctx = winGetGLContext(win);
 			if( glctx == null || !GL.init() || !testGL() ) {
@@ -38,6 +39,7 @@ class Window {
 			}
 			break;
 		}
+		this.title = title;
 		windows.push(this);
 		vsync = true;
 	}
@@ -76,6 +78,11 @@ class Window {
 			return false;
 		}
 		return true;
+	}
+
+	function set_title(name:String) {
+		winSetTitle(win, @:privateAccess name.toUtf8());
+		return title = name;
 	}
 
 	function set_displayMode(mode) {
@@ -144,8 +151,11 @@ class Window {
 		winResize(win, 2);
 	}
 
-	static function winCreate( title : hl.Bytes, width : Int, height : Int ) : WinPtr {
+	static function winCreate( width : Int, height : Int ) : WinPtr {
 		return null;
+	}
+
+	static function winSetTitle( win : WinPtr, title : hl.Bytes ) {
 	}
 
 	static function winGetGLContext( win : WinPtr ) : GLContext {

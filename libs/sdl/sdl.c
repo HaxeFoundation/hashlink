@@ -284,9 +284,9 @@ DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 
 // Window
 
-HL_PRIM SDL_Window *HL_NAME(win_create)(vbyte *title, int width, int height) {
+HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
 	SDL_Window *w;
-	w = SDL_CreateWindow((char*)title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	w = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
 	if( (SDL_GetWindowFlags(w) & SDL_WINDOW_INPUT_FOCUS) == 0 ) {
@@ -352,6 +352,10 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 	return false;
 }
 
+HL_PRIM void HL_NAME(win_set_title)(SDL_Window *win, vbyte *title) {
+	SDL_SetWindowTitle(win, title);
+}
+
 HL_PRIM void HL_NAME(win_set_size)(SDL_Window *win, int width, int height) {
 	SDL_SetWindowSize(win, width, height);
 }
@@ -392,10 +396,11 @@ HL_PRIM void HL_NAME(win_destroy)(SDL_Window *win, SDL_GLContext gl) {
 
 #define TWIN _ABSTRACT(sdl_window)
 #define TGL _ABSTRACT(sdl_gl)
-DEFINE_PRIM(TWIN, win_create, _BYTES _I32 _I32);
+DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(TGL, win_get_glcontext, TWIN);
 DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _I32);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
+DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_swap_window, TWIN);
