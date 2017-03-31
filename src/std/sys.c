@@ -79,14 +79,6 @@ typedef uchar pchar;
 #	define CLK_TCK	100
 #endif
 
-#ifdef HL_PS
-#include <kernel.h>
-int	gettimeofday(struct timeval *t, struct timezone *tz) {
-	HL_PS_API(Kernel,Gettimeofday)(t);
-	return 0;
-}
-#endif
-
 static pchar *pstrdup( const pchar *s, int len ) {
 	pchar *ret;
 	if( len < 0 ) len = (int)pstrlen(s);

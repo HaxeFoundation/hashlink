@@ -996,9 +996,16 @@ HL_PRIM void hl_free_executable_memory( void *c, int size ) {
 #endif
 }
 
+#ifdef HL_PS
+void *ps_alloc_align( int size, int align );
+void ps_free_align( void *ptr, int size );
+#endif
+
 static void *gc_alloc_page_memory( int size ) {
 #if defined(HL_WIN)
 	return VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
+#elif defined(HL_PS)
+	return ps_alloc_align(size, GC_PAGE_SIZE);
 #else
 	void *ptr;
 	if( posix_memalign(&ptr,GC_PAGE_SIZE,size) )
@@ -1010,6 +1017,8 @@ static void *gc_alloc_page_memory( int size ) {
 static void gc_free_page_memory( void *ptr, int size ) {
 #ifdef HL_WIN
 	VirtualFree(ptr, 0, MEM_RELEASE);
+#elif defined(HL_PS)
+	ps_free_align(ptr,size);
 #else
 	free(ptr);
 #endif
