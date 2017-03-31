@@ -39,7 +39,6 @@
 
 #ifdef __ORBIS__
 #	define HL_PS
-#	define HL_PS_API(name,fun)	sce##name##fun
 #endif
 
 #if (defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(HL_PS)
@@ -625,7 +624,7 @@ typedef struct {
 #		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #	endif
 #elif defined(LIBHL_STATIC)
-#define	HL_PRIM						
+#define	HL_PRIM
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #else
 #define	HL_PRIM						EXPORT
