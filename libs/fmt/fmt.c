@@ -1,8 +1,14 @@
 #define HL_NAME(n) fmt_##n
-#include <png.h>
-#include <turbojpeg.h>
-#include <zlib.h>
 #include <hl.h>
+#include <png.h>
+
+#ifdef HL_PS
+extern bool ps_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags );
+#else
+#	include <turbojpeg.h>
+#endif
+
+#include <zlib.h>
 #include <vorbis/vorbisfile.h>
 
 /* ------------------------------------------------- IMG --------------------------------------------------- */
@@ -12,11 +18,15 @@ typedef struct {
 } pixel;
 
 HL_PRIM bool HL_NAME(jpg_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
+#ifdef HL_PS
+	return ps_jpg_decode(data, dataLen, out, width, height, stride, format, flags);
+#else
 	tjhandle h = tjInitDecompress();
 	int result;
 	result = tjDecompress2(h,data,dataLen,out,width,stride,height,format,(flags & 1 ? TJFLAG_BOTTOMUP : 0));
 	tjDestroy(h);
 	return result == 0;
+#endif
 }
 
 HL_PRIM bool HL_NAME(png_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
@@ -93,7 +103,7 @@ HL_PRIM void HL_NAME(img_scale)( vbyte *out, int outPos, int outStride, int outW
 				int w1 = (int)(rx1 * ry1 * 256.0f + 0.5f);
 				int w2 = (int)(rx * ry1 * 256.0f + 0.5f);
 				int w3 = (int)(rx1 * ry * 256.0f + 0.5f);
-				int w4 = (int)(rx * ry * 256.0f + 0.5f); 
+				int w4 = (int)(rx * ry * 256.0f + 0.5f);
 				vbyte *rin = in + iy * inStride;
 				pixel p1 = *(pixel*)(rin + (ix<<2));
 				pixel p2 = *(pixel*)(rin + ((ix + 1)<<2));
