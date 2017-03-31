@@ -296,7 +296,7 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 
 	t->methods = (void**)hl_malloc(alloc, sizeof(void*) * t->nmethods);
 	if( p ) memcpy(t->methods,p->methods,p->nmethods * sizeof(void*));
-	
+
 	nmethods = p ? p->nmethods : 0;
 	for(i=0;i<o->nproto;i++) {
 		hl_obj_proto *pr = o->proto + i;
@@ -362,10 +362,11 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	cmpField = obj_resolve_field(o,hl_hash_gen(USTR("__compare"),false));
 	castField = obj_resolve_field(o,hl_hash_gen(USTR("__cast"),false));
 	getField = obj_resolve_field(o,hl_hash_gen(USTR("__get_field"),false));
-	t->toStringFun = strField ? t->methods[-(strField->field_index+1)] : NULL;	
+	t->toStringFun = strField ? t->methods[-(strField->field_index+1)] : NULL;
 	t->compareFun = cmpField ? t->methods[-(cmpField->field_index+1)] : NULL;
-	t->castFun = castField ? t->methods[-(castField->field_index+1)] : NULL;	
-	t->getFieldFun = getField ? t->methods[-(getField->field_index+1)] : (p ? p->getFieldFun : NULL);
+	t->castFun = castField ? t->methods[-(castField->field_index+1)] : NULL;
+	t->getFieldFun = getField ? t->methods[-(getField->field_index+1)] : NULL;
+	if( p && !t->getFieldFun ) t->getFieldFun = p->getFieldFun;
 
 	return t;
 }
@@ -433,7 +434,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 #endif
 	switch( obj->t->kind ) {
 	case HOBJ:
-		{ 
+		{
 			int i;
 			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual) + sizeof(void*)*vt->virt->nfields);
 			v->t = vt;

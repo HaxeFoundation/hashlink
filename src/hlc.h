@@ -45,7 +45,7 @@
 // disable some warnings triggered by HLC code generator
 
 #ifdef HL_VCC
-#	pragma warning(disable:4702) // unreachable code 
+#	pragma warning(disable:4702) // unreachable code
 #	pragma warning(disable:4100) // unreferenced param
 #	pragma warning(disable:4101) // unreferenced local var
 #	pragma warning(disable:4723) // potential divide by 0
@@ -57,6 +57,7 @@
 #	pragma GCC diagnostic ignored "-Wcomment" // comment in comment
 #	ifdef HL_CLANG
 #	pragma GCC diagnostic ignored "-Wreturn-type"
+#	pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
 #else
 #	pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #	pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
