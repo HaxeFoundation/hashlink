@@ -917,7 +917,7 @@ static void load( jit_ctx *ctx, preg *r, vreg *v ) {
 static preg *alloc_fpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
 	preg *p = fetch(r);
 	if( p->kind != RFPU ) {
-		if( !IS_FLOAT(r) ) ASSERT(r->t->kind);
+		if( !IS_FLOAT(r) && (IS_64 || r->t->kind != HI64) ) ASSERT(r->t->kind);
 		p = alloc_reg(ctx, RFPU);
 		if( andLoad )
 			load(ctx,p,r);
@@ -936,6 +936,7 @@ static preg *alloc_cpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
 	preg *p = fetch(r);
 	if( p->kind != RCPU ) {
 #		ifndef HL_64
+		if( r->t->kind == HI64 ) return alloc_fpu(ctx,r,andLoad);
 		if( r->size > 4 ) ASSERT(r->size);
 #		endif
 		p = alloc_reg(ctx, RCPU);
@@ -2343,7 +2344,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 				call_native_consts(ctx, hl_alloc_dynamic, &rt, 1);
 				// copy value to dynamic
-				if( IS_FLOAT(ra) && !IS_64 ) {
+				if( (IS_FLOAT(ra) || ra->size == 8) && !IS_64 ) {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
 					op64(ctx,MOV,tmp,&ra->stack);
 					op32(ctx,MOV,pmem(&p,Eax,HDYN_VALUE),tmp);
@@ -2404,9 +2405,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, w, true);
 			} else if (ra->t->kind == HF32) {
 				ASSERT(0);
+			} else if( dst->t->kind == HI64 && ra->t->kind == HI32 ) {
+				jit_error("TODO");
 			} else {
 				preg *r = alloc_cpu(ctx,dst,false);
-				copy(ctx, r, fetch(ra), ra->size);
+				copy_from(ctx, r, ra);
 				store(ctx, dst, r, true);
 			}
 			break;

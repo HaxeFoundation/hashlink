@@ -123,6 +123,10 @@
 #	endif
 #endif
 
+#ifndef PRId64
+#	define PRId64	"lld"
+#endif
+
 #ifdef __cplusplus
 #	define C_FUNCTION_BEGIN extern "C" {
 #	define C_FUNCTION_END	};

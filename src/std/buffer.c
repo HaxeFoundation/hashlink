@@ -143,6 +143,9 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 	case HI32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(int*)data));
 		break;
+	case HI64:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%" PRId64),*(int64*)data));
+		break;
 	case HF32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.9f"),*(float*)data));
 		break;
@@ -193,6 +196,9 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		break;
 	case HI32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.i));
+		break;
+	case HI64:
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%" PRId64),v->v.i64));
 		break;
 	case HF32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.9f"),v->v.f));
