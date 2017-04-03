@@ -431,9 +431,9 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 		EXIT("Invalid header");
 	r->code = c;
 	c->version = READ();
-	if( c->version <= 0 || c->version > 1 ) {
+	if( c->version <= 1 || c->version > 2 ) {
 		printf("VER=%d\n",c->version);
-		EXIT("Unsupported version");
+		EXIT("Unsupported bytecode version");
 	}
 	flags = UINDEX();
 	c->nints = UINDEX();

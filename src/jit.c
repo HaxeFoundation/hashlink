@@ -2885,9 +2885,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				store(ctx, dst, r, true);
 			}
 			break;
-		case OGetI32:
-		case OGetF32:
-		case OGetF64:
+		case OGetMem:
 			{
 				preg *base = alloc_cpu(ctx, ra, true);
 				preg *offset = alloc_cpu(ctx, rb, true);
@@ -2910,28 +2908,28 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx,MOV16,pmem2(&p,base->id,offset->id,1,0),value);
 			}
 			break;
-		case OSetI32:
+		case OSetMem: 
 			{
 				preg *base = alloc_cpu(ctx, dst, true);
 				preg *offset = alloc_cpu(ctx, ra, true);
-				preg *value = alloc_cpu(ctx, rb, true);
-				op32(ctx,MOV,pmem2(&p,base->id,offset->id,1,0),value);
-			}
-			break;
-		case OSetF32:
-			{
-				preg *base = alloc_cpu(ctx, dst, true);
-				preg *offset = alloc_cpu(ctx, ra, true);
-				preg *value = alloc_fpu(ctx, rb, true);
-				op32(ctx,MOVSS,pmem2(&p,base->id,offset->id,1,0),value);
-			}
-			break;
-		case OSetF64:
-			{
-				preg *base = alloc_cpu(ctx, dst, true);
-				preg *offset = alloc_cpu(ctx, ra, true);
-				preg *value = alloc_fpu(ctx, rb, true);
-				op32(ctx,MOVSD,pmem2(&p,base->id,offset->id,1,0),value);
+				preg *value;
+				switch( rb->t->kind ) {
+				case HI32:
+					value = alloc_cpu(ctx, rb, true);
+					op32(ctx,MOV,pmem2(&p,base->id,offset->id,1,0),value);
+					break;
+				case HF32:
+					value = alloc_fpu(ctx, rb, true);
+					op32(ctx,MOVSS,pmem2(&p,base->id,offset->id,1,0),value);
+					break;
+				case HF64:
+					value = alloc_fpu(ctx, rb, true);
+					op32(ctx,MOVSD,pmem2(&p,base->id,offset->id,1,0),value);
+					break;
+				default:
+					ASSERT(rb->t->kind);
+					break;
+				}
 			}
 			break;
 		case OType:
