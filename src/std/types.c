@@ -26,15 +26,16 @@ HL_PRIM hl_type hlt_bytes = { HBYTES };
 HL_PRIM hl_type hlt_dynobj = { HDYNOBJ };
 HL_PRIM hl_type hlt_dyn = { HDYN };
 HL_PRIM hl_type hlt_i32 = { HI32 };
+HL_PRIM hl_type hlt_i64 = { HI64 };
 HL_PRIM hl_type hlt_f32 = { HF32 };
 HL_PRIM hl_type hlt_f64 = { HF64 };
 HL_PRIM hl_type hlt_void = { HVOID };
 HL_PRIM hl_type hlt_bool = { HBOOL };
 
 static const uchar *TSTR[] = {
-	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("f32"), USTR("f64"),
-	USTR("bool"), USTR("bytes"), USTR("dynamic"), NULL, NULL, 
-	USTR("array"), USTR("type"), NULL, NULL, USTR("dynobj"), 
+	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("i64"), USTR("f32"), USTR("f64"),
+	USTR("bool"), USTR("bytes"), USTR("dynamic"), NULL, NULL,
+	USTR("array"), USTR("type"), NULL, NULL, USTR("dynobj"),
 	NULL, NULL, NULL
 };
 
@@ -43,6 +44,7 @@ static int T_SIZES[] = {
 	1, // I8
 	2, // I16
 	4, // I32
+	8, // I64
 	4, // F32
 	8, // F64
 	1, // BOOL
@@ -94,6 +96,7 @@ HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 	case HUI8:
 	case HUI16:
 	case HI32:
+	case HI64:
 	case HF32:
 	case HF64:
 	case HBOOL:
@@ -136,6 +139,7 @@ HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 		false, // HI8
 		false, // HI16
 		false, // HI32
+		false, // HI64
 		false, // HF32
 		false, // HF64
 		false, // HBOOL
