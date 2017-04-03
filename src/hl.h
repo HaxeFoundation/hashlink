@@ -207,23 +207,24 @@ typedef enum {
 	HUI8	= 1,
 	HUI16	= 2,
 	HI32	= 3,
-	HF32	= 4,
-	HF64	= 5,
-	HBOOL	= 6,
-	HBYTES	= 7,
-	HDYN	= 8,
-	HFUN	= 9,
-	HOBJ	= 10,
-	HARRAY	= 11,
-	HTYPE	= 12,
-	HREF	= 13,
-	HVIRTUAL= 14,
-	HDYNOBJ = 15,
-	HABSTRACT=16,
-	HENUM	= 17,
-	HNULL	= 18,
+	HI64	= 4,
+	HF32	= 5,
+	HF64	= 6,
+	HBOOL	= 7,
+	HBYTES	= 8,
+	HDYN	= 9,
+	HFUN	= 10,
+	HOBJ	= 11,
+	HARRAY	= 12,
+	HTYPE	= 13,
+	HREF	= 14,
+	HVIRTUAL= 15,
+	HDYNOBJ = 16,
+	HABSTRACT=17,
+	HENUM	= 18,
+	HNULL	= 19,
 	// ---------
-	HLAST	= 19,
+	HLAST	= 20,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
@@ -351,6 +352,7 @@ typedef struct {
 		double d;
 		vbyte *bytes;
 		void *ptr;
+		int64 i64;
 	} v;
 } vdynamic;
 
@@ -436,6 +438,7 @@ typedef struct _venum {
 
 HL_API hl_type hlt_void;
 HL_API hl_type hlt_i32;
+HL_API hl_type hlt_i64;
 HL_API hl_type hlt_f64;
 HL_API hl_type hlt_f32;
 HL_API hl_type hlt_dyn;
@@ -578,7 +581,7 @@ HL_API const uchar *hl_type_str( hl_type *t );
 // ----------------------- FFI ------------------------------------------------------
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsifdbBDPOATR??X?N"
+#define TYPE_STR	"vcsilfdbBDPOATR??X?N"
 
 #undef  _VOID
 #define _NO_ARG
@@ -586,6 +589,7 @@ HL_API const uchar *hl_type_str( hl_type *t );
 #define	_I8							"c"
 #define _I16						"s"
 #define _I32						"i"
+#define _I64						"l"
 #define _F32						"f"
 #define _F64						"d"
 #define _BOOL						"b"
