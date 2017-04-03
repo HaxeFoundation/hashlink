@@ -461,7 +461,7 @@ HL_PRIM int HL_NAME(haptic_rumble_init)(SDL_Haptic *haptic) {
 }
 
 HL_PRIM int HL_NAME(haptic_rumble_play)(SDL_Haptic *haptic, double strength, int length) {
-	return SDL_HapticRumblePlay(haptic, strength, length);
+	return SDL_HapticRumblePlay(haptic, (float)strength, length);
 }
 #define THAPTIC _ABSTRACT(sdl_haptic)
 DEFINE_PRIM(THAPTIC, haptic_open, TGCTRL);
