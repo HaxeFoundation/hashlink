@@ -21,6 +21,12 @@
  */
 #include <hl.h>
 
+#ifdef HL_VCC
+#	define PR_I64 L"%lld"
+#else
+#	define PR_I64 u"%" PRId64
+#endif
+
 typedef struct _stringitem {
 	uchar *str;
 	int size;
@@ -144,7 +150,7 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),*(int*)data));
 		break;
 	case HI64:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%" PRId64),*(int64*)data));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,PR_I64,*(int64*)data));
 		break;
 	case HF32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.9f"),*(float*)data));
@@ -198,7 +204,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%d"),v->v.i));
 		break;
 	case HI64:
-		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%" PRId64),v->v.i64));
+		hl_buffer_str_sub(b,buf,usprintf(buf,32,PR_I64,v->v.i64));
 		break;
 	case HF32:
 		hl_buffer_str_sub(b,buf,usprintf(buf,32,USTR("%.9f"),v->v.f));
@@ -354,7 +360,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			hl_buffer_char(b,'(');
 			for(i=0;i<c->nparams;i++) {
 				if( i ) hl_buffer_char(b,',');
-				hl_buffer_addr(b,(char*)v->v.ptr + c->offsets[i],c->params[i], &l); 
+				hl_buffer_addr(b,(char*)v->v.ptr + c->offsets[i],c->params[i], &l);
 			}
 			hl_buffer_char(b,')');
 		}
