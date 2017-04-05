@@ -106,10 +106,12 @@ int main(int argc, pchar *argv[]) {
 		vdynamic *exc;
 	} ctx;
 	hl_trap_ctx trap;
+	int first_boot_arg = -1;
 	argv++;
 	argc--;
-	while( argc-- ) {
+	while( argc ) {
 		pchar *arg = *argv++;
+		argc--;
 		if( pcompare(arg,PSTR("--debug")) == 0 ) {
 			if( argc-- == 0 ) break;
 			debug_port = ptoi(*argv++);
@@ -117,6 +119,15 @@ int main(int argc, pchar *argv[]) {
 		}
 		if( pcompare(arg,PSTR("--debug-wait")) == 0 ) {
 			debug_wait = true;
+			continue;
+		}
+		if( *arg == '-' || *arg == '+' ) {
+			if( first_boot_arg < 0 ) first_boot_arg = argc + 1;
+			// skip value
+			if( argc && **argv != '+' && **argv != '-' ) {
+				argc--;
+				argv++;
+			}
 			continue;
 		}
 		file = arg;
@@ -131,6 +142,10 @@ int main(int argc, pchar *argv[]) {
 			return 1;
 		}
 		fclose(fchk);
+		if( first_boot_arg >= 0 ) {
+			argv -= first_boot_arg;
+			argc = first_boot_arg;
+		}
 	}
 #	ifdef HL_64
 	fprintf(stderr,"HL/JIT is currently not supported when compiled to 64 bits, use make ARCH=32 to compile to 32 bits\n");
