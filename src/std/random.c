@@ -45,7 +45,7 @@ struct _rnd {
 	unsigned long cur;
 };
 
-static unsigned long mag01[2]={ 
+static unsigned long mag01[2]={
 	0x0, 0x8ebfd028 // magic, don't change
 };
 
@@ -58,7 +58,7 @@ static const unsigned long init_seeds[] = {
 };
 
 HL_PRIM rnd *hl_rnd_alloc() {
-	return (rnd*)hl_gc_alloc_raw(sizeof(rnd));
+	return (rnd*)hl_gc_alloc_noptr(sizeof(rnd));
 }
 
 HL_PRIM void hl_rnd_set_seed( rnd *r, int s ) {
@@ -79,7 +79,7 @@ HL_PRIM rnd *hl_rnd_init_system() {
 	struct timeval t;
 	gettimeofday(&t,NULL);
 	time = t.tv_sec * 1000000 + t.tv_usec;
-#endif	
+#endif
 	hl_rnd_set_seed(r,time ^ (pid | (pid << 16)));
 	return r;
 }
@@ -90,9 +90,9 @@ HL_PRIM unsigned int hl_rnd_int( rnd *r ) {
     if( pos >= NSEEDS ) {
 		int kk;
 		for(kk=0;kk<NSEEDS-MAX;kk++)
-			r->seeds[kk] = r->seeds[kk+MAX] ^ (r->seeds[kk] >> 1) ^ mag01[r->seeds[kk] % 2];		
+			r->seeds[kk] = r->seeds[kk+MAX] ^ (r->seeds[kk] >> 1) ^ mag01[r->seeds[kk] % 2];
 		for(;kk<NSEEDS;kk++)
-			r->seeds[kk] = r->seeds[kk+(MAX-NSEEDS)] ^ (r->seeds[kk] >> 1) ^ mag01[r->seeds[kk] % 2];      
+			r->seeds[kk] = r->seeds[kk+(MAX-NSEEDS)] ^ (r->seeds[kk] >> 1) ^ mag01[r->seeds[kk] % 2];
 		r->cur = 1;
 		pos = 0;
 	}
@@ -104,7 +104,7 @@ HL_PRIM unsigned int hl_rnd_int( rnd *r ) {
 }
 
 HL_PRIM double hl_rnd_float( rnd *r ) {
-	double big = 4294967296.0;	
+	double big = 4294967296.0;
 	return ((hl_rnd_int(r) / big + hl_rnd_int(r)) / big + hl_rnd_int(r)) / big;
 }
 

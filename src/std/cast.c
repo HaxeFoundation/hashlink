@@ -64,8 +64,7 @@ HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 		{
 			void *p = *(void**)data;
 			if( p == NULL ) return NULL;
-			v = (vdynamic*)hl_gc_alloc(sizeof(vdynamic));
-			v->t = t;
+			v = hl_alloc_dynamic(t);
 			v->v.ptr = p;
 			return v;
 		}
