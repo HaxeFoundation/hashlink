@@ -506,6 +506,22 @@ HL_API void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
 HL_API void hl_dyn_setf( vdynamic *d, int hfield, float f );
 HL_API void hl_dyn_setd( vdynamic *d, int hfield, double v );
 
+typedef enum {
+	OpAdd,
+	OpSub,
+	OpMul,
+	OpMod,
+	OpDiv,
+	OpShl,
+	OpShr,
+	OpUShr,
+	OpAnd,
+	OpOr,
+	OpXor,
+	OpLast
+} DynOp;
+HL_API vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b );
+
 HL_API vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
 HL_API vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );
 HL_API vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to );
