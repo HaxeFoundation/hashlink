@@ -389,6 +389,14 @@ HL_PRIM bool hl_type_safe_cast( hl_type *a, hl_type *b ) {
 	return hl_safe_cast(a,b);
 }
 
+HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
+	static uchar *op_names[] = { USTR("+"), USTR("-"), USTR("*"), USTR("%"), USTR("/"), USTR("<<"), USTR(">>"), USTR(">>>"), USTR("&"), USTR("|"), USTR("^") };
+	if( op < 0 || op >= OpLast ) hl_error_msg(USTR("Invalid op %d"),op);
+	hl_error_msg(USTR("Can't perform dyn op %s %s %s"),hl_type_str(a->t),op_names[op],hl_type_str(b->t));
+	return NULL;
+}
+
 DEFINE_PRIM(_I32, dyn_compare, _DYN _DYN);
 DEFINE_PRIM(_DYN, value_cast, _DYN _TYPE);
 DEFINE_PRIM(_BOOL, type_safe_cast, _TYPE _TYPE);
+DEFINE_PRIM(_DYN, dyn_op, _I32 _DYN _DYN);
