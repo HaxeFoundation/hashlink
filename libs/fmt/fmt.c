@@ -1,6 +1,6 @@
 #define HL_NAME(n) fmt_##n
-#include <hl.h>
 #include <png.h>
+#include <hl.h>
 
 #ifdef HL_PS
 extern bool ps_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags );
