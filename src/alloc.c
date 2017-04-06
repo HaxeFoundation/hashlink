@@ -684,7 +684,7 @@ static void gc_flush_mark() {
 				if( (int_val)t == 0xDDDDDDDD ) continue;
 #				endif
 #			endif
-			if( t && t->kind != HFUN && t->mark_bits ) {
+			if( t && t->mark_bits && t->kind != HFUN ) {
 				mark_bits = t->mark_bits;
 				block++;
 				pos++;
