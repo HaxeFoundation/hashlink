@@ -33,6 +33,7 @@
 #	define SHUT_RD		SD_RECEIVE
 #	define SHUT_RDWR	SD_BOTH
 	typedef int _sockaddr;
+	typedef int socklen_t;
 #else
 #	define _GNU_SOURCE
 #	include <string.h>
@@ -207,7 +208,7 @@ HL_PRIM vbyte *hl_host_reverse( int ip ) {
 	gethostbyaddr_r((char*)&ip,4,AF_INET,&htmp,buf,1024,&h,&errcode);
 #	endif
 	if( h == NULL )
-		return NULL; 
+		return NULL;
 	return (vbyte*)h->h_name;
 }
 
@@ -354,7 +355,7 @@ HL_PRIM int hl_socket_send_to( hl_socket *s, char *data, int len, int host, int 
 
 HL_PRIM int hl_socket_recv_from( hl_socket *s, char *data, int len, int *host, int *port ) {
 	struct sockaddr_in saddr;
-	int slen = sizeof(saddr);
+	socklen_t slen = sizeof(saddr);
 	if( !s ) return -2;
 	len = recvfrom(s->sock, data, len, MSG_NOSIGNAL, (struct sockaddr*)&saddr, &slen);
 	if( len == SOCKET_ERROR ) {

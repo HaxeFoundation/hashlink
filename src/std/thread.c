@@ -23,6 +23,7 @@
 
 #ifndef HL_WIN
 #	include <pthread.h>
+#	include <unistd.h>
 #	include <sys/syscall.h>
 #endif
 
@@ -74,7 +75,7 @@ HL_PRIM bool hl_thread_pause( hl_thread *t, bool pause ) {
 #	ifdef HL_WIN
 	bool ret;
 	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)(int_val)t);
-	if( pause ) 
+	if( pause )
 		ret = ((int)SuspendThread(h)) >= 0;
 	else {
 		int r;

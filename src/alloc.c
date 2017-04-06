@@ -559,7 +559,7 @@ static void hl_gc_check_track();
 void *hl_gc_alloc_gen( int size, int flags ) {
 	void *ptr;
 	int time = 0;
-	int allocated;
+	int allocated = 0;
 #ifdef HL_BUMP_ALLOC
 	if( !alloc_all ) {
 		int tot = 3<<29;
