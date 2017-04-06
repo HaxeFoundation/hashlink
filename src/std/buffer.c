@@ -21,10 +21,10 @@
  */
 #include <hl.h>
 
-#ifdef HL_VCC
-#	define PR_I64 L"%lld"
+#ifdef PRId64
+#	define PR_I64 USTR("%" PRId64)
 #else
-#	define PR_I64 u"%" PRId64
+#	define PR_I64 USTR("%lld")
 #endif
 
 typedef struct _stringitem {
