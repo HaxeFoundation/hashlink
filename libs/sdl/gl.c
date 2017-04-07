@@ -8,21 +8,36 @@
 #	include <SDL.h>
 #	include <GL/GLU.h>
 #	include <glext.h>
+#elif defined(HL_PS)
+#	include <GLES3/gl3.h>
+#	undef HL_NAME
+#	define HL_NAME(n) ps_##n
+#	define glClearDepth glClearDepthf
+#	define NOIMPL	hl_error("Not implemented")
+#	define glGetQueryObjectiv(...)	NOIMPL
+#	define glGetQueryObjectui64v(...) NOIMPL
+#	define glQueryCounter(...) NOIMPL
+#	define glBindFragDataLocation(...)	// noop
 #else
 #	include <SDL2/SDL.h>
 #	include <GL/glu.h>
 #	include <GL/glext.h>
 #endif
 
+#ifdef HL_PS
+#define GL_IMPORT(fun, t)
+#else
 #define GL_IMPORT(fun, t) PFNGL##t##PROC fun
 #include "GLImports.h"
 #undef GL_IMPORT
 #define GL_IMPORT(fun,t)	fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) return 1
+#endif
 
 static int GLLoadAPI() {
 #	include "GLImports.h"
 	return 0;
 }
+
 
 #ifdef GL_LOG
 #	define GLOG(fmt,...)	if( gl_log_active ) fprintf(gl_log_out, __FUNCTION__ "(" fmt ")\n", __VA_ARGS__)
