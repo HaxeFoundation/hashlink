@@ -55,7 +55,7 @@ class Sdl {
 	static function initOnce() return false;
 	static function eventLoop( e : Event ) return false;
 
-	public static var defaultEventHandler : Event -> Void;
+	public static var defaultEventHandler : Event -> Bool;
 
 	/**
 		Prevent the program from reporting timeout infinite loop.
@@ -69,29 +69,30 @@ class Sdl {
 		while( true ) {
 			if( !eventLoop(event) )
 				break;
-			if( event.type == Quit )
+			var ret = defaultEventHandler(event);
+			if( event.type == Quit && ret )
 				return false;
-			defaultEventHandler(event);
 		}
 		return true;
 	}
 
-	public static function loop( callb : Void -> Void, ?onEvent : Event -> Void ) {
+	public static function loop( callb : Void -> Void, ?onEvent : Event -> Bool ) {
 		var event = new Event();
 		if( onEvent == null ) onEvent = defaultEventHandler;
 		while( true ) {
 			while( true ) {
 				if( !eventLoop(event) )
 					break;
-				if( event.type == Quit )
-					return;
+				var ret = true;
 				if( onEvent != null ) {
 					try {
-						onEvent(event);
+						ret = onEvent(event);
 					} catch( e : Dynamic ) {
 						reportError(e);
 					}
 				}
+				if( event.type == Quit && ret )
+				 	return;
 			}
 			try {
 				callb();
