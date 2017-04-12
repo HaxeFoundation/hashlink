@@ -332,7 +332,7 @@ static void restore_regs( jit_ctx *ctx ) {
 		preg *p = ctx->pregs + i;
 		p->holds = r;
 		p->lock = ctx->savedLocks[i];
-		if( r ) r->current = p;	
+		if( r ) r->current = p;
 	}
 }
 
@@ -1089,7 +1089,7 @@ static void store_result( jit_ctx *ctx, vreg *r ) {
 
 static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
 	preg *r = fetch(from);
-	if( from->t->kind == HF32 && r->kind != RFPU ) 
+	if( from->t->kind == HF32 && r->kind != RFPU )
 		r = alloc_fpu(ctx,from,true);
 	store(ctx, to, r, true);
 }
@@ -1385,7 +1385,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				int args[] = { a->stack.id, b->stack.id };
 				int size = prepare_call_args(ctx,2,args,ctx->vregs,true,0);
 				void *mod_fun;
-				if( isf32 ) mod_fun = fmodf; else mod_fun = fmod; 
+				if( isf32 ) mod_fun = fmodf; else mod_fun = fmod;
 				call_native(ctx,mod_fun,size);
 				store_result(ctx,dst);
 				return fetch(dst);
@@ -1704,7 +1704,7 @@ static void dyn_value_compare( jit_ctx *ctx, preg *a, preg *b, hl_type *t ) {
 		op64(ctx,MOV,a,pmem(&p,a->id,HDYN_VALUE));
 		op64(ctx,MOV,b,pmem(&p,b->id,HDYN_VALUE));
 		op64(ctx,CMP,a,b);
-		break;	
+		break;
 	}
 }
 
@@ -1770,7 +1770,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				register_jump(ctx,do_jump(ctx,OJNotEq,false),targetPos);
 				patch_jump(ctx,jcmp);
 				patch_jump(ctx,jeq);
-			} else 
+			} else
 				jit_error("TODO");
 			return;
 		}
@@ -1926,7 +1926,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 			}
 			return;
 		}
-		// fallthrough		
+		// fallthrough
 	default:
 		op_binop(ctx,NULL,a,b,op);
 		break;
@@ -2859,14 +2859,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,ADD,PESP,pconst(&p,size));
 					store_result(ctx, dst);
 					patch_jump(ctx,jend);
-				}				
+				}
 				break;
 			default:
 				ASSERT(0);
 				break;
 			}
 			break;
-		case ORethrow: // TODO
+		case ORethrow:
+			{
+				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,true,0);
+				call_native(ctx,hl_rethrow,size);
+			}
+			break;
 		case OThrow:
 			{
 				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,true,0);
@@ -2911,7 +2916,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx,MOV16,pmem2(&p,base->id,offset->id,1,0),value);
 			}
 			break;
-		case OSetMem: 
+		case OSetMem:
 			{
 				preg *base = alloc_cpu(ctx, dst, true);
 				preg *offset = alloc_cpu(ctx, ra, true);
@@ -3192,7 +3197,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx, CMP, r, pconst(&p,o->p2));
 				XJump(JUGte,jdefault);
 				// r2 = r * 5 + eip
-				op32(ctx, MOV, r2, r); 
+				op32(ctx, MOV, r2, r);
 				op32(ctx, SHL, r2, pconst(&p,2));
 				op32(ctx, ADD, r2, r);
 				op64(ctx, ADD, r2, pconst64(&p,0));
