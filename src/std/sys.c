@@ -48,7 +48,9 @@ typedef struct _stat32 pstat;
 #	include <unistd.h>
 #	include <limits.h>
 #	include <sys/time.h>
-#ifndef HL_PS
+#ifdef HL_PS
+extern const char *ps_exe_path();
+#else
 #	include <dirent.h>
 #	include <termios.h>
 #	include <sys/times.h>
@@ -297,12 +299,8 @@ HL_PRIM int hl_sys_command( vbyte *cmd ) {
 }
 
 HL_PRIM bool hl_sys_exists( vbyte *path ) {
-#if defined(HL_PS)
-	return false;
-#else
 	pstat st;
 	return stat((pchar*)path,&st) == 0;
-#endif
 }
 
 HL_PRIM bool hl_sys_delete( vbyte *path ) {
@@ -322,9 +320,6 @@ HL_PRIM bool hl_sys_rename( vbyte *path, vbyte *newname ) {
 }
 
 HL_PRIM varray *hl_sys_stat( vbyte *path ) {
-#if defined(HL_PS)
-	return NULL;
-#else
 	pstat s;
 	varray *a;
 	int *i;
@@ -344,18 +339,13 @@ HL_PRIM varray *hl_sys_stat( vbyte *path ) {
 	*i++ = s.st_rdev;
 	*i++ = s.st_mode;
 	return a;
-#endif
 }
 
 HL_PRIM bool hl_sys_is_dir( vbyte *path ) {
-#if defined(HL_PS)
-	return false;
-#else
 	pstat s;
 	if( stat((pchar*)path,&s) != 0 )
 		return false;
 	return (s.st_mode & S_IFDIR) != 0;
-#endif
 }
 
 HL_PRIM bool hl_sys_create_dir( vbyte *path, int mode ) {
@@ -530,7 +520,7 @@ HL_PRIM vbyte *hl_sys_full_path( vbyte *path ) {
 	}
 	return (vbyte*)pstrdup(out,len);
 #elif defined(HL_PS)
-	return NULL;
+	return path;
 #else
 	pchar buf[PATH_MAX];
 	if( realpath((pchar*)path,buf) == NULL )
@@ -552,7 +542,7 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 		return NULL;
 	return (vbyte*)pstrdup(path,-1);
 #elif defined(HL_PS)
-	return NULL;
+	return ps_exe_path();
 #else
 	const pchar *p = getenv("_");
 	if( p != NULL )
