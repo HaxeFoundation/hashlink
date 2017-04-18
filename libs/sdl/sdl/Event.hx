@@ -25,11 +25,12 @@ package sdl;
 	var WindowState	= 6;
 	var KeyDown		= 7;
 	var KeyUp		= 8;
-	var GControllerAdded	= 9;
-	var GControllerRemoved	= 10;
-	var GControllerDown		= 11;
-	var GControllerUp		= 12;
-	var GControllerAxis 	= 13;
+	var TextInput	= 9;
+	var GControllerAdded	= 100;
+	var GControllerRemoved	= 101;
+	var GControllerDown		= 102;
+	var GControllerUp		= 103;
+	var GControllerAxis 	= 104;
 }
 
 @:enum abstract WindowStateChange(Int) {
