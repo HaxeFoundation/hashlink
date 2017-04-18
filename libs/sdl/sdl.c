@@ -31,7 +31,8 @@ typedef enum {
 	WindowState,
 	KeyDown,
 	KeyUp,
-	GControllerAdded,
+	TextInput,
+	GControllerAdded = 100,
 	GControllerRemoved,
 	GControllerDown,
 	GControllerUp,
@@ -195,9 +196,13 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			}
 			break;
 		case SDL_TEXTEDITING:
-		case SDL_TEXTINPUT:
 			// skip
 			continue;
+		case SDL_TEXTINPUT:
+			event->type = TextInput;
+			event->keyCode = *(int*)e.text.text;
+			event->keyCode &= e.text.text[0] ? e.text.text[1] ? e.text.text[2] ? e.text.text[3] ? 0xFFFFFFFF : 0xFFFFFF : 0xFFFF : 0xFF : 0;
+			break;
 		case SDL_CONTROLLERDEVICEADDED:
 			event->type = GControllerAdded;
 			event->controller = e.jdevice.which;
@@ -271,6 +276,13 @@ HL_PRIM bool HL_NAME(detect_win32)() {
 #	endif
 }
 
+HL_PRIM void HL_NAME(text_input)( bool enable ) {
+	if( enable )
+		SDL_StartTextInput();
+	else
+		SDL_StopTextInput();
+}
+
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
 DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32) );
@@ -281,6 +293,7 @@ DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
 DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
+DEFINE_PRIM(_VOID, text_input, _BOOL);
 
 // Window
 
