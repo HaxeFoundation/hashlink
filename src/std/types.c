@@ -470,8 +470,17 @@ HL_PRIM bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 			}
 			break;
 		default:
-			if( hl_dyn_compare(hl_make_dyn((char*)ea + c->offsets[i],t),hl_make_dyn((char*)eb + c->offsets[i],t)) )
-				return false;
+			{
+				vdynamic *pa = hl_make_dyn((char*)ea + c->offsets[i],t);
+				vdynamic *pb = hl_make_dyn((char*)eb + c->offsets[i],t);
+				if( pa && pa->t->kind == HENUM && pb && pa->t == pb->t ) {
+					if( !hl_type_enum_eq(pa,pb) )
+						return false;
+					continue;
+				}
+				if( hl_dyn_compare(pa,pb) )
+					return false;
+			}
 			break;
 		}
 	}
