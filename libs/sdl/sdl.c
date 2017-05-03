@@ -283,6 +283,10 @@ HL_PRIM void HL_NAME(text_input)( bool enable ) {
 		SDL_StopTextInput();
 }
 
+HL_PRIM int HL_NAME(set_relative_mouse_mode)(bool enable) {
+	return SDL_SetRelativeMouseMode(enable);
+}
+
 HL_PRIM vbyte *HL_NAME(detect_keyboard_layout)() {
 	char q = SDL_GetKeyFromScancode(SDL_SCANCODE_Q);
 	char w = SDL_GetKeyFromScancode(SDL_SCANCODE_W);
@@ -306,6 +310,7 @@ DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 DEFINE_PRIM(_VOID, text_input, _BOOL);
+DEFINE_PRIM(_I32, set_relative_mouse_mode, _BOOL);
 DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 
 // Window
