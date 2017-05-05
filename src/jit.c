@@ -2286,7 +2286,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					preg *pa = alloc_reg(ctx,RFPU);
 					preg *pb = alloc_fpu(ctx,ra,true);
 					op64(ctx,XORPD,pa,pa);
-					op64(ctx,SUBSD,pa,pb);
+					op64(ctx,ra->t->kind == HF32 ? SUBSS : SUBSD,pa,pb);
 					store(ctx,dst,pa,true);
 				} else {
 					preg *pa = alloc_reg(ctx,RCPU);
