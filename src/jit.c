@@ -2703,7 +2703,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 							break;
 						default:
 							size = pad_before_call(ctx,HL_WSIZE*4);
-							op64(ctx,PUSH,fetch(rb),UNUSED);
+							push_reg(ctx,rb);
 							op64(ctx,MOV,r,pconst64(&p,(int_val)rb->t));
 							op64(ctx,PUSH,r,UNUSED);
 							break;
@@ -2717,6 +2717,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						patch_jump(ctx,jhasfield);
 						copy_from(ctx, pmem(&p,(CpuReg)r->id,0), rb);
 						patch_jump(ctx,jend);
+						scratch(rb->current);
 					}
 					break;
 				default:
