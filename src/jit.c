@@ -2703,7 +2703,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 							break;
 						default:
 							size = pad_before_call(ctx,HL_WSIZE*4);
-							push_reg(ctx,rb);
+							if( hl_is_ptr(rb->t) ) op64(ctx,PUSH,fetch(rb),UNUSED); else push_reg(ctx,rb);
 							op64(ctx,MOV,r,pconst64(&p,(int_val)rb->t));
 							op64(ctx,PUSH,r,UNUSED);
 							break;
@@ -2711,6 +2711,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						op32(ctx,MOV,r,pconst(&p,dst->t->virt->fields[o->p2].hashed_name));
 						op64(ctx,PUSH,r,UNUSED);
 						op64(ctx,PUSH,obj,UNUSED);
+						if( rb->current ) RUNLOCK(rb->current); // we might need a free register for later use
 						call_native(ctx,get_dynset(rb->t),size);
 #						endif
 						XJump_small(JAlways,jend);
