@@ -192,7 +192,7 @@ HL_PRIM bool HL_NAME(tcp_bind_wrap)( uv_tcp_t *t, int host, int port ) {
 }
 
 
-HL_PRIM uv_tcp_t *HL_NAME(tcp_accept)( uv_tcp_t *t ) {
+HL_PRIM uv_tcp_t *HL_NAME(tcp_accept_wrap)( uv_tcp_t *t ) {
 	uv_tcp_t *client = UV_ALLOC(uv_tcp_t);
 	if( uv_tcp_init(t->loop, client) < 0 ) {
 		free(client);
@@ -209,7 +209,7 @@ HL_PRIM uv_tcp_t *HL_NAME(tcp_accept)( uv_tcp_t *t ) {
 DEFINE_PRIM(_TCP, tcp_init_wrap, _LOOP);
 DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID,_BOOL));
 DEFINE_PRIM(_BOOL, tcp_bind_wrap, _TCP _I32 _I32);
-DEFINE_PRIM(_HANDLE, tcp_accept, _HANDLE);
+DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
 
 // loop
 
