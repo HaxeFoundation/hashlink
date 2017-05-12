@@ -393,9 +393,66 @@ HL_PRIM bool hl_type_safe_cast( hl_type *a, hl_type *b ) {
 	return hl_safe_cast(a,b);
 }
 
+#define NULL_VAL HLAST
+#define OP(op,t1,t2)	(TK2(t1,t2) | (op << 10))
+#define OP_ADD 0
+#define OP_SUB 1
+#define OP_MUL 2
+#define OP_MOD 3
+#define OP_DIV 4
+#define OP_SHL 5
+#define OP_SHR 6
+#define OP_USHR 7
+#define OP_AND 8
+#define OP_OR  9
+#define OP_XOR 10
+
+static vdynamic *hl_dynf64( double v ) {
+	vdynamic *d = hl_alloc_dynamic(&hlt_f64);
+	d->v.d = v;
+	return d;
+}
+
+static vdynamic *hl_dyni32( int v ) {
+	vdynamic *d = hl_alloc_dynamic(&hlt_i32);
+	d->v.i = v;
+	return d;
+}
+
+static bool is_number( hl_type *t ) {
+	return t->kind >= HUI8 && t->kind <= HBOOL;
+}
+
+#define FOP(op) { double va = hl_dyn_castd(a,&hlt_dyn); double vb = hl_dyn_castd(b,&hlt_dyn); return hl_dynf64(va op vb); }
+#define IOP(op) { int va = hl_dyn_casti(a,&hlt_dyn,&hlt_i32); int vb = hl_dyn_casti(b,&hlt_dyn,&hlt_i32); return hl_dyni32(va op vb); }
+
 HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
 	static uchar *op_names[] = { USTR("+"), USTR("-"), USTR("*"), USTR("%"), USTR("/"), USTR("<<"), USTR(">>"), USTR(">>>"), USTR("&"), USTR("|"), USTR("^") };
 	if( op < 0 || op >= OpLast ) hl_error_msg(USTR("Invalid op %d"),op);
+	if( !a && !b ) return op == OP_DIV || op == OP_MOD ? hl_dynf64(hl_nan()) : NULL;
+	if( (!a || is_number(a->t)) && (!b || is_number(b->t)) ) {
+		switch( op ) {
+		case OP_ADD: FOP(+);
+		case OP_SUB: FOP(-);
+		case OP_MUL: FOP(*);
+		case OP_MOD: {
+			double va = hl_dyn_castd(a,&hlt_dyn);
+			double vb = hl_dyn_castd(b,&hlt_dyn);
+			return hl_dynf64(fmod(va,vb));
+		}
+		case OP_DIV: FOP(/);
+		case OP_SHL: IOP(<<);
+		case OP_SHR: IOP(>>);
+		case OP_USHR: {
+			int va = hl_dyn_casti(a,&hlt_dyn,&hlt_i32);
+			int vb = hl_dyn_casti(b,&hlt_dyn,&hlt_i32);
+			return hl_dyni32( ((unsigned)va) >> ((unsigned)vb) );
+		}
+		case OP_AND: IOP(&);
+		case OP_OR: IOP(|);
+		case OP_XOR: IOP(^);
+		}
+	}
 	hl_error_msg(USTR("Can't perform dyn op %s %s %s"),hl_type_str(a->t),op_names[op],hl_type_str(b->t));
 	return NULL;
 }
