@@ -90,6 +90,8 @@ OP_BEGIN
 	OP(OJSLte,3)
 	OP(OJULt,3)
 	OP(OJUGte,3)
+	OP(OJNotLt,3)
+	OP(OJNotGte,3)
 	OP(OJEq,3)
 	OP(OJNotEq,3)
 	OP(OJAlways,1)

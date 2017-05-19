@@ -1378,6 +1378,8 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OJSGt:
 		case OJEq:
 		case OJNotEq:
+		case OJNotLt:
+		case OJNotGte:
 			o = isf32 ? COMISS : COMISD;
 			break;
 		case OSMod:
@@ -1568,6 +1570,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				XJump_small(JNParity,jnotnan);
 				switch( op->op ) {
 				case OJSLt:
+				case OJNotLt:
 					{
 						preg *r = alloc_reg(ctx,RCPU);
 						// set CF=0, ZF=1
@@ -1576,6 +1579,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 						break;
 					}
 				case OJSGte:
+				case OJNotGte:
 					{
 						preg *r = alloc_reg(ctx,RCPU);
 						// set ZF=0, CF=1
@@ -1641,6 +1645,12 @@ static int do_jump( jit_ctx *ctx, hl_op op, bool isFloat ) {
 		break;
 	case OJNotEq:
 		XJump(JNeq,j);
+		break;
+	case OJNotLt:
+		XJump(JUGte,j);
+		break;
+	case OJNotGte:
+		XJump(JULt,j);
 		break;
 	default:
 		j = 0;
@@ -2323,6 +2333,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OJSGt:
 		case OJULt:
 		case OJUGte:
+		case OJNotLt:
+		case OJNotGte:
 			op_jump(ctx,dst,ra,o,(opCount + 1) + o->p3);
 			break;
 		case OJAlways:
@@ -2710,7 +2722,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						}
 						op32(ctx,MOV,r,pconst(&p,dst->t->virt->fields[o->p2].hashed_name));
 						op64(ctx,PUSH,r,UNUSED);
-						op64(ctx,PUSH,obj,UNUSED);						
+						op64(ctx,PUSH,obj,UNUSED);
 						call_native(ctx,get_dynset(rb->t),size);
 #						endif
 						XJump_small(JAlways,jend);
