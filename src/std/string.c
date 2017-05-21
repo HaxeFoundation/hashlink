@@ -139,7 +139,7 @@ HL_PRIM vbyte* hl_utf8_to_utf16( vbyte *str, int pos, int *size ) {
 	return (vbyte*)s;
 }
 
-#include "unicase.c"
+#include "unicase.h"
 
 HL_PRIM vbyte* hl_ucs2_upper( vbyte *str, int pos, int len ) {
 	uchar *cstr = (uchar*)(str + pos);
