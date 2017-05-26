@@ -553,6 +553,40 @@ class Memory {
 		ctx.print();
 	}
 
+	function subs( tstr : String, down = 0 ) {
+		var lt = null;
+		for( t in types )
+			if( t.t.toString() == tstr ) {
+				lt = t;
+				break;
+			}
+		if( lt == null ) {
+			log("Type not found");
+			return;
+		}
+
+		var ctx = new Stats(this);
+		var mark = new Map();
+		for( b in blocks )
+			if( b.type == lt ) {
+				function addRec(tl:Array<Int>,b:Block, k:Int) {
+					if( k < 0 ) return;
+					if( mark.exists(b) )
+						return;
+					mark.set(b, true);
+					tl.push(b.type == null ? 0 : b.type.tid);
+					ctx.addPath(tl, b.getMemSize());
+					if( b.subs != null ) {
+						k--;
+						for( s in b.subs )
+							addRec(tl.copy(),s, k);
+					}
+				}
+				addRec([], b, down);
+			}
+		ctx.print();
+	}
+
 	function printPartition() {
 		var part = sys.io.File.write("part.txt",false);
 		for( p in pages ) {
@@ -612,6 +646,8 @@ class Memory {
 				m.printUnknown();
 			case "locate":
 				m.locate(args.shift(), Std.parseInt(args.shift()));
+			case "subs":
+				m.subs(args.shift(), Std.parseInt(args.shift()));
 			case "part":
 				m.printPartition();
 			default:
