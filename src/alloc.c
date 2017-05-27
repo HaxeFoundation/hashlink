@@ -132,6 +132,7 @@ static int gc_free_blocks[GC_ALL_PAGES] = {0};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_level1_null[1<<GC_LEVEL1_BITS] = {NULL};
 static gc_pheader **hl_gc_page_map[1<<GC_LEVEL0_BITS] = {NULL};
+static void (*gc_track_callback)(hl_type *,int,int,void*) = NULL;
 
 static struct {
 	int64 total_requested;
@@ -166,6 +167,10 @@ static struct {
 static void ***gc_roots = NULL;
 static int gc_roots_count = 0;
 static int gc_roots_max = 0;
+
+HL_PRIM void hl_gc_set_track( void *f ) {
+	gc_track_callback = f;
+}
 
 HL_PRIM void hl_add_root( void *r ) {
 	if( gc_roots_count == gc_roots_max ) {
@@ -554,9 +559,7 @@ static unsigned char *alloc_all = NULL;
 static unsigned char *alloc_end = NULL;
 #endif
 
-static void hl_gc_check_track();
-
-void *hl_gc_alloc_gen( int size, int flags ) {
+void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	void *ptr;
 	int time = 0;
 	int allocated = 0;
@@ -583,7 +586,8 @@ void *hl_gc_alloc_gen( int size, int flags ) {
 		MZERO(ptr,allocated);
 	else if( MEM_HAS_PTR(flags) && allocated != size )
 		MZERO((char*)ptr+size,allocated-size); // erase possible pointers after data
-	if( gc_flags & GC_TRACK ) hl_gc_check_track();
+	if( (gc_flags & GC_TRACK) && gc_track_callback )
+		((void (*)(hl_type *,int,int,void*))gc_track_callback)(t,size,flags,ptr);
 	return ptr;
 }
 
@@ -1025,16 +1029,8 @@ static void gc_free_page_memory( void *ptr, int size ) {
 }
 
 vdynamic *hl_alloc_dynamic( hl_type *t ) {
-	vdynamic *d = (vdynamic*) (hl_is_ptr(t) ? hl_gc_alloc(sizeof(vdynamic)) : hl_gc_alloc_noptr(sizeof(vdynamic)));
+	vdynamic *d = (vdynamic*)hl_gc_alloc_gen(t, sizeof(vdynamic), (hl_is_ptr(t) ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 	d->t = t;
-#	ifndef HL_64
-	d->__pad = 0;
-#	endif
-	d->v.d = 0.;
-#	ifdef GC_DEBUG
-	if( t->kind == HVOID )
-		hl_error("alloc_dynamic(VOID)");
-#	endif
 	return d;
 }
 
@@ -1046,7 +1042,7 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(t);
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
-	o = (vobj*)hl_gc_alloc_gen(size, (rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
+	o = (vobj*)hl_gc_alloc_gen(t, size, (rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 	o->t = t;
 	for(i=0;i<rt->nbindings;i++) {
 		hl_runtime_binding *b = rt->bindings + i;
@@ -1056,7 +1052,7 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 }
 
 vdynobj *hl_alloc_dynobj() {
-	vdynobj *o = (vdynobj*)hl_gc_alloc(sizeof(vdynobj));
+	vdynobj *o = (vdynobj*)hl_gc_alloc(&hlt_dynobj,sizeof(vdynobj));
 	o->t = &hlt_dynobj;
 	o->lookup = NULL;
 	o->nfields = 0;
@@ -1067,7 +1063,7 @@ vdynobj *hl_alloc_dynobj() {
 }
 
 vvirtual *hl_alloc_virtual( hl_type *t ) {
-	vvirtual *v = (vvirtual*)hl_gc_alloc(t->virt->dataSize + sizeof(vvirtual) + sizeof(void*) * t->virt->nfields);
+	vvirtual *v = (vvirtual*)hl_gc_alloc(t, t->virt->dataSize + sizeof(vvirtual) + sizeof(void*) * t->virt->nfields);
 	void **fields = (void**)(v + 1);
 	char *vdata = (char*)(fields + t->virt->nfields);
 	int i;
@@ -1185,154 +1181,4 @@ DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);
 DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
 
-// ------- TRACKING ------------------------
-
-typedef struct {
-	int_val obj;
-	int_val old_value;
-	void **value;
-	vclosure *callb;
-} hl_track;
-
-static hl_track *tracked = NULL;
-static int tracked_count = 0;
-static int tracked_max = 0;
-
-#define hide_ptr(v)		(((int_val)(v))^1)
-
-static uchar *hl_gc_reason( void *ptr ) {
-	gc_pheader *page = GC_GET_PAGE(ptr);
-	int bid;
-	if( !hl_is_ptr(&hlt_dyn) ) return USTR("BrokenDyn");
-	if( cur_mark_stack != mark_stack_end - mark_stack_size + 2 ) return USTR("MarkStack");
-	if( !page ) return USTR("NoPage");
-	if( ((unsigned char*)ptr - (unsigned char*)page) % page->block_size != 0 ) return USTR("Unaligned");
-	bid = (int)((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
-	if( bid < page->first_block || bid >= page->max_blocks ) return USTR("OutPage");
-	if( page->sizes && page->sizes[bid] == 0 ) return USTR("ZeroSize");
-	// not live (only available if we haven't allocate since then)
-	if( page->bmp && page->next_block == page->first_block && (page->bmp[bid>>3]&(1<<(bid&7))) == 0 ) {
-		if( gc_stats.last_mark_allocs > gc_stats.allocation_count + 1 )
-			return USTR("MaybeUnref");
-		return USTR("Unref");
-	}
-	return USTR("IsBlock");
-}
-
-static void hl_gc_check_track() {
-	int i;
-	vdynamic b;
-	vdynamic *pptr[2];
-	pptr[1] = &b;
-	b.t = &hlt_bytes;
-	for(i=0;i<tracked_count;i++) {
-		hl_track *tr = tracked + i;
-		vdynamic *obj = (vdynamic*)hide_ptr(tr->obj);
-		if( !tr->value ) continue;
-		if( !hl_is_gc_ptr(obj) /*GC'ed!*/ ) {
-			tr->value = NULL;
-			b.v.ptr = hl_gc_reason(obj);
-		} else {
-			int_val v = hide_ptr(*tr->value);
-			if( v == tr->old_value ) continue;
-			tr->old_value = v;
-			b.v.ptr = USTR("Changed");
-		}
-		pptr[0] = obj;
-		hl_dyn_call(tr->callb,pptr,2);
-		pptr[0] = NULL;
-	}
-}
-
-HL_API bool hl_gc_track( vdynamic *dobj, int fid, vclosure *callb ) {
-	void *obj = NULL, **value = NULL;
-	hl_track *tr;
-	if( dobj == NULL )
-		return false;
-	switch( dobj->t->kind ) {
-	case HENUM:
-		{
-			int cid = *(int*)dobj->v.ptr;
-			hl_enum_construct *c = dobj->t->tenum->constructs + cid;
-			if( fid >= c->nparams ) return false;
-			obj = (void*)dobj->v.ptr;
-			value = (void**)((char*)obj + c->offsets[fid]);
-		}
-		break;
-	case HOBJ:
-		{
-			hl_runtime_obj *rt = dobj->t->obj->rt;
-			hl_field_lookup *f = NULL;
-			while( rt ) {
-				f = hl_lookup_find(rt->lookup,rt->nlookup,fid);
-				if( f ) break;
-				rt = rt->parent;
-			}
-			if( !f || f->field_index < 0 ) return false;
-			obj = dobj;
-			value = (void**)((char*)obj + f->field_index);
-		}
-		break;
-	default:
-		return false;
-	}
-	if( value == NULL )
-		return false;
-
-	if( !hl_is_gc_ptr(obj) )
-		return false;
-
-	if( tracked_count == tracked_max ) {
-		hl_track *newt;
-		tracked_max = tracked_max ? tracked_max << 1 : 16;
-		newt = hl_gc_alloc_raw(sizeof(hl_track)*tracked_max);
-		if( tracked ) {
-			memcpy(newt,tracked,tracked_count*sizeof(hl_track));
-		} else {
-			hl_add_root(&tracked);
-		}
-		tracked = newt;
-	}
-	tr = tracked + tracked_count++;
-	tr->callb = callb;
-	tr->value = value;
-	tr->old_value = hide_ptr(*value);
-	tr->obj = hide_ptr(obj);
-	return true;
-}
-
-HL_API bool hl_gc_untrack( vdynamic *obj ) {
-	int_val oval;
-	int i;
-	if( obj == NULL )
-		return false;
-	if( obj->t->kind == HENUM )
-		obj = (vdynamic*)obj->v.ptr;
-	oval = hide_ptr(obj);
-	for(i=0;i<tracked_count;i++) {
-		hl_track *tr = tracked + i;
-		if( tr->obj == oval ) {
-			tracked_count--;
-			memmove(tracked + i, tracked + i + 1, (tracked_count - i) * sizeof(hl_track));
-			memset(tracked + tracked_count, 0, sizeof(hl_track));
-			return true;
-		}
-	}
-	return false;
-}
-
-HL_API void hl_gc_untrack_all() {
-	if( tracked_count == 0 ) return;
-	memset(tracked, 0, sizeof(hl_track) * tracked_count);
-	tracked_count = 0;
-}
-
-HL_API int hl_gc_track_count() {
-	return tracked_count;
-}
-
-DEFINE_PRIM(_BOOL, gc_track, _DYN _I32 _FUN(_VOID, _DYN _BYTES));
-DEFINE_PRIM(_BOOL, gc_untrack, _DYN);
-DEFINE_PRIM(_VOID, gc_untrack_all, _NO_ARG);
-DEFINE_PRIM(_I32, gc_track_count, _NO_ARG);
 

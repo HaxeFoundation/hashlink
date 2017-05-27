@@ -436,7 +436,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	case HOBJ:
 		{
 			int i;
-			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual) + sizeof(void*)*vt->virt->nfields);
+			v = (vvirtual*)hl_gc_alloc(vt, sizeof(vvirtual) + sizeof(void*)*vt->virt->nfields);
 			v->t = vt;
 			v->value = obj;
 			v->next = NULL;
@@ -467,7 +467,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 				v = v->next;
 			}
 			// allocate a new virtual mapping
-			v = (vvirtual*)hl_gc_alloc(sizeof(vvirtual) + sizeof(void*) * vt->virt->nfields);
+			v = (vvirtual*)hl_gc_alloc(vt, sizeof(vvirtual) + sizeof(void*) * vt->virt->nfields);
 			v->t = vt;
 			v->value = obj;
 			for(i=0;i<vt->virt->nfields;i++) {

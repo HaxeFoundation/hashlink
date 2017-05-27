@@ -48,8 +48,9 @@ static hl_type *hl_get_closure_type( hl_type *t ) {
 }
 
 HL_PRIM vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) {
-	vclosure *c = (vclosure*)hl_gc_alloc(sizeof(vclosure));
-	c->t = hl_get_closure_type(fullt);
+	hl_type *t = hl_get_closure_type(fullt); 
+	vclosure *c = (vclosure*)hl_gc_alloc(t, sizeof(vclosure));
+	c->t = t;
 	c->fun = fvalue;
 	c->hasValue = 1;
 	c->value = v;
@@ -328,7 +329,7 @@ HL_PRIM vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
 	if( wrap == NULL ) return NULL;
 	if( v->fun != fun_var_args && v->t->fun->nargs != to->fun->nargs )
 		return NULL;
-	c = (vclosure_wrapper*)hl_gc_alloc(sizeof(vclosure_wrapper));
+	c = (vclosure_wrapper*)hl_gc_alloc(to, sizeof(vclosure_wrapper));
 	c->cl.t = to;
 	c->cl.fun = wrap;
 	c->cl.hasValue = 2;
