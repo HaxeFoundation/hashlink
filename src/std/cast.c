@@ -23,6 +23,15 @@
 
 #define TK2(a,b)		((a) | ((b)<<5))
 
+#ifndef HL_64
+#	define DYN_PAD	0,
+#else
+#	define DYN_PAD
+#endif
+
+static vdynamic vdyn_true = { &hlt_bool, DYN_PAD true };
+static vdynamic vdyn_false = { &hlt_bool, DYN_PAD false };
+
 HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	vdynamic *v;
 	switch( t->kind ) {
@@ -52,10 +61,7 @@ HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 		v->v.d = *(double*)data;
 		return v;
 	case HBOOL:
-		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
-		v->t = t;
-		v->v.b = *(bool*)data;
-		return v;
+		return *(bool*)data ? &vdyn_true : &vdyn_false;
 	case HBYTES:
 	case HTYPE:
 	case HREF:
@@ -112,7 +118,7 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 		return *(vdynamic**)data;
 	if( t->kind == HDYN || t->kind == HNULL ) {
 		vdynamic *v = *(vdynamic**)data;
-		if( v == NULL ) return NULL;
+		if( v == NULL || (to->kind == HNULL && v->t == to->tparam) ) return v;
 		t = v->t;
 		if( !hl_is_dynamic(t) ) data = &v->v;
 	} else if( hl_is_dynamic(t) ) {
