@@ -47,6 +47,14 @@ static resolve_symbol_type resolve_symbol_func = NULL;
 static capture_stack_type capture_stack_func = NULL;
 static vclosure *hl_error_handler = NULL;
 
+int hl_internal_capture_stack( void **stack, int size ) {
+	return capture_stack_func(stack,size);
+}
+
+HL_PRIM uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize ) {
+	return resolve_symbol_func(addr, out, outSize);
+}
+
 HL_PRIM void hl_setup_exception( void *resolve_symbol, void *capture_stack ) {
 	resolve_symbol_func = resolve_symbol;
 	capture_stack_func = capture_stack;
@@ -126,6 +134,9 @@ HL_PRIM void hl_breakpoint() {
 	hl_debug_break();
 }
 
+#define _SYMBOL _ABSTRACT(hl_symbol)
+
 DEFINE_PRIM(_ARR,exception_stack,_NO_ARG);
 DEFINE_PRIM(_VOID,set_error_handler,_FUN(_VOID,_DYN));
 DEFINE_PRIM(_VOID,breakpoint,_NO_ARG);
+DEFINE_PRIM(_BYTES,resolve_symbol, _SYMBOL _BYTES _REF(_I32));
