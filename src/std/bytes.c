@@ -213,9 +213,14 @@ HL_PRIM vbyte *hl_bytes_from_address( int low, int high ) {
 #	endif
 }
 
+HL_PRIM int hl_string_compare( vbyte *a, vbyte *b, int len ) {
+	return memcmp(a,b,len * sizeof(uchar));
+}
+
 DEFINE_PRIM(_BYTES,alloc_bytes,_I32);
 DEFINE_PRIM(_VOID,bytes_blit,_BYTES _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_I32,bytes_compare,_BYTES _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_I32,string_compare,_BYTES _BYTES _I32);
 DEFINE_PRIM(_I32,bytes_find,_BYTES _I32 _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,bytes_fill,_BYTES _I32 _I32 _I32);
 DEFINE_PRIM(_F64, parse_float,_BYTES _I32 _I32);
