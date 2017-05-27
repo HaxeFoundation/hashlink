@@ -262,7 +262,6 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		}
 		break;
 	case HTYPE:
-		hl_buffer_str_sub(b, USTR("type:"), 5);
 		hl_buffer_str(b, hl_type_str((hl_type*)v->v.ptr));
 		break;
 	case HREF:
