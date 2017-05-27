@@ -31,6 +31,7 @@ HL_PRIM hl_type hlt_f32 = { HF32 };
 HL_PRIM hl_type hlt_f64 = { HF64 };
 HL_PRIM hl_type hlt_void = { HVOID };
 HL_PRIM hl_type hlt_bool = { HBOOL };
+HL_PRIM hl_type hlt_abstract = { HABSTRACT, USTR("<abstract>") };
 
 static const uchar *TSTR[] = {
 	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("i64"), USTR("f32"), USTR("f64"),
@@ -210,22 +211,39 @@ HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 	return hl_same_type(t,to);
 }
 
-static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
+typedef struct tlist {
+	hl_type *t;
+	struct tlist *next;
+} tlist;
+
+static void hl_type_str_rec( hl_buffer *b, hl_type *t, tlist *parents ) {
 	const uchar *c = TSTR[t->kind];
+	tlist *l, cur;
 	int i;
 	if( c != NULL ) {
 		hl_buffer_str(b,c);
 		return;
 	}
+	l = parents;
+	while( l ) {
+		if( l->t == t ) {
+			hl_buffer_str(b,USTR("<...>"));
+			return;
+		}
+		l = l->next;
+	}
+	cur.t = t;
+	cur.next = parents;
+	l = &cur;
 	switch( t->kind ) {
 	case HFUN:
 		hl_buffer_char(b,'(');
-		hl_type_str_rec(b,t->fun->ret);
+		hl_type_str_rec(b,t->fun->ret,l);
 		hl_buffer_char(b,' ');
 		hl_buffer_char(b,'(');
 		for(i=0; i<t->fun->nargs; i++) {
 			if( i ) hl_buffer_char(b,',');
-			hl_type_str_rec(b,t->fun->args[i]);
+			hl_type_str_rec(b,t->fun->args[i],l);
 		}
 		hl_buffer_char(b,')');
 		hl_buffer_char(b,')');
@@ -236,7 +254,7 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 		break;
 	case HREF:
 		hl_buffer_str(b,USTR("ref<"));
-		hl_type_str_rec(b,t->tparam);
+		hl_type_str_rec(b,t->tparam,l);
 		hl_buffer_char(b,'>');
 		break;
 	case HVIRTUAL:
@@ -246,7 +264,7 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 			if( i ) hl_buffer_char(b,',');
 			hl_buffer_str(b,f->name);
 			hl_buffer_char(b,':');
-			hl_type_str_rec(b,f->t);
+			hl_type_str_rec(b,f->t,l);
 		}
 		hl_buffer_char(b,'>');
 		break;
@@ -263,7 +281,7 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t ) {
 		break;
 	case HNULL:
 		hl_buffer_str(b,USTR("null<"));
-		hl_type_str_rec(b,t->tparam);
+		hl_type_str_rec(b,t->tparam,l);
 		hl_buffer_char(b,'>');
 		break;
 	default:
@@ -278,7 +296,7 @@ HL_PRIM const uchar *hl_type_str( hl_type *t ) {
 	if( c != NULL )
 		return c;
 	b = hl_alloc_buffer();
-	hl_type_str_rec(b,t);
+	hl_type_str_rec(b,t,NULL);
 	return hl_buffer_content(b,NULL);
 }
 
