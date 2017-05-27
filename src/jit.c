@@ -3027,9 +3027,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OMakeEnum:
 			{
 				hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
-				int_val args[] = { c->size, c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR };
+				int_val args[] = { (int_val)dst->t, c->size, c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR };
 				int i;
-				call_native_consts(ctx, hl_gc_alloc_gen, args, 2);
+				call_native_consts(ctx, hl_gc_alloc_gen, args, 3);
 				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
 				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));
 				RLOCK(PEAX);
@@ -3045,8 +3045,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OEnumAlloc:
 			{
 				hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
-				int_val args[] = { c->size, (c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR) | MEM_ZERO };
-				call_native_consts(ctx, hl_gc_alloc_gen, args, 2);
+				int_val args[] = { (int_val)dst->t, c->size, (c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR) | MEM_ZERO };
+				call_native_consts(ctx, hl_gc_alloc_gen, args, 3);
 				store(ctx, dst, PEAX, true);
 				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
 				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));

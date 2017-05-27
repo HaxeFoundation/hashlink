@@ -313,12 +313,12 @@ typedef struct {
 struct hl_type {
 	hl_type_kind kind;
 	union {
+		const uchar *abs_name;
 		hl_type_fun *fun;
 		hl_type_obj *obj;
 		hl_type_enum *tenum;
 		hl_type_virtual *virt;
 		hl_type	*tparam;
-		const uchar *abs_name;
 	};
 	void **vobj_proto;
 	unsigned int *mark_bits;
@@ -446,6 +446,7 @@ HL_API hl_type hlt_array;
 HL_API hl_type hlt_bytes;
 HL_API hl_type hlt_dynobj;
 HL_API hl_type hlt_bool;
+HL_API hl_type hlt_abstract;
 
 HL_API double hl_nan();
 HL_API bool hl_is_dynamic( hl_type *t );
@@ -553,7 +554,7 @@ HL_API bool hl_thread_set_context( hl_thread *t, hl_thread_registers *regs );
 #define MEM_ALIGN_DOUBLE	128
 #define MEM_ZERO			256
 
-HL_API void *hl_gc_alloc_gen( int size, int flags );
+HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
 HL_API void hl_add_root( void *ptr );
 HL_API void hl_pop_root();
 HL_API void hl_remove_root( void *ptr );
@@ -563,10 +564,10 @@ HL_API bool hl_is_gc_ptr( void *ptr );
 typedef void (*hl_types_dump)( void (*)( void *, int) );
 HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
 
-#define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(size,MEM_KIND_NOPTR)
-#define hl_gc_alloc(size)			hl_gc_alloc_gen(size,MEM_KIND_DYNAMIC)
-#define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(size,MEM_KIND_RAW)
-#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(size,MEM_KIND_FINALIZER)
+#define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(&hlt_bytes,size,MEM_KIND_NOPTR)
+#define hl_gc_alloc(t,size)			hl_gc_alloc_gen(t,size,MEM_KIND_DYNAMIC)
+#define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(&hlt_abstract,size,MEM_KIND_RAW)
+#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract,size,MEM_KIND_FINALIZER)
 
 HL_API void hl_alloc_init( hl_alloc *a );
 HL_API void *hl_malloc( hl_alloc *a, int size );
