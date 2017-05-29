@@ -118,7 +118,10 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 		return *(vdynamic**)data;
 	if( t->kind == HDYN || t->kind == HNULL ) {
 		vdynamic *v = *(vdynamic**)data;
-		if( v == NULL || (to->kind == HNULL && v->t == to->tparam) ) return v;
+		if( v == NULL )
+			return NULL;
+		if( to->kind == HNULL && v->t == to->tparam && hl_is_gc_ptr(v) )
+			return v; // v might be a vdynamic on the stack
 		t = v->t;
 		if( !hl_is_dynamic(t) ) data = &v->v;
 	} else if( hl_is_dynamic(t) ) {
