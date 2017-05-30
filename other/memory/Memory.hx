@@ -309,6 +309,7 @@ class Memory {
 		var broot = new Block();
 		broot.type = new TType(types.length, HAbstract("roots"));
 		types.push(broot.type);
+		broot.depth = 0;
 		broot.addParent(all);
 		var rid = 0;
 		for( g in code.globals ) {
@@ -338,11 +339,14 @@ class Memory {
 
 		// look in stacks (low priority of ownership)
 		var tstacks = new TType(types.length, HAbstract("stack"));
+		var bstacks = [];
 		types.push(tstacks);
 		for( s in stacks ) {
 			var bstack = new Block();
+			bstack.depth = 10000;
 			bstack.type = tstacks;
 			bstack.addParent(all);
+			bstacks.push(bstack);
 			for( r in s.contents ) {
 				var b = pointerBlock.get(r);
 				if( b != null )
@@ -356,6 +360,35 @@ class Memory {
 				f.b.type.falsePositive++;
 				f.b.type.falsePositiveIndexes[f.idx]++;
 			}
+
+		// assign depths
+
+		Sys.println("Computing depths...");
+		broot.markDepth();
+		for( b in bstacks ) b.markDepth();
+
+		var changed = -1;
+		while( changed != 0 ) {
+			changed = 0;
+			for( b in blocks ) {
+				var minD = -1;
+				if( b.parents == null ) {
+					if( b.owner != null && b.owner.depth >= 0 )
+						minD = b.owner.depth;
+				} else {
+					for( p in b.parents )
+						if( p.depth >= 0 && (minD < 0 || p.depth < minD) )
+							minD = p.depth;
+				}
+				if( minD >= 0 ) {
+					minD++;
+					if( b.depth < 0 || b.depth > minD ) {
+						b.depth = minD;
+						changed++;
+					}
+				}
+			}
+		}
 
 		for( b in blocks )
 			b.finalize();
@@ -531,25 +564,35 @@ class Memory {
 					var ol = [owner];
 					tl.push(owner.type == null ? 0 : owner.type.tid);
 					var k : Int = up;
-					while( owner.owner != null && k-- > 0 ) {
+					while( owner.owner != null && k-- > 0 && ol.indexOf(owner.owner) < 0 && owner.owner != all ) {
 						var prev = owner;
 						owner = owner.owner;
-						if( ol.indexOf(owner) >= 0 && prev.parents != null ) {
-							var found = false;
-							for( p in prev.parents )
-								if( ol.indexOf(p) < 0 ) {
-									owner = p;
-									found = true;
-									break;
-								}
-							if( !found ) break;
-						}
 						ol.push(owner);
 						tl.unshift(owner.type == null ? 0 : owner.type.tid);
 					}
 				}
 				ctx.addPath(tl, b.getMemSize());
 			}
+		ctx.print();
+	}
+
+	function parents( tstr : String, up = 0 ) {
+		var lt = null;
+		for( t in types )
+			if( t.t.toString() == tstr ) {
+				lt = t;
+				break;
+			}
+		if( lt == null ) {
+			log("Type not found");
+			return;
+		}
+
+		var ctx = new Stats(this);
+		for( b in blocks )
+			if( b.type == lt )
+				for( b in b.getParents() )
+					ctx.addPath([if( b.type == null ) 0 else b.type.tid], 0);
 		ctx.print();
 	}
 
@@ -646,6 +689,8 @@ class Memory {
 				m.printUnknown();
 			case "locate":
 				m.locate(args.shift(), Std.parseInt(args.shift()));
+			case "parents":
+				m.parents(args.shift());
 			case "subs":
 				m.subs(args.shift(), Std.parseInt(args.shift()));
 			case "part":
