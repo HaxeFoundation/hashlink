@@ -209,19 +209,19 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 		case HI32:
 		case HBOOL:
 			{
-				int *v = (int*)hl_gc_alloc_raw(sizeof(int));
+				int *v = (int*)hl_gc_alloc_noptr(sizeof(int));
 				*v = hl_dyn_casti(data,t,to->tparam);
 				return v;
 			}
 		case HF32:
 			{
-				float *f = (float*)hl_gc_alloc_raw(sizeof(float));
+				float *f = (float*)hl_gc_alloc_noptr(sizeof(float));
 				*f = hl_dyn_castf(data,t);
 				return f;
 			}
 		case HF64:
 			{
-				double *d = (double*)hl_gc_alloc_raw(sizeof(double));
+				double *d = (double*)hl_gc_alloc_noptr(sizeof(double));
 				*d = hl_dyn_castd(data,t);
 				return d;
 			}
