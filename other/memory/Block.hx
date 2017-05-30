@@ -81,6 +81,8 @@ class Block {
 	public var type(default, set) : TType;
 	public var typeKind : BlockTypeKind;
 
+	public var depth : Int = -1;
+
 	public var subs : Array<Block>; // can be null
 	public var parents : Array<Block>; // if multiple owners
 
@@ -111,27 +113,42 @@ class Block {
 		b.subs.push(this);
 	}
 
+	public function getParents() {
+		return parents != null ? parents : owner == null ? [] : [owner];
+	}
+
+	public function markDepth() {
+		var d = depth + 1;
+		var all = subs;
+		while( all.length > 0 ) {
+			var out = [];
+			for( b in all ) {
+				if( b.depth < 0 || b.depth > d ) {
+					b.depth = d;
+					if( b.subs != null ) for( s in b.subs ) out.push(s);
+				}
+			}
+			all = out;
+			d++;
+		}
+	}
+
 	public function finalize() {
 		if( parents == null ) return;
 
 		inline function getPriority(b:Block) {
-			if( b.type == null ) return -2;
-			if( !b.type.hasPtr ) return -1; // false positive
+			var d = -b.depth * 5;
+			if( b.type == null ) return d-2;
+			if( !b.type.hasPtr ) return d-1; // false positive
 			return switch( b.type.t ) {
-			case HFun(_): 0;
-			case HVirtual(_): 1;
-			default: 2;
+			case HFun(_): d;
+			case HVirtual(_): d+1;
+			default: d+2;
 			}
 		}
 
-		var pbest = getPriority(owner);
-		for( p in parents ) {
-			var prio = getPriority(p);
-			if( prio > pbest ) {
-				owner = p;
-				prio = pbest;
-			}
-		}
+		parents.sort(function(p1, p2) return getPriority(p2) - getPriority(p1));
+		owner = parents[0];
 	}
 
 	function removeParent( p : Block ) {
