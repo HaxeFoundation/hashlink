@@ -303,10 +303,16 @@ static preg *pconst( preg *r, int c ) {
 }
 
 static preg *pconst64( preg *r, int_val c ) {
+#ifdef HL_64
+	if( (c&0xFFFFFFFF) == c )
+		return pconst(r,(int)c);
 	r->kind = RCONST;
 	r->id = 0xC064C064;
 	r->holds = (vreg*)c;
 	return r;
+#else
+	return pconst(r,(int)c);
+#endif
 }
 
 static preg *paddr( preg *r, void *p ) {
@@ -3027,11 +3033,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OMakeEnum:
 			{
 				hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
-				int_val args[] = { (int_val)dst->t, c->size, c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR };
+				int_val args[] = { (int_val)dst->t, o->p2 };
 				int i;
-				call_native_consts(ctx, hl_gc_alloc_gen, args, 3);
-				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
-				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));
+				call_native_consts(ctx, hl_alloc_enum, args, 2);
 				RLOCK(PEAX);
 				for(i=0;i<c->nparams;i++) {
 					preg *r = fetch(R(o->extra[i]));
@@ -3044,12 +3048,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OEnumAlloc:
 			{
-				hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
-				int_val args[] = { (int_val)dst->t, c->size, (c->hasptr?MEM_KIND_RAW:MEM_KIND_NOPTR) | MEM_ZERO };
-				call_native_consts(ctx, hl_gc_alloc_gen, args, 3);
+				int_val args[] = { (int_val)dst->t, o->p2 };
+				call_native_consts(ctx, hl_alloc_enum, args, 2);
 				store(ctx, dst, PEAX, true);
-				op32(ctx,MOV,REG_AT(Ecx),pconst(&p,o->p2));
-				op32(ctx,MOV,pmem(&p,Eax,0),REG_AT(Ecx));
 			}
 			break;
 		case OEnumField:
@@ -3181,24 +3182,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OEnumIndex:
-			switch( ra->t->kind ) {
-			case HENUM:
-				{
-					preg *r = alloc_reg(ctx,RCPU);
-					op64(ctx,MOV,r,pmem(&p,alloc_cpu(ctx,ra,true)->id,0));
-					store(ctx,dst,r,true);
-					break;
-				}
-			case HDYN:
-				{
-					preg *r = alloc_reg(ctx,RCPU);
-					op64(ctx,MOV,r,pmem(&p,alloc_cpu(ctx,ra,true)->id,HDYN_VALUE)); // read dynamic ptr
-					op64(ctx,MOV,r,pmem(&p,r->id,0)); // read index
-					store(ctx,dst,r,true);
-					break;
-				}
-			default:
-				ASSERT(ra->t->kind);
+			{
+				preg *r = alloc_reg(ctx,RCPU);
+				op64(ctx,MOV,r,pmem(&p,alloc_cpu(ctx,ra,true)->id,HL_WSIZE));
+				store(ctx,dst,r,true);
+				break;
 			}
 			break;
 		case OSwitch:
