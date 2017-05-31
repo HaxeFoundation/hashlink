@@ -341,7 +341,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			int i;
 			vlist l;
 			vlist *vtmp = stack;
-			hl_enum_construct *c = v->t->tenum->constructs + ((venum*)v->v.ptr)->index;
+			hl_enum_construct *c = v->t->tenum->constructs + ((venum*)v)->index;
 			if( !c->nparams ) {
 				hl_buffer_str(b, c->name);
 				break;
@@ -359,7 +359,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			hl_buffer_char(b,'(');
 			for(i=0;i<c->nparams;i++) {
 				if( i ) hl_buffer_char(b,',');
-				hl_buffer_addr(b,(char*)v->v.ptr + c->offsets[i],c->params[i], &l);
+				hl_buffer_addr(b,(char*)v + c->offsets[i],c->params[i], &l);
 			}
 			hl_buffer_char(b,')');
 		}

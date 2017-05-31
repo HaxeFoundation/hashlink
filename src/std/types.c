@@ -154,7 +154,7 @@ HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 		true, // HVIRTUAL
 		true, // HDYNOBJ
 		false, // HABSTRACT
-		false, // HENUM
+		true, // HENUM
 		true, // HNULL
 	};
 	return T_IS_DYNAMIC[t->kind];
@@ -323,7 +323,7 @@ HL_PRIM void hl_init_enum( hl_type *et, hl_module_context *m ) {
 	for(i=0;i<et->tenum->nconstructs;i++) {
 		hl_enum_construct *c = et->tenum->constructs + i;
 		c->hasptr = false;
-		c->size = sizeof(int); // index
+		c->size = sizeof(venum); // t + index
 		for(j=0;j<c->nparams;j++) {
 			hl_type *t = c->params[j];
 			c->size += hl_pad_size(c->size,t);
@@ -364,13 +364,8 @@ HL_PRIM varray* hl_type_enum_values( hl_type *t ) {
 	int i;
 	for( i=0; i<t->tenum->nconstructs;i++) {
 		hl_enum_construct *c = t->tenum->constructs + i;
-		if(c->nparams == 0) {
-			venum *e = hl_gc_alloc_noptr(c->size);
-			vdynamic *v = hl_alloc_dynamic(t);
-			e->index = i;
-			v->v.ptr = e;
-			hl_aptr(a,vdynamic*)[i] = v;
-		}
+		if(c->nparams == 0)
+			hl_aptr(a,venum*)[i] = hl_alloc_enum(t, i);
 	}
 	return a;
 }
@@ -461,41 +456,31 @@ HL_PRIM bool hl_type_set_global( hl_type *t, vdynamic *v ) {
 	return false;
 }
 
-HL_PRIM bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
+HL_PRIM bool hl_type_enum_eq( venum *a, venum *b ) {
 	int i;
-	venum *ea, *eb;
 	hl_enum_construct *c;
 	if( a == b )
 		return true;
-	if( !a || !b || a->t != b->t || a->t->kind != HENUM )
+	if( !a || !b || a->t != b->t )
 		return false;
-	ea = (venum*)a->v.ptr;
-	eb = (venum*)b->v.ptr;
-	if( ea->index != eb->index )
+	if( a->index != b->index )
 		return false;
-	c = a->t->tenum->constructs + ea->index;
+	c = a->t->tenum->constructs + a->index;
 	for(i=0;i<c->nparams;i++) {
 		hl_type *t = c->params[i];
 		switch( t->kind ) {
 		case HENUM:
 			{
-				vdynamic pa, pb;
-				pa.t = pb.t = t;
-				pa.v.ptr = *(void**)((char*)ea + c->offsets[i]);
-				pb.v.ptr = *(void**)((char*)eb + c->offsets[i]);
-				if( !hl_type_enum_eq(&pa,&pb) )
+				venum *pa = *(venum**)((char*)a + c->offsets[i]);
+				venum *pb = *(venum**)((char*)b + c->offsets[i]);
+				if( !hl_type_enum_eq(pa,pb) )
 					return false;
 			}
 			break;
 		default:
 			{
-				vdynamic *pa = hl_make_dyn((char*)ea + c->offsets[i],t);
-				vdynamic *pb = hl_make_dyn((char*)eb + c->offsets[i],t);
-				if( pa && pa->t->kind == HENUM && pb && pa->t == pb->t ) {
-					if( !hl_type_enum_eq(pa,pb) )
-						return false;
-					continue;
-				}
+				vdynamic *pa = hl_make_dyn((char*)a + c->offsets[i],t);
+				vdynamic *pb = hl_make_dyn((char*)b + c->offsets[i],t);
 				if( hl_dyn_compare(pa,pb) )
 					return false;
 			}
@@ -505,26 +490,29 @@ HL_PRIM bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 	return true;
 }
 
-HL_PRIM vdynamic *hl_alloc_enum( hl_type *t, int index, varray *args, int nargs ) {
+HL_PRIM venum *hl_alloc_enum( hl_type *t, int index ) {
 	hl_enum_construct *c = t->tenum->constructs + index;
-	venum *e;
-	vdynamic *v;
-	int i;
-	if( c->nparams != nargs || args->size < nargs )
-		return NULL;
-	e = (venum*)(c->hasptr ? hl_gc_alloc_raw(c->size) : hl_gc_alloc_noptr(c->size));
-	e->index = index;
-	for(i=0;i<c->nparams;i++)
-		hl_write_dyn((char*)e+c->offsets[i],c->params[i],hl_aptr(args,vdynamic*)[i]);
-	v = hl_alloc_dynamic(t);
-	v->v.ptr = e;
+	venum *v = (venum*)hl_gc_alloc_gen(t, c->size, MEM_KIND_DYNAMIC | (c->hasptr ? 0 : MEM_KIND_NOPTR) | MEM_ZERO);
+	v->t = t;
+	v->index = index;
 	return v;
 }
 
-HL_PRIM varray *hl_enum_parameters( vdynamic *v ) {
+HL_PRIM venum *hl_alloc_enum_dyn( hl_type *t, int index, varray *args, int nargs ) {
+	hl_enum_construct *c = t->tenum->constructs + index;
+	venum *e;
+	int i;
+	if( c->nparams != nargs || args->size < nargs )
+		return NULL;
+	e = hl_alloc_enum(t, index);
+	for(i=0;i<c->nparams;i++)
+		hl_write_dyn((char*)e+c->offsets[i],c->params[i],hl_aptr(args,vdynamic*)[i]);
+	return e;
+}
+
+HL_PRIM varray *hl_enum_parameters( venum *e ) {
 	varray *a;
-	venum *e = (venum*)v->v.ptr;
-	hl_enum_construct *c = v->t->tenum->constructs + e->index;
+	hl_enum_construct *c = e->t->tenum->constructs + e->index;
 	int i;
 	a = hl_alloc_array(&hlt_dyn,c->nparams);
 	for(i=0;i<c->nparams;i++)
@@ -541,6 +529,6 @@ DEFINE_PRIM(_DYN, type_get_global, _TYPE);
 DEFINE_PRIM(_ARR, type_enum_fields, _TYPE);
 DEFINE_PRIM(_ARR, type_enum_values, _TYPE);
 DEFINE_PRIM(_BOOL, type_enum_eq, _DYN _DYN);
-DEFINE_PRIM(_DYN, alloc_enum, _TYPE _I32 _ARR _I32);
+DEFINE_PRIM(_DYN, alloc_enum_dyn, _TYPE _I32 _ARR _I32);
 DEFINE_PRIM(_ARR, enum_parameters, _DYN);
 DEFINE_PRIM(_BOOL, type_set_global, _TYPE _DYN);

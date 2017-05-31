@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#include <math.h>
 
 #define TK2(a,b)		((a) | ((b)<<5))
 
@@ -66,7 +67,6 @@ HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	case HTYPE:
 	case HREF:
 	case HABSTRACT:
-	case HENUM:
 		{
 			void *p = *(void**)data;
 			if( p == NULL ) return NULL;
@@ -348,6 +348,7 @@ HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 			return a->t->obj->rt->compareFun(a,b);
 		return a > b ? 1 : -1;
 	case TK2(HENUM,HENUM):
+		return a > b ? 1 : -1;
 	case TK2(HTYPE,HTYPE):
 	case TK2(HBYTES,HBYTES):
 		return a->v.ptr != b->v.ptr;
