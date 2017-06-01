@@ -670,7 +670,7 @@ static void gc_flush_mark() {
 		int pos = 0, size, nwords;
 #		ifdef GC_DEBUG
 		vdynamic *ptr = (vdynamic*)block;
-		ptr += 0;
+		ptr += 0; // prevent unreferenced warning
 #		endif
 		if( !block ) {
 			mark_stack += 2;
@@ -690,8 +690,14 @@ static void gc_flush_mark() {
 #			endif
 			if( t && t->mark_bits && t->kind != HFUN ) {
 				mark_bits = t->mark_bits;
-				block++;
-				pos++;
+				if( t->kind == HENUM ) {
+					mark_bits += ((venum*)block)->index;
+					block += 2;
+					nwords -= 2;
+				} else {
+					block++;
+					pos++;
+				}
 			}
 		}
 #		endif

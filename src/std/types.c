@@ -318,8 +318,8 @@ HL_PRIM int hl_mark_size( int data_size );
 
 HL_PRIM void hl_init_enum( hl_type *et, hl_module_context *m ) {
 	int i, j;
-	int max_size = 0;
-	//unsigned int *mark;
+	int mark_size = 0;
+	unsigned int *mark;
 	for(i=0;i<et->tenum->nconstructs;i++) {
 		hl_enum_construct *c = et->tenum->constructs + i;
 		c->hasptr = false;
@@ -331,24 +331,23 @@ HL_PRIM void hl_init_enum( hl_type *et, hl_module_context *m ) {
 			if( hl_is_ptr(t) ) c->hasptr = true;
 			c->size += hl_type_size(t);
 		}
-		if( c->size > max_size && c->hasptr ) max_size = c->size;
+		if( c->hasptr ) {
+			int max_pos = i * sizeof(int) + hl_mark_size(c->size - HL_WSIZE*2);
+			if( max_pos > mark_size ) mark_size = max_pos;
+		}
 	}
 
-	// mark bits will be only work here if enums are dynamic !
-
-	/*
-	mark = (unsigned int*)hl_zalloc(&m->alloc,hl_mark_size(max_size));
+	mark = (unsigned int*)hl_zalloc(&m->alloc,mark_size);
 	for(i=0;i<et->tenum->nconstructs;i++) {
 		hl_enum_construct *c = et->tenum->constructs + i;
 		if( !c->hasptr ) continue;
 		for(j=0;j<c->nparams;j++)
 			if( hl_is_ptr(c->params[j]) ) {
-				int pos = c->offsets[j];
-				mark[pos >> 5] |= 1 << (pos & 31);
+				int pos = (c->offsets[j] / HL_WSIZE) - 2;
+				mark[i + (pos >> 5)] |= 1 << (pos & 31);
 			}
 	}
 	et->mark_bits = mark;
-	*/
 }
 
 HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
