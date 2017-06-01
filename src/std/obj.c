@@ -403,20 +403,26 @@ void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 vdynamic *hl_virtual_make_value( vvirtual *v ) {
 	vdynobj *o;
 	int i, nfields;
-	int hsize;
+	int dsize, hsize;
 	if( v->value )
 		return v->value;
 	nfields = v->t->virt->nfields;
 	hsize = sizeof(vvirtual) + nfields * sizeof(void*);
+	dsize = v->t->virt->dataSize;
 	o = hl_alloc_dynobj();
-	o->fields_data = (char*)v + hsize;
+	// make a copy of the data because we might change it's storage (and erase it)
+	o->fields_data = hl_gc_alloc_raw(dsize);
+	memcpy(o->fields_data, (char*)v + hsize, dsize);
+	memset((char*)v + hsize, 0, dsize);
+	o->dataSize = dsize;
 	o->nfields = nfields;
-	o->dataSize = v->t->virt->dataSize;
 	o->lookup = (hl_field_lookup*)hl_gc_alloc_noptr(sizeof(hl_field_lookup) * nfields);
 	memcpy(o->lookup,v->t->virt->lookup,nfields * sizeof(hl_field_lookup));
 	for(i=0;i<nfields;i++) {
 		hl_field_lookup *f = o->lookup + i;
-		f->field_index = v->t->virt->indexes[f->field_index] - hsize;
+		int offset = v->t->virt->indexes[f->field_index] - hsize;
+		hl_vfields(v)[f->field_index] = o->fields_data + offset;
+		f->field_index = offset;
 	}
 	o->virtuals = v;
 	v->value = (vdynamic*)o;
@@ -988,7 +994,7 @@ HL_PRIM vdynamic *hl_obj_copy( vdynamic *obj ) {
 			if( v->value )
 				return hl_obj_copy(v->value);
 			v2 = hl_alloc_virtual(v->t);
-			memcpy((void**)(v2 + 1) + v->t->virt->nfields, (void**)(v + 1) + v->t->virt->nfields, v->t->virt->dataSize);
+			memcpy(hl_vfields(v2) + v->t->virt->nfields, hl_vfields(v) + v->t->virt->nfields, v->t->virt->dataSize);
 			return (vdynamic*)v2;
 		}
 	default:
