@@ -158,6 +158,12 @@ static int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
 #define BUF_POS()				((int)(ctx->buf.b - ctx->startBuf))
 #define RTYPE(r)				r->t->kind
 
+#ifdef HL_64
+#	define RESERVE_ADDRESS	0x8000000000000000
+#else
+#	define RESERVE_ADDRESS	0x80000000
+#endif
+
 typedef struct jlist jlist;
 struct jlist {
 	int pos;
@@ -2531,7 +2537,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				j->next = ctx->calls;
 				ctx->calls = j;
 
-				op64(ctx,MOV,r,pconst64(&p,0));
+				op64(ctx,MOV,r,pconst64(&p,RESERVE_ADDRESS));
 				op64(ctx,PUSH,r,UNUSED);
 				op64(ctx,MOV,r,pconst64(&p,(int_val)m->code->functions[m->functions_indexes[o->p2]].type));
 				op64(ctx,PUSH,r,UNUSED);
@@ -3201,7 +3207,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx, MOV, r2, r);
 				op32(ctx, SHL, r2, pconst(&p,2));
 				op32(ctx, ADD, r2, r);
-				op64(ctx, ADD, r2, pconst64(&p,0));
+				op64(ctx, ADD, r2, pconst64(&p,RESERVE_ADDRESS));
 				{
 					jlist *s = (jlist*)hl_malloc(&ctx->galloc, sizeof(jlist));
 					s->pos = BUF_POS() - sizeof(void*);
