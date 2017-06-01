@@ -74,4 +74,7 @@ extern void *hlc_static_call(void *fun, hl_type *t, void **args, vdynamic *out);
 extern void *hlc_get_wrapper(hl_type *t);
 extern void hl_entry_point();
 
+#define HL__ENUM_CONSTRUCT__	hl_type *t; int index;
+#define HL__ENUM_INDEX__(v)		(v)->index
+
 #endif
