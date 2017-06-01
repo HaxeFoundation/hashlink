@@ -161,7 +161,6 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 	case HBYTES:
 		hl_buffer_str(b,*(uchar**)data);
 		break;
-	case HENUM:
 	case HTYPE:
 	case HREF:
 	case HABSTRACT:
