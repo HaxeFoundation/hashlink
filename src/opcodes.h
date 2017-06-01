@@ -138,6 +138,7 @@ OP_BEGIN
 	OP(OEnumField,4)
 	OP(OSetEnumField,3)
 
+	OP(OAssert,0)
 	OP(ONop,0)
 	// --
 	OP(OLast,0)

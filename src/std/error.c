@@ -134,6 +134,11 @@ HL_PRIM void hl_breakpoint() {
 	hl_debug_break();
 }
 
+HL_PRIM void hl_assert() {
+	hl_debug_break();
+	hl_error("Assert");
+}
+
 #define _SYMBOL _ABSTRACT(hl_symbol)
 
 DEFINE_PRIM(_ARR,exception_stack,_NO_ARG);
