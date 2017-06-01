@@ -479,6 +479,7 @@ HL_API const uchar *hl_field_name( int hash );
 
 #define hl_error(msg)	hl_error_msg(USTR(msg))
 HL_API void hl_error_msg( const uchar *msg, ... );
+HL_API void hl_assert();
 HL_API void hl_throw( vdynamic *v );
 HL_API void hl_rethrow( vdynamic *v );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );

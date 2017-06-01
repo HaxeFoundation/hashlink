@@ -1259,7 +1259,7 @@ static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
 	// native function, already resolved
 	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
 	op64(ctx,CALL,PEAX,UNUSED);
-	if( nativeFun == hl_null_access || nativeFun == hl_throw || nativeFun == on_jit_error )
+	if( nativeFun == hl_null_access || nativeFun == hl_assert || nativeFun == hl_throw || nativeFun == on_jit_error )
 		return;
 	discard_regs(ctx, true);
 	op64(ctx,ADD,PESP,pconst(&p,size));
@@ -3226,6 +3226,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OGetTID:
 			op32(ctx, MOV, alloc_cpu(ctx,dst,false), pmem(&p,alloc_cpu(ctx,ra,true)->id,0));
 			store(ctx,dst,dst->current,false);
+			break;
+		case OAssert:
+			call_native(ctx, hl_assert, 0);
 			break;
 		case ONop:
 			break;
