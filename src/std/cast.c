@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#include <math.h>
 
 #define TK2(a,b)		((a) | ((b)<<5))
 
@@ -445,16 +446,16 @@ HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
 		case OP_SUB: FOP(-);
 		case OP_MUL: FOP(*);
 		case OP_MOD: {
-			double va = hl_dyn_castd(a,&hlt_dyn);
-			double vb = hl_dyn_castd(b,&hlt_dyn);
+			double va = hl_dyn_castd(&a,&hlt_dyn);
+			double vb = hl_dyn_castd(&b,&hlt_dyn);
 			return hl_dynf64(fmod(va,vb));
 		}
 		case OP_DIV: FOP(/);
 		case OP_SHL: IOP(<<);
 		case OP_SHR: IOP(>>);
 		case OP_USHR: {
-			int va = hl_dyn_casti(a,&hlt_dyn,&hlt_i32);
-			int vb = hl_dyn_casti(b,&hlt_dyn,&hlt_i32);
+			int va = hl_dyn_casti(&a,&hlt_dyn,&hlt_i32);
+			int vb = hl_dyn_casti(&b,&hlt_dyn,&hlt_i32);
 			return hl_dyni32( ((unsigned)va) >> ((unsigned)vb) );
 		}
 		case OP_AND: IOP(&);
