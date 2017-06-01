@@ -505,7 +505,7 @@ HL_PRIM bool hl_type_enum_eq( vdynamic *a, vdynamic *b ) {
 	return true;
 }
 
-HL_PRIM vdynamic *hl_alloc_enum( hl_type *t, int index, varray *args, int nargs ) {
+HL_PRIM vdynamic *hl_alloc_enum_dyn( hl_type *t, int index, varray *args, int nargs ) {
 	hl_enum_construct *c = t->tenum->constructs + index;
 	venum *e;
 	vdynamic *v;
@@ -541,6 +541,6 @@ DEFINE_PRIM(_DYN, type_get_global, _TYPE);
 DEFINE_PRIM(_ARR, type_enum_fields, _TYPE);
 DEFINE_PRIM(_ARR, type_enum_values, _TYPE);
 DEFINE_PRIM(_BOOL, type_enum_eq, _DYN _DYN);
-DEFINE_PRIM(_DYN, alloc_enum, _TYPE _I32 _ARR _I32);
+DEFINE_PRIM(_DYN, alloc_enum_dyn, _TYPE _I32 _ARR _I32);
 DEFINE_PRIM(_ARR, enum_parameters, _DYN);
 DEFINE_PRIM(_BOOL, type_set_global, _TYPE _DYN);
