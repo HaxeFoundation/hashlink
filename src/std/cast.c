@@ -209,19 +209,19 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 		case HI32:
 		case HBOOL:
 			{
-				int *v = (int*)hl_gc_alloc_raw(sizeof(int));
+				int *v = (int*)hl_gc_alloc_noptr(sizeof(int));
 				*v = hl_dyn_casti(data,t,to->tparam);
 				return v;
 			}
 		case HF32:
 			{
-				float *f = (float*)hl_gc_alloc_raw(sizeof(float));
+				float *f = (float*)hl_gc_alloc_noptr(sizeof(float));
 				*f = hl_dyn_castf(data,t);
 				return f;
 			}
 		case HF64:
 			{
-				double *d = (double*)hl_gc_alloc_raw(sizeof(double));
+				double *d = (double*)hl_gc_alloc_noptr(sizeof(double));
 				*d = hl_dyn_castd(data,t);
 				return d;
 			}
@@ -446,16 +446,16 @@ HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
 		case OP_SUB: FOP(-);
 		case OP_MUL: FOP(*);
 		case OP_MOD: {
-			double va = hl_dyn_castd(a,&hlt_dyn);
-			double vb = hl_dyn_castd(b,&hlt_dyn);
+			double va = hl_dyn_castd(&a,&hlt_dyn);
+			double vb = hl_dyn_castd(&b,&hlt_dyn);
 			return hl_dynf64(fmod(va,vb));
 		}
 		case OP_DIV: FOP(/);
 		case OP_SHL: IOP(<<);
 		case OP_SHR: IOP(>>);
 		case OP_USHR: {
-			int va = hl_dyn_casti(a,&hlt_dyn,&hlt_i32);
-			int vb = hl_dyn_casti(b,&hlt_dyn,&hlt_i32);
+			int va = hl_dyn_casti(&a,&hlt_dyn,&hlt_i32);
+			int vb = hl_dyn_casti(&b,&hlt_dyn,&hlt_i32);
 			return hl_dyni32( ((unsigned)va) >> ((unsigned)vb) );
 		}
 		case OP_AND: IOP(&);

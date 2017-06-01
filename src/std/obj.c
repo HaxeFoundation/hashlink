@@ -430,7 +430,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	vvirtual *v = NULL;
 	if( obj == NULL ) return NULL;
 #ifdef _DEBUG
-	if( vt->virt->lookup == NULL ) hl_fatal("virtual not initialized");
+	if( vt->virt->nfields && vt->virt->lookup == NULL ) hl_fatal("virtual not initialized");
 #endif
 	switch( obj->t->kind ) {
 	case HOBJ:
