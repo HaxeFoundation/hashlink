@@ -10,7 +10,6 @@
 #define CHECK(call) if( (call) != S_OK ) return INIT_ERROR
 
 typedef struct {
-	IDXGIFactory *factory;
 	ID3D11Device *device;
 	ID3D11DeviceContext *context;
 	IDXGISwapChain *swapchain;
@@ -20,6 +19,13 @@ typedef struct {
 } dx_driver;
 
 static dx_driver *driver = NULL;
+static IDXGIFactory *factory = NULL;
+
+static IDXGIFactory *GetDXGI() {
+	if( factory == NULL && CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory) != S_OK )
+		hl_error("Failed to init DXGI");
+	return factory;
+}
 
 HL_PRIM dx_driver *HL_NAME(dx_create)( HWND window, int flags ) {
 	DWORD result;
@@ -55,9 +61,7 @@ HL_PRIM dx_driver *HL_NAME(dx_create)( HWND window, int flags ) {
 	desc.BufferCount = 1;
 	desc.Windowed = true;
 	desc.OutputWindow = window;
-	if( CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&d->factory) != S_OK )
-		return NULL;
-	if( d->factory->CreateSwapChain(d->device,&desc,&d->swapchain) != S_OK )
+	if( GetDXGI()->CreateSwapChain(d->device,&desc,&d->swapchain) != S_OK )
 		return NULL;
 
 	// create the backbuffer
@@ -84,7 +88,33 @@ HL_PRIM void HL_NAME(dx_present)() {
 	driver->swapchain->Present(0,0);
 }
 
+HL_PRIM int HL_NAME(dx_get_screen_width)() {
+	return GetSystemMetrics(SM_CXSCREEN);
+}
+
+HL_PRIM int HL_NAME(dx_get_screen_height)() {
+	return GetSystemMetrics(SM_CYSCREEN);
+}
+
+HL_PRIM const uchar *HL_NAME(dx_get_device_name)() {
+	IDXGIAdapter *adapter;
+	DXGI_ADAPTER_DESC desc;
+	if( GetDXGI()->EnumAdapters(0,&adapter) != S_OK || adapter->GetDesc(&desc) != S_OK )
+		return USTR("Unknown");
+	adapter->Release();
+	return (uchar*)hl_copy_bytes((vbyte*)desc.Description,(ustrlen((uchar*)desc.Description)+1)*2);
+}
+
+HL_PRIM double HL_NAME(dx_get_supported_version)() {
+	if( driver == NULL ) return 0.;
+	return (driver->feature >> 12) + ((driver->feature & 0xFFF) / 2560.);
+}
+
 #define _DRIVER _ABSTRACT(dx_driver)
 DEFINE_PRIM(_DRIVER, dx_create, _ABSTRACT(dx_window) _I32);
 DEFINE_PRIM(_VOID, dx_clear_color, _F64 _F64 _F64 _F64);
 DEFINE_PRIM(_VOID, dx_present, _NO_ARG);
+DEFINE_PRIM(_I32, dx_get_screen_width, _NO_ARG);
+DEFINE_PRIM(_I32, dx_get_screen_height, _NO_ARG);
+DEFINE_PRIM(_BYTES, dx_get_device_name, _NO_ARG);
+DEFINE_PRIM(_F64, dx_get_supported_version, _NO_ARG);
