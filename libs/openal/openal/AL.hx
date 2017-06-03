@@ -9,7 +9,7 @@ abstract Source(Int) {
 	public static inline function ofInt( v : Int ) : Source { return cast v; }
 }
 
-@:hlNative("sdl","al_")
+@:hlNative("openal","al_")
 extern class AL {
 	public static function dopplerFactor   (value : hl.F32) : Void;
 	public static function dopplerVelocity (value : hl.F32) : Void;
