@@ -1,0 +1,10 @@
+{
+	"name" : "hldx",
+	"url" : "https://github.com/HaxeFoundation/hl/tree/master/libs/directx",
+	"license" : "BSD",
+	"contributors" : ["ncannasse"],
+	"description" : "DirectX support for Haxe/HL.",
+	"version" : "1.0.0",
+	"releasenote" : "",
+	"dependencies": { "hlopenal" : "" }
+}
