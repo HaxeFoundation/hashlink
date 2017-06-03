@@ -4,7 +4,7 @@
 #include <dxgi.h>
 #include <d3dcommon.h>
 #include <d3d11.h>
-#include <DirectXMath.h>
+#include <D3Dcompiler.h>
 
 #define INIT_ERROR __LINE__
 #define CHECK(call) if( (call) != S_OK ) return INIT_ERROR
@@ -17,6 +17,8 @@ typedef struct {
 	D3D_FEATURE_LEVEL feature;
 	int init_flags;
 } dx_driver;
+
+typedef ID3D11Buffer dx_buffer;
 
 static dx_driver *driver = NULL;
 static IDXGIFactory *factory = NULL;
@@ -110,7 +112,41 @@ HL_PRIM double HL_NAME(dx_get_supported_version)() {
 	return (driver->feature >> 12) + ((driver->feature & 0xFFF) / 2560.);
 }
 
+HL_PRIM dx_buffer *HL_NAME(dx_create_buffer)( int size, int usage, int bind, int access, int misc, int stride, vbyte *data ) {
+	ID3D11Buffer *buffer;
+	D3D11_BUFFER_DESC desc;
+	D3D11_SUBRESOURCE_DATA res;
+	desc.ByteWidth = size;
+	desc.Usage = (D3D11_USAGE)usage;
+	desc.BindFlags = bind;
+	desc.CPUAccessFlags = access;
+	desc.MiscFlags = misc;
+	desc.StructureByteStride = stride;
+	res.pSysMem = data;
+	res.SysMemPitch = 0;
+	res.SysMemSlicePitch = 0;
+	if( driver->device->CreateBuffer(&desc,data?&res:NULL,&buffer) != S_OK )
+		return NULL;
+	return buffer;
+}
+
+HL_PRIM void HL_NAME(dx_release_buffer)( dx_buffer *b ) {
+	b->Release();
+}
+
+HL_PRIM vbyte *HL_NAME(dx_compile_shader)( vbyte *data, int dataSize, char *source, char *target, int flags, bool *error, int *size ) {
+	ID3DBlob *code;
+	ID3DBlob *errorMessage;
+	if( D3DCompile(data,dataSize,source,NULL,NULL,NULL,target,flags,0,&code,&errorMessage) != S_OK ) {
+		*error = true;
+		code = errorMessage;
+	}
+	*size = code->GetBufferSize();
+	return hl_copy_bytes((vbyte*)code->GetBufferPointer(),*size);
+}
+
 #define _DRIVER _ABSTRACT(dx_driver)
+#define _BUFFER _ABSTRACT(dx_buffer)
 DEFINE_PRIM(_DRIVER, dx_create, _ABSTRACT(dx_window) _I32);
 DEFINE_PRIM(_VOID, dx_clear_color, _F64 _F64 _F64 _F64);
 DEFINE_PRIM(_VOID, dx_present, _NO_ARG);
@@ -118,3 +154,6 @@ DEFINE_PRIM(_I32, dx_get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, dx_get_screen_height, _NO_ARG);
 DEFINE_PRIM(_BYTES, dx_get_device_name, _NO_ARG);
 DEFINE_PRIM(_F64, dx_get_supported_version, _NO_ARG);
+DEFINE_PRIM(_BUFFER, dx_create_buffer, _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID, dx_release_buffer, _BUFFER);
+DEFINE_PRIM(_BYTES, dx_compile_shader, _BYTES _I32 _BYTES _BYTES _I32 _REF(_BOOL) _REF(_I32));
