@@ -189,12 +189,26 @@ HL_PRIM void HL_NAME(release_buffer)( dx_buffer *b ) {
 HL_PRIM vbyte *HL_NAME(compile_shader)( vbyte *data, int dataSize, char *source, char *entry, char *target, int flags, bool *error, int *size ) {
 	ID3DBlob *code;
 	ID3DBlob *errorMessage;
+	vbyte *ret;
 	if( D3DCompile(data,dataSize,source,NULL,NULL,entry,target,flags,0,&code,&errorMessage) != S_OK ) {
 		*error = true;
 		code = errorMessage;
 	}
 	*size = code->GetBufferSize();
-	return hl_copy_bytes((vbyte*)code->GetBufferPointer(),*size);
+	ret = hl_copy_bytes((vbyte*)code->GetBufferPointer(),*size);
+	code->Release();
+	return ret;
+}
+
+HL_PRIM vbyte *HL_NAME(disassemble_shader)( vbyte *data, int dataSize, int flags, vbyte *comments, int *size ) {
+	ID3DBlob *out;
+	vbyte *ret;
+	if( D3DDisassemble(data,dataSize,flags,(char*)comments,&out) != S_OK )
+		return NULL;
+	*size = out->GetBufferSize();
+	ret = hl_copy_bytes((vbyte*)out->GetBufferPointer(),*size);
+	out->Release();
+	return ret;
 }
 
 HL_PRIM dx_vshader *HL_NAME(create_vertex_shader)( vbyte *code, int size ) {
@@ -209,6 +223,10 @@ HL_PRIM dx_pshader *HL_NAME(create_pixel_shader)( vbyte *code, int size ) {
 	if( driver->device->CreatePixelShader(code, size, NULL, &shader) != S_OK )
 		return NULL;
 	return shader;
+}
+
+HL_PRIM void HL_NAME(release_shader)( ID3D11DeviceChild *v ) {
+	v->Release();
 }
 
 HL_PRIM void HL_NAME(draw_indexed)( int count, int start, int baseVertex ) {
@@ -247,6 +265,10 @@ HL_PRIM void HL_NAME(ia_set_input_layout)( dx_layout *l ) {
 	driver->context->IASetInputLayout(l);
 }
 
+HL_PRIM void HL_NAME(release_layout)( dx_layout *l ) {
+	l->Release();
+}
+
 typedef struct {
 	hl_type *t;
 	D3D11_INPUT_ELEMENT_DESC desc;
@@ -280,7 +302,10 @@ DEFINE_PRIM(_BUFFER, create_buffer, _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_BYTES, buffer_map, _BUFFER _I32 _I32 _BOOL);
 DEFINE_PRIM(_VOID, buffer_unmap, _BUFFER _I32);
 DEFINE_PRIM(_VOID, release_buffer, _BUFFER);
+DEFINE_PRIM(_VOID, release_shader, _SHADER);
+DEFINE_PRIM(_VOID, release_layout, _LAYOUT);
 DEFINE_PRIM(_BYTES, compile_shader, _BYTES _I32 _BYTES _BYTES _BYTES _I32 _REF(_BOOL) _REF(_I32));
+DEFINE_PRIM(_BYTES, disassemble_shader, _BYTES _I32 _I32 _BYTES _REF(_I32));
 DEFINE_PRIM(_SHADER, create_vertex_shader, _BYTES _I32);
 DEFINE_PRIM(_SHADER, create_pixel_shader, _BYTES _I32);
 DEFINE_PRIM(_VOID, draw_indexed, _I32 _I32 _I32);
