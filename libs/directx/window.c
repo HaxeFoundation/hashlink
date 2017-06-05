@@ -25,7 +25,7 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 		wc.hIcon		 = LoadIcon(NULL, IDI_WINLOGO);
 		wc.hIconSm       = wc.hIcon;
 		wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
-		wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+		wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 		wc.lpszMenuName  = NULL;
 		wc.lpszClassName = USTR("HL_WIN");
 		wc.cbSize        = sizeof(WNDCLASSEX);

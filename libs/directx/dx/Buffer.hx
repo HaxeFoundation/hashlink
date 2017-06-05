@@ -50,14 +50,49 @@ package dx;
 	@:op(a | b) static function or(a:BufferMisc, b:BufferMisc) : BufferMisc;
 }
 
+@:enum abstract MapType(Int) {
+	var Read = 1;
+	var Write = 2;
+	var ReadWrite = 3;
+	var WriteDiscard = 4;
+	var WriteNoOverwrite = 5;
+}
+
+class ResourceBox {
+	public var left : Int;
+	public var top : Int;
+	public var front : Int;
+	public var right : Int;
+	public var bottom : Int;
+	public var back : Int;
+	public function new() {
+	}
+	public function reset() {
+		left = top = front = right = bottom = back = 0;
+	}
+}
+
 abstract Buffer(hl.Abstract<"dx_buffer">) {
 
-	@:hlNative("directx","dx_create_buffer")
+	@:hlNative("directx","create_buffer")
 	public static function alloc( size : Int, usage : BufferUsage, bind : BufferBind, access : BufferAccess, misc : BufferMisc, stride : Int, data : hl.Bytes ) : Buffer {
 		return null;
 	}
 
-	@:hlNative("directx", "dx_release_buffer")
+	@:hlNative("directx", "buffer_map")
+	public function map( subResource : Int, type : MapType, waitGpu : Bool ) : hl.Bytes {
+		return null;
+	}
+
+	@:hlNative("directx", "update_subresource")
+	public function updateSubresource( subResource : Int, box : Null<ResourceBox>, data : hl.Bytes, srcRowPitch : Int, srcDepthPitch : Int ) : Void {
+	}
+
+	@:hlNative("directx", "buffer_unmap")
+	public function unmap( subResource : Int ) : Void {
+	}
+
+	@:hlNative("directx", "release_buffer")
 	public function release() {
 	}
 
