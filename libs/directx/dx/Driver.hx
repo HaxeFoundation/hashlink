@@ -2,9 +2,15 @@ package dx;
 
 typedef DriverInstance = hl.Abstract<"dx_driver">;
 
-typedef Shader = hl.Abstract<"dx_shader">;
+abstract Shader(hl.Abstract<"dx_shader">) {
+	@:hlNative("directx", "release_shader") public function release() {
+	}
+}
 
-typedef Layout = hl.Abstract<"dx_layout">;
+abstract Layout(hl.Abstract<"dx_layout">) {
+	@:hlNative("directx", "release_layout") public function release() {
+	}
+}
 
 @:enum abstract DriverInitFlags(Int) {
 	var None = 0;
@@ -60,10 +66,24 @@ typedef Layout = hl.Abstract<"dx_layout">;
 	static inline function controlPointPatchList(count:Int) : PrimitiveTopology return cast (count + 32);
 }
 
+@:enum abstract DisassembleFlags(Int) {
+	var None = 0;
+	var EnableColorCode = 1;
+	var EnableDefaultValuePrints = 2;
+	var EnableInstructionNumbering = 4;
+	var EnableInsructionCycle = 8;
+	var DisableDebugInfo = 0x10;
+	var EnableInstructionOffset = 0x20;
+	var InstructionOnly = 0x40;
+	var PrintHexLiterals = 0x80;
+	@:op(a | b) static function or(a:DisassembleFlags, b:DisassembleFlags) : DisassembleFlags;
+}
+
 @:enum abstract LayoutClassification(Int) {
 	var PerVertexData = 0;
 	var PerInstanceData = 0;
 }
+
 
 class LayoutElement {
 	public var semanticName : hl.Bytes;
@@ -114,6 +134,14 @@ class Driver {
 		return out.toBytes(size);
 	}
 
+	public static function disassembleShader( data : haxe.io.Bytes, flags : DisassembleFlags, ?comments : String ) : String {
+		var size = 0;
+		var out = dxDisassembleShader(data, data.length, flags, comments == null ? null : @:privateAccess comments.toUtf8(), size);
+		if( out == null )
+			throw "Could not disassemble shader";
+		return @:privateAccess String.fromUTF8(out);
+	}
+
 	public static function createVertexShader( bytes : haxe.io.Bytes ) {
 		return dxCreateVertexShader(bytes, bytes.length);
 	}
@@ -160,6 +188,11 @@ class Driver {
 
 	@:hlNative("directx","compile_shader")
 	static function dxCompileShader( data : hl.Bytes, size : Int, source : hl.Bytes, entry : hl.Bytes, target : hl.Bytes, flags : ShaderFlags, error : hl.Ref<Bool>, outSize : hl.Ref<Int> ) : hl.Bytes {
+		return null;
+	}
+
+	@:hlNative("directx", "disassemble_shader")
+	static function dxDisassembleShader( data : hl.Bytes, size : Int, flags : DisassembleFlags, comments : hl.Bytes, outSize : hl.Ref<Int> ) : hl.Bytes {
 		return null;
 	}
 
