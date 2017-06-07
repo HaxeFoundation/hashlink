@@ -655,6 +655,43 @@ class Memory {
 		Sys.println(msg);
 	}
 
+	static inline var BMP_BITS = 5;
+
+	function makeBitmap() {
+	
+		// VMMap.exe tool can also be used to show address space fragmentation in realtime
+		// although it will not be able to show GC fragmentation
+	
+		var totalMem = 2 * 1024. * 1024. * 1024.; // GB of memory
+		var sizeReal = Math.ceil(Math.sqrt(totalMem / (1 << BMP_BITS)));
+		var size = 1, bits = 1;
+		while( size < sizeReal ) {
+			size <<= 1;
+			bits++;
+		}
+		var bytes = haxe.io.Bytes.alloc(size * size * 4);
+		var bmp : hl.BytesAccess<Int> = (bytes : hl.Bytes);
+		for( i in 0...size * size )
+			bmp[i] = 0xFF000000;
+		for( p in pages ) {
+			var index = p.addr.shift(BMP_BITS);
+			// reserved
+			for( i in 0...(p.size >> BMP_BITS) )
+				bmp[index+i] = 0xFF808080;
+			for( i in 0...((p.firstBlock * p.blockSize) >> BMP_BITS) )
+				bmp[index + i] = 0xFFFFFF00; // YELLOW = GC MEMORY
+		}
+		for( b in blocks ) {
+			var index = b.getPointer().shift(BMP_BITS);
+			var color = b.page.memHasPtr() ? 0xFFFF0000 : 0xFF00FF00; // GREEN = data / RED = objects
+			for( i in 0...b.getMemSize() >> BMP_BITS )
+				bmp[index + i] = color;
+		}
+		var f = sys.io.File.write("bitmap.png");
+		new format.png.Writer(f).write(format.png.Tools.build32BGRA(size, size, bytes));
+		f.close();
+	}
+
 	static function main() {
 		var m = new Memory();
 
@@ -695,6 +732,8 @@ class Memory {
 				m.subs(args.shift(), Std.parseInt(args.shift()));
 			case "part":
 				m.printPartition();
+			case "bitmap":
+				m.makeBitmap();
 			default:
 				Sys.println("Unknown command " + cmd);
 			}
