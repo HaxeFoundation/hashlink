@@ -62,8 +62,8 @@ HL_PRIM void HL_NAME(win_set_size)(dx_window *win, int width, int height) {
 HL_PRIM void HL_NAME(win_get_size)(dx_window *win, int *width, int *height) {
 	RECT r;
 	GetClientRect(win,&r);
-	*width = r.right;
-	*height = r.bottom;
+	if( width ) *width = r.right;
+	if( height ) *height = r.bottom;
 }
 
 HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {

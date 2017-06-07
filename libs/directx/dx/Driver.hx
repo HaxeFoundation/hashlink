@@ -12,6 +12,21 @@ abstract Layout(hl.Abstract<"dx_layout">) {
 	}
 }
 
+abstract RasterState(hl.Abstract<"dx_raster">) {
+	@:hlNative("directx", "release_raster") public function release() {
+	}
+}
+
+abstract RenderTargetView(hl.Abstract<"dx_render_target">) {
+	@:hlNative("directx", "release_render_target") public function release() {
+	}
+}
+
+abstract DepthStencilView(hl.Abstract<"dx_depth_stencil">) {
+	@:hlNative("directx", "release_depth_stencil") public function release() {
+	}
+}
+
 @:enum abstract DriverInitFlags(Int) {
 	var None = 0;
 	var SingleThread = 1;
@@ -97,6 +112,66 @@ class LayoutElement {
 	}
 }
 
+@:enum abstract RenderViewDimension(Int) {
+	var Unknown = 0;
+	var Buffer = 1;
+	var Texture1D = 2;
+	var Texture1DArray = 3;
+	var Texture2D = 4;
+	var Texture2DArray = 5;
+	var Texture2DMS = 6;
+	var Texture2DMSArray = 7;
+	var Texture3D = 8;
+}
+
+class RenderTargetDesc {
+	public var format : Format;
+	public var dimension : RenderViewDimension;
+	public var mipMap : Int;
+	public var firstSlice : Int;
+	public var sliceCount : Int;
+
+	// for buffer
+	public var firstElement(get, set) : Int;
+	public var elementCount(get, set) : Int;
+
+	public function new(format, dimension = Unknown) {
+		this.format = format;
+		this.dimension = dimension;
+	}
+
+	inline function get_firstElement() return mipMap;
+	inline function set_firstElement(m) return mipMap = m;
+	inline function get_elementCount() return firstSlice;
+	inline function set_elementCount(m) return firstSlice = m;
+}
+
+@:enum abstract FillMode(Int) {
+	public var WireFrame = 2;
+	public var Solid = 3;
+}
+
+@:enum abstract CullMode(Int) {
+	public var None = 1;
+	public var Front = 2;
+	public var Back = 3;
+}
+
+class RasterizerStateDesc {
+	public var fillMode : FillMode;
+	public var cullMode : CullMode;
+	public var frontCounterClockwise : Bool;
+	public var depthBias : Int;
+	public var depthBiasClamp : hl.F32;
+	public var slopeScaledDepthBias : hl.F32;
+	public var depthClipEnable : Bool;
+	public var scissorEnable : Bool;
+	public var multisampleEnable : Bool;
+	public var antialiasedLineEnable : Bool;
+	public function new() {
+	}
+}
+
 @:hlNative("directx")
 class Driver {
 
@@ -104,7 +179,28 @@ class Driver {
 		return dxCreate(@:privateAccess win.win, flags);
 	}
 
-	public static function clearColor( r : Float, g : Float, b : Float, a : Float ) {
+	public static function getBackBuffer() : Resource {
+		return null;
+	}
+
+	public static function createRenderTargetView( r : Resource, ?desc : RenderTargetDesc ) : RenderTargetView {
+		return dxCreateRenderTargetView(r,desc);
+	}
+
+	public static function omSetRenderTargets( count : Int, arr : hl.NativeArray<RenderTargetView>, ?depth : DepthStencilView ) {
+	}
+
+	public static function createRasterizerState( desc : RasterizerStateDesc ) : RasterState {
+		return dxCreateRasterizerState(desc);
+	}
+
+	public static function rsSetState( r : RasterState ) {
+	}
+
+	public static function rsSetViewports( count : Int, bytes : hl.BytesAccess<hl.F32> ) {
+	}
+
+	public static function clearColor( rt : RenderTargetView, r : Float, g : Float, b : Float, a : Float ) {
 	}
 
 	public static function present() {
@@ -156,22 +252,22 @@ class Driver {
 	public static function vsSetShader( shader : Shader ) : Void {
 	}
 
-	public static function vsSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Buffer> ) : Void {
+	public static function vsSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource> ) : Void {
 	}
 
 	public static function psSetShader( shader : Shader ) : Void {
 	}
 
-	public static function psSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Buffer> ) : Void {
+	public static function psSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource> ) : Void {
 	}
 
 	public static function iaSetPrimitiveTopology( topology : PrimitiveTopology ) : Void {
 	}
 
-	public static function iaSetIndexBuffer( buffer : Buffer, is32Bits : Bool, offset : Int ) : Void {
+	public static function iaSetIndexBuffer( buffer : Resource, is32Bits : Bool, offset : Int ) : Void {
 	}
 
-	public static function iaSetVertexBuffers( start : Int, count : Int, buffers : hl.NativeArray<Buffer>, strides : hl.BytesAccess<Int>, offsets : hl.BytesAccess<Int> ) : Void {
+	public static function iaSetVertexBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource>, strides : hl.BytesAccess<Int>, offsets : hl.BytesAccess<Int> ) : Void {
 	}
 
 	public static function iaSetInputLayout( layout : Layout ) : Void {
@@ -181,8 +277,19 @@ class Driver {
 		return null;
 	}
 
+	@:hlNative("directx", "create_rasterizer_state")
+	static function dxCreateRasterizerState( desc : Dynamic ) : RasterState {
+		return null;
+	}
+
+	@:hlNative("directx", "create_render_target_view")
+	static function dxCreateRenderTargetView( r : Resource, desc : Dynamic ) : RenderTargetView {
+		return null;
+	}
+
 	@:hlNative("directx","create")
-	static function dxCreate( win : hl.Abstract<"dx_window">, flags : DriverInitFlags ) : DriverInstance { return null; }
+	static function dxCreate( win : hl.Abstract < "dx_window" > , flags : DriverInitFlags ) : DriverInstance { return null; }
+
 	@:hlNative("directx","get_device_name")
 	static function dxGetDeviceName() : hl.Bytes { return null; }
 
