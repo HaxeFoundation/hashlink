@@ -14,6 +14,9 @@ abstract Pointer(Int) {
 	public inline function toString() {
 		return "0x"+StringTools.hex(this, 8);
 	}
+	public inline function shift( k : Int ) : Int {
+		return this >>> k;
+	}
 }
 
 @:enum abstract PageKind(Int) {
@@ -38,6 +41,10 @@ class Page {
 
 	public function new(m) {
 		memory = m;
+	}
+
+	public inline function memHasPtr() {
+		return kind == PDynamic || kind == PRaw;
 	}
 
 	public function isLiveBlock( bid : Int ) {
