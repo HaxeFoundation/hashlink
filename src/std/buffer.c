@@ -314,7 +314,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			l.next = stack;
 			f = hl_lookup_find(o->lookup,o->nfields,hl_hash_gen(USTR("__string"),false));
 			if( f && f->t->kind == HFUN && f->t->fun->nargs == 0 && f->t->fun->ret->kind == HBYTES ) {
-				vclosure *v = *(vclosure**)(o->fields_data + f->field_index);
+				vclosure *v = (vclosure*)o->values[f->field_index];
 				if( v ) {
 					hl_buffer_str(b, v->hasValue ? ((uchar*(*)(void*))v->fun)(v->value) : ((uchar*(*)())v->fun)());
 					break;
@@ -326,7 +326,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 				if( i ) hl_buffer_str_sub(b,USTR(", "),2);
 				hl_buffer_str(b,hl_field_name(f->hashed_name));
 				hl_buffer_str_sub(b,USTR(" : "),3);
-				hl_buffer_addr(b, o->fields_data + f->field_index, f->t, &l);
+				hl_buffer_addr(b, hl_is_ptr(f->t) ? (void*)(o->values + f->field_index) : (void*)(o->raw_data + f->field_index), f->t, &l);
 			}
 			hl_buffer_char(b, '}');
 		}

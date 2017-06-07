@@ -78,15 +78,6 @@ HL_PRIM int hl_stack_size( hl_type *t ) {
 	}
 }
 
-HL_PRIM int hl_pad_size( int pos, hl_type *t ) {
-	int sz = hl_type_size(t);
-	int align;
-	align = pos & (sz - 1);
-	if( align && t->kind != HVOID )
-		return sz - align;
-	return 0;
-}
-
 HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 	if( a == b )
 		return true;

@@ -1058,13 +1058,8 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 }
 
 vdynobj *hl_alloc_dynobj() {
-	vdynobj *o = (vdynobj*)hl_gc_alloc(&hlt_dynobj,sizeof(vdynobj));
+	vdynobj *o = (vdynobj*)hl_gc_alloc_gen(&hlt_dynobj,sizeof(vdynobj),MEM_KIND_DYNAMIC | MEM_ZERO);
 	o->t = &hlt_dynobj;
-	o->lookup = NULL;
-	o->nfields = 0;
-	o->dataSize = 0;
-	o->fields_data = NULL;
-	o->virtuals = NULL;
 	return o;
 }
 

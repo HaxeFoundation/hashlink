@@ -327,7 +327,7 @@ struct hl_type {
 C_FUNCTION_BEGIN
 
 HL_API int hl_type_size( hl_type *t );
-HL_API int hl_pad_size( int size, hl_type *t );
+#define hl_pad_size(size,t)	((t)->kind == HVOID ? 0 : ((-(size)) & (hl_type_size(t) - 1)))
 HL_API int hl_stack_size( hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
@@ -426,9 +426,11 @@ struct hl_runtime_obj {
 typedef struct {
 	hl_type *t;
 	hl_field_lookup *lookup;
-	char *fields_data;
+	char *raw_data;
+	void **values;
 	int nfields;
-	int dataSize;
+	int raw_size;
+	int nvalues;
 	vvirtual *virtuals;
 } vdynobj;
 

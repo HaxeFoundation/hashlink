@@ -400,30 +400,44 @@ void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 	}
 }
 
+#define hl_dynobj_field(o,f) (hl_is_ptr((f)->t) ? (void*)((o)->values + (f)->field_index) : (void*) ((o)->raw_data + (f)->field_index))
+
 vdynamic *hl_virtual_make_value( vvirtual *v ) {
 	vdynobj *o;
 	int i, nfields;
-	int dsize, hsize;
+	int raw_size = 0, nvalues = 0;
 	if( v->value )
 		return v->value;
 	nfields = v->t->virt->nfields;
-	hsize = sizeof(vvirtual) + nfields * sizeof(void*);
-	dsize = v->t->virt->dataSize;
 	o = hl_alloc_dynobj();
-	// make a copy of the data because we might change it's storage (and erase it)
-	o->fields_data = hl_gc_alloc_raw(dsize);
-	memcpy(o->fields_data, (char*)v + hsize, dsize);
-	memset((char*)v + hsize, 0, dsize);
-	o->dataSize = dsize;
-	o->nfields = nfields;
+	// copy the lookup table
 	o->lookup = (hl_field_lookup*)hl_gc_alloc_noptr(sizeof(hl_field_lookup) * nfields);
+	o->nfields = nfields;
 	memcpy(o->lookup,v->t->virt->lookup,nfields * sizeof(hl_field_lookup));
 	for(i=0;i<nfields;i++) {
 		hl_field_lookup *f = o->lookup + i;
-		int offset = v->t->virt->indexes[f->field_index] - hsize;
-		hl_vfields(v)[f->field_index] = o->fields_data + offset;
-		f->field_index = offset;
+		if( hl_is_ptr(f->t) )
+			f->field_index = nvalues++;
+		else {
+			raw_size += hl_pad_size(raw_size, f->t);
+			f->field_index = raw_size;
+			raw_size += hl_type_size(f->t);
+		}
 	}
+	// copy the data & rebind virtual addresses
+	o->raw_data = hl_gc_alloc_noptr(raw_size);
+	o->raw_size = raw_size;
+	o->values = hl_gc_alloc_raw(nvalues*sizeof(void*));
+	o->nvalues = nvalues;
+	for(i=0;i<nfields;i++) {
+		hl_field_lookup *f = o->lookup + i;
+		hl_field_lookup *vf = v->t->virt->lookup + i;
+		void **vaddr = hl_vfields(v) + vf->field_index;
+		memcpy(hl_dynobj_field(o,f),*vaddr, hl_type_size(f->t));
+		*vaddr = hl_dynobj_field(o,f);
+	}
+	// erase virtual data
+	memset(hl_vfields(v) + nfields, 0, v->t->virt->dataSize);
 	o->virtuals = v;
 	v->value = (vdynamic*)o;
 	return v->value;
@@ -478,7 +492,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 			v->value = obj;
 			for(i=0;i<vt->virt->nfields;i++) {
 				hl_field_lookup *f = hl_lookup_find(o->lookup,o->nfields,vt->virt->fields[i].hashed_name);
-				hl_vfields(v)[i] = f == NULL || !hl_same_type(f->t,vt->virt->fields[i].t) ? NULL : o->fields_data + f->field_index;
+				hl_vfields(v)[i] = f == NULL || !hl_same_type(f->t,vt->virt->fields[i].t) ? NULL : hl_dynobj_field(o,f);
 			}
 			// add it to the list
 			v->next = o->virtuals;
@@ -494,95 +508,119 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	return v;
 }
 
-static hl_field_lookup *hl_dyn_alloc_field( vdynobj *o, int hfield, hl_type *t ) {
-	int pad = hl_pad_size(o->dataSize, t);
-	int size = hl_type_size(t);
+static void hl_dynobj_remap_virtuals( vdynobj *o, hl_field_lookup *f, int_val address_offset ) {
+	vvirtual *v = o->virtuals;
+	bool is_ptr = hl_is_ptr(f->t);
+	while( v ) {
+		hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,f->hashed_name);
+		int i;
+		if( address_offset )
+			for(i=0;i<v->t->virt->nfields;i++)
+				if( hl_vfields(v)[i] && hl_is_ptr(v->t->virt->fields[i].t) == is_ptr )
+					((char**)hl_vfields(v))[i] += address_offset;
+		if( vf && hl_same_type(vf->t,f->t) )
+			hl_vfields(v)[vf->field_index] = hl_dynobj_field(o, f);
+		v = v->next;
+	}
+}
+
+static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
+	int i;
+	int index = f->field_index;
+	// erase data
+	if( hl_is_ptr(f->t) ) {
+		memmove(o->values + index, o->values + index + 1, (o->nvalues - (index + 1)) * sizeof(void*));
+		o->nvalues--;
+		o->values[o->nvalues] = NULL;
+		for(i=0;i<o->nfields;i++) {
+			hl_field_lookup *f = o->lookup + i;
+			if( hl_is_ptr(f->t) && f->field_index > index )
+				f->field_index--;
+		}
+	} else {
+		// no erase needed, compaction will be performed on next add
+	}
+
+	int field = (int)(f - o->lookup);
+	memmove(o->lookup + field, o->lookup + field + 1, (o->nfields - (field + 1)) * sizeof(hl_field_lookup));
+	o->nfields--;
+
+	// remove from virtuals
+	vvirtual *v = o->virtuals;
+	while( v ) {
+		hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,f->hashed_name);
+		if( vf ) hl_vfields(v)[vf->field_index] = NULL;
+		v = v->next;
+	}
+}
+
+static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t ) {
 	int index;
-	char *oldData = o->fields_data;
-	char *newData = (char*)hl_gc_alloc_raw(o->dataSize + pad + size);
+	int_val address_offset;
+	bool full_remap = false;
+
+	// expand data
+	if( hl_is_ptr(t) ) {
+		void **nvalues = hl_gc_alloc_raw( (o->nvalues + 1) * sizeof(void*) );
+		memcpy(nvalues,o->values,o->nvalues * sizeof(void*));
+		index = o->nvalues;
+		nvalues[index] = NULL;
+		address_offset = (char*)nvalues - (char*)o->values;
+		o->values = nvalues;
+		o->nvalues++;
+	} else {
+		int raw_size = 0;
+		int i;
+		for(i=0;i<o->nfields;i++) {
+			hl_field_lookup *f = o->lookup + i;
+			if( hl_is_ptr(f->t) ) continue;
+			raw_size += hl_pad_size(raw_size, f->t);
+			raw_size += hl_type_size(f->t);
+		}
+		if( raw_size > o->raw_size ) // our current mapping is better
+			raw_size = o->raw_size;
+		int pad = hl_pad_size(raw_size, t);
+		int size = hl_type_size(t);
+		char *newData = (char*)hl_gc_alloc_noptr(raw_size + pad + size);
+		if( raw_size == o->raw_size )
+			memcpy(newData,o->raw_data,o->raw_size);
+		else {
+			full_remap = true;
+			raw_size = 0;
+			for(i=0;i<o->nfields;i++) {
+				hl_field_lookup *f = o->lookup + i;
+				int index = f->field_index;
+				if( hl_is_ptr(f->t) ) continue;
+				raw_size += hl_pad_size(raw_size, f->t);
+				memcpy(newData + raw_size, o->raw_data + index, hl_type_size(f->t));
+				f->field_index = raw_size;
+				if( index != raw_size )
+					hl_dynobj_remap_virtuals(o, f, 0);
+				raw_size += hl_type_size(f->t);
+			}
+			o->raw_size = raw_size;
+		}
+		address_offset = newData - o->raw_data;
+		o->raw_data = newData;
+		o->raw_size += pad;
+		index = o->raw_size;
+		o->raw_size += size;
+	}
+
+	// update field table
 	hl_field_lookup *new_lookup = (hl_field_lookup*)hl_gc_alloc_noptr(sizeof(hl_field_lookup) * (o->nfields + 1));
 	int field_pos = hl_lookup_find_index(o->lookup, o->nfields, hfield);
-	hl_field_lookup *f;
-	// update data
-	memcpy(newData,o->fields_data,o->dataSize);
-	o->fields_data = newData;
-	o->dataSize += pad;
-	index = o->dataSize;
-	o->dataSize += size;
-	// update field table
 	memcpy(new_lookup,o->lookup,field_pos * sizeof(hl_field_lookup));
-	f = new_lookup + field_pos;
+	hl_field_lookup *f = new_lookup + field_pos;
 	f->t = t;
 	f->hashed_name = hfield;
 	f->field_index = index;
 	memcpy(new_lookup + (field_pos + 1),o->lookup + field_pos, (o->nfields - field_pos) * sizeof(hl_field_lookup));
 	o->nfields++;
 	o->lookup = new_lookup;
-	// rebuild virtuals
-	{
-		vvirtual *v = o->virtuals;
-		while( v ) {
-			hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,hfield);
-			int i;
-			for(i=0;i<v->t->virt->nfields;i++)
-				if( hl_vfields(v)[i] )
-					((char**)hl_vfields(v))[i] += (char*)newData - (char*)oldData;
-			if( vf && hl_same_type(vf->t,t) )
-				hl_vfields(v)[vf->field_index] = newData + f->field_index;
-			v = v->next;
-		}
-	}
-	return f;
-}
 
-static void hl_dyn_change_field( vdynobj *o, hl_field_lookup *f, hl_type *t ) {
-	int size = hl_type_size(t);
-	int old_size = hl_type_size(f->t);
-	char *oldData = o->fields_data;
-	char *newData = oldData;
-	if( size <= old_size ) {
-		// don't remap, let's keep hole
-	} else {
-		// we want to only remap this field because we don't want to have to rebuild all virtuals
-		// let's see if we have enough place already in case we have a hole after.
-		int i;
-		if( f->field_index + size > o->dataSize )
-			i = -1;
-		else {
-			for(i=0;i<o->nfields;i++) {
-				hl_field_lookup *f2 = o->lookup + i;
-				if( f2->field_index > f->field_index && f2->field_index < f->field_index + size ) break;
-			}
-		}
-		// not enough space, expand and move at end of data
-		if( i < o->nfields ) {
-			int pad = hl_pad_size(o->dataSize, t);
-			newData = (char*)hl_gc_alloc_raw(o->dataSize + pad + size);
-			memcpy(newData,o->fields_data,o->dataSize);
-			o->fields_data = newData;
-			o->dataSize += pad;
-			f->field_index = o->dataSize;
-			o->dataSize += size;
-		}
-	}
-	// update type
-	if( t->kind == HDYNOBJ ) t = &hlt_dynobj; // can't store gc ptr in fields
-	f->t = t;
-	// rebuild virtuals
-	{
-		vvirtual *v = o->virtuals;
-		while( v ) {
-			hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,f->hashed_name);
-			int i;
-			if( newData != oldData )
-				for(i=0;i<v->t->virt->nfields;i++)
-					if( hl_vfields(v)[i] )
-						((char**)hl_vfields(v))[i] += (char*)newData - (char*)oldData;
-			if( vf )
-				hl_vfields(v)[vf->field_index] = hl_same_type(vf->t,t) ? newData + f->field_index : NULL;
-			v = v->next;
-		}
-	}
+	hl_dynobj_remap_virtuals(o, f, address_offset);
+	return f;
 }
 
 // -------------------- DYNAMIC GET ------------------------------------
@@ -595,7 +633,7 @@ static void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t ) {
 			hl_field_lookup *f = hl_lookup_find(o->lookup,o->nfields,hfield);
 			if( f == NULL ) return NULL;
 			*t = f->t;
-			return o->fields_data + f->field_index;
+			return hl_dynobj_field(o,f);
 		}
 		break;
 	case HOBJ:
@@ -707,11 +745,17 @@ static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **f
 			vdynobj *o = (vdynobj*)d;
 			hl_field_lookup *f = hl_lookup_find(o->lookup,o->nfields,hfield);
 			if( f == NULL )
-				f = hl_dyn_alloc_field(o,hfield,t);
-			else if( !hl_same_type(t,f->t) )
-				hl_dyn_change_field(o,f,t);
+				f = hl_dynobj_add_field(o,hfield,t);
+			else if( !hl_same_type(t,f->t) ) {
+				if( hl_is_ptr(t) != hl_is_ptr(f->t) || hl_type_size(t) != hl_type_size(f->t) ) {
+					hl_dynobj_delete_field(o, f);
+					f = hl_dynobj_add_field(o,hfield,t);
+				} else {
+					f->t = t;
+				}
+			}
 			*ft = f->t;
-			return o->fields_data + f->field_index;
+			return hl_dynobj_field(o,f);
 		}
 		break;
 	case HOBJ:
@@ -895,18 +939,7 @@ HL_PRIM bool hl_obj_delete_field( vdynamic *obj, int hfield ) {
 			vdynobj *d = (vdynobj*)obj;
 			hl_field_lookup *f = hl_lookup_find(d->lookup,d->nfields,hfield);
 			if( f == NULL ) return false;
-			memmove(f, f + 1, ((char*)(d->lookup + d->nfields)) - (char*)(f + 1));
-			d->nfields--;
-			// rebuild virtuals
-			{
-				vvirtual *v = d->virtuals;
-				while( v ) {
-					hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,hfield);
-					if( vf )
-						hl_vfields(v)[vf->field_index] = NULL;
-					v = v->next;
-				}
-			}
+			hl_dynobj_delete_field(d, f);
 			return true;
 		}
 		break;
@@ -977,13 +1010,16 @@ HL_PRIM vdynamic *hl_obj_copy( vdynamic *obj ) {
 			vdynobj *o = (vdynobj*)obj;
 			vdynobj *c = hl_alloc_dynobj();
 			int lsize = sizeof(hl_field_lookup) * o->nfields;
-			c->dataSize = o->dataSize;
+			c->raw_size = o->raw_size;
 			c->nfields = o->nfields;
+			c->nvalues = o->nvalues;
 			c->virtuals = NULL;
 			c->lookup = (hl_field_lookup*)hl_gc_alloc_noptr(lsize);
 			memcpy(c->lookup,o->lookup,lsize);
-			c->fields_data = (char*)hl_gc_alloc_noptr(o->dataSize);
-			memcpy(c->fields_data,o->fields_data,o->dataSize);
+			c->raw_data = (char*)hl_gc_alloc_noptr(o->raw_size);
+			c->values = (void**)hl_gc_alloc_raw(o->nvalues * sizeof(void*));
+			memcpy(c->raw_data,o->raw_data,o->raw_size);
+			memcpy(c->values,o->values,o->nvalues * sizeof(void*));
 			return (vdynamic*)c;
 		}
 		break;
