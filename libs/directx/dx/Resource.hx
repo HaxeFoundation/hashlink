@@ -72,14 +72,14 @@ class ResourceBox {
 	}
 }
 
-abstract Buffer(hl.Abstract<"dx_buffer">) {
+abstract Resource(hl.Abstract<"dx_resource">) {
 
 	@:hlNative("directx","create_buffer")
-	public static function alloc( size : Int, usage : BufferUsage, bind : BufferBind, access : BufferAccess, misc : BufferMisc, stride : Int, data : hl.Bytes ) : Buffer {
+	public static function createBuffer( size : Int, usage : BufferUsage, bind : BufferBind, access : BufferAccess, misc : BufferMisc, stride : Int, data : hl.Bytes ) : Resource {
 		return null;
 	}
 
-	@:hlNative("directx", "buffer_map")
+	@:hlNative("directx", "map")
 	public function map( subResource : Int, type : MapType, waitGpu : Bool ) : hl.Bytes {
 		return null;
 	}
@@ -88,11 +88,11 @@ abstract Buffer(hl.Abstract<"dx_buffer">) {
 	public function updateSubresource( subResource : Int, box : Null<ResourceBox>, data : hl.Bytes, srcRowPitch : Int, srcDepthPitch : Int ) : Void {
 	}
 
-	@:hlNative("directx", "buffer_unmap")
+	@:hlNative("directx", "unmap")
 	public function unmap( subResource : Int ) : Void {
 	}
 
-	@:hlNative("directx", "release_buffer")
+	@:hlNative("directx", "release_resource")
 	public function release() {
 	}
 
