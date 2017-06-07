@@ -84,7 +84,7 @@ static inline unsigned int TRAILING_ZEROES( unsigned int x ) {
 #	define GC_DEBUG
 #endif
 
-#define out_of_memory()		hl_fatal("Out of Memory")
+#define out_of_memory(reason)		hl_fatal("Out of Memory (" reason ")")
 
 typedef struct _gc_pheader gc_pheader;
 
@@ -286,8 +286,11 @@ retry:
 		int pages = gc_stats.pages_allocated;
 		hl_gc_major();
 		if( pages != gc_stats.pages_allocated ) goto retry;
+		// big block : report stack trace - we should manage to handle it
+		if( size >= (8 << 20) )
+			hl_error_msg(USTR("Failed to alloc %d bytes"),size);
 		if( gc_flags & GC_DUMP_MEM ) hl_gc_dump_memory("hlmemory.dump");
-		out_of_memory();
+		out_of_memory("pages");
 	}
 
 #	ifdef HL_64
@@ -572,7 +575,7 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	}
 	ptr = alloc_all;
 	alloc_all += size;
-	if( alloc_all > alloc_end ) out_of_memory();
+	if( alloc_all > alloc_end ) out_of_memory("bump");
 #else
 	gc_check_mark();
 	if( gc_flags & GC_PROFILE ) time = TIMESTAMP();
@@ -614,35 +617,7 @@ HL_PRIM void **hl_gc_mark_grow( void **stack ) {
 	void **base_stack = mark_stack_end - mark_stack_size;
 	int avail = (int)(stack - base_stack);
 	if( nstack == NULL ) {
-		// try to recover / eliminate fully scanned elements
-/*		void **st = base_stack + 2;
-		void **out = st;
-		while( st < stack ) {
-			void **block = (void**)*st++;
-			unsigned char *page_bid = *st++;
-			gc_pheader *page = (gc_pheader*)((int_val)page_bid & ~(GC_PAGE_SIZE - 1));
-			int bid = ((int)(int_val)page_bid) & (GC_PAGE_SIZE - 1);
-			int size = page->sizes ? page->sizes[bid] * page->block_size : page->block_size;
-			int nwords = size / HL_WSIZE;
-			while( nwords-- ) {
-				void *p = *block++;
-				page = GC_GET_PAGE(p);
-				if( !page || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
-	#			ifdef HL_64
-				if( !INPAGE(p,page) ) continue;
-	#			endif
-				bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
-				if( page->sizes && page->sizes[bid] == 0 ) continue;
-				if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
-					// has ptr, let's keep it
-					*out++ = block;
-					*out++ = page_bid;
-					break;
-				}
-			}
-		}
-		if( out == mark_stack_end )*/
-			out_of_memory();
+		out_of_memory("markstack");
 		return NULL;
 	}
 	memcpy(nstack, base_stack, avail * sizeof(void*));
@@ -794,7 +769,7 @@ static void gc_mark() {
 		while( mark_size < mark_bytes )
 			mark_size <<= 1;
 		mark_data = gc_alloc_page_memory(mark_size);
-		if( mark_data == NULL ) out_of_memory();
+		if( mark_data == NULL ) out_of_memory("markbits");
 	}
 	mark_cur = mark_data;
 	MZERO(mark_data,mark_bytes);
@@ -947,7 +922,7 @@ void *hl_malloc( hl_alloc *a, int size ) {
 	if( b == NULL || b->size <= size ) {
 		int alloc = size < 4096-sizeof(hl_alloc_block) ? 4096-sizeof(hl_alloc_block) : size;
 		b = (hl_alloc_block *)malloc(sizeof(hl_alloc_block) + alloc);
-		if( b == NULL ) out_of_memory();
+		if( b == NULL ) out_of_memory("malloc");
 		b->p = ((unsigned char*)b) + sizeof(hl_alloc_block);
 		b->size = alloc;
 		b->next = a->cur;
