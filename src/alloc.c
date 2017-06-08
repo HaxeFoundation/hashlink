@@ -288,7 +288,7 @@ retry:
 		if( pages != gc_stats.pages_allocated ) goto retry;
 		// big block : report stack trace - we should manage to handle it
 		if( size >= (8 << 20) )
-			hl_error_msg(USTR("Failed to alloc %d bytes"),size);
+			hl_error_msg(USTR("Failed to alloc %d KB"),size>>10);
 		if( gc_flags & GC_DUMP_MEM ) hl_gc_dump_memory("hlmemory.dump");
 		out_of_memory("pages");
 	}
