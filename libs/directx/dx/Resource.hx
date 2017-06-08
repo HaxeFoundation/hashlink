@@ -1,55 +1,5 @@
 package dx;
 
-@:enum abstract BufferUsage(Int) {
-	var Default = 0;
-	var Immutable = 1;
-	var Dynamic = 2;
-	var Staging = 3;
-}
-
-@:enum abstract BufferBind(Int) {
-	var VertexBuffer = 1;
-	var IndexBuffer = 2;
-	var ConstantBuffer = 4;
-	var ShaderResource = 8;
-	var StreamOuput = 16;
-	var RenderTarget = 32;
-	var DepthStencil = 64;
-	var UnorderedAccess = 128;
-	var Decoder = 512;
-	var VideoDecoder = 1024;
-	@:op(a | b) static function or(a:BufferBind, b:BufferBind) : BufferBind;
-}
-
-@:enum abstract BufferAccess(Int) {
-	var None = 0;
-	var CpuWrite = 0x10000;
-	var CpuRead = 0x20000;
-	@:op(a | b) static function or(a:BufferAccess, b:BufferAccess) : BufferAccess;
-}
-
-@:enum abstract BufferMisc(Int) {
-	var None = 0;
-	var GenerateMips = 1;
-	var Shared = 2;
-	var TextureCube = 4;
-	var DrawIndirectArgs = 0x10;
-	var BufferAllowRawView = 0x20;
-	var BufferStructured = 0x40;
-	var ResourceClamp = 0x80;
-	var SharedKeyedMutex = 0x100;
-	var GdiCompatible = 0x200;
-	var SharedNTHandle = 0x800;
-	var RestrictedContent = 0x1000;
-	var RestrictSharedResource = 0x2000;
-	var RestrictSharedResourceDriver = 0x4000;
-	var Guarded = 0x8000;
-	var TilePool = 0x20000;
-	var Tiled = 0x40000;
-	var HWProtected = 0x80000;
-	@:op(a | b) static function or(a:BufferMisc, b:BufferMisc) : BufferMisc;
-}
-
 @:enum abstract MapType(Int) {
 	var Read = 1;
 	var Write = 2;
@@ -74,19 +24,19 @@ class ResourceBox {
 
 abstract Resource(hl.Abstract<"dx_resource">) {
 
-	@:hlNative("directx","create_buffer")
-	public static function createBuffer( size : Int, usage : BufferUsage, bind : BufferBind, access : BufferAccess, misc : BufferMisc, stride : Int, data : hl.Bytes ) : Resource {
-		return null;
-	}
-
 	@:hlNative("directx", "map")
 	public function map( subResource : Int, type : MapType, waitGpu : Bool ) : hl.Bytes {
 		return null;
 	}
 
-	@:hlNative("directx", "update_subresource")
-	public function updateSubresource( subResource : Int, box : Null<ResourceBox>, data : hl.Bytes, srcRowPitch : Int, srcDepthPitch : Int ) : Void {
+	public inline function updateSubresource( subResource : Int, box : Null<ResourceBox>, data : hl.Bytes, srcRowPitch : Int, srcDepthPitch : Int ) : Void {
+		dxUpdateSubresource(subResource, box, data, srcRowPitch, srcDepthPitch);
 	}
+
+	@:hlNative("directx", "update_subresource")
+	function dxUpdateSubresource( subResource : Int, box : Dynamic, data : hl.Bytes, srcRowPitch : Int, srcDepthPitch : Int ) : Void {
+	}
+
 
 	@:hlNative("directx", "unmap")
 	public function unmap( subResource : Int ) : Void {
