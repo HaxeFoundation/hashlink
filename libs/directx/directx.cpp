@@ -18,18 +18,14 @@ typedef struct {
 	int init_flags;
 } dx_driver;
 
-typedef struct {
+template <typename T> class dx_struct {
 	hl_type *t;
-	D3D11_BOX box;
-} dx_box_obj;
+public:
+	T value;
+};
 
-typedef ID3D11VertexShader dx_vshader;
-typedef ID3D11PixelShader dx_pshader;
-typedef ID3D11InputLayout dx_layout;
 typedef ID3D11Resource dx_resource;
-typedef ID3D11RenderTargetView dx_render_target;
-typedef ID3D11DepthStencilView dx_depth_stencil;
-typedef ID3D11RasterizerState dx_raster;
+typedef ID3D11DeviceChild dx_pointer;
 
 static dx_driver *driver = NULL;
 static IDXGIFactory *factory = NULL;
@@ -88,49 +84,39 @@ HL_PRIM dx_resource *HL_NAME(get_back_buffer)() {
 	return backBuffer;
 }
 
-typedef struct {
-	hl_type *t;
-	D3D11_RENDER_TARGET_VIEW_DESC desc;
-} crr_desc;
-
-HL_PRIM dx_render_target *HL_NAME(create_render_target_view)( dx_resource *r, crr_desc *desc ) {
+HL_PRIM dx_pointer *HL_NAME(create_render_target_view)( dx_resource *r, dx_struct<D3D11_RENDER_TARGET_VIEW_DESC> *desc ) {
 	ID3D11RenderTargetView *rt;
-	if( driver->device->CreateRenderTargetView(r, desc ? &desc->desc : NULL, &rt) != S_OK )
+	if( driver->device->CreateRenderTargetView(r, desc ? &desc->value : NULL, &rt) != S_OK )
 		return NULL;
 	return rt;
 }
 
-HL_PRIM void HL_NAME(om_set_render_targets)( int count, varray *arr, dx_depth_stencil *depth ) {
-	driver->context->OMSetRenderTargets(count,hl_aptr(arr,dx_render_target*),depth);
+HL_PRIM void HL_NAME(om_set_render_targets)( int count, varray *arr, dx_pointer *depth ) {
+	driver->context->OMSetRenderTargets(count,hl_aptr(arr,ID3D11RenderTargetView*),(ID3D11DepthStencilView*)depth);
 }
 
-typedef struct {
-	hl_type *t;
-	D3D11_RASTERIZER_DESC desc;
-} raster_desc;
-
-HL_PRIM dx_raster *HL_NAME(create_rasterizer_state)( raster_desc *desc ) {
+HL_PRIM dx_pointer *HL_NAME(create_rasterizer_state)( dx_struct<D3D11_RASTERIZER_DESC> *desc ) {
 	ID3D11RasterizerState *rs;
-	if( driver->device->CreateRasterizerState(&desc->desc,&rs) != S_OK )
+	if( driver->device->CreateRasterizerState(&desc->value,&rs) != S_OK )
 		return NULL;
 	return rs;
 }
 
-HL_PRIM void HL_NAME(rs_set_state)( dx_raster *rs ) {
-	driver->context->RSSetState(rs);
+HL_PRIM void HL_NAME(rs_set_state)( dx_pointer *rs ) {
+	driver->context->RSSetState((ID3D11RasterizerState*)rs);
 }
 
 HL_PRIM void HL_NAME(rs_set_viewports)( int count, vbyte *data ) {
 	driver->context->RSSetViewports(count,(D3D11_VIEWPORT*)data);
 }
 
-HL_PRIM void HL_NAME(clear_color)( dx_render_target *rt, double r, double g, double b, double a ) {
+HL_PRIM void HL_NAME(clear_color)( dx_pointer *rt, double r, double g, double b, double a ) {
 	float color[4];
 	color[0] = (float)r;
 	color[1] = (float)g;
 	color[2] = (float)b;
 	color[3] = (float)a;
-	driver->context->ClearRenderTargetView(rt,color);
+	driver->context->ClearRenderTargetView((ID3D11RenderTargetView*)rt,color);
 }
 
 HL_PRIM void HL_NAME(present)() {
@@ -177,8 +163,19 @@ HL_PRIM dx_resource *HL_NAME(create_buffer)( int size, int usage, int bind, int 
 	return buffer;
 }
 
-HL_PRIM void HL_NAME(update_subresource)( dx_resource *r, int index, dx_box_obj *box, vbyte *data, int srcRowPitch, int srcDstPitch ) {
-	driver->context->UpdateSubresource(r, index, box ? &box->box : NULL, data, srcRowPitch, srcDstPitch);
+HL_PRIM dx_resource *HL_NAME(create_texture_2d)( dx_struct<D3D11_TEXTURE2D_DESC> *desc, vbyte *data ) {
+	ID3D11Texture2D *tex;
+	D3D11_SUBRESOURCE_DATA res;
+	res.pSysMem = data;
+	res.SysMemPitch = 0;
+	res.SysMemSlicePitch = 0;
+	if( driver->device->CreateTexture2D(&desc->value,data?&res:NULL,&tex) != S_OK )
+		return NULL;
+	return tex;
+}
+
+HL_PRIM void HL_NAME(update_subresource)( dx_resource *r, int index, dx_struct<D3D11_BOX> *box, vbyte *data, int srcRowPitch, int srcDstPitch ) {
+	driver->context->UpdateSubresource(r, index, box ? &box->value : NULL, data, srcRowPitch, srcDstPitch);
 }
 
 HL_PRIM void *HL_NAME(map)( dx_resource *r, int subRes, int type, bool waitGpu ) {
@@ -217,15 +214,15 @@ HL_PRIM vbyte *HL_NAME(disassemble_shader)( vbyte *data, int dataSize, int flags
 	return ret;
 }
 
-HL_PRIM dx_vshader *HL_NAME(create_vertex_shader)( vbyte *code, int size ) {
-	dx_vshader *shader;
+HL_PRIM dx_pointer *HL_NAME(create_vertex_shader)( vbyte *code, int size ) {
+	ID3D11VertexShader *shader;
 	if( driver->device->CreateVertexShader(code, size, NULL, &shader) != S_OK )
 		return NULL;
 	return shader;
 }
 
-HL_PRIM dx_pshader *HL_NAME(create_pixel_shader)( vbyte *code, int size ) {
-	dx_pshader *shader;
+HL_PRIM dx_pointer *HL_NAME(create_pixel_shader)( vbyte *code, int size ) {
+	ID3D11PixelShader *shader;
 	if( driver->device->CreatePixelShader(code, size, NULL, &shader) != S_OK )
 		return NULL;
 	return shader;
@@ -235,16 +232,16 @@ HL_PRIM void HL_NAME(draw_indexed)( int count, int start, int baseVertex ) {
 	driver->context->DrawIndexed(count,start,baseVertex);
 }
 
-HL_PRIM void HL_NAME(vs_set_shader)( dx_vshader *s ) {
-	driver->context->VSSetShader(s,NULL,0);
+HL_PRIM void HL_NAME(vs_set_shader)( dx_pointer *s ) {
+	driver->context->VSSetShader((ID3D11VertexShader*)s,NULL,0);
 }
 
 HL_PRIM void HL_NAME(vs_set_constant_buffers)( int start, int count, varray *a ) {
 	driver->context->VSSetConstantBuffers(start,count,hl_aptr(a,ID3D11Buffer*));
 }
 
-HL_PRIM void HL_NAME(ps_set_shader)( dx_pshader *s ) {
-	driver->context->PSSetShader(s,NULL,0);
+HL_PRIM void HL_NAME(ps_set_shader)( dx_pointer *s ) {
+	driver->context->PSSetShader((ID3D11PixelShader*)s,NULL,0);
 }
 
 HL_PRIM void HL_NAME(ps_set_constant_buffers)( int start, int count, varray *a ) {
@@ -263,67 +260,86 @@ HL_PRIM void HL_NAME(ia_set_primitive_topology)( int topology ) {
 	driver->context->IASetPrimitiveTopology((D3D11_PRIMITIVE_TOPOLOGY)topology);
 }
 
-HL_PRIM void HL_NAME(ia_set_input_layout)( dx_layout *l ) {
-	driver->context->IASetInputLayout(l);
+HL_PRIM void HL_NAME(ia_set_input_layout)( dx_pointer *l ) {
+	driver->context->IASetInputLayout((ID3D11InputLayout*)l);
 }
 
-HL_PRIM void HL_NAME(release_shader)( ID3D11DeviceChild *v ) {
-	v->Release();
-}
-
-HL_PRIM void HL_NAME(release_render_target)( dx_render_target *rt ) {
-	rt->Release();
-}
-
-HL_PRIM void HL_NAME(release_depth_stencil)( dx_depth_stencil *ds ) {
-	ds->Release();
-}
-
-HL_PRIM void HL_NAME(release_raster)( dx_raster *r ) {
-	r->Release();
+HL_PRIM void HL_NAME(release_pointer)( dx_pointer *p ) {
+	p->Release();
 }
 
 HL_PRIM void HL_NAME(release_resource)( dx_resource *r ) {
 	r->Release();
 }
 
-HL_PRIM void HL_NAME(release_layout)( dx_layout *l ) {
-	l->Release();
-}
-
-typedef struct {
-	hl_type *t;
-	D3D11_INPUT_ELEMENT_DESC desc;
-} input_element;
-
-HL_PRIM dx_layout *HL_NAME(create_input_layout)( varray *arr, vbyte *bytecode, int bytecodeLength ) {
+HL_PRIM dx_pointer *HL_NAME(create_input_layout)( varray *arr, vbyte *bytecode, int bytecodeLength ) {
 	ID3D11InputLayout *input;
 	D3D11_INPUT_ELEMENT_DESC desc[32];
 	int i;
 	if( arr->size > 32 ) return NULL;
 	for(i=0;i<arr->size;i++)
-		desc[i] = hl_aptr(arr,input_element*)[i]->desc;
+		desc[i] = hl_aptr(arr,dx_struct<D3D11_INPUT_ELEMENT_DESC>*)[i]->value;
 	if( driver->device->CreateInputLayout(desc,arr->size,bytecode,bytecodeLength,&input) != S_OK )
 		return NULL;
 	return input;
 }
 
+HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_view)( dx_resource *tex, int format ) {
+	ID3D11DepthStencilView *view;
+	D3D11_DEPTH_STENCIL_VIEW_DESC  desc;
+	ZeroMemory(&desc, sizeof(desc));
+	desc.Format = (DXGI_FORMAT)format;
+	desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	if( driver->device->CreateDepthStencilView(tex,&desc,&view) != S_OK )
+		return NULL;
+	return view;
+}
+
+HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_state)( dx_struct<D3D11_DEPTH_STENCIL_DESC> *desc ) {
+	ID3D11DepthStencilState *state;
+	if( driver->device->CreateDepthStencilState(&desc->value,&state) != S_OK )
+		return NULL;
+	return state;
+}
+
+HL_PRIM void HL_NAME(om_set_depth_stencil_state)( dx_pointer *s, int ref )  {
+	driver->context->OMSetDepthStencilState((ID3D11DepthStencilState*)s,ref);
+}
+
+HL_PRIM void HL_NAME(clear_depth_stencil_view)( dx_pointer *view, vdynamic *depth, vdynamic *stencil ) {
+	driver->context->ClearDepthStencilView((ID3D11DepthStencilView*)view, (depth?D3D11_CLEAR_DEPTH:0) | (stencil?D3D11_CLEAR_STENCIL:0), depth ? (FLOAT)depth->v.d : 0.f, stencil ? stencil->v.i : 0); 
+}
+
+HL_PRIM void HL_NAME(om_set_blend_state)( dx_pointer *state, vbyte *factors, int sampleMask ) {
+	driver->context->OMSetBlendState((ID3D11BlendState*)state,(FLOAT*)factors,sampleMask);
+}
+
+HL_PRIM dx_pointer *HL_NAME(create_blend_state)( bool alphaToCoverage, bool independentBlend, varray *arr, int count ) {
+	ID3D11BlendState *s;
+	D3D11_BLEND_DESC desc;
+	int i;
+	ZeroMemory(&desc,sizeof(desc));
+	desc.AlphaToCoverageEnable = alphaToCoverage;
+	desc.IndependentBlendEnable = independentBlend;
+	for(i=0;i<count;i++)
+		desc.RenderTarget[i] = hl_aptr(arr,dx_struct<D3D11_RENDER_TARGET_BLEND_DESC>*)[i]->value;
+	if( driver->device->CreateBlendState(&desc,&s) != S_OK )
+		return NULL;
+	return s;
+}
+
 #define _DRIVER _ABSTRACT(dx_driver)
-#define _SHADER _ABSTRACT(dx_shader)
-#define _LAYOUT _ABSTRACT(dx_layout)
+#define _POINTER _ABSTRACT(dx_pointer)
 #define _RESOURCE _ABSTRACT(dx_resource)
-#define _RASTER _ABSTRACT(dx_raster)
-#define _RENDER_TARGET _ABSTRACT(dx_render_target)
-#define _DEPTH_STENCIL _ABSTRACT(dx_depth_stencil)
 
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32);
 DEFINE_PRIM(_RESOURCE, get_back_buffer, _NO_ARG);
-DEFINE_PRIM(_RENDER_TARGET, create_render_target_view, _RESOURCE _DYN);
-DEFINE_PRIM(_VOID, om_set_render_targets, _I32 _ARR _DEPTH_STENCIL);
-DEFINE_PRIM(_RASTER, create_rasterizer_state, _DYN);
-DEFINE_PRIM(_VOID, rs_set_state, _RASTER);
+DEFINE_PRIM(_POINTER, create_render_target_view, _RESOURCE _DYN);
+DEFINE_PRIM(_VOID, om_set_render_targets, _I32 _ARR _POINTER);
+DEFINE_PRIM(_POINTER, create_rasterizer_state, _DYN);
+DEFINE_PRIM(_VOID, rs_set_state, _POINTER);
 DEFINE_PRIM(_VOID, rs_set_viewports, _I32 _BYTES);
-DEFINE_PRIM(_VOID, clear_color, _RENDER_TARGET _F64 _F64 _F64 _F64);
+DEFINE_PRIM(_VOID, clear_color, _POINTER _F64 _F64 _F64 _F64);
 DEFINE_PRIM(_VOID, present, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
@@ -334,23 +350,25 @@ DEFINE_PRIM(_BYTES, map, _RESOURCE _I32 _I32 _BOOL);
 DEFINE_PRIM(_VOID, unmap, _RESOURCE _I32);
 DEFINE_PRIM(_BYTES, compile_shader, _BYTES _I32 _BYTES _BYTES _BYTES _I32 _REF(_BOOL) _REF(_I32));
 DEFINE_PRIM(_BYTES, disassemble_shader, _BYTES _I32 _I32 _BYTES _REF(_I32));
-DEFINE_PRIM(_SHADER, create_vertex_shader, _BYTES _I32);
-DEFINE_PRIM(_SHADER, create_pixel_shader, _BYTES _I32);
+DEFINE_PRIM(_POINTER, create_vertex_shader, _BYTES _I32);
+DEFINE_PRIM(_POINTER, create_pixel_shader, _BYTES _I32);
 DEFINE_PRIM(_VOID, draw_indexed, _I32 _I32 _I32);
-DEFINE_PRIM(_VOID, vs_set_shader, _SHADER);
+DEFINE_PRIM(_VOID, vs_set_shader, _POINTER);
 DEFINE_PRIM(_VOID, vs_set_constant_buffers, _I32 _I32 _ARR);
-DEFINE_PRIM(_VOID, ps_set_shader, _SHADER);
+DEFINE_PRIM(_VOID, ps_set_shader, _POINTER);
 DEFINE_PRIM(_VOID, ps_set_constant_buffers, _I32 _I32 _ARR);
-DEFINE_PRIM(_VOID, update_subresource, _RESOURCE _I32 _OBJ(_I32 _I32 _I32 _I32 _I32 _I32) _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID, update_subresource, _RESOURCE _I32 _DYN _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID, ia_set_index_buffer, _RESOURCE _BOOL _I32);
 DEFINE_PRIM(_VOID, ia_set_vertex_buffers, _I32 _I32 _ARR _BYTES _BYTES);
 DEFINE_PRIM(_VOID, ia_set_primitive_topology, _I32);
-DEFINE_PRIM(_VOID, ia_set_input_layout, _LAYOUT);
-DEFINE_PRIM(_LAYOUT, create_input_layout, _ARR _BYTES _I32);
-
-DEFINE_PRIM(_VOID, release_render_target, _RENDER_TARGET);
-DEFINE_PRIM(_VOID, release_depth_stencil, _DEPTH_STENCIL);
+DEFINE_PRIM(_VOID, ia_set_input_layout, _POINTER);
+DEFINE_PRIM(_POINTER, create_input_layout, _ARR _BYTES _I32);
+DEFINE_PRIM(_RESOURCE, create_texture_2d, _DYN _BYTES);
+DEFINE_PRIM(_POINTER, create_depth_stencil_view, _RESOURCE _I32);
+DEFINE_PRIM(_POINTER, create_depth_stencil_state, _DYN);
+DEFINE_PRIM(_VOID, om_set_depth_stencil_state, _POINTER);
+DEFINE_PRIM(_VOID, clear_depth_stencil_view, _POINTER _NULL(_F64) _NULL(_I32));
+DEFINE_PRIM(_POINTER, create_blend_state, _BOOL _BOOL _ARR _I32);
+DEFINE_PRIM(_VOID, om_set_blend_state, _POINTER _BYTES _I32);
+DEFINE_PRIM(_VOID, release_pointer, _POINTER);
 DEFINE_PRIM(_VOID, release_resource, _RESOURCE);
-DEFINE_PRIM(_VOID, release_raster, _RASTER);
-DEFINE_PRIM(_VOID, release_shader, _SHADER);
-DEFINE_PRIM(_VOID, release_layout, _LAYOUT);
