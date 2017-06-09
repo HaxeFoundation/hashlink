@@ -73,6 +73,7 @@ abstract DxBool(Int) {
 }
 
 @:enum abstract ResourceBind(Int) {
+	var None = 0;
 	var VertexBuffer = 1;
 	var IndexBuffer = 2;
 	var ConstantBuffer = 4;
@@ -259,6 +260,7 @@ class Texture2dDesc {
 	public var access : ResourceAccess;
 	public var misc : ResourceMisc;
 	public function new() {
+		mipLevels = arraySize = sampleCount = 1;
 	}
 }
 

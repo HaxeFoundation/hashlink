@@ -180,7 +180,7 @@ HL_PRIM void HL_NAME(update_subresource)( dx_resource *r, int index, dx_struct<D
 
 HL_PRIM void *HL_NAME(map)( dx_resource *r, int subRes, int type, bool waitGpu ) {
 	D3D11_MAPPED_SUBRESOURCE map;
-	if( driver->context->Map(r,subRes,(D3D11_MAP)type,waitGpu?0:D3D11_MAP_FLAG_DO_NOT_WAIT,&map) != S_OK ) 
+	if( driver->context->Map(r,subRes,(D3D11_MAP)type,waitGpu?0:D3D11_MAP_FLAG_DO_NOT_WAIT,&map) != S_OK )
 		return NULL;
 	return map.pData;
 }
@@ -307,7 +307,7 @@ HL_PRIM void HL_NAME(om_set_depth_stencil_state)( dx_pointer *s, int ref )  {
 }
 
 HL_PRIM void HL_NAME(clear_depth_stencil_view)( dx_pointer *view, vdynamic *depth, vdynamic *stencil ) {
-	driver->context->ClearDepthStencilView((ID3D11DepthStencilView*)view, (depth?D3D11_CLEAR_DEPTH:0) | (stencil?D3D11_CLEAR_STENCIL:0), depth ? (FLOAT)depth->v.d : 0.f, stencil ? stencil->v.i : 0); 
+	driver->context->ClearDepthStencilView((ID3D11DepthStencilView*)view, (depth?D3D11_CLEAR_DEPTH:0) | (stencil?D3D11_CLEAR_STENCIL:0), depth ? (FLOAT)depth->v.d : 0.f, stencil ? stencil->v.i : 0);
 }
 
 HL_PRIM void HL_NAME(om_set_blend_state)( dx_pointer *state, vbyte *factors, int sampleMask ) {
@@ -326,6 +326,36 @@ HL_PRIM dx_pointer *HL_NAME(create_blend_state)( bool alphaToCoverage, bool inde
 	if( driver->device->CreateBlendState(&desc,&s) != S_OK )
 		return NULL;
 	return s;
+}
+
+HL_PRIM dx_pointer *HL_NAME(create_sampler_state)( dx_struct<D3D11_SAMPLER_DESC> *desc ) {
+	ID3D11SamplerState *s;
+	if( driver->device->CreateSamplerState(&desc->value,&s) != S_OK )
+		return NULL;
+	return s;
+}
+
+HL_PRIM dx_pointer *HL_NAME(create_shader_resource_view)( dx_resource *res, dx_struct<D3D11_SHADER_RESOURCE_VIEW_DESC> *desc ) {
+	ID3D11ShaderResourceView *view;
+	if( driver->device->CreateShaderResourceView(res,&desc->value,&view) != S_OK )
+		return NULL;
+	return view;
+}
+
+HL_PRIM void HL_NAME(ps_set_samplers)( int start, int count, varray *arr ) {
+	driver->context->PSSetSamplers(start,count,hl_aptr(arr,ID3D11SamplerState*));
+}
+
+HL_PRIM void HL_NAME(vs_set_samplers)( int start, int count, varray *arr ) {
+	driver->context->VSSetSamplers(start,count,hl_aptr(arr,ID3D11SamplerState*));
+}
+
+HL_PRIM void HL_NAME(ps_set_shader_resources)( int start, int count, varray *arr ) {
+	driver->context->PSSetShaderResources(start, count, hl_aptr(arr,ID3D11ShaderResourceView*));
+}
+
+HL_PRIM void HL_NAME(vs_set_shader_resources)( int start, int count, varray *arr ) {
+	driver->context->VSSetShaderResources(start, count, hl_aptr(arr,ID3D11ShaderResourceView*));
 }
 
 #define _DRIVER _ABSTRACT(dx_driver)
@@ -372,3 +402,10 @@ DEFINE_PRIM(_POINTER, create_blend_state, _BOOL _BOOL _ARR _I32);
 DEFINE_PRIM(_VOID, om_set_blend_state, _POINTER _BYTES _I32);
 DEFINE_PRIM(_VOID, release_pointer, _POINTER);
 DEFINE_PRIM(_VOID, release_resource, _RESOURCE);
+DEFINE_PRIM(_POINTER, create_sampler_state, _DYN);
+DEFINE_PRIM(_POINTER, create_shader_resource_view, _RESOURCE _DYN);
+DEFINE_PRIM(_VOID, ps_set_samplers, _I32 _I32 _ARR);
+DEFINE_PRIM(_VOID, vs_set_samplers, _I32 _I32 _ARR);
+DEFINE_PRIM(_VOID, ps_set_shader_resources, _I32 _I32 _ARR);
+DEFINE_PRIM(_VOID, vs_set_shader_resources, _I32 _I32 _ARR);
+
