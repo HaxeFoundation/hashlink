@@ -265,27 +265,32 @@ static gc_pheader *gc_alloc_new_page( int pid, int block, int size, bool varsize
 	unsigned char *base;
 	gc_pheader *p;
 	int start_pos;
-	int num_pages;
-retry:
-	num_pages = 0;
+	int old_size = size;
 
 	// increase size based on previously allocated pages
-	p = gc_pages[pid];
-	while( p ) {
-		num_pages++;
-		p = p->next_page;
-	}
-	while( num_pages > 8 && (size<<1) / block <= GC_PAGE_SIZE ) {
-		size <<= 1;
-		num_pages /= 3;
+	if( block < 256 ) {
+		int num_pages = 0;
+		p = gc_pages[pid];
+		while( p ) {
+			num_pages++;
+			p = p->next_page;
+		}
+		while( num_pages > 8 && (size<<1) / block <= GC_PAGE_SIZE ) {
+			size <<= 1;
+			num_pages /= 3;
+		}
 	}
 
+retry:
 	base = (unsigned char*)gc_alloc_page_memory(size);
 	p = (gc_pheader*)base;
 	if( !base ) {
 		int pages = gc_stats.pages_allocated;
 		hl_gc_major();
-		if( pages != gc_stats.pages_allocated ) goto retry;
+		if( pages != gc_stats.pages_allocated ) {
+			size = old_size;
+			goto retry;
+		}
 		// big block : report stack trace - we should manage to handle it
 		if( size >= (8 << 20) )
 			hl_error_msg(USTR("Failed to alloc %d KB"),size>>10);
