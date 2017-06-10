@@ -507,7 +507,7 @@ class Memory {
 				if( bs == null ) continue;
 				var ft = fields != null ? fields[i] : null;
 
-				if( b.type == tdynObj && (i == 1 || i == 2) ) {
+				if( b.type == tdynObj && (i == 1 || i == 2 || i == 3) ) {
 					if( bs.typeKind != KHeader && (bs.typeKind != null || bs.type != null) )
 						trace(bs.typeKind, bs.type);
 					else {
@@ -658,10 +658,10 @@ class Memory {
 	static inline var BMP_BITS = 5;
 
 	function makeBitmap() {
-	
+
 		// VMMap.exe tool can also be used to show address space fragmentation in realtime
 		// although it will not be able to show GC fragmentation
-	
+
 		var totalMem = 2 * 1024. * 1024. * 1024.; // GB of memory
 		var sizeReal = Math.ceil(Math.sqrt(totalMem / (1 << BMP_BITS)));
 		var size = 1, bits = 1;
@@ -690,6 +690,35 @@ class Memory {
 		var f = sys.io.File.write("bitmap.png");
 		new format.png.Writer(f).write(format.png.Tools.build32BGRA(size, size, bytes));
 		f.close();
+	}
+
+	function printPages() {
+		var perBlockSize = new Map();
+		for( p in pages ) {
+			var inf = perBlockSize.get(p.blockSize);
+			if( inf == null ) {
+				inf = {
+					blockSize : p.blockSize,
+					count : 0,
+					mem : 0.,
+					kinds : [],
+					blocks : [],
+				};
+				perBlockSize.set(p.blockSize, inf);
+			}
+			inf.count++;
+			inf.mem += p.size;
+			inf.kinds[cast p.kind]++;
+		}
+		for( b in blocks ) {
+			var inf = perBlockSize.get(b.page.blockSize);
+			inf.blocks[cast b.page.kind]++;
+		}
+		var all = Lambda.array(perBlockSize);
+		all.sort(function(i1, i2) return i1.blockSize - i2.blockSize);
+		log("Kinds = [Dyn,Raw,NoPtr,Finalizer]");
+		for( i in all )
+			log('BlockSize ${i.blockSize} : ${i.count} pages, ${Std.int(i.mem/1024)} KB, kinds = ${i.kinds}, blocks = ${i.blocks}');
 	}
 
 	static function main() {
@@ -734,6 +763,8 @@ class Memory {
 				m.printPartition();
 			case "bitmap":
 				m.makeBitmap();
+			case "pages":
+				m.printPages();
 			default:
 				Sys.println("Unknown command " + cmd);
 			}
