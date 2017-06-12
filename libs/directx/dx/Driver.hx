@@ -46,6 +46,18 @@ abstract BlendState(Pointer) {
 	}
 }
 
+abstract SamplerState(Pointer) {
+	public inline function release() {
+		Driver.releasePointer(this);
+	}
+}
+
+abstract ShaderResourceView(Pointer) {
+	public inline function release() {
+		Driver.releasePointer(this);
+	}
+}
+
 abstract DxBool(Int) {
 	@:to public inline function toBool() : Bool return cast this;
 	@:from static function fromBool( b : Bool ) : DxBool return cast b;
@@ -187,7 +199,7 @@ class LayoutElement {
 	}
 }
 
-@:enum abstract RenderViewDimension(Int) {
+@:enum abstract ResourceDimension(Int) {
 	var Unknown = 0;
 	var Buffer = 1;
 	var Texture1D = 2;
@@ -197,11 +209,14 @@ class LayoutElement {
 	var Texture2DMS = 6;
 	var Texture2DMSArray = 7;
 	var Texture3D = 8;
+	var TextureCube = 9;
+	var TextureCubeArray = 10;
+	var TextureBufferEx = 11;
 }
 
 class RenderTargetDesc {
 	public var format : Format;
-	public var dimension : RenderViewDimension;
+	public var dimension : ResourceDimension;
 	public var mipMap : Int;
 	public var firstSlice : Int;
 	public var sliceCount : Int;
@@ -348,6 +363,82 @@ class RenderTargetBlendDesc {
 	}
 }
 
+@:enum abstract Filter(Int) {
+	var MinMagMipPoint = 0;
+	var MinMagPointMipLinear = 0x1;
+	var MinPointMagLinearMipPoint = 0x4;
+	var MinPointMagMipLinear = 0x5;
+	var MinLinearMagMipPoint = 0x10;
+	var MinLinearMagPointMipLinear = 0x11;
+	var MinMagLinearMipPoint = 0x14;
+	var MinMagMipLinear = 0x15;
+	var Anisotropic = 0x55;
+	var ComparisonMinMagMipPoint = 0x80;
+	var ComparisonMinMagPointMipLinear = 0x81;
+	var ComparisonMinPointMagLinearMipPoint = 0x84;
+	var ComparisonMinPointMagMipLinear = 0x85;
+	var ComparisonMinLinearMagMipPoint = 0x90;
+	var ComparisonMinLinearMagPointMipLinear = 0x91;
+	var ComparisonMinMagLinearMipPoint = 0x94;
+	var ComparisonMinMagMipLinear = 0x95;
+	var ComparisonAnisotropic = 0xd5;
+	var MininumMinMagMipPoint = 0x100;
+	var MininumMinMagPointMipLinear = 0x101;
+	var MininumMinPointMagLinearMipPoint = 0x104;
+	var MininumMinPointMagMipLinear = 0x105;
+	var MininumMinLinearMagMipPoint = 0x110;
+	var MininumMinLinearMagPointMipLinear = 0x111;
+	var MininumMinMagLinearMipPoint = 0x114;
+	var MininumMinMagMipLinear = 0x115;
+	var MininumAnisotropic = 0x155;
+	var MaximumMinMagMipPoint = 0x180;
+	var MaximumMinMagPointMipLinear = 0x181;
+	var MaximumMinPointMagLinearMipPoint = 0x184;
+	var MaximumMinPointMagMipLinear = 0x185;
+	var MaximumMinLinearMagMipPoint = 0x190;
+	var MaximumMinLinearMagPointMipLinear = 0x191;
+	var MaximumMinMagLinearMipPoint = 0x194;
+	var MaximumMinMagMipLinear = 0x195;
+	var MaximumAnisotropic = 0x1d5;
+}
+
+@:enum abstract AddressMode(Int) {
+	var Wrap = 1;
+	var Mirror = 2;
+	var Clamp = 3;
+	var Border = 4;
+	var MirrorOnce = 5;
+}
+
+class SamplerDesc {
+	public var filter : Filter;
+	public var addressU : AddressMode;
+	public var addressV : AddressMode;
+	public var addressW : AddressMode;
+	public var mipLodBias : hl.F32;
+	public var maxAnisotropy : Int;
+	public var comparisonFunc : ComparisonFunc;
+	public var borderColorR : hl.F32;
+	public var borderColorG : hl.F32;
+	public var borderColorB : hl.F32;
+	public var borderColorA : hl.F32;
+	public var minLod : hl.F32;
+	public var maxLod : hl.F32;
+	public function new() {
+	}
+}
+
+class ShaderResourceViewDesc {
+	public var format : Format;
+	public var dimension : ResourceDimension;
+	public var start : Int;
+	public var count : Int;
+	public var firstArraySlice : Int;
+	public var arraySize : Int;
+	public function new() {
+	}
+}
+
 @:hlNative("directx")
 class Driver {
 
@@ -431,13 +522,13 @@ class Driver {
 	public static function vsSetShader( shader : Shader ) : Void {
 	}
 
-	public static function vsSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource> ) : Void {
+	public static function vsSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource>, offset : Int ) : Void {
 	}
 
 	public static function psSetShader( shader : Shader ) : Void {
 	}
 
-	public static function psSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource> ) : Void {
+	public static function psSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource>, offset : Int ) : Void {
 	}
 
 	public static function iaSetPrimitiveTopology( topology : PrimitiveTopology ) : Void {
@@ -485,6 +576,26 @@ class Driver {
 	public static function omSetBlendState( state : BlendState, factors : hl.BytesAccess<hl.F32>, sampleMask : Int ) {
 	}
 
+	public static function createSamplerState( state : SamplerDesc ) : SamplerState {
+		return dxCreateSamplerState(state);
+	}
+
+	public static function createShaderResourceView( res : Resource, desc : ShaderResourceViewDesc ) : ShaderResourceView {
+		return dxCreateShaderResourceView(res, desc);
+	}
+
+	public static function psSetSamplers( start : Int, count : Int, arr : hl.NativeArray<SamplerState>, offset : Int ) {
+	}
+
+	public static function vsSetSamplers( start : Int, count : Int, arr : hl.NativeArray<SamplerState>, offset : Int ) {
+	}
+
+	public static function psSetShaderResources( start : Int, count : Int, arr : hl.NativeArray<ShaderResourceView>, offset : Int ) {
+	}
+
+	public static function vsSetShaderResources( start : Int, count : Int, arr : hl.NativeArray<ShaderResourceView>, offset : Int ) {
+	}
+
 	@:hlNative("directx", "create_depth_stencil_state")
 	static function dxCreateDepthStencilState( desc : Dynamic ) : DepthStencilState {
 		return null;
@@ -528,6 +639,16 @@ class Driver {
 
 	@:hlNative("directx","create_texture_2d")
 	static function dxCreateTexture2d( desc : Dynamic, data : hl.Bytes ) : Resource {
+		return null;
+	}
+
+	@:hlNative("directx","create_sampler_state")
+	static function dxCreateSamplerState( desc : Dynamic ) : SamplerState {
+		return null;
+	}
+
+	@:hlNative("directx","create_shader_resource_view")
+	static function dxCreateShaderResourceView( res : Resource, desc : Dynamic ) : ShaderResourceView {
 		return null;
 	}
 

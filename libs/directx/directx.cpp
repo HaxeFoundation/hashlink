@@ -6,8 +6,11 @@
 #include <d3d11.h>
 #include <D3Dcompiler.h>
 
-#define INIT_ERROR __LINE__
-#define CHECK(call) if( (call) != S_OK ) return INIT_ERROR
+#ifdef HL_DEBUG
+#	define DXERR()	hl_error_msg(USTR("DXERROR line %d"),__LINE__)
+#else
+#	define DXERR()	return NULL;
+#endif
 
 typedef struct {
 	ID3D11Device *device;
@@ -71,7 +74,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
 	desc.Windowed = true;
 	desc.OutputWindow = window;
 	if( GetDXGI()->CreateSwapChain(d->device,&desc,&d->swapchain) != S_OK )
-		return NULL;
+		DXERR();
 
 	driver = d;
 	return d;
@@ -80,14 +83,14 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
 HL_PRIM dx_resource *HL_NAME(get_back_buffer)() {
 	ID3D11Texture2D *backBuffer;
 	if( driver->swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer) != S_OK )
-		return NULL;
+		DXERR();
 	return backBuffer;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_render_target_view)( dx_resource *r, dx_struct<D3D11_RENDER_TARGET_VIEW_DESC> *desc ) {
 	ID3D11RenderTargetView *rt;
 	if( driver->device->CreateRenderTargetView(r, desc ? &desc->value : NULL, &rt) != S_OK )
-		return NULL;
+		DXERR();
 	return rt;
 }
 
@@ -98,7 +101,7 @@ HL_PRIM void HL_NAME(om_set_render_targets)( int count, varray *arr, dx_pointer 
 HL_PRIM dx_pointer *HL_NAME(create_rasterizer_state)( dx_struct<D3D11_RASTERIZER_DESC> *desc ) {
 	ID3D11RasterizerState *rs;
 	if( driver->device->CreateRasterizerState(&desc->value,&rs) != S_OK )
-		return NULL;
+		DXERR();
 	return rs;
 }
 
@@ -158,8 +161,10 @@ HL_PRIM dx_resource *HL_NAME(create_buffer)( int size, int usage, int bind, int 
 	res.pSysMem = data;
 	res.SysMemPitch = 0;
 	res.SysMemSlicePitch = 0;
-	if( driver->device->CreateBuffer(&desc,data?&res:NULL,&buffer) != S_OK )
+	if( size == 0 )
 		return NULL;
+	if( driver->device->CreateBuffer(&desc,data?&res:NULL,&buffer) != S_OK )
+		DXERR();
 	return buffer;
 }
 
@@ -170,7 +175,7 @@ HL_PRIM dx_resource *HL_NAME(create_texture_2d)( dx_struct<D3D11_TEXTURE2D_DESC>
 	res.SysMemPitch = 0;
 	res.SysMemSlicePitch = 0;
 	if( driver->device->CreateTexture2D(&desc->value,data?&res:NULL,&tex) != S_OK )
-		return NULL;
+		DXERR();
 	return tex;
 }
 
@@ -181,7 +186,7 @@ HL_PRIM void HL_NAME(update_subresource)( dx_resource *r, int index, dx_struct<D
 HL_PRIM void *HL_NAME(map)( dx_resource *r, int subRes, int type, bool waitGpu ) {
 	D3D11_MAPPED_SUBRESOURCE map;
 	if( driver->context->Map(r,subRes,(D3D11_MAP)type,waitGpu?0:D3D11_MAP_FLAG_DO_NOT_WAIT,&map) != S_OK )
-		return NULL;
+		DXERR();
 	return map.pData;
 }
 
@@ -217,14 +222,14 @@ HL_PRIM vbyte *HL_NAME(disassemble_shader)( vbyte *data, int dataSize, int flags
 HL_PRIM dx_pointer *HL_NAME(create_vertex_shader)( vbyte *code, int size ) {
 	ID3D11VertexShader *shader;
 	if( driver->device->CreateVertexShader(code, size, NULL, &shader) != S_OK )
-		return NULL;
+		DXERR();
 	return shader;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_pixel_shader)( vbyte *code, int size ) {
 	ID3D11PixelShader *shader;
 	if( driver->device->CreatePixelShader(code, size, NULL, &shader) != S_OK )
-		return NULL;
+		DXERR();
 	return shader;
 }
 
@@ -236,16 +241,16 @@ HL_PRIM void HL_NAME(vs_set_shader)( dx_pointer *s ) {
 	driver->context->VSSetShader((ID3D11VertexShader*)s,NULL,0);
 }
 
-HL_PRIM void HL_NAME(vs_set_constant_buffers)( int start, int count, varray *a ) {
-	driver->context->VSSetConstantBuffers(start,count,hl_aptr(a,ID3D11Buffer*));
+HL_PRIM void HL_NAME(vs_set_constant_buffers)( int start, int count, varray *a, int offset ) {
+	driver->context->VSSetConstantBuffers(start,count,hl_aptr(a,ID3D11Buffer*) + offset);
 }
 
 HL_PRIM void HL_NAME(ps_set_shader)( dx_pointer *s ) {
 	driver->context->PSSetShader((ID3D11PixelShader*)s,NULL,0);
 }
 
-HL_PRIM void HL_NAME(ps_set_constant_buffers)( int start, int count, varray *a ) {
-	driver->context->PSSetConstantBuffers(start,count,hl_aptr(a,ID3D11Buffer*));
+HL_PRIM void HL_NAME(ps_set_constant_buffers)( int start, int count, varray *a, int offset ) {
+	driver->context->PSSetConstantBuffers(start,count,hl_aptr(a,ID3D11Buffer*) + offset);
 }
 
 HL_PRIM void HL_NAME(ia_set_index_buffer)( dx_resource *r, bool is32, int offset ) {
@@ -280,7 +285,7 @@ HL_PRIM dx_pointer *HL_NAME(create_input_layout)( varray *arr, vbyte *bytecode, 
 	for(i=0;i<arr->size;i++)
 		desc[i] = hl_aptr(arr,dx_struct<D3D11_INPUT_ELEMENT_DESC>*)[i]->value;
 	if( driver->device->CreateInputLayout(desc,arr->size,bytecode,bytecodeLength,&input) != S_OK )
-		return NULL;
+		DXERR();
 	return input;
 }
 
@@ -291,14 +296,14 @@ HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_view)( dx_resource *tex, int fo
 	desc.Format = (DXGI_FORMAT)format;
 	desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 	if( driver->device->CreateDepthStencilView(tex,&desc,&view) != S_OK )
-		return NULL;
+		DXERR();
 	return view;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_state)( dx_struct<D3D11_DEPTH_STENCIL_DESC> *desc ) {
 	ID3D11DepthStencilState *state;
 	if( driver->device->CreateDepthStencilState(&desc->value,&state) != S_OK )
-		return NULL;
+		DXERR();
 	return state;
 }
 
@@ -324,38 +329,38 @@ HL_PRIM dx_pointer *HL_NAME(create_blend_state)( bool alphaToCoverage, bool inde
 	for(i=0;i<count;i++)
 		desc.RenderTarget[i] = hl_aptr(arr,dx_struct<D3D11_RENDER_TARGET_BLEND_DESC>*)[i]->value;
 	if( driver->device->CreateBlendState(&desc,&s) != S_OK )
-		return NULL;
+		DXERR();
 	return s;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_sampler_state)( dx_struct<D3D11_SAMPLER_DESC> *desc ) {
 	ID3D11SamplerState *s;
 	if( driver->device->CreateSamplerState(&desc->value,&s) != S_OK )
-		return NULL;
+		DXERR();
 	return s;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_shader_resource_view)( dx_resource *res, dx_struct<D3D11_SHADER_RESOURCE_VIEW_DESC> *desc ) {
 	ID3D11ShaderResourceView *view;
 	if( driver->device->CreateShaderResourceView(res,&desc->value,&view) != S_OK )
-		return NULL;
+		DXERR();
 	return view;
 }
 
-HL_PRIM void HL_NAME(ps_set_samplers)( int start, int count, varray *arr ) {
-	driver->context->PSSetSamplers(start,count,hl_aptr(arr,ID3D11SamplerState*));
+HL_PRIM void HL_NAME(ps_set_samplers)( int start, int count, varray *arr, int offset ) {
+	driver->context->PSSetSamplers(start,count,hl_aptr(arr,ID3D11SamplerState*) + offset);
 }
 
-HL_PRIM void HL_NAME(vs_set_samplers)( int start, int count, varray *arr ) {
-	driver->context->VSSetSamplers(start,count,hl_aptr(arr,ID3D11SamplerState*));
+HL_PRIM void HL_NAME(vs_set_samplers)( int start, int count, varray *arr, int offset ) {
+	driver->context->VSSetSamplers(start,count,hl_aptr(arr,ID3D11SamplerState*) + offset);
 }
 
-HL_PRIM void HL_NAME(ps_set_shader_resources)( int start, int count, varray *arr ) {
-	driver->context->PSSetShaderResources(start, count, hl_aptr(arr,ID3D11ShaderResourceView*));
+HL_PRIM void HL_NAME(ps_set_shader_resources)( int start, int count, varray *arr, int offset ) {
+	driver->context->PSSetShaderResources(start, count, hl_aptr(arr,ID3D11ShaderResourceView*) + offset);
 }
 
-HL_PRIM void HL_NAME(vs_set_shader_resources)( int start, int count, varray *arr ) {
-	driver->context->VSSetShaderResources(start, count, hl_aptr(arr,ID3D11ShaderResourceView*));
+HL_PRIM void HL_NAME(vs_set_shader_resources)( int start, int count, varray *arr, int offset ) {
+	driver->context->VSSetShaderResources(start, count, hl_aptr(arr,ID3D11ShaderResourceView*) + offset);
 }
 
 #define _DRIVER _ABSTRACT(dx_driver)
@@ -384,9 +389,9 @@ DEFINE_PRIM(_POINTER, create_vertex_shader, _BYTES _I32);
 DEFINE_PRIM(_POINTER, create_pixel_shader, _BYTES _I32);
 DEFINE_PRIM(_VOID, draw_indexed, _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, vs_set_shader, _POINTER);
-DEFINE_PRIM(_VOID, vs_set_constant_buffers, _I32 _I32 _ARR);
+DEFINE_PRIM(_VOID, vs_set_constant_buffers, _I32 _I32 _ARR _I32);
 DEFINE_PRIM(_VOID, ps_set_shader, _POINTER);
-DEFINE_PRIM(_VOID, ps_set_constant_buffers, _I32 _I32 _ARR);
+DEFINE_PRIM(_VOID, ps_set_constant_buffers, _I32 _I32 _ARR _I32);
 DEFINE_PRIM(_VOID, update_subresource, _RESOURCE _I32 _DYN _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID, ia_set_index_buffer, _RESOURCE _BOOL _I32);
 DEFINE_PRIM(_VOID, ia_set_vertex_buffers, _I32 _I32 _ARR _BYTES _BYTES);
@@ -404,8 +409,8 @@ DEFINE_PRIM(_VOID, release_pointer, _POINTER);
 DEFINE_PRIM(_VOID, release_resource, _RESOURCE);
 DEFINE_PRIM(_POINTER, create_sampler_state, _DYN);
 DEFINE_PRIM(_POINTER, create_shader_resource_view, _RESOURCE _DYN);
-DEFINE_PRIM(_VOID, ps_set_samplers, _I32 _I32 _ARR);
-DEFINE_PRIM(_VOID, vs_set_samplers, _I32 _I32 _ARR);
-DEFINE_PRIM(_VOID, ps_set_shader_resources, _I32 _I32 _ARR);
-DEFINE_PRIM(_VOID, vs_set_shader_resources, _I32 _I32 _ARR);
+DEFINE_PRIM(_VOID, ps_set_samplers, _I32 _I32 _ARR _I32);
+DEFINE_PRIM(_VOID, vs_set_samplers, _I32 _I32 _ARR _I32);
+DEFINE_PRIM(_VOID, ps_set_shader_resources, _I32 _I32 _ARR _I32);
+DEFINE_PRIM(_VOID, vs_set_shader_resources, _I32 _I32 _ARR _I32);
 
