@@ -61,25 +61,41 @@ HL_PRIM void hl_file_close( hl_fdesc *f ) {
 }
 
 HL_PRIM int hl_file_write( hl_fdesc *f, vbyte *buf, int pos, int len ) {
+	int ret;
 	if( !f ) return -1;
-	return (int)fwrite(buf+pos,1,len,f->f);
+	hl_blocking(true);
+	ret = (int)fwrite(buf+pos,1,len,f->f);
+	hl_blocking(false);
+	return ret;
 }
 
 HL_PRIM int hl_file_read( hl_fdesc *f, vbyte *buf, int pos, int len ) {
+	int ret;
 	if( !f ) return -1;
-	return (int)fread((char*)buf+pos,1,len,f->f);
+	hl_blocking(true);
+	ret = (int)fread((char*)buf+pos,1,len,f->f);
+	hl_blocking(false);
+	return ret;
 }
 
 HL_PRIM bool hl_file_write_char( hl_fdesc *f, int c ) {
+	int ret;
 	unsigned char cc = (unsigned char)c;
 	if( !f ) return false;
-	return fwrite(&cc,1,1,f->f) == 1;
+	hl_blocking(true);
+	ret = fwrite(&cc,1,1,f->f);
+	hl_blocking(false);
+	return ret == 1;
 }
 
 HL_PRIM int hl_file_read_char( hl_fdesc *f ) {
 	unsigned char cc;
-	if( !f || fread(&cc,1,1,f->f) != 1 )
+	hl_blocking(true);
+	if( !f || fread(&cc,1,1,f->f) != 1 ) {
+		hl_blocking(false);
 		return -2;
+	}
+	hl_blocking(false);
 	return cc;
 }
 
@@ -99,8 +115,12 @@ HL_PRIM bool hl_file_eof( hl_fdesc *f ) {
 }
 
 HL_PRIM bool hl_file_flush( hl_fdesc *f ) {
+	int ret;
 	if( !f ) return false;
-	return fflush( f->f ) == 0;
+	hl_blocking(true);
+	ret = fflush( f->f );
+	hl_blocking(false);
+	return ret == 0;
 }
 
 #define MAKE_STDIO(k) \
@@ -127,6 +147,7 @@ HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
 #	endif
 	if( f == NULL )
 		return NULL;
+	hl_blocking(true);
 	fseek(f,0,SEEK_END);
 	len = ftell(f);
 	if( size ) *size = len;
@@ -136,6 +157,7 @@ HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
 	while( len > 0 ) {
 		int d = (int)fread((char*)content + p,1,len,f);
 		if( d <= 0 ) {
+			hl_blocking(false);
 			fclose(f);
 			return NULL;
 		}
@@ -143,6 +165,7 @@ HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
 		len -= d;
 	}
 	fclose(f);
+	hl_blocking(false);
 	return content;
 }
 

@@ -566,6 +566,9 @@ HL_API void hl_remove_root( void *ptr );
 HL_API void hl_gc_major();
 HL_API bool hl_is_gc_ptr( void *ptr );
 
+HL_API void hl_blocking( bool b );
+HL_API bool hl_is_blocking();
+
 typedef void (*hl_types_dump)( void (*)( void *, int) );
 HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
 
