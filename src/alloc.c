@@ -900,6 +900,16 @@ static void hl_gc_init( void *stack_top ) {
 
 // ---- UTILITIES ----------------------
 
+static bool is_blocking = false; // TODO : use TLS for multithread
+
+HL_API bool hl_is_blocking() {
+	return is_blocking;
+}
+
+HL_API void hl_blocking( bool b) {
+	is_blocking = b;
+}
+
 void hl_global_init( void *stack_top ) {
 	hl_gc_init(stack_top);
 }

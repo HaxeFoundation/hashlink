@@ -210,6 +210,7 @@ static void sentinel_loop( vsentinel *s ) {
 		while( true ) {
 			Sleep(time_ms);
 			if( tick != s->ticks || s->pause ) break;
+			if( hl_is_blocking() ) continue;
 			k++;
 			if( k == 16 ) {
 				// pause

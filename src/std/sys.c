@@ -126,7 +126,9 @@ HL_PRIM vbyte *hl_sys_locale() {
 }
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
+	hl_blocking(true);
 	uprintf(USTR("%s"),(uchar*)msg);
+	hl_blocking(false);
 }
 
 HL_PRIM void hl_sys_exit( int code ) {
@@ -223,6 +225,7 @@ HL_PRIM varray *hl_sys_env() {
 
 
 HL_PRIM void hl_sys_sleep( double f ) {
+	hl_blocking(true);
 #if defined(HL_WIN)
 	Sleep((DWORD)(f * 1000));
 #elif defined(HL_PS)
@@ -233,6 +236,7 @@ HL_PRIM void hl_sys_sleep( double f ) {
 	t.tv_nsec = (int)((f - t.tv_sec) * 1e9);
 	nanosleep(&t,NULL);
 #endif
+	hl_blocking(false);
 }
 
 HL_PRIM bool hl_sys_set_time_locale( vbyte *l ) {
@@ -289,11 +293,18 @@ HL_PRIM bool hl_sys_is64() {
 
 HL_PRIM int hl_sys_command( vbyte *cmd ) {
 #if defined(HL_WIN)
-	return system((pchar*)cmd);
+	int ret;
+	hl_blocking(true);
+	ret = system((pchar*)cmd);
+	hl_blocking(false);
+	return ret;
 #elif defined(HL_PS)
 	return -1;
 #else
-	int status = system((pchar*)cmd);
+	int status;
+	hl_blocking(true);
+	status = system((pchar*)cmd);
+	hl_blocking(false);
 	return WEXITSTATUS(status) | (WTERMSIG(status) << 8);
 #endif
 }

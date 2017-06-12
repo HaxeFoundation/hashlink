@@ -31,10 +31,12 @@ static int stack_count = 0;
 static bool exc_rethrow = false;
 
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
+	hl_is_blocking(true);
 #	ifdef _WIN32
-	if( GetConsoleWindow() == NULL ) MessageBoxA(NULL,msg,"Fatal Error", MB_OK | MB_ICONERROR);
+	if( GetConsoleWindow() == NULL || GetActiveWindow() != NULL ) MessageBoxA(NULL,msg,"Fatal Error", MB_OK | MB_ICONERROR);
 #	endif
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
+	hl_is_blocking(false);
 	hl_debug_break();
 	exit(1);
 	return NULL;
