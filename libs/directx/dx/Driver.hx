@@ -247,7 +247,7 @@ class RenderTargetDesc {
 	public var Back = 3;
 }
 
-class RasterizerStateDesc {
+class RasterizerDesc {
 	public var fillMode : FillMode;
 	public var cullMode : CullMode;
 	public var frontCounterClockwise : DxBool;
@@ -301,7 +301,7 @@ class Texture2dDesc {
 	var Desc = 8;
 }
 
-class DepthStencilStateDesc {
+class DepthStencilDesc {
 	public var depthEnable : DxBool;
 	public var depthWrite : DxBool;
 	public var depthFunc : ComparisonFunc;
@@ -352,7 +352,7 @@ class RenderTargetBlendDesc {
 
 	public var blendEnable : DxBool;
 	public var srcBlend : Blend;
-	public var descBlend : Blend;
+	public var destBlend : Blend;
 	public var blendOp : BlendOp;
 	public var srcBlendAlpha : Blend;
 	public var destBlendAlpha : Blend;
@@ -457,7 +457,7 @@ class Driver {
 	public static function omSetRenderTargets( count : Int, arr : hl.NativeArray<RenderTargetView>, ?depth : DepthStencilView ) {
 	}
 
-	public static function createRasterizerState( desc : RasterizerStateDesc ) : RasterState {
+	public static function createRasterizerState( desc : RasterizerDesc ) : RasterState {
 		return dxCreateRasterizerState(desc);
 	}
 
@@ -565,7 +565,7 @@ class Driver {
 	public static function clearDepthStencilView( view : DepthStencilView, depth : Null<Float>, stencil : Null<Int> ) {
 	}
 
-	public static function createDepthStencilState( desc : DepthStencilStateDesc ) : DepthStencilState {
+	public static function createDepthStencilState( desc : DepthStencilDesc ) : DepthStencilState {
 		return dxCreateDepthStencilState(desc);
 	}
 
