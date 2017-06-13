@@ -139,6 +139,8 @@ OP_BEGIN
 	OP(OSetEnumField,3)
 
 	OP(OAssert,0)
+	OP(ORefData,2)
+	OP(ORefOffset,3)
 	OP(ONop,0)
 	// --
 	OP(OLast,0)
