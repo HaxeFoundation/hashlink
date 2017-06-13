@@ -454,7 +454,7 @@ class Driver {
 		return dxCreateRenderTargetView(r,desc);
 	}
 
-	public static function omSetRenderTargets( count : Int, arr : hl.NativeArray<RenderTargetView>, ?depth : DepthStencilView ) {
+	public static function omSetRenderTargets( count : Int, arr : hl.Ref<RenderTargetView>, ?depth : DepthStencilView ) {
 	}
 
 	public static function createRasterizerState( desc : RasterizerDesc ) : RasterState {
@@ -522,13 +522,13 @@ class Driver {
 	public static function vsSetShader( shader : Shader ) : Void {
 	}
 
-	public static function vsSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource>, offset : Int ) : Void {
+	public static function vsSetConstantBuffers( start : Int, count : Int, buffers : hl.Ref<Resource> ) : Void {
 	}
 
 	public static function psSetShader( shader : Shader ) : Void {
 	}
 
-	public static function psSetConstantBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource>, offset : Int ) : Void {
+	public static function psSetConstantBuffers( start : Int, count : Int, buffers : hl.Ref<Resource> ) : Void {
 	}
 
 	public static function iaSetPrimitiveTopology( topology : PrimitiveTopology ) : Void {
@@ -537,7 +537,7 @@ class Driver {
 	public static function iaSetIndexBuffer( buffer : Resource, is32Bits : Bool, offset : Int ) : Void {
 	}
 
-	public static function iaSetVertexBuffers( start : Int, count : Int, buffers : hl.NativeArray<Resource>, strides : hl.BytesAccess<Int>, offsets : hl.BytesAccess<Int> ) : Void {
+	public static function iaSetVertexBuffers( start : Int, count : Int, buffers : hl.Ref<Resource>, strides : hl.BytesAccess<Int>, offsets : hl.BytesAccess<Int> ) : Void {
 	}
 
 	public static function iaSetInputLayout( layout : Layout ) : Void {
@@ -584,16 +584,16 @@ class Driver {
 		return dxCreateShaderResourceView(res, desc);
 	}
 
-	public static function psSetSamplers( start : Int, count : Int, arr : hl.NativeArray<SamplerState>, offset : Int ) {
+	public static function psSetSamplers( start : Int, count : Int, arr : hl.Ref<SamplerState> ) {
 	}
 
-	public static function vsSetSamplers( start : Int, count : Int, arr : hl.NativeArray<SamplerState>, offset : Int ) {
+	public static function vsSetSamplers( start : Int, count : Int, arr : hl.Ref<SamplerState> ) {
 	}
 
-	public static function psSetShaderResources( start : Int, count : Int, arr : hl.NativeArray<ShaderResourceView>, offset : Int ) {
+	public static function psSetShaderResources( start : Int, count : Int, arr : hl.Ref<ShaderResourceView> ) {
 	}
 
-	public static function vsSetShaderResources( start : Int, count : Int, arr : hl.NativeArray<ShaderResourceView>, offset : Int ) {
+	public static function vsSetShaderResources( start : Int, count : Int, arr : hl.Ref<ShaderResourceView> ) {
 	}
 
 	@:hlNative("directx", "create_depth_stencil_state")
