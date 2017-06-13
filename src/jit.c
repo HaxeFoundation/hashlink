@@ -3027,7 +3027,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					preg *r = fetch(ra);
 					preg *d = alloc_cpu(ctx,dst,false);
 					op64(ctx,MOV,d,r);
-					op64(ctx,ADD,r,pconst(&p,sizeof(varray)));
+					op64(ctx,ADD,d,pconst(&p,sizeof(varray)));
 					store(ctx,dst,dst->current,false);
 				}
 				break;
@@ -3037,9 +3037,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case ORefOffset:
 			{
-				preg *r = fetch(ra);
-				preg *d = fetch(rb);
+				preg *d = alloc_cpu(ctx,rb,true);
 				preg *r2 = alloc_cpu(ctx,dst,false);
+				preg *r = fetch(ra);
 				int size = hl_type_size(dst->t->tparam);
 				op64(ctx,MOV,r2,r);
 				switch( size ) {
