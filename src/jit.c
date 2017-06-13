@@ -3020,6 +3020,49 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OSetref:
 			copy_from(ctx,pmem(&p,alloc_cpu(ctx,dst,true)->id,0),ra);
 			break;
+		case ORefData:
+			switch( ra->t->kind ) {
+			case HARRAY:
+				{
+					preg *r = fetch(ra);
+					preg *d = alloc_cpu(ctx,dst,false);
+					op64(ctx,MOV,d,r);
+					op64(ctx,ADD,r,pconst(&p,sizeof(varray)));
+					store(ctx,dst,dst->current,false);
+				}
+				break;
+			default:
+				ASSERT(ra->t->kind);
+			}
+			break;
+		case ORefOffset:
+			{
+				preg *r = fetch(ra);
+				preg *d = fetch(rb);
+				preg *r2 = alloc_cpu(ctx,dst,false);
+				int size = hl_type_size(dst->t->tparam);
+				op64(ctx,MOV,r2,r);
+				switch( size ) {
+				case 1:
+					break;
+				case 2:
+					op64(ctx,SHL,d,pconst(&p,1));
+					break;
+				case 4:
+					op64(ctx,SHL,d,pconst(&p,2));
+					break;
+				case 8:
+					op64(ctx,SHL,d,pconst(&p,3));
+					break;
+				default:
+					op64(ctx,IMUL,d,pconst(&p,size));
+					break;
+				}
+				op64(ctx,ADD,r2,d);
+				scratch(d);
+				store(ctx,dst,dst->current,false);
+			}
+			break;
 		case OToVirtual:
 			{
 #				ifdef HL_64
