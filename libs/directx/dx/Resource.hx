@@ -33,6 +33,10 @@ abstract Resource(hl.Abstract<"dx_resource">) {
 		dxUpdateSubresource(subResource, box, data, srcRowPitch, srcDepthPitch);
 	}
 
+	@:hlNative("directx", "copy_resource")
+	public function copyResource( from : Resource ) {
+	}
+
 	@:hlNative("directx", "update_subresource")
 	function dxUpdateSubresource( subResource : Int, box : Dynamic, data : hl.Bytes, srcRowPitch : Int, srcDepthPitch : Int ) : Void {
 	}
