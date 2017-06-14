@@ -39,7 +39,7 @@ static IDXGIFactory *GetDXGI() {
 	return factory;
 }
 
-HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
+HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags ) {
 	DWORD result;
 	static D3D_FEATURE_LEVEL levels[] = {
 		D3D_FEATURE_LEVEL_11_1,
@@ -67,7 +67,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
 	ZeroMemory(&desc,sizeof(desc));
 	desc.BufferDesc.Width = r.right;
 	desc.BufferDesc.Height = r.bottom;
-	desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.BufferDesc.Format = (DXGI_FORMAT)format;
 	desc.SampleDesc.Count = 1; // NO AA for now
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	desc.BufferCount = 1;
@@ -85,6 +85,10 @@ HL_PRIM dx_resource *HL_NAME(get_back_buffer)() {
 	if( driver->swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer) != S_OK )
 		DXERR();
 	return backBuffer;
+}
+
+HL_PRIM bool HL_NAME(resize)( int width, int height, int format ) {
+	return driver->swapchain->ResizeBuffers(1,width,height,(DXGI_FORMAT)format,0) == S_OK;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_render_target_view)( dx_resource *r, dx_struct<D3D11_RENDER_TARGET_VIEW_DESC> *desc ) {
@@ -113,6 +117,10 @@ HL_PRIM void HL_NAME(rs_set_viewports)( int count, vbyte *data ) {
 	driver->context->RSSetViewports(count,(D3D11_VIEWPORT*)data);
 }
 
+HL_PRIM void HL_NAME(rs_set_scissor_rects)( int count, vbyte *data ) {
+	driver->context->RSSetScissorRects(count,(D3D11_RECT*)data);
+}
+
 HL_PRIM void HL_NAME(clear_color)( dx_pointer *rt, double r, double g, double b, double a ) {
 	float color[4];
 	color[0] = (float)r;
@@ -122,16 +130,8 @@ HL_PRIM void HL_NAME(clear_color)( dx_pointer *rt, double r, double g, double b,
 	driver->context->ClearRenderTargetView((ID3D11RenderTargetView*)rt,color);
 }
 
-HL_PRIM void HL_NAME(present)() {
-	driver->swapchain->Present(0,0);
-}
-
-HL_PRIM int HL_NAME(get_screen_width)() {
-	return GetSystemMetrics(SM_CXSCREEN);
-}
-
-HL_PRIM int HL_NAME(get_screen_height)() {
-	return GetSystemMetrics(SM_CYSCREEN);
+HL_PRIM void HL_NAME(present)( int interval, int flags ) {
+	driver->swapchain->Present(interval,flags);
 }
 
 HL_PRIM const uchar *HL_NAME(get_device_name)() {
@@ -367,17 +367,17 @@ HL_PRIM void HL_NAME(vs_set_shader_resources)( int start, int count, dx_pointer 
 #define _POINTER _ABSTRACT(dx_pointer)
 #define _RESOURCE _ABSTRACT(dx_resource)
 
-DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32);
+DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _I32);
+DEFINE_PRIM(_BOOL, resize, _I32 _I32 _I32);
 DEFINE_PRIM(_RESOURCE, get_back_buffer, _NO_ARG);
 DEFINE_PRIM(_POINTER, create_render_target_view, _RESOURCE _DYN);
 DEFINE_PRIM(_VOID, om_set_render_targets, _I32 _REF(_POINTER) _POINTER);
 DEFINE_PRIM(_POINTER, create_rasterizer_state, _DYN);
 DEFINE_PRIM(_VOID, rs_set_state, _POINTER);
 DEFINE_PRIM(_VOID, rs_set_viewports, _I32 _BYTES);
+DEFINE_PRIM(_VOID, rs_set_scissor_rects, _I32 _BYTES);
 DEFINE_PRIM(_VOID, clear_color, _POINTER _F64 _F64 _F64 _F64);
-DEFINE_PRIM(_VOID, present, _NO_ARG);
-DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
-DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
+DEFINE_PRIM(_VOID, present, _I32 _I32);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
 DEFINE_PRIM(_F64, get_supported_version, _NO_ARG);
 DEFINE_PRIM(_RESOURCE, create_buffer, _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
