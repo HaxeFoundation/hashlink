@@ -194,6 +194,10 @@ HL_PRIM void HL_NAME(unmap)( dx_resource *r, int subRes ) {
 	driver->context->Unmap(r, subRes);
 }
 
+HL_PRIM void HL_NAME(copy_resource)( dx_resource *to, dx_resource *from ) {
+	driver->context->CopyResource(to,from);
+}
+
 HL_PRIM vbyte *HL_NAME(compile_shader)( vbyte *data, int dataSize, char *source, char *entry, char *target, int flags, bool *error, int *size ) {
 	ID3DBlob *code;
 	ID3DBlob *errorMessage;
@@ -383,6 +387,7 @@ DEFINE_PRIM(_F64, get_supported_version, _NO_ARG);
 DEFINE_PRIM(_RESOURCE, create_buffer, _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_BYTES, map, _RESOURCE _I32 _I32 _BOOL);
 DEFINE_PRIM(_VOID, unmap, _RESOURCE _I32);
+DEFINE_PRIM(_VOID, copy_resource, _RESOURCE _RESOURCE);
 DEFINE_PRIM(_BYTES, compile_shader, _BYTES _I32 _BYTES _BYTES _BYTES _I32 _REF(_BOOL) _REF(_I32));
 DEFINE_PRIM(_BYTES, disassemble_shader, _BYTES _I32 _I32 _BYTES _REF(_I32));
 DEFINE_PRIM(_POINTER, create_vertex_shader, _BYTES _I32);
