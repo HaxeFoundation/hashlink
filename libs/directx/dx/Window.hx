@@ -19,11 +19,12 @@ class Window {
 	static var windows : Array<Window> = [];
 
 	var win : WinPtr;
+	var savedSize : { width : Int, height : Int };
 	public var title(default, set) : String;
-	public var vsync(default, set) : Bool;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
+	public var vsync : Bool;
 
 	public function new( title : String, width : Int, height : Int ) {
 		win = winCreate(width, height);
@@ -40,9 +41,19 @@ class Window {
 	function set_displayMode(mode) {
 		if( mode == displayMode )
 			return mode;
-		if( winSetFullscreen(win, cast mode) )
-			displayMode = mode;
-		return displayMode;
+		displayMode = mode;
+		var fs = mode != Windowed;
+		if( savedSize == null ) {
+			if( !fs ) return mode;
+			savedSize = { width : width, height : height };
+			winSetFullscreen(win,true);
+		} else {
+			if( fs ) return mode;
+			winSetFullscreen(win, false);
+			resize(savedSize.width, savedSize.height);
+			savedSize = null;
+		}
+		return mode;
 	}
 
 	public function resize( width : Int, height : Int ) {
@@ -59,15 +70,6 @@ class Window {
 		var h = 0;
 		winGetSize(win, null, h);
 		return h;
-	}
-
-	function set_vsync(v) {
-		winSetVsync(win,v);
-		return vsync = v;
-	}
-
-	public function present() {
-		winSwapWindow(win);
 	}
 
 	public function destroy() {
@@ -95,11 +97,7 @@ class Window {
 	static function winSetTitle( win : WinPtr, title : hl.Bytes ) {
 	}
 
-	static function winSwapWindow( win : WinPtr ) {
-	}
-
-	static function winSetFullscreen( win : WinPtr, mode : DisplayMode ) {
-		return false;
+	static function winSetFullscreen( win : WinPtr, fs : Bool ) {
 	}
 
 	static function winSetSize( win : WinPtr, width : Int, height : Int ) {
@@ -114,7 +112,12 @@ class Window {
 	static function winDestroy( win : WinPtr ) {
 	}
 
-	static function winSetVsync( win : WinPtr, b : Bool ) {
+	public static function getScreenWidth() {
+		return 0;
+	}
+
+	public static function getScreenHeight() {
+		return 0;
 	}
 
 }

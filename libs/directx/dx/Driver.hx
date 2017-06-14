@@ -439,11 +439,29 @@ class ShaderResourceViewDesc {
 	}
 }
 
+@:enum abstract PresentFlags(Int) {
+	var None = 0;
+	var Test = 1;
+	var DoNotSequence = 2;
+	var Restart = 4;
+	var DoNotWait = 8;
+	var RestrictToOutput = 0x10;
+	var StereoPreferRight = 0x20;
+	var StereoTemporaryMono = 0x40;
+	var UseDuration = 0x100;
+	var AllowTearing = 0x200;
+	@:op(a | b) static function or(a:PresentFlags, b:PresentFlags) : PresentFlags;
+}
+
 @:hlNative("directx")
 class Driver {
 
-	public static function create( win : Window, flags : DriverInitFlags = None ) {
-		return dxCreate(@:privateAccess win.win, flags);
+	public static function create( win : Window, format : Format, flags : DriverInitFlags = None ) {
+		return dxCreate(@:privateAccess win.win, format, flags);
+	}
+
+	public static function resize( width : Int, height : Int, format : Format ) : Bool {
+		return false;
 	}
 
 	public static function getBackBuffer() : Resource {
@@ -467,22 +485,17 @@ class Driver {
 	public static function rsSetViewports( count : Int, bytes : hl.BytesAccess<hl.F32> ) {
 	}
 
+	public static function rsSetScissorRects( count : Int, rects : hl.BytesAccess<Int> ) {
+	}
+
 	public static function clearColor( rt : RenderTargetView, r : Float, g : Float, b : Float, a : Float ) {
 	}
 
-	public static function present() {
+	public static function present( intervals : Int, flags : PresentFlags ) {
 	}
 
 	public static function getDeviceName() {
 		return @:privateAccess String.fromUCS2(dxGetDeviceName());
-	}
-
-	public static function getScreenWidth() {
-		return 0;
-	}
-
-	public static function getScreenHeight() {
-		return 0;
 	}
 
 	public static function getSupportedVersion() : Float {
@@ -612,7 +625,7 @@ class Driver {
 	}
 
 	@:hlNative("directx","create")
-	static function dxCreate( win : hl.Abstract < "dx_window" > , flags : DriverInitFlags ) : DriverInstance { return null; }
+	static function dxCreate( win : hl.Abstract<"dx_window">, format : Format, flags : DriverInitFlags ) : DriverInstance { return null; }
 
 	@:hlNative("directx","get_device_name")
 	static function dxGetDeviceName() : hl.Bytes { return null; }

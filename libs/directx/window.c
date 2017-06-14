@@ -83,34 +83,35 @@ HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
 }
 
 
-HL_PRIM bool HL_NAME(win_set_fullscreen)(dx_window *win, int mode) {
-	switch( mode ) {
-	case 0: // WINDOWED
-	case 1: // FULLSCREEN
-	case 2: // BORDERLESS
-		;
+HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
+	if( fs ) {
+		SetWindowLong(win,GWL_STYLE,WS_POPUPWINDOW);
+		SetWindowPos(win,NULL,0,0,GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN),SWP_NOOWNERZORDER);
+	} else {
+		SetWindowLong(win,GWL_STYLE,WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
 	}
-	return false;
-}
-
-HL_PRIM void HL_NAME(win_swap_window)(dx_window *win) {
 }
 
 HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
 	DestroyWindow(win);
 }
 
-HL_PRIM void HL_NAME(win_set_vsync)(dx_window *win, bool vsync) {
+HL_PRIM int HL_NAME(get_screen_width)() {
+	return GetSystemMetrics(SM_CXSCREEN);
+}
+
+HL_PRIM int HL_NAME(get_screen_height)() {
+	return GetSystemMetrics(SM_CYSCREEN);
 }
 
 #define TWIN _ABSTRACT(dx_window)
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
-DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _I32);
+DEFINE_PRIM(_VOID, win_set_fullscreen, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
-DEFINE_PRIM(_VOID, win_swap_window, TWIN);
 DEFINE_PRIM(_VOID, win_destroy, TWIN);
-DEFINE_PRIM(_VOID, win_set_vsync, TWIN _BOOL);
 
+DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
+DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
