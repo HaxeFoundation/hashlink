@@ -145,7 +145,7 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 		wc.hInstance     = GetModuleHandle(NULL);
 		wc.hIcon		 = LoadIcon(NULL, IDI_WINLOGO);
 		wc.hIconSm       = wc.hIcon;
-		wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+		wc.hCursor       = NULL;
 		wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 		wc.lpszMenuName  = NULL;
 		wc.lpszClassName = USTR("HL_WIN");
@@ -163,6 +163,7 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 	memset(event_buffer,0, sizeof(dx_events));
 	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), event_buffer);
 	ShowWindow(win, SW_SHOW);
+	SetCursor(LoadCursor(NULL, IDC_ARROW));
 	SetForegroundWindow(win);
 	SetFocus(win);
 	return win;
@@ -255,3 +256,73 @@ DEFINE_PRIM(_BOOL, win_get_next_event, TWIN _DYN);
 
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
+
+typedef HCURSOR dx_cursor;
+
+HL_PRIM dx_cursor HL_NAME(load_cursor)( int res ) {
+	return LoadCursor(NULL,MAKEINTRESOURCE(res));
+}
+
+HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, int hotX, int hotY ) {
+	int pad = sizeof(void*) << 3;
+    HICON hicon;
+    HDC hdc = GetDC(NULL);
+    BITMAPV4HEADER bmh;
+    void *pixels;
+    void *maskbits;
+    int maskbitslen;
+    ICONINFO ii;
+
+    ZeroMemory(&bmh,sizeof(bmh));
+    bmh.bV4Size = sizeof(bmh);
+    bmh.bV4Width = width;
+    bmh.bV4Height = -height;
+    bmh.bV4Planes = 1;
+    bmh.bV4BitCount = 32;
+    bmh.bV4V4Compression = BI_BITFIELDS;
+    bmh.bV4AlphaMask = 0xFF000000;
+    bmh.bV4RedMask   = 0x00FF0000;
+    bmh.bV4GreenMask = 0x0000FF00;
+    bmh.bV4BlueMask  = 0x000000FF;
+
+    maskbitslen = ((width + (-width)%pad) >> 3) * height;
+    maskbits = malloc(maskbitslen);
+	if( maskbits == NULL )
+		return NULL;
+	memset(maskbits,0xFF,maskbitslen);
+  
+	memset(&ii,0,sizeof(ii));
+    ii.fIcon = FALSE;
+    ii.xHotspot = (DWORD)hotX;
+    ii.yHotspot = (DWORD)hotY;
+    ii.hbmColor = CreateDIBSection(hdc, (BITMAPINFO*)&bmh, DIB_RGB_COLORS, &pixels, NULL, 0);
+    ii.hbmMask = CreateBitmap(width, height, 1, 1, maskbits);
+    ReleaseDC(NULL, hdc);
+    free(maskbits);
+
+    memcpy(pixels, data, height * width * 4);
+    hicon = CreateIconIndirect(&ii);
+
+    DeleteObject(ii.hbmColor);
+    DeleteObject(ii.hbmMask);
+	return hicon;
+}
+
+HL_PRIM void HL_NAME(destroy_cursor)( dx_cursor c ) {
+	DestroyIcon(c);
+}
+
+HL_PRIM void HL_NAME(set_cursor)( dx_cursor c ) {
+	SetCursor(c);
+}
+
+HL_PRIM void HL_NAME(show_cursor)( bool visible ) {
+	ShowCursor(visible);
+}
+
+#define TCURSOR _ABSTRACT(dx_cursor)
+DEFINE_PRIM(TCURSOR, load_cursor, _I32);
+DEFINE_PRIM(TCURSOR, create_cursor, _I32 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID, destroy_cursor, TCURSOR);
+DEFINE_PRIM(_VOID, set_cursor, TCURSOR);
+DEFINE_PRIM(_VOID, show_cursor, _BOOL);
