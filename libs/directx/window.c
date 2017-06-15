@@ -101,6 +101,35 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_XBUTTONDOWN: addMouse(MouseUp,3 + HIWORD(wparam)); break;
 	case WM_MOUSEMOVE: addMouse(MouseMove,0); break;
 	case WM_MOUSEWHEEL: addMouse(MouseWheel,0); e->wheelDelta = ((int)(short)HIWORD(wparam)) / 120; break;
+	case WM_KEYDOWN:
+		// right alt has triggered a control !
+		if( wparam == VK_MENU && lparam & (1<<24) ) {
+			dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWL_USERDATA);
+			if( buf->event_count > buf->next_event && buf->events[buf->event_count-1].type == KeyDown && buf->events[buf->event_count-1].keyCode == (VK_CONTROL|256) ) {
+				buf->event_count--;
+				//printf("CANCEL\n");
+			}
+		}
+	case WM_KEYUP:
+		e = addEvent(wnd,umsg == WM_KEYUP ? KeyUp : KeyDown);
+		e->keyCode = wparam;
+		e->keyRepeat = umsg == WM_KEYDOWN && (lparam & 0x40000000) != 0;
+		// L/R location
+		if( e->keyCode == VK_SHIFT || e->keyCode == VK_CONTROL || e->keyCode == VK_MENU )
+			e->keyCode |= (lparam & (1<<24)) ? 512 : 256;
+		//printf("%.8X - %d[%s]%s%s\n",lparam,e->keyCode&255,e->type == KeyUp ? "UP":"DOWN",e->keyRepeat?" REPEAT":"",(e->keyCode&256) ? " LEFT" : (e->keyCode & 512) ? " RIGHT" : "");
+		/*
+			TODO:
+			- right shift not detected
+			- left alt not triggered
+			- numpad enter = main enter
+		*/
+		break;
+	case WM_CHAR:
+		e = addEvent(wnd,TextInput);
+		e->keyCode = wparam;
+		e->keyRepeat = (lparam & 0xFFFF) != 0;
+		break;
 	}
 	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
