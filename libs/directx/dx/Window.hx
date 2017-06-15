@@ -90,6 +90,10 @@ class Window {
 		winResize(win, 2);
 	}
 
+	public function getNextEvent( e : Event ) : Bool {
+		return winGetNextEvent(win, e);
+	}
+
 	static function winCreate( width : Int, height : Int ) : WinPtr {
 		return null;
 	}
@@ -118,6 +122,10 @@ class Window {
 
 	public static function getScreenHeight() {
 		return 0;
+	}
+
+	static function winGetNextEvent( win : WinPtr, event : Dynamic ) : Bool {
+		return false;
 	}
 
 }
