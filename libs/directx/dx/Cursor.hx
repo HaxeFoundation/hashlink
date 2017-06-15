@@ -3,49 +3,46 @@ package dx;
 private typedef CursorPtr = hl.Abstract<"dx_cursor">;
 
 @:enum abstract CursorKind(Int) {
-	var Arrow = 0;
-    var IBeam = 1;
-    var Wait = 2;
-    var CrossHair = 3;
-    var WaitArrow = 4;
-    var SizeNWSE = 5;
-    var SizeNESW = 6;
-    var SizeWE = 7;
-    var SizeNS = 8;
-    var SizeALL = 9;
-    var No = 10;
-    var Hand = 11;
+	var Arrow = 32512;
+    var IBeam = 32513;
+    var Wait = 32514;
+    var CrossHair = 32515;
+    var WaitArrow = 32650;
+    var No = 32648;
+    var Hand = 32649;
+	var SizeALL = 32646;
 }
 
-//@:hlNative("dx")
 abstract Cursor(CursorPtr) {
 
-	//@:hlNative("dx", "cursor_create_system")
+	@:hlNative("directx","load_cursor")
 	public static function createSystem( kind : CursorKind ) : Cursor {
 		return null;
 	}
 
-	public function free() {
-		freeCursor(this);
+	@:hlNative("directx","create_cursor")
+	public static function createCursor( width : Int, height : Int, pixels : hl.Bytes, hotX : Int, hotY : Int ) : Cursor {
+		return null;
+	}
+
+	public function destroy() {
+		destroyCursor(this);
 	}
 
 	public function set() {
 		setCursor(this);
 	}
 
-	//@:hlNative("dx", "show_cursor")
+	@:hlNative("directx","show_cursor")
 	public static function show( v : Bool ) {
 	}
 
-	//@:hlNative("dx", "set_cursor")
+	@:hlNative("directx","set_cursor")
 	static function setCursor( k : CursorPtr ) {
 	}
 
-	static function createSystemCursor( kind : CursorKind ) : CursorPtr {
-		return null;
-	}
-
-	static function freeCursor( ptr : CursorPtr ) {
+	@:hlNative("directx","destroy_cursor")
+	static function destroyCursor( ptr : CursorPtr ) {
 	}
 
 }
