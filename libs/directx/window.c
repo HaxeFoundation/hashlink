@@ -226,6 +226,10 @@ HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
 HL_PRIM bool HL_NAME(win_get_next_event)( dx_window *win, dx_event *e ) {
 	dx_events *buf = (dx_events*)GetWindowLongPtr(win,GWL_USERDATA);
 	hl_type *save;
+	if( !buf ) {
+		e->type = Quit;
+		return true;
+	}
 	if( buf->next_event == buf->event_count ) {
 		buf->next_event = buf->event_count = 0;
 		return false;
