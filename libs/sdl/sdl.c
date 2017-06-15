@@ -283,6 +283,22 @@ HL_PRIM void HL_NAME(text_input)( bool enable ) {
 		SDL_StopTextInput();
 }
 
+HL_PRIM int HL_NAME(set_relative_mouse_mode)(bool enable) {
+	return SDL_SetRelativeMouseMode(enable);
+}
+
+HL_PRIM vbyte *HL_NAME(detect_keyboard_layout)() {
+	char q = SDL_GetKeyFromScancode(SDL_SCANCODE_Q);
+	char w = SDL_GetKeyFromScancode(SDL_SCANCODE_W);
+	char y = SDL_GetKeyFromScancode(SDL_SCANCODE_Y);
+
+	if (q == 'q' && w == 'w' && y == 'y') return "qwerty";
+	if (q == 'a' && w == 'z' && y == 'y') return "azerty";
+	if (q == 'q' && w == 'w' && y == 'z') return "qwertz";
+	if (q == 'q' && w == 'z' && y == 'y') return "qzerty";
+	return "unknown";
+}
+
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
 DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32) );
@@ -294,6 +310,8 @@ DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 DEFINE_PRIM(_VOID, text_input, _BOOL);
+DEFINE_PRIM(_I32, set_relative_mouse_mode, _BOOL);
+DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 
 // Window
 
