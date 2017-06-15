@@ -1,16 +1,108 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
 
+#define MAX_EVENTS 1024
+
+typedef enum {
+	Quit		= 0,
+	MouseMove	= 1,
+	MouseLeave	= 2,
+	MouseDown	= 3,
+	MouseUp		= 4,
+	MouseWheel	= 5,
+	WindowState	= 6,
+	KeyDown		= 7,
+	KeyUp		= 8,
+	TextInput	= 9
+} EventType;
+
+typedef enum {
+	Show	= 0,
+	Hide	= 1,
+	Expose	= 2,
+	Move	= 3,
+	Resize	= 4,
+	Minimize= 5,
+	Maximize= 6,
+	Restore	= 7,
+	Enter	= 8,
+	Leave	= 9,
+	Focus	= 10,
+	Blur	= 11,
+	Close 	= 12
+} WindowStateChange;
+
+typedef struct {
+	hl_type *t;
+	EventType type;
+	int mouseX;
+	int mouseY;
+	int button;
+	int wheelDelta;
+	WindowStateChange state;
+	int keyCode;
+	bool keyRepeat;
+	int controller;
+	int value;
+} dx_event;
+
+typedef struct {
+	dx_event events[MAX_EVENTS];
+	int event_count;
+	int next_event;
+} dx_events;
+
 typedef struct HWND__ dx_window;
 
-static LRESULT CALLBACK WndProc( HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam ) {
+static dx_event *addEvent( HWND wnd, EventType type ) {
+	dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWL_USERDATA);
+	dx_event *e;
+	if( buf->event_count == MAX_EVENTS )
+		e = &buf->events[MAX_EVENTS-1];
+	else
+		e = &buf->events[buf->event_count++];
+	e->type = type;
+	return e;
+}
+
+#define addMouse(etype,but) { \
+	e = addEvent(wnd,etype); \
+	e->button = but; \
+	e->mouseX = (short)LOWORD(lparam); \
+	e->mouseY = (short)HIWORD(lparam); \
+}
+
+#define addState(wstate) { e = addEvent(wnd,WindowState); e->state = wstate; }
+
+static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lparam ) {
+	dx_event *e = NULL;
 	switch(umsg) {
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
-	default:
-		return DefWindowProc(hwnd, umsg, wparam, lparam);
+	case WM_CREATE:
+		SetWindowLongPtr(wnd,GWL_USERDATA,(LONG_PTR)((CREATESTRUCT*)lparam)->lpCreateParams);
+		break;
+	case WM_SIZE:
+		{
+			dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWL_USERDATA);
+			if( buf->event_count > buf->next_event && buf->events[buf->event_count-1].type == WindowState && buf->events[buf->event_count-1].state == Resize )
+				buf->event_count--;
+		}
+		addState(Resize);
+		break;
+	case WM_LBUTTONDOWN: addMouse(MouseDown,1); break;
+	case WM_LBUTTONUP: addMouse(MouseUp,1); break;
+	case WM_MBUTTONDOWN: addMouse(MouseDown,2); break;
+	case WM_MBUTTONUP: addMouse(MouseUp,2); break;
+	case WM_RBUTTONDOWN: addMouse(MouseDown,3); break;
+	case WM_RBUTTONUP: addMouse(MouseUp,3); break;
+	case WM_XBUTTONUP: addMouse(MouseDown,3 + HIWORD(wparam)); break;
+	case WM_XBUTTONDOWN: addMouse(MouseUp,3 + HIWORD(wparam)); break;
+	case WM_MOUSEMOVE: addMouse(MouseMove,0); break;
+	case WM_MOUSEWHEEL: addMouse(MouseWheel,0); e->wheelDelta = ((int)(short)HIWORD(wparam)) / 120; break;
 	}
+	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
 
 HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
@@ -38,7 +130,9 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 	r.right = width;
 	r.bottom = height;
 	AdjustWindowRect(&r,style,false);
-	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), NULL);
+	dx_events *event_buffer = (dx_events*)malloc(sizeof(dx_events));
+	memset(event_buffer,0, sizeof(dx_events));
+	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), event_buffer);
 	ShowWindow(win, SW_SHOW);
 	SetForegroundWindow(win);
 	SetFocus(win);
@@ -93,7 +187,23 @@ HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 }
 
 HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
+	dx_events *buf = (dx_events*)GetWindowLongPtr(win,GWL_USERDATA);
+	free(buf);
+	SetWindowLongPtr(win,GWL_USERDATA,0);
 	DestroyWindow(win);
+}
+
+HL_PRIM bool HL_NAME(win_get_next_event)( dx_window *win, dx_event *e ) {
+	dx_events *buf = (dx_events*)GetWindowLongPtr(win,GWL_USERDATA);
+	hl_type *save;
+	if( buf->next_event == buf->event_count ) {
+		buf->next_event = buf->event_count = 0;
+		return false;
+	}
+	save = e->t;
+	memcpy(e,&buf->events[buf->next_event++],sizeof(dx_event));
+	e->t = save;
+	return true;
 }
 
 HL_PRIM int HL_NAME(get_screen_width)() {
@@ -112,6 +222,7 @@ DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_destroy, TWIN);
+DEFINE_PRIM(_BOOL, win_get_next_event, TWIN _DYN);
 
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);

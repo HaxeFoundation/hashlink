@@ -14,8 +14,12 @@ class Loop {
 		sentinel.tick();
 	}
 
-	//@:hlNative TODO !
-	static function eventLoop( e : Event ) return false;
+	static function eventLoop( e : Event ) {
+		for( w in @:privateAccess Window.windows )
+			if( w.getNextEvent(e) )
+				return true;
+		return false;
+	}
 
 	public static function processEvents() {
 		var event = new Event();
