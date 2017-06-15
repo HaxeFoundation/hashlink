@@ -36,7 +36,7 @@ class Sdl {
 		var flags = new haxe.EnumFlags<hl.UI.DialogFlags>();
 		flags.set(IsError);
 		var msg = 'The application was unable to create an OpenGL context\nfor your $device video card.\nOpenGL $requiredGLMajor.$requiredGLMinor+ is required, please update your driver.';
-		#if (haxe_ver >= "3.4.1") sentinel.setPause(true); #end
+		sentinel.pause = true;
 		hl.UI.dialog("OpenGL Error", msg, flags);
 		Sys.exit( -1);
 	}
