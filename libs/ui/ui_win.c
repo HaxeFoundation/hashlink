@@ -252,6 +252,10 @@ HL_PRIM void HL_NAME(ui_sentinel_pause)( vsentinel *s, bool pause ) {
 	s->pause = pause;
 }
 
+HL_PRIM bool HL_NAME(ui_sentinel_is_paused)( vsentinel *s ) {
+	return s->pause;
+}
+
 HL_PRIM void HL_NAME(ui_close_console)() {
 	FreeConsole();
 }
@@ -274,3 +278,4 @@ DEFINE_PRIM(_VOID, ui_close_console, _NO_ARG);
 DEFINE_PRIM(_SENTINEL, ui_start_sentinel, _F64 _FUN(_VOID,_NO_ARG));
 DEFINE_PRIM(_VOID, ui_sentinel_tick, _SENTINEL);
 DEFINE_PRIM(_VOID, ui_sentinel_pause, _SENTINEL _BOOL);
+DEFINE_PRIM(_BOOL, ui_sentinel_is_paused, _SENTINEL);
