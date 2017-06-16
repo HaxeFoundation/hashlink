@@ -19,10 +19,12 @@ class Window {
 	static var windows : Array<Window> = [];
 
 	var win : WinPtr;
-	var savedSize : { width : Int, height : Int };
+	var savedSize : { x : Int, y : Int, width : Int, height : Int };
 	public var title(default, set) : String;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
+	public var x(get, never) : Int;
+	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
 	public var vsync : Bool;
 
@@ -45,12 +47,13 @@ class Window {
 		var fs = mode != Windowed;
 		if( savedSize == null ) {
 			if( !fs ) return mode;
-			savedSize = { width : width, height : height };
+			savedSize = { x : x, y : y, width : width, height : height };
 			winSetFullscreen(win,true);
 		} else {
 			if( fs ) return mode;
 			winSetFullscreen(win, false);
 			resize(savedSize.width, savedSize.height);
+			setPosition(savedSize.x, savedSize.y);
 			savedSize = null;
 		}
 		return mode;
@@ -58,6 +61,10 @@ class Window {
 
 	public function resize( width : Int, height : Int ) {
 		winSetSize(win, width, height);
+	}
+
+	public function setPosition( x : Int, y : Int ) {
+		winSetPosition(win, x, y);
 	}
 
 	function get_width() {
@@ -70,6 +77,18 @@ class Window {
 		var h = 0;
 		winGetSize(win, null, h);
 		return h;
+	}
+
+	function get_x() {
+		var x = 0;
+		winGetPosition(win, x, null);
+		return x;
+	}
+
+	function get_y() {
+		var y = 0;
+		winGetPosition(win, null, y);
+		return y;
 	}
 
 	public function destroy() {
@@ -107,10 +126,16 @@ class Window {
 	static function winSetSize( win : WinPtr, width : Int, height : Int ) {
 	}
 
+	static function winSetPosition( win : WinPtr, x : Int, y : Int ) {
+	}
+
 	static function winResize( win : WinPtr, mode : Int ) {
 	}
 
 	static function winGetSize( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
+	}
+
+	static function winGetPosition( win : WinPtr, x : hl.Ref<Int>, y : hl.Ref<Int> ) {
 	}
 
 	static function winDestroy( win : WinPtr ) {
