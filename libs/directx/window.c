@@ -190,6 +190,17 @@ HL_PRIM void HL_NAME(win_get_size)(dx_window *win, int *width, int *height) {
 	if( height ) *height = r.bottom;
 }
 
+HL_PRIM void HL_NAME(win_get_position)(dx_window *win, int *x, int *y) {
+	RECT r;
+	GetWindowRect(win,&r);
+	if( x ) *x = r.left;
+	if( y ) *y = r.top;
+}
+
+HL_PRIM void HL_NAME(win_set_position)(dx_window *win, int x, int y) {
+	SetWindowPos(win,NULL,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER);
+}
+
 HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
 	switch( mode ) {
 	case 0:
@@ -206,13 +217,15 @@ HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
 	}
 }
 
-
 HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 	if( fs ) {
-		SetWindowLong(win,GWL_STYLE,WS_POPUPWINDOW);
-		SetWindowPos(win,NULL,0,0,GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN),SWP_NOOWNERZORDER);
+		MONITORINFO mi = { sizeof(mi) };
+        GetMonitorInfo(MonitorFromWindow(win,MONITOR_DEFAULTTOPRIMARY), &mi);
+		SetWindowLong(win,GWL_STYLE,WS_POPUP | WS_VISIBLE);
+		SetWindowPos(win,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top,SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	} else {
 		SetWindowLong(win,GWL_STYLE,WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	}
 }
 
@@ -254,7 +267,9 @@ DEFINE_PRIM(_VOID, win_set_fullscreen, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_destroy, TWIN);
 DEFINE_PRIM(_BOOL, win_get_next_event, TWIN _DYN);
 
@@ -294,7 +309,7 @@ HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, in
 	if( maskbits == NULL )
 		return NULL;
 	memset(maskbits,0xFF,maskbitslen);
-  
+
 	memset(&ii,0,sizeof(ii));
     ii.fIcon = FALSE;
     ii.xHotspot = (DWORD)hotX;
