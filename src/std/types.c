@@ -471,6 +471,11 @@ HL_PRIM bool hl_type_enum_eq( venum *a, venum *b ) {
 			{
 				vdynamic *pa = hl_make_dyn((char*)a + c->offsets[i],t);
 				vdynamic *pb = hl_make_dyn((char*)b + c->offsets[i],t);
+				if( pa && pb && pa->t->kind == HENUM && pb->t->kind == HENUM ) {
+					if( !hl_type_enum_eq((venum*)pa,(venum*)pb) )
+						return false;
+					continue;
+				}
 				if( hl_dyn_compare(pa,pb) )
 					return false;
 			}
