@@ -25,7 +25,7 @@ class ResourceBox {
 abstract Resource(hl.Abstract<"dx_resource">) {
 
 	@:hlNative("directx", "map")
-	public function map( subResource : Int, type : MapType, waitGpu : Bool ) : hl.Bytes {
+	public function map( subResource : Int, type : MapType, waitGpu : Bool, pitch : hl.Ref<Int> ) : hl.Bytes {
 		return null;
 	}
 

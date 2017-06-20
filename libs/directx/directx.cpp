@@ -183,10 +183,12 @@ HL_PRIM void HL_NAME(update_subresource)( dx_resource *r, int index, dx_struct<D
 	driver->context->UpdateSubresource(r, index, box ? &box->value : NULL, data, srcRowPitch, srcDstPitch);
 }
 
-HL_PRIM void *HL_NAME(map)( dx_resource *r, int subRes, int type, bool waitGpu ) {
+HL_PRIM void *HL_NAME(map)( dx_resource *r, int subRes, int type, bool waitGpu, int *pitch ) {
 	D3D11_MAPPED_SUBRESOURCE map;
 	if( driver->context->Map(r,subRes,(D3D11_MAP)type,waitGpu?0:D3D11_MAP_FLAG_DO_NOT_WAIT,&map) != S_OK )
 		DXERR();
+	if( pitch )
+		*pitch = map.RowPitch;
 	return map.pData;
 }
 
@@ -389,7 +391,7 @@ DEFINE_PRIM(_VOID, present, _I32 _I32);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
 DEFINE_PRIM(_F64, get_supported_version, _NO_ARG);
 DEFINE_PRIM(_RESOURCE, create_buffer, _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
-DEFINE_PRIM(_BYTES, map, _RESOURCE _I32 _I32 _BOOL);
+DEFINE_PRIM(_BYTES, map, _RESOURCE _I32 _I32 _BOOL _REF(_I32));
 DEFINE_PRIM(_VOID, unmap, _RESOURCE _I32);
 DEFINE_PRIM(_VOID, copy_resource, _RESOURCE _RESOURCE);
 DEFINE_PRIM(_BYTES, compile_shader, _BYTES _I32 _BYTES _BYTES _BYTES _I32 _REF(_BOOL) _REF(_I32));
