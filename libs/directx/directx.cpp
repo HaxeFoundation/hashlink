@@ -373,6 +373,17 @@ HL_PRIM void HL_NAME(generate_mips)( dx_pointer *t ) {
 	driver->context->GenerateMips((ID3D11ShaderResourceView*)t);
 }
 
+HL_PRIM bool HL_NAME(set_fullscreen_state)( bool fs ) {
+	return driver->swapchain->SetFullscreenState(fs,NULL) == S_OK;
+}
+
+HL_PRIM bool HL_NAME(get_fullscreen_state)() {
+	BOOL ret;
+	if( driver->swapchain->GetFullscreenState(&ret,NULL) != S_OK )
+		return false;
+	return ret != 0;
+}
+
 #define _DRIVER _ABSTRACT(dx_driver)
 #define _POINTER _ABSTRACT(dx_pointer)
 #define _RESOURCE _ABSTRACT(dx_resource)
@@ -425,3 +436,5 @@ DEFINE_PRIM(_VOID, vs_set_samplers, _I32 _I32 _REF(_POINTER));
 DEFINE_PRIM(_VOID, ps_set_shader_resources, _I32 _I32 _REF(_POINTER));
 DEFINE_PRIM(_VOID, vs_set_shader_resources, _I32 _I32 _REF(_POINTER));
 DEFINE_PRIM(_VOID, generate_mips, _POINTER);
+DEFINE_PRIM(_BOOL, set_fullscreen_state, _BOOL);
+DEFINE_PRIM(_BOOL, get_fullscreen_state, _NO_ARG);
