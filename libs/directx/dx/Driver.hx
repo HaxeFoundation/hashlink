@@ -456,6 +456,8 @@ class ShaderResourceViewDesc {
 @:hlNative("directx")
 class Driver {
 
+	public static var fullScreen(get, set) : Bool;
+
 	public static function create( win : Window, format : Format, flags : DriverInitFlags = None ) {
 		return dxCreate(@:privateAccess win.win, format, flags);
 	}
@@ -610,6 +612,21 @@ class Driver {
 	}
 
 	public static function generateMips( res : ShaderResourceView ) {
+	}
+
+	static function get_fullScreen() return getFullscreenState();
+	static function set_fullScreen(b) {
+		if( !setFullscreenState(b) )
+			return false;
+		return b;
+	}
+
+	static function getFullscreenState() {
+		return false;
+	}
+
+	static function setFullscreenState( b : Bool ) {
+		return false;
 	}
 
 	@:hlNative("directx", "create_depth_stencil_state")

@@ -49,8 +49,11 @@ class Window {
 			if( !fs ) return mode;
 			savedSize = { x : x, y : y, width : width, height : height };
 			winSetFullscreen(win,true);
+			Driver.fullScreen = mode == Fullscreen;
 		} else {
-			if( fs ) return mode;
+			Driver.fullScreen = mode == Fullscreen;
+			if( fs )
+				return mode;
 			winSetFullscreen(win, false);
 			resize(savedSize.width, savedSize.height);
 			setPosition(savedSize.x, savedSize.y);
