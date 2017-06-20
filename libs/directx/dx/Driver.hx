@@ -609,6 +609,9 @@ class Driver {
 	public static function vsSetShaderResources( start : Int, count : Int, arr : hl.Ref<ShaderResourceView> ) {
 	}
 
+	public static function generateMips( res : ShaderResourceView ) {
+	}
+
 	@:hlNative("directx", "create_depth_stencil_state")
 	static function dxCreateDepthStencilState( desc : Dynamic ) : DepthStencilState {
 		return null;

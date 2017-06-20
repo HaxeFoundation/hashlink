@@ -367,6 +367,10 @@ HL_PRIM void HL_NAME(vs_set_shader_resources)( int start, int count, dx_pointer 
 	driver->context->VSSetShaderResources(start, count, (ID3D11ShaderResourceView**)arr);
 }
 
+HL_PRIM void HL_NAME(generate_mips)( dx_pointer *t ) {
+	driver->context->GenerateMips((ID3D11ShaderResourceView*)t);
+}
+
 #define _DRIVER _ABSTRACT(dx_driver)
 #define _POINTER _ABSTRACT(dx_pointer)
 #define _RESOURCE _ABSTRACT(dx_resource)
@@ -418,4 +422,4 @@ DEFINE_PRIM(_VOID, ps_set_samplers, _I32 _I32 _REF(_POINTER));
 DEFINE_PRIM(_VOID, vs_set_samplers, _I32 _I32 _REF(_POINTER));
 DEFINE_PRIM(_VOID, ps_set_shader_resources, _I32 _I32 _REF(_POINTER));
 DEFINE_PRIM(_VOID, vs_set_shader_resources, _I32 _I32 _REF(_POINTER));
-
+DEFINE_PRIM(_VOID, generate_mips, _POINTER);
