@@ -334,6 +334,8 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 	case HABSTRACT:
 		hl_buffer_char(b, '~');
 		hl_buffer_str(b, v->t->abs_name);
+		hl_buffer_char(b, ':');
+		hl_buffer_str_sub(b, buf, usprintf(buf, 32, _PTR_FMT,(int_val)v->v.ptr));
 		break;
 	case HENUM:
 		{
