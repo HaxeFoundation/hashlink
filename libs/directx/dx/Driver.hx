@@ -614,6 +614,10 @@ class Driver {
 	public static function generateMips( res : ShaderResourceView ) {
 	}
 
+	public static function debugPrint( str : String ) {
+		dxDebugPrint(@:privateAccess str.bytes);
+	}
+
 	static function get_fullScreen() return getFullscreenState();
 	static function set_fullScreen(b) {
 		if( !setFullscreenState(b) )
@@ -683,6 +687,10 @@ class Driver {
 	@:hlNative("directx","create_shader_resource_view")
 	static function dxCreateShaderResourceView( res : Resource, desc : Dynamic ) : ShaderResourceView {
 		return null;
+	}
+
+	@:hlNative("directx","debug_print")
+	static function dxDebugPrint( str : hl.Bytes ) {
 	}
 
 }
