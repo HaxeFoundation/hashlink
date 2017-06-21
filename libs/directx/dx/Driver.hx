@@ -614,8 +614,8 @@ class Driver {
 	public static function generateMips( res : ShaderResourceView ) {
 	}
 
-	public static function debugPrint( str : String ) {
-		dxDebugPrint(@:privateAccess str.bytes);
+	public static function debugPrint( v : Dynamic ) {
+		dxDebugPrint(@:privateAccess Std.string(v).bytes);
 	}
 
 	static function get_fullScreen() return getFullscreenState();
