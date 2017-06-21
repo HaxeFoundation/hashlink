@@ -384,6 +384,10 @@ HL_PRIM bool HL_NAME(get_fullscreen_state)() {
 	return ret != 0;
 }
 
+HL_PRIM void HL_NAME(debug_print)( vbyte *b ) {
+	OutputDebugString((LPCWSTR)b);
+}
+
 #define _DRIVER _ABSTRACT(dx_driver)
 #define _POINTER _ABSTRACT(dx_pointer)
 #define _RESOURCE _ABSTRACT(dx_resource)
@@ -438,3 +442,4 @@ DEFINE_PRIM(_VOID, vs_set_shader_resources, _I32 _I32 _REF(_POINTER));
 DEFINE_PRIM(_VOID, generate_mips, _POINTER);
 DEFINE_PRIM(_BOOL, set_fullscreen_state, _BOOL);
 DEFINE_PRIM(_BOOL, get_fullscreen_state, _NO_ARG);
+DEFINE_PRIM(_VOID, debug_print, _BYTES);
