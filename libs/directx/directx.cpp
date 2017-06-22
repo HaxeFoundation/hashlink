@@ -39,8 +39,7 @@ static IDXGIFactory *GetDXGI() {
 	return factory;
 }
 
-HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags ) {
-	DWORD result;
+HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int restrictLevel ) {
 	static D3D_FEATURE_LEVEL levels[] = {
 		D3D_FEATURE_LEVEL_11_1,
 		D3D_FEATURE_LEVEL_11_0,
@@ -50,11 +49,13 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags ) {
 		D3D_FEATURE_LEVEL_9_2,
 		D3D_FEATURE_LEVEL_9_1,
 	};
+	static int maxLevels = sizeof(levels) / sizeof(D3D_FEATURE_LEVEL);
+	DWORD result;
 	dx_driver *d = (dx_driver*)hl_gc_alloc_noptr(sizeof(dx_driver));
 	ZeroMemory(d,sizeof(dx_driver));
-
+	if( restrictLevel >= maxLevels ) restrictLevel = maxLevels - 1;
 	d->init_flags = flags;
-	result = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels,7,D3D11_SDK_VERSION,&d->device,&d->feature,&d->context);
+	result = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels + restrictLevel,maxLevels - restrictLevel,D3D11_SDK_VERSION,&d->device,&d->feature,&d->context);
 	if( result == E_INVALIDARG ) // most likely no DX11.1 support, try again
 		result = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,NULL,0,D3D11_SDK_VERSION,&d->device,&d->feature,&d->context);
 	if( result != S_OK )
@@ -392,7 +393,7 @@ HL_PRIM void HL_NAME(debug_print)( vbyte *b ) {
 #define _POINTER _ABSTRACT(dx_pointer)
 #define _RESOURCE _ABSTRACT(dx_resource)
 
-DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _I32);
+DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, resize, _I32 _I32 _I32);
 DEFINE_PRIM(_RESOURCE, get_back_buffer, _NO_ARG);
 DEFINE_PRIM(_POINTER, create_render_target_view, _RESOURCE _DYN);
