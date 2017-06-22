@@ -465,8 +465,8 @@ class Driver {
 
 	public static var fullScreen(get, set) : Bool;
 
-	public static function create( win : Window, format : Format, flags : DriverInitFlags = None ) {
-		return dxCreate(@:privateAccess win.win, format, flags);
+	public static function create( win : Window, format : Format, flags : DriverInitFlags = None, restrictLevel = 0 ) {
+		return dxCreate(@:privateAccess win.win, format, flags, restrictLevel);
 	}
 
 	public static function resize( width : Int, height : Int, format : Format ) : Bool {
@@ -656,7 +656,7 @@ class Driver {
 	}
 
 	@:hlNative("directx","create")
-	static function dxCreate( win : hl.Abstract<"dx_window">, format : Format, flags : DriverInitFlags ) : DriverInstance { return null; }
+	static function dxCreate( win : hl.Abstract<"dx_window">, format : Format, flags : DriverInitFlags, restrictLevel : Int ) : DriverInstance { return null; }
 
 	@:hlNative("directx","get_device_name")
 	static function dxGetDeviceName() : hl.Bytes { return null; }
