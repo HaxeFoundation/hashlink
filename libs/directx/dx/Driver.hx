@@ -186,7 +186,7 @@ abstract DxBool(Int) {
 	var PerInstanceData = 0;
 }
 
-
+@:keep
 class LayoutElement {
 	public var semanticName : hl.Bytes;
 	public var semanticIndex : Int;
@@ -214,6 +214,7 @@ class LayoutElement {
 	var TextureBufferEx = 11;
 }
 
+@:keep
 class RenderTargetDesc {
 	public var format : Format;
 	public var dimension : ResourceDimension;
@@ -247,6 +248,7 @@ class RenderTargetDesc {
 	public var Back = 3;
 }
 
+@:keep
 class RasterizerDesc {
 	public var fillMode : FillMode;
 	public var cullMode : CullMode;
@@ -262,6 +264,7 @@ class RasterizerDesc {
 	}
 }
 
+@:keep
 class Texture2dDesc {
 	public var width : Int;
 	public var height : Int;
@@ -301,6 +304,7 @@ class Texture2dDesc {
 	var Desc = 8;
 }
 
+@:keep
 class DepthStencilDesc {
 	public var depthEnable : DxBool;
 	public var depthWrite : DxBool;
@@ -348,6 +352,7 @@ class DepthStencilDesc {
 	var Max = 5;
 }
 
+@:keep
 class RenderTargetBlendDesc {
 
 	public var blendEnable : DxBool;
@@ -410,6 +415,7 @@ class RenderTargetBlendDesc {
 	var MirrorOnce = 5;
 }
 
+@:keep
 class SamplerDesc {
 	public var filter : Filter;
 	public var addressU : AddressMode;
@@ -428,6 +434,7 @@ class SamplerDesc {
 	}
 }
 
+@:keep
 class ShaderResourceViewDesc {
 	public var format : Format;
 	public var dimension : ResourceDimension;
