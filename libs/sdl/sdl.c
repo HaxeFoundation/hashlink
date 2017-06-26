@@ -70,6 +70,7 @@ typedef struct {
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
 		return false;
 #	ifdef _WIN32
