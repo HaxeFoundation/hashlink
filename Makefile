@@ -64,11 +64,11 @@ else
 CFLAGS += -m$(ARCH) -fPIC
 LFLAGS += -lm -Wl,--export-dynamic -Wl,--no-undefined
 
-# otherwise ld will link to the .a and complain about missing -fPIC (Ubuntu 14)
-LIBTURBOJPEG = -l:libturbojpeg.so.0
-
 ifeq ($(ARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
+LIBFLAGS += -L/opt/libjpeg-turbo/lib
+else
+LIBFLAGS += -L/opt/libjpeg-turbo/lib64
 endif
 
 LIBOPENAL = -lopenal

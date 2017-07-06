@@ -7,11 +7,11 @@ linux32_before_install: &linux32_before_install
       gcc-multilib
       libz-dev:i386
       zlib1g-dev:i386
-      libturbojpeg:i386
       libpng-dev:i386
       libsdl2-dev:i386
       libvorbis-dev:i386
       libalut-dev:i386
+      nasm # for compiling libjpeg-turbo
   # install mbedtls
   - mkdir ~/mbedtls
   - pushd ~/mbedtls
@@ -21,6 +21,16 @@ linux32_before_install: &linux32_before_install
   -   make lib           SHARED=1 CFLAGS="-O2 -m32" LDFLAGS="-m32"
   -   sudo make install  SHARED=1 CFLAGS="-O2 -m32" LDFLAGS="-m32"
   - popd
+  # install libjpeg-turbo (the Ubuntu package is missing -fPIE/-fPIC)
+  - mkdir ~/libjpeg-turbo
+  - pushd ~/libjpeg-turbo
+  -   wget https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.tar.gz
+  -   tar xzf 1.5.1.tar.gz --strip-components=1
+  -   autoreconf -fiv
+  -   ./configure
+  -   make
+  -   sudo make install
+  - popd
   - haxelib install hashlink
 
 linux64_before_install: &linux64_before_install
@@ -28,11 +38,11 @@ linux64_before_install: &linux64_before_install
   - sudo apt-get install -y
       libz-dev
       zlib1g-dev
-      libturbojpeg
       libpng-dev
       libsdl2-dev
       libvorbis-dev
       libalut-dev
+      nasm # for compiling libjpeg-turbo
   # install mbedtls
   - mkdir ~/mbedtls
   - pushd ~/mbedtls
@@ -40,6 +50,16 @@ linux64_before_install: &linux64_before_install
   -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
   -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
   -   SHARED=1 make lib
+  -   sudo make install
+  - popd
+  # install libjpeg-turbo (the Ubuntu package is missing -fPIE/-fPIC)
+  - mkdir ~/libjpeg-turbo
+  - pushd ~/libjpeg-turbo
+  -   wget https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.tar.gz
+  -   tar xzf 1.5.1.tar.gz --strip-components=1
+  -   autoreconf -fiv
+  -   ./configure
+  -   make
   -   sudo make install
   - popd
   - haxelib install hashlink
