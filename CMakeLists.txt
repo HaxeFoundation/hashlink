@@ -330,6 +330,9 @@ target_compile_definitions(fmt.hdll
 # Tests
 
 include(CTest)
-add_test(NAME hello.hl
-	COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
-)
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    # HL/JIT is currently not supported when compiled to 64 bits
+    add_test(NAME hello.hl
+        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
+    )
+endif()
