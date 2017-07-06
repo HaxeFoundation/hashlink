@@ -26,7 +26,7 @@ HL = src/callback.o src/code.o src/jit.o src/main.o src/module.o src/debugger.o
 
 FMT = libs/fmt/fmt.o
 
-SDL = libs/sdl/sdl.o libs/sdl/gl.o libs/sdl/openal.o
+SDL = libs/sdl/sdl.o libs/sdl/gl.o
 
 SSL = libs/ssl/ssl.o
 

@@ -536,7 +536,7 @@ HL_PRIM vdynamic *HL_NAME(gl_create_query)() {
 
 HL_PRIM void HL_NAME(gl_delete_query)( vdynamic *q ) {
 	GLOG("%d",q->v.i);
-	glDeleteQueries(1,&q->v.i);
+	glDeleteQueries(1, (const GLuint *) &q->v.i);
 }
 
 HL_PRIM void HL_NAME(gl_begin_query)( int target, vdynamic *q ) {
