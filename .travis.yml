@@ -74,6 +74,16 @@ matrix:
     - haxe: development
       os: linux
       dist: trusty
+      env: ARCH=64 BUILD=cmake
+      before_install: *linux64_before_install
+      install:
+        - cmake .
+        - make
+      script:
+        - make test ARGS="-V"
+    - haxe: development
+      os: linux
+      dist: trusty
       env: ARCH=64 BUILD=make
       before_install: *linux64_before_install
       before_script:
