@@ -1,37 +1,7 @@
 language: haxe
 
-linux32_before_install: &linux32_before_install
-  - sudo dpkg --add-architecture i386
-  - sudo apt-get update -y
-  - sudo apt-get install -y
-      gcc-multilib
-      libz-dev:i386
-      zlib1g-dev:i386
-      libpng-dev:i386
-      libsdl2-dev:i386
-      libvorbis-dev:i386
-      libalut-dev:i386
-      nasm # for compiling libjpeg-turbo
-  # install mbedtls
-  - mkdir ~/mbedtls
-  - pushd ~/mbedtls
-  -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
-  -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
-  -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
-  -   make lib           SHARED=1 CFLAGS="-O2 -m32" LDFLAGS="-m32"
-  -   sudo make install  SHARED=1 CFLAGS="-O2 -m32" LDFLAGS="-m32"
-  - popd
-  # install libjpeg-turbo (the Ubuntu package is missing -fPIE/-fPIC)
-  - mkdir ~/libjpeg-turbo
-  - pushd ~/libjpeg-turbo
-  -   wget https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.tar.gz
-  -   tar xzf 1.5.1.tar.gz --strip-components=1
-  -   autoreconf -fiv
-  -   ./configure
-  -   make
-  -   sudo make install
-  - popd
-  - haxelib install hashlink
+linux32_install: &linux32_install
+  - docker build -f Dockerfile-i386 -t hashlink .
 
 linux64_before_install: &linux64_before_install
   - sudo apt-get update -y
@@ -69,6 +39,21 @@ mac_before_install: &mac_before_install
   - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft mbedtls
   - haxelib install hashlink
 
+make_install: &make_install
+  - make all
+  - sudo make install_lib
+
+cmake_install: &cmake_install
+  - cmake .
+  - make
+
+make_script: &make_script
+  - haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
+    make hlc &&
+    ./hlc
+cmake_script: &cmake_script
+  - make test ARGS="-V"
+
 sudo: required
 matrix:
   allow_failures:
@@ -78,76 +63,72 @@ matrix:
       os: linux
       dist: trusty
       env: ARCH=32 BUILD=cmake
-      before_install: *linux32_before_install
-      install:
-        - cmake -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake
-        - make
+      services: [docker]
+      install: *linux32_install
       script:
-        - make test ARGS="-V"
+        - >
+          docker run hashlink bash -c
+          'cmake . -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake &&
+          make &&
+          make test ARGS=-V'
     - haxe: development
       os: linux
       dist: trusty
       env: ARCH=32 BUILD=make
-      before_install: *linux32_before_install
-      before_script:
-        - sudo ldconfig
+      services: [docker]
+      install: *linux32_install
+      script:
+        - >
+          docker run hashlink bash -c
+          'make all &&
+          make install_lib &&
+          ldconfig &&
+          haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
+          ./hl hello.hl &&
+          haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
+          make hlc &&
+          ./hlc'
     - haxe: development
       os: linux
       dist: trusty
       env: ARCH=64 BUILD=cmake
       before_install: *linux64_before_install
-      install:
-        - cmake .
-        - make
-      script:
-        - make test ARGS="-V"
+      install: *cmake_install
+      script: *cmake_script
     - haxe: development
       os: linux
       dist: trusty
       env: ARCH=64 BUILD=make
       before_install: *linux64_before_install
+      install: *make_install
       before_script:
         - sudo ldconfig
+      script: *make_script
     - haxe: development
       os: osx
       osx_image: xcode8
       env: ARCH=64 BUILD=make
       before_install: *mac_before_install
+      install: *make_install
+      script: *make_script
     - haxe: development
       os: osx
       osx_image: xcode8
       env: ARCH=64 BUILD=cmake
       before_install: *mac_before_install
-      install:
-        - cmake .
-        - make
-      script:
-        - make test ARGS="-V"
+      install: *cmake_install
+      script: *cmake_script
     - haxe: development
       os: osx
       osx_image: xcode7.1
       env: ARCH=64 BUILD=make
       before_install: *mac_before_install
+      install: *make_install
+      script: *make_script
     - haxe: development
       os: osx
       osx_image: xcode7.1
       env: ARCH=64 BUILD=cmake
       before_install: *mac_before_install
-      install:
-        - cmake .
-        - make
-      script:
-        - make test ARGS="-V"
-
-install:
-  - make all
-  - sudo make install_lib
-
-script:
-  - if [ "$ARCH" = "32" ]; then
-      haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
-      ./hl hello.hl;
-    fi
-  - haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
-    make hlc &&
-    ./hlc
+      install: *cmake_install
+      script: *cmake_script
