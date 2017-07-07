@@ -68,7 +68,8 @@ matrix:
       script:
         - >
           docker run hashlink bash -c
-          'cmake . -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake &&
+          'set -ex &&
+          cmake . -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake &&
           make &&
           make test ARGS=-V'
     - haxe: development
@@ -80,7 +81,8 @@ matrix:
       script:
         - >
           docker run hashlink bash -c
-          'make all &&
+          'set -ex &&
+          make all &&
           make install_lib &&
           ldconfig &&
           haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
