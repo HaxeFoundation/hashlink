@@ -130,6 +130,12 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		e->keyCode = wparam;
 		e->keyRepeat = (lparam & 0xFFFF) != 0;
 		break;
+	case WM_SETFOCUS:
+		addState(Focus);
+		break;
+	case WM_KILLFOCUS:
+		addState(Blur);
+		break;
 	}
 	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
