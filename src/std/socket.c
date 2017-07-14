@@ -401,6 +401,7 @@ static fd_set *make_socket_set( varray *a, char **tmp, int *tmp_size, unsigned i
 	if( *tmp_size < req )
 		return NULL;
 	*tmp_size -= req;
+	*tmp += req;
 	FD_ZERO(set);
 	for(i=0;i<a->size;i++) {
 		hl_socket *s= hl_aptr(a,hl_socket*)[i];
