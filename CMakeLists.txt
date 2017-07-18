@@ -74,8 +74,7 @@ add_library(libhl SHARED
 if(WIN32)
     set_target_properties(libhl
         PROPERTIES
-        PREFIX lib
-        OUTPUT_NAME hl
+        OUTPUT_NAME libhl
     )
 else()
     set_target_properties(libhl
