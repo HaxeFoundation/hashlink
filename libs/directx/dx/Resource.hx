@@ -33,6 +33,10 @@ abstract Resource(hl.Abstract<"dx_resource">) {
 		dxUpdateSubresource(subResource, box, data, srcRowPitch, srcDepthPitch);
 	}
 
+	public inline function copySubresourceRegion( subResource : Int, dstX : Int, dstY : Int, dstZ : Int, src : Resource, srcSubResource : Int, srcBox : Null<ResourceBox> ) : Void {
+		dxCopySubresourceRegion(subResource, dstX, dstY, dstZ, src, srcSubResource, srcBox);
+	}
+
 	@:hlNative("directx", "copy_resource")
 	public function copyResource( from : Resource ) {
 	}
@@ -41,6 +45,9 @@ abstract Resource(hl.Abstract<"dx_resource">) {
 	function dxUpdateSubresource( subResource : Int, box : Dynamic, data : hl.Bytes, srcRowPitch : Int, srcDepthPitch : Int ) : Void {
 	}
 
+	@:hlNative("directx", "copy_subresource_region")
+	function dxCopySubresourceRegion( subResource : Int, dstX : Int, dstY : Int, dstZ : Int, src : Resource, srcSubResource : Int, srcBox : Dynamic ) : Void {
+	}
 
 	@:hlNative("directx", "unmap")
 	public function unmap( subResource : Int ) : Void {
