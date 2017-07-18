@@ -56,8 +56,6 @@ cmake_script: &cmake_script
 
 sudo: required
 matrix:
-  allow_failures:
-    - os: osx
   include:
     - haxe: development
       os: linux
