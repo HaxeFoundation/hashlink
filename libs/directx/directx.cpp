@@ -184,6 +184,10 @@ HL_PRIM void HL_NAME(update_subresource)( dx_resource *r, int index, dx_struct<D
 	driver->context->UpdateSubresource(r, index, box ? &box->value : NULL, data, srcRowPitch, srcDstPitch);
 }
 
+HL_PRIM void HL_NAME(copy_subresource_region)( dx_resource *r, int index, int dx, int dy, int dz, dx_resource *src, int sindex, dx_struct<D3D11_BOX> *box ) {
+	driver->context->CopySubresourceRegion(r, index, dx, dy, dz, src, sindex, box ? &box->value : NULL);
+}
+
 HL_PRIM void *HL_NAME(map)( dx_resource *r, int subRes, int type, bool waitGpu, int *pitch ) {
 	D3D11_MAPPED_SUBRESOURCE map;
 	if( driver->context->Map(r,subRes,(D3D11_MAP)type,waitGpu?0:D3D11_MAP_FLAG_DO_NOT_WAIT,&map) != S_OK )
@@ -444,3 +448,4 @@ DEFINE_PRIM(_VOID, generate_mips, _POINTER);
 DEFINE_PRIM(_BOOL, set_fullscreen_state, _BOOL);
 DEFINE_PRIM(_BOOL, get_fullscreen_state, _NO_ARG);
 DEFINE_PRIM(_VOID, debug_print, _BYTES);
+DEFINE_PRIM(_VOID, copy_subresource_region, _RESOURCE _I32 _I32 _I32 _I32 _RESOURCE _I32 _DYN);
