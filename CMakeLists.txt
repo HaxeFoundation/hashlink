@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 2.8.12)
 cmake_policy(SET CMP0042 NEW)
 
 include(GNUInstallDirs)
+include(FindPkgConfig)
 project(hashlink C)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
@@ -176,7 +177,7 @@ endif()
 if(WIN32)
     set(ZLIB_INCLUDE_DIRS include/zlib)
     set(PNG_INCLUDE_DIRS include/png)
-    set(Vorbis_INCLUDE_DIRS include/vorbis)
+    set(OGGVORBIS_INCLUDE_DIR include/vorbis)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8) 
         set(TurboJPEG_INCLUDE_DIRS include/turbojpeg include/turbojpeg/x64)
@@ -292,6 +293,7 @@ else()
     find_package(ZLIB REQUIRED)
     find_package(PNG REQUIRED)
     find_package(TurboJPEG REQUIRED)
+    find_package(OggVorbis REQUIRED)
 
     add_library(fmt.hdll MODULE
         libs/fmt/fmt.c
@@ -310,14 +312,14 @@ target_include_directories(fmt.hdll
 	${ZLIB_INCLUDE_DIRS}
 	${PNG_INCLUDE_DIRS}
 	${TurboJPEG_INCLUDE_DIRS}
-	${Vorbis_INCLUDE_DIRS}
+	${OGGVORBIS_INCLUDE_DIR}
 )
 target_link_libraries(fmt.hdll
     libhl
     ${ZLIB_LIBRARIES}
     ${PNG_LIBRARIES}
     ${TurboJPEG_LIBRARIES}
-    ${Vorbis_LIBRARIES}
+    ${OGGVORBIS_LIBRARIES}
 )
 target_compile_definitions(fmt.hdll
     PRIVATE
