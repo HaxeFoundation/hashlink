@@ -28,6 +28,8 @@ FMT = libs/fmt/fmt.o
 
 SDL = libs/sdl/sdl.o libs/sdl/gl.o
 
+OPENAL = libs/openal/openal.o
+
 SSL = libs/ssl/ssl.o
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
@@ -50,11 +52,11 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(ARCH) -I /opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include
+CFLAGS += -m$(ARCH) -I /opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
 LIBFLAGS += -L/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
 LIBOPENGL = -framework OpenGL
-LIBOPENAL = -framework OpenAL
+LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 
 
@@ -96,7 +98,10 @@ fmt: ${FMT} libhl
 	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
 sdl: ${SDL} libhl
-	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENAL) $(LIBOPENGL)
+	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENGL)
+
+openal: ${OPENAL} libhl
+	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
 
 ssl: ${SSL} libhl
 	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
