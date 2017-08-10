@@ -364,13 +364,14 @@ static char **hl_read_strings( hl_reader *r, int nstrings, int **out_lens ) {
 	ALLOC(strings, char*, nstrings);
 	ALLOC(lens, int, nstrings);
 	for(i=0;i<nstrings;i++) {
+		char *sptr = sdata;
 		int sz = UINDEX();
-		strings[i] = sdata;
+		strings[i] = sptr;
 		lens[i] = sz;
-		sdata += sz;
-		if( sdata >= sdata + size || *sdata )
+		sptr += sz;
+		if( sptr >= sdata + size || *sptr )
 			EXIT("Invalid string");
-		sdata++;
+		sptr++;
 	}
 	*out_lens = lens;
 	return strings;
