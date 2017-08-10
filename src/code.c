@@ -356,7 +356,8 @@ const char *hl_op_name( int op ) {
 static char **hl_read_strings( hl_reader *r, int nstrings, int **out_lens ) {
 	int size = hl_read_i32(r);
 	hl_code *c = r->code;
-	char *sdata = (char*)hl_malloc(&c->alloc,sizeof(char) * size);
+	char *sbase = (char*)hl_malloc(&c->alloc,sizeof(char) * size);
+	char *sdata = sbase;
 	char **strings;
 	int *lens;
 	int i;
@@ -368,7 +369,7 @@ static char **hl_read_strings( hl_reader *r, int nstrings, int **out_lens ) {
 		strings[i] = sdata;
 		lens[i] = sz;
 		sdata += sz;
-		if( sdata >= sdata + size || *sdata )
+		if( sdata >= sbase + size || *sdata )
 			EXIT("Invalid string");
 		sdata++;
 	}
