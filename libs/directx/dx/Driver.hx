@@ -700,4 +700,13 @@ class Driver {
 	static function dxDebugPrint( str : hl.Bytes ) {
 	}
 
+	public static function detectKeyboardLayout() @:privateAccess {
+		return String.fromUTF8( dxDetectKeyboardLayout() );
+	}
+
+	@:hlNative("directx", "detect_keyboard_layout")
+	static function dxDetectKeyboardLayout() : hl.Bytes {
+		return null;
+	}
+
 }

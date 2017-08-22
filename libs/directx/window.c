@@ -357,3 +357,16 @@ DEFINE_PRIM(TCURSOR, create_cursor, _I32 _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID, destroy_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, set_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, show_cursor, _BOOL);
+
+HL_PRIM vbyte *HL_NAME(detect_keyboard_layout)() {
+	char q = MapVirtualKey(0x10, MAPVK_VSC_TO_VK);
+	char w = MapVirtualKey(0x11, MAPVK_VSC_TO_VK);
+	char y = MapVirtualKey(0x15, MAPVK_VSC_TO_VK);
+
+	if (q == 'Q' && w == 'W' && y == 'Y') return "qwerty";
+	if (q == 'A' && w == 'Z' && y == 'Y') return "azerty";
+	if (q == 'Q' && w == 'W' && y == 'Z') return "qwertz";
+	if (q == 'Q' && w == 'Z' && y == 'Y') return "qzerty";
+	return "unknown";
+}
+DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
