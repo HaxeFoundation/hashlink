@@ -160,6 +160,9 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_WINDOWPOSCHANGED:
 		updateClipCursor(wnd);
 		break;
+	case WM_CLOSE:
+		addEvent(wnd, Quit);
+		return 0;
 	}
 	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
