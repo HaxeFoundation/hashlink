@@ -101,29 +101,35 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_XBUTTONDOWN: addMouse(MouseUp,3 + HIWORD(wparam)); break;
 	case WM_MOUSEMOVE: addMouse(MouseMove,0); break;
 	case WM_MOUSEWHEEL: addMouse(MouseWheel,0); e->wheelDelta = ((int)(short)HIWORD(wparam)) / 120; break;
+	case WM_SYSCOMMAND:
+		if( wparam == SC_KEYMENU && (lparam>>16) <= 0 )
+			return 0;
+		break;
 	case WM_KEYDOWN:
+	case WM_SYSKEYDOWN:
+	case WM_KEYUP:
+	case WM_SYSKEYUP:
 		// right alt has triggered a control !
 		if( wparam == VK_MENU && lparam & (1<<24) ) {
 			dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWL_USERDATA);
-			if( buf->event_count > buf->next_event && buf->events[buf->event_count-1].type == KeyDown && buf->events[buf->event_count-1].keyCode == (VK_CONTROL|256) ) {
+			if( buf->event_count > buf->next_event && buf->events[buf->event_count-1].type == (umsg == WM_KEYUP ? KeyUp : KeyDown) && buf->events[buf->event_count-1].keyCode == (VK_CONTROL|256) ) {
 				buf->event_count--;
 				//printf("CANCEL\n");
 			}
 		}
-	case WM_KEYUP:
-		e = addEvent(wnd,umsg == WM_KEYUP ? KeyUp : KeyDown);
+		e = addEvent(wnd,(umsg == WM_KEYUP || umsg == WM_SYSKEYUP) ? KeyUp : KeyDown);
 		e->keyCode = wparam;
-		e->keyRepeat = umsg == WM_KEYDOWN && (lparam & 0x40000000) != 0;
+		e->keyRepeat = (umsg == WM_KEYDOWN || umsg == WM_SYSKEYDOWN) && (lparam & 0x40000000) != 0;
 		// L/R location
+		if( e->keyCode == VK_SHIFT )
+			e->keyCode |= MapVirtualKey((lparam >> 16) & 0xFF, MAPVK_VSC_TO_VK_EX) == VK_RSHIFT ? 512 : 256;
 		if( e->keyCode == VK_SHIFT || e->keyCode == VK_CONTROL || e->keyCode == VK_MENU )
 			e->keyCode |= (lparam & (1<<24)) ? 512 : 256;
+		if( e->keyCode == 13 && (lparam & 0x1000000) )
+			e->keyCode = 108; // numpad enter
 		//printf("%.8X - %d[%s]%s%s\n",lparam,e->keyCode&255,e->type == KeyUp ? "UP":"DOWN",e->keyRepeat?" REPEAT":"",(e->keyCode&256) ? " LEFT" : (e->keyCode & 512) ? " RIGHT" : "");
-		/*
-			TODO:
-			- right shift not detected
-			- left alt not triggered
-			- numpad enter = main enter
-		*/
+		if( (e->keyCode & 0xFF) == VK_MENU )
+			return 0;
 		break;
 	case WM_CHAR:
 		e = addEvent(wnd,TextInput);
