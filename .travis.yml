@@ -3,36 +3,36 @@ language: haxe
 linux32_install: &linux32_install
   - docker build -f Dockerfile-i386 -t hashlink .
 
-linux64_before_install: &linux64_before_install
-  - sudo apt-get update -y
-  - sudo apt-get install -y
-      libz-dev
-      zlib1g-dev
-      libpng-dev
-      libsdl2-dev
-      libvorbis-dev
-      libalut-dev
-      nasm # for compiling libjpeg-turbo
-  # install mbedtls
-  - mkdir ~/mbedtls
-  - pushd ~/mbedtls
-  -   wget https://tls.mbed.org/download/mbedtls-2.4.0-apache.tgz
-  -   tar xzf mbedtls-2.4.0-apache.tgz --strip-components=1
-  -   sed -i "s/\/\/#define MBEDTLS_THREADING_PTHREAD/#define MBEDTLS_THREADING_PTHREAD/; s/\/\/#define MBEDTLS_THREADING_C/#define MBEDTLS_THREADING_C/; s/#define MBEDTLS_SSL_PROTO_SSL3/\/\/#define MBEDTLS_SSL_PROTO_SSL3/" include/mbedtls/config.h
-  -   SHARED=1 make lib
-  -   sudo make install
-  - popd
-  # install libjpeg-turbo (the Ubuntu package is missing -fPIE/-fPIC)
-  - mkdir ~/libjpeg-turbo
-  - pushd ~/libjpeg-turbo
-  -   wget https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.tar.gz
-  -   tar xzf 1.5.1.tar.gz --strip-components=1
-  -   autoreconf -fiv
-  -   ./configure
-  -   make
-  -   sudo make install
-  - popd
-  - haxelib install hashlink
+linux64_install: &linux64_install
+  - docker build -f Dockerfile -t hashlink .
+
+docker_make_script: &docker_cmake_script
+  - >
+    docker run hashlink bash -c
+    'set -ex &&
+    (if [ "$ARCH" = "32" ]; then
+      cmake . -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake;
+    else
+      cmake .;
+    fi) &&
+    make &&
+    make test ARGS=-V'
+
+
+docker_cmake_script: &docker_make_script
+  - >
+    docker run hashlink bash -c
+    'set -ex &&
+    make all &&
+    make install_lib &&
+    ldconfig &&
+    (if [ "$ARCH" = "32" ]; then
+      haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
+      ./hl hello.hl;
+    fi) &&
+    haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
+    make hlc &&
+    ./hlc'
 
 mac_before_install: &mac_before_install
   - brew update
@@ -63,47 +63,28 @@ matrix:
       env: ARCH=32 BUILD=cmake
       services: [docker]
       install: *linux32_install
-      script:
-        - >
-          docker run hashlink bash -c
-          'set -ex &&
-          cmake . -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake &&
-          make &&
-          make test ARGS=-V'
+      script: *docker_cmake_script
     - haxe: development
       os: linux
       dist: trusty
       env: ARCH=32 BUILD=make
       services: [docker]
       install: *linux32_install
-      script:
-        - >
-          docker run hashlink bash -c
-          'set -ex &&
-          make all &&
-          make install_lib &&
-          ldconfig &&
-          haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
-          ./hl hello.hl &&
-          haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
-          make hlc &&
-          ./hlc'
+      script: *docker_make_script
     - haxe: development
       os: linux
       dist: trusty
       env: ARCH=64 BUILD=cmake
-      before_install: *linux64_before_install
-      install: *cmake_install
-      script: *cmake_script
+      services: [docker]
+      install: *linux64_install
+      script: *docker_cmake_script
     - haxe: development
       os: linux
       dist: trusty
       env: ARCH=64 BUILD=make
-      before_install: *linux64_before_install
-      install: *make_install
-      before_script:
-        - sudo ldconfig
-      script: *make_script
+      services: [docker]
+      install: *linux64_install
+      script: *docker_make_script
     - haxe: development
       os: osx
       osx_image: xcode8
