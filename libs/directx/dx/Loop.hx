@@ -5,7 +5,7 @@ class Loop {
 	static var sentinel : hl.UI.Sentinel;
 	static var dismissErrors = false;
 
-	public static var defaultEventHandler : Event -> Void;
+	public static var defaultEventHandler : Event -> Bool;
 
 	/**
 		Prevent the program from reporting timeout infinite loop.
@@ -26,14 +26,14 @@ class Loop {
 		while( true ) {
 			if( !eventLoop(event) )
 				break;
-			if( event.type == Quit )
+			var ret = defaultEventHandler(event);
+			if( event.type == Quit && ret )
 				return false;
-			defaultEventHandler(event);
 		}
 		return true;
 	}
 
-	public static function run( callb : Void -> Void, ?onEvent : Event -> Void ) {
+	public static function run( callb : Void -> Void, ?onEvent : Event -> Bool ) {
 		var event = new Event();
 		if( onEvent == null ) onEvent = defaultEventHandler;
 		while( true ) {
@@ -52,15 +52,16 @@ class Loop {
 			while( true ) {
 				if( !eventLoop(event) )
 					break;
-				if( event.type == Quit )
-					return;
+				var ret = true;
 				if( onEvent != null ) {
 					try {
-						onEvent(event);
+						ret = onEvent(event);
 					} catch( e : Dynamic ) {
 						reportError(e);
 					}
 				}
+				if( event.type == Quit && ret )
+				 	return;
 			}
 			// callback our events handlers
 			try {

@@ -116,6 +116,10 @@ class Window {
 		return winGetNextEvent(win, e);
 	}
 
+	public function clipCursor( enable : Bool ) : Void {
+		winClipCursor(enable ? win : null);
+	}
+
 	static function winCreate( width : Int, height : Int ) : WinPtr {
 		return null;
 	}
@@ -154,6 +158,9 @@ class Window {
 
 	static function winGetNextEvent( win : WinPtr, event : Dynamic ) : Bool {
 		return false;
+	}
+
+	static function winClipCursor( win : WinPtr ) : Void {
 	}
 
 }

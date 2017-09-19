@@ -70,8 +70,11 @@ typedef struct {
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
-	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+	if( SDL_Init(SDL_INIT_EVERYTHING) != 0 ) {
+		hl_error_msg(USTR("SDL_Init failed: %s"), hl_to_utf16(SDL_GetError()));
 		return false;
+	}
 #	ifdef _WIN32
 	// Set the internal windows timer period to 1ms (will give accurate sleep for vsync)
 	timeBeginPeriod(1);

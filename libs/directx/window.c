@@ -54,6 +54,20 @@ typedef struct {
 
 typedef struct HWND__ dx_window;
 
+static dx_window *cur_clip_cursor_window = NULL;
+
+static void updateClipCursor(HWND wnd) {
+	if (cur_clip_cursor_window == wnd) {
+		RECT rect;
+
+		GetClientRect(wnd, &rect);
+		ClientToScreen(wnd, (LPPOINT)& rect.left);
+		ClientToScreen(wnd, (LPPOINT)& rect.right);
+
+		ClipCursor(&rect);
+	}
+}
+
 static dx_event *addEvent( HWND wnd, EventType type ) {
 	dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWL_USERDATA);
 	dx_event *e;
@@ -137,11 +151,18 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		e->keyRepeat = (lparam & 0xFFFF) != 0;
 		break;
 	case WM_SETFOCUS:
+		updateClipCursor(wnd);
 		addState(Focus);
 		break;
 	case WM_KILLFOCUS:
 		addState(Blur);
 		break;
+	case WM_WINDOWPOSCHANGED:
+		updateClipCursor(wnd);
+		break;
+	case WM_CLOSE:
+		addEvent(wnd, Quit);
+		return 0;
 	}
 	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
@@ -242,6 +263,10 @@ HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 }
 
 HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
+	if (cur_clip_cursor_window == win) {
+		cur_clip_cursor_window = NULL;
+		ClipCursor(NULL);
+	}
 	dx_events *buf = (dx_events*)GetWindowLongPtr(win,GWL_USERDATA);
 	free(buf);
 	SetWindowLongPtr(win,GWL_USERDATA,0);
@@ -265,6 +290,15 @@ HL_PRIM bool HL_NAME(win_get_next_event)( dx_window *win, dx_event *e ) {
 	return true;
 }
 
+HL_PRIM void HL_NAME(win_clip_cursor)(dx_window *win) {
+	cur_clip_cursor_window = win;
+	if (win)
+		updateClipCursor(win);
+	else
+		ClipCursor(NULL);
+}
+
+
 HL_PRIM int HL_NAME(get_screen_width)() {
 	return GetSystemMetrics(SM_CXSCREEN);
 }
@@ -284,6 +318,7 @@ DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_destroy, TWIN);
 DEFINE_PRIM(_BOOL, win_get_next_event, TWIN _DYN);
+DEFINE_PRIM(_VOID, win_clip_cursor, TWIN);
 
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
@@ -357,3 +392,16 @@ DEFINE_PRIM(TCURSOR, create_cursor, _I32 _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID, destroy_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, set_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, show_cursor, _BOOL);
+
+HL_PRIM vbyte *HL_NAME(detect_keyboard_layout)() {
+	char q = MapVirtualKey(0x10, MAPVK_VSC_TO_VK);
+	char w = MapVirtualKey(0x11, MAPVK_VSC_TO_VK);
+	char y = MapVirtualKey(0x15, MAPVK_VSC_TO_VK);
+
+	if (q == 'Q' && w == 'W' && y == 'Y') return "qwerty";
+	if (q == 'A' && w == 'Z' && y == 'Y') return "azerty";
+	if (q == 'Q' && w == 'W' && y == 'Z') return "qwertz";
+	if (q == 'Q' && w == 'Z' && y == 'Y') return "qzerty";
+	return "unknown";
+}
+DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
