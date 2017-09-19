@@ -61,8 +61,8 @@ static void updateClipCursor(HWND wnd) {
 		RECT rect;
 
 		GetClientRect(wnd, &rect);
-		ClientToScreen(wnd, (LPPOINT)& rect);
-		ClientToScreen(wnd, (LPPOINT)& rect + 1);
+		ClientToScreen(wnd, (LPPOINT)& rect.left);
+		ClientToScreen(wnd, (LPPOINT)& rect.right);
 
 		ClipCursor(&rect);
 	}
