@@ -7,9 +7,9 @@
 #include <D3Dcompiler.h>
 
 #ifdef HL_DEBUG
-#	define DXERR()	hl_error_msg(USTR("DXERROR line %d"),__LINE__)
+#	define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret != S_OK ) hl_error_msg(USTR("DXERROR %X line %d"),(DWORD)__ret,__LINE__); }
 #else
-#	define DXERR()	return NULL;
+#	define DXERR(cmd)	if( (cmd) != S_OK ) return NULL;
 #endif
 
 typedef struct {
@@ -58,8 +58,8 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	result = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels + restrictLevel,maxLevels - restrictLevel,D3D11_SDK_VERSION,&d->device,&d->feature,&d->context);
 	if( result == E_INVALIDARG ) // most likely no DX11.1 support, try again
 		result = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,NULL,0,D3D11_SDK_VERSION,&d->device,&d->feature,&d->context);
-	if( result != S_OK )
-		return NULL;
+
+	DXERR(result);
 
 	// create the SwapChain
 	DXGI_SWAP_CHAIN_DESC desc;
@@ -74,17 +74,14 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	desc.BufferCount = 1;
 	desc.Windowed = true;
 	desc.OutputWindow = window;
-	if( GetDXGI()->CreateSwapChain(d->device,&desc,&d->swapchain) != S_OK )
-		DXERR();
-
+	DXERR( GetDXGI()->CreateSwapChain(d->device,&desc,&d->swapchain) );
 	driver = d;
 	return d;
 }
 
 HL_PRIM dx_resource *HL_NAME(get_back_buffer)() {
 	ID3D11Texture2D *backBuffer;
-	if( driver->swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer) != S_OK )
-		DXERR();
+	DXERR( driver->swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer) );
 	return backBuffer;
 }
 
@@ -94,8 +91,7 @@ HL_PRIM bool HL_NAME(resize)( int width, int height, int format ) {
 
 HL_PRIM dx_pointer *HL_NAME(create_render_target_view)( dx_resource *r, dx_struct<D3D11_RENDER_TARGET_VIEW_DESC> *desc ) {
 	ID3D11RenderTargetView *rt;
-	if( driver->device->CreateRenderTargetView(r, desc ? &desc->value : NULL, &rt) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateRenderTargetView(r, desc ? &desc->value : NULL, &rt) );
 	return rt;
 }
 
@@ -105,8 +101,7 @@ HL_PRIM void HL_NAME(om_set_render_targets)( int count, dx_pointer **arr, dx_poi
 
 HL_PRIM dx_pointer *HL_NAME(create_rasterizer_state)( dx_struct<D3D11_RASTERIZER_DESC> *desc ) {
 	ID3D11RasterizerState *rs;
-	if( driver->device->CreateRasterizerState(&desc->value,&rs) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateRasterizerState(&desc->value,&rs) );
 	return rs;
 }
 
@@ -164,8 +159,7 @@ HL_PRIM dx_resource *HL_NAME(create_buffer)( int size, int usage, int bind, int 
 	res.SysMemSlicePitch = 0;
 	if( size == 0 )
 		return NULL;
-	if( driver->device->CreateBuffer(&desc,data?&res:NULL,&buffer) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateBuffer(&desc,data?&res:NULL,&buffer) );
 	return buffer;
 }
 
@@ -175,8 +169,7 @@ HL_PRIM dx_resource *HL_NAME(create_texture_2d)( dx_struct<D3D11_TEXTURE2D_DESC>
 	res.pSysMem = data;
 	res.SysMemPitch = 0;
 	res.SysMemSlicePitch = 0;
-	if( driver->device->CreateTexture2D(&desc->value,data?&res:NULL,&tex) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateTexture2D(&desc->value,data?&res:NULL,&tex) );
 	return tex;
 }
 
@@ -190,8 +183,7 @@ HL_PRIM void HL_NAME(copy_subresource_region)( dx_resource *r, int index, int dx
 
 HL_PRIM void *HL_NAME(map)( dx_resource *r, int subRes, int type, bool waitGpu, int *pitch ) {
 	D3D11_MAPPED_SUBRESOURCE map;
-	if( driver->context->Map(r,subRes,(D3D11_MAP)type,waitGpu?0:D3D11_MAP_FLAG_DO_NOT_WAIT,&map) != S_OK )
-		DXERR();
+	DXERR( driver->context->Map(r,subRes,(D3D11_MAP)type,waitGpu?0:D3D11_MAP_FLAG_DO_NOT_WAIT,&map) );
 	if( pitch )
 		*pitch = map.RowPitch;
 	return map.pData;
@@ -232,15 +224,13 @@ HL_PRIM vbyte *HL_NAME(disassemble_shader)( vbyte *data, int dataSize, int flags
 
 HL_PRIM dx_pointer *HL_NAME(create_vertex_shader)( vbyte *code, int size ) {
 	ID3D11VertexShader *shader;
-	if( driver->device->CreateVertexShader(code, size, NULL, &shader) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateVertexShader(code, size, NULL, &shader) );
 	return shader;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_pixel_shader)( vbyte *code, int size ) {
 	ID3D11PixelShader *shader;
-	if( driver->device->CreatePixelShader(code, size, NULL, &shader) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreatePixelShader(code, size, NULL, &shader) );
 	return shader;
 }
 
@@ -295,8 +285,7 @@ HL_PRIM dx_pointer *HL_NAME(create_input_layout)( varray *arr, vbyte *bytecode, 
 	if( arr->size > 32 ) return NULL;
 	for(i=0;i<arr->size;i++)
 		desc[i] = hl_aptr(arr,dx_struct<D3D11_INPUT_ELEMENT_DESC>*)[i]->value;
-	if( driver->device->CreateInputLayout(desc,arr->size,bytecode,bytecodeLength,&input) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateInputLayout(desc,arr->size,bytecode,bytecodeLength,&input) );
 	return input;
 }
 
@@ -306,15 +295,13 @@ HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_view)( dx_resource *tex, int fo
 	ZeroMemory(&desc, sizeof(desc));
 	desc.Format = (DXGI_FORMAT)format;
 	desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-	if( driver->device->CreateDepthStencilView(tex,&desc,&view) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateDepthStencilView(tex,&desc,&view) );
 	return view;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_state)( dx_struct<D3D11_DEPTH_STENCIL_DESC> *desc ) {
 	ID3D11DepthStencilState *state;
-	if( driver->device->CreateDepthStencilState(&desc->value,&state) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateDepthStencilState(&desc->value,&state) );
 	return state;
 }
 
@@ -339,22 +326,19 @@ HL_PRIM dx_pointer *HL_NAME(create_blend_state)( bool alphaToCoverage, bool inde
 	desc.IndependentBlendEnable = independentBlend;
 	for(i=0;i<count;i++)
 		desc.RenderTarget[i] = hl_aptr(arr,dx_struct<D3D11_RENDER_TARGET_BLEND_DESC>*)[i]->value;
-	if( driver->device->CreateBlendState(&desc,&s) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateBlendState(&desc,&s) );
 	return s;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_sampler_state)( dx_struct<D3D11_SAMPLER_DESC> *desc ) {
 	ID3D11SamplerState *s;
-	if( driver->device->CreateSamplerState(&desc->value,&s) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateSamplerState(&desc->value,&s) );
 	return s;
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_shader_resource_view)( dx_resource *res, dx_struct<D3D11_SHADER_RESOURCE_VIEW_DESC> *desc ) {
 	ID3D11ShaderResourceView *view;
-	if( driver->device->CreateShaderResourceView(res,&desc->value,&view) != S_OK )
-		DXERR();
+	DXERR( driver->device->CreateShaderResourceView(res,&desc->value,&view) );
 	return view;
 }
 
