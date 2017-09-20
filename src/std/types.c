@@ -78,6 +78,37 @@ HL_PRIM int hl_stack_size( hl_type *t ) {
 	}
 }
 
+HL_PRIM int hl_pad_struct( int size, hl_type *t ) {
+	int align = sizeof(void*);
+#	define GET_ALIGN(type) { struct { unsigned char a; type b; } s = {0}; align = (unsigned char *)&s.b - (unsigned char*)&s; }
+	switch( t->kind ) {
+	case HVOID:
+		return 0;
+	case HUI8:
+		GET_ALIGN(unsigned char);
+		break;
+	case HUI16:
+		GET_ALIGN(unsigned short);
+		break;
+	case HI32:
+		GET_ALIGN(unsigned int);
+		break;
+	case HI64:
+		GET_ALIGN(int64);
+		break;
+	case HF32:
+		GET_ALIGN(float);
+		break;
+	case HF64:
+		GET_ALIGN(double);
+		break;
+	case HBOOL:
+		GET_ALIGN(bool);
+		break;
+	}
+	return (-size) & (align - 1);
+}
+
 HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 	if( a == b )
 		return true;
@@ -317,7 +348,7 @@ HL_PRIM void hl_init_enum( hl_type *et, hl_module_context *m ) {
 		c->size = sizeof(venum); // t + index
 		for(j=0;j<c->nparams;j++) {
 			hl_type *t = c->params[j];
-			c->size += hl_pad_size(c->size,t);
+			c->size += hl_pad_struct(c->size,t);
 			c->offsets[j] = c->size;
 			if( hl_is_ptr(t) ) c->hasptr = true;
 			c->size += hl_type_size(t);
