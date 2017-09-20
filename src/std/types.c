@@ -48,7 +48,7 @@ static int T_SIZES[] = {
 	8, // I64
 	4, // F32
 	8, // F64
-	1, // BOOL
+	sizeof(bool), // BOOL
 	HL_WSIZE, // BYTES
 	HL_WSIZE, // DYN
 	HL_WSIZE, // FUN
