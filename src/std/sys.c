@@ -466,7 +466,7 @@ HL_PRIM varray *hl_sys_read_dir( vbyte *_path ) {
 			continue;
 		if( pos == count ) {
 			int ncount = count == 0 ? 16 : count * 2;
-			varray *narr = hl_alloc_array(&hlt_bytes,count);
+			varray *narr = hl_alloc_array(&hlt_bytes,ncount);
 			pchar **ncur = hl_aptr(narr,pchar*);
 			memcpy(ncur,current,count*sizeof(void*));
 			current = ncur;
