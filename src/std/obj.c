@@ -219,7 +219,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	nlookup = 0;
 	for(i=0;i<o->nfields;i++) {
 		hl_type *ft = o->fields[i].t;
-		size += hl_pad_size(size,ft);
+		size += hl_pad_struct(size,ft);
 		t->fields_indexes[i+start] = size;
 		if( *o->fields[i].name )
 			hl_lookup_insert(t->lookup,nlookup++,o->fields[i].hashed_name,o->fields[i].t,size);
@@ -381,7 +381,7 @@ void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 	for(i=0;i<vt->virt->nfields;i++) {
 		hl_obj_field *f = vt->virt->fields + i;
 		hl_lookup_insert(l,i,f->hashed_name,f->t,i);
-		size += hl_pad_size(size, f->t);
+		size += hl_pad_struct(size, f->t);
 		indexes[i] = size;
 		size += hl_type_size(f->t);
 	}
