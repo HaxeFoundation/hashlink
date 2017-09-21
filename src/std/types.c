@@ -345,7 +345,7 @@ HL_PRIM void hl_init_enum( hl_type *et, hl_module_context *m ) {
 	for(i=0;i<et->tenum->nconstructs;i++) {
 		hl_enum_construct *c = et->tenum->constructs + i;
 		c->hasptr = false;
-		c->size = sizeof(venum); // t + index
+		c->size = sizeof(void*)+sizeof(int); // t + index
 		for(j=0;j<c->nparams;j++) {
 			hl_type *t = c->params[j];
 			c->size += hl_pad_struct(c->size,t);
