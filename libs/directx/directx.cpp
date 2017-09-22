@@ -36,7 +36,12 @@ static IDXGIFactory *GetDXGI() {
 }
 
 static void ReportDxError( HRESULT err, int line ) {
-	hl_error_msg(USTR("DXERROR %X line %d"),(DWORD)err,line);
+	if( err == DXGI_ERROR_DEVICE_REMOVED && driver ){
+		err = driver->device->GetDeviceRemovedReason();
+		hl_error_msg(USTR("DXGI_ERROR_DEVICE_REMOVED reason 0x%X line %d"),(DWORD)err,line);
+	}else{
+		hl_error_msg(USTR("DXERROR %X line %d"),(DWORD)err,line);
+	}
 }
 
 HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int restrictLevel ) {
