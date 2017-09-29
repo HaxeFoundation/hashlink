@@ -6,11 +6,7 @@
 #include <d3d11.h>
 #include <D3Dcompiler.h>
 
-#ifdef HL_DEBUG
-#	define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret != S_OK ) hl_error_msg(USTR("DXERROR %X line %d"),(DWORD)__ret,__LINE__); }
-#else
-#	define DXERR(cmd)	if( (cmd) != S_OK ) return NULL;
-#endif
+#define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret == E_OUTOFMEMORY ) return NULL; if( __ret != S_OK ) ReportDxError(__ret,__LINE__); }
 
 typedef struct {
 	ID3D11Device *device;
@@ -37,6 +33,10 @@ static IDXGIFactory *GetDXGI() {
 	if( factory == NULL && CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory) != S_OK )
 		hl_error("Failed to init DXGI");
 	return factory;
+}
+
+static void ReportDxError( HRESULT err, int line ) {
+	hl_error_msg(USTR("DXERROR %X line %d"),(DWORD)err,line);
 }
 
 HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int restrictLevel ) {
