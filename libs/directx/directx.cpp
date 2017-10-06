@@ -136,7 +136,7 @@ HL_PRIM const uchar *HL_NAME(get_device_name)() {
 	if( GetDXGI()->EnumAdapters(0,&adapter) != S_OK || adapter->GetDesc(&desc) != S_OK )
 		return USTR("Unknown");
 	adapter->Release();
-	return (uchar*)hl_copy_bytes((vbyte*)desc.Description,(ustrlen((uchar*)desc.Description)+1)*2);
+	return (uchar*)hl_copy_bytes((vbyte*)desc.Description,(int)(ustrlen((uchar*)desc.Description)+1)*2);
 }
 
 HL_PRIM double HL_NAME(get_supported_version)() {
@@ -216,7 +216,7 @@ HL_PRIM vbyte *HL_NAME(disassemble_shader)( vbyte *data, int dataSize, int flags
 	vbyte *ret;
 	if( D3DDisassemble(data,dataSize,flags,(char*)comments,&out) != S_OK )
 		return NULL;
-	*size = out->GetBufferSize();
+	*size = (int)out->GetBufferSize();
 	ret = hl_copy_bytes((vbyte*)out->GetBufferPointer(),*size);
 	out->Release();
 	return ret;

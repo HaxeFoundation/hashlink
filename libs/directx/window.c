@@ -69,7 +69,7 @@ static void updateClipCursor(HWND wnd) {
 }
 
 static dx_event *addEvent( HWND wnd, EventType type ) {
-	dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWL_USERDATA);
+	dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWLP_USERDATA);
 	dx_event *e;
 	if( buf->event_count == MAX_EVENTS )
 		e = &buf->events[MAX_EVENTS-1];
@@ -95,11 +95,11 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		PostQuitMessage(0);
 		return 0;
 	case WM_CREATE:
-		SetWindowLongPtr(wnd,GWL_USERDATA,(LONG_PTR)((CREATESTRUCT*)lparam)->lpCreateParams);
+		SetWindowLongPtr(wnd,GWLP_USERDATA,(LONG_PTR)((CREATESTRUCT*)lparam)->lpCreateParams);
 		break;
 	case WM_SIZE:
 		{
-			dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWL_USERDATA);
+			dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWLP_USERDATA);
 			if( buf->event_count > buf->next_event && buf->events[buf->event_count-1].type == WindowState && buf->events[buf->event_count-1].state == Resize )
 				buf->event_count--;
 		}
@@ -125,14 +125,14 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_SYSKEYUP:
 		// right alt has triggered a control !
 		if( wparam == VK_MENU && lparam & (1<<24) ) {
-			dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWL_USERDATA);
+			dx_events *buf = (dx_events*)GetWindowLongPtr(wnd,GWLP_USERDATA);
 			if( buf->event_count > buf->next_event && buf->events[buf->event_count-1].type == (umsg == WM_KEYUP ? KeyUp : KeyDown) && buf->events[buf->event_count-1].keyCode == (VK_CONTROL|256) ) {
 				buf->event_count--;
 				//printf("CANCEL\n");
 			}
 		}
 		e = addEvent(wnd,(umsg == WM_KEYUP || umsg == WM_SYSKEYUP) ? KeyUp : KeyDown);
-		e->keyCode = wparam;
+		e->keyCode = (int)wparam;
 		e->keyRepeat = (umsg == WM_KEYDOWN || umsg == WM_SYSKEYDOWN) && (lparam & 0x40000000) != 0;
 		// L/R location
 		if( e->keyCode == VK_SHIFT )
@@ -147,7 +147,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		break;
 	case WM_CHAR:
 		e = addEvent(wnd,TextInput);
-		e->keyCode = wparam;
+		e->keyCode = (int)wparam;
 		e->keyRepeat = (lparam & 0xFFFF) != 0;
 		break;
 	case WM_SETFOCUS:
@@ -267,14 +267,14 @@ HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
 		cur_clip_cursor_window = NULL;
 		ClipCursor(NULL);
 	}
-	dx_events *buf = (dx_events*)GetWindowLongPtr(win,GWL_USERDATA);
+	dx_events *buf = (dx_events*)GetWindowLongPtr(win,GWLP_USERDATA);
 	free(buf);
-	SetWindowLongPtr(win,GWL_USERDATA,0);
+	SetWindowLongPtr(win,GWLP_USERDATA,0);
 	DestroyWindow(win);
 }
 
 HL_PRIM bool HL_NAME(win_get_next_event)( dx_window *win, dx_event *e ) {
-	dx_events *buf = (dx_events*)GetWindowLongPtr(win,GWL_USERDATA);
+	dx_events *buf = (dx_events*)GetWindowLongPtr(win,GWLP_USERDATA);
 	hl_type *save;
 	if( !buf ) {
 		e->type = Quit;

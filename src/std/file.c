@@ -79,7 +79,7 @@ HL_PRIM int hl_file_read( hl_fdesc *f, vbyte *buf, int pos, int len ) {
 }
 
 HL_PRIM bool hl_file_write_char( hl_fdesc *f, int c ) {
-	int ret;
+	size_t ret;
 	unsigned char cc = (unsigned char)c;
 	if( !f ) return false;
 	hl_blocking(true);

@@ -80,7 +80,7 @@ HL_PRIM int hl_stack_size( hl_type *t ) {
 
 HL_PRIM int hl_pad_struct( int size, hl_type *t ) {
 	int align = sizeof(void*);
-#	define GET_ALIGN(type) { struct { unsigned char a; type b; } s = {0}; align = (unsigned char *)&s.b - (unsigned char*)&s; }
+#	define GET_ALIGN(type) { struct { unsigned char a; type b; } s = {0}; align = (int)((unsigned char *)&s.b - (unsigned char*)&s); }
 	switch( t->kind ) {
 	case HVOID:
 		return 0;

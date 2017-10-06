@@ -406,7 +406,7 @@ static fd_set *make_socket_set( varray *a, char **tmp, int *tmp_size, unsigned i
 	for(i=0;i<a->size;i++) {
 		hl_socket *s= hl_aptr(a,hl_socket*)[i];
 		if( s== NULL ) break;
-		if( s->sock > *max ) *max = s->sock;
+		if( s->sock > *max ) *max = (int)s->sock;
 		FD_SET(s->sock,set);
 	}
 	return set;

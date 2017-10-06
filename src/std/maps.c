@@ -97,7 +97,7 @@ static void hl_freelist_add_range( hl_free_list *f, int pos, int count ) {
 	}
 	// insert
 	if( f->head == f->nbuckets ) {
-		int pos = b - f->buckets;
+		int pos = (int)(b - f->buckets);
 		hl_freelist_resize(f,((f->nbuckets * 3) + 1) >> 1);
 		b = f->buckets + pos;
 	}
