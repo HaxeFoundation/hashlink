@@ -101,7 +101,7 @@ HL_PRIM bool HL_NAME(stream_write)( uv_stream_t *s, vbyte *b, int size, vclosure
 }
 
 static void on_alloc( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
-	*buf = uv_buf_init(malloc(size), size);
+	*buf = uv_buf_init(malloc(size), (int)size);
 }
 
 static void on_read( uv_stream_t *s, ssize_t nread, const uv_buf_t *buf ) {
@@ -111,7 +111,7 @@ static void on_read( uv_stream_t *s, ssize_t nread, const uv_buf_t *buf ) {
 	bytes.t = &hlt_bytes;
 	bytes.v.ptr = buf->base;
 	len.t = &hlt_i32;
-	len.v.i = nread;
+	len.v.i = (int)nread;
 	args[0] = &bytes;
 	args[1] = &len;
 	trigger_callb((uv_handle_t*)s,EVT_READ,args,2,true);

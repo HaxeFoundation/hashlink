@@ -491,7 +491,7 @@ HL_PRIM vbyte *hl_sys_full_path( vbyte *path ) {
 	const char sep = '\\';
 	if( GetFullPathNameW((pchar*)path,MAX_PATH+1,out,NULL) == 0 )
 		return NULL;
-	len = ustrlen(out);
+	len = (int)ustrlen(out);
 	i = 0;
 
 	if (len >= 2 && out[1] == ':') {
