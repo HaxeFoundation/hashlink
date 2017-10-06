@@ -151,7 +151,7 @@ hl_module *hl_module_alloc( hl_code *c ) {
 	int gsize = 0;
 	hl_module *m = (hl_module*)malloc(sizeof(hl_module));
 	if( m == NULL )
-		return NULL;	
+		return NULL;
 	memset(m,0,sizeof(hl_module));
 	m->code = c;
 	m->globals_indexes = (int*)malloc(sizeof(int)*c->nglobals);
@@ -244,25 +244,29 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 			if( curlib != n->lib ) {
 				curlib = n->lib;
 				strcpy(tmp,n->lib);
-				if( strcmp(n->lib,"std") == 0 )
-#				ifndef HL_WIN
-					libHandler = RTLD_DEFAULT;
+				if( strcmp(n->lib,"builtin") == 0 )
+					libHandler = dlopen(NULL,RTLD_LAZY);
 				else {
-#				else
-					strcpy(tmp, "libhl.dll");
-				else
-#				endif
-#					ifdef HL_64
-					strcpy(tmp+strlen(tmp),"64.hdll");
+					if( strcmp(n->lib,"std") == 0 )
+#					ifndef HL_WIN
+						libHandler = RTLD_DEFAULT;
+					else {
 #					else
-					strcpy(tmp+strlen(tmp),".hdll");
+						strcpy(tmp, "libhl.dll");
+					else
 #					endif
-					libHandler = dlopen(tmp,RTLD_LAZY);
-					if( libHandler == NULL )
-						hl_fatal1("Failed to load library %s",tmp);
-#				ifndef HL_WIN
+#						ifdef HL_64
+						strcpy(tmp+strlen(tmp),"64.hdll");
+#						else
+						strcpy(tmp+strlen(tmp),".hdll");
+#						endif
+						libHandler = dlopen(tmp,RTLD_LAZY);
+						if( libHandler == NULL )
+							hl_fatal1("Failed to load library %s",tmp);
+#					ifndef HL_WIN
+					}
+#					endif
 				}
-#				endif
 			}
 			strcpy(p,"hlp_");
 			p += 4;
