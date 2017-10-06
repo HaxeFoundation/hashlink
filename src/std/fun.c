@@ -53,6 +53,9 @@ HL_PRIM vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) 
 	c->t = t;
 	c->fun = fvalue;
 	c->hasValue = 1;
+#	ifdef HL_64
+	c->__pad = 0;
+#	endif
 	c->value = v;
 	return c;
 }

@@ -382,6 +382,9 @@ typedef struct _vclosure {
 	hl_type *t;
 	void *fun;
 	int hasValue;
+#	ifdef HL_64
+	int __pad;
+#	endif
 	void *value;
 } vclosure;
 
