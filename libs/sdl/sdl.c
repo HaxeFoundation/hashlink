@@ -9,7 +9,7 @@
 #	include <SDL2/SDL.h>
 #endif
 
-#ifndef _SDL_H
+#ifndef SDL_MAJOR_VERSION
 #	error "SDL2 SDK not found in hl/include/sdl/"
 #endif
 
