@@ -972,6 +972,14 @@ void hl_free( hl_alloc *a ) {
 		a->cur = NULL;
 }
 
+#ifdef HL_WIN
+#	if defined(GC_DEBUG) && defined(HL_64)
+	// force out of 32 bits addresses to check loss of precision
+	static char *start_address = (char*)0x100000000;
+#	else
+	static void *start_address = NULL;
+#	endif
+#endif
 HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #ifdef __APPLE__
 #  	ifndef MAP_ANONYMOUS
@@ -979,7 +987,11 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #       endif
 #endif
 #if defined(HL_WIN)
-	return VirtualAlloc(NULL,size,MEM_COMMIT,PAGE_EXECUTE_READWRITE);
+	void *ptr = VirtualAlloc(start_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
+#	if defined(GC_DEBUG) && defined(HL_64)
+	start_address += size + ((-size) & (GC_PAGE_SIZE - 1));
+#	endif
+	return ptr;
 #elif defined(HL_PS)
 	return NULL;
 #else
@@ -1004,7 +1016,11 @@ void ps_free_align( void *ptr, int size );
 
 static void *gc_alloc_page_memory( int size ) {
 #if defined(HL_WIN)
-	return VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
+	void *ptr = VirtualAlloc(start_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
+#	if defined(GC_DEBUG) && defined(HL_64)
+	start_address += size + ((-size) & (GC_PAGE_SIZE - 1));
+#	endif
+	return ptr;
 #elif defined(HL_PS)
 	return ps_alloc_align(size, GC_PAGE_SIZE);
 #else
