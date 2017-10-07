@@ -2947,12 +2947,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					call_native(ctx,hl_dyn_call_obj,size + paramsSize);
 #					endif
 					if( need_dyn ) {
-						if( IS_FLOAT(dst) )
-							jit_error("TODO");
-						else {
-							copy(ctx,PEAX,pmem(&p,Esp,HDYN_VALUE - sizeof(vdynamic)),dst->size);
-							store(ctx, dst, PEAX, false);
-						}
+						preg *r = IS_FLOAT(dst) ? REG_AT(XMM(0)) : PEAX;
+						copy(ctx,r,pmem(&p,Esp,HDYN_VALUE - sizeof(vdynamic)),dst->size);
+						store(ctx, dst, r, false);
 					} else
 						store(ctx, dst, PEAX, false);
 
