@@ -205,7 +205,7 @@ HL_PRIM vbyte *HL_NAME(compile_shader)( vbyte *data, int dataSize, char *source,
 		*error = true;
 		code = errorMessage;
 	}
-	*size = code->GetBufferSize();
+	*size = (int)code->GetBufferSize();
 	ret = hl_copy_bytes((vbyte*)code->GetBufferPointer(),*size);
 	code->Release();
 	return ret;
