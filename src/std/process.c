@@ -21,7 +21,9 @@
  */
 #include <hl.h>
 
-#ifndef HL_WIN
+#if defined(HL_CONSOLE)
+#	include <posix/posix.h>
+#elif !defined(HL_WIN)
 #	include <sys/types.h>
 #	include <unistd.h>
 #	include <errno.h>
