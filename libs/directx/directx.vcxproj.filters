@@ -3,5 +3,6 @@
   <ItemGroup>
     <ClCompile Include="window.c" />
     <ClCompile Include="directx.cpp" />
+    <ClCompile Include="gamecontroller.c" />
   </ItemGroup>
 </Project>
