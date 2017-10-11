@@ -127,6 +127,7 @@
     <ClCompile Include="..\..\include\zlib\trees.c" />
     <ClCompile Include="..\..\include\zlib\zutil.c" />
     <ClCompile Include="fmt.c" />
+    <ClCompile Include="sha1.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\png\png.h" />
@@ -164,6 +165,7 @@
     <ClInclude Include="..\..\include\zlib\trees.h" />
     <ClInclude Include="..\..\include\zlib\zconf.h" />
     <ClInclude Include="..\..\include\zlib\zlib.h" />
+    <ClInclude Include="sha1.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{7DDA1414-6675-45C7-8254-42057901F865}</ProjectGuid>

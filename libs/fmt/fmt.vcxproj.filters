@@ -299,6 +299,7 @@
     <ClCompile Include="..\..\include\vorbis\window.c">
       <Filter>vorbis</Filter>
     </ClCompile>
+    <ClCompile Include="sha1.c" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="turbojpeg">
@@ -420,5 +421,6 @@
     <ClInclude Include="..\..\include\vorbis\window.h">
       <Filter>vorbis</Filter>
     </ClInclude>
+    <ClInclude Include="sha1.h" />
   </ItemGroup>
 </Project>
