@@ -100,10 +100,10 @@ HL_PRIM void HL_NAME(img_scale)( vbyte *out, int outPos, int outStride, int outW
 				float ry = fy - iy;
 				float rx1 = 1.0f - rx;
 				float ry1 = 1.0f - ry;
-				int w1 = (int)(rx1 * ry1 * 256.0f + 0.5f);
-				int w2 = (int)(rx * ry1 * 256.0f + 0.5f);
-				int w3 = (int)(rx1 * ry * 256.0f + 0.5f);
-				int w4 = (int)(rx * ry * 256.0f + 0.5f);
+				int w1 = (int)(rx1 * ry1 * 256.0f);
+				int w2 = (int)(rx * ry1 * 256.0f);
+				int w3 = (int)(rx1 * ry * 256.0f);
+				int w4 = (int)(rx * ry * 256.0f);
 				vbyte *rin = in + iy * inStride;
 				pixel p1 = *(pixel*)(rin + (ix<<2));
 				pixel p2 = *(pixel*)(rin + ((ix + 1)<<2));
