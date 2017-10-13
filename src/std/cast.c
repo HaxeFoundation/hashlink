@@ -33,6 +33,10 @@
 static vdynamic vdyn_true = { &hlt_bool, DYN_PAD true };
 static vdynamic vdyn_false = { &hlt_bool, DYN_PAD false };
 
+static void invalid_cast( hl_type *from, hl_type *to ) {
+	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(from),hl_type_str(to));
+}
+
 HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	vdynamic *v;
 	switch( t->kind ) {
@@ -109,7 +113,7 @@ HL_PRIM int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 	default:
 		break;
 	}
-	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(t),hl_type_str(to));
+	invalid_cast(t,to);
 	return 0;
 }
 
@@ -234,7 +238,7 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 			break;
 		}
 	}
-	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(t),hl_type_str(to));
+	invalid_cast(t,to);
 	return 0;
 }
 
@@ -267,6 +271,7 @@ HL_PRIM double hl_dyn_castd( void *data, hl_type *t ) {
 	default:
 		break;
 	}
+	invalid_cast(t,&hlt_f64);
 	return 0.;
 }
 
@@ -299,6 +304,7 @@ HL_PRIM float hl_dyn_castf( void *data, hl_type *t ) {
 	default:
 		break;
 	}
+	invalid_cast(t,&hlt_f32);
 	return 0;
 }
 
@@ -395,7 +401,7 @@ HL_PRIM void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
 HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
 	if( t->kind == HDYN || v == NULL || hl_safe_cast(v->t,t) )
 		return v;
-	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(v->t),hl_type_str(t));
+	invalid_cast(v->t,t);
 	return NULL;
 }
 
