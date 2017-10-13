@@ -288,6 +288,7 @@ if(WIN32)
         include/vorbis/vorbisfile.c
         include/vorbis/window.c
         libs/fmt/fmt.c
+		libs/fmt/sha1.c
     )
 else()
     find_package(ZLIB REQUIRED)
@@ -297,6 +298,7 @@ else()
 
     add_library(fmt.hdll MODULE
         libs/fmt/fmt.c
+		libs/fmt/sha1.c
     )
 endif()
 
