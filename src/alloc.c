@@ -683,7 +683,7 @@ static void gc_flush_mark() {
 #		endif
 		while( pos < nwords ) {
 			void *p;
-			if( mark_bits && (mark_bits[pos >> 5] & (1 << pos)) == 0 ) { // &31 implicit
+			if( mark_bits && (mark_bits[pos >> 5] & (1 << (pos&31))) == 0 ) {
 				pos++;
 				block++;
 				continue;
