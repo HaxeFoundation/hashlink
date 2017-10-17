@@ -18,7 +18,7 @@ PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/p
 	include/pcre/pcre_exec.o include/pcre/pcre_fullinfo.o include/pcre/pcre_globals.o \
 	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o
 
-RUNTIME = src/alloc.o
+RUNTIME = src/alloc.o src/track.o
 
 STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o \
 	src/std/file.o src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/random.o src/std/regexp.o \
