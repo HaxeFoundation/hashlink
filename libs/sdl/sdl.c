@@ -409,6 +409,12 @@ HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
 	case 2:
 		SDL_RestoreWindow(win);
 		break;
+	case 3:
+		SDL_ShowWindow(win);
+		break;
+	case 4:
+		SDL_HideWindow(win);
+		break;
 	default:
 		break;
 	}
