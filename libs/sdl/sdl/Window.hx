@@ -26,6 +26,7 @@ class Window {
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
+	public var visible(default, set) : Bool = true;
 
 	public function new( title : String, width : Int, height : Int ) {
 		while( true ) {
@@ -91,6 +92,13 @@ class Window {
 		if( winSetFullscreen(win, cast mode) )
 			displayMode = mode;
 		return displayMode;
+	}
+
+	function set_visible(b) {
+		if( visible == b )
+			return b;
+		winResize(win, b ? 3 : 4);
+		return visible = b;
 	}
 
 	public function resize( width : Int, height : Int ) {
