@@ -26,6 +26,7 @@ class Window {
 	public var x(get, never) : Int;
 	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
+	public var visible(default, set) : Bool = true;
 	public var vsync : Bool;
 
 	public function new( title : String, width : Int, height : Int ) {
@@ -60,6 +61,13 @@ class Window {
 			savedSize = null;
 		}
 		return mode;
+	}
+
+	function set_visible(b) {
+		if( visible == b )
+			return b;
+		winResize(win, b ? 4 : 3);
+		return visible = b;
 	}
 
 	public function resize( width : Int, height : Int ) {

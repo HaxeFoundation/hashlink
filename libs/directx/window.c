@@ -245,6 +245,12 @@ HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
 	case 2:
 		ShowWindow(win, SW_RESTORE);
 		break;
+	case 3:
+		ShowWindow(win, SW_HIDE);
+		break;
+	case 4:
+		ShowWindow(win, SW_SHOW);
+		break;
 	default:
 		break;
 	}
