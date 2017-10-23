@@ -24,7 +24,7 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 
 HL = src/callback.o src/code.o src/jit.o src/main.o src/module.o src/debugger.o
 
-FMT = libs/fmt/fmt.o
+FMT = libs/fmt/fmt.o libs/fmt/sha1.o
 
 SDL = libs/sdl/sdl.o libs/sdl/gl.o
 
