@@ -90,6 +90,25 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	longjmp(t->buf,1);
 }
 
+HL_PRIM void hl_dump_stack() {
+	void *stack[0x1000];
+	int count = capture_stack_func(stack, 0x1000);
+	int i;
+	for(i=0;i<count;i++) {
+		void *addr = stack[i];
+		uchar sym[512];
+		int size = 512;
+		uchar *str = resolve_symbol_func(addr, sym, &size);
+		if( str == NULL ) {
+			int iaddr = (int)(int_val)addr;
+			str = sym;
+			uprintf(USTR("@0x%X\n"),iaddr);
+		} else
+			uprintf(USTR("%s\n"),str);
+	}
+}
+
+
 HL_PRIM varray *hl_exception_stack() {
 	varray *a = hl_alloc_array(&hlt_bytes, stack_count);
 	int i;

@@ -489,6 +489,7 @@ HL_API void hl_assert();
 HL_API void hl_throw( vdynamic *v );
 HL_API void hl_rethrow( vdynamic *v );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
+HL_API void hl_dump_stack();
 HL_API varray *hl_exception_stack();
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
