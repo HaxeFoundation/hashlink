@@ -620,7 +620,7 @@ static void md5_finish( md5_context *ctx, uint8 digest[16] ) {
 
 HL_PRIM void HL_NAME(digest)( vbyte *out, vbyte *in, int length, int format ) {
 	if( format & 256 ) {
-		in = hl_to_utf8((uchar*)in);
+		in = (vbyte*)hl_to_utf8((uchar*)in);
 		length = (int)strlen((char*)in);
 	}
 	switch( format & 0xFF ) {
