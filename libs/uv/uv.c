@@ -1,6 +1,11 @@
 #define HL_NAME(n) uv_##n
-#include <hl.h>
-#include <uv.h>
+#ifdef _WIN32
+#	include <uv.h>
+#	include <hl.h>
+#else
+#	include <hl.h>
+#	include <uv.h>
+#endif
 
 #define EVT_CLOSE	1
 
