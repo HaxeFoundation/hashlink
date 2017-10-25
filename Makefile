@@ -32,6 +32,10 @@ OPENAL = libs/openal/openal.o
 
 SSL = libs/ssl/ssl.o
 
+UV = libs/uv/uv.o
+
+UI = libs/ui/ui_stub.o
+
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
 BOOT = src/_main.o
@@ -82,7 +86,7 @@ all: libhl hl libs
 install_lib:
 	cp libhl.${LIBEXT} /usr/local/lib
 
-libs: fmt sdl ssl
+libs: fmt sdl ssl openal ui uv
 
 libhl: ${LIB}
 	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
@@ -106,13 +110,20 @@ openal: ${OPENAL} libhl
 ssl: ${SSL} libhl
 	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
 
+ui: ${UI} libhl
+	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} -L. -lhl
+
+uv: ${UV} libhl
+	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
+
+
 .SUFFIXES : .c .o
 
 .c.o :
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV}
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
