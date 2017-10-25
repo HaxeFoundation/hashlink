@@ -1,6 +1,6 @@
 #define HL_NAME(n) uv_##n
-#include <uv.h>
 #include <hl.h>
+#include <uv.h>
 
 #define EVT_CLOSE	1
 

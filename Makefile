@@ -63,11 +63,10 @@ LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 
-
 else
 
 # Linux
-CFLAGS += -m$(ARCH) -fPIC
+CFLAGS += -m$(ARCH) -fPIC -pthread
 LFLAGS += -lm -Wl,--export-dynamic -Wl,--no-undefined
 
 ifeq ($(ARCH),32)
