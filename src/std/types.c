@@ -105,6 +105,8 @@ HL_PRIM int hl_pad_struct( int size, hl_type *t ) {
 	case HBOOL:
 		GET_ALIGN(bool);
 		break;
+	default:
+		break;
 	}
 	return (-size) & (align - 1);
 }

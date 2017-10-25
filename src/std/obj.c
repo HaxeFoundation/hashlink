@@ -557,7 +557,6 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t ) {
 	int index;
 	int_val address_offset;
-	bool full_remap = false;
 
 	// expand data
 	if( hl_is_ptr(t) ) {
@@ -585,7 +584,6 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 		if( raw_size == o->raw_size )
 			memcpy(newData,o->raw_data,o->raw_size);
 		else {
-			full_remap = true;
 			raw_size = 0;
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = o->lookup + i;
@@ -785,7 +783,7 @@ static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **f
 }
 
 HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
-	hl_type *ft;
+	hl_type *ft = NULL;
 	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
 	switch( ft->kind ) {
 	case HUI8:
@@ -818,7 +816,7 @@ HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 }
 
 HL_PRIM void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
-	hl_type *t;
+	hl_type *t = NULL;
 	void *addr = hl_obj_lookup_set(d,hfield,&hlt_f32,&t);
 	if( t->kind == HF32 )
 		*(float*)addr = value;
@@ -831,7 +829,7 @@ HL_PRIM void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
 }
 
 HL_PRIM void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
-	hl_type *t;
+	hl_type *t = NULL;
 	void *addr = hl_obj_lookup_set(d,hfield,&hlt_f64,&t);
 	if( t->kind == HF64 )
 		*(double*)addr = value;
@@ -844,7 +842,7 @@ HL_PRIM void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
 }
 
 HL_PRIM void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *value ) {
-	hl_type *ft;
+	hl_type *ft = NULL;
 	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
 	if( hl_same_type(t,ft) || value == NULL )
 		*(void**)addr = value;
