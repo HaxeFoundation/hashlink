@@ -2274,7 +2274,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	ctx->allocOffset = 0;
 	if( f->nregs > ctx->maxRegs ) {
 		free(ctx->vregs);
-		ctx->vregs = (vreg*)malloc(sizeof(vreg) * f->nregs);
+		ctx->vregs = (vreg*)malloc(sizeof(vreg) * (f->nregs + 1));
 		if( ctx->vregs == NULL ) {
 			ctx->maxRegs = 0;
 			return -1;
@@ -2662,26 +2662,20 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OInstanceClosure:
 			{
-#				ifdef HL_64
-				jit_error("TODO");
-#				else
 				preg *r = alloc_cpu(ctx, rb, true);
 				jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
-				size = pad_before_call(ctx,HL_WSIZE*3);
-				op64(ctx,PUSH,r,UNUSED);
+				int size = begin_native_call(ctx,3);
+				set_native_arg(ctx,r);
 
 				j->pos = BUF_POS();
 				j->target = o->p2;
 				j->next = ctx->calls;
 				ctx->calls = j;
 
-				op64(ctx,MOV,r,pconst64(&p,RESERVE_ADDRESS));
-				op64(ctx,PUSH,r,UNUSED);
-				op64(ctx,MOV,r,pconst64(&p,(int_val)m->code->functions[m->functions_indexes[o->p2]].type));
-				op64(ctx,PUSH,r,UNUSED);
+				set_native_arg(ctx,pconst64(&p,RESERVE_ADDRESS));
+				set_native_arg(ctx,pconst64(&p,(int_val)m->code->functions[m->functions_indexes[o->p2]].type));				
 				call_native(ctx,hl_alloc_closure_ptr,size);
 				store(ctx,dst,PEAX,true);
-#				endif
 			}
 			break;
 		case OVirtualClosure:
@@ -2769,11 +2763,26 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				XJump_small(JAlways,jend);
 				patch_jump(ctx,jhasvalue);
 				restore_regs(ctx);
+#				ifdef HL_64
+				{
+					int regids[64];
+					preg *pc = REG_AT(CALL_REGS[0]);
+					vreg *sc = R(f->nregs); // scratch register that we temporary rebind					
+					if( o->p3 >= 63 ) jit_error("assert");
+					memcpy(regids + 1, o->extra, o->p3 * sizeof(int));
+					regids[0] = f->nregs;
+					sc->size = HL_WSIZE;
+					sc->t = &hlt_dyn;
+					op64(ctx, MOV, pc, pmem(&p,r->id,HL_WSIZE*3));
+					scratch(pc);
+					sc->current = pc;
+					pc->holds = sc;
+					size = prepare_call_args(ctx,o->p3 + 1,regids,ctx->vregs,false,0);
+					if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
+				}
+#				else
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,false,HL_WSIZE);
 				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
-#				ifdef HL_64
-				op64(ctx, MOV, REG_AT(CALL_REGS[0]), pmem(&p,r->id,HL_WSIZE*3));
-#				else
 				op64(ctx, PUSH,pmem(&p,r->id,HL_WSIZE*3),UNUSED); // push closure value
 #				endif
 				op_call(ctx, pmem(&p,r->id,HL_WSIZE), size);
@@ -3520,8 +3529,8 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	c = ctx->calls;
 	while( c ) {
 		int fpos = (int)(int_val)m->functions_ptrs[c->target];
-		if( (code[c->pos]&~3) == 0xB8 ) // MOV : absolute
-			*(int_val*)(code + c->pos + 1) = (int_val)(code + fpos);
+		if( (code[c->pos]&~3) == (IS_64?0x48:0xB8) ) // MOV : absolute
+			*(int_val*)(code + c->pos + (IS_64?2:1)) = (int_val)(code + fpos);
 		else
 			*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
 		c = c->next;
