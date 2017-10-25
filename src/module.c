@@ -222,6 +222,43 @@ static void append_type( char **p, hl_type *t ) {
 	}
 }
 
+static void *resolve_library( const char *lib ) {
+	char tmp[256];	
+	void *h;
+
+	if( strcmp(lib,"builtin") == 0 )
+		return dlopen(NULL,RTLD_LAZY);
+
+	if( strcmp(lib,"std") == 0 ) {
+#	ifdef HL_WIN
+#		ifdef HL_64						
+		h = dlopen("libhl64.dll",RTLD_LAZY);
+		if( h == NULL ) h = dlopen("libhl.dll",RTLD_LAZY);
+#		else
+		h = dlopen("libhl.dll",RTLD_LAZY);
+#		endif
+		if( h == NULL ) hl_fatal1("Failed to load library %s","libhl.dll");
+		return h;
+#	else
+		return RTLD_DEFAULT;
+#	endif
+	}
+	
+	strcpy(tmp,lib);
+
+#	ifdef HL_64
+	strcpy(tmp+strlen(lib),"64.hdll");
+	h = dlopen(tmp,RTLD_LAZY);
+	if( h != NULL ) return h;
+#	endif
+	
+	strcpy(tmp+strlen(lib),".hdll");
+	h = dlopen(tmp,RTLD_LAZY);
+	if( h == NULL )
+		hl_fatal1("Failed to load library %s",tmp);
+	return h;
+}
+
 int hl_module_init( hl_module *m, void *stack_top_val ) {
 	int i, entry;
 	jit_ctx *ctx;
@@ -243,30 +280,7 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 			void *f;
 			if( curlib != n->lib ) {
 				curlib = n->lib;
-				strcpy(tmp,n->lib);
-				if( strcmp(n->lib,"builtin") == 0 )
-					libHandler = dlopen(NULL,RTLD_LAZY);
-				else {
-					if( strcmp(n->lib,"std") == 0 )
-#					ifndef HL_WIN
-						libHandler = RTLD_DEFAULT;
-					else {
-#					else
-						strcpy(tmp, "libhl.dll");
-					else
-#					endif
-#						ifdef HL_64
-						strcpy(tmp+strlen(tmp),"64.hdll");
-#						else
-						strcpy(tmp+strlen(tmp),".hdll");
-#						endif
-						libHandler = dlopen(tmp,RTLD_LAZY);
-						if( libHandler == NULL )
-							hl_fatal1("Failed to load library %s",tmp);
-#					ifndef HL_WIN
-					}
-#					endif
-				}
+				libHandler = resolve_library(n->lib);
 			}
 			strcpy(p,"hlp_");
 			p += 4;
