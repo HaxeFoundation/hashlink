@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libalut-dev \
         libmbedtls-dev \
         libturbojpeg0-dev \
+        libuv1-dev \
+        libopenal-dev \
         neko \
         curl \
         ca-certificates \
