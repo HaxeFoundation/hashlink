@@ -63,7 +63,6 @@ LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 
-
 else
 
 # Linux
