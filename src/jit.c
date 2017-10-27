@@ -3529,7 +3529,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	c = ctx->calls;
 	while( c ) {
 		int fpos = (int)(int_val)m->functions_ptrs[c->target];
-		if( (code[c->pos]&~3) == (IS_64?0x48:0xB8) ) // MOV : absolute
+		if( (code[c->pos]&~3) == (IS_64?0x48:0xB8) || code[c->pos] == 0x68 ) // MOV : absolute | PUSH
 			*(int_val*)(code + c->pos + (IS_64?2:1)) = (int_val)(code + fpos);
 		else
 			*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
