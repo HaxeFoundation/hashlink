@@ -1143,8 +1143,10 @@ int mbedtls_x509_crt_parse_path( mbedtls_x509_crt *chain, const char *path )
                                      lstrlenW( file_data.cFileName ),
                                      p, (int) len - 1,
                                      NULL, NULL );
-        if( w_ret == 0 )
-            return( MBEDTLS_ERR_X509_FILE_IO_ERROR );
+		if (w_ret == 0) {
+			FindClose(hFind);
+			return(MBEDTLS_ERR_X509_FILE_IO_ERROR);
+		}
 
         w_ret = mbedtls_x509_crt_parse_file( chain, filename );
         if( w_ret < 0 )
