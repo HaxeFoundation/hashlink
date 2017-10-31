@@ -1,6 +1,7 @@
 -lib heaps
 -lib hlbullet
 -lib hldx
--hl sample.hl
+-cp .
 -main Main
+-hl sample.hl
 
