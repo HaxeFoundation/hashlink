@@ -2,7 +2,7 @@
 <project version="2">
   <!-- Output SWF options -->
   <output>
-    <movie outputType="Application" />
+    <movie outputType="CustomBuild" />
     <movie input="" />
     <movie path="sample.hxml" />
     <movie fps="0" />
@@ -10,12 +10,12 @@
     <movie height="0" />
     <movie version="0" />
     <movie minorVersion="0" />
-    <movie platform="hxml" />
+    <movie platform="Custom" />
     <movie background="#000000" />
   </output>
   <!-- Other classes to be compiled into your SWF -->
   <classpaths>
-    <class path="." />
+    <class path="" />
   </classpaths>
   <!-- Build options -->
   <build>
@@ -41,7 +41,7 @@
     <hidden path="obj" />
   </hiddenPaths>
   <!-- Executed before build -->
-  <preBuildCommand>cmd /c haxe $(OutputFile)</preBuildCommand>
+  <preBuildCommand>haxe --connect 6000 sample.hxml</preBuildCommand>
   <!-- Executed after build -->
   <postBuildCommand alwaysRun="False" />
   <!-- Other project options -->

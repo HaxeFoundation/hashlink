@@ -85,8 +85,98 @@ HL_PRIM Shape *HL_NAME(create_sphere_shape)( double radius ) {
 	return alloc_ref(s, finalize_shape);
 }
 
+HL_PRIM Shape *HL_NAME(create_capsule_shape)( int axis, double radius, double length ) {
+	btCollisionShape *s;
+	switch( axis ) {
+	case 0:
+		s = new btCapsuleShapeX(radius, length);
+		break;
+	case 1:
+		s = new btCapsuleShape(radius, length);
+		break;
+	default:
+		s = new btCapsuleShapeZ(radius, length);
+		break;
+	}
+	return alloc_ref(s, finalize_shape);
+}
+
+HL_PRIM Shape *HL_NAME(create_cylinder_shape)( int axis, double sizeX, double sizeY, double sizeZ ) {
+	btCollisionShape *s;
+	switch( axis ) {
+	case 0:
+		s = new btCylinderShapeX(btVector3(sizeX*0.5,sizeY*0.5,sizeZ*0.5));
+		break;
+	case 1:
+		s = new btCylinderShape(btVector3(sizeX*0.5,sizeY*0.5,sizeZ*0.5));
+		break;
+	default:
+		s = new btCylinderShapeZ(btVector3(sizeX*0.5,sizeY*0.5,sizeZ*0.5));
+		break;
+	}
+	return alloc_ref(s, finalize_shape);
+}
+
+HL_PRIM Shape *HL_NAME(create_cone_shape)( int axis, double radius, double height ) {
+	btCollisionShape *s;
+	switch( axis ) {
+	case 0:
+		s = new btConeShapeX(radius, height);
+		break;
+	case 1:
+		s = new btConeShape(radius, height);
+		break;
+	default:
+		s = new btConeShapeZ(radius, height);
+		break;
+	}
+	return alloc_ref(s, finalize_shape);
+}
+
+HL_PRIM Shape *HL_NAME(create_compound_shape)( varray *shapes, double *data ) {
+	btCompoundShape *s = new btCompoundShape(true,shapes->size);
+	int i;
+	btScalar *masses = new btScalar[shapes->size];
+	double *original_data = data;
+	for(i=0;i<shapes->size;i++) {
+		double x = *data++;
+		double y = *data++;
+		double z = *data++;
+		double qx = *data++;
+		double qy = *data++;
+		double qz = *data++;
+		double qw = *data++;
+		masses[i] = *data++;
+		s->addChildShape(btTransform(btQuaternion(qx,qy,qz,qw),btVector3(x,y,z)),hl_aptr(shapes,Shape*)[i]->value);
+	}
+	btTransform principal;
+	btVector3 inertia;
+	s->calculatePrincipalAxisTransform(masses, principal, inertia);
+	delete masses;
+
+	data = original_data;
+	*data++ = principal.getOrigin().x();
+	*data++ = principal.getOrigin().y();
+	*data++ = principal.getOrigin().z();
+	*data++ = principal.getRotation().x();
+	*data++ = principal.getRotation().y();
+	*data++ = principal.getRotation().z();
+	*data++ = principal.getRotation().w();
+
+	btTransform inverse = principal.inverse();
+	for(i=0;i<shapes->size;i++)
+		s->updateChildTransform(i, inverse*s->getChildTransform(i), i == shapes->size - 1);
+
+	// todo : keep references to added shapes ?
+	return alloc_ref((btCollisionShape*)s, finalize_shape);
+}
+
 DEFINE_PRIM(_SHAPE, create_box_shape, _F64 _F64 _F64);
 DEFINE_PRIM(_SHAPE, create_sphere_shape, _F64);
+DEFINE_PRIM(_SHAPE, create_capsule_shape, _I32 _F64 _F64);
+DEFINE_PRIM(_SHAPE, create_cylinder_shape, _I32 _F64 _F64 _F64);
+DEFINE_PRIM(_SHAPE, create_cone_shape, _I32 _F64 _F64);
+DEFINE_PRIM(_SHAPE, create_compound_shape, _ARR _BYTES);
 
 // --- RIGID BODY ----------------------------------------------------------------
 
