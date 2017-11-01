@@ -22,13 +22,6 @@
 #include <hl.h>
 #include <hlmodule.h>
 
-#ifdef HL_VCC
-#	include <crtdbg.h>
-#else
-#	define _CrtSetDbgFlag(x)
-#	define _CrtCheckMemory()
-#endif
-
 #ifdef HL_WIN
 #	include <locale.h>
 typedef uchar pchar;
@@ -45,8 +38,6 @@ typedef char pchar;
 #define ptoi atoi
 #define PSTR(x) x
 #endif
-
-extern void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret );
 
 static hl_code *load_code( const pchar *file ) {
 	hl_code *code;
@@ -173,7 +164,11 @@ int main(int argc, pchar *argv[]) {
 #	ifdef HL_VCC
 	__try {
 #	endif
-		hl_callback(ctx.m->functions_ptrs[ctx.m->code->entrypoint],ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type,NULL,NULL);
+		vclosure c;
+		c.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
+		c.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
+		c.hasValue = 0;
+		hl_dyn_call(&c,NULL,0);
 #	ifdef HL_VCC
 	} __except( throw_handler(GetExceptionCode()) ) {}
 #	endif

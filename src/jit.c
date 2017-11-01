@@ -2441,9 +2441,10 @@ static void jit_hl2c( jit_ctx *ctx ) {
 }
 
 static int jit_build( jit_ctx *ctx, void (*fbuild)( jit_ctx *) ) {
-	int pos = BUF_POS();
+	int pos;
 	jit_buf(ctx);
 	jit_nops(ctx);
+	pos = BUF_POS();
 	fbuild(ctx);
 	jit_nops(ctx);
 	return pos;
@@ -3673,26 +3674,28 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				int size, jenter, jtrap;
 				int trap_size = (sizeof(hl_trap_ctx) + 15) & 0xFFF0;
-				int trap_pad = trap_size - sizeof(hl_trap_ctx);
+				hl_trap_ctx *t = NULL;
 				// trap pad
-				if( trap_pad ) op64(ctx,SUB,PESP,pconst(&p,trap_pad));
 #				ifdef HL_64
+				preg *trap = REG_AT(CALL_REGS[0]);
+				RLOCK(trap);
 				preg *tmp = alloc_reg(ctx,RCPU);
 				op64(ctx,MOV,tmp,pconst64(&p,(int_val)&hl_current_trap));
-				op64(ctx,MOV,PEAX,pmem(&p,tmp->id,0));
-				op64(ctx,PUSH,PEAX,UNUSED);
-				op64(ctx,SUB,PESP,pconst(&p,sizeof(hl_trap_ctx) - HL_WSIZE));
-				op64(ctx,MOV,PEAX,PESP);
-				op64(ctx,MOV,pmem(&p,tmp->id,0),PEAX);
+				op64(ctx,MOV,trap,pmem(&p,tmp->id,0));
+				op64(ctx,SUB,PESP,pconst(&p,trap_size));
+				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&t->prev),trap);
+				op64(ctx,MOV,trap,PESP);
+				op64(ctx,MOV,pmem(&p,tmp->id,0),trap);
 #				else
-				op64(ctx,MOV,PEAX,paddr(&p,&hl_current_trap));
-				op64(ctx,PUSH,PEAX,UNUSED);
-				op64(ctx,SUB,PESP,pconst(&p,sizeof(hl_trap_ctx) - HL_WSIZE));
-				op64(ctx,MOV,PEAX,PESP);
-				op64(ctx,MOV,paddr(&p,&hl_current_trap),PEAX);
+				preg *trap = PEAX;
+				op64(ctx,MOV,trap,paddr(&p,&hl_current_trap));
+				op64(ctx,SUB,PESP,pconst(&p,trap_size));
+				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&t->prev),trap);
+				op64(ctx,MOV,trap,PESP);
+				op64(ctx,MOV,paddr(&p,&hl_current_trap),trap);
 #				endif
 				size = begin_native_call(ctx, 1);
-				set_native_arg(ctx,PEAX);
+				set_native_arg(ctx,trap);
 				call_native(ctx,setjmp,size);
 				op64(ctx,TEST,PEAX,PEAX);
 				XJump_small(JZero,jenter);
