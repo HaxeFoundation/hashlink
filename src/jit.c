@@ -2339,8 +2339,10 @@ static vdynamic *jit_wrapper_call( vclosure_wrapper *c, char *stack_args, void *
 	vdynamic *args[MAX_ARGS];
 	int i;
 	int nargs = c->cl.t->fun->nargs;
-	if( nargs > 0 )
-		hl_debug_break();
+#	ifdef JIT_DEBUG
+	if( nargs > 0 && IS_64 )
+		hl_error("TODO!"); // read call_regs
+#	endif
 	if( nargs > MAX_ARGS )
 		hl_error("Too many arguments for wrapped call");
 	for(i=0;i<nargs;i++) {
