@@ -258,7 +258,6 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\callback.c" />
     <ClCompile Include="src\code.c" />
     <ClCompile Include="src\debugger.c" />
     <ClCompile Include="src\jit.c" />

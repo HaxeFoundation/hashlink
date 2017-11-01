@@ -29,8 +29,6 @@
 #	include <dlfcn.h>
 #endif
 
-extern void hl_callback_init( void *e );
-
 static hl_module *cur_module;
 static void *stack_top;
 
@@ -260,7 +258,7 @@ static void *resolve_library( const char *lib ) {
 }
 
 int hl_module_init( hl_module *m, void *stack_top_val ) {
-	int i, entry;
+	int i;
 	jit_ctx *ctx;
 	// RESET globals
 	for(i=0;i<m->code->nglobals;i++) {
@@ -358,7 +356,6 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 	if( ctx == NULL )
 		return 0;
 	hl_jit_init(ctx, m);
-	entry = hl_jit_init_callback(ctx);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		int fpos = hl_jit_function(ctx, m, f);
@@ -373,7 +370,6 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
 	}
-	hl_callback_init(((unsigned char*)m->jit_code) + entry);
 	cur_module = m;
 	stack_top = stack_top_val;
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
