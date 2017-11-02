@@ -3268,7 +3268,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int size;
 				preg *r = alloc_cpu(ctx, R(0), true);
 				preg *tmp;
-				tmp = alloc_reg(ctx, RCPU);
+				tmp = alloc_reg(ctx, RCPU_CALL);
 				op64(ctx,MOV,tmp,pmem(&p,r->id,0)); // read type
 				op64(ctx,MOV,tmp,pmem(&p,tmp->id,HL_WSIZE*2)); // read proto
 				args[0] = 0;
