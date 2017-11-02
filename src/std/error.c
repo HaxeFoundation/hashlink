@@ -60,6 +60,12 @@ HL_PRIM uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	return resolve_symbol_func(addr, out, outSize);
 }
 
+static void (*throw_jump)( jmp_buf, int ) = longjmp;
+
+HL_PRIM void hl_setup_longjump( void *j ) {
+	throw_jump = j;
+}
+
 HL_PRIM void hl_setup_exception( void *resolve_symbol, void *capture_stack ) {
 	resolve_symbol_func = resolve_symbol;
 	capture_stack_func = capture_stack;
@@ -87,7 +93,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 		hl_debug_break();
 		if( hl_error_handler ) hl_dyn_call(hl_error_handler,&v,1);
 	}
-	longjmp(t->buf,1);
+	throw_jump(t->buf,1);
 }
 
 HL_PRIM void hl_dump_stack() {

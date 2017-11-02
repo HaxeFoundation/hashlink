@@ -78,6 +78,7 @@ typedef enum {
 	FSTP32,
 	FLD,
 	FLD32,
+	FLDCW,
 	// SSE
 	MOVSD,
 	MOVSS,
@@ -208,7 +209,7 @@ struct vreg {
 #define REG_AT(i)		(ctx->pregs + (i))
 
 #ifdef HL_64
-#	define RCPU_COUNT	14
+#	define RCPU_COUNT	16
 #	define RFPU_COUNT	16
 #	ifdef HL_WIN_CALL
 #		define CALL_NREGS			4
@@ -251,6 +252,10 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 
 #define BREAK()		B(0xCC)
 
+#if defined(HL_64) && defined(HL_VCC) && defined(_DEBUG)
+#	define JIT_CUSTOM_LONGJUMP
+#endif
+
 static preg _unused = { RUNUSED, 0, 0, NULL };
 static preg *UNUSED = &_unused;
 
@@ -287,6 +292,7 @@ struct jit_ctx {
 	hl_debug_infos *debug;
 	int c2hl;
 	int hl2c;
+	int longjump;
 };
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
@@ -442,6 +448,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "FSTP32", 0, RM(0xD9,3) },
 	{ "FLD", 0, RM(0xDD,0) },
 	{ "FLD32", 0, RM(0xD9,0) },
+	{ "FLDCW", 0, RM(0xD9, 5) },
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
@@ -2440,6 +2447,38 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	op64(ctx,RET,UNUSED,UNUSED);
 }
 
+#ifdef JIT_CUSTOM_LONGJUMP
+// Win64 debug CRT performs a Rtl stack check in debug mode, preventing from
+// using longjump. This in an alternate implementation that follows the native
+// setjump storage.
+//
+// Another more reliable way of handling this would be to use RtlAddFunctionTable
+// but this would require complex creation of unwind info
+static void jit_longjump( jit_ctx *ctx ) {
+	preg *buf = REG_AT(CALL_REGS[0]);
+	preg *ret = REG_AT(CALL_REGS[1]);
+	preg p;
+	int i;
+	op64(ctx,MOV,PEAX,ret); // return value
+	op64(ctx,MOV,REG_AT(Edx),pmem(&p,buf->id,0x0));
+	op64(ctx,MOV,REG_AT(Ebx),pmem(&p,buf->id,0x8));
+	op64(ctx,MOV,REG_AT(Esp),pmem(&p,buf->id,0x10));
+	op64(ctx,MOV,REG_AT(Ebp),pmem(&p,buf->id,0x18));
+	op64(ctx,MOV,REG_AT(Esi),pmem(&p,buf->id,0x20));
+	op64(ctx,MOV,REG_AT(Edi),pmem(&p,buf->id,0x28));
+	op64(ctx,MOV,REG_AT(R12),pmem(&p,buf->id,0x30));
+	op64(ctx,MOV,REG_AT(R13),pmem(&p,buf->id,0x38));
+	op64(ctx,MOV,REG_AT(R14),pmem(&p,buf->id,0x40));
+	op64(ctx,MOV,REG_AT(R15),pmem(&p,buf->id,0x48));
+	op64(ctx,LDMXCSR,pmem(&p,buf->id,0x58), UNUSED);
+	op64(ctx,FLDCW,pmem(&p,buf->id,0x5C), UNUSED);
+	for(i=0;i<10;i++)
+		op64(ctx,MOVSD,REG_AT(XMM(i+6)),pmem(&p,buf->id,0x60 + i * 16));
+	op64(ctx,PUSH,pmem(&p,buf->id,0x50),UNUSED);
+	op64(ctx,RET,UNUSED,UNUSED);
+}
+#endif
+
 static int jit_build( jit_ctx *ctx, void (*fbuild)( jit_ctx *) ) {
 	int pos;
 	jit_buf(ctx);
@@ -2461,6 +2500,9 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	}
 	ctx->c2hl = jit_build(ctx, jit_c2hl);
 	ctx->hl2c = jit_build(ctx, jit_hl2c);
+#	ifdef JIT_CUSTOM_LONGJUMP
+	ctx->longjump = jit_build(ctx, jit_longjump);
+#	endif
 }
 
 static void *get_dyncast( hl_type *t ) {
@@ -3882,6 +3924,9 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 			c = next;
 		}
 	}
+#	ifdef JIT_CUSTOM_LONGJUMP
+	hl_setup_longjump(code + ctx->longjump);
+#	endif
 	return code;
 }
 
