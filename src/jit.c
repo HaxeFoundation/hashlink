@@ -193,7 +193,7 @@ typedef enum {
 
 typedef struct {
 	preg_kind kind;
-	int id;
+	CpuReg id;
 	int lock;
 	vreg *holds;
 } preg;
@@ -3110,8 +3110,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				XJump_small(JNotZero,jhasvalue);
 				save_regs(ctx);
 				size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,0);
-				if( r->holds != ra ) r = alloc_cpu(ctx, ra, true);
-				op_call(ctx, pmem(&p,r->id,HL_WSIZE), size);
+				preg *rr = r;
+				if( rr->holds != ra ) rr = alloc_cpu(ctx, ra, true);
+				op_call(ctx, pmem(&p,rr->id,HL_WSIZE), size);
 				XJump_small(JAlways,jend);
 				patch_jump(ctx,jhasvalue);
 				restore_regs(ctx);
