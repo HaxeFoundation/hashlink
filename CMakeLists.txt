@@ -92,7 +92,6 @@ set_target_properties(libhl
 )
 
 add_executable(hl
-    src/callback.c
     src/code.c
     src/jit.c
     src/main.c
