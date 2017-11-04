@@ -406,6 +406,14 @@ HL_PRIM varray *hl_type_instance_fields( hl_type *t ) {
 	int out = 0;
 	hl_type_obj *o;
 	hl_runtime_obj *rt;
+	if( t->kind == HVIRTUAL ) {
+		int i;
+		a = hl_alloc_array(&hlt_bytes,t->virt->nfields);
+		names = hl_aptr(a,const uchar *);
+		for(i=0;i<t->virt->nfields;i++)
+			names[i] = t->virt->fields[i].name;
+		return a;
+	}
 	if( t->kind != HOBJ )
 		return NULL;
 	o = t->obj;
