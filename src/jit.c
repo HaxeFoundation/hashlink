@@ -880,6 +880,21 @@ static void patch_jump_to( jit_ctx *ctx, int p, int target ) {
 	}
 }
 
+static int stack_size( hl_type *t ) {
+	switch( t->kind ) {
+	case HUI8:
+	case HUI16:
+	case HBOOL:
+#	ifdef HL_64
+	case HI32:
+	case HF32:
+#	endif
+		return sizeof(int_val);
+	default:
+		return hl_type_size(t);
+	}
+}
+
 static int call_reg_index( int reg ) {
 #	ifdef HL_64
 	int i;
@@ -1273,7 +1288,7 @@ static int pad_before_call( jit_ctx *ctx, int size ) {
 
 static void push_reg( jit_ctx *ctx, vreg *r ) {
 	preg p;
-	switch( hl_stack_size(r->t) ) {
+	switch( stack_size(r->t) ) {
 	case 1:
 		op64(ctx,SUB,PESP,pconst(&p,1));
 		op32(ctx,MOV8,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
@@ -1418,7 +1433,7 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, i
 			RLOCK(c);
 			continue;
 		}
-		size += hl_stack_size(r->t);
+		size += stack_size(r->t);
 	}
 	paddedSize = pad_before_call(ctx,size);
 	for(i=0;i<count;i++) {
@@ -2223,7 +2238,7 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		int creg = select_call_reg(&cregs,at,i);
 		if( creg >= 0 )
 			continue;
-		size += hl_stack_size(at);
+		size += stack_size(at);
 	}
 	pad = (-size) & 15;
 	size += pad;
@@ -2234,7 +2249,7 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		hl_type *at = t->fun->args[j];
 		void *v = args[j];
 		int creg = mapped_reg(&cregs,j);
-		int tsize = hl_stack_size(at);
+		int tsize = stack_size(at);
 		void *store;
 		if( creg >= 0 ) {
 			if( REG_IS_FPU(creg) ) {
@@ -2410,7 +2425,7 @@ static vdynamic *jit_wrapper_call( vclosure_wrapper *c, char *stack_args, void *
 	for(i=0;i<nargs;i++) {
 		hl_type *t = c->cl.t->fun->args[i];
 		args[i] = hl_is_dynamic(t) ? *(vdynamic**)stack_args : hl_make_dyn(stack_args,t);
-		stack_args += hl_stack_size(t);
+		stack_args += stack_size(t);
 	}
 	return hl_dyn_call(c->wrappedFun,args,nargs);
 }
@@ -2704,7 +2719,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		if( creg < 0 || IS_WINCALL64 ) {
 			// use existing stack storage 
 			r->stackPos = argsSize + HL_WSIZE * 2;
-			argsSize += hl_stack_size(r->t);
+			argsSize += stack_size(r->t);
 		} else {
 			// make room in local vars
 			size += r->size;

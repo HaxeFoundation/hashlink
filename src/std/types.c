@@ -67,21 +67,6 @@ HL_PRIM int hl_type_size( hl_type *t ) {
 	return T_SIZES[t->kind];
 }
 
-HL_PRIM int hl_stack_size( hl_type *t ) {
-	switch( t->kind ) {
-	case HUI8:
-	case HUI16:
-	case HBOOL:
-#	ifdef HL_64
-	case HI32:
-	case HF32:
-#	endif
-		return sizeof(int_val);
-	default:
-		return T_SIZES[t->kind];
-	}
-}
-
 HL_PRIM int hl_pad_struct( int size, hl_type *t ) {
 	int align = sizeof(void*);
 #	define GET_ALIGN(type) { struct { unsigned char a; type b; } s = {0}; align = (int)((unsigned char *)&s.b - (unsigned char*)&s); }
