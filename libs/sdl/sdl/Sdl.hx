@@ -49,7 +49,7 @@ class Sdl {
 
 	static function __init__() {
 		hl.Api.setErrorHandler(function(e) reportError(e));
-		sentinel = new hl.UI.Sentinel(30,onTimeout);
+		if (isWin32) sentinel = new hl.UI.Sentinel(30,onTimeout);
 	}
 
 	static function initOnce() return false;
@@ -61,7 +61,7 @@ class Sdl {
 		Prevent the program from reporting timeout infinite loop.
 	**/
 	public static function tick() {
-		sentinel.tick();
+		if (sentinel != null) sentinel.tick();
 	}
 
 	public static function processEvents() {
@@ -122,27 +122,29 @@ class Sdl {
 			}
 		}
 
-		var f = new hl.UI.WinLog("Uncaught Exception", 500, 400);
-		f.setTextContent(err+"\n"+stack);
-		var but = new hl.UI.Button(f, "Continue");
-		but.onClick = function() {
-			hl.UI.stopLoop();
-		};
+    if (isWin32) {
+      var f = new hl.UI.WinLog("Uncaught Exception", 500, 400);
+      f.setTextContent(err+"\n"+stack);
+      var but = new hl.UI.Button(f, "Continue");
+      but.onClick = function() {
+        hl.UI.stopLoop();
+      };
 
-		var but = new hl.UI.Button(f, "Dismiss all");
-		but.onClick = function() {
-			dismissErrors = true;
-			hl.UI.stopLoop();
-		};
+      var but = new hl.UI.Button(f, "Dismiss all");
+      but.onClick = function() {
+        dismissErrors = true;
+        hl.UI.stopLoop();
+      };
 
-		var but = new hl.UI.Button(f, "Exit");
-		but.onClick = function() {
-			Sys.exit(0);
-		};
+      var but = new hl.UI.Button(f, "Exit");
+      but.onClick = function() {
+        Sys.exit(0);
+      };
 
-		while( hl.UI.loop(true) != Quit )
-			tick();
-		f.destroy();
+      while( hl.UI.loop(true) != Quit )
+        tick();
+      f.destroy();
+    }
 
 		for( w in wasFS )
 			w.w.displayMode = w.mode;
