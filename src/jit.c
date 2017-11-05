@@ -2168,7 +2168,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				op64(ctx,TEST,pb,pb);
 				XJump_small(JZero,jb);
 				op_call_fun(ctx,NULL,(int)(int_val)a->t->obj->rt->compareFun,2,args);
-				op64(ctx,CMP,PEAX,pconst(&p,0));
+				op32(ctx,CMP,PEAX,pconst(&p,0));
 				register_jump(ctx,do_jump(ctx,op->op,false),targetPos);
 				patch_jump(ctx,ja);
 				patch_jump(ctx,jb);
@@ -2274,6 +2274,12 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 					*(double*)store = d;
 				}
 				break;
+			case HF64:
+				*(double*)store = *(double*)v;
+				break;
+			case HI64:
+				*(int64*)store = *(int64*)v;
+				break;
 			default:
 				*(void**)store = v;
 				break;
@@ -2299,6 +2305,7 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 				break;
 #			ifndef HL_64
 			case HF64:
+			case HI64:
 				// will be reversed when pushed back
 				*(int*)store = *((int*)v + 1);
 				*((int*)store + 1) = *(int*)v;
@@ -2412,26 +2419,32 @@ static void jit_c2hl( jit_ctx *ctx ) {
 	op64(ctx,RET,UNUSED,UNUSED);
 }
 
-static vdynamic *jit_wrapper_call( vclosure_wrapper *c, char *stack_args, void **call_regs ) {
+static vdynamic *jit_wrapper_call( vclosure_wrapper *c, char *stack_args, void **regs ) {
 	vdynamic *args[MAX_ARGS];
 	int i;
 	int nargs = c->cl.t->fun->nargs;
-#	ifdef JIT_DEBUG
-	if( nargs > 0 && IS_64 )
-		hl_error("TODO!"); // read call_regs
-#	endif
+	call_regs cregs = {0};
 	if( nargs > MAX_ARGS )
 		hl_error("Too many arguments for wrapped call");
 	for(i=0;i<nargs;i++) {
 		hl_type *t = c->cl.t->fun->args[i];
-		args[i] = hl_is_dynamic(t) ? *(vdynamic**)stack_args : hl_make_dyn(stack_args,t);
-		stack_args += stack_size(t);
+		int creg = select_call_reg(&cregs,t,i);
+		if( creg < 0 ) {
+			args[i] = hl_is_dynamic(t) ? *(vdynamic**)stack_args : hl_make_dyn(stack_args,t);
+			stack_args += stack_size(t);
+		} else if( hl_is_dynamic(t) ) {
+			args[i] = *(vdynamic**)(regs + call_reg_index(creg) + 1);
+		} else if( t->kind == HF32 || t->kind == HF64 ) {
+			args[i] = hl_make_dyn(regs + CALL_NREGS + creg - XMM(0),&hlt_f64);
+		} else {
+			args[i] = hl_make_dyn(regs + call_reg_index(creg) + 1,t);
+		}
 	}
 	return hl_dyn_call(c->wrappedFun,args,nargs);
 }
 
-static void *jit_wrapper_ptr( vclosure_wrapper *c, char *stack_args, void **call_regs ) {
-	vdynamic *ret = jit_wrapper_call(c, stack_args, call_regs);
+static void *jit_wrapper_ptr( vclosure_wrapper *c, char *stack_args, void **regs ) {
+	vdynamic *ret = jit_wrapper_call(c, stack_args, regs);
 	hl_type *tret = c->cl.t->fun->ret;
 	switch( tret->kind ) {
 	case HVOID:
@@ -2446,8 +2459,8 @@ static void *jit_wrapper_ptr( vclosure_wrapper *c, char *stack_args, void **call
 	}
 }
 
-static double jit_wrapper_d( vclosure_wrapper *c, char *stack_args, void **call_regs ) {
-	vdynamic *ret = jit_wrapper_call(c, stack_args, call_regs);
+static double jit_wrapper_d( vclosure_wrapper *c, char *stack_args, void **regs ) {
+	vdynamic *ret = jit_wrapper_call(c, stack_args, regs);
 	return hl_dyn_castd(&ret,&hlt_dyn);
 }
 
@@ -2497,8 +2510,9 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	XJump_small(JEq,jfloat2);
 
 	size = begin_native_call(ctx,3);
+	op64(ctx, LEA, tmp, pmem(&p,Ebp,-HL_WSIZE*CALL_NREGS*2));
+	set_native_arg(ctx, tmp);
 	op64(ctx, LEA, tmp, pmem(&p,Ebp,HL_WSIZE*3));
-	set_native_arg(ctx, PEBP);
 	set_native_arg(ctx, tmp);
 	set_native_arg(ctx, cl);
 	call_native(ctx, jit_wrapper_ptr, size);
@@ -2506,6 +2520,9 @@ static void jit_hl2c( jit_ctx *ctx ) {
 
 	patch_jump(ctx,jfloat1);
 	patch_jump(ctx,jfloat2);
+	size = begin_native_call(ctx,3);
+	op64(ctx, LEA, tmp, pmem(&p,Ebp,-HL_WSIZE*CALL_NREGS*2));
+	set_native_arg(ctx, tmp);
 	op64(ctx, LEA, tmp, pmem(&p,Ebp,HL_WSIZE*3));
 	set_native_arg(ctx, tmp);
 	set_native_arg(ctx, cl);
@@ -2751,7 +2768,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			int reg = mapped_reg(&cregs, i);
 			if( reg < 0 ) continue;
 			p = REG_AT(reg);
-			op64(ctx,MOV,fetch(r),p);
+			op64(ctx,IS_FLOAT(r) ? MOVSD : MOV,fetch(r),p);
 			p->holds = r;
 			r->current = p;
 		}
