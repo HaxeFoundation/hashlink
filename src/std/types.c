@@ -72,7 +72,11 @@ HL_PRIM int hl_stack_size( hl_type *t ) {
 	case HUI8:
 	case HUI16:
 	case HBOOL:
-		return sizeof(int);
+#	ifdef HL_64
+	case HI32:
+	case HF32:
+#	endif
+		return sizeof(int_val);
 	default:
 		return T_SIZES[t->kind];
 	}

@@ -1200,6 +1200,7 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 
 static void store_result( jit_ctx *ctx, vreg *r ) {
 	switch( r->t->kind ) {
+#	ifndef HL_64
 	case HF64:
 		scratch(r->current);
 		op64(ctx,FSTP,&r->stack,UNUSED);
@@ -1208,8 +1209,9 @@ static void store_result( jit_ctx *ctx, vreg *r ) {
 		scratch(r->current);
 		op64(ctx,FSTP32,&r->stack,UNUSED);
 		break;
+#	endif
 	default:
-		store(ctx,r,PEAX,true);
+		store(ctx,r,IS_FLOAT(r) ? REG_AT(XMM(0)) : PEAX,true);
 		break;
 	}
 }
@@ -1319,7 +1321,8 @@ static int begin_native_call( jit_ctx *ctx, int nargs ) {
 
 static preg *alloc_native_arg( jit_ctx *ctx ) {
 #	ifdef HL_64
-	preg *r = REG_AT(CALL_REGS[ctx->nativeArgsCount - 1]);
+	int rid = ctx->nativeArgsCount - 1;
+	preg *r = rid < CALL_NREGS ? REG_AT(CALL_REGS[rid]) : alloc_reg(ctx,RCPU_CALL);
 	scratch(r);
 	return r;
 #	else
@@ -3536,13 +3539,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OGetArray:
 			{
-				op64(ctx,MOV,alloc_cpu(ctx,dst,false),pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,HL_WSIZE,sizeof(varray)));
+				op64(ctx,MOV,alloc_cpu(ctx,dst,false),pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,hl_type_size(dst->t),sizeof(varray)));
 				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case OSetArray:
 			{
-				op64(ctx,MOV,pmem2(&p,alloc_cpu(ctx,dst,true)->id,alloc_cpu64(ctx,ra,true)->id,HL_WSIZE,sizeof(varray)),alloc_cpu(ctx,rb,true));
+				op64(ctx,MOV,pmem2(&p,alloc_cpu(ctx,dst,true)->id,alloc_cpu64(ctx,ra,true)->id,hl_type_size(dst->t),sizeof(varray)),alloc_cpu(ctx,rb,true));
 			}
 			break;
 		case OArraySize:
