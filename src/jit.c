@@ -252,7 +252,7 @@ static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 
 #define BREAK()		B(0xCC)
 
-#if defined(HL_64) && defined(HL_VCC) && defined(_DEBUG)
+#if defined(HL_64) && defined(HL_VCC)
 #	define JIT_CUSTOM_LONGJUMP
 #endif
 
@@ -2682,9 +2682,9 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 	tmp = alloc_native_arg(ctx);
 	op64(ctx,MOV,tmp,REG_AT(Ebp));
 	if( v->stackPos >= 0 )
-		op32(ctx,ADD,tmp,pconst(&p,v->stackPos));
+		op64(ctx,ADD,tmp,pconst(&p,v->stackPos));
 	else
-		op32(ctx,SUB,tmp,pconst(&p,-v->stackPos));
+		op64(ctx,SUB,tmp,pconst(&p,-v->stackPos));
 	set_native_arg(ctx,tmp);
 	call_native(ctx,get_dyncast(dst->t),size);
 	store_result(ctx, dst);
