@@ -3429,12 +3429,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 
 					jit_buf(ctx);
 
-					size = begin_native_call(ctx, 5);
-					if( !need_dyn )
+					if( !need_dyn ) {
+						size = begin_native_call(ctx, 5);
 						set_native_arg(ctx, pconst(&p,0));
-					else {
-						preg *rtmp = alloc_native_arg(ctx);
-						op64(ctx,LEA,rtmp,pmem(&p,Esp,paramsSize - sizeof(vdynamic) + (size - HL_WSIZE*5)));
+					} else {
+						preg *rtmp = alloc_reg(ctx,RCPU);
+						op64(ctx,LEA,rtmp,pmem(&p,Esp,paramsSize - sizeof(vdynamic)));
+						size = begin_native_call(ctx, 5);
 						set_native_arg(ctx,rtmp);
 						if( !IS_64 ) RUNLOCK(rtmp);
 					}
