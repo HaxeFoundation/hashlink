@@ -192,7 +192,8 @@ typedef enum {
 	RADDR = 4,
 	RMEM = 5,
 	RUNUSED = 6,
-	RCPU_CALL = 1 | 8
+	RCPU_CALL = 1 | 8,
+	RCPU_8BITS = 1 | 16
 } preg_kind;
 
 typedef struct {
@@ -944,6 +945,7 @@ static preg *alloc_reg( jit_ctx *ctx, preg_kind k ) {
 	switch( k ) {
 	case RCPU:
 	case RCPU_CALL:
+	case RCPU_8BITS:
 		{
 			int off = ctx->allocOffset++;
 			const int count = RCPU_SCRATCH_COUNT;
@@ -952,6 +954,7 @@ static preg *alloc_reg( jit_ctx *ctx, preg_kind k ) {
 				p = ctx->pregs + r;
 				if( p->lock >= ctx->currentPos ) continue;
 				if( k == RCPU_CALL && is_call_reg(p) ) continue;
+				if( k == RCPU_8BITS && !is_reg8(p) ) continue;
 				if( p->holds == NULL ) {
 					RLOCK(p);
 					return p;
@@ -961,6 +964,7 @@ static preg *alloc_reg( jit_ctx *ctx, preg_kind k ) {
 				preg *p = ctx->pregs + RCPU_SCRATCH_REGS[(i + off)%count];
 				if( p->lock >= ctx->currentPos ) continue;
 				if( k == RCPU_CALL && is_call_reg(p) ) continue;
+				if( k == RCPU_8BITS && !is_reg8(p) ) continue;
 				if( p->holds ) {
 					RLOCK(p);
 					p->holds->current = NULL;
@@ -1072,6 +1076,7 @@ static preg *alloc_cpu( jit_ctx *ctx, vreg *r, bool andLoad ) {
 	return p;
 }
 
+// allocate a register that is not a call parameter
 static preg *alloc_cpu_call( jit_ctx *ctx, vreg *r ) {
 	preg *p = fetch(r);
 	if( p->kind != RCPU ) {
@@ -1114,6 +1119,23 @@ static preg *alloc_cpu64( jit_ctx *ctx, vreg *r, bool andLoad ) {
 #	endif
 }
 
+// make sure the register can be used with 8 bits access
+static preg *alloc_cpu8( jit_ctx *ctx, vreg *r, bool andLoad ) {
+	preg *p = fetch(r);
+	if( p->kind != RCPU ) {
+		p = alloc_reg(ctx, RCPU_8BITS);
+		load(ctx,p,r);
+	} else if( !is_reg8(p) ) {
+		preg *p2 = alloc_reg(ctx, RCPU_8BITS);
+		op64(ctx,MOV,p2,p);
+		scratch(p);
+		reg_bind(r,p2);
+		return p2;
+	} else
+		RLOCK(p);
+	return p;
+}
+
 static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 	if( size == 0 || to == from ) return to;
 	switch( ID2(to->kind,from->kind) ) {
@@ -1141,7 +1163,8 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 				preg *r = alloc_reg(ctx, RCPU_CALL);				
 				op32(ctx, MOV, r, from);
 				RUNLOCK(r);
-				from = r;
+				op32(ctx,MOV8,to,r);
+				return from;
 			}
 			op32(ctx,MOV8,to,from);
 			break;
@@ -1323,7 +1346,7 @@ static void push_reg( jit_ctx *ctx, vreg *r ) {
 	switch( stack_size(r->t) ) {
 	case 1:
 		op64(ctx,SUB,PESP,pconst(&p,1));
-		op32(ctx,MOV8,pmem(&p,Esp,0),alloc_cpu(ctx,r,true));
+		op32(ctx,MOV8,pmem(&p,Esp,0),alloc_cpu8(ctx,r,true));
 		break;
 	case 2:
 		op64(ctx,SUB,PESP,pconst(&p,2));
@@ -2020,8 +2043,8 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		break;
 	case HNULL:
 		{
-			preg *pa = alloc_cpu(ctx,a,true);
-			preg *pb = alloc_cpu(ctx,b,true);
+			preg *pa = a->size == 1 ? alloc_cpu8(ctx,a,true) : alloc_cpu(ctx,a,true);
+			preg *pb = b->size == 1 ? alloc_cpu8(ctx,b,true) : alloc_cpu(ctx,b,true);
 			if( op->op == OJEq ) {
 				// if( a == b || (a && b && a->b == b->v) ) goto
 				int ja, jb;
@@ -2936,14 +2959,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OJNotNull:
 		case OJNull:
 			{
-				preg *r = alloc_cpu(ctx, dst, true);
-				int op = dst->t->kind == HBOOL ? TEST8 : TEST;
-				if( op == TEST8 && !is_reg8(r) ) {
-					op32(ctx,SHL,r,pconst(&p,24));
-					op32(ctx,SHR,r,pconst(&p,24));
-					op32(ctx, TEST, r, r);
-				} else
-					op64(ctx, op, r, r);
+				preg *r = dst->t->kind == HBOOL ? alloc_cpu8(ctx, dst, true) : alloc_cpu(ctx, dst, true);
+				op64(ctx, dst->t->kind == HBOOL ? TEST8 : TEST, r, r);
 				XJump( o->op == OJFalse || o->op == OJNull ? JZero : JNotZero,jump);
 				register_jump(ctx,jump,(opCount + 1) + o->p2);
 			}
@@ -3536,7 +3553,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				preg *base = alloc_cpu(ctx, ra, true);
 				preg *offset = alloc_cpu64(ctx, rb, true);
-				preg *r = alloc_reg(ctx,RCPU);
+				preg *r = alloc_reg(ctx,o->op == OGetI8 ? RCPU_8BITS : RCPU);
 				op64(ctx,XOR,r,r);
 				op32(ctx, o->op == OGetI8 ? MOV8 : MOV16,r,pmem2(&p,base->id,offset->id,1,0));
 				store(ctx, dst, r, true);
@@ -3553,7 +3570,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				preg *base = alloc_cpu(ctx, dst, true);
 				preg *offset = alloc_cpu64(ctx, ra, true);
-				preg *value = alloc_cpu(ctx, rb, true);
+				preg *value = alloc_cpu8(ctx, rb, true);
 				op32(ctx,MOV8,pmem2(&p,base->id,offset->id,1,0),value);
 			}
 			break;
