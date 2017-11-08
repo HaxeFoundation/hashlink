@@ -221,7 +221,7 @@ struct vreg {
 static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, R8, R9, R10, R11 };
 static CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
 #	else
-#		define CALL_NREGS			6
+#		define CALL_NREGS			6 // TODO : XMM6+XMM7 are FPU reg parameters
 #		define RCPU_SCRATCH_COUNT	9
 #		define RFPU_SCRATCH_COUNT	16
 static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, Esi, Edi, R8, R9, R10, R11 };
@@ -2771,7 +2771,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			int reg = mapped_reg(&cregs, i);
 			if( reg < 0 ) continue;
 			p = REG_AT(reg);
-			op64(ctx,IS_FLOAT(r) ? MOVSD : MOV,fetch(r),p);
+			copy(ctx,fetch(r),p,r->size);
 			p->holds = r;
 			r->current = p;
 		}
