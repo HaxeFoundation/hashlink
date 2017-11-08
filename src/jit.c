@@ -109,6 +109,7 @@ typedef enum {
 	TEST8,
 	MOV16,
 	CMP16,
+	TEST16,
 	// --
 	_CPU_LAST
 } CpuOp;
@@ -479,6 +480,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
 	{ "MOV16", OP16(0x8B), OP16(0x89), OP16(0xB8) },
 	{ "CMP16", OP16(0x3B), OP16(0x39) },
+	{ "TEST16", OP16(0x85) },
 };
 
 #ifdef OP_LOG
@@ -572,12 +574,26 @@ static void log_op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		B(b); \
 	}
 
+static bool is_reg8( preg *a ) {
+	return a->kind == RSTACK || a->kind == RMEM || a->kind == RCONST || (a->kind == RCPU && a->id != Esi && a->id != Edi);
+}
+
 static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
 	int r64 = mode64 && (o != PUSH && o != POP && o != CALL) ? 8 : 0;
 #	ifdef OP_LOG
 	log_op(ctx,o,a,b,mode64 && IS_64);
 #	endif
+	switch( o ) {
+	case CMP8:
+	case TEST8:
+	case MOV8:
+		if( !is_reg8(a) || !is_reg8(b) )
+			ASSERT(0);
+		break;
+	default:
+		break;
+	}
 	switch( ID2(a->kind,b->kind) ) {
 	case ID2(RUNUSED,RUNUSED):
 		ERRIF(f->r_mem == 0);
@@ -1112,8 +1128,21 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 #	endif
 		switch( size ) {
 		case 1:
-			if( to->kind == RCPU )
+			if( to->kind == RCPU ) {
 				op64(ctx,XOR,to,to);
+				if( !is_reg8(to) ) {
+					preg p;
+					op32(ctx,MOV16,to,from);
+					op32(ctx,SHL,to,pconst(&p,24));
+					op32(ctx,SHR,to,pconst(&p,24));
+					break;
+				}
+			} else if( !is_reg8(from) ) {
+				preg *r = alloc_reg(ctx, RCPU_CALL);				
+				op32(ctx, MOV, r, from);
+				RUNLOCK(r);
+				from = r;
+			}
 			op32(ctx,MOV8,to,from);
 			break;
 		case 2:
@@ -2908,7 +2937,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OJNull:
 			{
 				preg *r = alloc_cpu(ctx, dst, true);
-				op64(ctx, dst->t->kind == HBOOL ? TEST8 : TEST, r, r);
+				int op = dst->t->kind == HBOOL ? TEST8 : TEST;
+				if( op == TEST8 && !is_reg8(r) ) {
+					op32(ctx,SHL,r,pconst(&p,24));
+					op32(ctx,SHR,r,pconst(&p,24));
+					op32(ctx, TEST, r, r);
+				} else
+					op64(ctx, op, r, r);
 				XJump( o->op == OJFalse || o->op == OJNull ? JZero : JNotZero,jump);
 				register_jump(ctx,jump,(opCount + 1) + o->p2);
 			}
