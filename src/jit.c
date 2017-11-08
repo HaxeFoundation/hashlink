@@ -196,7 +196,7 @@ typedef enum {
 
 typedef struct {
 	preg_kind kind;
-	CpuReg id;
+	int id;
 	int lock;
 	vreg *holds;
 } preg;
