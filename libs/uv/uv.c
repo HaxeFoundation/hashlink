@@ -7,11 +7,11 @@
 #	include <uv.h>
 #endif
 
-#ifdef HL_WIN
-typedef struct sockaddr uv_sockaddr;
-#else
-typedef struct sockaddr_in uv_sockaddr;
+#if (UV_VERSION_MAJOR <= 0)
+#	error "libuv1-dev required, uv version 0.x found"
 #endif
+
+typedef struct sockaddr uv_sockaddr;
 
 #define EVT_CLOSE	1
 
