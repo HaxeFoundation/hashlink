@@ -1366,7 +1366,7 @@ static void set_native_arg( jit_ctx *ctx, preg *r ) {
 
 static void set_native_arg_fpu( jit_ctx *ctx, preg *r, bool isf32 ) {
 #	ifdef HL_64
-	if( r->kind != RFPU ) ASSERT(0);
+	if( r->kind == RCPU ) ASSERT(0);
 	preg *target = REG_AT(XMM(IS_WINCALL64 ? --ctx->nativeArgsCount : ctx->nativeArgsCount));
 	if( target != r ) {
 		op64(ctx, isf32 ? MOVSS : MOVSD, target, r);
