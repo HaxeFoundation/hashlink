@@ -7,6 +7,12 @@
 #	include <uv.h>
 #endif
 
+#ifdef HL_WIN
+typedef struct sockaddr uv_sockaddr;
+#else
+typedef struct sockaddr_in uv_sockaddr;
+#endif
+
 #define EVT_CLOSE	1
 
 #define EVT_READ	0	// stream
@@ -177,7 +183,7 @@ HL_PRIM uv_connect_t *HL_NAME(tcp_connect_wrap)( uv_tcp_t *t, int host, int port
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons((unsigned short)port);
 	*(int*)&addr.sin_addr.s_addr = host;
-	if( !t || uv_tcp_connect(cnx,t,(struct sockaddr *)&addr,on_connect) < 0 ) {
+	if( !t || uv_tcp_connect(cnx,t,(uv_sockaddr *)&addr,on_connect) < 0 ) {
 		free(cnx);
 		return NULL;
 	}
@@ -193,7 +199,7 @@ HL_PRIM bool HL_NAME(tcp_bind_wrap)( uv_tcp_t *t, int host, int port ) {
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons((unsigned short)port);
 	*(int*)&addr.sin_addr.s_addr = host;
-	return uv_tcp_bind(t,(struct sockaddr *)&addr,0) >= 0;
+	return uv_tcp_bind(t,(uv_sockaddr *)&addr,0) >= 0;
 }
 
 
