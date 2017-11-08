@@ -13,4 +13,6 @@ The following patch was added to jsimd_i386.c (init_smd):
   simd_support &= ~JSIMD_SSE2; // using SSE2 in Debug mode will crash
 # endif
 
+Also added in jconfig.h
 
+#define WITH_SIMD
