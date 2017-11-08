@@ -165,6 +165,30 @@ HL_PRIM void hl_breakpoint() {
 	hl_debug_break();
 }
 
+#ifdef HL_LINUX
+#include <signal.h>
+static int debugger_present = -1;
+static void _sigtrap_handler(int signum) {
+	debugger_present = 0;
+	signal(SIGTRAP,SIG_DFL);
+}
+#endif
+
+HL_PRIM bool hl_detect_debugger() {
+#	if defined(HL_WIN)
+	return IsDebuggerPresent();
+#	elif defined(HL_LINUX)
+	if( debugger_present == -1 ) {
+		debugger_present = 1;
+		signal(SIGTRAP,_sigtrap_handler);
+		raise(SIGTRAP);
+	}
+	return (bool)debugger_present;
+#	else
+	return false;
+#	endif
+}
+
 HL_PRIM void hl_assert() {
 	hl_debug_break();
 	hl_error("Assert");

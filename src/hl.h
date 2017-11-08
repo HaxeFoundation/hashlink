@@ -194,6 +194,13 @@ C_FUNCTION_END
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
 #elif defined(HL_PS)
 #	define hl_debug_break()	__debugbreak()
+#elif defined(HL_LINUX)
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			__asm__("0:" \
+			    ".pushsection embed-breakpoints;" \
+			    ".quad 0b;" \
+			    ".popsection")
 #else
 #	define hl_debug_break()
 #endif
@@ -491,6 +498,7 @@ HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
 HL_API void hl_dump_stack();
 HL_API varray *hl_exception_stack();
+HL_API bool hl_detect_debugger();
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
