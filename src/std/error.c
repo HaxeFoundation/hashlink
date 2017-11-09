@@ -108,10 +108,10 @@ HL_PRIM void hl_dump_stack() {
 		uchar *str = resolve_symbol_func(addr, sym, &size);
 		if( str == NULL ) {
 			int iaddr = (int)(int_val)addr;
+			usprintf(sym,512,USTR("@0x%X"),iaddr);
 			str = sym;
-			uprintf(USTR("@0x%X\n"),iaddr);
-		} else
-			uprintf(USTR("%s\n"),str);
+		}
+		uprintf(USTR("%s\n"),str);
 	}
 }
 

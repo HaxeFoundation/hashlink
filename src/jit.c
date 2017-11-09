@@ -3506,7 +3506,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					call_native(ctx,hl_dyn_call_obj,size + paramsSize);
 					if( need_dyn ) {
 						preg *r = IS_FLOAT(dst) ? REG_AT(XMM(0)) : PEAX;
-						copy(ctx,r,pmem(&p,Esp,HDYN_VALUE - sizeof(vdynamic)),dst->size);
+						copy(ctx,r,pmem(&p,Esp,HDYN_VALUE - (int)sizeof(vdynamic)),dst->size);
 						store(ctx, dst, r, false);
 					} else
 						store(ctx, dst, PEAX, false);
