@@ -88,6 +88,8 @@ static dx_event *addEvent( HWND wnd, EventType type ) {
 
 #define addState(wstate) { e = addEvent(wnd,WindowState); e->state = wstate; }
 
+static bool shift_downs[] = { false, false };
+
 static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lparam ) {
 	dx_event *e = NULL;
 	switch(umsg) {
@@ -131,12 +133,18 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 				//printf("CANCEL\n");
 			}
 		}
+		bool repeat = (umsg == WM_KEYDOWN || umsg == WM_SYSKEYDOWN) && (lparam & 0x40000000) != 0;
+		// see 
 		e = addEvent(wnd,(umsg == WM_KEYUP || umsg == WM_SYSKEYUP) ? KeyUp : KeyDown);
 		e->keyCode = (int)wparam;
-		e->keyRepeat = (umsg == WM_KEYDOWN || umsg == WM_SYSKEYDOWN) && (lparam & 0x40000000) != 0;
+		e->keyRepeat = repeat;
 		// L/R location
-		if( e->keyCode == VK_SHIFT )
-			e->keyCode |= MapVirtualKey((lparam >> 16) & 0xFF, MAPVK_VSC_TO_VK_EX) == VK_RSHIFT ? 512 : 256;
+		if( e->keyCode == VK_SHIFT ) {
+			bool right = MapVirtualKey((lparam >> 16) & 0xFF, MAPVK_VSC_TO_VK_EX) == VK_RSHIFT;
+			e->keyCode |= right ? 512 : 256;			
+			e->keyRepeat = false;
+			shift_downs[right?1:0] = e->type == KeyDown;
+		}
 		if( e->keyCode == VK_SHIFT || e->keyCode == VK_CONTROL || e->keyCode == VK_MENU )
 			e->keyCode |= (lparam & (1<<24)) ? 512 : 256;
 		if( e->keyCode == 13 && (lparam & 0x1000000) )
@@ -144,6 +152,21 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		//printf("%.8X - %d[%s]%s%s\n",lparam,e->keyCode&255,e->type == KeyUp ? "UP":"DOWN",e->keyRepeat?" REPEAT":"",(e->keyCode&256) ? " LEFT" : (e->keyCode & 512) ? " RIGHT" : "");
 		if( (e->keyCode & 0xFF) == VK_MENU )
 			return 0;
+		break;
+	case WM_TIMER:
+		// bugfix for shifts being considered as a single key (one single WM_KEYUP is received when both are down)
+		if( shift_downs[0] && GetKeyState(VK_LSHIFT) >= 0 ) {
+			//printf("LSHIFT RELEASED\n");
+			shift_downs[0] = false;
+			e = addEvent(wnd,KeyUp);
+			e->keyCode = VK_SHIFT | 256;
+		}			
+		if( shift_downs[1] && GetKeyState(VK_RSHIFT) >= 0 ) {
+			//printf("RSHIFT RELEASED\n");
+			shift_downs[1] = false;
+			e = addEvent(wnd,KeyUp);
+			e->keyCode = VK_SHIFT | 512;
+		}			
 		break;
 	case WM_CHAR:
 		e = addEvent(wnd,TextInput);
@@ -155,6 +178,8 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		addState(Focus);
 		break;
 	case WM_KILLFOCUS:
+		shift_downs[0] = false;
+		shift_downs[1] = false;
 		addState(Blur);
 		break;
 	case WM_WINDOWPOSCHANGED:
@@ -195,6 +220,7 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 	dx_events *event_buffer = (dx_events*)malloc(sizeof(dx_events));
 	memset(event_buffer,0, sizeof(dx_events));
 	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), event_buffer);
+	SetTimer(win,0,10,NULL);
 	ShowWindow(win, SW_SHOW);
 	SetCursor(LoadCursor(NULL, IDC_ARROW));
 	SetForegroundWindow(win);
