@@ -567,7 +567,7 @@ HL_PRIM hl_ssl_pkey *HL_NAME(key_from_pem)(vbyte *data, bool pub, vbyte *pass) {
 	else if (pass == NULL)
 		r = mbedtls_pk_parse_key(pk, buf, len, NULL, 0);
 	else
-		r = mbedtls_pk_parse_key(pk, buf, len, (const unsigned char*)pass, strlen(pass));
+		r = mbedtls_pk_parse_key(pk, buf, len, (const unsigned char*)pass, strlen((char*)pass));
 	free(buf);
 	if (r != 0) {
 		mbedtls_pk_free(pk);
@@ -612,7 +612,7 @@ HL_PRIM vbyte *HL_NAME(dgst_sign)(vbyte *data, int len, hl_ssl_pkey *key, vbyte 
 	unsigned char hash[MBEDTLS_MD_MAX_SIZE];
 	size_t ssize = size ? *size : 0;
 
-	md = mbedtls_md_info_from_string(alg);
+	md = mbedtls_md_info_from_string((char*)alg);
 	if (md == NULL) {
 		hl_error("Invalid hash algorithm");
 		return NULL;

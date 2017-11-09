@@ -25,13 +25,13 @@
 #define TK2(a,b)		((a) | ((b)<<5))
 
 #ifndef HL_64
-#	define INIT_DYN(t,v) { t, 0, v }
+#	define DYN_PAD	0,
 #else
-#	define INIT_DYN(t,v) { t, v }
+#	define DYN_PAD
 #endif
 
-static vdynamic vdyn_true = INIT_DYN( &hlt_bool, true );
-static vdynamic vdyn_false = INIT_DYN( &hlt_bool, false );
+static vdynamic vdyn_true = { &hlt_bool, DYN_PAD {true} };
+static vdynamic vdyn_false = { &hlt_bool, DYN_PAD {false} };
 
 static void invalid_cast( hl_type *from, hl_type *to ) {
 	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(from),hl_type_str(to));
