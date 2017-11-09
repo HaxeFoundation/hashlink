@@ -127,7 +127,7 @@ int net_write(void *fd, const unsigned char *buf, size_t len) {
 }
 
 HL_PRIM void HL_NAME(ssl_set_socket)(mbedtls_ssl_context *ssl, hl_socket *socket) {
-	mbedtls_ssl_set_bio(ssl, (void*)socket->sock, net_write, net_read, NULL);
+	mbedtls_ssl_set_bio(ssl, (void*)(int_val)socket->sock, net_write, net_read, NULL);
 }
 
 HL_PRIM void HL_NAME(ssl_set_hostname)(mbedtls_ssl_context *ssl, vbyte *hostname) {
@@ -150,8 +150,8 @@ DEFINE_PRIM(_VOID, ssl_set_hostname, TSSL _BYTES);
 DEFINE_PRIM(TCERT, ssl_get_peer_certificate, TSSL);
 
 HL_PRIM int HL_NAME(ssl_send_char)(mbedtls_ssl_context *ssl, int c) {
-	char cc;
-	cc = (char)(unsigned char)c;
+	unsigned char cc;
+	cc = (unsigned char)c;
 	if (mbedtls_ssl_write(ssl, &cc, 1) == SOCKET_ERROR)
 		return block_error();
 	return 1;
@@ -470,7 +470,7 @@ HL_PRIM hl_ssl_cert *HL_NAME(cert_add_pem)(hl_ssl_cert *cert, vbyte *data) {
 		crt = (mbedtls_x509_crt*)malloc(sizeof(mbedtls_x509_crt));
 		mbedtls_x509_crt_init(crt);
 	}
-	len = (int)strlen(data) + 1;
+	len = (int)strlen((char*)data) + 1;
 	buf = (unsigned char *)malloc(len);
 	memcpy(buf, (char*)data, len - 1);
 	buf[len - 1] = '\0';
@@ -589,7 +589,7 @@ HL_PRIM vbyte *HL_NAME(dgst_make)(vbyte *data, int len, vbyte *alg, int *size) {
 	int mdlen, r = -1;
 	vbyte *out;
 
-	md = mbedtls_md_info_from_string(alg);
+	md = mbedtls_md_info_from_string((char*)alg);
 	if (md == NULL) {
 		hl_error("Invalid hash algorithm");
 		return NULL;
@@ -637,7 +637,7 @@ HL_PRIM bool HL_NAME(dgst_verify)(vbyte *data, int dlen, vbyte *sign, int slen, 
 	int r = -1;
 	unsigned char hash[MBEDTLS_MD_MAX_SIZE];
 	
-	md = mbedtls_md_info_from_string(alg);
+	md = mbedtls_md_info_from_string((char*)alg);
 	if (md == NULL) {
 		hl_error("Invalid hash algorithm");
 		return false;

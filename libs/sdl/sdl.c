@@ -290,7 +290,7 @@ HL_PRIM int HL_NAME(set_relative_mouse_mode)(bool enable) {
 	return SDL_SetRelativeMouseMode(enable);
 }
 
-HL_PRIM vbyte *HL_NAME(detect_keyboard_layout)() {
+HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 	char q = SDL_GetKeyFromScancode(SDL_SCANCODE_Q);
 	char w = SDL_GetKeyFromScancode(SDL_SCANCODE_W);
 	char y = SDL_GetKeyFromScancode(SDL_SCANCODE_Y);
@@ -387,7 +387,7 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 }
 
 HL_PRIM void HL_NAME(win_set_title)(SDL_Window *win, vbyte *title) {
-	SDL_SetWindowTitle(win, title);
+	SDL_SetWindowTitle(win, (char*)title);
 }
 
 HL_PRIM void HL_NAME(win_set_size)(SDL_Window *win, int width, int height) {

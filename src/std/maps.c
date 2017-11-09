@@ -111,10 +111,6 @@ static void hl_freelist_add( hl_free_list *f, int pos ) {
 	hl_freelist_add_range(f,pos,1);
 }
 
-static bool hl_freelist_empty( hl_free_list *f ) {
-	return f->buckets ? f->head == 0 : f->nbuckets == 0;
-}
-
 static int hl_freelist_get( hl_free_list *f ) {
 	hl_free_bucket *b;
 	int p;

@@ -51,7 +51,7 @@ HL_PRIM ALCdevice* HL_NAME(alc_get_contexts_device)(ALCcontext *context) {
 // Device management
 
 HL_PRIM ALCdevice* HL_NAME(alc_open_device)(vbyte *devicename) {
-	return alcOpenDevice(devicename);
+	return alcOpenDevice((char*)devicename);
 }
 
 HL_PRIM bool HL_NAME(alc_close_device)(ALCdevice *device) {
@@ -72,11 +72,11 @@ HL_PRIM void HL_NAME(alc_load_extensions)(ALCdevice *device) {
 }
 
 HL_PRIM bool HL_NAME(alc_is_extension_present)(ALCdevice *device, vbyte *extname) {
-	return alcIsExtensionPresent(device, extname) == ALC_TRUE;
+	return alcIsExtensionPresent(device, (char*)extname) == ALC_TRUE;
 }
 
 HL_PRIM int HL_NAME(alc_get_enum_value)(ALCdevice *device, vbyte *enumname) {
-	return alcGetEnumValue(device, enumname);
+	return alcGetEnumValue(device, (char*)enumname);
 }
 
 // Query function
@@ -92,7 +92,7 @@ HL_PRIM void HL_NAME(alc_get_integerv)(ALCdevice *device, int param, int size, v
 // Capture function
 
 HL_PRIM ALCdevice* HL_NAME(alc_capture_open_device)(vbyte *devicename, int frequency, int format, int buffersize) {
-	return alcCaptureOpenDevice(devicename, (ALCuint)frequency, format, buffersize);
+	return alcCaptureOpenDevice((char*)devicename, (ALCuint)frequency, format, buffersize);
 }
 
 HL_PRIM bool HL_NAME(alc_capture_close_device)(ALCdevice *device) {
@@ -231,11 +231,11 @@ HL_PRIM void HL_NAME(al_load_extensions)() {
 
 
 HL_PRIM bool HL_NAME(al_is_extension_present)(vbyte *extname) {
-	return alIsExtensionPresent(extname) == AL_TRUE;
+	return alIsExtensionPresent((char*)extname) == AL_TRUE;
 }
 
 HL_PRIM int HL_NAME(al_get_enum_value)(vbyte *ename) {
-	return alGetEnumValue(ename);
+	return alGetEnumValue((char*)ename);
 }
 
 // Set Listener parameters
@@ -600,7 +600,7 @@ DEFINE_PRIM(TCONTEXT, alc_get_thread_context, _NO_ARG);
 
 HL_PRIM ALCdevice* HL_NAME(alc_loopback_open_device_soft)(vbyte *devicename) {
 	CHECK_EXT(alcLoopbackOpenDeviceSOFT);
-	return alcLoopbackOpenDeviceSOFT(devicename);
+	return alcLoopbackOpenDeviceSOFT((char*)devicename);
 }
 
 HL_PRIM bool HL_NAME(alc_is_render_format_supported_soft)(ALCdevice *device, int freq, int channels, int type) {
