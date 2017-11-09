@@ -138,10 +138,6 @@ int main(int argc, pchar *argv[]) {
 			argc = first_boot_arg;
 		}
 	}
-#	ifdef HL_64
-	fprintf(stderr,"HL/JIT is currently not supported when compiled to 64 bits, use make ARCH=32 to compile to 32 bits\n");
-	exit(1);
-#	endif
 #	ifdef HL_WIN
 	setlocale(LC_CTYPE,""); // printf to current locale
 #	endif
