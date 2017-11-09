@@ -83,9 +83,9 @@ endif
 all: libhl hl libs
 
 install:
-	cp hl /usr/local/bin
-	cp libhl.${LIBEXT} /usr/local/lib
-	cp *.hdll /usr/local/lib
+	cp hl /usr/bin
+	cp libhl.${LIBEXT} /usr/lib
+	cp *.hdll /usr/lib
 
 install_lib:
 	cp libhl.${LIBEXT} /usr/local/lib
