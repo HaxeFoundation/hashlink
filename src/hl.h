@@ -102,7 +102,7 @@
 #	define IMPORT __declspec( dllimport )
 #else
 #	define EXPORT
-#	define IMPORT
+#	define IMPORT extern
 #endif
 
 #ifdef HL_64
