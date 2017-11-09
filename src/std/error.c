@@ -176,7 +176,7 @@ static void _sigtrap_handler(int signum) {
 
 HL_PRIM bool hl_detect_debugger() {
 #	if defined(HL_WIN)
-	return IsDebuggerPresent();
+	return (bool)IsDebuggerPresent();
 #	elif defined(HL_LINUX)
 	if( debugger_present == -1 ) {
 		debugger_present = 1;
