@@ -2043,10 +2043,10 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		break;
 	case HNULL:
 		{
-			preg *pa = a->size == 1 ? alloc_cpu8(ctx,a,true) : alloc_cpu(ctx,a,true);
-			preg *pb = b->size == 1 ? alloc_cpu8(ctx,b,true) : alloc_cpu(ctx,b,true);
+			preg *pa = hl_type_size(a->t->tparam) == 1 ? alloc_cpu8(ctx,a,true) : alloc_cpu(ctx,a,true);
+			preg *pb = hl_type_size(b->t->tparam) == 1 ? alloc_cpu8(ctx,b,true) : alloc_cpu(ctx,b,true);
 			if( op->op == OJEq ) {
-				// if( a == b || (a && b && a->b == b->v) ) goto
+				// if( a == b || (a && b && a->v == b->v) ) goto
 				int ja, jb;
 				// if( a != b && (!a || !b || a->v != b->v) ) goto
 				op64(ctx,CMP,pa,pb);
@@ -2235,6 +2235,9 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		}
 		// fallthrough
 	default:
+		// make sure we have valid 8 bits registers
+		if( a->size == 1 ) alloc_cpu8(ctx,a,true);
+		if( b->size == 1 ) alloc_cpu8(ctx,b,true);
 		op_binop(ctx,NULL,a,b,op);
 		break;
 	}
