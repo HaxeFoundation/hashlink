@@ -15,6 +15,7 @@ typedef struct {
 	hl_type *t;
 	int num;
 	int mask; // for hat only
+	int axis;
 } dinput_mapping_btn;
 
 typedef struct {
@@ -22,7 +23,6 @@ typedef struct {
 	unsigned int guid;
 	vbyte *name;
 	varray *button; // dinput_mapping_btn
-	varray *axis; // int
 } dinput_mapping;
 
 typedef struct _dx_gctrl_device dx_gctrl_device;
@@ -39,14 +39,11 @@ struct _dx_gctrl_device {
 typedef struct {
 	hl_type *t;
 	dx_gctrl_device *device;
+	int index;
 	vstring *name;
 	int buttons;
-	double lx;
-	double ly;
-	double rx;
-	double ry;
-	double lt;
-	double rt;
+	vbyte *axes;
+	vdynamic *rumbleEnd;
 } dx_gctrl_data;
 
 static dx_gctrl_device *dx_gctrl_devices = NULL;
@@ -93,12 +90,12 @@ static void gctrl_xinput_update(dx_gctrl_data *data) {
 		return;
 
 	data->buttons = (state.Gamepad.wButtons & 0x0FFF) | (state.Gamepad.wButtons & 0xF000) >> 2;
-	data->lx = (double)(state.Gamepad.sThumbLX < -32767 ? -1. : (state.Gamepad.sThumbLX / 32767.));
-	data->ly = (double)(state.Gamepad.sThumbLY < -32767 ? -1. : (state.Gamepad.sThumbLY / 32767.));
-	data->rx = (double)(state.Gamepad.sThumbRX < -32767 ? -1. : (state.Gamepad.sThumbRX / 32767.));
-	data->ry = (double)(state.Gamepad.sThumbRY < -32767 ? -1. : (state.Gamepad.sThumbRY / 32767.));
-	data->lt = (double)(state.Gamepad.bLeftTrigger / 255.);
-	data->rt = (double)(state.Gamepad.bRightTrigger / 255.);
+	((double*)data->axes)[0] = (double)(state.Gamepad.sThumbLX < -32767 ? -1. : (state.Gamepad.sThumbLX / 32767.));
+	((double*)data->axes)[1] = (double)(state.Gamepad.sThumbLY < -32767 ? -1. : (state.Gamepad.sThumbLY / 32767.));
+	((double*)data->axes)[2] = (double)(state.Gamepad.sThumbRX < -32767 ? -1. : (state.Gamepad.sThumbRX / 32767.));
+	((double*)data->axes)[3] = (double)(state.Gamepad.sThumbRY < -32767 ? -1. : (state.Gamepad.sThumbRY / 32767.));
+	((double*)data->axes)[4] = (double)(state.Gamepad.bLeftTrigger / 255.);
+	((double*)data->axes)[5] = (double)(state.Gamepad.bRightTrigger / 255.);
 }
 
 // DirectInput
@@ -216,8 +213,6 @@ static void gctrl_dinput_update(dx_gctrl_data *data) {
 	dinput_mapping *mapping = data->device->dMapping;
 	LPDIRECTINPUTDEVICE8 dDevice = data->device->dDevice;
 
-	int *axis = hl_aptr(mapping->axis, int);
-
 	HRESULT result = IDirectInputDevice8_GetDeviceState(dDevice, sizeof(DIJOYSTATE2), &state);
 	if( result == DIERR_INPUTLOST || result == DIERR_NOTACQUIRED ) {
 		IDirectInputDevice8_Acquire(dDevice);
@@ -226,20 +221,36 @@ static void gctrl_dinput_update(dx_gctrl_data *data) {
 	if( result != DI_OK )
 		return;
 	
-	if( mapping->axis->size > 0 ) data->lx = (double)((*(p + axis[0])) / 65535.) * 2 - 1.;
-	if( mapping->axis->size > 1 ) data->ly = (double)((*(p + axis[1])) / 65535.) * -2 + 1.;
-	if( mapping->axis->size > 2 ) data->rx = (double)((*(p + axis[2])) / 65535.) * 2 - 1.;
-	if( mapping->axis->size > 3 ) data->ry = (double)((*(p + axis[3])) / 65535.) * -2 + 1.;
-	if( mapping->axis->size > 4 ) data->lt = (double)((*(p + axis[4])) / 65535.);
-	if( mapping->axis->size > 5 ) data->rt = (double)((*(p + axis[5])) / 65535.);
-
 	data->buttons = 0;
 	for( int i = 0; i < mapping->button->size; i++ ) {
 		dinput_mapping_btn *bmap = hl_aptr(mapping->button, dinput_mapping_btn*)[i];
-		if( bmap->mask == 0 ) {
-			data->buttons |= (state.rgbButtons[bmap->num] > 0 ? 1 : 0) << i;
+		if (!bmap) continue;
+
+		int val;
+		if( bmap->axis < 0 && bmap->mask == 0 ) {
+			val = state.rgbButtons[bmap->num];
+		} else if( bmap->axis < 0 ){
+			val = gctrl_dinput_translatePOV(state.rgdwPOV[bmap->num])&bmap->mask;
 		} else {
-			data->buttons |= ((gctrl_dinput_translatePOV(state.rgdwPOV[bmap->num])&bmap->mask) > 0 ? 1 : 0) << i;
+			val = *(p + bmap->axis);
+		}
+
+		switch (i) {
+			case 0: 
+			case 2:
+				((double*)data->axes)[i] = (double)(val / 65535.) * 2 - 1.; 
+				break;
+			case 1:
+			case 3:
+				((double*)data->axes)[i] = (double)(val / 65535.) * - 2 + 1.;
+				break;
+			case 4:
+			case 5:
+				((double*)data->axes)[i] = bmap->axis < 0 ? (val > 0 ? 1 : 0) : (double)(val / 65535.);
+				break;
+			default: 
+				data->buttons |= (val > 0 ? 1 : 0) << (i - 6);
+				break;
 		}
 	}
 }
@@ -274,7 +285,7 @@ void gctrl_detect_thread(void *p) {
 
 		LeaveCriticalSection(&dx_gctrl_cs);
 
-		Sleep(1);
+		Sleep(300);
 	}
 }
 
@@ -339,5 +350,5 @@ HL_PRIM void HL_NAME(gctrl_set_vibration)(dx_gctrl_device *device, double streng
 #define TGAMECTRL _ABSTRACT(dx_gctrl_device)
 DEFINE_PRIM(_VOID, gctrl_init, _ARR);
 DEFINE_PRIM(_VOID, gctrl_detect, _FUN(_VOID, TGAMECTRL _BYTES));
-DEFINE_PRIM(_VOID, gctrl_update, _OBJ(TGAMECTRL _STRING _I32 _F64 _F64 _F64 _F64 _F64 _F64));
+DEFINE_PRIM(_VOID, gctrl_update, _OBJ(TGAMECTRL _I32 _STRING _I32 _BYTES _NULL(_F64)));
 DEFINE_PRIM(_VOID, gctrl_set_vibration, TGAMECTRL _F64);
