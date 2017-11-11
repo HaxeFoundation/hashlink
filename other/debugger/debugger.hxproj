@@ -39,7 +39,7 @@
     <hidden path="obj" />
   </hiddenPaths>
   <!-- Executed before build -->
-  <preBuildCommand>haxe -hl debug.hl -main Debugger -lib format</preBuildCommand>
+  <preBuildCommand>haxe -hl debug.hl -main hld.Main -lib format -D old-error-format</preBuildCommand>
   <!-- Executed after build -->
   <postBuildCommand alwaysRun="False" />
   <!-- Other project options -->
