@@ -8,14 +8,14 @@ private enum DebugFlag {
 class JitInfo {
 
 	public var is64(default, null) : Bool;
-	public var size(default,null) : Size;
+	public var align(default,null) : Align;
 
 
 	var flags : haxe.EnumFlags<DebugFlag>;
 	var input : haxe.io.Input;
 
 	public var mainThread : Int;
-	var globals : Pointer;
+	public var globals : Pointer;
 	public var stackTop : Pointer;
 	public var codeStart : Pointer;
 	var codeSize : Int;
@@ -24,9 +24,6 @@ class JitInfo {
 	var functions : Array<{ start : Int, large : Bool, offsets : haxe.io.Bytes }>;
 	var functionByCodePos : Map<Int,Int>;
 	var module : Module;
-
-	public var codeBegin(get,never) : Pointer;
-	public var codeEnd(get, never) : Pointer;
 
 	public function new() {
 	}
@@ -48,7 +45,7 @@ class JitInfo {
 			return false;
 		flags = haxe.EnumFlags.ofInt(input.readInt32());
 		is64 = flags.has(Is64);
-		size = new Size(is64?8:4, flags.has(Bool4)?4:1);
+		align = new Align(is64, flags.has(Bool4)?4:1);
 
 		mainThread = input.readInt32();
 		globals = readPointer();
@@ -57,6 +54,11 @@ class JitInfo {
 		codeSize = input.readInt32();
 		allTypes = readPointer();
 		functions = [];
+
+		var structSizes = [0];
+		for( i in 1...9 )
+			structSizes[i] = input.readInt32();
+		@:privateAccess align.structSizes = structSizes;
 
 		var nfunctions = input.readInt32();
 		if( nfunctions != module.code.functions.length )
@@ -86,6 +88,8 @@ class JitInfo {
 	}
 
 	public function resolveAsmPos( asmPos : Int ) {
+		if( asmPos < 0 || asmPos > codeSize )
+			return null;
 		var min = 0;
 		var max = functions.length;
 		while( min < max ) {
@@ -117,13 +121,8 @@ class JitInfo {
 		return { fidx : fidx, fpos : min - 1, codePos : asmPos, ebp : null };
 	}
 
-
-	function get_codeBegin() {
-		return codeStart.offset(functions[0].start);
-	}
-
-	function get_codeEnd() {
-		return codeStart.offset(codeSize);
+	public function functionFromAddr( p : Pointer ) {
+		return functionByCodePos.get(p.sub(codeStart));
 	}
 
 }

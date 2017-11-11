@@ -130,19 +130,28 @@ class Main {
 					Sys.println("Breakpoint set");
 				} else
 					Sys.println("No breakpoint set");
-/*			case "p", "print":
+			case "p", "print":
 				var path = args.shift();
 				if( path == null ) {
 					Sys.println("Requires variable name");
 					continue;
 				}
-				var v = dbg.eval(path);
+				var v = try dbg.getValue(path) catch( e : Dynamic ) {
+					Sys.println("Error " + e + haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
+					continue;
+				}
 				if( v == null ) {
 					Sys.println("Unknown var " + path);
 					continue;
 				}
-				Sys.println(dbg.valueStr(v) + " : " + v.t.toString());
-*/			case "clear":
+				Sys.println(dbg.eval.valueStr(v) + " : " + v.t.toString());
+				var fields = dbg.eval.getFields(v);
+				if( fields != null )
+					for( f in fields ) {
+						var fv = dbg.eval.readField(v, f);
+						Sys.println("  " + f + " = " + dbg.eval.valueStr(fv) + " : " + fv.t.toString());
+					}
+			case "clear":
 				switch( args.length ) {
 				case 0:
 					clearBP();

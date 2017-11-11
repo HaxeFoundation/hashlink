@@ -14,6 +14,7 @@ class Debugger {
 	var nextStep : Int = -1;
 	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int, ebp : hld.Pointer }>;
 
+	public var eval : Eval;
 	public var currentStackFrame : Int;
 	public var stackFrameCount(get, never) : Int;
 	public var stoppedThread : Null<Int>;
@@ -42,7 +43,8 @@ class Debugger {
 			sock.close();
 			return false;
 		}
-		module.init(jit.size);
+		module.init(jit.align);
+		eval = new Eval(module, api, jit);
 
 		if( !api.start() )
 			return false;
@@ -125,19 +127,14 @@ class Debugger {
 		// similar to module/module_capture_stack
 		var stackBottom = esp.toInt();
 		var stackTop = jit.stackTop.toInt();
-		var codeBegin = jit.codeBegin.toInt();
-		var codeEnd = jit.codeEnd.toInt();
 		for( i in 1...size >> 2 ) {
 			var val = mem.getI32(i << 2);
 			if( val > stackBottom && val < stackTop ) {
-				var prev = mem.getI32((i + 1) << 2);
-				if( prev >= codeBegin && prev < codeEnd ) {
-					var codePos = prev - jit.codeStart.toInt();
-					var e = jit.resolveAsmPos(codePos);
-					if( e != null ) {
-						e.ebp = esp.offset(i << 2);
-						stack.push(e);
-					}
+				var codePos = mem.getI32((i + 1) << 2) - jit.codeStart.toInt();
+				var e = jit.resolveAsmPos(codePos);
+				if( e != null ) {
+					e.ebp = Pointer.make(val,0);
+					stack.push(e);
 				}
 			}
 		}
@@ -151,9 +148,15 @@ class Debugger {
 	}
 
 	public function getStackFrame( ?frame ) {
-		if( frame < 0 ) frame = currentStackFrame;
+		if( frame == null ) frame = currentStackFrame;
 		var f = currentStack[frame];
 		return f == null ? {file:"???",line:0} : module.resolveSymbol(f.fidx, f.fpos);
+	}
+
+	public function getValue( path : String ) {
+		var cur = currentStack[currentStackFrame];
+		if( cur == null ) return null;
+		return eval.eval(path, cur.fidx, cur.fpos, cur.ebp);
 	}
 
 	public function resume() {

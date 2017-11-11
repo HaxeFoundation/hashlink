@@ -28,7 +28,8 @@ class Module {
 	var globalTable : GlobalAccess;
 	var protoCache : Map<String,ModuleProto>;
 	var functionRegsCache : Array<Array<{ t : HLType, offset : Int }>>;
-	var size : Size;
+	var align : Align;
+	var reversedHashes : Map<Int,String>;
 
 	public function new() {
 		protoCache = new Map();
@@ -77,16 +78,16 @@ class Module {
 		}
 	}
 
-	public function init( size : Size ) {
-		this.size = size;
+	public function init( align : Align ) {
+		this.align = align;
 
 		// init globals
 		var globalsPos = 0;
 		globalsOffsets = [];
 		for( g in code.globals ) {
-			globalsPos += size.pad(globalsPos, g);
+			globalsPos += align.padSize(globalsPos, g);
 			globalsOffsets.push(globalsPos);
-			globalsPos += size.type(g);
+			globalsPos += align.typeSize(g);
 		}
 
 		globalTable = {
@@ -124,13 +125,13 @@ class Module {
 			return p;
 
 		var parent = o.tsuper == null ? null : switch( o.tsuper ) { case HObj(o): getObjectProto(o); default: throw "assert"; };
-		var size = parent == null ? size.ptr : parent.size;
+		var size = parent == null ? align.ptr : parent.size;
 		var fields = parent == null ? new Map() : [for( k in parent.fields.keys() ) k => parent.fields.get(k)];
 
 		for( f in o.fields ) {
-			size += this.size.pad(size, f.t);
+			size += align.padStruct(size, f.t);
 			fields.set(f.name, { name : f.name, t : f.t, offset : size });
-			size += this.size.type(f.t);
+			size += align.typeSize(f.t);
 		}
 
 		p = {
@@ -205,6 +206,42 @@ class Module {
 		var fid = f.debug[fpos << 1];
 		var fline = f.debug[(fpos << 1) + 1];
 		return { file : code.debugFiles[fid], line : fline };
+	}
+
+	public function getFunctionRegs( fidx : Int ) {
+		var regs = functionRegsCache[fidx];
+		if( regs != null )
+			return regs;
+		var f = code.functions[fidx];
+		var nargs = switch( f.t ) { case HFun(f): f.args.length; default: throw "assert"; };
+		regs = [];
+
+		if( align.is64 ) throw "TODO : handle x64 calling conventions";
+
+		var argsSize = 0;
+		var size = 0;
+		for( i in 0...nargs ) {
+			var t = f.regs[i];
+			regs[i] = { t : t, offset : argsSize + align.ptr * 2 };
+			argsSize += align.stackSize(t);
+		}
+		for( i in nargs...f.regs.length ) {
+			var t = f.regs[i];
+			size += align.typeSize(t);
+			size += align.padSize(size, t);
+			regs[i] = { t : t, offset : -size };
+		}
+		functionRegsCache[fidx] = regs;
+		return regs;
+	}
+
+	public function reverseHash( h : Int ) {
+		if( reversedHashes == null ) {
+			reversedHashes = new Map();
+			for( s in code.strings )
+				reversedHashes.set(s.hash(), s);
+		}
+		return reversedHashes.get(h);
 	}
 
 }
