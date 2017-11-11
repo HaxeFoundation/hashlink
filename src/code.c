@@ -432,7 +432,7 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 		EXIT("Invalid header");
 	r->code = c;
 	c->version = READ();
-	if( c->version <= 1 || c->version > 2 ) {
+	if( c->version <= 1 || c->version > 3 ) {
 		printf("VER=%d\n",c->version);
 		EXIT("Unsupported bytecode version");
 	}
@@ -485,8 +485,18 @@ hl_code *hl_code_read( const unsigned char *data, int size ) {
 	for(i=0;i<c->nfunctions;i++) {
 		hl_read_function(r,c->functions+i);
 		CHK_ERROR();
-		if( c->hasdebug )
+		if( c->hasdebug ) {
 			c->functions[i].debug = hl_read_debug_infos(r,c->functions[i].nops);
+			if( c->version >= 3 ) {
+				// skip assigns (no need here)
+				int nassigns = UINDEX();
+				int j;
+				for(j=0;j<nassigns;j++) {
+					UINDEX();
+					INDEX();
+				}
+			}
+		}
 	}
 	CHK_ERROR();
 	return c;
