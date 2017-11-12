@@ -195,12 +195,21 @@ C_FUNCTION_END
 #elif defined(HL_PS)
 #	define hl_debug_break()	__debugbreak()
 #elif defined(HL_LINUX)
+#	ifdef HL_64
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \
-			__asm__("0:" \
+			__asm__("0: int3;" \
 			    ".pushsection embed-breakpoints;" \
 			    ".quad 0b;" \
 			    ".popsection")
+#	else
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			__asm__("0: int3;" \
+			    ".pushsection embed-breakpoints;" \
+			    ".long 0b;" \
+			    ".popsection")
+#	endif
 #else
 #	define hl_debug_break()
 #endif
