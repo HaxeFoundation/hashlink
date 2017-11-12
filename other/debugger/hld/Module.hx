@@ -40,7 +40,7 @@ class Module {
 	}
 
 	public function load( data : haxe.io.Bytes ) {
-		code = new format.hl.Reader(false).read(new haxe.io.BytesInput(data));
+		code = new format.hl.Reader().read(new haxe.io.BytesInput(data));
 
 		// init files
 		fileIndexes = new Map();
@@ -268,4 +268,7 @@ class Module {
 		return reversedHashes.get(h);
 	}
 
+	public function buildGraph( fidx : Int ) {
+		return new CodeGraph(code.functions[fidx]);
+	}
 }
