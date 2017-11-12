@@ -85,7 +85,11 @@ class Main {
 			}
 
 			Sys.print("> ");
-			var r = stdin.readLine();
+			var r = args.shift();
+			if( r == null )
+				r = stdin.readLine();
+			else
+				Sys.println(r);
 			var args = r.split(" ");
 			switch( args.shift() ) {
 			case "q", "quit":

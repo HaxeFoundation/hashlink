@@ -10,6 +10,8 @@ enum ValueRepr {
 	VString( v : String );
 	VClosure( p : FunRepr, d : Value );
 	VFunction( p : FunRepr );
+	VArray( t : HLType, length : Int, read : Int -> Value );
+	VMap( tkey : HLType, nkeys : Int, readKey : Int -> Value, readValue : Int -> Value );
 }
 
 enum FunRepr {

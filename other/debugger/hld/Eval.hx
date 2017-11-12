@@ -10,6 +10,8 @@ class Eval {
 	var currentFunIndex : Int;
 	var currentCodePos : Int;
 	var currentEbp : Pointer;
+	var sizeofVArray : Int;
+	public var maxArrLength : Int = 10;
 
 	static var HASH_PREFIX = "$_h$";
 
@@ -18,6 +20,7 @@ class Eval {
 		this.api = api;
 		this.jit = jit;
 		this.align = jit.align;
+		sizeofVArray = align.ptr * 2 + align.typeSize(HI32) * 2;
 	}
 
 	public function eval( name : String, funIndex : Int, codePos : Int, ebp : Pointer ) {
@@ -54,6 +57,15 @@ class Eval {
 		return v;
 	}
 
+	function escape( s : String ) {
+		s = s.split("\\").join("\\\\");
+		s = s.split("\n").join("\\n");
+		s = s.split("\r").join("\\r");
+		s = s.split("\t").join("\\t");
+		s = s.split('"').join('\\"');
+		return s;
+	}
+
 	public function valueStr( v : Value ) {
 		return switch( v.v ) {
 		case VUndef: "undef"; // null read / outside bounds
@@ -62,9 +74,25 @@ class Eval {
 		case VFloat(v): "" + v;
 		case VBool(b): b?"true":"false";
 		case VPointer(v): v.toString();
-		case VString(s): s;
+		case VString(s): "\"" + escape(s) + "\"";
 		case VClosure(f, d): funStr(f) + "[" + valueStr(d) + "]";
 		case VFunction(f): funStr(f);
+		case VArray(_, length, read):
+			if( length <= maxArrLength )
+				[for(i in 0...length) valueStr(read(i))].toString();
+			else {
+				var arr = [for(i in 0...maxArrLength) valueStr(read(i))];
+				arr.push("...");
+				arr.toString()+":"+length;
+			}
+		case VMap(_, nkeys, readKey, readValue):
+			var max = nkeys < maxArrLength ? nkeys : maxArrLength;
+			var content = [for( i in 0...max ) { var k = readKey(i); valueStr(k) + "=>" + valueStr(readValue(i)); }];
+			if( max != nkeys ) {
+				content.push("...");
+				return content.toString() + ":" + nkeys;
+			}
+			return content.toString();
 		}
 	}
 
@@ -124,12 +152,34 @@ class Eval {
 		switch( t ) {
 		case HObj(o):
 			t = readType(p);
+			switch( t ) {
+			case HObj(o2): o = o2;
+			default:
+			}
 			switch( o.name ) {
 			case "String":
 				var bytes = readPointer(p.offset(align.ptr));
 				var length = readI32(p.offset(align.ptr * 2));
 				var str = readUCS2(bytes, length);
 				v = VString(str);
+			case "hl.types.ArrayObj":
+				var length = readI32(p.offset(align.ptr));
+				var nativeArray = readPointer(p.offset(align.ptr * 2));
+				var type = readType(nativeArray.offset(align.ptr));
+				v = VArray(type, length, function(i) return readVal(nativeArray.offset(sizeofVArray + i * align.ptr), type));
+			case "hl.types.ArrayBytes_Int":
+				v = makeArrayBytes(p, HI32);
+			case "hl.types.ArrayBytes_Float":
+				v = makeArrayBytes(p, HF64);
+			case "hl.types.ArrayBytes_Single":
+				v = makeArrayBytes(p, HF32);
+			case "hl.types.ArrayBytes_hl_UI16":
+				v = makeArrayBytes(p, HUi16);
+			case "hl.types.ArrayDyn":
+				// hide implementation details, substitute underlying array
+				v = readField({ v : v, t : t }, "array").v;
+			//case "haxe.ds.IntMap":
+			//	v = makeMap(readPointer(p.offset(align.ptr)), HI32);
 			default:
 			}
 		case HVirtual(_):
@@ -160,6 +210,13 @@ class Eval {
 		default:
 		}
 		return { v : v, t : t };
+	}
+
+	function makeArrayBytes( p : Pointer, t : HLType ) {
+		var length = readI32(p.offset(align.ptr));
+		var bytes = readPointer(p.offset(align.ptr * 2));
+		var size = align.typeSize(t);
+		return VArray(t, length, function(i) return readVal(bytes.offset(i * size), t));
 	}
 
 	public function getFields( v : Value ) : Array<String> {
