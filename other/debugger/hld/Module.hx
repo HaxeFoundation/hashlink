@@ -18,6 +18,7 @@ typedef ModuleProto = {
 	}>;
 }
 
+typedef ModuleEProto = Array<{ name : String, size : Int, params : Array<{ offset : Int, t : HLType }> }>;
 
 class Module {
 
@@ -27,12 +28,14 @@ class Module {
 	var globalsOffsets : Array<Int>;
 	var globalTable : GlobalAccess;
 	var protoCache : Map<String,ModuleProto>;
+	var eprotoCache : Map<String,ModuleEProto>;
 	var functionRegsCache : Array<Array<{ t : HLType, offset : Int }>>;
 	var align : Align;
 	var reversedHashes : Map<Int,String>;
 
 	public function new() {
 		protoCache = new Map();
+		eprotoCache = new Map();
 		functionRegsCache = [];
 	}
 
@@ -143,6 +146,27 @@ class Module {
 		};
 		protoCache.set(p.name, p);
 
+		return p;
+	}
+
+	public function getEnumProto( e : EnumPrototype ) : ModuleEProto {
+		var p = eprotoCache.get(e.name);
+		if( p != null )
+			return p;
+		p = [];
+		for( c in e.constructs ) {
+			var size = align.ptr;
+			size += align.padStruct(size, HI32);
+			size += 4; // index
+			var params = [];
+			for( t in c.params ) {
+				size += align.padStruct(size, t);
+				params.push({ offset : size, t : t });
+				size += align.typeSize(t);
+			}
+			p.push({ name : c.name, size : size, params : params });
+		}
+		eprotoCache.set(e.name, p);
 		return p;
 	}
 

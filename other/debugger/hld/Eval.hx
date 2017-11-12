@@ -11,6 +11,8 @@ class Eval {
 	var currentCodePos : Int;
 	var currentEbp : Pointer;
 	var sizeofVArray : Int;
+
+	public var maxStringRec : Int = 3;
 	public var maxArrLength : Int = 10;
 
 	static var HASH_PREFIX = "$_h$";
@@ -67,7 +69,10 @@ class Eval {
 	}
 
 	public function valueStr( v : Value ) {
-		return switch( v.v ) {
+		if( maxStringRec < 0 && v.t.isPtr() )
+			return "<...>";
+		maxStringRec--;
+		var str = switch( v.v ) {
 		case VUndef: "undef"; // null read / outside bounds
 		case VNull: "null";
 		case VInt(i): "" + i;
@@ -90,10 +95,19 @@ class Eval {
 			var content = [for( i in 0...max ) { var k = readKey(i); valueStr(k) + "=>" + valueStr(readValue(i)); }];
 			if( max != nkeys ) {
 				content.push("...");
-				return content.toString() + ":" + nkeys;
-			}
-			return content.toString();
+				content.toString() + ":" + nkeys;
+			} else
+				content.toString();
+		case VType(t):
+			t.toString();
+		case VEnum(c, values):
+			if( values.length == 0 )
+				c
+			else
+				c + "(" + [for( v in values ) valueStr(v)].join(", ") + ")";
 		}
+		maxStringRec++;
+		return str;
 	}
 
 	function funStr( f : FunRepr ) {
@@ -205,8 +219,14 @@ class Eval {
 				v = VClosure(fval, value);
 			} else
 				v = VFunction(fval);
+		case HType:
+			v = VType(readType(p,true));
 		case HBytes:
 			// maybe try reading string data ?
+		case HEnum(e):
+			var index = readI32(p.offset(align.ptr));
+			var c = module.getEnumProto(e)[index];
+			v = VEnum(c.name,[for( a in c.params ) readVal(p.offset(a.offset),a.t)]);
 		default:
 		}
 		return { v : v, t : t };
@@ -227,7 +247,11 @@ class Eval {
 		}
 		switch( v.t ) {
 		case HObj(o):
-			return module.getObjectProto(o).fieldNames.copy();
+			function getRec(o:format.hl.Data.ObjPrototype) {
+				var parent = o.tsuper == null ? [] : getRec(switch( o.tsuper ) { case HObj(o): o; default: throw "assert"; });
+				return parent.concat(module.getObjectProto(o).fieldNames);
+			}
+			return getRec(o);
 		case HVirtual(fields):
 			return [for( f in fields ) f.name];
 		case HDynObj:
@@ -337,8 +361,9 @@ class Eval {
 		return readMem(p, 4).getI32(0);
 	}
 
-	function readType( p : Pointer ) {
-		var p = readPointer(p);
+	function readType( p : Pointer, direct = false ) {
+		if( !direct )
+			p = readPointer(p);
 		switch( readI32(p) ) {
 		case 0:
 			return HVoid;
