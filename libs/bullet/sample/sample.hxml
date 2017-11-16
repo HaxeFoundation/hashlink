@@ -1,5 +1,5 @@
 -lib heaps
--lib hlbullet
+-lib hxbullet
 -lib hldx
 -cp .
 -main Main
