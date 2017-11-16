@@ -37,3 +37,7 @@ ReleaseStatic
 shiroLibs
 ReleaseVS2013
 /include/bullet
+/libs/bullet/sample/sample.js
+/libs/bullet/bullet_js.cpp
+/libs/bullet/bullet.js
+*.bc
