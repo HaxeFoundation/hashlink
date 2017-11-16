@@ -1,0 +1,10 @@
+{
+	"name" : "hxbullet",
+	"url" : "https://github.com/HaxeFoundation/hl/tree/master/libs/bullet",
+	"license" : "BSD",
+	"contributors" : ["ncannasse"],
+	"description" : "Bullet3D support for Haxe HL/JS.",
+	"version" : "1.0.0",
+	"releasenote" : "",
+	"dependencies": { "webidl" : "" }
+}

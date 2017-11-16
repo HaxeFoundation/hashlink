@@ -12,6 +12,7 @@ class Main extends hxd.App {
 		world.addRigidBody(floor);
 
 		var floorGfx = new h3d.prim.Cube(100, 100, 1, true);
+		floorGfx.addNormals();
 		var floorMesh = new h3d.scene.Mesh(floorGfx, s3d);
 		floorMesh.material.color.setColor(0x800000);
 		bodies.push({ b : floor, m : floorMesh });
@@ -71,6 +72,9 @@ class Main extends hxd.App {
 			b.m.z = pos.z;
 			b.m.setRotationQuat(q);
 		}
+		// check correct memory gc
+		for( i in 0...1000 )
+			bullet.Shape.createSphere(0.5);
 	}
 
 	static function main() {

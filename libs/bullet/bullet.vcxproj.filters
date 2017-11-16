@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="bullet.cpp" />
     <ClCompile Include="..\..\include\bullet\src\Bullet3Common\b3AlignedAllocator.cpp">
       <Filter>Bullet\common</Filter>
     </ClCompile>
@@ -443,6 +442,34 @@
     <ClCompile Include="..\..\include\bullet\src\LinearMath\btVector3.cpp">
       <Filter>Bullet\maths</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btDefaultSoftBodySolver.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btSoftBody.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodyConcaveCollisionAlgorithm.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodyHelpers.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodyRigidBodyCollisionConfiguration.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btSoftMultiBodyDynamicsWorld.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btSoftRigidCollisionAlgorithm.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btSoftRigidDynamicsWorld.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\bullet\src\BulletSoftBody\btSoftSoftCollisionAlgorithm.cpp">
+      <Filter>Bullet\softbody</Filter>
+    </ClCompile>
+    <ClCompile Include="bullet.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Bullet">
@@ -462,6 +489,9 @@
     </Filter>
     <Filter Include="Bullet\maths">
       <UniqueIdentifier>{4133acc4-93ed-4762-8a08-afacebe2c5eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Bullet\softbody">
+      <UniqueIdentifier>{6a324131-101d-468e-b70d-3192f7c481d4}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -1193,6 +1223,45 @@
     </ClInclude>
     <ClInclude Include="..\..\include\bullet\src\LinearMath\btVector3.h">
       <Filter>Bullet\maths</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btDefaultSoftBodySolver.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftBody.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodyConcaveCollisionAlgorithm.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodyData.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodyHelpers.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodyInternals.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodyRigidBodyCollisionConfiguration.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodySolvers.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftBodySolverVertexBuffer.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftMultiBodyDynamicsWorld.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftRigidCollisionAlgorithm.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftRigidDynamicsWorld.h">
+      <Filter>Bullet\softbody</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\bullet\src\BulletSoftBody\btSoftSoftCollisionAlgorithm.h">
+      <Filter>Bullet\softbody</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
