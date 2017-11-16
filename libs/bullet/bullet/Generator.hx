@@ -23,7 +23,7 @@ class Generator {
 
 	static var options = { idl : "bullet.idl", libName : "bullet", includeCode : INCLUDE, autoGC : true };
 
-	public static function generateHL() {
+	public static function buildHL() {
 		webidl.HLGen.generate(options);
 	}
 

@@ -3,7 +3,7 @@ SOURCES := haxe -lib webidl -main bullet.Generator --interp
 all:
 
 generate:
-	haxe -lib webidl --macro "bullet.Generator.generate()"
+	haxe -lib webidl --macro "bullet.Generator.buildHL()"
 
 genjs:
 	haxe -lib webidl --macro "bullet.Generator.buildJS()"
