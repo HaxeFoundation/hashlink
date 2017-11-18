@@ -14,6 +14,8 @@ class Debugger {
 	var nextStep : Int = -1;
 	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int, ebp : hld.Pointer }>;
 
+	var stepBreakData : { ptr : Pointer, old : Int };
+
 	public var eval : Eval;
 	public var currentStackFrame : Int;
 	public var stackFrameCount(get, never) : Int;
@@ -65,16 +67,44 @@ class Debugger {
 		return wait();
 	}
 
-	public function wait() {
+	function singleStep(tid) {
+		var r = getReg(tid, EFlags);
+		setReg(tid, EFlags, r.or(256));
+	}
+
+	public function getException() {
+		var exc = @:privateAccess eval.readPointer(jit.debugExc);
+		if( exc == null )
+			return null;
+		return eval.readVal(exc, HDyn);
+	}
+
+	function wait( onStep = false ) : Api.WaitResult {
 		var cmd = null;
 		while( true ) {
 			cmd = api.wait(1000);
+
 			var tid = cmd.tid;
 			switch( cmd.r ) {
 			case Timeout:
 				// continue
 			case Breakpoint:
 				var eip = getReg(tid, Eip);
+
+				if( stepBreakData != null ) {
+					var ptr = stepBreakData.ptr;
+					api.writeByte(ptr, 0, stepBreakData.old);
+					api.flush(ptr, 1);
+					stepBreakData = null;
+					// we triggered this break
+					if( eip.sub(ptr) == 1 ) {
+						setReg(tid, Eip, eip.offset(-1));
+						stoppedThread = tid;
+						if( !onStep ) throw "?";
+						return SingleStep;
+					}
+				}
+
 				var codePos = eip.sub(jit.codeStart) - 1;
 				for( b in breakPoints ) {
 					if( b.codePos == codePos ) {
@@ -97,6 +127,8 @@ class Debugger {
 					nextStep = -1;
 				}
 				stoppedThread = tid;
+				if( onStep )
+					return SingleStep;
 				resume();
 			default:
 				break;
@@ -108,18 +140,194 @@ class Debugger {
 		return cmd.r;
 	}
 
-	function makeStack(tid) {
+	function smartStep( tid : Int, stepIntoCall : Bool ) {
+		var eip = getReg(tid, Eip);
+		var op = api.readByte(eip, 0);
+		switch( op ) {
+		case 0xEA:
+			// FAR JMP : this will elimate our single step flag
+			// instead, put a tmp breakpoint on return eip
+			// this fixes step-into continuing execution bug
+			var esp = getReg(tid, Esp);
+			var ptr = readMem(esp, jit.align.ptr).getPointer(0, jit.align);
+			stepBreak(ptr);
+		case 0xFF if( !stepIntoCall && api.readByte(eip,1) & 7 == 2 /* RM/2 */ ):
+			stepBreak(eip.offset(2));
+		case 0xE8 if( !stepIntoCall ):
+			stepBreak(eip.offset(5));
+		default:
+			singleStep(tid);
+		}
+	}
+
+	function stepBreak( ptr : Pointer ) {
+		var old = api.readByte(ptr, 0);
+		api.writeByte(ptr, 0, INT3);
+		api.flush(ptr, 1);
+		stepBreakData = { ptr : ptr, old : old };
+	}
+
+	public function debugTrace( stepIn ) {
+		var tid = stoppedThread;
+		var prevFun = -1, prevPos = -1, inC = false;
+		var tabs = "";
+		function debugSt() {
+			var s = currentStack[0];
+			var eip = getReg(tid, Eip);
+			var codePos = eip.sub(jit.codeStart);
+
+			if( codePos < s.codePos || codePos > s.codePos + 1024 ) {
+				if( s.fidx == prevFun && s.fpos == prevPos && s.ebp.sub(getReg(tid, Ebp)) > 0 ) {
+					// in C function
+					if( !inC ) {
+						inC = true;
+						Sys.println(tabs+"IN C CALL");
+					}
+				}
+			}
+
+			if( s.fidx == prevFun && s.fpos == prevPos )
+				return;
+
+			inC = false;
+
+			var calls = makeStack(tid);
+			tabs = [for( c in calls ) ""].join("  ");
+
+			var inf = module.resolveSymbol(s.fidx, s.fpos);
+			var file = inf.file.split("\\").join("/").split("/").pop();
+			var str = tabs;
+			str += StringTools.hex(module.code.functions[s.fidx].findex) + "h @" + StringTools.hex(s.fpos);
+			str += " " +file+":" + inf.line;
+			str += " " + Std.string(module.code.functions[s.fidx].ops[s.fpos]).substr(1);
+			Sys.println(str);
+			prevFun = s.fidx;
+			prevPos = s.fpos;
+		}
+		debugSt();
+		while( true ) {
+			smartStep(tid,stepIn);
+			resume();
+			var r = wait(true);
+			if( r != SingleStep )
+				return r;
+			currentStack = makeStack(tid, 1);
+			if( currentStack.length == 0 )
+				continue;
+			debugSt();
+		}
+	}
+
+
+	public function stepNext() : Api.WaitResult {
+		var tid = stoppedThread;
+		var s = currentStack[0];
+		var line = module.resolveSymbol(s.fidx, s.fpos).line;
+		while( true ) {
+			var eip = getReg(tid, Eip);
+			smartStep(tid, false);
+			resume();
+			var r = wait(true);
+			if( r != SingleStep )
+				return r; // breakpoint
+			var st = makeStack(tid, 1)[0];
+			if( st == null )
+				continue;
+			var deltaEbp = st.ebp.sub(s.ebp);
+			if( st.fidx == s.fidx && deltaEbp == 0 ) {
+				if( module.resolveSymbol(st.fidx, st.fpos).line != line )
+					break;
+			} else if( deltaEbp > 0 ) {
+				// check if we have returned
+				if( api.readByte(eip, 0) == 0xC3 ) // RET
+					break;
+			}
+		}
+		currentStackFrame = 0;
+		currentStack = (stoppedThread == jit.mainThread) ? makeStack(stoppedThread) : [];
+		return Breakpoint;
+	}
+
+	public function stepOut() : Api.WaitResult {
+		var tid = stoppedThread;
+		var s = currentStack[0];
+		var line = module.resolveSymbol(s.fidx, s.fpos).line;
+		while( true ) {
+			var eip = getReg(tid, Eip);
+			smartStep(tid,false);
+			resume();
+			var r = wait(true);
+			if( r != SingleStep )
+				return r; // breakpoint
+			var st = makeStack(tid, 1)[0];
+			if( st == null )
+				continue;
+			var deltaEbp = st.ebp.sub(s.ebp);
+			if( st.fidx == s.fidx && deltaEbp == 0 ) {
+				if( module.resolveSymbol(st.fidx, st.fpos).line != line )
+					break;
+			} else if( deltaEbp > 0 ) {
+				// check if we have returned
+				if( api.readByte(eip, 0) == 0xC3 ) // RET
+					break;
+			}
+		}
+		currentStackFrame = 0;
+		currentStack = (stoppedThread == jit.mainThread) ? makeStack(stoppedThread) : [];
+		return Breakpoint;
+	}
+
+	public function stepInto() {
+		var s = currentStack[0];
+		var tid = stoppedThread;
+		var line = module.resolveSymbol(s.fidx, s.fpos).line;
+		while( true ) {
+			smartStep(tid,true);
+			resume();
+			var r = wait(true);
+			if( r != SingleStep )
+				return r; // breakpoint
+			var st = makeStack(tid, 1)[0];
+			if( st == null )
+				continue;
+			if( st.fidx != s.fidx || module.resolveSymbol(st.fidx, st.fpos).line != line )
+				break;
+		}
+		currentStackFrame = 0;
+		currentStack = (stoppedThread == jit.mainThread) ? makeStack(stoppedThread) : [];
+		return Breakpoint;
+	}
+
+	function makeStack(tid,max = 0) {
 		var stack = [];
 		var esp = getReg(tid, Esp);
-		var size = jit.stackTop.sub(esp);
-		var mem = readMem(esp, size);
+		var size = jit.stackTop.sub(esp) + jit.align.ptr;
+		if( size < 0 ) size = 0;
+		var mem = readMem(esp.offset(-jit.align.ptr), size);
 
 		var asmPos = getReg(tid, Eip).sub(jit.codeStart);
 		var e = jit.resolveAsmPos(asmPos);
+		var inProlog = false;
+
+		if( e == null && size > 0 ) {
+			// we are in a C function ?
+			// try again with immediate frame
+			asmPos = mem.getPointer(jit.align.ptr,jit.align).sub(jit.codeStart);
+			e = jit.resolveAsmPos(asmPos);
+		}
 
 		if( e != null ) {
-			e.ebp = getReg(tid, Ebp);
+			var ebp = getReg(tid, Ebp);
+			if( e.fpos < 0 ) {
+				// we are in function prolog
+				e.fpos = 0;
+				e.ebp = esp;
+				inProlog = true;
+			} else
+				e.ebp = ebp;
 			stack.push(e);
+			if( max > 0 && stack.length >= max )
+				return stack;
 		}
 
 		if( jit.is64 ) throw "TODO : use int64 calculus";
@@ -127,14 +335,15 @@ class Debugger {
 		// similar to module/module_capture_stack
 		var stackBottom = esp.toInt();
 		var stackTop = jit.stackTop.toInt();
-		for( i in 1...size >> 2 ) {
+		for( i in 0...size >> 2 ) {
 			var val = mem.getI32(i << 2);
-			if( val > stackBottom && val < stackTop ) {
+			if( val > stackBottom && val < stackTop || (inProlog && i == 0) ) {
 				var codePos = mem.getI32((i + 1) << 2) - jit.codeStart.toInt();
 				var e = jit.resolveAsmPos(codePos);
-				if( e != null ) {
+				if( e != null && e.fpos >= 0 ) {
 					e.ebp = Pointer.make(val,0);
 					stack.push(e);
+					if( max > 0 && stack.length >= max ) return stack;
 				}
 			}
 		}

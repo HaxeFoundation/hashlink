@@ -11,4 +11,10 @@ abstract Buffer(hl.Bytes) {
 		return @:privateAccess String.fromUCS2(this.sub(pos,(length + 1) << 1));
 	}
 
+	public function getPointer( pos : Int, align : Align ) {
+		if( align.is64 )
+			return Pointer.make(this.getI32(pos), this.getI32(pos + 4));
+		return Pointer.make(this.getI32(pos), 0);
+	}
+
 }

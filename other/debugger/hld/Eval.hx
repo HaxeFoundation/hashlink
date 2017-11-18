@@ -340,7 +340,7 @@ class Eval {
 	function readPointer( p : Pointer ) {
 		if( align.is64 ) {
 			var m = readMem(p, 8);
-			return Pointer.make(m.getI32(0), m.getI32(4));
+			return m.getPointer(0,align);
 		}
 		return Pointer.make(readI32(p), 0);
 	}

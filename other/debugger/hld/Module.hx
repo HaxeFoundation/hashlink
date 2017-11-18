@@ -48,7 +48,7 @@ class Module {
 			var f = code.debugFiles[i];
 			fileIndexes.set(f, i);
 			var low = f.split("\\").join("/").toLowerCase();
-			fileIndexes.set(f, i);
+			fileIndexes.set(low, i);
 			var fileOnly = low.split("/").pop();
 			if( !fileIndexes.exists(fileOnly) ) {
 				fileIndexes.set(fileOnly, i);
@@ -186,7 +186,7 @@ class Module {
 	public function getBreaks( file : String, line : Int ) {
 		var ifile = fileIndexes.get(file);
 		if( ifile == null )
-			ifile = fileIndexes.get(file.split("\\").join("//").toLowerCase());
+			ifile = fileIndexes.get(file.split("\\").join("/").toLowerCase());
 
 		var functions = functionsByFile.get(ifile);
 		if( ifile == null || functions == null )

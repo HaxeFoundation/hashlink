@@ -73,6 +73,22 @@ class Main {
 			Sys.println(count + " breakpoints removed");
 		}
 
+		function handleResult( r : hld.Api.WaitResult ) {
+			switch( r ) {
+			case Exit:
+				dbg.resume();
+			case Breakpoint:
+				Sys.println("Thread " + dbg.stoppedThread + " paused " + frameStr(dbg.getStackFrame()));
+				var exc = dbg.getException();
+				if( exc != null )
+					Sys.println("Exception: "+dbg.eval.valueStr(exc));
+			case Error:
+				Sys.println("*** an error has occured, paused ***");
+			default:
+				throw "assert "+r;
+			}
+		}
+
 		var stdin = Sys.stdin();
 		while( true ) {
 
@@ -90,23 +106,13 @@ class Main {
 				r = stdin.readLine();
 			else
 				Sys.println(r);
-			var args = r.split(" ");
+			var args = ~/[ \t\r\n]+/g.split(r);
 			switch( args.shift() ) {
 			case "q", "quit":
 				dumpProcessOut();
 				break;
 			case "r", "run", "c", "continue":
-				var r = dbg.run();
-				switch( r ) {
-				case Exit:
-					dbg.resume();
-				case Breakpoint:
-					Sys.println("Thread "+dbg.stoppedThread+" paused");
-				case Error:
-					Sys.println("*** an error has occured, paused ***");
-				default:
-					throw "assert";
-				}
+				handleResult(dbg.run());
 			case "bt", "backtrace":
 				for( f in dbg.getBackTrace() )
 					Sys.println(frameStr(f));
@@ -127,8 +133,9 @@ class Main {
 					dbg.currentStackFrame = 0;
 				Sys.println(frameStr(dbg.getStackFrame()));
 			case "b", "break":
-				var file = args.shift();
-				var line = Std.parseInt(args.shift());
+				var fileLine = args.shift().split(":");
+				var line = Std.parseInt(fileLine.pop());
+				var file = fileLine.join(":");
 				if( dbg.addBreakpoint(file, line) ) {
 					breaks.push({file:file, line:line});
 					Sys.println("Breakpoint set");
@@ -173,6 +180,14 @@ class Main {
 				}
 			case "delete", "d":
 				clearBP();
+			case "next", "n":
+				handleResult(dbg.stepNext());
+			case "step", "s":
+				handleResult(dbg.stepInto());
+			case "finish":
+				handleResult(dbg.stepOut());
+			case "debug":
+				handleResult(dbg.debugTrace(args.shift() == "step"));
 			default:
 				Sys.println("Unknown command " + r);
 			}

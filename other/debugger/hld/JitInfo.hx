@@ -18,6 +18,7 @@ class JitInfo {
 	public var globals : Pointer;
 	public var stackTop : Pointer;
 	public var codeStart : Pointer;
+	public var debugExc : Pointer;
 	var codeSize : Int;
 	var allTypes : Pointer;
 
@@ -49,6 +50,7 @@ class JitInfo {
 
 		mainThread = input.readInt32();
 		globals = readPointer();
+		debugExc = readPointer();
 		stackTop = readPointer();
 		codeStart = readPointer();
 		codeSize = input.readInt32();
@@ -116,8 +118,6 @@ class JitInfo {
 			else
 				max = mid;
 		}
-		if( min == 0 )
-			return null; // ???
 		return { fidx : fidx, fpos : min - 1, codePos : asmPos, ebp : null };
 	}
 
