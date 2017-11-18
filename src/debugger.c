@@ -34,6 +34,7 @@ HL_API int hl_socket_send( hl_socket *s, vbyte *buf, int pos, int len );
 HL_API int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len );
 HL_API void hl_sys_sleep( double t );
 HL_API int hl_thread_id();
+HL_API vdynamic **hl_debug_exc;
 
 static hl_socket *debug_socket = NULL;
 static hl_socket *client_socket = NULL;
@@ -47,6 +48,7 @@ static void send( void *ptr, int size ) {
 
 static void hl_debug_loop( hl_module *m ) {
 	void *stack_top = hl_module_stack_top();
+	void *dbg_addr = &hl_debug_exc;
 	int flags = 0;
 #	ifdef HL_64
 	flags |= 1;
@@ -61,6 +63,7 @@ static void hl_debug_loop( hl_module *m ) {
 		send(&flags,4);
 		send(&main_thread_id,4);
 		send(&m->globals_data,sizeof(void*));
+		send(&dbg_addr,sizeof(void*));
 		send(&stack_top,sizeof(void*));
 		send(&m->jit_code,sizeof(void*));
 		send(&m->codesize,4);
