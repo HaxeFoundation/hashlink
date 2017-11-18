@@ -25,6 +25,7 @@
 
 HL_PRIM hl_trap_ctx *hl_current_trap = NULL;
 HL_PRIM vdynamic *hl_current_exc = NULL;
+HL_PRIM vdynamic **hl_debug_exc = NULL;
 
 static void *stack_trace[0x1000];
 static int stack_count = 0;
@@ -90,7 +91,9 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_current_exc = v;
 	hl_current_trap = t->prev;
 	if( hl_current_trap == NULL ) {
+		hl_debug_exc = &v;
 		hl_debug_break();
+		hl_debug_exc = NULL;
 		if( hl_error_handler ) hl_dyn_call(hl_error_handler,&v,1);
 	}
 	if( throw_jump == NULL ) throw_jump = longjmp;
