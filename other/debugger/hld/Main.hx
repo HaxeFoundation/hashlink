@@ -61,8 +61,8 @@ class Main {
 			error("Failed to access process #" + pid+" on port "+debugPort+" for debugging");
 		}
 
-		function frameStr( f : { file : String, line : Int } ) {
-			return f.file+":" + f.line;
+		function frameStr( f : { file : String, line : Int, ebp : Pointer }, ?debug ) {
+			return f.file+":" + f.line + (debug ? " @"+f.ebp.toString():"");
 		}
 
 		function clearBP() {
@@ -116,6 +116,9 @@ class Main {
 			case "bt", "backtrace":
 				for( f in dbg.getBackTrace() )
 					Sys.println(frameStr(f));
+			case "btdebug":
+				for( f in dbg.getBackTrace() )
+					Sys.println(frameStr(f,true));
 			case "where":
 				Sys.println(frameStr(dbg.getStackFrame()));
 			case "frame","f":
@@ -181,11 +184,11 @@ class Main {
 			case "delete", "d":
 				clearBP();
 			case "next", "n":
-				handleResult(dbg.stepNext());
+				handleResult(dbg.step(Next));
 			case "step", "s":
-				handleResult(dbg.stepInto());
+				handleResult(dbg.step(Into));
 			case "finish":
-				handleResult(dbg.stepOut());
+				handleResult(dbg.step(Out));
 			case "debug":
 				handleResult(dbg.debugTrace(args.shift() == "step"));
 			default:

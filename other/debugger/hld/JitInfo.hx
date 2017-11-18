@@ -84,6 +84,10 @@ class JitInfo {
 		return true;
 	}
 
+	public function getFunctionPos( fidx : Int ) {
+		return functions[fidx].start;
+	}
+
 	public function getCodePos( fidx : Int, pos : Int ) {
 		var dbg = functions[fidx];
 		return dbg.start + (dbg.large ? dbg.offsets.getInt32(pos << 2) : dbg.offsets.getUInt16(pos << 1));
