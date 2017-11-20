@@ -51,8 +51,11 @@ class Window {
 			var reg = ~/[0-9]+\.[0-9]+/;
 			var v : String = GL.getParameter(GL.SHADING_LANGUAGE_VERSION);
 			var shaderVersion = 130;
-			if( reg.match(v) )
-				shaderVersion = hxd.Math.imin( 150, Math.round( Std.parseFloat(reg.matched(0)) * 100 ) );
+			if( reg.match(v) ) {
+				var minVer = 150;
+				shaderVersion = Math.round( Std.parseFloat(reg.matched(0)) * 100 );
+				if( shaderVersion < minVer ) shaderVersion = minVer;
+			}
 
 			var vertex = GL.createShader(GL.VERTEX_SHADER);
 			GL.shaderSource(vertex, ["#version " + shaderVersion, "void main() { gl_Position = vec4(1.0); }"].join("\n"));
