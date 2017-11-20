@@ -27,6 +27,12 @@
 #	pragma comment(lib, "Dbghelp.lib")
 #endif
 
+#ifdef HL_CONSOLE
+extern void sys_global_init();
+extern void sys_global_exit();
+#endif
+
+
 #ifdef HL_VCC
 #	include <crtdbg.h>
 #else
@@ -90,6 +96,9 @@ int main(int argc, char *argv[]) {
 #endif
 	hl_trap_ctx ctx;
 	vdynamic *exc;
+#	ifdef HL_CONSOLE
+	sys_global_init();
+#	endif
 	hl_global_init(&ctx);
 	hl_setup_exception(hlc_resolve_symbol,hlc_capture_stack);
 	hl_setup_callbacks(hlc_static_call, hlc_get_wrapper);
@@ -114,5 +123,8 @@ on_exception:
 		hl_debug_break();
 	}
 	hl_global_free();
+#	ifdef HL_CONSOLE
+	sys_global_exit();
+#	endif
 	return 1;
 }

@@ -41,7 +41,15 @@
 #	define HL_PS
 #endif
 
-#if (defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(HL_PS)
+#ifdef __NX__
+#	define HL_NX
+#endif
+
+#if defined(HL_PS) || defined(HL_NX)
+#	define HL_CONSOLE
+#endif
+
+#if (defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(HL_CONSOLE)
 #	define HL_BSD
 #endif
 

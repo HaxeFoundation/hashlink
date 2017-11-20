@@ -20,15 +20,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
-#include <time.h>
 
-#ifdef HL_PS
-static struct tm *localtime_r( const time_t *clock, struct tm *result ) {
-	struct tm *tt = localtime(clock);
-	if( !tt ) return NULL;
-	*result = *tt;
-	return result;
-}
+#ifdef HL_CONSOLE
+#	include <posix/posix.h>
+#else
+#	include <time.h>
 #endif
 
 #ifdef HL_WIN
