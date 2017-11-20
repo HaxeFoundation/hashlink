@@ -22,17 +22,15 @@
 #include <hl.h>
 #include <time.h>
 #include <string.h>
-#ifdef HL_WIN
+#if defined(HL_WIN)
 #	include <windows.h>
 #	include <process.h>
+#elif defined(HL_CONSOLE)
+#	include <posix/posix.h>
 #else
 #	include <sys/time.h>
 #	include <sys/types.h>
 #	include <unistd.h>
-#endif
-
-#ifdef HL_PS
-#define getpid() 0
 #endif
 
 #define NSEEDS	25

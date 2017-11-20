@@ -34,6 +34,11 @@
 #	define SHUT_RDWR	SD_BOTH
 	typedef int _sockaddr;
 	typedef int socklen_t;
+
+#else
+
+#if defined(__ORBIS__) || defined(__NX__)
+#	include <posix/posix.h>
 #else
 #	define _GNU_SOURCE
 #	include <string.h>
@@ -44,28 +49,19 @@
 #	include <netinet/tcp.h>
 #	include <arpa/inet.h>
 #	include <unistd.h>
-#	ifdef __ORBIS__
-#	include <net.h>
-struct hostent { unsigned int *h_addr_list[1]; const char *h_name; };
-extern unsigned int inet_addr( const char *host );
-extern const char *inet_ntoa( struct in_addr addr );
-extern struct hostent *gethostbyname( const char *name );
-extern struct hostent *gethostbyaddr( const void *addr, socklen_t len, int type);
-extern int gethostname( char *name, size_t len );
-#	define errno sce_net_errno
-#	else
 #	include <netdb.h>
 #	include <poll.h>
-#	endif
 #	include <fcntl.h>
 #	include <errno.h>
 #	include <stdio.h>
+#endif
 	typedef int SOCKET;
 #	define closesocket close
 #	define SOCKET_ERROR (-1)
 #	define INVALID_SOCKET (-1)
 	typedef unsigned int _sockaddr;
 #endif
+
 #ifdef HL_LINUX
 #	include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44)
@@ -73,6 +69,7 @@ extern int gethostname( char *name, size_t len );
 #	define HAS_EPOLL
 #endif
 #endif
+
 #ifndef HAS_EPOLL
 #	define EPOLLIN 0x001
 #	define EPOLLOUT 0x004
@@ -187,7 +184,7 @@ HL_PRIM int hl_host_resolve( vbyte *host ) {
 	ip = inet_addr((char*)host);
 	if( ip == INADDR_NONE ) {
 		struct hostent *h;
-#	if defined(HL_WIN) || defined(HL_MAC) || defined (HL_CYGWIN) || defined(HL_PS)
+#	if defined(HL_WIN) || defined(HL_MAC) || defined (HL_CYGWIN) || defined(HL_CONSOLE)
 		h = gethostbyname((char*)host);
 #	else
 		struct hostent hbase;
@@ -210,7 +207,7 @@ HL_PRIM vbyte *hl_host_to_string( int ip ) {
 
 HL_PRIM vbyte *hl_host_reverse( int ip ) {
 	struct hostent *h;
-#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_CYGWIN) || defined(HL_PS)
+#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_CYGWIN) || defined(HL_CONSOLE)
 	h = gethostbyaddr((char *)&ip,4,AF_INET);
 #	else
 	struct hostent htmp;

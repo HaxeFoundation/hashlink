@@ -1,7 +1,7 @@
 
 // include by os_types.h as a fallback
 
-#if defined(__ORBIS__)
+#if defined(__ORBIS__) || defined(__NX__)
 
 #  include <sys/types.h>
 typedef short ogg_int16_t;

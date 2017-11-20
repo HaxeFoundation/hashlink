@@ -890,7 +890,7 @@ static void hl_gc_init( void *stack_top ) {
 		hl_fatal("Invalid builtin tl1");
 	if( TRAILING_ZEROES((unsigned)~0x080003FF) != 10 || TRAILING_ZEROES(0) != 32 || TRAILING_ZEROES(0xFFFFFFFF) != 0 )
 		hl_fatal("Invalid builtin tl0");
-#	ifndef HL_PS
+#	ifndef HL_CONSOLE
 	if( getenv("HL_GC_PROFILE") )
 		gc_flags |= GC_PROFILE;
 	if( getenv("HL_DUMP_MEMORY") )
@@ -995,7 +995,7 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 	start_address += size + ((-size) & (GC_PAGE_SIZE - 1));
 #	endif
 	return ptr;
-#elif defined(HL_PS)
+#elif defined(HL_CONSOLE)
 	return NULL;
 #else
 	void *p;
@@ -1007,14 +1007,14 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 HL_PRIM void hl_free_executable_memory( void *c, int size ) {
 #if defined(HL_WIN)
 	VirtualFree(c,0,MEM_RELEASE);
-#elif !defined(HL_PS)
+#elif !defined(HL_CONSOLE)
 	munmap(c, size);
 #endif
 }
 
-#ifdef HL_PS
-void *ps_alloc_align( int size, int align );
-void ps_free_align( void *ptr, int size );
+#ifdef HL_CONSOLE
+void *sys_alloc_align( int size, int align );
+void sys_free_align( void *ptr, int size );
 #endif
 
 static void *gc_alloc_page_memory( int size ) {
@@ -1028,8 +1028,8 @@ static void *gc_alloc_page_memory( int size ) {
 	start_address += size + ((-size) & (GC_PAGE_SIZE - 1));
 #	endif
 	return ptr;
-#elif defined(HL_PS)
-	return ps_alloc_align(size, GC_PAGE_SIZE);
+#elif defined(HL_CONSOLE)
+	return sys_alloc_align(size, GC_PAGE_SIZE);
 #else
 	void *ptr;
 	if( posix_memalign(&ptr,GC_PAGE_SIZE,size) )
@@ -1041,8 +1041,8 @@ static void *gc_alloc_page_memory( int size ) {
 static void gc_free_page_memory( void *ptr, int size ) {
 #ifdef HL_WIN
 	VirtualFree(ptr, 0, MEM_RELEASE);
-#elif defined(HL_PS)
-	ps_free_align(ptr,size);
+#elif defined(HL_CONSOLE)
+	sys_free_align(ptr,size);
 #else
 	free(ptr);
 #endif

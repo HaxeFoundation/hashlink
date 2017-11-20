@@ -2,8 +2,8 @@
 #include <png.h>
 #include <hl.h>
 
-#ifdef HL_PS
-extern bool ps_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags );
+#ifdef HL_CONSOLE
+extern bool sys_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags );
 #else
 #	include <turbojpeg.h>
 #endif
@@ -18,8 +18,8 @@ typedef struct {
 } pixel;
 
 HL_PRIM bool HL_NAME(jpg_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
-#ifdef HL_PS
-	return ps_jpg_decode(data, dataLen, out, width, height, stride, format, flags);
+#ifdef HL_CONSOLE
+	return sys_jpg_decode(data, dataLen, out, width, height, stride, format, flags);
 #else
 	tjhandle h = tjInitDecompress();
 	int result;
