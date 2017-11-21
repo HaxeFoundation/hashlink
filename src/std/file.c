@@ -21,6 +21,9 @@
  */
 #include <hl.h>
 #include <stdio.h>
+#ifdef HL_CONSOLE
+#	include <posix/posix.h>
+#endif
 #ifdef HL_WIN
 #	include <windows.h>
 #	define fopen(name,mode) _wfopen(name,mode)
