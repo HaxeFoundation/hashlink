@@ -19,6 +19,8 @@ class Body {
 		state = new Native.DefaultMotionState();
 		var inf = new Native.RigidBodyConstructionInfo(mass, state, @:privateAccess shape.getInstance(), inertia);
 		inst = new Native.RigidBody(inf);
+		inertia.delete();
+		inf.delete();
 		this.shape = shape;
 		this.mass = mass;
 		_tmp[6] = 0.;
@@ -26,22 +28,39 @@ class Body {
 
 	public function setTransform( p : h3d.col.Point, ?q : h3d.Quat ) {
 		var t = inst.getCenterOfMassTransform();
-		t.setOrigin(new Native.Vector3(p.x, p.y, p.z));
-		if( q != null ) t.setRotation(new Native.Quaternion(q.x, q.y, q.z, q.w));
+		var v = new Native.Vector3(p.x, p.y, p.z);
+		t.setOrigin(v);
+		v.delete();
+		if( q != null ) {
+			var qv = new Native.Quaternion(q.x, q.y, q.z, q.w);
+			t.setRotation(qv);
+			qv.delete();
+		}
 		inst.setCenterOfMassTransform(t);
+		t.delete();
+	}
+
+	public function delete() {
+		inst.delete();
+		state.delete();
 	}
 
 	function get_position() {
 		var t = inst.getCenterOfMassTransform();
 		var p = t.getOrigin();
 		_pos.set(p.x(), p.y(), p.z());
+		t.delete();
+		p.delete();
 		return _pos;
 	}
 
 	function get_rotation() {
 		var t = inst.getCenterOfMassTransform();
-		var q : Native.QuadWord = t.getRotation();
-		_q.set(q.x(), q.y(), q.z(), q.w());
+		var q = t.getRotation();
+		var qw : Native.QuadWord = q;
+		_q.set(qw.x(), qw.y(), qw.z(), qw.w());
+		q.delete();
+		t.delete();
 		return _q;
 	}
 

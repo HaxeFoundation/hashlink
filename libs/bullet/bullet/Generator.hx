@@ -23,8 +23,8 @@ class Generator {
 
 	static var options = { idl : "bullet.idl", libName : "bullet", includeCode : INCLUDE, autoGC : true };
 
-	public static function buildHL() {
-		webidl.HLGen.generate(options);
+	public static function generateCpp() {
+		webidl.Generate.generateCpp(options);
 	}
 
 	public static function getFiles() {
@@ -37,19 +37,19 @@ class Generator {
 					var fname = f.att.Include.split("\\").join("/");
 					sources.push(fname);
 				}
-		sources.remove("bullet.cpp");
 		return sources;
 	}
 
-	public static function buildJS() {
+	public static function generateJs() {
 		// ammo.js params
-		var defines = ["NO_EXIT_RUNTIME=1", "NO_FILESYSTEM=1", "AGGRESSIVE_VARIABLE_ELIMINATION=1", "ELIMINATE_DUPLICATE_FUNCTIONS=1", "NO_DYNAMIC_EXECUTION=1"];
-		var params = ["-O3", "--llvm-lto", "1", "-I", "../../include/bullet/src"];
+		var debug = false;
+		var defines = debug ? [] : ["NO_EXIT_RUNTIME=1", "NO_FILESYSTEM=1", "AGGRESSIVE_VARIABLE_ELIMINATION=1", "ELIMINATE_DUPLICATE_FUNCTIONS=1", "NO_DYNAMIC_EXECUTION=1"];
+		var params = ["-O"+(debug?0:3), "--llvm-lto", "1", "-I", "../../include/bullet/src"];
 		for( d in defines ) {
 			params.push("-s");
 			params.push(d);
 		}
-		webidl.JSGen.compile(options, getFiles(), params);
+		webidl.Generate.generateJs(options, getFiles(), params);
 	}
 
 }
