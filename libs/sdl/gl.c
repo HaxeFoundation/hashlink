@@ -8,8 +8,8 @@
 #	include <SDL.h>
 #	include <GL/GLU.h>
 #	include <glext.h>
-#elif defined(HL_PS)
-#	include <graphic/ps_gl.h>
+#elif defined(HL_CONSOLE)
+#	include <graphic/glapi.h>
 #else
 #	include <SDL2/SDL.h>
 #	include <GL/glu.h>
