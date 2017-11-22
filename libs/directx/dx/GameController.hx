@@ -6,10 +6,12 @@ typedef GameControllerPtr = hl.Abstract<"dx_gctrl_device">;
 private class DInputButton {
 	var num : Int;
 	var mask : Int;
+	var axis : Int;
 	
-	public function new( num : Int, mask : Int ){
+	public function new( num : Int, mask : Int, axis : Int ){
 		this.num = num;
 		this.mask = mask;
+		this.axis = axis;
 	}
 }
 
@@ -17,7 +19,6 @@ private class DInputMapping {
 	var guid : Int;
 	var name : hl.Bytes;
 	var button : hl.NativeArray<DInputButton>;
-	var axis : hl.NativeArray<Int>;
 	
 	function new( s : String ){
 		var a = s.split(",");
@@ -26,54 +27,54 @@ private class DInputMapping {
 		var product = Std.parseInt( "0x" + suid.substr(16,4) );
 		guid = (product&0xFF)<<24 | (product&0xFF00)<<8 | (vendor&0xFF)<<8 | (vendor&0xFF00)>>8;
 		name = @:privateAccess a.shift().toUtf8();
-		button = new hl.NativeArray(14);
-		axis = new hl.NativeArray(6);
+		button = new hl.NativeArray(20);
 		
 		for( e in a ){
 			var p = e.split(":");
 			if( p.length != 2 ) continue;
-			if( p[1].charCodeAt(0) == 'a'.code ){
-				var num = Std.parseInt(p[1].substr(1));
-				switch( p[0] ){
-					case "leftx":        axis[0] = num;
-					case "lefty":        axis[1] = num;
-					case "rightx":       axis[2] = num;
-					case "righty":       axis[3] = num;
-					case "lefttrigger":  axis[4] = num;
-					case "righttrigger": axis[5] = num;
-					default:
+			
+			var btn : DInputButton = switch( p[1].charCodeAt(0) ){
+				case 'b'.code: new DInputButton(Std.parseInt(p[1].substr(1)), 0, -1);
+				case 'h'.code: {
+					var ba = p[1].substr(1).split(".");
+					if( ba == null ) 
+						null;
+					else
+						new DInputButton(Std.parseInt(ba[0]), Std.parseInt(ba[1]), -1);
 				}
-			}else{
-				var btn : DInputButton = switch( p[1].charCodeAt(0) ){
-					case 'b'.code: new DInputButton(Std.parseInt(p[1].substr(1)), 0);
-					case 'h'.code: {
-						var ba = p[1].substr(1).split(".");
-						if( ba == null ) 
-							null;
-						else
-							new DInputButton(Std.parseInt(ba[0]), Std.parseInt(ba[1]));
+				case 'a'.code:
+					new DInputButton(-1,-1,Std.parseInt(p[1].substr(1)));
+				default: null;
+			}
+			if( btn == null ) continue;
+
+			switch( p[0] ){
+				case "leftx":        button[0] = btn;
+				case "lefty":        button[1] = btn;
+				case "rightx":       button[2] = btn;
+				case "righty":       button[3] = btn;
+				case "lefttrigger":  button[4] = btn;
+				case "righttrigger": button[5] = btn;
+				default:
+					var idx = switch( p[0] ){
+						case "dpup":          Btn_DPadUp;
+						case "dpdown":        Btn_DPadDown;
+						case "dpleft":        Btn_DPadLeft;
+						case "dpright":       Btn_DPadRight;
+						case "start":         Btn_Start;
+						case "back":          Btn_Back;
+						case "leftstick":     Btn_LeftStick;
+						case "rightstick":    Btn_RightStick;
+						case "leftshoulder":  Btn_LB;
+						case "rightshoulder": Btn_RB;
+						case "a":             Btn_A;
+						case "b":             Btn_B;
+						case "x":             Btn_X;
+						case "y":             Btn_Y;
+						default: null;
 					}
-					default: null;
-				}
-				var idx = switch( p[0] ){
-					case "dpup":          Btn_DPadUp;
-					case "dpdown":        Btn_DPadDown;
-					case "dpleft":        Btn_DPadLeft;
-					case "dpright":       Btn_DPadRight;
-					case "start":         Btn_Start;
-					case "back":          Btn_Back;
-					case "leftstick":     Btn_LeftStick;
-					case "rightstick":    Btn_RightStick;
-					case "leftshoulder":  Btn_LB;
-					case "rightshoulder": Btn_RB;
-					case "a":             Btn_A;
-					case "b":             Btn_B;
-					case "x":             Btn_X;
-					case "y":             Btn_Y;
-					default: null;
-				}
-				if( idx != null && btn != null )
-					button[Type.enumIndex(idx)] = btn;
+					if( idx != null )
+						button[6+Type.enumIndex(idx)] = btn;
 			}
 		}
 	}
@@ -101,7 +102,7 @@ private class DInputMapping {
 		"03000000380700005082000000000000,Mad Catz FightPad PRO (PS4),a:b1,b:b2,back:b8,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,guide:b12,leftshoulder:b4,leftstick:b10,lefttrigger:a3,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b11,righttrigger:a4,rightx:a2,righty:a5,start:b9,x:b0,y:b3,",
 		"03000000790000004418000000000000,Mayflash GameCube Controller,a:b1,b:b2,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,lefttrigger:a3,leftx:a0,lefty:a1,rightshoulder:b7,righttrigger:a4,rightx:a5,righty:a2,start:b9,x:b0,y:b3,",
 		"030000001008000001e5000000000000,NEXT SNES Controller,a:b2,b:b1,back:b8,dpdown:+a1,dpleft:-a0,dpright:+a0,dpup:-a1,leftshoulder:b4,rightshoulder:b6,start:b9,x:b3,y:b0,",
-		"030000007e0500000920000000000000,Nintendo Switch Pro Controller,a:b0,b:b1,back:b8,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,guide:b12,leftshoulder:b4,leftstick:b10,lefttrigger:b6,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b11,righttrigger:b7,rightx:a2,righty:a3,start:b9,x:b2,y:b3,",
+		"030000007e0500000920000000000000,Nintendo Switch Pro Controller,a:b0,b:b1,back:b8,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,guide:b12,leftshoulder:b4,leftstick:b10,lefttrigger:b6,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b11,righttrigger:b7,rightx:a3,righty:a4,start:b9,x:b2,y:b3,",
 		"03000000362800000100000000000000,OUYA Game Controller,a:b0,b:b3,dpdown:b9,dpleft:b10,dpright:b11,dpup:b8,guide:b14,leftshoulder:b4,leftstick:b6,lefttrigger:a2,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b7,righttrigger:b13,rightx:a3,righty:a4,x:b1,y:b2,",
 		"03000000888800000803000000000000,PS3 Controller,a:b2,b:b1,back:b8,dpdown:h0.8,dpleft:h0.4,dpright:h0.2,dpup:h0.1,guide:b12,leftshoulder:b4,leftstick:b9,lefttrigger:b6,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b10,righttrigger:b7,rightx:a3,righty:a4,start:b11,x:b0,y:b3,",
 		"030000004c0500006802000000000000,PS3 Controller,a:b14,b:b13,back:b0,dpdown:b6,dpleft:b7,dpright:b5,dpup:b4,guide:b16,leftshoulder:b10,leftstick:b1,lefttrigger:b8,leftx:a0,lefty:a1,rightshoulder:b11,rightstick:b2,righttrigger:b9,rightx:a2,righty:a3,start:b3,x:b15,y:b12,",
@@ -143,41 +144,98 @@ enum GameControllerButton {
 
 @:keep @:hlNative("directx")
 class GameController {
+	public static var CONFIG = {
+		analogX : 14,
+		analogY : 15,
+		ranalogX : 16,
+		ranalogY : 17,
+		LT : 18,
+		RT : 19,
+
+		dpadUp : 0,
+		dpadDown : 1,
+		dpadLeft : 2,
+		dpadRight : 3,
+		start : 4,
+		back : 5,
+		analogClick : 6,
+		ranalogClick : 7,
+		LB : 8,
+		RB : 9,
+		A : 10,
+		B : 11,
+		X : 12,
+		Y : 13,
+
+		names : ["DUp","DDown","DLeft","DRight","Start","Back","LCLK","RCLK","LB","RB","A","B","X","Y","LX","LY","RX","RY","LT","RT"],
+	};
+
+	public static var NUM_BUTTONS = 14;
+	public static var NUM_AXES = 6;
 	
+	var ptr(default,null) : GameControllerPtr;
+	public var index : Int;
+	public var name(default,null) : String;
+	public var buttons : haxe.EnumFlags<GameControllerButton>;
+	public var axes : hl.Bytes;
+	var rumbleEnd : Null<Float>;
+	
+	function new(){
+	}
+	
+	public inline function update(){
+		gctrlUpdate(this);
+		if( rumbleEnd != null && haxe.Timer.stamp() > rumbleEnd ){
+			gctrlSetVibration(ptr,0.);
+			rumbleEnd = null;
+		}
+	}
+	
+	public inline function rumble( strength : Float, time_s : Float ){
+		gctrlSetVibration(ptr,strength);
+		rumbleEnd = strength <= 0 ? null : haxe.Timer.stamp() + time_s;
+	}
+
+	public inline function getAxis( i : Int ) {
+		return (i<0 || i>=NUM_AXES) ? 0. : axes.getF64(i*8);
+	}
+
+	public inline function getButtons(){
+		return buttons.toInt();
+	}
+	
+	// 
+
+	static var UID = 0;
+	static var ALL = [];
+
 	public static function init(){
 		var mappings = DInputMapping.parseDefaults();
 		gctrlInit( mappings );
 	}
 	
-	public static function detect( onDetect : GameControllerPtr -> hl.Bytes -> Void ){
-		gctrlDetect(onDetect);
+	public static function detect( onDetect : GameController -> Bool -> Void ){
+		gctrlDetect(function(ptr:GameControllerPtr, name:hl.Bytes){
+			if( name != null ){
+				var d = new GameController();
+				d.ptr = ptr;
+				d.name = @:privateAccess String.fromUTF8(name);
+				d.index = UID++;
+				d.axes = new hl.Bytes(NUM_AXES*8);
+				d.update();
+				ALL.push(d);
+				onDetect(d,true);
+			}else{
+				for( d in ALL ){
+					if( d.ptr == ptr ){
+						ALL.remove(d);
+						onDetect(d,false);
+						break;
+					}
+				}
+			}
+		});
 	}
-
-	
-	public var ptr(default,null) : GameControllerPtr;
-	public var name(default,null) : String;
-	public var buttons : haxe.EnumFlags<GameControllerButton>;
-	public var lx : Float;
-	public var ly : Float;
-	public var rx : Float;
-	public var ry : Float;
-	public var lt : Float;
-	public var rt : Float;
-	
-	public function new( ptr : GameControllerPtr, name : hl.Bytes ){
-		this.ptr = ptr;
-		this.name = @:privateAccess String.fromUTF8(name);
-	}
-	
-	public inline function update(){
-		gctrlUpdate(this);
-	}
-	
-	public inline function setVibration( strength : Float ){
-		gctrlSetVibration(ptr,strength);
-	}
-	
-	// 
 	
 	static function gctrlInit( mappings : hl.NativeArray<DInputMapping> ){}
 	static function gctrlDetect( onDetect : GameControllerPtr -> hl.Bytes -> Void ){}
