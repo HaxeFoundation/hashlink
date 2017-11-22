@@ -54,7 +54,11 @@ GL_IMPORT(glGetQueryObjectui64v, GETQUERYOBJECTUI64V);
 GL_IMPORT(glQueryCounter, QUERYCOUNTER);
 
 #endif
-#ifdef _WIN32
+#if defined(_WIN32) || defined(HL_NX)
 GL_IMPORT(glBlendEquation, BLENDEQUATION);
 GL_IMPORT(glActiveTexture, ACTIVETEXTURE);
+#endif
+
+#if defined(HL_NX)
+GL_IMPORT(glClearDepthf, CLEARDEPTHF);
 #endif
