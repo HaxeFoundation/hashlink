@@ -32,10 +32,12 @@ class Module {
 	var functionRegsCache : Array<Array<{ t : HLType, offset : Int }>>;
 	var align : Align;
 	var reversedHashes : Map<Int,String>;
+	var graphCache : Map<Int, CodeGraph>;
 
 	public function new() {
 		protoCache = new Map();
 		eprotoCache = new Map();
+		graphCache = new Map();
 		functionRegsCache = [];
 	}
 
@@ -268,7 +270,13 @@ class Module {
 		return reversedHashes.get(h);
 	}
 
-	public function buildGraph( fidx : Int ) {
-		return new CodeGraph(code.functions[fidx]);
+	public function getGraph( fidx : Int ) {
+		var g = graphCache.get(fidx);
+		if( g != null )
+			return g;
+		g = new CodeGraph(code.functions[fidx]);
+		graphCache.set(fidx, g);
+		return g;
 	}
+
 }

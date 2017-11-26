@@ -126,6 +126,8 @@ class Eval {
 		var r = module.getFunctionRegs(currentFunIndex)[index];
 		if( r == null )
 			return null;
+		if( !module.getGraph(currentFunIndex).isRegisterWritten(index, currentCodePos) )
+			return { v : VUndef, t : r.t };
 		return readVal(currentEbp.offset(r.offset), r.t);
 	}
 
