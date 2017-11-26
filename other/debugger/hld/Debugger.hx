@@ -85,6 +85,12 @@ class Debugger {
 		return eval.readVal(exc, HDyn);
 	}
 
+	public function getCurrentVars( args : Bool ) {
+		var s = currentStack[currentStackFrame];
+		var g = module.getGraph(s.fidx);
+		return args ? g.getArgs() : g.getLocals(s.fpos);
+	}
+
 	function wait( onStep = false ) : Api.WaitResult {
 		var cmd = null;
 		while( true ) {

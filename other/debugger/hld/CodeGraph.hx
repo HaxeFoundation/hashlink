@@ -11,35 +11,48 @@ private enum Control {
 	CLabel;
 }
 
+typedef LocalAccess = { rid : Int, ?index : Int, t : format.hl.Data.HLType };
+
 class CodeBlock {
 
 	public var start : Int;
-	public var end : Int;
+	public var end : Int; // inclusive
 	public var loop : Bool;
 	public var prev : Array<CodeBlock>;
 	public var next : Array<CodeBlock>;
 
 	public var writtenRegs : Map<Int,Int>;
+	public var writtenVars : Map<String, Array<Int>>;
 
 	public function new(pos) {
 		start = pos;
 		prev = [];
 		next = [];
 		writtenRegs = new Map();
+		writtenVars = new Map();
 	}
 
 }
 
 class CodeGraph {
 
+	var module : format.hl.Data;
 	var fun : format.hl.Data.HLFunction;
 	var blockPos : Map<Int,CodeBlock>;
 	var allBlocks : Map<Int,Bool>;
+	var assigns : Map<Int, Array<String>>;
+	var args : Array<{ hasIndex : Bool, vars : Array<String> }>;
+	var nargs : Int;
 
-	public function new(f) {
+	public function new(md, f) {
+		this.module = md;
 		this.fun = f;
 		blockPos = new Map();
 		allBlocks = new Map();
+		nargs = switch( fun.t ) {
+		case HFun(f): f.args.length;
+		default: throw "assert";
+		};
 		// build graph
 		for( i in 0...f.ops.length )
 			switch( control(i) ) {
@@ -48,36 +61,152 @@ class CodeGraph {
 			default:
 			}
 		makeBlock(0);
+
+		// init assign args (slightly complicated, let's handle complex logic here)
+		args = [];
+		var reg = -1;
+		for( a in fun.assigns ) {
+			if( a.position >= 0 ) break;
+			var vname = module.strings[a.varName];
+			if( a.position == -1 ) {
+				args.push({ hasIndex : false, vars : [vname] });
+				continue;
+			}
+			var r = -a.position - 2;
+			var vars;
+			if( r != reg ) {
+				reg = r;
+				vars = [];
+				args.unshift({ hasIndex : true, vars : vars });
+			} else {
+				vars = args[0].vars;
+			}
+			vars.push(vname);
+		}
+		if( args.length == nargs - 1 )
+			args.unshift({ hasIndex : false, vars : ["this"] });
+		if( args.length != nargs )
+			throw "assert";
+
+		// init assigns
+		assigns = new Map();
+		var reg = -1;
+		var argCount = 0;
+		for( a in fun.assigns ) {
+			if( a.position < 0 ) continue;
+			var vname = module.strings[a.varName];
+			var vl = assigns.get(a.position);
+			if( vl == null ) {
+				vl = [];
+				assigns.set(a.position, vl);
+			}
+			vl.push(vname);
+		}
+
 		// calculate written registers
 		for( b in blockPos )
 			checkWrites(b);
 		// absolutes
-		for( b in blockPos )
-			for( b2 in b.prev ) {
-				for( rid in b2.writtenRegs.keys() ) {
-					var pos = b2.writtenRegs.get(rid);
-					var cur = b.writtenRegs.get(rid);
-					if( cur == null || cur > pos )
-						b.writtenRegs.set(rid, pos);
+		while( true ) {
+			var changed = false;
+			for( b in blockPos )
+				for( b2 in b.prev ) {
+					for( rid in b2.writtenRegs.keys() ) {
+						var pos = b2.writtenRegs.get(rid);
+						var cur = b.writtenRegs.get(rid);
+						if( cur == null || cur > pos ) {
+							b.writtenRegs.set(rid, pos);
+							changed = true;
+						}
+					}
 				}
-			}
+			if( !changed ) break;
+		}
 	}
 
-	public function isRegisterWritten( rid : Int, pos : Int ) {
-		switch( fun.t ) {
-		case HFun(f) if( rid < f.args.length ): return true;
-		default:
-		}
+	function getBlock( pos : Int ) {
 		var bpos = pos;
 		var b;
 		while( (b = blockPos.get(bpos)) == null ) bpos--;
+		return b;
+	}
+
+	public function isRegisterWritten( rid : Int, pos : Int ) {
+		if( rid < nargs )
+			return true;
+		var b = getBlock(pos);
 		var rpos = b.writtenRegs.get(rid);
 		return rpos != null && rpos < pos;
 	}
 
+	public function getArgs() : Array<String> {
+		var arr = [];
+		for( a in args )
+			for( v in a.vars )
+				arr.push(v);
+		return arr;
+	}
+
+	public function getLocals( pos : Int ) : Array<String> {
+		var arr = [];
+		for( a in fun.assigns ) {
+			if( a.position >= pos ) break;
+			if( a.position < 0 ) continue; // arg
+			if( arr.indexOf(a.varName) >= 0 ) continue;
+			arr.push(a.varName);
+		}
+		return [for( a in arr ) module.strings[a]];
+	}
+
+	public function getLocal( name : String, pos : Int ) : LocalAccess {
+		var b = getBlock(pos);
+		var l = lookupLocal(b, name, pos);
+		if( l != null )
+			return l;
+		for( i in 0...args.length ) {
+			var a = args[i];
+			for( k in 0...a.vars.length )
+				if( a.vars[k] == name ) {
+					if( !a.hasIndex )
+						return { rid : i, t : fun.regs[i] };
+					var t = switch( fun.regs[i] ) { case HEnum(e): e.constructs[0].params[k]; default: throw "assert"; };
+					return { rid : i, index : k, t : t };
+				}
+		}
+		return null;
+	}
+
+	function lookupLocal( b : CodeBlock, name : String, pos : Int ) : LocalAccess {
+		var v = b.writtenVars.get(name);
+		if( v != null )
+			for( p in v )
+				if( p < pos ) {
+					var rid = -1;
+					opFx(fun.ops[p], function(_) {}, function(w) rid = w);
+					return { rid : rid, t : fun.regs[rid] };
+				}
+		for( b2 in b.prev )
+			if( b2.start < b.start ) {
+				var l = lookupLocal(b2, name, pos);
+				if( l != null ) return l;
+			}
+		return null;
+	}
+
 	function checkWrites( b : CodeBlock ) {
-		for( i in b.start...b.end )
+		for( i in b.start...b.end+1 ) {
 			opFx(fun.ops[i], function(_) {}, function(rid) if( !b.writtenRegs.exists(rid) ) b.writtenRegs.set(rid, i));
+			var vl = assigns.get(i);
+			if( vl == null ) continue;
+			for( v in vl ) {
+				var wl = b.writtenVars.get(v);
+				if( wl == null ) {
+					wl = [];
+					b.writtenVars.set(v, wl);
+				}
+				wl.push(i);
+			}
+		}
 	}
 
 	function makeBlock( pos : Int ) {

@@ -274,7 +274,7 @@ class Module {
 		var g = graphCache.get(fidx);
 		if( g != null )
 			return g;
-		g = new CodeGraph(code.functions[fidx]);
+		g = new CodeGraph(code, code.functions[fidx]);
 		graphCache.set(fidx, g);
 		return g;
 	}

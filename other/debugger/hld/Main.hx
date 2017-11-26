@@ -191,6 +191,22 @@ class Main {
 				handleResult(dbg.step(Out));
 			case "debug":
 				handleResult(dbg.debugTrace(args.shift() == "step"));
+			case "info":
+				function printVar( name : String ) {
+					var v = dbg.getValue(name);
+					Sys.println(" " + name+" = " + (v == null ? "???" : dbg.eval.valueStr(v) + " : " + v.t.toString()));
+				}
+				switch( args.shift() ) {
+				case "args":
+					for( name in dbg.getCurrentVars(true) )
+						printVar(name);
+				case "locals":
+					for( name in dbg.getCurrentVars(false) )
+						printVar(name);
+				case "variables":
+					for( name in dbg.getCurrentVars(true).concat(dbg.getCurrentVars(false)) )
+						printVar(name);
+				}
 			default:
 				Sys.println("Unknown command " + r);
 			}

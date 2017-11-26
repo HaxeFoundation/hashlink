@@ -34,26 +34,30 @@ class Eval {
 
 		var path = name.split(".");
 		var v;
-
-		// TODO : look in locals
-
-		if( ~/^\$[0-9]+$/.match(path[0]) ) {
-
+		// locals
+		var loc = module.getGraph(funIndex).getLocal(path[0], codePos);
+		if( loc != null ) {
+			path.shift();
+			v = readReg(loc.rid);
+			if( loc.index != null )
+				switch( v.v ) {
+				case VEnum(_, values): v = values[loc.index];
+				case VUndef: v = { v : VUndef, t : loc.t };
+				default: throw "assert";
+				}
+		} else if( ~/^\$[0-9]+$/.match(path[0]) ) {
 			// register
 			v = readReg(Std.parseInt(path.shift().substr(1)));
-			if( v == null )
-				return null;
-
 		} else {
-
 			// global
 			var g = module.resolveGlobal(path);
 			if( g == null )
 				return null;
-
 			v = readVal(jit.globals.offset(g.offset), g.type);
 		}
 
+		if( v == null )
+			return null;
 		for( p in path )
 			v = readField(v, p);
 		return v;
@@ -79,10 +83,10 @@ class Eval {
 		case VFloat(v): "" + v;
 		case VBool(b): b?"true":"false";
 		case VPointer(v): v.toString();
-		case VString(s): "\"" + escape(s) + "\"";
+		case VString(s,_): "\"" + escape(s) + "\"";
 		case VClosure(f, d): funStr(f) + "[" + valueStr(d) + "]";
 		case VFunction(f): funStr(f);
-		case VArray(_, length, read):
+		case VArray(_, length, read, _):
 			if( length <= maxArrLength )
 				[for(i in 0...length) valueStr(read(i))].toString();
 			else {
@@ -90,7 +94,7 @@ class Eval {
 				arr.push("...");
 				arr.toString()+":"+length;
 			}
-		case VMap(_, nkeys, readKey, readValue):
+		case VMap(_, nkeys, readKey, readValue, _):
 			var max = nkeys < maxArrLength ? nkeys : maxArrLength;
 			var content = [for( i in 0...max ) { var k = readKey(i); valueStr(k) + "=>" + valueStr(readValue(i)); }];
 			if( max != nkeys ) {
@@ -177,12 +181,12 @@ class Eval {
 				var bytes = readPointer(p.offset(align.ptr));
 				var length = readI32(p.offset(align.ptr * 2));
 				var str = readUCS2(bytes, length);
-				v = VString(str);
+				v = VString(str, p);
 			case "hl.types.ArrayObj":
 				var length = readI32(p.offset(align.ptr));
 				var nativeArray = readPointer(p.offset(align.ptr * 2));
 				var type = readType(nativeArray.offset(align.ptr));
-				v = VArray(type, length, function(i) return readVal(nativeArray.offset(sizeofVArray + i * align.ptr), type));
+				v = VArray(type, length, function(i) return readVal(nativeArray.offset(sizeofVArray + i * align.ptr), type), p);
 			case "hl.types.ArrayBytes_Int":
 				v = makeArrayBytes(p, HI32);
 			case "hl.types.ArrayBytes_Float":
@@ -238,7 +242,7 @@ class Eval {
 		var length = readI32(p.offset(align.ptr));
 		var bytes = readPointer(p.offset(align.ptr * 2));
 		var size = align.typeSize(t);
-		return VArray(t, length, function(i) return readVal(bytes.offset(i * size), t));
+		return VArray(t, length, function(i) return readVal(bytes.offset(i * size), t), p);
 	}
 
 	public function getFields( v : Value ) : Array<String> {
@@ -277,6 +281,9 @@ class Eval {
 		var ptr = switch( v.v ) {
 		case VUndef, VNull: null;
 		case VPointer(p): p;
+		case VArray(_, _, _, p): p;
+		case VString(_, p): p;
+		case VMap(_, _, _, _, p): p;
 		default:
 			return null;
 		}
