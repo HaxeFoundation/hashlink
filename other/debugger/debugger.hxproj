@@ -24,7 +24,7 @@
     <option noInlineOnDebug="False" />
     <option mainClass="" />
     <option enabledebug="False" />
-    <option additional="-lib format" />
+    <option additional="-lib format&#xA;-lib hscript" />
   </build>
   <!-- haxelib libraries -->
   <haxelib>
@@ -39,7 +39,7 @@
     <hidden path="obj" />
   </hiddenPaths>
   <!-- Executed before build -->
-  <preBuildCommand>haxe -hl debug.hl -main hld.Main -lib format -D old-error-format</preBuildCommand>
+  <preBuildCommand>haxe -hl debug.hl -main hld.Main -lib format -lib hscript -D old-error-format</preBuildCommand>
   <!-- Executed after build -->
   <postBuildCommand alwaysRun="False" />
   <!-- Other project options -->

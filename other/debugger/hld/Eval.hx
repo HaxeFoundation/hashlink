@@ -1,5 +1,6 @@
 package hld;
 import hld.Value;
+import format.hl.Data.HLType;
 
 class Eval {
 
@@ -7,10 +8,14 @@ class Eval {
 	var api : Api;
 	var jit : JitInfo;
 	var module : Module;
-	var currentFunIndex : Int;
-	var currentCodePos : Int;
-	var currentEbp : Pointer;
 	var sizeofVArray : Int;
+	var parser : hscript.Parser;
+
+	var t_string : HLType;
+
+	var funIndex : Int;
+	var codePos : Int;
+	var ebp : Pointer;
 
 	public var maxStringRec : Int = 3;
 	public var maxArrLength : Int = 10;
@@ -22,44 +27,200 @@ class Eval {
 		this.api = api;
 		this.jit = jit;
 		this.align = jit.align;
+		parser = new hscript.Parser();
 		sizeofVArray = align.ptr * 2 + align.typeSize(HI32) * 2;
+		for( t in module.code.types )
+			switch( t ) {
+			case HObj(o):
+				switch( o.name ) {
+				case "String":
+					t_string = t;
+				default:
+				}
+			default:
+			}
 	}
 
-	public function eval( name : String, funIndex : Int, codePos : Int, ebp : Pointer ) {
-		if( name == null || name == "" )
+	public function eval( expr : String, funIndex : Int, codePos : Int, ebp : Pointer ) {
+		if( expr == null || expr == "" )
 			return null;
-		currentFunIndex = funIndex;
-		currentCodePos = codePos;
-		currentEbp = ebp;
+		this.funIndex = funIndex;
+		this.codePos = codePos;
+		this.ebp = ebp;
 
-		var path = name.split(".");
-		var v;
+		var expr = try parser.parseString(expr) catch( e : hscript.Expr.Error ) throw hscript.Printer.errorToString(e);
+		return evalExpr(expr);
+	}
+
+	function evalExpr( e : hscript.Expr ) : Value {
+		switch( e ) {
+		case EConst(c):
+			switch( c ) {
+			case CInt(v):
+				return { v : VInt(v), t : HI32 };
+			case CFloat(f):
+				return { v : VFloat(f), t : HF64 };
+			case CString(s):
+				return { v : VString(s, null), t : t_string };
+			}
+		case EIdent(i):
+			var v = getVar(i);
+			if( v == null )
+				throw "Unknown identifier " + i;
+			return v;
+		case EArray(v, i):
+			var v = evalExpr(v);
+			var i = evalExpr(i);
+			switch( v.v ) {
+			case VArray(t, len, read, _):
+				var i = toInt(i);
+				return i < 0 || i >= len ? defVal(t) : read(i);
+			default:
+			}
+			throw "Can't access " + valueStr(v) + "[" + valueStr(i) + "]";
+		case EArrayDecl(vl):
+			var vl = [for( v in vl ) evalExpr(v)];
+			return { v : VArray(HDyn, vl.length, function(i) return vl[i], null), t : HDyn };
+		case EBinop(op, e1, e2):
+			switch( op ) {
+			case "&&":
+				return { v : VBool(toBool(evalExpr(e1)) && toBool(evalExpr(e2))), t : HBool };
+			case "||":
+				return { v : VBool(toBool(evalExpr(e1)) || toBool(evalExpr(e2))), t : HBool };
+			default:
+				return evalBinop(op, evalExpr(e1), evalExpr(e2));
+			}
+		case EBlock(el):
+			var v = { v : VNull, t : HDyn };
+			for( e in el )
+				v = evalExpr(e);
+			return v;
+		case EField(e, f):
+			var e = e;
+			var path = [f];
+			var v = null;
+			while( true ) {
+				switch( e ) {
+				case EIdent(i):
+					path.unshift(i);
+					v = evalPath(path);
+					break;
+				case EField(e2, f):
+					path.unshift(f);
+					e = e2;
+				default:
+					v = evalExpr(e);
+					break;
+				}
+			}
+			for( f in path )
+				v = readField(v, f);
+			return v;
+		case EIf(econd, e1, e2), ETernary(econd, e1, e2):
+			if( toBool(evalExpr(econd)) )
+				return evalExpr(e1);
+			return e2 == null ? { v : VNull, t : HDyn } : evalExpr(e2);
+		case EParent(e):
+			return evalExpr(e);
+		case EThrow(e):
+			throw valueStr(evalExpr(e));
+		case EUnop(op, prefix, e):
+			return evalUnop(op, prefix, evalExpr(e));
+		case EMeta(_, _, e):
+			return evalExpr(e);
+		case EObject(_), ENew(_), ECall(_), EFor(_), ETry(_), EReturn(_), EBreak, EContinue, EDoWhile(_), EFunction(_), EVar(_), EWhile(_), ESwitch(_):
+			throw "Unsupported expression `" + hscript.Printer.toString(e) + "`";
+		}
+	}
+
+	function evalBinop(op, v1:Value, v2:Value) : Value {
+		switch( op ) {
+		default:
+			throw "Can't eval " + valueStr(v1) + " " + op + " " + valueStr(v2);
+		}
+	}
+
+	function evalUnop(op, prefix:Bool, v:Value) : Value {
+		switch( op ) {
+		default:
+			throw "Can't eval " + (prefix ? op + valueStr(v) : valueStr(v) + op);
+		}
+	}
+
+	function defVal( t : HLType ) {
+		return switch( t ) {
+		case HUi8, HUi16, HI32, HI64: { v : VInt(0), t : t };
+		case HF32, HF64: { v : VFloat(0.), t : t };
+		case HBool: { v : VBool(false), t : t };
+		default: { v : VNull, t : t };
+		}
+	}
+
+	function toInt( v : Value ) {
+		switch( v.v ) {
+		case VNull, VUndef:
+			return 0;
+		case VInt(i):
+			return i;
+		case VFloat(f):
+			return Std.int(f);
+		default:
+			throw "Can't case " + valueStr(v) + " to int";
+		}
+	}
+
+	function toBool( v : Value ) {
+		switch( v.v ) {
+		case VNull, VUndef:
+			return false;
+		case VBool(b):
+			return b;
+		default:
+			throw "Can't case " + valueStr(v) + " to int";
+		}
+	}
+
+	function getVar( name : String ) {
 		// locals
-		var loc = module.getGraph(funIndex).getLocal(path[0], codePos);
+		var loc = module.getGraph(funIndex).getLocal(name, codePos);
 		if( loc != null ) {
-			path.shift();
-			v = readReg(loc.rid);
+			var v = readReg(loc.rid);
 			if( loc.index != null )
 				switch( v.v ) {
 				case VEnum(_, values): v = values[loc.index];
 				case VUndef: v = { v : VUndef, t : loc.t };
 				default: throw "assert";
 				}
-		} else if( ~/^\$[0-9]+$/.match(path[0]) ) {
-			// register
-			v = readReg(Std.parseInt(path.shift().substr(1)));
-		} else {
-			// global
-			var g = module.resolveGlobal(path);
-			if( g == null )
-				return null;
-			v = readVal(jit.globals.offset(g.offset), g.type);
+			return v;
 		}
 
-		if( v == null )
+		// register
+		if( ~/^\$[0-9]+$/.match(name) )
+			return readReg(Std.parseInt(name.substr(1)));
+
+		// global
+		return getGlobal([name]);
+	}
+
+	function evalPath( path : Array<String> ) {
+		var v = getVar(path[0]);
+		if( v != null ) {
+			path.shift();
+			return v;
+		}
+		var g = getGlobal(path);
+		if( g == null )
+			throw "Unknown identifier " + path[0];
+		return g;
+	}
+
+	function getGlobal( path : Array<String> ) {
+		var g = module.resolveGlobal(path);
+		if( g == null )
 			return null;
-		for( p in path )
-			v = readField(v, p);
+		var v = readVal(jit.globals.offset(g.offset), g.type);
+		for( f in path )
+			v = readField(v, f);
 		return v;
 	}
 
@@ -127,12 +288,12 @@ class Eval {
 	}
 
 	function readReg(index) {
-		var r = module.getFunctionRegs(currentFunIndex)[index];
+		var r = module.getFunctionRegs(funIndex)[index];
 		if( r == null )
 			return null;
-		if( !module.getGraph(currentFunIndex).isRegisterWritten(index, currentCodePos) )
+		if( !module.getGraph(funIndex).isRegisterWritten(index, codePos) )
 			return { v : VUndef, t : r.t };
-		return readVal(currentEbp.offset(r.offset), r.t);
+		return readVal(ebp.offset(r.offset), r.t);
 	}
 
 	public function readVal( p : Pointer, t : HLType ) : Value {
@@ -395,8 +556,16 @@ class Eval {
 		case 9:
 			return HDyn;
 		case 10:
-			// HFun
-			throw "TODO";
+			var t = typeFromAddr(p);
+			if( t != null )
+				return t;
+			// vclosure !
+			var tfun = readPointer(p.offset(align.ptr));
+			var tparent = readType(tfun.offset(align.ptr * 3));
+			return switch( tparent ) {
+			case HFun(f): var args = f.args.copy(); args.shift(); HFun({ args : args, ret: f.ret });
+			default: throw "assert";
+			}
 		case 12:
 			return HArray;
 		case 13:
