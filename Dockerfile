@@ -19,13 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+ENV HAXE_STD_PATH=/usr/local/share/haxe/std
 RUN set -ex \
     && mkdir /haxe \
     && cd /haxe \
     && curl -sSL http://hxbuilds.s3-website-us-east-1.amazonaws.com/builds/haxe/linux64/haxe_latest.tar.gz | tar -x -z --strip-components=1 -f - \
     && ln -s /haxe/haxe /haxe/haxelib /usr/local/bin/ \
-    && mkdir -p /usr/local/lib/haxe/ \
-    && ln -s /haxe/std /usr/local/lib/haxe/std \
+    && mkdir -p `dirname "$HAXE_STD_PATH"` \
+    && ln -s /haxe/std "$HAXE_STD_PATH" \
     && cd ..
 
 RUN set -ex \
