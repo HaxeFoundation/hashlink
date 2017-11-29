@@ -23,6 +23,7 @@
 #endif
 
 #if !defined(HL_CONSOLE) && !defined(HL_MESA)
+#define GL_IMPORT(fun, t) PFNGL##t##PROC fun
 #include "GLImports.h"
 #undef GL_IMPORT
 #define GL_IMPORT(fun,t)	fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) return 1
