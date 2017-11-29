@@ -4,6 +4,7 @@
 #include <InitGuid.h>
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
+#include <dbt.h>
 
 #define HAT_CENTERED    0x00
 #define HAT_UP          0x01
@@ -54,6 +55,8 @@ static bool dx_gctrl_syncNeeded = FALSE;
 // DirectInput specific
 static LPDIRECTINPUT8 gctrl_dinput = NULL;
 static varray *gctrl_dinput_mappings = NULL;
+static HWND gctrl_dinput_win = NULL;
+static bool gctrl_dinput_changed = FALSE;
 
 // XInput
 static void gctrl_xinput_add(int uid, dx_gctrl_device **current) {
@@ -100,11 +103,44 @@ static void gctrl_xinput_update(dx_gctrl_data *data) {
 
 // DirectInput
 
+static LRESULT CALLBACK gctrl_WndProc(HWND wnd, UINT umsg, WPARAM wparam, LPARAM lparam) {
+	switch (umsg) {
+	case WM_DEVICECHANGE:
+		switch (wparam) {
+		case DBT_DEVICEARRIVAL:
+		case DBT_DEVICEREMOVECOMPLETE:
+			if (((DEV_BROADCAST_HDR*)lparam)->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
+				gctrl_dinput_changed = TRUE;
+			}
+			break;
+		}
+	}
+	return DefWindowProc(wnd, umsg, wparam, lparam);
+}
+
 static void gctrl_dinput_init( varray *mappings ) {
 	if( !gctrl_dinput) {
-		HINSTANCE instance = GetModuleHandle(NULL);
-		if( instance )
-			DirectInput8Create(instance, DIRECTINPUT_VERSION, &IID_IDirectInput8, &gctrl_dinput, NULL);
+		DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, &IID_IDirectInput8, &gctrl_dinput, NULL);
+		if (gctrl_dinput) {
+			WNDCLASSEX wc;
+			memset(&wc, 0, sizeof(wc));
+			wc.lpfnWndProc = gctrl_WndProc;
+			wc.hInstance = GetModuleHandle(NULL);
+			wc.lpszClassName = USTR("HL_GCTRL");
+			wc.cbSize = sizeof(WNDCLASSEX);
+			RegisterClassEx(&wc);
+
+			gctrl_dinput_win = CreateWindowEx(0, USTR("HL_GCTRL"), NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+
+			GUID guid = { 0x4D1E55B2L, 0xF16F, 0x11CF,{ 0x88, 0xCB, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30 } };
+			DEV_BROADCAST_DEVICEINTERFACE dbh;
+			memset(&dbh, 0, sizeof(dbh));
+			dbh.dbcc_size = sizeof(dbh);
+			dbh.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+			dbh.dbcc_classguid = guid;
+			RegisterDeviceNotification(gctrl_dinput_win, &dbh, DEVICE_NOTIFY_WINDOW_HANDLE);
+			gctrl_dinput_changed = TRUE;
+		}
 	}
 
 	if( mappings ) {
@@ -272,19 +308,31 @@ void gctrl_detect_thread(void *p) {
 		}
 
 		// DInput
-		if (gctrl_dinput)
-			IDirectInput8_EnumDevices(gctrl_dinput, DI8DEVCLASS_GAMECTRL, gctrl_dinput_deviceCb, &current, DIEDFL_ATTACHEDONLY);
+		if (gctrl_dinput ) {
+			if (gctrl_dinput_changed) {
+				IDirectInput8_EnumDevices(gctrl_dinput, DI8DEVCLASS_GAMECTRL, gctrl_dinput_deviceCb, &current, DIEDFL_ATTACHEDONLY);
+				gctrl_dinput_changed = FALSE;
+			} else {
+				while (current) {
+					dx_gctrl_device *next = current->next;
+					if (current->xUID < 0) {
+						current->next = dx_gctrl_devices;
+						dx_gctrl_devices = current;
+					}
+					current = next;
+				}
+			}
+		}
 
 		while (current) {
 			dx_gctrl_device *next = current->next;
 			current->next = dx_gctrl_removed;
 			dx_gctrl_removed = current;
-			current = next;
 			dx_gctrl_syncNeeded = TRUE;
+			current = next;
 		}
 
 		LeaveCriticalSection(&dx_gctrl_cs);
-
 		Sleep(300);
 	}
 }
