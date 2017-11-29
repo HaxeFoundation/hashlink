@@ -50,8 +50,11 @@ GL_IMPORT(glEndQuery, ENDQUERY);
 GL_IMPORT(glGenQueries, GENQUERIES);
 GL_IMPORT(glDeleteQueries, DELETEQUERIES);
 GL_IMPORT(glGetQueryObjectiv, GETQUERYOBJECTIV);
+
+#if !defined(HL_MESA)
 GL_IMPORT(glGetQueryObjectui64v, GETQUERYOBJECTUI64V);
 GL_IMPORT(glQueryCounter, QUERYCOUNTER);
+#endif
 
 #endif
 #if defined(_WIN32) || defined(HL_NX)
