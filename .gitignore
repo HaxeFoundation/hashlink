@@ -41,3 +41,4 @@ ReleaseVS2013
 /libs/bullet/bullet_js.cpp
 /libs/bullet/bullet.js
 *.bc
+/libs/mesa/sample/output.png

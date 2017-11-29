@@ -10,14 +10,19 @@
 #	include <glext.h>
 #elif defined(HL_CONSOLE)
 #	include <graphic/glapi.h>
+#elif defined(HL_MESA)
+# 	include <GLES3/gl3.h>
+#	include <GL/osmesa.h>
+#	define GL_IMPORT(fun, t)
+#	define glBindFragDataLocation(...)
+#	define glGetQueryObjectiv glGetQueryObjectuiv
 #else
 #	include <SDL2/SDL.h>
 #	include <GL/glu.h>
 #	include <GL/glext.h>
 #endif
 
-#ifndef HL_CONSOLE
-#define GL_IMPORT(fun, t) PFNGL##t##PROC fun
+#if !defined(HL_CONSOLE) && !defined(HL_MESA)
 #include "GLImports.h"
 #undef GL_IMPORT
 #define GL_IMPORT(fun,t)	fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) return 1
@@ -543,12 +548,16 @@ HL_PRIM bool HL_NAME(gl_query_result_available)( vdynamic *q ) {
 
 HL_PRIM double HL_NAME(gl_query_result)( vdynamic *q ) {
 	GLuint64 v = -1;
+#	ifndef HL_MESA
 	glGetQueryObjectui64v(q->v.i, GL_QUERY_RESULT, &v);
+#	endif
 	return (double)v;
 }
 
 HL_PRIM void HL_NAME(gl_query_counter)( vdynamic *q, int target ) {
+#	ifndef HL_MESA
 	glQueryCounter(q->v.i, target);
+#	endif
 }
 
 // vertex array
