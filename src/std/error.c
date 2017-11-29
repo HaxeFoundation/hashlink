@@ -168,7 +168,7 @@ HL_PRIM void hl_breakpoint() {
 	hl_debug_break();
 }
 
-#ifdef HL_LINUX
+#ifdef HL_LINUX__
 #include <signal.h>
 static int debugger_present = -1;
 static void _sigtrap_handler(int signum) {
@@ -180,7 +180,7 @@ static void _sigtrap_handler(int signum) {
 HL_PRIM bool hl_detect_debugger() {
 #	if defined(HL_WIN)
 	return (bool)IsDebuggerPresent();
-#	elif defined(HL_LINUX)
+#	elif defined(HL_LINUX__)
 	if( debugger_present == -1 ) {
 		debugger_present = 1;
 		signal(SIGTRAP,_sigtrap_handler);
