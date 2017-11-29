@@ -19,3 +19,5 @@ libmesa:
 
 mesa.hdll:
 	gcc -shared -fPIC -D HL_MESA -I ../sdl -I $(MESA)/include -o mesa.hdll ../sdl/gl.c mesa.c $(MESA_LIBS) -lm -lstdc++ -L /usr/lib/llvm-4.0/lib -lLLVM -ldl -lpthread -lz -lhl
+
+.PHONY: libmesa mesa.hdll
