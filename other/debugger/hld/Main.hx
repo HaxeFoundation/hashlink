@@ -51,15 +51,15 @@ class Main {
 			Sys.stderr().writeString(process.stderr.readAll().toString());
 		}
 
-		var api = new hld.HLDebugApi(pid);
 		var dbg = new hld.Debugger();
 		var breaks = [];
 		dbg.loadModule(sys.io.File.getBytes(file));
 
-		if( !dbg.connect(api, "127.0.0.1", debugPort) ) {
+		if( !dbg.connect("127.0.0.1", debugPort) || !dbg.init(new hld.HLDebugApi(pid, dbg.is64)) ) {
 			dumpProcessOut();
 			error("Failed to access process #" + pid+" on port "+debugPort+" for debugging");
 		}
+
 
 		function frameStr( f : { file : String, line : Int, ebp : Pointer }, ?debug ) {
 			return f.file+":" + f.line + (debug ? " @"+f.ebp.toString():"");

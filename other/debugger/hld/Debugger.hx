@@ -22,6 +22,8 @@ class Debugger {
 
 	var stepBreakData : { ptr : Pointer, old : Int };
 
+	public var is64(get, never) : Bool;
+
 	public var eval : Eval;
 	public var currentStackFrame : Int;
 	public var stackFrameCount(get, never) : Int;
@@ -31,13 +33,16 @@ class Debugger {
 		breakPoints = [];
 	}
 
+	function get_is64() {
+		return jit.is64;
+	}
+
 	public function loadModule( content : haxe.io.Bytes ) {
 		module = new Module();
 		module.load(content);
 	}
 
-	public function connect( api : Api, host : String, port : Int ) {
-		this.api = api;
+	public function connect( host : String, port : Int ) {
 		sock = new sys.net.Socket();
 		try {
 			sock.connect(new sys.net.Host(host), port);
@@ -45,20 +50,21 @@ class Debugger {
 			sock.close();
 			return false;
 		}
-
 		jit = new JitInfo();
 		if( !jit.read(sock.input, module) ) {
 			sock.close();
 			return false;
 		}
 		module.init(jit.align);
-		eval = new Eval(module, api, jit);
+		return true;
+	}
 
+	public function init( api : Api ) {
+		this.api = api;
+		eval = new Eval(module, api, jit);
 		if( !api.start() )
 			return false;
-
 		wait(); // wait first break
-
 		return true;
 	}
 

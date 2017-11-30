@@ -13,14 +13,18 @@ class HLDebugApi implements Api {
 	static function debugFlush( pid : Int, ptr : hl.Bytes, size : Int ) : Bool { return false; }
 	static function debugWait( pid : Int, threadId : hl.Ref<Int>, timeout : Int ) : Int { return 0; }
 	static function debugResume( pid : Int, tid : Int ) : Bool { return false; }
-	static function debugReadRegister( pid : Int, tid : Int, register : Register ) : Pointer { return null; }
-	static function debugWriteRegister( pid : Int, tid : Int, register : Register, v : Pointer ) : Bool { return false; }
+	static function debugReadRegister( pid : Int, tid : Int, register : Register, is64 : Bool ) : Pointer { return null; }
+	static function debugWriteRegister( pid : Int, tid : Int, register : Register, v : Pointer, is64 : Bool ) : Bool { return false; }
 
 	var pid : Int;
 	var tmp : Buffer;
+	var is64 : Bool;
 
-	public function new( pid : Int ) {
+	public function new( pid : Int, is64 : Bool ) {
+		if( is64 && !hl.Api.is64() )
+			throw "You can't debug a 64 bit process from a 32 bit HL";
 		this.pid = pid;
+		this.is64 = is64;
 		tmp = new Buffer(1);
 	}
 
@@ -71,11 +75,11 @@ class HLDebugApi implements Api {
 	}
 
 	public function readRegister( tid : Int, register : Register ) : Pointer {
-		return debugReadRegister(pid, tid, register);
+		return debugReadRegister(pid, tid, register, is64);
 	}
 
 	public function writeRegister( tid : Int, register : Register, v : Pointer ) : Bool {
-		return debugWriteRegister(pid, tid, register, v);
+		return debugWriteRegister(pid, tid, register, v, is64);
 	}
 
 }
