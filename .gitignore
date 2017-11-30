@@ -42,3 +42,7 @@ ReleaseVS2013
 /libs/bullet/bullet.js
 *.bc
 /libs/mesa/sample/output.png
+/other/debugger/debugger.js
+node_modules
+
+/other/debugger/package-lock.json
