@@ -5,8 +5,6 @@ class Sdl {
 
 	static var initDone = false;
 	static var isWin32 = false;
-	static var sentinel : hl.UI.Sentinel;
-	static var dismissErrors = false;
 
 	public static var requiredGLMajor(default,null) = 3;
 	public static var requiredGLMinor(default,null) = 2;
@@ -36,116 +34,25 @@ class Sdl {
 		var flags = new haxe.EnumFlags<hl.UI.DialogFlags>();
 		flags.set(IsError);
 		var msg = 'The application was unable to create an OpenGL context\nfor your $device video card.\nOpenGL $requiredGLMajor.$requiredGLMinor+ is required, please update your driver.';
-		sentinel.pause = true;
 		hl.UI.dialog("OpenGL Error", msg, flags);
 		Sys.exit( -1);
 	}
 
 	static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int ) {}
 
-	static function onTimeout() {
-		throw "Program timeout (infinite loop?)";
-	}
-
-	static function __init__() {
-		hl.Api.setErrorHandler(function(e) reportError(e));
-		sentinel = new hl.UI.Sentinel(30,onTimeout);
-	}
-
 	static function initOnce() return false;
 	static function eventLoop( e : Event ) return false;
 
-	public static var defaultEventHandler : Event -> Bool;
-
-	/**
-		Prevent the program from reporting timeout infinite loop.
-	**/
-	public static function tick() {
-		sentinel.tick();
-	}
-
-	public static function processEvents() {
-		var event = new Event();
+	static var event = new Event();
+	public static function processEvents( onEvent : Event -> Bool ) {
 		while( true ) {
 			if( !eventLoop(event) )
 				break;
-			var ret = defaultEventHandler(event);
+			var ret = onEvent(event);
 			if( event.type == Quit && ret )
 				return false;
 		}
 		return true;
-	}
-
-	public static function loop( callb : Void -> Void, ?onEvent : Event -> Bool ) {
-		var event = new Event();
-		if( onEvent == null ) onEvent = defaultEventHandler;
-		while( true ) {
-			while( true ) {
-				if( !eventLoop(event) )
-					break;
-				var ret = true;
-				if( onEvent != null ) {
-					try {
-						ret = onEvent(event);
-					} catch( e : Dynamic ) {
-						reportError(e);
-					}
-				}
-				if( event.type == Quit && ret )
-				 	return;
-			}
-			try {
-				callb();
-			} catch( e : Dynamic ) {
-				reportError(e);
-			}
-			tick();
-        }
-	}
-
-	public dynamic static function reportError( e : Dynamic ) {
-
-		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
-		var err = try Std.string(e) catch( _ : Dynamic ) "????";
-		Sys.println(err + stack);
-
-		if( dismissErrors )
-			return;
-
-		var wasFS = [];
-		for( w in @:privateAccess Window.windows ) {
-			switch( w.displayMode ) {
-			case Windowed, Borderless:
-			default:
-				wasFS.push({ w : w, mode : w.displayMode });
-				w.displayMode = Windowed;
-			}
-		}
-
-		var f = new hl.UI.WinLog("Uncaught Exception", 500, 400);
-		f.setTextContent(err+"\n"+stack);
-		var but = new hl.UI.Button(f, "Continue");
-		but.onClick = function() {
-			hl.UI.stopLoop();
-		};
-
-		var but = new hl.UI.Button(f, "Dismiss all");
-		but.onClick = function() {
-			dismissErrors = true;
-			hl.UI.stopLoop();
-		};
-
-		var but = new hl.UI.Button(f, "Exit");
-		but.onClick = function() {
-			Sys.exit(0);
-		};
-
-		while( hl.UI.loop(true) != Quit )
-			tick();
-		f.destroy();
-
-		for( w in wasFS )
-			w.w.displayMode = w.mode;
 	}
 
 	public static function quit() {
