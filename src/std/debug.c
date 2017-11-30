@@ -139,31 +139,53 @@ HL_API bool hl_debug_resume( int pid, int thread ) {
 }
 
 #ifdef HL_WIN
-#	ifdef HL_64
-#		define GET_REG(x)	&c->R##x
-#		define REGDATA		DWORD64
-#	else
-#		define GET_REG(x)	&c->E##x
-#		define REGDATA		DWORD
-#	endif
-REGDATA *GetContextReg( CONTEXT *c, int reg ) {
-	switch( reg ) {
-	case 0: return GET_REG(sp);
-	case 1: return GET_REG(bp);
-	case 2: return GET_REG(ip);
-	case 4: return &c->Dr0;
-	case 5: return &c->Dr1;
-	case 6: return &c->Dr2;
-	case 7: return &c->Dr3;
-	case 8: return &c->Dr6;
-	case 9: return &c->Dr7;
-	default: return GET_REG(ax);
+#define DefineGetReg(type,GetFun) \
+	REGDATA *GetFun( type *c, int reg ) { \
+		switch( reg ) { \
+		case 0: return GET_REG(sp); \
+		case 1: return GET_REG(bp); \
+		case 2: return GET_REG(ip); \
+		case 4: return &c->Dr0; \
+		case 5: return &c->Dr1; \
+		case 6: return &c->Dr2; \
+		case 7: return &c->Dr3; \
+		case 8: return &c->Dr6; \
+		case 9: return &c->Dr7; \
+		default: return GET_REG(ax); \
+		} \
 	}
-}
+
+#define GET_REG(x)	&c->E##x
+#define REGDATA		DWORD
+
+#ifdef HL_64
+DefineGetReg(WOW64_CONTEXT,GetContextReg32);
+#	undef GET_REG
+#	undef REGDATA
+#	define GET_REG(x)	&c->R##x
+#	define REGDATA		DWORD64
+#	endif
+
+DefineGetReg(CONTEXT,GetContextReg);
+
 #endif
 
-HL_API void *hl_debug_read_register( int pit, int thread, int reg ) {
+
+HL_API void *hl_debug_read_register( int pit, int thread, int reg, bool is64 ) {
 #	ifdef HL_WIN
+#	ifdef HL_64
+	if( !is64 ) {
+		WOW64_CONTEXT c;
+		c.ContextFlags = CONTEXT_FULL | CONTEXT_DEBUG_REGISTERS;
+		if( !Wow64GetThreadContext(OpenTID(thread),&c) )
+			return NULL;
+		if( reg == 3 )
+			return (void*)(int_val)c.EFlags;
+		return (void*)(int_val)*GetContextReg32(&c,reg);
+	}
+#	else
+	if( is64 ) return NULL;
+#	endif
 	CONTEXT c;
 	c.ContextFlags = CONTEXT_FULL | CONTEXT_DEBUG_REGISTERS;
 	if( !GetThreadContext(OpenTID(thread),&c) )
@@ -176,8 +198,23 @@ HL_API void *hl_debug_read_register( int pit, int thread, int reg ) {
 #	endif
 }
 
-HL_API bool hl_debug_write_register( int pit, int thread, int reg, void *value ) {
+HL_API bool hl_debug_write_register( int pit, int thread, int reg, void *value, bool is64 ) {
 #	ifdef HL_WIN
+#	ifdef HL_64
+	if( !is64 ) {
+		WOW64_CONTEXT c;
+		c.ContextFlags = CONTEXT_FULL | CONTEXT_DEBUG_REGISTERS;
+		if( !Wow64GetThreadContext(OpenTID(thread),&c) )
+			return false;
+		if( reg == 3 )
+			c.EFlags = (int)(int_val)value;
+		else
+			*GetContextReg32(&c,reg) = (DWORD)(int_val)value;
+		return (bool)Wow64SetThreadContext(OpenTID(thread),&c);
+	}
+#	else
+	if( is64 ) return false;
+#	endif
 	CONTEXT c;
 	c.ContextFlags = CONTEXT_FULL | CONTEXT_DEBUG_REGISTERS;
 	if( !GetThreadContext(OpenTID(thread),&c) )
@@ -200,6 +237,6 @@ DEFINE_PRIM(_BOOL, debug_write, _I32 _BYTES _BYTES _I32);
 DEFINE_PRIM(_BOOL, debug_flush, _I32 _BYTES _I32);
 DEFINE_PRIM(_I32, debug_wait, _I32 _REF(_I32) _I32);
 DEFINE_PRIM(_BOOL, debug_resume, _I32 _I32);
-DEFINE_PRIM(_BYTES, debug_read_register, _I32 _I32 _I32);
-DEFINE_PRIM(_BOOL, debug_write_register, _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_BYTES, debug_read_register, _I32 _I32 _I32 _BOOL);
+DEFINE_PRIM(_BOOL, debug_write_register, _I32 _I32 _I32 _BYTES _BOOL);
 
