@@ -65,7 +65,11 @@ HL_PRIM void HL_NAME(ui_init)() {
 }
 
 HL_PRIM int HL_NAME(ui_dialog)( const uchar *title, const uchar *message, int flags ) {
-	return MessageBoxW(NULL,message,title,((flags & 1)?MB_YESNO:MB_OK) | ((flags & 2)?MB_ICONERROR:MB_ICONINFORMATION) ) == IDYES;
+	int ret;
+	hl_blocking(true);
+	ret = MessageBoxW(NULL,message,title,((flags & 1)?MB_YESNO:MB_OK) | ((flags & 2)?MB_ICONERROR:MB_ICONINFORMATION) ) == IDYES;
+	hl_blocking(false);
+	return ret;
 }
 
 static HFONT font = NULL;
