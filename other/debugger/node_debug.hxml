@@ -1,0 +1,6 @@
+-js debugger.js
+-main hld.Main
+-lib format
+-lib hscript
+-lib hxnodejs
+-D old-error-format

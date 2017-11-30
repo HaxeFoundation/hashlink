@@ -80,8 +80,8 @@ class Debugger {
 	}
 
 	function singleStep(tid) {
-		var r = getReg(tid, EFlags);
-		setReg(tid, EFlags, r.or(256));
+		var r = getReg(tid, EFlags).toInt() | 256;
+		setReg(tid, EFlags, hld.Pointer.make(r,0));
 	}
 
 	public function getException() {
@@ -130,9 +130,7 @@ class Debugger {
 						setAsm(codePos, b.oldByte);
 						// move backward
 						setReg(tid, Eip, eip.offset(-1));
-						// set EFLAGS to single step
-						var r = getReg(tid, EFlags);
-						setReg(tid, EFlags, r.or(256));
+						singleStep(tid);
 						nextStep = codePos;
 						break;
 					}

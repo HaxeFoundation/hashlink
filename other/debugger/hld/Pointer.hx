@@ -1,5 +1,6 @@
 package hld;
 
+#if hl
 abstract Pointer(hl.Bytes) to hl.Bytes {
 
 	public inline function new(b) {
@@ -12,14 +13,6 @@ abstract Pointer(hl.Bytes) to hl.Bytes {
 
 	public inline function sub( p : Pointer ) {
 		return this.subtract(p);
-	}
-
-	public inline function or( v : Int ) {
-		return new Pointer(hl.Bytes.fromAddress(this.address() | v));
-	}
-
-	public inline function and( v : Int ) {
-		return new Pointer(hl.Bytes.fromAddress(this.address() & v));
 	}
 
 	public function toInt() {
@@ -42,3 +35,42 @@ abstract Pointer(hl.Bytes) to hl.Bytes {
 	}
 
 }
+#else
+abstract Pointer(haxe.Int64) to haxe.Int64 {
+
+	var i64(get, never) : haxe.Int64;
+
+	public inline function new(b) {
+		this = b;
+	}
+
+	inline function get_i64() return this;
+
+	public inline function offset(pos:Int) : Pointer {
+		return new Pointer(this + pos);
+	}
+
+	public inline function sub( p : Pointer ) : Int {
+		return haxe.Int64.toInt(this - p.i64);
+	}
+
+	public function toInt() {
+		return this.low;
+	}
+
+	public function toString() {
+		if( this.high == 0 )
+			return "0x" + StringTools.hex(this.low);
+		return "0x" + StringTools.hex(this.high) + StringTools.hex(this.low, 8);
+	}
+
+	public static function ofPtr( p : haxe.Int64 ) : Pointer {
+		return cast p;
+	}
+
+	public static function make( low : Int, high : Int ) {
+		return new Pointer(haxe.Int64.make(high, low));
+	}
+
+}
+#end
