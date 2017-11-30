@@ -247,7 +247,9 @@ HL_PRIM void HL_NAME(quit)() {
 }
 
 HL_PRIM void HL_NAME(delay)( int time ) {
+	hl_blocking(true);
 	SDL_Delay(time);
+	hl_blocking(false);
 }
 
 HL_PRIM int HL_NAME(get_screen_width)() {
@@ -264,8 +266,11 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 
 
 HL_PRIM void HL_NAME(message_box)(vbyte *title, vbyte *text, bool error) {
+	hl_blocking(true);
 	SDL_ShowSimpleMessageBox(error ? SDL_MESSAGEBOX_ERROR : 0, (char*)title, (char*)text, NULL);
+	hl_blocking(false);
 }
+
 
 HL_PRIM void HL_NAME(set_vsync)(bool v) {
 	SDL_GL_SetSwapInterval(v ? 1 : 0);
