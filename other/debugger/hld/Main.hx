@@ -1,5 +1,17 @@
 package hld;
 
+#if debug
+@:jsRequire('source-map-support')
+extern class SMS {
+	public static function install() : Void;
+}
+class SMSInstall {
+	static function __init__() : Void {
+		SMS.install();
+	}
+}
+#end
+
 /**
 	Commandline interface - GDB like
 **/

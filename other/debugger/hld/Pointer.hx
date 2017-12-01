@@ -38,7 +38,7 @@ abstract Pointer(hl.Bytes) to hl.Bytes {
 #else
 abstract Pointer(haxe.Int64) to haxe.Int64 {
 
-	var i64(get, never) : haxe.Int64;
+	public var i64(get, never) : haxe.Int64;
 
 	public inline function new(b) {
 		this = b;

@@ -46,7 +46,7 @@
   <options>
     <option showHiddenPaths="False" />
     <option testMovie="Custom" />
-    <option testMovieCommand="node debugger.js" />
+    <option testMovieCommand="runnode.bat" />
   </options>
   <!-- Plugin storage -->
   <storage />
