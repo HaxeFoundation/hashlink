@@ -4,6 +4,7 @@ class System {
 
 	public static var width = 800;
 	public static var height = 600;
+	public static var vsync = true;
 
 	public static var buffer : haxe.io.Bytes = null;
 	public static var ctx : mesa.Context;
@@ -30,6 +31,10 @@ class System {
 			throw "Failed to make Mesa current context";
 		if( !mesa.GL.init() )
 			throw "Failed to init GL API";
+		return true;
+	}
+	
+	public static function emitEvents(_) {
 		return true;
 	}
 
