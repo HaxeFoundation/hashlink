@@ -120,6 +120,36 @@ ui: ${UI} libhl
 uv: ${UV} libhl
 	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
 
+release: release_win release_haxelib
+	
+release_haxelib:
+	make HLIB=directx release_haxelib_package
+	make HLIB=sdl release_haxelib_package
+	make HLIB=openal release_haxelib_package
+
+ifeq ($(HLIB),directx)
+HLPACK=dx
+else
+HLPACK=$(HLIB)
+endif
+	
+release_haxelib_package:
+	rm -rf $(HLIB)_release
+	mkdir $(HLIB)_release
+	(cd libs/$(HLIB) && cp -R $(HLPACK) *.h *.c* haxelib.json ../../$(HLIB)_release | true)
+	zip -r $(HLIB).zip $(HLIB)_release
+	haxelib submit $(HLIB).zip
+	rm -rf $(HLIB)_release	
+	
+release_win:
+	rm -rf hl_release
+	mkdir hl_release
+	(cd ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../hl_release)
+	cp c:/windows/syswow64/msvcr120.dll hl_release
+	mkdir hl_release/include
+	cp src/hl.h src/hlc* hl_release/include
+	zip -r hl_release.zip hl_release
+	rm -rf hl_release
 
 .SUFFIXES : .c .o
 
@@ -132,4 +162,4 @@ clean_o:
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
 
-.PHONY: libhl hl hlc fmt sdl libs
+.PHONY: libhl hl hlc fmt sdl libs release
