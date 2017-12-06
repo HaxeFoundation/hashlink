@@ -516,7 +516,11 @@ class Driver {
 		var out = dxCompileShader(data.toUtf8(), data.length, source.toUtf8(), entryPoint.toUtf8(), target.toUtf8(), flags, isError, size);
 		if( isError )
 			throw String.fromUTF8(out);
+		#if (haxe_ver < 4)
+		throw "Haxe 4.x required";
+		#else
 		return out.toBytes(size);
+		#end
 	}
 
 	public static function disassembleShader( data : haxe.io.Bytes, flags : DisassembleFlags, ?comments : String ) : String {
