@@ -4,7 +4,7 @@
 	"license" : "BSD",
 	"contributors" : ["ncannasse"],
 	"description" : "SDL/GL support for Haxe/HL.",
-	"version" : "1.1.0",
+	"version" : "1.4.0",
 	"releasenote" : "",
 	"dependencies": { "hlopenal" : "" }
 }
