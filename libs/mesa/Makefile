@@ -12,12 +12,14 @@ MESA_LIBS= \
 	$(MESA)/src/mesa/.libs/libmesagallium.a \
 	$(MESA)/src/mapi/shared-glapi/.libs/libglapi.a
 
+LLVM_LIBDIR=`llvm-config --libdir`
+	
 all: libmesa mesa.hdll
 
 libmesa:
 	(cd $(MESA) && ./configure CFLAGS="$(MESA_CFLAGS)" CXXFLAGS="$(MESA_CFLAGS)" $(MESA_CONFIG) && make)
 
 mesa.hdll:
-	gcc -shared -fPIC -D HL_MESA -I ../sdl -I $(MESA)/include -o mesa.hdll ../sdl/gl.c mesa.c $(MESA_LIBS) -lm -lstdc++ -L /usr/lib/llvm-4.0/lib -lLLVM -ldl -lpthread -lz -lhl
+	gcc -shared -fPIC -D HL_MESA -I ../sdl -I $(MESA)/include -o mesa.hdll ../sdl/gl.c mesa.c $(MESA_LIBS) -lm -lstdc++ -L $(LLVM_LIBDIR) -lLLVM -ldl -lpthread -lz -lhl
 
 .PHONY: libmesa mesa.hdll
