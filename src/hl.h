@@ -22,6 +22,11 @@
 #ifndef HL_H
 #define HL_H
 
+/**
+	Detailed documentation can be found here: 
+	https://github.com/HaxeFoundation/hashlink/wiki/
+**/
+
 #define HL_VERSION	0x140
 
 #ifdef _WIN32
