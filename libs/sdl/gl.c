@@ -112,6 +112,10 @@ HL_PRIM void HL_NAME(gl_viewport)( int x, int y, int width, int height ) {
 	glViewport(x, y, width, height);
 }
 
+HL_PRIM void HL_NAME(gl_flush)() {
+	glFlush();
+}
+
 HL_PRIM void HL_NAME(gl_finish)() {
 	GLOG("");
 #	ifdef GL_LOG
@@ -592,6 +596,7 @@ DEFINE_PRIM(_VOID,gl_clear_depth,_F64);
 DEFINE_PRIM(_VOID,gl_clear_stencil,_I32);
 DEFINE_PRIM(_VOID,gl_viewport,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_finish,_NO_ARG);
+DEFINE_PRIM(_VOID,gl_flush,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_pixel_storei,_I32 _I32);
 DEFINE_PRIM(_BYTES,gl_get_string,_I32);
 DEFINE_PRIM(_VOID,gl_enable,_I32);
