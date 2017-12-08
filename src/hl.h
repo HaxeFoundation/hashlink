@@ -184,7 +184,8 @@ typedef wchar_t	uchar;
 #	define utostr(out,size,str) wcstombs(out,str,size)
 #else
 #	include <stdarg.h>
-typedef unsigned short uchar;
+#	include <uchar.h>
+typedef char16_t uchar;
 #	undef USTR
 #	define USTR(str)	u##str
 #endif
