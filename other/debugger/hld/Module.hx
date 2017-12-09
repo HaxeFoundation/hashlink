@@ -254,7 +254,8 @@ class Module {
 		var size = 0;
 		for( i in 0...nargs ) {
 
-			throw "TODO : handle x64 calling conventions";
+			if( align.is64 )
+				throw "TODO : handle x64 calling conventions";
 
 			var t = f.regs[i];
 			regs[i] = { t : t, offset : argsSize + align.ptr * 2 };

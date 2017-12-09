@@ -315,8 +315,11 @@ class Debugger {
 		if( e == null && size > 0 ) {
 			// we are on the first opcode of a C function ?
 			// try again with immediate frame
-			asmPos = mem.getPointer(jit.align.ptr,jit.align).sub(jit.codeStart);
-			e = jit.resolveAsmPos(asmPos);
+			var ptr = mem.getPointer(jit.align.ptr, jit.align);
+			if( ptr > jit.codeStart && ptr < jit.codeEnd ) {
+				asmPos = ptr.sub(jit.codeStart);
+				e = jit.resolveAsmPos(asmPos);
+			}
 		} else {
 			// if we are on ret, our EBP is wrong, so let's ignore this stack part
 			var op = api.readByte(eip, 0);
