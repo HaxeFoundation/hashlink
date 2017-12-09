@@ -6,6 +6,7 @@ package hld;
 	public var Breakpoint = 1;
 	public var SingleStep = 2;
 	public var Error = 3;
+	public var Handled = 4;
 }
 
 @:enum abstract Register(Int) {

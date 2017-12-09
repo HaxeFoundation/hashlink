@@ -29,6 +29,8 @@ class Debugger {
 	public var stackFrameCount(get, never) : Int;
 	public var stoppedThread : Null<Int>;
 
+	public var customTimeout : Null<Float>;
+
 	public function new() {
 		breakPoints = [];
 	}
@@ -79,6 +81,12 @@ class Debugger {
 		return wait();
 	}
 
+	public function pause() {
+		if( !api.breakpoint() )
+			throw "Failed to break process";
+		return wait();
+	}
+
 	function singleStep(tid) {
 		var r = getReg(tid, EFlags).toInt() | 256;
 		setReg(tid, EFlags, hld.Pointer.make(r,0));
@@ -100,12 +108,15 @@ class Debugger {
 	function wait( onStep = false ) : Api.WaitResult {
 		var cmd = null;
 		while( true ) {
-			cmd = api.wait(1000);
+			cmd = api.wait(customTimeout == null ? 1000 : Math.ceil(customTimeout * 1000));
 
 			var tid = cmd.tid;
 			switch( cmd.r ) {
-			case Timeout:
-				// continue
+			case Timeout, Handled:
+
+				if( customTimeout != null )
+					return cmd.r;
+
 			case Breakpoint:
 				var eip = getReg(tid, Eip);
 
@@ -146,7 +157,10 @@ class Debugger {
 				if( onStep )
 					return SingleStep;
 				resume();
-			default:
+			case Error if( cmd.tid != jit.mainThread ):
+				stoppedThread = cmd.tid;
+				resume();
+			case Error, Exit:
 				break;
 			}
 		}
@@ -443,6 +457,25 @@ class Debugger {
 		return set;
 	}
 
+	public function clearBreakpoints( file : String ) {
+		var ffuns = module.getFileFunctions(file);
+		if( ffuns == null )
+			return;
+		for( b in breakPoints.copy() )
+			for( f in ffuns.functions )
+				if( b.fid == f.ifun ) {
+					removeBP(b);
+					break;
+				}
+	}
+
+	function removeBP( bp ) {
+		breakPoints.remove(bp);
+		setAsm(bp.codePos, bp.oldByte);
+		if( nextStep == bp.codePos )
+			nextStep = -1;
+	}
+
 	public function removeBreakpoint( file : String, line : Int ) {
 		var breaks = module.getBreaks(file, line);
 		if( breaks == null )
@@ -452,9 +485,7 @@ class Debugger {
 			for( a in breakPoints )
 				if( a.fid == b.ifun && a.pos == b.pos ) {
 					rem = true;
-					breakPoints.remove(a);
-					setAsm(a.codePos, a.oldByte);
-					if( nextStep == a.codePos ) nextStep = -1;
+					removeBP(a);
 					break;
 				}
 		return rem;

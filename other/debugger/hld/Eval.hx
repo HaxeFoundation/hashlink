@@ -249,11 +249,11 @@ class Eval {
 		case VFunction(f): funStr(f);
 		case VArray(_, length, read, _):
 			if( length <= maxArrLength )
-				[for(i in 0...length) valueStr(read(i))].toString();
+				"["+[for(i in 0...length) valueStr(read(i))].join(", ")+"]";
 			else {
 				var arr = [for(i in 0...maxArrLength) valueStr(read(i))];
 				arr.push("...");
-				arr.toString()+":"+length;
+				"["+arr.join(",")+"]:"+length;
 			}
 		case VMap(_, nkeys, readKey, readValue, _):
 			var max = nkeys < maxArrLength ? nkeys : maxArrLength;
@@ -327,7 +327,7 @@ class Eval {
 	}
 
 	function valueCast( p : Pointer, t : HLType ) {
-		if( p == null )
+		if( p.isNull() )
 			return { v : VNull, t : t };
 		var v = VPointer(p);
 		switch( t ) {

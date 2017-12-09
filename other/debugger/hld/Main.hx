@@ -41,6 +41,7 @@ class Main {
 	}
 
 	function init() {
+		var cmd = "hl";
 		while( args.length > 0 && args[0].charCodeAt(0) == '-'.code ) {
 			var param = args.shift();
 			switch( param ) {
@@ -52,6 +53,8 @@ class Main {
 				param = args.shift();
 				if( param == null || (pid = Std.parseInt(param)) == null )
 					error("Require attach process id value");
+			case "--cmd":
+				cmd = args.shift();
 			default:
 				error("Unsupported parameter " + param);
 			}
@@ -65,7 +68,6 @@ class Main {
 			error(file+" not found");
 
 		if( pid == null ) {
-			var cmd = "hl";
 			var args = ["--debug", "" + debugPort, "--debug-wait", file];
 			#if nodejs
 			process = js.node.ChildProcess.spawn(cmd, args);

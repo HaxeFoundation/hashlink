@@ -142,7 +142,7 @@ class NodeDebugApi implements Api {
 			Exit;
 		default:
 			resume(tid);
-			Timeout;
+			Handled;
 		}
 		return { r : result, tid : tid };
 	}

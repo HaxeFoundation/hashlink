@@ -185,17 +185,25 @@ class Module {
 		return g == globalTable ? null : { type : code.globals[g.gid], offset : globalsOffsets[g.gid] };
 	}
 
-	public function getBreaks( file : String, line : Int ) {
+	public function getFileFunctions( file : String ) {
 		var ifile = fileIndexes.get(file);
 		if( ifile == null )
 			ifile = fileIndexes.get(file.split("\\").join("/").toLowerCase());
-
+		if( ifile == null )
+			return null;
 		var functions = functionsByFile.get(ifile);
-		if( ifile == null || functions == null )
+		if( functions == null )
+			return null;
+		return { functions : functions, fidx : ifile };
+	}
+
+	public function getBreaks( file : String, line : Int ) {
+		var ffuns = getFileFunctions(file);
+		if( ffuns == null )
 			return null;
 
 		var breaks = [];
-		for( f in functions ) {
+		for( f in ffuns.functions ) {
 			if( f.lmin > line || f.lmax < line ) continue;
 			var ifun = f.ifun;
 			var f = f.f;
@@ -203,7 +211,7 @@ class Module {
 			var len = f.debug.length >> 1;
 			while( i < len ) {
 				var dfile = f.debug[i << 1];
-				if( dfile != ifile ) {
+				if( dfile != ffuns.fidx ) {
 					i++;
 					continue;
 				}
@@ -218,7 +226,7 @@ class Module {
 				while( i < len ) {
 					var dfile = f.debug[i << 1];
 					var dline = f.debug[(i << 1) + 1];
-					if( dfile == ifile && dline != line )
+					if( dfile == ffuns.fidx && dline != line )
 						break;
 					i++;
 				}
