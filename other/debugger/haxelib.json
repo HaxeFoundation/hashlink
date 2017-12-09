@@ -1,0 +1,10 @@
+{
+	"name" : "hldebug",
+	"url" : "https://github.com/HaxeFoundation/hashlink/tree/master/other/debugger",
+	"license" : "BSD",
+	"contributors" : ["ncannasse"],
+	"description" : "A Haxe Library for debugging hashlink virtual machine.",
+	"version" : "1.0.0",
+	"dependencies" : { "format" : "", "hxnodejs" : "", "hscript" : "" },
+	"releasenote" : ""
+}
