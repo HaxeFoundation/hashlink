@@ -126,7 +126,7 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 		ContinueDebugEvent(e.dwProcessId, e.dwThreadId, DBG_CONTINUE);
 		break;
 	}
-	return -1;
+	return 4;
 #	else
 	return 0;
 #	endif
