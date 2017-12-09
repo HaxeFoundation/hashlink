@@ -198,7 +198,7 @@ HL_PRIM int hl_bytes_subtract( vbyte *a, vbyte *b ) {
 
 HL_PRIM int hl_bytes_address( vbyte *a, int *high ) {
 #	ifdef HL_64
-	*high = (int)(((size_t)a)>>32);
+	*high = (int)(((uint64)a)>>32);
 #	else
 	*high = 0;
 #	endif
@@ -207,7 +207,11 @@ HL_PRIM int hl_bytes_address( vbyte *a, int *high ) {
 
 HL_PRIM vbyte *hl_bytes_from_address( int low, int high ) {
 #	ifdef HL_64
-	return (vbyte*)(low | (((int_val)high)<<32));
+	// MSVC does overflow on <<32 even on uint64...
+	struct { int low; int high; } i64;
+	i64.low = low;
+	i64.high = high;
+	return *(vbyte**)&i64;
 #	else
 	return (vbyte*)low;
 #	endif
