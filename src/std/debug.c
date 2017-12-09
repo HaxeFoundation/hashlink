@@ -112,8 +112,10 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 	case EXCEPTION_DEBUG_EVENT:
 		switch( e.u.Exception.ExceptionRecord.ExceptionCode ) {
 		case EXCEPTION_BREAKPOINT:
+		case 0x4000001F: // STATUS_WX86_BREAKPOINT
 			return 1;
 		case EXCEPTION_SINGLE_STEP:
+		case 0x4000001E: // STATUS_WX86_SINGLE_STEP
 			return 2;
 		default:
 			return 3;
@@ -171,7 +173,7 @@ DefineGetReg(CONTEXT,GetContextReg);
 #endif
 
 
-HL_API void *hl_debug_read_register( int pit, int thread, int reg, bool is64 ) {
+HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 #	ifdef HL_WIN
 #	ifdef HL_64
 	if( !is64 ) {
@@ -198,7 +200,7 @@ HL_API void *hl_debug_read_register( int pit, int thread, int reg, bool is64 ) {
 #	endif
 }
 
-HL_API bool hl_debug_write_register( int pit, int thread, int reg, void *value, bool is64 ) {
+HL_API bool hl_debug_write_register( int pid, int thread, int reg, void *value, bool is64 ) {
 #	ifdef HL_WIN
 #	ifdef HL_64
 	if( !is64 ) {
