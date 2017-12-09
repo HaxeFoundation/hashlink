@@ -18,6 +18,7 @@ class JitInfo {
 	public var globals : Pointer;
 	public var stackTop : Pointer;
 	public var codeStart : Pointer;
+	public var codeEnd : Pointer;
 	public var debugExc : Pointer;
 	var codeSize : Int;
 	var allTypes : Pointer;
@@ -54,6 +55,7 @@ class JitInfo {
 		stackTop = readPointer();
 		codeStart = readPointer();
 		codeSize = input.readInt32();
+		codeEnd = codeStart.offset(codeSize);
 		allTypes = readPointer();
 		functions = [];
 

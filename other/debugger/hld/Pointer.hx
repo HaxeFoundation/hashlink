@@ -19,6 +19,21 @@ abstract Pointer(hl.Bytes) to hl.Bytes {
 		return this.address().low;
 	}
 
+	inline function addr() {
+		return this.address();
+	}
+
+	public inline function isNull() {
+		return this == null;
+	}
+
+	@:op(a > b) static function opGt( a : Pointer, b : Pointer ) : Bool {
+		return a.addr() > b.addr();
+	}
+	@:op(a < b) static function opLt( a : Pointer, b : Pointer ) : Bool {
+		return a.addr() < b.addr();
+	}
+
 	public function toString() {
 		var i = this.address();
 		if( i.high == 0 )
@@ -56,6 +71,17 @@ abstract Pointer(haxe.Int64) to haxe.Int64 {
 
 	public function toInt() {
 		return this.low;
+	}
+
+	public inline function isNull() {
+		return this == null || (this.low == 0 && this.high == 0);
+	}
+
+	@:op(a > b) static function opGt( a : Pointer, b : Pointer ) : Bool {
+		return a.i64 > b.i64;
+	}
+	@:op(a < b) static function opLt( a : Pointer, b : Pointer ) : Bool {
+		return a.i64 < b.i64;
 	}
 
 	public function toString() {

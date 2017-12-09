@@ -65,15 +65,16 @@ class Main {
 			error(file+" not found");
 
 		if( pid == null ) {
+			var cmd = "hl";
 			var args = ["--debug", "" + debugPort, "--debug-wait", file];
 			#if nodejs
-			process = js.node.ChildProcess.spawn("hl", args);
+			process = js.node.ChildProcess.spawn(cmd, args);
 			process.on("close", function(code) processExitCode = code);
 			process.stdout.on("data", function(data:String) Sys.print(data));
 			process.stderr.on("data", function(data:String) Sys.stderr().writeString(data));
 			pid = process.pid;
 			#else
-			process = new sys.io.Process("hl", args);
+			process = new sys.io.Process(cmd, args);
 			pid = process.getPid();
 			#end
 		}
@@ -255,6 +256,7 @@ class Main {
 
 	static function main() {
 		new Main().init();
+		Sys.exit(0);
 	}
 
 }

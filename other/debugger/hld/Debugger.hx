@@ -86,7 +86,7 @@ class Debugger {
 
 	public function getException() {
 		var exc = @:privateAccess eval.readPointer(jit.debugExc);
-		if( exc == null )
+		if( exc.isNull() )
 			return null;
 		return eval.readVal(exc, HDyn);
 	}
@@ -328,20 +328,36 @@ class Debugger {
 				return stack;
 		}
 
-		if( jit.is64 ) throw "TODO : use int64 calculus";
-
 		// similar to module/module_capture_stack
-		var stackBottom = esp.toInt();
-		var stackTop = jit.stackTop.toInt();
-		for( i in 0...size >> 2 ) {
-			var val = mem.getI32(i << 2);
-			if( val > stackBottom && val < stackTop || (inProlog && i == 0) ) {
-				var codePos = mem.getI32((i + 1) << 2) - jit.codeStart.toInt();
-				var e = jit.resolveAsmPos(codePos);
-				if( e != null && e.fpos >= 0 ) {
-					e.ebp = Pointer.make(val,0);
-					stack.push(e);
-					if( max > 0 && stack.length >= max ) return stack;
+		if( is64 ) {
+			for( i in 0...size >> 3 ) {
+				var val = mem.getPointer(i << 3, jit.align);
+				if( val > esp && val < jit.stackTop || (inProlog && i == 0) ) {
+					var codePtr = mem.getPointer((i + 1) << 3, jit.align);
+					if( codePtr < jit.codeStart || codePtr > jit.codeEnd )
+						continue;
+					var codePos = codePtr.sub(jit.codeStart);
+					var e = jit.resolveAsmPos(codePos);
+					if( e != null && e.fpos >= 0 ) {
+						e.ebp = val;
+						stack.push(e);
+						if( max > 0 && stack.length >= max ) return stack;
+					}
+				}
+			}
+		} else {
+			var stackBottom = esp.toInt();
+			var stackTop = jit.stackTop.toInt();
+			for( i in 0...size >> 2 ) {
+				var val = mem.getI32(i << 2);
+				if( val > stackBottom && val < stackTop || (inProlog && i == 0) ) {
+					var codePos = mem.getI32((i + 1) << 2) - jit.codeStart.toInt();
+					var e = jit.resolveAsmPos(codePos);
+					if( e != null && e.fpos >= 0 ) {
+						e.ebp = Pointer.make(val,0);
+						stack.push(e);
+						if( max > 0 && stack.length >= max ) return stack;
+					}
 				}
 			}
 		}

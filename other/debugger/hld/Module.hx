@@ -242,11 +242,12 @@ class Module {
 		var nargs = switch( f.t ) { case HFun(f): f.args.length; default: throw "assert"; };
 		regs = [];
 
-		if( align.is64 ) throw "TODO : handle x64 calling conventions";
-
 		var argsSize = 0;
 		var size = 0;
 		for( i in 0...nargs ) {
+
+			throw "TODO : handle x64 calling conventions";
+
 			var t = f.regs[i];
 			regs[i] = { t : t, offset : argsSize + align.ptr * 2 };
 			argsSize += align.stackSize(t);

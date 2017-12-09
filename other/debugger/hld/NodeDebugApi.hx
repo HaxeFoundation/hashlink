@@ -7,6 +7,7 @@ class NodeDebugApi implements Api {
 
 	var pid : Int;
 	var tmp : Buffer;
+	var tmpByte : Buffer;
 	var is64 : Bool;
 	var isNode64 : Bool;
 
@@ -27,6 +28,7 @@ class NodeDebugApi implements Api {
 			throw "Can't debug HL 64 bit process with Node 32 bit host";
 
 		tmp = new Buffer(8);
+		tmpByte = new Buffer(4);
 		winApi = NodeFFI.Library("Kernel32.dll", {
 			DebugActiveProcess : FDecl(bool, [int]),
 			DebugActiveProcessStop : FDecl(bool, [int]),
@@ -41,6 +43,15 @@ class NodeDebugApi implements Api {
 			WriteProcessMemory : FDecl(bool, [pointer, pointer, pointer, size_t, pointer]),
 			FlushInstructionCache : FDecl(bool, [pointer, pointer, size_t]),
 		});
+
+		if( isNode64 && !is64 ) {
+			var wow64 = NodeFFI.Library("Kernel32.dll", {
+				Wow64GetThreadContext : FDecl(bool, [pointer, pointer]),
+				Wow64SetThreadContext : FDecl(bool, [pointer, pointer]),
+			});
+			winApi.GetThreadContext = wow64.Wow64GetThreadContext;
+			winApi.SetThreadContext = wow64.Wow64SetThreadContext;
+		}
 
 		phandle = winApi.OpenProcess(0xF0000 | 0x100000 | 0xFFFF, 0, pid);
 
@@ -60,16 +71,13 @@ class NodeDebugApi implements Api {
 			dev.defineProperty('pad' + i, int);
 
 		context = new js.node.Buffer(2048);
-		var flagsPos = isNode64 ? 48 : 0;
+		var flagsPos = is64 ? 0x30 : 0;
 		var flags = 1 | 2 | 8;
-		if( isNode64 )
+		if( is64 )
 			flags |= 0x00100000;
 		context.writeUInt32LE(flags, flagsPos);
 
-		var baseRegs = 8 + 9;
-		inline function R(index) return (baseRegs + index) << 3;
-		regPositions = [R(4), R(5), R(16), 68];
-
+		regPositions = is64 ? [0x98, 0xA0, 0xF8, 0x44] : [0xC4, 0xB4, 0xB8, 0xC0];
 		debugEvent = dev.alloc({});
 	}
 
@@ -96,9 +104,9 @@ class NodeDebugApi implements Api {
 	}
 
 	public function readByte( ptr : Pointer, pos : Int ) : Int {
-		if( !read(ptr.offset(pos), tmp, 1) )
+		if( !read(ptr.offset(pos), tmpByte, 1) )
 			throw "Failed to read process memory";
-		return tmp.getUI8(0);
+		return tmpByte.getUI8(0);
 	}
 
 	public function write( ptr : Pointer, buffer : Buffer, size : Int ) : Bool {
@@ -106,8 +114,8 @@ class NodeDebugApi implements Api {
 	}
 
 	public function writeByte( ptr : Pointer, pos : Int, value : Int ) : Void {
-		tmp.setI32(0, value);
-		if( !write(ptr.offset(pos), tmp, 1) )
+		tmpByte.setI32(0, value);
+		if( !write(ptr.offset(pos), tmpByte, 1) )
 			throw "Failed to write process memory";
 	}
 
@@ -123,9 +131,9 @@ class NodeDebugApi implements Api {
 		var result : WaitResult = switch( e.debugEventCode ) {
 		case 1://EXCEPTION_DEBUG_EVENT
 			switch( e.exceptionCode ) {
-			case 0x80000003: //EXCEPTION_BREAKPOINT
+			case 0x80000003, 0x4000001F: //EXCEPTION_BREAKPOINT
 				Breakpoint;
-			case 0x80000004: //EXCEPTION_SINGLE_STEP
+			case 0x80000004, 0x4000001E: //EXCEPTION_SINGLE_STEP
 				SingleStep;
 			default:
 				Error;
