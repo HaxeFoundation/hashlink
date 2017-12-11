@@ -34,6 +34,9 @@ class System {
 		return true;
 	}
 	
+	@:extern public static inline function beginFrame() {
+	}
+	
 	public static function emitEvents(_) {
 		return true;
 	}
