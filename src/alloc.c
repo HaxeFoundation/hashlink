@@ -1054,6 +1054,20 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	return d;
 }
 
+#ifndef HL_64
+#	define DYN_PAD	0,
+#else
+#	define DYN_PAD
+#endif
+
+static vdynamic vdyn_true = { &hlt_bool, DYN_PAD {true} };
+static vdynamic vdyn_false = { &hlt_bool, DYN_PAD {false} };
+
+vdynamic *hl_alloc_dynbool( bool b ) {
+	return b ? &vdyn_true : &vdyn_false;
+}
+
+
 vdynamic *hl_alloc_obj( hl_type *t ) {
 	vobj *o;
 	int size;
