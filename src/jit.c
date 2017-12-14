@@ -2985,7 +2985,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			register_jump(ctx,jump,(opCount + 1) + o->p1);
 			break;
 		case OToDyn:
-			{
+			if( ra->t->kind == HBOOL ) {
+				int size = begin_native_call(ctx, 1);
+				set_native_arg(ctx, fetch(ra));
+				call_native(ctx, hl_alloc_dynbool, size);
+				store(ctx, dst, PEAX, true);
+			} else {
 				int_val rt = (int_val)ra->t;
 				int jskip = 0;
 				if( hl_is_ptr(ra->t) ) {

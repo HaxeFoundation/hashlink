@@ -24,15 +24,6 @@
 
 #define TK2(a,b)		((a) | ((b)<<5))
 
-#ifndef HL_64
-#	define DYN_PAD	0,
-#else
-#	define DYN_PAD
-#endif
-
-static vdynamic vdyn_true = { &hlt_bool, DYN_PAD {true} };
-static vdynamic vdyn_false = { &hlt_bool, DYN_PAD {false} };
-
 static void invalid_cast( hl_type *from, hl_type *to ) {
 	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(from),hl_type_str(to));
 }
@@ -66,7 +57,7 @@ HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 		v->v.d = *(double*)data;
 		return v;
 	case HBOOL:
-		return *(bool*)data ? &vdyn_true : &vdyn_false;
+		return hl_alloc_dynbool(*(bool*)data);
 	case HBYTES:
 	case HTYPE:
 	case HREF:

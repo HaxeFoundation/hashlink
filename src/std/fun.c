@@ -168,12 +168,17 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 	tret = cl->t->fun->ret;
 	if( !hl_is_ptr(tret) ) {
 		vdynamic *r;
-		if( tret->kind == HVOID )
+		switch( tret->kind ) {
+		case HVOID:
 			return NULL;
-		r = hl_alloc_dynamic(tret);
-		r->t = tret;
-		r->v.d = out.v.d; // copy
-		return r;
+		case HBOOL:
+			return hl_alloc_dynbool(out.v.b);
+		default:
+			r = hl_alloc_dynamic(tret);
+			r->t = tret;
+			r->v.d = out.v.d; // copy
+			return r;
+		}
 	}
 	if( ret == NULL || hl_is_dynamic(tret) )
 		return (vdynamic*)ret;
