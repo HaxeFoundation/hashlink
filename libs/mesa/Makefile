@@ -1,4 +1,6 @@
 MESA_CFLAGS=-fPIC -O3
+CFLAGS = -fPIC -D HL_MESA -I ../sdl -I $(MESA)/include -I ../../src
+LFLAGS = -lm -lstdc++ -L $(LLVM_LIBDIR) -lLLVM -ldl -lpthread -lz -L../.. -lhl
 
 MESA_CONFIG= \
 	--enable-opengl --disable-gles1 --disable-gles2 --disable-egl \
@@ -20,6 +22,6 @@ libmesa:
 	(cd $(MESA) && ./configure CFLAGS="$(MESA_CFLAGS)" CXXFLAGS="$(MESA_CFLAGS)" $(MESA_CONFIG) && make)
 
 mesa.hdll:
-	gcc -shared -fPIC -D HL_MESA -I ../sdl -I $(MESA)/include -o mesa.hdll ../sdl/gl.c mesa.c $(MESA_LIBS) -lm -lstdc++ -L $(LLVM_LIBDIR) -lLLVM -ldl -lpthread -lz -lhl
+	gcc -shared $(CFLAGS) -o ../../mesa.hdll ../sdl/gl.c mesa.c $(MESA_LIBS) $(LFLAGS)
 
 .PHONY: libmesa mesa.hdll
