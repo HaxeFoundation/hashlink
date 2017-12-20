@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hlc.h>
+#include <SDL_main.h>
 
 #ifdef _WIN32
 #	pragma warning(disable:4091)

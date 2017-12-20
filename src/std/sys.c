@@ -74,6 +74,18 @@ typedef uchar pchar;
 #define pstrlen	ustrlen
 #endif
 
+
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#if TARGET_OS_IOS || TARGET_OS_TV
+#include <mobile/hl_mobile.h>
+#endif
+#endif
+
+#if __ANDROID__
+#include <mobile/hl_mobile.h>
+#endif
+
 #ifdef HL_MAC
 #	include <sys/syslimits.h>
 #	include <limits.h>
@@ -113,8 +125,14 @@ HL_PRIM vbyte *hl_sys_string() {
 	return (vbyte*)USTR("Mac");
 #elif defined(HL_CONSOLE)
 	return (vbyte*)sys_platform_name();
+#elif defined(HL_IOS)
+    return (vbyte*)USTR("iOS");
+#elif defined(HL_TVOS)
+    return (vbyte*)USTR("tvOS");
+#elif defined(HL_ANDROID)
+    return (vbyte*)USTR("Android");
 #else
-#error Unknow system string
+#error Unknown system string
 #endif
 }
 
@@ -130,7 +148,11 @@ HL_PRIM vbyte *hl_sys_locale() {
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
+#if __ANDROID__
+	LOG_ANDROID_FMT("%s", hl_to_utf8(msg));
+#else
 	uprintf(USTR("%s"),(uchar*)msg);
+#endif
 	hl_blocking(false);
 }
 
@@ -282,15 +304,24 @@ HL_PRIM int hl_sys_command( vbyte *cmd ) {
 #else
 	int status;
 	hl_blocking(true);
+#if TARGET_OS_IOS || TARGET_OS_TV
+	status = 0;
+	hl_error("hl_sys_command() not available on this platform");
+#else
 	status = system((pchar*)cmd);
+#endif
 	hl_blocking(false);
 	return WEXITSTATUS(status) | (WTERMSIG(status) << 8);
 #endif
 }
 
 HL_PRIM bool hl_sys_exists( vbyte *path ) {
+#if TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+	return hl_mobile_file_exists(path);
+#else
 	pstat st;
 	return stat((pchar*)path,&st) == 0;
+#endif
 }
 
 HL_PRIM bool hl_sys_delete( vbyte *path ) {
@@ -331,7 +362,11 @@ HL_PRIM bool hl_sys_is_dir( vbyte *path ) {
 }
 
 HL_PRIM bool hl_sys_create_dir( vbyte *path, int mode ) {
+#if TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+	return hl_mobile_create_directory(path, mode) == 0;
+#else
 	return mkdir((pchar*)path,mode) == 0;
+#endif
 }
 
 HL_PRIM bool hl_sys_remove_dir( vbyte *path ) {

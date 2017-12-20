@@ -27,6 +27,10 @@
 #	include <sys/syscall.h>
 #endif
 
+#if defined(__APPLE__)
+#	include <TargetConditionals.h>
+#endif
+
 HL_PRIM hl_thread *hl_thread_current() {
 #	ifdef HL_WIN
 	return (hl_thread*)(int_val)GetCurrentThreadId();
@@ -39,7 +43,7 @@ HL_PRIM int hl_thread_id() {
 #	ifdef HL_WIN
 	return (int)GetCurrentThreadId();
 #	else
-#	ifdef SYS_gettid
+#	if defined(SYS_gettid) && !TARGET_OS_TV
 	return syscall(SYS_gettid);
 #	else
 	hl_error("hl_thread_id() not available for this platform");

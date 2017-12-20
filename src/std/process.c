@@ -28,7 +28,7 @@
 #	include <unistd.h>
 #	include <errno.h>
 #	if !defined(HL_MAC)
-#		if defined(HL_BSD)
+#		if defined(HL_BSD) || defined (HL_IOS) || defined (HL_TVOS)
 #			include <sys/wait.h>
 #		else
 #			include <wait.h>
@@ -136,8 +136,13 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 	if( pipe(input) || pipe(output) || pipe(error) )
 		return NULL;
 	p = (vprocess*)hl_gc_alloc_finalizer(sizeof(vprocess));
+#if TARGET_OS_TV
+	hl_error("hl_process_run() not available for this platform");
+	p->pid = -1;
+#else
 	p->pid = fork();
-	if( p->pid == -1 ) {
+#endif
+    if( p->pid == -1 ) {
 		close(input[0]);
 		close(input[1]);
 		close(output[0]);
@@ -154,7 +159,11 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 		dup2(input[0],0);
 		dup2(output[1],1);
 		dup2(error[1],2);
+#if TARGET_OS_TV
+		hl_error("hl_process_run() not available for this platform");
+#else
 		execvp(argv[0],argv);
+#endif
 		fprintf(stderr,"Command not found : %s\n",cmd);
 		exit(1);
 	}
@@ -273,6 +282,8 @@ HL_PRIM void hl_process_close( vprocess *p ) {
 HL_PRIM void hl_process_kill( vprocess *p ) {
 #	ifdef HL_WIN
 	TerminateProcess(p->pinf.hProcess,0xCDCDCDCD);
+#   elif defined(HL_IOS) || defined(HL_TVOS)
+    hl_error("hl_process_kill() not available on this platform");
 #	else
 	kill(p->pid,9);
 #	endif

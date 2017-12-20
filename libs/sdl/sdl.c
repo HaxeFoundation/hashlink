@@ -7,6 +7,7 @@
 #	include <SDL_syswm.h>
 #else
 #	include <SDL2/SDL.h>
+#	include <SDL2/SDL_syswm.h>
 #endif
 
 #ifndef SDL_MAJOR_VERSION
@@ -27,6 +28,9 @@ typedef enum {
 	MouseLeave,
 	MouseDown,
 	MouseUp,
+	TouchUp,
+	TouchDown,
+	TouchMove,
 	MouseWheel,
 	WindowState,
 	KeyDown,
@@ -142,6 +146,21 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->mouseX = e.button.x;
 			event->mouseY = e.motion.y;
 			break;
+		case SDL_FINGERDOWN:
+            event->type = TouchDown;
+            event->mouseX = e.tfinger.x;
+            event->mouseY = e.tfinger.y;
+            break;
+        case SDL_FINGERMOTION:
+            event->type = TouchMove;
+            event->mouseX = e.tfinger.x;
+            event->mouseY = e.tfinger.y;
+            break;
+        case SDL_FINGERUP:
+            event->type = TouchUp;
+            event->mouseX = e.tfinger.x;
+            event->mouseY = e.tfinger.y;
+            break;
 		case SDL_MOUSEWHEEL:
 			event->type = MouseWheel;
 			event->wheelDelta = e.wheel.y;
@@ -427,6 +446,14 @@ HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
 
 
 HL_PRIM void HL_NAME(win_swap_window)(SDL_Window *win) {
+#if TARGET_OS_IOS || TARGET_OS_TV
+	SDL_SysWMinfo info;
+	SDL_VERSION(&info.version);
+	SDL_GetWindowWMInfo(win, &info);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, info.info.uikit.framebuffer);
+	glBindRenderbuffer(GL_RENDERBUFFER,info.info.uikit.colorbuffer);
+#endif
 	SDL_GL_SwapWindow(win);
 }
 
