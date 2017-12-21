@@ -10,6 +10,14 @@
 #	include <SDL2/SDL_syswm.h>
 #endif
 
+#if defined(__APPLE__)
+#    include <TargetConditionals.h>
+#    if TARGET_OS_IOS || TARGET_OS_TV
+#       include <OpenGLES/ES3/gl.h>
+#       include <OpenGLES/ES3/glext.h>
+#   endif
+#endif
+
 #ifndef SDL_MAJOR_VERSION
 #	error "SDL2 SDK not found in hl/include/sdl/"
 #endif
@@ -28,9 +36,6 @@ typedef enum {
 	MouseLeave,
 	MouseDown,
 	MouseUp,
-	TouchUp,
-	TouchDown,
-	TouchMove,
 	MouseWheel,
 	WindowState,
 	KeyDown,
@@ -40,7 +45,10 @@ typedef enum {
 	GControllerRemoved,
 	GControllerDown,
 	GControllerUp,
-	GControllerAxis
+	GControllerAxis,
+	TouchDown = 200,
+	TouchUp,
+	TouchMove,
 } event_type;
 
 typedef enum {
@@ -71,6 +79,7 @@ typedef struct {
 	bool keyRepeat;
 	int controller;
 	int value;
+	int fingerId;
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
@@ -84,9 +93,15 @@ HL_PRIM bool HL_NAME(init_once)() {
 	timeBeginPeriod(1);
 #	endif
 	// default GL parameters
+#if TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#endif
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
@@ -146,21 +161,24 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->mouseX = e.button.x;
 			event->mouseY = e.motion.y;
 			break;
-		case SDL_FINGERDOWN:
-            event->type = TouchDown;
-            event->mouseX = e.tfinger.x;
-            event->mouseY = e.tfinger.y;
-            break;
-        case SDL_FINGERMOTION:
-            event->type = TouchMove;
-            event->mouseX = e.tfinger.x;
-            event->mouseY = e.tfinger.y;
-            break;
-        case SDL_FINGERUP:
-            event->type = TouchUp;
-            event->mouseX = e.tfinger.x;
-            event->mouseY = e.tfinger.y;
-            break;
+			case SDL_FINGERDOWN:
+				event->type = TouchDown;
+				event->mouseX = e.tfinger.x*100;
+				event->mouseY = e.tfinger.y*100;
+				event->fingerId = e.tfinger.fingerId;
+				break;
+			case SDL_FINGERMOTION:
+				event->type = TouchMove;
+				event->mouseX = e.tfinger.x*100;
+				event->mouseY = e.tfinger.y*100;
+				event->fingerId = e.tfinger.fingerId;
+				break;
+			case SDL_FINGERUP:
+				event->type = TouchUp;
+				event->mouseX = e.tfinger.x*100;
+				event->mouseY = e.tfinger.y*100;
+				event->fingerId = e.tfinger.fingerId;
+				break;
 		case SDL_MOUSEWHEEL:
 			event->type = MouseWheel;
 			event->wheelDelta = e.wheel.y;
@@ -344,7 +362,14 @@ DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 
 HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
 	SDL_Window *w;
+	// force window to match device resolution on mobile
+#if	TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+	SDL_DisplayMode displayMode;
+	SDL_GetDesktopDisplayMode(0, &displayMode);
+	w = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS);
+#else
 	w = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+#endif
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
 	if( (SDL_GetWindowFlags(w) & SDL_WINDOW_INPUT_FOCUS) == 0 ) {
@@ -356,7 +381,11 @@ HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
 }
 
 HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {
-	return SDL_GL_CreateContext(win);
+	SDL_GLContext ctx = SDL_GL_GetCurrentContext();
+	if (ctx==NULL)
+		ctx = SDL_GL_CreateContext(win);
+	int result = SDL_GL_MakeCurrent(win ,ctx);
+	return ctx;
 }
 
 HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
