@@ -93,7 +93,7 @@ HL_PRIM bool HL_NAME(init_once)() {
 	timeBeginPeriod(1);
 #	endif
 	// default GL parameters
-#if TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+#if TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
@@ -363,7 +363,7 @@ DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
 	SDL_Window *w;
 	// force window to match device resolution on mobile
-#if	TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+#if	TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
 	SDL_DisplayMode displayMode;
 	SDL_GetDesktopDisplayMode(0, &displayMode);
 	w = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS);
@@ -475,7 +475,7 @@ HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
 
 
 HL_PRIM void HL_NAME(win_swap_window)(SDL_Window *win) {
-#if TARGET_OS_IOS || TARGET_OS_TV
+#if TARGET_OS_IOS || TARGET_OS_TV
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
 	SDL_GetWindowWMInfo(win, &info);

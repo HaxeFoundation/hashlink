@@ -195,7 +195,7 @@ typedef wchar_t	uchar;
 #	define utostr(out,size,str) wcstombs(out,str,size)
 #else
 #	include <stdarg.h>
-#if defined(HL_IOS) || defined(HL_TVOS)
+#if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_MAC)
 #include <stddef.h>
 #include <stdint.h>
 typedef uint16_t char16_t;
