@@ -7,7 +7,6 @@
 #	include <SDL_syswm.h>
 #else
 #	include <SDL2/SDL.h>
-#	include <SDL2/SDL_syswm.h>
 #endif
 
 #if defined(__APPLE__)
@@ -15,6 +14,7 @@
 #    if TARGET_OS_IOS || TARGET_OS_TV
 #       include <OpenGLES/ES3/gl.h>
 #       include <OpenGLES/ES3/glext.h>
+#	include <SDL2/SDL_syswm.h>
 #   endif
 #endif
 
