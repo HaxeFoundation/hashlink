@@ -29,7 +29,7 @@
 #	define fopen(name,mode) _wfopen(name,mode)
 #	define HL_UFOPEN
 #endif
-#if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_ANDROID)
+#if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_ANDROID)
 #include <mobile/hl_mobile.h>
 #endif
 
@@ -47,7 +47,7 @@ HL_PRIM hl_fdesc *hl_file_open( vbyte *name, int mode, bool binary ) {
 #	ifdef HL_UFOPEN
 	static const uchar *MODES[] = { USTR("r"), USTR("w"), USTR("a"), NULL, USTR("rb"), USTR("wb"), USTR("ab") };
 	FILE *f = fopen((uchar*)name,MODES[mode|(binary?4:0)]);
-#   elif defined(HL_IOS) || defined(HL_TVOS) || defined(HL_ANDROID)
+#   elif defined(HL_IOS) || defined(HL_TVOS) || defined(HL_ANDROID)
     static const char *MODES[] = { "r", "w", "a", NULL, "rb", "wb", "ab" };
     int m = mode | (binary?4:0);
     FILE *f = NULL;
@@ -157,7 +157,7 @@ HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
 	vbyte *content;
 #	ifdef HL_UFOPEN
 	FILE *f = fopen((uchar*)name,USTR("rb"));
-#   elif defined(HL_IOS) || defined(HL_TVOS) || defined(HL_ANDROID)
+#   elif defined(HL_IOS) || defined(HL_TVOS) || defined(HL_ANDROID)
     FILE *f = fopen((char*)hl_mobile_get_document_path(name),"rb");
 #	else
 	FILE *f = fopen((char*)name,"rb");
