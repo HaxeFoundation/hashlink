@@ -184,7 +184,7 @@ HL_PRIM int hl_host_resolve( vbyte *host ) {
 	ip = inet_addr((char*)host);
 	if( ip == INADDR_NONE ) {
 		struct hostent *h;
-#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS) || defined (HL_CYGWIN) || defined(HL_CONSOLE)
+#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS) || defined (HL_CYGWIN) || defined(HL_CONSOLE)
 		h = gethostbyname((char*)host);
 #	else
 		struct hostent hbase;
