@@ -23,6 +23,10 @@
 #	define GL_IMPORT(fun, t)
 #	define glBindFragDataLocation(...)
 #	define glGetQueryObjectiv glGetQueryObjectuiv
+#elif defined(HL_ANDROID)
+#	include <SDL.h>
+#	include <GLES3/gl3.h>
+#	include <GLES3/gl3ext.h>
 #else
 #	include <SDL2/SDL.h>
 #	include <GL/glu.h>

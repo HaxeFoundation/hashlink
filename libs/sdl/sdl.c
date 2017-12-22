@@ -2,7 +2,7 @@
 
 #include <hl.h>
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__ANDROID__)
 #	include <SDL.h>
 #	include <SDL_syswm.h>
 #else
