@@ -74,15 +74,7 @@ typedef uchar pchar;
 #define pstrlen	ustrlen
 #endif
 
-
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#if TARGET_OS_IOS || TARGET_OS_TV
-#include <mobile/hl_mobile.h>
-#endif
-#endif
-
-#if __ANDROID__
+#ifdef HL_MOBILE
 #include <mobile/hl_mobile.h>
 #endif
 
@@ -304,7 +296,7 @@ HL_PRIM int hl_sys_command( vbyte *cmd ) {
 #else
 	int status;
 	hl_blocking(true);
-#if TARGET_OS_IOS || TARGET_OS_TV
+#if defined(HL_IOS) || defined(HL_TVOS)
 	status = 0;
 	hl_error("hl_sys_command() not available on this platform");
 #else
@@ -316,7 +308,7 @@ HL_PRIM int hl_sys_command( vbyte *cmd ) {
 }
 
 HL_PRIM bool hl_sys_exists( vbyte *path ) {
-#if TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+#ifdef HL_MOBILE
 	return hl_mobile_file_exists(path);
 #else
 	pstat st;
@@ -362,7 +354,7 @@ HL_PRIM bool hl_sys_is_dir( vbyte *path ) {
 }
 
 HL_PRIM bool hl_sys_create_dir( vbyte *path, int mode ) {
-#if TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+#ifdef HL_MOBILE
 	return hl_mobile_create_directory(path, mode) == 0;
 #else
 	return mkdir((pchar*)path,mode) == 0;

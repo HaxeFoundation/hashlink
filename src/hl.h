@@ -50,7 +50,11 @@
 #endif
 
 #ifdef __ANDROID__
-#define HL_ANDROID
+#	define HL_ANDROID
+#endif
+
+#if defined(HL_IOS) || defined(HL_ANDROID) || defined(HL_TVOS)
+#	define HL_MOBILE
 #endif
 
 #ifdef __ORBIS__

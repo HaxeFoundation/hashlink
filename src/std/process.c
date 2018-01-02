@@ -136,7 +136,7 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 	if( pipe(input) || pipe(output) || pipe(error) )
 		return NULL;
 	p = (vprocess*)hl_gc_alloc_finalizer(sizeof(vprocess));
-#if TARGET_OS_TV
+#ifdef HL_TVOS
 	hl_error("hl_process_run() not available for this platform");
 	p->pid = -1;
 #else
@@ -159,7 +159,7 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 		dup2(input[0],0);
 		dup2(output[1],1);
 		dup2(error[1],2);
-#if TARGET_OS_TV
+#ifdef HL_TVOS
 		hl_error("hl_process_run() not available for this platform");
 #else
 		execvp(argv[0],argv);

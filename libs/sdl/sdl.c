@@ -9,13 +9,10 @@
 #	include <SDL2/SDL.h>
 #endif
 
-#if defined(__APPLE__)
-#    include <TargetConditionals.h>
-#    if TARGET_OS_IOS || TARGET_OS_TV
-#       include <OpenGLES/ES3/gl.h>
-#       include <OpenGLES/ES3/glext.h>
+#if defined (HL_IOS) || defined(HL_TVOS)
+#	include <OpenGLES/ES3/gl.h>
+#	include <OpenGLES/ES3/glext.h>
 #	include <SDL2/SDL_syswm.h>
-#   endif
 #endif
 
 #ifndef SDL_MAJOR_VERSION
@@ -93,7 +90,7 @@ HL_PRIM bool HL_NAME(init_once)() {
 	timeBeginPeriod(1);
 #	endif
 	// default GL parameters
-#if TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+#ifdef HL_MOBILE
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
@@ -161,24 +158,24 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->mouseX = e.button.x;
 			event->mouseY = e.motion.y;
 			break;
-			case SDL_FINGERDOWN:
-				event->type = TouchDown;
-				event->mouseX = e.tfinger.x*100;
-				event->mouseY = e.tfinger.y*100;
-				event->fingerId = e.tfinger.fingerId;
-				break;
-			case SDL_FINGERMOTION:
-				event->type = TouchMove;
-				event->mouseX = e.tfinger.x*100;
-				event->mouseY = e.tfinger.y*100;
-				event->fingerId = e.tfinger.fingerId;
-				break;
-			case SDL_FINGERUP:
-				event->type = TouchUp;
-				event->mouseX = e.tfinger.x*100;
-				event->mouseY = e.tfinger.y*100;
-				event->fingerId = e.tfinger.fingerId;
-				break;
+		case SDL_FINGERDOWN:
+			event->type = TouchDown;
+			event->mouseX = e.tfinger.x*100;
+			event->mouseY = e.tfinger.y*100;
+			event->fingerId = e.tfinger.fingerId;
+			break;
+		case SDL_FINGERMOTION:
+			event->type = TouchMove;
+			event->mouseX = e.tfinger.x*100;
+			event->mouseY = e.tfinger.y*100;
+			event->fingerId = e.tfinger.fingerId;
+			break;
+		case SDL_FINGERUP:
+			event->type = TouchUp;
+			event->mouseX = e.tfinger.x*100;
+			event->mouseY = e.tfinger.y*100;
+			event->fingerId = e.tfinger.fingerId;
+			break;
 		case SDL_MOUSEWHEEL:
 			event->type = MouseWheel;
 			event->wheelDelta = e.wheel.y;
@@ -363,7 +360,7 @@ DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
 	SDL_Window *w;
 	// force window to match device resolution on mobile
-#if	TARGET_OS_IOS || TARGET_OS_TV || __ANDROID__
+#ifdef	HL_MOBILE
 	SDL_DisplayMode displayMode;
 	SDL_GetDesktopDisplayMode(0, &displayMode);
 	w = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS);
@@ -475,7 +472,7 @@ HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
 
 
 HL_PRIM void HL_NAME(win_swap_window)(SDL_Window *win) {
-#if TARGET_OS_IOS || TARGET_OS_TV
+#if defined(HL_IOS) || defined(HL_TVOS)
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
 	SDL_GetWindowWMInfo(win, &info);

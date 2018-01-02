@@ -1,16 +1,16 @@
 #define HL_NAME(n) sdl_##n
 #include <hl.h>
 
-#if defined(__APPLE__)
-#	include <TargetConditionals.h>
-#	if TARGET_OS_IOS || TARGET_OS_TV
-#		include <SDL2/SDL.h>
-#		include <SDL2/SDL_syswm.h>
-#		include <OpenGLES/ES3/gl.h>
-#	elif TARGET_OS_OSX
-#		include <SDL2/SDL.h>
-#		include <OpenGL/gl3.h>
-#	endif
+#if defined(HL_IOS) || defined (HL_TVOS)
+#	include <SDL2/SDL.h>
+#	include <SDL2/SDL_syswm.h>
+#	include <OpenGLES/ES3/gl.h>
+#	define glBindFragDataLocation(...)
+#	define glGetQueryObjectiv glGetQueryObjectuiv
+#	define glClearDepth glClearDepthf
+#elif defined(HL_MAC)
+#	include <SDL2/SDL.h>
+#	include <OpenGL/gl3.h>
 #elif defined(_WIN32)
 #	include <SDL.h>
 #	include <GL/GLU.h>
@@ -392,7 +392,7 @@ HL_PRIM vdynamic *HL_NAME(gl_create_framebuffer)() {
 
 HL_PRIM void HL_NAME(gl_bind_framebuffer)( int target, vdynamic *f ) {
 	GLOG("%d,%d",target,ZIDX(f));
-#if	TARGET_OS_IOS || TARGET_OS_TV
+#if	defined(HL_IOS) || defined(HL_TVOS)
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
 	SDL_GetWindowWMInfo(SDL_GL_GetCurrentWindow(), &info);
@@ -439,7 +439,7 @@ HL_PRIM vdynamic *HL_NAME(gl_create_renderbuffer)() {
 
 HL_PRIM void HL_NAME(gl_bind_renderbuffer)( int target, vdynamic *r ) {
 	GLOG("%d,%d",target,ZIDX(r));
-#if	TARGET_OS_IOS || TARGET_OS_TV
+#if	defined(HL_IOS) || defined(HL_TVOS)
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
 	SDL_GetWindowWMInfo(SDL_GL_GetCurrentWindow(), &info);
@@ -578,14 +578,14 @@ HL_PRIM bool HL_NAME(gl_query_result_available)( vdynamic *q ) {
 
 HL_PRIM double HL_NAME(gl_query_result)( vdynamic *q ) {
 	GLuint64 v = -1;
-#	ifndef HL_MESA
+#	if !defined(HL_MESA) && !defined(HL_MOBILE)
 	glGetQueryObjectui64v(q->v.i, GL_QUERY_RESULT, &v);
 #	endif
 	return (double)v;
 }
 
 HL_PRIM void HL_NAME(gl_query_counter)( vdynamic *q, int target ) {
-#	ifndef HL_MESA
+#	if !defined(HL_MESA) && !defined(HL_MOBILE)
 	glQueryCounter(q->v.i, target);
 #	endif
 }
