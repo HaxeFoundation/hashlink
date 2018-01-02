@@ -6,7 +6,7 @@ linux32_install: &linux32_install
 linux64_install: &linux64_install
   - docker build -f Dockerfile -t hashlink .
 
-docker_make_script: &docker_cmake_script
+docker_cmake_script: &docker_cmake_script
   - >
     docker run hashlink bash -c
     'set -ex &&
@@ -19,12 +19,12 @@ docker_make_script: &docker_cmake_script
     make test ARGS=-V'
 
 
-docker_cmake_script: &docker_make_script
+docker_make_script: &docker_make_script
   - >
     docker run hashlink bash -c
     'set -ex &&
     make all &&
-    make install_lib &&
+    make install &&
     ldconfig &&
     (if [ "$ARCH" = "32" ]; then
       haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
@@ -41,7 +41,7 @@ mac_before_install: &mac_before_install
 
 make_install: &make_install
   - make all
-  - sudo make install_lib
+  - sudo make install
 
 cmake_install: &cmake_install
   - cmake .
