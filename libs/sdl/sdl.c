@@ -472,7 +472,7 @@ HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
 
 
 HL_PRIM void HL_NAME(win_swap_window)(SDL_Window *win) {
-#if defined(HL_IOS) || defined(HL_TVOS)
+#if defined(HL_IOS) || defined(HL_TVOS)
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
 	SDL_GetWindowWMInfo(win, &info);
