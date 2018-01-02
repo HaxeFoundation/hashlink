@@ -26,10 +26,8 @@ docker_make_script: &docker_make_script
     make all &&
     make install &&
     ldconfig &&
-    (if [ "$ARCH" = "32" ]; then
-      haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
-      ./hl hello.hl;
-    fi) &&
+    haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp &&
+    ./hl hello.hl &&
     haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
     make hlc &&
     ./hlc'
