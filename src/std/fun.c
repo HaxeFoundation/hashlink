@@ -360,3 +360,32 @@ DEFINE_PRIM(_DYN, get_closure_value, _DYN);
 DEFINE_PRIM(_BOOL, fun_compare, _DYN _DYN);
 DEFINE_PRIM(_DYN, make_var_args, _FUN(_DYN,_ARR));
 DEFINE_PRIM(_DYN, call_method, _DYN _ARR);
+
+
+#ifdef HL_VCC
+static int throw_handler( int code ) {
+	switch( code ) {
+	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
+	case EXCEPTION_STACK_OVERFLOW: hl_error("Stack overflow");
+	default: hl_error("Unknown runtime error");
+	}
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
+
+HL_PRIM vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool *isException ) {
+	hl_trap_ctx trap;
+	vdynamic *exc;
+	*isException = false;
+	hl_trap(trap, exc, on_exception);
+#	ifdef HL_VCC
+	__try {
+#	endif
+		return hl_dyn_call(c,args,nargs);
+#	ifdef HL_VCC
+	} __except( throw_handler(GetExceptionCode()) ) {}
+#	endif
+on_exception:
+	*isException = true;
+	return exc;
+}

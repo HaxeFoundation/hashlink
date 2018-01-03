@@ -48,8 +48,29 @@ HL_PRIM int hl_thread_id() {
 #	endif
 }
 
+typedef struct {
+	void (*callb)( void *);
+	void *param;
+} thread_start;
+
+static void gc_thread_entry( thread_start *_s ) {
+	thread_start s = *_s;
+	hl_register_thread(&s);
+	free(_s);
+	hl_remove_root(&_s->param);
+	s.callb(s.param);
+	hl_unregister_thread(&s);
+}
+
 HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
-	if( withGC ) hl_error("Threads with garbage collector are currently not supported");
+	if( withGC ) {
+		thread_start *s = (thread_start*)malloc(sizeof(thread_start));
+		s->callb = callback;
+		s->param = param;
+		hl_add_root(&s->param);
+		callback = gc_thread_entry;
+		param = s;
+	}
 #	ifdef HL_WIN
 	DWORD tid;
 	HANDLE h = CreateThread(NULL,0,callback,param,0,&tid);
@@ -71,22 +92,23 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 #	endif
 }
 
-HL_PRIM bool hl_thread_pause( hl_thread *t, bool pause ) {
-#	ifdef HL_WIN
-	bool ret;
-	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,(DWORD)(int_val)t);
-	if( pause )
-		ret = ((int)SuspendThread(h)) >= 0;
-	else {
-		int r;
-		while( (r = (int)ResumeThread(h)) > 0 ) {
-		}
-		ret = r == 0;
-	}
-	CloseHandle(h);
-	return ret;
-#	else
-	// TODO : use libthread_db
-	return false;
-#	endif
+static void hl_run_thread( vclosure *c ) {
+	bool isExc;
+	varray *a;
+	int i;
+	vdynamic *exc = hl_dyn_call_safe(c,NULL,0,&isExc);
+	if( !isExc )
+		return;
+	a = hl_exception_stack();
+	uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
+	for(i=0;i<a->size;i++)
+		uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
 }
+
+HL_PRIM hl_thread *hl_thread_create( vclosure *c ) {
+	return hl_thread_start(hl_run_thread,c,true);
+}
+
+#define _THREAD _ABSTRACT(hl_thread)
+DEFINE_PRIM(_THREAD, thread_current, _NO_ARG);
+DEFINE_PRIM(_THREAD, thread_create, _FUN(_VOID,_NO_ARG));

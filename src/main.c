@@ -94,9 +94,10 @@ int main(int argc, pchar *argv[]) {
 	struct {
 		hl_code *code;
 		hl_module *m;
-		vdynamic *exc;
+		vdynamic *ret;
+		vclosure c;
 	} ctx;
-	hl_trap_ctx trap;
+	bool isExc = false;
 	int first_boot_arg = -1;
 	argv++;
 	argc--;
@@ -143,13 +144,14 @@ int main(int argc, pchar *argv[]) {
 #	endif
 	hl_global_init(&ctx);
 	hl_sys_init((void**)argv,argc,file);
+	hl_register_thread(&argc);
 	ctx.code = load_code(file);
 	if( ctx.code == NULL )
 		return 1;
 	ctx.m = hl_module_alloc(ctx.code);
 	if( ctx.m == NULL )
 		return 2;
-	if( !hl_module_init(ctx.m, &argc) )
+	if( !hl_module_init(ctx.m) )
 		return 3;
 	hl_code_free(ctx.code);
 	if( debug_port > 0 )
@@ -158,32 +160,23 @@ int main(int argc, pchar *argv[]) {
 		fprintf(stderr,"Could not start debugger on port %d",debug_port);
 		return 4;
 	}
-	hl_trap(trap, ctx.exc, on_exception);
-#	ifdef HL_VCC
-	__try {
-#	endif
-		vclosure c;
-		c.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
-		c.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
-		c.hasValue = 0;
-		hl_dyn_call(&c,NULL,0);
-#	ifdef HL_VCC
-	} __except( throw_handler(GetExceptionCode()) ) {}
-#	endif
+	ctx.c.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
+	ctx.c.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
+	ctx.c.hasValue = 0;
+	ctx.ret = hl_dyn_call_safe(&ctx.c,NULL,0,&isExc);
+	if( isExc ) {
+		varray *a = hl_exception_stack();
+		int i;
+		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ctx.ret));
+		for(i=0;i<a->size;i++)
+			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
+		hl_debug_break();
+		hl_global_free();
+		return 1;
+	}
 	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
 	hl_global_free();
 	return 0;
-on_exception:
-	{
-		varray *a = hl_exception_stack();
-		int i;
-		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ctx.exc));
-		for(i=0;i<a->size;i++)
-			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
-		hl_debug_break();
-	}
-	hl_global_free();
-	return 1;
 }
 
