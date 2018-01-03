@@ -378,11 +378,7 @@ HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
 }
 
 HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {
-	SDL_GLContext ctx = SDL_GL_GetCurrentContext();
-	if (ctx==NULL)
-		ctx = SDL_GL_CreateContext(win);
-	int result = SDL_GL_MakeCurrent(win ,ctx);
-	return ctx;
+	return SDL_GL_CreateContext(win);
 }
 
 HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
