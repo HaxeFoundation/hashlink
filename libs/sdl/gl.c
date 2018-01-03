@@ -391,15 +391,17 @@ HL_PRIM vdynamic *HL_NAME(gl_create_framebuffer)() {
 }
 
 HL_PRIM void HL_NAME(gl_bind_framebuffer)( int target, vdynamic *f ) {
-	GLOG("%d,%d",target,ZIDX(f));
+	unsigned int id = ZIDX(f);
+	GLOG("%d,%d",target,id);
 #if	defined(HL_IOS) || defined(HL_TVOS)
-	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
-	SDL_GetWindowWMInfo(SDL_GL_GetCurrentWindow(), &info);
-	glBindFramebuffer(target, ZIDX(f) ==0 ? info.info.uikit.framebuffer : ZIDX(f));
-#else
-	glBindFramebuffer(target, ZIDX(f));
+	if ( id==0 ) {
+		SDL_SysWMinfo info;
+		SDL_VERSION(&info.version);
+		SDL_GetWindowWMInfo(SDL_GL_GetCurrentWindow(), &info);
+		id = info.info.uikit.framebuffer;
+	}
 #endif
+	glBindFramebuffer(target, id);
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_texture2d)( int target, int attach, int texTarget, vdynamic *t, int level ) {
@@ -438,15 +440,17 @@ HL_PRIM vdynamic *HL_NAME(gl_create_renderbuffer)() {
 }
 
 HL_PRIM void HL_NAME(gl_bind_renderbuffer)( int target, vdynamic *r ) {
-	GLOG("%d,%d",target,ZIDX(r));
+	unsigned int id = ZIDX(r);
+	GLOG("%d,%d",target,id);
 #if	defined(HL_IOS) || defined(HL_TVOS)
-	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
-	SDL_GetWindowWMInfo(SDL_GL_GetCurrentWindow(), &info);
-	glBindRenderbuffer(GL_RENDERBUFFER, ZIDX(r) == 0 ? info.info.uikit.colorbuffer : ZIDX(r));
-#else
-	glBindRenderbuffer(target, ZIDX(r));
+	if ( id==0 ) {
+		SDL_SysWMinfo info;
+		SDL_VERSION(&info.version);
+		SDL_GetWindowWMInfo(SDL_GL_GetCurrentWindow(), &info);
+		id = info.info.uikit.colorbuffer;
+	}
 #endif
+	glBindRenderbuffer(GL_RENDERBUFFER, id);
 }
 
 HL_PRIM void HL_NAME(gl_renderbuffer_storage)( int target, int format, int width, int height ) {
