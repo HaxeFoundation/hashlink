@@ -35,11 +35,11 @@ HL_API int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len );
 HL_API void hl_sys_sleep( double t );
 HL_API int hl_thread_id();
 HL_API vdynamic **hl_debug_exc;
+HL_API void *hl_gc_thread_info();
 
 static hl_socket *debug_socket = NULL;
 static hl_socket *client_socket = NULL;
 static bool debugger_connected = false;
-static int main_thread_id = 0;
 
 #define send hl_send_data
 static void send( void *ptr, int size ) {
@@ -47,8 +47,8 @@ static void send( void *ptr, int size ) {
 }
 
 static void hl_debug_loop( hl_module *m ) {
-	void *stack_top = hl_module_stack_top();
 	void *dbg_addr = &hl_debug_exc;
+	void *inf_addr = hl_gc_thread_info();
 	int flags = 0;
 #	ifdef HL_64
 	flags |= 1;
@@ -60,11 +60,9 @@ static void hl_debug_loop( hl_module *m ) {
 		hl_socket *s = hl_socket_accept(debug_socket);
 		client_socket = s;
 		send("HLD0",4);
-		send(&flags,4);
-		send(&main_thread_id,4);
 		send(&m->globals_data,sizeof(void*));
+		send(&inf_addr,sizeof(void*));
 		send(&dbg_addr,sizeof(void*));
-		send(&stack_top,sizeof(void*));
 		send(&m->jit_code,sizeof(void*));
 		send(&m->codesize,4);
 		send(&m->code->types,sizeof(void*));
@@ -110,7 +108,6 @@ bool hl_module_debug( hl_module *m, int port, bool wait ) {
 	}
 	hl_add_root(&debug_socket);
 	hl_add_root(&client_socket);
-	main_thread_id = hl_thread_id();
 	debug_socket = s;
 	if( !hl_thread_start(hl_debug_loop, m, false) ) {
 		hl_socket_close(s);

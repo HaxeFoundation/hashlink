@@ -575,6 +575,7 @@ HL_API vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to );
 HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
 HL_API void *hl_dyn_call_obj( vdynamic *obj, hl_type *ft, int hfield, void **args, vdynamic *ret );
 HL_API vdynamic *hl_dyn_call( vclosure *c, vdynamic **args, int nargs );
+HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool *isException );
 
 // ----------------------- THREADS --------------------------------------------------
 
@@ -583,7 +584,9 @@ typedef struct _hl_thread hl_thread;
 
 HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
 HL_API hl_thread *hl_thread_current();
-HL_API bool hl_thread_pause( hl_thread *t, bool pause );
+HL_API void hl_register_thread( void *stack_top );
+HL_API void hl_unregister_thread();
+HL_API void *hl_gc_stack_top();
 
 // ----------------------- ALLOC --------------------------------------------------
 
