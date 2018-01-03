@@ -196,7 +196,7 @@ HL_PRIM void HL_NAME(ui_stop_loop)() {
 
 typedef struct {
 	hl_thread *thread;
-	hl_thread *original;
+	DWORD original;
 	void *callback;
 	double timeout;
 	int ticks;
@@ -205,9 +205,9 @@ typedef struct {
 
 static void sentinel_loop( vsentinel *s ) {
 	int time_ms = (int)((s->timeout * 1000.) / 16.);
-	hl_thread_registers *regs = (hl_thread_registers*)malloc(sizeof(int_val) * hl_thread_context_size());
-	int eip = hl_thread_context_index("eip");
-	int esp = hl_thread_context_index("esp");
+	HANDLE h = OpenThread(THREAD_ALL_ACCESS,FALSE,s->original);
+	CONTEXT regs;
+	regs.ContextFlags = CONTEXT_FULL;
 	while( true ) {
 		int k = 0;
 		int tick = s->ticks;
@@ -218,15 +218,21 @@ static void sentinel_loop( vsentinel *s ) {
 			k++;
 			if( k == 16 ) {
 				// pause
-				hl_thread_pause(s->original, true);
-				hl_thread_get_context(s->original,regs);
+				SuspendThread(h);
+				GetThreadContext(h,&regs);
 				// simulate a call
-				*--(int_val*)regs[esp] = regs[eip];
-				*--(int_val*)regs[esp] = regs[esp];
-				regs[eip] = (int_val)s->callback;
+#				ifdef HL_64
+				*--(int_val*)regs.Rsp = regs.Rip;
+				*--(int_val*)regs.Rsp = regs.Rsp;
+				regs.Rip = (int_val)s->callback;
+#				else
+				*--(int_val*)regs.Esp = regs.Eip;
+				*--(int_val*)regs.Esp = regs.Esp;
+				regs.Eip = (int_val)s->callback;
+#				endif
 				// resume
-				hl_thread_set_context(s->original,regs);
-				hl_thread_pause(s->original, false);
+				SetThreadContext(h,&regs);
+				ResumeThread(h);
 				break;
 			}
 		}
@@ -242,7 +248,7 @@ HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 	s->timeout = timeout;
 	s->ticks = 0;
 	s->pause = false;
-	s->original = hl_thread_current();
+	s->original = GetCurrentThreadId();
 	s->callback = c->fun;
 	s->thread = hl_thread_start(sentinel_loop,s,false);
 	return s;
