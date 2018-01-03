@@ -606,6 +606,13 @@ HL_PRIM vbyte *hl_sys_hl_file() {
 	return hl_file;
 }
 
+#ifndef HL_MOBILE
+const char *hl_sys_special( const char *key ) {
+     hl_error("Unknown sys_special key");
+     return NULL;
+}
+DEFINE_PRIM(_BYTES, sys_special, _BYTES);
+#endif
 
 DEFINE_PRIM(_BYTES, sys_hl_file, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_utf8_path, _NO_ARG);
