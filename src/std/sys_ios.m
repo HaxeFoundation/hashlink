@@ -28,12 +28,12 @@
 #include <Foundation/Foundation.h>
 #include <UIKit/UIKit.h>
 
-static const char* ios_get_document_path(const char* file)
+static const char* ios_get_document_path()
 {
 	return [[[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject] fileSystemRepresentation];
 }
 
-static const char* ios_get_resource_path(const char* file)
+static const char* ios_get_resource_path()
 {
 	return [[[NSBundle mainBundle] resourcePath] UTF8String];
 }
@@ -52,13 +52,13 @@ static int ios_get_retina_scale_factor()
 }
 
 const char *hl_sys_special( const char *key ) { 
-	else if (strcmp(key, "ios_resource_path")==0)
+	if (strcmp(key, "ios_resource_path")==0)
 		return ios_get_resource_path();
 	else if (strcmp(key, "ios_document_path")==0)
 		return ios_get_document_path();
 	else if (strcmp(key, "ios_retina_scale_factor")==0)
 		return ios_get_retina_scale_factor();
-	else if (strmcmp(key, "ios_device_name")==0)
+	else if (strcmp(key, "ios_device_name")==0)
 		return ios_get_device_name();
 	else
     	hl_error("Unknown sys_special key");

@@ -74,10 +74,6 @@ typedef uchar pchar;
 #define pstrlen	ustrlen
 #endif
 
-#ifdef HL_MOBILE
-#include <mobile/hl_mobile.h>
-#endif
-
 #ifdef HL_MAC
 #	include <sys/syslimits.h>
 #	include <limits.h>
@@ -308,12 +304,8 @@ HL_PRIM int hl_sys_command( vbyte *cmd ) {
 }
 
 HL_PRIM bool hl_sys_exists( vbyte *path ) {
-#ifdef HL_MOBILE
-	return hl_mobile_file_exists(path);
-#else
 	pstat st;
 	return stat((pchar*)path,&st) == 0;
-#endif
 }
 
 HL_PRIM bool hl_sys_delete( vbyte *path ) {
@@ -354,11 +346,7 @@ HL_PRIM bool hl_sys_is_dir( vbyte *path ) {
 }
 
 HL_PRIM bool hl_sys_create_dir( vbyte *path, int mode ) {
-#ifdef HL_MOBILE
-	return hl_mobile_create_directory(path, mode) == 0;
-#else
 	return mkdir((pchar*)path,mode) == 0;
-#endif
 }
 
 HL_PRIM bool hl_sys_remove_dir( vbyte *path ) {
