@@ -27,6 +27,9 @@
 #	include <SDL.h>
 #	include <GLES3/gl3.h>
 #	include <GLES3/gl3ext.h>
+#	define glBindFragDataLocation(...)
+#	define glGetQueryObjectiv glGetQueryObjectuiv
+#	define glClearDepth glClearDepthf
 #else
 #	include <SDL2/SDL.h>
 #	include <GL/glu.h>

@@ -24,37 +24,12 @@
 
 #if defined(HL_MOBILE) && defined(HL_ANDROID)
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <locale.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-
-#include <errno.h>
-#include <unistd.h>
-#include <limits.h>
-#include <sys/time.h>
-#include <dirent.h>
-#include <termios.h>
-#include <sys/times.h>
-#include <sys/wait.h>
-#include <locale.h>
-
-#define HL_UTF8PATH
-typedef struct stat pstat;
-
-#include <assert.h>
-#include <malloc.h>
-#include <memory.h>
-
 #include <SDL_system.h>
 
 const char *hl_sys_special( const char *key ) { 
 	if (strcmp(key, "android_external_storage_path")==0)
 		return SDL_AndroidGetExternalStoragePath();
-	else if (strmcmp(key, "android_internal_storage_path")==0)
+	else if (strcmp(key, "android_internal_storage_path")==0)
 		return SDL_AndroidGetInternalStoragePath();
 	else
     	hl_error("Unknown sys_special key");
