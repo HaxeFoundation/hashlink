@@ -30,20 +30,23 @@
 
 static const char* ios_get_document_path()
 {
-	return [[[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject] fileSystemRepresentation];
+	NSString* string = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
+	const char* path = strdup([string fileSystemRepresentation]);
+	return path;
 }
 
 static const char* ios_get_resource_path()
 {
-	return [[[NSBundle mainBundle] resourcePath] UTF8String];
+	NSString* string = [[NSBundle mainBundle] resourcePath];
+	const char* path = strdup([string UTF8String]);
+	return path;
 }
 
 static const char* ios_get_device_name()
 {
-    struct utsname systemInfo;
-    uname(&systemInfo);
-    NSString* code = [NSString stringWithCString:systemInfo.machine encoding:NSUTF8StringEncoding];
-    return [code UTF8String];
+	struct utsname systemInfo;
+	uname(&systemInfo);
+	return strdup(systemInfo.machine);
 }
 
 static int ios_get_retina_scale_factor()
@@ -61,7 +64,7 @@ const char *hl_sys_special( const char *key ) {
 	else if (strcmp(key, "ios_device_name")==0)
 		return ios_get_device_name();
 	else
-    	hl_error("Unknown sys_special key");
+		hl_error("Unknown sys_special key");
 	return NULL;
 }
 

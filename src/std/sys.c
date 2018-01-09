@@ -114,11 +114,11 @@ HL_PRIM vbyte *hl_sys_string() {
 #elif defined(HL_CONSOLE)
 	return (vbyte*)sys_platform_name();
 #elif defined(HL_IOS)
-    return (vbyte*)USTR("iOS");
+	return (vbyte*)USTR("iOS");
 #elif defined(HL_TVOS)
-    return (vbyte*)USTR("tvOS");
+	return (vbyte*)USTR("tvOS");
 #elif defined(HL_ANDROID)
-    return (vbyte*)USTR("Android");
+	return (vbyte*)USTR("Android");
 #else
 #error Unknown system string
 #endif
@@ -543,7 +543,7 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 		int length = readlink("/proc/self/exe", path, sizeof(path));
 		if( length < 0 )
 			return NULL;
-	    path[length] = '\0';
+		path[length] = '\0';
 		return (vbyte*)pstrdup(path,-1);
 	}
 #endif
@@ -596,8 +596,8 @@ HL_PRIM vbyte *hl_sys_hl_file() {
 
 #ifndef HL_MOBILE
 const char *hl_sys_special( const char *key ) {
-     hl_error("Unknown sys_special key");
-     return NULL;
+	 hl_error("Unknown sys_special key");
+	 return NULL;
 }
 DEFINE_PRIM(_BYTES, sys_special, _BYTES);
 #endif

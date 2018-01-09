@@ -142,7 +142,7 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 #else
 	p->pid = fork();
 #endif
-    if( p->pid == -1 ) {
+	if( p->pid == -1 ) {
 		close(input[0]);
 		close(input[1]);
 		close(output[0]);
@@ -283,7 +283,7 @@ HL_PRIM void hl_process_kill( vprocess *p ) {
 #	ifdef HL_WIN
 	TerminateProcess(p->pinf.hProcess,0xCDCDCDCD);
 #   elif defined(HL_IOS) || defined(HL_TVOS)
-    hl_error("hl_process_kill() not available on this platform");
+	hl_error("hl_process_kill() not available on this platform");
 #	else
 	kill(p->pid,9);
 #	endif
