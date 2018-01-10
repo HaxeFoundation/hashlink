@@ -217,6 +217,10 @@ static void sentinel_loop( vsentinel *s ) {
 			if( hl_is_blocking() ) continue;
 			k++;
 			if( k == 16 ) {
+				if( hl_detect_debugger() ) {
+					k = 0;
+					continue;
+				}
 				// pause
 				SuspendThread(h);
 				GetThreadContext(h,&regs);
