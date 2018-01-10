@@ -224,7 +224,11 @@ static char *utos( const uchar *s ) {
 void uprintf( const uchar *fmt, const uchar *str ) {
 	char *cfmt = utos(fmt);
 	char *cstr = utos(str);
+#ifdef HL_ANDROID
+	LOG_ANDROID(cfmt,cstr);
+#else
 	printf(cfmt,cstr);
+#endif
 	free(cfmt);
 	free(cstr);
 }

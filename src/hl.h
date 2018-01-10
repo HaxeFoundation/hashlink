@@ -52,8 +52,13 @@
 #ifdef __ANDROID__
 #	define HL_ANDROID
 #	include <android/log.h>
-#	define LOG_TAG "hl"
-#	define LOG_ANDROID(str) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "%s", str);
+#	ifndef HL_ANDROID_LOG_TAG
+#		define HL_ANDROID_LOG_TAG "hl"
+#	endif
+#	ifndef HL_ANDROID_LOG_LEVEL
+#		define HL_ANDROID_LOG_LEVEL ANDROID_LOG_DEBUG
+#	endif
+#	define LOG_ANDROID(cfmt,cstr) __android_log_print(HL_ANDROID_LOG_LEVEL, HL_ANDROID_LOG_TAG, cfmt, cstr);
 #endif
 
 #if defined(HL_IOS) || defined(HL_ANDROID) || defined(HL_TVOS)
