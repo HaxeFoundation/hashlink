@@ -415,8 +415,10 @@ class Eval {
 		switch( v.t ) {
 		case HObj(o):
 			function getRec(o:format.hl.Data.ObjPrototype) {
-				var parent = o.tsuper == null ? [] : getRec(switch( o.tsuper ) { case HObj(o): o; default: throw "assert"; });
-				return parent.concat(module.getObjectProto(o).fieldNames);
+				var fields = o.tsuper == null ? [] : getRec(switch( o.tsuper ) { case HObj(o): o; default: throw "assert"; });
+				for( f in o.fields )
+					fields.push(f.name);
+				return fields;
 			}
 			return getRec(o);
 		case HVirtual(fields):
