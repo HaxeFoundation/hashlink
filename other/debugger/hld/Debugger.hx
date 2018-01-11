@@ -181,7 +181,7 @@ class Debugger {
 			var esp = getReg(tid, Esp);
 			var ptr = readMem(esp, jit.align.ptr).getPointer(0, jit.align);
 			stepBreak(ptr);
-		case 0xFF if( !stepIntoCall && api.readByte(eip,1) & 7 == 2 /* RM/2 */ ):
+		case 0xFF if( !stepIntoCall && (api.readByte(eip,1)>>3) & 7 == 2 /* RM/2 */ ):
 			stepBreak(eip.offset(2));
 		case 0xE8 if( !stepIntoCall ):
 			stepBreak(eip.offset(5));
