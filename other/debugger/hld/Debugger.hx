@@ -173,6 +173,7 @@ class Debugger {
 	function smartStep( tid : Int, stepIntoCall : Bool ) {
 		var eip = getReg(tid, Eip);
 		var op = api.readByte(eip, 0);
+		var mod_rm;
 		switch( op ) {
 		case 0xEA:
 			// FAR JMP : this will elimate our single step flag
@@ -181,8 +182,19 @@ class Debugger {
 			var esp = getReg(tid, Esp);
 			var ptr = readMem(esp, jit.align.ptr).getPointer(0, jit.align);
 			stepBreak(ptr);
-		case 0xFF if( !stepIntoCall && (api.readByte(eip,1)>>3) & 7 == 2 /* RM/2 */ ):
-			stepBreak(eip.offset(2));
+		// skip CALL instruction
+		case 0xFF if( !stepIntoCall && ((mod_rm = api.readByte(eip, 1)) >> 3) & 7 == 2 /* RM/2 */ ):
+			var reg = mod_rm & 7;
+			var mod = mod_rm >> 6;
+			var size = 2; // 0xFF + mod/rm
+			if( mod == 1 )
+				size++; // single byte
+			else if( mod == 2 )
+				size += 4; // word
+			if( reg == 4 )
+				size++; // esp reg
+			stepBreak(eip.offset(size));
+		// skip CALL instruction
 		case 0xE8 if( !stepIntoCall ):
 			stepBreak(eip.offset(5));
 		default:
