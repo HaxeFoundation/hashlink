@@ -359,8 +359,12 @@ class Eval {
 			case "hl.types.ArrayDyn":
 				// hide implementation details, substitute underlying array
 				v = readField({ v : v, t : t }, "array").v;
-			//case "haxe.ds.IntMap":
-			//	v = makeMap(readPointer(p.offset(align.ptr)), HI32);
+			case "haxe.ds.StringMap":
+				v = makeMap(readPointer(p.offset(align.ptr)), HBytes);
+			case "haxe.ds.IntMap":
+				v = makeMap(readPointer(p.offset(align.ptr)), HI32);
+			case "haxe.ds.ObjectMap":
+				v = makeMap(readPointer(p.offset(align.ptr)), HDyn);
 			default:
 			}
 		case HVirtual(_):
@@ -406,6 +410,74 @@ class Eval {
 		return VArray(t, length, function(i) return readVal(bytes.offset(i * size), t), p);
 	}
 
+	function makeMap( p : Pointer, tkey : HLType ) {
+		var cells = readPointer(p);
+		var entries = readPointer(p.offset(align.ptr));
+		var values = readPointer(p.offset(align.ptr * 2));
+		var freelist_size = align.ptr + 4 + 4;
+		var pos = align.ptr * 3 + freelist_size;
+		var ncells = readI32(p.offset(pos));
+		var nentries = readI32(p.offset(pos + 4));
+		var content : Array<{ key : Value, value : Value }> = [];
+
+		var curCell = 0;
+
+		var keyInValue;
+		var keyPos, valuePos, keyStride, valueStride;
+		switch( tkey ) {
+		case HBytes:
+			keyInValue = true;
+			keyPos = 0;
+			valuePos = align.ptr;
+			keyStride = 8;
+			valueStride = align.ptr * 2;
+		case HI32:
+			keyInValue = false;
+			keyPos = 0;
+			valuePos = 0;
+			keyStride = 8;
+			valueStride = align.ptr;
+		case HDyn:
+			keyInValue = true;
+			keyPos = 0;
+			valuePos = align.ptr;
+			keyStride = 4;
+			valueStride = align.ptr * 2;
+		default:
+			throw "Unsupported map " + tkey.toString();
+		}
+
+
+		function fetch(k) {
+			while( content.length <= k ) {
+				if( curCell == ncells ) throw "assert";
+				var c = readI32(cells.offset((curCell++) << 2));
+				while( c >= 0 ) {
+					var value = readVal(values.offset(c * valueStride + valuePos), HDyn);
+					var keyPtr = keyInValue ? values.offset(c * valueStride + keyPos) : entries.offset(c * keyStride + keyPos);
+					var key : Value = switch( tkey ) {
+					case HBytes:
+						{ v : VString(readUCSBytes(readPointer(keyPtr)), null), t : t_string };
+					case HI32:
+						{ v : VInt(readI32(keyPtr)), t : HI32 };
+					case HDyn:
+						readVal(keyPtr,HDyn);
+					default:
+						throw "Unsupported map " + tkey.toString();
+					}
+					content.push({ key : key, value : value });
+					c = readI32(entries.offset(c * keyStride + keyStride - 4));
+				}
+			}
+			return content[k];
+		}
+
+		function getKey(k) return k < 0 || k >= nentries ? { v : VUndef, t : tkey } : fetch(k).key;
+		function getValue(k) return k < 0 || k >= nentries ? { v : VUndef, t : HDyn } : fetch(k).value;
+
+		return VMap(tkey == HBytes ? t_string : tkey,nentries,getKey, getValue, p);
+	}
+
 	public function getFields( v : Value ) : Array<String> {
 		var ptr = switch( v.v ) {
 		case VPointer(p): p;
@@ -415,8 +487,11 @@ class Eval {
 		switch( v.t ) {
 		case HObj(o):
 			function getRec(o:format.hl.Data.ObjPrototype) {
-				var parent = o.tsuper == null ? [] : getRec(switch( o.tsuper ) { case HObj(o): o; default: throw "assert"; });
-				return parent.concat(module.getObjectProto(o).fieldNames);
+				var fields = o.tsuper == null ? [] : getRec(switch( o.tsuper ) { case HObj(o): o; default: throw "assert"; });
+				for( f in o.fields )
+					if( f.name != "" )
+						fields.push(f.name);
+				return fields;
 			}
 			return getRec(o);
 		case HVirtual(fields):
@@ -525,6 +600,20 @@ class Eval {
 	function readUCS2( ptr : Pointer, length : Int ) {
 		var mem = readMem(ptr, (length + 1) << 2);
 		return mem.readStringUCS2(0,length);
+	}
+
+	function readUCSBytes( ptr : Pointer ) {
+		var len = 0;
+		while( true ) {
+			var v = readI32(ptr.offset(len << 1));
+			var low = v & 0xFFFF;
+			var high = v >>> 16;
+			if( low == 0 ) break;
+			len++;
+			if( high == 0 ) break;
+			len++;
+		}
+		return readUCS2(ptr, len);
 	}
 
 	function readI32( p : Pointer ) {
