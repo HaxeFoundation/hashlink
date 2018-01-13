@@ -1097,6 +1097,18 @@ static preg *alloc_cpu_call( jit_ctx *ctx, vreg *r ) {
 	return p;
 }
 
+static preg *fetch32( jit_ctx *ctx, vreg *r ) {
+	if( r->current )
+		return r->current;
+	// make sure that the register is correctly erased
+	if( r->size < 4 ) {
+		preg *p = alloc_cpu(ctx, r, true);
+		RUNLOCK(p);
+		return p;
+	}
+	return fetch(r);
+}
+
 // make sure higher bits are zeroes 
 static preg *alloc_cpu64( jit_ctx *ctx, vreg *r, bool andLoad ) {
 #	ifndef HL_64
@@ -1401,6 +1413,8 @@ static preg *alloc_native_arg( jit_ctx *ctx ) {
 }
 
 static void set_native_arg( jit_ctx *ctx, preg *r ) {
+	if( r->kind == RSTACK && r->holds && r->holds->size < 4 )
+		r = fetch32(ctx, r->holds);
 #	ifdef HL_64
 	if( r->kind == RFPU ) ASSERT(0);
 	int rid = --ctx->nativeArgsCount;
@@ -1609,7 +1623,10 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 #		endif
 		break;
 	default:
-		op64(ctx, MOV, PEAX, fetch(r));
+		if( r->size < 4 && !r->current )
+			fetch32(ctx, r);
+		if( r->current != PEAX )
+			op64(ctx,MOV,PEAX,fetch(r));
 		break;
 	}
 	if( ctx->totalRegsSize ) op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
@@ -3079,7 +3096,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OIncr:
 			{
 				preg *v = fetch(dst);
-				if( IS_FLOAT(dst) ) {
+				if( IS_FLOAT(dst) || dst->size != 4 ) {
 					ASSERT(0);
 				} else {
 					op32(ctx,INC,v,UNUSED);
@@ -3090,7 +3107,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case ODecr:
 			{
 				preg *v = fetch(dst);
-				if( IS_FLOAT(dst) ) {
+				if( IS_FLOAT(dst) || dst->size != 4 ) {
 					ASSERT(0);
 				} else {
 					op32(ctx,DEC,v,UNUSED);
@@ -3384,7 +3401,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 							break;
 						default:
 							size = pad_before_call(ctx,HL_WSIZE*4);
-							op64(ctx,PUSH,fetch(rb),UNUSED);
+							op64(ctx,PUSH,fetch32(ctx,rb),UNUSED);
 							op64(ctx,MOV,r,pconst64(&p,(int_val)rb->t));
 							op64(ctx,PUSH,r,UNUSED);
 							break;
@@ -3858,7 +3875,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					break;
 				default:
 					size = pad_before_call(ctx, HL_WSIZE*4);
-					op32(ctx,PUSH,fetch(rb),UNUSED);
+					op32(ctx,PUSH,fetch32(ctx,rb),UNUSED);
 					op32(ctx,PUSH,pconst64(&p,(int_val)rb->t),UNUSED);
 					op32(ctx,PUSH,pconst64(&p,hl_hash_gen(hl_get_ustring(m->code,o->p2),true)),UNUSED);
 					op32(ctx,PUSH,fetch(dst),UNUSED);
