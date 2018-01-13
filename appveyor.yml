@@ -23,7 +23,8 @@ install:
   - 7z x openal-soft-1.17.2-bin.zip
   - move openal-soft-1.17.2-bin include/openal
   # install neko and haxe
-  - cinst neko -y
+  - ps: Set-Service wuauserv -StartupType Manual
+  - cinst neko --version 2.2.0 -y
   - cinst haxe --prerelease --ignore-dependencies -s 'https://ci.appveyor.com/nuget/haxe' -y
   - RefreshEnv
   - neko -version
