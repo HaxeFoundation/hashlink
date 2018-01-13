@@ -223,6 +223,16 @@ class Eval {
 		if( ~/^\$[0-9]+$/.match(name) )
 			return readRegAddress(Std.parseInt(name.substr(1)));
 
+		// this variable
+		if( module.getGraph(funIndex).getLocal("this", codePos) != null ) {
+			var vthis = getVar("this");
+			if( vthis != null ) {
+				var f = readFieldAddress(vthis, name);
+				if( f != null )
+					return f;
+			}
+		}
+
 		// global
 		return getGlobalAddress([name]);
 	}
