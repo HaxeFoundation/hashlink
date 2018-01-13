@@ -3095,10 +3095,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OIncr:
 			{
-				preg *v = fetch(dst);
-				if( IS_FLOAT(dst) || dst->size != 4 ) {
+				if( IS_FLOAT(dst) ) {
 					ASSERT(0);
 				} else {
+					preg *v = fetch32(ctx,dst);
 					op32(ctx,INC,v,UNUSED);
 					if( v->kind != RSTACK ) store(ctx, dst, v, false);
 				}
@@ -3106,10 +3106,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case ODecr:
 			{
-				preg *v = fetch(dst);
-				if( IS_FLOAT(dst) || dst->size != 4 ) {
+				if( IS_FLOAT(dst) ) {
 					ASSERT(0);
 				} else {
+					preg *v = fetch32(ctx,dst);
 					op32(ctx,DEC,v,UNUSED);
 					if( v->kind != RSTACK ) store(ctx, dst, v, false);
 				}
