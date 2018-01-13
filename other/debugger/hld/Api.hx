@@ -7,6 +7,7 @@ package hld;
 	public var SingleStep = 2;
 	public var Error = 3;
 	public var Handled = 4;
+	public var Watchbreak = 0x100;
 }
 
 @:enum abstract Register(Int) {
@@ -14,6 +15,12 @@ package hld;
 	public var Ebp = 1;
 	public var Eip = 2;
 	public var EFlags = 3;
+	public var Dr0 = 4;
+	public var Dr1 = 5;
+	public var Dr2 = 6;
+	public var Dr3 = 7;
+	public var Dr6 = 8;
+	public var Dr7 = 9;
 	public inline function toInt() return this;
 }
 

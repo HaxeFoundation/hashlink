@@ -52,6 +52,28 @@ class Eval {
 		return evalExpr(expr);
 	}
 
+	public function ref( exprSrc : String, funIndex : Int, codePos : Int, ebp : Pointer ) {
+		if( exprSrc == null || exprSrc == "" )
+			return null;
+		this.funIndex = funIndex;
+		this.codePos = codePos;
+		this.ebp = ebp;
+
+		var expr = try parser.parseString(exprSrc) catch( e : hscript.Expr.Error ) throw hscript.Printer.errorToString(e);
+		switch( expr ) {
+		case EField(obj, f):
+			var v = evalExpr(obj);
+			var addr = readFieldAddress(v, f);
+			if( addr == null || addr.ptr == null )
+				throw "Can't reference " + exprSrc;
+			return addr;
+		case EIdent(i):
+			return getVarAddress(i);
+		default:
+			throw "Can't get ref for " + hscript.Printer.toString(expr);
+		}
+	}
+
 	function evalExpr( e : hscript.Expr ) : Value {
 		switch( e ) {
 		case EConst(c):
@@ -181,25 +203,28 @@ class Eval {
 	}
 
 	function getVar( name : String ) {
+		return fetch(getVarAddress(name));
+	}
+
+	function getVarAddress( name : String ) {
 		// locals
 		var loc = module.getGraph(funIndex).getLocal(name, codePos);
 		if( loc != null ) {
-			var v = readReg(loc.rid);
-			if( loc.index != null )
-				switch( v.v ) {
-				case VEnum(_, values): v = values[loc.index];
-				case VUndef: v = { v : VUndef, t : loc.t };
-				default: throw "assert";
-				}
+			var v = readRegAddress(loc.rid);
+			if( loc.index != null ) {
+				if( v.ptr == null )
+					return { ptr : null, t : loc.t };
+				return { ptr : v.ptr.offset(module.getEnumProto(loc.container)[0].params[loc.index].offset), t : loc.t };
+			}
 			return v;
 		}
 
 		// register
 		if( ~/^\$[0-9]+$/.match(name) )
-			return readReg(Std.parseInt(name.substr(1)));
+			return readRegAddress(Std.parseInt(name.substr(1)));
 
 		// global
-		return getGlobal([name]);
+		return getGlobalAddress([name]);
 	}
 
 	function evalPath( path : Array<String> ) {
@@ -208,20 +233,20 @@ class Eval {
 			path.shift();
 			return v;
 		}
-		var g = getGlobal(path);
+		var g = fetch(getGlobalAddress(path));
 		if( g == null )
 			throw "Unknown identifier " + path[0];
 		return g;
 	}
 
-	function getGlobal( path : Array<String> ) {
+	function getGlobalAddress( path : Array<String> ) {
 		var g = module.resolveGlobal(path);
 		if( g == null )
 			return null;
-		var v = readVal(jit.globals.offset(g.offset), g.type);
+		var addr = { ptr : jit.globals.offset(g.offset), t : g.type };
 		for( f in path )
-			v = readField(v, f);
-		return v;
+			addr = readFieldAddress(fetch(addr), f);
+		return addr;
 	}
 
 	function escape( s : String ) {
@@ -287,13 +312,17 @@ class Eval {
 		return s.file+":" + s.line;
 	}
 
-	function readReg(index) {
+	function readRegAddress(index) {
 		var r = module.getFunctionRegs(funIndex)[index];
 		if( r == null )
 			return null;
 		if( !module.getGraph(funIndex).isRegisterWritten(index, codePos) )
-			return { v : VUndef, t : r.t };
-		return readVal(ebp.offset(r.offset), r.t);
+			return { ptr : null, t : r.t };
+		return { ptr : ebp.offset(r.offset), t : r.t };
+	}
+
+	function readReg(index) {
+		return fetch(readRegAddress(index));
 	}
 
 	public function readVal( p : Pointer, t : HLType ) : Value {
@@ -513,7 +542,19 @@ class Eval {
 		}
 	}
 
-	public function readField( v : Value, name : String ) : Value {
+	public function readField( v : Value, name : String ) {
+		return fetch(readFieldAddress(v, name));
+	}
+
+	public function fetch( addr : { ptr : Pointer, t : HLType } ) {
+		if( addr == null )
+			return null;
+		if( addr.ptr == null )
+			return { v : VUndef, t : addr.t };
+		return readVal(addr.ptr, addr.t);
+	}
+
+	public function readFieldAddress( v : Value, name : String ) : { ptr : Null<Pointer>, t : HLType }  {
 		var ptr = switch( v.v ) {
 		case VUndef, VNull: null;
 		case VPointer(p): p;
@@ -528,28 +569,26 @@ class Eval {
 			var f = module.getObjectProto(o).fields.get(name);
 			if( f == null )
 				return null;
-			return ptr == null ? { v : VUndef, t : f.t } : readVal(ptr.offset(f.offset), f.t);
+			return { ptr : ptr == null ? null : ptr.offset(f.offset), t : f.t };
 		case HVirtual(fl):
 			for( i in 0...fl.length )
 				if( fl[i].name == name ) {
 					var t = fl[i].t;
 					if( ptr == null )
-						return { v : VUndef, t : t };
+						return { ptr : null, t : t };
 					var addr = readPointer(ptr.offset(align.ptr * (3 + i)));
 					if( addr != null )
-						return readVal(addr, t);
-					var realValue = readPointer(ptr.offset(align.ptr));
-					if( realValue == null )
-						return null;
-					var v = readField({ v : VPointer(realValue), t : HDyn }, name);
-					if( v == null )
-						return { v : VUndef, t : t };
-					return v;
+						return { ptr : addr, t : t };
 				}
-			return null;
+			if( ptr == null )
+				return null;
+			var realValue = readPointer(ptr.offset(align.ptr));
+			if( realValue == null )
+				return null;
+			return readFieldAddress({ v : VPointer(realValue), t : HDyn }, name);
 		case HDynObj:
 			if( ptr == null )
-				return { v : VUndef, t : HDyn };
+				return { ptr : null, t : HDyn };
 			var lookup = readPointer(ptr.offset(align.ptr * 1));
 			var raw_data = readPointer(ptr.offset(align.ptr * 2));
 			var values = readPointer(ptr.offset(align.ptr * 3));
@@ -569,14 +608,14 @@ class Eval {
 				else {
 					var t = readType(lid);
 					var offset = readI32(lid.offset(align.ptr + 4));
-					return readVal(t.isPtr() ? values.offset(offset * align.ptr) : raw_data.offset(offset), t);
+					return { ptr : t.isPtr() ? values.offset(offset * align.ptr) : raw_data.offset(offset), t : t };
 				}
 			}
 			return null;
 		case HDyn:
 			if( ptr == null )
-				return { v : VUndef, t  : HDyn };
-			return readField({ v : v.v, t : readType(ptr) }, name);
+				return { ptr : null, t : HDyn };
+			return readFieldAddress({ v : v.v, t : readType(ptr) }, name);
 		default:
 			return null;
 		}

@@ -6,9 +6,18 @@ enum StepMode {
 	Into;
 }
 
+typedef Address = { ptr : Pointer, t : format.hl.Data.HLType };
+
+typedef WatchPoint = {
+	var addr : Address;
+	var regs : Array<{ offset : Int, bits : Int, r : Api.Register }>;
+	var forReadWrite : Bool;
+}
+
 class Debugger {
 
 	static inline var INT3 = 0xCC;
+	static var HW_REGS : Array<Api.Register> = [Dr0, Dr1, Dr2, Dr3];
 
 	var sock : sys.net.Socket;
 
@@ -19,8 +28,8 @@ class Debugger {
 	var breakPoints : Array<{ fid : Int, pos : Int, codePos : Int, oldByte : Int }>;
 	var nextStep : Int = -1;
 	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int, ebp : hld.Pointer }>;
-
 	var stepBreakData : { ptr : Pointer, old : Int };
+	var watches : Array<WatchPoint>;
 
 	public var is64(get, never) : Bool;
 
@@ -31,8 +40,11 @@ class Debugger {
 
 	public var customTimeout : Null<Float>;
 
+	public var watchBreak : Address; // set if breakpoint occur on watch expression
+
 	public function new() {
 		breakPoints = [];
+		watches = [];
 	}
 
 	function get_is64() {
@@ -107,6 +119,7 @@ class Debugger {
 
 	function wait( onStep = false ) : Api.WaitResult {
 		var cmd = null;
+		watchBreak = null;
 		while( true ) {
 			cmd = api.wait(customTimeout == null ? 1000 : Math.ceil(customTimeout * 1000));
 
@@ -152,6 +165,25 @@ class Debugger {
 				if( nextStep >= 0 ) {
 					setAsm(nextStep, INT3);
 					nextStep = -1;
+				} else if( watches.length > 0 ) {
+
+					// check if we have a break on a watchpoint
+					var dr6 = api.readRegister(tid, Dr6);
+					var watchBits = dr6.toInt() & 7;
+					if( watchBits != 0 ) {
+						for( w in watches )
+							for( r in w.regs )
+								if( watchBits & (1 << HW_REGS.indexOf(r.r)) != 0 ) {
+									watchBreak = w.addr;
+									break;
+								}
+						api.writeRegister(tid, Dr6, Pointer.make(0, 0));
+						if( watchBreak != null ) {
+							cmd.r = Watchbreak;
+							break;
+						}
+					}
+
 				}
 				stoppedThread = tid;
 				if( onStep )
@@ -160,7 +192,7 @@ class Debugger {
 			case Error if( cmd.tid != jit.mainThread ):
 				stoppedThread = cmd.tid;
 				resume();
-			case Error, Exit:
+			case Error, Exit, Watchbreak:
 				break;
 			}
 		}
@@ -408,10 +440,79 @@ class Debugger {
 		return { file : s.file, line : s.line, ebp : f.ebp };
 	}
 
-	public function getValue( path : String ) {
+	public function getValue( expr : String ) : Value {
 		var cur = currentStack[currentStackFrame];
 		if( cur == null ) return null;
-		return eval.eval(path, cur.fidx, cur.fpos, cur.ebp);
+		return eval.eval(expr, cur.fidx, cur.fpos, cur.ebp);
+	}
+
+	public function getRef( expr : String ) : Address {
+		var cur = currentStack[currentStackFrame];
+		if( cur == null ) return null;
+		return eval.ref(expr, cur.fidx, cur.fpos, cur.ebp);
+	}
+
+	public function getWatches() {
+		return [for( w in watches ) w.addr];
+	}
+
+	public function watch( a : Address, forReadWrite = false ) {
+		var size = jit.align.typeSize(a.t);
+		var availableRegs = HW_REGS.copy();
+		for( w in watches )
+			for( r in w.regs )
+				availableRegs.remove(r.r);
+		var w : WatchPoint = {
+			addr : a,
+			regs : [],
+			forReadWrite : forReadWrite,
+		};
+		var offset = 0;
+		var bitSize = [1, 2, 8, 4];
+		while( size > 0 ) {
+			var r = availableRegs.shift();
+			if( r == null )
+				throw "Not enough hardware register to watch: remove previous watches";
+			var v = if( size >= 8 ) 2 else if( size >= 4 ) 3 else if( size >= 2 ) 1 else 0;
+			w.regs.push({ r : r, offset : offset, bits : v });
+			var delta = bitSize[v];
+			size -= delta;
+			offset += delta;
+		}
+		watches.push(w);
+		syncDebugRegs();
+		return w;
+	}
+
+	public function unwatch( a : Address ) {
+		for( w in watches )
+			if( w.addr == a ) {
+				watches.remove(w);
+				syncDebugRegs();
+				return true;
+			}
+		return false;
+	}
+
+
+	function syncDebugRegs() {
+		var wasPaused = false;
+		if( stoppedThread == null ) {
+			pause();
+			wasPaused = true;
+		}
+		var dr7 = 0x100;
+		for( w in watches ) {
+			for( r in w.regs ) {
+				var rid = HW_REGS.indexOf(r.r);
+				dr7 |= 1 << (rid * 2);
+				dr7 |= ((w.forReadWrite ? 3 : 1) | (r.bits << 2)) << (16 + rid * 4);
+				api.writeRegister(stoppedThread, r.r, w.addr.ptr.offset(r.offset));
+			}
+		}
+		api.writeRegister(stoppedThread, Dr7, Pointer.make(dr7, 0));
+		if( wasPaused )
+			resume();
 	}
 
 	public function resume() {
@@ -420,6 +521,7 @@ class Debugger {
 		if( !api.resume(stoppedThread) )
 			throw "Could not resume "+stoppedThread;
 		stoppedThread = null;
+		watchBreak = null;
 	}
 
 	function readMem( addr : Pointer, size : Int ) {

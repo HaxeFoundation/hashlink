@@ -129,6 +129,9 @@ class Main {
 				Sys.println("Exception: "+dbg.eval.valueStr(exc));
 		case Error:
 			Sys.println("*** an error has occured, paused ***");
+		case Watchbreak:
+			var w = dbg.watchBreak;
+			Sys.println("Watch change " + w.ptr.toString() + ":" + w.t.toString() + " = " + dbg.eval.valueStr(dbg.eval.fetch(w)) + " at "+frameStr(dbg.getStackFrame()));
 		default:
 			throw "assert "+r;
 		}
@@ -150,7 +153,8 @@ class Main {
 		else
 			Sys.println(r);
 		var args = ~/[ \t\r\n]+/g.split(r);
-		switch( args.shift() ) {
+		var cmd = args.shift();
+		switch( cmd ) {
 		case "q", "quit":
 			dumpProcessOut();
 			return false;
@@ -188,17 +192,17 @@ class Main {
 			} else
 				Sys.println("No breakpoint set");
 		case "p", "print":
-			var path = args.shift();
-			if( path == null ) {
-				Sys.println("Requires variable name");
+			var expr = args.shift();
+			if( expr == null ) {
+				Sys.println("Requires expression");
 				return true;
 			}
-			var v = try dbg.getValue(path) catch( e : Dynamic ) {
+			var v = try dbg.getValue(expr) catch( e : Dynamic ) {
 				Sys.println("Error " + e + haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
 				return true;
 			}
 			if( v == null ) {
-				Sys.println("Unknown var " + path);
+				Sys.println("Unknown var " + expr);
 				return true;
 			}
 			Sys.println(dbg.eval.valueStr(v) + " : " + v.t.toString());
@@ -208,6 +212,36 @@ class Main {
 					var fv = dbg.eval.readField(v, f);
 					Sys.println("  " + f + " = " + dbg.eval.valueStr(fv) + " : " + fv.t.toString());
 				}
+		case "watch", "rwatch":
+			var expr = args.shift();
+			var v = try dbg.getRef(expr) catch( e : Dynamic ) {
+				Sys.println("Error " + e + haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
+				return true;
+			};
+			if( v == null ) {
+				Sys.println("Unknown var " + expr);
+				return true;
+			}
+			if( v.ptr == null ) {
+				Sys.println("Can't watch undefined var");
+				return true;
+			}
+			try {
+				dbg.watch(v, cmd == "rwatch");
+			} catch( e : Dynamic ) {
+				Sys.println("Error " + e + haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
+				return true;
+			}
+			Sys.println("Watching " + v.ptr.toString() + ":" + v.t.toString() + " " + dbg.eval.valueStr(dbg.eval.fetch(v)));
+		case "unwatch":
+			var param = args.shift();
+			var count = 0;
+			for( w in dbg.getWatches() )
+				if( param == null || w.ptr.toString() == param ) {
+					dbg.unwatch(w);
+					count++;
+				}
+			Sys.println("Unwatch " + count + " addresses");
 		case "clear":
 			switch( args.length ) {
 			case 0:
