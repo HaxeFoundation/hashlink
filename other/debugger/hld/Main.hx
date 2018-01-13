@@ -93,8 +93,8 @@ class Main {
 
 	}
 
-	function frameStr( f : { file : String, line : Int, ebp : Pointer }, ?debug ) {
-		return f.file+":" + f.line + (debug ? " @"+f.ebp.toString():"");
+	function frameStr( f : Debugger.StackInfo, ?debug ) {
+		return f.file+":" + f.line + (f.context == null ? "" : " ("+f.context.obj.name+"::"+f.context.field+")") + (debug ? " @"+f.ebp.toString():"");
 	}
 
 	function dumpProcessOut() {

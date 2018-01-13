@@ -14,6 +14,8 @@ typedef WatchPoint = {
 	var forReadWrite : Bool;
 }
 
+typedef StackInfo = { file : String, line : Int, ebp : Pointer, ?context : { obj : format.hl.Data.ObjPrototype, field : String } };
+
 class Debugger {
 
 	static inline var INT3 = 0xCC;
@@ -427,17 +429,21 @@ class Debugger {
 
 	inline function get_stackFrameCount() return currentStack.length;
 
-	public function getBackTrace() : Array<{ file : String, line : Int, ebp : Pointer }> {
-		return [for( e in currentStack ) { var s = module.resolveSymbol(e.fidx, e.fpos); { file : s.file, line : s.line, ebp : e.ebp }; }];
+	public function getBackTrace() : Array<StackInfo> {
+		return [for( e in currentStack ) stackInfo(e)];
 	}
 
-	public function getStackFrame( ?frame ) {
+	public function getStackFrame( ?frame ) : StackInfo {
 		if( frame == null ) frame = currentStackFrame;
 		var f = currentStack[frame];
 		if( f == null )
-			return {file:"???", line:0, ebp:Pointer.make(0,0)};
+			return {file:"???", line:0, ebp:Pointer.make(0, 0)};
+		return stackInfo(f);
+	}
+
+	function stackInfo( f ) {
 		var s = module.resolveSymbol(f.fidx, f.fpos);
-		return { file : s.file, line : s.line, ebp : f.ebp };
+		return { file : s.file, line : s.line, ebp : f.ebp, context : module.getMethodContext(f.fidx) };
 	}
 
 	public function getValue( expr : String ) : Value {
