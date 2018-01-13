@@ -27,7 +27,6 @@ class Main {
 
 	#if nodejs
 	var process : js.node.child_process.ChildProcess;
-	var processExitCode : Null<Int>;
 	#else
 	var process : sys.io.Process;
 	#end
@@ -71,7 +70,6 @@ class Main {
 			var args = ["--debug", "" + debugPort, "--debug-wait", file];
 			#if nodejs
 			process = js.node.ChildProcess.spawn(cmd, args);
-			process.on("close", function(code) processExitCode = code);
 			process.stdout.on("data", function(data:String) Sys.print(data));
 			process.stderr.on("data", function(data:String) Sys.stderr().writeString(data));
 			pid = process.pid;
@@ -102,7 +100,7 @@ class Main {
 	function dumpProcessOut() {
 		if( process == null ) return;
 		#if nodejs
-		if( processExitCode == null ) process.kill();
+		process.kill();
 		#else
 		if( process.exitCode(false) == null ) process.kill();
 		Sys.print(process.stdout.readAll().toString());
@@ -121,6 +119,10 @@ class Main {
 	function handleResult( r : hld.Api.WaitResult ) {
 		switch( r ) {
 		case Exit:
+			#if nodejs
+			Sys.println("Process has exit");
+			Sys.exit(0);
+			#end
 			dbg.resume();
 		case Breakpoint:
 			Sys.println("Thread " + dbg.stoppedThread + " paused " + frameStr(dbg.getStackFrame()));
@@ -138,13 +140,15 @@ class Main {
 	}
 
 	function command() {
+		#if !nodejs
 		if( process != null ) {
-			var ecode = #if nodejs processExitCode #else process.exitCode(false) #end;
+			var ecode = process.exitCode(false);
 			if( ecode != null ) {
 				dumpProcessOut();
 				error("Process exit with code " + ecode);
 			}
 		}
+		#end
 
 		Sys.print("> ");
 		var r = args.shift();
