@@ -214,7 +214,8 @@ class Eval {
 			if( loc.index != null ) {
 				if( v.ptr == null )
 					return { ptr : null, t : loc.t };
-				return { ptr : v.ptr.offset(module.getEnumProto(loc.container)[0].params[loc.index].offset), t : loc.t };
+				var ptr = readPointer(v.ptr);
+				return { ptr : ptr.offset(module.getEnumProto(loc.container)[0].params[loc.index].offset), t : loc.t };
 			}
 			return v;
 		}
@@ -230,6 +231,16 @@ class Eval {
 				var f = readFieldAddress(vthis, name);
 				if( f != null )
 					return f;
+				// static var
+				switch( vthis.t ) {
+				case HObj(o) if( o.globalValue != null ):
+					var path = o.name.split(".");
+					path.push(name);
+					var f = getGlobalAddress(path);
+					if( f != null )
+						return f;
+				default:
+				}
 			}
 		}
 
