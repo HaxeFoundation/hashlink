@@ -488,7 +488,7 @@ HL_API hl_type hlt_dynobj;
 HL_API hl_type hlt_bool;
 HL_API hl_type hlt_abstract;
 
-HL_API double hl_nan();
+HL_API double hl_nan( void );
 HL_API bool hl_is_dynamic( hl_type *t );
 #define hl_is_ptr(t)	((t)->kind >= HBYTES)
 HL_API bool hl_same_type( hl_type *a, hl_type *b );
@@ -502,7 +502,7 @@ HL_API vdynamic *hl_alloc_dynbool( bool b );
 HL_API vdynamic *hl_alloc_obj( hl_type *t );
 HL_API venum *hl_alloc_enum( hl_type *t, int index );
 HL_API vvirtual *hl_alloc_virtual( hl_type *t );
-HL_API vdynobj *hl_alloc_dynobj();
+HL_API vdynobj *hl_alloc_dynobj( void );
 HL_API vbyte *hl_alloc_bytes( int size );
 HL_API vbyte *hl_copy_bytes( const vbyte *byte, int size );
 HL_API int hl_utf8_length( const vbyte *s, int pos );
@@ -519,14 +519,14 @@ HL_API const uchar *hl_field_name( int hash );
 
 #define hl_error(msg)	hl_error_msg(USTR(msg))
 HL_API void hl_error_msg( const uchar *msg, ... );
-HL_API void hl_assert();
+HL_API void hl_assert( void );
 HL_API void hl_throw( vdynamic *v );
 HL_API void hl_rethrow( vdynamic *v );
 HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
-HL_API void hl_dump_stack();
-HL_API varray *hl_exception_stack();
-HL_API bool hl_detect_debugger();
+HL_API void hl_dump_stack( void );
+HL_API varray *hl_exception_stack( void );
+HL_API bool hl_detect_debugger( void );
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
@@ -582,7 +582,7 @@ struct _hl_thread;
 typedef struct _hl_thread hl_thread;
 
 HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
-HL_API hl_thread *hl_thread_current();
+HL_API hl_thread *hl_thread_current( void );
 HL_API bool hl_thread_pause( hl_thread *t, bool pause );
 
 // ----------------------- ALLOC --------------------------------------------------
@@ -597,13 +597,13 @@ HL_API bool hl_thread_pause( hl_thread *t, bool pause );
 
 HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
 HL_API void hl_add_root( void *ptr );
-HL_API void hl_pop_root();
+HL_API void hl_pop_root( void );
 HL_API void hl_remove_root( void *ptr );
-HL_API void hl_gc_major();
+HL_API void hl_gc_major( void );
 HL_API bool hl_is_gc_ptr( void *ptr );
 
 HL_API void hl_blocking( bool b );
-HL_API bool hl_is_blocking();
+HL_API bool hl_is_blocking( void );
 
 typedef void (*hl_types_dump)( void (*)( void *, int) );
 HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
@@ -619,7 +619,7 @@ HL_API void *hl_zalloc( hl_alloc *a, int size );
 HL_API void hl_free( hl_alloc *a );
 
 HL_API void hl_global_init( void *stack_top );
-HL_API void hl_global_free();
+HL_API void hl_global_free( void );
 
 HL_API void *hl_alloc_executable_memory( int size );
 HL_API void hl_free_executable_memory( void *ptr, int size );
@@ -628,7 +628,7 @@ HL_API void hl_free_executable_memory( void *ptr, int size );
 
 typedef struct hl_buffer hl_buffer;
 
-HL_API hl_buffer *hl_alloc_buffer();
+HL_API hl_buffer *hl_alloc_buffer( void );
 HL_API void hl_buffer_val( hl_buffer *b, vdynamic *v );
 HL_API void hl_buffer_char( hl_buffer *b, uchar c );
 HL_API void hl_buffer_str( hl_buffer *b, const uchar *str );
