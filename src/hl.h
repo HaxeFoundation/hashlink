@@ -232,8 +232,6 @@ C_FUNCTION_END
 #	define hl_debug_break()
 #endif
 
-#define DADDR(v)	((int)((int_val)(v))&0xFFFF)
-
 // ---- TYPES -------------------------------------------
 
 typedef enum {
