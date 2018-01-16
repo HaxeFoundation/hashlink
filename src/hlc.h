@@ -50,6 +50,7 @@
 #	pragma warning(disable:4100) // unreferenced param
 #	pragma warning(disable:4101) // unreferenced local var
 #	pragma warning(disable:4102) // unreferenced label
+#	pragma warning(disable:4700) // uninitialized local variable used
 #	pragma warning(disable:4703) // potentially uninitialized local
 #	pragma warning(disable:4723) // potential divide by 0
 #	pragma warning(disable:4715) // control paths must return a value
