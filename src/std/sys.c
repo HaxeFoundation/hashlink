@@ -136,7 +136,11 @@ HL_PRIM vbyte *hl_sys_locale() {
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
+#ifdef HL_ANDROID
+	LOG_ANDROID(hl_to_utf8(msg));
+#else
 	uprintf(USTR("%s"),(uchar*)msg);
+#endif
 	hl_blocking(false);
 }
 
