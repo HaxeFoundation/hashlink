@@ -23,8 +23,7 @@
 #ifndef HL_NATIVE_UCHAR_FUN
 #include <stdarg.h>
 
-#ifdef __ANDROID__
-#	define HL_ANDROID
+#ifdef HL_ANDROID
 #	include <android/log.h>
 #	ifndef HL_ANDROID_LOG_TAG
 #		define HL_ANDROID_LOG_TAG "hl"

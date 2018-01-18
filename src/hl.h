@@ -44,6 +44,10 @@
 #endif
 #endif
 
+#ifdef __ANDROID__
+#	define HL_ANDROID
+#endif
+
 #if defined(linux) || defined(__linux__)
 #	define HL_LINUX
 #	define _GNU_SOURCE
