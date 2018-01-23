@@ -813,13 +813,26 @@ static void gc_mark() {
 		void *p = *stack_head++;
 		gc_pheader *page = GC_GET_PAGE(p);
 		int bid;
+#		ifdef STACK_INTERIOR_POINTER
+		if( !page ) continue;
+#		else
 		if( !page || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
+#		endif
+
 #		ifdef HL_64
 		if( !INPAGE(p,page) ) continue;
 #		endif
 		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 		if( page->sizes ) {
+#			ifdef STACK_INTERIOR_POINTER
+			int oid = bid;
+			while( bid > page->first_block && page->sizes[bid] == 0 && oid - bid < 0xFF ) 
+				bid--;
+			if( oid - bid > page->sizes[bid] )
+				continue;
+#			else
 			if( page->sizes[bid] == 0 ) continue;
+#			endif
 		} else if( bid < page->first_block )
 			continue;
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
