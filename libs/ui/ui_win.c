@@ -274,6 +274,50 @@ HL_PRIM void HL_NAME(ui_close_console)() {
 	FreeConsole();
 }
 
+
+HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
+	wref *win = (wref*)hl_dyn_getp(options,hl_hash_utf8("window"), &hlt_abstract);
+	varray *filters = (varray*)hl_dyn_getp(options,hl_hash_utf8("filters"),&hlt_array);
+	wchar_t *fileName = (wchar_t*)hl_dyn_getp(options,hl_hash_utf8("fileName"),&hlt_bytes);
+	OPENFILENAME op;
+	wchar_t filterStr[1024];
+	wchar_t outputFile[1024] = {0};
+	ZeroMemory(&op, sizeof(op));
+	op.lStructSize = sizeof(op);
+	op.hwndOwner = win ? win->h : NULL;
+	if( filters && filters->size > 0 ) {
+		int i, pos = 0;
+		for(i=0;i<filters->size;i++) {
+			wchar_t *str = hl_aptr(filters,wchar_t*)[i];
+			int len = wcslen(str);
+			if( pos + len > 1024 ) return false;
+			memcpy(filterStr + pos, str, (len + 1) << 1);
+			pos += len + 1;
+		}
+		filterStr[pos] = 0;
+		op.lpstrFilter = filterStr;
+		op.nFilterIndex = hl_dyn_geti(options,hl_hash_utf8("filterIndex"),&hlt_i32) + 1; // 1 based
+	}
+	if( fileName )
+		memcpy(outputFile, fileName, (wcslen(fileName)+1) * 2 );
+	op.lpstrFile = outputFile;
+	op.nMaxFile = 1024;
+	op.lpstrInitialDir = hl_dyn_getp(options,hl_hash_utf8("directory"),&hlt_bytes);
+	op.lpstrTitle = hl_dyn_getp(options,hl_hash_utf8("title"),&hlt_bytes);
+	op.Flags |= OFN_NOCHANGEDIR;
+	if( forSave ) {
+		op.Flags |= OFN_OVERWRITEPROMPT;
+		if( !GetSaveFileName(&op) )
+			return NULL;
+	} else {
+		op.Flags |= OFN_CREATEPROMPT;
+		if( !GetOpenFileName(&op) )
+			return NULL;
+	}
+	return hl_copy_bytes((vbyte*)outputFile, (wcslen(outputFile)+1)*2);
+}
+
+
 #define _WIN _ABSTRACT(ui_window)
 #define _SENTINEL _ABSTRACT(ui_sentinel)
 
@@ -293,3 +337,5 @@ DEFINE_PRIM(_SENTINEL, ui_start_sentinel, _F64 _FUN(_VOID,_NO_ARG));
 DEFINE_PRIM(_VOID, ui_sentinel_tick, _SENTINEL);
 DEFINE_PRIM(_VOID, ui_sentinel_pause, _SENTINEL _BOOL);
 DEFINE_PRIM(_BOOL, ui_sentinel_is_paused, _SENTINEL);
+
+DEFINE_PRIM(_BYTES, ui_choose_file, _BOOL _DYN);
