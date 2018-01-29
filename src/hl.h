@@ -34,12 +34,27 @@
 #endif
 
 #if defined(__APPLE__) || defined(__MACH__) || defined(macintosh)
-#	define HL_MAC
+#include <TargetConditionals.h>
+#if TARGET_OS_IOS
+#define HL_IOS
+#elif TARGET_OS_TV
+#define HL_TVOS
+#elif TARGET_OS_MAC
+#define HL_MAC
+#endif
+#endif
+
+#ifdef __ANDROID__
+#	define HL_ANDROID
 #endif
 
 #if defined(linux) || defined(__linux__)
 #	define HL_LINUX
 #	define _GNU_SOURCE
+#endif
+
+#if defined(HL_IOS) || defined(HL_ANDROID) || defined(HL_TVOS)
+#	define HL_MOBILE
 #endif
 
 #ifdef __ORBIS__
@@ -188,7 +203,14 @@ typedef uint16_t uchar;
 #	define USTR(str)	u##str
 #else
 #	include <stdarg.h>
+#if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_MAC)
+#include <stddef.h>
+#include <stdint.h>
+typedef uint16_t char16_t;
+typedef uint32_t char32_t;
+#else
 #	include <uchar.h>
+#endif
 typedef char16_t uchar;
 #	undef USTR
 #	define USTR(str)	u##str
@@ -212,7 +234,7 @@ C_FUNCTION_END
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
 #elif defined(HL_PS)
 #	define hl_debug_break()	__debugbreak()
-#elif defined(HL_LINUX)
+#elif defined(HL_LINUX) && defined(__i386__)
 #	ifdef HL_64
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \

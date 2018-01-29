@@ -21,6 +21,10 @@
  */
 #include <hlc.h>
 
+#if defined(HL_MOBILE) && defined(sdl__Sdl__val)
+#   include <SDL_main.h>
+#endif
+
 #ifdef _WIN32
 #	pragma warning(disable:4091)
 #	include <DbgHelp.h>

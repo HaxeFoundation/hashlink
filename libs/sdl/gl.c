@@ -1,7 +1,14 @@
 #define HL_NAME(n) sdl_##n
 #include <hl.h>
 
-#if defined(__APPLE__)
+#if defined(HL_IOS) || defined (HL_TVOS)
+#	include <SDL2/SDL.h>
+#	include <SDL2/SDL_syswm.h>
+#	include <OpenGLES/ES3/gl.h>
+#	define glBindFragDataLocation(...)
+#	define glGetQueryObjectiv glGetQueryObjectuiv
+#	define glClearDepth glClearDepthf
+#elif defined(HL_MAC)
 #	include <SDL2/SDL.h>
 #	include <OpenGL/gl3.h>
 #elif defined(_WIN32)
@@ -16,6 +23,13 @@
 #	define GL_IMPORT(fun, t)
 #	define glBindFragDataLocation(...)
 #	define glGetQueryObjectiv glGetQueryObjectuiv
+#elif defined(HL_ANDROID)
+#	include <SDL.h>
+#	include <GLES3/gl3.h>
+#	include <GLES3/gl3ext.h>
+#	define glBindFragDataLocation(...)
+#	define glGetQueryObjectiv glGetQueryObjectuiv
+#	define glClearDepth glClearDepthf
 #else
 #	include <SDL2/SDL.h>
 #	include <GL/glu.h>
@@ -380,8 +394,17 @@ HL_PRIM vdynamic *HL_NAME(gl_create_framebuffer)() {
 }
 
 HL_PRIM void HL_NAME(gl_bind_framebuffer)( int target, vdynamic *f ) {
-	GLOG("%d,%d",target,ZIDX(f));
-	glBindFramebuffer(target, ZIDX(f));
+	unsigned int id = ZIDX(f);
+	GLOG("%d,%d",target,id);
+#if	defined(HL_IOS) || defined(HL_TVOS)
+	if ( id==0 ) {
+		SDL_SysWMinfo info;
+		SDL_VERSION(&info.version);
+		SDL_GetWindowWMInfo(SDL_GL_GetCurrentWindow(), &info);
+		id = info.info.uikit.framebuffer;
+	}
+#endif
+	glBindFramebuffer(target, id);
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_texture2d)( int target, int attach, int texTarget, vdynamic *t, int level ) {
@@ -420,8 +443,17 @@ HL_PRIM vdynamic *HL_NAME(gl_create_renderbuffer)() {
 }
 
 HL_PRIM void HL_NAME(gl_bind_renderbuffer)( int target, vdynamic *r ) {
-	GLOG("%d,%d",target,ZIDX(r));
-	glBindRenderbuffer(target, ZIDX(r));
+	unsigned int id = ZIDX(r);
+	GLOG("%d,%d",target,id);
+#if	defined(HL_IOS) || defined(HL_TVOS)
+	if ( id==0 ) {
+		SDL_SysWMinfo info;
+		SDL_VERSION(&info.version);
+		SDL_GetWindowWMInfo(SDL_GL_GetCurrentWindow(), &info);
+		id = info.info.uikit.colorbuffer;
+	}
+#endif
+	glBindRenderbuffer(GL_RENDERBUFFER, id);
 }
 
 HL_PRIM void HL_NAME(gl_renderbuffer_storage)( int target, int format, int width, int height ) {
@@ -553,14 +585,14 @@ HL_PRIM bool HL_NAME(gl_query_result_available)( vdynamic *q ) {
 
 HL_PRIM double HL_NAME(gl_query_result)( vdynamic *q ) {
 	GLuint64 v = -1;
-#	ifndef HL_MESA
+#	if !defined(HL_MESA) && !defined(HL_MOBILE)
 	glGetQueryObjectui64v(q->v.i, GL_QUERY_RESULT, &v);
 #	endif
 	return (double)v;
 }
 
 HL_PRIM void HL_NAME(gl_query_counter)( vdynamic *q, int target ) {
-#	ifndef HL_MESA
+#	if !defined(HL_MESA) && !defined(HL_MOBILE)
 	glQueryCounter(q->v.i, target);
 #	endif
 }

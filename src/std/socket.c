@@ -77,7 +77,7 @@
 
 #include <hl.h>
 
-#if defined(HL_WIN) || defined(HL_MAC)
+#if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS)
 #	define MSG_NOSIGNAL 0
 #endif
 
@@ -184,7 +184,7 @@ HL_PRIM int hl_host_resolve( vbyte *host ) {
 	ip = inet_addr((char*)host);
 	if( ip == INADDR_NONE ) {
 		struct hostent *h;
-#	if defined(HL_WIN) || defined(HL_MAC) || defined (HL_CYGWIN) || defined(HL_CONSOLE)
+#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS) || defined (HL_CYGWIN) || defined(HL_CONSOLE)
 		h = gethostbyname((char*)host);
 #	else
 		struct hostent hbase;
@@ -207,8 +207,10 @@ HL_PRIM vbyte *hl_host_to_string( int ip ) {
 
 HL_PRIM vbyte *hl_host_reverse( int ip ) {
 	struct hostent *h;
-#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_CYGWIN) || defined(HL_CONSOLE)
+#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS) || defined(HL_CYGWIN) || defined(HL_CONSOLE)
 	h = gethostbyaddr((char *)&ip,4,AF_INET);
+#	elif defined(__ANDROID__)
+	hl_error("hl_host_reverse() not available for this platform");
 #	else
 	struct hostent htmp;
 	int errcode;
