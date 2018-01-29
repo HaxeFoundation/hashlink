@@ -73,6 +73,12 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	if( restrictLevel >= maxLevels ) restrictLevel = maxLevels - 1;
 	d->init_flags = flags;
 	result = D3D11CreateDeviceAndSwapChain(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels + restrictLevel,maxLevels - restrictLevel,D3D11_SDK_VERSION,&desc,&d->swapchain,&d->device,&d->feature,&d->context);
+	if( result == DXGI_ERROR_SDK_COMPONENT_MISSING && (flags & D3D11_CREATE_DEVICE_DEBUG) != 0 ) {
+		// no debug driver available, retry
+		flags &= ~D3D11_CREATE_DEVICE_DEBUG;
+		d->init_flags = flags;
+		result = E_INVALIDARG;
+	}
 	if( result == E_INVALIDARG ) // most likely no DX11.1 support, try again
 		result = D3D11CreateDeviceAndSwapChain(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,NULL,0,D3D11_SDK_VERSION, &desc, &d->swapchain, &d->device, &d->feature, &d->context);
 
