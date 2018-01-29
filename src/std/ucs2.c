@@ -23,6 +23,17 @@
 #ifndef HL_NATIVE_UCHAR_FUN
 #include <stdarg.h>
 
+#ifdef HL_ANDROID
+#	include <android/log.h>
+#	ifndef HL_ANDROID_LOG_TAG
+#		define HL_ANDROID_LOG_TAG "hl"
+#	endif
+#	ifndef HL_ANDROID_LOG_LEVEL
+#		define HL_ANDROID_LOG_LEVEL ANDROID_LOG_DEBUG
+#	endif
+#	define LOG_ANDROID(cfmt,cstr) __android_log_print(HL_ANDROID_LOG_LEVEL, HL_ANDROID_LOG_TAG, cfmt, cstr);
+#endif
+
 int ustrlen( const uchar *str ) {
 	const uchar *p = str;
 	while( *p ) p++;
@@ -224,7 +235,11 @@ static char *utos( const uchar *s ) {
 void uprintf( const uchar *fmt, const uchar *str ) {
 	char *cfmt = utos(fmt);
 	char *cstr = utos(str);
+#ifdef HL_ANDROID
+	LOG_ANDROID(cfmt,cstr);
+#else
 	printf(cfmt,cstr);
+#endif
 	free(cfmt);
 	free(cstr);
 }
