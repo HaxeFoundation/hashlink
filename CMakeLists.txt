@@ -24,10 +24,10 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIR})
 # avoid the extra "Debug", "Release" directories
 # http://stackoverflow.com/questions/7747857/in-cmake-how-do-i-work-around-the-debug-and-release-directories-visual-studio-2
 foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
-	string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
-	set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
-	set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
-	set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
+    string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
+    set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
+    set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
+    set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
 endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
 set(HL_VERSION_MAJOR 0)
@@ -41,31 +41,31 @@ include_directories(
 )
 
 file(GLOB pcre_srcs
-	include/pcre/*.c
+    include/pcre/*.c
 )
 file(GLOB std_srcs
-	src/std/array.c
+    src/std/array.c
     src/std/buffer.c
     src/std/bytes.c
     src/std/cast.c
     src/std/date.c
     src/std/error.c
-	src/std/file.c
+    src/std/file.c
     src/std/fun.c
     src/std/maps.c
     src/std/math.c
     src/std/obj.c
     src/std/random.c
     src/std/regexp.c
-	src/std/socket.c
+    src/std/socket.c
     src/std/string.c
     src/std/sys.c
     src/std/sys_android.c
     src/std/sys_ios.m
     src/std/types.c
     src/std/ucs2.c
-	src/std/thread.c
-	src/std/process.c
+    src/std/thread.c
+    src/std/process.c
 )
 
 add_library(libhl SHARED
@@ -87,10 +87,10 @@ else()
 endif()
 
 set_target_properties(libhl
-	PROPERTIES
-	VERSION ${HL_VERSION}
-	SOVERSION ${HL_VERSION_MAJOR}
-	COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
+    PROPERTIES
+    VERSION ${HL_VERSION}
+    SOVERSION ${HL_VERSION_MAJOR}
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
 )
 
 add_executable(hl
@@ -98,14 +98,14 @@ add_executable(hl
     src/jit.c
     src/main.c
     src/module.c
-	src/debugger.c
+    src/debugger.c
 )
 
 target_link_libraries(hl libhl)
 
 if(WIN32)
-	target_link_libraries(libhl ws2_32 user32)
-	target_link_libraries(hl user32)
+    target_link_libraries(libhl ws2_32 user32)
+    target_link_libraries(hl user32)
 else()
     target_link_libraries(libhl m dl pthread)
 endif()
@@ -144,8 +144,8 @@ set_target_properties(sdl.hdll
     SUFFIX .hdll
 )
 target_include_directories(sdl.hdll
-	PRIVATE
-	${SDL2_INCLUDE_DIR}
+    PRIVATE
+    ${SDL2_INCLUDE_DIR}
     include/gl
 )
 target_link_libraries(sdl.hdll
@@ -289,7 +289,7 @@ if(WIN32)
         include/vorbis/vorbisfile.c
         include/vorbis/window.c
         libs/fmt/fmt.c
-		libs/fmt/sha1.c
+        libs/fmt/sha1.c
     )
 else()
     find_package(ZLIB REQUIRED)
@@ -299,7 +299,7 @@ else()
 
     add_library(fmt.hdll MODULE
         libs/fmt/fmt.c
-		libs/fmt/sha1.c
+        libs/fmt/sha1.c
     )
 endif()
 
@@ -311,11 +311,11 @@ set_target_properties(fmt.hdll
     SUFFIX .hdll
 )
 target_include_directories(fmt.hdll
-	PRIVATE
-	${ZLIB_INCLUDE_DIRS}
-	${PNG_INCLUDE_DIRS}
-	${TurboJPEG_INCLUDE_DIRS}
-	${OGGVORBIS_INCLUDE_DIR}
+    PRIVATE
+    ${ZLIB_INCLUDE_DIRS}
+    ${PNG_INCLUDE_DIRS}
+    ${TurboJPEG_INCLUDE_DIRS}
+    ${OGGVORBIS_INCLUDE_DIR}
 )
 target_link_libraries(fmt.hdll
     libhl
