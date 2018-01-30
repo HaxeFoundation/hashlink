@@ -60,13 +60,23 @@ file(GLOB std_srcs
     src/std/socket.c
     src/std/string.c
     src/std/sys.c
-    src/std/sys_android.c
-    src/std/sys_ios.m
     src/std/types.c
     src/std/ucs2.c
     src/std/thread.c
     src/std/process.c
 )
+
+if (ANDROID)
+    list(APPEND std_srcs
+        src/std/sys_android.c
+    )
+endif()
+
+if (IOS_PLATFORM)
+    list(APPEND std_srcs
+        src/std/sys_ios.m
+    )
+endif()
 
 add_library(libhl SHARED
     ${pcre_srcs}
