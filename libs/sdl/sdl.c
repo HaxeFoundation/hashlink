@@ -160,21 +160,21 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			break;
 		case SDL_FINGERDOWN:
 			event->type = TouchDown;
-			event->mouseX = e.tfinger.x*100;
-			event->mouseY = e.tfinger.y*100;
-			event->fingerId = e.tfinger.fingerId;
+			event->mouseX = (int)(e.tfinger.x*100);
+			event->mouseY = (int)(e.tfinger.y*100);
+			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_FINGERMOTION:
 			event->type = TouchMove;
-			event->mouseX = e.tfinger.x*100;
-			event->mouseY = e.tfinger.y*100;
-			event->fingerId = e.tfinger.fingerId;
+			event->mouseX = (int)(e.tfinger.x*100);
+			event->mouseY = (int)(e.tfinger.y*100);
+			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_FINGERUP:
 			event->type = TouchUp;
-			event->mouseX = e.tfinger.x*100;
-			event->mouseY = e.tfinger.y*100;
-			event->fingerId = e.tfinger.fingerId;
+			event->mouseX = (int)(e.tfinger.x*100);
+			event->mouseY = (int)(e.tfinger.y*100);
+			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_MOUSEWHEEL:
 			event->type = MouseWheel;
@@ -343,7 +343,7 @@ HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
 DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32);
-DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32) );
+DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32 _I32) );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
