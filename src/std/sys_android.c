@@ -101,7 +101,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved)
 	env = hl_android_jni_get_env();
 
 	/* Try to retrieve local reference to our Activity class */
-	cls = (*env)->FindClass(env, hl_java_activity_class);
+	cls = (*env)->FindClass(env, HL_ANDROID_ACTIVITY);
 	if (!cls) {
 		__android_log_print(ANDROID_LOG_ERROR, HL_JNI_LOG_TAG, "Error cannot find HashLink Activity class");
 	}
