@@ -57,7 +57,7 @@ class Window {
 			var shaderVersion = 120;
 			if (isOpenGLES) {
 				if( reg.match(v) )
-					shaderVersion = hxd.Math.imin( 100, Math.round( Std.parseFloat(reg.matched(0)) * 100 ) );
+					shaderVersion = Std.int(Math.min( 100, Math.round( Std.parseFloat(reg.matched(0)) * 100 ) ));
 			}
 			else {
 				shaderVersion = 130;
