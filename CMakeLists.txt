@@ -136,6 +136,26 @@ add_custom_target(hello.hl ALL
 )
 
 #####################
+# ui.hdll
+
+add_library(ui.hdll MODULE libs/ui/ui_stub.c)
+
+if (WIN32)
+    set_target_properties(ui.hdll PROPERTIES SOURCES libs/ui/ui_win.c)
+endif()
+
+set_target_properties(ui.hdll
+    PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME ui
+    SUFFIX .hdll
+)
+
+target_link_libraries(ui.hdll
+    libhl
+)
+
+#####################
 # sdl.hdll
 
 if (WIN32)
@@ -190,10 +210,10 @@ if(WIN32)
     set(PNG_INCLUDE_DIRS include/png)
     set(OGGVORBIS_INCLUDE_DIR include/vorbis)
 
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8) 
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(TurboJPEG_INCLUDE_DIRS include/turbojpeg include/turbojpeg/x64)
         find_library(TurboJPEG_LIBRARIES simd PATHS include/turbojpeg/x64)
-    else() 
+    else()
         set(TurboJPEG_INCLUDE_DIRS include/turbojpeg include/turbojpeg/x86)
         find_library(TurboJPEG_LIBRARIES simd PATHS include/turbojpeg/x86)
     endif()
