@@ -468,6 +468,95 @@ if(WIN32)
     )
 endif()
 
+
+#####################
+# ssl.hdll
+# TODO: unix
+
+if(WIN32)
+    add_library(ssl.hdll MODULE
+        include/mbedtls/library/aes.c
+        include/mbedtls/library/aesni.c
+        include/mbedtls/library/arc4.c
+        include/mbedtls/library/asn1parse.c
+        include/mbedtls/library/asn1write.c
+        include/mbedtls/library/base64.c
+        include/mbedtls/library/bignum.c
+        include/mbedtls/library/blowfish.c
+        include/mbedtls/library/camellia.c
+        include/mbedtls/library/ccm.c
+        include/mbedtls/library/certs.c
+        include/mbedtls/library/cipher.c
+        include/mbedtls/library/cipher_wrap.c
+        include/mbedtls/library/ctr_drbg.c
+        include/mbedtls/library/debug.c
+        include/mbedtls/library/des.c
+        include/mbedtls/library/dhm.c
+        include/mbedtls/library/ecdh.c
+        include/mbedtls/library/ecdsa.c
+        include/mbedtls/library/ecjpake.c
+        include/mbedtls/library/ecp.c
+        include/mbedtls/library/ecp_curves.c
+        include/mbedtls/library/entropy.c
+        include/mbedtls/library/entropy_poll.c
+        include/mbedtls/library/error.c
+        include/mbedtls/library/gcm.c
+        include/mbedtls/library/havege.c
+        include/mbedtls/library/hmac_drbg.c
+        include/mbedtls/library/md.c
+        include/mbedtls/library/md2.c
+        include/mbedtls/library/md4.c
+        include/mbedtls/library/md5.c
+        include/mbedtls/library/md_wrap.c
+        include/mbedtls/library/memory_buffer_alloc.c
+        include/mbedtls/library/oid.c
+        include/mbedtls/library/padlock.c
+        include/mbedtls/library/pem.c
+        include/mbedtls/library/pk.c
+        include/mbedtls/library/pkcs11.c
+        include/mbedtls/library/pkcs12.c
+        include/mbedtls/library/pkcs5.c
+        include/mbedtls/library/pkparse.c
+        include/mbedtls/library/pkwrite.c
+        include/mbedtls/library/pk_wrap.c
+        include/mbedtls/library/platform.c
+        include/mbedtls/library/ripemd160.c
+        include/mbedtls/library/rsa.c
+        include/mbedtls/library/sha1.c
+        include/mbedtls/library/sha256.c
+        include/mbedtls/library/sha512.c
+        include/mbedtls/library/ssl_cache.c
+        include/mbedtls/library/ssl_ciphersuites.c
+        include/mbedtls/library/ssl_cli.c
+        include/mbedtls/library/ssl_cookie.c
+        include/mbedtls/library/ssl_srv.c
+        include/mbedtls/library/ssl_ticket.c
+        include/mbedtls/library/ssl_tls.c
+        include/mbedtls/library/threading.c
+        include/mbedtls/library/timing.c
+        include/mbedtls/library/version.c
+        include/mbedtls/library/version_features.c
+        include/mbedtls/library/x509.c
+        include/mbedtls/library/x509write_crt.c
+        include/mbedtls/library/x509write_csr.c
+        include/mbedtls/library/x509_create.c
+        include/mbedtls/library/x509_crl.c
+        include/mbedtls/library/x509_crt.c
+        include/mbedtls/library/x509_csr.c
+        include/mbedtls/library/xtea.c
+        libs/ssl/ssl.c
+    )
+    set_as_hdll(ssl)
+    target_include_directories(ssl.hdll
+        PRIVATE
+        include/mbedtls/include
+    )
+    target_link_libraries(ssl.hdll
+        libhl
+        crypt32
+    )
+endif()
+
 #####################
 # Tests
 
@@ -495,6 +584,7 @@ install(
         sqlite.hdll
         directx.hdll
         uv.hdll
+        ssl.hdll
     DESTINATION .
     PUBLIC_HEADER DESTINATION include
 )
