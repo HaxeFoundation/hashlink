@@ -98,7 +98,7 @@ unset(_LibUV_H_REGEX)
 unset(_LibUV_H)
 
 #-----------------------------------------------------------------------------
-include(${CMAKE_CURRENT_LIST_DIR}/../../Modules/FindPackageHandleStandardArgs.cmake)
+include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibUV
   FOUND_VAR LibUV_FOUND
   REQUIRED_VARS LibUV_LIBRARY LibUV_INCLUDE_DIR

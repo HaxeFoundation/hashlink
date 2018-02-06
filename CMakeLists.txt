@@ -393,8 +393,6 @@ target_link_libraries(sqlite.hdll
 #####################
 # uv.hdll
 
-find_package(LibUV)
-
 add_library(uv.hdll MODULE
     libs/uv/uv.c
 )
@@ -434,6 +432,8 @@ if (WIN32)
             include/libuv/src/win/winapi.c
             include/libuv/src/win/winsock.c
     )
+else()
+    find_package(LibUV)
 endif()
 
 set_target_properties(uv.hdll
