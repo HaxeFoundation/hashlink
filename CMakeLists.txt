@@ -359,6 +359,26 @@ target_compile_definitions(fmt.hdll
     ${PNG_DEFINITIONS}
 )
 
+#####################
+# sqlite.hdll
+
+add_library(sqlite.hdll MODULE
+    libs/sqlite/sqlite.c
+    include/sqlite/src/sqlite3.c
+)
+set_target_properties(sqlite.hdll
+    PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME sqlite
+    SUFFIX .hdll
+)
+target_include_directories(sqlite.hdll
+    PRIVATE
+    include/sqlite/src
+)
+target_link_libraries(sqlite.hdll
+    libhl
+)
 
 #####################
 # Tests
