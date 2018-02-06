@@ -1,13 +1,18 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.1)
 
 cmake_policy(SET CMP0042 NEW)
 
 include(GNUInstallDirs)
 include(FindPkgConfig)
-project(hashlink C CXX)
+
+if (WIN32)
+    project(hashlink C CXX) # C++ required for directx
+else()
+    project(hashlink C)
+endif()
 
 # force Unicode over Multi-byte
-if(MSVC)
+if (MSVC)
     add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
@@ -385,6 +390,72 @@ target_link_libraries(sqlite.hdll
     libhl
 )
 
+#####################
+# uv.hdll
+
+find_package(LibUV)
+
+add_library(uv.hdll MODULE
+    libs/uv/uv.c
+)
+
+if (WIN32)
+    target_sources(uv.hdll
+        PRIVATE
+            include/libuv/src/fs-poll.c
+            include/libuv/src/inet.c
+            include/libuv/src/threadpool.c
+            include/libuv/src/uv-common.c
+            include/libuv/src/version.c
+            include/libuv/src/win/async.c
+            include/libuv/src/win/core.c
+            include/libuv/src/win/dl.c
+            include/libuv/src/win/error.c
+            include/libuv/src/win/fs-event.c
+            include/libuv/src/win/fs.c
+            include/libuv/src/win/getaddrinfo.c
+            include/libuv/src/win/getnameinfo.c
+            include/libuv/src/win/handle.c
+            include/libuv/src/win/loop-watcher.c
+            include/libuv/src/win/pipe.c
+            include/libuv/src/win/poll.c
+            include/libuv/src/win/process-stdio.c
+            include/libuv/src/win/process.c
+            include/libuv/src/win/req.c
+            include/libuv/src/win/signal.c
+            include/libuv/src/win/snprintf.c
+            include/libuv/src/win/stream.c
+            include/libuv/src/win/tcp.c
+            include/libuv/src/win/thread.c
+            include/libuv/src/win/timer.c
+            include/libuv/src/win/tty.c
+            include/libuv/src/win/udp.c
+            include/libuv/src/win/util.c
+            include/libuv/src/win/winapi.c
+            include/libuv/src/win/winsock.c
+    )
+endif()
+
+set_target_properties(uv.hdll
+    PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME uv
+    SUFFIX .hdll
+)
+target_include_directories(uv.hdll
+    PRIVATE
+    include/libuv/include
+)
+target_link_libraries(uv.hdll
+    libhl
+)
+if (WIN32)
+    target_link_libraries(uv.hdll
+        psapi
+        iphlpapi
+        userenv
+    )
+endif()
 
 #####################
 # directx.hdll
