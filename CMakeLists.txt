@@ -582,11 +582,18 @@ install(
         ui.hdll
         sdl.hdll
         sqlite.hdll
-        directx.hdll
         uv.hdll
-        ssl.hdll
     DESTINATION .
     PUBLIC_HEADER DESTINATION include
 )
+
+if (WIN32)
+    install(
+        TARGETS
+            directx.hdll
+            ssl.hdll
+        DESTINATION .
+    )
+endif()
 
 include(CPack)
