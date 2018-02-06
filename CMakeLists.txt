@@ -4,7 +4,12 @@ cmake_policy(SET CMP0042 NEW)
 
 include(GNUInstallDirs)
 include(FindPkgConfig)
-project(hashlink C)
+project(hashlink C CXX)
+
+# force Unicode over Multi-byte
+if(MSVC)
+    add_definitions(-DUNICODE -D_UNICODE)
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
@@ -379,6 +384,33 @@ target_include_directories(sqlite.hdll
 target_link_libraries(sqlite.hdll
     libhl
 )
+
+
+#####################
+# directx.hdll
+
+if(WIN32)
+    find_package(DirectX)
+    add_library(directx.hdll MODULE
+        libs/directx/directx.cpp
+        libs/directx/gamecontroller.c
+        libs/directx/window.c
+    )
+    set_target_properties(directx.hdll
+        PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME directx
+        SUFFIX .hdll
+    )
+    target_link_libraries(directx.hdll
+        libhl
+        d3d11
+        dxgi
+        d3dcompiler
+        xinput9_1_0
+        dinput8
+    )
+endif()
 
 #####################
 # Tests
