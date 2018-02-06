@@ -103,6 +103,12 @@ add_library(libhl SHARED
     ${std_srcs}
 )
 
+set_target_properties(libhl
+    PROPERTIES
+        PUBLIC_HEADER
+            "src/hl.h;src/hlc.h;src/hlc_main.c"
+)
+
 if(WIN32)
     set_target_properties(libhl
         PROPERTIES
@@ -469,3 +475,28 @@ include(CTest)
 add_test(NAME hello.hl
     COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
 )
+
+#####################
+# Packaging
+
+set(CPACK_PACKAGE_VENDOR "Haxe Foundation")
+set(CPACK_PACKAGE_VERSION_MAJOR ${HL_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${HL_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${HL_VERSION_PATCH})
+set(CPACK_GENERATOR ZIP)
+
+install(
+    TARGETS
+        hl
+        libhl
+        fmt.hdll
+        ui.hdll
+        sdl.hdll
+        sqlite.hdll
+        directx.hdll
+        uv.hdll
+    DESTINATION .
+    PUBLIC_HEADER DESTINATION include
+)
+
+include(CPack)
