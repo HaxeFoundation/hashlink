@@ -45,6 +45,15 @@ set(HL_VERSION_MINOR 1)
 set(HL_VERSION_PATCH 0)
 set(HL_VERSION ${HL_VERSION_MAJOR}.${HL_VERSION_MINOR}.${HL_VERSION_PATCH})
 
+function(set_as_hdll target)
+    set_target_properties(${target}.hdll
+        PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME ${target}
+        SUFFIX .hdll
+    )
+endfunction()
+
 include_directories(
     src
     include/pcre
@@ -154,12 +163,7 @@ if (WIN32)
     set_target_properties(ui.hdll PROPERTIES SOURCES libs/ui/ui_win.c)
 endif()
 
-set_target_properties(ui.hdll
-    PROPERTIES
-    PREFIX ""
-    OUTPUT_NAME ui
-    SUFFIX .hdll
-)
+set_as_hdll(ui)
 
 target_link_libraries(ui.hdll
     libhl
@@ -177,12 +181,7 @@ add_library(sdl.hdll MODULE
     libs/sdl/sdl.c
     libs/sdl/gl.c
 )
-set_target_properties(sdl.hdll
-    PROPERTIES
-    PREFIX ""
-    OUTPUT_NAME sdl
-    SUFFIX .hdll
-)
+set_as_hdll(sdl)
 target_include_directories(sdl.hdll
     PRIVATE
     ${SDL2_INCLUDE_DIR}
@@ -344,12 +343,7 @@ else()
 endif()
 
 
-set_target_properties(fmt.hdll
-    PROPERTIES
-    PREFIX ""
-    OUTPUT_NAME fmt
-    SUFFIX .hdll
-)
+set_as_hdll(fmt)
 target_include_directories(fmt.hdll
     PRIVATE
     ${ZLIB_INCLUDE_DIRS}
@@ -376,12 +370,7 @@ add_library(sqlite.hdll MODULE
     libs/sqlite/sqlite.c
     include/sqlite/src/sqlite3.c
 )
-set_target_properties(sqlite.hdll
-    PROPERTIES
-    PREFIX ""
-    OUTPUT_NAME sqlite
-    SUFFIX .hdll
-)
+set_as_hdll(sqlite)
 target_include_directories(sqlite.hdll
     PRIVATE
     include/sqlite/src
@@ -436,12 +425,7 @@ else()
     find_package(LibUV)
 endif()
 
-set_target_properties(uv.hdll
-    PROPERTIES
-    PREFIX ""
-    OUTPUT_NAME uv
-    SUFFIX .hdll
-)
+set_as_hdll(uv)
 target_include_directories(uv.hdll
     PRIVATE
     include/libuv/include
@@ -467,12 +451,7 @@ if(WIN32)
         libs/directx/gamecontroller.c
         libs/directx/window.c
     )
-    set_target_properties(directx.hdll
-        PROPERTIES
-        PREFIX ""
-        OUTPUT_NAME directx
-        SUFFIX .hdll
-    )
+    set_as_hdll(directx)
     target_link_libraries(directx.hdll
         libhl
         d3d11
