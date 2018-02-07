@@ -12,7 +12,7 @@ environment:
   matrix:
     - builder: cmake
       artifacts:
-        - path: hashlink-*.zip
+        - path: 'hashlink-*.zip'
           name: Build
     - builder: vc
 
