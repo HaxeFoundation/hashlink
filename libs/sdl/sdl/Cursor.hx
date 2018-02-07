@@ -47,14 +47,6 @@ abstract Cursor(CursorPtr) {
 	static function setCursor( k : CursorPtr ) {
 	}
 
-	static function createCursorFrom( surface : Surface, hotX : Int, hotY : Int ) : CursorPtr {
-		return null;
-	}
-
-	static function createSystemCursor( kind : CursorKind ) : CursorPtr {
-		return null;
-	}
-
 	static function freeCursor( ptr : CursorPtr ) {
 	}
 
