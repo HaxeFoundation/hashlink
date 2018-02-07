@@ -432,18 +432,26 @@ else()
 endif()
 
 set_as_hdll(uv)
-target_include_directories(uv.hdll
-    PRIVATE
-    include/libuv/include
-)
 target_link_libraries(uv.hdll
     libhl
 )
 if (WIN32)
+    target_include_directories(uv.hdll
+        PRIVATE
+        include/libuv/include
+    )
     target_link_libraries(uv.hdll
         psapi
         iphlpapi
         userenv
+    )
+else()
+    target_include_directories(uv.hdll
+        PRIVATE
+        ${LibUV_INCLUDE_DIRS}
+    )
+    target_link_libraries(uv.hdll
+        ${LibUV_LIBRARIES}
     )
 endif()
 
