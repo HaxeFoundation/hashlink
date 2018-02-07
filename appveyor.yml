@@ -11,11 +11,11 @@ environment:
     HAXELIB_ROOT: C:\projects\haxelib
   matrix:
     - builder: cmake
-      artifacts:
-        - path: 'hashlink-*.zip'
-          name: Build
     - builder: vc
 
+artifacts:
+  - path: 'hashlink-*.zip'
+    name: Build
 
 install:
   # install sdl
