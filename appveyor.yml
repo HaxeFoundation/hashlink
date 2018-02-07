@@ -11,7 +11,11 @@ environment:
     HAXELIB_ROOT: C:\projects\haxelib
   matrix:
     - builder: cmake
+      artifacts:
+        - path: hashlink-*.zip
+          name: Build
     - builder: vc
+
 
 install:
   # install sdl
@@ -34,7 +38,7 @@ install:
   - haxelib setup "%HAXELIB_ROOT%"
 
 build_script:
-  # if "%builder%"=="vc" 
+  # if "%builder%"=="vc"
   - if "%builder%"=="vc"      msbuild libhl.vcxproj         /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild hl.vcxproj            /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild libs/fmt/fmt.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
@@ -44,8 +48,9 @@ build_script:
   - if "%builder%"=="vc"      msbuild libs/ssl/ssl.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   # if "%builder%"=="cmake"
   - if "%builder%"=="cmake"   cmake -G "Visual Studio 14 2015"
-  - if "%builder%"=="cmake"   msbuild ALL_BUILD.vcxproj     /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - if "%builder%"=="cmake"   msbuild RUN_TESTS.vcxproj     /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="cmake"   msbuild ALL_BUILD.vcxproj     /p:Configuration=Release /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="cmake"   msbuild RUN_TESTS.vcxproj     /p:Configuration=Release /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - if "%builder%"=="cmake"   cpack
 
 test: off
 # test_script:
