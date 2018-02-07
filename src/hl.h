@@ -717,7 +717,7 @@ typedef struct {
 #	else
 #		define	HL_PRIM				EXPORT
 #	endif
-#define DEFINE_PRIM_WITH_NAME		_DEFINE_PRIM_WITH_NAME
+#	define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
 #endif
 
 // -------------- EXTRA ------------------------------------
