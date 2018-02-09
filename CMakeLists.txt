@@ -163,7 +163,7 @@ add_custom_target(hello.hl ALL
 #####################
 # ui.hdll
 
-add_library(ui.hdll MODULE libs/ui/ui_stub.c)
+add_library(ui.hdll SHARED libs/ui/ui_stub.c)
 
 if (WIN32)
     set_target_properties(ui.hdll PROPERTIES SOURCES libs/ui/ui_win.c)
@@ -183,7 +183,7 @@ if (WIN32)
 endif()
 find_package(SDL2 REQUIRED)
 
-add_library(sdl.hdll MODULE
+add_library(sdl.hdll SHARED
     libs/sdl/sdl.c
     libs/sdl/gl.c
 )
@@ -233,7 +233,7 @@ if(WIN32)
         find_library(TurboJPEG_LIBRARIES simd PATHS include/turbojpeg/x86)
     endif()
 
-    add_library(fmt.hdll MODULE
+    add_library(fmt.hdll SHARED
         include/png/png.c
         include/png/pngerror.c
         include/png/pngget.c
@@ -342,7 +342,7 @@ else()
     find_package(TurboJPEG REQUIRED)
     find_package(OggVorbis REQUIRED)
 
-    add_library(fmt.hdll MODULE
+    add_library(fmt.hdll SHARED
         libs/fmt/fmt.c
         libs/fmt/sha1.c
     )
@@ -372,7 +372,7 @@ target_compile_definitions(fmt.hdll
 #####################
 # sqlite.hdll
 
-add_library(sqlite.hdll MODULE
+add_library(sqlite.hdll SHARED
     libs/sqlite/sqlite.c
     include/sqlite/src/sqlite3.c
 )
@@ -388,7 +388,7 @@ target_link_libraries(sqlite.hdll
 #####################
 # uv.hdll
 
-add_library(uv.hdll MODULE
+add_library(uv.hdll SHARED
     libs/uv/uv.c
 )
 
@@ -460,7 +460,7 @@ endif()
 
 if(WIN32)
     find_package(DirectX)
-    add_library(directx.hdll MODULE
+    add_library(directx.hdll SHARED
         libs/directx/directx.cpp
         libs/directx/gamecontroller.c
         libs/directx/window.c
@@ -482,7 +482,7 @@ endif()
 # TODO: unix
 
 if(WIN32)
-    add_library(ssl.hdll MODULE
+    add_library(ssl.hdll SHARED
         include/mbedtls/library/aes.c
         include/mbedtls/library/aesni.c
         include/mbedtls/library/arc4.c
