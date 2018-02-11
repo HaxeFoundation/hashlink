@@ -712,8 +712,12 @@ typedef struct {
 #define	HL_PRIM
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #else
-#define	HL_PRIM						EXPORT
-#define DEFINE_PRIM_WITH_NAME		_DEFINE_PRIM_WITH_NAME
+#	ifdef __cplusplus
+#		define	HL_PRIM				extern "C" EXPORT
+#	else
+#		define	HL_PRIM				EXPORT
+#	endif
+#	define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
 #endif
 
 // -------------- EXTRA ------------------------------------
