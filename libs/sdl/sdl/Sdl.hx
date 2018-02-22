@@ -16,10 +16,10 @@ class Sdl {
 		isWin32 = detectWin32();
 	}
 
-	public static function setGLOptions( major : Int = 3, minor : Int = 2, depth : Int = 24, stencil : Int = 8, flags : Int = 1 ) {
+	public static function setGLOptions( major : Int = 3, minor : Int = 2, depth : Int = 24, stencil : Int = 8, flags : Int = 1, samples : Int = 1 ) {
 		requiredGLMajor = major;
 		requiredGLMinor = minor;
-		glOptions(major, minor, depth, stencil, flags);
+		glOptions(major, minor, depth, stencil, flags, samples);
 	}
 
 
@@ -38,7 +38,7 @@ class Sdl {
 		Sys.exit( -1);
 	}
 
-	static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int ) {}
+	static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int, samples : Int ) {}
 
 	static function initOnce() return false;
 	static function eventLoop( e : Event ) return false;
