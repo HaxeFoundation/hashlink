@@ -106,7 +106,7 @@ HL_PRIM bool HL_NAME(init_once)() {
 	return true;
 }
 
-HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, int flags ) {
+HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, int flags, int samples ) {
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depth);
@@ -120,6 +120,11 @@ HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, 
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	else
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, 0); // auto
+
+	if (samples > 1) {
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, samples);
+	}
 }
 
 HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
@@ -342,7 +347,7 @@ HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 }
 
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
-DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32 _I32) );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);

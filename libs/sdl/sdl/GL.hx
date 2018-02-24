@@ -441,6 +441,8 @@ class GL {
 	public static inline var POLYGON_OFFSET_FILL            = 0x8037;
 	public static inline var SAMPLE_ALPHA_TO_COVERAGE       = 0x809E;
 	public static inline var SAMPLE_COVERAGE                = 0x80A0;
+	public static inline var MULTISAMPLE                    = 0x809D;
+	public static inline var DEPTH_CLAMP                    = 0x864F;
 
 	/* ErrorCode */
 	public static inline var NO_ERROR                       = 0;
@@ -556,13 +558,14 @@ class GL {
 	public static inline var RGB32F                         = 0x8815;
 	public static inline var RGBA16F                        = 0x881A;
 	public static inline var RGB16F                         = 0x881B;
-
+	public static inline var R11F_G11F_B10F                 = 0x8C3A;
 	public static inline var ALPHA16F                       = 0x881C;
 	public static inline var ALPHA32F                       = 0x8816;
 
 	/* Shaders */
 	public static inline var FRAGMENT_SHADER                  = 0x8B30;
 	public static inline var VERTEX_SHADER                    = 0x8B31;
+	public static inline var GEOMETRY_SHADER                  = 0x8DD9;
 	public static inline var MAX_VERTEX_ATTRIBS               = 0x8869;
 	public static inline var MAX_VERTEX_UNIFORM_VECTORS       = 0x8DFB;
 	public static inline var MAX_VARYING_VECTORS              = 0x8DFC;
@@ -773,7 +776,7 @@ class GL {
 	public static inline var BROWSER_DEFAULT_WEBGL          = 0x9244;
 
 	/* Queries */
-	public static inline var SAMPLES_PASSED					= 0x8914;
-	public static inline var TIMESTAMP						= 0x8E28;
+	public static inline var SAMPLES_PASSED                 = 0x8914;
+	public static inline var TIMESTAMP                      = 0x8E28;
 
 }
