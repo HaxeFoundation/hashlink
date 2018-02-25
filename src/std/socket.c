@@ -174,8 +174,10 @@ HL_PRIM int hl_socket_recv_char( hl_socket *s ) {
 	int ret;
 	if( !s ) return -2;
 	ret = recv(s->sock,&cc,1,MSG_NOSIGNAL);
-	if( ret == SOCKET_ERROR || ret == 0 )
+	if( ret == SOCKET_ERROR )
 		return block_error();
+	if( ret == 0 )
+		return -2;
 	return (unsigned char)cc;
 }
 
