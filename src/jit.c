@@ -3570,13 +3570,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OGetArray:
 			{
-				op64(ctx,MOV,alloc_cpu(ctx,dst,false),pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,hl_type_size(dst->t),sizeof(varray)));
+				preg *rdst = IS_FLOAT(dst) ? alloc_fpu(ctx,dst,false) : alloc_cpu(ctx,dst,false);
+				copy(ctx, rdst, pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,hl_type_size(dst->t),sizeof(varray)), dst->size);
 				store(ctx,dst,dst->current,false);
 			}
 			break;
 		case OSetArray:
 			{
-				op64(ctx,MOV,pmem2(&p,alloc_cpu(ctx,dst,true)->id,alloc_cpu64(ctx,ra,true)->id,hl_type_size(dst->t),sizeof(varray)),alloc_cpu(ctx,rb,true));
+				preg *rrb = IS_FLOAT(rb) ? alloc_fpu(ctx,rb,true) : alloc_cpu(ctx,rb,true);
+				copy(ctx, pmem2(&p,alloc_cpu(ctx,dst,true)->id,alloc_cpu64(ctx,ra,true)->id,hl_type_size(rb->t),sizeof(varray)), rrb, rb->size);
 			}
 			break;
 		case OArraySize:

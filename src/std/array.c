@@ -33,7 +33,8 @@ HL_PRIM varray *hl_alloc_array( hl_type *at, int size ) {
 }
 
 HL_PRIM void hl_array_blit( varray *dst, int dpos, varray *src, int spos, int len ) {
-	memmove( hl_aptr(dst,void*) + dpos, hl_aptr(src,void*) + spos, len * sizeof(void*)); 
+	int size = hl_type_size(dst->at); 
+	memmove( hl_aptr(dst,vbyte) + dpos * size, hl_aptr(src,vbyte) + spos * size, len * size); 
 }
 
 HL_PRIM hl_type *hl_array_type( varray *a ) {
