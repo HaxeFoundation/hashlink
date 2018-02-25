@@ -150,13 +150,8 @@ static int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
 
 #define AddJump(how,local)		{ if( (how) == JAlways ) { B(0xE9); } else { B(0x0F); B(how); }; local = BUF_POS(); W(0); }
 #define AddJump_small(how,local) { if( (how) == JAlways ) { B(0xEB); } else B(how - 0x10); local = BUF_POS() | 0x40000000; B(0); }
-#ifdef OP_LOG
-#	define XJump(how,local)		{ AddJump(how,local); printf("%s\n",(how) == JAlways ? "JUMP" : JUMP_NAMES[(how)&0x7F]); }
-#	define XJump_small(how,local)		{ AddJump_small(how,local); printf("%s\n",(how) == JAlways ? "JUMP" : JUMP_NAMES[(how)&0x7F]); }
-#else
-#	define XJump(how,local)		AddJump(how,local)
-#	define XJump_small(how,local)		AddJump_small(how,local)
-#endif
+#define XJump(how,local)		AddJump(how,local)
+#define XJump_small(how,local)		AddJump_small(how,local)
 
 #define MAX_OP_SIZE				256
 
@@ -484,74 +479,6 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "TEST16", OP16(0x85) },
 };
 
-#ifdef OP_LOG
-
-static const char *REG_NAMES[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
-static const char *JUMP_NAMES[] = { "JOVERFLOW", "J???", "JLT", "JGTE", "JEQ", "JNEQ", "JLTE", "JGT", "J?8", "J?9", "JP", "JNP", "JSLT", "JSGTE", "JSLTE", "JSGT" };
-
-static const char *preg_str( jit_ctx *ctx, preg *r, bool mode64 ) {
-	static char buf[64];
-	switch( r->kind ) {
-	case RCPU:
-		if( r->id < 8 )
-			sprintf(buf,"%c%s",mode64?'r':'e',REG_NAMES[r->id]);
-		else
-			sprintf(buf,"r%d%s",r->id,mode64?"":"d");
-		break;
-	case RFPU:
-		sprintf(buf,"xmm%d%s",r->id,mode64?"":"f");
-		break;
-	case RSTACK:
-		{
-			int sp = R(r->id)->stackPos;
-			sprintf(buf,"@%d[%s%Xh]",r->id,sp < 0 ? "-" : "", sp < 0 ? -sp : sp);
-		}
-		break;
-	case RCONST:
-		{
-			int_val v = r->holds ? (int_val)r->holds : r->id;
-			sprintf(buf,"%s" _PTR_FMT "h",v < 0 ? "-" : "", v < 0 ? -v : v);
-		}
-		break;
-	case RMEM:
-		{
-			int mult = r->id & 0xF;
-			int regOrOffs = mult == 15 ? r->id >> 4 : r->id >> 8;
-			CpuReg reg = (r->id >> 4) & 0xF;
-			if( mult == 15 ) {
-				sprintf(buf,"%s ptr[%c%Xh]",mode64 ? "qword" : "dword", regOrOffs<0?'-':'+',regOrOffs<0?-regOrOffs:regOrOffs);
-			} else if( mult == 0 ) {
-				int off = regOrOffs;
-				if( reg < 8 )
-					sprintf(buf,"[%c%s %c %Xh]",mode64?'r':'e',REG_NAMES[reg], off < 0 ? '-' : '+', off < 0 ? -off : off);
-				else
-					sprintf(buf,"[r%d%s %c %Xh]",reg,mode64?"":"d",off < 0 ? '-' : '+', off < 0 ? -off : off);
-			} else {
-				return "TODO";
-			}
-		}
-		break;
-	case RADDR:
-		sprintf(buf, "%s ptr[" _PTR_FMT "h]", mode64 ? "qword" : "dword", r->holds);
-		break;
-	default:
-		return "???";
-	}
-	return buf;
-}
-
-static void log_op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
-	opform *f = &OP_FORMS[o];
-	printf("@%d %s%s",ctx->currentPos-1, f->name,mode64?"64":"");
-	if( a->kind != RUNUSED )
-		printf(" %s",preg_str(ctx, a, mode64));
-	if( b->kind != RUNUSED )
-		printf(",%s",preg_str(ctx, b, mode64));
-	printf("\n");
-}
-
-#endif
-
 #ifdef HL_64
 #	define REX()	if( r64 ) B(r64 | 0x40)
 #else
@@ -582,9 +509,6 @@ static bool is_reg8( preg *a ) {
 static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
 	int r64 = mode64 && (o != PUSH && o != POP && o != CALL) ? 8 : 0;
-#	ifdef OP_LOG
-	log_op(ctx,o,a,b,mode64 && IS_64);
-#	endif
 	switch( o ) {
 	case CMP8:
 	case TEST8:
@@ -2098,7 +2022,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 				patch_jump(ctx,jcmp);
 				patch_jump(ctx,jeq);
 			} else
-				jit_error("TODO");
+				ASSERT(op->op);
 			return;
 		}
 	case HVIRTUAL:
@@ -3086,7 +3010,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			} else if (ra->t->kind == HF32) {
 				ASSERT(0);
 			} else if( dst->t->kind == HI64 && ra->t->kind == HI32 ) {
-				jit_error("TODO");
+				ASSERT(0); // todo : more i64 native support
 			} else {
 				preg *r = alloc_cpu(ctx,dst,false);
 				copy_from(ctx, r, ra);
@@ -3129,14 +3053,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,MOVSD,alloc_fpu(ctx,dst,false),pcodeaddr(&p,o->p2 * 8));
 #					else
 					op64(ctx,MOVSD,alloc_fpu(ctx,dst,false),paddr(&p,m->code->floats + o->p2));
-#					endif
-					break;
-				case HF32:
-					BREAK();
-#					ifdef HL_64
-					jit_error("TODO");
-#					else
-					op32(ctx,MOVSS,alloc_fpu(ctx,dst,false),paddr(&p,m->code->floats + o->p2));
 #					endif
 					break;
 				default:
@@ -3243,13 +3159,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOV,r,PESP);
 				for(i=0;i<o->p3;i++) {
 					vreg *a = R(o->extra[i]);
-					if( hl_is_dynamic(a->t) ) {
-						preg *v = alloc_cpu(ctx,a,true);
-						op64(ctx,MOV,pmem(&p,r->id,i * HL_WSIZE),v);
-						RUNLOCK(v);
-					} else {
-						jit_error("TODO");
-					}
+					if( !hl_is_dynamic(a->t) ) ASSERT(0);
+					preg *v = alloc_cpu(ctx,a,true);
+					op64(ctx,MOV,pmem(&p,r->id,i * HL_WSIZE),v);
+					RUNLOCK(v);
 				}
 #				ifdef HL_64
 				int size = begin_native_call(ctx, 3) + offset;
