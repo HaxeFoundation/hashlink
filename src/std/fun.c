@@ -48,7 +48,7 @@ static hl_type *hl_get_closure_type( hl_type *t ) {
 }
 
 HL_PRIM vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) {
-	hl_type *t = hl_get_closure_type(fullt); 
+	hl_type *t = hl_get_closure_type(fullt);
 	vclosure *c = (vclosure*)hl_gc_alloc(t, sizeof(vclosure));
 	c->t = t;
 	c->fun = fvalue;
@@ -296,7 +296,23 @@ HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args, vdynamic *ret ) {
 	switch( o->t->kind ) {
 	case HDYNOBJ:
-		hl_fatal("TODO");
+		{
+			vdynobj *d = (vdynobj*)o;
+			hl_field_lookup *l = hl_lookup_find(d->lookup,d->nfields, hfield);
+			if( l != NULL && l->t->kind != HFUN )
+				hl_error_msg(USTR("Field %s is of type %s and cannot be called"), hl_field_name(hfield), hl_type_str(l->t));
+			vclosure *tmp = (vclosure*)d->values[l->field_index];
+			if( tmp ) {
+				vclosure_wrapper w;
+				w.cl.t = ft;
+				w.cl.fun = hlc_get_wrapper(ft);
+				w.cl.hasValue = 2;
+				w.cl.value = &w;
+				w.wrappedFun = tmp;
+				return hl_wrapper_call(&w,args,ret);
+			}
+			hl_error_msg(USTR("%s has no method %s"),hl_type_str(o->t),hl_field_name(hfield));
+		}
 		break;
 	case HOBJ:
 		{
@@ -342,7 +358,7 @@ HL_PRIM vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
 	c->cl.fun = wrap;
 	c->cl.hasValue = 2;
 	c->cl.value = c;
-	c->wrappedFun = v; 
+	c->wrappedFun = v;
 	return (vclosure*)c;
 }
 
