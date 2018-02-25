@@ -42,10 +42,10 @@ static void fdesc_finalize( hl_fdesc *f ) {
 
 HL_PRIM hl_fdesc *hl_file_open( vbyte *name, int mode, bool binary ) {
 #	ifdef HL_UFOPEN
-	static const uchar *MODES[] = { USTR("r"), USTR("w"), USTR("a"), NULL, USTR("rb"), USTR("wb"), USTR("ab") };
+	static const uchar *MODES[] = { USTR("r"), USTR("w"), USTR("a"), USTR("r+"), USTR("rb"), USTR("wb"), USTR("ab"), USTR("rb+") };
 	FILE *f = fopen((uchar*)name,MODES[mode|(binary?4:0)]);
 #	else
-	static const char *MODES[] = { "r", "w", "a", NULL, "rb", "wb", "ab" };
+	static const char *MODES[] = { "r", "w", "a", "r+", "rb", "wb", "ab", "rb+" };
 	FILE *f = fopen((char*)name,MODES[mode|(binary?4:0)]);
 #	endif
 	hl_fdesc *fd;
