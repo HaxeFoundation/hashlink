@@ -368,7 +368,9 @@ HL_PRIM void HL_NAME(gl_bind_texture)( int t, vdynamic *texture ) {
 }
 
 HL_PRIM void HL_NAME(gl_bind_image_texture)( int unit, int texture, int level, bool layered, int layer, int access, int format ) {
+#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC)
 	glBindImageTexture(unit, texture, level, layered, layer, access, format);
+#	endif
 }
 
 HL_PRIM void HL_NAME(gl_tex_parameterf)( int t, int key, float value ) {
@@ -578,11 +580,15 @@ HL_PRIM void HL_NAME(gl_uniform4fv)( vdynamic *u, vbyte *buffer, int bufPos, int
 // compute
 HL_PRIM void HL_NAME(gl_dispatch_compute)( int num_groups_x, int num_groups_y, int num_groups_z ) {
 	GLOG("%d,%d,%d",num_groups_x,num_groups_y,num_groups_z);
+#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC)
 	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
+#	endif
 }
 
 HL_PRIM void HL_NAME(gl_memory_barrier)( int barriers ) {
+#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC)
 	glMemoryBarrier(barriers);
+#	endif
 }
 
 // draw
