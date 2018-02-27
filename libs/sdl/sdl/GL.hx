@@ -82,6 +82,9 @@ class GL {
 
 	// state changes
 
+	public static function polygonMode( face : Int, mode : Int ) {
+	}
+
 	public static function enable( feature : Int ) {
 	}
 
@@ -202,6 +205,9 @@ class GL {
 	public static function texParameteri( t : Int, key : Int, value : Int ) {
 	}
 
+	public static function texParameterf( t : Int, key : Int, value : hl.F32 ) {
+	}
+
 	@:hlNative("sdl","gl_tex_image2d")
 	public static function texImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
 	}
@@ -213,6 +219,9 @@ class GL {
 	}
 
 	// framebuffer
+
+	public static function blitFramebuffer( src_x0 : Int, src_y0 : Int, src_x1 : Int, src_y1 : Int, dst_x0 : Int, dst_y0 : Int, dst_x1 : Int, dst_y1 : Int, mask : Int, filter : Int ) {
+	}
 
 	public static function createFramebuffer() : Framebuffer {
 		return null;
@@ -261,6 +270,9 @@ class GL {
 		return null;
 	}
 
+	public static function bindBufferBase( target : Int, index : Int, buffer : Buffer ) {
+	}
+
 	public static function bindBuffer( target : Int, b : Buffer ) {
 	}
 
@@ -282,6 +294,9 @@ class GL {
 	public static function vertexAttribPointer( index : Int, size : Int, type : Int, normalized : Bool, stride : Int, position : Int ) {
 	}
 
+	public static function vertexAttribIPointer( index : Int, size : Int, type : Int, stride : Int, position : Int ) {
+	}
+
 	public static function deleteBuffer( b : Buffer ) {
 	}
 
@@ -291,6 +306,14 @@ class GL {
 	}
 
 	public static function uniform4fv( u : Uniform, buffer : hl.Bytes, bufPos : Int, count : Int ) {
+	}
+
+	// compute
+
+	public static function dispatchCompute( num_groups_x : Int, num_groups_y : Int, num_groups_z : Int ) {
+	}
+
+	public static function memoryBarrier( barrier : Int ) {
 	}
 
 	// draw
@@ -406,6 +429,9 @@ class GL {
 	public static inline var ELEMENT_ARRAY_BUFFER           = 0x8893;
 	public static inline var ARRAY_BUFFER_BINDING           = 0x8894;
 	public static inline var ELEMENT_ARRAY_BUFFER_BINDING   = 0x8895;
+	public static inline var SHADER_STORAGE_BUFFER          = 0x90D2;
+	public static inline var UNIFORM_BUFFER                 = 0x8A11;
+	public static inline var QUERY_BUFFER                   = 0x9192;
 
 	public static inline var STREAM_DRAW                    = 0x88E0;
 	public static inline var STATIC_DRAW                    = 0x88E4;
@@ -420,6 +446,11 @@ class GL {
 	public static inline var FRONT                          = 0x0404;
 	public static inline var BACK                           = 0x0405;
 	public static inline var FRONT_AND_BACK                 = 0x0408;
+
+	/* PolygonMode */
+	public static inline var POINT                          = 0x1B00;
+	public static inline var LINE                           = 0x1B01;
+	public static inline var FILL                           = 0x1B02;
 
 	/* DepthFunction */
 	/*      NEVER */
@@ -724,6 +755,8 @@ class GL {
 	/* GLFramebuffer Object. */
 	public static inline var FRAMEBUFFER                    = 0x8D40;
 	public static inline var RENDERBUFFER                   = 0x8D41;
+	public static inline var READ_FRAMEBUFFER               = 0x8CA8;
+	public static inline var DRAW_FRAMEBUFFER               = 0x8CA9;
 
 	public static inline var RGBA4                          = 0x8056;
 	public static inline var RGB5_A1                        = 0x8057;
@@ -778,5 +811,22 @@ class GL {
 	/* Queries */
 	public static inline var SAMPLES_PASSED                 = 0x8914;
 	public static inline var TIMESTAMP                      = 0x8E28;
+
+	/* Barriers */
+	public static inline var VERTEX_ATTRIB_ARRAY_BARRIER_BIT = 0x00000001;
+	public static inline var ELEMENT_ARRAY_BARRIER_BIT       = 0x00000002;
+	public static inline var UNIFORM_BARRIER_BIT             = 0x00000004;
+	public static inline var TEXTURE_FETCH_BARRIER_BIT       = 0x00000008;
+	public static inline var SHADER_IMAGE_ACCESS_BARRIER_BIT = 0x00000020;
+	public static inline var COMMAND_BARRIER_BIT             = 0x00000040;
+	public static inline var PIXEL_BUFFER_BARRIER_BIT        = 0x00000080;
+	public static inline var TEXTURE_UPDATE_BARRIER_BIT      = 0x00000100;
+	public static inline var BUFFER_UPDATE_BARRIER_BIT       = 0x00000200;
+	public static inline var FRAMEBUFFER_BARRIER_BIT         = 0x00000400;
+	public static inline var TRANSFORM_FEEDBACK_BARRIER_BIT  = 0x00000800;
+	public static inline var ATOMIC_COUNTER_BARRIER_BIT      = 0x00001000;
+	public static inline var SHADER_STORAGE_BARRIER_BIT      = 0x00002000;
+	public static inline var QUERY_BUFFER_BARRIER_BIT        = 0x00008000;
+	public static inline var ALL_BARRIER_BITS                = 0xFFFFFFFF;
 
 }
