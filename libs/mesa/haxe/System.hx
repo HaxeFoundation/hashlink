@@ -11,6 +11,9 @@ class System {
 
 	public static var name = "OSMesa";
 
+	public static var savePathPrefix = "";
+	public static var dataPathPrefix = "";
+
 	public static function init() {
 		var attribs : Array<Int> = [
 			mesa.Context.FORMAT, mesa.Context.RGBA,
