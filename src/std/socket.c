@@ -38,6 +38,7 @@
 #else
 
 #if defined(__ORBIS__) || defined(__NX__)
+#	include <hl.h>
 #	include <posix/posix.h>
 #else
 #	define _GNU_SOURCE
