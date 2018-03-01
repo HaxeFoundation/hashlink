@@ -30,6 +30,10 @@ install:
   - appveyor DownloadFile https://ffmpeg.zeranoe.com/builds/win32/dev/ffmpeg-3.4.2-win32-dev.zip
   - 7z x ffmpeg-3.4.2-win32-dev.zip
   - move ffmpeg-3.4.2-win32-dev include/ffmpeg
+  # install bullet
+  - appveyor DownloadFile https://github.com/bulletphysics/bullet3/archive/2.87.zip
+  - 7z x bullet3-2.87.zip
+  - move bullet3-2.87 include/bullet
   # install neko and haxe
   - ps: Set-Service wuauserv -StartupType Manual
   - cinst neko --version 2.2.0 -y

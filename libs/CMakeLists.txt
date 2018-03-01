@@ -9,7 +9,7 @@ function(set_as_hdll target)
     )
 endfunction()
 
-#add_subdirectory(bullet)
+add_subdirectory(bullet)
 
 if(WIN32)
 	add_subdirectory(directx)
