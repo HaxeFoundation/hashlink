@@ -26,6 +26,10 @@ install:
   - appveyor DownloadFile http://openal-soft.org/openal-binaries/openal-soft-1.17.2-bin.zip
   - 7z x openal-soft-1.17.2-bin.zip
   - move openal-soft-1.17.2-bin include/openal
+  # install ffmpeg
+  - appveyor DownloadFile https://ffmpeg.zeranoe.com/builds/win32/dev/ffmpeg-3.4.2-win32-dev.zip
+  - 7z x ffmpeg-3.4.2-win32-dev.zip
+  - move ffmpeg-3.4.2-win32-dev include/ffmpeg
   # install neko and haxe
   - ps: Set-Service wuauserv -StartupType Manual
   - cinst neko --version 2.2.0 -y
