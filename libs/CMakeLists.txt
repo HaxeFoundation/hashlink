@@ -17,7 +17,7 @@ endif()
 
 add_subdirectory(fmt)
 # add_subdirectory(mesa)
-# add_subdirectory(openal)
+add_subdirectory(openal)
 add_subdirectory(sdl)
 add_subdirectory(sqlite)
 add_subdirectory(ssl)
