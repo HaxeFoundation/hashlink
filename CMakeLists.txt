@@ -178,43 +178,54 @@ target_link_libraries(ui.hdll
 #####################
 # sdl.hdll
 
-if (WIN32)
-    set(SDL2_PATH ${CMAKE_SOURCE_DIR}/include/sdl)
-endif()
-find_package(SDL2 REQUIRED)
+option(WITH_SDL2 "Build SDL2 support." ON)
 
-add_library(sdl.hdll SHARED
-    libs/sdl/sdl.c
-    libs/sdl/gl.c
-)
-set_as_hdll(sdl)
-target_include_directories(sdl.hdll
-    PRIVATE
-    ${SDL2_INCLUDE_DIR}
-    include/gl
-)
-target_link_libraries(sdl.hdll
-    libhl
-    ${SDL2_LIBRARY}
-)
+if (WITH_SDL2)
+    if (WIN32)
+        set(SDL2_PATH ${CMAKE_SOURCE_DIR}/include/sdl)
+    endif()
+    find_package(SDL2 REQUIRED)
 
-if(WIN32)
-    target_link_libraries(sdl.hdll
-        winmm
-        opengl32
+    add_library(sdl.hdll SHARED
+        libs/sdl/sdl.c
+        libs/sdl/gl.c
     )
-endif()
-
-if (APPLE)
-    find_package(OPENGL REQUIRED)
+    set_as_hdll(sdl)
     target_include_directories(sdl.hdll
         PRIVATE
-        ${OPENGL_INCLUDE_DIR}
+        ${SDL2_INCLUDE_DIR}
+        include/gl
     )
     target_link_libraries(sdl.hdll
         libhl
-        ${OPENGL_gl_LIBRARY}
+        ${SDL2_LIBRARY}
     )
+
+    if(WIN32)
+        target_link_libraries(sdl.hdll
+            winmm
+            opengl32
+        )
+    endif()
+
+    if (APPLE)
+        find_package(OPENGL REQUIRED)
+        target_include_directories(sdl.hdll
+            PRIVATE
+            ${OPENGL_INCLUDE_DIR}
+        )
+        target_link_libraries(sdl.hdll
+            libhl
+            ${OPENGL_gl_LIBRARY}
+        )
+    endif()
+
+
+    install(
+        TARGETS sdl.hdll
+        DESTINATION .
+    )
+
 endif()
 
 #####################
@@ -588,7 +599,6 @@ install(
         libhl
         fmt.hdll
         ui.hdll
-        sdl.hdll
         sqlite.hdll
         uv.hdll
     DESTINATION .
