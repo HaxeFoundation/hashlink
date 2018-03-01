@@ -10,8 +10,14 @@ environment:
   global:
     HAXELIB_ROOT: C:\projects\haxelib
   matrix:
-    - builder: cmake
-    - builder: vc
+    - ARCH: 32
+      builder: vc
+    - ARCH: 32
+      CMAKE_GENERATOR: "Visual Studio 14 2015"
+      builder: cmake
+    - ARCH: 64
+      CMAKE_GENERATOR: "Visual Studio 14 2015 Win64"
+      builder: cmake
 
 artifacts:
   - path: 'hashlink-*.zip'
@@ -27,9 +33,9 @@ install:
   - 7z x openal-soft-1.17.2-bin.zip
   - move openal-soft-1.17.2-bin include/openal
   # install ffmpeg
-  - appveyor DownloadFile https://ffmpeg.zeranoe.com/builds/win32/dev/ffmpeg-3.4.2-win32-dev.zip
-  - 7z x ffmpeg-3.4.2-win32-dev.zip
-  - move ffmpeg-3.4.2-win32-dev include/ffmpeg
+  - appveyor DownloadFile https://ffmpeg.zeranoe.com/builds/win%ARCH%/dev/ffmpeg-3.4.2-win%ARCH%-dev.zip
+  - 7z x ffmpeg-3.4.2-win%ARCH%-dev.zip
+  - move ffmpeg-3.4.2-win%ARCH%-dev include/ffmpeg
   # install bullet
   - appveyor DownloadFile https://github.com/bulletphysics/bullet3/archive/2.87.zip
   - 7z x 2.87.zip
@@ -55,7 +61,7 @@ build_script:
   - if "%builder%"=="vc"      msbuild libs/sqlite/sqlite.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild libs/ssl/ssl.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   # if "%builder%"=="cmake"
-  - if "%builder%"=="cmake"   cmake -G "Visual Studio 14 2015"
+  - if "%builder%"=="cmake"   cmake -G "%CMAKE_GENERATOR%"
   - if "%builder%"=="cmake"   msbuild ALL_BUILD.vcxproj     /p:Configuration=Release /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="cmake"   msbuild RUN_TESTS.vcxproj     /p:Configuration=Release /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="cmake"   cpack
