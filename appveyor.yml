@@ -32,7 +32,7 @@ install:
   - move ffmpeg-3.4.2-win32-dev include/ffmpeg
   # install bullet
   - appveyor DownloadFile https://github.com/bulletphysics/bullet3/archive/2.87.zip
-  - 7z x bullet3-2.87.zip
+  - 7z x 2.87.zip
   - move bullet3-2.87 include/bullet
   # install neko and haxe
   - ps: Set-Service wuauserv -StartupType Manual
