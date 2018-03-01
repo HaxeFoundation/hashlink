@@ -21,7 +21,7 @@ class Generator {
 
 ";
 
-	static var options = { idl : "bullet.idl", libName : "bullet", includeCode : INCLUDE, autoGC : true };
+	static var options = { idlFile : "bullet.idl", nativeLib : "bullet", includeCode : INCLUDE, autoGC : true };
 
 	public static function generateCpp() {
 		webidl.Generate.generateCpp(options);
