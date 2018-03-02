@@ -74,6 +74,7 @@
     <ClCompile Include="..\..\include\mbedtls\library\platform.c" />
     <ClCompile Include="..\..\include\mbedtls\library\ripemd160.c" />
     <ClCompile Include="..\..\include\mbedtls\library\rsa.c" />
+    <ClCompile Include="..\..\include\mbedtls\library\rsa_internal.c" />
     <ClCompile Include="..\..\include\mbedtls\library\sha1.c" />
     <ClCompile Include="..\..\include\mbedtls\library\sha256.c" />
     <ClCompile Include="..\..\include\mbedtls\library\sha512.c" />
