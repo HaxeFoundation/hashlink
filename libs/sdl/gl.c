@@ -426,6 +426,11 @@ HL_PRIM void HL_NAME(gl_bind_framebuffer)( int target, vdynamic *f ) {
 	glBindFramebuffer(target, id);
 }
 
+HL_PRIM void HL_NAME(gl_framebuffer_texture)( int target, int attach, vdynamic *t, int level ) {
+	GLOG("%d,%d,%d,%d,%d",target,attach,ZIDX(t),level);
+	glFramebufferTexture(target, attach, ZIDX(t), level);
+}
+
 HL_PRIM void HL_NAME(gl_framebuffer_texture2d)( int target, int attach, int texTarget, vdynamic *t, int level ) {
 	GLOG("%d,%d,%d,%d,%d",target,attach,texTarget,ZIDX(t),level);
 	glFramebufferTexture2D(target, attach, texTarget, ZIDX(t), level);
@@ -541,7 +546,7 @@ HL_PRIM void HL_NAME(gl_vertex_attrib_pointer)( int index, int size, int type, b
 }
 
 HL_PRIM void HL_NAME(gl_vertex_attrib_ipointer)( int index, int size, int type, int stride, int position ) {
-	GLOG("%d,%d,%d,%d,%d,%d",index,size,type,stride,position);
+	GLOG("%d,%d,%d,%d,%d",index,size,type,stride,position);
 	glVertexAttribIPointer(index, size, type, stride, (void*)(int_val)position);
 }
 
@@ -596,6 +601,21 @@ HL_PRIM void HL_NAME(gl_memory_barrier)( int barriers ) {
 HL_PRIM void HL_NAME(gl_draw_elements)( int mode, int count, int type, int start ) {
 	GLOG("%d,%d,%d,%d",mode,count,type,start);
 	glDrawElements(mode, count, type, (void*)(int_val)start);
+}
+
+HL_PRIM void HL_NAME(gl_draw_arrays)( int mode, int first, int count, int start ) {
+	GLOG("%d,%d,%d",mode,first,count);
+	glDrawArrays(mode,first,count);
+}
+
+HL_PRIM void HL_NAME(gl_draw_elements_instanced)( int mode, int count, int type, int start, int primcount ) {
+	GLOG("%d,%d,%d,%d,%d",mode,count,type,start,primcount);
+	glDrawElementsInstanced(mode,count,type,(void*)(int_val)start,primcount);
+}
+
+HL_PRIM void HL_NAME(gl_draw_arrays_instanced)( int mode, int first, int count, int start, int primcount ) {
+	GLOG("%d,%d,%d,%d",mode,first,count,primcount);
+	glDrawArraysInstanced(mode,first,count,primcount);
 }
 
 // queries
@@ -715,6 +735,7 @@ DEFINE_PRIM(_VOID,gl_delete_texture,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_blit_framebuffer,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_framebuffer,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_framebuffer,_I32 _NULL(_I32));
+DEFINE_PRIM(_VOID,gl_framebuffer_texture,_I32 _I32 _NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_framebuffer_texture2d,_I32 _I32 _I32 _NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_delete_framebuffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_read_pixels,_I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
@@ -742,6 +763,9 @@ DEFINE_PRIM(_VOID,gl_bind_image_texture,_I32 _I32 _I32 _BOOL _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_dispatch_compute,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_memory_barrier,_I32);
 DEFINE_PRIM(_VOID,gl_draw_elements,_I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_draw_elements_instanced,_I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_draw_arrays,_I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_draw_arrays_instanced,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_vertex_array,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_vertex_array,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_delete_vertex_array,_NULL(_I32));

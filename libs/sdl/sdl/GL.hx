@@ -234,6 +234,9 @@ class GL {
 	public static function framebufferTexture2D( target : Int, attach : Int, texTarget : Int, t : Texture, level : Int ) {
 	}
 
+	public static function framebufferTexture( target : Int, attach : Int, t : Texture, level : Int ) {
+	}
+
 	public static function deleteFramebuffer( f : Framebuffer ) {
 	}
 
@@ -319,6 +322,15 @@ class GL {
 	// draw
 
 	public static function drawElements( mode : Int, count : Int, type : Int, start : Int ) {
+	}
+
+	public static function drawElementsInstanced( mode : Int, count : Int, type : Int, start : Int, primcount : Int ) {
+	}
+
+	public static function drawArrays( mode : Int, start : Int, count : Int ) {
+	}
+
+	public static function drawArraysInstanced( mode : Int, start : Int, count : Int, primcount : Int ) {
 	}
 
 	// queries
@@ -597,6 +609,7 @@ class GL {
 	public static inline var FRAGMENT_SHADER                  = 0x8B30;
 	public static inline var VERTEX_SHADER                    = 0x8B31;
 	public static inline var GEOMETRY_SHADER                  = 0x8DD9;
+	public static inline var COMPUTE_SHADER                   = 0x91B9;
 	public static inline var MAX_VERTEX_ATTRIBS               = 0x8869;
 	public static inline var MAX_VERTEX_UNIFORM_VECTORS       = 0x8DFB;
 	public static inline var MAX_VARYING_VECTORS              = 0x8DFC;
@@ -661,6 +674,7 @@ class GL {
 	public static inline var TEXTURE_2D                     = 0x0DE1;
 	public static inline var TEXTURE                        = 0x1702;
 
+	public static inline var TEXTURE_CUBE_MAP_SEAMLESS      = 0x884F;
 	public static inline var TEXTURE_CUBE_MAP               = 0x8513;
 	public static inline var TEXTURE_BINDING_CUBE_MAP       = 0x8514;
 	public static inline var TEXTURE_CUBE_MAP_POSITIVE_X    = 0x8515;
