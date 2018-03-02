@@ -209,6 +209,9 @@
     <ClCompile Include="..\..\include\mbedtls\library\ecdh.c">
       <Filter>mbedtls</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\mbedtls\library\rsa_internal.c">
+      <Filter>mbedtls</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="mbedtls">

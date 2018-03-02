@@ -47,6 +47,7 @@ if(WIN32)
         ${INCLUDES_BASE_DIR}/mbedtls/library/platform.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/ripemd160.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/rsa.c
+        ${INCLUDES_BASE_DIR}/mbedtls/library/rsa_internal.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/sha1.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/sha256.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/sha512.c
