@@ -60,7 +60,6 @@ HL_PRIM vbyte *hl_date_to_string( int date, int *len ) {
 	size = (int)strftime(buf,127,"%Y-%m-%d %H:%M:%S",&t);
 	out = (uchar*)hl_gc_alloc_noptr((size + 1) << 1);
 	hl_from_utf8(out,size,buf);
-	out[size] = 0;
 	*len = size;
 	return (vbyte*)out;
 }
