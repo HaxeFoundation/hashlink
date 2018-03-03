@@ -212,6 +212,14 @@ class GL {
 	public static function texImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
 	}
 
+	@:hlNative("sdl","gl_tex_image3d")
+	public static function texImage3D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, depth : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
+	}
+
+	@:hlNative("sdl","gl_tex_image2d_multisample")
+	public static function texImage2DMultisample( target : Int, internalFormat : Int, samples : Int, width : Int, height : Int, fixedsamplelocations : Bool ) {
+	}
+
 	public static function generateMipmap( t : Int ) {
 	}
 
@@ -259,6 +267,9 @@ class GL {
 	}
 
 	public static function renderbufferStorage( target : Int, format : Int, width : Int, height : Int ) {
+	}
+
+	public static function renderbufferStorageMultisample( target : Int, samples : Int, format : Int, width : Int, height : Int ) {
 	}
 
 	public static function framebufferRenderbuffer( frameTarget : Int, attach : Int, renderTarget : Int, b : Renderbuffer ) {
@@ -672,6 +683,8 @@ class GL {
 
 	/* TextureTarget */
 	public static inline var TEXTURE_2D                     = 0x0DE1;
+	public static inline var TEXTURE_2D_MULTISAMPLE         = 0x9100;
+	public static inline var TEXTURE_3D                     = 0x806F;
 	public static inline var TEXTURE                        = 0x1702;
 
 	public static inline var TEXTURE_CUBE_MAP_SEAMLESS      = 0x884F;

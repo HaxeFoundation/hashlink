@@ -388,6 +388,16 @@ HL_PRIM void HL_NAME(gl_tex_image2d)( int target, int level, int internalFormat,
 	glTexImage2D(target, level, internalFormat, width, height, border, format, type, image);
 }
 
+HL_PRIM void HL_NAME(gl_tex_image3d)( int target, int level, int internalFormat, int width, int height, int depth, int border, int format, int type, vbyte *image ) {
+	GLOG("%d,%d,%d,%d,%d,%d,%d,%d,%s",target,level,internalFormat,width,height,border,format,type,hexlog(image,16));
+	glTexImage3D(target, level, internalFormat, width, height, depth, border, format, type, image);
+}
+
+HL_PRIM void HL_NAME(gl_tex_image2d_multisample)( int target, int samples, int internalFormat, int width, int height, bool fixedsamplelocations) {
+	GLOG("%d,%d,%d,%d,%d,%d",target,samples,internalFormat,width,height,fixedsamplelocations);
+	glTexImage2DMultisample(target, samples, internalFormat, width, height, fixedsamplelocations);
+}
+
 HL_PRIM void HL_NAME(gl_generate_mipmap)( int t ) {
 	GLOG("%d",t);
 	glGenerateMipmap(t);
@@ -483,6 +493,12 @@ HL_PRIM void HL_NAME(gl_bind_renderbuffer)( int target, vdynamic *r ) {
 HL_PRIM void HL_NAME(gl_renderbuffer_storage)( int target, int format, int width, int height ) {
 	GLOG("%d,%d,%d,%d",target,format,width,height);
 	glRenderbufferStorage(target, format, width, height);
+}
+
+
+HL_PRIM void HL_NAME(gl_renderbuffer_storage_multisample)( int target, int samples, int format, int width, int height ) {
+	GLOG("%d,%d,%d,%d,%d",target,samples,format,width,height);
+	glRenderbufferStorageMultisample(target, samples, format, width, height);
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_renderbuffer)( int frameTarget, int attach, int renderTarget, vdynamic *b ) {
@@ -730,6 +746,8 @@ DEFINE_PRIM(_VOID,gl_bind_texture,_I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_tex_parameteri,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_tex_parameterf,_I32 _I32 _F32);
 DEFINE_PRIM(_VOID,gl_tex_image2d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_tex_image3d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_tex_image2d_multisample,_I32 _I32 _I32 _I32 _I32 _BOOL);
 DEFINE_PRIM(_VOID,gl_generate_mipmap,_I32);
 DEFINE_PRIM(_VOID,gl_delete_texture,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_blit_framebuffer,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32);
@@ -744,6 +762,7 @@ DEFINE_PRIM(_VOID,gl_draw_buffers,_I32 _BYTES);
 DEFINE_PRIM(_NULL(_I32),gl_create_renderbuffer,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_renderbuffer,_I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_renderbuffer_storage,_I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_renderbuffer_storage_multisample,_I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_framebuffer_renderbuffer,_I32 _I32 _I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_delete_renderbuffer,_NULL(_I32));
 DEFINE_PRIM(_NULL(_I32),gl_create_buffer,_NO_ARG);
