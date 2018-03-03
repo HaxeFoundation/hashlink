@@ -25,7 +25,6 @@ GL_IMPORT(glBindFramebuffer, BINDFRAMEBUFFER);
 GL_IMPORT(glFramebufferTexture, FRAMEBUFFERTEXTURE);
 GL_IMPORT(glFramebufferTexture2D, FRAMEBUFFERTEXTURE2D);
 GL_IMPORT(glDeleteFramebuffers, DELETEFRAMEBUFFERS);
-GL_IMPORT(glTexImage3D, TEXIMAGE3D);
 GL_IMPORT(glGenRenderbuffers, GENRENDERBUFFERS);
 GL_IMPORT(glBindRenderbuffer, BINDRENDERBUFFER);
 GL_IMPORT(glTexImage2DMultisample, TEXIMAGE2DMULTISAMPLE);
@@ -72,6 +71,7 @@ GL_IMPORT(glQueryCounter, QUERYCOUNTER);
 #if defined(_WIN32) || defined(HL_NX)
 GL_IMPORT(glBlendEquation, BLENDEQUATION);
 GL_IMPORT(glActiveTexture, ACTIVETEXTURE);
+GL_IMPORT(glTexImage3D, TEXIMAGE3D);
 #endif
 
 #if defined(HL_NX)
