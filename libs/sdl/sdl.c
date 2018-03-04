@@ -69,6 +69,8 @@ typedef struct {
 	event_type type;
 	int mouseX;
 	int mouseY;
+	int mouseXRel;
+	int mouseYRel;
 	int button;
 	int wheelDelta;
 	ws_change state;
@@ -139,6 +141,8 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->type = MouseMove;
 			event->mouseX = e.motion.x;
 			event->mouseY = e.motion.y;
+			event->mouseXRel = e.motion.xrel;
+			event->mouseYRel = e.motion.yrel;
 			break;
 		case SDL_KEYDOWN:
 			event->type = KeyDown;
@@ -348,7 +352,7 @@ HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
 DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32 _I32);
-DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32 _I32) );
+DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32 _I32) );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
