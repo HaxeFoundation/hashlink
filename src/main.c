@@ -112,6 +112,10 @@ int main(int argc, pchar *argv[]) {
 			debug_wait = true;
 			continue;
 		}
+		if( pcompare(arg,PSTR("--version")) == 0 ) {
+			printf("%d.%d.%d",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
+			return 0;
+		}
 		if( *arg == '-' || *arg == '+' ) {
 			if( first_boot_arg < 0 ) first_boot_arg = argc + 1;
 			// skip value
