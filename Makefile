@@ -189,6 +189,7 @@ release_osx:
 
 OSX_LIBS=/usr/local/opt
 build_package_osx: release
+	rm -rf hl-$(HL_VER)-static
 	tar -xzf hl-$(HL_VER).tgz
 	cp $(OSX_LIBS)/libpng/lib/libpng16.16.dylib hl-$(HL_VER)
 	cp $(OSX_LIBS)/jpeg-turbo/lib/libturbojpeg.0.dylib hl-$(HL_VER)
@@ -198,11 +199,13 @@ build_package_osx: release
 	cp $(OSX_LIBS)/mbedtls/lib/libmbed*.dylib hl-$(HL_VER)
 	cp $(OSX_LIBS)/libuv/lib/libuv.1.dylib hl-$(HL_VER)
 	-cp ../hlsteam/steam.hdll ../hlsteam/native/lib/osx32/libsteam_api.dylib hl-$(HL_VER)
+	mv hl-$(HL_VER) hl-$(HL_VER)-static
 	tar -czf hl-$(HL_VER)-static.tgz hl-$(HL_VER)-static
 	
 # staticaly locked binaries
 LINUX_LIBS=/usr/lib/x86_64-linux-gnu
 build_package_linux: release
+	rm -rf hl-$(HL_VER)-static
 	tar -xzf hl-$(HL_VER).tgz	
 	cp $(LINUX_LIBS)/libturbojpeg.so.0 hl-$(HL_VER)
 	cp $(LINUX_LIBS)/libvorbisfile.so.3 hl-$(HL_VER)
@@ -214,6 +217,7 @@ build_package_linux: release
 	cp $(LINUX_LIBS)/libuv.so.1 hl-$(HL_VER)
 	-cp ../hlsteam/steam.hdll ../hlsteam/native/lib/linux64/libsteam_api.so hl-$(HL_VER)
 	(cd hl-$(HL_VER) && find *.hdll hl *.so *.so.* | xargs -L 1 patchelf --set-rpath ./)
+	mv hl-$(HL_VER) hl-$(HL_VER)-static
 	tar -czf hl-$(HL_VER)-static.tgz hl-$(HL_VER)-static
 
 .SUFFIXES : .c .o
