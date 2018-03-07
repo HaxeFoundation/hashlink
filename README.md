@@ -20,6 +20,10 @@ To install all dependencies on Ubuntu for example:
 
 `sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev`
 
+And on OSX:
+
+`brew install libpng jpeg-turbo libvorbis sdl2 mbedtls openal-soft libuv`
+
 # Documentation
 
 Read the [Documentation](https://github.com/HaxeFoundation/hashlink/wiki) on the HashLink wiki.
