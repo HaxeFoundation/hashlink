@@ -144,9 +144,11 @@ mesa:
 release: release_version release_$(RELEASE_NAME)
 
 release_version:
-	$(eval HL_VER := `(hl --version)`)
-	rm -rf $(HLIB)_release
-	mkdir $(HLIB)_release
+	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))	
+	rm -rf hl-$(HL_VER)
+	mkdir hl-$(HL_VER)
+	mkdir hl-$(HL_VER)/include
+	cp src/hl.h src/hlc* hl-$(HL_VER)/include
 
 release_haxelib:
 	make HLIB=directx release_haxelib_package
@@ -160,6 +162,8 @@ HLPACK=$(HLIB)
 endif
 	
 release_haxelib_package:
+	rm -rf $(HLIB)_release
+	mkdir $(HLIB)_release
 	(cd libs/$(HLIB) && cp -R $(HLPACK) *.h *.c* haxelib.json ../../$(HLIB)_release | true)
 	zip -r $(HLIB).zip $(HLIB)_release
 	haxelib submit $(HLIB).zip
@@ -168,8 +172,8 @@ release_haxelib_package:
 release_win:
 	(cd ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../hl-$(HL_VER))
 	cp c:/windows/syswow64/msvcr120.dll hl-$(HL_VER)
-	mkdir hl-$(HL_VER)/include
-	cp src/hl.h src/hlc* hl-$(HL_VER)/include
+	cp `which SDL2.dll` hl-$(HL_VER)
+	cp `which OpenAL32.dll` hl-$(HL_VER)
 	zip -r hl-$(HL_VER).zip hl-$(HL_VER)
 	rm -rf hl-$(HL_VER)
 
