@@ -48,3 +48,4 @@ node_modules
 /other/debugger/package-lock.json
 /other/debugger/*.map
 /*.zip
+/*.tgz
