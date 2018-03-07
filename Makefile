@@ -187,6 +187,35 @@ release_osx:
 	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
 	rm -rf hl-$(HL_VER)
 
+OSX_LIBS=/usr/local/opt
+build_package_osx: release
+	tar -xzf hl-$(HL_VER).tgz
+	cp $(OSX_LIBS)/libpng/lib/libpng16.16.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/jpeg-turbo/lib/libturbojpeg.0.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/libvorbis/lib/libvorbisfile.3.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/openal-soft/lib/libopenal.1.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/sdl2/lib/libSDL2*.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/mbedtls/lib/libmbed*.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/libuv/lib/libuv.1.dylib hl-$(HL_VER)
+	-cp ../hlsteam/steam.hdll ../hlsteam/native/lib/osx32/libsteam_api.dylib hl-$(HL_VER)
+	tar -czf hl-$(HL_VER)-static.tgz hl-$(HL_VER)-static
+	
+# staticaly locked binaries
+LINUX_LIBS=/usr/lib/x86_64-linux-gnu
+build_package_linux: release
+	tar -xzf hl-$(HL_VER).tgz	
+	cp $(LINUX_LIBS)/libturbojpeg.so.0 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libvorbisfile.so.3 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libvorbis.so.0 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libogg.so.0 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libopenal.so.1 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libSDL2* hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libmbed* hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libuv.so.1 hl-$(HL_VER)
+	-cp ../hlsteam/steam.hdll ../hlsteam/native/lib/linux64/libsteam_api.so hl-$(HL_VER)
+	(cd hl-$(HL_VER) && find *.hdll hl *.so *.so.* | xargs -L 1 patchelf --set-rpath ./)
+	tar -czf hl-$(HL_VER)-static.tgz hl-$(HL_VER)-static
+
 .SUFFIXES : .c .o
 
 .c.o :
