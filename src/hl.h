@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x140
+#define HL_VERSION	0x150
 
 #ifdef _WIN32
 #	define HL_WIN
