@@ -207,6 +207,7 @@ LINUX_LIBS=/usr/lib/x86_64-linux-gnu
 build_package_linux: release
 	rm -rf hl-$(HL_VER)-static
 	tar -xzf hl-$(HL_VER).tgz	
+	cp $(LINUX_LIBS)/libpng16.so.16 hl-$(HL_VER)
 	cp $(LINUX_LIBS)/libturbojpeg.so.0 hl-$(HL_VER)
 	cp $(LINUX_LIBS)/libvorbisfile.so.3 hl-$(HL_VER)
 	cp $(LINUX_LIBS)/libvorbis.so.0 hl-$(HL_VER)
