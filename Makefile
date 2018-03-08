@@ -194,6 +194,8 @@ build_package_osx: release
 	cp $(OSX_LIBS)/libpng/lib/libpng16.16.dylib hl-$(HL_VER)
 	cp $(OSX_LIBS)/jpeg-turbo/lib/libturbojpeg.0.dylib hl-$(HL_VER)
 	cp $(OSX_LIBS)/libvorbis/lib/libvorbisfile.3.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/libvorbis/lib/libvorbis.0.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/libogg/lib/libogg.0.dylib hl-$(HL_VER)
 	cp $(OSX_LIBS)/openal-soft/lib/libopenal.1.dylib hl-$(HL_VER)
 	cp $(OSX_LIBS)/sdl2/lib/libSDL2*.dylib hl-$(HL_VER)
 	cp $(OSX_LIBS)/mbedtls/lib/libmbed*.dylib hl-$(HL_VER)
