@@ -11,7 +11,7 @@ docker_cmake_script: &docker_cmake_script
     docker run hashlink bash -c
     'set -ex &&
     (if [ "$ARCH" = "32" ]; then
-      cmake . -DCMAKE_TOOLCHAIN_FILE=cmake/linux32.toolchain.cmake;
+      cmake . -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake;
     else
       cmake .;
     fi) &&
