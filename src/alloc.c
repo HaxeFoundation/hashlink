@@ -1203,6 +1203,10 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	fdump = NULL;
 }
 
+HL_API vdynamic *hl_debug_call( int mode, vdynamic *v ) {
+	return NULL;
+}
+
 DEFINE_PRIM(_VOID, gc_major, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_enable, _BOOL);
 DEFINE_PRIM(_VOID, gc_profile, _BOOL);
@@ -1210,5 +1214,5 @@ DEFINE_PRIM(_VOID, gc_stats, _REF(_F64) _REF(_F64) _REF(_F64));
 DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);
 DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
-
+DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
 
