@@ -1337,8 +1337,11 @@ static preg *alloc_native_arg( jit_ctx *ctx ) {
 }
 
 static void set_native_arg( jit_ctx *ctx, preg *r ) {
-	if( r->kind == RSTACK && r->holds && r->holds->size < 4 )
-		r = fetch32(ctx, r->holds);
+	if( r->kind == RSTACK ) {
+		vreg *v = ctx->vregs + r->id;
+		if( v->size < 4 )
+			r = fetch32(ctx, v);
+	}
 #	ifdef HL_64
 	if( r->kind == RFPU ) ASSERT(0);
 	int rid = --ctx->nativeArgsCount;
@@ -3403,7 +3406,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,MOV,r,pmem(&p,v->id,sizeof(vvirtual)+HL_WSIZE*o->p2));
 					op64(ctx,TEST,r,r);
 					save_regs(ctx);
-					XJump_small(JNotZero,jhasfield);
+
+					if( o->p3 < 7 ) {
+						XJump_small(JNotZero,jhasfield);
+					} else {
+						XJump(JNotZero,jhasfield);
+					}
 
 					need_dyn = !hl_is_ptr(dst->t) && dst->t->kind != HVOID;
 					paramsSize = (o->p3 - 1) * HL_WSIZE;
