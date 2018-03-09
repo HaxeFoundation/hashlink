@@ -218,7 +218,7 @@ build_package_linux: release
 	cp $(LINUX_LIBS)/libSDL2*.so* hl-$(HL_VER)
 	cp $(LINUX_LIBS)/libmbed* hl-$(HL_VER)
 	cp $(LINUX_LIBS)/libuv.so.1 hl-$(HL_VER)
-	cp $(LINUX_LIBS)/libbsd.so.0 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libsd.so.0 hl-$(HL_VER)
 	-cp ../hlsteam/steam.hdll ../hlsteam/native/lib/linux64/libsteam_api.so hl-$(HL_VER)	
 	(cd hl-$(HL_VER) && chmod +x *.so* && find *.hdll hl *.so *.so.* | xargs -L 1 patchelf --set-rpath ./)
 	mv hl-$(HL_VER) hl-$(HL_VER)-static
