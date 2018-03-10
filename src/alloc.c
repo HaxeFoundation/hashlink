@@ -260,7 +260,7 @@ static int PAGE_ID = 0;
 
 HL_API void hl_gc_dump_memory( const char *filename );
 
-static gc_pheader *gc_alloc_new_page( int pid, int block, int size, bool varsize ) {
+static gc_pheader *gc_alloc_new_page( int pid, int block, int size, int kind, bool varsize ) {
 	int m, i;
 	unsigned char *base;
 	gc_pheader *p;
@@ -307,19 +307,23 @@ retry:
 #			else
 			printf("GC Page HASH collide %lX %lX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
 #			endif
-			return gc_alloc_new_page(pid,block,size,varsize);
+			return gc_alloc_new_page(pid,block,size,kind,varsize);
 		}
 	}
 #endif
 
-#	ifdef GC_DEBUG
+#	if defined(GC_DEBUG)
 	memset(base,0xDD,size);
 	p->page_id = PAGE_ID++;
+#	else
+	// prevent false positive to access invalid type
+	if( kind == MEM_KIND_DYNAMIC ) memset(base, 0, size);
 #	endif
 	if( ((int_val)base) & ((1<<GC_MASK_BITS) - 1) )
 		hl_fatal("Page memory is not correctly aligned");
 	p->page_size = size;
 	p->block_size = block;
+	p->page_kind = kind;
 	p->max_blocks = size / block;
 	p->sizes = NULL;
 	p->bmp = NULL;
@@ -389,10 +393,8 @@ static void *gc_alloc_fixed( int part, int kind ) {
 			break;
 		p = p->next_page;
 	}
-	if( p == NULL ) {
-		p = gc_alloc_new_page(pid, GC_SIZES[part], GC_PAGE_SIZE, false);
-		p->page_kind = kind;
-	}
+	if( p == NULL )
+		p = gc_alloc_new_page(pid, GC_SIZES[part], GC_PAGE_SIZE, kind, false);
 alloc_fixed:
 	ptr = (unsigned char*)p + p->next_block * p->block_size;
 #	ifdef GC_DEBUG
@@ -487,8 +489,7 @@ skip:
 		int psize = GC_PAGE_SIZE;
 		while( psize < size + 1024 )
 			psize <<= 1;
-		p = gc_alloc_new_page(pid, GC_SIZES[part], psize, true);
-		p->page_kind = kind;
+		p = gc_alloc_new_page(pid, GC_SIZES[part], psize, kind, true);
 	}
 alloc_var:
 	ptr = (unsigned char*)p + p->next_block * p->block_size;
@@ -1202,6 +1203,10 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	fdump = NULL;
 }
 
+HL_API vdynamic *hl_debug_call( int mode, vdynamic *v ) {
+	return NULL;
+}
+
 DEFINE_PRIM(_VOID, gc_major, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_enable, _BOOL);
 DEFINE_PRIM(_VOID, gc_profile, _BOOL);
@@ -1209,5 +1214,5 @@ DEFINE_PRIM(_VOID, gc_stats, _REF(_F64) _REF(_F64) _REF(_F64));
 DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);
 DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
-
+DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
 

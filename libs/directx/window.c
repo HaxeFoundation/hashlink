@@ -194,14 +194,17 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 
 HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 	static bool wnd_class_reg = false;
+	HINSTANCE hinst = GetModuleHandle(NULL);
 	if( !wnd_class_reg ) {
 		WNDCLASSEX wc;
+		wchar_t fileName[1024];
+		GetModuleFileName(hinst,fileName,1024);
 		wc.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 		wc.lpfnWndProc   = WndProc;
 		wc.cbClsExtra    = 0;
 		wc.cbWndExtra    = 0;
-		wc.hInstance     = GetModuleHandle(NULL);
-		wc.hIcon		 = LoadIcon(NULL, IDI_WINLOGO);
+		wc.hInstance     = hinst;
+		wc.hIcon		 = ExtractIcon(hinst, fileName, 0);
 		wc.hIconSm       = wc.hIcon;
 		wc.hCursor       = NULL;
 		wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
@@ -219,7 +222,7 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 	AdjustWindowRect(&r,style,false);
 	dx_events *event_buffer = (dx_events*)malloc(sizeof(dx_events));
 	memset(event_buffer,0, sizeof(dx_events));
-	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), event_buffer);
+	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
 	SetTimer(win,0,10,NULL);
 	ShowWindow(win, SW_SHOW);
 	SetCursor(LoadCursor(NULL, IDC_ARROW));

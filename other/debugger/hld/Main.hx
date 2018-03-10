@@ -27,7 +27,6 @@ class Main {
 
 	#if nodejs
 	var process : js.node.child_process.ChildProcess;
-	var processExitCode : Null<Int>;
 	#else
 	var process : sys.io.Process;
 	#end
@@ -71,7 +70,6 @@ class Main {
 			var args = ["--debug", "" + debugPort, "--debug-wait", file];
 			#if nodejs
 			process = js.node.ChildProcess.spawn(cmd, args);
-			process.on("close", function(code) processExitCode = code);
 			process.stdout.on("data", function(data:String) Sys.print(data));
 			process.stderr.on("data", function(data:String) Sys.stderr().writeString(data));
 			pid = process.pid;
@@ -95,14 +93,14 @@ class Main {
 
 	}
 
-	function frameStr( f : { file : String, line : Int, ebp : Pointer }, ?debug ) {
-		return f.file+":" + f.line + (debug ? " @"+f.ebp.toString():"");
+	function frameStr( f : Debugger.StackInfo, ?debug ) {
+		return f.file+":" + f.line + (f.context == null ? "" : " ("+f.context.obj.name+"::"+f.context.field+")") + (debug ? " @"+f.ebp.toString():"");
 	}
 
 	function dumpProcessOut() {
 		if( process == null ) return;
 		#if nodejs
-		if( processExitCode == null ) process.kill();
+		process.kill();
 		#else
 		if( process.exitCode(false) == null ) process.kill();
 		Sys.print(process.stdout.readAll().toString());
@@ -121,6 +119,10 @@ class Main {
 	function handleResult( r : hld.Api.WaitResult ) {
 		switch( r ) {
 		case Exit:
+			#if nodejs
+			Sys.println("Process has exit");
+			Sys.exit(0);
+			#end
 			dbg.resume();
 		case Breakpoint:
 			Sys.println("Thread " + dbg.stoppedThread + " paused " + frameStr(dbg.getStackFrame()));
@@ -129,19 +131,24 @@ class Main {
 				Sys.println("Exception: "+dbg.eval.valueStr(exc));
 		case Error:
 			Sys.println("*** an error has occured, paused ***");
+		case Watchbreak:
+			var w = dbg.watchBreak;
+			Sys.println("Watch change " + w.ptr.toString() + ":" + w.t.toString() + " = " + dbg.eval.valueStr(dbg.eval.fetch(w)) + " at "+frameStr(dbg.getStackFrame()));
 		default:
 			throw "assert "+r;
 		}
 	}
 
 	function command() {
+		#if !nodejs
 		if( process != null ) {
-			var ecode = #if nodejs processExitCode #else process.exitCode(false) #end;
+			var ecode = process.exitCode(false);
 			if( ecode != null ) {
 				dumpProcessOut();
 				error("Process exit with code " + ecode);
 			}
 		}
+		#end
 
 		Sys.print("> ");
 		var r = args.shift();
@@ -150,7 +157,8 @@ class Main {
 		else
 			Sys.println(r);
 		var args = ~/[ \t\r\n]+/g.split(r);
-		switch( args.shift() ) {
+		var cmd = args.shift();
+		switch( cmd ) {
 		case "q", "quit":
 			dumpProcessOut();
 			return false;
@@ -188,17 +196,17 @@ class Main {
 			} else
 				Sys.println("No breakpoint set");
 		case "p", "print":
-			var path = args.shift();
-			if( path == null ) {
-				Sys.println("Requires variable name");
+			var expr = args.shift();
+			if( expr == null ) {
+				Sys.println("Requires expression");
 				return true;
 			}
-			var v = try dbg.getValue(path) catch( e : Dynamic ) {
+			var v = try dbg.getValue(expr) catch( e : Dynamic ) {
 				Sys.println("Error " + e + haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
 				return true;
 			}
 			if( v == null ) {
-				Sys.println("Unknown var " + path);
+				Sys.println("Unknown var " + expr);
 				return true;
 			}
 			Sys.println(dbg.eval.valueStr(v) + " : " + v.t.toString());
@@ -208,6 +216,36 @@ class Main {
 					var fv = dbg.eval.readField(v, f);
 					Sys.println("  " + f + " = " + dbg.eval.valueStr(fv) + " : " + fv.t.toString());
 				}
+		case "watch", "rwatch":
+			var expr = args.shift();
+			var v = try dbg.getRef(expr) catch( e : Dynamic ) {
+				Sys.println("Error " + e + haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
+				return true;
+			};
+			if( v == null ) {
+				Sys.println("Unknown var " + expr);
+				return true;
+			}
+			if( v.ptr == null ) {
+				Sys.println("Can't watch undefined var");
+				return true;
+			}
+			try {
+				dbg.watch(v, cmd == "rwatch");
+			} catch( e : Dynamic ) {
+				Sys.println("Error " + e + haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
+				return true;
+			}
+			Sys.println("Watching " + v.ptr.toString() + ":" + v.t.toString() + " " + dbg.eval.valueStr(dbg.eval.fetch(v)));
+		case "unwatch":
+			var param = args.shift();
+			var count = 0;
+			for( w in dbg.getWatches() )
+				if( param == null || w.ptr.toString() == param ) {
+					dbg.unwatch(w);
+					count++;
+				}
+			Sys.println("Unwatch " + count + " addresses");
 		case "clear":
 			switch( args.length ) {
 			case 0:

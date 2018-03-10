@@ -11,7 +11,7 @@ private enum Control {
 	CLabel;
 }
 
-typedef LocalAccess = { rid : Int, ?index : Int, t : format.hl.Data.HLType };
+typedef LocalAccess = { rid : Int, ?index : Int, ?container : format.hl.Data.EnumPrototype, t : format.hl.Data.HLType };
 
 class CodeBlock {
 
@@ -90,8 +90,6 @@ class CodeGraph {
 
 		// init assigns
 		assigns = new Map();
-		var reg = -1;
-		var argCount = 0;
 		for( a in fun.assigns ) {
 			if( a.position < 0 ) continue;
 			var vname = module.strings[a.varName];
@@ -169,8 +167,15 @@ class CodeGraph {
 				if( a.vars[k] == name ) {
 					if( !a.hasIndex )
 						return { rid : i, t : fun.regs[i] };
-					var t = switch( fun.regs[i] ) { case HEnum(e): e.constructs[0].params[k]; default: throw "assert"; };
-					return { rid : i, index : k, t : t };
+					var en = null;
+					var t = switch( fun.regs[i] ) {
+					case HEnum(e):
+						en = e;
+						e.constructs[0].params[k];
+					default:
+						throw "assert";
+					};
+					return { rid : i, index : k, container : en, t : t };
 				}
 		}
 		return null;

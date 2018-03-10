@@ -18,7 +18,11 @@ uv: libuv1-dev
 
 To install all dependencies on Ubuntu for example:
 
-`sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev`
+`sudo apt-get install libpng16-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev`
+
+And on OSX:
+
+`brew install libpng jpeg-turbo libvorbis sdl2 mbedtls openal-soft libuv`
 
 # Documentation
 

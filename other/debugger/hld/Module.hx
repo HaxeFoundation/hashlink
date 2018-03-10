@@ -33,16 +33,36 @@ class Module {
 	var align : Align;
 	var reversedHashes : Map<Int,String>;
 	var graphCache : Map<Int, CodeGraph>;
+	var methods : Array<{ obj : ObjPrototype, field : String }>;
+	var functionsIndexes : Map<Int,Int>;
 
 	public function new() {
 		protoCache = new Map();
 		eprotoCache = new Map();
 		graphCache = new Map();
+		functionsIndexes = new Map();
 		functionRegsCache = [];
+		methods = [];
+	}
+
+	public function getMethodContext( fidx : Int ) {
+		var f = code.functions[fidx];
+		if( f == null ) return null;
+		return methods[f.findex];
 	}
 
 	public function load( data : haxe.io.Bytes ) {
 		code = new format.hl.Reader().read(new haxe.io.BytesInput(data));
+
+		for( t in code.types )
+			switch( t ) {
+			case HObj(o):
+				for( f in o.proto )
+					methods[f.findex] = { obj : o, field : f.name };
+				for( b in o.bindings )
+					methods[b.mid] = { obj : o, field : fetchField(o, b.fid).name };
+			default:
+			}
 
 		// init files
 		fileIndexes = new Map();
@@ -63,6 +83,7 @@ class Module {
 		for( ifun in 0...code.functions.length ) {
 			var f = code.functions[ifun];
 			var files = new Map();
+			functionsIndexes.set(f.findex, ifun);
 			for( i in 0...f.debug.length >> 1 ) {
 				var ifile = f.debug[i << 1];
 				var dline = f.debug[(i << 1) + 1];
@@ -81,6 +102,29 @@ class Module {
 				if( dline > inf.lmax ) inf.lmax = dline;
 			}
 		}
+	}
+
+	function fetchField( o : ObjPrototype, fid : Int ) {
+		var pl = [];
+		var fcount = 0;
+		while( true ) {
+			pl.push(o);
+			fcount += o.fields.length;
+			if( o.tsuper == null ) break;
+			switch( o.tsuper ) {
+			case HObj(s): o = s;
+			default: throw "assert";
+			}
+		}
+		if( fid < 0 || fid >= fcount )
+			return null;
+		for( i in 0...pl.length ) {
+			var o = pl[pl.length - i - 1];
+			if( fid < o.fields.length )
+				return o.fields[fid];
+			fid -= o.fields.length;
+		}
+		return null;
 	}
 
 	public function init( align : Align ) {

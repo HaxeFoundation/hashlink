@@ -39,7 +39,7 @@ HL_PRIM int hl_thread_id() {
 #	ifdef HL_WIN
 	return (int)GetCurrentThreadId();
 #	else
-#	ifdef SYS_gettid
+#	if defined(SYS_gettid) && !defined(HL_TVOS)
 	return syscall(SYS_gettid);
 #	else
 	hl_error("hl_thread_id() not available for this platform");

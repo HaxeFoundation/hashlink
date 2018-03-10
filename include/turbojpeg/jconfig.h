@@ -1,7 +1,9 @@
 /* jconfig.vc --- jconfig.h for Microsoft Visual C++ on Windows 95 or NT. */
 /* see jconfig.txt for explanations */
 
-#define WITH_SIMD
+#ifndef __ANDROID__
+#	define WITH_SIMD
+#endif
 
 #define JPEG_LIB_VERSION 62
 #define LIBJPEG_TURBO_VERSION 1.4.2
