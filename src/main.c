@@ -83,6 +83,9 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 
 #endif
 
+HL_PRIM double hl_sys_time();
+static int K = 0;
+
 #ifdef HL_WIN
 int wmain(int argc, pchar *argv[]) {
 #else
@@ -101,6 +104,7 @@ int main(int argc, pchar *argv[]) {
 	int first_boot_arg = -1;
 	argv++;
 	argc--;
+
 	while( argc ) {
 		pchar *arg = *argv++;
 		argc--;
@@ -146,9 +150,9 @@ int main(int argc, pchar *argv[]) {
 #	ifdef HL_WIN
 	setlocale(LC_CTYPE,""); // printf to current locale
 #	endif
-	hl_global_init(&ctx);
+	hl_global_init();
 	hl_sys_init((void**)argv,argc,file);
-	hl_register_thread(&argc);
+	hl_register_thread(&ctx);
 	setbuf(stdout,NULL); // disable stdout buffering
 	ctx.code = load_code(file);
 	if( ctx.code == NULL )

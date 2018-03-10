@@ -120,6 +120,10 @@
 #	define HL_DEBUG
 #endif
 
+#ifndef HL_NO_THREADS
+#	define HL_THREADS
+#endif
+
 #include <stddef.h>
 #ifndef HL_VCC
 #	include <stdint.h>
@@ -600,13 +604,28 @@ HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool
 // ----------------------- THREADS --------------------------------------------------
 
 struct _hl_thread;
+struct _hl_lock;
+struct _hl_tls;
 typedef struct _hl_thread hl_thread;
+typedef struct _hl_lock hl_lock;
+typedef struct _hl_tls hl_tls;
 
 HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
 HL_API hl_thread *hl_thread_current( void );
 HL_API void hl_register_thread( void *stack_top );
-HL_API void hl_unregister_thread();
-HL_API void *hl_gc_stack_top();
+HL_API void hl_unregister_thread( void );
+HL_API void *hl_gc_stack_top( void );
+
+HL_API hl_lock *hl_lock_alloc( void );
+HL_API void hl_lock_acquire( hl_lock *l );
+HL_API bool hl_lock_try_acquire( hl_lock *l );
+HL_API void hl_lock_release( hl_lock *l );
+HL_API void hl_lock_free( hl_lock *l );
+
+HL_API hl_tls *hl_tls_alloc( void );
+HL_API void hl_tls_set( hl_tls *l, void *value );
+HL_API void *hl_tls_get( hl_tls *l );
+HL_API void hl_tls_free( hl_tls *l );
 
 // ----------------------- ALLOC --------------------------------------------------
 
@@ -620,7 +639,6 @@ HL_API void *hl_gc_stack_top();
 
 HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
 HL_API void hl_add_root( void *ptr );
-HL_API void hl_pop_root( void );
 HL_API void hl_remove_root( void *ptr );
 HL_API void hl_gc_major( void );
 HL_API bool hl_is_gc_ptr( void *ptr );
@@ -641,7 +659,7 @@ HL_API void *hl_malloc( hl_alloc *a, int size );
 HL_API void *hl_zalloc( hl_alloc *a, int size );
 HL_API void hl_free( hl_alloc *a );
 
-HL_API void hl_global_init( void *stack_top );
+HL_API void hl_global_init( void );
 HL_API void hl_global_free( void );
 
 HL_API void *hl_alloc_executable_memory( int size );
