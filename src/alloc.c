@@ -138,15 +138,15 @@ static void (*gc_track_callback)(hl_type *,int,int,void*) = NULL;
 typedef struct {
 	void *stack_top;
 	void *stack_cur;
-	hl_lock *lock;
 	jmp_buf regs;
-	int blocking;
+	volatile int blocking;
 } gc_thread;
 
 static struct {
 	int count;
+	bool stopping_world;
 	gc_thread **threads;
-	hl_lock *global_lock;
+	hl_mutex *global_lock;
 	hl_tls *cur_thread;
 } gc_threads;
 
@@ -188,17 +188,25 @@ static gc_thread *gc_get_thread() {
 	return hl_tls_get(gc_threads.cur_thread);
 }
 
+static void gc_save_context( gc_thread *t ) {
+	setjmp(t->regs);
+	t->stack_cur = &t;
+}
+
 #ifndef HL_THREADS
 #	define gc_global_lock(_)
 #else
 static void gc_global_lock( bool lock ) {
 	gc_thread *t = gc_get_thread();
 	if( lock ) {
+		if( t->blocking ) 
+			hl_fatal("Can't lock GC in hl_blocking section");
+		gc_save_context(t);
 		t->blocking++;
-		hl_lock_acquire(gc_threads.global_lock);
+		hl_mutex_acquire(gc_threads.global_lock);
 	} else {
 		t->blocking--;
-		hl_lock_release(gc_threads.global_lock);
+		hl_mutex_release(gc_threads.global_lock);
 	}
 }
 #endif
@@ -246,11 +254,10 @@ HL_PRIM gc_pheader *hl_gc_get_page( void *v ) {
 
 HL_API void hl_register_thread( void *stack_top ) {
 	if( gc_get_thread() )
-		hl_error("Thread already registered");
+		hl_fatal("Thread already registered");
 
 	gc_thread *t = (gc_thread*)malloc(sizeof(gc_thread));
 	t->blocking = 0;
-	t->lock = hl_lock_alloc();
 	t->stack_top = stack_top;
 	hl_tls_set(gc_threads.cur_thread, t);
 
@@ -266,7 +273,7 @@ HL_API void hl_unregister_thread() {
 	int i;
 	gc_thread *t = gc_get_thread();
 	if( !t )
-		hl_error("Thread not registered");
+		hl_fatal("Thread not registered");
 	gc_global_lock(true);
 	for(i=0;i<gc_threads.count;i++)
 		if( gc_threads.threads[i] == t ) {
@@ -276,7 +283,8 @@ HL_API void hl_unregister_thread() {
 			break;
 		}
 	hl_tls_set(gc_threads.cur_thread, NULL);
-	gc_global_lock(false);
+	// don't use gc_global_lock(false)
+	hl_mutex_release(gc_threads.global_lock);
 }
 
 HL_API void *hl_gc_stack_top() {
@@ -287,14 +295,22 @@ HL_API void *hl_gc_threads_info() {
 	return &gc_threads;
 }
 
-static void gc_stop_self() {
-	gc_thread *t = gc_get_thread();
-	setjmp(t->regs);
-	t->stack_cur = &t;
-}
-
 static void gc_stop_world( bool b ) {
-	if( b ) gc_stop_self();
+#	ifdef HL_THREADS
+	if( b ) {
+		int i;
+		gc_threads.stopping_world = true;
+		for(i=0;i<gc_threads.count;i++) {
+			gc_thread *t = gc_threads.threads[i];
+			while( t->blocking == 0 ) {}; // spinwait
+		}
+	} else {
+		// releasing global lock will release all threads
+		gc_threads.stopping_world = false;
+	}
+#	else
+	if( b ) gc_save_context(gc_get_thread());
+#	endif
 }
 
 // -------------------------  ALLOCATOR ----------------------------------------------------------
@@ -349,6 +365,7 @@ static int PAGE_ID = 0;
 #endif
 
 HL_API void hl_gc_dump_memory( const char *filename );
+static void gc_major( void );
 
 static gc_pheader *gc_alloc_new_page( int pid, int block, int size, int kind, bool varsize ) {
 	int m, i;
@@ -376,14 +393,16 @@ retry:
 	p = (gc_pheader*)base;
 	if( !base ) {
 		int pages = gc_stats.pages_allocated;
-		hl_gc_major();
+		gc_major();
 		if( pages != gc_stats.pages_allocated ) {
 			size = old_size;
 			goto retry;
 		}
 		// big block : report stack trace - we should manage to handle it
-		if( size >= (8 << 20) )
+		if( size >= (8 << 20) ) {
+			gc_global_lock(false);
 			hl_error_msg(USTR("Failed to alloc %d KB"),size>>10);
+		}
 		if( gc_flags & GC_DUMP_MEM ) hl_gc_dump_memory("hlmemory.dump");
 		out_of_memory("pages");
 	}
@@ -645,6 +664,7 @@ static void *gc_alloc_gen( int size, int flags, int *allocated ) {
 			return ptr;
 		}
 	}
+	gc_global_lock(false);
 	hl_error("Required memory allocation too big");
 	return NULL;
 }
@@ -916,9 +936,8 @@ static void gc_mark() {
 	gc_flush_empty_pages();
 }
 
-HL_API void hl_gc_major() {
+static void gc_major() {
 	int time = TIMESTAMP(), dt;
-	gc_global_lock(true);
 	gc_stats.last_mark = gc_stats.total_allocated;
 	gc_stats.last_mark_allocs = gc_stats.allocation_count;
 	gc_stop_world(true);
@@ -941,6 +960,11 @@ HL_API void hl_gc_major() {
 		last_profile.alloc_time = gc_stats.alloc_time;
 		last_profile.total_allocated = gc_stats.total_allocated;
 	}
+}
+
+HL_API void hl_gc_major() {
+	gc_global_lock(true);
+	gc_major();
 	gc_global_lock(false);
 }
 
@@ -963,7 +987,7 @@ static void gc_check_mark() {
 	int64 m = gc_stats.total_allocated - gc_stats.last_mark;
 	int64 b = gc_stats.allocation_count - gc_stats.last_mark_allocs;
 	if( (m > gc_stats.pages_total_memory * gc_mark_threshold || b > gc_stats.pages_blocks * gc_mark_threshold) && gc_is_active )
-		hl_gc_major();
+		gc_major();
 }
 
 static void hl_gc_init() {
@@ -981,7 +1005,7 @@ static void hl_gc_init() {
 		gc_flags |= GC_DUMP_MEM;
 #	endif
 	memset(&gc_threads,0,sizeof(gc_threads));
-	gc_threads.global_lock = hl_lock_alloc();
+	gc_threads.global_lock = hl_mutex_alloc();
 	gc_threads.cur_thread = hl_tls_alloc();
 }
 
@@ -1001,12 +1025,21 @@ HL_API bool hl_is_blocking() {
 HL_API void hl_blocking( bool b ) {
 	gc_thread *t = gc_get_thread();
 	if( !t ) hl_error("Unregistered thread");
-	if( b )
+	if( b ) {
+#		ifdef HL_THREADS
+		if( t->blocking == 0 )
+			gc_save_context(t);
+#		endif
 		t->blocking++; 
-	else if( t->blocking == 0 ) 
+	} else if( t->blocking == 0 ) 
 		hl_error("Unblocked thread");
-	else
+	else {
 		t->blocking--;
+		if( t->blocking == 0 && gc_threads.stopping_world ) {
+			gc_global_lock(true);
+			gc_global_lock(false);
+		}
+	}
 }
 
 void hl_global_init() {
