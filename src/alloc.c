@@ -134,6 +134,22 @@ static gc_pheader *gc_level1_null[1<<GC_LEVEL1_BITS] = {NULL};
 static gc_pheader **hl_gc_page_map[1<<GC_LEVEL0_BITS] = {NULL};
 static void (*gc_track_callback)(hl_type *,int,int,void*) = NULL;
 
+
+typedef struct {
+	void *stack_top;
+	void *stack_cur;
+	hl_lock *lock;
+	jmp_buf regs;
+	int blocking;
+} gc_thread;
+
+static struct {
+	int count;
+	gc_thread **threads;
+	hl_lock *global_lock;
+	hl_tls *cur_thread;
+} gc_threads;
+
 static struct {
 	int64 total_requested;
 	int64 total_allocated;
@@ -168,11 +184,31 @@ static void ***gc_roots = NULL;
 static int gc_roots_count = 0;
 static int gc_roots_max = 0;
 
+static gc_thread *gc_get_thread() {
+	return hl_tls_get(gc_threads.cur_thread);
+}
+
+#ifndef HL_THREADS
+#	define gc_global_lock(_)
+#else
+static void gc_global_lock( bool lock ) {
+	gc_thread *t = gc_get_thread();
+	if( lock ) {
+		t->blocking++;
+		hl_lock_acquire(gc_threads.global_lock);
+	} else {
+		t->blocking--;
+		hl_lock_release(gc_threads.global_lock);
+	}
+}
+#endif
+
 HL_PRIM void hl_gc_set_track( void *f ) {
 	gc_track_callback = f;
 }
 
 HL_PRIM void hl_add_root( void *r ) {
+	gc_global_lock(true);
 	if( gc_roots_count == gc_roots_max ) {
 		int nroots = gc_roots_max ? (gc_roots_max << 1) : 16;
 		void ***roots = (void***)malloc(sizeof(void*)*nroots);
@@ -182,20 +218,19 @@ HL_PRIM void hl_add_root( void *r ) {
 		gc_roots_max = nroots;
 	}
 	gc_roots[gc_roots_count++] = (void**)r;
-}
-
-HL_PRIM void hl_pop_root() {
-	gc_roots_count--;
+	gc_global_lock(false);
 }
 
 HL_PRIM void hl_remove_root( void *v ) {
 	int i;
-	for(i=0;i<gc_roots_count;i++)
+	gc_global_lock(true);
+	for(i=gc_roots_count-1;i>=0;i--)
 		if( gc_roots[i] == (void**)v ) {
 			gc_roots_count--;
 			memmove(gc_roots + i, gc_roots + (i+1), (gc_roots_count - i) * sizeof(void*));
 			break;
 		}
+	gc_global_lock(false);
 }
 
 HL_PRIM gc_pheader *hl_gc_get_page( void *v ) {
@@ -205,6 +240,61 @@ HL_PRIM gc_pheader *hl_gc_get_page( void *v ) {
 		page = NULL;
 #	endif
 	return page;
+}
+
+// -------------------------  THREADS ----------------------------------------------------------
+
+HL_API void hl_register_thread( void *stack_top ) {
+	if( gc_get_thread() )
+		hl_error("Thread already registered");
+
+	gc_thread *t = (gc_thread*)malloc(sizeof(gc_thread));
+	t->blocking = 0;
+	t->lock = hl_lock_alloc();
+	t->stack_top = stack_top;
+	hl_tls_set(gc_threads.cur_thread, t);
+
+	gc_global_lock(true);
+	gc_thread **all = (gc_thread**)malloc(sizeof(void*) * (gc_threads.count + 1));
+	memcpy(all,gc_threads.threads,sizeof(void*)*gc_threads.count);
+	gc_threads.threads = all;
+	all[gc_threads.count++] = t;
+	gc_global_lock(false);
+}
+
+HL_API void hl_unregister_thread() {
+	int i;
+	gc_thread *t = gc_get_thread();
+	if( !t )
+		hl_error("Thread not registered");
+	gc_global_lock(true);
+	for(i=0;i<gc_threads.count;i++)
+		if( gc_threads.threads[i] == t ) {
+			memmove(gc_threads.threads + i, gc_threads.threads + i + 1, sizeof(void*) * (gc_threads.count - i - 1));
+			gc_threads.count--;
+			free(t);
+			break;
+		}
+	hl_tls_set(gc_threads.cur_thread, NULL);
+	gc_global_lock(false);
+}
+
+HL_API void *hl_gc_stack_top() {
+	return gc_get_thread()->stack_top;
+}
+
+HL_API void *hl_gc_threads_info() {
+	return &gc_threads;
+}
+
+static void gc_stop_self() {
+	gc_thread *t = gc_get_thread();
+	setjmp(t->regs);
+	t->stack_cur = &t;
+}
+
+static void gc_stop_world( bool b ) {
+	if( b ) gc_stop_self();
 }
 
 // -------------------------  ALLOCATOR ----------------------------------------------------------
@@ -561,28 +651,11 @@ static void *gc_alloc_gen( int size, int flags, int *allocated ) {
 
 static void gc_check_mark();
 
-//#define HL_BUMP_ALLOC
-
-#ifdef HL_BUMP_ALLOC
-static unsigned char *alloc_all = NULL;
-static unsigned char *alloc_end = NULL;
-#endif
-
 void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	void *ptr;
 	int time = 0;
 	int allocated = 0;
-#ifdef HL_BUMP_ALLOC
-	if( !alloc_all ) {
-		int tot = 3<<29;
-		alloc_all = gc_alloc_page_memory(tot);
-		if( !alloc_all ) hl_fatal("Failed to allocate bump memory");
-		alloc_end = alloc_all + tot;
-	}
-	ptr = alloc_all;
-	alloc_all += size;
-	if( alloc_all > alloc_end ) out_of_memory("bump");
-#else
+	gc_global_lock(true);
 	gc_check_mark();
 	if( gc_flags & GC_PROFILE ) time = TIMESTAMP();
 	ptr = gc_alloc_gen(size, flags, &allocated);
@@ -590,11 +663,11 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 #	ifdef GC_DEBUG
 	memset(ptr,0xCD,allocated);
 #	endif
-#endif
 	if( flags & MEM_ZERO )
 		MZERO(ptr,allocated);
 	else if( MEM_HAS_PTR(flags) && allocated != size )
 		MZERO((char*)ptr+size,allocated-size); // erase possible pointers after data
+	gc_global_lock(false);
 	if( (gc_flags & GC_TRACK) && gc_track_callback )
 		((void (*)(hl_type *,int,int,void*))gc_track_callback)(t,size,flags,ptr);
 	return ptr;
@@ -603,7 +676,6 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 // -------------------------  MARKING ----------------------------------------------------------
 
 static float gc_mark_threshold = 0.2f;
-static void *gc_stack_top = NULL;
 static int mark_size = 0;
 static unsigned char *mark_data = NULL;
 static void **cur_mark_stack = NULL;
@@ -758,16 +830,35 @@ static void gc_call_finalizers(){
 	}
 }
 
+static void gc_mark_stack( void *start, void *end ) {
+	void **mark_stack = cur_mark_stack;
+	void **stack_head = (void**)start;
+	while( stack_head < (void**)end ) {
+		void *p = *stack_head++;
+		gc_pheader *page = GC_GET_PAGE(p);
+		int bid;
+		if( !page || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
+#		ifdef HL_64
+		if( !INPAGE(p,page) ) continue;
+#		endif
+		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
+		if( page->sizes ) {
+			if( page->sizes[bid] == 0 ) continue;
+		} else if( bid < page->first_block )
+			continue;
+		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
+			page->bmp[bid>>3] |= 1<<(bid&7);
+			GC_PUSH_GEN(p,page,bid);
+		}
+	}
+	cur_mark_stack = mark_stack;
+}
+
 static void gc_mark() {
-	jmp_buf regs;
-	void **stack_head;
-	void **stack_top = (void**)gc_stack_top;
 	void **mark_stack = cur_mark_stack;
 	int mark_bytes = gc_stats.mark_bytes;
 	int pid, i;
 	unsigned char *mark_cur;
-	// save registers
-	setjmp(regs);
 	// prepare mark bits
 	if( mark_bytes > mark_size ) {
 		gc_free_page_memory(mark_data, mark_size);
@@ -806,27 +897,16 @@ static void gc_mark() {
 			GC_PUSH_GEN(p,page,bid);
 		}
 	}
-	// scan stack
-	stack_head = (void**)&stack_head;
-	if( stack_head > (void**)&regs ) stack_head = (void**)&regs; // fix for compilers that might inverse variables
-	while( stack_head <= stack_top ) {
-		void *p = *stack_head++;
-		gc_pheader *page = GC_GET_PAGE(p);
-		int bid;
-		if( !page || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
-#		ifdef HL_64
-		if( !INPAGE(p,page) ) continue;
-#		endif
-		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
-		if( page->sizes ) {
-			if( page->sizes[bid] == 0 ) continue;
-		} else if( bid < page->first_block )
-			continue;
-		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
-			page->bmp[bid>>3] |= 1<<(bid&7);
-			GC_PUSH_GEN(p,page,bid);
-		}
+
+	// scan threads stacks & registers
+	for(i=0;i<gc_threads.count;i++) {
+		gc_thread *t = gc_threads.threads[i];
+		cur_mark_stack = mark_stack;
+		gc_mark_stack(t->stack_cur,t->stack_top);
+		gc_mark_stack(&t->regs,(void**)&t->regs + (sizeof(jmp_buf) / sizeof(void*) - 1));
+		mark_stack = cur_mark_stack;
 	}
+
 	cur_mark_stack = mark_stack;
 	if( mark_stack ) gc_flush_mark();
 	gc_call_finalizers();
@@ -838,9 +918,12 @@ static void gc_mark() {
 
 HL_API void hl_gc_major() {
 	int time = TIMESTAMP(), dt;
+	gc_global_lock(true);
 	gc_stats.last_mark = gc_stats.total_allocated;
 	gc_stats.last_mark_allocs = gc_stats.allocation_count;
+	gc_stop_world(true);
 	gc_mark();
+	gc_stop_world(false);
 	dt = TIMESTAMP() - time;
 	gc_stats.mark_count++;
 	gc_stats.mark_time += dt;
@@ -858,6 +941,7 @@ HL_API void hl_gc_major() {
 		last_profile.alloc_time = gc_stats.alloc_time;
 		last_profile.total_allocated = gc_stats.total_allocated;
 	}
+	gc_global_lock(false);
 }
 
 HL_API bool hl_is_gc_ptr( void *ptr ) {
@@ -882,9 +966,8 @@ static void gc_check_mark() {
 		hl_gc_major();
 }
 
-static void hl_gc_init( void *stack_top ) {
+static void hl_gc_init() {
 	int i;
-	gc_stack_top = stack_top;
 	for(i=0;i<1<<GC_LEVEL0_BITS;i++)
 		hl_gc_page_map[i] = gc_level1_null;
 	if( TRAILING_ONES(0x080003FF) != 10 || TRAILING_ONES(0) != 0 || TRAILING_ONES(0xFFFFFFFF) != 32 )
@@ -897,22 +980,37 @@ static void hl_gc_init( void *stack_top ) {
 	if( getenv("HL_DUMP_MEMORY") )
 		gc_flags |= GC_DUMP_MEM;
 #	endif
+	memset(&gc_threads,0,sizeof(gc_threads));
+	gc_threads.global_lock = hl_lock_alloc();
+	gc_threads.cur_thread = hl_tls_alloc();
 }
 
 // ---- UTILITIES ----------------------
 
-static bool is_blocking = false; // TODO : use TLS for multithread
-
 HL_API bool hl_is_blocking() {
-	return is_blocking;
+	gc_thread *t = gc_get_thread();
+	// when called from a non GC thread, tells if the main thread is blocking
+	if( t == NULL ) {
+		if( gc_threads.count == 0 )
+			return false;
+		t = gc_threads.threads[0];
+	}
+	return t->blocking > 0;
 }
 
-HL_API void hl_blocking( bool b) {
-	is_blocking = b;
+HL_API void hl_blocking( bool b ) {
+	gc_thread *t = gc_get_thread();
+	if( !t ) hl_error("Unregistered thread");
+	if( b )
+		t->blocking++; 
+	else if( t->blocking == 0 ) 
+		hl_error("Unblocked thread");
+	else
+		t->blocking--;
 }
 
-void hl_global_init( void *stack_top ) {
-	hl_gc_init(stack_top);
+void hl_global_init() {
+	hl_gc_init();
 }
 
 void hl_cache_free();
@@ -1149,6 +1247,8 @@ HL_API void hl_gc_set_dump_types( hl_types_dump tdump ) {
 
 HL_API void hl_gc_dump_memory( const char *filename ) {
 	int i;
+	gc_global_lock(true);
+	gc_stop_world(true);
 	gc_mark();
 	fdump = fopen(filename,"wb");
 	// header
@@ -1179,13 +1279,13 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	for(i=0;i<gc_roots_count;i++)
 		fdump_p(*gc_roots[i]);
 	// stacks
-	fdump_i(1);
-	fdump_p(gc_stack_top);
-	{
-		void **stack_head = (void**)&stack_head;
-		int size = (int)((void**)gc_stack_top - stack_head);
+	fdump_i(gc_threads.count);
+	for(i=0;i<gc_threads.count;i++) {
+		gc_thread *t = gc_threads.threads[i];
+		fdump_p(t->stack_top);
+		int size = (int)((void**)t->stack_top - (void**)t->stack_cur);
 		fdump_i(size);
-		fdump_d(stack_head,size*sizeof(void*));
+		fdump_d(t->stack_cur,size*sizeof(void*));
 	}
 	// types
 #	define fdump_t(t)	fdump_i(t.kind); fdump_p(&t);
@@ -1201,6 +1301,8 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	if( gc_types_dump ) gc_types_dump(fdump_d);
 	fclose(fdump);
 	fdump = NULL;
+	gc_stop_world(false);
+	gc_global_lock(false);
 }
 
 HL_API vdynamic *hl_debug_call( int mode, vdynamic *v ) {

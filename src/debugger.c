@@ -35,7 +35,7 @@ HL_API int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len );
 HL_API void hl_sys_sleep( double t );
 HL_API int hl_thread_id();
 HL_API vdynamic **hl_debug_exc;
-HL_API void *hl_gc_thread_info();
+HL_API void *hl_gc_threads_info();
 
 static hl_socket *debug_socket = NULL;
 static hl_socket *client_socket = NULL;
@@ -48,12 +48,15 @@ static void send( void *ptr, int size ) {
 
 static void hl_debug_loop( hl_module *m ) {
 	void *dbg_addr = &hl_debug_exc;
-	void *inf_addr = hl_gc_thread_info();
+	void *inf_addr = hl_gc_threads_info();
 	int flags = 0;
 #	ifdef HL_64
 	flags |= 1;
 #	endif
 	if( sizeof(bool) == 4 ) flags |= 2;
+#	ifdef HL_THREADS
+	flags |= 4;
+#	endif
 	while( true ) {
 		int i;
 		vbyte cmd;
