@@ -147,8 +147,9 @@ static struct {
 	bool stopping_world;
 	gc_thread **threads;
 	hl_mutex *global_lock;
-	hl_tls *cur_thread;
 } gc_threads;
+
+HL_THREAD_VAR static gc_thread *current_thread;
 
 static struct {
 	int64 total_requested;
@@ -185,7 +186,7 @@ static int gc_roots_count = 0;
 static int gc_roots_max = 0;
 
 static gc_thread *gc_get_thread() {
-	return hl_tls_get(gc_threads.cur_thread);
+	return current_thread;
 }
 
 static void gc_save_context( gc_thread *t ) {
@@ -259,7 +260,7 @@ HL_API void hl_register_thread( void *stack_top ) {
 	gc_thread *t = (gc_thread*)malloc(sizeof(gc_thread));
 	t->blocking = 0;
 	t->stack_top = stack_top;
-	hl_tls_set(gc_threads.cur_thread, t);
+	current_thread = t;
 
 	gc_global_lock(true);
 	gc_thread **all = (gc_thread**)malloc(sizeof(void*) * (gc_threads.count + 1));
@@ -282,7 +283,7 @@ HL_API void hl_unregister_thread() {
 			free(t);
 			break;
 		}
-	hl_tls_set(gc_threads.cur_thread, NULL);
+	current_thread = NULL;
 	// don't use gc_global_lock(false)
 	hl_mutex_release(gc_threads.global_lock);
 }
@@ -1006,7 +1007,6 @@ static void hl_gc_init() {
 #	endif
 	memset(&gc_threads,0,sizeof(gc_threads));
 	gc_threads.global_lock = hl_mutex_alloc();
-	gc_threads.cur_thread = hl_tls_alloc();
 }
 
 // ---- UTILITIES ----------------------

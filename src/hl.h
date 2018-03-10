@@ -121,7 +121,14 @@
 #endif
 
 #ifndef HL_NO_THREADS
-//#	define HL_THREADS
+#	define HL_THREADS
+#	ifdef HL_VCC
+#		define HL_THREAD_VAR __declspec( thread )
+#	else
+#		define HL_THREAD_VAR __thread
+#	endif
+#else
+#	define HL_THREAD_VAR
 #endif
 
 #include <stddef.h>
