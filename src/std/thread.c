@@ -23,7 +23,7 @@
 
 #if !defined(HL_THREADS)
 
-struct _hl_lock {
+struct _hl_mutex {
 	void *_unused;
 };
 
@@ -34,7 +34,7 @@ struct _hl_tls {
 
 #elif defined(HL_WIN)
 
-struct _hl_lock {
+struct _hl_mutex {
 	CRITICAL_SECTION cs;
 };
 
@@ -44,7 +44,7 @@ struct _hl_lock {
 #	include <unistd.h>
 #	include <sys/syscall.h>
 
-struct _hl_lock {
+struct _hl_mutex {
 	pthread_mutex_t lock;
 };
 
@@ -55,15 +55,15 @@ struct _hl_tls {
 
 // ----------------- ALLOC
 
-HL_PRIM hl_lock *hl_lock_alloc() {
+HL_PRIM hl_mutex *hl_mutex_alloc() {
 #	if !defined(HL_THREADS)
-	return (hl_lock*)1;
+	return (hl_mutex*)1;
 #	elif defined(HL_WIN)
-	hl_lock *l = (hl_lock*)malloc(sizeof(hl_lock));
+	hl_mutex *l = (hl_mutex*)malloc(sizeof(hl_mutex));
 	InitializeCriticalSection(&l->cs);
 	return l;
 #	else
-	hl_lock *l = (hl_lock*)malloc(sizeof(hl_lock));
+	hl_mutex *l = (hl_mutex*)malloc(sizeof(hl_mutex));
 	pthread_mutexattr_t a;
 	pthread_mutexattr_init(&a);
 	pthread_mutexattr_settype(&a,PTHREAD_MUTEX_RECURSIVE);
@@ -73,7 +73,7 @@ HL_PRIM hl_lock *hl_lock_alloc() {
 #	endif
 }
 
-HL_PRIM void hl_lock_acquire( hl_lock *l ) {
+HL_PRIM void hl_mutex_acquire( hl_mutex *l ) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	EnterCriticalSection(&l->cs);
@@ -82,7 +82,7 @@ HL_PRIM void hl_lock_acquire( hl_lock *l ) {
 #	endif
 }
 
-HL_PRIM bool hl_lock_try_acquire( hl_lock *l ) {
+HL_PRIM bool hl_mutex_try_acquire( hl_mutex *l ) {
 #if	!defined(HL_THREADS)
 	return true;
 #	elif defined(HL_WIN)
@@ -92,7 +92,7 @@ HL_PRIM bool hl_lock_try_acquire( hl_lock *l ) {
 #	endif
 }
 
-HL_PRIM void hl_lock_release( hl_lock *l ) {
+HL_PRIM void hl_mutex_release( hl_mutex *l ) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	LeaveCriticalSection(&l->cs);
@@ -101,7 +101,7 @@ HL_PRIM void hl_lock_release( hl_lock *l ) {
 #	endif
 }
 
-HL_PRIM void hl_lock_free( hl_lock *l ) {
+HL_PRIM void hl_mutex_free( hl_mutex *l ) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	DeleteCriticalSection(&l->cs);
@@ -201,6 +201,7 @@ static void gc_thread_entry( thread_start *_s ) {
 }
 
 HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
+#ifdef HL_THREADS
 	if( withGC ) {
 		thread_start *s = (thread_start*)malloc(sizeof(thread_start));
 		s->callb = callback;
@@ -209,8 +210,8 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 		callback = gc_thread_entry;
 		param = s;
 	}
+#endif
 #if !defined(HL_THREADS)
-	hl_pop_root();
 	hl_error("Threads support is disabled");
 	return NULL;
 #elif defined(HL_WIN)

@@ -121,7 +121,7 @@
 #endif
 
 #ifndef HL_NO_THREADS
-#	define HL_THREADS
+//#	define HL_THREADS
 #endif
 
 #include <stddef.h>
@@ -604,10 +604,10 @@ HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool
 // ----------------------- THREADS --------------------------------------------------
 
 struct _hl_thread;
-struct _hl_lock;
+struct _hl_mutex;
 struct _hl_tls;
 typedef struct _hl_thread hl_thread;
-typedef struct _hl_lock hl_lock;
+typedef struct _hl_mutex hl_mutex;
 typedef struct _hl_tls hl_tls;
 
 HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
@@ -616,11 +616,11 @@ HL_API void hl_register_thread( void *stack_top );
 HL_API void hl_unregister_thread( void );
 HL_API void *hl_gc_stack_top( void );
 
-HL_API hl_lock *hl_lock_alloc( void );
-HL_API void hl_lock_acquire( hl_lock *l );
-HL_API bool hl_lock_try_acquire( hl_lock *l );
-HL_API void hl_lock_release( hl_lock *l );
-HL_API void hl_lock_free( hl_lock *l );
+HL_API hl_mutex *hl_mutex_alloc( void );
+HL_API void hl_mutex_acquire( hl_mutex *l );
+HL_API bool hl_mutex_try_acquire( hl_mutex *l );
+HL_API void hl_mutex_release( hl_mutex *l );
+HL_API void hl_mutex_free( hl_mutex *l );
 
 HL_API hl_tls *hl_tls_alloc( void );
 HL_API void hl_tls_set( hl_tls *l, void *value );
