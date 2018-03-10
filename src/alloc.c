@@ -1042,11 +1042,13 @@ HL_API void hl_blocking( bool b ) {
 	}
 }
 
+void hl_cache_free();
+void hl_cache_init();
+
 void hl_global_init() {
 	hl_gc_init();
+	hl_cache_init();
 }
-
-void hl_cache_free();
 
 void hl_global_free() {
 	hl_cache_free();
