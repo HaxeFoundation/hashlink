@@ -27,19 +27,34 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x140
+#define HL_VERSION	0x150
 
 #ifdef _WIN32
 #	define HL_WIN
 #endif
 
 #if defined(__APPLE__) || defined(__MACH__) || defined(macintosh)
-#	define HL_MAC
+#include <TargetConditionals.h>
+#if TARGET_OS_IOS
+#define HL_IOS
+#elif TARGET_OS_TV
+#define HL_TVOS
+#elif TARGET_OS_MAC
+#define HL_MAC
+#endif
+#endif
+
+#ifdef __ANDROID__
+#	define HL_ANDROID
 #endif
 
 #if defined(linux) || defined(__linux__)
 #	define HL_LINUX
 #	define _GNU_SOURCE
+#endif
+
+#if defined(HL_IOS) || defined(HL_ANDROID) || defined(HL_TVOS)
+#	define HL_MOBILE
 #endif
 
 #ifdef __ORBIS__
@@ -188,7 +203,14 @@ typedef uint16_t uchar;
 #	define USTR(str)	u##str
 #else
 #	include <stdarg.h>
+#if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_MAC)
+#include <stddef.h>
+#include <stdint.h>
+typedef uint16_t char16_t;
+typedef uint32_t char32_t;
+#else
 #	include <uchar.h>
+#endif
 typedef char16_t uchar;
 #	undef USTR
 #	define USTR(str)	u##str
@@ -212,7 +234,7 @@ C_FUNCTION_END
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
 #elif defined(HL_PS)
 #	define hl_debug_break()	__debugbreak()
-#elif defined(HL_LINUX)
+#elif defined(HL_LINUX) && defined(__i386__)
 #	ifdef HL_64
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \
@@ -231,8 +253,6 @@ C_FUNCTION_END
 #else
 #	define hl_debug_break()
 #endif
-
-#define DADDR(v)	((int)((int_val)(v))&0xFFFF)
 
 // ---- TYPES -------------------------------------------
 
@@ -488,7 +508,7 @@ HL_API hl_type hlt_dynobj;
 HL_API hl_type hlt_bool;
 HL_API hl_type hlt_abstract;
 
-HL_API double hl_nan();
+HL_API double hl_nan( void );
 HL_API bool hl_is_dynamic( hl_type *t );
 #define hl_is_ptr(t)	((t)->kind >= HBYTES)
 HL_API bool hl_same_type( hl_type *a, hl_type *b );
@@ -502,7 +522,7 @@ HL_API vdynamic *hl_alloc_dynbool( bool b );
 HL_API vdynamic *hl_alloc_obj( hl_type *t );
 HL_API venum *hl_alloc_enum( hl_type *t, int index );
 HL_API vvirtual *hl_alloc_virtual( hl_type *t );
-HL_API vdynobj *hl_alloc_dynobj();
+HL_API vdynobj *hl_alloc_dynobj( void );
 HL_API vbyte *hl_alloc_bytes( int size );
 HL_API vbyte *hl_copy_bytes( const vbyte *byte, int size );
 HL_API int hl_utf8_length( const vbyte *s, int pos );
@@ -519,14 +539,14 @@ HL_API const uchar *hl_field_name( int hash );
 
 #define hl_error(msg)	hl_error_msg(USTR(msg))
 HL_API void hl_error_msg( const uchar *msg, ... );
-HL_API void hl_assert();
+HL_API void hl_assert( void );
 HL_API void hl_throw( vdynamic *v );
 HL_API void hl_rethrow( vdynamic *v );
 HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
-HL_API void hl_dump_stack();
-HL_API varray *hl_exception_stack();
-HL_API bool hl_detect_debugger();
+HL_API void hl_dump_stack( void );
+HL_API varray *hl_exception_stack( void );
+HL_API bool hl_detect_debugger( void );
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
@@ -583,7 +603,7 @@ struct _hl_thread;
 typedef struct _hl_thread hl_thread;
 
 HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
-HL_API hl_thread *hl_thread_current();
+HL_API hl_thread *hl_thread_current( void );
 HL_API void hl_register_thread( void *stack_top );
 HL_API void hl_unregister_thread();
 HL_API void *hl_gc_stack_top();
@@ -600,13 +620,13 @@ HL_API void *hl_gc_stack_top();
 
 HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
 HL_API void hl_add_root( void *ptr );
-HL_API void hl_pop_root();
+HL_API void hl_pop_root( void );
 HL_API void hl_remove_root( void *ptr );
-HL_API void hl_gc_major();
+HL_API void hl_gc_major( void );
 HL_API bool hl_is_gc_ptr( void *ptr );
 
 HL_API void hl_blocking( bool b );
-HL_API bool hl_is_blocking();
+HL_API bool hl_is_blocking( void );
 
 typedef void (*hl_types_dump)( void (*)( void *, int) );
 HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
@@ -622,7 +642,7 @@ HL_API void *hl_zalloc( hl_alloc *a, int size );
 HL_API void hl_free( hl_alloc *a );
 
 HL_API void hl_global_init( void *stack_top );
-HL_API void hl_global_free();
+HL_API void hl_global_free( void );
 
 HL_API void *hl_alloc_executable_memory( int size );
 HL_API void hl_free_executable_memory( void *ptr, int size );
@@ -631,7 +651,7 @@ HL_API void hl_free_executable_memory( void *ptr, int size );
 
 typedef struct hl_buffer hl_buffer;
 
-HL_API hl_buffer *hl_alloc_buffer();
+HL_API hl_buffer *hl_alloc_buffer( void );
 HL_API void hl_buffer_val( hl_buffer *b, vdynamic *v );
 HL_API void hl_buffer_char( hl_buffer *b, uchar c );
 HL_API void hl_buffer_str( hl_buffer *b, const uchar *str );
@@ -695,8 +715,12 @@ typedef struct {
 #define	HL_PRIM
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #else
-#define	HL_PRIM						EXPORT
-#define DEFINE_PRIM_WITH_NAME		_DEFINE_PRIM_WITH_NAME
+#	ifdef __cplusplus
+#		define	HL_PRIM				extern "C" EXPORT
+#	else
+#		define	HL_PRIM				EXPORT
+#	endif
+#	define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
 #endif
 
 // -------------- EXTRA ------------------------------------

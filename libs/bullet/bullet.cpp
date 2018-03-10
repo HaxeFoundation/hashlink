@@ -872,9 +872,12 @@ DEFINE_PRIM(_IDL, btDefaultMotionState_new2, _IDL _IDL);
 HL_PRIM _ref(btTransform)* HL_NAME(btDefaultMotionState_get_m_graphicsWorldTrans)( _ref(btDefaultMotionState)* _this ) {
 	return alloc_ref(new btTransform(_unref(_this)->m_graphicsWorldTrans),btTransform);
 }
-HL_PRIM void HL_NAME(btDefaultMotionState_set_m_graphicsWorldTrans)( _ref(btDefaultMotionState)* _this, _ref(btTransform)* value ) {
+HL_PRIM _ref(btTransform)* HL_NAME(btDefaultMotionState_set_m_graphicsWorldTrans)( _ref(btDefaultMotionState)* _this, _ref(btTransform)* value ) {
 	_unref(_this)->m_graphicsWorldTrans = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btDefaultMotionState_get_m_graphicsWorldTrans,_IDL);
+DEFINE_PRIM(_IDL,btDefaultMotionState_set_m_graphicsWorldTrans,_IDL _IDL);
 
 HL_PRIM void HL_NAME(btCollisionObject_setAnisotropicFriction2)(_ref(btCollisionObject)* _this, _ref(btVector3)* anisotropicFriction, int frictionMode) {
 	_unref(_this)->setAnisotropicFriction(*_unref(anisotropicFriction), frictionMode);
@@ -1007,23 +1010,32 @@ DEFINE_PRIM(_BOOL, RayResultCallback_hasHit0, _IDL);
 HL_PRIM short HL_NAME(RayResultCallback_get_m_collisionFilterGroup)( _ref(btCollisionWorld::RayResultCallback)* _this ) {
 	return _unref(_this)->m_collisionFilterGroup;
 }
-HL_PRIM void HL_NAME(RayResultCallback_set_m_collisionFilterGroup)( _ref(btCollisionWorld::RayResultCallback)* _this, short value ) {
+HL_PRIM short HL_NAME(RayResultCallback_set_m_collisionFilterGroup)( _ref(btCollisionWorld::RayResultCallback)* _this, short value ) {
 	_unref(_this)->m_collisionFilterGroup = (value);
+	return value;
 }
+DEFINE_PRIM(_I16,RayResultCallback_get_m_collisionFilterGroup,_IDL);
+DEFINE_PRIM(_I16,RayResultCallback_set_m_collisionFilterGroup,_IDL _I16);
 
 HL_PRIM short HL_NAME(RayResultCallback_get_m_collisionFilterMask)( _ref(btCollisionWorld::RayResultCallback)* _this ) {
 	return _unref(_this)->m_collisionFilterMask;
 }
-HL_PRIM void HL_NAME(RayResultCallback_set_m_collisionFilterMask)( _ref(btCollisionWorld::RayResultCallback)* _this, short value ) {
+HL_PRIM short HL_NAME(RayResultCallback_set_m_collisionFilterMask)( _ref(btCollisionWorld::RayResultCallback)* _this, short value ) {
 	_unref(_this)->m_collisionFilterMask = (value);
+	return value;
 }
+DEFINE_PRIM(_I16,RayResultCallback_get_m_collisionFilterMask,_IDL);
+DEFINE_PRIM(_I16,RayResultCallback_set_m_collisionFilterMask,_IDL _I16);
 
 HL_PRIM HL_CONST _ref(btCollisionObject)* HL_NAME(RayResultCallback_get_m_collisionObject)( _ref(btCollisionWorld::RayResultCallback)* _this ) {
 	return alloc_ref_const(_unref(_this)->m_collisionObject,btCollisionObject);
 }
-HL_PRIM void HL_NAME(RayResultCallback_set_m_collisionObject)( _ref(btCollisionWorld::RayResultCallback)* _this, HL_CONST _ref(btCollisionObject)* value ) {
+HL_PRIM HL_CONST _ref(btCollisionObject)* HL_NAME(RayResultCallback_set_m_collisionObject)( _ref(btCollisionWorld::RayResultCallback)* _this, HL_CONST _ref(btCollisionObject)* value ) {
 	_unref(_this)->m_collisionObject = _unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,RayResultCallback_get_m_collisionObject,_IDL);
+DEFINE_PRIM(_IDL,RayResultCallback_set_m_collisionObject,_IDL _IDL);
 
 HL_PRIM _ref(btCollisionWorld::ClosestRayResultCallback)* HL_NAME(ClosestRayResultCallback_new2)(_ref(btVector3)* from, _ref(btVector3)* to) {
 	return alloc_ref((new btCollisionWorld::ClosestRayResultCallback(*_unref(from), *_unref(to))),ClosestRayResultCallback);
@@ -1033,30 +1045,42 @@ DEFINE_PRIM(_IDL, ClosestRayResultCallback_new2, _IDL _IDL);
 HL_PRIM _ref(btVector3)* HL_NAME(ClosestRayResultCallback_get_m_rayFromWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_rayFromWorld),btVector3);
 }
-HL_PRIM void HL_NAME(ClosestRayResultCallback_set_m_rayFromWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(ClosestRayResultCallback_set_m_rayFromWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_rayFromWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,ClosestRayResultCallback_get_m_rayFromWorld,_IDL);
+DEFINE_PRIM(_IDL,ClosestRayResultCallback_set_m_rayFromWorld,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(ClosestRayResultCallback_get_m_rayToWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_rayToWorld),btVector3);
 }
-HL_PRIM void HL_NAME(ClosestRayResultCallback_set_m_rayToWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(ClosestRayResultCallback_set_m_rayToWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_rayToWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,ClosestRayResultCallback_get_m_rayToWorld,_IDL);
+DEFINE_PRIM(_IDL,ClosestRayResultCallback_set_m_rayToWorld,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(ClosestRayResultCallback_get_m_hitNormalWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hitNormalWorld),btVector3);
 }
-HL_PRIM void HL_NAME(ClosestRayResultCallback_set_m_hitNormalWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(ClosestRayResultCallback_set_m_hitNormalWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hitNormalWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,ClosestRayResultCallback_get_m_hitNormalWorld,_IDL);
+DEFINE_PRIM(_IDL,ClosestRayResultCallback_set_m_hitNormalWorld,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(ClosestRayResultCallback_get_m_hitPointWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hitPointWorld),btVector3);
 }
-HL_PRIM void HL_NAME(ClosestRayResultCallback_set_m_hitPointWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(ClosestRayResultCallback_set_m_hitPointWorld)( _ref(btCollisionWorld::ClosestRayResultCallback)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hitPointWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,ClosestRayResultCallback_get_m_hitPointWorld,_IDL);
+DEFINE_PRIM(_IDL,ClosestRayResultCallback_set_m_hitPointWorld,_IDL _IDL);
 
 HL_PRIM HL_CONST _ref(btVector3)* HL_NAME(btManifoldPoint_getPositionWorldOnA0)(_ref(btManifoldPoint)* _this) {
 	return alloc_ref(new btVector3(_unref(_this)->getPositionWorldOnA()),btVector3);
@@ -1081,37 +1105,52 @@ DEFINE_PRIM(_F64, btManifoldPoint_getDistance0, _IDL);
 HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_get_m_localPointA)( _ref(btManifoldPoint)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_localPointA),btVector3);
 }
-HL_PRIM void HL_NAME(btManifoldPoint_set_m_localPointA)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_set_m_localPointA)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_localPointA = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btManifoldPoint_get_m_localPointA,_IDL);
+DEFINE_PRIM(_IDL,btManifoldPoint_set_m_localPointA,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_get_m_localPointB)( _ref(btManifoldPoint)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_localPointB),btVector3);
 }
-HL_PRIM void HL_NAME(btManifoldPoint_set_m_localPointB)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_set_m_localPointB)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_localPointB = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btManifoldPoint_get_m_localPointB,_IDL);
+DEFINE_PRIM(_IDL,btManifoldPoint_set_m_localPointB,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_get_m_positionWorldOnB)( _ref(btManifoldPoint)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_positionWorldOnB),btVector3);
 }
-HL_PRIM void HL_NAME(btManifoldPoint_set_m_positionWorldOnB)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_set_m_positionWorldOnB)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_positionWorldOnB = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btManifoldPoint_get_m_positionWorldOnB,_IDL);
+DEFINE_PRIM(_IDL,btManifoldPoint_set_m_positionWorldOnB,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_get_m_positionWorldOnA)( _ref(btManifoldPoint)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_positionWorldOnA),btVector3);
 }
-HL_PRIM void HL_NAME(btManifoldPoint_set_m_positionWorldOnA)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_set_m_positionWorldOnA)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_positionWorldOnA = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btManifoldPoint_get_m_positionWorldOnA,_IDL);
+DEFINE_PRIM(_IDL,btManifoldPoint_set_m_positionWorldOnA,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_get_m_normalWorldOnB)( _ref(btManifoldPoint)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_normalWorldOnB),btVector3);
 }
-HL_PRIM void HL_NAME(btManifoldPoint_set_m_normalWorldOnB)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btManifoldPoint_set_m_normalWorldOnB)( _ref(btManifoldPoint)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_normalWorldOnB = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btManifoldPoint_get_m_normalWorldOnB,_IDL);
+DEFINE_PRIM(_IDL,btManifoldPoint_set_m_normalWorldOnB,_IDL _IDL);
 
 HL_PRIM float HL_NAME(ContactResultCallback_addSingleResult7)(_ref(btCollisionWorld::ContactResultCallback)* _this, _ref(btManifoldPoint)* cp, _ref(btCollisionObjectWrapper)* colObj0Wrap, int partId0, int index0, _ref(btCollisionObjectWrapper)* colObj1Wrap, int partId1, int index1) {
 	return _unref(_this)->addSingleResult(*_unref(cp), _unref(colObj0Wrap), partId0, index0, _unref(colObj1Wrap), partId1, index1);
@@ -1121,16 +1160,22 @@ DEFINE_PRIM(_F32, ContactResultCallback_addSingleResult7, _IDL _IDL _IDL _I32 _I
 HL_PRIM int HL_NAME(LocalShapeInfo_get_m_shapePart)( _ref(btCollisionWorld::LocalShapeInfo)* _this ) {
 	return _unref(_this)->m_shapePart;
 }
-HL_PRIM void HL_NAME(LocalShapeInfo_set_m_shapePart)( _ref(btCollisionWorld::LocalShapeInfo)* _this, int value ) {
+HL_PRIM int HL_NAME(LocalShapeInfo_set_m_shapePart)( _ref(btCollisionWorld::LocalShapeInfo)* _this, int value ) {
 	_unref(_this)->m_shapePart = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,LocalShapeInfo_get_m_shapePart,_IDL);
+DEFINE_PRIM(_I32,LocalShapeInfo_set_m_shapePart,_IDL _I32);
 
 HL_PRIM int HL_NAME(LocalShapeInfo_get_m_triangleIndex)( _ref(btCollisionWorld::LocalShapeInfo)* _this ) {
 	return _unref(_this)->m_triangleIndex;
 }
-HL_PRIM void HL_NAME(LocalShapeInfo_set_m_triangleIndex)( _ref(btCollisionWorld::LocalShapeInfo)* _this, int value ) {
+HL_PRIM int HL_NAME(LocalShapeInfo_set_m_triangleIndex)( _ref(btCollisionWorld::LocalShapeInfo)* _this, int value ) {
 	_unref(_this)->m_triangleIndex = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,LocalShapeInfo_get_m_triangleIndex,_IDL);
+DEFINE_PRIM(_I32,LocalShapeInfo_set_m_triangleIndex,_IDL _I32);
 
 HL_PRIM _ref(btCollisionWorld::LocalConvexResult)* HL_NAME(LocalConvexResult_new5)(_ref(btCollisionObject)* hitCollisionObject, _ref(btCollisionWorld::LocalShapeInfo)* localShapeInfo, _ref(btVector3)* hitNormalLocal, _ref(btVector3)* hitPointLocal, float hitFraction) {
 	return alloc_ref((new btCollisionWorld::LocalConvexResult(_unref(hitCollisionObject), _unref(localShapeInfo), *_unref(hitNormalLocal), *_unref(hitPointLocal), hitFraction)),LocalConvexResult);
@@ -1140,37 +1185,52 @@ DEFINE_PRIM(_IDL, LocalConvexResult_new5, _IDL _IDL _IDL _IDL _F32);
 HL_PRIM HL_CONST _ref(btCollisionObject)* HL_NAME(LocalConvexResult_get_m_hitCollisionObject)( _ref(btCollisionWorld::LocalConvexResult)* _this ) {
 	return alloc_ref_const(_unref(_this)->m_hitCollisionObject,btCollisionObject);
 }
-HL_PRIM void HL_NAME(LocalConvexResult_set_m_hitCollisionObject)( _ref(btCollisionWorld::LocalConvexResult)* _this, HL_CONST _ref(btCollisionObject)* value ) {
+HL_PRIM HL_CONST _ref(btCollisionObject)* HL_NAME(LocalConvexResult_set_m_hitCollisionObject)( _ref(btCollisionWorld::LocalConvexResult)* _this, HL_CONST _ref(btCollisionObject)* value ) {
 	_unref(_this)->m_hitCollisionObject = _unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,LocalConvexResult_get_m_hitCollisionObject,_IDL);
+DEFINE_PRIM(_IDL,LocalConvexResult_set_m_hitCollisionObject,_IDL _IDL);
 
 HL_PRIM _ref(btCollisionWorld::LocalShapeInfo)* HL_NAME(LocalConvexResult_get_m_localShapeInfo)( _ref(btCollisionWorld::LocalConvexResult)* _this ) {
 	return alloc_ref(_unref(_this)->m_localShapeInfo,LocalShapeInfo);
 }
-HL_PRIM void HL_NAME(LocalConvexResult_set_m_localShapeInfo)( _ref(btCollisionWorld::LocalConvexResult)* _this, _ref(btCollisionWorld::LocalShapeInfo)* value ) {
+HL_PRIM _ref(btCollisionWorld::LocalShapeInfo)* HL_NAME(LocalConvexResult_set_m_localShapeInfo)( _ref(btCollisionWorld::LocalConvexResult)* _this, _ref(btCollisionWorld::LocalShapeInfo)* value ) {
 	_unref(_this)->m_localShapeInfo = _unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,LocalConvexResult_get_m_localShapeInfo,_IDL);
+DEFINE_PRIM(_IDL,LocalConvexResult_set_m_localShapeInfo,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(LocalConvexResult_get_m_hitNormalLocal)( _ref(btCollisionWorld::LocalConvexResult)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hitNormalLocal),btVector3);
 }
-HL_PRIM void HL_NAME(LocalConvexResult_set_m_hitNormalLocal)( _ref(btCollisionWorld::LocalConvexResult)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(LocalConvexResult_set_m_hitNormalLocal)( _ref(btCollisionWorld::LocalConvexResult)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hitNormalLocal = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,LocalConvexResult_get_m_hitNormalLocal,_IDL);
+DEFINE_PRIM(_IDL,LocalConvexResult_set_m_hitNormalLocal,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(LocalConvexResult_get_m_hitPointLocal)( _ref(btCollisionWorld::LocalConvexResult)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hitPointLocal),btVector3);
 }
-HL_PRIM void HL_NAME(LocalConvexResult_set_m_hitPointLocal)( _ref(btCollisionWorld::LocalConvexResult)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(LocalConvexResult_set_m_hitPointLocal)( _ref(btCollisionWorld::LocalConvexResult)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hitPointLocal = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,LocalConvexResult_get_m_hitPointLocal,_IDL);
+DEFINE_PRIM(_IDL,LocalConvexResult_set_m_hitPointLocal,_IDL _IDL);
 
 HL_PRIM float HL_NAME(LocalConvexResult_get_m_hitFraction)( _ref(btCollisionWorld::LocalConvexResult)* _this ) {
 	return _unref(_this)->m_hitFraction;
 }
-HL_PRIM void HL_NAME(LocalConvexResult_set_m_hitFraction)( _ref(btCollisionWorld::LocalConvexResult)* _this, float value ) {
+HL_PRIM float HL_NAME(LocalConvexResult_set_m_hitFraction)( _ref(btCollisionWorld::LocalConvexResult)* _this, float value ) {
 	_unref(_this)->m_hitFraction = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,LocalConvexResult_get_m_hitFraction,_IDL);
+DEFINE_PRIM(_F32,LocalConvexResult_set_m_hitFraction,_IDL _F32);
 
 HL_PRIM bool HL_NAME(ConvexResultCallback_hasHit0)(_ref(btCollisionWorld::ConvexResultCallback)* _this) {
 	return _unref(_this)->hasHit();
@@ -1180,23 +1240,32 @@ DEFINE_PRIM(_BOOL, ConvexResultCallback_hasHit0, _IDL);
 HL_PRIM short HL_NAME(ConvexResultCallback_get_m_collisionFilterGroup)( _ref(btCollisionWorld::ConvexResultCallback)* _this ) {
 	return _unref(_this)->m_collisionFilterGroup;
 }
-HL_PRIM void HL_NAME(ConvexResultCallback_set_m_collisionFilterGroup)( _ref(btCollisionWorld::ConvexResultCallback)* _this, short value ) {
+HL_PRIM short HL_NAME(ConvexResultCallback_set_m_collisionFilterGroup)( _ref(btCollisionWorld::ConvexResultCallback)* _this, short value ) {
 	_unref(_this)->m_collisionFilterGroup = (value);
+	return value;
 }
+DEFINE_PRIM(_I16,ConvexResultCallback_get_m_collisionFilterGroup,_IDL);
+DEFINE_PRIM(_I16,ConvexResultCallback_set_m_collisionFilterGroup,_IDL _I16);
 
 HL_PRIM short HL_NAME(ConvexResultCallback_get_m_collisionFilterMask)( _ref(btCollisionWorld::ConvexResultCallback)* _this ) {
 	return _unref(_this)->m_collisionFilterMask;
 }
-HL_PRIM void HL_NAME(ConvexResultCallback_set_m_collisionFilterMask)( _ref(btCollisionWorld::ConvexResultCallback)* _this, short value ) {
+HL_PRIM short HL_NAME(ConvexResultCallback_set_m_collisionFilterMask)( _ref(btCollisionWorld::ConvexResultCallback)* _this, short value ) {
 	_unref(_this)->m_collisionFilterMask = (value);
+	return value;
 }
+DEFINE_PRIM(_I16,ConvexResultCallback_get_m_collisionFilterMask,_IDL);
+DEFINE_PRIM(_I16,ConvexResultCallback_set_m_collisionFilterMask,_IDL _I16);
 
 HL_PRIM float HL_NAME(ConvexResultCallback_get_m_closestHitFraction)( _ref(btCollisionWorld::ConvexResultCallback)* _this ) {
 	return _unref(_this)->m_closestHitFraction;
 }
-HL_PRIM void HL_NAME(ConvexResultCallback_set_m_closestHitFraction)( _ref(btCollisionWorld::ConvexResultCallback)* _this, float value ) {
+HL_PRIM float HL_NAME(ConvexResultCallback_set_m_closestHitFraction)( _ref(btCollisionWorld::ConvexResultCallback)* _this, float value ) {
 	_unref(_this)->m_closestHitFraction = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,ConvexResultCallback_get_m_closestHitFraction,_IDL);
+DEFINE_PRIM(_F32,ConvexResultCallback_set_m_closestHitFraction,_IDL _F32);
 
 HL_PRIM _ref(btCollisionWorld::ClosestConvexResultCallback)* HL_NAME(ClosestConvexResultCallback_new2)(_ref(btVector3)* convexFromWorld, _ref(btVector3)* convexToWorld) {
 	return alloc_ref((new btCollisionWorld::ClosestConvexResultCallback(*_unref(convexFromWorld), *_unref(convexToWorld))),ClosestConvexResultCallback);
@@ -1206,30 +1275,42 @@ DEFINE_PRIM(_IDL, ClosestConvexResultCallback_new2, _IDL _IDL);
 HL_PRIM _ref(btVector3)* HL_NAME(ClosestConvexResultCallback_get_m_convexFromWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_convexFromWorld),btVector3);
 }
-HL_PRIM void HL_NAME(ClosestConvexResultCallback_set_m_convexFromWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(ClosestConvexResultCallback_set_m_convexFromWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_convexFromWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,ClosestConvexResultCallback_get_m_convexFromWorld,_IDL);
+DEFINE_PRIM(_IDL,ClosestConvexResultCallback_set_m_convexFromWorld,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(ClosestConvexResultCallback_get_m_convexToWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_convexToWorld),btVector3);
 }
-HL_PRIM void HL_NAME(ClosestConvexResultCallback_set_m_convexToWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(ClosestConvexResultCallback_set_m_convexToWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_convexToWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,ClosestConvexResultCallback_get_m_convexToWorld,_IDL);
+DEFINE_PRIM(_IDL,ClosestConvexResultCallback_set_m_convexToWorld,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(ClosestConvexResultCallback_get_m_hitNormalWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hitNormalWorld),btVector3);
 }
-HL_PRIM void HL_NAME(ClosestConvexResultCallback_set_m_hitNormalWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(ClosestConvexResultCallback_set_m_hitNormalWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hitNormalWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,ClosestConvexResultCallback_get_m_hitNormalWorld,_IDL);
+DEFINE_PRIM(_IDL,ClosestConvexResultCallback_set_m_hitNormalWorld,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(ClosestConvexResultCallback_get_m_hitPointWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hitPointWorld),btVector3);
 }
-HL_PRIM void HL_NAME(ClosestConvexResultCallback_set_m_hitPointWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(ClosestConvexResultCallback_set_m_hitPointWorld)( _ref(btCollisionWorld::ClosestConvexResultCallback)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hitPointWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,ClosestConvexResultCallback_get_m_hitPointWorld,_IDL);
+DEFINE_PRIM(_IDL,ClosestConvexResultCallback_set_m_hitPointWorld,_IDL _IDL);
 
 HL_PRIM void HL_NAME(btCollisionShape_setLocalScaling1)(_ref(btCollisionShape)* _this, _ref(btVector3)* scaling) {
 	_unref(_this)->setLocalScaling(*_unref(scaling));
@@ -1590,86 +1671,122 @@ DEFINE_PRIM(_IDL, btRigidBodyConstructionInfo_new4, _F32 _IDL _IDL _IDL);
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_linearDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_linearDamping;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_linearDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_linearDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_linearDamping = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_linearDamping,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_linearDamping,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_angularDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_angularDamping;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_angularDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_angularDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_angularDamping = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_angularDamping,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_angularDamping,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_friction)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_friction;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_friction)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_friction)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_friction = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_friction,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_friction,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_rollingFriction)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_rollingFriction;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_rollingFriction)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_rollingFriction)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_rollingFriction = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_rollingFriction,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_rollingFriction,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_restitution)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_restitution;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_restitution)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_restitution)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_restitution = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_restitution,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_restitution,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_linearSleepingThreshold)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_linearSleepingThreshold;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_linearSleepingThreshold)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_linearSleepingThreshold)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_linearSleepingThreshold = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_linearSleepingThreshold,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_linearSleepingThreshold,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_angularSleepingThreshold)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_angularSleepingThreshold;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_angularSleepingThreshold)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_angularSleepingThreshold)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_angularSleepingThreshold = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_angularSleepingThreshold,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_angularSleepingThreshold,_IDL _F32);
 
 HL_PRIM bool HL_NAME(btRigidBodyConstructionInfo_get_m_additionalDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_additionalDamping;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_additionalDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(btRigidBodyConstructionInfo_set_m_additionalDamping)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, bool value ) {
 	_unref(_this)->m_additionalDamping = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,btRigidBodyConstructionInfo_get_m_additionalDamping,_IDL);
+DEFINE_PRIM(_BOOL,btRigidBodyConstructionInfo_set_m_additionalDamping,_IDL _BOOL);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_additionalDampingFactor)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_additionalDampingFactor;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_additionalDampingFactor)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_additionalDampingFactor)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_additionalDampingFactor = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_additionalDampingFactor,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_additionalDampingFactor,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_additionalLinearDampingThresholdSqr)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_additionalLinearDampingThresholdSqr;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_additionalLinearDampingThresholdSqr)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_additionalLinearDampingThresholdSqr)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_additionalLinearDampingThresholdSqr = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_additionalLinearDampingThresholdSqr,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_additionalLinearDampingThresholdSqr,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_additionalAngularDampingThresholdSqr)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_additionalAngularDampingThresholdSqr;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_additionalAngularDampingThresholdSqr)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_additionalAngularDampingThresholdSqr)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_additionalAngularDampingThresholdSqr = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_additionalAngularDampingThresholdSqr,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_additionalAngularDampingThresholdSqr,_IDL _F32);
 
 HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_get_m_additionalAngularDampingFactor)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this ) {
 	return _unref(_this)->m_additionalAngularDampingFactor;
 }
-HL_PRIM void HL_NAME(btRigidBodyConstructionInfo_set_m_additionalAngularDampingFactor)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btRigidBodyConstructionInfo_set_m_additionalAngularDampingFactor)( _ref(btRigidBody::btRigidBodyConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_additionalAngularDampingFactor = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_get_m_additionalAngularDampingFactor,_IDL);
+DEFINE_PRIM(_F32,btRigidBodyConstructionInfo_set_m_additionalAngularDampingFactor,_IDL _F32);
 
 HL_PRIM _ref(btRigidBody)* HL_NAME(btRigidBody_new1)(_ref(btRigidBody::btRigidBodyConstructionInfo)* constructionInfo) {
 	return alloc_ref((new btRigidBody(*_unref(constructionInfo))),btRigidBody);
@@ -1794,23 +1911,32 @@ DEFINE_PRIM(_IDL, btConstraintSetting_new0,);
 HL_PRIM float HL_NAME(btConstraintSetting_get_m_tau)( _ref(btConstraintSetting)* _this ) {
 	return _unref(_this)->m_tau;
 }
-HL_PRIM void HL_NAME(btConstraintSetting_set_m_tau)( _ref(btConstraintSetting)* _this, float value ) {
+HL_PRIM float HL_NAME(btConstraintSetting_set_m_tau)( _ref(btConstraintSetting)* _this, float value ) {
 	_unref(_this)->m_tau = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btConstraintSetting_get_m_tau,_IDL);
+DEFINE_PRIM(_F32,btConstraintSetting_set_m_tau,_IDL _F32);
 
 HL_PRIM float HL_NAME(btConstraintSetting_get_m_damping)( _ref(btConstraintSetting)* _this ) {
 	return _unref(_this)->m_damping;
 }
-HL_PRIM void HL_NAME(btConstraintSetting_set_m_damping)( _ref(btConstraintSetting)* _this, float value ) {
+HL_PRIM float HL_NAME(btConstraintSetting_set_m_damping)( _ref(btConstraintSetting)* _this, float value ) {
 	_unref(_this)->m_damping = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btConstraintSetting_get_m_damping,_IDL);
+DEFINE_PRIM(_F32,btConstraintSetting_set_m_damping,_IDL _F32);
 
 HL_PRIM float HL_NAME(btConstraintSetting_get_m_impulseClamp)( _ref(btConstraintSetting)* _this ) {
 	return _unref(_this)->m_impulseClamp;
 }
-HL_PRIM void HL_NAME(btConstraintSetting_set_m_impulseClamp)( _ref(btConstraintSetting)* _this, float value ) {
+HL_PRIM float HL_NAME(btConstraintSetting_set_m_impulseClamp)( _ref(btConstraintSetting)* _this, float value ) {
 	_unref(_this)->m_impulseClamp = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btConstraintSetting_get_m_impulseClamp,_IDL);
+DEFINE_PRIM(_F32,btConstraintSetting_set_m_impulseClamp,_IDL _F32);
 
 HL_PRIM void HL_NAME(btTypedConstraint_enableFeedback1)(_ref(btTypedConstraint)* _this, bool needsFeedback) {
 	_unref(_this)->enableFeedback(needsFeedback);
@@ -1870,9 +1996,12 @@ DEFINE_PRIM(_IDL, btPoint2PointConstraint_getPivotInB0, _IDL);
 HL_PRIM _ref(btConstraintSetting)* HL_NAME(btPoint2PointConstraint_get_m_setting)( _ref(btPoint2PointConstraint)* _this ) {
 	return alloc_ref(new btConstraintSetting(_unref(_this)->m_setting),btConstraintSetting);
 }
-HL_PRIM void HL_NAME(btPoint2PointConstraint_set_m_setting)( _ref(btPoint2PointConstraint)* _this, _ref(btConstraintSetting)* value ) {
+HL_PRIM _ref(btConstraintSetting)* HL_NAME(btPoint2PointConstraint_set_m_setting)( _ref(btPoint2PointConstraint)* _this, _ref(btConstraintSetting)* value ) {
 	_unref(_this)->m_setting = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btPoint2PointConstraint_get_m_setting,_IDL);
+DEFINE_PRIM(_IDL,btPoint2PointConstraint_set_m_setting,_IDL _IDL);
 
 HL_PRIM _ref(btGeneric6DofConstraint)* HL_NAME(btGeneric6DofConstraint_new5)(_ref(btRigidBody)* rbA, _ref(btRigidBody)* rbB, _ref(btTransform)* frameInA, _ref(btTransform)* frameInB, bool useLinearFrameReferenceFrameA) {
 	return alloc_ref((new btGeneric6DofConstraint(*_unref(rbA), *_unref(rbB), *_unref(frameInA), *_unref(frameInB), useLinearFrameReferenceFrameA)),btGeneric6DofConstraint);
@@ -2087,79 +2216,112 @@ DEFINE_PRIM(_IDL, btFixedConstraint_new4, _IDL _IDL _IDL _IDL);
 HL_PRIM float HL_NAME(btDispatcherInfo_get_m_timeStep)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_timeStep;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_timeStep)( _ref(btDispatcherInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btDispatcherInfo_set_m_timeStep)( _ref(btDispatcherInfo)* _this, float value ) {
 	_unref(_this)->m_timeStep = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btDispatcherInfo_get_m_timeStep,_IDL);
+DEFINE_PRIM(_F32,btDispatcherInfo_set_m_timeStep,_IDL _F32);
 
 HL_PRIM int HL_NAME(btDispatcherInfo_get_m_stepCount)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_stepCount;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_stepCount)( _ref(btDispatcherInfo)* _this, int value ) {
+HL_PRIM int HL_NAME(btDispatcherInfo_set_m_stepCount)( _ref(btDispatcherInfo)* _this, int value ) {
 	_unref(_this)->m_stepCount = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,btDispatcherInfo_get_m_stepCount,_IDL);
+DEFINE_PRIM(_I32,btDispatcherInfo_set_m_stepCount,_IDL _I32);
 
 HL_PRIM int HL_NAME(btDispatcherInfo_get_m_dispatchFunc)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_dispatchFunc;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_dispatchFunc)( _ref(btDispatcherInfo)* _this, int value ) {
+HL_PRIM int HL_NAME(btDispatcherInfo_set_m_dispatchFunc)( _ref(btDispatcherInfo)* _this, int value ) {
 	_unref(_this)->m_dispatchFunc = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,btDispatcherInfo_get_m_dispatchFunc,_IDL);
+DEFINE_PRIM(_I32,btDispatcherInfo_set_m_dispatchFunc,_IDL _I32);
 
 HL_PRIM float HL_NAME(btDispatcherInfo_get_m_timeOfImpact)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_timeOfImpact;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_timeOfImpact)( _ref(btDispatcherInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btDispatcherInfo_set_m_timeOfImpact)( _ref(btDispatcherInfo)* _this, float value ) {
 	_unref(_this)->m_timeOfImpact = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btDispatcherInfo_get_m_timeOfImpact,_IDL);
+DEFINE_PRIM(_F32,btDispatcherInfo_set_m_timeOfImpact,_IDL _F32);
 
 HL_PRIM bool HL_NAME(btDispatcherInfo_get_m_useContinuous)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_useContinuous;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_useContinuous)( _ref(btDispatcherInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(btDispatcherInfo_set_m_useContinuous)( _ref(btDispatcherInfo)* _this, bool value ) {
 	_unref(_this)->m_useContinuous = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,btDispatcherInfo_get_m_useContinuous,_IDL);
+DEFINE_PRIM(_BOOL,btDispatcherInfo_set_m_useContinuous,_IDL _BOOL);
 
 HL_PRIM bool HL_NAME(btDispatcherInfo_get_m_enableSatConvex)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_enableSatConvex;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_enableSatConvex)( _ref(btDispatcherInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(btDispatcherInfo_set_m_enableSatConvex)( _ref(btDispatcherInfo)* _this, bool value ) {
 	_unref(_this)->m_enableSatConvex = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,btDispatcherInfo_get_m_enableSatConvex,_IDL);
+DEFINE_PRIM(_BOOL,btDispatcherInfo_set_m_enableSatConvex,_IDL _BOOL);
 
 HL_PRIM bool HL_NAME(btDispatcherInfo_get_m_enableSPU)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_enableSPU;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_enableSPU)( _ref(btDispatcherInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(btDispatcherInfo_set_m_enableSPU)( _ref(btDispatcherInfo)* _this, bool value ) {
 	_unref(_this)->m_enableSPU = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,btDispatcherInfo_get_m_enableSPU,_IDL);
+DEFINE_PRIM(_BOOL,btDispatcherInfo_set_m_enableSPU,_IDL _BOOL);
 
 HL_PRIM bool HL_NAME(btDispatcherInfo_get_m_useEpa)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_useEpa;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_useEpa)( _ref(btDispatcherInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(btDispatcherInfo_set_m_useEpa)( _ref(btDispatcherInfo)* _this, bool value ) {
 	_unref(_this)->m_useEpa = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,btDispatcherInfo_get_m_useEpa,_IDL);
+DEFINE_PRIM(_BOOL,btDispatcherInfo_set_m_useEpa,_IDL _BOOL);
 
 HL_PRIM float HL_NAME(btDispatcherInfo_get_m_allowedCcdPenetration)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_allowedCcdPenetration;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_allowedCcdPenetration)( _ref(btDispatcherInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btDispatcherInfo_set_m_allowedCcdPenetration)( _ref(btDispatcherInfo)* _this, float value ) {
 	_unref(_this)->m_allowedCcdPenetration = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btDispatcherInfo_get_m_allowedCcdPenetration,_IDL);
+DEFINE_PRIM(_F32,btDispatcherInfo_set_m_allowedCcdPenetration,_IDL _F32);
 
 HL_PRIM bool HL_NAME(btDispatcherInfo_get_m_useConvexConservativeDistanceUtil)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_useConvexConservativeDistanceUtil;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_useConvexConservativeDistanceUtil)( _ref(btDispatcherInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(btDispatcherInfo_set_m_useConvexConservativeDistanceUtil)( _ref(btDispatcherInfo)* _this, bool value ) {
 	_unref(_this)->m_useConvexConservativeDistanceUtil = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,btDispatcherInfo_get_m_useConvexConservativeDistanceUtil,_IDL);
+DEFINE_PRIM(_BOOL,btDispatcherInfo_set_m_useConvexConservativeDistanceUtil,_IDL _BOOL);
 
 HL_PRIM float HL_NAME(btDispatcherInfo_get_m_convexConservativeDistanceThreshold)( _ref(btDispatcherInfo)* _this ) {
 	return _unref(_this)->m_convexConservativeDistanceThreshold;
 }
-HL_PRIM void HL_NAME(btDispatcherInfo_set_m_convexConservativeDistanceThreshold)( _ref(btDispatcherInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btDispatcherInfo_set_m_convexConservativeDistanceThreshold)( _ref(btDispatcherInfo)* _this, float value ) {
 	_unref(_this)->m_convexConservativeDistanceThreshold = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btDispatcherInfo_get_m_convexConservativeDistanceThreshold,_IDL);
+DEFINE_PRIM(_F32,btDispatcherInfo_set_m_convexConservativeDistanceThreshold,_IDL _F32);
 
 HL_PRIM _ref(btDispatcher)* HL_NAME(btCollisionWorld_getDispatcher0)(_ref(btCollisionWorld)* _this) {
 	return alloc_ref((_unref(_this)->getDispatcher()),btDispatcher);
@@ -2215,23 +2377,32 @@ DEFINE_PRIM(_VOID, btCollisionWorld_contactTest2, _IDL _IDL _IDL);
 HL_PRIM int HL_NAME(btContactSolverInfo_get_m_splitImpulse)( _ref(btContactSolverInfo)* _this ) {
 	return _unref(_this)->m_splitImpulse;
 }
-HL_PRIM void HL_NAME(btContactSolverInfo_set_m_splitImpulse)( _ref(btContactSolverInfo)* _this, int value ) {
+HL_PRIM int HL_NAME(btContactSolverInfo_set_m_splitImpulse)( _ref(btContactSolverInfo)* _this, int value ) {
 	_unref(_this)->m_splitImpulse = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,btContactSolverInfo_get_m_splitImpulse,_IDL);
+DEFINE_PRIM(_I32,btContactSolverInfo_set_m_splitImpulse,_IDL _I32);
 
 HL_PRIM int HL_NAME(btContactSolverInfo_get_m_splitImpulsePenetrationThreshold)( _ref(btContactSolverInfo)* _this ) {
 	return _unref(_this)->m_splitImpulsePenetrationThreshold;
 }
-HL_PRIM void HL_NAME(btContactSolverInfo_set_m_splitImpulsePenetrationThreshold)( _ref(btContactSolverInfo)* _this, int value ) {
+HL_PRIM int HL_NAME(btContactSolverInfo_set_m_splitImpulsePenetrationThreshold)( _ref(btContactSolverInfo)* _this, int value ) {
 	_unref(_this)->m_splitImpulsePenetrationThreshold = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,btContactSolverInfo_get_m_splitImpulsePenetrationThreshold,_IDL);
+DEFINE_PRIM(_I32,btContactSolverInfo_set_m_splitImpulsePenetrationThreshold,_IDL _I32);
 
 HL_PRIM int HL_NAME(btContactSolverInfo_get_m_numIterations)( _ref(btContactSolverInfo)* _this ) {
 	return _unref(_this)->m_numIterations;
 }
-HL_PRIM void HL_NAME(btContactSolverInfo_set_m_numIterations)( _ref(btContactSolverInfo)* _this, int value ) {
+HL_PRIM int HL_NAME(btContactSolverInfo_set_m_numIterations)( _ref(btContactSolverInfo)* _this, int value ) {
 	_unref(_this)->m_numIterations = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,btContactSolverInfo_get_m_numIterations,_IDL);
+DEFINE_PRIM(_I32,btContactSolverInfo_set_m_numIterations,_IDL _I32);
 
 HL_PRIM void HL_NAME(btDynamicsWorld_addAction1)(_ref(btDynamicsWorld)* _this, _ref(btActionInterface)* action) {
 	_unref(_this)->addAction(_unref(action));
@@ -2310,65 +2481,92 @@ DEFINE_PRIM(_IDL, btVehicleTuning_new0,);
 HL_PRIM float HL_NAME(btVehicleTuning_get_m_suspensionStiffness)( _ref(btRaycastVehicle::btVehicleTuning)* _this ) {
 	return _unref(_this)->m_suspensionStiffness;
 }
-HL_PRIM void HL_NAME(btVehicleTuning_set_m_suspensionStiffness)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
+HL_PRIM float HL_NAME(btVehicleTuning_set_m_suspensionStiffness)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
 	_unref(_this)->m_suspensionStiffness = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btVehicleTuning_get_m_suspensionStiffness,_IDL);
+DEFINE_PRIM(_F32,btVehicleTuning_set_m_suspensionStiffness,_IDL _F32);
 
 HL_PRIM float HL_NAME(btVehicleTuning_get_m_suspensionCompression)( _ref(btRaycastVehicle::btVehicleTuning)* _this ) {
 	return _unref(_this)->m_suspensionCompression;
 }
-HL_PRIM void HL_NAME(btVehicleTuning_set_m_suspensionCompression)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
+HL_PRIM float HL_NAME(btVehicleTuning_set_m_suspensionCompression)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
 	_unref(_this)->m_suspensionCompression = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btVehicleTuning_get_m_suspensionCompression,_IDL);
+DEFINE_PRIM(_F32,btVehicleTuning_set_m_suspensionCompression,_IDL _F32);
 
 HL_PRIM float HL_NAME(btVehicleTuning_get_m_suspensionDamping)( _ref(btRaycastVehicle::btVehicleTuning)* _this ) {
 	return _unref(_this)->m_suspensionDamping;
 }
-HL_PRIM void HL_NAME(btVehicleTuning_set_m_suspensionDamping)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
+HL_PRIM float HL_NAME(btVehicleTuning_set_m_suspensionDamping)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
 	_unref(_this)->m_suspensionDamping = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btVehicleTuning_get_m_suspensionDamping,_IDL);
+DEFINE_PRIM(_F32,btVehicleTuning_set_m_suspensionDamping,_IDL _F32);
 
 HL_PRIM float HL_NAME(btVehicleTuning_get_m_maxSuspensionTravelCm)( _ref(btRaycastVehicle::btVehicleTuning)* _this ) {
 	return _unref(_this)->m_maxSuspensionTravelCm;
 }
-HL_PRIM void HL_NAME(btVehicleTuning_set_m_maxSuspensionTravelCm)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
+HL_PRIM float HL_NAME(btVehicleTuning_set_m_maxSuspensionTravelCm)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
 	_unref(_this)->m_maxSuspensionTravelCm = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btVehicleTuning_get_m_maxSuspensionTravelCm,_IDL);
+DEFINE_PRIM(_F32,btVehicleTuning_set_m_maxSuspensionTravelCm,_IDL _F32);
 
 HL_PRIM float HL_NAME(btVehicleTuning_get_m_frictionSlip)( _ref(btRaycastVehicle::btVehicleTuning)* _this ) {
 	return _unref(_this)->m_frictionSlip;
 }
-HL_PRIM void HL_NAME(btVehicleTuning_set_m_frictionSlip)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
+HL_PRIM float HL_NAME(btVehicleTuning_set_m_frictionSlip)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
 	_unref(_this)->m_frictionSlip = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btVehicleTuning_get_m_frictionSlip,_IDL);
+DEFINE_PRIM(_F32,btVehicleTuning_set_m_frictionSlip,_IDL _F32);
 
 HL_PRIM float HL_NAME(btVehicleTuning_get_m_maxSuspensionForce)( _ref(btRaycastVehicle::btVehicleTuning)* _this ) {
 	return _unref(_this)->m_maxSuspensionForce;
 }
-HL_PRIM void HL_NAME(btVehicleTuning_set_m_maxSuspensionForce)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
+HL_PRIM float HL_NAME(btVehicleTuning_set_m_maxSuspensionForce)( _ref(btRaycastVehicle::btVehicleTuning)* _this, float value ) {
 	_unref(_this)->m_maxSuspensionForce = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btVehicleTuning_get_m_maxSuspensionForce,_IDL);
+DEFINE_PRIM(_F32,btVehicleTuning_set_m_maxSuspensionForce,_IDL _F32);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btVehicleRaycasterResult_get_m_hitPointInWorld)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hitPointInWorld),btVector3);
 }
-HL_PRIM void HL_NAME(btVehicleRaycasterResult_set_m_hitPointInWorld)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btVehicleRaycasterResult_set_m_hitPointInWorld)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hitPointInWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btVehicleRaycasterResult_get_m_hitPointInWorld,_IDL);
+DEFINE_PRIM(_IDL,btVehicleRaycasterResult_set_m_hitPointInWorld,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btVehicleRaycasterResult_get_m_hitNormalInWorld)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hitNormalInWorld),btVector3);
 }
-HL_PRIM void HL_NAME(btVehicleRaycasterResult_set_m_hitNormalInWorld)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btVehicleRaycasterResult_set_m_hitNormalInWorld)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hitNormalInWorld = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btVehicleRaycasterResult_get_m_hitNormalInWorld,_IDL);
+DEFINE_PRIM(_IDL,btVehicleRaycasterResult_set_m_hitNormalInWorld,_IDL _IDL);
 
 HL_PRIM float HL_NAME(btVehicleRaycasterResult_get_m_distFraction)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this ) {
 	return _unref(_this)->m_distFraction;
 }
-HL_PRIM void HL_NAME(btVehicleRaycasterResult_set_m_distFraction)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this, float value ) {
+HL_PRIM float HL_NAME(btVehicleRaycasterResult_set_m_distFraction)( _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* _this, float value ) {
 	_unref(_this)->m_distFraction = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btVehicleRaycasterResult_get_m_distFraction,_IDL);
+DEFINE_PRIM(_F32,btVehicleRaycasterResult_set_m_distFraction,_IDL _F32);
 
 HL_PRIM void HL_NAME(btVehicleRaycaster_castRay3)(_ref(btVehicleRaycaster)* _this, _ref(btVector3)* from, _ref(btVector3)* to, _ref(btDefaultVehicleRaycaster::btVehicleRaycasterResult)* result) {
 	_unref(_this)->castRay(*_unref(from), *_unref(to), *_unref(result));
@@ -2383,247 +2581,352 @@ DEFINE_PRIM(_IDL, btDefaultVehicleRaycaster_new1, _IDL);
 HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_get_m_contactNormalWS)( _ref(btWheelInfo::RaycastInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_contactNormalWS),btVector3);
 }
-HL_PRIM void HL_NAME(RaycastInfo_set_m_contactNormalWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_set_m_contactNormalWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_contactNormalWS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,RaycastInfo_get_m_contactNormalWS,_IDL);
+DEFINE_PRIM(_IDL,RaycastInfo_set_m_contactNormalWS,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_get_m_contactPointWS)( _ref(btWheelInfo::RaycastInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_contactPointWS),btVector3);
 }
-HL_PRIM void HL_NAME(RaycastInfo_set_m_contactPointWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_set_m_contactPointWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_contactPointWS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,RaycastInfo_get_m_contactPointWS,_IDL);
+DEFINE_PRIM(_IDL,RaycastInfo_set_m_contactPointWS,_IDL _IDL);
 
 HL_PRIM float HL_NAME(RaycastInfo_get_m_suspensionLength)( _ref(btWheelInfo::RaycastInfo)* _this ) {
 	return _unref(_this)->m_suspensionLength;
 }
-HL_PRIM void HL_NAME(RaycastInfo_set_m_suspensionLength)( _ref(btWheelInfo::RaycastInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(RaycastInfo_set_m_suspensionLength)( _ref(btWheelInfo::RaycastInfo)* _this, float value ) {
 	_unref(_this)->m_suspensionLength = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,RaycastInfo_get_m_suspensionLength,_IDL);
+DEFINE_PRIM(_F32,RaycastInfo_set_m_suspensionLength,_IDL _F32);
 
 HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_get_m_hardPointWS)( _ref(btWheelInfo::RaycastInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_hardPointWS),btVector3);
 }
-HL_PRIM void HL_NAME(RaycastInfo_set_m_hardPointWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_set_m_hardPointWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_hardPointWS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,RaycastInfo_get_m_hardPointWS,_IDL);
+DEFINE_PRIM(_IDL,RaycastInfo_set_m_hardPointWS,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_get_m_wheelDirectionWS)( _ref(btWheelInfo::RaycastInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_wheelDirectionWS),btVector3);
 }
-HL_PRIM void HL_NAME(RaycastInfo_set_m_wheelDirectionWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_set_m_wheelDirectionWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_wheelDirectionWS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,RaycastInfo_get_m_wheelDirectionWS,_IDL);
+DEFINE_PRIM(_IDL,RaycastInfo_set_m_wheelDirectionWS,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_get_m_wheelAxleWS)( _ref(btWheelInfo::RaycastInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_wheelAxleWS),btVector3);
 }
-HL_PRIM void HL_NAME(RaycastInfo_set_m_wheelAxleWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(RaycastInfo_set_m_wheelAxleWS)( _ref(btWheelInfo::RaycastInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_wheelAxleWS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,RaycastInfo_get_m_wheelAxleWS,_IDL);
+DEFINE_PRIM(_IDL,RaycastInfo_set_m_wheelAxleWS,_IDL _IDL);
 
 HL_PRIM bool HL_NAME(RaycastInfo_get_m_isInContact)( _ref(btWheelInfo::RaycastInfo)* _this ) {
 	return _unref(_this)->m_isInContact;
 }
-HL_PRIM void HL_NAME(RaycastInfo_set_m_isInContact)( _ref(btWheelInfo::RaycastInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(RaycastInfo_set_m_isInContact)( _ref(btWheelInfo::RaycastInfo)* _this, bool value ) {
 	_unref(_this)->m_isInContact = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,RaycastInfo_get_m_isInContact,_IDL);
+DEFINE_PRIM(_BOOL,RaycastInfo_set_m_isInContact,_IDL _BOOL);
 
 HL_PRIM void* HL_NAME(RaycastInfo_get_m_groundObject)( _ref(btWheelInfo::RaycastInfo)* _this ) {
 	return _unref(_this)->m_groundObject;
 }
-HL_PRIM void HL_NAME(RaycastInfo_set_m_groundObject)( _ref(btWheelInfo::RaycastInfo)* _this, void* value ) {
+HL_PRIM void* HL_NAME(RaycastInfo_set_m_groundObject)( _ref(btWheelInfo::RaycastInfo)* _this, void* value ) {
 	_unref(_this)->m_groundObject = (value);
+	return value;
 }
+DEFINE_PRIM(_BYTES,RaycastInfo_get_m_groundObject,_IDL);
+DEFINE_PRIM(_BYTES,RaycastInfo_set_m_groundObject,_IDL _BYTES);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfoConstructionInfo_get_m_chassisConnectionCS)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_chassisConnectionCS),btVector3);
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_chassisConnectionCS)( _ref(btWheelInfoConstructionInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfoConstructionInfo_set_m_chassisConnectionCS)( _ref(btWheelInfoConstructionInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_chassisConnectionCS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btWheelInfoConstructionInfo_get_m_chassisConnectionCS,_IDL);
+DEFINE_PRIM(_IDL,btWheelInfoConstructionInfo_set_m_chassisConnectionCS,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfoConstructionInfo_get_m_wheelDirectionCS)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_wheelDirectionCS),btVector3);
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_wheelDirectionCS)( _ref(btWheelInfoConstructionInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfoConstructionInfo_set_m_wheelDirectionCS)( _ref(btWheelInfoConstructionInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_wheelDirectionCS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btWheelInfoConstructionInfo_get_m_wheelDirectionCS,_IDL);
+DEFINE_PRIM(_IDL,btWheelInfoConstructionInfo_set_m_wheelDirectionCS,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfoConstructionInfo_get_m_wheelAxleCS)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_wheelAxleCS),btVector3);
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_wheelAxleCS)( _ref(btWheelInfoConstructionInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfoConstructionInfo_set_m_wheelAxleCS)( _ref(btWheelInfoConstructionInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_wheelAxleCS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btWheelInfoConstructionInfo_get_m_wheelAxleCS,_IDL);
+DEFINE_PRIM(_IDL,btWheelInfoConstructionInfo_set_m_wheelAxleCS,_IDL _IDL);
 
 HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_get_m_suspensionRestLength)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_suspensionRestLength;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_suspensionRestLength)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_set_m_suspensionRestLength)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_suspensionRestLength = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_get_m_suspensionRestLength,_IDL);
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_set_m_suspensionRestLength,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_get_m_maxSuspensionTravelCm)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_maxSuspensionTravelCm;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_maxSuspensionTravelCm)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_set_m_maxSuspensionTravelCm)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_maxSuspensionTravelCm = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_get_m_maxSuspensionTravelCm,_IDL);
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_set_m_maxSuspensionTravelCm,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_get_m_wheelRadius)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_wheelRadius;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_wheelRadius)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_set_m_wheelRadius)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_wheelRadius = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_get_m_wheelRadius,_IDL);
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_set_m_wheelRadius,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_get_m_suspensionStiffness)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_suspensionStiffness;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_suspensionStiffness)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_set_m_suspensionStiffness)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_suspensionStiffness = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_get_m_suspensionStiffness,_IDL);
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_set_m_suspensionStiffness,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_get_m_wheelsDampingCompression)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_wheelsDampingCompression;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_wheelsDampingCompression)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_set_m_wheelsDampingCompression)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_wheelsDampingCompression = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_get_m_wheelsDampingCompression,_IDL);
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_set_m_wheelsDampingCompression,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_get_m_wheelsDampingRelaxation)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_wheelsDampingRelaxation;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_wheelsDampingRelaxation)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_set_m_wheelsDampingRelaxation)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_wheelsDampingRelaxation = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_get_m_wheelsDampingRelaxation,_IDL);
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_set_m_wheelsDampingRelaxation,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_get_m_frictionSlip)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_frictionSlip;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_frictionSlip)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_set_m_frictionSlip)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_frictionSlip = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_get_m_frictionSlip,_IDL);
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_set_m_frictionSlip,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_get_m_maxSuspensionForce)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_maxSuspensionForce;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_maxSuspensionForce)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfoConstructionInfo_set_m_maxSuspensionForce)( _ref(btWheelInfoConstructionInfo)* _this, float value ) {
 	_unref(_this)->m_maxSuspensionForce = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_get_m_maxSuspensionForce,_IDL);
+DEFINE_PRIM(_F32,btWheelInfoConstructionInfo_set_m_maxSuspensionForce,_IDL _F32);
 
 HL_PRIM bool HL_NAME(btWheelInfoConstructionInfo_get_m_bIsFrontWheel)( _ref(btWheelInfoConstructionInfo)* _this ) {
 	return _unref(_this)->m_bIsFrontWheel;
 }
-HL_PRIM void HL_NAME(btWheelInfoConstructionInfo_set_m_bIsFrontWheel)( _ref(btWheelInfoConstructionInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(btWheelInfoConstructionInfo_set_m_bIsFrontWheel)( _ref(btWheelInfoConstructionInfo)* _this, bool value ) {
 	_unref(_this)->m_bIsFrontWheel = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,btWheelInfoConstructionInfo_get_m_bIsFrontWheel,_IDL);
+DEFINE_PRIM(_BOOL,btWheelInfoConstructionInfo_set_m_bIsFrontWheel,_IDL _BOOL);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_suspensionStiffness)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_suspensionStiffness;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_suspensionStiffness)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_suspensionStiffness)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_suspensionStiffness = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_suspensionStiffness,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_suspensionStiffness,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_frictionSlip)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_frictionSlip;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_frictionSlip)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_frictionSlip)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_frictionSlip = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_frictionSlip,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_frictionSlip,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_engineForce)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_engineForce;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_engineForce)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_engineForce)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_engineForce = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_engineForce,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_engineForce,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_rollInfluence)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_rollInfluence;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_rollInfluence)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_rollInfluence)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_rollInfluence = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_rollInfluence,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_rollInfluence,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_suspensionRestLength1)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_suspensionRestLength1;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_suspensionRestLength1)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_suspensionRestLength1)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_suspensionRestLength1 = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_suspensionRestLength1,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_suspensionRestLength1,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_wheelsRadius)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_wheelsRadius;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_wheelsRadius)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_wheelsRadius)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_wheelsRadius = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_wheelsRadius,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_wheelsRadius,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_wheelsDampingCompression)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_wheelsDampingCompression;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_wheelsDampingCompression)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_wheelsDampingCompression)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_wheelsDampingCompression = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_wheelsDampingCompression,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_wheelsDampingCompression,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_wheelsDampingRelaxation)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_wheelsDampingRelaxation;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_wheelsDampingRelaxation)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_wheelsDampingRelaxation)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_wheelsDampingRelaxation = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_wheelsDampingRelaxation,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_wheelsDampingRelaxation,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_steering)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_steering;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_steering)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_steering)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_steering = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_steering,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_steering,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_maxSuspensionForce)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_maxSuspensionForce;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_maxSuspensionForce)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_maxSuspensionForce)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_maxSuspensionForce = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_maxSuspensionForce,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_maxSuspensionForce,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_maxSuspensionTravelCm)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_maxSuspensionTravelCm;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_maxSuspensionTravelCm)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_maxSuspensionTravelCm)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_maxSuspensionTravelCm = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_maxSuspensionTravelCm,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_maxSuspensionTravelCm,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_wheelsSuspensionForce)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_wheelsSuspensionForce;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_wheelsSuspensionForce)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_wheelsSuspensionForce)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_wheelsSuspensionForce = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_wheelsSuspensionForce,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_wheelsSuspensionForce,_IDL _F32);
 
 HL_PRIM bool HL_NAME(btWheelInfo_get_m_bIsFrontWheel)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_bIsFrontWheel;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_bIsFrontWheel)( _ref(btWheelInfo)* _this, bool value ) {
+HL_PRIM bool HL_NAME(btWheelInfo_set_m_bIsFrontWheel)( _ref(btWheelInfo)* _this, bool value ) {
 	_unref(_this)->m_bIsFrontWheel = (value);
+	return value;
 }
+DEFINE_PRIM(_BOOL,btWheelInfo_get_m_bIsFrontWheel,_IDL);
+DEFINE_PRIM(_BOOL,btWheelInfo_set_m_bIsFrontWheel,_IDL _BOOL);
 
 HL_PRIM _ref(btWheelInfo::RaycastInfo)* HL_NAME(btWheelInfo_get_m_raycastInfo)( _ref(btWheelInfo)* _this ) {
 	return alloc_ref(new btWheelInfo::RaycastInfo(_unref(_this)->m_raycastInfo),RaycastInfo);
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_raycastInfo)( _ref(btWheelInfo)* _this, _ref(btWheelInfo::RaycastInfo)* value ) {
+HL_PRIM _ref(btWheelInfo::RaycastInfo)* HL_NAME(btWheelInfo_set_m_raycastInfo)( _ref(btWheelInfo)* _this, _ref(btWheelInfo::RaycastInfo)* value ) {
 	_unref(_this)->m_raycastInfo = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btWheelInfo_get_m_raycastInfo,_IDL);
+DEFINE_PRIM(_IDL,btWheelInfo_set_m_raycastInfo,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfo_get_m_chassisConnectionPointCS)( _ref(btWheelInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_chassisConnectionPointCS),btVector3);
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_chassisConnectionPointCS)( _ref(btWheelInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfo_set_m_chassisConnectionPointCS)( _ref(btWheelInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_chassisConnectionPointCS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btWheelInfo_get_m_chassisConnectionPointCS,_IDL);
+DEFINE_PRIM(_IDL,btWheelInfo_set_m_chassisConnectionPointCS,_IDL _IDL);
 
 HL_PRIM _ref(btWheelInfo)* HL_NAME(btWheelInfo_new1)(_ref(btWheelInfoConstructionInfo)* ci) {
 	return alloc_ref((new btWheelInfo(*_unref(ci))),btWheelInfo);
@@ -2643,65 +2946,92 @@ DEFINE_PRIM(_VOID, btWheelInfo_updateWheel2, _IDL _IDL _IDL);
 HL_PRIM _ref(btTransform)* HL_NAME(btWheelInfo_get_m_worldTransform)( _ref(btWheelInfo)* _this ) {
 	return alloc_ref(new btTransform(_unref(_this)->m_worldTransform),btTransform);
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_worldTransform)( _ref(btWheelInfo)* _this, _ref(btTransform)* value ) {
+HL_PRIM _ref(btTransform)* HL_NAME(btWheelInfo_set_m_worldTransform)( _ref(btWheelInfo)* _this, _ref(btTransform)* value ) {
 	_unref(_this)->m_worldTransform = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btWheelInfo_get_m_worldTransform,_IDL);
+DEFINE_PRIM(_IDL,btWheelInfo_set_m_worldTransform,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfo_get_m_wheelDirectionCS)( _ref(btWheelInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_wheelDirectionCS),btVector3);
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_wheelDirectionCS)( _ref(btWheelInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfo_set_m_wheelDirectionCS)( _ref(btWheelInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_wheelDirectionCS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btWheelInfo_get_m_wheelDirectionCS,_IDL);
+DEFINE_PRIM(_IDL,btWheelInfo_set_m_wheelDirectionCS,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfo_get_m_wheelAxleCS)( _ref(btWheelInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_wheelAxleCS),btVector3);
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_wheelAxleCS)( _ref(btWheelInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btWheelInfo_set_m_wheelAxleCS)( _ref(btWheelInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_wheelAxleCS = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btWheelInfo_get_m_wheelAxleCS,_IDL);
+DEFINE_PRIM(_IDL,btWheelInfo_set_m_wheelAxleCS,_IDL _IDL);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_rotation)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_rotation;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_rotation)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_rotation)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_rotation = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_rotation,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_rotation,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_deltaRotation)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_deltaRotation;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_deltaRotation)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_deltaRotation)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_deltaRotation = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_deltaRotation,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_deltaRotation,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_brake)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_brake;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_brake)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_brake)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_brake = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_brake,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_brake,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_clippedInvContactDotSuspension)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_clippedInvContactDotSuspension;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_clippedInvContactDotSuspension)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_clippedInvContactDotSuspension)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_clippedInvContactDotSuspension = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_clippedInvContactDotSuspension,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_clippedInvContactDotSuspension,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_suspensionRelativeVelocity)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_suspensionRelativeVelocity;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_suspensionRelativeVelocity)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_suspensionRelativeVelocity)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_suspensionRelativeVelocity = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_suspensionRelativeVelocity,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_suspensionRelativeVelocity,_IDL _F32);
 
 HL_PRIM float HL_NAME(btWheelInfo_get_m_skidInfo)( _ref(btWheelInfo)* _this ) {
 	return _unref(_this)->m_skidInfo;
 }
-HL_PRIM void HL_NAME(btWheelInfo_set_m_skidInfo)( _ref(btWheelInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btWheelInfo_set_m_skidInfo)( _ref(btWheelInfo)* _this, float value ) {
 	_unref(_this)->m_skidInfo = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btWheelInfo_get_m_skidInfo,_IDL);
+DEFINE_PRIM(_F32,btWheelInfo_set_m_skidInfo,_IDL _F32);
 
 HL_PRIM void HL_NAME(btActionInterface_updateAction2)(_ref(btActionInterface)* _this, _ref(btCollisionWorld)* collisionWorld, float deltaTimeStep) {
 	_unref(_this)->updateAction(_unref(collisionWorld), deltaTimeStep);
@@ -2987,72 +3317,102 @@ DEFINE_PRIM(_IDL, btSoftBodyWorldInfo_new0,);
 HL_PRIM float HL_NAME(btSoftBodyWorldInfo_get_air_density)( _ref(btSoftBodyWorldInfo)* _this ) {
 	return _unref(_this)->air_density;
 }
-HL_PRIM void HL_NAME(btSoftBodyWorldInfo_set_air_density)( _ref(btSoftBodyWorldInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btSoftBodyWorldInfo_set_air_density)( _ref(btSoftBodyWorldInfo)* _this, float value ) {
 	_unref(_this)->air_density = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btSoftBodyWorldInfo_get_air_density,_IDL);
+DEFINE_PRIM(_F32,btSoftBodyWorldInfo_set_air_density,_IDL _F32);
 
 HL_PRIM float HL_NAME(btSoftBodyWorldInfo_get_water_density)( _ref(btSoftBodyWorldInfo)* _this ) {
 	return _unref(_this)->water_density;
 }
-HL_PRIM void HL_NAME(btSoftBodyWorldInfo_set_water_density)( _ref(btSoftBodyWorldInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btSoftBodyWorldInfo_set_water_density)( _ref(btSoftBodyWorldInfo)* _this, float value ) {
 	_unref(_this)->water_density = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btSoftBodyWorldInfo_get_water_density,_IDL);
+DEFINE_PRIM(_F32,btSoftBodyWorldInfo_set_water_density,_IDL _F32);
 
 HL_PRIM float HL_NAME(btSoftBodyWorldInfo_get_water_offset)( _ref(btSoftBodyWorldInfo)* _this ) {
 	return _unref(_this)->water_offset;
 }
-HL_PRIM void HL_NAME(btSoftBodyWorldInfo_set_water_offset)( _ref(btSoftBodyWorldInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btSoftBodyWorldInfo_set_water_offset)( _ref(btSoftBodyWorldInfo)* _this, float value ) {
 	_unref(_this)->water_offset = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btSoftBodyWorldInfo_get_water_offset,_IDL);
+DEFINE_PRIM(_F32,btSoftBodyWorldInfo_set_water_offset,_IDL _F32);
 
 HL_PRIM float HL_NAME(btSoftBodyWorldInfo_get_m_maxDisplacement)( _ref(btSoftBodyWorldInfo)* _this ) {
 	return _unref(_this)->m_maxDisplacement;
 }
-HL_PRIM void HL_NAME(btSoftBodyWorldInfo_set_m_maxDisplacement)( _ref(btSoftBodyWorldInfo)* _this, float value ) {
+HL_PRIM float HL_NAME(btSoftBodyWorldInfo_set_m_maxDisplacement)( _ref(btSoftBodyWorldInfo)* _this, float value ) {
 	_unref(_this)->m_maxDisplacement = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,btSoftBodyWorldInfo_get_m_maxDisplacement,_IDL);
+DEFINE_PRIM(_F32,btSoftBodyWorldInfo_set_m_maxDisplacement,_IDL _F32);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btSoftBodyWorldInfo_get_water_normal)( _ref(btSoftBodyWorldInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->water_normal),btVector3);
 }
-HL_PRIM void HL_NAME(btSoftBodyWorldInfo_set_water_normal)( _ref(btSoftBodyWorldInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btSoftBodyWorldInfo_set_water_normal)( _ref(btSoftBodyWorldInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->water_normal = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btSoftBodyWorldInfo_get_water_normal,_IDL);
+DEFINE_PRIM(_IDL,btSoftBodyWorldInfo_set_water_normal,_IDL _IDL);
 
 HL_PRIM _ref(btBroadphaseInterface)* HL_NAME(btSoftBodyWorldInfo_get_m_broadphase)( _ref(btSoftBodyWorldInfo)* _this ) {
 	return alloc_ref(_unref(_this)->m_broadphase,btBroadphaseInterface);
 }
-HL_PRIM void HL_NAME(btSoftBodyWorldInfo_set_m_broadphase)( _ref(btSoftBodyWorldInfo)* _this, _ref(btBroadphaseInterface)* value ) {
+HL_PRIM _ref(btBroadphaseInterface)* HL_NAME(btSoftBodyWorldInfo_set_m_broadphase)( _ref(btSoftBodyWorldInfo)* _this, _ref(btBroadphaseInterface)* value ) {
 	_unref(_this)->m_broadphase = _unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btSoftBodyWorldInfo_get_m_broadphase,_IDL);
+DEFINE_PRIM(_IDL,btSoftBodyWorldInfo_set_m_broadphase,_IDL _IDL);
 
 HL_PRIM _ref(btDispatcher)* HL_NAME(btSoftBodyWorldInfo_get_m_dispatcher)( _ref(btSoftBodyWorldInfo)* _this ) {
 	return alloc_ref(_unref(_this)->m_dispatcher,btDispatcher);
 }
-HL_PRIM void HL_NAME(btSoftBodyWorldInfo_set_m_dispatcher)( _ref(btSoftBodyWorldInfo)* _this, _ref(btDispatcher)* value ) {
+HL_PRIM _ref(btDispatcher)* HL_NAME(btSoftBodyWorldInfo_set_m_dispatcher)( _ref(btSoftBodyWorldInfo)* _this, _ref(btDispatcher)* value ) {
 	_unref(_this)->m_dispatcher = _unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btSoftBodyWorldInfo_get_m_dispatcher,_IDL);
+DEFINE_PRIM(_IDL,btSoftBodyWorldInfo_set_m_dispatcher,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(btSoftBodyWorldInfo_get_m_gravity)( _ref(btSoftBodyWorldInfo)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_gravity),btVector3);
 }
-HL_PRIM void HL_NAME(btSoftBodyWorldInfo_set_m_gravity)( _ref(btSoftBodyWorldInfo)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(btSoftBodyWorldInfo_set_m_gravity)( _ref(btSoftBodyWorldInfo)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_gravity = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btSoftBodyWorldInfo_get_m_gravity,_IDL);
+DEFINE_PRIM(_IDL,btSoftBodyWorldInfo_set_m_gravity,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(Node_get_m_x)( _ref(btSoftBody::Node)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_x),btVector3);
 }
-HL_PRIM void HL_NAME(Node_set_m_x)( _ref(btSoftBody::Node)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(Node_set_m_x)( _ref(btSoftBody::Node)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_x = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,Node_get_m_x,_IDL);
+DEFINE_PRIM(_IDL,Node_set_m_x,_IDL _IDL);
 
 HL_PRIM _ref(btVector3)* HL_NAME(Node_get_m_n)( _ref(btSoftBody::Node)* _this ) {
 	return alloc_ref(new btVector3(_unref(_this)->m_n),btVector3);
 }
-HL_PRIM void HL_NAME(Node_set_m_n)( _ref(btSoftBody::Node)* _this, _ref(btVector3)* value ) {
+HL_PRIM _ref(btVector3)* HL_NAME(Node_set_m_n)( _ref(btSoftBody::Node)* _this, _ref(btVector3)* value ) {
 	_unref(_this)->m_n = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,Node_get_m_n,_IDL);
+DEFINE_PRIM(_IDL,Node_set_m_n,_IDL _IDL);
 
 HL_PRIM HL_CONST int HL_NAME(tNodeArray_size0)(_ref(btSoftBody::tNodeArray)* _this) {
 	return _unref(_this)->size();
@@ -3067,30 +3427,42 @@ DEFINE_PRIM(_IDL, tNodeArray_at1, _IDL _I32);
 HL_PRIM float HL_NAME(Material_get_m_kLST)( _ref(btSoftBody::Material)* _this ) {
 	return _unref(_this)->m_kLST;
 }
-HL_PRIM void HL_NAME(Material_set_m_kLST)( _ref(btSoftBody::Material)* _this, float value ) {
+HL_PRIM float HL_NAME(Material_set_m_kLST)( _ref(btSoftBody::Material)* _this, float value ) {
 	_unref(_this)->m_kLST = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Material_get_m_kLST,_IDL);
+DEFINE_PRIM(_F32,Material_set_m_kLST,_IDL _F32);
 
 HL_PRIM float HL_NAME(Material_get_m_kAST)( _ref(btSoftBody::Material)* _this ) {
 	return _unref(_this)->m_kAST;
 }
-HL_PRIM void HL_NAME(Material_set_m_kAST)( _ref(btSoftBody::Material)* _this, float value ) {
+HL_PRIM float HL_NAME(Material_set_m_kAST)( _ref(btSoftBody::Material)* _this, float value ) {
 	_unref(_this)->m_kAST = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Material_get_m_kAST,_IDL);
+DEFINE_PRIM(_F32,Material_set_m_kAST,_IDL _F32);
 
 HL_PRIM float HL_NAME(Material_get_m_kVST)( _ref(btSoftBody::Material)* _this ) {
 	return _unref(_this)->m_kVST;
 }
-HL_PRIM void HL_NAME(Material_set_m_kVST)( _ref(btSoftBody::Material)* _this, float value ) {
+HL_PRIM float HL_NAME(Material_set_m_kVST)( _ref(btSoftBody::Material)* _this, float value ) {
 	_unref(_this)->m_kVST = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Material_get_m_kVST,_IDL);
+DEFINE_PRIM(_F32,Material_set_m_kVST,_IDL _F32);
 
 HL_PRIM int HL_NAME(Material_get_m_flags)( _ref(btSoftBody::Material)* _this ) {
 	return _unref(_this)->m_flags;
 }
-HL_PRIM void HL_NAME(Material_set_m_flags)( _ref(btSoftBody::Material)* _this, int value ) {
+HL_PRIM int HL_NAME(Material_set_m_flags)( _ref(btSoftBody::Material)* _this, int value ) {
 	_unref(_this)->m_flags = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,Material_get_m_flags,_IDL);
+DEFINE_PRIM(_I32,Material_set_m_flags,_IDL _I32);
 
 HL_PRIM HL_CONST int HL_NAME(tMaterialArray_size0)(_ref(btSoftBody::tMaterialArray)* _this) {
 	return _unref(_this)->size();
@@ -3105,177 +3477,252 @@ DEFINE_PRIM(_IDL, tMaterialArray_at1, _IDL _I32);
 HL_PRIM float HL_NAME(Config_get_kVCF)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kVCF;
 }
-HL_PRIM void HL_NAME(Config_set_kVCF)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kVCF)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kVCF = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kVCF,_IDL);
+DEFINE_PRIM(_F32,Config_set_kVCF,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kDP)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kDP;
 }
-HL_PRIM void HL_NAME(Config_set_kDP)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kDP)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kDP = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kDP,_IDL);
+DEFINE_PRIM(_F32,Config_set_kDP,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kDG)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kDG;
 }
-HL_PRIM void HL_NAME(Config_set_kDG)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kDG)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kDG = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kDG,_IDL);
+DEFINE_PRIM(_F32,Config_set_kDG,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kLF)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kLF;
 }
-HL_PRIM void HL_NAME(Config_set_kLF)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kLF)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kLF = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kLF,_IDL);
+DEFINE_PRIM(_F32,Config_set_kLF,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kPR)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kPR;
 }
-HL_PRIM void HL_NAME(Config_set_kPR)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kPR)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kPR = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kPR,_IDL);
+DEFINE_PRIM(_F32,Config_set_kPR,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kVC)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kVC;
 }
-HL_PRIM void HL_NAME(Config_set_kVC)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kVC)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kVC = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kVC,_IDL);
+DEFINE_PRIM(_F32,Config_set_kVC,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kDF)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kDF;
 }
-HL_PRIM void HL_NAME(Config_set_kDF)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kDF)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kDF = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kDF,_IDL);
+DEFINE_PRIM(_F32,Config_set_kDF,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kMT)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kMT;
 }
-HL_PRIM void HL_NAME(Config_set_kMT)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kMT)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kMT = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kMT,_IDL);
+DEFINE_PRIM(_F32,Config_set_kMT,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kCHR)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kCHR;
 }
-HL_PRIM void HL_NAME(Config_set_kCHR)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kCHR)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kCHR = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kCHR,_IDL);
+DEFINE_PRIM(_F32,Config_set_kCHR,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kKHR)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kKHR;
 }
-HL_PRIM void HL_NAME(Config_set_kKHR)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kKHR)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kKHR = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kKHR,_IDL);
+DEFINE_PRIM(_F32,Config_set_kKHR,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kSHR)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kSHR;
 }
-HL_PRIM void HL_NAME(Config_set_kSHR)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kSHR)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kSHR = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kSHR,_IDL);
+DEFINE_PRIM(_F32,Config_set_kSHR,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kAHR)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kAHR;
 }
-HL_PRIM void HL_NAME(Config_set_kAHR)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kAHR)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kAHR = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kAHR,_IDL);
+DEFINE_PRIM(_F32,Config_set_kAHR,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kSRHR_CL)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kSRHR_CL;
 }
-HL_PRIM void HL_NAME(Config_set_kSRHR_CL)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kSRHR_CL)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kSRHR_CL = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kSRHR_CL,_IDL);
+DEFINE_PRIM(_F32,Config_set_kSRHR_CL,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kSKHR_CL)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kSKHR_CL;
 }
-HL_PRIM void HL_NAME(Config_set_kSKHR_CL)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kSKHR_CL)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kSKHR_CL = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kSKHR_CL,_IDL);
+DEFINE_PRIM(_F32,Config_set_kSKHR_CL,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kSSHR_CL)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kSSHR_CL;
 }
-HL_PRIM void HL_NAME(Config_set_kSSHR_CL)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kSSHR_CL)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kSSHR_CL = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kSSHR_CL,_IDL);
+DEFINE_PRIM(_F32,Config_set_kSSHR_CL,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kSR_SPLT_CL)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kSR_SPLT_CL;
 }
-HL_PRIM void HL_NAME(Config_set_kSR_SPLT_CL)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kSR_SPLT_CL)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kSR_SPLT_CL = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kSR_SPLT_CL,_IDL);
+DEFINE_PRIM(_F32,Config_set_kSR_SPLT_CL,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kSK_SPLT_CL)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kSK_SPLT_CL;
 }
-HL_PRIM void HL_NAME(Config_set_kSK_SPLT_CL)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kSK_SPLT_CL)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kSK_SPLT_CL = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kSK_SPLT_CL,_IDL);
+DEFINE_PRIM(_F32,Config_set_kSK_SPLT_CL,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_kSS_SPLT_CL)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->kSS_SPLT_CL;
 }
-HL_PRIM void HL_NAME(Config_set_kSS_SPLT_CL)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_kSS_SPLT_CL)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->kSS_SPLT_CL = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_kSS_SPLT_CL,_IDL);
+DEFINE_PRIM(_F32,Config_set_kSS_SPLT_CL,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_maxvolume)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->maxvolume;
 }
-HL_PRIM void HL_NAME(Config_set_maxvolume)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_maxvolume)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->maxvolume = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_maxvolume,_IDL);
+DEFINE_PRIM(_F32,Config_set_maxvolume,_IDL _F32);
 
 HL_PRIM float HL_NAME(Config_get_timescale)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->timescale;
 }
-HL_PRIM void HL_NAME(Config_set_timescale)( _ref(btSoftBody::Config)* _this, float value ) {
+HL_PRIM float HL_NAME(Config_set_timescale)( _ref(btSoftBody::Config)* _this, float value ) {
 	_unref(_this)->timescale = (value);
+	return value;
 }
+DEFINE_PRIM(_F32,Config_get_timescale,_IDL);
+DEFINE_PRIM(_F32,Config_set_timescale,_IDL _F32);
 
 HL_PRIM int HL_NAME(Config_get_viterations)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->viterations;
 }
-HL_PRIM void HL_NAME(Config_set_viterations)( _ref(btSoftBody::Config)* _this, int value ) {
+HL_PRIM int HL_NAME(Config_set_viterations)( _ref(btSoftBody::Config)* _this, int value ) {
 	_unref(_this)->viterations = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,Config_get_viterations,_IDL);
+DEFINE_PRIM(_I32,Config_set_viterations,_IDL _I32);
 
 HL_PRIM int HL_NAME(Config_get_piterations)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->piterations;
 }
-HL_PRIM void HL_NAME(Config_set_piterations)( _ref(btSoftBody::Config)* _this, int value ) {
+HL_PRIM int HL_NAME(Config_set_piterations)( _ref(btSoftBody::Config)* _this, int value ) {
 	_unref(_this)->piterations = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,Config_get_piterations,_IDL);
+DEFINE_PRIM(_I32,Config_set_piterations,_IDL _I32);
 
 HL_PRIM int HL_NAME(Config_get_diterations)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->diterations;
 }
-HL_PRIM void HL_NAME(Config_set_diterations)( _ref(btSoftBody::Config)* _this, int value ) {
+HL_PRIM int HL_NAME(Config_set_diterations)( _ref(btSoftBody::Config)* _this, int value ) {
 	_unref(_this)->diterations = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,Config_get_diterations,_IDL);
+DEFINE_PRIM(_I32,Config_set_diterations,_IDL _I32);
 
 HL_PRIM int HL_NAME(Config_get_citerations)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->citerations;
 }
-HL_PRIM void HL_NAME(Config_set_citerations)( _ref(btSoftBody::Config)* _this, int value ) {
+HL_PRIM int HL_NAME(Config_set_citerations)( _ref(btSoftBody::Config)* _this, int value ) {
 	_unref(_this)->citerations = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,Config_get_citerations,_IDL);
+DEFINE_PRIM(_I32,Config_set_citerations,_IDL _I32);
 
 HL_PRIM int HL_NAME(Config_get_collisions)( _ref(btSoftBody::Config)* _this ) {
 	return _unref(_this)->collisions;
 }
-HL_PRIM void HL_NAME(Config_set_collisions)( _ref(btSoftBody::Config)* _this, int value ) {
+HL_PRIM int HL_NAME(Config_set_collisions)( _ref(btSoftBody::Config)* _this, int value ) {
 	_unref(_this)->collisions = (value);
+	return value;
 }
+DEFINE_PRIM(_I32,Config_get_collisions,_IDL);
+DEFINE_PRIM(_I32,Config_set_collisions,_IDL _I32);
 
 HL_PRIM _ref(btSoftBody)* HL_NAME(btSoftBody_new4)(_ref(btSoftBodyWorldInfo)* worldInfo, int node_count, _ref(btVector3)* x, float* m) {
 	return alloc_ref((new btSoftBody(_unref(worldInfo), node_count, _unref(x), m)),btSoftBody);
@@ -3285,23 +3732,32 @@ DEFINE_PRIM(_IDL, btSoftBody_new4, _IDL _I32 _IDL _BYTES);
 HL_PRIM _ref(btSoftBody::Config)* HL_NAME(btSoftBody_get_m_cfg)( _ref(btSoftBody)* _this ) {
 	return alloc_ref(new btSoftBody::Config(_unref(_this)->m_cfg),Config);
 }
-HL_PRIM void HL_NAME(btSoftBody_set_m_cfg)( _ref(btSoftBody)* _this, _ref(btSoftBody::Config)* value ) {
+HL_PRIM _ref(btSoftBody::Config)* HL_NAME(btSoftBody_set_m_cfg)( _ref(btSoftBody)* _this, _ref(btSoftBody::Config)* value ) {
 	_unref(_this)->m_cfg = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btSoftBody_get_m_cfg,_IDL);
+DEFINE_PRIM(_IDL,btSoftBody_set_m_cfg,_IDL _IDL);
 
 HL_PRIM _ref(btSoftBody::tNodeArray)* HL_NAME(btSoftBody_get_m_nodes)( _ref(btSoftBody)* _this ) {
 	return alloc_ref(new btSoftBody::tNodeArray(_unref(_this)->m_nodes),tNodeArray);
 }
-HL_PRIM void HL_NAME(btSoftBody_set_m_nodes)( _ref(btSoftBody)* _this, _ref(btSoftBody::tNodeArray)* value ) {
+HL_PRIM _ref(btSoftBody::tNodeArray)* HL_NAME(btSoftBody_set_m_nodes)( _ref(btSoftBody)* _this, _ref(btSoftBody::tNodeArray)* value ) {
 	_unref(_this)->m_nodes = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btSoftBody_get_m_nodes,_IDL);
+DEFINE_PRIM(_IDL,btSoftBody_set_m_nodes,_IDL _IDL);
 
 HL_PRIM _ref(btSoftBody::tMaterialArray)* HL_NAME(btSoftBody_get_m_materials)( _ref(btSoftBody)* _this ) {
 	return alloc_ref(new btSoftBody::tMaterialArray(_unref(_this)->m_materials),tMaterialArray);
 }
-HL_PRIM void HL_NAME(btSoftBody_set_m_materials)( _ref(btSoftBody)* _this, _ref(btSoftBody::tMaterialArray)* value ) {
+HL_PRIM _ref(btSoftBody::tMaterialArray)* HL_NAME(btSoftBody_set_m_materials)( _ref(btSoftBody)* _this, _ref(btSoftBody::tMaterialArray)* value ) {
 	_unref(_this)->m_materials = *_unref(value);
+	return value;
 }
+DEFINE_PRIM(_IDL,btSoftBody_get_m_materials,_IDL);
+DEFINE_PRIM(_IDL,btSoftBody_set_m_materials,_IDL _IDL);
 
 HL_PRIM HL_CONST bool HL_NAME(btSoftBody_checkLink2)(_ref(btSoftBody)* _this, int node0, int node1) {
 	return _unref(_this)->checkLink(node0, node1);

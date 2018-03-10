@@ -135,7 +135,7 @@ const uchar *hl_get_ustring( hl_code *code, int index ) {
 	if( str == NULL ) {
 		int size = hl_utf8_length((vbyte*)code->strings[index],0);
 		str = hl_malloc(&code->alloc,(size+1)<<1);
-		hl_from_utf8(str,size+1,code->strings[index]);
+		hl_from_utf8(str,size,code->strings[index]);
 		code->ustrings[index] = str;
 	}
 	return str;
@@ -369,8 +369,10 @@ static char **hl_read_strings( hl_reader *r, int nstrings, int **out_lens ) {
 		strings[i] = sdata;
 		lens[i] = sz;
 		sdata += sz;
-		if( sdata >= sbase + size || *sdata )
-			EXIT("Invalid string");
+		if( sdata >= sbase + size || *sdata ) {
+			ERROR("Invalid string");
+			return NULL;
+		}
 		sdata++;
 	}
 	*out_lens = lens;

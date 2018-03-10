@@ -49,6 +49,7 @@ ifeq ($(OS),Windows_NT)
 
 LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
+RELEASE_NAME=win
 
 ifeq ($(ARCH),32)
 CC=i686-pc-cygwin-gcc
@@ -64,6 +65,7 @@ LIBFLAGS += -L/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/loca
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
+RELEASE_NAME = osx
 
 else
 
@@ -79,6 +81,7 @@ LIBFLAGS += -L/opt/libjpeg-turbo/lib64
 endif
 
 LIBOPENAL = -lopenal
+RELEASE_NAME = linux
 
 endif
 
@@ -138,8 +141,15 @@ uv: ${UV} libhl
 mesa:
 	(cd libs/mesa && make)
 
-release: release_win release_haxelib
-	
+release: release_version release_$(RELEASE_NAME)
+
+release_version:
+	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))	
+	rm -rf hl-$(HL_VER)
+	mkdir hl-$(HL_VER)
+	mkdir hl-$(HL_VER)/include
+	cp src/hl.h src/hlc* hl-$(HL_VER)/include
+
 release_haxelib:
 	make HLIB=directx release_haxelib_package
 	make HLIB=sdl release_haxelib_package
@@ -160,14 +170,60 @@ release_haxelib_package:
 	rm -rf $(HLIB)_release	
 	
 release_win:
-	rm -rf hl_release
-	mkdir hl_release
-	(cd ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../hl_release)
-	cp c:/windows/syswow64/msvcr120.dll hl_release
-	mkdir hl_release/include
-	cp src/hl.h src/hlc* hl_release/include
-	zip -r hl_release.zip hl_release
-	rm -rf hl_release
+	(cd ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../hl-$(HL_VER))
+	cp c:/windows/syswow64/msvcr120.dll hl-$(HL_VER)
+	cp `which SDL2.dll` hl-$(HL_VER)
+	cp `which OpenAL32.dll` hl-$(HL_VER)
+	zip -r hl-$(HL_VER).zip hl-$(HL_VER)
+	rm -rf hl-$(HL_VER)
+
+release_linux:
+	cp hl libhl.so *.hdll hl-$(HL_VER)
+	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
+	rm -rf hl-$(HL_VER)
+
+release_osx:
+	cp hl libhl.dylib *.hdll hl-$(HL_VER)
+	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
+	rm -rf hl-$(HL_VER)
+
+OSX_LIBS=/usr/local/opt
+build_package_osx: release
+	rm -rf hl-$(HL_VER)-static
+	tar -xzf hl-$(HL_VER).tgz
+	cp $(OSX_LIBS)/libpng/lib/libpng16.16.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/jpeg-turbo/lib/libturbojpeg.0.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/libvorbis/lib/libvorbisfile.3.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/libvorbis/lib/libvorbis.0.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/libogg/lib/libogg.0.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/openal-soft/lib/libopenal.1.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/sdl2/lib/libSDL2*.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/mbedtls/lib/libmbed*.dylib hl-$(HL_VER)
+	cp $(OSX_LIBS)/libuv/lib/libuv.1.dylib hl-$(HL_VER)
+	-cp ../hlsteam/steam.hdll ../hlsteam/native/lib/osx32/libsteam_api.dylib hl-$(HL_VER)
+	mv hl-$(HL_VER) hl-$(HL_VER)-static
+	tar -czf hl-$(HL_VER)-static.tgz hl-$(HL_VER)-static
+	
+# staticaly locked binaries
+LINUX_LIBS=/usr/lib/x86_64-linux-gnu
+build_package_linux: release
+	rm -rf hl-$(HL_VER)-static
+	tar -xzf hl-$(HL_VER).tgz	
+	cp $(LINUX_LIBS)/libpng16.so.16 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libturbojpeg.so.0 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libvorbisfile.so.3 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libvorbis.so.0 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libogg.so.0 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libopenal.so.1 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libSDL2*.so* hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libmbed* hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libuv.so.1 hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libsndio.so* hl-$(HL_VER)
+	cp /lib/x86_64-linux-gnu/libbsd.so.0 hl-$(HL_VER)
+	-cp ../hlsteam/steam.hdll ../hlsteam/native/lib/linux64/libsteam_api.so hl-$(HL_VER)	
+	(cd hl-$(HL_VER) && chmod +x *.so* && find *.hdll hl *.so *.so.* | xargs -L 1 patchelf --set-rpath ./)
+	mv hl-$(HL_VER) hl-$(HL_VER)-static
+	tar -czf hl-$(HL_VER)-static.tgz hl-$(HL_VER)-static
 
 .SUFFIXES : .c .o
 

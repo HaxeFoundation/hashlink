@@ -113,6 +113,10 @@ int main(int argc, pchar *argv[]) {
 			debug_wait = true;
 			continue;
 		}
+		if( pcompare(arg,PSTR("--version")) == 0 ) {
+			printf("%d.%d.%d",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
+			return 0;
+		}
 		if( *arg == '-' || *arg == '+' ) {
 			if( first_boot_arg < 0 ) first_boot_arg = argc + 1;
 			// skip value
@@ -145,6 +149,7 @@ int main(int argc, pchar *argv[]) {
 	hl_global_init(&ctx);
 	hl_sys_init((void**)argv,argc,file);
 	hl_register_thread(&argc);
+	setbuf(stdout,NULL); // disable stdout buffering
 	ctx.code = load_code(file);
 	if( ctx.code == NULL )
 		return 1;
@@ -154,8 +159,6 @@ int main(int argc, pchar *argv[]) {
 	if( !hl_module_init(ctx.m) )
 		return 3;
 	hl_code_free(ctx.code);
-	if( debug_port > 0 )
-		setbuf(stdout,NULL);
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
 		fprintf(stderr,"Could not start debugger on port %d",debug_port);
 		return 4;

@@ -4,6 +4,8 @@ package sdl;
 	public var type : EventType;
 	public var mouseX : Int;
 	public var mouseY : Int;
+	public var mouseXRel : Int;
+	public var mouseYRel : Int;
 	public var button : Int;
 	public var wheelDelta : Int;
 	public var state : WindowStateChange;
@@ -11,6 +13,7 @@ package sdl;
 	public var keyRepeat : Bool;
 	public var controller : Int;
 	public var value : Int;
+	public var fingerId : Int;
 	public function new() {
 	}
 }
@@ -31,6 +34,9 @@ package sdl;
 	var GControllerDown		= 102;
 	var GControllerUp		= 103;
 	var GControllerAxis 	= 104;
+	var TouchDown	= 200;
+	var TouchUp		= 201;
+	var TouchMove	= 202;
 }
 
 @:enum abstract WindowStateChange(Int) {

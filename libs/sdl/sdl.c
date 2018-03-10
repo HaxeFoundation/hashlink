@@ -2,11 +2,17 @@
 
 #include <hl.h>
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__ANDROID__)
 #	include <SDL.h>
 #	include <SDL_syswm.h>
 #else
 #	include <SDL2/SDL.h>
+#endif
+
+#if defined (HL_IOS) || defined(HL_TVOS)
+#	include <OpenGLES/ES3/gl.h>
+#	include <OpenGLES/ES3/glext.h>
+#	include <SDL2/SDL_syswm.h>
 #endif
 
 #ifndef SDL_MAJOR_VERSION
@@ -36,7 +42,10 @@ typedef enum {
 	GControllerRemoved,
 	GControllerDown,
 	GControllerUp,
-	GControllerAxis
+	GControllerAxis,
+	TouchDown = 200,
+	TouchUp,
+	TouchMove,
 } event_type;
 
 typedef enum {
@@ -60,6 +69,8 @@ typedef struct {
 	event_type type;
 	int mouseX;
 	int mouseY;
+	int mouseXRel;
+	int mouseYRel;
 	int button;
 	int wheelDelta;
 	ws_change state;
@@ -67,6 +78,7 @@ typedef struct {
 	bool keyRepeat;
 	int controller;
 	int value;
+	int fingerId;
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
@@ -80,9 +92,15 @@ HL_PRIM bool HL_NAME(init_once)() {
 	timeBeginPeriod(1);
 #	endif
 	// default GL parameters
+#ifdef HL_MOBILE
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#endif
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
@@ -90,7 +108,7 @@ HL_PRIM bool HL_NAME(init_once)() {
 	return true;
 }
 
-HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, int flags ) {
+HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, int flags, int samples ) {
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depth);
@@ -104,6 +122,11 @@ HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, 
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	else
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, 0); // auto
+
+	if (samples > 1) {
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, samples);
+	}
 }
 
 HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
@@ -118,6 +141,8 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->type = MouseMove;
 			event->mouseX = e.motion.x;
 			event->mouseY = e.motion.y;
+			event->mouseXRel = e.motion.xrel;
+			event->mouseYRel = e.motion.yrel;
 			break;
 		case SDL_KEYDOWN:
 			event->type = KeyDown;
@@ -141,6 +166,24 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->button = e.button.button;
 			event->mouseX = e.button.x;
 			event->mouseY = e.motion.y;
+			break;
+		case SDL_FINGERDOWN:
+			event->type = TouchDown;
+			event->mouseX = (int)(e.tfinger.x*100);
+			event->mouseY = (int)(e.tfinger.y*100);
+			event->fingerId = (int)e.tfinger.fingerId;
+			break;
+		case SDL_FINGERMOTION:
+			event->type = TouchMove;
+			event->mouseX = (int)(e.tfinger.x*100);
+			event->mouseY = (int)(e.tfinger.y*100);
+			event->fingerId = (int)e.tfinger.fingerId;
+			break;
+		case SDL_FINGERUP:
+			event->type = TouchUp;
+			event->mouseX = (int)(e.tfinger.x*100);
+			event->mouseY = (int)(e.tfinger.y*100);
+			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_MOUSEWHEEL:
 			event->type = MouseWheel;
@@ -308,8 +351,8 @@ HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 }
 
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
-DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32);
-DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32) );
+DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32 _I32) );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
@@ -325,7 +368,14 @@ DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 
 HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
 	SDL_Window *w;
+	// force window to match device resolution on mobile
+#ifdef	HL_MOBILE
+	SDL_DisplayMode displayMode;
+	SDL_GetDesktopDisplayMode(0, &displayMode);
+	w = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS);
+#else
 	w = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+#endif
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
 	if( (SDL_GetWindowFlags(w) & SDL_WINDOW_INPUT_FOCUS) == 0 ) {
@@ -427,6 +477,14 @@ HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
 
 
 HL_PRIM void HL_NAME(win_swap_window)(SDL_Window *win) {
+#if defined(HL_IOS) || defined(HL_TVOS)
+	SDL_SysWMinfo info;
+	SDL_VERSION(&info.version);
+	SDL_GetWindowWMInfo(win, &info);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, info.info.uikit.framebuffer);
+	glBindRenderbuffer(GL_RENDERBUFFER,info.info.uikit.colorbuffer);
+#endif
 	SDL_GL_SwapWindow(win);
 }
 

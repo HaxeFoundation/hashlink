@@ -32,7 +32,7 @@ static int stack_count = 0;
 static bool exc_rethrow = false;
 
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
-	hl_is_blocking(true);
+	hl_blocking(true);
 #	ifdef _WIN32
     HWND consoleWnd = GetConsoleWindow();
     DWORD pid;
@@ -40,7 +40,7 @@ HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
     if( consoleWnd == NULL || GetActiveWindow() != NULL || GetCurrentProcessId() == pid ) MessageBoxA(NULL,msg,"Fatal Error", MB_OK | MB_ICONERROR);
 #	endif
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
-	hl_is_blocking(false);
+	hl_blocking(false);
 	hl_debug_break();
 	exit(1);
 	return NULL;
