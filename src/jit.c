@@ -142,7 +142,7 @@ typedef enum {
 #	define W64(wv)	W(wv)
 #endif
 
-static int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
+static const int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
 
 #define MOD_RM(mod,reg,rm)		B(((mod) << 6) | (((reg)&7) << 3) | ((rm)&7))
 #define SIB(mult,rmult,rbase)	B((SIB_MULT[mult]<<6) | (((rmult)&7)<<3) | ((rbase)&7))
@@ -215,14 +215,14 @@ struct vreg {
 #		define CALL_NREGS			4
 #		define RCPU_SCRATCH_COUNT	7
 #		define RFPU_SCRATCH_COUNT	6
-static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, R8, R9, R10, R11 };
-static CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
+static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, R8, R9, R10, R11 };
+static const CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
 #	else
 #		define CALL_NREGS			6 // TODO : XMM6+XMM7 are FPU reg parameters
 #		define RCPU_SCRATCH_COUNT	9
 #		define RFPU_SCRATCH_COUNT	16
-static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, Esi, Edi, R8, R9, R10, R11 };
-static CpuReg CALL_REGS[] = { Edi, Esi, Edx, Ecx, R8, R9 };
+static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, Esi, Edi, R8, R9, R10, R11 };
+static const CpuReg CALL_REGS[] = { Edi, Esi, Edx, Ecx, R8, R9 };
 #	endif
 #else
 #	define CALL_NREGS	0
@@ -230,7 +230,7 @@ static CpuReg CALL_REGS[] = { Edi, Esi, Edx, Ecx, R8, R9 };
 #	define RFPU_COUNT	8
 #	define RCPU_SCRATCH_COUNT	3
 #	define RFPU_SCRATCH_COUNT	8
-static int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
+static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 #endif
 
 #define XMM(i)			((i) + RCPU_COUNT)
