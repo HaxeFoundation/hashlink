@@ -73,7 +73,12 @@ static hl_field_lookup *obj_resolve_field( hl_type_obj *o, int hfield ) {
 
 static int hl_cache_count = 0;
 static int hl_cache_size = 0;
+static hl_mutex *hl_cache_lock = NULL;
 static hl_field_lookup *hl_cache = NULL;
+
+void hl_cache_init() {
+	hl_cache_lock = hl_mutex_alloc();
+}
 
 HL_PRIM int hl_hash( vbyte *b ) {
 	return hl_hash_gen((uchar*)b,true);
@@ -99,7 +104,9 @@ HL_PRIM int hl_hash_gen( const uchar *name, bool cache_name ) {
 	}
 	h %= 0x1FFFFF7B;
 	if( cache_name ) {
-		hl_field_lookup *l = hl_lookup_find(hl_cache, hl_cache_count, h);
+		hl_field_lookup *l;
+		hl_mutex_acquire(hl_cache_lock);
+		l = hl_lookup_find(hl_cache, hl_cache_count, h);
 		// check for potential conflict (see haxe#5572)
 		while( l && ucmp((uchar*)l->t,oname) != 0 ) {
 			h++;
@@ -117,6 +124,7 @@ HL_PRIM int hl_hash_gen( const uchar *name, bool cache_name ) {
 			}
 			hl_lookup_insert(hl_cache,hl_cache_count++,h,(hl_type*)ustrdup(oname),0);
 		}
+		hl_mutex_release(hl_cache_lock);
 	}
 	return h;
 }
@@ -133,6 +141,8 @@ HL_PRIM void hl_cache_free() {
 	free(hl_cache);
 	hl_cache = NULL;
 	hl_cache_count = hl_cache_size = 0;
+	hl_mutex_free(hl_cache_lock);
+	hl_cache_lock = NULL;
 }
 
 HL_PRIM hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid ) {
