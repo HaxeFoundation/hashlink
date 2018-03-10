@@ -83,9 +83,6 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 
 #endif
 
-HL_PRIM double hl_sys_time();
-static int K = 0;
-
 #ifdef HL_WIN
 int wmain(int argc, pchar *argv[]) {
 #else

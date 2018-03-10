@@ -587,7 +587,7 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 }
 
 HL_PRIM vbyte *hl_sys_hl_file() {
-	return hl_file;
+	return (vbyte*)hl_file;
 }
 
 #ifndef HL_MOBILE
