@@ -82,6 +82,7 @@ static inline unsigned int TRAILING_ZEROES( unsigned int x ) {
 
 #ifdef HL_DEBUG
 #	define GC_DEBUG
+#	define GC_MEMCHK
 #endif
 
 #define out_of_memory(reason)		hl_fatal("Out of Memory (" reason ")")
@@ -561,42 +562,29 @@ static void *gc_alloc_gen( int size, int flags, int *allocated ) {
 
 static void gc_check_mark();
 
-//#define HL_BUMP_ALLOC
-
-#ifdef HL_BUMP_ALLOC
-static unsigned char *alloc_all = NULL;
-static unsigned char *alloc_end = NULL;
-#endif
-
 void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	void *ptr;
 	int time = 0;
 	int allocated = 0;
-#ifdef HL_BUMP_ALLOC
-	if( !alloc_all ) {
-		int tot = 3<<29;
-		alloc_all = gc_alloc_page_memory(tot);
-		if( !alloc_all ) hl_fatal("Failed to allocate bump memory");
-		alloc_end = alloc_all + tot;
-	}
-	ptr = alloc_all;
-	alloc_all += size;
-	if( alloc_all > alloc_end ) out_of_memory("bump");
-#else
 	gc_check_mark();
+#	ifdef GC_MEMCHK
+	size += HL_WSIZE;
+#	endif
 	if( gc_flags & GC_PROFILE ) time = TIMESTAMP();
 	ptr = gc_alloc_gen(size, flags, &allocated);
 	if( gc_flags & GC_PROFILE ) gc_stats.alloc_time += TIMESTAMP() - time;
 #	ifdef GC_DEBUG
 	memset(ptr,0xCD,allocated);
 #	endif
-#endif
 	if( flags & MEM_ZERO )
 		MZERO(ptr,allocated);
 	else if( MEM_HAS_PTR(flags) && allocated != size )
 		MZERO((char*)ptr+size,allocated-size); // erase possible pointers after data
 	if( (gc_flags & GC_TRACK) && gc_track_callback )
 		((void (*)(hl_type *,int,int,void*))gc_track_callback)(t,size,flags,ptr);
+#	ifdef GC_MEMCHK
+	memset((char*)ptr+(allocated - HL_WSIZE),0xEE,HL_WSIZE);
+#	endif
 	return ptr;
 }
 
@@ -719,10 +707,19 @@ static void gc_clear_unmarked_mem() {
 			int bid;
 			for(bid=p->first_block;bid<p->max_blocks;bid++) {
 				if( p->sizes && !p->sizes[bid] ) continue;
+				int size = p->sizes ? p->sizes[bid] * p->block_size : p->block_size;
+				unsigned char *ptr = (unsigned char*)p + bid * p->block_size;
+				if( bid * p->block_size + size > p->page_size ) hl_fatal("invalid block size");
+#				ifdef GC_MEMCHK
+				int_val eob = *(int_val*)(ptr + size - HL_WSIZE);
+#				ifdef HL_64
+				if( eob != 0xEEEEEEEEEEEEEEEE && eob != 0xDDDDDDDDDDDDDDDD )
+#				else
+				if( eob != 0xEEEEEEEE && eob != 0xDDDDDDDD )
+#				endif
+					hl_fatal("Block written out of bounds");
+#				endif
 				if( (p->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
-					int size = p->sizes ? p->sizes[bid] * p->block_size : p->block_size;
-					unsigned char *ptr = (unsigned char*)p + bid * p->block_size;
-					if( bid * p->block_size + size > p->page_size ) hl_fatal("invalid block size");
 					memset(ptr,0xDD,size);
 					if( p->sizes ) p->sizes[bid] = 0;
 				}
