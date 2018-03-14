@@ -1,6 +1,8 @@
 #define HL_NAME(n) ui_##n
 #include <hl.h>
+#ifndef HL_WIN
 #include <unistd.h>
+#endif
 
 #define wref void
 #define vsentinel void

@@ -1,21 +1,18 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
 
+#ifdef HL_WIN_DESKTOP
 #include <dxgi.h>
 #include <d3dcommon.h>
 #include <d3d11.h>
 #include <D3Dcompiler.h>
+#else
+#include <xbo_directx.h>
+#endif
+#include <assert.h>
+#include "directx.h"
 
 #define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret == E_OUTOFMEMORY ) return NULL; if( __ret != S_OK ) ReportDxError(__ret,__LINE__); }
-
-typedef struct {
-	ID3D11Device *device;
-	ID3D11DeviceContext *context;
-	IDXGISwapChain *swapchain;
-	ID3D11RenderTargetView *renderTarget;
-	D3D_FEATURE_LEVEL feature;
-	int init_flags;
-} dx_driver;
 
 template <typename T> class dx_struct {
 	hl_type *t;
@@ -67,18 +64,30 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	desc.BufferDesc.Format = (DXGI_FORMAT)format;
 	desc.SampleDesc.Count = 1; // NO AA for now
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+#ifdef HL_WIN_DESKTOP
 	desc.BufferCount = 1;
 	desc.Windowed = true;
+#else
+	desc.BufferCount = 2;
+	desc.Windowed = false;
+#endif
 	desc.OutputWindow = window;
 	if( restrictLevel >= maxLevels ) restrictLevel = maxLevels - 1;
+#if _DEBUG
+	flags |= D3D11_CREATE_DEVICE_INSTRUMENTED;
+#endif
 	d->init_flags = flags;
 	result = D3D11CreateDeviceAndSwapChain(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels + restrictLevel,maxLevels - restrictLevel,D3D11_SDK_VERSION,&desc,&d->swapchain,&d->device,&d->feature,&d->context);
+
+#ifdef HL_WIN_DESKTOP
 	if( result == DXGI_ERROR_SDK_COMPONENT_MISSING && (flags & D3D11_CREATE_DEVICE_DEBUG) != 0 ) {
 		// no debug driver available, retry
 		flags &= ~D3D11_CREATE_DEVICE_DEBUG;
 		d->init_flags = flags;
 		result = E_INVALIDARG;
 	}
+#endif
+
 	if( result == E_INVALIDARG ) // most likely no DX11.1 support, try again
 		result = D3D11CreateDeviceAndSwapChain(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,NULL,0,D3D11_SDK_VERSION, &desc, &d->swapchain, &d->device, &d->feature, &d->context);
 
@@ -88,14 +97,23 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	return d;
 }
 
+HL_PRIM dx_driver *HL_NAME(get_driver)(){
+	return driver;
+}
+
 HL_PRIM dx_resource *HL_NAME(get_back_buffer)() {
 	ID3D11Texture2D *backBuffer;
 	DXERR( driver->swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer) );
 	return backBuffer;
 }
 
-HL_PRIM bool HL_NAME(resize)( int width, int height, int format ) {
-	return driver->swapchain->ResizeBuffers(1,width,height,(DXGI_FORMAT)format,0) == S_OK;
+HL_PRIM bool HL_NAME(resize)(int width, int height, int format) {
+#ifdef HL_WIN_DESKTOP
+	HRESULT res = driver->swapchain->ResizeBuffers(1, width, height, (DXGI_FORMAT)format, 0); assert(res == S_OK);
+	return res == S_OK;
+#else
+	return TRUE; //Should not be called if the window is not resized (in the case here it will never happen)
+#endif
 }
 
 HL_PRIM dx_pointer *HL_NAME(create_render_target_view)( dx_resource *r, dx_struct<D3D11_RENDER_TARGET_VIEW_DESC> *desc ) {
@@ -136,7 +154,8 @@ HL_PRIM void HL_NAME(clear_color)( dx_pointer *rt, double r, double g, double b,
 }
 
 HL_PRIM void HL_NAME(present)( int interval, int flags ) {
-	driver->swapchain->Present(interval,flags);
+	HRESULT ret = driver->swapchain->Present(interval, flags);
+	if (ret != S_OK) ReportDxError(ret, __LINE__);
 }
 
 HL_PRIM const uchar *HL_NAME(get_device_name)() {
