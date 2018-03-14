@@ -219,6 +219,7 @@ build_package_linux: release
 	cp $(LINUX_LIBS)/libmbed* hl-$(HL_VER)
 	cp $(LINUX_LIBS)/libuv.so.1 hl-$(HL_VER)
 	cp $(LINUX_LIBS)/libsndio.so* hl-$(HL_VER)
+	cp $(LINUX_LIBS)/libpulse.so.0 hl-$(HL_VER)
 	cp /lib/x86_64-linux-gnu/libbsd.so.0 hl-$(HL_VER)
 	-cp ../hlsteam/steam.hdll ../hlsteam/native/lib/linux64/libsteam_api.so hl-$(HL_VER)	
 	(cd hl-$(HL_VER) && chmod +x *.so* && find *.hdll hl *.so *.so.* | xargs -L 1 patchelf --set-rpath ./)
