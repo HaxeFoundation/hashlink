@@ -136,7 +136,11 @@ HL_PRIM vbyte *hl_sys_locale() {
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
+#	ifdef HL_XBO
+	OutputDebugStringW((LPCWSTR)msg);
+#	else
 	uprintf(USTR("%s"),(uchar*)msg);
+#	endif
 	hl_blocking(false);
 }
 
