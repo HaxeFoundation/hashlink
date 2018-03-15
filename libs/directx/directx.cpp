@@ -73,9 +73,6 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 #endif
 	desc.OutputWindow = window;
 	if( restrictLevel >= maxLevels ) restrictLevel = maxLevels - 1;
-#if _DEBUG
-	flags |= D3D11_CREATE_DEVICE_INSTRUMENTED;
-#endif
 	d->init_flags = flags;
 	result = D3D11CreateDeviceAndSwapChain(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels + restrictLevel,maxLevels - restrictLevel,D3D11_SDK_VERSION,&desc,&d->swapchain,&d->device,&d->feature,&d->context);
 
