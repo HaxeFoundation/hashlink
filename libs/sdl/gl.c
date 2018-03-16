@@ -629,7 +629,7 @@ HL_PRIM void HL_NAME(gl_draw_elements_instanced)( int mode, int count, int type,
 	glDrawElementsInstanced(mode,count,type,(void*)(int_val)start,primcount);
 }
 
-HL_PRIM void HL_NAME(gl_draw_arrays_instanced)( int mode, int first, int count, int start, int primcount ) {
+HL_PRIM void HL_NAME(gl_draw_arrays_instanced)( int mode, int first, int count, int primcount ) {
 	GLOG("%d,%d,%d,%d",mode,first,count,primcount);
 	glDrawArraysInstanced(mode,first,count,primcount);
 }
