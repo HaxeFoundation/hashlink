@@ -38,6 +38,11 @@ class Sdl {
 		Sys.exit( -1);
 	}
 
+	public static inline var DOUBLE_BUFFER            = 1 << 0;
+	public static inline var GL_CORE_PROFILE          = 1 << 1;
+	public static inline var GL_COMPATIBILITY_PROFILE = 1 << 2;
+	public static inline var GL_ES                    = 1 << 3;
+
 	static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int, samples : Int ) {}
 
 	static function initOnce() return false;
