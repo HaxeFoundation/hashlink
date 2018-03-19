@@ -221,8 +221,22 @@ static void append_type( char **p, hl_type *t ) {
 }
 
 static void *resolve_library( const char *lib ) {
+	static char *DISABLED_LIBS = NULL;
 	char tmp[256];	
 	void *h;
+
+#	ifndef HL_CONSOLE
+	if( !DISABLED_LIBS ) {
+		DISABLED_LIBS = getenv("HL_DISABLED_LIBS");
+		if( !DISABLED_LIBS ) DISABLED_LIBS = "";
+	}
+	char *disPart = strstr(DISABLED_LIBS, lib);
+	if( disPart ) {
+		disPart += strlen(lib);
+		if( *disPart == 0 || *disPart == ',' )
+			return NULL;
+	}
+#	endif
 
 	if( strcmp(lib,"builtin") == 0 )
 		return dlopen(NULL,RTLD_LAZY);
@@ -257,6 +271,10 @@ static void *resolve_library( const char *lib ) {
 	return h;
 }
 
+static void disabled_primitive() {
+	hl_error("This library primitive has been disabled");
+}
+
 int hl_module_init( hl_module *m, void *stack_top_val ) {
 	int i;
 	jit_ctx *ctx;
@@ -280,6 +298,11 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 				curlib = n->lib;
 				libHandler = resolve_library(n->lib);
 			}
+			if( libHandler == NULL ) {
+				m->functions_ptrs[n->findex] = disabled_primitive;
+				continue;
+			}
+
 			strcpy(p,"hlp_");
 			p += 4;
 			strcpy(p,n->name);
