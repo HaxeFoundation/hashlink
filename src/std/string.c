@@ -38,6 +38,21 @@ HL_PRIM vbyte *hl_ftos( double d, int *len ) {
 	// don't use the last digit (eg 5.1 = 5.09999..996)
 	// also cut one more digit for some numbers (eg 86.57 and 85.18) <- to fix since we lose one PI digit
 	k = (int)usprintf(tmp,24,USTR("%.15g"),d);
+#	if defined(HL_WIN) && _MSC_VER <= 1800
+	// fix for window : 1e-5 is printed as 1e-005 whereas it's 1e-05 on other platforms
+	// note : this is VS2013 std bug, VS2015 works correctly
+	{
+		int i;
+		for(i=0;i<k;i++)
+			if( tmp[i] == 'e' ) {
+				if( tmp[i+1] == '+' || tmp[i+1] == '-' ) i++;
+				if( tmp[i+1] != '0' || tmp[i+2] != '0' ) break;
+				memmove(tmp+i+1,tmp+i+2,(k-(i+1))*2);
+				k--;
+				break;
+			}
+	}
+#	endif
 	*len = k;
 	return hl_copy_bytes((vbyte*)tmp,(k + 1) << 1);
 }
