@@ -221,11 +221,11 @@ static void append_type( char **p, hl_type *t ) {
 }
 
 static void *resolve_library( const char *lib ) {
-	static char *DISABLED_LIBS = NULL;
 	char tmp[256];	
 	void *h;
 
 #	ifndef HL_CONSOLE
+	static char *DISABLED_LIBS = NULL;
 	if( !DISABLED_LIBS ) {
 		DISABLED_LIBS = getenv("HL_DISABLED_LIBS");
 		if( !DISABLED_LIBS ) DISABLED_LIBS = "";
