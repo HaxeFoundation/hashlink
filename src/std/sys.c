@@ -101,7 +101,9 @@ HL_PRIM bool hl_sys_utf8_path() {
 }
 
 HL_PRIM vbyte *hl_sys_string() {
-#if defined(HL_WIN) || defined(HL_CYGWIN) || defined(HL_MINGW)
+#if defined(HL_CONSOLE)
+	return (vbyte*)sys_platform_name();
+#elif defined(HL_WIN) || defined(HL_CYGWIN) || defined(HL_MINGW)
 	return (vbyte*)USTR("Windows");
 #elif defined(HL_GNUKBSD)
 	return (vbyte*)USTR("GNU/kFreeBSD");
@@ -111,8 +113,6 @@ HL_PRIM vbyte *hl_sys_string() {
 	return (vbyte*)USTR("BSD");
 #elif defined(HL_MAC)
 	return (vbyte*)USTR("Mac");
-#elif defined(HL_CONSOLE)
-	return (vbyte*)sys_platform_name();
 #elif defined(HL_IOS)
 	return (vbyte*)USTR("iOS");
 #elif defined(HL_TVOS)
