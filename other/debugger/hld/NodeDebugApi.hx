@@ -128,6 +128,7 @@ class NodeDebugApi implements Api {
 		if( !winApi.WaitForDebugEvent(e.ref(), timeout) )
 			return { r : Timeout, tid : 0 };
 		var tid = e.threadId;
+		trace(e);
 		var result : WaitResult = switch( e.debugEventCode ) {
 		case 1://EXCEPTION_DEBUG_EVENT
 			switch( e.exceptionCode ) {
@@ -135,6 +136,9 @@ class NodeDebugApi implements Api {
 				Breakpoint;
 			case 0x80000004, 0x4000001E: //EXCEPTION_SINGLE_STEP
 				SingleStep;
+			case 0x406D1388: // MS_VC_EXCEPTION (see SetThreadName)
+				resume(tid);
+				Handled;
 			default:
 				Error;
 			}

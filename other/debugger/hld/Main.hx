@@ -288,6 +288,8 @@ class Main {
 				for( name in dbg.getCurrentVars(true).concat(dbg.getCurrentVars(false)) )
 					printVar(name);
 			}
+		case "cd":
+			try Sys.setCwd(args.shift()) catch( e : Dynamic ) Sys.println(""+e);
 		default:
 			Sys.println("Unknown command " + r);
 		}
