@@ -138,6 +138,9 @@ class NodeDebugApi implements Api {
 			case 0x406D1388: // MS_VC_EXCEPTION (see SetThreadName)
 				resume(tid);
 				Handled;
+			case 0xE06D7363: // C++ EH EXCEPTION
+				winApi.ContinueDebugEvent(pid, tid, 0x80010001/*DBG_EXCEPTION_NOT_HANDLED*/);
+				Handled;
 			default:
 				Sys.println("Unknown error 0x" + StringTools.hex(e.exceptionCode));
 				Error;
