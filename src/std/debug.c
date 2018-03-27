@@ -120,6 +120,9 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 		case 0x406D1388: // MS_VC_EXCEPTION (see SetThreadName)
 			ContinueDebugEvent(e.dwProcessId, e.dwThreadId, DBG_CONTINUE);
 			break;
+		case 0xE06D7363: // C++ EH EXCEPTION
+			ContinueDebugEvent(e.dwProcessId, e.dwThreadId, DBG_EXCEPTION_NOT_HANDLED);
+			break;
 		default:
 			return 3;
 		}
