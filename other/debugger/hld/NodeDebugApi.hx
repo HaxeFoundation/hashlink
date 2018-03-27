@@ -128,7 +128,6 @@ class NodeDebugApi implements Api {
 		if( !winApi.WaitForDebugEvent(e.ref(), timeout) )
 			return { r : Timeout, tid : 0 };
 		var tid = e.threadId;
-		trace(e);
 		var result : WaitResult = switch( e.debugEventCode ) {
 		case 1://EXCEPTION_DEBUG_EVENT
 			switch( e.exceptionCode ) {
@@ -140,6 +139,7 @@ class NodeDebugApi implements Api {
 				resume(tid);
 				Handled;
 			default:
+				Sys.println("Unknown error 0x" + StringTools.hex(e.exceptionCode));
 				Error;
 			}
 		case 5://EXIT_PROCESS_DEBUG_EVENT:
