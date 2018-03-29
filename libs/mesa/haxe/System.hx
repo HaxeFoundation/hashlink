@@ -37,7 +37,7 @@ class System {
 		return true;
 	}
 
-	public dynamic function reportError(e:Dynamic) {
+	public static dynamic function reportError(e:Dynamic) {
 		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
 		var err = try Std.string(e) catch( _ : Dynamic ) "????";
 		Sys.println(err + stack);
