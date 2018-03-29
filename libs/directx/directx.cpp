@@ -152,7 +152,7 @@ HL_PRIM void HL_NAME(clear_color)( dx_pointer *rt, double r, double g, double b,
 
 HL_PRIM void HL_NAME(present)( int interval, int flags ) {
 	HRESULT ret = driver->swapchain->Present(interval, flags);
-	if (ret != S_OK) ReportDxError(ret, __LINE__);
+	if (ret != S_OK && ret != DXGI_STATUS_OCCLUDED) ReportDxError(ret, __LINE__);
 }
 
 HL_PRIM const uchar *HL_NAME(get_device_name)() {
