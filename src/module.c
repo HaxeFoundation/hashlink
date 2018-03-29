@@ -220,6 +220,8 @@ static void append_type( char **p, hl_type *t ) {
 	}
 }
 
+#define DISABLED_LIB_PTR ((void*)(int_val)2)
+
 static void *resolve_library( const char *lib ) {
 	char tmp[256];	
 	void *h;
@@ -234,7 +236,7 @@ static void *resolve_library( const char *lib ) {
 	if( disPart ) {
 		disPart += strlen(lib);
 		if( *disPart == 0 || *disPart == ',' )
-			return NULL;
+			return DISABLED_LIB_PTR;
 	}
 #	endif
 
@@ -298,7 +300,7 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 				curlib = n->lib;
 				libHandler = resolve_library(n->lib);
 			}
-			if( libHandler == NULL ) {
+			if( libHandler == DISABLED_LIB_PTR ) {
 				m->functions_ptrs[n->findex] = disabled_primitive;
 				continue;
 			}
