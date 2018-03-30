@@ -69,7 +69,18 @@ static inline unsigned int TRAILING_ZEROES( unsigned int x ) {
 // we should instead have some special handling for them
 // in x86-64 user space grows up to 0x8000-00000000 (16 bits base + 31 bits page id)
 
+#ifdef HL_WIN
 #	define gc_hash(ptr)			((int_val)(ptr)&0x0000000FFFFFFFFF)
+#else
+// Linux gives addresses using the following patterns (X=any,Y=small value - can be 0): 
+//		0x0000000YXXX0000
+//		0x0007FY0YXXX0000
+static int_val gc_hash( void *ptr ) {
+	int_val v = (int_val)ptr;
+	return (v ^ ((v >> 33) << 28)) & 0x0000000FFFFFFFFF;
+}
+#endif
+
 #endif
 
 #define GC_MASK_BITS		16
