@@ -38,7 +38,8 @@ class Debugger {
 	public var eval : Eval;
 	public var currentStackFrame : Int;
 	public var stackFrameCount(get, never) : Int;
-	public var stoppedThread : Null<Int>;
+	public var stoppedThread(default,set) : Null<Int>;
+	public var currentThread : Null<Int>;
 
 	public var customTimeout : Null<Float>;
 
@@ -47,6 +48,10 @@ class Debugger {
 	public function new() {
 		breakPoints = [];
 		watches = [];
+	}
+
+	function set_stoppedThread(v) {
+		return stoppedThread = currentThread = v;
 	}
 
 	function get_is64() {
@@ -98,7 +103,12 @@ class Debugger {
 	public function pause() {
 		if( !api.breakpoint() )
 			throw "Failed to break process";
-		return wait();
+		var r = wait();
+		if( stoppedThread != jit.mainThread ) {
+			currentThread = jit.mainThread;
+			prepareStack();
+		}
+		return r;
 	}
 
 	function singleStep(tid) {
@@ -199,9 +209,13 @@ class Debugger {
 			}
 		}
 		stoppedThread = cmd.tid;
-		currentStackFrame = 0;
-		currentStack = (cmd.tid == jit.mainThread) ? makeStack(cmd.tid) : [];
+		prepareStack();
 		return cmd.r;
+	}
+
+	function prepareStack() {
+		currentStackFrame = 0;
+		currentStack = (currentThread == jit.mainThread) ? makeStack(currentThread) : [];
 	}
 
 	function smartStep( tid : Int, stepIntoCall : Bool ) {
@@ -244,7 +258,7 @@ class Debugger {
 	}
 
 	public function debugTrace( stepIn ) {
-		var tid = stoppedThread;
+		var tid = currentThread;
 		var prevFun = -1, prevPos = -1, inC = false;
 		var prevEbp = null, prevStack = 0;
 		var tabs = "";
@@ -312,7 +326,7 @@ class Debugger {
 	}
 
 	public function step( mode : StepMode ) : Api.WaitResult {
-		var tid = stoppedThread;
+		var tid = currentThread;
 		var s = currentStack[0];
 		var line = module.resolveSymbol(s.fidx, s.fpos).line;
 		while( true ) {
@@ -341,8 +355,7 @@ class Debugger {
 			if( deltaEbp > 0 )
 				break;
 		}
-		currentStackFrame = 0;
-		currentStack = (stoppedThread == jit.mainThread) ? makeStack(stoppedThread) : [];
+		prepareStack();
 		return Breakpoint;
 	}
 
@@ -497,7 +510,7 @@ class Debugger {
 
 	function syncDebugRegs() {
 		var wasPaused = false;
-		if( stoppedThread == null ) {
+		if( currentThread == null ) {
 			pause();
 			wasPaused = true;
 		}
@@ -507,10 +520,10 @@ class Debugger {
 				var rid = HW_REGS.indexOf(r.r);
 				dr7 |= 1 << (rid * 2);
 				dr7 |= ((w.forReadWrite ? 3 : 1) | (r.bits << 2)) << (16 + rid * 4);
-				api.writeRegister(stoppedThread, r.r, w.addr.ptr.offset(r.offset));
+				api.writeRegister(currentThread, r.r, w.addr.ptr.offset(r.offset));
 			}
 		}
-		api.writeRegister(stoppedThread, Dr7, Pointer.make(dr7, 0));
+		api.writeRegister(currentThread, Dr7, Pointer.make(dr7, 0));
 		if( wasPaused )
 			resume();
 	}
