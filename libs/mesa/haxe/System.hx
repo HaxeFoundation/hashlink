@@ -36,10 +36,16 @@ class System {
 			throw "Failed to init GL API";
 		return true;
 	}
-	
+
+	public static dynamic function reportError(e:Dynamic) {
+		var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
+		var err = try Std.string(e) catch( _ : Dynamic ) "????";
+		Sys.println(err + stack);
+	}
+
 	@:extern public static inline function beginFrame() {
 	}
-	
+
 	public static function emitEvents(_) {
 		return true;
 	}
