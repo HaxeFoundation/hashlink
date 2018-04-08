@@ -54,6 +54,8 @@ class Main {
 					error("Require attach process id value");
 			case "--cmd":
 				cmd = args.shift();
+			case "--cwd":
+				Sys.setCwd(args.shift());
 			default:
 				error("Unsupported parameter " + param);
 			}
