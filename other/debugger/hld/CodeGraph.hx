@@ -16,6 +16,7 @@ typedef LocalAccess = { rid : Int, ?index : Int, ?container : format.hl.Data.Enu
 class CodeBlock {
 
 	public var start : Int;
+
 	public var end : Int; // inclusive
 	public var loop : Bool;
 	public var prev : Array<CodeBlock>;
@@ -23,6 +24,8 @@ class CodeBlock {
 
 	public var writtenRegs : Map<Int,Int>;
 	public var writtenVars : Map<String, Array<Int>>;
+
+	public var visitTag : Int = 0;
 
 	public function new(pos) {
 		start = pos;
@@ -43,6 +46,7 @@ class CodeGraph {
 	var assigns : Map<Int, Array<String>>;
 	var args : Array<{ hasIndex : Bool, vars : Array<String> }>;
 	var nargs : Int;
+	var currentTag : Int = 0;
 
 	public function new(md, f) {
 		this.module = md;
@@ -151,6 +155,7 @@ class CodeGraph {
 			if( a.position >= pos ) break;
 			if( a.position < 0 ) continue; // arg
 			if( arr.indexOf(a.varName) >= 0 ) continue;
+			if( getLocal(module.strings[a.varName],pos) == null ) continue; // not written
 			arr.push(a.varName);
 		}
 		return [for( a in arr ) module.strings[a]];
@@ -158,6 +163,7 @@ class CodeGraph {
 
 	public function getLocal( name : String, pos : Int ) : LocalAccess {
 		var b = getBlock(pos);
+		currentTag++;
 		var l = lookupLocal(b, name, pos);
 		if( l != null )
 			return l;
@@ -182,6 +188,9 @@ class CodeGraph {
 	}
 
 	function lookupLocal( b : CodeBlock, name : String, pos : Int ) : LocalAccess {
+		if( b.visitTag == currentTag )
+			return null;
+		b.visitTag = currentTag;
 		var v = b.writtenVars.get(name);
 		if( v != null )
 			for( p in v )
