@@ -146,6 +146,9 @@ class Main {
 		case Watchbreak:
 			var w = dbg.watchBreak;
 			Sys.println("Watch change " + w.ptr.toString() + ":" + w.t.toString() + " = " + dbg.eval.valueStr(dbg.eval.fetch(w)) + " at "+frameStr(dbg.getStackFrame()));
+		case Timeout:
+			dbg.customTimeout = null;
+			handleResult(dbg.pause());
 		default:
 			throw "assert "+r;
 		}
@@ -175,7 +178,14 @@ class Main {
 			dumpProcessOut();
 			return false;
 		case "r", "run", "c", "continue":
-			handleResult(dbg.run());
+			var time = args.shift();
+			dbg.customTimeout = time == null ? null : Std.parseFloat(time);
+			while( true ) {
+				var r = dbg.run();
+				if( r == Handled ) continue;
+				handleResult(r);
+				break;
+			}
 		case "bt", "backtrace":
 			for( f in dbg.getBackTrace() )
 				Sys.println(frameStr(f));
