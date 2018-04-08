@@ -358,16 +358,8 @@ class Debugger {
 		var e = jit.resolveAsmPos(asmPos);
 		var inProlog = false;
 
-		if( e == null && size > 0 ) {
-			// we are on the first opcode of a C function ?
-			// try again with immediate frame
-			var ptr = mem.getPointer(jit.align.ptr, jit.align);
-			if( ptr > jit.codeStart && ptr < jit.codeEnd ) {
-				asmPos = ptr.sub(jit.codeStart);
-				e = jit.resolveAsmPos(asmPos);
-			}
-		} else {
-			// if we are on ret, our EBP is wrong, so let's ignore this stack part
+		// if we are on ret, our EBP is wrong, so let's ignore this stack part
+		if( e != null ) {
 			var op = api.readByte(eip, 0);
 			if( op == 0xC3 ) // RET
 				e = null;
