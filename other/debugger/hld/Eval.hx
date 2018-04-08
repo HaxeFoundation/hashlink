@@ -290,7 +290,11 @@ class Eval {
 		case VInt(i): "" + i;
 		case VFloat(v): "" + v;
 		case VBool(b): b?"true":"false";
-		case VPointer(v): v.toString();
+		case VPointer(p):
+			switch( v.t ) {
+			case HVirtual(_): p.toString();
+			default: v.t.toString().split(".").pop();
+			}
 		case VString(s,_): "\"" + escape(s) + "\"";
 		case VClosure(f, d): funStr(f) + "[" + valueStr(d) + "]";
 		case VFunction(f): funStr(f);
@@ -532,6 +536,9 @@ class Eval {
 	public function getFields( v : Value ) : Array<String> {
 		var ptr = switch( v.v ) {
 		case VPointer(p): p;
+		case VEnum(_,values):
+			// only list the pointer fields (others are displayed in enum anyway)
+			return [for( i in 0...values.length ) if( values[i].t.isPtr() ) "$"+i];
 		default:
 			return null;
 		}
@@ -565,7 +572,13 @@ class Eval {
 	}
 
 	public function readField( v : Value, name : String ) {
-		return fetch(readFieldAddress(v, name));
+		switch( v.v ) {
+		case VEnum(_,values) if( name.charCodeAt(0) == "$".code ):
+			return values[Std.parseInt(name.substr(1))];
+		default:
+		}
+		var a = readFieldAddress(v, name);
+		return fetch(a);
 	}
 
 	public function fetch( addr : { ptr : Pointer, t : HLType } ) {
