@@ -62,14 +62,24 @@ class Main {
 		}
 		file = args.shift();
 		if( file == null ) {
-			Sys.println("hldebug [-port <port>] [-path <path>] <file.hl> <args>");
+			Sys.println("hldebug [-port <port>] [--cwd <path>] <file.hl> [--args <args>] or [<commands>]");
 			Sys.exit(1);
 		}
 		if( !sys.FileSystem.exists(file) )
 			error(file+" not found");
 
+		var hlArgs = [];
+		if( args[0] == "--args" ) {
+			args.shift();
+			while( true ) {
+				var a = args.shift();
+				if( a == null || a == "--" ) break;
+				hlArgs.push(a);
+			}
+		}
+
 		if( pid == null ) {
-			var args = ["--debug", "" + debugPort, "--debug-wait", file];
+			var args = ["--debug", "" + debugPort, "--debug-wait", file].concat(hlArgs);
 			#if nodejs
 			process = js.node.ChildProcess.spawn(cmd, args);
 			process.stdout.on("data", function(data:String) Sys.print(data));
