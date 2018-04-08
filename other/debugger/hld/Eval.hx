@@ -293,6 +293,7 @@ class Eval {
 		case VPointer(p):
 			switch( v.t ) {
 			case HVirtual(_): p.toString();
+			case HBytes, HAbstract(_): v.t.toString()+"("+p.toString()+")";
 			default: v.t.toString().split(".").pop();
 			}
 		case VString(s,_): "\"" + escape(s) + "\"";
