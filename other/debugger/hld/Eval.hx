@@ -420,7 +420,7 @@ class Eval {
 			}
 		case HVirtual(_):
 			var v = readPointer(p.offset(align.ptr));
-			if( v != null )
+			if( !v.isNull() )
 				return valueCast(v, HDyn);
 		case HDyn:
 			var t = readType(p);
