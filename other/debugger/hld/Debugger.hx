@@ -387,9 +387,11 @@ class Debugger {
 			} else
 				e.ebp = ebp;
 			stack.push(e);
-			if( max > 0 && stack.length >= max )
-				return stack;
 		}
+
+		// when requiring only top level stack, do not look further if we are in a C function
+		// because we need to step so we don't want false positive
+		if( max == 1 ) return stack;
 
 		// similar to module/module_capture_stack
 		if( is64 ) {
