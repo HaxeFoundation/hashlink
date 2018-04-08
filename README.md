@@ -24,6 +24,12 @@ And on OSX:
 
 `brew install libpng jpeg-turbo libvorbis sdl2 mbedtls openal-soft libuv`
 
+# Building on Windows
+
+Open `hl.sln` using Visual Studio Code and compile.
+
+To build all of HashLink libraries it is required to download several additional distributions, read each library README file (in hashlink/libs/xxx/README.md) for additional information. 
+
 # Documentation
 
 Read the [Documentation](https://github.com/HaxeFoundation/hashlink/wiki) on the HashLink wiki.
