@@ -28,6 +28,7 @@ class Eval {
 		this.jit = jit;
 		this.align = jit.align;
 		parser = new hscript.Parser();
+		parser.identChars += "$";
 		sizeofVArray = align.ptr * 2 + align.typeSize(HI32) * 2;
 		for( t in module.code.types )
 			switch( t ) {
