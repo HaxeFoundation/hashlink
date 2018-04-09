@@ -28,7 +28,11 @@ And on OSX:
 
 Open `hl.sln` using Visual Studio Code and compile.
 
-To build all of HashLink libraries it is required to download several additional distributions, read each library README file (in hashlink/libs/xxx/README.md) for additional information. 
+To build all of HashLink libraries it is required to download several additional distributions, read each library README file (in hashlink/libs/xxx/README.md) for additional information.
+
+# Debugging
+
+You can debug Haxe/HashLink applications by using the [Visual Studio Code Debugger](https://marketplace.visualstudio.com/items?itemName=HaxeFoundation.haxe-hl)
 
 # Documentation
 
