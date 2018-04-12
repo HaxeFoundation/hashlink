@@ -542,10 +542,6 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 		// no erase needed, compaction will be performed on next add
 	}
 
-	int field = (int)(f - o->lookup);
-	memmove(o->lookup + field, o->lookup + field + 1, (o->nfields - (field + 1)) * sizeof(hl_field_lookup));
-	o->nfields--;
-
 	// remove from virtuals
 	vvirtual *v = o->virtuals;
 	while( v ) {
@@ -553,6 +549,11 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 		if( vf ) hl_vfields(v)[vf->field_index] = NULL;
 		v = v->next;
 	}
+
+	// remove from lookup
+	int field = (int)(f - o->lookup);
+	memmove(o->lookup + field, o->lookup + field + 1, (o->nfields - (field + 1)) * sizeof(hl_field_lookup));
+	o->nfields--;
 }
 
 static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t ) {
