@@ -636,7 +636,6 @@ HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
 HL_API hl_thread *hl_thread_current( void );
 HL_API void hl_register_thread( void *stack_top );
 HL_API void hl_unregister_thread( void );
-HL_API void *hl_gc_stack_top( void );
 
 HL_API hl_mutex *hl_mutex_alloc( void );
 HL_API void hl_mutex_acquire( hl_mutex *l );
@@ -785,10 +784,31 @@ struct _hl_trap_ctx {
 	jmp_buf buf;
 	hl_trap_ctx *prev;
 };
-HL_API hl_trap_ctx *hl_current_trap;
-HL_API vdynamic *hl_current_exc;
-#define hl_trap(ctx,r,label) { ctx.prev = hl_current_trap; hl_current_trap = &ctx; if( setjmp(ctx.buf) ) { r = hl_current_exc; goto label; } }
-#define hl_endtrap(ctx)	hl_current_trap = ctx.prev
+#define hl_trap(ctx,r,label) { hl_thread_info *__tinf = hl_get_thread(); ctx.prev = __tinf->trap_current; __tinf->trap_current = &ctx; if( setjmp(ctx.buf) ) { r = __tinf->exc_value; goto label; } }
+#define hl_endtrap(ctx)	hl_get_thread()->current_trap = ctx.prev
+
+#define HL_EXC_MAX_STACK	0x100
+#define HL_EXC_RETHROW		1
+#define HL_EXC_CATCH_ALL	2
+
+typedef struct {
+	int thread_id;
+	// gc vars
+	void *stack_top;
+	void *stack_cur;
+	jmp_buf gc_regs;
+	volatile int gc_blocking;
+	// exception handling
+	hl_trap_ctx *trap_current;
+	hl_trap_ctx *trap_uncaught;
+	vclosure *exc_handler;
+	vdynamic *exc_value;
+	int exc_flags;
+	int exc_stack_count;
+	void *exc_stack_trace[HL_EXC_MAX_STACK];
+} hl_thread_info;
+
+HL_API hl_thread_info *hl_get_thread();
 
 C_FUNCTION_END
 
