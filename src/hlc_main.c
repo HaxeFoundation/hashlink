@@ -36,6 +36,9 @@
 #ifdef HL_CONSOLE
 extern void sys_global_init();
 extern void sys_global_exit();
+#else
+#define sys_global_init()
+#define sys_global_exit()
 #endif
 
 
@@ -60,7 +63,7 @@ static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	if( !stack_process_handle ) {
 		stack_process_handle = GetCurrentProcess();
 		SymSetOptions(SYMOPT_LOAD_LINES);
-		SymInitialize(stack_process_handle,NULL,TRUE);
+		SymInitialize(stack_process_handle,NULL,(BOOL)1);
 	}
 	if( SymFromAddrW(stack_process_handle,(DWORD64)(int_val)addr,&index,&data.sym) ) {
 		DWORD offset = 0;
@@ -104,37 +107,31 @@ int wmain(int argc, uchar *argv[]) {
 #else
 int main(int argc, char *argv[]) {
 #endif
-	hl_trap_ctx ctx;
-	vdynamic *exc;
-#	ifdef HL_CONSOLE
+	vdynamic *ret;
+	bool isExc = false;
+	hl_type_fun tf = { 0 };
+	hl_type clt = { 0 };
+	vclosure cl = { 0 };
 	sys_global_init();
-#	endif
-	hl_global_init(&ctx);
+	hl_global_init();
+	hl_register_thread(&ret);
 	hl_setup_exception(hlc_resolve_symbol,hlc_capture_stack);
 	hl_setup_callbacks(hlc_static_call, hlc_get_wrapper);
 	hl_sys_init((void**)(argv + 1),argc - 1,NULL);
-	hl_trap(ctx, exc, on_exception);
-#	ifdef HL_VCC
-	__try {
-#	endif
-	hl_entry_point();
-#	ifdef HL_VCC
-	} __except( throw_handler(GetExceptionCode()) ) {}
-#	endif
-	hl_global_free();
-	return 0;
-on_exception:
-	{
+	tf.ret = &hlt_void;
+	clt.kind = HFUN;
+	clt.fun = &tf;
+	cl.t = &clt;
+	cl.fun = hl_entry_point;
+	ret = hl_dyn_call_safe(&cl, NULL, 0, &isExc);
+	if( isExc ) {
 		varray *a = hl_exception_stack();
 		int i;
-		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
-		for(i=0;i<a->size;i++)
-			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
-		hl_debug_break();
+		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ret));
+		for (i = 0; i<a->size; i++)
+			uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar*)[i]);
 	}
 	hl_global_free();
-#	ifdef HL_CONSOLE
 	sys_global_exit();
-#	endif
-	return 1;
+	return (int)isExc;
 }

@@ -144,13 +144,9 @@ int main(int argc, pchar *argv[]) {
 			argc = first_boot_arg;
 		}
 	}
-#	ifdef HL_WIN
-	setlocale(LC_CTYPE,""); // printf to current locale
-#	endif
 	hl_global_init();
 	hl_sys_init((void**)argv,argc,file);
 	hl_register_thread(&ctx);
-	setbuf(stdout,NULL); // disable stdout buffering
 	ctx.code = load_code(file);
 	if( ctx.code == NULL )
 		return 1;

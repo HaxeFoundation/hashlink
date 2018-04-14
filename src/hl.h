@@ -785,7 +785,7 @@ struct _hl_trap_ctx {
 	hl_trap_ctx *prev;
 };
 #define hl_trap(ctx,r,label) { hl_thread_info *__tinf = hl_get_thread(); ctx.prev = __tinf->trap_current; __tinf->trap_current = &ctx; if( setjmp(ctx.buf) ) { r = __tinf->exc_value; goto label; } }
-#define hl_endtrap(ctx)	hl_get_thread()->current_trap = ctx.prev
+#define hl_endtrap(ctx)	hl_get_thread()->trap_current = ctx.prev
 
 #define HL_EXC_MAX_STACK	0x100
 #define HL_EXC_RETHROW		1
