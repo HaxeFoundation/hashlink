@@ -1,7 +1,6 @@
 #define COMPILE_PCRE16
 #undef SUPPORT_JIT
 #define PCRE_STATIC
-#define PCRE_JAVASCRIPT_COMPAT
 
 #ifdef _MSC_VER
 #	pragma warning(disable:4710) // inline disabled
