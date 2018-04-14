@@ -106,6 +106,7 @@ class Main {
 	}
 
 	function frameStr( f : Debugger.StackInfo, ?debug ) {
+		if( f == null ) return "???";
 		return f.file+":" + f.line + (f.context == null ? "" : " ("+f.context.obj.name+"::"+f.context.field+")") + (debug ? " @"+f.ebp.toString():"");
 	}
 
@@ -309,6 +310,15 @@ class Main {
 			case "variables":
 				for( name in dbg.getCurrentVars(true).concat(dbg.getCurrentVars(false)) )
 					printVar(name);
+			case "threads":
+				var cur = dbg.currentThread;
+				var stack = dbg.currentStackFrame;
+				for( tid in dbg.getThreads() ) {
+					dbg.setCurrentThread(tid);
+					Sys.println(" Thread "+tid+" "+frameStr(dbg.getBackTrace()[0]));
+				}
+				dbg.setCurrentThread(cur);
+				dbg.currentStackFrame = stack;
 			}
 		case "cd":
 			try Sys.setCwd(args.shift()) catch( e : Dynamic ) Sys.println(""+e);

@@ -264,8 +264,8 @@ HL_API void hl_register_thread( void *stack_top ) {
 		hl_fatal("Thread already registered");
 
 	hl_thread_info *t = (hl_thread_info*)malloc(sizeof(hl_thread_info));
+	memset(t, 0, sizeof(hl_thread_info));
 	t->thread_id = hl_thread_id();
-	t->gc_blocking = 0;
 	t->stack_top = stack_top;
 	current_thread = t;
 	hl_add_root(&t->exc_value);

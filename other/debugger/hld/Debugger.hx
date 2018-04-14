@@ -32,14 +32,16 @@ class Debugger {
 	var currentStack : Array<{ fidx : Int, fpos : Int, codePos : Int, ebp : hld.Pointer }>;
 	var stepBreakData : { ptr : Pointer, old : Int };
 	var watches : Array<WatchPoint>;
+	var threads : Map<Int,{ id : Int, stackTop : Pointer, exception : Pointer }>;
 
 	public var is64(get, never) : Bool;
 
 	public var eval : Eval;
 	public var currentStackFrame : Int;
 	public var stackFrameCount(get, never) : Int;
+	public var mainThread(default, null) : Int = 0;
 	public var stoppedThread(default,set) : Null<Int>;
-	public var currentThread : Null<Int>;
+	public var currentThread(default,null) : Null<Int>;
 
 	public var customTimeout : Null<Float>;
 
@@ -100,12 +102,30 @@ class Debugger {
 		return wait();
 	}
 
+	public function getThreads() {
+		var tl = [for( t in threads ) t.id];
+		tl.sort(Reflect.compare);
+		return tl;
+	}
+
+	public function setCurrentThread(tid) {
+		currentThread = tid;
+		prepareStack();
+	}
+
 	public function pause() {
 		if( !api.breakpoint() )
 			throw "Failed to break process";
 		var r = wait();
-		if( stoppedThread != jit.mainThread ) {
-			currentThread = jit.mainThread;
+		// if we have stopped on a not HL thread, let's switch on main thread
+		var found = false;
+		for( t in threads )
+			if( t.id == stoppedThread ) {
+				found = true;
+				break;
+			}
+		if( !found ) {
+			currentThread = mainThread;
 			prepareStack();
 		}
 		return r;
@@ -117,7 +137,10 @@ class Debugger {
 	}
 
 	public function getException() {
-		var exc = @:privateAccess eval.readPointer(jit.debugExc);
+		var t = threads.get(currentThread);
+		if( t == null )
+			return null;
+		var exc = t.exception;
 		if( exc.isNull() )
 			return null;
 		return eval.readVal(exc, HDyn);
@@ -201,21 +224,58 @@ class Debugger {
 				if( onStep )
 					return SingleStep;
 				resume();
-			case Error if( cmd.tid != jit.mainThread ):
-				stoppedThread = cmd.tid;
-				resume();
 			case Error, Exit, Watchbreak:
 				break;
 			}
 		}
 		stoppedThread = cmd.tid;
+
+		// in thread-disabled we don't know the main thread id in HL:
+		// first stop is on a special thread in windows
+		// wait for second stop with is user-specific
+		if( jit.oldThreadInfos != null )
+			mainThread = jit.oldThreadInfos.id;
+		else if( mainThread == 0 )
+			mainThread = -1;
+		else if( mainThread == -1 )
+			mainThread = stoppedThread;
+
+		readThreads();
 		prepareStack();
 		return cmd.r;
 	}
 
+	function readThreads() {
+		var old = jit.oldThreadInfos;
+		threads = new Map();
+		if( old != null ) {
+			threads.set(old.id, { id : old.id, stackTop : old.stackTop, exception : eval.readPointer(old.debugExc) });
+			return;
+		}
+		var count = eval.readI32(jit.threads);
+		var tinfos = eval.readPointer(jit.threads.offset(8));
+		var flagsPos = jit.align.ptr * 6 + 8;
+		var excPos = jit.align.ptr * 5 + 8;
+		for( i in 0...count ) {
+			var tinf = eval.readPointer(tinfos.offset(jit.align.ptr * i));
+			var tid = eval.readI32(tinf);
+			if( tid == 0 )
+				tid = mainThread;
+			else if( mainThread <= 0 )
+				mainThread = tid;
+			var flags = eval.readI32(tinf.offset(flagsPos));
+			var t = {
+				id : tid,
+				stackTop : eval.readPointer(tinf.offset(8)),
+				exception : flags & 4 == 0 ? null : tinf.offset(excPos),
+			};
+			threads.set(tid, t);
+		}
+	}
+
 	function prepareStack() {
 		currentStackFrame = 0;
-		currentStack = (currentThread == jit.mainThread) ? makeStack(currentThread) : [];
+		currentStack = makeStack(currentThread);
 	}
 
 	function smartStep( tid : Int, stepIntoCall : Bool ) {
@@ -361,8 +421,11 @@ class Debugger {
 
 	function makeStack(tid,max = 0) {
 		var stack = [];
+		var tinf = threads.get(tid);
+		if( tinf == null )
+			return stack;
 		var esp = getReg(tid, Esp);
-		var size = jit.stackTop.sub(esp) + jit.align.ptr;
+		var size = tinf.stackTop.sub(esp) + jit.align.ptr;
 		if( size < 0 ) size = 0;
 		var mem = readMem(esp.offset(-jit.align.ptr), size);
 
@@ -402,7 +465,7 @@ class Debugger {
 		if( is64 ) {
 			for( i in 0...size >> 3 ) {
 				var val = mem.getPointer(i << 3, jit.align);
-				if( val > esp && val < jit.stackTop || (inProlog && i == 0) ) {
+				if( val > esp && val < tinf.stackTop || (inProlog && i == 0) ) {
 					var codePtr = mem.getPointer((i + 1) << 3, jit.align);
 					if( codePtr < jit.codeStart || codePtr > jit.codeEnd )
 						continue;
@@ -417,7 +480,7 @@ class Debugger {
 			}
 		} else {
 			var stackBottom = esp.toInt();
-			var stackTop = jit.stackTop.toInt();
+			var stackTop = tinf.stackTop.toInt();
 			for( i in 0...size >> 2 ) {
 				var val = mem.getI32(i << 2);
 				if( val > stackBottom && val < stackTop || (inProlog && i == 0) ) {

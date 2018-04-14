@@ -3,23 +3,26 @@ package hld;
 private enum DebugFlag {
 	Is64; // runs in 64 bit mode
 	Bool4; // bool = 4 bytes (instead of 1)
+	Threads; // was compiled with threads support
 }
 
 class JitInfo {
 
 	public var is64(default, null) : Bool;
 	public var align(default,null) : Align;
+	public var hasThreads(get,never) : Bool;
 
 
 	var flags : haxe.EnumFlags<DebugFlag>;
 	var input : haxe.io.Input;
 
-	public var mainThread : Int;
+	public var oldThreadInfos : { id : Int, stackTop : Pointer, debugExc : Pointer };
+
+	public var hlVersion : Int;
 	public var globals : Pointer;
-	public var stackTop : Pointer;
 	public var codeStart : Pointer;
 	public var codeEnd : Pointer;
-	public var debugExc : Pointer;
+	public var threads : Pointer;
 	var codeSize : Int;
 	var allTypes : Pointer;
 
@@ -28,6 +31,10 @@ class JitInfo {
 	var module : Module;
 
 	public function new() {
+	}
+
+	function get_hasThreads() {
+		return oldThreadInfos != null || flags.has(Threads);
 	}
 
 	function readPointer() : Pointer {
@@ -43,16 +50,24 @@ class JitInfo {
 		if( input.readString(3) != "HLD" )
 			return false;
 		var version = input.readByte() - "0".code;
-		if( version > 0 )
+		if( version > 1 )
 			return false;
 		flags = haxe.EnumFlags.ofInt(input.readInt32());
 		is64 = flags.has(Is64);
 		align = new Align(is64, flags.has(Bool4)?4:1);
 
-		mainThread = input.readInt32();
-		globals = readPointer();
-		debugExc = readPointer();
-		stackTop = readPointer();
+		if( version == 0 ) {
+			var mainThread = input.readInt32();
+			globals = readPointer();
+			var debugExc = readPointer();
+			var stackTop = readPointer();
+			oldThreadInfos = { id : mainThread, stackTop : stackTop, debugExc : debugExc };
+			hlVersion = 0x150;
+		} else {
+			hlVersion = input.readInt32();
+			threads = readPointer();
+			globals = readPointer();
+		}
 		codeStart = readPointer();
 		codeSize = input.readInt32();
 		codeEnd = codeStart.offset(codeSize);
