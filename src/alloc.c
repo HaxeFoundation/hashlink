@@ -146,22 +146,14 @@ static gc_pheader *gc_level1_null[1<<GC_LEVEL1_BITS] = {NULL};
 static gc_pheader **hl_gc_page_map[1<<GC_LEVEL0_BITS] = {NULL};
 static void (*gc_track_callback)(hl_type *,int,int,void*) = NULL;
 
-
-typedef struct {
-	void *stack_top;
-	void *stack_cur;
-	jmp_buf regs;
-	volatile int blocking;
-} gc_thread;
-
 static struct {
 	int count;
 	bool stopping_world;
-	gc_thread **threads;
+	hl_thread_info **threads;
 	hl_mutex *global_lock;
 } gc_threads;
 
-HL_THREAD_VAR static gc_thread *current_thread;
+HL_THREAD_VAR static hl_thread_info *current_thread;
 
 static struct {
 	int64 total_requested;
@@ -197,12 +189,12 @@ static void ***gc_roots = NULL;
 static int gc_roots_count = 0;
 static int gc_roots_max = 0;
 
-static gc_thread *gc_get_thread() {
+HL_API hl_thread_info *hl_get_thread() {
 	return current_thread;
 }
 
-static void gc_save_context( gc_thread *t ) {
-	setjmp(t->regs);
+static void gc_save_context(hl_thread_info *t ) {
+	setjmp(t->gc_regs);
 	t->stack_cur = &t;
 }
 
@@ -210,15 +202,15 @@ static void gc_save_context( gc_thread *t ) {
 #	define gc_global_lock(_)
 #else
 static void gc_global_lock( bool lock ) {
-	gc_thread *t = gc_get_thread();
+	hl_thread_info *t = current_thread;
 	if( lock ) {
-		if( t->blocking ) 
+		if( t->gc_blocking )
 			hl_fatal("Can't lock GC in hl_blocking section");
 		gc_save_context(t);
-		t->blocking++;
+		t->gc_blocking++;
 		hl_mutex_acquire(gc_threads.global_lock);
 	} else {
-		t->blocking--;
+		t->gc_blocking--;
 		hl_mutex_release(gc_threads.global_lock);
 	}
 }
@@ -265,17 +257,22 @@ HL_PRIM gc_pheader *hl_gc_get_page( void *v ) {
 
 // -------------------------  THREADS ----------------------------------------------------------
 
+HL_API int hl_thread_id();
+
 HL_API void hl_register_thread( void *stack_top ) {
-	if( gc_get_thread() )
+	if( hl_get_thread() )
 		hl_fatal("Thread already registered");
 
-	gc_thread *t = (gc_thread*)malloc(sizeof(gc_thread));
-	t->blocking = 0;
+	hl_thread_info *t = (hl_thread_info*)malloc(sizeof(hl_thread_info));
+	t->thread_id = hl_thread_id();
+	t->gc_blocking = 0;
 	t->stack_top = stack_top;
 	current_thread = t;
+	hl_add_root(&t->exc_value);
+	hl_add_root(&t->exc_handler);
 
 	gc_global_lock(true);
-	gc_thread **all = (gc_thread**)malloc(sizeof(void*) * (gc_threads.count + 1));
+	hl_thread_info **all = (hl_thread_info**)malloc(sizeof(void*) * (gc_threads.count + 1));
 	memcpy(all,gc_threads.threads,sizeof(void*)*gc_threads.count);
 	gc_threads.threads = all;
 	all[gc_threads.count++] = t;
@@ -284,7 +281,7 @@ HL_API void hl_register_thread( void *stack_top ) {
 
 HL_API void hl_unregister_thread() {
 	int i;
-	gc_thread *t = gc_get_thread();
+	hl_thread_info *t = hl_get_thread();
 	if( !t )
 		hl_fatal("Thread not registered");
 	gc_global_lock(true);
@@ -292,16 +289,14 @@ HL_API void hl_unregister_thread() {
 		if( gc_threads.threads[i] == t ) {
 			memmove(gc_threads.threads + i, gc_threads.threads + i + 1, sizeof(void*) * (gc_threads.count - i - 1));
 			gc_threads.count--;
-			free(t);
 			break;
 		}
+	hl_remove_root(&t->exc_value);
+	hl_remove_root(&t->exc_handler);
+	free(t);
 	current_thread = NULL;
 	// don't use gc_global_lock(false)
 	hl_mutex_release(gc_threads.global_lock);
-}
-
-HL_API void *hl_gc_stack_top() {
-	return gc_get_thread()->stack_top;
 }
 
 HL_API void *hl_gc_threads_info() {
@@ -314,15 +309,15 @@ static void gc_stop_world( bool b ) {
 		int i;
 		gc_threads.stopping_world = true;
 		for(i=0;i<gc_threads.count;i++) {
-			gc_thread *t = gc_threads.threads[i];
-			while( t->blocking == 0 ) {}; // spinwait
+			hl_thread_info *t = gc_threads.threads[i];
+			while( t->gc_blocking == 0 ) {}; // spinwait
 		}
 	} else {
 		// releasing global lock will release all threads
 		gc_threads.stopping_world = false;
 	}
 #	else
-	if( b ) gc_save_context(gc_get_thread());
+	if( b ) gc_save_context(current_thread);
 #	endif
 }
 
@@ -948,10 +943,10 @@ static void gc_mark() {
 
 	// scan threads stacks & registers
 	for(i=0;i<gc_threads.count;i++) {
-		gc_thread *t = gc_threads.threads[i];
+		hl_thread_info *t = gc_threads.threads[i];
 		cur_mark_stack = mark_stack;
 		gc_mark_stack(t->stack_cur,t->stack_top);
-		gc_mark_stack(&t->regs,(void**)&t->regs + (sizeof(jmp_buf) / sizeof(void*) - 1));
+		gc_mark_stack(&t->gc_regs,(void**)&t->gc_regs + (sizeof(jmp_buf) / sizeof(void*) - 1));
 		mark_stack = cur_mark_stack;
 	}
 
@@ -1039,30 +1034,30 @@ static void hl_gc_init() {
 // ---- UTILITIES ----------------------
 
 HL_API bool hl_is_blocking() {
-	gc_thread *t = gc_get_thread();
+	hl_thread_info *t = current_thread;
 	// when called from a non GC thread, tells if the main thread is blocking
 	if( t == NULL ) {
 		if( gc_threads.count == 0 )
 			return false;
 		t = gc_threads.threads[0];
 	}
-	return t->blocking > 0;
+	return t->gc_blocking > 0;
 }
 
 HL_API void hl_blocking( bool b ) {
-	gc_thread *t = gc_get_thread();
+	hl_thread_info *t = current_thread;
 	if( !t ) hl_error("Unregistered thread");
 	if( b ) {
 #		ifdef HL_THREADS
-		if( t->blocking == 0 )
+		if( t->gc_blocking == 0 )
 			gc_save_context(t);
 #		endif
-		t->blocking++; 
-	} else if( t->blocking == 0 ) 
+		t->gc_blocking++;
+	} else if( t->gc_blocking == 0 )
 		hl_error("Unblocked thread");
 	else {
-		t->blocking--;
-		if( t->blocking == 0 && gc_threads.stopping_world ) {
+		t->gc_blocking--;
+		if( t->gc_blocking == 0 && gc_threads.stopping_world ) {
 			gc_global_lock(true);
 			gc_global_lock(false);
 		}
@@ -1343,7 +1338,7 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	// stacks
 	fdump_i(gc_threads.count);
 	for(i=0;i<gc_threads.count;i++) {
-		gc_thread *t = gc_threads.threads[i];
+		hl_thread_info *t = gc_threads.threads[i];
 		fdump_p(t->stack_top);
 		int size = (int)((void**)t->stack_top - (void**)t->stack_cur);
 		fdump_i(size);
