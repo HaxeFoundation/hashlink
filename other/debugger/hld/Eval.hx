@@ -428,7 +428,7 @@ class Eval {
 			if( !v.isNull() )
 				return valueCast(v, HDyn);
 		case HDyn:
-			var t = readType(p);
+			t = readType(p);
 			if( t.isDynamic() )
 				return valueCast(p, t);
 			v = readVal(p.offset(8), t).v;
@@ -449,7 +449,19 @@ class Eval {
 		case HType:
 			v = VType(readType(p,true));
 		case HBytes:
-			// maybe try reading string data ?
+			var len = 0;
+			var buf = new StringBuf();
+			while( true ) {
+				var c = try readI32(p.offset(len<<1)) & 0xFFFF catch( e : Dynamic ) 0;
+				if( c == 0 ) break;
+				buf.addChar(c);
+				len++;
+				if( len > 50 ) {
+					buf.add("...");
+					break;
+				}
+			}
+			v = VString(buf.toString(), p);
 		case HEnum(e):
 			var index = readI32(p.offset(align.ptr));
 			var c = module.getEnumProto(e)[index];
