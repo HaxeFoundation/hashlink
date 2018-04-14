@@ -26,9 +26,11 @@
 #endif
 
 #ifdef HL_WIN_DESKTOP
+#	define CONST
 #	pragma warning(disable:4091)
 #	include <DbgHelp.h>
 #	pragma comment(lib, "Dbghelp.lib")
+#	undef CONST
 #endif
 
 #ifdef HL_CONSOLE
