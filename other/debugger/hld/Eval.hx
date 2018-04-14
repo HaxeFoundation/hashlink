@@ -28,6 +28,7 @@ class Eval {
 		this.jit = jit;
 		this.align = jit.align;
 		parser = new hscript.Parser();
+		parser.identChars += "$";
 		sizeofVArray = align.ptr * 2 + align.typeSize(HI32) * 2;
 		for( t in module.code.types )
 			switch( t ) {
@@ -289,7 +290,12 @@ class Eval {
 		case VInt(i): "" + i;
 		case VFloat(v): "" + v;
 		case VBool(b): b?"true":"false";
-		case VPointer(v): v.toString();
+		case VPointer(p):
+			switch( v.t ) {
+			case HVirtual(_): p.toString();
+			case HBytes, HAbstract(_): v.t.toString()+"("+p.toString()+")";
+			default: v.t.toString().split(".").pop();
+			}
 		case VString(s,_): "\"" + escape(s) + "\"";
 		case VClosure(f, d): funStr(f) + "[" + valueStr(d) + "]";
 		case VFunction(f): funStr(f);
@@ -419,10 +425,10 @@ class Eval {
 			}
 		case HVirtual(_):
 			var v = readPointer(p.offset(align.ptr));
-			if( v != null )
+			if( !v.isNull() )
 				return valueCast(v, HDyn);
 		case HDyn:
-			var t = readType(p);
+			t = readType(p);
 			if( t.isDynamic() )
 				return valueCast(p, t);
 			v = readVal(p.offset(8), t).v;
@@ -443,7 +449,19 @@ class Eval {
 		case HType:
 			v = VType(readType(p,true));
 		case HBytes:
-			// maybe try reading string data ?
+			var len = 0;
+			var buf = new StringBuf();
+			while( true ) {
+				var c = try readI32(p.offset(len<<1)) & 0xFFFF catch( e : Dynamic ) 0;
+				if( c == 0 ) break;
+				buf.addChar(c);
+				len++;
+				if( len > 50 ) {
+					buf.add("...");
+					break;
+				}
+			}
+			v = VString(buf.toString(), p);
 		case HEnum(e):
 			var index = readI32(p.offset(align.ptr));
 			var c = module.getEnumProto(e)[index];
@@ -531,6 +549,9 @@ class Eval {
 	public function getFields( v : Value ) : Array<String> {
 		var ptr = switch( v.v ) {
 		case VPointer(p): p;
+		case VEnum(_,values):
+			// only list the pointer fields (others are displayed in enum anyway)
+			return [for( i in 0...values.length ) if( values[i].t.isPtr() ) "$"+i];
 		default:
 			return null;
 		}
@@ -564,7 +585,13 @@ class Eval {
 	}
 
 	public function readField( v : Value, name : String ) {
-		return fetch(readFieldAddress(v, name));
+		switch( v.v ) {
+		case VEnum(_,values) if( name.charCodeAt(0) == "$".code ):
+			return values[Std.parseInt(name.substr(1))];
+		default:
+		}
+		var a = readFieldAddress(v, name);
+		return fetch(a);
 	}
 
 	public function fetch( addr : { ptr : Pointer, t : HLType } ) {

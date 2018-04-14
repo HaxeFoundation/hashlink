@@ -54,20 +54,32 @@ class Main {
 					error("Require attach process id value");
 			case "--cmd":
 				cmd = args.shift();
+			case "--cwd":
+				Sys.setCwd(args.shift());
 			default:
 				error("Unsupported parameter " + param);
 			}
 		}
 		file = args.shift();
 		if( file == null ) {
-			Sys.println("hldebug [-port <port>] [-path <path>] <file.hl> <args>");
+			Sys.println("hldebug [-port <port>] [--cwd <path>] <file.hl> [--args <args>] or [<commands>]");
 			Sys.exit(1);
 		}
 		if( !sys.FileSystem.exists(file) )
 			error(file+" not found");
 
+		var hlArgs = [];
+		if( args[0] == "--args" ) {
+			args.shift();
+			while( true ) {
+				var a = args.shift();
+				if( a == null || a == "--" ) break;
+				hlArgs.push(a);
+			}
+		}
+
 		if( pid == null ) {
-			var args = ["--debug", "" + debugPort, "--debug-wait", file];
+			var args = ["--debug", "" + debugPort, "--debug-wait", file].concat(hlArgs);
 			#if nodejs
 			process = js.node.ChildProcess.spawn(cmd, args);
 			process.stdout.on("data", function(data:String) Sys.print(data));
@@ -134,6 +146,9 @@ class Main {
 		case Watchbreak:
 			var w = dbg.watchBreak;
 			Sys.println("Watch change " + w.ptr.toString() + ":" + w.t.toString() + " = " + dbg.eval.valueStr(dbg.eval.fetch(w)) + " at "+frameStr(dbg.getStackFrame()));
+		case Timeout:
+			dbg.customTimeout = null;
+			handleResult(dbg.pause());
 		default:
 			throw "assert "+r;
 		}
@@ -163,7 +178,14 @@ class Main {
 			dumpProcessOut();
 			return false;
 		case "r", "run", "c", "continue":
-			handleResult(dbg.run());
+			var time = args.shift();
+			dbg.customTimeout = time == null ? null : Std.parseFloat(time);
+			while( true ) {
+				var r = dbg.run();
+				if( r == Handled ) continue;
+				handleResult(r);
+				break;
+			}
 		case "bt", "backtrace":
 			for( f in dbg.getBackTrace() )
 				Sys.println(frameStr(f));
@@ -288,6 +310,8 @@ class Main {
 				for( name in dbg.getCurrentVars(true).concat(dbg.getCurrentVars(false)) )
 					printVar(name);
 			}
+		case "cd":
+			try Sys.setCwd(args.shift()) catch( e : Dynamic ) Sys.println(""+e);
 		default:
 			Sys.println("Unknown command " + r);
 		}

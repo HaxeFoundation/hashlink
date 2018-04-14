@@ -1,7 +1,7 @@
 if(WIN32)
     set(ZLIB_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/zlib)
     set(PNG_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/png)
-    set(OGGVORBIS_INCLUDE_DIR ${INCLUDES_BASE_DIR}/vorbis)
+    set(VORBIS_INCLUDE_DIR ${INCLUDES_BASE_DIR}/vorbis)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(TurboJPEG_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/turbojpeg ${INCLUDES_BASE_DIR}/turbojpeg/x64)
@@ -133,7 +133,7 @@ target_include_directories(fmt.hdll
     ${ZLIB_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIRS}
     ${TurboJPEG_INCLUDE_DIRS}
-    ${OGGVORBIS_INCLUDE_DIR}
+    ${VORBIS_INCLUDE_DIR}
 )
 
 target_link_libraries(fmt.hdll

@@ -6,7 +6,7 @@
 HashLink is a virtual machine for Haxe http://hashlink.haxe.org
 
 
-# Building on Linux/OSX
+## Building on Linux/OSX
 
 HashLink is distributed with some graphics libraries allowing to develop various applications, you can manually disable the libraries you want to compile in Makefile. Here's the dependencies that you install in order to compile all the libraries:
 
@@ -24,6 +24,16 @@ And on OSX:
 
 `brew install libpng jpeg-turbo libvorbis sdl2 mbedtls openal-soft libuv`
 
-# Documentation
+## Building on Windows
+
+Open `hl.sln` using Visual Studio Code and compile.
+
+To build all of HashLink libraries it is required to download several additional distributions, read each library README file (in hashlink/libs/xxx/README.md) for additional information.
+
+## Debugging
+
+You can debug Haxe/HashLink applications by using the [Visual Studio Code Debugger](https://marketplace.visualstudio.com/items?itemName=HaxeFoundation.haxe-hl)
+
+## Documentation
 
 Read the [Documentation](https://github.com/HaxeFoundation/hashlink/wiki) on the HashLink wiki.

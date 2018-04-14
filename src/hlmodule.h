@@ -51,6 +51,12 @@ typedef struct {
 } hl_function;
 
 typedef struct {
+	int global;
+	int nfields;
+	int *fields;
+} hl_constant;
+
+typedef struct {
 	int version;
 	int nints;
 	int nfloats;
@@ -59,6 +65,7 @@ typedef struct {
 	int nglobals;
 	int nnatives;
 	int nfunctions;
+	int nconstants;
 	int entrypoint;
 	int ndebugfiles;
 	bool hasdebug;
@@ -73,6 +80,7 @@ typedef struct {
 	hl_type**	globals;
 	hl_native*	natives;
 	hl_function*functions;
+	hl_constant*constants;
 	hl_alloc	alloc;
 	hl_alloc	falloc;
 } hl_code;

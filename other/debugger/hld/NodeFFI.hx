@@ -40,7 +40,7 @@ abstract CStruct(Dynamic) {
 		this.defineProperty(name, t);
 	}
 	public inline function alloc( obj : {} ) : CValue {
-		return js.Syntax.new_(this, [obj]);
+		return js.Syntax.construct(this, [obj]);
 	}
 }
 

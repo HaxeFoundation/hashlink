@@ -2,4 +2,3 @@
 -lib hscript
 -hl debug.hl
 -main hld.Main
--D old-error-format

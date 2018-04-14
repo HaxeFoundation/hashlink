@@ -29,8 +29,11 @@
 
 #define HL_VERSION	0x150
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #	define HL_WIN
+#	ifndef _DURANGO
+#		define HL_WIN_DESKTOP
+#	endif
 #endif
 
 #if defined(__APPLE__) || defined(__MACH__) || defined(macintosh)
@@ -65,7 +68,11 @@
 #	define HL_NX
 #endif
 
-#if defined(HL_PS) || defined(HL_NX)
+#ifdef _DURANGO
+#	define HL_XBO
+#endif
+
+#if defined(HL_PS) || defined(HL_NX) || defined(HL_XBO)
 #	define HL_CONSOLE
 #endif
 
@@ -194,7 +201,11 @@ typedef unsigned long long uint64;
 // -------------- UNICODE -----------------------------------
 
 #if defined(HL_WIN) && !defined(HL_LLVM)
-#	include <windows.h>
+#ifdef HL_WIN_DESKTOP
+#	include <Windows.h>
+#else
+#	include <xdk.h>
+#endif
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
@@ -243,8 +254,12 @@ C_FUNCTION_END
 
 #if defined(HL_VCC)
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
-#elif defined(HL_PS)
+#elif defined(HL_PS) && defined(_DEBUG)
 #	define hl_debug_break()	__debugbreak()
+#elif defined(HL_NX)
+C_FUNCTION_BEGIN
+HL_API void hl_debug_break( void );
+C_FUNCTION_END
 #elif defined(HL_LINUX) && defined(__i386__)
 #	ifdef HL_64
 #	define hl_debug_break() \
@@ -737,7 +752,11 @@ typedef struct {
 #		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #	endif
 #elif defined(LIBHL_STATIC)
-#define	HL_PRIM
+#	ifdef __cplusplus
+#		define	HL_PRIM				extern "C" 
+#	else
+#		define	HL_PRIM				
+#	endif
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #else
 #	ifdef __cplusplus

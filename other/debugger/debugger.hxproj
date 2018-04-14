@@ -10,7 +10,7 @@
     <movie height="0" />
     <movie version="0" />
     <movie minorVersion="0" />
-    <movie platform="HL" />
+    <movie platform="HashLink" />
     <movie background="#FFFFFF" />
   </output>
   <!-- Other classes to be compiled into your SWF -->
