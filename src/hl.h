@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x150
+#define HL_VERSION	0x160
 
 #if defined(_WIN32)
 #	define HL_WIN
@@ -798,8 +798,6 @@ typedef struct {
 	volatile int gc_blocking;
 	void *stack_top;
 	void *stack_cur;
-	void *dummy;
-	jmp_buf gc_regs;
 	// exception handling
 	hl_trap_ctx *trap_current;
 	hl_trap_ctx *trap_uncaught;
@@ -807,6 +805,8 @@ typedef struct {
 	vdynamic *exc_value;
 	int exc_flags;
 	int exc_stack_count;
+	// extra
+	jmp_buf gc_regs;
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
 } hl_thread_info;
 
