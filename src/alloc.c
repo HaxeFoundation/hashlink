@@ -1216,11 +1216,11 @@ vdynamic *hl_alloc_dynamic( hl_type *t ) {
 #	define DYN_PAD
 #endif
 
-static vdynamic vdyn_true = { &hlt_bool, DYN_PAD {true} };
-static vdynamic vdyn_false = { &hlt_bool, DYN_PAD {false} };
+static const vdynamic vdyn_true = { &hlt_bool, DYN_PAD {true} };
+static const vdynamic vdyn_false = { &hlt_bool, DYN_PAD {false} };
 
 vdynamic *hl_alloc_dynbool( bool b ) {
-	return b ? &vdyn_true : &vdyn_false;
+	return (vdynamic*)(b ? &vdyn_true : &vdyn_false);
 }
 
 
