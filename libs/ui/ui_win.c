@@ -254,7 +254,9 @@ HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 	s->pause = false;
 	s->original = GetCurrentThreadId();
 	s->callback = c->fun;
+#	ifdef HL_THREADS
 	s->thread = hl_thread_start(sentinel_loop,s,false);
+#	endif
 	return s;
 }
 
