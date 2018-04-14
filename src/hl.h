@@ -790,14 +790,16 @@ struct _hl_trap_ctx {
 #define HL_EXC_MAX_STACK	0x100
 #define HL_EXC_RETHROW		1
 #define HL_EXC_CATCH_ALL	2
+#define HL_EXC_IS_THROW		4
 
 typedef struct {
 	int thread_id;
 	// gc vars
+	volatile int gc_blocking;
 	void *stack_top;
 	void *stack_cur;
+	void *dummy;
 	jmp_buf gc_regs;
-	volatile int gc_blocking;
 	// exception handling
 	hl_trap_ctx *trap_current;
 	hl_trap_ctx *trap_uncaught;
