@@ -2704,6 +2704,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	unsigned short *debug16 = NULL;
 	int *debug32 = NULL;
 	call_regs cregs = {0};
+	hl_thread_info *tinf = NULL;
 	preg p;
 	ctx->f = f;
 	ctx->allocOffset = 0;
@@ -3816,12 +3817,20 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int size, jenter, jtrap;
 				int trap_size = (sizeof(hl_trap_ctx) + 15) & 0xFFF0;
 				hl_trap_ctx *t = NULL;
+#				ifndef HL_THREADS
+				if( tinf == NULL ) tinf = hl_get_thread(); // single thread
+#				endif
+
 				// trap pad
 #				ifdef HL_64
 				preg *trap = REG_AT(CALL_REGS[0]);
 				RLOCK(trap);
 				preg *tmp = alloc_reg(ctx,RCPU);
-				op64(ctx,MOV,tmp,pconst64(&p,(int_val)&hl_current_trap));
+				if( !tinf ) {
+					hl_fatal("TODO");
+				} else {
+					op64(ctx,MOV,tmp,pconst64(&p,(int_val)&tinf->trap_current));
+				}
 				op64(ctx,MOV,trap,pmem(&p,tmp->id,0));
 				op64(ctx,SUB,PESP,pconst(&p,trap_size));
 				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&t->prev),trap);
@@ -3829,11 +3838,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOV,pmem(&p,tmp->id,0),trap);
 #				else
 				preg *trap = PEAX;
-				op64(ctx,MOV,trap,paddr(&p,&hl_current_trap));
+				if (!tinf) {
+					hl_fatal("TODO");
+				} else {
+					op64(ctx, MOV, trap, paddr(&p, &tinf->trap_current));
+				}
 				op64(ctx,SUB,PESP,pconst(&p,trap_size));
 				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&t->prev),trap);
 				op64(ctx,MOV,trap,PESP);
-				op64(ctx,MOV,paddr(&p,&hl_current_trap),trap);
+				if (!tinf) {
+					hl_fatal("TODO");
+				} else {
+					op64(ctx, MOV, paddr(&p, &tinf->trap_current), trap);
+				}
 #				endif
 				size = begin_native_call(ctx, 1);
 				set_native_arg(ctx,trap);
@@ -3842,10 +3859,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				XJump_small(JZero,jenter);
 				op64(ctx,ADD,PESP,pconst(&p,trap_size));
 #				ifdef HL_64
-				op64(ctx,MOV,PEAX,pconst64(&p,(int_val)&hl_current_exc));
+				if (!tinf) {
+					hl_fatal("TODO");
+				} else {
+					op64(ctx, MOV, PEAX, pconst64(&p, (int_val)&tinf->exc_value));
+				}
 				op64(ctx,MOV,PEAX,pmem(&p,Eax,0));
 #				else
-				op64(ctx,MOV,PEAX,paddr(&p,&hl_current_exc));
+				if (!tinf) {
+					hl_fatal("TODO");
+				}
+				else {
+					op64(ctx, MOV, PEAX, paddr(&p, &tinf->exc_value));
+				}
 #				endif
 				store(ctx,dst,PEAX,false);
 				jtrap = do_jump(ctx,OJAlways,false);
@@ -3860,14 +3886,26 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				hl_trap_ctx *tmp = NULL;
 #				ifdef HL_64
 				preg *addr = alloc_reg(ctx,RCPU);
-				op64(ctx, MOV, addr, pconst64(&p,(int_val)&hl_current_trap));
+				if (!tinf) {
+					hl_fatal("TODO");
+				} else {
+					op64(ctx, MOV, addr, pconst64(&p, (int_val)&tinf->trap_current));
+				}
 				op64(ctx, MOV, r, pmem(&p,addr->id,0));
 				op64(ctx, MOV, r, pmem(&p,r->id,(int)(int_val)&tmp->prev));
 				op64(ctx, MOV, pmem(&p,addr->id,0), r);
 #				else
-				op64(ctx, MOV, r, paddr(&p,&hl_current_trap));
+				if (!tinf) {
+					hl_fatal("TODO");
+				} else {
+					op64(ctx, MOV, r, paddr(&p,&tinf->trap_current));
+				}
 				op64(ctx, MOV, r, pmem(&p,r->id,(int)(int_val)&tmp->prev));
-				op64(ctx, MOV, paddr(&p,&hl_current_trap), r);
+				if (!tinf) {
+					hl_fatal("TODO");
+				} else {
+					op64(ctx, MOV, paddr(&p, &tinf->trap_current), r);
+				}
 #				endif
 				op64(ctx,ADD,PESP,pconst(&p,trap_size));
 			}
