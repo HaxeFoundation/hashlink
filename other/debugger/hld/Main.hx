@@ -295,6 +295,14 @@ class Main {
 			handleResult(dbg.step(Out));
 		case "debug":
 			handleResult(dbg.debugTrace(args.shift() == "step"));
+		case "thread":
+			var arg = args.shift();
+			if( arg != null ) {
+				var tid = Std.parseInt(args.shift());
+				if( tid != null ) tid = dbg.getThreads()[tid];
+				if( tid != null ) dbg.setCurrentThread(tid);
+			}
+			Sys.println("Thread "+dbg.getThreads().indexOf(dbg.currentThread));
 		case "info":
 			function printVar( name : String ) {
 				var v = dbg.getValue(name);
@@ -313,9 +321,10 @@ class Main {
 			case "threads":
 				var cur = dbg.currentThread;
 				var stack = dbg.currentStackFrame;
+				var index = 0;
 				for( tid in dbg.getThreads() ) {
 					dbg.setCurrentThread(tid);
-					Sys.println(" Thread "+tid+" "+frameStr(dbg.getBackTrace()[0]));
+					Sys.println((tid == cur ? "*" : " ")+" Thread "+(index++)+"("+tid+") "+frameStr(dbg.getBackTrace()[0]));
 				}
 				dbg.setCurrentThread(cur);
 				dbg.currentStackFrame = stack;
