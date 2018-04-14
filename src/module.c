@@ -395,6 +395,42 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
 	}
+	// INIT constants
+	for (i = 0; i<m->code->nconstants; i++) {
+		int j;
+		hl_constant *c = m->code->constants + i;
+		hl_type *t = m->code->globals[c->global];
+		hl_runtime_obj *rt;
+		vdynamic **global = (vdynamic**)(m->globals_data + m->globals_indexes[c->global]);
+		vdynamic *v = NULL;
+		switch (t->kind) {
+		case HOBJ:
+			rt = hl_get_obj_rt(t);
+			v = (vdynamic*)malloc(rt->size);
+			v->t = t;
+			for (j = 0; j<c->nfields; j++) {
+				int idx = c->fields[j];
+				hl_type *ft = t->obj->fields[j].t;
+				void *addr = (char*)v + rt->fields_indexes[j];
+				switch (ft->kind) {
+				case HI32:
+					*(int*)addr = m->code->ints[idx];
+					break;
+				case HBYTES:
+					*(const void**)addr = hl_get_ustring(m->code, idx);
+					break;
+				default:
+					hl_fatal("assert");
+				}
+			}
+			break;
+		default:
+			hl_fatal("assert");
+		}
+		*global = v;
+		hl_remove_root(global);
+	}
+	// DONE
 	cur_module = m;
 	stack_top = stack_top_val;
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
