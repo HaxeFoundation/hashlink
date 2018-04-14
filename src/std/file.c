@@ -25,7 +25,11 @@
 #	include <posix/posix.h>
 #endif
 #ifdef HL_WIN
+#ifdef HL_WIN_DESKTOP
 #	include <windows.h>
+#else
+#	include<xdk.h>
+#endif
 #	define fopen(name,mode) _wfopen(name,mode)
 #	define HL_UFOPEN
 #endif

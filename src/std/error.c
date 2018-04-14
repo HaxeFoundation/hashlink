@@ -23,17 +23,22 @@
 #include <stdarg.h>
 #include <string.h>
 
+#ifdef HL_CONSOLE
+#include <posix/posix.h>
+#endif
+
 HL_PRIM hl_trap_ctx *hl_current_trap = NULL;
 HL_PRIM vdynamic *hl_current_exc = NULL;
 HL_PRIM vdynamic **hl_debug_exc = NULL;
-
+HL_PRIM bool hl_debug_catch_all = false;
+static hl_trap_ctx *hl_trap_root = NULL;
 static void *stack_trace[0x1000];
 static int stack_count = 0;
 static bool exc_rethrow = false;
 
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	hl_blocking(true);
-#	ifdef _WIN32
+#	ifdef HL_WIN_DESKTOP
     HWND consoleWnd = GetConsoleWindow();
     DWORD pid;
     GetWindowThreadProcessId(consoleWnd, &pid);
@@ -73,13 +78,13 @@ HL_PRIM void hl_setup_exception( void *resolve_symbol, void *capture_stack ) {
 }
 
 HL_PRIM void hl_set_error_handler( vclosure *d ) {
+	hl_trap_root = hl_current_trap;
 	if( d == hl_error_handler )
 		return;
 	hl_error_handler = d;
+	hl_remove_root(&hl_error_handler);
 	if( d )
 		hl_add_root(&hl_error_handler);
-	else
-		hl_remove_root(&hl_error_handler);
 }
 
 HL_PRIM void hl_throw( vdynamic *v ) {
@@ -90,7 +95,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 		stack_count = capture_stack_func(stack_trace, 0x1000);
 	hl_current_exc = v;
 	hl_current_trap = t->prev;
-	if( hl_current_trap == NULL ) {
+	if( t == hl_trap_root || hl_current_trap == NULL || hl_debug_catch_all ) {
 		hl_debug_exc = &v;
 		hl_debug_break();
 		hl_debug_exc = NULL;
@@ -117,7 +122,6 @@ HL_PRIM void hl_dump_stack() {
 		uprintf(USTR("%s\n"),str);
 	}
 }
-
 
 HL_PRIM varray *hl_exception_stack() {
 	varray *a = hl_alloc_array(&hlt_bytes, stack_count);

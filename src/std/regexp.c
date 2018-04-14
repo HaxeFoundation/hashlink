@@ -47,7 +47,7 @@ HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	int errorcode;
 	pcre16 *p;
 	uchar *o = (uchar*)opts;
-	int options = 0;
+	int options = PCRE_JAVASCRIPT_COMPAT;
 	while( *o ) {
 		switch( *o++ ) {
 		case 'i':

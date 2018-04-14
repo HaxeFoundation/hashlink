@@ -552,10 +552,6 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 		// no erase needed, compaction will be performed on next add
 	}
 
-	int field = (int)(f - o->lookup);
-	memmove(o->lookup + field, o->lookup + field + 1, (o->nfields - (field + 1)) * sizeof(hl_field_lookup));
-	o->nfields--;
-
 	// remove from virtuals
 	vvirtual *v = o->virtuals;
 	while( v ) {
@@ -563,6 +559,11 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 		if( vf ) hl_vfields(v)[vf->field_index] = NULL;
 		v = v->next;
 	}
+
+	// remove from lookup
+	int field = (int)(f - o->lookup);
+	memmove(o->lookup + field, o->lookup + field + 1, (o->nfields - (field + 1)) * sizeof(hl_field_lookup));
+	o->nfields--;
 }
 
 static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t ) {
@@ -702,7 +703,10 @@ static vdynamic *hl_obj_lookup_extra( vdynamic *d, int hfield ) {
 HL_PRIM int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup(d,hfield,&ft);
-	if( !addr ) return 0;
+	if( !addr ) {
+		d = hl_obj_lookup_extra(d,hfield);
+		return d == NULL ? 0 : hl_dyn_casti(&d,&hlt_dyn,t);
+	}
 	switch( ft->kind ) {
 	case HUI8:
 		return *(unsigned char*)addr;
@@ -724,14 +728,20 @@ HL_PRIM int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 HL_PRIM float hl_dyn_getf( vdynamic *d, int hfield ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup(d,hfield,&ft);
-	if( !addr ) return 0.;
+	if( !addr ) {
+		d = hl_obj_lookup_extra(d,hfield);
+		return d == NULL ? 0.f : hl_dyn_castf(&d,&hlt_dyn);
+	}
 	return ft->kind == HF32 ? *(float*)addr : hl_dyn_castf(addr,ft);
 }
 
 HL_PRIM double hl_dyn_getd( vdynamic *d, int hfield ) {
 	hl_type *ft;
 	void *addr = hl_obj_lookup(d,hfield,&ft);
-	if( !addr ) return 0.;
+	if( !addr ) {
+		d = hl_obj_lookup_extra(d,hfield);
+		return d == NULL ? 0. : hl_dyn_castd(&d,&hlt_dyn);
+	}
 	return ft->kind == HF64 ? *(double*)addr : hl_dyn_castd(addr,ft);
 }
 

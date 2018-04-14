@@ -3,7 +3,8 @@
 #
 #  OGGVORBIS_FOUND - system has OggVorbis
 #  OGGVORBIS_VERSION - set either to 1 or 2
-#  OGGVORBIS_INCLUDE_DIR - the OggVorbis include directory
+#  VORBIS_INCLUDE_DIR - the vorbisfile.h include directory
+#  OGG_INCLUDE_DIR - the ogg.h include directory
 #  OGGVORBIS_LIBRARIES - The libraries needed to use OggVorbis
 #  OGG_LIBRARY         - The Ogg library
 #  VORBIS_LIBRARY      - The Vorbis library

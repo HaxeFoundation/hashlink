@@ -593,8 +593,14 @@ class GL {
 	public static inline var LUMINANCE                      = 0x1909;
 	public static inline var LUMINANCE_ALPHA                = 0x190A;
 
-	public static inline var BGRA							= 0x80E1;
-	public static inline var RGBA8							= 0x8058;
+	public static inline var BGRA                           = 0x80E1;
+	public static inline var RGBA8                          = 0x8058;
+	public static inline var RGB10_A2                       = 0x8059;
+
+	public static inline var RG16                           = 0x822C;
+	public static inline var RG16UI                         = 0x823A;
+	public static inline var RG16F                          = 0x822F;
+	public static inline var RG32F                          = 0x8230;
 
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
@@ -602,11 +608,11 @@ class GL {
 	public static inline var UNSIGNED_SHORT_5_5_5_1         = 0x8034;
 	public static inline var UNSIGNED_SHORT_5_6_5           = 0x8363;
 
-	public static inline var SRGB							= 0x8C40;
-	public static inline var SRGB8							= 0x8C41;
-	public static inline var SRGB_ALPHA						= 0x8C42;
-	public static inline var SRGB8_ALPHA					= 0x8C43;
-	public static inline var FRAMEBUFFER_SRGB				= 0x8DB9;
+	public static inline var SRGB                           = 0x8C40;
+	public static inline var SRGB8                          = 0x8C41;
+	public static inline var SRGB_ALPHA                     = 0x8C42;
+	public static inline var SRGB8_ALPHA                    = 0x8C43;
+	public static inline var FRAMEBUFFER_SRGB               = 0x8DB9;
 
 	public static inline var RGBA32F                        = 0x8814;
 	public static inline var RGB32F                         = 0x8815;
@@ -678,8 +684,14 @@ class GL {
 	/* TextureParameterName */
 	public static inline var TEXTURE_MAG_FILTER             = 0x2800;
 	public static inline var TEXTURE_MIN_FILTER             = 0x2801;
+	public static inline var TEXTURE_WRAP_R                 = 0x8072;
 	public static inline var TEXTURE_WRAP_S                 = 0x2802;
 	public static inline var TEXTURE_WRAP_T                 = 0x2803;
+	public static inline var TEXTURE_LOD_BIAS               = 0x8501;
+	public static inline var TEXTURE_MAX_ANISOTROPY         = 0x84FE;
+	public static inline var TEXTURE_COMPARE_MODE           = 0x884C;
+	public static inline var TEXTURE_COMPARE_FUNC           = 0x884D;
+	public static inline var COMPARE_REF_TO_TEXTURE         = 0x884E;
 
 	/* TextureTarget */
 	public static inline var TEXTURE_2D                     = 0x0DE1;
