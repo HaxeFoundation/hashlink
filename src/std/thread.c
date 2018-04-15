@@ -174,41 +174,6 @@ HL_PRIM void *hl_tls_get( hl_tls *l ) {
 #	endif
 }
 
-// ----------------- SPINLOCK
-
-HL_PRIM hl_spinlock *hl_spinlock_alloc() {
-#	if !defined(HL_THREADS)
-	return NULL;
-#	elif defined(HL_WIN)
-	hl_spinlock *s = _aligned_malloc(sizeof(hl_spinlock),32);
-	s->value = NULL;
-	return s;
-#	else
-#	endif
-}
-
-HL_PRIM bool hl_spinlock_acquire( hl_spinlock *s, void *value, int count ) {
-#	if !defined(HL_THREADS)
-	return true;
-#	elif defined(HL_WIN)
-	while (s->value != value) {
-		if (count-- == 0) return false;
-		InterlockedCompareExchangePointer(&s->value, value, NULL);
-	}
-	return true;
-#	else
-#	endif
-}
-
-HL_PRIM void hl_spinlock_release( hl_spinlock *s ) {
-#	if !defined(HL_THREADS)
-	return true;
-#	elif defined(HL_WIN)
-	s->value = NULL;
-#	else
-#	endif
-}
-
 // ----------------- THREAD
 
 HL_PRIM hl_thread *hl_thread_current() {

@@ -151,7 +151,7 @@ static struct {
 	int count;
 	bool stopping_world;
 	hl_thread_info **threads;
-	hl_spinlock *global_lock;
+	hl_mutex *global_lock;
 } gc_threads;
 
 HL_THREAD_STATIC_VAR hl_thread_info *current_thread;
@@ -210,11 +210,10 @@ static void gc_global_lock( bool lock ) {
 			hl_fatal("Can't lock GC in hl_blocking section");
 		if( mt ) gc_save_context(t);
 		t->gc_blocking++;
-		while ( mt && !hl_spinlock_acquire(gc_threads.global_lock, t, 100000))
-			hl_thread_yield();
+		if( mt ) hl_mutex_acquire(gc_threads.global_lock);
 	} else {
 		t->gc_blocking--;
-		if( mt ) hl_spinlock_release(gc_threads.global_lock);
+		if( mt ) hl_mutex_release(gc_threads.global_lock);
 	}
 }
 #endif
@@ -299,7 +298,7 @@ HL_API void hl_unregister_thread() {
 	free(t);
 	current_thread = NULL;
 	// don't use gc_global_lock(false)
-	hl_spinlock_release(gc_threads.global_lock);
+	hl_mutex_release(gc_threads.global_lock);
 }
 
 HL_API void *hl_gc_threads_info() {
@@ -1031,7 +1030,7 @@ static void hl_gc_init() {
 		gc_flags |= GC_DUMP_MEM;
 #	endif
 	memset(&gc_threads,0,sizeof(gc_threads));
-	gc_threads.global_lock = hl_spinlock_alloc();
+	gc_threads.global_lock = hl_mutex_alloc();
 }
 
 // ---- UTILITIES ----------------------
