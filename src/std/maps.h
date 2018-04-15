@@ -110,7 +110,7 @@ static void _MNAME(resize)( t_map *m ) {
 				c = old.entries[c].next;
 			}
 		}
-		hl_pop_root();
+		hl_remove_root(&old);
 	}
 }
 

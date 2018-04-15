@@ -254,7 +254,9 @@ HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 	s->pause = false;
 	s->original = GetCurrentThreadId();
 	s->callback = c->fun;
+#	ifdef HL_THREADS
 	s->thread = hl_thread_start(sentinel_loop,s,false);
+#	endif
 	return s;
 }
 
@@ -289,7 +291,7 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 		int i, pos = 0;
 		for(i=0;i<filters->size;i++) {
 			wchar_t *str = hl_aptr(filters,wchar_t*)[i];
-			int len = wcslen(str);
+			int len = (int)wcslen(str);
 			if( pos + len > 1024 ) return false;
 			memcpy(filterStr + pos, str, (len + 1) << 1);
 			pos += len + 1;
@@ -314,7 +316,7 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 		if( !GetOpenFileName(&op) )
 			return NULL;
 	}
-	return hl_copy_bytes((vbyte*)outputFile, (wcslen(outputFile)+1)*2);
+	return hl_copy_bytes((vbyte*)outputFile, (int)(wcslen(outputFile)+1)*2);
 }
 
 

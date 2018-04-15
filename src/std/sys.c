@@ -588,10 +588,14 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 	sys_args = (pchar**)args;
 	sys_nargs = nargs;
 	hl_file = hlfile;
+#	ifdef HL_WIN
+	setlocale(LC_CTYPE, ""); // printf to current locale
+#	endif
+	setbuf(stdout, NULL); // disable stdout buffering
 }
 
 HL_PRIM vbyte *hl_sys_hl_file() {
-	return hl_file;
+	return (vbyte*)hl_file;
 }
 
 #ifndef HL_MOBILE

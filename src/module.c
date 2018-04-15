@@ -30,11 +30,6 @@
 #endif
 
 static hl_module *cur_module;
-static void *stack_top;
-
-void *hl_module_stack_top() {
-	return stack_top;
-}
 
 static bool module_resolve_pos( void *addr, int *fidx, int *fpos ) {
 	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code));
@@ -104,6 +99,7 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 static int module_capture_stack( void **stack, int size ) {
 	void **stack_ptr = (void**)&stack;
 	void *stack_bottom = stack_ptr;
+	void *stack_top = hl_get_thread()->stack_top;
 	int count = 0;
 	unsigned char *code = cur_module->jit_code;
 	int code_size = cur_module->codesize;
@@ -277,7 +273,7 @@ static void disabled_primitive() {
 	hl_error("This library primitive has been disabled");
 }
 
-int hl_module_init( hl_module *m, void *stack_top_val ) {
+int hl_module_init( hl_module *m ) {
 	int i;
 	jit_ctx *ctx;
 	// RESET globals
@@ -432,7 +428,6 @@ int hl_module_init( hl_module *m, void *stack_top_val ) {
 	}
 	// DONE
 	cur_module = m;
-	stack_top = stack_top_val;
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_gc_set_dump_types(hl_module_types_dump);
 	hl_jit_free(ctx);
