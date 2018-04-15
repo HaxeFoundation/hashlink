@@ -669,7 +669,7 @@ class Eval {
 		}
 	}
 
-	function readPointer( p : Pointer ) {
+	public function readPointer( p : Pointer ) {
 		if( align.is64 ) {
 			var m = readMem(p, 8);
 			return m.getPointer(0,align);
@@ -703,7 +703,7 @@ class Eval {
 		return readUCS2(ptr, len);
 	}
 
-	function readI32( p : Pointer ) {
+	public function readI32( p : Pointer ) {
 		return readMem(p, 4).getI32(0);
 	}
 

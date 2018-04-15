@@ -42,6 +42,8 @@
 #undef NO_ERROR
 #undef EOF
 #undef STRICT
+#undef TRUE
+#undef FALSE
 
 // disable some warnings triggered by HLC code generator
 
