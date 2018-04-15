@@ -31,18 +31,10 @@ struct _hl_tls {
 	void *value;
 };
 
-struct _hl_spinlock {
-	void *value;
-};
-
 #elif defined(HL_WIN)
 
 struct _hl_mutex {
 	CRITICAL_SECTION cs;
-};
-
-struct _hl_spinlock {
-	void *value;
 };
 
 #else
@@ -57,11 +49,6 @@ struct _hl_mutex {
 
 struct _hl_tls {
 	pthread_key_t key;
-};
-
-struct _hl_spinlock {
-	pthread_mutex_t lock;
-	void *value;
 };
 
 #endif
