@@ -631,11 +631,9 @@ HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool
 struct _hl_thread;
 struct _hl_mutex;
 struct _hl_tls;
-struct _hl_spinlock;
 typedef struct _hl_thread hl_thread;
 typedef struct _hl_mutex hl_mutex;
 typedef struct _hl_tls hl_tls;
-typedef struct _hl_spinlock hl_spinlock;
 
 HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
 HL_API hl_thread *hl_thread_current( void );
@@ -653,10 +651,6 @@ HL_API hl_tls *hl_tls_alloc( void );
 HL_API void hl_tls_set( hl_tls *l, void *value );
 HL_API void *hl_tls_get( hl_tls *l );
 HL_API void hl_tls_free( hl_tls *l );
-
-HL_API hl_spinlock *hl_spinlock_alloc(void);
-HL_API bool hl_spinlock_acquire( hl_spinlock *s, void *value, int count );
-HL_API void hl_spinlock_release( hl_spinlock *s );
 
 // ----------------------- ALLOC --------------------------------------------------
 
