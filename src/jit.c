@@ -3818,9 +3818,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int offset = 0;
 				int trap_size = (sizeof(hl_trap_ctx) + 15) & 0xFFF0;
 				hl_trap_ctx *t = NULL;
-				preg *treg = REG_AT(Ebx);
-				scratch(treg);
-				RLOCK(treg);
 #				ifndef HL_THREADS
 				if( tinf == NULL ) tinf = hl_get_thread(); // single thread
 #				endif
@@ -3830,6 +3827,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #				else
 				preg *trap = PEAX;
 #				endif
+				RLOCK(trap);
+
+				preg *treg = alloc_reg(ctx, RCPU);
 				if( !tinf ) {
 					call_native(ctx, hl_get_thread, 0);
 					op64(ctx,MOV,treg,PEAX);
@@ -3849,8 +3849,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				call_native(ctx,setjmp,size);
 				op64(ctx,TEST,PEAX,PEAX);
 				XJump_small(JZero,jenter);
+				call_native(ctx, hl_get_thread, 0);
 				op64(ctx,ADD,PESP,pconst(&p,trap_size));
-				op64(ctx,MOV,PEAX,pmem(&p, treg->id, (int)(int_val)&tinf->exc_value));
+				if( !tinf ) {
+					call_native(ctx, hl_get_thread, 0);
+					op64(ctx,MOV,PEAX,pmem(&p, Eax, (int)(int_val)&tinf->exc_value));
+				} else {
+					op64(ctx,MOV,PEAX,pconst64(&p,(int_val)&tinf->trap_current));
+					op64(ctx,MOV,PEAX,pmem(&p, Eax, 0));
+				}
 				store(ctx,dst,PEAX,false);
 
 				jtrap = do_jump(ctx,OJAlways,false);
