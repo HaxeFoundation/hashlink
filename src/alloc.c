@@ -137,6 +137,7 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 #define GC_PROFILE		1
 #define GC_DUMP_MEM		2
 #define GC_TRACK		4
+#define GC_NO_THREADS	8
 
 static int gc_flags = 0;
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
@@ -150,10 +151,10 @@ static struct {
 	int count;
 	bool stopping_world;
 	hl_thread_info **threads;
-	hl_mutex *global_lock;
+	hl_spinlock *global_lock;
 } gc_threads;
 
-HL_THREAD_VAR static hl_thread_info *current_thread;
+HL_THREAD_STATIC_VAR hl_thread_info *current_thread;
 
 static struct {
 	int64 total_requested;
@@ -203,15 +204,17 @@ static void gc_save_context(hl_thread_info *t ) {
 #else
 static void gc_global_lock( bool lock ) {
 	hl_thread_info *t = current_thread;
+	bool mt = (gc_flags & GC_NO_THREADS) == 0;
 	if( lock ) {
 		if( t->gc_blocking )
 			hl_fatal("Can't lock GC in hl_blocking section");
-		gc_save_context(t);
+		if( mt ) gc_save_context(t);
 		t->gc_blocking++;
-		hl_mutex_acquire(gc_threads.global_lock);
+		while ( mt && !hl_spinlock_acquire(gc_threads.global_lock, t, 100000))
+			hl_thread_yield();
 	} else {
 		t->gc_blocking--;
-		hl_mutex_release(gc_threads.global_lock);
+		if( mt ) hl_spinlock_release(gc_threads.global_lock);
 	}
 }
 #endif
@@ -284,6 +287,8 @@ HL_API void hl_unregister_thread() {
 	hl_thread_info *t = hl_get_thread();
 	if( !t )
 		hl_fatal("Thread not registered");
+	hl_remove_root(&t->exc_value);
+	hl_remove_root(&t->exc_handler);
 	gc_global_lock(true);
 	for(i=0;i<gc_threads.count;i++)
 		if( gc_threads.threads[i] == t ) {
@@ -291,12 +296,10 @@ HL_API void hl_unregister_thread() {
 			gc_threads.count--;
 			break;
 		}
-	hl_remove_root(&t->exc_value);
-	hl_remove_root(&t->exc_handler);
 	free(t);
 	current_thread = NULL;
 	// don't use gc_global_lock(false)
-	hl_mutex_release(gc_threads.global_lock);
+	hl_spinlock_release(gc_threads.global_lock);
 }
 
 HL_API void *hl_gc_threads_info() {
@@ -1028,7 +1031,7 @@ static void hl_gc_init() {
 		gc_flags |= GC_DUMP_MEM;
 #	endif
 	memset(&gc_threads,0,sizeof(gc_threads));
-	gc_threads.global_lock = hl_mutex_alloc();
+	gc_threads.global_lock = hl_spinlock_alloc();
 }
 
 // ---- UTILITIES ----------------------
@@ -1374,4 +1377,4 @@ DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);
 DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
 DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
-
+DEFINE_PRIM(_VOID, blocking, _BOOL);

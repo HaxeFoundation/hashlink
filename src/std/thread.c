@@ -31,11 +31,18 @@ struct _hl_tls {
 	void *value;
 };
 
+struct _hl_spinlock {
+	void *value;
+};
 
 #elif defined(HL_WIN)
 
 struct _hl_mutex {
 	CRITICAL_SECTION cs;
+};
+
+struct _hl_spinlock {
+	void *value;
 };
 
 #else
@@ -51,6 +58,12 @@ struct _hl_mutex {
 struct _hl_tls {
 	pthread_key_t key;
 };
+
+struct _hl_spinlock {
+	pthread_mutex_t lock;
+	void *value;
+};
+
 #endif
 
 // ----------------- ALLOC
@@ -161,6 +174,41 @@ HL_PRIM void *hl_tls_get( hl_tls *l ) {
 #	endif
 }
 
+// ----------------- SPINLOCK
+
+HL_PRIM hl_spinlock *hl_spinlock_alloc() {
+#	if !defined(HL_THREADS)
+	return NULL;
+#	elif defined(HL_WIN)
+	hl_spinlock *s = _aligned_malloc(sizeof(hl_spinlock),32);
+	s->value = NULL;
+	return s;
+#	else
+#	endif
+}
+
+HL_PRIM bool hl_spinlock_acquire( hl_spinlock *s, void *value, int count ) {
+#	if !defined(HL_THREADS)
+	return true;
+#	elif defined(HL_WIN)
+	while (s->value != value) {
+		if (count-- == 0) return false;
+		InterlockedCompareExchangePointer(&s->value, value, NULL);
+	}
+	return true;
+#	else
+#	endif
+}
+
+HL_PRIM void hl_spinlock_release( hl_spinlock *s ) {
+#	if !defined(HL_THREADS)
+	return true;
+#	elif defined(HL_WIN)
+	s->value = NULL;
+#	else
+#	endif
+}
+
 // ----------------- THREAD
 
 HL_PRIM hl_thread *hl_thread_current() {
@@ -172,6 +220,17 @@ HL_PRIM hl_thread *hl_thread_current() {
 	return (hl_thread*)pthread_self();
 #endif
 }
+
+HL_PRIM void hl_thread_yield() {
+#if !defined(Hl_THREADS)
+	// nothing
+#elif defined(HL_WIN)
+	Sleep(0);
+#else
+	pthread_yield();
+#endif
+}
+
 
 HL_PRIM int hl_thread_id() {
 #if !defined(HL_THREADS)

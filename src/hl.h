@@ -131,11 +131,14 @@
 #	define HL_THREADS
 #	ifdef HL_VCC
 #		define HL_THREAD_VAR __declspec( thread )
+#		define HL_THREAD_STATIC_VAR HL_THREAD_VAR static
 #	else
 #		define HL_THREAD_VAR __thread
+#		define HL_THREAD_STATIC_VAR static HL_THREAD_VAR
 #	endif
 #else
 #	define HL_THREAD_VAR
+#	define HL_THREAD_STATIC_VAR static
 #endif
 
 #include <stddef.h>
@@ -628,12 +631,15 @@ HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool
 struct _hl_thread;
 struct _hl_mutex;
 struct _hl_tls;
+struct _hl_spinlock;
 typedef struct _hl_thread hl_thread;
 typedef struct _hl_mutex hl_mutex;
 typedef struct _hl_tls hl_tls;
+typedef struct _hl_spinlock hl_spinlock;
 
 HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
 HL_API hl_thread *hl_thread_current( void );
+HL_API void hl_thread_yield(void);
 HL_API void hl_register_thread( void *stack_top );
 HL_API void hl_unregister_thread( void );
 
@@ -647,6 +653,10 @@ HL_API hl_tls *hl_tls_alloc( void );
 HL_API void hl_tls_set( hl_tls *l, void *value );
 HL_API void *hl_tls_get( hl_tls *l );
 HL_API void hl_tls_free( hl_tls *l );
+
+HL_API hl_spinlock *hl_spinlock_alloc(void);
+HL_API bool hl_spinlock_acquire( hl_spinlock *s, void *value, int count );
+HL_API void hl_spinlock_release( hl_spinlock *s );
 
 // ----------------------- ALLOC --------------------------------------------------
 
