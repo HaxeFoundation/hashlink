@@ -402,7 +402,7 @@ int hl_module_init( hl_module *m ) {
 		switch (t->kind) {
 		case HOBJ:
 			rt = hl_get_obj_rt(t);
-			v = (vdynamic*)malloc(rt->size);
+			v = (vdynamic*)hl_malloc(&m->ctx.alloc,rt->size);
 			v->t = t;
 			for (j = 0; j<c->nfields; j++) {
 				int idx = c->fields[j];
@@ -412,11 +412,21 @@ int hl_module_init( hl_module *m ) {
 				case HI32:
 					*(int*)addr = m->code->ints[idx];
 					break;
+				case HBOOL:
+					*(bool*)addr = idx != 0;
+					break;
+				case HF64:
+					*(double*)addr = m->code->floats[idx];
+					break;
 				case HBYTES:
 					*(const void**)addr = hl_get_ustring(m->code, idx);
 					break;
+				case HTYPE:
+					*(hl_type**)addr = m->code->types + idx;
+					break;
 				default:
-					hl_fatal("assert");
+					*(void**)addr = *(void**)(m->globals_data + m->globals_indexes[idx]);
+					break;
 				}
 			}
 			break;
