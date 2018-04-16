@@ -83,6 +83,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	t->exc_value = v;
 	t->trap_current = trap->prev;
 	if( trap == t->trap_uncaught || t->trap_current == NULL || (t->exc_flags&HL_EXC_CATCH_ALL) ) {
+		if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
 		t->exc_flags |= HL_EXC_IS_THROW;
 		hl_debug_break();
 		t->exc_flags &= ~HL_EXC_IS_THROW;
