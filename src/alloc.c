@@ -206,6 +206,8 @@ static void gc_global_lock( bool lock ) {
 	hl_thread_info *t = current_thread;
 	bool mt = (gc_flags & GC_NO_THREADS) == 0;
 	if( lock ) {
+		if( !t )
+			hl_fatal("Can't lock GC in unregistered thread");
 		if( t->gc_blocking )
 			hl_fatal("Can't lock GC in hl_blocking section");
 		if( mt ) gc_save_context(t);
@@ -1048,7 +1050,8 @@ HL_API bool hl_is_blocking() {
 
 HL_API void hl_blocking( bool b ) {
 	hl_thread_info *t = current_thread;
-	if( !t ) hl_error("Unregistered thread");
+	if( !t )
+		return; // allow hl_blocking in non-GC threads
 	if( b ) {
 #		ifdef HL_THREADS
 		if( t->gc_blocking == 0 )
