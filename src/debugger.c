@@ -115,7 +115,7 @@ bool hl_module_debug( hl_module *m, int port, bool wait ) {
 #	ifdef HL_THREADS
 	hl_add_root(&debug_socket);
 	hl_add_root(&client_socket);
-	if( !hl_thread_start(hl_debug_loop, m, false) ) {
+	if( !hl_thread_start(hl_debug_loop, m, true) ) {
 		hl_socket_close(s);
 		return false;
 	}
