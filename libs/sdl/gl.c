@@ -368,7 +368,7 @@ HL_PRIM void HL_NAME(gl_bind_texture)( int t, vdynamic *texture ) {
 }
 
 HL_PRIM void HL_NAME(gl_bind_image_texture)( int unit, int texture, int level, bool layered, int layer, int access, int format ) {
-#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC)
+#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC) && !defined(HL_MESA)
 	glBindImageTexture(unit, texture, level, layered, layer, access, format);
 #	endif
 }
@@ -395,7 +395,9 @@ HL_PRIM void HL_NAME(gl_tex_image3d)( int target, int level, int internalFormat,
 
 HL_PRIM void HL_NAME(gl_tex_image2d_multisample)( int target, int samples, int internalFormat, int width, int height, bool fixedsamplelocations) {
 	GLOG("%d,%d,%d,%d,%d,%d",target,samples,internalFormat,width,height,fixedsamplelocations);
+#	if !defined(HL_MESA)
 	glTexImage2DMultisample(target, samples, internalFormat, width, height, fixedsamplelocations);
+#	endif
 }
 
 HL_PRIM void HL_NAME(gl_generate_mipmap)( int t ) {
@@ -438,7 +440,9 @@ HL_PRIM void HL_NAME(gl_bind_framebuffer)( int target, vdynamic *f ) {
 
 HL_PRIM void HL_NAME(gl_framebuffer_texture)( int target, int attach, vdynamic *t, int level ) {
 	GLOG("%d,%d,%d,%d,%d",target,attach,ZIDX(t),level);
+#if !defined (HL_MESA)
 	glFramebufferTexture(target, attach, ZIDX(t), level);
+#endif
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_texture2d)( int target, int attach, int texTarget, vdynamic *t, int level ) {
@@ -601,13 +605,13 @@ HL_PRIM void HL_NAME(gl_uniform4fv)( vdynamic *u, vbyte *buffer, int bufPos, int
 // compute
 HL_PRIM void HL_NAME(gl_dispatch_compute)( int num_groups_x, int num_groups_y, int num_groups_z ) {
 	GLOG("%d,%d,%d",num_groups_x,num_groups_y,num_groups_z);
-#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC)
+#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC) && !defined(HL_MESA)
 	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
 #	endif
 }
 
 HL_PRIM void HL_NAME(gl_memory_barrier)( int barriers ) {
-#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC)
+#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC) && !defined(HL_MESA)
 	glMemoryBarrier(barriers);
 #	endif
 }
