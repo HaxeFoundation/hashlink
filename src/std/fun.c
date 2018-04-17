@@ -378,7 +378,7 @@ DEFINE_PRIM(_DYN, make_var_args, _FUN(_DYN,_ARR));
 DEFINE_PRIM(_DYN, call_method, _DYN _ARR);
 
 
-#ifdef HL_VCC
+#if defined(HL_VCC) && !defined(HL_XBO)
 static int throw_handler( int code ) {
 	switch( code ) {
 	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
@@ -394,12 +394,12 @@ HL_PRIM vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, boo
 	vdynamic *exc;
 	*isException = false;
 	hl_trap(trap, exc, on_exception);
-#	ifdef HL_VCC
+#	if defined(HL_VCC) && !defined(HL_XBO)
 	__try {
-#	endif
 		return hl_dyn_call(c,args,nargs);
-#	ifdef HL_VCC
 	} __except( throw_handler(GetExceptionCode()) ) {}
+#	else
+	return hl_dyn_call(c,args,nargs);
 #	endif
 on_exception:
 	*isException = true;
