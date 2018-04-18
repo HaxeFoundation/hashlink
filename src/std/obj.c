@@ -538,8 +538,9 @@ static void hl_dynobj_remap_virtuals( vdynobj *o, hl_field_lookup *f, int_val ad
 static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 	int i;
 	int index = f->field_index;
+	bool is_ptr = hl_is_ptr(f->t); 
 	// erase data
-	if( hl_is_ptr(f->t) ) {
+	if( is_ptr ) {
 		memmove(o->values + index, o->values + index + 1, (o->nvalues - (index + 1)) * sizeof(void*));
 		o->nvalues--;
 		o->values[o->nvalues] = NULL;
@@ -557,6 +558,17 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 	while( v ) {
 		hl_field_lookup *vf = hl_lookup_find(v->t->virt->lookup,v->t->virt->nfields,f->hashed_name);
 		if( vf ) hl_vfields(v)[vf->field_index] = NULL;
+		// remap pointers that were moved
+		if( is_ptr ) {
+			for(i=0;i<v->t->virt->nfields;i++) {
+				vf = v->t->virt->lookup + i;
+				if( hl_is_ptr(vf->t) ) {
+					void ***pf = (void***)hl_vfields(v) + vf->field_index;
+					if( *pf && *pf > (void**)(o->values + index) )
+						*pf = (*pf) - 1;
+				}
+			}
+		}
 		v = v->next;
 	}
 
