@@ -117,8 +117,16 @@ if(WIN32)
 else()
     find_package(ZLIB REQUIRED)
     find_package(PNG REQUIRED)
-    find_package(TurboJPEG REQUIRED)
-    find_package(OggVorbis REQUIRED)
+
+    find_package(TurboJPEG QUIET)
+    if (NOT TurboJPEG_FOUND)
+        pkg_check_modules(TurboJPEG REQUIRED libjpeg)
+    endif()
+
+    find_package(OggVorbis QUIET)
+    if (NOT OGGVORBIS_FOUND)
+        pkg_check_modules(OGGVORBIS REQUIRED vorbis vorbisenc vorbisfile)
+    endif()
 
     add_library(fmt.hdll SHARED
         fmt.c
