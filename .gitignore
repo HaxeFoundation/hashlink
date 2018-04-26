@@ -28,6 +28,7 @@ ReleaseStatic
 /other/benchs/flashout.txt
 
 /bin*
+/build*
 /other/memory/*.dump
 /src/_std
 /src/hl
