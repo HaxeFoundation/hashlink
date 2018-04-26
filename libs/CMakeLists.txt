@@ -1,4 +1,4 @@
-set(INCLUDES_BASE_DIR ${CMAKE_SOURCE_DIR}/include)
+set(INCLUDES_BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
 function(set_as_hdll target)
     set_target_properties(${target}.hdll
