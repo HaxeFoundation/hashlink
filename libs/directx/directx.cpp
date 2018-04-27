@@ -25,6 +25,7 @@ typedef ID3D11DeviceChild dx_pointer;
 
 static dx_driver *driver = NULL;
 static IDXGIFactory *factory = NULL;
+static vclosure *on_dx_error = NULL;
 
 static IDXGIFactory *GetDXGI() {
 	if( factory == NULL && CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory) != S_OK )
@@ -33,12 +34,32 @@ static IDXGIFactory *GetDXGI() {
 }
 
 static void ReportDxError( HRESULT err, int line ) {
+	if( on_dx_error ) {
+		vdynamic args[3];
+		vdynamic *vargs[3] = { &args[0], &args[1], &args[2] };
+		args[0].t = &hlt_i32;
+		args[1].t = &hlt_i32;
+		args[2].t = &hlt_i32;
+		args[0].v.i = (int)err;
+		args[1].v.i = (err == DXGI_ERROR_DEVICE_REMOVED ? (int)driver->device->GetDeviceRemovedReason() : 0);
+		args[2].v.i = line;
+		hl_dyn_call(on_dx_error,vargs,3);
+		return;
+	}
 	if( err == DXGI_ERROR_DEVICE_REMOVED && driver ){
 		err = driver->device->GetDeviceRemovedReason();
 		hl_error_msg(USTR("DXGI_ERROR_DEVICE_REMOVED reason 0x%X line %d"),(DWORD)err,line);
 	}else{
 		hl_error_msg(USTR("DXERROR %X line %d"),(DWORD)err,line);
 	}
+}
+
+HL_PRIM void HL_NAME(set_error_handler)( vclosure *c ) {
+	if( !on_dx_error ) {
+		if( !c ) return;
+		hl_add_root(&on_dx_error);
+	}
+	on_dx_error = c;
 }
 
 HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int restrictLevel ) {
@@ -406,6 +427,7 @@ HL_PRIM void HL_NAME(debug_print)( vbyte *b ) {
 #define _POINTER _ABSTRACT(dx_pointer)
 #define _RESOURCE _ABSTRACT(dx_resource)
 
+DEFINE_PRIM(_VOID, set_error_handler, _FUN(_VOID, _I32 _I32 _I32));
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, resize, _I32 _I32 _I32);
 DEFINE_PRIM(_RESOURCE, get_back_buffer, _NO_ARG);
