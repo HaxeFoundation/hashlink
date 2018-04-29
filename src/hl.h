@@ -641,7 +641,7 @@ HL_API void hl_thread_yield(void);
 HL_API void hl_register_thread( void *stack_top );
 HL_API void hl_unregister_thread( void );
 
-HL_API hl_mutex *hl_mutex_alloc( void );
+HL_API hl_mutex *hl_mutex_alloc( bool gc_thread );
 HL_API void hl_mutex_acquire( hl_mutex *l );
 HL_API bool hl_mutex_try_acquire( hl_mutex *l );
 HL_API void hl_mutex_release( hl_mutex *l );
@@ -795,6 +795,7 @@ struct _hl_trap_ctx {
 #define HL_EXC_RETHROW		1
 #define HL_EXC_CATCH_ALL	2
 #define HL_EXC_IS_THROW		4
+#define HL_TRACK_DISABLE	8
 
 typedef struct {
 	int thread_id;
