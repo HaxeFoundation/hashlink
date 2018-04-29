@@ -77,7 +77,8 @@ static hl_mutex *hl_cache_lock = NULL;
 static hl_field_lookup *hl_cache = NULL;
 
 void hl_cache_init() {
-	hl_cache_lock = hl_mutex_alloc();
+	hl_add_root(&hl_cache_lock);
+	hl_cache_lock = hl_mutex_alloc(false);
 }
 
 HL_PRIM int hl_hash( vbyte *b ) {
@@ -143,6 +144,7 @@ HL_PRIM void hl_cache_free() {
 	hl_cache_count = hl_cache_size = 0;
 	hl_mutex_free(hl_cache_lock);
 	hl_cache_lock = NULL;
+	hl_remove_root(&hl_cache_lock);
 }
 
 HL_PRIM hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid ) {

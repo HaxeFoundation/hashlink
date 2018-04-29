@@ -136,8 +136,7 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 
 #define GC_PROFILE		1
 #define GC_DUMP_MEM		2
-#define GC_TRACK		4
-#define GC_NO_THREADS	8
+#define GC_NO_THREADS	4
 
 static int gc_flags = 0;
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
@@ -205,6 +204,7 @@ static void gc_save_context(hl_thread_info *t ) {
 static void gc_global_lock( bool lock ) {
 	hl_thread_info *t = current_thread;
 	bool mt = (gc_flags & GC_NO_THREADS) == 0;
+	if( !t && gc_threads.count == 0 ) return;
 	if( lock ) {
 		if( !t )
 			hl_fatal("Can't lock GC in unregistered thread");
@@ -702,12 +702,12 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 		MZERO(ptr,allocated);
 	else if( MEM_HAS_PTR(flags) && allocated != size )
 		MZERO((char*)ptr+size,allocated-size); // erase possible pointers after data
-	gc_global_lock(false);
-	if( (gc_flags & GC_TRACK) && gc_track_callback )
-		((void (*)(hl_type *,int,int,void*))gc_track_callback)(t,size,flags,ptr);
 #	ifdef GC_MEMCHK
 	memset((char*)ptr+(allocated - HL_WSIZE),0xEE,HL_WSIZE);
 #	endif
+	gc_global_lock(false);
+	if( gc_track_callback && (current_thread->exc_flags&HL_TRACK_DISABLE) == 0 )
+		((void (*)(hl_type *,int,int,void*))gc_track_callback)(t,size,flags,ptr);
 	return ptr;
 }
 
@@ -1032,7 +1032,8 @@ static void hl_gc_init() {
 		gc_flags |= GC_DUMP_MEM;
 #	endif
 	memset(&gc_threads,0,sizeof(gc_threads));
-	gc_threads.global_lock = hl_mutex_alloc();
+	gc_threads.global_lock = hl_mutex_alloc(false);
+	hl_add_root(&gc_threads.global_lock);
 }
 
 // ---- UTILITIES ----------------------

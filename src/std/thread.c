@@ -34,7 +34,14 @@ struct _hl_tls {
 #elif defined(HL_WIN)
 
 struct _hl_mutex {
+	void (*free)( hl_mutex * );
 	CRITICAL_SECTION cs;
+	bool is_gc;
+};
+
+struct _hl_tls {
+	void (*free)( hl_tls * );
+	DWORD tid;
 };
 
 #else
@@ -44,10 +51,13 @@ struct _hl_mutex {
 #	include <sys/syscall.h>
 
 struct _hl_mutex {
+	void (*free)( hl_mutex * );
 	pthread_mutex_t lock;
+	bool is_gc;
 };
 
 struct _hl_tls {
+	void (*free)( hl_mutex * );
 	pthread_key_t key;
 };
 
@@ -55,15 +65,19 @@ struct _hl_tls {
 
 // ----------------- ALLOC
 
-HL_PRIM hl_mutex *hl_mutex_alloc() {
+HL_PRIM hl_mutex *hl_mutex_alloc( bool gc_thread ) {
 #	if !defined(HL_THREADS)
 	return (hl_mutex*)1;
 #	elif defined(HL_WIN)
-	hl_mutex *l = (hl_mutex*)malloc(sizeof(hl_mutex));
+	hl_mutex *l = (hl_mutex*)hl_gc_alloc_finalizer(sizeof(hl_mutex));
+	l->free = hl_mutex_free;
+	l->is_gc = gc_thread;
 	InitializeCriticalSection(&l->cs);
 	return l;
 #	else
-	hl_mutex *l = (hl_mutex*)malloc(sizeof(hl_mutex));
+	hl_mutex *l = (hl_mutex*)hl_gc_alloc_finalizer(sizeof(hl_mutex));
+	l->free = hl_mutex_free;
+	l->is_gc = gc_thread;
 	pthread_mutexattr_t a;
 	pthread_mutexattr_init(&a);
 	pthread_mutexattr_settype(&a,PTHREAD_MUTEX_RECURSIVE);
@@ -76,9 +90,13 @@ HL_PRIM hl_mutex *hl_mutex_alloc() {
 HL_PRIM void hl_mutex_acquire( hl_mutex *l ) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
+	if( l->is_gc ) hl_blocking(true);
 	EnterCriticalSection(&l->cs);
+	if( l->is_gc ) hl_blocking(false);
 #	else
+	if( l->is_gc ) hl_blocking(true);
 	pthread_mutex_lock(&l->lock);
+	if( l->is_gc ) hl_blocking(false);
 #	endif
 }
 
@@ -104,13 +122,24 @@ HL_PRIM void hl_mutex_release( hl_mutex *l ) {
 HL_PRIM void hl_mutex_free( hl_mutex *l ) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
-	DeleteCriticalSection(&l->cs);
-	free(l);
+	if( l->free ) {
+		DeleteCriticalSection(&l->cs);
+		l->free = NULL;
+	}
 #	else
-	pthread_mutex_destroy(&l->lock);
-	free(l);
+	if( l->free ) {
+		pthread_mutex_destroy(&l->lock);
+		l->free = NULL;
+	}
 #	endif
 }
+
+#define _MUTEX _ABSTRACT(hl_mutex)
+DEFINE_PRIM(_MUTEX, mutex_alloc, _NO_ARG);
+DEFINE_PRIM(_VOID, mutex_acquire, _MUTEX);
+DEFINE_PRIM(_BOOL, mutex_try_acquire, _MUTEX);
+DEFINE_PRIM(_VOID, mutex_release, _MUTEX);
+DEFINE_PRIM(_VOID, mutex_free, _MUTEX);
 
 // ----------------- THREAD LOCAL
 
@@ -120,11 +149,14 @@ HL_PRIM hl_tls *hl_tls_alloc() {
 	l->value = NULL;
 	return l;
 #	elif defined(HL_WIN)
-	DWORD t = TlsAlloc();
-	TlsSetValue(t,NULL);
-	return (hl_tls*)(int_val)t;
+	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
+	l->free = hl_tls_free;
+	l->tid = TlsAlloc();
+	TlsSetValue(l->tid,NULL);
+	return l;
 #	else
-	hl_tls *l = malloc(sizeof(hl_tls));
+	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
+	l->free = hl_tls_free;
 	pthread_key_create(&l->key,NULL);
 	return l;
 #	endif
@@ -134,10 +166,15 @@ HL_PRIM void hl_tls_free( hl_tls *l ) {
 #	if !defined(HL_THREADS)
 	free(l);
 #	elif defined(HL_WIN)
-	TlsFree((DWORD)(int_val)l);
+	if( l->free ) {
+		TlsFree(l->tid);
+		l->free = NULL;
+	}
 #	else
-	pthread_key_delete(l->key);
-	free(l);
+	if( l->free ) {
+		pthread_key_delete(l->key);
+		l->free = NULL;
+	}
 #	endif
 }
 
@@ -145,7 +182,7 @@ HL_PRIM void hl_tls_set( hl_tls *l, void *v ) {
 #	if !defined(HL_THREADS)
 	l->value = v;
 #	elif defined(HL_WIN)
-	TlsSetValue((DWORD)(int_val)l,v);
+	TlsSetValue(l->tid,v);
 #	else
 	pthread_setspecific(l->key,v);
 #	endif
@@ -155,11 +192,142 @@ HL_PRIM void *hl_tls_get( hl_tls *l ) {
 #	if !defined(HL_THREADS)
 	return l->value;
 #	elif defined(HL_WIN)
-	return (void*)TlsGetValue((DWORD)(int_val)l);
+	return (void*)TlsGetValue(l->tid);
 #	else
 	return pthread_getspecific(l->key);
 #	endif
 }
+
+// ----------------- DEQUE
+
+typedef struct _tqueue {
+	vdynamic *msg;
+	struct _tqueue *next;
+} tqueue;
+
+struct _hl_deque;
+typedef struct _hl_deque hl_deque;
+
+struct _hl_deque {
+	void (*free)( hl_deque * );
+	tqueue *first;
+	tqueue *last;
+#ifdef HL_THREADS
+#	ifdef HL_WIN
+	CRITICAL_SECTION lock;
+	HANDLE wait;
+#	else
+	pthread_mutex_t lock;
+	pthread_cond_t wait;
+#	endif
+#endif
+};
+
+#if !defined(HL_WIN)
+#	define LOCK(l)
+#	define UNLOCK(l)
+#	define SIGNAL(l)
+#elif defined(HL_WIN)
+#	define LOCK(l)		EnterCriticalSection(&(l))
+#	define UNLOCK(l)	LeaveCriticalSection(&(l))
+#	define SIGNAL(l)	ReleaseSemaphore(l,1,NULL)
+#else
+#	define LOCK(l)		pthread_mutex_lock(&(l))
+#	define UNLOCK(l)	pthread_mutex_unlock(&(l))
+#	define SIGNAL(l)	pthread_cond_signal(&(l))
+#endif
+
+static void hl_deque_free( hl_deque *q ) {
+	hl_remove_root(&q->first);
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	DeleteCriticalSection(&q->lock);
+	CloseHandle(q->wait);
+#	else
+	pthread_mutex_destroy(&q->lock);
+	pthread_cond_destroy(&q->wait);
+#	endif
+}
+
+HL_API hl_deque *hl_deque_alloc() {
+	hl_deque *q = (hl_deque*)hl_gc_alloc_finalizer(sizeof(hl_deque));
+	q->free = hl_deque_free;
+	q->first = NULL;
+	q->last = NULL;
+	hl_add_root(&q->first);
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	q->wait = CreateSemaphore(NULL,0,(1 << 30),NULL);
+	InitializeCriticalSection(&q->lock);
+#	else
+	pthread_mutex_init(&q->lock,NULL);
+	pthread_cond_init(&q->wait,NULL);
+#	endif
+	return q;
+}
+
+HL_API void hl_deque_add( hl_deque *q, vdynamic *msg ) {
+	tqueue *t = (tqueue*)hl_gc_alloc_raw(sizeof(tqueue));
+	t->msg = msg;
+	t->next = NULL;
+	LOCK(q->lock);
+	if( q->last == NULL )
+		q->first = t;
+	else
+		q->last->next = t;
+	q->last = t;
+	SIGNAL(q->wait);
+	UNLOCK(q->lock);
+}
+
+HL_API void hl_deque_push( hl_deque *q, vdynamic *msg ) {
+	tqueue *t = (tqueue*)hl_gc_alloc_raw(sizeof(tqueue));
+	t->msg = msg;
+	LOCK(q->lock);
+	t->next = q->first;
+	q->first = t;
+	if( q->last == NULL )
+		q->last = t;
+	SIGNAL(q->wait);
+	UNLOCK(q->lock);
+}
+
+HL_API vdynamic *hl_deque_pop( hl_deque *q, bool block ) {
+	vdynamic *msg;
+	hl_blocking(true);
+	LOCK(q->lock);
+	while( q->first == NULL )
+		if( block ) {
+#			if !defined(HL_THREADS)
+#			elif defined(HL_WIN)
+			UNLOCK(q->lock);
+			WaitForSingleObject(q->wait,INFINITE);
+			LOCK(q->lock);
+#			else
+			pthread_cond_wait(&q->wait,&q->lock);
+#			endif
+		} else {
+			UNLOCK(q->lock);
+			hl_blocking(false);
+			return NULL;
+		}
+	msg = q->first->msg;
+	q->first = q->first->next;
+	if( q->first == NULL )
+		q->last = NULL;
+	else
+		SIGNAL(q->wait);
+	UNLOCK(q->lock);
+	hl_blocking(false);
+	return msg;
+}
+
+
+#define _DEQUE _ABSTRACT(hl_deque)
+DEFINE_PRIM(_DEQUE, deque_alloc, _NO_ARG);
+DEFINE_PRIM(_VOID, deque_add, _DEQUE _DYN);
+DEFINE_PRIM(_VOID, deque_push, _DEQUE _DYN);
+DEFINE_PRIM(_DYN, deque_pop, _DEQUE _BOOL);
 
 // ----------------- THREAD
 
