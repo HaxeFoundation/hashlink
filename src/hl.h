@@ -647,7 +647,7 @@ HL_API bool hl_mutex_try_acquire( hl_mutex *l );
 HL_API void hl_mutex_release( hl_mutex *l );
 HL_API void hl_mutex_free( hl_mutex *l );
 
-HL_API hl_tls *hl_tls_alloc( void );
+HL_API hl_tls *hl_tls_alloc( bool gc_value );
 HL_API void hl_tls_set( hl_tls *l, void *value );
 HL_API void *hl_tls_get( hl_tls *l );
 HL_API void hl_tls_free( hl_tls *l );
