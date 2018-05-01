@@ -135,7 +135,7 @@ HL_PRIM void hl_mutex_free( hl_mutex *l ) {
 }
 
 #define _MUTEX _ABSTRACT(hl_mutex)
-DEFINE_PRIM(_MUTEX, mutex_alloc, _NO_ARG);
+DEFINE_PRIM(_MUTEX, mutex_alloc, _BOOL);
 DEFINE_PRIM(_VOID, mutex_acquire, _MUTEX);
 DEFINE_PRIM(_BOOL, mutex_try_acquire, _MUTEX);
 DEFINE_PRIM(_VOID, mutex_release, _MUTEX);
@@ -143,9 +143,10 @@ DEFINE_PRIM(_VOID, mutex_free, _MUTEX);
 
 // ----------------- THREAD LOCAL
 
-HL_PRIM hl_tls *hl_tls_alloc() {
+HL_PRIM hl_tls *hl_tls_alloc( bool gc_value ) {
 #	if !defined(HL_THREADS)
-	hl_tls *l = malloc(sizeof(hl_tls));
+	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
+	l->free = hl_tls_free;
 	l->value = NULL;
 	return l;
 #	elif defined(HL_WIN)
@@ -197,6 +198,11 @@ HL_PRIM void *hl_tls_get( hl_tls *l ) {
 	return pthread_getspecific(l->key);
 #	endif
 }
+
+#define _TLS _ABSTRACT(hl_tls)
+DEFINE_PRIM(_TLS, tls_alloc, _BOOL);
+DEFINE_PRIM(_DYN, tls_get, _TLS);
+DEFINE_PRIM(_VOID, tls_set, _TLS _DYN);
 
 // ----------------- DEQUE
 
