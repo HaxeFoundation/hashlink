@@ -1446,18 +1446,12 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, i
 	return paddedSize;
 }
 
-// prevent remove of push ebp which would prevent our stack from being correctly reported
 #ifdef HL_VCC
 #	pragma optimize( "", off )
 #endif
-#ifdef HL_GCC
-__attribute__((optimize("-O0")))
-#endif
-
-static void hl_null_access() {
+HL_NO_OPT static void hl_null_access() {
 	hl_error_msg(USTR("Null access"));
 }
-
 #ifdef HL_VCC
 #	pragma optimize( "", on )
 #endif
