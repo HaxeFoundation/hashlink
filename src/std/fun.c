@@ -68,6 +68,13 @@ HL_PRIM vdynamic *hl_no_closure( vdynamic *c ) {
 	return (vdynamic*)hl_alloc_closure_void(cl->t->fun->parent,cl->fun);
 }
 
+HL_PRIM vdynamic *hl_make_closure( vdynamic *c, vdynamic *v ) {
+	vclosure *cl = (vclosure*)c;
+	if( cl->hasValue == 2 )
+		return hl_make_closure((vdynamic*)((vclosure_wrapper*)c)->wrappedFun, v);
+	return (vdynamic*)hl_alloc_closure_ptr( cl->hasValue ? cl->t->fun->parent : cl->t, cl->fun, v);
+}
+
 HL_PRIM vdynamic* hl_get_closure_value( vdynamic *c ) {
 	vclosure *cl = (vclosure*)c;
 	if( cl->hasValue == 2 )
@@ -372,6 +379,7 @@ HL_PRIM vdynamic *hl_make_var_args( vclosure *c ) {
 }
 
 DEFINE_PRIM(_DYN, no_closure, _DYN);
+DEFINE_PRIM(_DYN, make_closure, _DYN _DYN);
 DEFINE_PRIM(_DYN, get_closure_value, _DYN);
 DEFINE_PRIM(_BOOL, fun_compare, _DYN _DYN);
 DEFINE_PRIM(_DYN, make_var_args, _FUN(_DYN,_ARR));
