@@ -250,6 +250,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	compareHash = hl_hash_gen(USTR("__compare"),false);
 	for(i=0;i<o->nproto;i++) {
 		hl_obj_proto *pr = o->proto + i;
+		hl_type *mt;
 		int method_index;
 		if( p ) {
 			if( pr->pindex >= 0 && pr->pindex < p->nproto )
@@ -258,9 +259,10 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		} else
 			method_index = i;
 		if( pr->pindex >= t->nproto ) t->nproto = pr->pindex + 1;
-		hl_lookup_insert(t->lookup,nlookup++,pr->hashed_name,m->functions_types[pr->findex],-(method_index+1));
+		mt = m->functions_types[pr->findex];
+		hl_lookup_insert(t->lookup,nlookup++,pr->hashed_name,mt,-(method_index+1));
 		// tell if we have a compare fun (req for JIT)
-		if( pr->hashed_name == compareHash )
+		if( pr->hashed_name == compareHash && mt->fun->nargs == 2 && mt->fun->args[1]->kind == HDYN && mt->fun->ret->kind == HI32 )
 			t->compareFun = (void*)(int_val)pr->findex;
 	}
 
@@ -375,7 +377,7 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	castField = obj_resolve_field(o,hl_hash_gen(USTR("__cast"),false));
 	getField = obj_resolve_field(o,hl_hash_gen(USTR("__get_field"),false));
 	t->toStringFun = strField ? t->methods[-(strField->field_index+1)] : NULL;
-	t->compareFun = cmpField ? t->methods[-(cmpField->field_index+1)] : NULL;
+	t->compareFun = cmpField && t->compareFun ? t->methods[-(cmpField->field_index+1)] : NULL;
 	t->castFun = castField ? t->methods[-(castField->field_index+1)] : NULL;
 	t->getFieldFun = getField ? t->methods[-(getField->field_index+1)] : NULL;
 	if( p && !t->getFieldFun ) t->getFieldFun = p->getFieldFun;
