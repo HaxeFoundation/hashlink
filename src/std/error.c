@@ -157,9 +157,15 @@ HL_PRIM void hl_fatal_fmt( const char *file, int line, const char *fmt, ...) {
 	hl_fatal_error(buf,file,line);
 }
 
-HL_PRIM void hl_breakpoint() {
+#ifdef HL_VCC
+#	pragma optimize( "", off )
+#endif
+HL_PRIM HL_NO_OPT void hl_breakpoint() {
 	hl_debug_break();
 }
+#ifdef HL_VCC
+#	pragma optimize( "", on )
+#endif
 
 #ifdef HL_LINUX__
 #include <signal.h>
