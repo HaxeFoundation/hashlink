@@ -115,6 +115,14 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	return d;
 }
 
+HL_PRIM void HL_NAME(dispose_driver)( dx_driver *d ) {
+	d->swapchain->Release();
+	d->device->Release();
+	d->context->Release();
+	if( driver == d )
+		driver = NULL;
+}
+
 HL_PRIM dx_driver *HL_NAME(get_driver)(){
 	return driver;
 }
@@ -429,6 +437,7 @@ HL_PRIM void HL_NAME(debug_print)( vbyte *b ) {
 
 DEFINE_PRIM(_VOID, set_error_handler, _FUN(_VOID, _I32 _I32 _I32));
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, dispose_driver, _DRIVER);
 DEFINE_PRIM(_BOOL, resize, _I32 _I32 _I32);
 DEFINE_PRIM(_RESOURCE, get_back_buffer, _NO_ARG);
 DEFINE_PRIM(_POINTER, create_render_target_view, _RESOURCE _DYN);
