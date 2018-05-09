@@ -70,9 +70,12 @@ HL_PRIM vdynamic *hl_no_closure( vdynamic *c ) {
 
 HL_PRIM vdynamic *hl_make_closure( vdynamic *c, vdynamic *v ) {
 	vclosure *cl = (vclosure*)c;
+	hl_type *t = cl->hasValue ? cl->t->fun->parent : cl->t;
 	if( cl->hasValue == 2 )
 		return hl_make_closure((vdynamic*)((vclosure_wrapper*)c)->wrappedFun, v);
-	return (vdynamic*)hl_alloc_closure_ptr( cl->hasValue ? cl->t->fun->parent : cl->t, cl->fun, v);
+	if( t->fun->nargs == 0 || !v || !hl_safe_cast(v->t,t->fun->args[0]) )
+		return NULL;
+	return (vdynamic*)hl_alloc_closure_ptr( t, cl->fun, v );
 }
 
 HL_PRIM vdynamic* hl_get_closure_value( vdynamic *c ) {
