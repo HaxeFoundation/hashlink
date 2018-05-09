@@ -24,10 +24,12 @@
 #if !defined(HL_THREADS)
 
 struct _hl_mutex {
+	void (*free)( hl_mutex * );
 	void *_unused;
 };
 
 struct _hl_tls {
+	void (*free)( hl_mutex * );
 	void *value;
 };
 
@@ -229,7 +231,7 @@ struct _hl_deque {
 #endif
 };
 
-#if !defined(HL_WIN)
+#if !defined(HL_THREADS)
 #	define LOCK(l)
 #	define UNLOCK(l)
 #	define SIGNAL(l)
