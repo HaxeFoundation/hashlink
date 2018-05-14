@@ -20,8 +20,7 @@ environment:
       builder: cmake
 
 artifacts:
-  - path: 'hashlink-*.zip'
-    name: Build
+  - path: 'bin/hashlink-*.zip'
 
 install:
   # install sdl
