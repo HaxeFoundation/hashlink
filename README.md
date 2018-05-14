@@ -16,11 +16,13 @@ sdl: libsdl2-dev
 ssl: libmbedtls-dev
 uv: libuv1-dev
 
-To install all dependencies on Ubuntu for example:
+To install all dependencies on the latest Ubuntu, for example:
 
 `sudo apt-get install libpng16-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev`
 
-And on OSX:
+For 16.04, see [this note](https://github.com/HaxeFoundation/hashlink/issues/147).
+
+**And on OSX:**
 
 `brew install libpng jpeg-turbo libvorbis sdl2 mbedtls openal-soft libuv`
 
