@@ -191,10 +191,16 @@ HL_PRIM bool hl_detect_debugger() {
 #	endif
 }
 
-HL_PRIM void hl_assert() {
+#ifdef HL_VCC
+#	pragma optimize( "", off )
+#endif
+HL_PRIM HL_NO_OPT void hl_assert() {
 	hl_debug_break();
 	hl_error("Assert");
 }
+#ifdef HL_VCC
+#	pragma optimize( "", on )
+#endif
 
 #define _SYMBOL _ABSTRACT(hl_symbol)
 
