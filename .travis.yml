@@ -1,10 +1,10 @@
 language: haxe
 
-linux32_install: &linux32_install
-  - docker build -f Dockerfile-i386 -t hashlink .
-
 linux64_install: &linux64_install
   - docker build -f Dockerfile -t hashlink .
+
+linux32_install: &linux32_install
+  - docker build -f Dockerfile-i386 -t hashlink .
 
 docker_cmake_script: &docker_cmake_script
   - >
@@ -17,7 +17,6 @@ docker_cmake_script: &docker_cmake_script
     fi) &&
     make &&
     make test ARGS=-V'
-
 
 docker_make_script: &docker_make_script
   - >
@@ -37,24 +36,41 @@ mac_before_install: &mac_before_install
   - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft mbedtls libuv
   - haxelib install hashlink
 
+cmake_install: &cmake_install
+  - cmake .
+  - make
+
 make_install: &make_install
   - make all
   - sudo make install
 
-cmake_install: &cmake_install
-  - cmake .
-  - make
+cmake_script: &cmake_script
+  - make test ARGS="-V"
 
 make_script: &make_script
   - haxe -hl src/_main.c -cp other/tests -main HelloWorld &&
     make hlc &&
     ./hlc
-cmake_script: &cmake_script
-  - make test ARGS="-V"
 
 sudo: required
 matrix:
   include:
+    # Linux 64-bit
+    - haxe: development
+      os: linux
+      dist: trusty
+      env: ARCH=64 BUILD=cmake
+      services: [docker]
+      install: *linux64_install
+      script: *docker_cmake_script
+    - haxe: development
+      os: linux
+      dist: trusty
+      env: ARCH=64 BUILD=make
+      services: [docker]
+      install: *linux64_install
+      script: *docker_make_script
+    # Linux 32-bit
     - haxe: development
       os: linux
       dist: trusty
@@ -69,30 +85,25 @@ matrix:
       services: [docker]
       install: *linux32_install
       script: *docker_make_script
-    - haxe: development
-      os: linux
-      dist: trusty
-      env: ARCH=64 BUILD=cmake
-      services: [docker]
-      install: *linux64_install
-      script: *docker_cmake_script
-    - haxe: development
-      os: linux
-      dist: trusty
-      env: ARCH=64 BUILD=make
-      services: [docker]
-      install: *linux64_install
-      script: *docker_make_script
+    # Mac xcode9.3
     - haxe: development
       os: osx
-      osx_image: xcode8
+      osx_image: xcode9.3
+      env: ARCH=64 BUILD=cmake
+      before_install: *mac_before_install
+      install: *cmake_install
+      script: *cmake_script
+    - haxe: development
+      os: osx
+      osx_image: xcode9.3
       env: ARCH=64 BUILD=make
       before_install: *mac_before_install
       install: *make_install
       script: *make_script
+    # Mac xcode7.1
     - haxe: development
       os: osx
-      osx_image: xcode8
+      osx_image: xcode7.1
       env: ARCH=64 BUILD=cmake
       before_install: *mac_before_install
       install: *cmake_install
@@ -104,10 +115,3 @@ matrix:
       before_install: *mac_before_install
       install: *make_install
       script: *make_script
-    - haxe: development
-      os: osx
-      osx_image: xcode7.1
-      env: ARCH=64 BUILD=cmake
-      before_install: *mac_before_install
-      install: *cmake_install
-      script: *cmake_script
