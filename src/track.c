@@ -125,9 +125,9 @@ static void on_alloc( hl_type *t, int size, int flags, void *ptr ) {
 		hash = (hash * 31) + (((unsigned int)(int_val)tinf->exc_stack_trace[i]) >> 1);
 	// look for bucket
 	hl_mutex_acquire(track_lock);
-	if( hash == prev_hash ) {
+	if( hash == prev_hash && prev_b!=NULL ) {
 		b = prev_b;
-	} else if( hash == prev_hash2 ) {
+	} else if( hash == prev_hash2 && prev_b2!=NULL ) {
 		b = prev_b2;
 	} else {
 		b = bucket_find_insert(hash, tinf->exc_stack_trace, count);
