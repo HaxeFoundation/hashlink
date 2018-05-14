@@ -43,7 +43,7 @@ if (WITH_SDL2)
 
     install(
         TARGETS sdl.hdll
-        DESTINATION .
+        DESTINATION ${HDLL_DESTINATION}
     )
 
 endif()

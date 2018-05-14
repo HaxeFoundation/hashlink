@@ -68,5 +68,5 @@ endif()
 install(
     TARGETS
         uv.hdll
-    DESTINATION .
+    DESTINATION ${HDLL_DESTINATION}
 )

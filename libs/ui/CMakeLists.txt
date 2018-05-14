@@ -13,5 +13,5 @@ target_link_libraries(ui.hdll
 install(
     TARGETS
         ui.hdll
-    DESTINATION .
+    DESTINATION ${HDLL_DESTINATION}
 )
