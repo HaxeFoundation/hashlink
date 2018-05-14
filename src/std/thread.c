@@ -29,7 +29,7 @@ struct _hl_mutex {
 };
 
 struct _hl_tls {
-	void (*free)( hl_mutex * );
+	void (*free)( hl_tls * );
 	void *value;
 };
 
