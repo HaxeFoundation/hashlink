@@ -1665,14 +1665,17 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OUMod:
 			{
 				preg *out = op->op == OSMod || op->op == OUMod ? REG_AT(Edx) : PEAX;
-				preg *r = alloc_cpu(ctx,b,true);
+				preg *r;
 				int jz, jend;
+				if( pa->kind == RCPU && pa->id == Eax ) RLOCK(pa);
+				r = alloc_cpu(ctx,b,true);
 				// integer div 0 => 0
 				op32(ctx,TEST,r,r);
 				XJump_small(JNotZero,jz);
 				op32(ctx,XOR,out,out);
 				XJump_small(JAlways,jend);
 				patch_jump(ctx,jz);
+				pa = fetch(a);
 				if( pa->kind != RCPU || pa->id != Eax ) {
 					scratch(PEAX);
 					scratch(pa);
