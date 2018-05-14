@@ -20,5 +20,5 @@ target_link_libraries(directx.hdll
 install(
 	TARGETS
 		directx.hdll
-	DESTINATION .
+	DESTINATION ${HDLL_DESTINATION}
 )

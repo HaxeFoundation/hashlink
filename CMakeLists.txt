@@ -94,10 +94,14 @@ add_library(libhl SHARED
     ${std_srcs}
 )
 
+set(public_headers
+    src/hl.h
+    src/hlc.h
+)
+
 set_target_properties(libhl
     PROPERTIES
-        PUBLIC_HEADER
-            "src/hl.h;src/hlc.h;src/hlc_main.c"
+    PUBLIC_HEADER "${public_headers}"
 )
 
 if(WIN32)
@@ -162,18 +166,34 @@ add_test(NAME hello.hl
 #####################
 # Packaging
 
+set(CPACK_OUTPUT_FILE_PREFIX ${OUTPUT_DIR})
+
 set(CPACK_PACKAGE_VENDOR "Haxe Foundation")
 set(CPACK_PACKAGE_VERSION_MAJOR ${HL_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${HL_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${HL_VERSION_PATCH})
-set(CPACK_GENERATOR ZIP)
+
+if (WIN32)
+	set(CPACK_GENERATOR "ZIP")
+else()
+	set(CPACK_GENERATOR "TGZ")
+endif()
+
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+set(HDLL_DESTINATION
+    ${CMAKE_INSTALL_LIBDIR}
+)
 
 install(
     TARGETS
         hl
         libhl
-    DESTINATION .
-    PUBLIC_HEADER DESTINATION include
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 if (DEFINED ENV{APPVEYOR_REPO_COMMIT})

@@ -160,5 +160,5 @@ target_compile_definitions(fmt.hdll
 install(
     TARGETS
         fmt.hdll
-    DESTINATION .
+    DESTINATION ${HDLL_DESTINATION}
 )

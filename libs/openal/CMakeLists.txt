@@ -26,6 +26,6 @@ if(WIN32)
     install(
         TARGETS
             openal.hdll
-        DESTINATION .
+        DESTINATION ${HDLL_DESTINATION}
     )
 endif()
