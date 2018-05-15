@@ -770,7 +770,7 @@ typedef struct {
 #	define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
 #endif
 
-#ifdef HL_GCC
+#if defined(HL_GCC) && !defined(HL_CONSOLE)
 #	define HL_NO_OPT __attribute__((optimize("-O0")))
 #else
 #	define HL_NO_OPT
