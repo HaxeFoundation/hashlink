@@ -26,6 +26,14 @@ For 16.04, see [this note](https://github.com/HaxeFoundation/hashlink/issues/147
 
 `brew install libpng jpeg-turbo libvorbis sdl2 mbedtls openal-soft libuv`
 
+Once dependencies are installed you can simply call:
+
+`make`
+
+To install hashlink binaries on your system you can then call:
+
+`make install`
+
 ## Building on Windows
 
 Open `hl.sln` using Visual Studio Code and compile.
