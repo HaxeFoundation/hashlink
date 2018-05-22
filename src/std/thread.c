@@ -378,6 +378,7 @@ typedef struct {
 	void *param;
 } thread_start;
 
+#ifdef HL_THREADS
 static void gc_thread_entry( thread_start *_s ) {
 	thread_start s = *_s;
 	hl_register_thread(&s);
@@ -386,6 +387,7 @@ static void gc_thread_entry( thread_start *_s ) {
 	s.callb(s.param);
 	hl_unregister_thread();
 }
+#endif
 
 HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 #ifdef HL_THREADS
