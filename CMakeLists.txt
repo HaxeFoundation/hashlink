@@ -148,11 +148,31 @@ find_program(
     haxe
 )
 
-add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
-    COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+    COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
 )
 add_custom_target(hello.hl ALL
-    DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
+    DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+)
+
+#####################
+# hello.c
+
+add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
+    COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+)
+add_executable(hello
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
+)
+set_target_properties(hello
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test
+)
+target_include_directories(hello
+    PRIVATE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test
+)
+target_link_libraries(hello
+    libhl
 )
 
 #####################
@@ -160,7 +180,10 @@ add_custom_target(hello.hl ALL
 
 include(CTest)
 add_test(NAME hello.hl
-    COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/hello.hl
+    COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+)
+add_test(NAME hello
+    COMMAND hello
 )
 
 #####################
