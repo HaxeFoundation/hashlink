@@ -602,6 +602,11 @@ HL_PRIM void HL_NAME(gl_uniform4fv)( vdynamic *u, vbyte *buffer, int bufPos, int
 	glUniform4fv(u->v.i, count, (float*)buffer + bufPos);
 }
 
+HL_PRIM void HL_NAME(gl_uniform_matrix4fv)( vdynamic *u, bool transpose, vbyte *buffer, int bufPos, int count ) {
+	GLOG("%d,%d",u->v.i,count);
+	glUniformMatrix4fv(u->v.i, count, transpose ? GL_TRUE : GL_FALSE, (float*)buffer + bufPos);
+}
+
 // compute
 HL_PRIM void HL_NAME(gl_dispatch_compute)( int num_groups_x, int num_groups_y, int num_groups_z ) {
 	GLOG("%d,%d,%d",num_groups_x,num_groups_y,num_groups_z);
@@ -782,6 +787,7 @@ DEFINE_PRIM(_VOID,gl_vertex_attrib_ipointer,_I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_delete_buffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_uniform1i,_NULL(_I32) _I32);
 DEFINE_PRIM(_VOID,gl_uniform4fv,_NULL(_I32) _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,gl_uniform_matrix4fv,_NULL(_I32) _BOOL _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_bind_image_texture,_I32 _I32 _I32 _BOOL _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_dispatch_compute,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_memory_barrier,_I32);
