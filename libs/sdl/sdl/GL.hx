@@ -322,6 +322,9 @@ class GL {
 	public static function uniform4fv( u : Uniform, buffer : hl.Bytes, bufPos : Int, count : Int ) {
 	}
 
+	public static function uniformMatrix4fv( u : Uniform, transpose : Bool, buffer : hl.Bytes, bufPos : Int, count : Int ) {
+	}
+
 	// compute
 
 	public static function dispatchCompute( num_groups_x : Int, num_groups_y : Int, num_groups_z : Int ) {
