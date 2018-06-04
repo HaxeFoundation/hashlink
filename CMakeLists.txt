@@ -2,14 +2,15 @@ cmake_minimum_required(VERSION 3.1)
 
 cmake_policy(SET CMP0042 NEW)
 
-include(GNUInstallDirs)
-include(FindPkgConfig)
-
 if (WIN32)
     project(hashlink C CXX) # C++ required for directx
 else()
     project(hashlink C)
 endif()
+
+include(GNUInstallDirs)
+include(FindPkgConfig)
+include(CTest)
 
 # force Unicode over Multi-byte
 if (MSVC)
@@ -140,51 +141,54 @@ else()
     target_link_libraries(libhl m dl pthread)
 endif()
 
-#####################
-# hello.hl
+if (BUILD_TESTING)
 
-find_program(
-    HAXE_COMPILER
-    haxe
-)
+    #####################
+    # hello.hl
 
-add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
-    COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
-)
-add_custom_target(hello.hl ALL
-    DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
-)
+    find_program(
+        HAXE_COMPILER
+        haxe
+    )
 
-#####################
-# hello.c
+    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+        COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+    )
+    add_custom_target(hello.hl ALL
+        DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+    )
 
-add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
-    COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
-)
-add_executable(hello
-    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
-)
-set_target_properties(hello
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test
-)
-target_include_directories(hello
-    PRIVATE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test
-)
-target_link_libraries(hello
-    libhl
-)
+    #####################
+    # hello.c
 
-#####################
-# Tests
+    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
+        COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+    )
+    add_executable(hello
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
+    )
+    set_target_properties(hello
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test
+    )
+    target_include_directories(hello
+        PRIVATE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test
+    )
+    target_link_libraries(hello
+        libhl
+    )
 
-include(CTest)
-add_test(NAME hello.hl
-    COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
-)
-add_test(NAME hello
-    COMMAND hello
-)
+    #####################
+    # Tests
+
+    add_test(NAME hello.hl
+        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+    )
+    add_test(NAME hello
+        COMMAND hello
+    )
+
+endif()
 
 #####################
 # Packaging
