@@ -42,7 +42,7 @@ foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
 endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
 set(HL_VERSION_MAJOR 1)
-set(HL_VERSION_MINOR 5)
+set(HL_VERSION_MINOR 6)
 set(HL_VERSION_PATCH 0)
 set(HL_VERSION ${HL_VERSION_MAJOR}.${HL_VERSION_MINOR}.${HL_VERSION_PATCH})
 
@@ -186,6 +186,13 @@ if (BUILD_TESTING)
     )
     add_test(NAME hello
         COMMAND hello
+    )
+    add_test(NAME version
+        COMMAND hl --version
+    )
+    set_tests_properties(version
+        PROPERTIES
+        PASS_REGULAR_EXPRESSION "${HL_VERSION}"
     )
 
 endif()
