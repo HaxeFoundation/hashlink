@@ -1,4 +1,4 @@
-if (WIN32)
+if(WIN32)
     set(SDL2_PATH ${INCLUDES_BASE_DIR}/sdl)
 endif()
 find_package(SDL2 REQUIRED)
@@ -25,7 +25,7 @@ if(WIN32)
     )
 endif()
 
-if (APPLE)
+if(APPLE)
     find_package(OPENGL REQUIRED)
     target_include_directories(sdl.hdll
         PRIVATE

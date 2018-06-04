@@ -119,12 +119,12 @@ else()
     find_package(PNG REQUIRED)
 
     find_package(TurboJPEG QUIET)
-    if (NOT TurboJPEG_FOUND)
+    if(NOT TurboJPEG_FOUND)
         pkg_check_modules(TurboJPEG REQUIRED libjpeg)
     endif()
 
     find_package(OggVorbis QUIET)
-    if (NOT OGGVORBIS_FOUND)
+    if(NOT OGGVORBIS_FOUND)
         pkg_check_modules(OGGVORBIS REQUIRED vorbis vorbisenc vorbisfile)
     endif()
 

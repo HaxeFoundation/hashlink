@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 
 cmake_policy(SET CMP0042 NEW)
 
-if (WIN32)
+if(WIN32)
     project(hashlink C CXX) # C++ required for directx
 else()
     project(hashlink C)
@@ -13,17 +13,20 @@ include(FindPkgConfig)
 include(CTest)
 
 # force Unicode over Multi-byte
-if (MSVC)
+if(MSVC)
     add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/other/cmake ${CMAKE_MODULE_PATH})
+list(APPEND CMAKE_MODULE_PATH
+    ${CMAKE_CURRENT_SOURCE_DIR}/other/cmake
+)
 
-if (CMAKE_VERSION VERSION_LESS "3.1")
-    set (CMAKE_C_FLAGS "-std=c11 ${CMAKE_C_FLAGS}")
-else ()
-    set (CMAKE_C_STANDARD 11)
-endif ()
+if(CMAKE_VERSION VERSION_LESS "3.1")
+    set(CMAKE_C_FLAGS "-std=c11 ${CMAKE_C_FLAGS}")
+else()
+    set(CMAKE_C_STANDARD 11)
+    set(CMAKE_C_STANDARD_REQUIRED ON)
+endif()
 
 # put output in "bin"
 
@@ -33,13 +36,12 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIR})
 
 # avoid the extra "Debug", "Release" directories
-# http://stackoverflow.com/questions/7747857/in-cmake-how-do-i-work-around-the-debug-and-release-directories-visual-studio-2
 foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
     string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
     set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
     set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
     set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
-endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
+endforeach()
 
 set(HL_VERSION_MAJOR 1)
 set(HL_VERSION_MINOR 6)
@@ -77,13 +79,13 @@ file(GLOB std_srcs
     src/std/process.c
 )
 
-if (ANDROID)
+if(ANDROID)
     list(APPEND std_srcs
         src/std/sys_android.c
     )
 endif()
 
-if (IOS_PLATFORM)
+if(IOS_PLATFORM)
     list(APPEND std_srcs
         src/std/sys_ios.m
     )
@@ -141,7 +143,7 @@ else()
     target_link_libraries(libhl m dl pthread)
 endif()
 
-if (BUILD_TESTING)
+if(BUILD_TESTING)
 
     #####################
     # hello.hl
@@ -152,7 +154,9 @@ if (BUILD_TESTING)
     )
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
-        COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+        COMMAND ${HAXE_COMPILER}
+            -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+            -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
     )
     add_custom_target(hello.hl ALL
         DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
@@ -162,7 +166,9 @@ if (BUILD_TESTING)
     # hello.c
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
-        COMMAND ${HAXE_COMPILER} -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+        COMMAND ${HAXE_COMPILER}
+            -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
+            -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
     )
     add_executable(hello
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.c
@@ -207,10 +213,10 @@ set(CPACK_PACKAGE_VERSION_MAJOR ${HL_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${HL_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${HL_VERSION_PATCH})
 
-if (WIN32)
-	set(CPACK_GENERATOR "ZIP")
+if(WIN32)
+    set(CPACK_GENERATOR "ZIP")
 else()
-	set(CPACK_GENERATOR "TGZ")
+    set(CPACK_GENERATOR "TGZ")
 endif()
 
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
@@ -231,16 +237,20 @@ install(
 )
 
 
-if (NOT DEFINED ENV{APPVEYOR_REPO_TAG_NAME} AND DEFINED ENV{APPVEYOR_REPO_COMMIT})
+if(
+    NOT DEFINED ENV{APPVEYOR_REPO_TAG_NAME}
+    AND
+    DEFINED ENV{APPVEYOR_REPO_COMMIT}
+)
     string(SUBSTRING $ENV{APPVEYOR_REPO_COMMIT} 0 7 short_commit)
 endif()
 
-if (NOT DEFINED ENV{TRAVIS_TAG} AND DEFINED ENV{TRAVIS_COMMIT})
+if(NOT DEFINED ENV{TRAVIS_TAG} AND DEFINED ENV{TRAVIS_COMMIT})
     string(SUBSTRING $ENV{TRAVIS_COMMIT} 0 7 short_commit)
 endif()
 
-if (DEFINED short_commit)
-    set(CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}+${short_commit}")
+if(DEFINED short_commit)
+    set(CPACK_PACKAGE_VERSION "${HL_VERSION}+${short_commit}")
 endif()
 
 

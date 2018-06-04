@@ -24,7 +24,7 @@ if(WIN32)
 endif()
 
 option(WITH_FMT "Build fmt.hdll." ON)
-if (WITH_FMT)
+if(WITH_FMT)
     add_subdirectory(fmt)
 endif()
 
@@ -32,7 +32,7 @@ endif()
 
 if(WIN32)
     option(WITH_OPENAL "Build openal.hdll." ON)
-    if (WITH_OPENAL)
+    if(WITH_OPENAL)
         add_subdirectory(openal)
     endif()
 endif()
