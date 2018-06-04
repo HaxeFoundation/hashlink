@@ -23,7 +23,7 @@ ENV HAXE_STD_PATH=/usr/local/share/haxe/std
 RUN set -ex \
     && mkdir /haxe \
     && cd /haxe \
-    && curl -sSL http://hxbuilds.s3-website-us-east-1.amazonaws.com/builds/haxe/linux64/haxe_latest.tar.gz | tar -x -z --strip-components=1 -f - \
+    && curl -sSL https://build.haxe.org/builds/haxe/linux64/haxe_latest.tar.gz | tar -x -z --strip-components=1 -f - \
     && ln -s /haxe/haxe /haxe/haxelib /usr/local/bin/ \
     && mkdir -p `dirname "$HAXE_STD_PATH"` \
     && ln -s /haxe/std "$HAXE_STD_PATH" \
