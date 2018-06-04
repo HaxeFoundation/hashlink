@@ -55,6 +55,14 @@ make_script: &make_script
 sudo: required
 matrix:
   include:
+    # Linting
+    - os: linux
+      dist: trusty
+      env: LINTING
+      install:
+        - sudo pip install cmakelint==1.3.4.1
+      script:
+        - cmakelint --filter=-linelength $(find . -name 'CMakeLists.txt' -print)
     # Linux 64-bit
     - haxe: development
       os: linux
