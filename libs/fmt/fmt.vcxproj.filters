@@ -300,6 +300,10 @@
       <Filter>vorbis</Filter>
     </ClCompile>
     <ClCompile Include="sha1.c" />
+    <ClCompile Include="mikkt.c" />
+    <ClCompile Include="..\..\include\mikktspace\mikktspace.c">
+      <Filter>mikkt</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="turbojpeg">
@@ -313,6 +317,9 @@
     </Filter>
     <Filter Include="vorbis">
       <UniqueIdentifier>{3f330839-1ff8-4160-8d74-6957d97e9e37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="mikkt">
+      <UniqueIdentifier>{b16da6f5-be29-4433-b595-14badcd2cd06}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -422,5 +429,8 @@
       <Filter>vorbis</Filter>
     </ClInclude>
     <ClInclude Include="sha1.h" />
+    <ClInclude Include="..\..\include\mikktspace\mikktspace.h">
+      <Filter>mikkt</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
