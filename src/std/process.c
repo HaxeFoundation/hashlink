@@ -246,15 +246,16 @@ HL_PRIM int hl_process_exit( vprocess *p, bool *running ) {
 	}
 	return rval;
 #	else
-	int rval;
+	int rval = 0;
 	int wret = waitpid(p->pid,&rval,running ? WNOHANG : 0);
 	if( running ) *running = false;
 	if( wret != p->pid ) {
-		if( running && wret == 0 ) {
-			*running = true;
+		if( running ) {
+			if( wret == 0 )
+				*running = true;
 			return 0;
-		}
-		return -1;
+		} else
+			return -1;
 	}
 	if( !WIFEXITED(rval) ) {
 		if( WIFSIGNALED(rval) )
