@@ -127,6 +127,7 @@ class NodeDebugApi implements Api {
 		var e = debugEvent;
 		if( !winApi.WaitForDebugEvent(e.ref(), timeout) )
 			return { r : Timeout, tid : 0 };
+		var e : Dynamic = e;
 		var tid = e.threadId;
 		var result : WaitResult = switch( e.debugEventCode ) {
 		case 1://EXCEPTION_DEBUG_EVENT

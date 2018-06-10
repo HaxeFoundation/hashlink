@@ -7,6 +7,7 @@ abstract CType(String) {
 	public var bool = 'bool';
 	public var string = 'string';
 	public var pointer = 'pointer';
+	public var long = 'long';
 	public var size_t = 'size_t';
 
 	var self(get, never) : CType;
@@ -25,10 +26,13 @@ abstract CType(String) {
 }
 
 
-extern class CValue extends js.node.Buffer implements Dynamic {
+extern class CValue extends js.node.Buffer {
 
 	public function deref() : CValue;
 	public function ref() : CValue;
+	public function address() : Int;
+	public function hexAddress() : String;
+	public function isNull() : Bool;
 
 }
 

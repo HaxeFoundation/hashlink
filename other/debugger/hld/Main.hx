@@ -94,7 +94,23 @@ class Main {
 		dbg = new hld.Debugger();
 		dbg.loadModule(sys.io.File.getBytes(file));
 
-		if( !dbg.connect("127.0.0.1", debugPort) || !dbg.init(new #if js hld.NodeDebugApi #else hld.HLDebugApi #end(pid, dbg.is64)) ) {
+		function getAPI() : hld.Api {
+			#if hl
+			return new hld.HLDebugApi(pid, dbg.is64);
+			#elseif nodejs
+			switch( Sys.systemName() ) {
+			case "Windows":
+				return new hld.NodeDebugApi(pid, dbg.is64);
+			default:
+				return new hld.NodeDebugApiLinux(pid,dbg.is64);
+			}
+			#else
+			throw "This platform does not have a debug API";
+			return null;
+			#end
+		}
+
+		if( !dbg.connect("127.0.0.1", debugPort) || !dbg.init(getAPI()) ) {
 			dumpProcessOut();
 			error("Failed to access process #" + pid + " on port " + debugPort + " for debugging");
 			return;

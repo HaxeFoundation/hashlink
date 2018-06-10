@@ -59,6 +59,14 @@ abstract Buffer(js.node.Buffer) {
 		this.writeInt32LE(value, pos);
 	}
 
+	public inline function setUI16(pos,value) {
+		this.writeUInt16LE(value, pos);
+	}
+
+	public inline function setUI8(pos,value) {
+		this.writeUInt8(value, pos);
+	}
+
 	public function readStringUCS2(pos, length) {
 		var str = "";
 		for( i in 0...length ) {
