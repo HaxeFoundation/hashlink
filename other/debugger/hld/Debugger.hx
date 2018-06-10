@@ -26,6 +26,7 @@ class Debugger {
 	var api : Api;
 	var module : Module;
 	var jit : JitInfo;
+	var processExit : Bool;
 
 	var breakPoints : Array<{ fid : Int, pos : Int, codePos : Int, oldByte : Int }>;
 	var nextStep : Int = -1;
@@ -65,14 +66,24 @@ class Debugger {
 		module.load(content);
 	}
 
-	public function connect( host : String, port : Int ) {
+	public function connect( host : String, port : Int, retries = 10 ) {
 		sock = new sys.net.Socket();
-		try {
-			sock.connect(new sys.net.Host(host), port);
-		} catch( e : Dynamic ) {
+
+		var connected = false;
+		for( i in 0...retries ) {
+			try {
+				sock.connect(new sys.net.Host(host), port);
+				connected = true;
+				break;
+			} catch( e : Dynamic ) {
+				Sys.sleep(0.1);
+			}
+		}
+		if( !connected ) {
 			sock.close();
 			return false;
 		}
+
 		jit = new JitInfo();
 		if( !jit.read(sock.input, module) ) {
 			sock.close();
@@ -131,8 +142,9 @@ class Debugger {
 		return r;
 	}
 
-	function singleStep(tid) {
-		var r = getReg(tid, EFlags).toInt() | 256;
+	function singleStep(tid,set=true) {
+		var r = getReg(tid, EFlags).toInt();
+		if( set ) r |= 256 else r &= ~256;
 		setReg(tid, EFlags, hld.Pointer.make(r,0));
 	}
 
@@ -157,6 +169,12 @@ class Debugger {
 		watchBreak = null;
 		while( true ) {
 			cmd = api.wait(customTimeout == null ? 1000 : Math.ceil(customTimeout * 1000));
+
+			if( cmd.r == Breakpoint && nextStep >= 0 ) {
+				// On Linux, singlestep is not reset
+				cmd.r = SingleStep;
+				singleStep(cmd.tid,false);
+			}
 
 			var tid = cmd.tid;
 			switch( cmd.r ) {
@@ -224,7 +242,10 @@ class Debugger {
 				if( onStep )
 					return SingleStep;
 				resume();
-			case Error, Exit, Watchbreak:
+			case Exit:
+				processExit = true;
+				break;
+			case Error, Watchbreak:
 				break;
 			}
 		}
@@ -594,7 +615,7 @@ class Debugger {
 	public function resume() {
 		if( stoppedThread == null )
 			throw "No thread stopped";
-		if( !api.resume(stoppedThread) )
+		if( !api.resume(stoppedThread) && !processExit )
 			throw "Could not resume "+stoppedThread;
 		stoppedThread = null;
 		watchBreak = null;
