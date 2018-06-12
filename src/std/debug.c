@@ -151,9 +151,15 @@ static void *get_reg( int r ) {
 		struct user_regs_struct *regs = NULL;
 		struct user *user = NULL;
 		switch( r ) {
+#		ifdef HL_64
 		case 0: return &regs->rsp;
 		case 1: return &regs->rbp;
 		case 2: return &regs->rip;
+#		else
+		case 0: return &regs->esp;
+		case 1: return &regs->ebp;
+		case 2: return &regs->eip;
+#		endif
 		case 3: return &regs->eflags;
 		default: return &user->u_debugreg[r-4];
 		}
