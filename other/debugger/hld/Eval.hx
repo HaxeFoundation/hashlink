@@ -280,6 +280,15 @@ class Eval {
 		return s;
 	}
 
+	public function typeStr( t : HLType ) {
+		switch( t ) {
+		case HDynObj:
+			return "{...}";
+		default:
+			return t.toString();
+		}
+	}
+
 	public function valueStr( v : Value ) {
 		if( maxStringRec < 0 && v.t.isPtr() )
 			return "<...>";
@@ -293,8 +302,8 @@ class Eval {
 		case VPointer(p):
 			switch( v.t ) {
 			case HVirtual(_): p.toString();
-			case HBytes, HAbstract(_): v.t.toString()+"("+p.toString()+")";
-			default: v.t.toString().split(".").pop();
+			case HBytes, HAbstract(_): typeStr(v.t)+"("+p.toString()+")";
+			default: typeStr(v.t).split(".").pop();
 			}
 		case VString(s,_): "\"" + escape(s) + "\"";
 		case VClosure(f, d): funStr(f) + "[" + valueStr(d) + "]";
@@ -316,7 +325,7 @@ class Eval {
 			} else
 				content.toString();
 		case VType(t):
-			t.toString();
+			typeStr(t);
 		case VEnum(c, values):
 			if( values.length == 0 )
 				c
