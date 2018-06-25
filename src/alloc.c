@@ -137,6 +137,7 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 #define GC_PROFILE		1
 #define GC_DUMP_MEM		2
 #define GC_NO_THREADS	4
+#define GC_FORCE_MAJOR	8
 
 static int gc_flags = 0;
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
@@ -1013,7 +1014,7 @@ static bool gc_is_active = true;
 static void gc_check_mark() {
 	int64 m = gc_stats.total_allocated - gc_stats.last_mark;
 	int64 b = gc_stats.allocation_count - gc_stats.last_mark_allocs;
-	if( (m > gc_stats.pages_total_memory * gc_mark_threshold || b > gc_stats.pages_blocks * gc_mark_threshold) && gc_is_active )
+	if( (m > gc_stats.pages_total_memory * gc_mark_threshold || b > gc_stats.pages_blocks * gc_mark_threshold || (gc_flags & GC_FORCE_MAJOR)) && gc_is_active )
 		gc_major();
 }
 
