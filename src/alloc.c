@@ -1369,9 +1369,15 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	gc_global_lock(false);
 }
 
+#ifdef HL_VCC
+#	pragma optimize( "", off )
+#endif
 HL_API vdynamic *hl_debug_call( int mode, vdynamic *v ) {
 	return NULL;
 }
+#ifdef HL_VCC
+#	pragma optimize( "", on )
+#endif
 
 DEFINE_PRIM(_VOID, gc_major, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_enable, _BOOL);
