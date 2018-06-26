@@ -706,6 +706,17 @@ HL_PRIM void HL_NAME(gl_delete_vertex_array)( vdynamic *b ) {
 	glDeleteVertexArrays(1, &bb);
 }
 
+// uniform buffer
+
+HL_PRIM int HL_NAME(gl_get_uniform_block_index)( vdynamic *p, vstring *name ) {
+	char *cname = hl_to_utf8(name->bytes);
+	return (int)glGetUniformBlockIndex(p->v.i, cname);
+}
+
+HL_PRIM void HL_NAME(gl_uniform_block_binding)( vdynamic *p, int index, int binding ) {
+	glUniformBlockBinding(p->v.i, index, binding);
+}
+
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_clear,_I32);
@@ -807,3 +818,6 @@ DEFINE_PRIM(_VOID, gl_end_query, _I32);
 DEFINE_PRIM(_BOOL, gl_query_result_available, _NULL(_I32));
 DEFINE_PRIM(_VOID, gl_query_counter, _NULL(_I32) _I32);
 DEFINE_PRIM(_F64, gl_query_result, _NULL(_I32));
+
+DEFINE_PRIM(_I32, gl_get_uniform_block_index, _NULL(_I32) _STRING);
+DEFINE_PRIM(_VOID, gl_uniform_block_binding, _NULL(_I32) _I32 _I32);
