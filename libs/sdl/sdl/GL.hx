@@ -384,6 +384,15 @@ class GL {
 	public static function deleteVertexArray( a : VertexArray ) : Void {
 	}
 
+	// uniform buffer
+
+	public static function getUniformBlockIndex( p : Program, name : String ) : Int {
+		return 0;
+	}
+
+	public static function uniformBlockBinding( p : Program, blockIndex : Int, blockBinding : Int ) : Void {
+	}
+
 	// ----- CONSTANTS -----
 
 	/* ClearBufferMask */
