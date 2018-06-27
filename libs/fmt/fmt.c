@@ -19,12 +19,17 @@ typedef struct {
 
 HL_PRIM bool HL_NAME(jpg_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
 #if defined(HL_CONSOLE) && !defined(HL_XBO)
-	return sys_jpg_decode(data, dataLen, out, width, height, stride, format, flags);
+	hl_blocking(true);
+	bool b = sys_jpg_decode(data, dataLen, out, width, height, stride, format, flags);
+	hl_blocking(false);
+	return b;
 #else
+	hl_blocking(true);
 	tjhandle h = tjInitDecompress();
 	int result;
 	result = tjDecompress2(h,data,dataLen,out,width,stride,height,format,(flags & 1 ? TJFLAG_BOTTOMUP : 0));
 	tjDestroy(h);
+	hl_blocking(false);
 	return result == 0;
 #endif
 }
@@ -32,9 +37,11 @@ HL_PRIM bool HL_NAME(jpg_decode)( vbyte *data, int dataLen, vbyte *out, int widt
 HL_PRIM bool HL_NAME(png_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
 #	ifdef PNG_IMAGE_VERSION
 	png_image img;
+	hl_blocking(true);
 	memset(&img, 0, sizeof(img));
 	img.version = PNG_IMAGE_VERSION;
 	if( png_image_begin_read_from_memory(&img,data,dataLen) == 0 ) {
+		hl_blocking(false);
 		png_image_free(&img);
 		return false;
 	}
@@ -58,18 +65,22 @@ HL_PRIM bool HL_NAME(png_decode)( vbyte *data, int dataLen, vbyte *out, int widt
 		img.format = PNG_FORMAT_ARGB;
 		break;
 	default:
+		hl_blocking(false);
 		png_image_free(&img);
 		hl_error("Unsupported format");
 		break;
 	}
 	if( img.width != width || img.height != height ) {
+		hl_blocking(false);
 		png_image_free(&img);
 		return false;
 	}
 	if( png_image_finish_read(&img,NULL,out,stride * (flags & 1 ? -1 : 1),NULL) == 0 ) {
+		hl_blocking(false);
 		png_image_free(&img);
 		return false;
 	}
+	hl_blocking(false);
 	png_image_free(&img);
 #	else
 	hl_error("PNG support is missing for this libPNG version");
@@ -83,6 +94,7 @@ HL_PRIM void HL_NAME(img_scale)( vbyte *out, int outPos, int outStride, int outW
 	float scaleY = outHeight <= 1 ? 0.0f : (float)((inHeight - 1.001f) / (outHeight - 1));
 	out += outPos;
 	in += inPos;
+	hl_blocking(true);
 	for(y=0;y<outHeight;y++) {
 		for(x=0;x<outWidth;x++) {
 			float fx = x * scaleX;
@@ -117,6 +129,7 @@ HL_PRIM void HL_NAME(img_scale)( vbyte *out, int outPos, int outStride, int outW
 		}
 		out += outStride - (outWidth << 2);
 	}
+	hl_blocking(false);
 }
 
 
@@ -235,16 +248,20 @@ HL_PRIM bool HL_NAME(inflate_buffer)( fmt_zip *zip, vbyte *src, int srcpos, int 
 	dlen = dstlen - dstpos;
 	if( srcpos < 0 || dstpos < 0 || slen < 0 || dlen < 0 )
 		hl_error("Out of range");
+	hl_blocking(true);
 	z->next_in = (Bytef*)(src + srcpos);
 	z->next_out = (Bytef*)(dst + dstpos);
 	z->avail_in = slen;
 	z->avail_out = dlen;
-	if( (err = inflate(z,zip->flush)) < 0 )
+	if( (err = inflate(z,zip->flush)) < 0 ) {
+		hl_blocking(false);
 		zlib_error(z,err);
+	}
 	z->next_in = NULL;
 	z->next_out = NULL;
 	*read = slen - z->avail_in;
 	*write = dlen - z->avail_out;
+	hl_blocking(false);
 	return err == Z_STREAM_END;
 }
 
@@ -255,16 +272,20 @@ HL_PRIM bool HL_NAME(deflate_buffer)( fmt_zip *zip, vbyte *src, int srcpos, int 
 	dlen = dstlen - dstpos;
 	if( srcpos < 0 || dstpos < 0 || slen < 0 || dlen < 0 )
 		hl_error("Out of range");
+	hl_blocking(true);
 	z->next_in = (Bytef*)(src + srcpos);
 	z->next_out = (Bytef*)(dst + dstpos);
 	z->avail_in = slen;
 	z->avail_out = dlen;
-	if( (err = deflate(z,zip->flush)) < 0 )
+	if( (err = deflate(z,zip->flush)) < 0 ) {
+		hl_blocking(false);
 		zlib_error(z,err);
+	}
 	z->next_in = NULL;
 	z->next_out = NULL;
 	*read = slen - z->avail_in;
 	*write = dlen - z->avail_out;
+	hl_blocking(false);
 	return err == Z_STREAM_END;
 }
 
@@ -372,17 +393,21 @@ HL_PRIM bool HL_NAME(ogg_seek)( fmt_ogg *o, int sample ) {
 #define OGGFMT_UNSIGNED		256
 
 HL_PRIM int HL_NAME(ogg_read)( fmt_ogg *o, char *output, int size, int format ) {
+	int ret = -1;
+	hl_blocking(true);
 	switch( format&127 ) {
 	case OGGFMT_I8:
 	case OGGFMT_I16:
-		return ov_read(&o->f, output, size, (format & OGGFMT_BIGENDIAN) != 0, format&3, (format & OGGFMT_UNSIGNED) == 0, &o->section);
+		ret = ov_read(&o->f, output, size, (format & OGGFMT_BIGENDIAN) != 0, format&3, (format & OGGFMT_UNSIGNED) == 0, &o->section);
+		break;
 //	case OGGFMT_F32:
 //		-- this decodes separates channels instead of mixed single buffer one
 //		return ov_read_float(&o->f, output, size, (format & OGGFMT_BIGENDIAN) != 0, format&3, (format & OGGFMT_UNSIGNED) == 0, &o->section);
 	default:
 		break;
 	}
-	return -1;
+	hl_blocking(false);
+	return ret;
 }
 
 #define _OGG _ABSTRACT(fmt_ogg)
@@ -623,6 +648,7 @@ HL_PRIM void HL_NAME(digest)( vbyte *out, vbyte *in, int length, int format ) {
 		in = (vbyte*)hl_to_utf8((uchar*)in);
 		length = (int)strlen((char*)in);
 	}
+	hl_blocking(true);
 	switch( format & 0xFF ) {
 	case 0:
 		{
@@ -647,9 +673,11 @@ HL_PRIM void HL_NAME(digest)( vbyte *out, vbyte *in, int length, int format ) {
 		*((int*)out) = adler32(*(int*)out, in, length);
 		break;
 	default:
+		hl_blocking(false);
 		hl_error_msg(USTR("Unknown digest format %d"),format&0xFF);
 		break;
 	}
+	hl_blocking(false);
 }
 
 DEFINE_PRIM(_VOID, digest, _BYTES _BYTES _I32 _I32);
