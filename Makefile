@@ -121,7 +121,7 @@ hl: ${HL} libhl
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
 
 fmt: ${FMT} libhl
-	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -I include/mikktspace -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
+	${CC} ${CFLAGS} -I include/mikktspace -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
 sdl: ${SDL} libhl
 	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENGL)
