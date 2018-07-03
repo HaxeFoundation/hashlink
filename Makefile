@@ -26,7 +26,7 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 
 HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o
 
-FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.c libs/fmt/mikkt.c
+FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o
 
 SDL = libs/sdl/sdl.o libs/sdl/gl.o
 
