@@ -82,6 +82,9 @@ class GL {
 
 	// state changes
 
+	public static function polygonMode( face : Int, mode : Int ) {
+	}
+
 	public static function enable( feature : Int ) {
 	}
 
@@ -202,8 +205,19 @@ class GL {
 	public static function texParameteri( t : Int, key : Int, value : Int ) {
 	}
 
+	public static function texParameterf( t : Int, key : Int, value : hl.F32 ) {
+	}
+
 	@:hlNative("mesa","gl_tex_image2d")
 	public static function texImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
+	}
+
+	@:hlNative("mesa","gl_tex_image3d")
+	public static function texImage3D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, depth : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
+	}
+
+	@:hlNative("mesa","gl_tex_image2d_multisample")
+	public static function texImage2DMultisample( target : Int, internalFormat : Int, samples : Int, width : Int, height : Int, fixedsamplelocations : Bool ) {
 	}
 
 	public static function generateMipmap( t : Int ) {
@@ -214,6 +228,9 @@ class GL {
 
 	// framebuffer
 
+	public static function blitFramebuffer( src_x0 : Int, src_y0 : Int, src_x1 : Int, src_y1 : Int, dst_x0 : Int, dst_y0 : Int, dst_x1 : Int, dst_y1 : Int, mask : Int, filter : Int ) {
+	}
+
 	public static function createFramebuffer() : Framebuffer {
 		return null;
 	}
@@ -223,6 +240,12 @@ class GL {
 
 	@:hlNative("mesa","gl_framebuffer_texture2d")
 	public static function framebufferTexture2D( target : Int, attach : Int, texTarget : Int, t : Texture, level : Int ) {
+	}
+
+	public static function framebufferTextureLayer( target : Int, attach : Int, t : Texture, level : Int, layer : Int ) {
+	}
+
+	public static function framebufferTexture( target : Int, attach : Int, t : Texture, level : Int ) {
 	}
 
 	public static function deleteFramebuffer( f : Framebuffer ) {
@@ -249,6 +272,9 @@ class GL {
 	public static function renderbufferStorage( target : Int, format : Int, width : Int, height : Int ) {
 	}
 
+	public static function renderbufferStorageMultisample( target : Int, samples : Int, format : Int, width : Int, height : Int ) {
+	}
+
 	public static function framebufferRenderbuffer( frameTarget : Int, attach : Int, renderTarget : Int, b : Renderbuffer ) {
 	}
 
@@ -259,6 +285,9 @@ class GL {
 
 	public static function createBuffer() : Buffer {
 		return null;
+	}
+
+	public static function bindBufferBase( target : Int, index : Int, buffer : Buffer ) {
 	}
 
 	public static function bindBuffer( target : Int, b : Buffer ) {
@@ -282,6 +311,9 @@ class GL {
 	public static function vertexAttribPointer( index : Int, size : Int, type : Int, normalized : Bool, stride : Int, position : Int ) {
 	}
 
+	public static function vertexAttribIPointer( index : Int, size : Int, type : Int, stride : Int, position : Int ) {
+	}
+
 	public static function deleteBuffer( b : Buffer ) {
 	}
 
@@ -293,9 +325,29 @@ class GL {
 	public static function uniform4fv( u : Uniform, buffer : hl.Bytes, bufPos : Int, count : Int ) {
 	}
 
+	public static function uniformMatrix4fv( u : Uniform, transpose : Bool, buffer : hl.Bytes, bufPos : Int, count : Int ) {
+	}
+
+	// compute
+
+	public static function dispatchCompute( num_groups_x : Int, num_groups_y : Int, num_groups_z : Int ) {
+	}
+
+	public static function memoryBarrier( barrier : Int ) {
+	}
+
 	// draw
 
 	public static function drawElements( mode : Int, count : Int, type : Int, start : Int ) {
+	}
+
+	public static function drawElementsInstanced( mode : Int, count : Int, type : Int, start : Int, primcount : Int ) {
+	}
+
+	public static function drawArrays( mode : Int, start : Int, count : Int ) {
+	}
+
+	public static function drawArraysInstanced( mode : Int, start : Int, count : Int, primcount : Int ) {
 	}
 
 	// queries
@@ -333,6 +385,15 @@ class GL {
 	}
 
 	public static function deleteVertexArray( a : VertexArray ) : Void {
+	}
+
+	// uniform buffer
+
+	public static function getUniformBlockIndex( p : Program, name : String ) : Int {
+		return 0;
+	}
+
+	public static function uniformBlockBinding( p : Program, blockIndex : Int, blockBinding : Int ) : Void {
 	}
 
 	// ----- CONSTANTS -----
@@ -406,6 +467,9 @@ class GL {
 	public static inline var ELEMENT_ARRAY_BUFFER           = 0x8893;
 	public static inline var ARRAY_BUFFER_BINDING           = 0x8894;
 	public static inline var ELEMENT_ARRAY_BUFFER_BINDING   = 0x8895;
+	public static inline var SHADER_STORAGE_BUFFER          = 0x90D2;
+	public static inline var UNIFORM_BUFFER                 = 0x8A11;
+	public static inline var QUERY_BUFFER                   = 0x9192;
 
 	public static inline var STREAM_DRAW                    = 0x88E0;
 	public static inline var STATIC_DRAW                    = 0x88E4;
@@ -420,6 +484,11 @@ class GL {
 	public static inline var FRONT                          = 0x0404;
 	public static inline var BACK                           = 0x0405;
 	public static inline var FRONT_AND_BACK                 = 0x0408;
+
+	/* PolygonMode */
+	public static inline var POINT                          = 0x1B00;
+	public static inline var LINE                           = 0x1B01;
+	public static inline var FILL                           = 0x1B02;
 
 	/* DepthFunction */
 	/*      NEVER */
@@ -441,6 +510,8 @@ class GL {
 	public static inline var POLYGON_OFFSET_FILL            = 0x8037;
 	public static inline var SAMPLE_ALPHA_TO_COVERAGE       = 0x809E;
 	public static inline var SAMPLE_COVERAGE                = 0x80A0;
+	public static inline var MULTISAMPLE                    = 0x809D;
+	public static inline var DEPTH_CLAMP                    = 0x864F;
 
 	/* ErrorCode */
 	public static inline var NO_ERROR                       = 0;
@@ -537,8 +608,14 @@ class GL {
 	public static inline var LUMINANCE                      = 0x1909;
 	public static inline var LUMINANCE_ALPHA                = 0x190A;
 
-	public static inline var BGRA							= 0x80E1;
-	public static inline var RGBA8							= 0x8058;
+	public static inline var BGRA                           = 0x80E1;
+	public static inline var RGBA8                          = 0x8058;
+	public static inline var RGB10_A2                       = 0x8059;
+
+	public static inline var RG16                           = 0x822C;
+	public static inline var RG16UI                         = 0x823A;
+	public static inline var RG16F                          = 0x822F;
+	public static inline var RG32F                          = 0x8230;
 
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
@@ -546,23 +623,25 @@ class GL {
 	public static inline var UNSIGNED_SHORT_5_5_5_1         = 0x8034;
 	public static inline var UNSIGNED_SHORT_5_6_5           = 0x8363;
 
-	public static inline var SRGB							= 0x8C40;
-	public static inline var SRGB8							= 0x8C41;
-	public static inline var SRGB_ALPHA						= 0x8C42;
-	public static inline var SRGB8_ALPHA					= 0x8C43;
-	public static inline var FRAMEBUFFER_SRGB				= 0x8DB9;
+	public static inline var SRGB                           = 0x8C40;
+	public static inline var SRGB8                          = 0x8C41;
+	public static inline var SRGB_ALPHA                     = 0x8C42;
+	public static inline var SRGB8_ALPHA                    = 0x8C43;
+	public static inline var FRAMEBUFFER_SRGB               = 0x8DB9;
 
 	public static inline var RGBA32F                        = 0x8814;
 	public static inline var RGB32F                         = 0x8815;
 	public static inline var RGBA16F                        = 0x881A;
 	public static inline var RGB16F                         = 0x881B;
-
+	public static inline var R11F_G11F_B10F                 = 0x8C3A;
 	public static inline var ALPHA16F                       = 0x881C;
 	public static inline var ALPHA32F                       = 0x8816;
 
 	/* Shaders */
 	public static inline var FRAGMENT_SHADER                  = 0x8B30;
 	public static inline var VERTEX_SHADER                    = 0x8B31;
+	public static inline var GEOMETRY_SHADER                  = 0x8DD9;
+	public static inline var COMPUTE_SHADER                   = 0x91B9;
 	public static inline var MAX_VERTEX_ATTRIBS               = 0x8869;
 	public static inline var MAX_VERTEX_UNIFORM_VECTORS       = 0x8DFB;
 	public static inline var MAX_VARYING_VECTORS              = 0x8DFC;
@@ -620,13 +699,23 @@ class GL {
 	/* TextureParameterName */
 	public static inline var TEXTURE_MAG_FILTER             = 0x2800;
 	public static inline var TEXTURE_MIN_FILTER             = 0x2801;
+	public static inline var TEXTURE_WRAP_R                 = 0x8072;
 	public static inline var TEXTURE_WRAP_S                 = 0x2802;
 	public static inline var TEXTURE_WRAP_T                 = 0x2803;
+	public static inline var TEXTURE_LOD_BIAS               = 0x8501;
+	public static inline var TEXTURE_MAX_ANISOTROPY         = 0x84FE;
+	public static inline var TEXTURE_COMPARE_MODE           = 0x884C;
+	public static inline var TEXTURE_COMPARE_FUNC           = 0x884D;
+	public static inline var COMPARE_REF_TO_TEXTURE         = 0x884E;
 
 	/* TextureTarget */
 	public static inline var TEXTURE_2D                     = 0x0DE1;
+	public static inline var TEXTURE_2D_MULTISAMPLE         = 0x9100;
+	public static inline var TEXTURE_3D                     = 0x806F;
 	public static inline var TEXTURE                        = 0x1702;
+	public static inline var TEXTURE_2D_ARRAY				= 0x8C1A;
 
+	public static inline var TEXTURE_CUBE_MAP_SEAMLESS      = 0x884F;
 	public static inline var TEXTURE_CUBE_MAP               = 0x8513;
 	public static inline var TEXTURE_BINDING_CUBE_MAP       = 0x8514;
 	public static inline var TEXTURE_CUBE_MAP_POSITIVE_X    = 0x8515;
@@ -721,6 +810,8 @@ class GL {
 	/* GLFramebuffer Object. */
 	public static inline var FRAMEBUFFER                    = 0x8D40;
 	public static inline var RENDERBUFFER                   = 0x8D41;
+	public static inline var READ_FRAMEBUFFER               = 0x8CA8;
+	public static inline var DRAW_FRAMEBUFFER               = 0x8CA9;
 
 	public static inline var RGBA4                          = 0x8056;
 	public static inline var RGB5_A1                        = 0x8057;
@@ -773,7 +864,24 @@ class GL {
 	public static inline var BROWSER_DEFAULT_WEBGL          = 0x9244;
 
 	/* Queries */
-	public static inline var SAMPLES_PASSED					= 0x8914;
-	public static inline var TIMESTAMP						= 0x8E28;
+	public static inline var SAMPLES_PASSED                 = 0x8914;
+	public static inline var TIMESTAMP                      = 0x8E28;
+
+	/* Barriers */
+	public static inline var VERTEX_ATTRIB_ARRAY_BARRIER_BIT = 0x00000001;
+	public static inline var ELEMENT_ARRAY_BARRIER_BIT       = 0x00000002;
+	public static inline var UNIFORM_BARRIER_BIT             = 0x00000004;
+	public static inline var TEXTURE_FETCH_BARRIER_BIT       = 0x00000008;
+	public static inline var SHADER_IMAGE_ACCESS_BARRIER_BIT = 0x00000020;
+	public static inline var COMMAND_BARRIER_BIT             = 0x00000040;
+	public static inline var PIXEL_BUFFER_BARRIER_BIT        = 0x00000080;
+	public static inline var TEXTURE_UPDATE_BARRIER_BIT      = 0x00000100;
+	public static inline var BUFFER_UPDATE_BARRIER_BIT       = 0x00000200;
+	public static inline var FRAMEBUFFER_BARRIER_BIT         = 0x00000400;
+	public static inline var TRANSFORM_FEEDBACK_BARRIER_BIT  = 0x00000800;
+	public static inline var ATOMIC_COUNTER_BARRIER_BIT      = 0x00001000;
+	public static inline var SHADER_STORAGE_BARRIER_BIT      = 0x00002000;
+	public static inline var QUERY_BUFFER_BARRIER_BIT        = 0x00008000;
+	public static inline var ALL_BARRIER_BITS                = 0xFFFFFFFF;
 
 }
