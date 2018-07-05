@@ -472,7 +472,7 @@ DEFINE_PRIM(_POINTER, create_input_layout, _ARR _BYTES _I32);
 DEFINE_PRIM(_RESOURCE, create_texture_2d, _DYN _BYTES);
 DEFINE_PRIM(_POINTER, create_depth_stencil_view, _RESOURCE _I32);
 DEFINE_PRIM(_POINTER, create_depth_stencil_state, _DYN);
-DEFINE_PRIM(_VOID, om_set_depth_stencil_state, _POINTER);
+DEFINE_PRIM(_VOID, om_set_depth_stencil_state, _POINTER _I32);
 DEFINE_PRIM(_VOID, clear_depth_stencil_view, _POINTER _NULL(_F64) _NULL(_I32));
 DEFINE_PRIM(_POINTER, create_blend_state, _BOOL _BOOL _ARR _I32);
 DEFINE_PRIM(_VOID, om_set_blend_state, _POINTER _BYTES _I32);
