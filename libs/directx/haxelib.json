@@ -4,7 +4,7 @@
 	"license" : "BSD",
 	"contributors" : ["ncannasse"],
 	"description" : "DirectX support for Haxe/HL.",
-	"version" : "1.6.0",
+	"version" : "1.7.0",
 	"releasenote" : "",
 	"dependencies": { "hlopenal" : "" }
 }

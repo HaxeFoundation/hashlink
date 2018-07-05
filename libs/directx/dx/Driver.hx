@@ -301,7 +301,7 @@ class Texture2dDesc {
 	var DecrSat = 5;
 	var Invert = 6;
 	var Incr = 7;
-	var Desc = 8;
+	var Decr = 8;
 }
 
 @:keep
@@ -598,7 +598,7 @@ class Driver {
 		return null;
 	}
 
-	public static function omSetDepthStencilState( state : DepthStencilState ) : Void {
+	public static function omSetDepthStencilState( state : DepthStencilState, ref : Int ) : Void {
 	}
 
 	public static function clearDepthStencilView( view : DepthStencilView, depth : Null<Float>, stencil : Null<Int> ) {
