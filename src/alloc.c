@@ -1179,6 +1179,19 @@ void *sys_alloc_align( int size, int align );
 void sys_free_align( void *ptr, int size );
 #endif
 
+#if defined(__ANDROID__) && !defined(HAVE_POSIX_MEMALIGN)
+int posix_memalign(void** memptr, size_t alignment, size_t size) {
+    if ((alignment & (alignment - 1)) != 0 || alignment == 0 || alignment % sizeof(void*) != 0) {
+        return 22; // Invalid argument (EINVAL)
+    }
+    *memptr = memalign(alignment, size);
+    if (*memptr == NULL) {
+        return errno;
+    }
+    return 0;
+}
+#endif /* __ANDROID_API__ < 17 */
+
 static void *gc_alloc_page_memory( int size ) {
 #if defined(HL_WIN)
 	void *ptr = VirtualAlloc(start_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
