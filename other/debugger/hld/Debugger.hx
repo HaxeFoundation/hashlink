@@ -649,10 +649,10 @@ class Debugger {
 	public function addBreakpoint( file : String, line : Int ) {
 		var breaks = module.getBreaks(file, line);
 		if( breaks == null )
-			return false;
+			return -1;
 		// check already defined
 		var set = false;
-		for( b in breaks.copy() ) {
+		for( b in breaks.breaks ) {
 			var found = false;
 			for( a in breakPoints ) {
 				if( a.fid == b.ifun && a.pos == b.pos ) {
@@ -668,7 +668,7 @@ class Debugger {
 			breakPoints.push({ fid : b.ifun, pos : b.pos, oldByte : old, codePos : codePos });
 			set = true;
 		}
-		return set;
+		return breaks.line;
 	}
 
 	public function clearBreakpoints( file : String ) {
@@ -695,7 +695,7 @@ class Debugger {
 		if( breaks == null )
 			return false;
 		var rem = false;
-		for( b in breaks )
+		for( b in breaks.breaks )
 			for( a in breakPoints )
 				if( a.fid == b.ifun && a.pos == b.pos ) {
 					rem = true;

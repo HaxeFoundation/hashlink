@@ -152,7 +152,7 @@ class CodeGraph {
 	public function getLocals( pos : Int ) : Array<String> {
 		var arr = [];
 		for( a in fun.assigns ) {
-			if( a.position >= pos ) break;
+			if( a.position > pos ) break;
 			if( a.position < 0 ) continue; // arg
 			if( arr.indexOf(a.varName) >= 0 ) continue;
 			if( getLocal(module.strings[a.varName],pos) == null ) continue; // not written

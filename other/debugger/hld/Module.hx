@@ -247,36 +247,48 @@ class Module {
 			return null;
 
 		var breaks = [];
-		for( f in ffuns.functions ) {
-			if( f.lmin > line || f.lmax < line ) continue;
-			var ifun = f.ifun;
-			var f = f.f;
-			var i = 0;
-			var len = f.debug.length >> 1;
-			while( i < len ) {
-				var dfile = f.debug[i << 1];
-				if( dfile != ffuns.fidx ) {
-					i++;
-					continue;
-				}
-				var dline = f.debug[(i << 1) + 1];
-				if( dline != line ) {
-					i++;
-					continue;
-				}
-				breaks.push({ ifun : ifun, pos : i });
-				// skip
-				i++;
+		var funs = ffuns.functions;
+		var matched = [];
+
+		while( breaks.length == 0  && funs.length > 0 ) {
+			for( f in funs ) {
+				if( f.lmin > line || f.lmax < line ) continue;
+				matched.push(f);
+				var ifun = f.ifun;
+				var f = f.f;
+				var i = 0;
+				var len = f.debug.length >> 1;
 				while( i < len ) {
 					var dfile = f.debug[i << 1];
+					if( dfile != ffuns.fidx ) {
+						i++;
+						continue;
+					}
 					var dline = f.debug[(i << 1) + 1];
-					if( dfile == ffuns.fidx && dline != line )
-						break;
+					if( dline != line ) {
+						i++;
+						continue;
+					}
+					breaks.push({ ifun : ifun, pos : i });
+					// skip
 					i++;
+					while( i < len ) {
+						var dfile = f.debug[i << 1];
+						var dline = f.debug[(i << 1) + 1];
+						if( dfile == ffuns.fidx && dline != line )
+							break;
+						i++;
+					}
 				}
 			}
+			// breakpoint not found ? move to the next line
+			if( breaks.length == 0 ) {
+				funs = matched;
+				matched = [];
+				line++;
+			}
 		}
-		return breaks;
+		return { breaks : breaks, line : line };
 	}
 
 	public function resolveSymbol( fidx : Int, fpos : Int ) {

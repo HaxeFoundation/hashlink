@@ -229,9 +229,10 @@ class Main {
 			var fileLine = args.shift().split(":");
 			var line = Std.parseInt(fileLine.pop());
 			var file = fileLine.join(":");
-			if( dbg.addBreakpoint(file, line) ) {
+			line = dbg.addBreakpoint(file, line);
+			if( line >= 0 ) {
 				breaks.push({file:file, line:line});
-				Sys.println("Breakpoint set");
+				Sys.println("Breakpoint set line "+line);
 			} else
 				Sys.println("No breakpoint set");
 		case "p", "print":
