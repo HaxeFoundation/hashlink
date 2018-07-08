@@ -20,6 +20,22 @@ class Debugger {
 
 	static inline var INT3 = 0xCC;
 	static var HW_REGS : Array<Api.Register> = [Dr0, Dr1, Dr2, Dr3];
+	public static var IGNORED_ROOTS = [
+		"hl",
+		"sys",
+		"haxe",
+		"Date",
+		"EReg",
+		"Math",
+		"Reflect",
+		"Std",
+		"String",
+		"StringBuf",
+		"Sys",
+		"Type",
+		"Xml",
+		"ArrayObj" // special
+	];
 
 	var sock : sys.net.Socket;
 
@@ -27,6 +43,7 @@ class Debugger {
 	var module : Module;
 	var jit : JitInfo;
 	var processExit : Bool;
+	var ignoredRoots : Map<String,Bool>;
 
 	var breakPoints : Array<{ fid : Int, pos : Int, codePos : Int, oldByte : Int }>;
 	var nextStep : Int = -1;
@@ -427,6 +444,18 @@ class Debugger {
 		}
 	}
 
+	function skipFunction( fidx : Int ) {
+		var ctx = module.getMethodContext(fidx);
+		var name = ctx == null ? new haxe.io.Path(module.resolveSymbol(fidx, 0).file).file : ctx.obj.name.split(".")[0];
+		if( name.charCodeAt(0) == "$".code ) name = name.substr(1);
+		if( ignoredRoots == null ) {
+			ignoredRoots = new Map();
+			for( r in IGNORED_ROOTS )
+				ignoredRoots.set(r,true);
+		}
+		return ignoredRoots.exists(name);
+	}
+
 	public function step( mode : StepMode ) : Api.WaitResult {
 		var tid = currentThread;
 		var s = currentStack[0];
@@ -448,7 +477,12 @@ class Debugger {
 					break;
 			case Into:
 				// different method or different line
-				if( st.fidx != s.fidx || module.resolveSymbol(st.fidx, st.fpos).line != line )
+				if( st.fidx != s.fidx ) {
+					if( deltaEbp < 0 && skipFunction(st.fidx) )
+						continue;
+					break;
+				}
+				if( module.resolveSymbol(st.fidx, st.fpos).line != line )
 					break;
 			case Out:
 				// only on ret
