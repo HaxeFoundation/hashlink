@@ -282,8 +282,8 @@ class Eval {
 		if( g == null )
 			return null;
 		var addr = { ptr : jit.globals.offset(g.offset), t : g.type };
-		for( f in path )
-			addr = readFieldAddress(fetch(addr), f);
+		while( path.length > 0 )
+			addr = readFieldAddress(fetch(addr), path.shift());
 		return addr;
 	}
 

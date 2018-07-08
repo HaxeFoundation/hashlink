@@ -226,7 +226,7 @@ class Module {
 			path.shift();
 			g = n;
 		}
-		return g == globalTable ? null : { type : code.globals[g.gid], offset : globalsOffsets[g.gid] };
+		return g == globalTable || g.gid == null ? null : { type : code.globals[g.gid], offset : globalsOffsets[g.gid] };
 	}
 
 	public function getFileFunctions( file : String ) {
