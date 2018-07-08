@@ -203,7 +203,7 @@ HL_PRIM vdynamic *HL_NAME(gl_get_program_parameter)( vdynamic *p, int param ) {
 		return alloc_i32(ret);
 	}
 	default:
-		hl_error_msg(USTR("Unsupported param %d"),param);
+		hl_error("Unsupported param %d",param);
 	}
 	return NULL;
 }
@@ -266,7 +266,7 @@ HL_PRIM vdynamic *HL_NAME(gl_get_shader_parameter)( vdynamic *s, int param ) {
 		return alloc_i32(ret);
 	}
 	default:
-		hl_error_msg(USTR("Unsupported param %d"), param);
+		hl_error("Unsupported param %d", param);
 	}
 	return NULL;
 }

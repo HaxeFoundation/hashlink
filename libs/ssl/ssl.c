@@ -87,7 +87,7 @@ static int ssl_error(int ret) {
 	uchar buf16[128];
 	mbedtls_strerror(ret, buf, sizeof(buf));
 	hl_from_utf8(buf16, (int)strlen(buf), buf);
-	hl_error_msg(buf16);
+	hl_error("%s",buf16);
 	return ret;
 }
 

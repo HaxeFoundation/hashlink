@@ -517,7 +517,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 		if( hl_safe_cast(obj->t, vt) ) return (vvirtual*)obj;
 		return hl_to_virtual(vt,hl_virtual_make_value((vvirtual*)obj));
 	default:
-		hl_error_msg(USTR("Can't cast %s to %s"), hl_type_str(obj->t), hl_type_str(vt));
+		hl_error("Can't cast %s to %s", hl_type_str(obj->t), hl_type_str(vt));
 		break;
 	}
 	return v;
@@ -796,7 +796,7 @@ static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **f
 	case HOBJ:
 		{
 			hl_field_lookup *f = obj_resolve_field(d->t->obj,hfield);
-			if( f == NULL || f->field_index < 0 ) hl_error_msg(USTR("%s does not have field %s"),d->t->obj->name,hl_field_name(hfield));
+			if( f == NULL || f->field_index < 0 ) hl_error("%s does not have field %s",d->t->obj->name,hl_field_name(hfield));
 			*ft = f->t;
 			return (char*)d + f->field_index;
 		}

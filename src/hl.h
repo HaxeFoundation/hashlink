@@ -217,7 +217,7 @@ typedef wchar_t	uchar;
 #	define uprintf		wprintf
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
-#	define uvsprintf	wvsprintf
+HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
 #	define utod(s,end)	wcstod(s,end)
 #	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
@@ -250,7 +250,7 @@ HL_API int utoi( const uchar *str, uchar **end );
 HL_API int ucmp( const uchar *a, const uchar *b );
 HL_API int utostr( char *out, int out_size, const uchar *str );
 HL_API int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
-HL_API int uvsprintf( uchar *out, const uchar *fmt, va_list arglist );
+HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
 HL_API void uprintf( const uchar *fmt, const uchar *str );
 C_FUNCTION_END
 #endif
@@ -566,8 +566,8 @@ HL_API int hl_hash_utf8( const char *str ); // no cache
 HL_API int hl_hash_gen( const uchar *name, bool cache_name );
 HL_API const uchar *hl_field_name( int hash );
 
-#define hl_error(msg)	hl_error_msg(USTR(msg))
-HL_API void hl_error_msg( const uchar *msg, ... );
+#define hl_error(msg, ...) hl_throw(hl_alloc_strbytes(USTR(msg), __VA_ARGS__))
+HL_API vdynamic *hl_alloc_strbytes( const uchar *msg, ... );
 HL_API void hl_assert( void );
 HL_API void hl_throw( vdynamic *v );
 HL_API void hl_rethrow( vdynamic *v );

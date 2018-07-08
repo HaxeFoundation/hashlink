@@ -75,7 +75,7 @@
 #endif
 
 static void hl_null_access() {
-	hl_error_msg(USTR("Null access"));
+	hl_error("Null access");
 }
 
 #endif

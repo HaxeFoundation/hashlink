@@ -1450,7 +1450,9 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, i
 #	pragma optimize( "", off )
 #endif
 HL_NO_OPT static void hl_null_access() {
-	hl_error_msg(USTR("Null access"));
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
+	d->v.ptr = USTR("Null access");
+	hl_throw(d);
 }
 #ifdef HL_VCC
 #	pragma optimize( "", on )
