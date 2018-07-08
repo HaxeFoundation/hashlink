@@ -776,7 +776,11 @@ typedef struct {
 #endif
 
 #if defined(HL_GCC) && !defined(HL_CONSOLE)
-#	define HL_NO_OPT __attribute__((optimize("-O0")))
+#	ifdef HL_CLANG
+#		define HL_NO_OPT	__attribute__ ((optnone))
+#	else
+#		define HL_NO_OPT	__attribute__((optimize("-O0")))
+#	endif
 #else
 #	define HL_NO_OPT
 #endif
