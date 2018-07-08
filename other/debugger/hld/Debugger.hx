@@ -164,6 +164,27 @@ class Debugger {
 		return args ? g.getArgs() : g.getLocals(s.fpos);
 	}
 
+	public function getCurrentClass() {
+		var s = currentStack[currentStackFrame];
+		var ctx = module.getMethodContext(s.fidx);
+		if( ctx == null )
+			return null;
+		var name = ctx.obj.name;
+		if( name.charCodeAt(0) == '$'.code ) name = name.substr(1);
+		return name;
+	}
+
+	public function getClassStatics( cl : String ) {
+		var v = getValue(cl);
+		var fields = eval.getFields(v);
+		fields.remove("__name__");
+		fields.remove("__type__");
+		fields.remove("__meta__");
+		fields.remove("__implementedBy__");
+		fields.remove("__constructor__");
+		return fields;
+	}
+
 	function wait( onStep = false ) : Api.WaitResult {
 		var cmd = null;
 		watchBreak = null;

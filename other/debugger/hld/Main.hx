@@ -345,6 +345,18 @@ class Main {
 				}
 				dbg.setCurrentThread(cur);
 				dbg.currentStackFrame = stack;
+			case "statics":
+				var cl = dbg.getCurrentClass();
+				if( cl == null )
+					Sys.println("Class not found");
+				else {
+					Sys.println("Class "+cl);
+					var fields = dbg.getClassStatics(cl);
+					for( f in fields )
+						printVar(cl+"."+f);
+				}
+			default:
+				Sys.println("Unknown info request");
 			}
 		case "cd":
 			try Sys.setCwd(args.shift()) catch( e : Dynamic ) Sys.println(""+e);

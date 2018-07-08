@@ -245,6 +245,22 @@ class Eval {
 			}
 		}
 
+		// static
+		var ctx = module.getMethodContext(funIndex);
+		if( ctx != null ) {
+			var t = ctx.obj;
+			if( t.globalValue != null )
+				t = switch( module.code.globals[t.globalValue] ) {
+				case HObj(p): p;
+				default: null;
+				}
+			if( t != null && t.name.charCodeAt(0) == '$'.code ) {
+				for( f in t.fields )
+					if( f.name == name )
+						return readFieldAddress(getVar(t.name.substr(1)), name);
+			}
+		}
+
 		// global
 		return getGlobalAddress([name]);
 	}
