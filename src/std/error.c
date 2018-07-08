@@ -140,7 +140,7 @@ HL_PRIM vdynamic *hl_alloc_strbytes( const uchar *fmt, ... ) {
 	vdynamic *d;
 	int len;
 	uchar *buf = _buf;
-	int bsize = sizeof(_buf);
+	int bsize = sizeof(_buf) / sizeof(uchar);
 	va_list args;
 	while( true ) {
 		va_start(args, fmt);
@@ -149,7 +149,7 @@ HL_PRIM vdynamic *hl_alloc_strbytes( const uchar *fmt, ... ) {
 		if( (len + 2) << 1 < bsize ) break;
 		if( buf != _buf ) free(buf);
 		bsize <<= 1;
-		buf = (uchar*)malloc(bsize);
+		buf = (uchar*)malloc(bsize * sizeof(uchar));
 	}
 	d = hl_alloc_dynamic(&hlt_bytes);
 	d->v.ptr = hl_copy_bytes((vbyte*)buf,(len + 1) << 1);

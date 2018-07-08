@@ -169,7 +169,7 @@ void uprintf( const uchar *fmt, const uchar *str ) {
 
 HL_PRIM int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist ) {
 	uchar *start = out;
-	uchar *end = out + (out_size >> 1) - 1;
+	uchar *end = out + out_size - 1;
 	char cfmt[20];
 	char tmp[32];
 	uchar c;
