@@ -113,7 +113,7 @@ int usprintf( uchar *out, int out_size, const uchar *fmt, ... ) {
 	va_list args;
 	int ret;
 	va_start(args, fmt);
-	ret = uvsprintf(out, fmt, args);
+	ret = uvszprintf(out, out_size, fmt, args);
 	va_end(args);
 	return ret;
 }
