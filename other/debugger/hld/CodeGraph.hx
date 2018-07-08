@@ -192,13 +192,19 @@ class CodeGraph {
 			return null;
 		b.visitTag = currentTag;
 		var v = b.writtenVars.get(name);
-		if( v != null )
+		if( v != null ) {
+			var last = -1;
 			for( p in v )
-				if( p < pos ) {
+				if( p < pos )
+					last = p;
+				else if( last < 0 )
+					break;
+				else {
 					var rid = -1;
-					opFx(fun.ops[p], function(_) {}, function(w) rid = w);
+					opFx(fun.ops[last], function(_) {}, function(w) rid = w);
 					return { rid : rid, t : fun.regs[rid] };
 				}
+		}
 		for( b2 in b.prev )
 			if( b2.start < b.start ) {
 				var l = lookupLocal(b2, name, pos);
