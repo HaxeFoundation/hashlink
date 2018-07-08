@@ -40,7 +40,7 @@ static void HL_NAME(error)( sqlite3 *db, bool close ) {
 	hl_buffer_str(b, sqlite3_errmsg16(db));
 	if ( close )
 		sqlite3_close(db);
-	hl_error_msg(hl_buffer_content(b, NULL));
+	hl_error("%s",hl_buffer_content(b,NULL));
 }
 
 static void HL_NAME(finalize_request)(sqlite_result *r, bool exc ) {
@@ -141,7 +141,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 					hl_buffer_str(b, USTR("SQLite error: Same field is two times in the request: "));
 					hl_buffer_str(b, (uchar*)sql);
 
-					hl_error_msg(hl_buffer_content(b, NULL));
+					hl_error("%s",hl_buffer_content(b, NULL));
 				} else {
 					hl_buffer *b = hl_alloc_buffer();
 					hl_buffer_str(b, USTR("SQLite error: Same field ids for: "));
@@ -150,7 +150,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 					hl_buffer_str(b, sqlite3_column_name16(r->r,j));
 					
 					sqlite3_finalize(r->r);
-					hl_error_msg(hl_buffer_content(b, NULL));
+					hl_error("%s",hl_buffer_content(b, NULL));
 				}
 			}
 		r->names[i] = id;
@@ -245,7 +245,7 @@ HL_PRIM varray *HL_NAME(result_next)( sqlite_result *r ) {
 				break;
 			}
 			default:
-				hl_error_msg(USTR("SQLite error: Unknown type #%d"), sqlite3_column_type(r->r,i));
+				hl_error("SQLite error: Unknown type #%d", sqlite3_column_type(r->r,i));
 			}
 			hl_aptr(a, vdynamic*)[i] = v;
 		}

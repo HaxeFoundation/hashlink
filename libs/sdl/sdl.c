@@ -84,7 +84,7 @@ typedef struct {
 HL_PRIM bool HL_NAME(init_once)() {
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 	if( SDL_Init(SDL_INIT_EVERYTHING) != 0 ) {
-		hl_error_msg(USTR("SDL_Init failed: %s"), hl_to_utf16(SDL_GetError()));
+		hl_error("SDL_Init failed: %s", hl_to_utf16(SDL_GetError()));
 		return false;
 	}
 #	ifdef _WIN32

@@ -25,7 +25,7 @@
 #define TK2(a,b)		((a) | ((b)<<5))
 
 static void invalid_cast( hl_type *from, hl_type *to ) {
-	hl_error_msg(USTR("Can't cast %s to %s"),hl_type_str(from),hl_type_str(to));
+	hl_error("Can't cast %s to %s",hl_type_str(from),hl_type_str(to));
 }
 
 HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
@@ -441,7 +441,7 @@ static bool is_number( hl_type *t ) {
 
 HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
 	static uchar *op_names[] = { USTR("+"), USTR("-"), USTR("*"), USTR("%"), USTR("/"), USTR("<<"), USTR(">>"), USTR(">>>"), USTR("&"), USTR("|"), USTR("^") };
-	if( op < 0 || op >= OpLast ) hl_error_msg(USTR("Invalid op %d"),op);
+	if( op < 0 || op >= OpLast ) hl_error("Invalid op %d",op);
 	if( !a && !b ) return op == OP_DIV || op == OP_MOD ? hl_dynf64(hl_nan()) : NULL;
 	if( (!a || is_number(a->t)) && (!b || is_number(b->t)) ) {
 		switch( op ) {
@@ -466,7 +466,7 @@ HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
 		case OP_XOR: IOP(^);
 		}
 	}
-	hl_error_msg(USTR("Can't perform dyn op %s %s %s"),hl_type_str(a->t),op_names[op],hl_type_str(b->t));
+	hl_error("Can't perform dyn op %s %s %s",hl_type_str(a->t),op_names[op],hl_type_str(b->t));
 	return NULL;
 }
 

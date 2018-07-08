@@ -236,7 +236,7 @@ HL_PRIM void HL_NAME(zip_flush_mode)( fmt_zip *z, int flush ) {
 		z->flush = Z_BLOCK;
 		break;
 	default:
-		hl_error_msg(USTR("Invalid flush mode %d"),flush);
+		hl_error("Invalid flush mode %d",flush);
 		break;
 	}
 }
@@ -674,7 +674,7 @@ HL_PRIM void HL_NAME(digest)( vbyte *out, vbyte *in, int length, int format ) {
 		break;
 	default:
 		hl_blocking(false);
-		hl_error_msg(USTR("Unknown digest format %d"),format&0xFF);
+		hl_error("Unknown digest format %d",format&0xFF);
 		break;
 	}
 	hl_blocking(false);

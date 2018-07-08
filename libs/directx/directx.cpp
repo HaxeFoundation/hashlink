@@ -48,9 +48,9 @@ static void ReportDxError( HRESULT err, int line ) {
 	}
 	if( err == DXGI_ERROR_DEVICE_REMOVED && driver ){
 		err = driver->device->GetDeviceRemovedReason();
-		hl_error_msg(USTR("DXGI_ERROR_DEVICE_REMOVED reason 0x%X line %d"),(DWORD)err,line);
+		hl_error("DXGI_ERROR_DEVICE_REMOVED reason 0x%X line %d",(DWORD)err,line);
 	}else{
-		hl_error_msg(USTR("DXERROR %X line %d"),(DWORD)err,line);
+		hl_error("DXERROR %X line %d",(DWORD)err,line);
 	}
 }
 

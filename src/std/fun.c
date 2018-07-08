@@ -140,7 +140,7 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 		hl_error("Can't call closure with value");
 	}
 	if( args->size < cl->t->fun->nargs )
-		hl_error_msg(USTR("Missing arguments : %d expected but %d passed"),cl->t->fun->nargs, args->size);
+		hl_error("Missing arguments : %d expected but %d passed",cl->t->fun->nargs, args->size);
 	for(i=0;i<cl->t->fun->nargs;i++) {
 		vdynamic *v = vargs[i];
 		hl_type *t = cl->t->fun->args[i];
@@ -310,7 +310,7 @@ HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args
 			vdynobj *d = (vdynobj*)o;
 			hl_field_lookup *l = hl_lookup_find(d->lookup,d->nfields, hfield);
 			if( l != NULL && l->t->kind != HFUN )
-				hl_error_msg(USTR("Field %s is of type %s and cannot be called"), hl_field_name(hfield), hl_type_str(l->t));
+				hl_error("Field %s is of type %s and cannot be called", hl_field_name(hfield), hl_type_str(l->t));
 			vclosure *tmp = (vclosure*)d->values[l->field_index];
 			if( tmp ) {
 				vclosure_wrapper w;
@@ -321,7 +321,7 @@ HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args
 				w.wrappedFun = tmp;
 				return hl_wrapper_call(&w,args,ret);
 			}
-			hl_error_msg(USTR("%s has no method %s"),hl_type_str(o->t),hl_field_name(hfield));
+			hl_error("%s has no method %s",hl_type_str(o->t),hl_field_name(hfield));
 		}
 		break;
 	case HOBJ:
@@ -346,7 +346,7 @@ HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args
 				rt = rt->parent;
 				if( rt == NULL ) break;
 			}
-			hl_error_msg(USTR("%s has no method %s"),o->t->obj->name,hl_field_name(hfield));
+			hl_error("%s has no method %s",o->t->obj->name,hl_field_name(hfield));
 		}
 		break;
 	default:

@@ -109,14 +109,74 @@ int ucmp( const uchar *a, const uchar *b ) {
 	}
 }
 
-int uvsprintf( uchar *out, const uchar *fmt, va_list arglist ) {
+int usprintf( uchar *out, int out_size, const uchar *fmt, ... ) {
+	va_list args;
+	int ret;
+	va_start(args, fmt);
+	ret = uvsprintf(out, fmt, args);
+	va_end(args);
+	return ret;
+}
+
+// USE UTF-8 encoding
+int utostr( char *out, int out_size, const uchar *str ) {
+	char *start = out;
+	char *end = out + out_size - 1; // final 0
+	if( out_size <= 0 ) return 0;
+	while( out < end ) {
+		unsigned int c = *str++;
+		if( c == 0 ) break;
+		if( c < 0x80 )
+			*out++ = (char)c;
+		else if( c < 0x800 ) {
+			if( out + 2 > end ) break;
+			*out++ = (char)(0xC0|(c>>6));
+			*out++ = 0x80|(c&63);
+		} else {
+			if( out + 3 > end ) break;
+			*out++ = (char)(0xE0|(c>>12));
+			*out++ = 0x80|((c>>6)&63);
+			*out++ = 0x80|(c&63);
+		}
+	}
+	*out = 0;
+	return (int)(out - start);
+}
+
+static char *utos( const uchar *s ) {
+	int len = ustrlen_utf8(s);
+	char *out = (char*)malloc(len + 1);
+	if( utostr(out,len+1,s) < 0 )
+		*out = 0;
+	return out;
+}
+
+void uprintf( const uchar *fmt, const uchar *str ) {
+	char *cfmt = utos(fmt);
+	char *cstr = utos(str);
+#ifdef HL_ANDROID
+	LOG_ANDROID(cfmt,cstr);
+#else
+	printf(cfmt,cstr);
+#endif
+	free(cfmt);
+	free(cstr);
+}
+
+#endif
+
+#if !defined(HL_NATIVE_UCHAR_FUN) || defined(HL_WIN)
+
+HL_PRIM int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist ) {
 	uchar *start = out;
+	uchar *end = out + (out_size >> 1) - 1;
 	char cfmt[20];
 	char tmp[32];
 	uchar c;
 	while(true) {
 sprintf_loop:
 		c = *fmt++;
+		if( out == end ) c = 0;
 		switch( c ) {
 		case 0:
 			*out = 0;
@@ -178,7 +238,7 @@ sprintf_loop:
 sprintf_add:
 				// copy from c string to u string
 				i = 0;
-				while( i < size )
+				while( i < size && out < end )
 					*out++ = tmp[i++];
 			}
 			break;
@@ -188,60 +248,6 @@ sprintf_add:
 		}
 	}
 	return 0;
-}
-
-int usprintf( uchar *out, int out_size, const uchar *fmt, ... ) {
-	va_list args;
-	int ret;
-	va_start(args, fmt);
-	ret = uvsprintf(out, fmt, args);
-	va_end(args);
-	return ret;
-}
-
-// USE UTF-8 encoding
-int utostr( char *out, int out_size, const uchar *str ) {
-	char *start = out;
-	char *end = out + out_size - 1; // final 0
-	if( out_size <= 0 ) return 0;
-	while( out < end ) {
-		unsigned int c = *str++;
-		if( c == 0 ) break;
-		if( c < 0x80 )
-			*out++ = (char)c;
-		else if( c < 0x800 ) {
-			if( out + 2 > end ) break;
-			*out++ = (char)(0xC0|(c>>6));
-			*out++ = 0x80|(c&63);
-		} else {
-			if( out + 3 > end ) break;
-			*out++ = (char)(0xE0|(c>>12));
-			*out++ = 0x80|((c>>6)&63);
-			*out++ = 0x80|(c&63);
-		}
-	}
-	*out = 0;
-	return (int)(out - start);
-}
-
-static char *utos( const uchar *s ) {
-	int len = ustrlen_utf8(s);
-	char *out = (char*)malloc(len + 1);
-	if( utostr(out,len+1,s) < 0 )
-		*out = 0;
-	return out;
-}
-
-void uprintf( const uchar *fmt, const uchar *str ) {
-	char *cfmt = utos(fmt);
-	char *cstr = utos(str);
-#ifdef HL_ANDROID
-	LOG_ANDROID(cfmt,cstr);
-#else
-	printf(cfmt,cstr);
-#endif
-	free(cfmt);
-	free(cstr);
 }
 
 #endif
