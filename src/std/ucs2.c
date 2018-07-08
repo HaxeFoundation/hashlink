@@ -213,7 +213,7 @@ sprintf_loop:
 						if( i != 2 ) hl_fatal("Unsupported printf format"); // no support for precision qualifier
 						{
 							uchar *s = va_arg(arglist,uchar *);
-							while( *s )
+							while( *s && out < end )
 								*out++ = *s++;
 							goto sprintf_loop;
 						}
