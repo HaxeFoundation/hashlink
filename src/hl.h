@@ -566,7 +566,12 @@ HL_API int hl_hash_utf8( const char *str ); // no cache
 HL_API int hl_hash_gen( const uchar *name, bool cache_name );
 HL_API const uchar *hl_field_name( int hash );
 
-#define hl_error(msg, ...) hl_throw(hl_alloc_strbytes(USTR(msg), __VA_ARGS__))
+#ifdef HL_VCC
+#	define hl_error(msg, ...) hl_throw(hl_alloc_strbytes(USTR(msg), __VA_ARGS__))
+#else
+#	define hl_error(msg, ...) hl_throw(hl_alloc_strbytes(USTR(msg), #__VA_ARGS__))
+#endif
+
 HL_API vdynamic *hl_alloc_strbytes( const uchar *msg, ... );
 HL_API void hl_assert( void );
 HL_API void hl_throw( vdynamic *v );
