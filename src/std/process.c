@@ -27,6 +27,7 @@
 #	include <sys/types.h>
 #	include <unistd.h>
 #	include <errno.h>
+#	include <signal.h>
 #	if !defined(HL_MAC)
 #		if defined(HL_BSD) || defined (HL_IOS) || defined (HL_TVOS)
 #			include <sys/wait.h>
