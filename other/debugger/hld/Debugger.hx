@@ -318,11 +318,12 @@ class Debugger {
 		for( i in 0...count ) {
 			var tinf = eval.readPointer(tinfos.offset(jit.align.ptr * i));
 			var tid = eval.readI32(tinf);
+			var flags = eval.readI32(tinf.offset(flagsPos));
+			if( flags & 16 != 0 ) continue; // invisible
 			if( tid == 0 )
 				tid = mainThread;
 			else if( mainThread <= 0 )
 				mainThread = tid;
-			var flags = eval.readI32(tinf.offset(flagsPos));
 			var t = {
 				id : tid,
 				stackTop : eval.readPointer(tinf.offset(8)),
