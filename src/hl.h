@@ -807,6 +807,7 @@ struct _hl_trap_ctx {
 #define HL_EXC_CATCH_ALL	2
 #define HL_EXC_IS_THROW		4
 #define HL_TRACK_DISABLE	8
+#define HL_THREAD_INVISIBLE	16
 
 typedef struct {
 	int thread_id;
