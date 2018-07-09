@@ -35,6 +35,7 @@ HL_API int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len );
 HL_API void hl_sys_sleep( double t );
 HL_API int hl_thread_id();
 HL_API void *hl_gc_threads_info();
+HL_API int hl_sys_getpid();
 
 static hl_socket *debug_socket = NULL;
 static hl_socket *client_socket = NULL;
@@ -50,6 +51,7 @@ static void hl_debug_loop( hl_module *m ) {
 	int flags = 0;
 	int hl_ver = HL_VERSION;
 	bool loop = false;
+	int pid = hl_sys_getpid();
 #	ifdef HL_64
 	flags |= 1;
 #	endif
@@ -67,6 +69,7 @@ static void hl_debug_loop( hl_module *m ) {
 		send("HLD1",4);
 		send(&flags,4);
 		send(&hl_ver, 4);
+		send(&pid,4);
 		send(&inf_addr, sizeof(void*));
 		send(&m->globals_data,sizeof(void*));
 		send(&m->jit_code,sizeof(void*));

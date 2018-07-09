@@ -11,7 +11,7 @@ class JitInfo {
 	public var is64(default, null) : Bool;
 	public var align(default,null) : Align;
 	public var hasThreads(get,never) : Bool;
-
+	public var pid(default,null) : Int = 0;
 
 	var flags : haxe.EnumFlags<DebugFlag>;
 	var input : haxe.io.Input;
@@ -65,6 +65,8 @@ class JitInfo {
 			hlVersion = 0x150;
 		} else {
 			hlVersion = input.readInt32();
+			if( hlVersion >= 170 )
+				pid = input.readInt32();
 			threads = readPointer();
 			globals = readPointer();
 		}

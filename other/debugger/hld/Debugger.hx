@@ -677,6 +677,11 @@ class Debugger {
 		watchBreak = null;
 	}
 
+	public function end() {
+		if( stoppedThread != null ) resume();
+		api.stop();
+	}
+
 	function readMem( addr : Pointer, size : Int ) {
 		var mem = new Buffer(size);
 		if( !api.read(addr, mem, size) )
