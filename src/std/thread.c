@@ -435,6 +435,7 @@ static void hl_run_thread( vclosure *c ) {
 	uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
 	for(i=0;i<a->size;i++)
 		uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
+	fflush(stdout);
 }
 
 HL_PRIM hl_thread *hl_thread_create( vclosure *c ) {
