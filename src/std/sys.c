@@ -140,6 +140,7 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 	OutputDebugStringW((LPCWSTR)msg);
 #	else
 	uprintf(USTR("%s"),(uchar*)msg);
+	fflush(stdout);
 #	endif
 	hl_blocking(false);
 }
@@ -591,7 +592,6 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 #	ifdef HL_WIN
 	setlocale(LC_CTYPE, ""); // printf to current locale
 #	endif
-	setbuf(stdout, NULL); // disable stdout buffering
 }
 
 HL_PRIM vbyte *hl_sys_hl_file() {
