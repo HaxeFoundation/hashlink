@@ -87,6 +87,11 @@ class CodeGraph {
 			}
 			vars.push(vname);
 		}
+
+		// single captured pointer => passed directly
+		if( args.length >= 1 && args[0].hasIndex && args[0].vars.length == 1 && !f.regs[0].match(HEnum({name:""})) )
+			args[0].hasIndex = false;
+
 		if( args.length == nargs - 1 )
 			args.unshift({ hasIndex : false, vars : ["this"] });
 		if( args.length != nargs )
