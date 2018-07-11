@@ -14,6 +14,7 @@ enum ValueRepr {
 	VMap( tkey : HLType, nkeys : Int, readKey : Int -> Value, readValue : Int -> Value, p : Pointer );
 	VType( t : HLType );
 	VEnum( c : String, values : Array<Value> );
+	VBytes( length : Int, read : Int -> Int );
 }
 
 enum FunRepr {

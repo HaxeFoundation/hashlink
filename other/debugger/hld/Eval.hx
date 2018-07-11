@@ -19,6 +19,7 @@ class Eval {
 
 	public var maxStringRec : Int = 3;
 	public var maxArrLength : Int = 10;
+	public var maxBytesLength : Int = 128;
 
 	static var HASH_PREFIX = "$_h$";
 
@@ -330,6 +331,15 @@ class Eval {
 				arr.push("...");
 				"["+arr.join(",")+"]:"+length;
 			}
+		case VBytes(length, read):
+			var blen = length < maxBytesLength ? length : maxBytesLength;
+			var bytes = haxe.io.Bytes.alloc(blen);
+			for( i in 0...blen )
+				bytes.set(i, read(i));
+			var str = length+":0x" + bytes.toHex().toUpperCase();
+			if( length > maxBytesLength )
+				str += "...";
+			str;
 		case VMap(_, nkeys, readKey, readValue, _):
 			var max = nkeys < maxArrLength ? nkeys : maxArrLength;
 			var content = [for( i in 0...max ) { var k = readKey(i); valueStr(k) + "=>" + valueStr(readValue(i)); }];
@@ -444,6 +454,10 @@ class Eval {
 				v = makeMap(readPointer(p.offset(align.ptr)), HI32);
 			case "haxe.ds.ObjectMap":
 				v = makeMap(readPointer(p.offset(align.ptr)), HDyn);
+			case "haxe.io.Bytes":
+				var length = readI32(p.offset(align.ptr));
+				var bytes = readPointer(p.offset(align.ptr * 2));
+				v = VBytes(length, function(i) return readMem(bytes.offset(i),1).getUI8(0));
 			default:
 			}
 		case HVirtual(_):
