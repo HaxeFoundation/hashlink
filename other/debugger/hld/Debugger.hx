@@ -187,12 +187,13 @@ class Debugger {
 		if( ctx == null )
 			return null;
 		var name = ctx.obj.name;
-		if( name.charCodeAt(0) == '$'.code ) name = name.substr(1);
-		return name;
+		return name.split("$").join("");
 	}
 
 	public function getClassStatics( cl : String ) {
 		var v = getValue(cl);
+		if( v == null )
+			throw "No such class "+cl;
 		var fields = eval.getFields(v);
 		fields.remove("__name__");
 		fields.remove("__type__");
