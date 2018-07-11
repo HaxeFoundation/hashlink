@@ -199,11 +199,11 @@ class CodeGraph {
 					last = p;
 				else if( last < 0 )
 					break;
-				else {
-					var rid = -1;
-					opFx(fun.ops[last], function(_) {}, function(w) rid = w);
-					return { rid : rid, t : fun.regs[rid] };
-				}
+			if( last >= 0 ) {
+				var rid = -1;
+				opFx(fun.ops[last], function(_) {}, function(w) rid = w);
+				return { rid : rid, t : fun.regs[rid] };
+			}
 		}
 		for( b2 in b.prev )
 			if( b2.start < b.start ) {
