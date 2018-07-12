@@ -3884,6 +3884,17 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx, MOV, r, pmem(&p,addr->id,offset));
 				op64(ctx, MOV, r, pmem(&p,r->id,(int)(int_val)&tmp->prev));
 				op64(ctx, MOV, pmem(&p,addr->id, offset), r);
+#				ifdef HL_WIN
+				// erase eip (prevent false positive)
+				{
+					_JUMP_BUFFER *b = NULL;
+#					ifdef HL_64
+					op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&(b->Rip)),PEAX);
+#					else
+					op64(ctx,MOV,pmem(&p,Esp,(int)&(b->Eip)),PEAX);
+#					endif
+				}
+#				endif
 				op64(ctx,ADD,PESP,pconst(&p,trap_size));
 			}
 			break;
