@@ -598,13 +598,22 @@ class Debugger {
 	public function getValue( expr : String ) : Value {
 		var cur = currentStack[currentStackFrame];
 		if( cur == null ) return null;
-		return eval.eval(expr, cur.fidx, cur.fpos, cur.ebp);
+		eval.setContext(cur.fidx, cur.fpos, cur.ebp);
+		return eval.eval(expr);
+	}
+
+	public function setValue( expr : String, value : String ) : Value {
+		var cur = currentStack[currentStackFrame];
+		if( cur == null ) return null;
+		eval.setContext(cur.fidx, cur.fpos, cur.ebp);
+		return eval.setValue(expr, value);
 	}
 
 	public function getRef( expr : String ) : Address {
 		var cur = currentStack[currentStackFrame];
 		if( cur == null ) return null;
-		return eval.ref(expr, cur.fidx, cur.fpos, cur.ebp);
+		eval.setContext(cur.fidx, cur.fpos, cur.ebp);
+		return eval.ref(expr);
 	}
 
 	public function getWatches() {

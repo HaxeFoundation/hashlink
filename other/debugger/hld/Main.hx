@@ -368,6 +368,19 @@ class Main {
 			default:
 				Sys.println("Invalid catch mode");
 			}
+		case "set":
+			var all = args.join(" ").split("=");
+			var expr = all.shift();
+			var value = all.join("=");
+			if( expr == "" || value == null || value == "" ) {
+				Sys.println("Syntax: set <expr>=<value>");
+				return true;
+			}
+			var value = dbg.setValue(expr,value);
+			if( value == null )
+				Sys.println("Failed to set expression");
+			else
+				Sys.println(dbg.eval.valueStr(value) + " : " + value.t.toString());
 		case "cd":
 			try Sys.setCwd(args.shift()) catch( e : Dynamic ) Sys.println(""+e);
 		default:

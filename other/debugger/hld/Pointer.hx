@@ -3,6 +3,8 @@ package hld;
 #if hl
 abstract Pointer(hl.Bytes) to hl.Bytes {
 
+	public var i64(get, never) : haxe.Int64;
+
 	public inline function new(b) {
 		this = b;
 	}
@@ -22,6 +24,8 @@ abstract Pointer(hl.Bytes) to hl.Bytes {
 	inline function addr() {
 		return this.address();
 	}
+
+	inline function get_i64() return this.address();
 
 	public inline function isNull() {
 		return this == null;
