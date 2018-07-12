@@ -358,6 +358,16 @@ class Main {
 			default:
 				Sys.println("Unknown info request");
 			}
+		case "catch":
+			var arg = args.shift();
+			switch( arg ) {
+			case "throw":
+				dbg.breakOnThrow = true;
+			case "uncaught":
+				dbg.breakOnThrow = false;
+			default:
+				Sys.println("Invalid catch mode");
+			}
 		case "cd":
 			try Sys.setCwd(args.shift()) catch( e : Dynamic ) Sys.println(""+e);
 		default:

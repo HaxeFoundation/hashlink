@@ -56,6 +56,7 @@ class Debugger {
 
 	public var eval : Eval;
 	public var currentStackFrame : Int;
+	public var breakOnThrow(default, set) : Bool;
 	public var stackFrameCount(get, never) : Int;
 	public var mainThread(default, null) : Int = 0;
 	public var stoppedThread(default,set) : Null<Int>;
@@ -766,5 +767,19 @@ class Debugger {
 				}
 		return rem;
 	}
+
+	function set_breakOnThrow(b) {
+		var count = eval.readI32(jit.threads);
+		var tinfos = eval.readPointer(jit.threads.offset(8));
+		var flagsPos = jit.align.ptr * 6 + 8;
+		for( i in 0...count ) {
+			var tinf = eval.readPointer(tinfos.offset(jit.align.ptr * i));
+			var flags = eval.readI32(tinf.offset(flagsPos));
+			if( b ) flags |= 2 else flags &= ~2;
+			eval.writeI32(tinf.offset(flagsPos), flags);
+		}
+		return breakOnThrow = b;
+	}
+
 
 }

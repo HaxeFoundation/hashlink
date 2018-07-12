@@ -744,6 +744,17 @@ class Eval {
 		return readMem(p, 4).getI32(0);
 	}
 
+	public function writeI32( p : Pointer, v : Int ) {
+		var buf = new Buffer(4);
+		buf.setI32(0,v);
+		writeMem(p, buf, 4);
+	}
+
+	function writeMem( p : Pointer, b : Buffer, size : Int ) {
+		if( !api.write(p, b, size) )
+			throw "Failed to write @" + p.toString() + ":" + size;
+	}
+
 	function readType( p : Pointer, direct = false ) {
 		if( !direct )
 			p = readPointer(p);
