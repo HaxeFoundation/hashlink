@@ -1,9 +1,8 @@
 
 LBITS := $(shell getconf LONG_BIT)
-
-ifndef ARCH
-	ARCH = $(LBITS)
-endif
+ARCH ?= $(LBITS)
+PREFIX ?= /usr/local
+INSTALL_DIR ?= $(PREFIX)
 
 LIBS=fmt sdl ssl openal ui uv
 
@@ -85,9 +84,6 @@ RELEASE_NAME = linux
 
 endif
 
-ifndef INSTALL_DIR
-INSTALL_DIR=/usr/local
-endif
 
 ifdef MESA
 LIBS += mesa
