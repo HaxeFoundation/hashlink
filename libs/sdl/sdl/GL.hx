@@ -602,7 +602,11 @@ class GL {
 
 	/* PixelFormat */
 	public static inline var DEPTH_COMPONENT                = 0x1902;
+	public static inline var RED                            = 0x1903;
+	public static inline var GREEN                          = 0x1904;
+	public static inline var BLUE                           = 0x1905;
 	public static inline var ALPHA                          = 0x1906;
+	public static inline var RG                             = 0x8227;
 	public static inline var RGB                            = 0x1907;
 	public static inline var RGBA                           = 0x1908;
 	public static inline var LUMINANCE                      = 0x1909;
