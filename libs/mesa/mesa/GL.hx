@@ -1,4 +1,4 @@
-package mesa;
+package sdl;
 
 abstract Uniform(Null<Int>) {
 }
@@ -602,7 +602,11 @@ class GL {
 
 	/* PixelFormat */
 	public static inline var DEPTH_COMPONENT                = 0x1902;
+	public static inline var RED                            = 0x1903;
+	public static inline var GREEN                          = 0x1904;
+	public static inline var BLUE                           = 0x1905;
 	public static inline var ALPHA                          = 0x1906;
+	public static inline var RG                             = 0x8227;
 	public static inline var RGB                            = 0x1907;
 	public static inline var RGBA                           = 0x1908;
 	public static inline var LUMINANCE                      = 0x1909;
@@ -616,6 +620,11 @@ class GL {
 	public static inline var RG16UI                         = 0x823A;
 	public static inline var RG16F                          = 0x822F;
 	public static inline var RG32F                          = 0x8230;
+	public static inline var R8								= 0x8229;
+	public static inline var RG8							= 0x822B;
+	public static inline var R16F							= 0x822D;
+	public static inline var R32F							= 0x822E;
+	public static inline var UNSIGNED_INT_2_10_10_10_REV	= 0x8368;
 
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
