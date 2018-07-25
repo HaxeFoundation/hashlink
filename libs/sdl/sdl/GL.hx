@@ -620,6 +620,11 @@ class GL {
 	public static inline var RG16UI                         = 0x823A;
 	public static inline var RG16F                          = 0x822F;
 	public static inline var RG32F                          = 0x8230;
+	public static inline var R8								= 0x8229;
+	public static inline var RG8							= 0x822B;
+	public static inline var R16F							= 0x822D;
+	public static inline var R32F							= 0x822E;
+	public static inline var UNSIGNED_INT_2_10_10_10_REV	= 0x8368;
 
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
