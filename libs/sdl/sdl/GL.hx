@@ -625,6 +625,7 @@ class GL {
 	public static inline var R16F							= 0x822D;
 	public static inline var R32F							= 0x822E;
 	public static inline var UNSIGNED_INT_2_10_10_10_REV	= 0x8368;
+	public static inline var UNSIGNED_INT_10F_11F_11F_REV	= 0x8C3B;
 
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
