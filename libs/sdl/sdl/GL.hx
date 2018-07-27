@@ -443,6 +443,8 @@ class GL {
 	/*      ONE_MINUS_DST_ALPHA */
 	/* BlendEquationSeparate */
 	public static inline var FUNC_ADD                       = 0x8006;
+	public static inline var FUNC_MIN                       = 0x8007;
+    public static inline var FUNC_MAX                       = 0x8008;
 	public static inline var BLEND_EQUATION                 = 0x8009;
 	public static inline var BLEND_EQUATION_RGB             = 0x8009;   /* same as BLEND_EQUATION */
 	public static inline var BLEND_EQUATION_ALPHA           = 0x883D;
