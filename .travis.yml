@@ -33,7 +33,7 @@ docker_make_script: &docker_make_script
 
 mac_before_install: &mac_before_install
   - brew update
-  - brew install jpeg-turbo sdl2 libogg libvorbis openal-soft mbedtls libuv
+  - brew bundle
   - haxelib install hashlink
 
 cmake_install: &cmake_install

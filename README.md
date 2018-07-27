@@ -24,7 +24,7 @@ For 16.04, see [this note](https://github.com/HaxeFoundation/hashlink/issues/147
 
 **And on OSX:**
 
-`brew install libpng jpeg-turbo libvorbis sdl2 mbedtls openal-soft libuv`
+`brew bundle` to install the dependencies listed in [Brewfile](Brewfile).
 
 Once dependencies are installed you can simply call:
 
