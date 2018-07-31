@@ -93,6 +93,12 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	throw_jump(trap->buf,1);
 }
 
+HL_PRIM void hl_throw_buffer( hl_buffer *b ) {
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);	
+	d->v.ptr = hl_buffer_content(b,NULL);
+	hl_throw(d);
+}
+
 HL_PRIM void hl_dump_stack() {
 	void *stack[0x1000];
 	int count = capture_stack_func(stack, 0x1000);

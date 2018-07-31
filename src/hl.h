@@ -705,6 +705,7 @@ HL_API int hl_buffer_length( hl_buffer *b );
 HL_API uchar *hl_buffer_content( hl_buffer *b, int *len );
 HL_API uchar *hl_to_string( vdynamic *v );
 HL_API const uchar *hl_type_str( hl_type *t );
+HL_API void hl_throw_buffer( hl_buffer *b );
 
 // ----------------------- FFI ------------------------------------------------------
 
