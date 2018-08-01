@@ -135,6 +135,9 @@ ui: ${UI} libhl
 
 uv: ${UV} libhl
 	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
+
+mysql: ${MYSQL} libhl
+	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
 	
 mesa:
 	(cd libs/mesa && make)
