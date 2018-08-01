@@ -183,7 +183,7 @@ abstract DxBool(Int) {
 
 @:enum abstract LayoutClassification(Int) {
 	var PerVertexData = 0;
-	var PerInstanceData = 0;
+	var PerInstanceData = 1;
 }
 
 @:keep
@@ -556,6 +556,9 @@ class Driver {
 	}
 
 	public static function drawIndexed( indexCount : Int, startIndex : Int, baseVertex : Int ) : Void {
+	}
+
+	public static function drawIndexedInstancedIndirect( buffer : Resource, offset : Int ) : Void {
 	}
 
 	public static function vsSetShader( shader : Shader ) : Void {
