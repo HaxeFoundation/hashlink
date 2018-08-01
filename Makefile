@@ -4,7 +4,7 @@ ARCH ?= $(LBITS)
 PREFIX ?= /usr/local
 INSTALL_DIR ?= $(PREFIX)
 
-LIBS=fmt sdl ssl openal ui uv
+LIBS=fmt sdl ssl openal ui uv mysql
 
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
@@ -36,6 +36,8 @@ SSL = libs/ssl/ssl.o
 UV = libs/uv/uv.o
 
 UI = libs/ui/ui_stub.o
+
+MYSQL = libs/mysql/socket.o libs/mysql/sha1.o libs/mysql/my_proto.o libs/mysql/my_api.o libs/mysql/mysql.o
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
