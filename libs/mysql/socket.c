@@ -29,6 +29,7 @@
 #	define HANDLE_EINTR(x)
 
 #else
+#	define _GNU_SOURCE
 #	include <sys/types.h>
 #	include <sys/socket.h>
 #	include <sys/time.h>
@@ -130,7 +131,7 @@ PHOST phost_resolve( const char *host ) {
 #	endif
 		if( h == NULL )
 			return UNRESOLVED_HOST;
-		ip = *((unsigned int*)h->h_addr);
+		ip = *((unsigned int*)h->h_addr_list[0]);
 	}
 	return ip;
 }
