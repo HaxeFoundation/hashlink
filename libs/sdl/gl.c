@@ -522,7 +522,23 @@ HL_PRIM void HL_NAME(gl_draw_arrays_instanced)( int mode, int first, int count, 
 }
 
 HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect)( int mode, int type, vbyte *data, int count, int stride ) {
+#	ifdef GL_VERSION_4_3
 	glMultiDrawElementsIndirect(mode, type, data, count, stride);
+#	endif
+}
+
+HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
+	switch( feature ) {
+	case 0:
+#		ifdef GL_VERSION_4_3
+		return 1;
+#		else
+		return 0;
+#		endif
+	default:
+		break;
+	}
+	return -1;
 }
 
 // queries
@@ -700,3 +716,5 @@ DEFINE_PRIM(_F64, gl_query_result, _NULL(_I32));
 
 DEFINE_PRIM(_I32, gl_get_uniform_block_index, _NULL(_I32) _STRING);
 DEFINE_PRIM(_VOID, gl_uniform_block_binding, _NULL(_I32) _I32 _I32);
+
+DEFINE_PRIM(_I32, gl_get_config_parameter, _I32);

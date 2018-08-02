@@ -34,6 +34,11 @@ class GL {
 		return false;
 	}
 
+	// non standard
+	public static function getConfigParameter( v : Int ) : Int {
+		return 0;
+	}
+
 	public static function isContextLost() : Bool {
 		return false;
 	}
@@ -352,7 +357,7 @@ class GL {
 
 	public static function drawArraysInstanced( mode : Int, start : Int, count : Int, primcount : Int ) {
 	}
-	
+
 	public static function multiDrawElementsIndirect( mode : Int, type : Int, data : hl.Bytes, count : Int, stride : Int ) {
 	}
 
