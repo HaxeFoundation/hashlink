@@ -787,6 +787,7 @@ static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **f
 					f = hl_dynobj_add_field(o,hfield,t);
 				} else {
 					f->t = t;
+					hl_dynobj_remap_virtuals(o,f,0);
 				}
 			}
 			*ft = f->t;
