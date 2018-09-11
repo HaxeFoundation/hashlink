@@ -799,8 +799,9 @@ typedef struct _hl_trap_ctx hl_trap_ctx;
 struct _hl_trap_ctx {
 	jmp_buf buf;
 	hl_trap_ctx *prev;
+	vdynamic *tcheck;
 };
-#define hl_trap(ctx,r,label) { hl_thread_info *__tinf = hl_get_thread(); ctx.prev = __tinf->trap_current; __tinf->trap_current = &ctx; if( setjmp(ctx.buf) ) { r = __tinf->exc_value; goto label; } }
+#define hl_trap(ctx,r,label) { hl_thread_info *__tinf = hl_get_thread(); ctx.tcheck = NULL; ctx.prev = __tinf->trap_current; __tinf->trap_current = &ctx; if( setjmp(ctx.buf) ) { r = __tinf->exc_value; goto label; } }
 #define hl_endtrap(ctx)	hl_get_thread()->trap_current = ctx.prev
 
 #define HL_EXC_MAX_STACK	0x100

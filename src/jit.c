@@ -3843,6 +3843,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOV,trap,PESP);
 				op64(ctx,MOV,pmem(&p,treg->id,offset),trap);
 
+				hl_opcode *next = f->ops + opCount + 1 + o->p2;
+				if( next->op == OGetGlobal ) {
+					hl_type *gt = m->code->globals[next->p2];
+					while( gt->kind == HOBJ && gt->obj->super ) gt = gt->obj->super;
+					if( gt->kind == HOBJ && gt->obj->nfields && gt->obj->fields[0].t->kind == HTYPE ) {
+						op64(ctx,MOV,treg,paddr(&p,m->globals_data + m->globals_indexes[next->p2]));
+					} else
+						op64(ctx,MOV,treg,pconst(&p,0));
+				} else {
+					op64(ctx,MOV,treg,pconst(&p,0));
+				}
+				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&t->tcheck),treg);
+
 				size = begin_native_call(ctx, 1);
 				set_native_arg(ctx,trap);
 				call_native(ctx,setjmp,size);
