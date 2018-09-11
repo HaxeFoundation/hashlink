@@ -3848,7 +3848,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					hl_type *gt = m->code->globals[next->p2];
 					while( gt->kind == HOBJ && gt->obj->super ) gt = gt->obj->super;
 					if( gt->kind == HOBJ && gt->obj->nfields && gt->obj->fields[0].t->kind == HTYPE ) {
-						op64(ctx,MOV,treg,paddr(&p,m->globals_data + m->globals_indexes[next->p2]));
+						void *addr = m->globals_data + m->globals_indexes[next->p2];
+#						ifdef HL_64
+						op64(ctx,MOV,treg,pconst64(&p,(int_val)addr));
+						op64(ctx,MOV,treg,pmem(&p,treg->id,0));
+#						else
+						op64(ctx,MOV,treg,paddr(&p,addr));
+#						endif
 					} else
 						op64(ctx,MOV,treg,pconst(&p,0));
 				} else {
