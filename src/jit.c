@@ -3843,8 +3843,21 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOV,trap,PESP);
 				op64(ctx,MOV,pmem(&p,treg->id,offset),trap);
 
+				/*
+					This is a bit hackshish : we want to detect the type of exception filtered by the catch so we check the following
+					sequence of HL opcodes:
+
+					trap E,@catch
+					...
+					@catch:
+					global R, _
+					call _, ???(R,E)
+
+					??? is expected to be hl.BaseType.check
+				*/
 				hl_opcode *next = f->ops + opCount + 1 + o->p2;
-				if( next->op == OGetGlobal ) {
+				hl_opcode *next2 = f->ops + opCount + 2 + o->p2;
+				if( next->op == OGetGlobal && next2->op == OCall2 && next2->p3 == next->p1 && dst->stack.id == (int)(int_val)next2->extra ) {
 					hl_type *gt = m->code->globals[next->p2];
 					while( gt->kind == HOBJ && gt->obj->super ) gt = gt->obj->super;
 					if( gt->kind == HOBJ && gt->obj->nfields && gt->obj->fields[0].t->kind == HTYPE ) {
