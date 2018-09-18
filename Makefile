@@ -15,7 +15,8 @@ LIBTURBOJPEG = -lturbojpeg
 
 PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/pcre_dfa_exec.o \
 	include/pcre/pcre_exec.o include/pcre/pcre_fullinfo.o include/pcre/pcre_globals.o \
-	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o
+	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o \
+	include/pcre/pcre16_ord2utf16.o include/pcre/pcre16_valid_utf16.o
 
 RUNTIME = src/alloc.o
 
