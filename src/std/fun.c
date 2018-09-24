@@ -86,7 +86,7 @@ HL_PRIM vdynamic* hl_get_closure_value( vdynamic *c ) {
 	if( cl->hasValue == 2 )
 		return hl_get_closure_value((vdynamic*)((vclosure_wrapper*)c)->wrappedFun);
 	if( cl->fun == fun_var_args )
-		return (vdynamic*)cl->value;
+		return NULL;
 	return hl_make_dyn(&cl->value, cl->t->fun->parent->fun->args[0]);
 }
 
