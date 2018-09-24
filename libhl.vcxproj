@@ -269,9 +269,9 @@
     <ClCompile Include="src\std\string.c" />
     <ClCompile Include="src\std\sys.c" />
     <ClCompile Include="src\std\thread.c" />
+    <ClCompile Include="src\std\track.c" />
     <ClCompile Include="src\std\types.c" />
     <ClCompile Include="src\std\ucs2.c" />
-    <ClCompile Include="src\track.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\pcre\config.h" />
