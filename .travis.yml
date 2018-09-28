@@ -93,17 +93,17 @@ matrix:
       services: [docker]
       install: *linux32_install
       script: *docker_make_script
-    # Mac xcode9.3
+    # Mac xcode9.4
     - haxe: development
       os: osx
-      osx_image: xcode9.3
+      osx_image: xcode9.4
       env: ARCH=64 BUILD=cmake
       before_install: *mac_before_install
       install: *cmake_install
       script: *cmake_script
     - haxe: development
       os: osx
-      osx_image: xcode9.3
+      osx_image: xcode9.4
       env: ARCH=64 BUILD=make
       before_install: *mac_before_install
       install: *make_install
