@@ -293,6 +293,7 @@ struct jit_ctx {
 	int c2hl;
 	int hl2c;
 	int longjump;
+	int static_functions[8];
 };
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
@@ -1446,18 +1447,6 @@ static int prepare_call_args( jit_ctx *ctx, int count, int *args, vreg *vregs, i
 	return paddedSize;
 }
 
-#ifdef HL_VCC
-#	pragma optimize( "", off )
-#endif
-HL_NO_OPT static void hl_null_access() {
-	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
-	d->v.ptr = USTR("Null access");
-	hl_throw(d);
-}
-#ifdef HL_VCC
-#	pragma optimize( "", on )
-#endif
-
 static void op_call( jit_ctx *ctx, preg *r, int size ) {
 	preg p;
 #	ifdef JIT_DEBUG
@@ -1479,7 +1468,7 @@ static void op_call( jit_ctx *ctx, preg *r, int size ) {
 }
 
 static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
-	bool isExc = nativeFun == hl_null_access || nativeFun == hl_assert || nativeFun == hl_throw || nativeFun == on_jit_error;
+	bool isExc = nativeFun == hl_assert || nativeFun == hl_throw || nativeFun == on_jit_error;
 	preg p;
 	// native function, already resolved
 	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
@@ -2572,6 +2561,30 @@ static void jit_longjump( jit_ctx *ctx ) {
 }
 #endif
 
+static void jit_fail( uchar *msg ) {
+	if( msg == NULL ) {
+		hl_debug_break();
+		msg = USTR("assert");
+	}
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
+	d->v.ptr = msg;
+	hl_throw(d);
+}
+
+static void jit_null_access( jit_ctx *ctx ) {
+	op64(ctx,PUSH,PEBP,UNUSED);
+	op64(ctx,MOV,PEBP,PESP);
+	int_val arg = (int_val)USTR("Null access");
+	call_native_consts(ctx, jit_fail, &arg, 1);
+}
+
+static void jit_assert( jit_ctx *ctx ) {
+	op64(ctx,PUSH,PEBP,UNUSED);
+	op64(ctx,MOV,PEBP,PESP);
+	int_val arg = 0;
+	call_native_consts(ctx, jit_fail, &arg, 1);
+}
+
 static int jit_build( jit_ctx *ctx, void (*fbuild)( jit_ctx *) ) {
 	int pos;
 	jit_buf(ctx);
@@ -2596,6 +2609,8 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 #	ifdef JIT_CUSTOM_LONGJUMP
 	ctx->longjump = jit_build(ctx, jit_longjump);
 #	endif
+	ctx->static_functions[0] = jit_build(ctx,jit_null_access);
+	ctx->static_functions[1] = jit_build(ctx,jit_assert);
 }
 
 static void *get_dyncast( hl_type *t ) {
@@ -3724,7 +3739,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				preg *r = alloc_cpu(ctx,dst,true);
 				op64(ctx,TEST,r,r);
 				XJump_small(JNotZero,jz);
-				call_native_consts(ctx,hl_null_access,NULL,0);
+				pad_before_call(ctx, 0);
+
+				jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
+				j->pos = BUF_POS();
+				j->target = -1;
+				j->next = ctx->calls;
+				ctx->calls = j;
+
+				op64(ctx,MOV,PEAX,pconst64(&p,RESERVE_ADDRESS));
+				op_call(ctx,PEAX,-1);
 				patch_jump(ctx,jz);
 			}
 			break;
@@ -3982,7 +4006,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			store(ctx,dst,dst->current,false);
 			break;
 		case OAssert:
-			call_native(ctx, hl_assert, 0);
+			{
+				jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
+				j->pos = BUF_POS();
+				j->target = -1;
+				j->next = ctx->calls;
+				ctx->calls = j;
+
+				op64(ctx,MOV,PEAX,pconst64(&p,RESERVE_ADDRESS));
+				op_call(ctx,PEAX,-2);
+			}
 			break;
 		case ONop:
 			break;
@@ -4056,7 +4089,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	// patch calls
 	c = ctx->calls;
 	while( c ) {
-		int fpos = (int)(int_val)m->functions_ptrs[c->target];
+		int fpos = c->target < 0 ? ctx->static_functions[-c->target-1] : (int)(int_val)m->functions_ptrs[c->target];
 		if( (code[c->pos]&~3) == (IS_64?0x48:0xB8) || code[c->pos] == 0x68 ) // MOV : absolute | PUSH
 			*(int_val*)(code + c->pos + (IS_64?2:1)) = (int_val)(code + fpos);
 		else
