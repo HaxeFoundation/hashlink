@@ -25,6 +25,10 @@
 #include <math.h>
 #include <hlmodule.h>
 
+#ifdef __arm__
+#	error "JIT does not support ARM processors, only x86 and x86-64 are supported, please use HashLink/C native compilation instead"
+#endif
+
 #ifdef HL_DEBUG
 #	define JIT_DEBUG
 #endif
