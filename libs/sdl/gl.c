@@ -5,12 +5,13 @@
 #	include <SDL2/SDL.h>
 #	include <SDL2/SDL_syswm.h>
 #	include <OpenGLES/ES3/gl.h>
-#	define glBindFragDataLocation(...)
-#	define glGetQueryObjectiv glGetQueryObjectuiv
-#	define glClearDepth glClearDepthf
+#	define HL_GLES
 #elif defined(HL_MAC)
 #	include <SDL2/SDL.h>
 #	include <OpenGL/gl3.h>
+#	define glBindImageTexture(...) hl_error("Not supported on OSX")
+#	define glDispatchCompute(...) hl_error("Not supported on OSX")
+#	define glMemoryBarrier(...) hl_error("Not supported on OSX")
 #elif defined(_WIN32)
 #	include <SDL.h>
 #	include <GL/GLU.h>
@@ -20,23 +21,33 @@
 #elif defined(HL_MESA)
 # 	include <GLES3/gl3.h>
 #	include <GL/osmesa.h>
-#	define GL_IMPORT(fun, t)
-#	define glBindFragDataLocation(...)
-#	define glGetQueryObjectiv glGetQueryObjectuiv
+#	define HL_GLES
 #elif defined(HL_ANDROID)
 #	include <SDL.h>
 #	include <GLES3/gl3.h>
 #	include <GLES3/gl3ext.h>
-#	define glBindFragDataLocation(...)
-#	define glGetQueryObjectiv glGetQueryObjectuiv
-#	define glClearDepth glClearDepthf
+#	define HL_GLES
 #else
 #	include <SDL2/SDL.h>
 #	include <GL/glu.h>
 #	include <GL/glext.h>
 #endif
 
-#if !defined(HL_CONSOLE) && !defined(HL_MESA)
+#ifdef HL_GLES
+#	define GL_IMPORT(fun, t)
+#	define ES_NOT_SUPPORTED hl_error("Not supported by GLES3")
+#	define glBindFragDataLocation(...) ES_NOT_SUPPORTED
+#	define glBindImageTexture(...) ES_NOT_SUPPORTED
+#	define glTexImage2DMultisample(...) ES_NOT_SUPPORTED
+#	define glFramebufferTexture(...) ES_NOT_SUPPORTED
+#	define glDispatchCompute(...) ES_NOT_SUPPORTED
+#	define glMemoryBarrier(...) ES_NOT_SUPPORTED
+#	define glPolygonMode(face,mode) if( mode != 0x1B02 ) ES_NOT_SUPPORTED
+#	define glGetQueryObjectiv glGetQueryObjectuiv
+#	define glClearDepth glClearDepthf
+#endif
+
+#if !defined(HL_CONSOLE) && !defined(GL_IMPORT)
 #define GL_IMPORT(fun, t) PFNGL##t##PROC fun
 #include "GLImports.h"
 #undef GL_IMPORT
@@ -292,9 +303,7 @@ HL_PRIM void HL_NAME(gl_bind_texture)( int t, vdynamic *texture ) {
 }
 
 HL_PRIM void HL_NAME(gl_bind_image_texture)( int unit, int texture, int level, bool layered, int layer, int access, int format ) {
-#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC) && !defined(HL_MESA)
 	glBindImageTexture(unit, texture, level, layered, layer, access, format);
-#	endif
 }
 
 HL_PRIM void HL_NAME(gl_tex_parameterf)( int t, int key, float value ) {
@@ -314,9 +323,7 @@ HL_PRIM void HL_NAME(gl_tex_image3d)( int target, int level, int internalFormat,
 }
 
 HL_PRIM void HL_NAME(gl_tex_image2d_multisample)( int target, int samples, int internalFormat, int width, int height, bool fixedsamplelocations) {
-#	if !defined(HL_MESA)
 	glTexImage2DMultisample(target, samples, internalFormat, width, height, fixedsamplelocations);
-#	endif
 }
 
 HL_PRIM void HL_NAME(gl_generate_mipmap)( int t ) {
@@ -354,9 +361,7 @@ HL_PRIM void HL_NAME(gl_bind_framebuffer)( int target, vdynamic *f ) {
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_texture)( int target, int attach, vdynamic *t, int level ) {
-#if !defined (HL_MESA)
 	glFramebufferTexture(target, attach, ZIDX(t), level);
-#endif
 }
 
 HL_PRIM void HL_NAME(gl_framebuffer_texture2d)( int target, int attach, int texTarget, vdynamic *t, int level ) {
@@ -492,15 +497,11 @@ HL_PRIM void HL_NAME(gl_uniform_matrix4fv)( vdynamic *u, bool transpose, vbyte *
 
 // compute
 HL_PRIM void HL_NAME(gl_dispatch_compute)( int num_groups_x, int num_groups_y, int num_groups_z ) {
-#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC) && !defined(HL_MESA)
 	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
-#	endif
 }
 
 HL_PRIM void HL_NAME(gl_memory_barrier)( int barriers ) {
-#	if !defined(HL_IOS) && !defined(HL_TVOS) && !defined(HL_MAC) && !defined(HL_MESA)
 	glMemoryBarrier(barriers);
-#	endif
 }
 
 // draw
