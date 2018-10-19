@@ -32,18 +32,18 @@
 static hl_module *cur_module;
 
 static bool module_resolve_pos( void *addr, int *fidx, int *fpos ) {
-	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code));
+	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->codeptr));
 	int min, max;
 	hl_debug_infos *dbg;
 	hl_function *fdebug;
-	if( cur_module->jit_debug == NULL )
+	if( cur_module->debug == NULL )
 		return false;
 	// lookup function from code pos
 	min = 0;
 	max = cur_module->code->nfunctions;
 	while( min < max ) {
 		int mid = (min + max) >> 1;
-		hl_debug_infos *p = cur_module->jit_debug + mid;
+		hl_debug_infos *p = cur_module->debug + mid;
 		if( p->start <= code_pos )
 			min = mid + 1;
 		else
@@ -52,7 +52,7 @@ static bool module_resolve_pos( void *addr, int *fidx, int *fpos ) {
 	if( min == 0 )
 		return false; // hl_callback
 	*fidx = (min - 1);
-	dbg = cur_module->jit_debug + (min - 1);
+	dbg = cur_module->debug + (min - 1);
 	fdebug = cur_module->code->functions + (min - 1);
 	// lookup inside function
 	min = 0;
@@ -101,10 +101,10 @@ static int module_capture_stack( void **stack, int size ) {
 	void *stack_bottom = stack_ptr;
 	void *stack_top = hl_get_thread()->stack_top;
 	int count = 0;
-	unsigned char *code = cur_module->jit_code;
+	unsigned char *code = cur_module->codeptr;
 	int code_size = cur_module->codesize;
-	if( cur_module->jit_debug ) {
-		int s = cur_module->jit_debug[0].start;
+	if( cur_module->debug ) {
+		int s = cur_module->debug[0].start;
 		code += s;
 		code_size -= s;
 	}
@@ -275,7 +275,6 @@ static void disabled_primitive() {
 
 int hl_module_init( hl_module *m ) {
 	int i;
-	jit_ctx *ctx;
 	// RESET globals
 	for(i=0;i<m->code->nglobals;i++) {
 		hl_type *t = m->code->globals[i];
@@ -372,8 +371,20 @@ int hl_module_init( hl_module *m ) {
 			break;
 		}
 	}
+	// INTERP
+#	ifdef HL_INTERP_ENABLE
+	interp_ctx *ctx = hl_interp_alloc();
+	if( ctx == NULL )
+		return 0;
+	hl_interp_init(ctx,m);
+	for(i=0;i<m->code->nfunctions;i++) {
+		hl_function *f = m->code->functions + i;
+		m->functions_ptrs[f->findex] = hl_interp_function(ctx,m,f);
+	}
+#	endif
 	// JIT
-	ctx = hl_jit_alloc();
+#	ifdef HL_JIT_ENABLE
+	jit_ctx *ctx = hl_jit_alloc();
 	if( ctx == NULL )
 		return 0;
 	hl_jit_init(ctx, m);
@@ -386,11 +397,14 @@ int hl_module_init( hl_module *m ) {
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
 	}
-	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug);
+	m->codeptr = hl_jit_code(ctx, m, &m->codesize, &m->debug);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
-		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
+		m->functions_ptrs[f->findex] = ((unsigned char*)m->codeptr) + ((int_val)m->functions_ptrs[f->findex]);
 	}
+#	endif
+	if( !m->codeptr )
+		return false;
 	// INIT constants
 	for (i = 0; i<m->code->nconstants; i++) {
 		int j;
@@ -440,7 +454,9 @@ int hl_module_init( hl_module *m ) {
 	cur_module = m;
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_gc_set_dump_types(hl_module_types_dump);
+#	ifdef HL_JIT_ENABLE
 	hl_jit_free(ctx);
+#	endif
 	return 1;
 }
 
@@ -452,11 +468,11 @@ void hl_module_free( hl_module *m ) {
 	free(m->ctx.functions_types);
 	free(m->globals_indexes);
 	free(m->globals_data);
-	if( m->jit_debug ) {
+	if( m->debug ) {
 		int i;
 		for(i=0;i<m->code->nfunctions;i++)
-			free(m->jit_debug[i].offsets);
-		free(m->jit_debug);
+			free(m->debug[i].offsets);
+		free(m->debug);
 	}
 	free(m);
 }

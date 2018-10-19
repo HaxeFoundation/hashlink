@@ -145,7 +145,8 @@ int main(int argc, pchar *argv[]) {
 		return 2;
 	if( !hl_module_init(ctx.m) )
 		return 3;
-	hl_code_free(ctx.code);
+	if( !ctx.m->isinterp )
+		hl_code_free(ctx.code);
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
 		fprintf(stderr,"Could not start debugger on port %d",debug_port);
 		return 4;

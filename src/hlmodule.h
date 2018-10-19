@@ -22,6 +22,15 @@
 #include <hl.h>
 #include "opcodes.h"
 
+#if defined(__arm__) || defined(HL_VERSION) 
+#	define HL_NO_JIT
+#	define HL_INTERP_ENABLE
+#endif
+
+#ifndef HL_NO_JIT
+#	define HL_JIT_ENABLE
+#endif
+
 typedef struct {
 	const char *lib;
 	const char *name;
@@ -98,12 +107,11 @@ typedef struct {
 	unsigned char *globals_data;
 	void **functions_ptrs;
 	int *functions_indexes;
-	void *jit_code;
-	hl_debug_infos *jit_debug;
+	void *codeptr;
+	bool isinterp;
+	hl_debug_infos *debug;
 	hl_module_context ctx;
 } hl_module;
-
-typedef struct jit_ctx jit_ctx;
 
 hl_code *hl_code_read( const unsigned char *data, int size );
 void hl_code_free( hl_code *c );
@@ -115,8 +123,19 @@ int hl_module_init( hl_module *m );
 void hl_module_free( hl_module *m );
 bool hl_module_debug( hl_module *m, int port, bool wait );
 
+#ifdef HL_JIT_ENABLE
+typedef struct jit_ctx jit_ctx;
+
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug );
+#endif
+
+#ifdef HL_INTERP_ENABLE
+typedef struct interp_ctx interp_ctx;
+interp_ctx *hl_interp_alloc();
+void hl_interp_init( interp_ctx *ctx, hl_module *m );
+void *hl_interp_function( interp_ctx *ctx, hl_module *m, hl_function *f );
+#endif

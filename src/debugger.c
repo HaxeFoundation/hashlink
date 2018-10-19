@@ -72,7 +72,7 @@ static void hl_debug_loop( hl_module *m ) {
 		send(&pid,4);
 		send(&inf_addr, sizeof(void*));
 		send(&m->globals_data,sizeof(void*));
-		send(&m->jit_code,sizeof(void*));
+		send(&m->codeptr,sizeof(void*));
 		send(&m->codesize,4);
 		send(&m->code->types,sizeof(void*));
 
@@ -85,7 +85,7 @@ static void hl_debug_loop( hl_module *m ) {
 		send(&m->code->nfunctions,4);
 		for(i=0;i<m->code->nfunctions;i++) {
 			hl_function *f = m->code->functions + i;
-			hl_debug_infos *d = m->jit_debug + i;
+			hl_debug_infos *d = m->debug + i;
 			struct {
 				int nops;
 				int start;

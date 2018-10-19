@@ -258,6 +258,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="interp.c" />
     <ClCompile Include="src\code.c" />
     <ClCompile Include="src\debugger.c" />
     <ClCompile Include="src\jit.c" />
