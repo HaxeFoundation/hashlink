@@ -23,7 +23,7 @@
 #define HL_H
 
 /**
-	Detailed documentation can be found here: 
+	Detailed documentation can be found here:
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
@@ -204,8 +204,10 @@ typedef unsigned long long uint64;
 // -------------- UNICODE -----------------------------------
 
 #if defined(HL_WIN) && !defined(HL_LLVM)
-#ifdef HL_WIN_DESKTOP
+#if defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)
 #	include <Windows.h>
+#elif defined(HL_WIN_DESKTOP) && defined(HL_MINGW)
+#	include<windows.h>
 #else
 #	include <xdk.h>
 #endif
@@ -758,9 +760,9 @@ typedef struct {
 #	endif
 #elif defined(LIBHL_STATIC)
 #	ifdef __cplusplus
-#		define	HL_PRIM				extern "C" 
+#		define	HL_PRIM				extern "C"
 #	else
-#		define	HL_PRIM				
+#		define	HL_PRIM
 #	endif
 #define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #else
