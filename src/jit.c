@@ -3088,8 +3088,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			store(ctx,dst,dst->current,false);
 			break;
 		case OBytes:
-			op64(ctx,MOV,alloc_cpu(ctx,dst,false),pconst64(&p,(int_val)m->code->strings[o->p2]));
-			store(ctx,dst,dst->current,false);
+			{
+				char *b = m->code->version >= 5 ? m->code->bytes + m->code->bytes_pos[o->p2] : m->code->strings[o->p2];
+				op64(ctx,MOV,alloc_cpu(ctx,dst,false),pconst64(&p,(int_val)b));
+				store(ctx,dst,dst->current,false);
+			}
 			break;
 		case ONull:
 			{
