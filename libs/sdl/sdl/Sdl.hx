@@ -66,13 +66,20 @@ class Sdl {
 	public static function delay(time:Int) {
 	}
 
-
 	public static function getScreenWidth() : Int {
 		return 0;
 	}
 
 	public static function getScreenHeight() : Int {
 		return 0;
+	}
+
+	static function get_platform() : hl.Bytes {
+		return null;
+	}
+
+	public static function getPlatform(){
+		return @:privateAccess String.fromUTF8(get_platform());
 	}
 
 	public static function message( title : String, text : String, error = false ) {

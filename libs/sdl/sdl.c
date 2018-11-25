@@ -307,6 +307,9 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 	return e.h;
 }
 
+HL_PRIM const char *HL_NAME(get_platform)() {
+	return SDL_GetPlatform();
+}
 
 HL_PRIM void HL_NAME(message_box)(vbyte *title, vbyte *text, bool error) {
 	hl_blocking(true);
@@ -357,6 +360,7 @@ DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
+DEFINE_PRIM(_BYTES, get_platform, _NO_ARG);
 DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
