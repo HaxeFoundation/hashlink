@@ -3911,13 +3911,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				call_native(ctx,setjmp,size);
 				op64(ctx,TEST,PEAX,PEAX);
 				XJump_small(JZero,jenter);
-				call_native(ctx, hl_get_thread, 0);
 				op64(ctx,ADD,PESP,pconst(&p,trap_size));
 				if( !tinf ) {
 					call_native(ctx, hl_get_thread, 0);
 					op64(ctx,MOV,PEAX,pmem(&p, Eax, (int)(int_val)&tinf->exc_value));
 				} else {
-					op64(ctx,MOV,PEAX,pconst64(&p,(int_val)&tinf->trap_current));
+					op64(ctx,MOV,PEAX,pconst64(&p,(int_val)&tinf->exc_value));
 					op64(ctx,MOV,PEAX,pmem(&p, Eax, 0));
 				}
 				store(ctx,dst,PEAX,false);
