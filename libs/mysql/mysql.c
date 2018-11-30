@@ -306,7 +306,7 @@ HL_PRIM result *HL_NAME(request)( connection *c, const char *rq, int rqLen  ) {
 
 HL_PRIM const char *HL_NAME(escape)( connection *c, const char *str, int len ) {
 	int wlen = len * 2;
-	vbyte *sout = hl_gc_alloc_noptr(wlen);
+	vbyte *sout = hl_gc_alloc_noptr(wlen+1);
 	wlen = mysql_real_escape_string(c->c,sout,str,len);
 	if( wlen < 0 ) {
 		hl_buffer *b = hl_alloc_buffer();
@@ -314,7 +314,7 @@ HL_PRIM const char *HL_NAME(escape)( connection *c, const char *str, int len ) {
 		hl_buffer_cstr(b,mysql_character_set_name(c->c));
 		hl_throw_buffer(b);
 	}
-	sout[len] = 0;
+	sout[wlen] = 0;
 	return sout;
 }
 
