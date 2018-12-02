@@ -336,7 +336,7 @@ HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args
 					vclosure tmp;
 					vclosure_wrapper w;
 					tmp.t = hl_get_closure_type(l->t);
-					tmp.fun = rt->methods[-l->field_index-1];
+					tmp.fun = o->t->obj->rt->methods[-l->field_index-1];
 					tmp.hasValue = 1;
 					tmp.value = o;
 					w.cl.t = ft;
