@@ -157,7 +157,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 		{
 			int i;
 			int nargs = READ(); 
-			t->fun = (hl_type_fun*)hl_malloc(&r->code->alloc,sizeof(hl_type_fun));
+			t->fun = (hl_type_fun*)hl_zalloc(&r->code->alloc,sizeof(hl_type_fun));
 			t->fun->nargs = nargs;
 			t->fun->args = (hl_type**)hl_malloc(&r->code->alloc,sizeof(hl_type*)*nargs);
 			for(i=0;i<nargs;i++)
