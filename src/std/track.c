@@ -111,7 +111,7 @@ static void init_lock() {
 	tinf->exc_flags |= HL_TRACK_DISABLE;
 	track_lock = hl_mutex_alloc(true);
 	hl_add_root(&track_lock);
-	tinf->exc_flags &= HL_TRACK_DISABLE;
+	tinf->exc_flags &= ~HL_TRACK_DISABLE;
 }
 
 static void on_alloc( hl_type *t, int size, int flags, void *ptr ) {
