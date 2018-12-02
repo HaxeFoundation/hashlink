@@ -61,6 +61,7 @@ static int T_SIZES[] = {
 	HL_WSIZE, // ABSTRACT
 	HL_WSIZE, // ENUM
 	HL_WSIZE, // NULL
+	HL_WSIZE, // METHOD
 };
 
 HL_PRIM int hl_type_size( hl_type *t ) {
@@ -124,6 +125,7 @@ HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 	case HNULL:
 		return hl_same_type(a->tparam, b->tparam);
 	case HFUN:
+	case HMETHOD:
 		{
 			int i;
 			if( a->fun->nargs != b->fun->nargs )
@@ -169,6 +171,7 @@ HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 		false, // HABSTRACT
 		true, // HENUM
 		true, // HNULL
+		false, // HMETHOD
 	};
 	return T_IS_DYNAMIC[t->kind];
 }
@@ -250,6 +253,7 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t, tlist *parents ) {
 	l = &cur;
 	switch( t->kind ) {
 	case HFUN:
+	case HMETHOD:
 		hl_buffer_char(b,'(');
 		hl_type_str_rec(b,t->fun->ret,l);
 		hl_buffer_char(b,' ');

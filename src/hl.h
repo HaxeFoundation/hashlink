@@ -308,8 +308,9 @@ typedef enum {
 	HABSTRACT=17,
 	HENUM	= 18,
 	HNULL	= 19,
+	HMETHOD = 20,
 	// ---------
-	HLAST	= 20,
+	HLAST	= 21,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 

@@ -154,6 +154,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 	t->kind = READ();
 	switch( (int)t->kind ) {
 	case HFUN:
+	case HMETHOD:
 		{
 			int i;
 			int nargs = READ(); 
