@@ -499,7 +499,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 					tf.args = f->t->fun->args + 1;
 					tf.nargs = f->t->fun->nargs - 1;
 					tf.ret = f->t->fun->ret;
-					if( hl_safe_cast(ft,&tmp) )
+					if( hl_safe_cast(&tmp,ft) )
 						hl_vfields(v)[i] = obj->t->obj->rt->methods[-f->field_index-1];
 					else
 						hl_vfields(v)[i] = NULL;
