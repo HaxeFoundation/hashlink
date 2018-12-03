@@ -208,6 +208,7 @@ HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 			}
 		}
 	case HFUN:
+	case HMETHOD:
 		if( t->fun->nargs == to->fun->nargs ) {
 			int i;
 			if( !hl_safe_cast(t->fun->ret,to->fun->ret) )
