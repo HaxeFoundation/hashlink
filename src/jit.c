@@ -1723,6 +1723,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HVIRTUAL:
 	case HOBJ:
 	case HFUN:
+	case HMETHOD:
 	case HBYTES:
 	case HNULL:
 	case HENUM:
@@ -1761,6 +1762,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HDYNOBJ:
 	case HVIRTUAL:
 	case HFUN:
+	case HMETHOD:
 	case HBYTES:
 	case HNULL:
 	case HENUM:

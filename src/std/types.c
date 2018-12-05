@@ -388,7 +388,7 @@ HL_PRIM varray* hl_type_enum_values( hl_type *t ) {
 }
 
 HL_PRIM int hl_type_args_count( hl_type *t ) {
-	if( t->kind == HFUN )
+	if( t->kind == HFUN || t->kind == HMETHOD )
 		return t->fun->nargs;
 	return 0;
 }
