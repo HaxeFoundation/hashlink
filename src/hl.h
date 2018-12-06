@@ -285,6 +285,14 @@ C_FUNCTION_END
 #	define hl_debug_break()
 #endif
 
+#ifdef HL_VCC
+#	define HL_NO_RETURN(f) __declspec(noreturn) f
+#	define HL_UNREACHABLE
+#else
+#	define HL_NO_RETURN(f) f __attribute__((noreturn))
+#	define HL_UNREACHABLE __builtin_unreachable()
+#endif
+
 // ---- TYPES -------------------------------------------
 
 typedef enum {
@@ -573,8 +581,8 @@ HL_API const uchar *hl_field_name( int hash );
 
 HL_API vdynamic *hl_alloc_strbytes( const uchar *msg, ... );
 HL_API void hl_assert( void );
-HL_API void hl_throw( vdynamic *v );
-HL_API void hl_rethrow( vdynamic *v );
+HL_API HL_NO_RETURN( void hl_throw( vdynamic *v ) );
+HL_API HL_NO_RETURN( void hl_rethrow( vdynamic *v ) );
 HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
 HL_API void hl_dump_stack( void );

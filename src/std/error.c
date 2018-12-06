@@ -106,6 +106,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	if( t->exc_handler && call_handler ) hl_dyn_call(t->exc_handler,&v,1);
 	if( throw_jump == NULL ) throw_jump = longjmp;
 	throw_jump(trap->buf,1);
+	HL_UNREACHABLE;
 }
 
 HL_PRIM void hl_throw_buffer( hl_buffer *b ) {
