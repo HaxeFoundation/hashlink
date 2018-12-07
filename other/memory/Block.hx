@@ -89,6 +89,8 @@ enum BlockTypeKind {
 }
 
 class Block {
+	public static var MARK_UID = 0;
+
 	public var page : Page;
 	public var bid : Int;
 	public var owner : Block;
@@ -96,6 +98,7 @@ class Block {
 	public var typeKind : BlockTypeKind;
 
 	public var depth : Int = -1;
+	public var mark : Int = -1;
 
 	public var subs : Array<Block>; // can be null
 	public var parents : Array<Block>; // if multiple owners

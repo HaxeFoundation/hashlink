@@ -27,10 +27,17 @@ class Stats {
 		inf.mem += mem;
 	}
 
-	public function print() {
+	public function print( withSum = false ) {
 		allT.sort(function(i1, i2) return i1.mem - i2.mem);
-		for( i in allT )
+		var totCount = 0;
+		var totMem = 0;
+		for( i in allT ) {
+			totCount += i.count;
+			totMem += i.mem;
 			mem.log(i.count + " count, " + Memory.MB(i.mem) + " " + [for( tid in i.tl ) mem.types[tid].toString()].join(" > "));
+		}
+		if( withSum )
+			mem.log("Total: "+totCount+" count, "+Memory.MB(totMem));
 	}
 
 }
@@ -546,17 +553,17 @@ class Memory {
 		ctx.print();
 	}
 
-	function locate( tstr : String, up = 0 ) {
-		var lt = null;
+	function resolveType( str ) {
 		for( t in types )
-			if( t.t.toString() == tstr ) {
-				lt = t;
-				break;
-			}
-		if( lt == null ) {
-			log("Type not found");
-			return;
-		}
+			if( t.t.toString() == str )
+				return t;
+		log("Type not found '"+str+"'");
+		return null;
+	}
+
+	function locate( tstr : String, up = 0 ) {
+		var lt = resolveType(tstr);
+		if( lt == null ) return;
 
 		var ctx = new Stats(this);
 		for( b in blocks )
@@ -577,6 +584,33 @@ class Memory {
 				ctx.addPath(tl, b.getMemSize());
 			}
 		ctx.print();
+	}
+
+	function count( tstr : String, excludes : Array<String> ) {
+		var t = resolveType(tstr);
+		if( t == null ) return;
+		var texclude = [];
+		for( e in excludes ) {
+			var t = resolveType(e);
+			if( t == null ) return;
+			texclude.push(t);
+		}
+		var ctx = new Stats(this);
+		Block.MARK_UID++;
+		for( b in blocks )
+			if( b.type == t )
+				visitRec(b, ctx, texclude);
+		ctx.print(true);
+	}
+
+	function visitRec( b : Block, ctx : Stats, exclude : Array<TType> ) {
+		if( b.mark == Block.MARK_UID ) return;
+		b.mark = Block.MARK_UID;
+		for( t in exclude ) if( b.type == t ) return;
+		ctx.addPath([b.type.tid],b.getMemSize());
+		if( b.subs != null )
+			for( s in b.subs )
+				visitRec(s,ctx,exclude);
 	}
 
 	function parents( tstr : String, up = 0 ) {
@@ -758,6 +792,8 @@ class Memory {
 				m.printUnknown();
 			case "locate":
 				m.locate(args.shift(), Std.parseInt(args.shift()));
+			case "count":
+				m.count(args.shift(), args);
 			case "parents":
 				m.parents(args.shift());
 			case "subs":
