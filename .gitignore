@@ -50,3 +50,4 @@ node_modules
 /other/debugger/*.map
 /*.zip
 /*.tgz
+args.txt
