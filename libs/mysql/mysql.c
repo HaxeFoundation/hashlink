@@ -50,7 +50,7 @@ typedef enum {
 } CONV;
 
 typedef struct {
-	void (*free)( void * );
+	void *free;
 	MYSQL_RES *r;
 	int nfields;
 	CONV *fields_convs;
@@ -59,7 +59,7 @@ typedef struct {
 } result;
 
 typedef struct {
-	void (*free)( void * );
+	void *free;
 	MYSQL *c;
 } connection;
 
@@ -88,7 +88,7 @@ HL_PRIM varray *HL_NAME(result_get_fields_names)( result *r ) {
 	MYSQL_FIELD *fields = mysql_fetch_fields(r->r);
 	varray *a = hl_alloc_array(&hlt_bytes,r->nfields);
 	for(k=0;k<r->nfields;k++)
-		hl_aptr(a,vbyte*)[k] = fields[k].name;
+		hl_aptr(a,vbyte*)[k] = (vbyte*)fields[k].name;
 	return a;
 }
 
@@ -304,10 +304,10 @@ HL_PRIM result *HL_NAME(request)( connection *c, const char *rq, int rqLen  ) {
 }
 
 
-HL_PRIM const char *HL_NAME(escape)( connection *c, const char *str, int len ) {
+HL_PRIM vbyte *HL_NAME(escape)( connection *c, const char *str, int len ) {
 	int wlen = len * 2;
 	vbyte *sout = hl_gc_alloc_noptr(wlen+1);
-	wlen = mysql_real_escape_string(c->c,sout,str,len);
+	wlen = mysql_real_escape_string(c->c,(char*)sout,str,len);
 	if( wlen < 0 ) {
 		hl_buffer *b = hl_alloc_buffer();
 		hl_buffer_cstr(b,"Unsupported charset : ");
