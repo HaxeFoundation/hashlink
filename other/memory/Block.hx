@@ -1,4 +1,11 @@
-abstract Pointer(Int) {
+abstract Pointer(haxe.Int64) {
+
+	public var value(get,never) : haxe.Int64;
+
+	inline function get_value() return this;
+
+	inline function new(v) this = v;
+
 	public inline function isNull() {
 		return this == 0;
 	}
@@ -6,16 +13,16 @@ abstract Pointer(Int) {
 		return cast (this + i);
 	}
 	public inline function sub( p : Pointer ) : Int {
-		return this - cast(p);
+		return haxe.Int64.toInt(this - p.value);
 	}
 	public inline function pageAddress() : Pointer {
-		return cast (this & ~0xFFFF);
+		return new Pointer(haxe.Int64.and(this,haxe.Int64.make(-1,~0xFFFF)));
 	}
 	public inline function toString() {
-		return "0x"+StringTools.hex(this, 8);
+		return "0x"+(this.high == 0 ? StringTools.hex(this.high, 8) : "")+StringTools.hex(this.low,8);
 	}
-	public inline function shift( k : Int ) : Int {
-		return this >>> k;
+	public inline function shift( k : Int ) : haxe.Int64 {
+		return haxe.Int64.shr(this,k);
 	}
 }
 
@@ -177,3 +184,63 @@ class Block {
 
 }
 
+@:generic
+private class PointerMapEntry<T> {
+	public var id1 : Int;
+	public var id2 : Int;
+	public var value : T;
+	public function new() {
+	}
+}
+
+@:generic
+class PointerMap<T> {
+
+	var array : Array<PointerMapEntry<T>>;
+
+	public function new() {
+		array = [];
+	}
+
+	inline function lookup( p : Pointer, insert : Bool ) {
+		var min = 0;
+		var max = array.length;
+		var id1 = p.value.low;
+		var id2 = p.value.high;
+		var found = null;
+		while( min < max ) {
+			var mid = (min + max) >> 1;
+			var c = array[mid];
+			if( c.id1 < id1 )
+				min = mid + 1;
+			else if( c.id1 > id1 )
+				max = mid;
+			else if( c.id2 < id2 )
+				min = mid + 1;
+			else if( c.id2 > id2 )
+				max = mid;
+			else {
+				found = c;
+				break;
+			}
+		}
+		if( !insert || found != null ) return found;
+		var c = new PointerMapEntry<T>();
+		c.id1 = id1;
+		c.id2 = id2;
+		array.insert((min+max)>>1, c);
+		return c;
+	}
+
+	public function set( p : Pointer, v : T ) {
+		var c = lookup(p, true);
+		c.value = v;
+	}
+
+	public function get( p : Pointer ) : T {
+		if( p == null ) return null;
+		var c = lookup(p, false);
+		return c == null ? null : c.value;
+	}
+
+}

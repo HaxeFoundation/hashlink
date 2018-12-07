@@ -60,8 +60,8 @@ class Memory {
 	var toProcess : Array<Block>;
 	var tdynObj : TType;
 	var tdynObjData : TType;
-	var pointerBlock : Map<Pointer, Block>;
-	var pointerType : Map<Pointer, TType>;
+	var pointerBlock : PointerMap<Block>;
+	var pointerType : PointerMap<TType>;
 	var falseCandidates : Array<{ b : Block, f : Block, idx : Int }>;
 
 	function new() {
@@ -103,7 +103,9 @@ class Memory {
 	}
 
 	inline function readPointer() : Pointer {
-		return cast memoryDump.readInt32();
+		var low = memoryDump.readInt32();
+		var high = is64 ? memoryDump.readInt32() : 0;
+		return cast haxe.Int64.make(high,low);
 	}
 
 	public static function MB( v : Float ) {
@@ -125,7 +127,6 @@ class Memory {
 		bool32 = (flags & 2) != 0;
 
 		ptrBits = is64 ? 3 : 2;
-		if( is64 ) throw "64 bit not supported";
 
 		// load pages
 		var count = readInt();
@@ -223,7 +224,7 @@ class Memory {
 		if( memoryDump == null ) throw "Missing .dump file";
 		if( code.types.length != this.typesPointers.length ) throw "Types count mismatch";
 
-		pointerType = new Map();
+		pointerType = new PointerMap();
 		var cid = 0;
 		types = [for( i in 0...code.types.length ) new TType(i, code.types[i])];
 		for( i in 0...typesPointers.length ) {
@@ -244,7 +245,9 @@ class Memory {
 				}
 				var ct = new TType(tid, HFun({ args : args, ret : f.ret }), clparam);
 				types.push(ct);
-				pointerType.set(closuresPointers[cid++], ct);
+				var pt = closuresPointers[cid++];
+				if( pt != null )
+					pointerType.set(pt, ct);
 			default:
 			}
 		}
@@ -259,9 +262,9 @@ class Memory {
 		}
 
 		blocks = [];
-		var pageMem = new Map();
+		var pageMem = new PointerMap<Page>();
 		var progress = 0;
-		pointerBlock = new Map();
+		pointerBlock = new PointerMap();
 
 		for( p in pages ) {
 			progress++;
@@ -674,7 +677,7 @@ class Memory {
 		for( i in 0...size * size )
 			bmp[i] = 0xFF000000;
 		for( p in pages ) {
-			var index = p.addr.shift(BMP_BITS);
+			var index = p.addr.shift(BMP_BITS).low;
 			// reserved
 			for( i in 0...(p.size >> BMP_BITS) )
 				bmp[index+i] = 0xFF808080;
@@ -682,7 +685,7 @@ class Memory {
 				bmp[index + i] = 0xFFFFFF00; // YELLOW = GC MEMORY
 		}
 		for( b in blocks ) {
-			var index = b.getPointer().shift(BMP_BITS);
+			var index = b.getPointer().shift(BMP_BITS).low;
 			var color = b.page.memHasPtr() ? 0xFFFF0000 : 0xFF00FF00; // GREEN = data / RED = objects
 			for( i in 0...b.getMemSize() >> BMP_BITS )
 				bmp[index + i] = color;
