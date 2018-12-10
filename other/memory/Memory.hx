@@ -574,7 +574,7 @@ class Memory {
 
 		var ctx = new Stats(this);
 		for( b in blocks )
-			if( b.type == lt ) {
+			if( b.type != null && b.type.match(lt) ) {
 				var tl = [];
 				var owner = b.owner;
 				if( owner != null ) {
