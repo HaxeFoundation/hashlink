@@ -1173,23 +1173,12 @@ HL_PRIM void hl_free_executable_memory( void *c, int size ) {
 #endif
 }
 
-#ifdef HL_CONSOLE
+#if defined(HL_CONSOLE)
 void *sys_alloc_align( int size, int align );
 void sys_free_align( void *ptr, int size );
+#elif !defined(HL_WIN)
+static void *base_addr = (void*)0x40000000;
 #endif
-
-#if defined(__ANDROID__) && !defined(HAVE_POSIX_MEMALIGN)
-int posix_memalign(void** memptr, size_t alignment, size_t size) {
-    if ((alignment & (alignment - 1)) != 0 || alignment == 0 || alignment % sizeof(void*) != 0) {
-        return 22; // Invalid argument (EINVAL)
-    }
-    *memptr = memalign(alignment, size);
-    if (*memptr == NULL) {
-        return 12; // Out of memory (ENOMEM)
-    }
-    return 0;
-}
-#endif /* __ANDROID_API__ < 17 */
 
 static void *gc_alloc_page_memory( int size ) {
 #if defined(HL_WIN)
@@ -1205,9 +1194,10 @@ static void *gc_alloc_page_memory( int size ) {
 #elif defined(HL_CONSOLE)
 	return sys_alloc_align(size, GC_PAGE_SIZE);
 #else
-	void *ptr;
-	if( posix_memalign(&ptr,GC_PAGE_SIZE,size) )
+	void *ptr = mmap(base_addr,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+	if( ptr == (void*)-1 )
 		return NULL;
+	base_addr = (char*)ptr+size;
 	return ptr;
 #endif
 }
@@ -1218,7 +1208,7 @@ static void gc_free_page_memory( void *ptr, int size ) {
 #elif defined(HL_CONSOLE)
 	sys_free_align(ptr,size);
 #else
-	free(ptr);
+	munmap(ptr,size);
 #endif
 }
 
