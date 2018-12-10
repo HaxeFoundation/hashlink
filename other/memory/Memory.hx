@@ -255,6 +255,13 @@ class Memory {
 				var pt = closuresPointers[cid++];
 				if( pt != null )
 					pointerType.set(pt, ct);
+			case HObj(o):
+				if( o.tsuper != null )
+					for( j in 0...types.length )
+						if( types[j].t == o.tsuper ) {
+							types[i].parentClass = types[j];
+							break;
+						}
 			default:
 			}
 		}
@@ -597,20 +604,25 @@ class Memory {
 		}
 		var ctx = new Stats(this);
 		Block.MARK_UID++;
+		var mark = [];
 		for( b in blocks )
 			if( b.type == t )
-				visitRec(b, ctx, texclude);
+				visitRec(b,ctx,[],mark);
+		while( mark.length > 0 ) {
+			var b = mark.pop();
+			for( s in b.subs )
+				visitRec(s,ctx,texclude,mark);
+		}
 		ctx.print(true);
 	}
 
-	function visitRec( b : Block, ctx : Stats, exclude : Array<TType> ) {
+	function visitRec( b : Block, ctx : Stats, exclude : Array<TType>, mark : Array<Block> ) {
 		if( b.mark == Block.MARK_UID ) return;
 		b.mark = Block.MARK_UID;
-		for( t in exclude ) if( b.type == t ) return;
-		ctx.addPath([b.type.tid],b.getMemSize());
+		if( b.type != null ) for( t in exclude ) if( b.type.match(t) ) return;
+		ctx.addPath(b.type == null ? [] : [b.type.tid],b.getMemSize());
 		if( b.subs != null )
-			for( s in b.subs )
-				visitRec(s,ctx,exclude);
+			mark.push(b);
 	}
 
 	function parents( tstr : String, up = 0 ) {
@@ -763,15 +775,23 @@ class Memory {
 
 		//hl.Gc.dumpMemory(); Sys.command("cp memory.hl test.hl");
 
+		var code = null, memory = null;
 		var args = Sys.args();
 		while( args.length > 0 ) {
 			var arg = args.shift();
 			if( StringTools.endsWith(arg, ".hl") ) {
+				code = arg;
 				m.loadBytecode(arg);
 				continue;
 			}
+			memory = arg;
 			m.loadMemory(arg);
 		}
+		if( code != null && memory == null ) {
+			memory = new haxe.io.Path(code).dir+"/hlmemory.dump";
+			if( sys.FileSystem.exists(memory) ) m.loadMemory(memory);
+		}
+
 		m.check();
 
 		var stdin = Sys.stdin();
