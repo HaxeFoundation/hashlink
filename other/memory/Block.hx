@@ -188,62 +188,28 @@ class Block {
 }
 
 @:generic
-private class PointerMapEntry<T> {
-	public var id1 : Int;
-	public var id2 : Int;
-	public var value : T;
-	public function new() {
-	}
-}
-
-@:generic
 class PointerMap<T> {
 
-	var array : Array<PointerMapEntry<T>>;
+	var lookup : Map<Int,Map<Int,T>>;
 
 	public function new() {
-		array = [];
-	}
-
-	inline function lookup( p : Pointer, insert : Bool ) {
-		var min = 0;
-		var max = array.length;
-		var id1 = p.value.low;
-		var id2 = p.value.high;
-		var found = null;
-		while( min < max ) {
-			var mid = (min + max) >> 1;
-			var c = array[mid];
-			if( c.id1 < id1 )
-				min = mid + 1;
-			else if( c.id1 > id1 )
-				max = mid;
-			else if( c.id2 < id2 )
-				min = mid + 1;
-			else if( c.id2 > id2 )
-				max = mid;
-			else {
-				found = c;
-				break;
-			}
-		}
-		if( !insert || found != null ) return found;
-		var c = new PointerMapEntry<T>();
-		c.id1 = id1;
-		c.id2 = id2;
-		array.insert((min+max)>>1, c);
-		return c;
+		lookup = new Map();
 	}
 
 	public function set( p : Pointer, v : T ) {
-		var c = lookup(p, true);
-		c.value = v;
+		var c = lookup.get(p.value.high);
+		if( c == null ) {
+			c = new Map();
+			lookup.set(p.value.high, c);
+		}
+		c.set(p.value.low, v);
 	}
 
 	public function get( p : Pointer ) : T {
 		if( p == null ) return null;
-		var c = lookup(p, false);
-		return c == null ? null : c.value;
+		var c = lookup.get(p.value.high);
+		if( c == null ) return null;
+		return c.get(p.value.low);
 	}
 
 }
