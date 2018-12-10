@@ -1197,6 +1197,22 @@ static void *gc_alloc_page_memory( int size ) {
 	void *ptr = mmap(base_addr,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
 	if( ptr == (void*)-1 )
 		return NULL;
+	if( ((int_val)ptr) & (GC_PAGE_SIZE-1) ) {
+		munmap(ptr,size);
+		void *tmp;
+		int tmp_size = (int)((int_val)ptr - (int_val)base_addr);
+		if( tmp_size > 0 ) {
+			base_addr = (void*)((((int_val)ptr) & ~(GC_PAGE_SIZE-1)) + GC_PAGE_SIZE);
+			tmp = ptr;
+		} else {
+			base_addr = (void*)(((int_val)ptr) & ~(GC_PAGE_SIZE-1));
+			tmp = NULL;
+		}
+		if( tmp ) tmp = mmap(tmp,tmp_size,PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+		ptr = gc_alloc_page_memory(size);
+		if( tmp ) munmap(tmp,tmp_size);
+		return ptr;
+	}
 	base_addr = (char*)ptr+size;
 	return ptr;
 #endif
