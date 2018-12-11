@@ -75,7 +75,7 @@ typedef struct {
 	int wheelDelta;
 	ws_change state;
 	int keyCode;
-  int scanCode;
+	int scanCode;
 	bool keyRepeat;
 	int controller;
 	int value;
