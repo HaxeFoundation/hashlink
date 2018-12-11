@@ -75,6 +75,7 @@ typedef struct {
 	int wheelDelta;
 	ws_change state;
 	int keyCode;
+  int scanCode;
 	bool keyRepeat;
 	int controller;
 	int value;
@@ -147,11 +148,13 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 		case SDL_KEYDOWN:
 			event->type = KeyDown;
 			event->keyCode = e.key.keysym.sym;
+			event->scanCode = e.key.keysym.scancode;
 			event->keyRepeat = e.key.repeat != 0;
 			break;
 		case SDL_KEYUP:
 			event->type = KeyUp;
 			event->keyCode = e.key.keysym.sym;
+			event->scanCode = e.key.keysym.scancode;
 			break;
 		case SDL_SYSWMEVENT:
 			continue;
