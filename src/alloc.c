@@ -378,6 +378,18 @@ static int PAGE_ID = 0;
 HL_API void hl_gc_dump_memory( const char *filename );
 static void gc_major( void );
 
+static void *gc_will_collide( void *p, int size ) {
+#	ifdef HL_64
+	int i;
+	for(i=0;i<size>>GC_MASK_BITS;i++) {
+		void *ptr = (unsigned char*)p + (i<<GC_MASK_BITS);
+		if( GC_GET_PAGE(ptr) )
+			return ptr;
+	}
+#	endif
+	return NULL;
+}
+
 static gc_pheader *gc_alloc_new_page( int pid, int block, int size, int kind, bool varsize ) {
 	int m, i;
 	unsigned char *base;
@@ -419,16 +431,14 @@ retry:
 	}
 
 #	ifdef HL_64
-	for(i=0;i<size>>GC_MASK_BITS;i++) {
-		void *ptr = (unsigned char*)p + (i<<GC_MASK_BITS);
-		if( GC_GET_PAGE(ptr) ) {
-#			ifdef HL_VCC
-			printf("GC Page HASH collide %IX %IX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
-#			else
-			printf("GC Page HASH collide %lX %lX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
-#			endif
-			return gc_alloc_new_page(pid,block,size,kind,varsize);
-		}
+	void *ptr = gc_will_collide(p,size);
+	if( ptr ) {
+#		ifdef HL_VCC
+		printf("GC Page HASH collide %IX %IX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
+#		else
+		printf("GC Page HASH collide %lX %lX\n",(int_val)GC_GET_PAGE(ptr),(int_val)ptr);
+#		endif
+		return gc_alloc_new_page(pid,block,size,kind,varsize);
 	}
 #endif
 
@@ -1194,6 +1204,8 @@ static void *gc_alloc_page_memory( int size ) {
 #elif defined(HL_CONSOLE)
 	return sys_alloc_align(size, GC_PAGE_SIZE);
 #else
+	while( gc_will_collide(base_addr,size) )
+		base_addr = (char*)base_addr + GC_PAGE_SIZE;
 	void *ptr = mmap(base_addr,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
 	if( ptr == (void*)-1 )
 		return NULL;
