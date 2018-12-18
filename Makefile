@@ -93,6 +93,10 @@ ifdef MESA
 LIBS += mesa
 endif
 
+ifdef DEBUG
+CFLAGS += -g
+endif
+
 all: libhl hl libs
 
 install:
