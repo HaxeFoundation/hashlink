@@ -46,6 +46,7 @@ typedef enum {
 	CONV_BINARY,
 	CONV_DATE,
 	CONV_DATETIME,
+	CONV_JSON,
 	CONV_BOOL
 } CONV;
 
@@ -64,6 +65,7 @@ typedef struct {
 } connection;
 
 static vclosure *conv_string = NULL;
+static vclosure *conv_json = NULL;
 static vclosure *conv_bytes = NULL;
 static vclosure *conv_date = NULL;
 
@@ -118,6 +120,11 @@ HL_PRIM vdynamic *HL_NAME(result_next)( result *r ) {
 			arg.t = &hlt_bytes;
 			arg.v.ptr = row[i];
 			value = hl_dyn_call(conv_string, pargs, 1);
+			break;
+		case CONV_JSON:
+			arg.t = &hlt_bytes;
+			arg.v.ptr = row[i];
+			value = hl_dyn_call(conv_json, pargs, 1);
 			break;
 		case CONV_BOOL:
 			hl_dyn_seti(obj, r->fields_ids[i], &hlt_bool, (int)(*row[i] != '0'));
@@ -225,7 +232,7 @@ static CONV convert_type( enum enum_field_types t, int flags, unsigned int lengt
 	case 246: // 5.0 MYSQL_NEW_DECIMAL
 		return CONV_FLOAT;
 	case 245: // JSON
-		return CONV_STRING;
+		return CONV_JSON;
 	case FIELD_TYPE_BLOB:
 	case FIELD_TYPE_TINY_BLOB:
 	case FIELD_TYPE_MEDIUM_BLOB:
@@ -342,10 +349,11 @@ HL_PRIM connection *HL_NAME(connect_wrap)( cnx_params *p ) {
 	return c;
 }
 
-HL_PRIM void HL_NAME(set_conv_funs)( vclosure *fstring, vclosure *fbytes, vclosure *fdate ) {
+HL_PRIM void HL_NAME(set_conv_funs)( vclosure *fstring, vclosure *fbytes, vclosure *fdate, vclosure *fjson ) {
 	conv_string = fstring;
 	conv_bytes = fbytes;
 	conv_date = fdate;
+	conv_json = fjson;
 }
 
 // ---------------------------------------------------------------
@@ -368,6 +376,6 @@ DEFINE_PRIM(_BYTES, result_get, _RESULT _I32);
 DEFINE_PRIM(_I32, result_get_int, _RESULT _I32);
 DEFINE_PRIM(_F64, result_get_float, _RESULT _I32);
 
-DEFINE_PRIM(_VOID, set_conv_funs, _DYN _DYN _DYN);
+DEFINE_PRIM(_VOID, set_conv_funs, _DYN _DYN _DYN _DYN);
 
 /* ************************************************************************ */
