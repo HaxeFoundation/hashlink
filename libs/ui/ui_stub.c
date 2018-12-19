@@ -11,6 +11,7 @@ HL_PRIM void HL_NAME(ui_init)() {
 }
 
 HL_PRIM int HL_NAME(ui_dialog)( const uchar *title, const uchar *message, int flags ) {
+	uprintf(USTR("[DIALOG] [%s] %s"), title, message);
 	return 0;
 }
 
