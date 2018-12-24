@@ -13,6 +13,7 @@ Release
 x64
 *.stackdump
 *.hdll
+*.so
 /src/_main*
 *.dylib
 *.o
