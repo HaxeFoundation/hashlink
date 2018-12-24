@@ -79,6 +79,7 @@ static void handle_signal( int signum ) {
 	signal(signum, SIG_DFL);
 	printf("SIGNAL %d\n",signum);
 	hl_dump_stack();
+	fflush(stdout);
 	raise(signum);
 }
 static void setup_handler() {
