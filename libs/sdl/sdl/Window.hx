@@ -25,12 +25,14 @@ class Window {
 	public var vsync(default, set) : Bool;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
+	public var x(get, never) : Int;
+	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
 	public var visible(default, set) : Bool = true;
 
-	public function new( title : String, width : Int, height : Int ) {
+	public function new( title : String, width : Int, height : Int, resizable : Bool = true ) {
 		while( true ) {
-			win = winCreate(width, height);
+			win = winCreateEx(width, height, resizable);
 			if( win == null ) throw "Failed to create window";
 			glctx = winGetGLContext(win);
 			if( glctx == null || !GL.init() || !testGL() ) {
@@ -122,6 +124,14 @@ class Window {
 		winSetSize(win, width, height);
 	}
 
+	public function setPosition( x : Int, y : Int ) {
+		winSetPosition(win, x, y);
+	}
+
+	public function center() {
+		winCenter(win);
+	}
+
 	function get_width() {
 		var w = 0;
 		winGetSize(win, w, null);
@@ -132,6 +142,18 @@ class Window {
 		var h = 0;
 		winGetSize(win, null, h);
 		return h;
+	}
+
+	function get_x() {
+		var x = 0;
+		winGetPosition(win, x, null);
+		return x;
+	}
+
+	function get_y() {
+		var y = 0;
+		winGetPosition(win, null, y);
+		return y;
 	}
 
 	function set_vsync(v) {
@@ -176,11 +198,24 @@ class Window {
 		winResize(win, 2);
 	}
 
+	static function winCreateEx( width : Int, height : Int, resizable : Bool ) : WinPtr {
+		return null;
+	}
+
 	static function winCreate( width : Int, height : Int ) : WinPtr {
 		return null;
 	}
 
 	static function winSetTitle( win : WinPtr, title : hl.Bytes ) {
+	}
+
+	static function winSetPosition( win : WinPtr, width : Int, height : Int ) {
+	}
+
+	static function winGetPosition( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
+	}
+
+	static function winCenter( win : WinPtr ) {
 	}
 
 	static function winGetGLContext( win : WinPtr ) : GLContext {

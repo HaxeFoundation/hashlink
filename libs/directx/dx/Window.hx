@@ -29,8 +29,8 @@ class Window {
 	public var visible(default, set) : Bool = true;
 	public var vsync : Bool;
 
-	public function new( title : String, width : Int, height : Int ) {
-		win = winCreate(width, height);
+	public function new( title : String, width : Int, height : Int, resizable : Bool = true ) {
+		win = winCreateEx(width, height, resizable);
 		this.title = title;
 		windows.push(this);
 		vsync = true;
@@ -76,6 +76,10 @@ class Window {
 
 	public function setPosition( x : Int, y : Int ) {
 		winSetPosition(win, x, y);
+	}
+
+	public function center( centerPrimary : Bool = true ) {
+		winCenter(win, centerPrimary);
 	}
 
 	function get_width() {
@@ -128,6 +132,10 @@ class Window {
 		winClipCursor(enable ? win : null);
 	}
 
+	static function winCreateEx( width : Int, height : Int, resizable : Bool ) : WinPtr {
+		return null;
+	}
+
 	static function winCreate( width : Int, height : Int ) : WinPtr {
 		return null;
 	}
@@ -142,6 +150,9 @@ class Window {
 	}
 
 	static function winSetPosition( win : WinPtr, x : Int, y : Int ) {
+	}
+
+	static function winCenter( win : WinPtr, centerPrimary : Bool ) {
 	}
 
 	static function winResize( win : WinPtr, mode : Int ) {

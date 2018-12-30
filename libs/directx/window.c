@@ -215,7 +215,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
 
-HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
+HL_PRIM dx_window *HL_NAME(win_create_ex)( int width, int height, bool resizable ) {
 	static bool wnd_class_reg = false;
 	HINSTANCE hinst = GetModuleHandle(NULL);
 	if( !wnd_class_reg ) {
@@ -239,6 +239,9 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 
 	RECT r;
 	DWORD style = WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+	if( !resizable )  {
+		style &= ~( WS_MAXIMIZEBOX | WS_THICKFRAME );
+	}
 	r.left = r.top = 0;
 	r.right = width;
 	r.bottom = height;
@@ -252,6 +255,10 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 	SetForegroundWindow(win);
 	SetFocus(win);
 	return win;
+}
+
+HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
+	return HL_NAME(win_create_ex)(width, height, true);
 }
 
 HL_PRIM void HL_NAME(win_set_title)(dx_window *win, vbyte *title) {
@@ -284,6 +291,36 @@ HL_PRIM void HL_NAME(win_get_position)(dx_window *win, int *x, int *y) {
 
 HL_PRIM void HL_NAME(win_set_position)(dx_window *win, int x, int y) {
 	SetWindowPos(win,NULL,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER);
+}
+
+// initially written with the intent to center on closest monitor; however, SDL centers to primary, so both options are provided
+HL_PRIM void HL_NAME(win_center)(dx_window *win, bool centerPrimary) {
+	int scnX = 0;
+	int scnY = 0;
+	int scnWidth = -1;
+	int scnHeight = -1;
+	if( centerPrimary ) {
+		scnWidth = GetSystemMetrics(SM_CXSCREEN);
+		scnHeight = GetSystemMetrics(SM_CYSCREEN);
+	} else {
+		HMONITOR m = MonitorFromWindow(win, MONITOR_DEFAULTTONEAREST);
+		if( m != NULL ) {
+			MONITORINFO info;
+			info.cbSize = sizeof(MONITORINFO);
+			GetMonitorInfo(m, &info);
+			RECT screen = info.rcMonitor; // "rcMonitor" to match SM_CXSCREEN/SM_CYSCREEN measurements
+			scnX = screen.left;
+			scnY = screen.top;
+			scnWidth = (screen.right - scnX);
+			scnHeight = (screen.bottom - scnY);
+		}
+	}
+	if( scnWidth >= 0 && scnHeight >= 0 ) {
+		int winWidth = 0;
+		int winHeight = 0;
+		HL_NAME(win_get_size)(win, &winWidth, &winHeight);
+		HL_NAME(win_set_position)(win, scnX + ((scnWidth - winWidth) / 2), scnY + ((scnHeight - winHeight) / 2));
+	}
 }
 
 HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
@@ -366,12 +403,14 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 }
 
 #define TWIN _ABSTRACT(dx_window)
+DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _BOOL);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_fullscreen, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_center, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_destroy, TWIN);
