@@ -2,6 +2,7 @@
 
 brew "cmake"
 brew "jpeg-turbo"
+brew "libpng"
 brew "sdl2"
 brew "libogg"
 brew "libvorbis"
