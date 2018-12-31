@@ -321,6 +321,9 @@
     <Filter Include="mikkt">
       <UniqueIdentifier>{b16da6f5-be29-4433-b595-14badcd2cd06}</UniqueIdentifier>
     </Filter>
+    <Filter Include="minimp3">
+      <UniqueIdentifier>{1bfe5a7d-6015-497d-936d-1a92e8938ca7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\zlib\zconf.h">
@@ -431,6 +434,9 @@
     <ClInclude Include="sha1.h" />
     <ClInclude Include="..\..\include\mikktspace\mikktspace.h">
       <Filter>mikkt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\minimp3\minimp3.h">
+      <Filter>minimp3</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

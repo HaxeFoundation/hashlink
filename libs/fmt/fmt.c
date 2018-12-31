@@ -11,6 +11,10 @@ extern bool sys_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int
 #include <zlib.h>
 #include <vorbis/vorbisfile.h>
 
+#define MINIMP3_IMPLEMENTATION
+#define MINIMP3_FLOAT_OUTPUT
+#include "minimp3.h"
+
 /* ------------------------------------------------- IMG --------------------------------------------------- */
 
 typedef struct {
@@ -303,7 +307,7 @@ DEFINE_PRIM(_VOID, zip_flush_mode, _ZIP _I32);
 DEFINE_PRIM(_BOOL, inflate_buffer, _ZIP _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_BOOL, deflate_buffer, _ZIP _BYTES _I32 _I32 _BYTES _I32 _I32 _REF(_I32) _REF(_I32));
 
-/* ------------------------------------------------- SOUND --------------------------------------------------- */
+/* ----------------------------------------------- SOUND : OGG ------------------------------------------------ */
 
 typedef struct _fmt_ogg fmt_ogg;
 struct _fmt_ogg {
@@ -417,6 +421,41 @@ DEFINE_PRIM(_VOID, ogg_info, _OGG _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_I32, ogg_tell, _OGG);
 DEFINE_PRIM(_BOOL, ogg_seek, _OGG _I32);
 DEFINE_PRIM(_I32, ogg_read, _OGG _BYTES _I32 _I32);
+
+/* ----------------------------------------------- SOUND : MP3 ------------------------------------------------ */
+
+typedef struct _fmt_mp3 fmt_mp3;
+struct _fmt_mp3 {
+	char *bytes;
+	int size;
+	mp3dec_t dec;
+	mp3dec_frame_info_t info;
+	mp3d_sample_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
+};
+
+HL_PRIM fmt_mp3 *HL_NAME(mp3_open)( char *bytes, int size ) {
+	fmt_mp3 *o = (fmt_mp3*)hl_gc_alloc_raw(sizeof(fmt_mp3));
+	o->bytes = bytes;
+	o->size = size;
+	mp3dec_init(&o->dec);
+	return o;
+}
+
+HL_PRIM int HL_NAME(mp3_decode_frame)( fmt_mp3 *o, int position, char *output, int size, int offset ) {
+	int ret = -1;
+	hl_blocking(true);
+	ret = mp3dec_decode_frame(&o->dec, o->bytes + position, o->size - position, o->pcm, &o->info);
+	// TODO: Without memcpy?
+	// TODO: Safe write
+	memcpy( (void *)(output + offset), (void *)o->pcm, sizeof(o->pcm) );
+	hl_blocking(false);
+	return ret;
+}
+
+#define _MP3 _ABSTRACT(fmt_mp3)
+
+DEFINE_PRIM(_MP3, mp3_open, _BYTES _I32);
+DEFINE_PRIM(_I32, mp3_decode_frame, _MP3 _I32 _BYTES _I32 _I32);
 
 /* ------------------------------------------------- CRYPTO --------------------------------------------------- */
 
