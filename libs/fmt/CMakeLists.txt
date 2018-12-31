@@ -2,7 +2,6 @@ if(WIN32)
     set(ZLIB_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/zlib)
     set(PNG_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/png)
     set(VORBIS_INCLUDE_DIR ${INCLUDES_BASE_DIR}/vorbis)
-    set(MINIMP3_INCLUDE_DIR ${INCLUDES_BASE_DIR}/minimp3)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(TurboJPEG_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/turbojpeg ${INCLUDES_BASE_DIR}/turbojpeg/x64)
@@ -134,6 +133,8 @@ else()
         sha1.c
     )
 endif()
+
+set(MINIMP3_INCLUDE_DIR ${INCLUDES_BASE_DIR}/minimp3)
 
 set_as_hdll(fmt)
 
