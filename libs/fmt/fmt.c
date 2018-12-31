@@ -13,7 +13,7 @@ extern bool sys_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int
 
 #define MINIMP3_IMPLEMENTATION
 #define MINIMP3_FLOAT_OUTPUT
-#include "minimp3.h"
+#include <minimp3.h>
 
 /* ------------------------------------------------- IMG --------------------------------------------------- */
 
