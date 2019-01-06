@@ -426,36 +426,90 @@ DEFINE_PRIM(_I32, ogg_read, _OGG _BYTES _I32 _I32);
 
 typedef struct _fmt_mp3 fmt_mp3;
 struct _fmt_mp3 {
-	char *bytes;
-	int size;
 	mp3dec_t dec;
 	mp3dec_frame_info_t info;
 	mp3d_sample_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
 };
 
-HL_PRIM fmt_mp3 *HL_NAME(mp3_open)( char *bytes, int size ) {
-	fmt_mp3 *o = (fmt_mp3*)hl_gc_alloc_raw(sizeof(fmt_mp3));
-	o->bytes = bytes;
-	o->size = size;
+// Allocate MP3 reader.
+HL_PRIM fmt_mp3 *HL_NAME(mp3_open)() {
+	fmt_mp3 *o = (fmt_mp3*)hl_gc_alloc_noptr(sizeof(fmt_mp3));
 	mp3dec_init(&o->dec);
 	return o;
 }
 
-HL_PRIM int HL_NAME(mp3_decode_frame)( fmt_mp3 *o, int position, char *output, int size, int offset ) {
-	int ret = -1;
+/**
+	Retreive last decoded frame information.
+	@param bitrate_kbps Bitrate of the frame
+	@param channels Total amount of channels in the frame.
+	@param frame_bytes The size of the frame in the input stream,
+	@param hz
+	@param layer Mpeg Layer index (usually 3).
+**/
+HL_PRIM void HL_NAME(mp3_frame_info)(fmt_mp3 *o, int *bitrate_kbps, int *channels, int *frame_bytes, int *hz, int *layer) {
+	*bitrate_kbps = o->info.bitrate_kbps;
+	*channels = o->info.channels;
+	*frame_bytes = o->info.frame_bytes;
+	*hz = o->info.hz;
+	*layer = o->info.layer;
+}
+
+/**
+	Decodes a single frame from input stream and writes result to output.
+	Decoded samples are in Float32 format. Output bytes should contain enough space to fit entire frame in.
+	To calculate required output size, follow next formula: `samples * channels * 4`.
+	For Layer 1, amount of frames is 384, MPEG 2 Layer 2 is 576 and 1152 otherwise. Using 1152 samples is the safest.
+	@param o Allocated MP3 reader.
+	@param bytes Input stream.
+	@param size Input stream size.
+	@param position Input stream offset.
+	@param output Output stream.
+	@param outputSize Output stream size.
+	@param offset Output stream write offset.
+	@returns 0 if no MP3 data was found (end of stream/invalid data), -1 if either input buffer position invalid or output size is insufficent.
+		Amount of decoded samples otherwise.
+**/
+HL_PRIM int HL_NAME(mp3_decode_frame)( fmt_mp3 *o, char *bytes, int size, int position, char *output, int outputSize, int offset ) {
+
+	// Out of mp3 file bounds.
+	if ( position < 0 || size <= position )
+		return -1;
+
+	int samples = 0;
 	hl_blocking(true);
-	ret = mp3dec_decode_frame(&o->dec, o->bytes + position, o->size - position, o->pcm, &o->info);
-	// TODO: Without memcpy?
-	// TODO: Safe write
-	memcpy( (void *)(output + offset), (void *)o->pcm, sizeof(o->pcm) );
+
+	do {
+		samples = mp3dec_decode_frame(&o->dec, bytes + position, size - position, o->pcm, &o->info);
+		// Try to read until found mp3 data or EOF.
+		if ( samples != 0 || o->info.frame_bytes == 0 )
+			break;
+		position += o->info.frame_bytes;
+	} while ( size > position );
+
+	// No or invalid MP3 data.
+	if ( samples == 0 || o->info.frame_bytes == 0 ) {
+		hl_blocking(false);
+		return 0;
+	}
+
+	int decodedSize = samples * o->info.channels * sizeof(mp3d_sample_t);
+	// Insufficent output buffer size.
+	if ( outputSize - offset < decodedSize ) {
+		hl_blocking(false);
+		return -1;
+	}
+
+	memcpy( (void *)(output + offset), (void *)o->pcm, decodedSize );
+
 	hl_blocking(false);
-	return ret;
+	return samples;
 }
 
 #define _MP3 _ABSTRACT(fmt_mp3)
 
 DEFINE_PRIM(_MP3, mp3_open, _BYTES _I32);
-DEFINE_PRIM(_I32, mp3_decode_frame, _MP3 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID, mp3_frame_info, _MP3 _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32))
+DEFINE_PRIM(_I32, mp3_decode_frame, _MP3 _BYTES _I32 _I32 _BYTES _I32 _I32);
 
 /* ------------------------------------------------- CRYPTO --------------------------------------------------- */
 
