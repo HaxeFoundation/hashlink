@@ -110,6 +110,8 @@ HL_PRIM int HL_NAME(ssl_handshake)(mbedtls_ssl_context *ssl) {
 	r = mbedtls_ssl_handshake(ssl);
 	if( is_ssl_blocking(r) )
 		return -1;
+	if( r == MBEDTLS_ERR_SSL_CONN_EOF )
+		return -2;
 	if( r != 0 )
 		return ssl_error(r);
 	return 0;
