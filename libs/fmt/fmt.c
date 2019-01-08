@@ -479,7 +479,7 @@ HL_PRIM int HL_NAME(mp3_decode_frame)( fmt_mp3 *o, char *bytes, int size, int po
 	hl_blocking(true);
 
 	do {
-		samples = mp3dec_decode_frame(&o->dec, bytes + position, size - position, o->pcm, &o->info);
+		samples = mp3dec_decode_frame(&o->dec, (unsigned char*)bytes + position, size - position, o->pcm, &o->info);
 		// Try to read until found mp3 data or EOF.
 		if ( samples != 0 || o->info.frame_bytes == 0 )
 			break;
