@@ -1204,8 +1204,14 @@ static void *gc_alloc_page_memory( int size ) {
 #elif defined(HL_CONSOLE)
 	return sys_alloc_align(size, GC_PAGE_SIZE);
 #else
-	while( gc_will_collide(base_addr,size) )
+	int i;
+	while( gc_will_collide(base_addr,size) ) {
 		base_addr = (char*)base_addr + GC_PAGE_SIZE;
+		i++;
+		// most likely our hashing creates too many collisions
+		if( i >= 1 << (GC_LEVEL0_BITS + GC_LEVEL1_BITS + 2) )
+			return NULL;
+	}
 	void *ptr = mmap(base_addr,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
 	if( ptr == (void*)-1 )
 		return NULL;
