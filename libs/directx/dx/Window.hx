@@ -18,6 +18,10 @@ class Window {
 
 	static var windows : Array<Window> = [];
 
+	public static inline var CW_USEDEFAULT : Int = 0x80000000;
+
+	public static inline var RESIZABLE : Int = 0x000001;
+
 	var win : WinPtr;
 	var savedSize : { x : Int, y : Int, width : Int, height : Int };
 	public var title(default, set) : String;
@@ -29,8 +33,8 @@ class Window {
 	public var visible(default, set) : Bool = true;
 	public var vsync : Bool;
 
-	public function new( title : String, width : Int, height : Int, resizable : Bool = true ) {
-		win = winCreateEx(width, height, resizable);
+	public function new( title : String, width : Int, height : Int, x : Int = CW_USEDEFAULT, y : Int = CW_USEDEFAULT, windowFlags : Int = RESIZABLE ) {
+		win = winCreateEx(x, y, width, height, windowFlags);
 		this.title = title;
 		windows.push(this);
 		vsync = true;
@@ -132,7 +136,7 @@ class Window {
 		winClipCursor(enable ? win : null);
 	}
 
-	static function winCreateEx( width : Int, height : Int, resizable : Bool ) : WinPtr {
+	static function winCreateEx( x : Int, y : Int, width : Int, height : Int, windowFlags : Int ) : WinPtr {
 		return null;
 	}
 

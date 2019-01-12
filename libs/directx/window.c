@@ -32,6 +32,10 @@ typedef enum {
 	Close 	= 12
 } WindowStateChange;
 
+typedef enum {
+	Resizable = 0x000001
+} WindowFlags;
+
 typedef struct {
 	hl_type *t;
 	EventType type;
@@ -215,7 +219,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
 
-HL_PRIM dx_window *HL_NAME(win_create_ex)( int width, int height, bool resizable ) {
+HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, WindowFlags windowFlags ) {
 	static bool wnd_class_reg = false;
 	HINSTANCE hinst = GetModuleHandle(NULL);
 	if( !wnd_class_reg ) {
@@ -239,8 +243,8 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int width, int height, bool resizable
 
 	RECT r;
 	DWORD style = WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
-	if( !resizable )  {
-		style &= ~( WS_MAXIMIZEBOX | WS_THICKFRAME );
+	if( ( windowFlags & Resizable ) == 0 ) {
+		style &= ~(WS_MAXIMIZEBOX | WS_THICKFRAME);
 	}
 	r.left = r.top = 0;
 	r.right = width;
@@ -248,7 +252,7 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int width, int height, bool resizable
 	AdjustWindowRect(&r,style,false);
 	dx_events *event_buffer = (dx_events*)malloc(sizeof(dx_events));
 	memset(event_buffer,0, sizeof(dx_events));
-	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
+	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, x, y, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
 	SetTimer(win,0,10,NULL);
 	ShowWindow(win, SW_SHOW);
 	SetCursor(LoadCursor(NULL, IDC_ARROW));
@@ -258,7 +262,7 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int width, int height, bool resizable
 }
 
 HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
-	return HL_NAME(win_create_ex)(width, height, true);
+	return HL_NAME(win_create_ex)(CW_USEDEFAULT, CW_USEDEFAULT, width, height, Resizable);
 }
 
 HL_PRIM void HL_NAME(win_set_title)(dx_window *win, vbyte *title) {
@@ -403,7 +407,7 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 }
 
 #define TWIN _ABSTRACT(dx_window)
-DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _BOOL);
+DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_fullscreen, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);

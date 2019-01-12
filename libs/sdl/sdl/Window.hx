@@ -18,6 +18,31 @@ class Window {
 
 	static var windows : Array<Window> = [];
 
+	public static inline var SDL_WINDOWPOS_UNDEFINED : Int = 0x1FFF0000;
+	public static inline var SDL_WINDOWPOS_CENTERED : Int = 0x2FFF0000;
+
+	public static inline var SDL_WINDOW_FULLSCREEN         = 0x00000001;
+	public static inline var SDL_WINDOW_OPENGL             = 0x00000002;
+	public static inline var SDL_WINDOW_SHOWN              = 0x00000004;
+	public static inline var SDL_WINDOW_HIDDEN             = 0x00000008;
+	public static inline var SDL_WINDOW_BORDERLESS         = 0x00000010;
+	public static inline var SDL_WINDOW_RESIZABLE          = 0x00000020;
+	public static inline var SDL_WINDOW_MINIMIZED          = 0x00000040;
+	public static inline var SDL_WINDOW_MAXIMIZED          = 0x00000080;
+	public static inline var SDL_WINDOW_INPUT_GRABBED      = 0x00000100;
+	public static inline var SDL_WINDOW_INPUT_FOCUS        = 0x00000200;
+	public static inline var SDL_WINDOW_MOUSE_FOCUS        = 0x00000400;
+	public static inline var SDL_WINDOW_FULLSCREEN_DESKTOP = 0x00001001;
+	public static inline var SDL_WINDOW_FOREIGN            = 0x00000800;
+	public static inline var SDL_WINDOW_ALLOW_HIGHDPI      = 0x00002000;
+	public static inline var SDL_WINDOW_MOUSE_CAPTURE      = 0x00004000;
+	public static inline var SDL_WINDOW_ALWAYS_ON_TOP      = 0x00008000;
+	public static inline var SDL_WINDOW_SKIP_TASKBAR       = 0x00010000;
+	public static inline var SDL_WINDOW_UTILITY            = 0x00020000;
+	public static inline var SDL_WINDOW_TOOLTIP            = 0x00040000;
+	public static inline var SDL_WINDOW_POPUP_MENU         = 0x00080000;
+	public static inline var SDL_WINDOW_VULKAN             = 0x10000000;
+
 	var win : WinPtr;
 	var glctx : GLContext;
 	var lastFrame : Float;
@@ -30,9 +55,9 @@ class Window {
 	public var displayMode(default, set) : DisplayMode;
 	public var visible(default, set) : Bool = true;
 
-	public function new( title : String, width : Int, height : Int, resizable : Bool = true ) {
+	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_RESIZABLE ) {
 		while( true ) {
-			win = winCreateEx(width, height, resizable);
+			win = winCreateEx(x, y, width, height, sdlFlags);
 			if( win == null ) throw "Failed to create window";
 			glctx = winGetGLContext(win);
 			if( glctx == null || !GL.init() || !testGL() ) {
@@ -129,7 +154,7 @@ class Window {
 	}
 
 	public function center() {
-		winCenter(win);
+		setPosition(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 	}
 
 	function get_width() {
@@ -198,7 +223,7 @@ class Window {
 		winResize(win, 2);
 	}
 
-	static function winCreateEx( width : Int, height : Int, resizable : Bool ) : WinPtr {
+	static function winCreateEx( x : Int, y : Int, width : Int, height : Int, sdlFlags : Int ) : WinPtr {
 		return null;
 	}
 
@@ -213,9 +238,6 @@ class Window {
 	}
 
 	static function winGetPosition( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
-	}
-
-	static function winCenter( win : WinPtr ) {
 	}
 
 	static function winGetGLContext( win : WinPtr ) : GLContext {
