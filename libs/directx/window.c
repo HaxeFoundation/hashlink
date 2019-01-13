@@ -33,7 +33,8 @@ typedef enum {
 } WindowStateChange;
 
 typedef enum {
-	Resizable = 0x000001
+	Hidden    = 0x000001,
+	Resizable = 0x000002
 } WindowFlags;
 
 typedef struct {
@@ -52,6 +53,7 @@ typedef struct {
 
 typedef struct {
 	dx_event events[MAX_EVENTS];
+	DWORD normal_style;
 	int event_count;
 	int next_event;
 	bool is_over;
@@ -243,8 +245,8 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 
 	RECT r;
 	DWORD style = WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
-	if( ( windowFlags & Resizable ) == 0 ) {
-		style &= ~(WS_MAXIMIZEBOX | WS_THICKFRAME);
+	if( !(windowFlags & Resizable) ) {
+		style &= ~( WS_MAXIMIZEBOX | WS_THICKFRAME );
 	}
 	r.left = r.top = 0;
 	r.right = width;
@@ -253,8 +255,11 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 	dx_events *event_buffer = (dx_events*)malloc(sizeof(dx_events));
 	memset(event_buffer,0, sizeof(dx_events));
 	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, x, y, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
+	event_buffer->normal_style = style;
 	SetTimer(win,0,10,NULL);
-	ShowWindow(win, SW_SHOW);
+	if( !(windowFlags & Hidden) ) {
+		ShowWindow(win, SW_SHOW);
+	}
 	SetCursor(LoadCursor(NULL, IDC_ARROW));
 	SetForegroundWindow(win);
 	SetFocus(win);
@@ -356,7 +361,8 @@ HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 		SetWindowLong(win,GWL_STYLE,WS_POPUP | WS_VISIBLE);
 		SetWindowPos(win,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top,SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	} else {
-		SetWindowLong(win,GWL_STYLE,WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+		dx_events *buf = get_events(win);
+		SetWindowLong(win,GWL_STYLE,buf->normal_style);
 		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	}
 }

@@ -18,8 +18,8 @@ class Window {
 
 	static var windows : Array<Window> = [];
 
-	public static inline var SDL_WINDOWPOS_UNDEFINED : Int = 0x1FFF0000;
-	public static inline var SDL_WINDOWPOS_CENTERED : Int = 0x2FFF0000;
+	public static inline var SDL_WINDOWPOS_UNDEFINED = 0x1FFF0000;
+	public static inline var SDL_WINDOWPOS_CENTERED  = 0x2FFF0000;
 
 	public static inline var SDL_WINDOW_FULLSCREEN         = 0x00000001;
 	public static inline var SDL_WINDOW_OPENGL             = 0x00000002;
@@ -55,7 +55,7 @@ class Window {
 	public var displayMode(default, set) : DisplayMode;
 	public var visible(default, set) : Bool = true;
 
-	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_RESIZABLE ) {
+	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE ) {
 		while( true ) {
 			win = winCreateEx(x, y, width, height, sdlFlags);
 			if( win == null ) throw "Failed to create window";

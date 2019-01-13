@@ -18,9 +18,10 @@ class Window {
 
 	static var windows : Array<Window> = [];
 
-	public static inline var CW_USEDEFAULT : Int = 0x80000000;
+	public static inline var CW_USEDEFAULT = 0x80000000;
 
-	public static inline var RESIZABLE : Int = 0x000001;
+	public static inline var HIDDEN    = 0x000001;
+	public static inline var RESIZABLE = 0x000002;
 
 	var win : WinPtr;
 	var savedSize : { x : Int, y : Int, width : Int, height : Int };
