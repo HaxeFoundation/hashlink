@@ -134,6 +134,8 @@ else()
     )
 endif()
 
+set(MINIMP3_INCLUDE_DIR ${INCLUDES_BASE_DIR}/minimp3)
+
 set_as_hdll(fmt)
 
 target_include_directories(fmt.hdll
@@ -142,6 +144,7 @@ target_include_directories(fmt.hdll
     ${PNG_INCLUDE_DIRS}
     ${TurboJPEG_INCLUDE_DIRS}
     ${VORBIS_INCLUDE_DIR}
+    ${MINIMP3_INCLUDE_DIR}
 )
 
 target_link_libraries(fmt.hdll
