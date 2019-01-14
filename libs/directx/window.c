@@ -32,6 +32,11 @@ typedef enum {
 	Close 	= 12
 } WindowStateChange;
 
+typedef enum {
+	Hidden    = 0x000001,
+	Resizable = 0x000002
+} WindowFlags;
+
 typedef struct {
 	hl_type *t;
 	EventType type;
@@ -48,6 +53,7 @@ typedef struct {
 
 typedef struct {
 	dx_event events[MAX_EVENTS];
+	DWORD normal_style;
 	int event_count;
 	int next_event;
 	bool is_over;
@@ -215,7 +221,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
 
-HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
+HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, WindowFlags windowFlags ) {
 	static bool wnd_class_reg = false;
 	HINSTANCE hinst = GetModuleHandle(NULL);
 	if( !wnd_class_reg ) {
@@ -239,19 +245,29 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 
 	RECT r;
 	DWORD style = WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+	if( !(windowFlags & Resizable) ) {
+		style &= ~( WS_MAXIMIZEBOX | WS_THICKFRAME );
+	}
 	r.left = r.top = 0;
 	r.right = width;
 	r.bottom = height;
 	AdjustWindowRect(&r,style,false);
 	dx_events *event_buffer = (dx_events*)malloc(sizeof(dx_events));
 	memset(event_buffer,0, sizeof(dx_events));
-	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
+	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, x, y, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
+	event_buffer->normal_style = style;
 	SetTimer(win,0,10,NULL);
-	ShowWindow(win, SW_SHOW);
+	if( !(windowFlags & Hidden) ) {
+		ShowWindow(win, SW_SHOW);
+	}
 	SetCursor(LoadCursor(NULL, IDC_ARROW));
 	SetForegroundWindow(win);
 	SetFocus(win);
 	return win;
+}
+
+HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
+	return HL_NAME(win_create_ex)(CW_USEDEFAULT, CW_USEDEFAULT, width, height, Resizable);
 }
 
 HL_PRIM void HL_NAME(win_set_title)(dx_window *win, vbyte *title) {
@@ -286,6 +302,36 @@ HL_PRIM void HL_NAME(win_set_position)(dx_window *win, int x, int y) {
 	SetWindowPos(win,NULL,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER);
 }
 
+// initially written with the intent to center on closest monitor; however, SDL centers to primary, so both options are provided
+HL_PRIM void HL_NAME(win_center)(dx_window *win, bool centerPrimary) {
+	int scnX = 0;
+	int scnY = 0;
+	int scnWidth = -1;
+	int scnHeight = -1;
+	if( centerPrimary ) {
+		scnWidth = GetSystemMetrics(SM_CXSCREEN);
+		scnHeight = GetSystemMetrics(SM_CYSCREEN);
+	} else {
+		HMONITOR m = MonitorFromWindow(win, MONITOR_DEFAULTTONEAREST);
+		if( m != NULL ) {
+			MONITORINFO info;
+			info.cbSize = sizeof(MONITORINFO);
+			GetMonitorInfo(m, &info);
+			RECT screen = info.rcMonitor; // "rcMonitor" to match SM_CXSCREEN/SM_CYSCREEN measurements
+			scnX = screen.left;
+			scnY = screen.top;
+			scnWidth = (screen.right - scnX);
+			scnHeight = (screen.bottom - scnY);
+		}
+	}
+	if( scnWidth >= 0 && scnHeight >= 0 ) {
+		int winWidth = 0;
+		int winHeight = 0;
+		HL_NAME(win_get_size)(win, &winWidth, &winHeight);
+		HL_NAME(win_set_position)(win, scnX + ((scnWidth - winWidth) / 2), scnY + ((scnHeight - winHeight) / 2));
+	}
+}
+
 HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
 	switch( mode ) {
 	case 0:
@@ -315,7 +361,8 @@ HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 		SetWindowLong(win,GWL_STYLE,WS_POPUP | WS_VISIBLE);
 		SetWindowPos(win,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top,SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	} else {
-		SetWindowLong(win,GWL_STYLE,WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+		dx_events *buf = get_events(win);
+		SetWindowLong(win,GWL_STYLE,buf->normal_style);
 		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	}
 }
@@ -366,12 +413,14 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 }
 
 #define TWIN _ABSTRACT(dx_window)
+DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_fullscreen, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_center, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_destroy, TWIN);

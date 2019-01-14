@@ -366,15 +366,15 @@ DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 
 // Window
 
-HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
+HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, int sdlFlags) {
 	SDL_Window *w;
 	// force window to match device resolution on mobile
 #ifdef	HL_MOBILE
 	SDL_DisplayMode displayMode;
 	SDL_GetDesktopDisplayMode(0, &displayMode);
-	w = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS);
+	w = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | sdlFlags);
 #else
-	w = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	w = SDL_CreateWindow("", x, y, width, height, SDL_WINDOW_OPENGL | sdlFlags);
 #endif
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
@@ -384,6 +384,10 @@ HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
 	}
 #	endif
 	return w;
+}
+
+HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
+	return HL_NAME(win_create_ex)(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, 0);
 }
 
 HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {
@@ -445,6 +449,14 @@ HL_PRIM void HL_NAME(win_set_title)(SDL_Window *win, vbyte *title) {
 	SDL_SetWindowTitle(win, (char*)title);
 }
 
+HL_PRIM void HL_NAME(win_set_position)(SDL_Window *win, int x, int y) {
+	SDL_SetWindowPosition(win, x, y);
+}
+
+HL_PRIM void HL_NAME(win_get_position)(SDL_Window *win, int *x, int *y) {
+	SDL_GetWindowPosition(win, x, y);
+}
+
 HL_PRIM void HL_NAME(win_set_size)(SDL_Window *win, int width, int height) {
 	SDL_SetWindowSize(win, width, height);
 }
@@ -499,11 +511,14 @@ HL_PRIM void HL_NAME(win_destroy)(SDL_Window *win, SDL_GLContext gl) {
 
 #define TWIN _ABSTRACT(sdl_window)
 #define TGL _ABSTRACT(sdl_gl)
+DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(TGL, win_get_glcontext, TWIN);
 DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _I32);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
+DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_swap_window, TWIN);
