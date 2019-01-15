@@ -609,6 +609,10 @@ HL_PRIM void HL_NAME(show_cursor)( bool b ) {
 	SDL_ShowCursor(b?SDL_ENABLE:SDL_DISABLE);
 }
 
+HL_PRIM bool HL_NAME(is_cursor_visible)() {
+	return SDL_ShowCursor(SDL_QUERY) == SDL_ENABLE;
+}
+
 HL_PRIM SDL_Cursor *HL_NAME(cursor_create)( SDL_Surface *s, int hotX, int hotY ) {
 	return SDL_CreateColorCursor(s,hotX,hotY);
 }
@@ -642,6 +646,7 @@ HL_PRIM varray *HL_NAME(get_devices)() {
 
 #define _CURSOR _ABSTRACT(sdl_cursor)
 DEFINE_PRIM(_VOID, show_cursor, _BOOL);
+DEFINE_PRIM(_BOOL, is_cursor_visible, _NO_ARG);
 DEFINE_PRIM(_CURSOR, cursor_create, _SURF _I32 _I32);
 DEFINE_PRIM(_CURSOR, cursor_create_system, _I32);
 DEFINE_PRIM(_VOID, free_cursor, _CURSOR);

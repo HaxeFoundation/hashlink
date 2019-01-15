@@ -63,6 +63,11 @@ typedef struct HWND__ dx_window;
 
 static dx_window *cur_clip_cursor_window = NULL;
 
+typedef HCURSOR dx_cursor;
+
+static dx_cursor cur_cursor = NULL;
+static bool show_cursor = true;
+
 static dx_events *get_events(HWND wnd) {
 	return (dx_events*)GetWindowLongPtr(wnd,GWLP_USERDATA);
 }
@@ -214,6 +219,15 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_WINDOWPOSCHANGED:
 		updateClipCursor(wnd);
 		break;
+	case WM_SETCURSOR:
+		if( LOWORD(lparam) == HTCLIENT ) {
+			if( show_cursor )
+				SetCursor(cur_cursor != NULL ? cur_cursor : LoadCursor(NULL, IDC_ARROW));
+			else
+				SetCursor(NULL);
+			return TRUE;
+		}
+		break;
 	case WM_CLOSE:
 		addEvent(wnd, Quit);
 		return 0;
@@ -260,7 +274,6 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 	if( !(windowFlags & Hidden) ) {
 		ShowWindow(win, SW_SHOW);
 	}
-	SetCursor(LoadCursor(NULL, IDC_ARROW));
 	SetForegroundWindow(win);
 	SetFocus(win);
 	return win;
@@ -430,8 +443,6 @@ DEFINE_PRIM(_VOID, win_clip_cursor, TWIN);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
 
-typedef HCURSOR dx_cursor;
-
 HL_PRIM dx_cursor HL_NAME(load_cursor)( int res ) {
 	return LoadCursor(NULL,MAKEINTRESOURCE(res));
 }
@@ -486,11 +497,18 @@ HL_PRIM void HL_NAME(destroy_cursor)( dx_cursor c ) {
 }
 
 HL_PRIM void HL_NAME(set_cursor)( dx_cursor c ) {
-	SetCursor(c);
+	cur_cursor = c;
+	if( show_cursor )
+		SetCursor(c);
 }
 
 HL_PRIM void HL_NAME(show_cursor)( bool visible ) {
-	ShowCursor(visible);
+	show_cursor = visible;
+	SetCursor(visible ? cur_cursor : NULL);
+}
+
+HL_PRIM bool HL_NAME(is_cursor_visible)() {
+	return show_cursor;
 }
 
 #define TCURSOR _ABSTRACT(dx_cursor)
@@ -499,6 +517,7 @@ DEFINE_PRIM(TCURSOR, create_cursor, _I32 _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID, destroy_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, set_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, show_cursor, _BOOL);
+DEFINE_PRIM(_BOOL, is_cursor_visible, _NO_ARG);
 
 HL_PRIM vbyte *HL_NAME(detect_keyboard_layout)() {
 	char q = MapVirtualKey(0x10, MAPVK_VSC_TO_VK);
