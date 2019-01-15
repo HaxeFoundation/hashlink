@@ -52,3 +52,4 @@ node_modules
 /*.zip
 /*.tgz
 args.txt
+/other/benchs/hlc

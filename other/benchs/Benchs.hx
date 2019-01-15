@@ -24,6 +24,8 @@ class Benchs {
 		o.close();
 
 		flash.desktop.NativeApplication.nativeApplication.exit();
+		#elseif js
+		untyped console.log(v);
 		#else
 		trace(v);
 		#end
@@ -36,11 +38,14 @@ class Benchs {
 		var isWin = Sys.systemName() == "Windows";
 		var args = Sys.args();
 		var is32 = false;
+		var checkFlash = false;
 		
 		while( args.length > 0 ) {
 			switch( args[0] ) {
 			case "-32": 
 				is32 = true;
+			case "-swf":
+				checkFlash = true;
 			default:
 				break;
 			}
@@ -50,12 +55,12 @@ class Benchs {
 		var selected = args.shift();
 		var targets : Array<Target> = [
 			{ name : "hl", out : "bench.hl", cmd : "hl", args : ["bench.hl"] },
-			{ name : "hlc", out : "bench.c", cmd : isWin ? "hlc.exe":"./hlc", args : [] },
+			{ name : "hlc", out : "hlc/bench.c", cmd : isWin ? "hlc.exe":"./hlc", args : [] },
 			{ name : "js", out : "bench.js", cmd : "node", args : ["bench.js"] },
 			{ name : "neko", out : "bench.n", cmd : "neko", args : ["bench.n"] },
 			{ name : "cpp", out : "cpp", cmd : "cpp/$name" + (isWin ? ".exe" : ""), args : [], extraArgs : "-D HXCPP_SILENT" },
 		];
-		if( isWin )
+		if( checkFlash )
 			targets.push({ name : "swf", out : "bench.swf", cmd : "adl", args : ["bench.air"], extraArgs : "-lib air3" });
 
 		var all = [for( f in sys.FileSystem.readDirectory(".") ) if( StringTools.endsWith(f, ".hx") ) f];
@@ -73,7 +78,10 @@ class Benchs {
 			var found = false;
 			for( p in path )
 				if( sys.FileSystem.exists(p+"/cl.exe") ) {
-					trace(p);
+					if( Sys.getEnv("INCLUDE") == null ) {
+						Sys.println("INCLUDE env var not set for MSVC, please set and restart");
+						Sys.exit(1);
+					}
 					found = true;
 					break;
 				}
@@ -115,9 +123,9 @@ class Benchs {
 					// build
 					var cmd;
 					if( useMSVC )
-						cmd = 'cl.exe /nologo /Ox /I ../../src /Fehlc.exe bench.c ../../src/hlc_main.c ../../Release/libhl.lib';
+						cmd = 'cl.exe /nologo /Ox /I hlc /I ../../src /Fehlc.exe hlc/bench.c ../../Release/libhl.lib';
 					else
-						cmd = '$gcc -O3 ${is32?'-m32':''} -std=c11 -o hlc -I ../../src -L ../.. bench.c ../../src/hlc_main.c -lhl -lm';
+						cmd = '$gcc -O3 ${is32?'-m32':''} -std=c11 -o hlc -I hlc -I ../../src -L ../.. hlc/bench.c -lhl -lm';
 					if( Sys.command(cmd) != 0 ) {
 						Sys.println("Failed to run "+cmd);
 						Sys.println(t.name+" failed to compile");
