@@ -59,9 +59,6 @@
     <ClCompile Include="..\..\include\libuv\src\win\process-stdio.c">
       <Filter>libuv</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\req.c">
-      <Filter>libuv</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\signal.c">
       <Filter>libuv</Filter>
     </ClCompile>
@@ -77,7 +74,7 @@
     <ClCompile Include="..\..\include\libuv\src\win\thread.c">
       <Filter>libuv</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\timer.c">
+    <ClCompile Include="..\..\include\libuv\src\timer.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\tty.c">
@@ -93,6 +90,18 @@
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\winsock.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\idna.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\strscpy.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\uv-data-getter-setters.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\win\detect-wakeup.c">
       <Filter>libuv</Filter>
     </ClCompile>
   </ItemGroup>
@@ -130,6 +139,57 @@
       <Filter>libuv</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\libuv\src\win\winsock.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\src\idna.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\src\strscpy.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\aix.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\android-ifaddrs.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\bsd.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\darwin.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\errno.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\linux.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\os390.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\posix.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\stdint-msvc2008.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\sunos.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\threadpool.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\tree.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\unix.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\version.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\include\uv\win.h">
       <Filter>libuv</Filter>
     </ClInclude>
   </ItemGroup>

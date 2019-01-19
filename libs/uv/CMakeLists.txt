@@ -24,13 +24,12 @@ if(WIN32)
             ${INCLUDES_BASE_DIR}/libuv/src/win/poll.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/process-stdio.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/process.c
-            ${INCLUDES_BASE_DIR}/libuv/src/win/req.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/signal.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/snprintf.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/stream.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/tcp.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/thread.c
-            ${INCLUDES_BASE_DIR}/libuv/src/win/timer.c
+            ${INCLUDES_BASE_DIR}/libuv/src/timer.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/tty.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/udp.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/util.c
