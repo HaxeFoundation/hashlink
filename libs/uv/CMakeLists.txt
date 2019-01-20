@@ -6,16 +6,16 @@ if(WIN32)
     target_sources(uv.hdll
         PRIVATE
             ${INCLUDES_BASE_DIR}/libuv/src/fs-poll.c
-			${INCLUDES_BASE_DIR}/libuv/src/idna.c
+            ${INCLUDES_BASE_DIR}/libuv/src/idna.c
             ${INCLUDES_BASE_DIR}/libuv/src/inet.c
-			${INCLUDES_BASE_DIR}/libuv/src/strscpy.c
+            ${INCLUDES_BASE_DIR}/libuv/src/strscpy.c
             ${INCLUDES_BASE_DIR}/libuv/src/threadpool.c
             ${INCLUDES_BASE_DIR}/libuv/src/uv-common.c
-			${INCLUDES_BASE_DIR}/libuv/src/uv-data-getter-setters.c
+            ${INCLUDES_BASE_DIR}/libuv/src/uv-data-getter-setters.c
             ${INCLUDES_BASE_DIR}/libuv/src/version.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/async.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/core.c
-			${INCLUDES_BASE_DIR}/libuv/src/win/detect-wakeup.c
+            ${INCLUDES_BASE_DIR}/libuv/src/win/detect-wakeup.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/dl.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/error.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/fs-event.c
