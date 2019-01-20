@@ -37,6 +37,11 @@ abstract Cursor(CursorPtr) {
 	public static function show( v : Bool ) {
 	}
 
+	@:hlNative("directx","is_cursor_visible")
+	public static function isVisible() : Bool {
+		return false;
+	}
+
 	@:hlNative("directx","set_cursor")
 	static function setCursor( k : CursorPtr ) {
 	}
