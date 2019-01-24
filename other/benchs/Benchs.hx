@@ -58,7 +58,7 @@ class Benchs {
 			{ name : "hlc", out : "hlc/bench.c", cmd : isWin ? "hlc.exe":"./hlc", args : [] },
 			{ name : "js", out : "bench.js", cmd : "node", args : ["bench.js"] },
 			{ name : "neko", out : "bench.n", cmd : "neko", args : ["bench.n"] },
-			{ name : "cpp", out : "cpp", cmd : "cpp/$name" + (isWin ? ".exe" : ""), args : [], extraArgs : "-D HXCPP_SILENT" },
+			{ name : "cpp", out : "cpp", cmd : "cpp/$name" + (isWin ? ".exe" : ""), args : [], extraArgs : "-D HXCPP_SILENT -D HXCPP_GC_GENERATIONAL" },
 		];
 		if( checkFlash )
 			targets.push({ name : "swf", out : "bench.swf", cmd : "adl", args : ["bench.air"], extraArgs : "-lib air3" });
@@ -138,6 +138,7 @@ class Benchs {
 					var totT = 0., count = 0;
 					var r = null;
 
+					var firstRun = true;
 					while( totT < 1. ) {
 						var t0 = haxe.Timer.stamp();
 						var p = new sys.io.Process(t.cmd.split("$name").join(name),t.args);
@@ -157,8 +158,12 @@ class Benchs {
 							Sys.println(t.name+" result "+r+" but expected "+result);
 							return;
 						}
-						totT += et;
-						count++;
+						if (firstRun)
+							firstRun = false;
+						else {
+							totT += et;
+							count++;
+						}
 					}
 
 					var et = totT / count;
