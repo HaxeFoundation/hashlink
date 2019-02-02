@@ -36,6 +36,7 @@ class Window {
 	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
 	public var visible(default, set) : Bool = true;
+	public var opacity(get, set) : Float;
 	public var vsync : Bool;
 
 	public function new( title : String, width : Int, height : Int, x : Int = CW_USEDEFAULT, y : Int = CW_USEDEFAULT, windowFlags : Int = RESIZABLE ) {
