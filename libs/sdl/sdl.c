@@ -461,8 +461,34 @@ HL_PRIM void HL_NAME(win_set_size)(SDL_Window *win, int width, int height) {
 	SDL_SetWindowSize(win, width, height);
 }
 
+HL_PRIM void HL_NAME(win_set_min_size)(SDL_Window *win, int width, int height) {
+	SDL_SetWindowMinimumSize(win, width, height);
+}
+
+HL_PRIM void HL_NAME(win_set_max_size)(SDL_Window *win, int width, int height) {
+	SDL_SetWindowMaximumSize(win, width, height);
+}
+
 HL_PRIM void HL_NAME(win_get_size)(SDL_Window *win, int *width, int *height) {
 	SDL_GetWindowSize(win, width, height);
+}
+
+HL_PRIM void HL_NAME(win_get_min_size)(SDL_Window *win, int *width, int *height) {
+	SDL_GetWindowMinimumSize(win, width, height);
+}
+
+HL_PRIM void HL_NAME(win_get_max_size)(SDL_Window *win, int *width, int *height) {
+	SDL_GetWindowMaximumSize(win, width, height);
+}
+
+HL_PRIM double HL_NAME(win_get_opacity)(SDL_Window *win) {
+	float opacity = 1.0f;
+	SDL_GetWindowOpacity(win, &opacity);
+	return opacity;
+}
+
+HL_PRIM bool HL_NAME(win_set_opacity)(SDL_Window *win, double opacity) {
+	return SDL_SetWindowOpacity(win, opacity) == 0;
 }
 
 HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
@@ -520,7 +546,13 @@ DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_set_min_size, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_set_max_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, win_get_min_size, TWIN _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, win_get_max_size, TWIN _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_F64, win_get_opacity, TWIN);
+DEFINE_PRIM(_BOOL, win_set_opacity, TWIN _F64);
 DEFINE_PRIM(_VOID, win_swap_window, TWIN);
 DEFINE_PRIM(_VOID, win_render_to, TWIN TGL);
 DEFINE_PRIM(_VOID, win_destroy, TWIN TGL);

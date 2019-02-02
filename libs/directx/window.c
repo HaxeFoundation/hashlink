@@ -54,6 +54,11 @@ typedef struct {
 typedef struct {
 	dx_event events[MAX_EVENTS];
 	DWORD normal_style;
+	double opacity;
+	int min_width;
+	int min_height;
+	int max_width;
+	int max_height;
 	int event_count;
 	int next_event;
 	bool is_over;
@@ -219,6 +224,62 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_WINDOWPOSCHANGED:
 		updateClipCursor(wnd);
 		break;
+	case WM_GETMINMAXINFO:
+	{
+		dx_events *buf = get_events(wnd);
+		if( buf ) {
+			long resizable_flags = (WS_MAXIMIZEBOX | WS_THICKFRAME);
+			if( (buf->normal_style & resizable_flags) == resizable_flags ) {
+				if( buf->min_width != 0 || buf->min_height != 0 ||
+					buf->max_width != 0 || buf->max_height != 0 ) {
+					MINMAXINFO *info = (MINMAXINFO*)lparam;
+
+					RECT r;
+					GetClientRect(wnd, &r);
+					int curr_width = r.right;
+					int curr_height = r.bottom;
+
+					// remove curr_width/height which contain non-client dimensions
+					bool apply_max = false;
+					int min_width = buf->min_width - curr_width;
+					int min_height = buf->min_height - curr_height;
+					int max_width = buf->max_width;
+					int max_height = buf->max_height;
+					if( max_width && max_height ) {
+						max_width -= curr_width;
+						max_height -= curr_height;
+						apply_max = true;
+					}
+
+					// fix curr_width/height to contain only client size
+					{
+						RECT size;
+						LONG style = GetWindowLong(wnd, GWL_STYLE);
+						BOOL menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(wnd) != NULL);
+						size.top = 0;
+						size.left = 0;
+						size.bottom = curr_height;
+						size.right = curr_width;
+
+						AdjustWindowRectEx(&size, style, menu, 0);
+						curr_width = size.right - size.left;
+						curr_height = size.bottom - size.top;
+					}
+
+					// apply curr_width/height without client size
+					info->ptMinTrackSize.x = min_width + curr_width;
+					info->ptMinTrackSize.y = min_height + curr_height;
+					if( apply_max ) {
+						info->ptMaxTrackSize.x = max_width + curr_width;
+						info->ptMaxTrackSize.y = max_height + curr_height;
+					}
+
+					return 0;
+				}
+			}
+		}
+		break;
+	}
 	case WM_SETCURSOR:
 		if( LOWORD(lparam) == HTCLIENT ) {
 			if( show_cursor )
@@ -268,8 +329,9 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 	AdjustWindowRect(&r,style,false);
 	dx_events *event_buffer = (dx_events*)malloc(sizeof(dx_events));
 	memset(event_buffer,0, sizeof(dx_events));
-	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, x, y, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
 	event_buffer->normal_style = style;
+	event_buffer->opacity = 1.0;
+	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, x, y, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
 	SetTimer(win,0,10,NULL);
 	if( !(windowFlags & Hidden) ) {
 		ShowWindow(win, SW_SHOW);
@@ -302,6 +364,61 @@ HL_PRIM void HL_NAME(win_get_size)(dx_window *win, int *width, int *height) {
 	GetClientRect(win,&r);
 	if( width ) *width = r.right;
 	if( height ) *height = r.bottom;
+}
+
+HL_PRIM void HL_NAME(win_set_min_size)(dx_window *win, int width, int height) {
+	dx_events *buf = get_events(win);
+
+	if( width < 0 ) width = 0;
+	if( height < 0 ) height = 0;
+	if( buf->max_width != 0 && width > buf->max_width ) width = buf->max_width;
+	if( buf->max_height != 0 && height > buf->max_height ) height = buf->max_height;
+
+	if( buf->min_width != width || buf->min_height != height ) {
+		buf->min_width = width;
+		buf->min_height = height;
+
+		int curr_width = 0;
+		int curr_height = 0;
+		HL_NAME(win_get_size)(win, &curr_width, &curr_height);
+		if( curr_width < width || curr_height < height )
+			HL_NAME(win_set_size)(win, max(curr_width, width), max(curr_height, height));
+	}
+}
+
+HL_PRIM void HL_NAME(win_get_min_size)(dx_window *win, int *width, int *height) {
+	dx_events *buf = get_events(win);
+	if( width ) *width = buf->min_width;
+	if( height ) *height = buf->min_height;
+}
+
+HL_PRIM void HL_NAME(win_set_max_size)(dx_window *win, int width, int height) {
+	dx_events *buf = get_events(win);
+	if( width == 0 && height == 0 ) {
+		buf->max_width = 0;
+		buf->max_height = 0;
+	} else {
+		if( width < buf->min_width ) width = buf->min_width;
+		if( height < buf->min_height ) height = buf->min_height;
+		if( width == 0 ) width = 1;
+		if( height == 0 ) height = 1;
+		if( buf->max_width != width || buf->max_height != height ) {
+			buf->max_width = width;
+			buf->max_height = height;
+
+			int curr_width = 0;
+			int curr_height = 0;
+			HL_NAME(win_get_size)(win, &curr_width, &curr_height);
+			if( curr_width > width || curr_height > height )
+				HL_NAME(win_set_size)(win, min(curr_width, width), min(curr_height, height));
+		}
+	}
+}
+
+HL_PRIM void HL_NAME(win_get_max_size)(dx_window *win, int *width, int *height) {
+	dx_events *buf = get_events(win);
+	if( width ) *width = buf->max_width;
+	if( height ) *height = buf->max_height;
 }
 
 HL_PRIM void HL_NAME(win_get_position)(dx_window *win, int *x, int *y) {
@@ -380,6 +497,37 @@ HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 	}
 }
 
+HL_PRIM double HL_NAME(win_get_opacity)(dx_window *win) {
+	dx_events *buf = get_events(win);
+	return buf->opacity;
+}
+
+HL_PRIM bool HL_NAME(win_set_opacity)(dx_window *win, double opacity) {
+	if( opacity > 1.0 )
+		opacity = 1.0;
+	else if( opacity < 0.0 )
+		opacity = 0.0;
+
+	dx_events *buf = get_events(win);
+	if( buf->opacity != opacity ) {
+		buf->opacity = opacity;
+		LONG style = GetWindowLong(win, GWL_EXSTYLE);
+		bool layered = (style & WS_EX_LAYERED) != 0;
+		if( opacity >= 1.0 ) {
+			if( layered )
+				if( SetWindowLong(win, GWL_EXSTYLE, style & ~WS_EX_LAYERED) == 0 )
+					return false;
+		} else {
+			if( !layered )
+				if( SetWindowLong(win, GWL_EXSTYLE, style | WS_EX_LAYERED) == 0 )
+					return false;
+			if( SetLayeredWindowAttributes(win, 0, (BYTE)((int)(opacity * 255.0)), LWA_ALPHA) == 0 )
+				return false;
+		}
+	}
+	return true;
+}
+
 HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
 	if (cur_clip_cursor_window == win) {
 		cur_clip_cursor_window = NULL;
@@ -432,10 +580,16 @@ DEFINE_PRIM(_VOID, win_set_fullscreen, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_set_min_size, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_set_max_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_center, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, win_get_min_size, TWIN _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, win_get_max_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_F64, win_get_opacity, TWIN);
+DEFINE_PRIM(_BOOL, win_set_opacity, TWIN _F64);
 DEFINE_PRIM(_VOID, win_destroy, TWIN);
 DEFINE_PRIM(_BOOL, win_get_next_event, TWIN _DYN);
 DEFINE_PRIM(_VOID, win_clip_cursor, TWIN);
