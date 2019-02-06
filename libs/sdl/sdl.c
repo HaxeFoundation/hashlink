@@ -488,7 +488,7 @@ HL_PRIM double HL_NAME(win_get_opacity)(SDL_Window *win) {
 }
 
 HL_PRIM bool HL_NAME(win_set_opacity)(SDL_Window *win, double opacity) {
-	return SDL_SetWindowOpacity(win, opacity) == 0;
+	return SDL_SetWindowOpacity(win, (float)opacity) == 0;
 }
 
 HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
