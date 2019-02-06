@@ -91,7 +91,7 @@ static int_val gc_hash( void *ptr ) {
 #define PAGE_KIND_BITS		2
 #define PAGE_KIND_MASK		((1 << PAGE_KIND_BITS) - 1)
 
-#ifdef HL_DEBUG
+#if defined(HL_DEBUG) && !defined(HL_CONSOLE)
 #	define GC_DEBUG
 #	define GC_MEMCHK
 #endif
