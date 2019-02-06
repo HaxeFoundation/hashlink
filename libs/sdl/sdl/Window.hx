@@ -50,10 +50,15 @@ class Window {
 	public var vsync(default, set) : Bool;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
+	public var minWidth(get, never) : Int;
+	public var minHeight(get, never) : Int;
+	public var maxWidth(get, never) : Int;
+	public var maxHeight(get, never) : Int;
 	public var x(get, never) : Int;
 	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
 	public var visible(default, set) : Bool = true;
+	public var opacity(get, set) : Float;
 
 	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE ) {
 		while( true ) {
@@ -149,6 +154,14 @@ class Window {
 		winSetSize(win, width, height);
 	}
 
+	public function setMinSize( width : Int, height : Int ) {
+		winSetMinSize(win, width, height);
+	}
+
+	public function setMaxSize( width : Int, height : Int ) {
+		winSetMaxSize(win, width, height);
+	}
+
 	public function setPosition( x : Int, y : Int ) {
 		winSetPosition(win, x, y);
 	}
@@ -169,6 +182,30 @@ class Window {
 		return h;
 	}
 
+	function get_minWidth() {
+		var w = 0;
+		winGetMinSize(win, w, null);
+		return w;
+	}
+
+	function get_minHeight() {
+		var h = 0;
+		winGetMinSize(win, null, h);
+		return h;
+	}
+
+	function get_maxWidth() {
+		var w = 0;
+		winGetMaxSize(win, w, null);
+		return w;
+	}
+
+	function get_maxHeight() {
+		var h = 0;
+		winGetMaxSize(win, null, h);
+		return h;
+	}
+
 	function get_x() {
 		var x = 0;
 		winGetPosition(win, x, null);
@@ -184,6 +221,15 @@ class Window {
 	function set_vsync(v) {
 		setVsync(v);
 		return vsync = v;
+	}
+
+	function get_opacity() {
+		return winGetOpacity(win);
+	}
+
+	function set_opacity(v) {
+		winSetOpacity(win, v);
+		return v;
 	}
 
 	/**
@@ -257,7 +303,27 @@ class Window {
 	static function winResize( win : WinPtr, mode : Int ) {
 	}
 
+	static function winSetMinSize( win : WinPtr, width : Int, height : Int ) {
+	}
+
+	static function winSetMaxSize( win : WinPtr, width : Int, height : Int ) {
+	}
+
 	static function winGetSize( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
+	}
+
+	static function winGetMinSize( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
+	}
+
+	static function winGetMaxSize( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
+	}
+
+	static function winGetOpacity( win : WinPtr ) : Float {
+		return 0.0;
+	}
+
+	static function winSetOpacity( win : WinPtr, opacity : Float ) : Bool {
+		return false;
 	}
 
 	static function winRenderTo( win : WinPtr, gl : GLContext ) {
