@@ -2992,6 +2992,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OToSFloat:
+			if( ra == dst ) break;
 			if( ra->t->kind == HI32 ) {
 				preg *r = alloc_cpu(ctx,ra,true);
 				preg *w = alloc_fpu(ctx,dst,false);
@@ -3019,6 +3020,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case OToInt:
+			if( ra == dst ) break;
 			if( ra->t->kind == HF64 ) {
 				preg *r = alloc_fpu(ctx,ra,true);
 				preg *w = alloc_cpu(ctx,dst,false);
