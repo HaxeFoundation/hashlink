@@ -55,6 +55,11 @@ if(WIN32)
         iphlpapi
         userenv
     )
+    target_compile_definitions(uv.hdll
+        PRIVATE
+        UV_EXPORTS
+        BUILDING_UV_SHARED
+    )
 else()
     target_include_directories(uv.hdll
         PRIVATE
