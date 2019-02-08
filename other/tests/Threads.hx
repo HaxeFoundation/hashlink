@@ -7,7 +7,7 @@ class Threads {
 	}
 
 	static function run(i,k) {
-		for( i in 0...Math.ceil(10000000/k) )
+		for( i in 0...Math.ceil(1000000/k) )
 			new hl.Bytes(1);
 		if( i>=0 ) WAIT[i] = false; 
 	}
