@@ -111,10 +111,18 @@ class UVSample {
 		log("Enter Loop");
 
 		var K = 0;
-		while( loop.run(NoWait) != 0 )
+		var maxRead = 1000000;
+		while( loop.run(NoWait) != 0 ) {
 			if( K++ % 10000 == 0 ) log("Read=" + totR);
 
+			if( totR > maxRead ) {
+				log("Total Read > " + maxRead);
+				break;
+			}
+		}
+
 		log("Done");
+		Sys.exit(0);
 	}
 
 }
