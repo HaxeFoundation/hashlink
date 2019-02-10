@@ -344,7 +344,7 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 }
 
 #undef CHK_ERROR
-#define CHK_ERROR() if( r->error ) { if( c ) hl_free(&c->alloc); printf("%s\n", r->error); return NULL; }
+#define CHK_ERROR() if( r->error ) { if( c ) hl_free(&c->alloc); *error_msg = r->error; return NULL; }
 #define EXIT(msg) { ERROR(msg); CHK_ERROR(); }
 #define ALLOC(v,ptr,count) v = (ptr *)hl_zalloc(&c->alloc,count*sizeof(ptr))
 
@@ -420,7 +420,7 @@ static int *hl_read_debug_infos( hl_reader *r, int nops ) {
 	return debug;
 }
 
-hl_code *hl_code_read( const unsigned char *data, int size ) {
+hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	hl_reader _r = { data, size, 0, 0, NULL };	
 	hl_reader *r = &_r;
 	hl_code *c;
