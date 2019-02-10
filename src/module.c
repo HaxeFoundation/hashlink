@@ -81,10 +81,10 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	int fidx, fpos;
 	hl_function *fdebug;
 	int i;
-	hl_module *m;
+	hl_module *m = NULL;
 	for(i=0;i<modules_count;i++) {
 		m = cur_modules[i];
-		if( addr >= m->jit_code && addr <= (char*)m->jit_code + m->codesize ) break;
+		if( addr >= m->jit_code && addr <= (void*)((char*)m->jit_code + m->codesize) ) break;
 	}
 	if( i == modules_count )
 		return NULL;
