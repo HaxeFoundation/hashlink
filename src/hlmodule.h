@@ -94,6 +94,8 @@ typedef struct {
 	bool large;
 } hl_debug_infos;
 
+typedef struct jit_ctx jit_ctx;
+
 typedef struct {
 	hl_code *code;
 	int codesize;
@@ -101,26 +103,28 @@ typedef struct {
 	unsigned char *globals_data;
 	void **functions_ptrs;
 	int *functions_indexes;
+	int *functions_hashes;
 	void *jit_code;
 	hl_debug_infos *jit_debug;
+	jit_ctx *jit_ctx;
 	hl_module_context ctx;
 } hl_module;
 
-typedef struct jit_ctx jit_ctx;
-
 hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg );
+int hl_code_hash_fun( hl_code *c, hl_function *f );
 void hl_code_free( hl_code *c );
 const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
 
 hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m, bool hot_reload );
-void hl_module_patch( hl_module *m, hl_code *code );
+bool hl_module_patch( hl_module *m, hl_code *code );
 void hl_module_free( hl_module *m );
 bool hl_module_debug( hl_module *m, int port, bool wait );
 
 jit_ctx *hl_jit_alloc();
-void hl_jit_free( jit_ctx *ctx );
+void hl_jit_free( jit_ctx *ctx, bool can_reset );
+void hl_jit_reset( jit_ctx *ctx, hl_module *m );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug );
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );

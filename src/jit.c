@@ -297,7 +297,7 @@ struct jit_ctx {
 	int c2hl;
 	int hl2c;
 	int longjump;
-	int static_functions[8];
+	void *static_functions[8];
 };
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
@@ -2205,13 +2205,23 @@ jit_ctx *hl_jit_alloc() {
 	return ctx;
 }
 
-void hl_jit_free( jit_ctx *ctx ) {
+void hl_jit_free( jit_ctx *ctx, bool can_reset ) {
 	free(ctx->vregs);
 	free(ctx->opsPos);
 	free(ctx->startBuf);
+	ctx->maxRegs = 0;
+	ctx->vregs = NULL;
+	ctx->maxOps = 0;
+	ctx->opsPos = NULL;
+	ctx->startBuf = NULL;
+	ctx->bufSize = 0;
+	ctx->buf.b = NULL;
+	ctx->calls = NULL;
+	ctx->switchs = NULL;
+	ctx->closure_list = NULL;
 	hl_free(&ctx->falloc);
 	hl_free(&ctx->galloc);
-	free(ctx);
+	if( !can_reset ) free(ctx);
 }
 
 static void jit_nops( jit_ctx *ctx ) {
@@ -2601,7 +2611,7 @@ static int jit_build( jit_ctx *ctx, void (*fbuild)( jit_ctx *) ) {
 	return pos;
 }
 
-void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
+static void hl_jit_init_module( jit_ctx *ctx, hl_module *m ) {
 	int i;
 	ctx->m = m;
 	if( m->code->hasdebug )
@@ -2610,13 +2620,22 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 		jit_buf(ctx);
 		*ctx->buf.d++ = m->code->floats[i];
 	}
+}
+
+void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
+	hl_jit_init_module(ctx,m);
 	ctx->c2hl = jit_build(ctx, jit_c2hl);
 	ctx->hl2c = jit_build(ctx, jit_hl2c);
 #	ifdef JIT_CUSTOM_LONGJUMP
 	ctx->longjump = jit_build(ctx, jit_longjump);
 #	endif
-	ctx->static_functions[0] = jit_build(ctx,jit_null_access);
-	ctx->static_functions[1] = jit_build(ctx,jit_assert);
+	ctx->static_functions[0] = (void*)(int_val)jit_build(ctx,jit_null_access);
+	ctx->static_functions[1] = (void*)(int_val)jit_build(ctx,jit_assert);
+}
+
+void hl_jit_reset( jit_ctx *ctx, hl_module *m ) {
+	ctx->debug = NULL;
+	hl_jit_init_module(ctx,m);
 }
 
 static void *get_dyncast( hl_type *t ) {
@@ -4083,7 +4102,7 @@ static void *get_wrapper( hl_type *t ) {
 	return call_jit_hl2c;
 }
 
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug ) {
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
 	jlist *c;
 	int size = BUF_POS();
 	unsigned char *code;
@@ -4093,17 +4112,48 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	memcpy(code,ctx->startBuf,BUF_POS());
 	*codesize = size;
 	*debug = ctx->debug;
-	call_jit_c2hl = code + ctx->c2hl;
-	call_jit_hl2c = code + ctx->hl2c;
-	hl_setup_callbacks(callback_c2hl, get_wrapper);
+	if( !call_jit_c2hl ) {
+		call_jit_c2hl = code + ctx->c2hl;
+		call_jit_hl2c = code + ctx->hl2c;
+		hl_setup_callbacks(callback_c2hl, get_wrapper);
+#		ifdef JIT_CUSTOM_LONGJUMP
+		hl_setup_longjump(code + ctx->longjump);
+#		endif
+		int i;
+		for(i=0;i<sizeof(ctx->static_functions)/sizeof(void*);i++)
+			ctx->static_functions[i] = (void*)(code + (int)(int_val)ctx->static_functions[i]);
+	} else {
+		if( ctx->calls )
+			printf("TODO:CALLS\n");
+		if( ctx->closure_list )
+			printf("TODO:CALLS\n");
+	}
 	// patch calls
 	c = ctx->calls;
 	while( c ) {
-		int fpos = c->target < 0 ? ctx->static_functions[-c->target-1] : (int)(int_val)m->functions_ptrs[c->target];
+		int_val fabs;
+		if( c->target < 0 )
+			fabs = (int_val)ctx->static_functions[-c->target-1];
+		else {
+			fabs = (int_val)m->functions_ptrs[c->target];
+			if( fabs == 0 ) {
+				// todo : read absolute address from previous module
+				return NULL;
+			} else {
+				fabs += (int_val)code;
+			}
+		}
 		if( (code[c->pos]&~3) == (IS_64?0x48:0xB8) || code[c->pos] == 0x68 ) // MOV : absolute | PUSH
-			*(int_val*)(code + c->pos + (IS_64?2:1)) = (int_val)(code + fpos);
-		else
-			*(int*)(code + c->pos + 1) = fpos - (c->pos + 5);
+			*(int_val*)(code + c->pos + (IS_64?2:1)) = fabs;
+		else {
+			int_val delta = fabs - (int_val)code - (c->pos + 5);
+			int rpos = (int)delta;
+			if( (int_val)rpos != delta ) {
+				printf("Target code too far too rebase\n");
+				return NULL;
+			}
+			*(int*)(code + c->pos + 1) = rpos;
+		}
 		c = c->next;
 	}
 	// patch switchs
@@ -4124,9 +4174,6 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 			c = next;
 		}
 	}
-#	ifdef JIT_CUSTOM_LONGJUMP
-	hl_setup_longjump(code + ctx->longjump);
-#	endif
 	return code;
 }
 

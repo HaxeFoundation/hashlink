@@ -48,7 +48,7 @@ typedef struct {
 	int file_time;
 } main_context;
 
-static int pfiletime( uchar *file )	{
+static int pfiletime( pchar *file )	{
 #ifdef HL_WIN
 	struct _stat32 st;
 	_wstat32(file,&st);
@@ -90,16 +90,17 @@ static hl_code *load_code( const pchar *file, char **error_msg, bool print_error
 
 static bool check_reload( main_context *m ) {
 	int time = pfiletime(m->file);
+	bool changed;
 	if( time == m->file_time )
 		return false;
 	char *error_msg = NULL;
 	hl_code *code = load_code(m->file, &error_msg, false);
 	if( code == NULL )
 		return false;
-	hl_module_patch(m->m, code);
+	changed = hl_module_patch(m->m, code);
 	m->file_time = time;
 	hl_code_free(code);
-	return true;
+	return changed;
 }
 
 #ifdef HL_VCC

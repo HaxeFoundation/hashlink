@@ -320,51 +320,8 @@ static void disabled_primitive() {
 	hl_error("This library primitive has been disabled");
 }
 
-int hl_module_init( hl_module *m, bool hot_reload ) {
+static void hl_module_init_indexes( hl_module *m ) {
 	int i;
-	jit_ctx *ctx;
-	// RESET globals
-	for(i=0;i<m->code->nglobals;i++) {
-		hl_type *t = m->code->globals[i];
-		if( t->kind == HFUN ) *(void**)(m->globals_data + m->globals_indexes[i]) = null_function;
-		if( hl_is_ptr(t) )
-			hl_add_root(m->globals_data+m->globals_indexes[i]);
-	}
-	// INIT natives
-	{
-		char tmp[256];
-		void *libHandler = NULL;
-		const char *curlib = NULL, *sign;
-		for(i=0;i<m->code->nnatives;i++) {
-			hl_native *n = m->code->natives + i;
-			char *p = tmp;
-			void *f;
-			if( curlib != n->lib ) {
-				curlib = n->lib;
-				libHandler = resolve_library(n->lib);
-			}
-			if( libHandler == DISABLED_LIB_PTR ) {
-				m->functions_ptrs[n->findex] = disabled_primitive;
-				continue;
-			}
-
-			strcpy(p,"hlp_");
-			p += 4;
-			strcpy(p,n->name);
-			p += strlen(n->name);
-			*p++ = 0;
-			f = dlsym(libHandler,tmp);
-			if( f == NULL )
-				hl_fatal2("Failed to load function %s@%s",n->lib,n->name);
-			m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
-			p = tmp;
-			append_type(&p,n->t);
-			*p++ = 0;
-			if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
-				hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
-		}
-	}
-	// INIT indexes
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_indexes[f->findex] = i;
@@ -419,6 +376,63 @@ int hl_module_init( hl_module *m, bool hot_reload ) {
 			break;
 		}
 	}
+}
+
+static void hl_module_hash( hl_module *m ) {
+	int i;
+	m->functions_hashes = malloc(sizeof(int) * m->code->nfunctions);
+	for(i=0;i<m->code->nfunctions;i++) {
+		hl_function *f = m->code->functions + i;
+		m->functions_hashes[i] = hl_code_hash_fun(m->code,f);
+	}
+}
+
+int hl_module_init( hl_module *m, bool hot_reload ) {
+	int i;
+	jit_ctx *ctx;
+	// RESET globals
+	for(i=0;i<m->code->nglobals;i++) {
+		hl_type *t = m->code->globals[i];
+		if( t->kind == HFUN ) *(void**)(m->globals_data + m->globals_indexes[i]) = null_function;
+		if( hl_is_ptr(t) )
+			hl_add_root(m->globals_data+m->globals_indexes[i]);
+	}
+	// INIT natives
+	{
+		char tmp[256];
+		void *libHandler = NULL;
+		const char *curlib = NULL, *sign;
+		for(i=0;i<m->code->nnatives;i++) {
+			hl_native *n = m->code->natives + i;
+			char *p = tmp;
+			void *f;
+			if( curlib != n->lib ) {
+				curlib = n->lib;
+				libHandler = resolve_library(n->lib);
+			}
+			if( libHandler == DISABLED_LIB_PTR ) {
+				m->functions_ptrs[n->findex] = disabled_primitive;
+				continue;
+			}
+
+			strcpy(p,"hlp_");
+			p += 4;
+			strcpy(p,n->name);
+			p += strlen(n->name);
+			*p++ = 0;
+			f = dlsym(libHandler,tmp);
+			if( f == NULL )
+				hl_fatal2("Failed to load function %s@%s",n->lib,n->name);
+			m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
+			p = tmp;
+			append_type(&p,n->t);
+			*p++ = 0;
+			if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
+				hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
+		}
+	}
+	// INIT indexes
+	hl_module_init_indexes(m);
 	// JIT
 	ctx = hl_jit_alloc();
 	if( ctx == NULL )
@@ -428,12 +442,12 @@ int hl_module_init( hl_module *m, bool hot_reload ) {
 		hl_function *f = m->code->functions + i;
 		int fpos = hl_jit_function(ctx, m, f);
 		if( fpos < 0 ) {
-			hl_jit_free(ctx);
+			hl_jit_free(ctx, false);
 			return 0;
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
 	}
-	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug);
+	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
@@ -495,11 +509,72 @@ int hl_module_init( hl_module *m, bool hot_reload ) {
 
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_gc_set_dump_types(hl_module_types_dump);
-	hl_jit_free(ctx);
+	hl_jit_free(ctx, hot_reload);
+	if( hot_reload ) {
+		hl_module_hash(m);
+		m->jit_ctx = ctx;
+	}
 	return 1;
 }
 
-void hl_module_patch( hl_module *m, hl_code *c ) {
+bool hl_module_patch( hl_module *m1, hl_code *c ) {
+	int i1,i2;
+	bool has_changes = false;
+	jit_ctx *ctx = m1->jit_ctx;
+
+	hl_module *m2 = hl_module_alloc(c);
+	hl_module_init_indexes(m2);
+	hl_module_hash(m2);
+	
+	hl_jit_reset(ctx, m2);
+
+	for(i2=0;i2<m2->code->nfunctions;i2++) {
+		hl_function *f2 = m2->code->functions + i2;
+		if( f2->obj == NULL ) {
+			m2->functions_hashes[i2] = -1;
+			continue;
+		}
+		for(i1=0;i1<m1->code->nfunctions;i1++) {
+			hl_function *f1 = m1->code->functions + i1;
+			if( f1->obj && ucmp(f1->obj->name, f2->obj->name) == 0 && ucmp(f1->field,f2->field) == 0 ) {
+				int hash1 = m1->functions_hashes[i1];
+				int hash2 = m2->functions_hashes[i2];
+				if( hash1 == hash2 )
+					break;
+				uprintf(USTR("%s.%s has been modified\n"), f1->obj->name, f1->field);
+				m1->functions_hashes[i1] = hash2; // update hash
+				int fpos = hl_jit_function(ctx, m2, f2);
+				if( fpos < 0 ) break;
+				m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
+				has_changes = true;
+				break;
+			}
+		}
+		m2->functions_hashes[i2] = i1 == m1->code->nfunctions ? -1 : i1;
+	}
+	if( !has_changes ) {
+		printf("No changes found\n");
+		hl_jit_free(ctx, true);
+		return false;
+	}
+	m2->jit_code = hl_jit_code(ctx, m2, &m2->codesize, &m2->jit_debug, m1);
+	
+	int i;
+	for(i=0;i<m2->code->nfunctions;i++) {
+		hl_function *f2 = m2->code->functions + i;
+		if( m2->functions_hashes[i] < 0 ) continue;
+		if( (int_val)m2->functions_ptrs[f2->findex] == 0 ) continue; 
+		void *ptr = ((unsigned char*)m2->jit_code) + ((int_val)m2->functions_ptrs[f2->findex]);
+		m2->functions_ptrs[f2->findex] = ptr;
+		// update real function ptr
+		hl_function *f1 = m1->code->functions + m2->functions_hashes[i];
+		m1->functions_ptrs[f1->findex] = ptr;
+	}
+	for(i=0;i<m1->code->ntypes;i++) {
+		hl_type *t = m1->code->types + i;
+		if( t->kind == HOBJ ) hl_flush_proto(t);
+	}
+	return true;
 }
 
 void hl_module_free( hl_module *m ) {
@@ -510,11 +585,14 @@ void hl_module_free( hl_module *m ) {
 	free(m->ctx.functions_types);
 	free(m->globals_indexes);
 	free(m->globals_data);
+	free(m->functions_hashes);
 	if( m->jit_debug ) {
 		int i;
 		for(i=0;i<m->code->nfunctions;i++)
 			free(m->jit_debug[i].offsets);
 		free(m->jit_debug);
 	}
+	if( m->jit_ctx )
+		hl_jit_free(m->jit_ctx,false);
 	free(m);
 }

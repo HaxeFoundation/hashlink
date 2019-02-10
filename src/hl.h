@@ -426,6 +426,7 @@ HL_API int hl_pad_struct( int size, hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
 HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
+HL_API void hl_flush_proto( hl_type *ot );
 HL_API void hl_init_enum( hl_type *et, hl_module_context *m );
 
 /* -------------------- VALUES ------------------------------ */
