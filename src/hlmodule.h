@@ -115,6 +115,7 @@ const char* hl_op_name( int op );
 
 hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m, bool hot_reload );
+void hl_module_patch( hl_module *m, hl_code *code );
 void hl_module_free( hl_module *m );
 bool hl_module_debug( hl_module *m, int port, bool wait );
 

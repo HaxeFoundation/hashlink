@@ -320,7 +320,7 @@ static void disabled_primitive() {
 	hl_error("This library primitive has been disabled");
 }
 
-int hl_module_init( hl_module *m ) {
+int hl_module_init( hl_module *m, bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
 	// RESET globals
@@ -497,6 +497,9 @@ int hl_module_init( hl_module *m ) {
 	hl_gc_set_dump_types(hl_module_types_dump);
 	hl_jit_free(ctx);
 	return 1;
+}
+
+void hl_module_patch( hl_module *m, hl_code *c ) {
 }
 
 void hl_module_free( hl_module *m ) {

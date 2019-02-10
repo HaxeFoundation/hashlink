@@ -96,6 +96,7 @@ static bool check_reload( main_context *m ) {
 	hl_code *code = load_code(m->file, &error_msg, false);
 	if( code == NULL )
 		return false;
+	hl_module_patch(m, code);
 	m->file_time = time;
 	hl_code_free(code);
 	return true;

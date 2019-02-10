@@ -344,7 +344,7 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 }
 
 #undef CHK_ERROR
-#define CHK_ERROR() if( r->error ) { if( c ) hl_free(&c->alloc); *error_msg = r->error; return NULL; }
+#define CHK_ERROR() if( r->error ) { if( c ) hl_free(&c->alloc); *error_msg = (char*)r->error; return NULL; }
 #define EXIT(msg) { ERROR(msg); CHK_ERROR(); }
 #define ALLOC(v,ptr,count) v = (ptr *)hl_zalloc(&c->alloc,count*sizeof(ptr))
 
