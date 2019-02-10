@@ -541,7 +541,8 @@ bool hl_module_patch( hl_module *m1, hl_code *c ) {
 				int hash2 = m2->functions_hashes[i2];
 				if( hash1 == hash2 )
 					break;
-				uprintf(USTR("%s.%s has been modified\n"), f1->obj->name, f1->field);
+				uprintf(USTR("%s."), f1->obj->name);
+				uprintf(USTR("%s has been modified\n"), f1->field);
 				m1->functions_hashes[i1] = hash2; // update hash
 				int fpos = hl_jit_function(ctx, m2, f2);
 				if( fpos < 0 ) break;
