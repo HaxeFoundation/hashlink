@@ -31,6 +31,7 @@ typedef uchar pchar;
 #define ptoi(s)	wcstol(s,NULL,10)
 #define PSTR(x) USTR(x)
 #else
+#	include <sys/stat.h>
 typedef char pchar;
 #define pprintf printf
 #define pfopen fopen
