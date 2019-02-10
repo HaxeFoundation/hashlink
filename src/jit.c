@@ -2205,7 +2205,7 @@ jit_ctx *hl_jit_alloc() {
 	return ctx;
 }
 
-void hl_jit_free( jit_ctx *ctx, bool can_reset ) {
+void hl_jit_free( jit_ctx *ctx, h_bool can_reset ) {
 	free(ctx->vregs);
 	free(ctx->opsPos);
 	free(ctx->startBuf);

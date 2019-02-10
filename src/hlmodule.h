@@ -116,14 +116,15 @@ void hl_code_free( hl_code *c );
 const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
 
+typedef unsigned char h_bool;
 hl_module *hl_module_alloc( hl_code *code );
-int hl_module_init( hl_module *m, bool hot_reload );
-bool hl_module_patch( hl_module *m, hl_code *code );
+int hl_module_init( hl_module *m, h_bool hot_reload );
+h_bool hl_module_patch( hl_module *m, hl_code *code );
 void hl_module_free( hl_module *m );
-bool hl_module_debug( hl_module *m, int port, bool wait );
+h_bool hl_module_debug( hl_module *m, int port, h_bool wait );
 
 jit_ctx *hl_jit_alloc();
-void hl_jit_free( jit_ctx *ctx, bool can_reset );
+void hl_jit_free( jit_ctx *ctx, h_bool can_reset );
 void hl_jit_reset( jit_ctx *ctx, hl_module *m );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );

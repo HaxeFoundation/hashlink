@@ -19,6 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#include <hl.h>
 #include <hlmodule.h>
 
 #ifdef HL_WIN
@@ -387,7 +388,7 @@ static void hl_module_hash( hl_module *m ) {
 	}
 }
 
-int hl_module_init( hl_module *m, bool hot_reload ) {
+int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
 	// RESET globals
@@ -517,7 +518,7 @@ int hl_module_init( hl_module *m, bool hot_reload ) {
 	return 1;
 }
 
-bool hl_module_patch( hl_module *m1, hl_code *c ) {
+h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	int i1,i2;
 	bool has_changes = false;
 	jit_ctx *ctx = m1->jit_ctx;
