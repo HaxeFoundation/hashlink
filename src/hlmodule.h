@@ -108,7 +108,7 @@ typedef struct {
 
 typedef struct jit_ctx jit_ctx;
 
-hl_code *hl_code_read( const unsigned char *data, int size, const char **error_msg );
+hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg );
 void hl_code_free( hl_code *c );
 const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
