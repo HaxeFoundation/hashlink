@@ -4102,6 +4102,33 @@ static void *get_wrapper( hl_type *t ) {
 	return call_jit_hl2c;
 }
 
+void hl_jit_patch_method( void *old_fun, void **new_fun_table ) {
+	// mov eax, addr
+	// jmp [eax]
+	unsigned char *b = (unsigned char*)old_fun;
+	unsigned long long addr = (unsigned long long)(int_val)new_fun_table;
+#	ifdef HL_64
+	*b++ = 0x48;
+	*b++ = 0xB8;
+	*b++ = (unsigned char)addr;
+	*b++ = (unsigned char)(addr>>8);
+	*b++ = (unsigned char)(addr>>16);
+	*b++ = (unsigned char)(addr>>24);
+	*b++ = (unsigned char)(addr>>32);
+	*b++ = (unsigned char)(addr>>40);
+	*b++ = (unsigned char)(addr>>48);
+	*b++ = (unsigned char)(addr>>56);
+#	else
+	*b++ = 0xB8;
+	*b++ = (unsigned char)addr;
+	*b++ = (unsigned char)(addr>>8);
+	*b++ = (unsigned char)(addr>>16);
+	*b++ = (unsigned char)(addr>>24);
+#	endif
+	*b++ = 0xFF;
+	*b++ = 0x20;
+}
+
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
 	jlist *c;
 	int size = BUF_POS();

@@ -568,6 +568,7 @@ bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		m2->functions_ptrs[f2->findex] = ptr;
 		// update real function ptr
 		hl_function *f1 = m1->code->functions + m2->functions_hashes[i];
+		hl_jit_patch_method(m1->functions_ptrs[f1->findex], m1->functions_ptrs + f1->findex);
 		m1->functions_ptrs[f1->findex] = ptr;
 	}
 	for(i=0;i<m1->code->ntypes;i++) {

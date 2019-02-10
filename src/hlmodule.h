@@ -128,3 +128,4 @@ void hl_jit_reset( jit_ctx *ctx, hl_module *m );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );
+void hl_jit_patch_method( void *old_fun, void **new_fun_table );
