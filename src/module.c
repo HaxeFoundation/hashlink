@@ -29,21 +29,22 @@
 #	include <dlfcn.h>
 #endif
 
-static hl_module *cur_module;
+static hl_module **cur_modules = NULL;
+static int modules_count = 0;
 
-static bool module_resolve_pos( void *addr, int *fidx, int *fpos ) {
-	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)cur_module->jit_code));
+static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos ) {
+	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)m->jit_code));
 	int min, max;
 	hl_debug_infos *dbg;
 	hl_function *fdebug;
-	if( cur_module->jit_debug == NULL )
+	if( m->jit_debug == NULL )
 		return false;
 	// lookup function from code pos
 	min = 0;
-	max = cur_module->code->nfunctions;
+	max = m->code->nfunctions;
 	while( min < max ) {
 		int mid = (min + max) >> 1;
-		hl_debug_infos *p = cur_module->jit_debug + mid;
+		hl_debug_infos *p = m->jit_debug + mid;
 		if( p->start <= code_pos )
 			min = mid + 1;
 		else
@@ -52,8 +53,8 @@ static bool module_resolve_pos( void *addr, int *fidx, int *fpos ) {
 	if( min == 0 )
 		return false; // hl_callback
 	*fidx = (min - 1);
-	dbg = cur_module->jit_debug + (min - 1);
-	fdebug = cur_module->code->functions + (min - 1);
+	dbg = m->jit_debug + (min - 1);
+	fdebug = m->code->functions + (min - 1);
 	// lookup inside function
 	min = 0;
 	max = fdebug->nops;
@@ -79,10 +80,18 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	int pos = 0;
 	int fidx, fpos;
 	hl_function *fdebug;
-	if( !module_resolve_pos(addr,&fidx,&fpos) )
+	int i;
+	hl_module *m;
+	for(i=0;i<modules_count;i++) {
+		m = cur_modules[i];
+		if( addr >= m->jit_code && addr <= (char*)m->jit_code + m->codesize ) break;
+	}
+	if( i == modules_count )
+		return NULL;
+	if( !module_resolve_pos(m,addr,&fidx,&fpos) )
 		return NULL;
 	// extract debug info
-	fdebug = cur_module->code->functions + fidx;
+	fdebug = m->code->functions + fidx;
 	debug_addr = fdebug->debug + ((fpos&0xFFFF) * 2);
 	file = debug_addr[0];
 	line = debug_addr[1];
@@ -90,7 +99,7 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 		pos += usprintf(out,size - pos,USTR("%s.%s("),fdebug->obj->name,fdebug->field);
 	else
 		pos += usprintf(out,size - pos,USTR("fun$%d("),fdebug->findex);
-	pos += hl_from_utf8(out + pos,size - pos,cur_module->code->debugfiles[file]);
+	pos += hl_from_utf8(out + pos,size - pos,m->code->debugfiles[file]);
 	pos += usprintf(out + pos, size - pos, USTR(":%d)"), line);
 	*outSize = pos;
 	return out;
@@ -101,20 +110,50 @@ static int module_capture_stack( void **stack, int size ) {
 	void *stack_bottom = stack_ptr;
 	void *stack_top = hl_get_thread()->stack_top;
 	int count = 0;
-	unsigned char *code = cur_module->jit_code;
-	int code_size = cur_module->codesize;
-	if( cur_module->jit_debug ) {
-		int s = cur_module->jit_debug[0].start;
-		code += s;
-		code_size -= s;
-	}
-	while( stack_ptr < (void**)stack_top ) {
-		void *stack_addr = *stack_ptr++; // EBP
-		if( stack_addr > stack_bottom && stack_addr < stack_top ) {
-			void *module_addr = *stack_ptr; // EIP
-			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-				if( count == size ) break;
-				stack[count++] = module_addr;
+	if( modules_count == 1 ) {
+		hl_module *m = cur_modules[0];
+		unsigned char *code = m->jit_code;
+		int code_size = m->codesize;
+		if( m->jit_debug ) {
+			int s = m->jit_debug[0].start;
+			code += s;
+			code_size -= s;
+		}
+		while( stack_ptr < (void**)stack_top ) {
+			void *stack_addr = *stack_ptr++; // EBP
+			if( stack_addr > stack_bottom && stack_addr < stack_top ) {
+				void *module_addr = *stack_ptr; // EIP
+				if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
+					if( count == size ) break;
+					stack[count++] = module_addr;
+				}
+			}
+		}
+	} else {
+		while( stack_ptr < (void**)stack_top ) {
+			void *stack_addr = *stack_ptr++; // EBP
+			if( stack_addr > stack_bottom && stack_addr < stack_top ) {
+				void *module_addr = *stack_ptr; // EIP
+				int i;
+				for(i=0;i<modules_count;i++) {
+					hl_module *m = cur_modules[i];
+					unsigned char *code = m->jit_code;
+					int code_size = m->codesize;
+					if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
+						if( count == size ) {
+							stack_ptr = stack_top;
+							break;
+						}
+						if( m->jit_debug ) {
+							int s = m->jit_debug[0].start;
+							code += s;
+							code_size -= s;
+							if( module_addr < (void*)code || module_addr >= (void*)(code + code_size) ) continue;
+						}
+						stack[count++] = module_addr;
+						break;
+					}
+				}
 			}
 		}
 	}
@@ -122,20 +161,28 @@ static int module_capture_stack( void **stack, int size ) {
 }
 
 static void hl_module_types_dump( void (*fdump)( void *, int) ) {
-	int ntypes = cur_module->code->ntypes;
-	int i, fcount = 0;
+	int ntypes = 0;
+	int i, j, fcount = 0;
+	for(i=0;i<modules_count;i++)
+		ntypes += cur_modules[i]->code->ntypes;
 	fdump(&ntypes,4);
-	for(i=0;i<ntypes;i++) {
-		hl_type *t = cur_module->code->types + i;
-		fdump(&t,sizeof(void*));
-		if( t->kind == HFUN ) fcount++;
+	for(i=0;i<modules_count;i++) {
+		hl_module *m = cur_modules[i];
+		for(j=0;j<m->code->ntypes;j++) {
+			hl_type *t = m->code->types + j;
+			fdump(&t,sizeof(void*));
+			if( t->kind == HFUN ) fcount++;
+		}
 	}
 	fdump(&fcount,4);
-	for(i=0;i<ntypes;i++) {
-		hl_type *t = cur_module->code->types + i;
-		if( t->kind == HFUN ) {
-			hl_type *ct = (hl_type*)&t->fun->closure_type;
-			fdump(&ct,sizeof(void*));
+	for(i=0;i<modules_count;i++) {
+		hl_module *m = cur_modules[i];
+		for(j=0;j<m->code->ntypes;j++) {
+			hl_type *t = m->code->types + j;
+			if( t->kind == HFUN ) {
+				hl_type *ct = (hl_type*)&t->fun->closure_type;
+				fdump(&ct,sizeof(void*));
+			}
 		}
 	}
 }
@@ -436,8 +483,16 @@ int hl_module_init( hl_module *m ) {
 		*global = v;
 		hl_remove_root(global);
 	}
+
 	// DONE
-	cur_module = m;
+	hl_module **old_modules = cur_modules;
+	hl_module **new_modules = (hl_module**)malloc(sizeof(void*)*(modules_count + 1));
+	memcpy(new_modules, old_modules, sizeof(void*)*modules_count);
+	new_modules[modules_count] = m;
+	cur_modules = new_modules;
+	modules_count++;
+	free(old_modules);
+
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_gc_set_dump_types(hl_module_types_dump);
 	hl_jit_free(ctx);
