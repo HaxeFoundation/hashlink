@@ -110,7 +110,7 @@ __declspec(dllexport) DWORD NvOptimusEnablement = 1;
 __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 #endif
 
-#if defined(HL_LINUX) || defined(HL_OSX)
+#if defined(HL_LINUX) || defined(HL_MAC)
 #include <signal.h>
 static void handle_signal( int signum ) {
 	signal(signum, SIG_DFL);
