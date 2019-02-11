@@ -97,7 +97,9 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	file = debug_addr[0];
 	line = debug_addr[1];
 	if( fdebug->obj )
-		pos += usprintf(out,size - pos,USTR("%s.%s("),fdebug->obj->name,fdebug->field);
+		pos += usprintf(out,size - pos,USTR("%s.%s("),fdebug->obj->name,fdebug->field.name);
+	else if( fdebug->field.ref )
+		pos += usprintf(out,size - pos,USTR("%s.~%s.%d("),fdebug->field.ref->obj->name, fdebug->field.ref->field.name, fdebug->ref);
 	else
 		pos += usprintf(out,size - pos,USTR("fun$%d("),fdebug->findex);
 	pos += hl_from_utf8(out + pos,size - pos,m->code->debugfiles[file]);
@@ -345,7 +347,7 @@ static void hl_module_init_indexes( hl_module *m ) {
 					hl_obj_proto *p = t->obj->proto + j;
 					hl_function *f = m->code->functions + m->functions_indexes[p->findex];
 					f->obj = t->obj;
-					f->field = p->name;
+					f->field.name = p->name;
 				}
 				for(j=0;j<t->obj->nbindings;j++) {
 					int fid = t->obj->bindings[j<<1];
@@ -357,7 +359,7 @@ static void hl_module_init_indexes( hl_module *m ) {
 						{
 							hl_function *f = m->code->functions + m->functions_indexes[mid];
 							f->obj = t->obj;
-							f->field = of->name;
+							f->field.name = of->name;
 						}
 						break;
 					default:
@@ -375,6 +377,35 @@ static void hl_module_init_indexes( hl_module *m ) {
 			break;
 		default:
 			break;
+		}
+	}
+	for(i=0;i<m->code->nfunctions;i++) {
+		int k;
+		hl_function *f = m->code->functions + i;
+		hl_function *real_f = f;		
+		while( real_f && !real_f->obj ) real_f = real_f->field.ref;
+		if( real_f == NULL ) continue;
+		for(k=0;k<f->nops;k++) {
+			hl_opcode *op = f->ops + k;
+			switch( op->op ) {
+			case OCall0:
+			case OCall1:
+			case OCall2:
+			case OCall3:
+			case OCall4:
+			case OCallN:
+			case OStaticClosure:
+			case OInstanceClosure:
+				if( m->functions_indexes[op->p2] < m->code->nfunctions ) {
+					hl_function *floc = m->code->functions + m->functions_indexes[op->p2];
+					if( floc->obj ) continue;
+					floc->field.ref = real_f;
+					floc->ref = real_f->ref++;
+				}
+				break;
+			default:
+				break;
+			}
 		}
 	}
 }
@@ -541,28 +572,56 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 
 	for(i2=0;i2<m2->code->nfunctions;i2++) {
 		hl_function *f2 = m2->code->functions + i2;
-		if( f2->obj == NULL ) {
+		int sign2 = m2->functions_signs[i2];
+		if( f2->field.name == NULL ) {
 			m2->functions_hashes[i2] = -1;
 			continue;
 		}
 		for(i1=0;i1<m1->code->nfunctions;i1++) {
-			hl_function *f1 = m1->code->functions + i1;
-			if( f1->obj && ucmp(f1->obj->name, f2->obj->name) == 0 && ucmp(f1->field,f2->field) == 0 ) {
-				int hash1 = m1->functions_hashes[i1];
+			int sign1 = m1->functions_signs[i1];
+			if( sign1 == sign2 ) {
+				hl_function *f1 = m1->code->functions + i1;
+				if( (f1->obj != NULL) != (f2->obj != NULL) || !f1->field.name || !f2->field.name ) {
+					printf("Signature conflict\n");
+					continue;
+				}
+				if( ucmp(fun_obj(f1)->name,fun_obj(f2)->name) != 0 || ucmp(fun_field_name(f1),fun_field_name(f2)) != 0 ) {
+					printf("Signature conflict\n");
+					continue;
+				}
+
 				int hash2 = m2->functions_hashes[i2];
+				int hash1 = m1->functions_hashes[i1];
+				m2->functions_hashes[i2] = i1; // index reference
 				if( hash1 == hash2 )
 					break;
-				uprintf(USTR("%s."), f1->obj->name);
-				uprintf(USTR("%s has been modified\n"), f1->field);
+				uprintf(USTR("%s."), fun_obj(f1)->name);
+				uprintf(USTR("%s"), fun_field_name(f1));
+				if( !f1->obj )
+					printf("~%d", f1->ref);
+				printf(" has been modified\n");
 				m1->functions_hashes[i1] = hash2; // update hash
 				int fpos = hl_jit_function(ctx, m2, f2);
-				if( fpos < 0 ) break;
+				if( fpos < 0 ) return false;
 				m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
 				has_changes = true;
 				break;
 			}
 		}
-		m2->functions_hashes[i2] = i1 == m1->code->nfunctions ? -1 : i1;
+		if( i1 == m1->code->nfunctions ) {
+			// not found (signature changed or new method) : inject new method!
+			int fpos = hl_jit_function(ctx, m2, f2);
+			if( fpos < 0 ) return false;
+			m2->functions_hashes[i2] = -1;
+			m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
+			uprintf(USTR("%s."), fun_obj(f2)->name);
+			uprintf(USTR("%s"), fun_field_name(f2));
+			if( !f2->obj )
+				printf("~%d", f2->ref);
+			printf(" has been added\n");
+			has_changes = true;
+			// should be added to m1 functions for later reload?
+		}
 	}
 	if( !has_changes ) {
 		printf("No changes found\n");
@@ -570,15 +629,22 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		return false;
 	}
 	m2->jit_code = hl_jit_code(ctx, m2, &m2->codesize, &m2->jit_debug, m1);
+	hl_jit_free(ctx,true);
+
+	if( m2->jit_code == NULL ) {
+		printf("Couldn't JIT result\n");
+		return false;
+	}
 	
 	int i;
 	for(i=0;i<m2->code->nfunctions;i++) {
 		hl_function *f2 = m2->code->functions + i;
-		if( m2->functions_hashes[i] < 0 ) continue;
-		if( (int_val)m2->functions_ptrs[f2->findex] == 0 ) continue; 
+		if( m2->functions_hashes[i] < -1 ) continue;
+		if( m2->functions_ptrs[f2->findex] == NULL ) continue;
 		void *ptr = ((unsigned char*)m2->jit_code) + ((int_val)m2->functions_ptrs[f2->findex]);
 		m2->functions_ptrs[f2->findex] = ptr;
 		// update real function ptr
+		if( m2->functions_hashes[i] < 0 ) continue;
 		hl_function *f1 = m1->code->functions + m2->functions_hashes[i];
 		hl_jit_patch_method(m1->functions_ptrs[f1->findex], m1->functions_ptrs + f1->findex);
 		m1->functions_ptrs[f1->findex] = ptr;
@@ -587,6 +653,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		hl_type *t = m1->code->types + i;
 		if( t->kind == HOBJ ) hl_flush_proto(t);
 	}
+
 	return true;
 }
 

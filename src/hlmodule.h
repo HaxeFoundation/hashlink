@@ -37,18 +37,27 @@ typedef struct {
 	int *extra;
 } hl_opcode;
 
-typedef struct {
+typedef struct hl_function hl_function;
+
+struct hl_function {
 	int findex;
 	int nregs;
 	int nops;
+	int ref;
 	hl_type *type;
 	hl_type **regs;
 	hl_opcode *ops;
 	int *debug;
 
 	hl_type_obj *obj;
-	const uchar *field;
-} hl_function;
+	union {
+		const uchar *name;
+		hl_function *ref; // obj = NULL
+	} field;
+};
+
+#define fun_obj(f) ((f)->obj ? (f)->obj : (f)->field.ref ? (f)->field.ref->obj : NULL)
+#define fun_field_name(f) ((f)->obj ? (f)->field.name : (f)->field.ref ? (f)->field.ref->field.name : NULL)
 
 typedef struct {
 	int global;

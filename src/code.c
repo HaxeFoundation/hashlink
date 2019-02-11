@@ -639,7 +639,11 @@ int hl_code_hash_fun_sign( hl_function *f ) {
 	H32(hl_code_hash_type(f->type));
 	if( f->obj ) {
 		HUSTR(f->obj->name);
-		HUSTR(f->field);
+		HUSTR(f->field.name);
+	} else if( f->field.ref ) {
+		HUSTR(f->field.ref->obj->name);
+		HUSTR(f->field.ref->field.name);
+		H32(f->ref);
 	}
 	return hash;
 }
@@ -706,11 +710,24 @@ int hl_code_hash_fun( hl_code *c, hl_function *f, int *functions_indexes, int *f
 				H32(o->extra[i]);
 			break;
 		case OStaticClosure:
+			H32(o->p1);
+			HFUN(o->p2);
 			break;
 		case OInstanceClosure:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
 			break;
-		//case ODynGet:
-		//case ODynSet:
+		case ODynGet:
+			H32(o->p1);
+			H32(o->p2);
+			HSTR(c->strings[o->p3]);
+			break;
+		case ODynSet:
+			H32(o->p1);
+			HSTR(c->strings[o->p2]);
+			H32(o->p3);
+			break;
 		default:
 			switch( hl_op_nargs[o->op] ) {
 			case 0:

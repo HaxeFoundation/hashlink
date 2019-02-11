@@ -4149,31 +4149,30 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 		int i;
 		for(i=0;i<sizeof(ctx->static_functions)/sizeof(void*);i++)
 			ctx->static_functions[i] = (void*)(code + (int)(int_val)ctx->static_functions[i]);
-	} else {
-		if( ctx->calls )
-			printf("TODO:CALLS\n");
-		if( ctx->closure_list )
-			printf("TODO:CALLS\n");
 	}
 	// patch calls
 	c = ctx->calls;
 	while( c ) {
-		int_val fabs;
+		void *fabs;
 		if( c->target < 0 )
-			fabs = (int_val)ctx->static_functions[-c->target-1];
+			fabs = ctx->static_functions[-c->target-1];
 		else {
-			fabs = (int_val)m->functions_ptrs[c->target];
-			if( fabs == 0 ) {
-				// todo : read absolute address from previous module
-				return NULL;
+			fabs = m->functions_ptrs[c->target];
+			if( fabs == NULL ) {
+				// read absolute address from previous module
+				int old_idx = m->functions_hashes[m->functions_indexes[c->target]];
+				if( old_idx < 0 )
+					return NULL;
+				fabs = previous->functions_ptrs[(previous->code->functions + old_idx)->findex];
 			} else {
-				fabs += (int_val)code;
+				// relative
+				fabs = (unsigned char*)code + (int)(int_val)fabs;
 			}
 		}
 		if( (code[c->pos]&~3) == (IS_64?0x48:0xB8) || code[c->pos] == 0x68 ) // MOV : absolute | PUSH
-			*(int_val*)(code + c->pos + (IS_64?2:1)) = fabs;
+			*(void**)(code + c->pos + (IS_64?2:1)) = fabs;
 		else {
-			int_val delta = fabs - (int_val)code - (c->pos + 5);
+			int_val delta = (int_val)fabs - (int_val)code - (c->pos + 5);
 			int rpos = (int)delta;
 			if( (int_val)rpos != delta ) {
 				printf("Target code too far too rebase\n");
@@ -4194,8 +4193,19 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 		vclosure *c = ctx->closure_list;
 		while( c ) {
 			vclosure *next;
-			int fpos = (int)(int_val)m->functions_ptrs[(int)(int_val)c->fun];
-			c->fun = code + fpos;
+			int fidx = (int)(int_val)c->fun;
+			void *fabs = m->functions_ptrs[fidx];
+			if( fabs == NULL ) {
+				// read absolute address from previous module
+				int old_idx = m->functions_hashes[m->functions_indexes[fidx]];
+				if( old_idx < 0 )
+					return NULL;
+				fabs = previous->functions_ptrs[(previous->code->functions + old_idx)->findex];
+			} else {
+				// relative
+				fabs = (unsigned char*)code + (int)(int_val)fabs;
+			}
+			c->fun = fabs;
 			next = (vclosure*)c->value;
 			c->value = NULL;
 			c = next;
