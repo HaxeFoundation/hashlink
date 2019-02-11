@@ -604,10 +604,51 @@ static const unsigned int crc32_table[] =
 
 #define H(b) hash = (hash >> 8) ^ crc32_table[(hash ^ b) & 0xFF]
 #define H32(i) { H(i&0xFF); H((i>>8)&0xFF); H((i>>16)&0xFF); H(((unsigned int)i)>>24); }
+#define HFUN(idx) H32(functions_signs[functions_indexes[idx]]); 
+#define HSTR(s) { const char *_c = s; while( *_c ) H(*_c++); }
+#define HUSTR(s) { const uchar *_c = s; while( *_c ) H(*_c++); }
 
-int hl_code_hash_fun( hl_code *c, hl_function *f ) {
+int hl_code_hash_type( hl_type *t ) {
 	int hash = -1;
-	int k;
+	int i;
+	switch( t->kind ) {
+	case HFUN:
+		H(t->fun->nargs);
+		for(i=0;i<t->fun->nargs;i++)
+			H32(hl_code_hash_type(t->fun->args[i]));
+		H32(hl_code_hash_type(t->fun->ret));
+		break;
+	// TODO
+	default:
+		break;
+	}
+	H(t->kind);
+	return hash;
+}
+
+int hl_code_hash_native( hl_native *n ) {
+	int hash = -1;
+	HSTR(n->lib);
+	HSTR(n->name);
+	H32(hl_code_hash_type(n->t));
+	return hash;
+}
+
+int hl_code_hash_fun_sign( hl_function *f ) {
+	int hash = -1;
+	H32(hl_code_hash_type(f->type));
+	if( f->obj ) {
+		HUSTR(f->obj->name);
+		HUSTR(f->field);
+	}
+	return hash;
+}
+
+int hl_code_hash_fun( hl_code *c, hl_function *f, int *functions_indexes, int *functions_signs ) {
+	int hash = -1;
+	int i, k;
+	for(i=0;i<f->nregs;i++)
+		H32(hl_code_hash_type(f->regs[i]));
 	for(k=0;k<f->nops;k++) {
 		hl_opcode *o = f->ops + k;
 		H(o->op);
@@ -621,6 +662,55 @@ int hl_code_hash_fun( hl_code *c, hl_function *f ) {
 			H32( ((int*)c->floats)[o->p2<<1] );
 			H32( ((int*)c->floats)[(o->p2<<1)|1] );
 			break;
+		//case OString:
+		//case OBytes:
+		case OType:
+			H32(o->p1);
+			H32(hl_code_hash_type(c->types + o->p2));
+			break;
+		case OCall0:
+			H32(o->p1);
+			HFUN(o->p2);
+			break;
+		case OCall1:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			break;
+		case OCall2:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			H32((int)(int_val)o->extra);
+			break;
+		case OCall3:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			H32(o->extra[0]);
+			H32(o->extra[1]);
+			break;
+		case OCall4:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			H32(o->extra[0]);
+			H32(o->extra[1]);
+			H32(o->extra[2]);
+			break;
+		case OCallN:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			for(i=0;i<o->p3;i++)
+				H32(o->extra[i]);
+			break;
+		case OStaticClosure:
+			break;
+		case OInstanceClosure:
+			break;
+		//case ODynGet:
+		//case ODynSet:
 		default:
 			switch( hl_op_nargs[o->op] ) {
 			case 0:
@@ -650,24 +740,18 @@ int hl_code_hash_fun( hl_code *c, hl_function *f ) {
 				case OCallMethod:
 				case OCallThis:
 				case OMakeEnum:
-					{
-						int i;
-						H32(o->p1);
-						H32(o->p2);
-						H32(o->p3);
-						for(i=0;i<o->p3;i++)
-							H32(o->extra[i]);
-					}
+					H32(o->p1);
+					H32(o->p2);
+					H32(o->p3);
+					for(i=0;i<o->p3;i++)
+						H32(o->extra[i]);
 					break;
 				case OSwitch:
-					{
-						int i;
-						H32(o->p1);
-						H32(o->p2);
-						for(i=0;i<o->p2;i++)
-							H32(o->extra[i]);
-						H32(o->p3);
-					}
+					H32(o->p1);
+					H32(o->p2);
+					for(i=0;i<o->p2;i++)
+						H32(o->extra[i]);
+					H32(o->p3);
 					break;
 				default:
 					printf("Don't know how to process opcode %d",o->op);
@@ -676,7 +760,7 @@ int hl_code_hash_fun( hl_code *c, hl_function *f ) {
 				break;
 			default:
 				{
-					int i, size = hl_op_nargs[o->op] - 3;
+					int size = hl_op_nargs[o->op] - 3;
 					H32(o->p1);
 					H32(o->p2);
 					H32(o->p3);
@@ -687,5 +771,5 @@ int hl_code_hash_fun( hl_code *c, hl_function *f ) {
 			}
 		}
 	}
-	return hash ^ -1;
+	return hash;
 }

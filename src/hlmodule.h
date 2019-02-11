@@ -103,6 +103,7 @@ typedef struct {
 	unsigned char *globals_data;
 	void **functions_ptrs;
 	int *functions_indexes;
+	int *functions_signs;
 	int *functions_hashes;
 	void *jit_code;
 	hl_debug_infos *jit_debug;
@@ -111,7 +112,9 @@ typedef struct {
 } hl_module;
 
 hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg );
-int hl_code_hash_fun( hl_code *c, hl_function *f );
+int hl_code_hash_fun_sign( hl_function *f );
+int hl_code_hash_fun( hl_code *c, hl_function *f, int *functions_indexes, int *functions_signs );
+int hl_code_hash_native( hl_native *n );
 void hl_code_free( hl_code *c );
 const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );

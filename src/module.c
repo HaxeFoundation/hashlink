@@ -381,10 +381,53 @@ static void hl_module_init_indexes( hl_module *m ) {
 
 static void hl_module_hash( hl_module *m ) {
 	int i;
+	m->functions_signs = malloc(sizeof(int) * (m->code->nfunctions + m->code->nnatives));
+	for(i=0;i<m->code->nfunctions;i++) {
+		hl_function *f = m->code->functions + i;
+		m->functions_signs[i] = hl_code_hash_fun_sign(f);
+	}
+	for(i=0;i<m->code->nnatives;i++) {
+		hl_native *n = m->code->natives + i;
+		m->functions_signs[i + m->code->nfunctions] = hl_code_hash_native(n);
+	}
 	m->functions_hashes = malloc(sizeof(int) * m->code->nfunctions);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
-		m->functions_hashes[i] = hl_code_hash_fun(m->code,f);
+		m->functions_hashes[i] = hl_code_hash_fun(m->code,f, m->functions_indexes, m->functions_signs);
+	}
+}
+
+static void hl_module_init_natives( hl_module *m ) {
+	char tmp[256];
+	int i;
+	void *libHandler = NULL;
+	const char *curlib = NULL, *sign;
+	for(i=0;i<m->code->nnatives;i++) {
+		hl_native *n = m->code->natives + i;
+		char *p = tmp;
+		void *f;
+		if( curlib != n->lib ) {
+			curlib = n->lib;
+			libHandler = resolve_library(n->lib);
+		}
+		if( libHandler == DISABLED_LIB_PTR ) {
+			m->functions_ptrs[n->findex] = disabled_primitive;
+			continue;
+		}
+		strcpy(p,"hlp_");
+		p += 4;
+		strcpy(p,n->name);
+		p += strlen(n->name);
+		*p++ = 0;
+		f = dlsym(libHandler,tmp);
+		if( f == NULL )
+			hl_fatal2("Failed to load function %s@%s",n->lib,n->name);
+		m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
+		p = tmp;
+		append_type(&p,n->t);
+		*p++ = 0;
+		if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
+			hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
 	}
 }
 
@@ -398,41 +441,8 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 		if( hl_is_ptr(t) )
 			hl_add_root(m->globals_data+m->globals_indexes[i]);
 	}
-	// INIT natives
-	{
-		char tmp[256];
-		void *libHandler = NULL;
-		const char *curlib = NULL, *sign;
-		for(i=0;i<m->code->nnatives;i++) {
-			hl_native *n = m->code->natives + i;
-			char *p = tmp;
-			void *f;
-			if( curlib != n->lib ) {
-				curlib = n->lib;
-				libHandler = resolve_library(n->lib);
-			}
-			if( libHandler == DISABLED_LIB_PTR ) {
-				m->functions_ptrs[n->findex] = disabled_primitive;
-				continue;
-			}
-
-			strcpy(p,"hlp_");
-			p += 4;
-			strcpy(p,n->name);
-			p += strlen(n->name);
-			*p++ = 0;
-			f = dlsym(libHandler,tmp);
-			if( f == NULL )
-				hl_fatal2("Failed to load function %s@%s",n->lib,n->name);
-			m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
-			p = tmp;
-			append_type(&p,n->t);
-			*p++ = 0;
-			if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
-				hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
-		}
-	}
-	// INIT indexes
+	// inits
+	hl_module_init_natives(m);
 	hl_module_init_indexes(m);
 	// JIT
 	ctx = hl_jit_alloc();
@@ -454,7 +464,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
 	}
 	// INIT constants
-	for (i = 0; i<m->code->nconstants; i++) {
+	for(i=0;i<m->code->nconstants;i++) {
 		int j;
 		hl_constant *c = m->code->constants + i;
 		hl_type *t = m->code->globals[c->global];
@@ -524,9 +534,9 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	jit_ctx *ctx = m1->jit_ctx;
 
 	hl_module *m2 = hl_module_alloc(c);
+	hl_module_init_natives(m2);
 	hl_module_init_indexes(m2);
-	hl_module_hash(m2);
-	
+	hl_module_hash(m2);	
 	hl_jit_reset(ctx, m2);
 
 	for(i2=0;i2<m2->code->nfunctions;i2++) {
@@ -589,6 +599,7 @@ void hl_module_free( hl_module *m ) {
 	free(m->globals_indexes);
 	free(m->globals_data);
 	free(m->functions_hashes);
+	free(m->functions_signs);
 	if( m->jit_debug ) {
 		int i;
 		for(i=0;i<m->code->nfunctions;i++)
