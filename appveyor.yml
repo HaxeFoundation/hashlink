@@ -66,7 +66,7 @@ build_script:
   - if "%builder%"=="vc"      msbuild libs/uv/uv.vcxproj            /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild libs/video/video.vcxproj      /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   # if "%builder%"=="cmake"
-  - if "%builder%"=="cmake"   cmake -G "%CMAKE_GENERATOR%"
+  - if "%builder%"=="cmake"   cmake -G "%CMAKE_GENERATOR%" .
   - if "%builder%"=="cmake"   msbuild ALL_BUILD.vcxproj     /p:Configuration=Release /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="cmake"   msbuild RUN_TESTS.vcxproj     /p:Configuration=Release /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="cmake"   cpack
