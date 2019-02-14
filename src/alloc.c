@@ -113,9 +113,6 @@ struct _gc_pheader {
 	unsigned char *sizes;
 	unsigned char *bmp;
 	gc_pheader *next_page;
-#ifdef HL_TRACK_ALLOC
-	int *alloc_hashes;
-#endif
 #ifdef GC_DEBUG
 	int page_id;
 #endif
@@ -145,7 +142,6 @@ static int gc_free_blocks[GC_ALL_PAGES] = {0};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_level1_null[1<<GC_LEVEL1_BITS] = {NULL};
 static gc_pheader **hl_gc_page_map[1<<GC_LEVEL0_BITS] = {NULL};
-static void (*gc_track_callback)(hl_type *,int,int,void*) = NULL;
 
 static struct {
 	int count;
@@ -219,10 +215,6 @@ static void gc_global_lock( bool lock ) {
 }
 #endif
 
-HL_PRIM void hl_gc_set_track( void *f ) {
-	gc_track_callback = f;
-}
-
 HL_PRIM void hl_add_root( void *r ) {
 	gc_global_lock(true);
 	if( gc_roots_count == gc_roots_max ) {
@@ -270,6 +262,7 @@ HL_API void hl_register_thread( void *stack_top ) {
 	memset(t, 0, sizeof(hl_thread_info));
 	t->thread_id = hl_thread_id();
 	t->stack_top = stack_top;
+	t->flags = HL_TRACK_MASK << HL_TREAD_TRACK_SHIFT;
 	current_thread = t;
 	hl_add_root(&t->exc_value);
 	hl_add_root(&t->exc_handler);
@@ -465,10 +458,6 @@ retry:
 		start_pos += p->max_blocks;
 		MZERO(p->sizes,p->max_blocks);
 	}
-#	ifdef HL_TRACK_ALLOC
-	p->alloc_hashes = (int*)malloc(sizeof(int) * p->max_blocks);
-	MZERO(p->alloc_hashes,p->max_blocks * sizeof(int));
-#	endif
 	m = start_pos % block;
 	if( m ) start_pos += block - m;
 	p->first_block = start_pos / block;
@@ -538,9 +527,6 @@ alloc_fixed:
 			if( ptr[i] != 0xDD )
 				hl_fatal("assert");
 	}
-#	endif
-#	ifdef HL_TRACK_ALLOC
-	p->alloc_hashes[p->next_block] = hl_get_stack_hash();
 #	endif
 	p->next_block++;
 	gc_stats.total_allocated += p->block_size;
@@ -648,9 +634,6 @@ alloc_var:
 	} else {
 		p->free_blocks = p->max_blocks - (p->next_block + nblocks);
 	}
-#	ifdef HL_TRACK_ALLOC
-	p->alloc_hashes[p->next_block] = hl_get_stack_hash();
-#	endif
 	if( nblocks > 1 ) MZERO(p->sizes + p->next_block, nblocks);
 	p->sizes[p->next_block] = (unsigned char)nblocks;
 	p->next_block += nblocks;
@@ -715,8 +698,7 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	memset((char*)ptr+(allocated - HL_WSIZE),0xEE,HL_WSIZE);
 #	endif
 	gc_global_lock(false);
-	if( gc_track_callback && (current_thread->exc_flags&HL_TRACK_DISABLE) == 0 )
-		((void (*)(hl_type *,int,int,void*))gc_track_callback)(t,size,flags,ptr);
+	hl_track_call(HL_TRACK_ALLOC, on_alloc(t,size,flags,ptr));
 	return ptr;
 }
 

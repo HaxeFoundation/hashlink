@@ -127,6 +127,10 @@
 #	define HL_DEBUG
 #endif
 
+#ifndef HL_CONSOLE
+#	define HL_TRACK_ENABLE
+#endif
+
 #ifndef HL_NO_THREADS
 #	define HL_THREADS
 #	ifdef HL_VCC
@@ -821,8 +825,14 @@ struct _hl_trap_ctx {
 #define HL_EXC_RETHROW		1
 #define HL_EXC_CATCH_ALL	2
 #define HL_EXC_IS_THROW		4
-#define HL_TRACK_DISABLE	8
 #define HL_THREAD_INVISIBLE	16
+#define HL_TREAD_TRACK_SHIFT 5
+
+#define HL_TRACK_ALLOC		1
+#define HL_TRACK_CAST		2
+#define HL_TRACK_DYNFIELD	4
+#define HL_TRACK_DYNCALL	8
+#define HL_TRACK_MASK		(HL_TRACK_ALLOC | HL_TRACK_CAST | HL_TRACK_DYNFIELD | HL_TRACK_DYNCALL)
 
 typedef struct {
 	int thread_id;
@@ -835,7 +845,7 @@ typedef struct {
 	hl_trap_ctx *trap_uncaught;
 	vclosure *exc_handler;
 	vdynamic *exc_value;
-	int exc_flags;
+	int flags;
 	int exc_stack_count;
 	// extra
 	jmp_buf gc_regs;
@@ -843,6 +853,28 @@ typedef struct {
 } hl_thread_info;
 
 HL_API hl_thread_info *hl_get_thread();
+
+#ifdef HL_TRACK_ENABLE
+
+typedef struct {
+	int flags;
+	void (*on_alloc)(hl_type *,int,int,void*);
+	void (*on_cast)(hl_type *, hl_type*);
+	void (*on_dynfield)( vdynamic *, int );
+	void (*on_dyncall)( vdynamic *, int );
+} hl_track_info;
+
+#define hl_is_tracking(flag) ((hl_track.flags&(flag)) && (hl_get_thread()->flags & (flag<<HL_TREAD_TRACK_SHIFT)))
+#define hl_track_call(flag,call) if( hl_is_tracking(flag) ) hl_track.call
+
+HL_API hl_track_info hl_track;
+
+#else 
+
+#define hl_is_tracking(_) false
+#define hl_track_call(a,b)
+
+#endif
 
 C_FUNCTION_END
 

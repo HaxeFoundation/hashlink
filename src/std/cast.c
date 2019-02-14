@@ -76,6 +76,7 @@ HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 
 
 HL_PRIM int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
+	hl_track_call(HL_TRACK_CAST, on_cast(t,to));
 	if( t->kind == HDYN ) {
 		vdynamic *v = *((vdynamic**)data);
 		if( v == NULL ) return 0;
@@ -109,6 +110,7 @@ HL_PRIM int hl_dyn_casti( void *data, hl_type *t, hl_type *to ) {
 }
 
 HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
+	hl_track_call(HL_TRACK_CAST, on_cast(t,to));
 	if( to->kind == HDYN && hl_is_dynamic(t) )
 		return *(vdynamic**)data;
 	if( t->kind == HDYN || t->kind == HNULL ) {
@@ -234,6 +236,7 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 }
 
 HL_PRIM double hl_dyn_castd( void *data, hl_type *t ) {
+	hl_track_call(HL_TRACK_CAST, on_cast(t,&hlt_f64));
 	if( t->kind == HDYN ) {
 		vdynamic *v = *((vdynamic**)data);
 		if( v == NULL ) return 0;
@@ -267,6 +270,7 @@ HL_PRIM double hl_dyn_castd( void *data, hl_type *t ) {
 }
 
 HL_PRIM float hl_dyn_castf( void *data, hl_type *t ) {
+	hl_track_call(HL_TRACK_CAST, on_cast(t,&hlt_f32));
 	if( t->kind == HDYN ) {
 		vdynamic *v = *((vdynamic**)data);
 		if( v == NULL ) return 0;
@@ -320,6 +324,7 @@ HL_PRIM int hl_ptr_compare( vdynamic *a, vdynamic *b ) {
 }
 
 HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
+	hl_track_call(HL_TRACK_CAST, on_cast(a?a->t:&hlt_dyn,b?b->t:&hlt_dyn));
 	if( a == b )
 		return 0;
 	if( a == NULL )
@@ -370,6 +375,7 @@ HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 }
 
 HL_PRIM void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
+	hl_track_call(HL_TRACK_CAST, on_cast(v?v->t:&hlt_dyn,t));
 	switch( t->kind ) {
 	case HUI8:
 		*(unsigned char*)data = (unsigned char)hl_dyn_casti(&v,&hlt_dyn,t);
@@ -396,6 +402,7 @@ HL_PRIM void hl_write_dyn( void *data, hl_type *t, vdynamic *v ) {
 }
 
 HL_PRIM vdynamic* hl_value_cast( vdynamic *v, hl_type *t ) {
+	hl_track_call(HL_TRACK_CAST, on_cast(v?v->t:&hlt_dyn,t));
 	if( t->kind == HDYN || v == NULL || hl_safe_cast(v->t,t) )
 		return v;
 	invalid_cast(v->t,t);
@@ -442,6 +449,7 @@ static bool is_number( hl_type *t ) {
 HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
 	static uchar *op_names[] = { USTR("+"), USTR("-"), USTR("*"), USTR("%"), USTR("/"), USTR("<<"), USTR(">>"), USTR(">>>"), USTR("&"), USTR("|"), USTR("^") };
 	if( op < 0 || op >= OpLast ) hl_error("Invalid op %d",op);
+	hl_track_call(HL_TRACK_CAST, on_cast(a?a->t:&hlt_dyn,b?b->t:&hlt_dyn));
 	if( !a && !b ) return op == OP_DIV || op == OP_MOD ? hl_dynf64(hl_nan()) : NULL;
 	if( (!a || is_number(a->t)) && (!b || is_number(b->t)) ) {
 		switch( op ) {

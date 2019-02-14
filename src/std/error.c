@@ -89,19 +89,19 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_trap_ctx *trap = t->trap_current;
 	bool was_rethrow = false;
 	bool call_handler = false;
-	if( t->exc_flags & HL_EXC_RETHROW ) {
+	if( t->flags & HL_EXC_RETHROW ) {
 		was_rethrow = true;
-		t->exc_flags &= ~HL_EXC_RETHROW;
+		t->flags &= ~HL_EXC_RETHROW;
 	} else
 		t->exc_stack_count = capture_stack_func(t->exc_stack_trace, HL_EXC_MAX_STACK);
 	t->exc_value = v;
 	t->trap_current = trap->prev;
-	call_handler = (t->exc_flags&HL_EXC_CATCH_ALL) || trap == t->trap_uncaught || t->trap_current == NULL;
-	if( (t->exc_flags&HL_EXC_CATCH_ALL) || break_on_trap(t,trap,v) ) {
+	call_handler = (t->flags&HL_EXC_CATCH_ALL) || trap == t->trap_uncaught || t->trap_current == NULL;
+	if( (t->flags&HL_EXC_CATCH_ALL) || break_on_trap(t,trap,v) ) {
 		if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
-		t->exc_flags |= HL_EXC_IS_THROW;
+		t->flags |= HL_EXC_IS_THROW;
 		hl_debug_break();
-		t->exc_flags &= ~HL_EXC_IS_THROW;
+		t->flags &= ~HL_EXC_IS_THROW;
 	}
 	if( t->exc_handler && call_handler ) hl_dyn_call(t->exc_handler,&v,1);
 	if( throw_jump == NULL ) throw_jump = longjmp;
@@ -153,7 +153,7 @@ HL_PRIM varray *hl_exception_stack() {
 }
 
 HL_PRIM void hl_rethrow( vdynamic *v ) {
-	hl_get_thread()->exc_flags |= HL_EXC_RETHROW;
+	hl_get_thread()->flags |= HL_EXC_RETHROW;
 	hl_throw(v);
 }
 

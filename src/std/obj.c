@@ -770,6 +770,7 @@ static vdynamic *hl_obj_lookup_extra( vdynamic *d, int hfield ) {
 
 HL_PRIM int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 	hl_type *ft;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) {
 		d = hl_obj_lookup_extra(d,hfield);
@@ -795,6 +796,7 @@ HL_PRIM int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 
 HL_PRIM float hl_dyn_getf( vdynamic *d, int hfield ) {
 	hl_type *ft;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) {
 		d = hl_obj_lookup_extra(d,hfield);
@@ -805,6 +807,7 @@ HL_PRIM float hl_dyn_getf( vdynamic *d, int hfield ) {
 
 HL_PRIM double hl_dyn_getd( vdynamic *d, int hfield ) {
 	hl_type *ft;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) {
 		d = hl_obj_lookup_extra(d,hfield);
@@ -815,6 +818,7 @@ HL_PRIM double hl_dyn_getd( vdynamic *d, int hfield ) {
 
 HL_PRIM void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
 	hl_type *ft;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
 	void *addr = hl_obj_lookup(d,hfield,&ft);
 	if( !addr ) {
 		d = hl_obj_lookup_extra(d,hfield);
@@ -874,6 +878,7 @@ static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **f
 
 HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 	hl_type *ft = NULL;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
 	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
 	switch( ft->kind ) {
 	case HUI8:
@@ -907,6 +912,7 @@ HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 
 HL_PRIM void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
 	hl_type *t = NULL;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
 	void *addr = hl_obj_lookup_set(d,hfield,&hlt_f32,&t);
 	if( t->kind == HF32 )
 		*(float*)addr = value;
@@ -920,6 +926,7 @@ HL_PRIM void hl_dyn_setf( vdynamic *d, int hfield, float value ) {
 
 HL_PRIM void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
 	hl_type *t = NULL;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
 	void *addr = hl_obj_lookup_set(d,hfield,&hlt_f64,&t);
 	if( t->kind == HF64 )
 		*(double*)addr = value;
@@ -933,6 +940,7 @@ HL_PRIM void hl_dyn_setd( vdynamic *d, int hfield, double value ) {
 
 HL_PRIM void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *value ) {
 	hl_type *ft = NULL;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
 	void *addr = hl_obj_lookup_set(d,hfield,t,&ft);
 	if( hl_same_type(t,ft) || (hl_is_ptr(ft) && value == NULL) )
 		*(void**)addr = value;
@@ -1140,3 +1148,5 @@ DEFINE_PRIM(_ARR, obj_fields, _DYN);
 DEFINE_PRIM(_DYN, obj_copy, _DYN);
 DEFINE_PRIM(_DYN, get_virtual_value, _DYN);
 DEFINE_PRIM(_I32, hash, _BYTES);
+DEFINE_PRIM(_BYTES, field_name, _I32);
+
