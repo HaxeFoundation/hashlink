@@ -23,6 +23,7 @@
 #include <stdio.h>
 
 static int track_depth = 10;
+static int max_depth = 0;
 
 #ifdef HL_TRACK_ENABLE
 hl_track_info hl_track = {0};
@@ -142,6 +143,7 @@ static bucket *fetch_bucket( bucket_kind kind ) {
 	bucket *b;
 	if( track_lock == NULL ) init_lock();
 	count = hl_internal_capture_stack(tinf->exc_stack_trace,track_depth);
+	if( count > max_depth ) max_depth = count;
 	hash = -count;
 	for(i=0;i<count;i++)
 		hash = (hash * 31) + (((unsigned int)(int_val)tinf->exc_stack_trace[i]) >> 1);
@@ -220,7 +222,7 @@ HL_PRIM int hl_track_count( int *depth ) {
 	int i;
 	for(i=0;i<_KLAST;i++)
 		value += all_data[i].bcount;
-	*depth = track_depth;
+	*depth = max_depth;
 	return value;
 }
 
@@ -266,6 +268,10 @@ HL_PRIM int hl_track_get_bits( bool thread ) {
 #	endif
 }
 
+HL_PRIM void hl_track_set_depth( int d ) {
+	track_depth = d;
+}
+
 HL_PRIM void hl_track_set_bits( int flags, bool thread ) {
 #	ifdef HL_TRACK_ENABLE
 	if( thread ) {
@@ -287,6 +293,7 @@ DEFINE_PRIM(_VOID, track_init, _NO_ARG);
 DEFINE_PRIM(_I32, track_count, _REF(_I32));
 DEFINE_PRIM(_I32, track_entry, _I32 _REF(_TYPE) _REF(_I32) _REF(_I32) _ARR);
 DEFINE_PRIM(_VOID, track_lock, _BOOL);
+DEFINE_PRIM(_VOID, track_set_depth, _I32);
 DEFINE_PRIM(_I32, track_get_bits, _BOOL);
 DEFINE_PRIM(_VOID, track_set_bits, _I32 _BOOL);
 DEFINE_PRIM(_VOID, track_reset, _NO_ARG);
