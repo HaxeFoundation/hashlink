@@ -73,6 +73,7 @@ file(GLOB std_srcs
     src/std/socket.c
     src/std/string.c
     src/std/sys.c
+    src/std/track.c
     src/std/types.c
     src/std/ucs2.c
     src/std/thread.c
