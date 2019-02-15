@@ -293,7 +293,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			for(i=0;i<vv->t->virt->nfields;i++) {
 				hl_field_lookup *f = vv->t->virt->lookup + i;
 				if( i ) hl_buffer_str_sub(b,USTR(", "),2);
-				hl_buffer_str(b,hl_field_name(f->hashed_name));
+				hl_buffer_str(b,(uchar*)hl_field_name(f->hashed_name));
 				hl_buffer_str_sub(b,USTR(" : "),3);
 				hl_buffer_addr(b, (char*)v + vv->t->virt->indexes[f->field_index], f->t, &l);
 			}
@@ -328,7 +328,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = o->lookup + i;
 				if( i ) hl_buffer_str_sub(b,USTR(", "),2);
-				hl_buffer_str(b,hl_field_name(f->hashed_name));
+				hl_buffer_str(b,(uchar*)hl_field_name(f->hashed_name));
 				hl_buffer_str_sub(b,USTR(" : "),3);
 				hl_buffer_addr(b, hl_is_ptr(f->t) ? (void*)(o->values + f->field_index) : (void*)(o->raw_data + f->field_index), f->t, &l);
 			}

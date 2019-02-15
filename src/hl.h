@@ -580,7 +580,7 @@ HL_API hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid );
 HL_API int hl_hash( vbyte *name );
 HL_API int hl_hash_utf8( const char *str ); // no cache
 HL_API int hl_hash_gen( const uchar *name, bool cache_name );
-HL_API const uchar *hl_field_name( int hash );
+HL_API vbyte *hl_field_name( int hash );
 
 #define hl_error(msg, ...) hl_throw(hl_alloc_strbytes(USTR(msg), ## __VA_ARGS__))
 

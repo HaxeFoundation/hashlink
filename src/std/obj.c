@@ -130,9 +130,9 @@ HL_PRIM int hl_hash_gen( const uchar *name, bool cache_name ) {
 	return h;
 }
 
-HL_PRIM const uchar *hl_field_name( int hash ) {
+HL_PRIM vbyte *hl_field_name( int hash ) {
 	hl_field_lookup *l = hl_lookup_find(hl_cache, hl_cache_count, hash);
-	return l ? (uchar*)l->t : USTR("???");
+	return l ? (vbyte*)l->t : (vbyte*)USTR("???");
 }
 
 HL_PRIM void hl_cache_free() {
