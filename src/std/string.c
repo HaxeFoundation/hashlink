@@ -281,6 +281,10 @@ HL_PRIM vbyte *hl_url_encode( vbyte *str, int *len ) {
 					hl_buffer_hex(b, 0x80|((c>>6)&63));
 					hl_buffer_hex(b, 0x80|(c&63));
 				}
+			} else {
+				hl_buffer_hex(b, 0xE0|(c>>12));
+				hl_buffer_hex(b, 0x80|((c>>6)&63));
+				hl_buffer_hex(b, 0x80|(c&63));
 			}
 		}
 	}
