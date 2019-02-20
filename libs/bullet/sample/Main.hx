@@ -17,12 +17,12 @@ class Main extends hxd.App {
 		floorMesh.material.color.setColor(0x800000);
 		bodies.push({ b : floor, m : floorMesh });
 
-		new h3d.scene.DirLight(new h3d.Vector(1, 2, -4), s3d);
+		new h3d.scene.fwd.DirLight(new h3d.Vector(1, 2, -4), s3d);
 
 		var shapes = [bullet.Shape.createSphere(0.5), bullet.Shape.createBox(1,1,1)];
 		var prims = [new h3d.prim.Sphere(0.5), new h3d.prim.Cube(1, 1, 1, true)];
 		prims[1].unindex();
-
+/*
 		var comp = bullet.Shape.createCompound([
 			{ shape : shapes[0], mass : 1, position : new h3d.col.Point(0, 0, 0), rotation : new h3d.Quat() },
 			{ shape : shapes[1], mass : 1, position : new h3d.col.Point(0, 0, 1), rotation : new h3d.Quat() }
@@ -30,7 +30,7 @@ class Main extends hxd.App {
 		shapes.push(comp.shape);
 		var c = new h3d.prim.Cube(1, 1, 2, true);
 		c.unindex();
-		prims.push(c);
+		prims.push(c);*/
 
 		for( p in prims )
 			p.addNormals();
@@ -39,7 +39,7 @@ class Main extends hxd.App {
 			var m = new h3d.scene.Mesh(prims[id], s3d);
 			m.x = Math.random() * 10;
 			m.y = Math.random() * 10;
-			m.z = 2 + Math.random() * 10;
+			m.z = 10 + Math.random() * 10;
 
 			var mt = new h3d.Matrix();
 			mt.identity();
@@ -53,17 +53,11 @@ class Main extends hxd.App {
 			bodies.push({ b : b, m : m });
 		}
 
-		for( b in bodies ) {
-			b.m.material.mainPass.enableLights = true;
-			b.m.material.shadows = true;
-		}
-
-
 		new h3d.scene.CameraController(80, s3d);
 	}
 
 	override function update(dt:Float) {
-		world.stepSimulation(dt / 60, 10);
+		world.stepSimulation(dt, 10);
 		for( b in bodies ) {
 			var pos = b.b.position;
 			var q = b.b.rotation;
