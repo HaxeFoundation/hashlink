@@ -16,6 +16,8 @@ class Body {
 
 	public function new( shape : Shape, mass : Float ) {
 		var inertia = new Native.Vector3(0, 0, 0);
+		if( mass > 0 )
+			@:privateAccess shape.getInstance().calculateLocalInertia(mass,inertia);
 		state = new Native.DefaultMotionState();
 		var inf = new Native.RigidBodyConstructionInfo(mass, state, @:privateAccess shape.getInstance(), inertia);
 		inst = new Native.RigidBody(inf);
