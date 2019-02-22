@@ -28,7 +28,7 @@ class Generator {
 	}
 
 	public static function getFiles() {
-		var prj = new haxe.xml.Fast(Xml.parse(sys.io.File.getContent("bullet.vcxproj.filters")).firstElement());
+		var prj = new haxe.xml.Access(Xml.parse(sys.io.File.getContent("bullet.vcxproj.filters")).firstElement());
 		var sources = [];
 		for( i in prj.elements )
 			if( i.name == "ItemGroup" )
