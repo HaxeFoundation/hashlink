@@ -1,7 +1,0 @@
--lib heaps
--lib hxbullet
--lib hldx
--cp .
--main Main
--hl sample.hl
-

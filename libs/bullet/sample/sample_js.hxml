@@ -1,7 +1,0 @@
--cp .
--js sample.js
--main Main
--lib heaps
--lib hxbullet
--D old-error-format
--dce full
