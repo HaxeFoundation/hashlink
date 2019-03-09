@@ -35,10 +35,6 @@ install:
   - appveyor DownloadFile https://ffmpeg.zeranoe.com/builds/win%ARCH%/dev/ffmpeg-3.4.2-win%ARCH%-dev.zip
   - 7z x ffmpeg-3.4.2-win%ARCH%-dev.zip
   - move ffmpeg-3.4.2-win%ARCH%-dev include/ffmpeg
-  # install bullet
-  - appveyor DownloadFile https://github.com/bulletphysics/bullet3/archive/2.87.zip
-  - 7z x 2.87.zip
-  - move bullet3-2.87 include/bullet
   # install neko and haxe
   - ps: Set-Service wuauserv -StartupType Manual
   - cinst neko --version 2.2.0 -y
@@ -55,7 +51,6 @@ build_script:
   # if "%builder%"=="vc"
   - if "%builder%"=="vc"      msbuild libhl.vcxproj                 /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild hl.vcxproj                    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - if "%builder%"=="vc"      msbuild libs/bullet/bullet.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild libs/directx/directx.vcxproj  /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild libs/fmt/fmt.vcxproj          /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
   - if "%builder%"=="vc"      msbuild libs/openal/openal.vcxproj    /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
