@@ -74,7 +74,7 @@ else
 
 # Linux
 CFLAGS += -m$(ARCH) -fPIC -pthread
-LFLAGS += -lm -Wl,--export-dynamic -Wl,--no-undefined
+LFLAGS += -lm -Wl,-rpath,. -Wl,--export-dynamic -Wl,--no-undefined
 
 ifeq ($(ARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
