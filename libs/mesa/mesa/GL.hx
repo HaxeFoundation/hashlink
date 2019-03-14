@@ -225,6 +225,14 @@ class GL {
 	public static function texImage2DMultisample( target : Int, internalFormat : Int, samples : Int, width : Int, height : Int, fixedsamplelocations : Bool ) {
 	}
 
+	@:hlNative("mesa","gl_compressed_tex_image2d")
+	public static function compressedTexImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, imageSize : Int, image : hl.Bytes ) {
+	}
+
+	@:hlNative("mesa","gl_compressed_tex_image3d")
+	public static function compressedTexImage3D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, depth : Int, border : Int, imageSize : Int, image : hl.Bytes ) {
+	}
+
 	public static function generateMipmap( t : Int ) {
 	}
 
