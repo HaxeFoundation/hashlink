@@ -10,13 +10,6 @@ function(set_as_hdll target)
 endfunction()
 
 if(WIN32)
-    option(WITH_BULLET "Build bullet.hdll." ON)
-    if(WITH_BULLET)
-        add_subdirectory(bullet)
-    endif()
-endif()
-
-if(WIN32)
     option(WITH_DIRECTX "Build directx.hdll." ON)
     if(WITH_DIRECTX)
         add_subdirectory(directx)
