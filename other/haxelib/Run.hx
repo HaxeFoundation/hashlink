@@ -24,15 +24,34 @@ class Build {
 		var tpl = config.defines.get("hlgen.makefile");
 		if( tpl != null )
 			generateVCProj(tpl);
-		Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
+		if( config.defines.get("hlgen.noprint") == null )
+			Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
 	}
 
 	function generateVCProj( ?tpl ) {
-		if( tpl == null )
-			tpl = "vc2015";
-		var srcDir = dataPath + "templates/"+tpl;
-		if( !sys.FileSystem.exists(srcDir) )
-			throw "Failed to find make template '"+tpl+"'";
+		if( tpl == null || tpl == "1" )
+			tpl = "vs2015";
+		var srcDir = tpl;
+		var targetDir = config.defines.get("hlgen.makefilepath");
+		var relDir = "";
+		if( targetDir == null )
+			targetDir = this.targetDir;
+		else {
+			if( !StringTools.endsWith(targetDir,"/") && !StringTools.endsWith(targetDir,"\\") )
+				targetDir += "/";
+			var targetAbs = sys.FileSystem.absolutePath(targetDir);
+			var currentAbs = sys.FileSystem.absolutePath(this.targetDir);
+			if( !StringTools.startsWith(currentAbs, targetAbs) )
+				relDir = currentAbs+"/"; // absolute
+			else 
+				relDir = currentAbs.substr(targetAbs.length);
+			relDir = relDir.split("\\").join("/");
+		}
+		if( !sys.FileSystem.exists(srcDir) ) {
+			srcDir = dataPath + "templates/"+tpl;
+			if( !sys.FileSystem.exists(srcDir) )
+				throw "Failed to find make template '"+tpl+"'";
+		}
 		function genRec( path : String ) {
 			var dir = srcDir + "/" + path;
 			for( f in sys.FileSystem.readDirectory(dir) ) {
@@ -76,6 +95,7 @@ class Build {
 					name : this.name,
 					libraries : [for( l in config.libs ) if( l != "std" ) { name : l }],
 					files : files,
+					relDir : relDir,
 					directories : directories,
 					cfiles : [for( f in files ) if( StringTools.endsWith(f.path,".c") ) f],
 					hfiles : [for( f in files ) if( StringTools.endsWith(f.path,".h") ) f],
@@ -87,7 +107,9 @@ class Build {
 					},
 					winPath : function(_,s:String) return s.split("/").join("\\"),
 				});
-				sys.io.File.saveContent(targetPath, content);
+				var prevContent = try sys.io.File.getContent(targetPath) catch( e : Dynamic ) null;
+				if( prevContent != content )
+					sys.io.File.saveContent(targetPath, content);
 			}
 		}
 		genRec(".");
