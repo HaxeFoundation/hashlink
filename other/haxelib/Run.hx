@@ -24,7 +24,7 @@ class Build {
 		var tpl = config.defines.get("hlgen.makefile");
 		if( tpl != null )
 			generateVCProj(tpl);
-		if( config.defines.get("hlgen.noprint") == null )
+		if( config.defines.get("hlgen.silent") == null )
 			Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
 	}
 
