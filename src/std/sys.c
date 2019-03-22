@@ -125,12 +125,14 @@ HL_PRIM vbyte *hl_sys_string() {
 }
 
 HL_PRIM vbyte *hl_sys_locale() {
-#ifdef HL_WIN_DESKTOP
+#if defined(HL_WIN_DESKTOP)
 	wchar_t loc[LOCALE_NAME_MAX_LENGTH];
 	int len = GetSystemDefaultLocaleName(loc,LOCALE_NAME_MAX_LENGTH);
 	return len == 0 ? NULL : hl_copy_bytes((vbyte*)loc,(len+1)*2);
+#elif defined(HL_CONSOLE)
+	return (vbyte*)sys_get_user_lang();
 #else
-	return (vbyte*)setlocale(LC_ALL, NULL);
+	return (vbyte*)getenv("LANG");
 #endif
 }
 
