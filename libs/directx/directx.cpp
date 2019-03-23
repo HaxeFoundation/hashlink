@@ -292,6 +292,10 @@ HL_PRIM void HL_NAME(draw_indexed)( int count, int start, int baseVertex ) {
 	driver->context->DrawIndexed(count,start,baseVertex);
 }
 
+HL_PRIM void HL_NAME(draw_indexed_instanced)( int indexCountPerInstance, int instanceCount, int startIndexLocation, int baseVertexLocation, int startInstanceLocation ) {
+	driver->context->DrawIndexedInstanced(indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+}
+
 HL_PRIM void HL_NAME(draw_indexed_instanced_indirect)( dx_resource *r, int offset ) {
 	driver->context->DrawIndexedInstancedIndirect((ID3D11Buffer*)r, (UINT)offset);
 }
@@ -463,6 +467,7 @@ DEFINE_PRIM(_BYTES, disassemble_shader, _BYTES _I32 _I32 _BYTES _REF(_I32));
 DEFINE_PRIM(_POINTER, create_vertex_shader, _BYTES _I32);
 DEFINE_PRIM(_POINTER, create_pixel_shader, _BYTES _I32);
 DEFINE_PRIM(_VOID, draw_indexed, _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, draw_indexed_instanced, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, draw_indexed_instanced_indirect, _RESOURCE _I32);
 DEFINE_PRIM(_VOID, vs_set_shader, _POINTER);
 DEFINE_PRIM(_VOID, vs_set_constant_buffers, _I32 _I32 _REF(_RESOURCE));

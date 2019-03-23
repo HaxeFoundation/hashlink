@@ -558,6 +558,9 @@ class Driver {
 	public static function drawIndexed( indexCount : Int, startIndex : Int, baseVertex : Int ) : Void {
 	}
 
+	public static function drawIndexedInstanced( indexCountPerInstance : Int, instanceCount : Int, startIndexLocation : Int, baseVertexLocation : Int, startInstanceLocation : Int ) {
+	}
+
 	public static function drawIndexedInstancedIndirect( buffer : Resource, offset : Int ) : Void {
 	}
 
