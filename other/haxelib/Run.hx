@@ -41,10 +41,10 @@ class Build {
 				targetDir += "/";
 			var targetAbs = sys.FileSystem.absolutePath(targetDir);
 			var currentAbs = sys.FileSystem.absolutePath(this.targetDir);
-			if( !StringTools.startsWith(currentAbs, targetAbs) )
+			if( !StringTools.startsWith(currentAbs, targetAbs+"/") )
 				relDir = currentAbs+"/"; // absolute
 			else 
-				relDir = currentAbs.substr(targetAbs.length);
+				relDir = currentAbs.substr(targetAbs.length+1);
 			relDir = relDir.split("\\").join("/");
 		}
 		if( !sys.FileSystem.exists(srcDir) ) {
