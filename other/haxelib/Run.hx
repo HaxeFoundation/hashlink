@@ -86,7 +86,7 @@ class Build {
 			var dir = srcDir + "/" + path;
 			for( f in sys.FileSystem.readDirectory(dir) ) {
 				var srcPath = dir + "/" + f;
-				var targetPath = targetDir + f.split("__file__").join(name);
+				var targetPath = targetDir + path + "/" + f.split("__file__").join(name);
 				if( sys.FileSystem.isDirectory(srcPath) ) {
 					try sys.FileSystem.createDirectory(targetPath) catch( e : Dynamic ) {};
 					genRec(path+"/"+f);
