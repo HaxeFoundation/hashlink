@@ -1722,6 +1722,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HDYNOBJ:
 	case HVIRTUAL:
 	case HOBJ:
+	case HSTRUCT:
 	case HFUN:
 	case HMETHOD:
 	case HBYTES:
@@ -1759,6 +1760,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		return out;
 #	ifdef HL_64
 	case HOBJ:
+	case HSTRUCT:
 	case HDYNOBJ:
 	case HVIRTUAL:
 	case HFUN:
@@ -2114,6 +2116,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		}
 		break;
 	case HOBJ:
+	case HSTRUCT:
 		if( b->t->kind == HVIRTUAL ) {
 			op_jump(ctx,b,a,op,targetPos); // inverse
 			return;
@@ -3131,6 +3134,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int nargs = 1;
 				switch( dst->t->kind ) {
 				case HOBJ:
+				case HSTRUCT:
 					allocFun = hl_alloc_obj;
 					break;
 				case HDYNOBJ:
@@ -3286,6 +3290,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				switch( ra->t->kind ) {
 				case HOBJ:
+				case HSTRUCT:
 					{
 						hl_runtime_obj *rt = hl_get_obj_rt(ra->t);
 						preg *rr = alloc_cpu(ctx,ra, true);
@@ -3324,6 +3329,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				switch( dst->t->kind ) {
 				case HOBJ:
+				case HSTRUCT:
 					{
 						hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
 						preg *rr = alloc_cpu(ctx, dst, true);

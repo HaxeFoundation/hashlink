@@ -167,6 +167,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 		}
 		break;
 	case HOBJ:
+	case HSTRUCT:
 		{
 			int i;
 			const uchar *name = hl_read_ustring(r);

@@ -130,6 +130,7 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 		return *(void**)data;
 	switch( TK2(t->kind,to->kind) ) {
 	case TK2(HOBJ,HOBJ):
+	case TK2(HSTRUCT,HSTRUCT):
 		{
 			hl_type_obj *t1 = t->obj;
 			hl_type_obj *t2 = to->obj;
@@ -169,6 +170,7 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	case TK2(HFUN,HDYN):
 	case TK2(HNULL,HDYN):
 	case TK2(HARRAY,HDYN):
+	// NO(HSTRUCT,HDYN)
 		return *(void**)data;
 	}
 	if( to->kind == HDYN )
@@ -352,6 +354,7 @@ HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	case TK2(HI32, HF64):
 		return dcompare((double)a->v.i,b->v.d);
 	case TK2(HOBJ,HOBJ):
+	case TK2(HSTRUCT,HSTRUCT):
 		if( a->t->obj->rt->compareFun )
 			return a->t->obj->rt->compareFun(a,b);
 		return a > b ? 1 : -1;
