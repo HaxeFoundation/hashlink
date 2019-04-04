@@ -24,7 +24,8 @@
 
 #ifdef HL_WIN
 #	include <windows.h>
-#	define dlopen(l,p)		(void*)( (l) ? LoadLibraryA(l) : GetModuleHandle(NULL))
+EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+#	define dlopen(l,p)		(void*)( (l) ? LoadLibraryA(l) : (HMODULE)&__ImageBase)
 #	define dlsym(h,n)		GetProcAddress((HANDLE)h,n)
 #else
 #	include <dlfcn.h>
