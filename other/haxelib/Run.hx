@@ -112,6 +112,7 @@ class Build {
 						return dir == "" ? "./" : (StringTools.endsWith(dir,"/") || StringTools.endsWith(dir,"\\")) ? dir : dir + "/";
 					},
 					winPath : function(_,s:String) return s.split("/").join("\\"),
+					getEnv : function(_,s:String) return Sys.getEnv(s),
 				});
 				var prevContent = try sys.io.File.getContent(targetPath) catch( e : Dynamic ) null;
 				if( prevContent != content )
