@@ -23,12 +23,12 @@ class Build {
 	public function run() {
 		var tpl = config.defines.get("hlgen.makefile");
 		if( tpl != null )
-			generateVCProj(tpl);
+			generateTemplates(tpl);
 		if( config.defines.get("hlgen.silent") == null )
 			Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
 	}
 
-	function generateVCProj( ?tpl ) {
+	function generateTemplates( ?tpl ) {
 		if( tpl == null || tpl == "1" )
 			tpl = "vs2015";
 		var srcDir = tpl;
@@ -86,11 +86,18 @@ class Build {
 			var dir = srcDir + "/" + path;
 			for( f in sys.FileSystem.readDirectory(dir) ) {
 				var srcPath = dir + "/" + f;
+				var parts = f.split(".");
+				var isBin = parts[parts.length-2] == "bin"; // .bin.xxx file
+				var f = isBin ? { parts.splice(parts.length-2,1); parts.join("."); } : f;
 				var targetPath = targetDir + path + "/" + f.split("__file__").join(name);
 				if( sys.FileSystem.isDirectory(srcPath) ) {
 					try sys.FileSystem.createDirectory(targetPath) catch( e : Dynamic ) {};
 					genRec(path+"/"+f);
 					continue;
+				}
+				if( isBin ) {
+					if( !sys.FileSystem.exists(targetPath) ) sys.io.File.copy(srcPath,targetPath);
+					return;
 				}
 				var content = sys.io.File.getContent(srcPath);
 				var tpl = new haxe.Template(content);
