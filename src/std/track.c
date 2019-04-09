@@ -56,7 +56,7 @@ typedef struct {
 	bucket *prev_b2;
 } bucket_list;
 
-static bucket_list all_data[_KLAST] = {0};
+static bucket_list all_data[_KLAST] = {{0}};
 static hl_mutex *track_lock = NULL;
 
 int hl_internal_capture_stack( void **stack, int size );
