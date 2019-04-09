@@ -81,12 +81,23 @@ typedef struct {
 	int fingerId;
 } event_data;
 
+// workaround for _extremely_ slow (5-10 seconds) gamepad init on some windows 10 systems.
+// it's not usually a big deal if gamepads don't accept input for a few seconds as long as
+// we've got the window up and doing things otherwise. on most systems this will be fast.
+static int init_gamepad(void* ptr) {
+	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+	SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+	return 0;
+}
+
 HL_PRIM bool HL_NAME(init_once)() {
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-	if( SDL_Init(SDL_INIT_EVERYTHING) != 0 ) {
+	Uint32 do_not_init = SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO;
+	if( SDL_Init(SDL_INIT_EVERYTHING ^ do_not_init) != 0 ) {
 		hl_error("SDL_Init failed: %s", hl_to_utf16(SDL_GetError()));
 		return false;
 	}
+	SDL_CreateThread(init_gamepad, "Gamepad Workaround", NULL);
 #	ifdef _WIN32
 	// Set the internal windows timer period to 1ms (will give accurate sleep for vsync)
 	timeBeginPeriod(1);
