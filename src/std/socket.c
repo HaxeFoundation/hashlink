@@ -202,7 +202,7 @@ HL_PRIM int hl_host_resolve( vbyte *host ) {
 #	endif
 		if( h == NULL ) {
 			hl_blocking(false);
-			return 0;
+			return -1;
 		}
 		ip = *((unsigned int*)h->h_addr_list[0]);
 	}
