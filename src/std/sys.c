@@ -24,7 +24,7 @@
 #ifdef HL_CONSOLE
 #	include <posix/posix.h>
 #endif
-#if !defined(HL_CONSOLE) || defined(HL_WIN)
+#if !defined(HL_CONSOLE) || defined(HL_WIN_DESKTOP)
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -194,7 +194,7 @@ HL_PRIM bool hl_sys_put_env( vbyte *e, vbyte *v ) {
 #	undef environ
 #	define environ _wenviron
 #else
-extern char **environ;
+extern pchar **environ;
 #endif
 
 HL_PRIM varray *hl_sys_env() {
