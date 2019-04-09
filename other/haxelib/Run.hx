@@ -97,7 +97,7 @@ class Build {
 				}
 				if( isBin ) {
 					if( !sys.FileSystem.exists(targetPath) ) sys.io.File.copy(srcPath,targetPath);
-					return;
+					continue;
 				}
 				var content = sys.io.File.getContent(srcPath);
 				var tpl = new haxe.Template(content);
