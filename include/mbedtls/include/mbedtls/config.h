@@ -920,7 +920,9 @@
  *
  * Enable functions that use the filesystem.
  */
-#define MBEDTLS_FS_IO
+#ifndef __ORBIS__
+#	define MBEDTLS_FS_IO
+#endif
 
 /**
  * \def MBEDTLS_NO_DEFAULT_ENTROPY_SOURCES
@@ -2535,7 +2537,9 @@
  *
  * This module is used by the HAVEGE random number generator.
  */
-#define MBEDTLS_TIMING_C
+#ifndef __ORBIS__
+#	define MBEDTLS_TIMING_C
+#endif
 
 /**
  * \def MBEDTLS_VERSION_C
