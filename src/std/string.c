@@ -194,14 +194,15 @@ HL_PRIM vbyte* hl_ucs2_lower( vbyte *str, int pos, int len ) {
 	return (vbyte*)out;
 }
 
-HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
+HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int len, int *size ) {
 	vbyte *out;
-	uchar *c = (uchar*)(str + pos);
+	uchar *c = (uchar*)str;
+	uchar *end = len == 0 ? NULL : c + len;
 	int utf8bytes = 0;
 	int p = 0;
-	while( true ) {
+	while( c != end ) {
 		unsigned int v = (unsigned int)*c;
-		if( v == 0 ) break;
+		if( v == 0 && end == NULL ) break;
 		if( v < 0x80 )
 			utf8bytes++;
 		else if( v < 0x800 )
@@ -214,12 +215,12 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int pos, int *size ) {
 		c++;
 	}
 	out = hl_gc_alloc_noptr(utf8bytes + 1);
-	c = (uchar*)(str + pos);
-	while( true ) {
+	c = (uchar*)str;
+	while( c != end ) {
 		unsigned int v = (unsigned int)*c;
 		if( v < 0x80 ) {
 			out[p++] = (vbyte)v;
-			if( v == 0 ) break;
+			if( v == 0 && end == NULL ) break;
 		} else if( v < 0x800 ) {
 			out[p++] = (vbyte)(0xC0|(v>>6));
 			out[p++] = (vbyte)(0x80|(v&63));
