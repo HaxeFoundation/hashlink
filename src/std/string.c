@@ -86,7 +86,7 @@ HL_PRIM int hl_utf8_length( const vbyte *s, int pos ) {
 	while( true ) {
 		unsigned char c = (unsigned)*s;
 		len++;
-		if( c < 0x7F ) {
+		if( c < 0x80 ) {
 			if( c == 0 ) {
 				len--;
 				break;
