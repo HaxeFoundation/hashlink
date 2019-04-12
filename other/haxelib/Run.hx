@@ -136,6 +136,9 @@ class Build {
 					makePath : function(_,dir:String) {
 						return dir == "" ? "./" : (StringTools.endsWith(dir,"/") || StringTools.endsWith(dir,"\\")) ? dir : dir + "/";
 					},
+					upper : function(_,s:String) {
+						return s.charAt(0).toUpperCase() + s.substr(1);
+					},
 					winPath : function(_,s:String) return s.split("/").join("\\"),
 					getEnv : function(_,s:String) return Sys.getEnv(s),
 				});
