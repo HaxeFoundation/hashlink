@@ -28,7 +28,10 @@ class Stats {
 	}
 
 	public function print( withSum = false ) {
-		allT.sort(function(i1, i2) return i1.mem - i2.mem);
+		if( @:privateAccess mem.sortByCount )
+			allT.sort(function(i1, i2) return i1.count - i2.count);
+		else
+			allT.sort(function(i1, i2) return i1.mem - i2.mem);
 		var totCount = 0;
 		var totMem = 0;
 		for( i in allT ) {
@@ -54,6 +57,7 @@ class Memory {
 
 	public var types : Array<TType>;
 
+	var sortByCount : Bool;
 	var code : format.hl.Data;
 	var pages : Array<Page>;
 	var roots : Array<Pointer>;
@@ -824,6 +828,15 @@ class Memory {
 				m.makeBitmap();
 			case "pages":
 				m.printPages();
+			case "sort":
+				switch( args.shift() ) {
+				case "mem":
+					m.sortByCount = false;
+				case "count":
+					m.sortByCount = true;
+				case mode:
+					Sys.println("Unknown sort mode " + mode);
+				}
 			default:
 				Sys.println("Unknown command " + cmd);
 			}
