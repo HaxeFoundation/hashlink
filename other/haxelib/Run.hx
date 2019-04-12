@@ -27,6 +27,16 @@ class Build {
 		if( config.defines.get("hlgen.silent") == null )
 			Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
 	}
+	
+	function isAscii( bytes : haxe.io.Bytes ) {
+		var i = 0;
+		var len = bytes.length;
+		while( i < len ) {
+			var c = bytes.get(i++);
+			if( c == 0 || c >= 0x80 ) return false;			
+		}
+		return true;
+	}
 
 	function generateTemplates( ?tpl ) {
 		if( tpl == null || tpl == "1" )
@@ -88,15 +98,23 @@ class Build {
 				var srcPath = dir + "/" + f;
 				var parts = f.split(".");
 				var isBin = parts[parts.length-2] == "bin"; // .bin.xxx file
-				var f = isBin ? { parts.splice(parts.length-2,1); parts.join("."); } : f;
+				var isOnce = isBin || parts[parts.length-2] == "once"; // .once.xxxx file - don't overwrite existing
+				var f = (isBin || isOnce) ? { parts.splice(parts.length-2,1); parts.join("."); } : f;
 				var targetPath = targetDir + path + "/" + f.split("__file__").join(name);
 				if( sys.FileSystem.isDirectory(srcPath) ) {
 					try sys.FileSystem.createDirectory(targetPath) catch( e : Dynamic ) {};
 					genRec(path+"/"+f);
 					continue;
 				}
+				var bytes = sys.io.File.getBytes(srcPath);
+				if( !isAscii(bytes) ) {
+					isBin = true;
+					isOnce = true;
+				}
+				if( isOnce && sys.FileSystem.exists(targetPath) )
+					continue;
 				if( isBin ) {
-					if( !sys.FileSystem.exists(targetPath) ) sys.io.File.copy(srcPath,targetPath);
+					sys.io.File.copy(srcPath,targetPath);
 					continue;
 				}
 				var content = sys.io.File.getContent(srcPath);
