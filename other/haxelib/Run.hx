@@ -29,6 +29,9 @@ class Build {
 	}
 	
 	function isAscii( bytes : haxe.io.Bytes ) {
+		// BOM CHECK
+		if( bytes.length > 3 && bytes.get(0) == 0xEF && bytes.get(1) == 0xBB && bytes.get(2) == 0xBF )
+			return true;
 		var i = 0;
 		var len = bytes.length;
 		while( i < len ) {
