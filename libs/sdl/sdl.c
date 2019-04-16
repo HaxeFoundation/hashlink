@@ -338,6 +338,18 @@ HL_PRIM int HL_NAME(set_relative_mouse_mode)(bool enable) {
 	return SDL_SetRelativeMouseMode(enable);
 }
 
+HL_PRIM bool HL_NAME(get_relative_mouse_mode)() {
+	return SDL_GetRelativeMouseMode();
+}
+
+HL_PRIM void HL_NAME(set_window_grab)(SDL_Window* window, bool grabbed) {
+	SDL_SetWindowGrab(window, grabbed);
+}
+
+HL_PRIM bool HL_NAME(get_window_grab)(SDL_Window* window) {
+	SDL_GetWindowGrab(window);
+}
+
 HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 	char q = SDL_GetKeyFromScancode(SDL_SCANCODE_Q);
 	char w = SDL_GetKeyFromScancode(SDL_SCANCODE_W);

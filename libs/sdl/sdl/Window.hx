@@ -59,6 +59,7 @@ class Window {
 	public var displayMode(default, set) : DisplayMode;
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
+	public var grab(get, set) : Bool;
 
 	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE ) {
 		while( true ) {
@@ -231,6 +232,15 @@ class Window {
 		winSetOpacity(win, v);
 		return v;
 	}
+	
+	function get_grab() {
+		return getWindowGrab(win);
+	}
+	
+	function set_grab(v) {
+		setWindowGrab(win, v);
+		return v;
+	}
 
 	/**
 		Set the current window you will render to (in case of multiple windows)
@@ -333,6 +343,13 @@ class Window {
 	}
 
 	static function setVsync( b : Bool ) {
+	}
+
+	static function setWindowGrab( win : WinPtr, grab : Bool ) {
+	}
+	
+	static function getWindowGrab( win : WinPtr ) : Bool {
+		return false;
 	}
 
 }

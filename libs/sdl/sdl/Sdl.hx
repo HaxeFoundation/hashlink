@@ -108,6 +108,10 @@ class Sdl {
 		return 0;
 	}
 
+	public static function getRelativeMouseMode() : Bool {
+		return false;
+	}
+
 	static function detect_keyboard_layout() : hl.Bytes {
 		return null;
 	}
