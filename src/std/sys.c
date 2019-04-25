@@ -136,14 +136,12 @@ HL_PRIM vbyte *hl_sys_locale() {
 #endif
 }
 
-vbyte *hl_utf16_to_utf8( vbyte *str, int len, int *size );
-
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
 #	ifdef HL_XBO
 	OutputDebugStringW((LPCWSTR)msg);
 #	else
-	printf("%s",(char *)hl_utf16_to_utf8(msg, 0, NULL));
+	uprintf(USTR("%s"),(uchar*)msg);
 	fflush(stdout);
 #	endif
 	hl_blocking(false);
