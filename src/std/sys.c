@@ -602,6 +602,7 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 #	ifdef HL_WIN
 	setlocale(LC_CTYPE, ""); // printf to current locale
 	_setmode(_fileno(stdout),_O_U8TEXT); // set output to utf8
+	_setmode(_fileno(stderr),_O_U8TEXT);
 #	endif
 }
 
