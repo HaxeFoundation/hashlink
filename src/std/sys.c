@@ -37,6 +37,8 @@
 #	include <windows.h>
 #	include <direct.h>
 #	include <conio.h>
+#	include <fcntl.h>
+#	include <io.h>
 #	define getenv _wgetenv
 #	define putenv _wputenv
 #	define getcwd(buf,size) (void*)(int_val)GetCurrentDirectoryW(size,buf)
@@ -599,6 +601,7 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 	hl_file = hlfile;
 #	ifdef HL_WIN
 	setlocale(LC_CTYPE, ""); // printf to current locale
+	_setmode(_fileno(stdout),_O_U8TEXT); // set output to utf8
 #	endif
 }
 
