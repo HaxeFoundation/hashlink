@@ -359,7 +359,7 @@ HL_PRIM vbyte *hl_url_decode( vbyte *str, int *len ) {
 				if( *cstr++ != '%' ) break;
 				p4 = decode_hex(&cstr);
 				if( p4 < 0 ) break;
-				k = ((p1 & 0x0F) << 18) | ((p2 & 0x7F) << 12) | ((p3 & 0x7F) << 6) | (p4 & 0x7F);
+				k = (((p1 & 0x0F) << 18) | ((p2 & 0x7F) << 12) | ((p3 & 0x7F) << 6) | (p4 & 0x7F)) - 0x10000;
 				hl_buffer_char(b,(uchar)((k >> 10) + 0xD800));
 				c = (uchar)((k & 0x3FF) | 0xDC00);
 			}
