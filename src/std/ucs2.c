@@ -138,7 +138,7 @@ int utostr( char *out, int out_size, const uchar *str ) {
 			*out++ = 0x80|(c&63);
 		} else if( c >= 0xD800 && c <= 0xDFFF ) { // surrogate pair
 			if( out + 4 > end ) break;
-			unsigned int full = ((c - 0xD800) << 10) | ((*str++) - 0xDC00);
+			unsigned int full = (((c - 0xD800) << 10) | ((*str++) - 0xDC00)) + 0x10000;
 			*out++ = (char)(0xF0|(full>>18));
 			*out++ = 0x80|((full>>12)&63);
 			*out++ = 0x80|((full>>6)&63);
