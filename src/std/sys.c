@@ -599,7 +599,7 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 	sys_args = (pchar**)args;
 	sys_nargs = nargs;
 	hl_file = hlfile;
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	setlocale(LC_CTYPE, ""); // printf to current locale
 	_setmode(_fileno(stdout),_O_U8TEXT); // set output to utf8
 	_setmode(_fileno(stderr),_O_U8TEXT);
