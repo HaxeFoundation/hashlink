@@ -620,9 +620,9 @@ alloc_var:
 	}
 #	endif
 	if( p->bmp ) {
-		int i;
 		int bid = p->next_block;
 #		ifdef GC_DEBUG
+		int i;
 		for(i=0;i<nblocks;i++) {
 			if( (p->bmp[bid>>3]&(1<<(bid&7))) != 0 ) hl_fatal("Alloc on marked block");
 			bid++;
@@ -758,6 +758,9 @@ static void gc_flush_mark() {
 			break;
 		}
 		size = page->sizes ? page->sizes[bid] * page->block_size : page->block_size;
+#		ifdef GC_DEBUG
+		if( size == 0 ) hl_fatal("assert");
+#		endif
 		nwords = size / HL_WSIZE;
 #		ifdef GC_PRECISE
 		if( page->page_kind == MEM_KIND_DYNAMIC ) {
@@ -926,9 +929,23 @@ static void gc_mark() {
 		int bid;
 		if( !p ) continue;
 		page = GC_GET_PAGE(p);
-		if( !page ) continue; // the value was set to a not gc allocated ptr
-		// don't check if valid ptr : it's a manual added root, so should be valid
+		if( !page ) continue; // the value was set to a not gc allocated ptr (static closure or constant string for instance)
 		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
+
+#		ifdef GC_DEBUG
+		// only check if valid ptr in debug : it's a manual added root, so shouldn't be an invalid ptr
+		bool valid = true;
+		if( (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) valid = false;
+		if( page->sizes ) {
+			if( page->sizes[bid] == 0 ) valid = false;
+		} else if( bid < page->first_block )
+			valid = false;
+#		ifdef HL_64
+		if( !INPAGE(p,page) ) valid = false;
+#		endif
+		if( !valid ) hl_fatal("Root containing invalid ptr");
+#		endif
+
 		if( (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
 			GC_PUSH_GEN(p,page,bid);
@@ -1023,7 +1040,9 @@ static void hl_gc_init() {
 #	endif
 	memset(&gc_threads,0,sizeof(gc_threads));
 	gc_threads.global_lock = hl_mutex_alloc(false);
+#	ifdef HL_THREADS
 	hl_add_root(&gc_threads.global_lock);
+#	endif
 }
 
 // ---- UTILITIES ----------------------
