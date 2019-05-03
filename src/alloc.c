@@ -622,14 +622,13 @@ alloc_var:
 	if( p->bmp ) {
 		int i;
 		int bid = p->next_block;
+#		ifdef GC_DEBUG
 		for(i=0;i<nblocks;i++) {
-#			ifdef GC_DEBUG
 			if( (p->bmp[bid>>3]&(1<<(bid&7))) != 0 ) hl_fatal("Alloc on marked block");
-#			endif
-			p->bmp[bid>>3] &= ~(1<<(bid&7));
 			bid++;
 		}
 		bid = p->next_block;
+#		endif
 		p->bmp[bid>>3] |= 1<<(bid&7);
 	} else {
 		p->free_blocks = p->max_blocks - (p->next_block + nblocks);
