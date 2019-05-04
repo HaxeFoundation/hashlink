@@ -261,4 +261,19 @@ sprintf_add:
 	return 0;
 }
 
+#ifdef HL_WIN
+// we can no longer use basic printf after we changed the console output encoding
+HL_PRIM void hl_win_cprintf( const char *fmt, ... ) {
+	char buf[4096];
+	uchar ubuf[4096];
+	va_list args;
+	va_start(args, fmt);
+	vsprintf(buf, fmt, args);
+	va_end(args);
+	hl_from_utf8(ubuf,4096,buf);
+	wprintf(USTR("%s"),ubuf);
+	fflush(stdout);
+}
+#endif
+
 #endif
