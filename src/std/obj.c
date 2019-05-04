@@ -77,7 +77,7 @@ static hl_mutex *hl_cache_lock = NULL;
 static hl_field_lookup *hl_cache = NULL;
 
 void hl_cache_init() {
-#	ifdef HL_THREAD
+#	ifdef HL_THREADS
 	hl_add_root(&hl_cache_lock);
 #	endif
 	hl_cache_lock = hl_mutex_alloc(false);
