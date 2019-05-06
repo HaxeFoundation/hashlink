@@ -563,9 +563,7 @@ resume:
 					if( avail > p->free_blocks ) p->free_blocks = avail;
 					avail = 0;
 					next += bits - 1;
-#					ifdef GC_DEBUG
 					if( p->sizes[next] == 0 ) hl_fatal("assert");
-#					endif
 					next += p->sizes[next];
 					if( next + nblocks > p->max_blocks ) {
 						p->next_block = next;
