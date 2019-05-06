@@ -129,7 +129,11 @@ static const int GC_SIZES[GC_PARTITIONS] = {8,16,24,32,40,	8,64,1<<14,1<<22};
 static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 #endif
 
-#define INPAGE(ptr,page) ((void*)(ptr) > (void*)(page) && (unsigned char*)(ptr) < (unsigned char*)(page) + (page)->page_size)
+#ifdef HL_64
+#	define INPAGE(ptr,page) ((void*)(ptr) > (void*)(page) && (unsigned char*)(ptr) < (unsigned char*)(page) + (page)->page_size)
+#else
+#	define INPAGE(ptr,page) true
+#endif
 
 #define GC_PROFILE		1
 #define GC_DUMP_MEM		2
@@ -243,10 +247,8 @@ HL_PRIM void hl_remove_root( void *v ) {
 
 HL_PRIM gc_pheader *hl_gc_get_page( void *v ) {
 	gc_pheader *page = GC_GET_PAGE(v);
-#	ifdef HL_64
 	if( page && !INPAGE(v,page) )
 		page = NULL;
-#	endif
 	return page;
 }
 
@@ -795,10 +797,7 @@ static void gc_flush_mark() {
 			p = *block++;
 			pos++;
 			page = GC_GET_PAGE(p);
-			if( !page || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
-#			ifdef HL_64
-			if( !INPAGE(p,page) ) continue;
-#			endif
+			if( !page || !INPAGE(p,page) || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
 			bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 			if( page->sizes ) {
 				if( page->sizes[bid] == 0 ) continue;
@@ -877,10 +876,7 @@ static void gc_mark_stack( void *start, void *end ) {
 		void *p = *stack_head++;
 		gc_pheader *page = GC_GET_PAGE(p);
 		int bid;
-		if( !page || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
-#		ifdef HL_64
-		if( !INPAGE(p,page) ) continue;
-#		endif
+		if( !page || !INPAGE(p,page) || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
 		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 		if( page->sizes ) {
 			if( page->sizes[bid] == 0 ) continue;
@@ -929,7 +925,8 @@ static void gc_mark() {
 		int bid;
 		if( !p ) continue;
 		page = GC_GET_PAGE(p);
-		if( !page ) continue; // the value was set to a not gc allocated ptr (static closure or constant string for instance)
+		if( !page || !INPAGE(p,page) ) continue; // the value was set to a not gc allocated ptr
+		// don't check if valid ptr : it's a manual added root, so should be valid
 		bid = (int)((unsigned char*)p - (unsigned char*)page) / page->block_size;
 
 #		ifdef GC_DEBUG
@@ -940,9 +937,6 @@ static void gc_mark() {
 			if( page->sizes[bid] == 0 ) valid = false;
 		} else if( bid < page->first_block )
 			valid = false;
-#		ifdef HL_64
-		if( !INPAGE(p,page) ) valid = false;
-#		endif
 		if( !valid ) hl_fatal("Root containing invalid ptr");
 #		endif
 
@@ -1005,7 +999,7 @@ HL_API void hl_gc_major() {
 HL_API bool hl_is_gc_ptr( void *ptr ) {
 	gc_pheader *page = GC_GET_PAGE(ptr);
 	int bid;
-	if( !page ) return false;
+	if( !page || !INPAGE(ptr,page) ) return false;
 	if( ((unsigned char*)ptr - (unsigned char*)page) % page->block_size != 0 ) return false;
 	bid = (int)((unsigned char*)ptr - (unsigned char*)page) / page->block_size;
 	if( bid < page->first_block || bid >= page->max_blocks ) return false;
