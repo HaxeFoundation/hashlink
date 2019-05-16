@@ -96,7 +96,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 		t->exc_stack_count = capture_stack_func(t->exc_stack_trace, HL_EXC_MAX_STACK);
 	t->exc_value = v;
 	t->trap_current = trap->prev;
-	call_handler = (t->flags&HL_EXC_CATCH_ALL) || trap == t->trap_uncaught || t->trap_current == NULL;
+	call_handler = trap == t->trap_uncaught || t->trap_current == NULL;
 	if( (t->flags&HL_EXC_CATCH_ALL) || break_on_trap(t,trap,v) ) {
 		if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
 		t->flags |= HL_EXC_IS_THROW;
