@@ -304,6 +304,7 @@
     <ClCompile Include="..\..\include\mikktspace\mikktspace.c">
       <Filter>mikkt</Filter>
     </ClCompile>
+    <ClCompile Include="dxt.c" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="turbojpeg">
