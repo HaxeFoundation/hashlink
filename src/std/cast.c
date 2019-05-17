@@ -446,8 +446,8 @@ static bool is_number( hl_type *t ) {
 	return t->kind >= HUI8 && t->kind <= HBOOL;
 }
 
-#define FOP(op) { double va = hl_dyn_castd(a,&hlt_dyn); double vb = hl_dyn_castd(b,&hlt_dyn); return hl_dynf64(va op vb); }
-#define IOP(op) { int va = hl_dyn_casti(a,&hlt_dyn,&hlt_i32); int vb = hl_dyn_casti(b,&hlt_dyn,&hlt_i32); return hl_dyni32(va op vb); }
+#define FOP(op) { double va = hl_dyn_castd(&a,&hlt_dyn); double vb = hl_dyn_castd(&b,&hlt_dyn); return hl_dynf64(va op vb); }
+#define IOP(op) { int va = hl_dyn_casti(&a,&hlt_dyn,&hlt_i32); int vb = hl_dyn_casti(&b,&hlt_dyn,&hlt_i32); return hl_dyni32(va op vb); }
 
 HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
 	static uchar *op_names[] = { USTR("+"), USTR("-"), USTR("*"), USTR("%"), USTR("/"), USTR("<<"), USTR(">>"), USTR(">>>"), USTR("&"), USTR("|"), USTR("^") };
