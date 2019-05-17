@@ -124,7 +124,7 @@ HL_PRIM int hl_bytes_rfind( vbyte *where, int len, vbyte *which, int wlen ) {
 	if( wlen > len ) return -1;
 	if( wlen == 0 ) return len; // at end
 	int pos = len - wlen;
-	while( pos > 0 ) {
+	while( pos >= 0 ) {
 		if( memcmp(where+pos,which,wlen) == 0 )
 			return pos;
 		pos--;
