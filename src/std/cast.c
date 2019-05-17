@@ -369,6 +369,14 @@ HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 	case TK2(HVIRTUAL,HOBJ):
 	case TK2(HVIRTUAL,HDYNOBJ):
 		return hl_dyn_compare(((vvirtual*)a)->value,b);
+	case TK2(HFUN,HFUN):
+		if( ((vclosure*)a)->hasValue == 2 )
+			return hl_dyn_compare((vdynamic*)((vclosure_wrapper*)a)->wrappedFun,b);
+		if( ((vclosure*)b)->hasValue == 2 )
+			return hl_dyn_compare(a,(vdynamic*)((vclosure_wrapper*)b)->wrappedFun);
+		if( ((vclosure*)a)->fun != ((vclosure*)b)->fun )
+			return hl_invalid_comparison;
+		return hl_dyn_compare(((vclosure*)a)->value,((vclosure*)b)->value);
 	case TK2(HVIRTUAL,HVIRTUAL):
 		if( ((vvirtual*)a)->value && ((vvirtual*)b)->value )
 			return hl_dyn_compare(((vvirtual*)a)->value,((vvirtual*)b)->value);

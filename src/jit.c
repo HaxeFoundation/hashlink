@@ -1959,7 +1959,7 @@ static void dyn_value_compare( jit_ctx *ctx, preg *a, preg *b, hl_type *t ) {
 }
 
 static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPos ) {
-	if( a->t->kind == HDYN || b->t->kind == HDYN ) {
+	if( a->t->kind == HDYN || b->t->kind == HDYN || a->t->kind == HFUN || b->t->kind == HFUN ) {
 		int args[] = { a->stack.id, b->stack.id };
 		int size = prepare_call_args(ctx,2,args,ctx->vregs,0);
 		call_native(ctx,hl_dyn_compare,size);
