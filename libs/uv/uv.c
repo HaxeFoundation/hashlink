@@ -55,6 +55,7 @@
 #define _PASSWD _ABSTRACT(uv_passwd_t)
 #define _UTSNAME _ABSTRACT(uv_utsname_t)
 #define _FILE _ABSTRACT(uv_file)
+#define _STAT _ABSTRACT(uv_stat_t)
 #define _BUF _ABSTRACT(uv_buf_t)
 
 // Non-UV types
@@ -166,73 +167,99 @@ DEFINE_PRIM(_VOID, stop, _LOOP);
 // ------------- HANDLE ---------------------------------------------
 // ------------- FILESYSTEM -----------------------------------------
 
-void handle_fs_cb(uv_fs_t *req) {
-	int result = req->result;
-	vclosure *cb = (vclosure *)UV_REQ_DATA(req);
-	uv_fs_req_cleanup(req);
-	hl_remove_root(UV_REQ_DATA(req));
-	free(req);
-	vdynamic *err = NULL;
-	if (result < 0) {
-		err = construct_error((vbyte *)strdup(uv_strerror(result)));
+#define UV_FS_HANDLER(name, n_args, setup) \
+	void name(uv_fs_t *req) { \
+		vdynamic *args[n_args] = {NULL}; \
+		if (req->result < 0) \
+			args[0] = construct_error((vbyte *)strdup(uv_strerror(req->result))); \
+		else \
+			setup \
+		vclosure *cb = (vclosure *)UV_REQ_DATA(req); \
+		uv_fs_req_cleanup(req); \
+		hl_remove_root(UV_REQ_DATA(req)); \
+		free(req); \
+		hl_dyn_call(cb, args, n_args); \
 	}
-	vdynamic **args = &err;
-	hl_dyn_call(cb, args, 1);
-}
 
-#define UV_WRAP(name, sign, call, ffi) \
+UV_FS_HANDLER(handle_fs_cb, 1, {});
+UV_FS_HANDLER(handle_fs_cb_bytes, 2, {
+	puts("handling here");
+	printf("path: %s\n", (char *)req->ptr);
+	args[1] = hl_alloc_dynamic(&hlt_bytes);
+	args[1]->v.ptr = hl_to_utf16((const char *)req->ptr);
+});
+UV_FS_HANDLER(handle_fs_cb_path, 2, {
+	args[1] = hl_alloc_dynamic(&hlt_bytes);
+	args[1]->v.ptr = hl_to_utf16((const char *)req->path);
+});
+UV_FS_HANDLER(handle_fs_cb_int, 2, {
+	args[1] = hl_alloc_dynamic(&hlt_i32);
+	args[1]->v.i = req->result;
+});
+
+UV_FS_HANDLER(handle_fs_cb_file, 2, {
+	// TODO: this doesn't work (cast problems?)
+	args[1] = hl_alloc_dynamic(&hlt_abstract);
+	args[1]->v.i = req->result;
+});
+UV_FS_HANDLER(handle_fs_cb_stat, 2, {
+	args[1] = hl_alloc_dynamic(&hlt_abstract);
+	args[1]->v.ptr = &req->statbuf;
+});
+
+#define _CB _FUN(_VOID, _ERROR)
+#define _CB_BYTES _FUN(_VOID, _ERROR _BYTES)
+#define _CB_INT _FUN(_VOID, _ERROR _I32)
+#define _CB_FILE _FUN(_VOID, _ERROR _FILE)
+#define _CB_STAT _FUN(_VOID, _ERROR _STAT)
+
+#define UV_WRAP(name, sign, call, ffi, handler) \
 	HL_PRIM void HL_NAME(w_ ## name)(uv_loop_t *loop, sign, vclosure *cb) { \
 		UV_ALLOC_CHECK(req, uv_fs_t); \
 		UV_REQ_DATA(req) = (void *)cb; \
 		hl_add_root(UV_REQ_DATA(req)); \
-		UV_ERROR_CHECK(uv_ ## name(loop, req, call, handle_fs_cb)); \
+		UV_ERROR_CHECK(uv_ ## name(loop, req, call, handler)); \
 	} \
-	DEFINE_PRIM(_VOID, w_ ## name, _LOOP ffi _FUN(_VOID, _ERROR));
+	DEFINE_PRIM(_VOID, w_ ## name, _LOOP ffi);
 
 #define COMMA ,
-#define UV_WRAP1(name, arg1, sign) \
-	UV_WRAP(name, arg1 _arg1, _arg1, sign)
-#define UV_WRAP2(name, arg1, arg2, sign) \
-	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2, _arg1 COMMA _arg2, sign)
-#define UV_WRAP3(name, arg1, arg2, arg3, sign) \
-	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3, _arg1 COMMA _arg2 COMMA _arg3, sign)
-#define UV_WRAP4(name, arg1, arg2, arg3, arg4, sign) \
-	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, sign)
+#define UV_WRAP1(name, arg1, sign, handler) \
+	UV_WRAP(name, arg1 _arg1, _arg1, sign, handler)
+#define UV_WRAP2(name, arg1, arg2, sign, handler) \
+	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2, _arg1 COMMA _arg2, sign, handler)
+#define UV_WRAP3(name, arg1, arg2, arg3, sign, handler) \
+	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3, _arg1 COMMA _arg2 COMMA _arg3, sign, handler)
+#define UV_WRAP4(name, arg1, arg2, arg3, arg4, sign, handler) \
+	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, sign, handler)
 
-UV_WRAP1(fs_close, uv_file, _FILE);
-UV_WRAP3(fs_open, const char*, int, int, _BYTES _I32 _I32);
-UV_WRAP4(fs_read, uv_file, const uv_buf_t*, unsigned int, int64_t, _FILE _ARR _I32 _I64);
-UV_WRAP1(fs_unlink, const char*, _BYTES);
-UV_WRAP4(fs_write, uv_file, const uv_buf_t*, unsigned int, int64_t, _FILE _ARR _I32 _I64);
-UV_WRAP2(fs_mkdir, const char*, int, _BYTES _I32);
-UV_WRAP1(fs_mkdtemp, const char*, _BYTES);
-UV_WRAP1(fs_rmdir, const char*, _BYTES);
-UV_WRAP2(fs_scandir, const char*, int, _BYTES _I32);
-UV_WRAP1(fs_stat, const char*, _BYTES);
-UV_WRAP1(fs_fstat, uv_file, _FILE);
-UV_WRAP1(fs_lstat, const char*, _BYTES);
-UV_WRAP2(fs_rename, const char*, const char*, _BYTES _BYTES);
-UV_WRAP1(fs_fsync, uv_file, _FILE);
-UV_WRAP1(fs_fdatasync, uv_file, _FILE);
-UV_WRAP2(fs_ftruncate, uv_file, int64_t, _FILE _I64);
-UV_WRAP4(fs_sendfile, uv_file, uv_file, int64_t, size_t, _FILE _FILE _I64 _I64);
-UV_WRAP2(fs_access, const char*, int, _BYTES _I32);
-UV_WRAP2(fs_chmod, const char*, int, _BYTES _I32);
-UV_WRAP2(fs_fchmod, uv_file, int, _FILE _I32);
-UV_WRAP3(fs_utime, const char*, double, double, _BYTES _F64 _F64);
-UV_WRAP3(fs_futime, uv_file, double, double, _FILE _F64 _F64);
-UV_WRAP2(fs_link, const char*, const char*, _BYTES _BYTES);
-UV_WRAP3(fs_symlink, const char*, const char*, int, _BYTES _BYTES _I32);
-UV_WRAP1(fs_readlink, const char*, _BYTES);
-UV_WRAP1(fs_realpath, const char*, _BYTES);
-UV_WRAP3(fs_chown, const char*, uv_uid_t, uv_gid_t, _BYTES _I32 _I32);
-UV_WRAP3(fs_fchown, uv_file, uv_uid_t, uv_gid_t, _FILE _I32 _I32);
-
-#undef UV_WRAP1
-#undef UV_WRAP2
-#undef UV_WRAP3
-#undef UV_WRAP
-#undef COMMA
+UV_WRAP1(fs_close, uv_file, _FILE _CB, handle_fs_cb);
+UV_WRAP3(fs_open, const char*, int, int, _BYTES _I32 _I32 _CB_FILE, handle_fs_cb_file);
+UV_WRAP4(fs_read, uv_file, const uv_buf_t*, unsigned int, int64_t, _FILE _ARR _I32 _I64 _CB_INT, handle_fs_cb_int);
+UV_WRAP1(fs_unlink, const char*, _BYTES _CB, handle_fs_cb);
+UV_WRAP4(fs_write, uv_file, const uv_buf_t*, unsigned int, int64_t, _FILE _ARR _I32 _I64 _CB_INT, handle_fs_cb_int);
+UV_WRAP2(fs_mkdir, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP1(fs_mkdtemp, const char*, _BYTES _CB_BYTES, handle_fs_cb_path);
+UV_WRAP1(fs_rmdir, const char*, _BYTES _CB, handle_fs_cb);
+UV_WRAP2(fs_scandir, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP1(fs_stat, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
+UV_WRAP1(fs_fstat, uv_file, _FILE _CB_STAT, handle_fs_cb_stat);
+UV_WRAP1(fs_lstat, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
+UV_WRAP2(fs_rename, const char*, const char*, _BYTES _BYTES _CB, handle_fs_cb);
+UV_WRAP1(fs_fsync, uv_file, _FILE _CB, handle_fs_cb);
+UV_WRAP1(fs_fdatasync, uv_file, _FILE _CB, handle_fs_cb);
+UV_WRAP2(fs_ftruncate, uv_file, int64_t, _FILE _I64 _CB, handle_fs_cb);
+UV_WRAP4(fs_sendfile, uv_file, uv_file, int64_t, size_t, _FILE _FILE _I64 _I64 _CB, handle_fs_cb);
+UV_WRAP2(fs_access, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP2(fs_chmod, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP2(fs_fchmod, uv_file, int, _FILE _I32 _CB, handle_fs_cb);
+UV_WRAP3(fs_utime, const char*, double, double, _BYTES _F64 _F64 _CB, handle_fs_cb);
+UV_WRAP3(fs_futime, uv_file, double, double, _FILE _F64 _F64 _CB, handle_fs_cb);
+UV_WRAP2(fs_link, const char*, const char*, _BYTES _BYTES _CB, handle_fs_cb);
+UV_WRAP3(fs_symlink, const char*, const char*, int, _BYTES _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP1(fs_readlink, const char*, _BYTES _CB_BYTES, handle_fs_cb_bytes);
+UV_WRAP1(fs_realpath, const char*, _BYTES _CB_BYTES, handle_fs_cb_bytes);
+UV_WRAP3(fs_chown, const char*, uv_uid_t, uv_gid_t, _BYTES _I32 _I32 _CB, handle_fs_cb);
+UV_WRAP3(fs_fchown, uv_file, uv_uid_t, uv_gid_t, _FILE _I32 _I32 _CB, handle_fs_cb);
 
 /*
 
