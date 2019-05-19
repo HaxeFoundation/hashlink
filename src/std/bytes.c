@@ -39,6 +39,16 @@ HL_PRIM int hl_bytes_compare( vbyte *a, int apos, vbyte *b, int bpos, int len ) 
 	return memcmp(a+apos,b+bpos,len);
 }
 
+HL_PRIM int hl_bytes_compare16( vbyte *a, vbyte *b, int len ) {
+	unsigned short *s1 = (unsigned short *)a;
+	unsigned short *s2 = (unsigned short *)b;
+	int i;
+	for(i=0;i<len;i++)
+		if( s1[i] != s2[i] )
+			return ((int)s1[i]) - ((int)s2[i]);
+	return 0;
+}
+
 typedef unsigned char byte;
 static void *
 memfind_rb (const void  *in_block,      /*  Block containing data            */
@@ -236,6 +246,7 @@ HL_PRIM int hl_string_compare( vbyte *a, vbyte *b, int len ) {
 DEFINE_PRIM(_BYTES,alloc_bytes,_I32);
 DEFINE_PRIM(_VOID,bytes_blit,_BYTES _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_I32,bytes_compare,_BYTES _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_I32,bytes_compare16,_BYTES _BYTES _I32);
 DEFINE_PRIM(_I32,string_compare,_BYTES _BYTES _I32);
 DEFINE_PRIM(_I32,bytes_find,_BYTES _I32 _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_I32,bytes_rfind,_BYTES _I32 _BYTES _I32);
