@@ -438,7 +438,7 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	r->code = c;
 	c->version = READ();
 	if( c->version <= 1 || c->version > max_version ) {
-		printf("Found version %d while HL %d.%d supports up to %d\n",c->version,HL_VERSION>>8,(HL_VERSION>>4)&15,max_version);
+		printf("Found version %d while HL %d.%d supports up to %d\n",c->version,HL_VERSION>>16,(HL_VERSION>>8)&0xFF,max_version);
 		EXIT("Unsupported bytecode version");
 	}
 	flags = UINDEX();
