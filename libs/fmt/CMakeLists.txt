@@ -113,7 +113,7 @@ if(WIN32)
         ${INCLUDES_BASE_DIR}/vorbis/window.c
         fmt.c
         sha1.c
-		dxt.c
+        dxt.c
     )
 else()
     find_package(ZLIB REQUIRED)
