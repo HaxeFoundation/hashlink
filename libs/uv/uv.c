@@ -117,12 +117,14 @@ static void clean_hl_data_req(uv_req_t *h) {
 
 static vdynamic * (*construct_error)(vbyte *);
 static vdynamic * (*construct_fs_stat)(int, int, int, int, int, int, int, int, int, int, int, int);
+static vdynamic * (*construct_fs_dirent)(const char *name, int);
 
-HL_PRIM void HL_NAME(glue_register)(vclosure *c_error, vclosure *c_fs_stat) {
+HL_PRIM void HL_NAME(glue_register)(vclosure *c_error, vclosure *c_fs_stat, vclosure *c_fs_dirent) {
 	construct_error = (vdynamic * (*)(vbyte *))c_error->fun;
 	construct_fs_stat = (vdynamic * (*)(int, int, int, int, int, int, int, int, int, int, int, int))c_fs_stat->fun;
+	construct_fs_dirent = (vdynamic * (*)(const char *, int))c_fs_dirent->fun;
 }
-DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32));
+DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32) _FUN(_DYN, _BYTES _I32));
 
 #define UV_ALLOC_CHECK(var, type) \
 	type *var = UV_ALLOC(type); \
@@ -223,12 +225,32 @@ UV_FS_HANDLER(handle_fs_cb_stat, vdynamic *, value2 = construct_fs_stat(
 		req->statbuf.st_flags,
 		req->statbuf.st_gen
 	));
+UV_FS_HANDLER(handle_fs_cb_scandir, varray *, {
+		uv_dirent_t ent;
+		vlist *last = NULL;
+		int count = 0;
+		while (uv_fs_scandir_next(req, &ent) != UV_EOF) {
+			count++;
+			vlist *node = (vlist *)malloc(sizeof(vlist));
+			node->v = construct_fs_dirent(ent.name, ent.type);
+			node->next = last;
+			last = node;
+		}
+		value2 = hl_alloc_array(&hlt_dyn, count);
+		for (int i = 0; i < count; i++) {
+			hl_aptr(value2, vdynamic *)[i] = last->v;
+			vlist *next = last->next;
+			free(last);
+			last = next;
+		}
+	});
 
 #define _CB _FUN(_VOID, _ERROR)
 #define _CB_BYTES _FUN(_VOID, _ERROR _BYTES)
 #define _CB_INT _FUN(_VOID, _ERROR _I32)
 #define _CB_FILE _FUN(_VOID, _ERROR _FILE)
 #define _CB_STAT _FUN(_VOID, _ERROR _STAT)
+#define _CB_SCANDIR _FUN(_VOID, _ERROR _ARR)
 
 #define UV_WRAP(name, sign, call, ffi, handler) \
 	HL_PRIM void HL_NAME(w_ ## name)(uv_loop_t *loop, sign, vclosure *cb) { \
@@ -269,13 +291,20 @@ HL_PRIM void HL_NAME(w_fs_write)(uv_loop_t *loop, uv_file file, const uv_buf_t *
 }
 DEFINE_PRIM(_VOID, w_fs_write, _LOOP _FILE _BUF _I32 _CB_INT);
 
+HL_PRIM void HL_NAME(w_fs_scandir)(uv_loop_t *loop, const char *path, int flags, vclosure *cb) {
+	UV_ALLOC_CHECK(req, uv_fs_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	hl_add_root(UV_REQ_DATA(req));
+	UV_ERROR_CHECK(uv_fs_scandir(loop, req, path, flags, handle_fs_cb_scandir));
+}
+DEFINE_PRIM(_VOID, w_fs_scandir, _LOOP _BYTES _I32 _CB_SCANDIR);
+
 UV_WRAP1(fs_close, uv_file, _FILE _CB, handle_fs_cb);
 UV_WRAP3(fs_open, const char*, int, int, _BYTES _I32 _I32 _CB_FILE, handle_fs_cb_file);
 UV_WRAP1(fs_unlink, const char*, _BYTES _CB, handle_fs_cb);
 UV_WRAP2(fs_mkdir, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
 UV_WRAP1(fs_mkdtemp, const char*, _BYTES _CB_BYTES, handle_fs_cb_path);
 UV_WRAP1(fs_rmdir, const char*, _BYTES _CB, handle_fs_cb);
-UV_WRAP2(fs_scandir, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
 UV_WRAP1(fs_stat, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
 UV_WRAP1(fs_fstat, uv_file, _FILE _CB_STAT, handle_fs_cb_stat);
 UV_WRAP1(fs_lstat, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);

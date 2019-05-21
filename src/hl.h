@@ -542,6 +542,11 @@ typedef struct _venum {
 	int index;
 } venum;
 
+typedef struct vlist {
+	vdynamic *v;
+	struct vlist *next;
+} vlist;
+
 HL_API hl_type hlt_void;
 HL_API hl_type hlt_i32;
 HL_API hl_type hlt_i64;
