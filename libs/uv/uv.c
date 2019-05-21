@@ -5,6 +5,7 @@
 #else
 #	include <hl.h>
 #	include <uv.h>
+# include <stdlib.h>
 #endif
 
 #if (UV_VERSION_MAJOR <= 0)
@@ -55,7 +56,7 @@
 #define _PASSWD _ABSTRACT(uv_passwd_t)
 #define _UTSNAME _ABSTRACT(uv_utsname_t)
 #define _FILE _ABSTRACT(uv_file)
-#define _STAT _ABSTRACT(uv_stat_t)
+// #define _STAT _ABSTRACT(uv_stat_t)
 #define _BUF _ABSTRACT(uv_buf_t)
 
 // Non-UV types
@@ -63,8 +64,9 @@
 typedef struct sockaddr uv_sockaddr;
 #define _SOCKADDR _ABSTRACT(uv_sockaddr)
 
-// Error type
+// Haxe types
 #define _ERROR _OBJ(_OBJ(_BYTES _I32))
+#define _STAT _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32)
 
 // ------------- UTILITY MACROS -------------------------------------
 
@@ -114,12 +116,13 @@ static void clean_hl_data_req(uv_req_t *h) {
 // ------------- ERROR HANDLING -------------------------------------
 
 static vdynamic * (*construct_error)(vbyte *);
+static vdynamic * (*construct_fs_stat)(int, int, int, int, int, int, int, int, int, int, int, int);
 
-HL_PRIM void HL_NAME(glue_register_error)(vclosure *cb) {
-	construct_error = (vdynamic * (*)(vbyte *))cb->fun;
+HL_PRIM void HL_NAME(glue_register)(vclosure *c_error, vclosure *c_fs_stat) {
+	construct_error = (vdynamic * (*)(vbyte *))c_error->fun;
+	construct_fs_stat = (vdynamic * (*)(int, int, int, int, int, int, int, int, int, int, int, int))c_fs_stat->fun;
 }
-
-DEFINE_PRIM(_VOID, glue_register_error, _FUN(_DYN, _BYTES));
+DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32));
 
 #define UV_ALLOC_CHECK(var, type) \
 	type *var = UV_ALLOC(type); \
@@ -164,48 +167,62 @@ DEFINE_PRIM(_BOOL, w_run, _LOOP _I32);
 DEFINE_PRIM(_BOOL, w_loop_alive, _LOOP);
 DEFINE_PRIM(_VOID, stop, _LOOP);
 
+// ------------- MISC -----------------------------------------------
+
+HL_PRIM uv_buf_t *HL_NAME(w_buf_init)(vbyte *bytes, unsigned int length) {
+  uv_buf_t *ptr = (uv_buf_t *)hl_gc_alloc_noptr(sizeof(uv_buf_t));
+  *ptr = uv_buf_init((char *)bytes, length);
+  return ptr;
+}
+DEFINE_PRIM(_BUF, w_buf_init, _BYTES _I32);
+
 // ------------- HANDLE ---------------------------------------------
 // ------------- FILESYSTEM -----------------------------------------
 
-#define UV_FS_HANDLER(name, n_args, setup) \
+void handle_fs_cb(uv_fs_t *req) {
+	vclosure *cb = UV_REQ_DATA(req);
+	if (req->result < 0)
+		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(req->result))));
+	else
+		hl_call1(void, cb, vdynamic *, NULL);
+	uv_fs_req_cleanup(req);
+	hl_remove_root(UV_REQ_DATA(req));
+	free(req);
+}
+
+#define UV_FS_HANDLER(name, type2, setup) \
 	void name(uv_fs_t *req) { \
-		vdynamic *args[n_args] = {NULL}; \
+		vclosure *cb = UV_REQ_DATA(req); \
 		if (req->result < 0) \
-			args[0] = construct_error((vbyte *)strdup(uv_strerror(req->result))); \
-		else \
-			setup \
-		vclosure *cb = (vclosure *)UV_REQ_DATA(req); \
+			hl_call2(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(req->result))), type2, (type2)0); \
+		else { \
+			type2 value2; \
+			setup; \
+			hl_call2(void, cb, vdynamic *, NULL, type2, value2); \
+		} \
 		uv_fs_req_cleanup(req); \
 		hl_remove_root(UV_REQ_DATA(req)); \
 		free(req); \
-		hl_dyn_call(cb, args, n_args); \
 	}
 
-UV_FS_HANDLER(handle_fs_cb, 1, {});
-UV_FS_HANDLER(handle_fs_cb_bytes, 2, {
-	puts("handling here");
-	printf("path: %s\n", (char *)req->ptr);
-	args[1] = hl_alloc_dynamic(&hlt_bytes);
-	args[1]->v.ptr = hl_to_utf16((const char *)req->ptr);
-});
-UV_FS_HANDLER(handle_fs_cb_path, 2, {
-	args[1] = hl_alloc_dynamic(&hlt_bytes);
-	args[1]->v.ptr = hl_to_utf16((const char *)req->path);
-});
-UV_FS_HANDLER(handle_fs_cb_int, 2, {
-	args[1] = hl_alloc_dynamic(&hlt_i32);
-	args[1]->v.i = req->result;
-});
-
-UV_FS_HANDLER(handle_fs_cb_file, 2, {
-	// TODO: this doesn't work (cast problems?)
-	args[1] = hl_alloc_dynamic(&hlt_abstract);
-	args[1]->v.i = req->result;
-});
-UV_FS_HANDLER(handle_fs_cb_stat, 2, {
-	args[1] = hl_alloc_dynamic(&hlt_abstract);
-	args[1]->v.ptr = &req->statbuf;
-});
+UV_FS_HANDLER(handle_fs_cb_bytes, vbyte *, value2 = (vbyte *)hl_to_utf16((const char *)req->ptr));
+UV_FS_HANDLER(handle_fs_cb_path, vbyte *, value2 = (vbyte *)hl_to_utf16((const char *)req->path));
+UV_FS_HANDLER(handle_fs_cb_int, int, value2 = req->result);
+UV_FS_HANDLER(handle_fs_cb_file, uv_file, value2 = req->result);
+UV_FS_HANDLER(handle_fs_cb_stat, vdynamic *, value2 = construct_fs_stat(
+		req->statbuf.st_dev,
+		req->statbuf.st_mode,
+		req->statbuf.st_nlink,
+		req->statbuf.st_uid,
+		req->statbuf.st_gid,
+		req->statbuf.st_rdev,
+		req->statbuf.st_ino,
+		req->statbuf.st_size,
+		req->statbuf.st_blksize,
+		req->statbuf.st_blocks,
+		req->statbuf.st_flags,
+		req->statbuf.st_gen
+	));
 
 #define _CB _FUN(_VOID, _ERROR)
 #define _CB_BYTES _FUN(_VOID, _ERROR _BYTES)
@@ -232,11 +249,29 @@ UV_FS_HANDLER(handle_fs_cb_stat, 2, {
 #define UV_WRAP4(name, arg1, arg2, arg3, arg4, sign, handler) \
 	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, sign, handler)
 
+HL_PRIM void HL_NAME(w_fs_read)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset, vclosure *cb) {
+	// note: signature different due to no struct passing support in HL
+	// currently only a single uv_buf_t can be passed at a time
+	UV_ALLOC_CHECK(req, uv_fs_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	hl_add_root(UV_REQ_DATA(req));
+	UV_ERROR_CHECK(uv_fs_read(loop, req, file, buf, 1, offset, handle_fs_cb_int));
+}
+DEFINE_PRIM(_VOID, w_fs_read, _LOOP _FILE _BUF _I32 _CB_INT);
+
+HL_PRIM void HL_NAME(w_fs_write)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset, vclosure *cb) {
+	// note: signature different due to no struct passing support in HL
+	// currently only a single uv_buf_t can be passed at a time
+	UV_ALLOC_CHECK(req, uv_fs_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	hl_add_root(UV_REQ_DATA(req));
+	UV_ERROR_CHECK(uv_fs_write(loop, req, file, buf, 1, offset, handle_fs_cb_int));
+}
+DEFINE_PRIM(_VOID, w_fs_write, _LOOP _FILE _BUF _I32 _CB_INT);
+
 UV_WRAP1(fs_close, uv_file, _FILE _CB, handle_fs_cb);
 UV_WRAP3(fs_open, const char*, int, int, _BYTES _I32 _I32 _CB_FILE, handle_fs_cb_file);
-UV_WRAP4(fs_read, uv_file, const uv_buf_t*, unsigned int, int64_t, _FILE _ARR _I32 _I64 _CB_INT, handle_fs_cb_int);
 UV_WRAP1(fs_unlink, const char*, _BYTES _CB, handle_fs_cb);
-UV_WRAP4(fs_write, uv_file, const uv_buf_t*, unsigned int, int64_t, _FILE _ARR _I32 _I64 _CB_INT, handle_fs_cb_int);
 UV_WRAP2(fs_mkdir, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
 UV_WRAP1(fs_mkdtemp, const char*, _BYTES _CB_BYTES, handle_fs_cb_path);
 UV_WRAP1(fs_rmdir, const char*, _BYTES _CB, handle_fs_cb);
