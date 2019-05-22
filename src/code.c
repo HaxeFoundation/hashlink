@@ -603,7 +603,7 @@ static const unsigned int crc32_table[] =
   0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 };
 
-#define H(b) hash = (hash >> 8) ^ crc32_table[(hash ^ b) & 0xFF]
+#define H(b) hash = (hash >> 8) ^ crc32_table[(hash ^ (b)) & 0xFF]
 #define H32(i) { H(i&0xFF); H((i>>8)&0xFF); H((i>>16)&0xFF); H(((unsigned int)i)>>24); }
 #define HFUN(idx) H32(functions_signs[functions_indexes[idx]]); 
 #define HSTR(s) { const char *_c = s; while( *_c ) H(*_c++); }
