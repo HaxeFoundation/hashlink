@@ -256,7 +256,7 @@ void myp_encrypt_password( const char *pass, const char *seed, SHA1_DIGEST out )
 	SHA1_DIGEST hash_stage1, hash_stage2;
 	// stage 1: hash password
 	sha1_init(&ctx);
-	sha1_update(&ctx,pass,strlen(pass));;
+	sha1_update(&ctx,(unsigned char*)pass,strlen(pass));;
 	sha1_final(&ctx,hash_stage1);
 	// stage 2: hash stage 1; note that hash_stage2 is stored in the database
 	sha1_init(&ctx);
@@ -264,7 +264,7 @@ void myp_encrypt_password( const char *pass, const char *seed, SHA1_DIGEST out )
 	sha1_final(&ctx, hash_stage2);
 	// create crypt string as sha1(message, hash_stage2)
 	sha1_init(&ctx);
-	sha1_update(&ctx, seed, SHA1_SIZE);
+	sha1_update(&ctx, (unsigned char*)seed, SHA1_SIZE);
 	sha1_update(&ctx, hash_stage2, SHA1_SIZE);
 	sha1_final( &ctx, out );
 	// xor the result
