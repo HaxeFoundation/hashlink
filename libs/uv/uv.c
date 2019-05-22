@@ -20,8 +20,7 @@
 #define _HANDLE _ABSTRACT(uv_handle_t)
 #define _DIR _ABSTRACT(uv_dir_t)
 #define _STREAM _ABSTRACT(uv_stream_t)
-#define _TCP _HANDLE
-//_ABSTRACT(uv_tcp_t)
+#define _TCP _ABSTRACT(uv_tcp_t)
 #define _UDP _ABSTRACT(uv_udp_t)
 #define _PIPE _ABSTRACT(uv_pipe_t)
 #define _TTY _ABSTRACT(uv_tty_t)
@@ -59,59 +58,32 @@
 // #define _STAT _ABSTRACT(uv_stat_t)
 #define _BUF _ABSTRACT(uv_buf_t)
 
-// Non-UV types
-
-typedef struct sockaddr uv_sockaddr;
-#define _SOCKADDR _ABSTRACT(uv_sockaddr)
-
 // Haxe types
+
 #define _ERROR _OBJ(_OBJ(_BYTES _I32))
 #define _STAT _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32)
 
+// Callback types
+
+#define _CB _FUN(_VOID, _ERROR)
+#define _CB_STR _FUN(_VOID, _ERROR _BYTES)
+#define _CB_BYTES _FUN(_VOID, _ERROR _BYTES _I32)
+#define _CB_INT _FUN(_VOID, _ERROR _I32)
+#define _CB_FILE _FUN(_VOID, _ERROR _FILE)
+#define _CB_STAT _FUN(_VOID, _ERROR _STAT)
+#define _CB_SCANDIR _FUN(_VOID, _ERROR _ARR)
+
 // ------------- UTILITY MACROS -------------------------------------
 
+// access the data of a handle or request
 #define UV_HANDLE_DATA(h) (((uv_handle_t *)(h))->data)
+#define UV_HANDLE_DATA_SUB(h, t) ((t *)((uv_handle_t *)(h))->data)
 #define UV_REQ_DATA(r) (((uv_req_t *)(r))->data)
-#define UV_DATA(h) ((events_data *)((h)->data))
+
+//# define UV_DATA(h) ((events_data *)((h)->data))
+
 #define UV_ALLOC(t) ((t *)malloc(sizeof(t)))
-
-// ------------- MEMORY MANAGEMENT ----------------------------------
-/*
-static events_data *init_hl_data(void) {
-	events_data *d = hl_gc_alloc_raw(sizeof(events_data));
-	memset(d,0,sizeof(events_data));
-	return d;
-}
-
-static void init_hl_data_handle(uv_handle_t *handle) {
-	UV_HANDLE_DATA(h) = init_hl_data();
-	hl_add_root(&UV_HANDLE_DATA(h));
-}
-
-static void init_hl_data_req(uv_req_t *req) {
-	UV_REQ_DATA(h) = init_hl_data();
-	hl_add_root(&UV_REQ_DATA(h));
-}
-
-static void clean_hl_data_handle(uv_handle_t *h) {
-	hl_remove_root(UV_HANDLE_DATA(h));
-	UV_HANDLE_DATA(h) = NULL;
-	/ *
-	events_data *ev = UV_DATA(h);
-	if( !ev ) return;
-	trigger_callb(h, EVT_CLOSE, NULL, 0, false);
-	free(ev->write_data);
-	hl_remove_root(&h->data);
-	h->data = NULL;
-	free(h);
-	* /
-}
-
-static void clean_hl_data_req(uv_req_t *h) {
-	hl_remove_root(UV_REQ_DATA(h));
-	UV_REQ_DATA(h) = NULL;
-}
-*/
+#define UV_GC_ALLOC(t) ((t *)hl_gc_alloc_noptr(sizeof(t)))
 
 // ------------- ERROR HANDLING -------------------------------------
 
@@ -131,9 +103,23 @@ DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _
 	if (var == NULL) { \
 		hl_throw(construct_error((vbyte *)"malloc " #type " failed")); \
 	} else {}
+#define UV_ALLOC_CHECK_C(var, type, cleanup) \
+	type *var = UV_ALLOC(type); \
+	if (var == NULL) { \
+		cleanup; \
+		hl_throw(construct_error((vbyte *)"malloc " #type " failed")); \
+	} else {}
 #define UV_ERROR_CHECK(expr) do { \
 		int __tmp_result = expr; \
 		if (__tmp_result < 0) { \
+			vdynamic *err = construct_error((vbyte *)strdup(uv_strerror(__tmp_result))); \
+			hl_throw(err); \
+		} \
+	} while (0)
+#define UV_ERROR_CHECK_C(expr, cleanup) do { \
+		int __tmp_result = expr; \
+		if (__tmp_result < 0) { \
+			cleanup; \
 			vdynamic *err = construct_error((vbyte *)strdup(uv_strerror(__tmp_result))); \
 			hl_throw(err); \
 		} \
@@ -143,7 +129,7 @@ DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _
 
 HL_PRIM uv_loop_t * HL_NAME(w_loop_init)(void) {
 	UV_ALLOC_CHECK(loop, uv_loop_t);
-	UV_ERROR_CHECK(uv_loop_init(loop));
+	UV_ERROR_CHECK_C(uv_loop_init(loop), free(loop));
 	return loop;
 }
 
@@ -172,13 +158,35 @@ DEFINE_PRIM(_VOID, stop, _LOOP);
 // ------------- MISC -----------------------------------------------
 
 HL_PRIM uv_buf_t *HL_NAME(w_buf_init)(vbyte *bytes, unsigned int length) {
-  uv_buf_t *ptr = (uv_buf_t *)hl_gc_alloc_noptr(sizeof(uv_buf_t));
-  *ptr = uv_buf_init((char *)bytes, length);
-  return ptr;
+	uv_buf_t *ptr = UV_GC_ALLOC(uv_buf_t);
+	*ptr = uv_buf_init((char *)bytes, length);
+	return ptr;
 }
+
 DEFINE_PRIM(_BUF, w_buf_init, _BYTES _I32);
 
 // ------------- HANDLE ---------------------------------------------
+
+typedef struct {
+	vclosure *cb_close;
+} uv_w_handle_t;
+
+void handle_handle_cb_close(uv_handle_t *handle) {
+	vclosure *cb = UV_HANDLE_DATA_SUB(handle, uv_w_handle_t)->cb_close;
+	hl_call1(void, cb, vdynamic *, NULL);
+	free(UV_HANDLE_DATA(handle));
+	free(handle);
+}
+
+static void w_close(uv_handle_t *handle, vclosure *cb) {
+	UV_HANDLE_DATA_SUB(handle, uv_w_handle_t)->cb_close = cb;
+	uv_close(handle, handle_handle_cb_close);
+}
+
+//DEFINE_PRIM(_VOID, ref, _HANDLE);
+//DEFINE_PRIM(_VOID, unref, _HANDLE);
+//DEFINE_PRIM(_VOID, w_close, _HANDLE _CB);
+
 // ------------- FILESYSTEM -----------------------------------------
 
 void handle_fs_cb(uv_fs_t *req) {
@@ -245,302 +253,239 @@ UV_FS_HANDLER(handle_fs_cb_scandir, varray *, {
 		}
 	});
 
-#define _CB _FUN(_VOID, _ERROR)
-#define _CB_BYTES _FUN(_VOID, _ERROR _BYTES)
-#define _CB_INT _FUN(_VOID, _ERROR _I32)
-#define _CB_FILE _FUN(_VOID, _ERROR _FILE)
-#define _CB_STAT _FUN(_VOID, _ERROR _STAT)
-#define _CB_SCANDIR _FUN(_VOID, _ERROR _ARR)
-
-#define UV_WRAP(name, sign, call, ffi, handler) \
-	HL_PRIM void HL_NAME(w_ ## name)(uv_loop_t *loop, sign, vclosure *cb) { \
-		UV_ALLOC_CHECK(req, uv_fs_t); \
+#define UV_REQ_WRAP(name, reqtype, sign, call, ffi, handler) \
+	HL_PRIM void HL_NAME(w_ ## name)(sign, vclosure *cb) { \
+		UV_ALLOC_CHECK(req, reqtype); \
 		UV_REQ_DATA(req) = (void *)cb; \
+		UV_ERROR_CHECK_C(uv_ ## name(req, call, handler), free(req)); \
 		hl_add_root(UV_REQ_DATA(req)); \
-		UV_ERROR_CHECK(uv_ ## name(loop, req, call, handler)); \
+	} \
+	DEFINE_PRIM(_VOID, w_ ## name, ffi);
+#define UV_REQ_WRAP_LOOP(name, reqtype, sign, call, ffi, handler) \
+	HL_PRIM void HL_NAME(w_ ## name)(uv_loop_t *loop, sign, vclosure *cb) { \
+		UV_ALLOC_CHECK(req, reqtype); \
+		UV_REQ_DATA(req) = (void *)cb; \
+		UV_ERROR_CHECK_C(uv_ ## name(loop, req, call, handler), free(req)); \
+		hl_add_root(UV_REQ_DATA(req)); \
 	} \
 	DEFINE_PRIM(_VOID, w_ ## name, _LOOP ffi);
 
 #define COMMA ,
-#define UV_WRAP1(name, arg1, sign, handler) \
-	UV_WRAP(name, arg1 _arg1, _arg1, sign, handler)
-#define UV_WRAP2(name, arg1, arg2, sign, handler) \
-	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2, _arg1 COMMA _arg2, sign, handler)
-#define UV_WRAP3(name, arg1, arg2, arg3, sign, handler) \
-	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3, _arg1 COMMA _arg2 COMMA _arg3, sign, handler)
-#define UV_WRAP4(name, arg1, arg2, arg3, arg4, sign, handler) \
-	UV_WRAP(name, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, sign, handler)
+#define UV_WRAP1_LOOP(name, reqtype, arg1, sign, handler) \
+	UV_REQ_WRAP_LOOP(name, reqtype, arg1 _arg1, _arg1, sign, handler)
+#define UV_WRAP2_LOOP(name, reqtype, arg1, arg2, sign, handler) \
+	UV_REQ_WRAP_LOOP(name, reqtype, arg1 _arg1 COMMA arg2 _arg2, _arg1 COMMA _arg2, sign, handler)
+#define UV_WRAP3_LOOP(name, reqtype, arg1, arg2, arg3, sign, handler) \
+	UV_REQ_WRAP_LOOP(name, reqtype, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3, _arg1 COMMA _arg2 COMMA _arg3, sign, handler)
+#define UV_WRAP4_LOOP(name, reqtype, arg1, arg2, arg3, arg4, sign, handler) \
+	UV_REQ_WRAP_LOOP(name, reqtype, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, sign, handler)
 
 HL_PRIM void HL_NAME(w_fs_read)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset, vclosure *cb) {
 	// note: signature different due to no struct passing support in HL
 	// currently only a single uv_buf_t can be passed at a time
 	UV_ALLOC_CHECK(req, uv_fs_t);
 	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_fs_read(loop, req, file, buf, 1, offset, handle_fs_cb_int), free(req));
 	hl_add_root(UV_REQ_DATA(req));
-	UV_ERROR_CHECK(uv_fs_read(loop, req, file, buf, 1, offset, handle_fs_cb_int));
 }
-DEFINE_PRIM(_VOID, w_fs_read, _LOOP _FILE _BUF _I32 _CB_INT);
 
 HL_PRIM void HL_NAME(w_fs_write)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset, vclosure *cb) {
 	// note: signature different due to no struct passing support in HL
 	// currently only a single uv_buf_t can be passed at a time
 	UV_ALLOC_CHECK(req, uv_fs_t);
 	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_fs_write(loop, req, file, buf, 1, offset, handle_fs_cb_int), free(req));
 	hl_add_root(UV_REQ_DATA(req));
-	UV_ERROR_CHECK(uv_fs_write(loop, req, file, buf, 1, offset, handle_fs_cb_int));
 }
-DEFINE_PRIM(_VOID, w_fs_write, _LOOP _FILE _BUF _I32 _CB_INT);
 
 HL_PRIM void HL_NAME(w_fs_scandir)(uv_loop_t *loop, const char *path, int flags, vclosure *cb) {
 	UV_ALLOC_CHECK(req, uv_fs_t);
 	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_fs_scandir(loop, req, path, flags, handle_fs_cb_scandir), free(req));
 	hl_add_root(UV_REQ_DATA(req));
-	UV_ERROR_CHECK(uv_fs_scandir(loop, req, path, flags, handle_fs_cb_scandir));
 }
+
 DEFINE_PRIM(_VOID, w_fs_scandir, _LOOP _BYTES _I32 _CB_SCANDIR);
+DEFINE_PRIM(_VOID, w_fs_read, _LOOP _FILE _BUF _I32 _CB_INT);
+DEFINE_PRIM(_VOID, w_fs_write, _LOOP _FILE _BUF _I32 _CB_INT);
 
-UV_WRAP1(fs_close, uv_file, _FILE _CB, handle_fs_cb);
-UV_WRAP3(fs_open, const char*, int, int, _BYTES _I32 _I32 _CB_FILE, handle_fs_cb_file);
-UV_WRAP1(fs_unlink, const char*, _BYTES _CB, handle_fs_cb);
-UV_WRAP2(fs_mkdir, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
-UV_WRAP1(fs_mkdtemp, const char*, _BYTES _CB_BYTES, handle_fs_cb_path);
-UV_WRAP1(fs_rmdir, const char*, _BYTES _CB, handle_fs_cb);
-UV_WRAP1(fs_stat, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
-UV_WRAP1(fs_fstat, uv_file, _FILE _CB_STAT, handle_fs_cb_stat);
-UV_WRAP1(fs_lstat, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
-UV_WRAP2(fs_rename, const char*, const char*, _BYTES _BYTES _CB, handle_fs_cb);
-UV_WRAP1(fs_fsync, uv_file, _FILE _CB, handle_fs_cb);
-UV_WRAP1(fs_fdatasync, uv_file, _FILE _CB, handle_fs_cb);
-UV_WRAP2(fs_ftruncate, uv_file, int64_t, _FILE _I64 _CB, handle_fs_cb);
-UV_WRAP4(fs_sendfile, uv_file, uv_file, int64_t, size_t, _FILE _FILE _I64 _I64 _CB, handle_fs_cb);
-UV_WRAP2(fs_access, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
-UV_WRAP2(fs_chmod, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
-UV_WRAP2(fs_fchmod, uv_file, int, _FILE _I32 _CB, handle_fs_cb);
-UV_WRAP3(fs_utime, const char*, double, double, _BYTES _F64 _F64 _CB, handle_fs_cb);
-UV_WRAP3(fs_futime, uv_file, double, double, _FILE _F64 _F64 _CB, handle_fs_cb);
-UV_WRAP2(fs_link, const char*, const char*, _BYTES _BYTES _CB, handle_fs_cb);
-UV_WRAP3(fs_symlink, const char*, const char*, int, _BYTES _BYTES _I32 _CB, handle_fs_cb);
-UV_WRAP1(fs_readlink, const char*, _BYTES _CB_BYTES, handle_fs_cb_bytes);
-UV_WRAP1(fs_realpath, const char*, _BYTES _CB_BYTES, handle_fs_cb_bytes);
-UV_WRAP3(fs_chown, const char*, uv_uid_t, uv_gid_t, _BYTES _I32 _I32 _CB, handle_fs_cb);
-UV_WRAP3(fs_fchown, uv_file, uv_uid_t, uv_gid_t, _FILE _I32 _I32 _CB, handle_fs_cb);
+UV_WRAP1_LOOP(fs_close, uv_fs_t, uv_file, _FILE _CB, handle_fs_cb);
+UV_WRAP3_LOOP(fs_open, uv_fs_t, const char*, int, int, _BYTES _I32 _I32 _CB_FILE, handle_fs_cb_file);
+UV_WRAP1_LOOP(fs_unlink, uv_fs_t, const char*, _BYTES _CB, handle_fs_cb);
+UV_WRAP2_LOOP(fs_mkdir, uv_fs_t, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP1_LOOP(fs_mkdtemp, uv_fs_t, const char*, _BYTES _CB_STR, handle_fs_cb_path);
+UV_WRAP1_LOOP(fs_rmdir, uv_fs_t, const char*, _BYTES _CB, handle_fs_cb);
+UV_WRAP1_LOOP(fs_stat, uv_fs_t, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
+UV_WRAP1_LOOP(fs_fstat, uv_fs_t, uv_file, _FILE _CB_STAT, handle_fs_cb_stat);
+UV_WRAP1_LOOP(fs_lstat, uv_fs_t, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
+UV_WRAP2_LOOP(fs_rename, uv_fs_t, const char*, const char*, _BYTES _BYTES _CB, handle_fs_cb);
+UV_WRAP1_LOOP(fs_fsync, uv_fs_t, uv_file, _FILE _CB, handle_fs_cb);
+UV_WRAP1_LOOP(fs_fdatasync, uv_fs_t, uv_file, _FILE _CB, handle_fs_cb);
+UV_WRAP2_LOOP(fs_ftruncate, uv_fs_t, uv_file, int64_t, _FILE _I64 _CB, handle_fs_cb);
+UV_WRAP4_LOOP(fs_sendfile, uv_fs_t, uv_file, uv_file, int64_t, size_t, _FILE _FILE _I64 _I64 _CB, handle_fs_cb);
+UV_WRAP2_LOOP(fs_access, uv_fs_t, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP2_LOOP(fs_chmod, uv_fs_t, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP2_LOOP(fs_fchmod, uv_fs_t, uv_file, int, _FILE _I32 _CB, handle_fs_cb);
+UV_WRAP3_LOOP(fs_utime, uv_fs_t, const char*, double, double, _BYTES _F64 _F64 _CB, handle_fs_cb);
+UV_WRAP3_LOOP(fs_futime, uv_fs_t, uv_file, double, double, _FILE _F64 _F64 _CB, handle_fs_cb);
+UV_WRAP2_LOOP(fs_link, uv_fs_t, const char*, const char*, _BYTES _BYTES _CB, handle_fs_cb);
+UV_WRAP3_LOOP(fs_symlink, uv_fs_t, const char*, const char*, int, _BYTES _BYTES _I32 _CB, handle_fs_cb);
+UV_WRAP1_LOOP(fs_readlink, uv_fs_t, const char*, _BYTES _CB_STR, handle_fs_cb_bytes);
+UV_WRAP1_LOOP(fs_realpath, uv_fs_t, const char*, _BYTES _CB_STR, handle_fs_cb_bytes);
+UV_WRAP3_LOOP(fs_chown, uv_fs_t, const char*, uv_uid_t, uv_gid_t, _BYTES _I32 _I32 _CB, handle_fs_cb);
+UV_WRAP3_LOOP(fs_fchown, uv_fs_t, uv_file, uv_uid_t, uv_gid_t, _FILE _I32 _I32 _CB, handle_fs_cb);
 
-/*
-
-#define EVT_CLOSE	1
-
-#define EVT_READ	0	// stream
-#define EVT_LISTEN	2	// stream
-
-#define EVT_WRITE	0	// write_t
-#define EVT_CONNECT	0	// connect_t
-
-#define EVT_MAX		2
+// ------------- STREAM ---------------------------------------------
 
 typedef struct {
-	vclosure *events[EVT_MAX + 1];
-	void *write_data;
-} events_data;
+	uv_w_handle_t w_handle;
+	vclosure *cb_read;
+	vclosure *cb_connection;
+} uv_w_stream_t;
 
-#define _CALLB	_FUN(_VOID,_NO_ARG)
-
-// HANDLE
-
-static events_data *init_hl_data( uv_handle_t *h ) {
-	events_data *d = hl_gc_alloc_raw(sizeof(events_data));
-	memset(d,0,sizeof(events_data));
-	hl_add_root(&h->data);
-	h->data = d;
-	return d;
+void handle_stream_cb(uv_req_t *req, int status) {
+	vclosure *cb = UV_REQ_DATA(req);
+	if (status < 0)
+		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))));
+	else
+		hl_call1(void, cb, vdynamic *, NULL);
+	hl_remove_root(UV_REQ_DATA(req));
+	free(req);
 }
 
-static void register_callb( uv_handle_t *h, vclosure *c, int event_kind ) {
-	if( !h || !h->data ) return;
-	UV_DATA(h)->events[event_kind] = c;
+void handle_stream_cb_connection(uv_stream_t *stream, int status) {
+	vclosure *cb = UV_HANDLE_DATA_SUB(stream, uv_w_stream_t)->cb_connection;
+	if (status < 0)
+		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))));
+	else
+		hl_call1(void, cb, vdynamic *, NULL);
 }
 
-static void clear_callb( uv_handle_t *h, int event_kind ) {
-	register_callb(h,NULL,event_kind);
+void handle_stream_cb_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+	buf->base = hl_gc_alloc_noptr(suggested_size);
+	buf->len = suggested_size;
 }
 
-static void trigger_callb( uv_handle_t *h, int event_kind, vdynamic **args, int nargs, bool repeat ) {
-	events_data *ev = UV_DATA(h);
-	vclosure *c = ev ? ev->events[event_kind] : NULL;
-	if( !c ) return;
-	if( !repeat ) ev->events[event_kind] = NULL;
-	hl_dyn_call(c, args, nargs);
+void handle_stream_cb_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
+	vclosure *cb = UV_HANDLE_DATA_SUB(stream, uv_w_stream_t)->cb_read;
+	if (nread < 0)
+		hl_call3(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(nread))), vbyte *, NULL, int, 0);
+	else
+		hl_call3(void, cb, vdynamic *, NULL, vbyte *, (vbyte *)buf->base, int, buf->len);
 }
 
-static void on_close( uv_handle_t *h ) {
-	events_data *ev = UV_DATA(h);
-	if( !ev ) return;
-	trigger_callb(h, EVT_CLOSE, NULL, 0, false);
-	free(ev->write_data);
-	hl_remove_root(&h->data);
-	h->data = NULL;
-	free(h);
+static void w_listen(uv_stream_t *stream, int backlog, vclosure *cb) {
+	UV_HANDLE_DATA_SUB(stream, uv_w_stream_t)->cb_connection = cb;
+	UV_ERROR_CHECK(uv_listen(stream, backlog, handle_stream_cb_connection));
 }
 
-static void free_handle( void *h ) {
-	if( h ) uv_close((uv_handle_t*)h, on_close);
+static void w_write(uv_stream_t *stream, const uv_buf_t *buf, vclosure *cb) {
+	// note: signature different due to no struct passing support in HL
+	// currently only a single uv_buf_t can be passed at a time
+	UV_ALLOC_CHECK(req, uv_write_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_write(req, stream, buf, 1, (void (*)(uv_write_t *, int))handle_stream_cb), free(req));
+	hl_add_root(UV_REQ_DATA(req));
 }
 
-HL_PRIM void HL_NAME(close_handle)( uv_handle_t *h, vclosure *c ) {
-	register_callb(h, c, EVT_CLOSE);
-	free_handle(h);
+static void w_read_start(uv_stream_t *stream, vclosure *cb) {
+	UV_HANDLE_DATA_SUB(stream, uv_w_stream_t)->cb_read = cb;
+	UV_ERROR_CHECK(uv_read_start(stream, handle_stream_cb_alloc, handle_stream_cb_read));
 }
 
-DEFINE_PRIM(_VOID, close_handle, _HANDLE _CALLB);
+//DEFINE_PRIM(_VOID, w_listen, _STREAM _I32 _CB);
+//DEFINE_PRIM(_VOID, w_write, _STREAM _BUF _CB);
+//DEFINE_PRIM(_VOID, w_read_start, _STREAM _CB_READ);
+//DEFINE_PRIM(_VOID, read_stop, _STREAM);
+UV_REQ_WRAP(shutdown, uv_shutdown_t, uv_stream_t *stream, stream, _STREAM _CB, (void (*)(uv_shutdown_t *, int))handle_stream_cb);
 
-// STREAM
+// ------------- TCP ------------------------------------------------
 
-static void on_write( uv_write_t *wr, int status ) {
-	vdynamic b;
-	vdynamic *args = &b;
-	b.t = &hlt_bool;
-	b.v.b = status == 0;
-	trigger_callb((uv_handle_t*)wr,EVT_WRITE,&args,1,false);
-	on_close((uv_handle_t*)wr);
+HL_PRIM uv_tcp_t *HL_NAME(w_tcp_init)(uv_loop_t *loop) {
+	UV_ALLOC_CHECK(handle, uv_tcp_t);
+	UV_ERROR_CHECK_C(uv_tcp_init(loop, handle), free(handle));
+	UV_ALLOC_CHECK_C(data, uv_w_stream_t, free(handle));
+	memset(data, 0, sizeof(uv_w_stream_t));
+	UV_HANDLE_DATA(handle) = data;
+	return handle;
 }
 
-HL_PRIM bool HL_NAME(stream_write)( uv_stream_t *s, vbyte *b, int size, vclosure *c ) {
-	uv_write_t *wr = UV_ALLOC(uv_write_t);
-	events_data *d = init_hl_data((uv_handle_t*)wr);
-	// keep a copy of the data
-	uv_buf_t buf;
-	d->write_data = malloc(size);
-	memcpy(d->write_data,b,size);
-	buf.base = d->write_data;
-	buf.len = size;
-	register_callb((uv_handle_t*)wr,c,EVT_WRITE);
-	if( uv_write(wr,s,&buf,1,on_write) < 0 ) {
-		on_close((uv_handle_t*)wr);
-		return false;
-	}
-	return true;
+HL_PRIM void HL_NAME(w_tcp_nodelay)(uv_tcp_t *handle, bool enable) {
+	UV_ERROR_CHECK(uv_tcp_nodelay(handle, enable ? 1 : 0));
 }
 
-static void on_alloc( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
-	*buf = uv_buf_init(malloc(size), (int)size);
+HL_PRIM void HL_NAME(w_tcp_keepalive)(uv_tcp_t *handle, bool enable, unsigned int delay) {
+	UV_ERROR_CHECK(uv_tcp_keepalive(handle, enable ? 1 : 0, delay));
 }
 
-static void on_read( uv_stream_t *s, ssize_t nread, const uv_buf_t *buf ) {
-	vdynamic bytes;
-	vdynamic len;
-	vdynamic *args[2];
-	bytes.t = &hlt_bytes;
-	bytes.v.ptr = buf->base;
-	len.t = &hlt_i32;
-	len.v.i = (int)nread;
-	args[0] = &bytes;
-	args[1] = &len;
-	trigger_callb((uv_handle_t*)s,EVT_READ,args,2,true);
-	free(buf->base);
-}
-
-HL_PRIM bool HL_NAME(stream_read_start)( uv_stream_t *s, vclosure *c ) {
-	register_callb((uv_handle_t*)s,c,EVT_READ);
-	return uv_read_start(s,on_alloc,on_read) >= 0;
-}
-
-HL_PRIM void HL_NAME(stream_read_stop)( uv_stream_t *s ) {
-	uv_read_stop(s);
-	clear_callb((uv_handle_t*)s,EVT_READ); // clear callback
-}
-
-static void on_listen( uv_stream_t *s, int status ) {
-	trigger_callb((uv_handle_t*)s, EVT_LISTEN, NULL, 0, true);
-}
-
-HL_PRIM bool HL_NAME(stream_listen)( uv_stream_t *s, int count, vclosure *c ) {
-	register_callb((uv_handle_t*)s,c,EVT_LISTEN);
-	return uv_listen(s,count,on_listen) >= 0;
-}
-
-DEFINE_PRIM(_BOOL, stream_write, _HANDLE _BYTES _I32 _FUN(_VOID,_BOOL));
-DEFINE_PRIM(_BOOL, stream_read_start, _HANDLE _FUN(_VOID,_BYTES _I32));
-DEFINE_PRIM(_VOID, stream_read_stop, _HANDLE);
-DEFINE_PRIM(_BOOL, stream_listen, _HANDLE _I32 _CALLB);
-
-// TCP
-
-HL_PRIM uv_tcp_t *HL_NAME(tcp_init_wrap)( uv_loop_t *loop ) {
-	uv_tcp_t *t = UV_ALLOC(uv_tcp_t);
-	if( uv_tcp_init(loop,t) < 0 ) {
-		free(t);
-		return NULL;
-	}
-	init_hl_data((uv_handle_t*)t);
-	return t;
-}
-
-static void on_connect( uv_connect_t *cnx, int status ) {
-	vdynamic b;
-	vdynamic *args = &b;
-	b.t = &hlt_bool;
-	b.v.b = status == 0;
-	trigger_callb((uv_handle_t*)cnx,EVT_CONNECT,&args,1,false);
-	on_close((uv_handle_t*)cnx);
-}
-
-HL_PRIM uv_connect_t *HL_NAME(tcp_connect_wrap)( uv_tcp_t *t, int host, int port, vclosure *c ) {
-	uv_connect_t *cnx = UV_ALLOC(uv_connect_t);
-	struct sockaddr_in addr;
-	memset(&addr,0,sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons((unsigned short)port);
-	*(int*)&addr.sin_addr.s_addr = host;
-	if( !t || uv_tcp_connect(cnx,t,(uv_sockaddr *)&addr,on_connect) < 0 ) {
-		free(cnx);
-		return NULL;
-	}
-	memset(&addr,0,sizeof(addr));
-	init_hl_data((uv_handle_t*)cnx);
-	register_callb((uv_handle_t*)cnx, c, EVT_CONNECT);
-	return cnx;
-}
-
-HL_PRIM bool HL_NAME(tcp_bind_wrap)( uv_tcp_t *t, int host, int port ) {
-	struct sockaddr_in addr;
-	memset(&addr,0,sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons((unsigned short)port);
-	*(int*)&addr.sin_addr.s_addr = host;
-	return uv_tcp_bind(t,(uv_sockaddr *)&addr,0) >= 0;
-}
-
-
-HL_PRIM uv_tcp_t *HL_NAME(tcp_accept_wrap)( uv_tcp_t *t ) {
-	uv_tcp_t *client = UV_ALLOC(uv_tcp_t);
-	if( uv_tcp_init(t->loop, client) < 0 ) {
-		free(client);
-		return NULL;
-	}
-	if( uv_accept((uv_stream_t*)t,(uv_stream_t*)client) < 0 ) {
-		uv_close((uv_handle_t*)client, NULL);
-		return NULL;
-	}
-	init_hl_data((uv_handle_t*)client);
+HL_PRIM uv_tcp_t *HL_NAME(w_tcp_accept)(uv_loop_t *loop, uv_tcp_t *server) {
+	uv_tcp_t *client = HL_NAME(w_tcp_init)(loop);
+	UV_ERROR_CHECK_C(uv_accept((uv_stream_t *)server, (uv_stream_t *)client), free(client));
 	return client;
 }
 
-HL_PRIM void HL_NAME(tcp_nodelay_wrap)( uv_tcp_t *t, bool enable ) {
-	uv_tcp_nodelay(t,enable?1:0);
+HL_PRIM void HL_NAME(w_tcp_bind_ipv4)(uv_tcp_t *handle, int host, int port) {
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons((unsigned short)port);
+	addr.sin_addr.s_addr = htonl(host);
+	UV_ERROR_CHECK(uv_tcp_bind(handle, (const struct sockaddr *)&addr, 0));
 }
 
-DEFINE_PRIM(_TCP, tcp_init_wrap, _LOOP);
-DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID,_BOOL));
-DEFINE_PRIM(_BOOL, tcp_bind_wrap, _TCP _I32 _I32);
-DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
-DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _TCP _BOOL);
+HL_PRIM void HL_NAME(w_tcp_bind_ipv6)(uv_tcp_t *handle, vbyte *host, int port) {
+	struct sockaddr_in6 addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin6_family = AF_INET6;
+	addr.sin6_port = htons((unsigned short)port);
+	memcpy(addr.sin6_addr.s6_addr, host, 16);
+	UV_ERROR_CHECK(uv_tcp_bind(handle, (const struct sockaddr *)&addr, 0));
+}
 
-// loop
+HL_PRIM void HL_NAME(w_tcp_connect_ipv4)(uv_tcp_t *handle, int host, int port, vclosure *cb) {
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons((unsigned short)port);
+	addr.sin_addr.s_addr = htonl(host);
+	UV_ALLOC_CHECK(req, uv_connect_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_tcp_connect(req, handle, (const struct sockaddr *)&addr, (void (*)(uv_connect_t *, int))handle_stream_cb), free(req));
+	hl_add_root(UV_REQ_DATA(req));
+}
 
+HL_PRIM void HL_NAME(w_tcp_connect_ipv6)(uv_tcp_t *handle, vbyte *host, int port, vclosure *cb) {
+	struct sockaddr_in6 addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin6_family = AF_INET6;
+	addr.sin6_port = htons((unsigned short)port);
+	memcpy(addr.sin6_addr.s6_addr, host, 16);
+	UV_ALLOC_CHECK(req, uv_connect_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_tcp_connect(req, handle, (const struct sockaddr *)&addr, (void (*)(uv_connect_t *, int))handle_stream_cb), free(req));
+	hl_add_root(UV_REQ_DATA(req));
+}
 
-DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
-DEFINE_PRIM(_I32, loop_close, _LOOP);
-DEFINE_PRIM(_I32, run, _LOOP _I32);
-DEFINE_PRIM(_I32, loop_alive, _LOOP);
-DEFINE_PRIM(_VOID, stop, _LOOP);
-DEFINE_PRIM(_BYTES, strerror, _I32);
-*/
+HL_PRIM void HL_NAME(w_tcp_read_stop)(uv_tcp_t *stream) {
+	uv_read_stop((uv_stream_t *)stream);
+}
+
+DEFINE_PRIM(_TCP, w_tcp_init, _LOOP);
+DEFINE_PRIM(_VOID, w_tcp_nodelay, _TCP _BOOL);
+DEFINE_PRIM(_VOID, w_tcp_keepalive, _TCP _BOOL _I32);
+DEFINE_PRIM(_TCP, w_tcp_accept, _LOOP _TCP);
+DEFINE_PRIM(_VOID, w_tcp_bind_ipv4, _TCP _I32 _I32);
+DEFINE_PRIM(_VOID, w_tcp_bind_ipv6, _TCP _BYTES _I32);
+DEFINE_PRIM(_VOID, w_tcp_connect_ipv4, _TCP _I32 _I32 _CB);
+DEFINE_PRIM(_VOID, w_tcp_connect_ipv6, _TCP _BYTES _I32 _CB);
+DEFINE_PRIM(_VOID, w_tcp_read_stop, _TCP);
+
+#define UV_TCP_CAST(name, basename, basetype, sign, call, ffi) \
+	HL_PRIM void HL_NAME(name)(uv_tcp_t *stream, sign) { \
+		basename((basetype *)stream, call); \
+	} \
+	DEFINE_PRIM(_VOID, name, _TCP ffi);
+
+UV_TCP_CAST(w_tcp_listen, w_listen, uv_stream_t, int backlog COMMA vclosure *cb, backlog COMMA cb, _I32 _CB);
+UV_TCP_CAST(w_tcp_write, w_write, uv_stream_t, uv_buf_t *buf COMMA vclosure *cb, buf COMMA cb, _BUF _CB);
+UV_TCP_CAST(w_tcp_shutdown, HL_NAME(w_shutdown), uv_stream_t, vclosure *cb, cb, _CB);
+UV_TCP_CAST(w_tcp_close, w_close, uv_handle_t, vclosure *cb, cb, _CB);
+UV_TCP_CAST(w_tcp_read_start, w_read_start, uv_stream_t, vclosure *cb, cb, _CB_BYTES);
