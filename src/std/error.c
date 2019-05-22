@@ -87,12 +87,8 @@ static bool break_on_trap( hl_thread_info *t, hl_trap_ctx *trap, vdynamic *v ) {
 HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_thread_info *t = hl_get_thread();
 	hl_trap_ctx *trap = t->trap_current;
-	bool was_rethrow = false;
 	bool call_handler = false;
-	if( t->flags & HL_EXC_RETHROW ) {
-		was_rethrow = true;
-		t->flags &= ~HL_EXC_RETHROW;
-	} else
+	if( !(t->flags & HL_EXC_RETHROW) )
 		t->exc_stack_count = capture_stack_func(t->exc_stack_trace, HL_EXC_MAX_STACK);
 	t->exc_value = v;
 	t->trap_current = trap->prev;
@@ -103,6 +99,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 		hl_debug_break();
 		t->flags &= ~HL_EXC_IS_THROW;
 	}
+	t->flags &= ~HL_EXC_RETHROW;
 	if( t->exc_handler && call_handler ) hl_dyn_call(t->exc_handler,&v,1);
 	if( throw_jump == NULL ) throw_jump = longjmp;
 	throw_jump(trap->buf,1);
