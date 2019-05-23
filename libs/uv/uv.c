@@ -73,6 +73,7 @@
 #define _CB_STAT _FUN(_VOID, _ERROR _STAT)
 #define _CB_SCANDIR _FUN(_VOID, _ERROR _ARR)
 #define _CB_GAI _FUN(_VOID, _ERROR _ARR)
+#define _CB_GNI _FUN(_VOID, _ERROR _BYTES _BYTES)
 
 // ------------- UTILITY MACROS -------------------------------------
 
@@ -542,4 +543,38 @@ HL_PRIM void HL_NAME(w_getaddrinfo)(uv_loop_t *loop, vbyte *node, vbyte *service
 	hl_add_root(UV_REQ_DATA(req));
 }
 
-DEFINE_PRIM(_VOID, w_getaddrinfo, _LOOP _BYTES _BYTES _I32 _I32 _I32 _I32 _CB_GAI)
+static void handle_dns_gni(uv_getnameinfo_t *req, int status, const char *hostname, const char *service) {
+	vclosure *cb = UV_REQ_DATA(req);
+	if (status < 0)
+		hl_call3(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))), vbyte *, NULL, vbyte *, NULL);
+	else 
+		hl_call3(void, cb, vdynamic *, NULL, vbyte *, (vbyte *)hostname, vbyte *, (vbyte *)service);
+	hl_remove_root(UV_REQ_DATA(req));
+	free(req);
+}
+
+HL_PRIM void HL_NAME(w_getnameinfo_ipv4)(uv_loop_t *loop, int ip, int flags, vclosure *cb) {
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = 0;
+	addr.sin_addr.s_addr = htonl(ip);
+	UV_ALLOC_CHECK(req, uv_getnameinfo_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_getnameinfo(loop, req, handle_dns_gni, (const struct sockaddr *)&addr, flags), free(req));
+	hl_add_root(UV_REQ_DATA(req));
+}
+
+HL_PRIM void HL_NAME(w_getnameinfo_ipv6)(uv_loop_t *loop, vbyte *ip, int flags, vclosure *cb) {
+	struct sockaddr_in6 addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin6_family = AF_INET6;
+	memcpy(addr.sin6_addr.s6_addr, ip, 16);
+	UV_ALLOC_CHECK(req, uv_getnameinfo_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_getnameinfo(loop, req, handle_dns_gni, (const struct sockaddr *)&addr, flags), free(req));
+	hl_add_root(UV_REQ_DATA(req));
+}
+
+DEFINE_PRIM(_VOID, w_getaddrinfo, _LOOP _BYTES _BYTES _I32 _I32 _I32 _I32 _CB_GAI);
+DEFINE_PRIM(_VOID, w_getnameinfo_ipv4, _LOOP _I32 _I32 _CB_GNI);
+DEFINE_PRIM(_VOID, w_getnameinfo_ipv6, _LOOP _BYTES _I32 _CB_GNI);
