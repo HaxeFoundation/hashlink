@@ -72,6 +72,7 @@
 #define _CB_FILE _FUN(_VOID, _ERROR _FILE)
 #define _CB_STAT _FUN(_VOID, _ERROR _STAT)
 #define _CB_SCANDIR _FUN(_VOID, _ERROR _ARR)
+#define _CB_GAI _FUN(_VOID, _ERROR _ARR)
 
 // ------------- UTILITY MACROS -------------------------------------
 
@@ -80,23 +81,28 @@
 #define UV_HANDLE_DATA_SUB(h, t) ((t *)((uv_handle_t *)(h))->data)
 #define UV_REQ_DATA(r) (((uv_req_t *)(r))->data)
 
-//# define UV_DATA(h) ((events_data *)((h)->data))
-
 #define UV_ALLOC(t) ((t *)malloc(sizeof(t)))
 #define UV_GC_ALLOC(t) ((t *)hl_gc_alloc_noptr(sizeof(t)))
 
-// ------------- ERROR HANDLING -------------------------------------
+// ------------- HAXE CONSTRUCTORS ----------------------------------
 
 static vdynamic * (*construct_error)(vbyte *);
 static vdynamic * (*construct_fs_stat)(int, int, int, int, int, int, int, int, int, int, int, int);
-static vdynamic * (*construct_fs_dirent)(const char *name, int);
+static vdynamic * (*construct_fs_dirent)(const char *name, int type);
+static vdynamic * (*construct_addrinfo_ipv4)(int ip);
+static vdynamic * (*construct_addrinfo_ipv6)(vbyte *ip);
 
-HL_PRIM void HL_NAME(glue_register)(vclosure *c_error, vclosure *c_fs_stat, vclosure *c_fs_dirent) {
+HL_PRIM void HL_NAME(glue_register)(vclosure *c_error, vclosure *c_fs_stat, vclosure *c_fs_dirent, vclosure *c_addrinfo_ipv4, vclosure *c_addrinfo_ipv6) {
 	construct_error = (vdynamic * (*)(vbyte *))c_error->fun;
 	construct_fs_stat = (vdynamic * (*)(int, int, int, int, int, int, int, int, int, int, int, int))c_fs_stat->fun;
 	construct_fs_dirent = (vdynamic * (*)(const char *, int))c_fs_dirent->fun;
+	construct_addrinfo_ipv4 = (vdynamic * (*)(int))c_addrinfo_ipv4->fun;
+	construct_addrinfo_ipv6 = (vdynamic * (*)(vbyte *))c_addrinfo_ipv6->fun;
 }
-DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32) _FUN(_DYN, _BYTES _I32));
+
+DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32) _FUN(_DYN, _BYTES _I32) _FUN(_DYN, _I32) _FUN(_DYN, _BYTES));
+
+// ------------- ERROR HANDLING -------------------------------------
 
 #define UV_ALLOC_CHECK(var, type) \
 	type *var = UV_ALLOC(type); \
@@ -171,7 +177,7 @@ typedef struct {
 	vclosure *cb_close;
 } uv_w_handle_t;
 
-void handle_handle_cb_close(uv_handle_t *handle) {
+static void handle_handle_cb_close(uv_handle_t *handle) {
 	vclosure *cb = UV_HANDLE_DATA_SUB(handle, uv_w_handle_t)->cb_close;
 	hl_call1(void, cb, vdynamic *, NULL);
 	free(UV_HANDLE_DATA(handle));
@@ -189,7 +195,7 @@ static void w_close(uv_handle_t *handle, vclosure *cb) {
 
 // ------------- FILESYSTEM -----------------------------------------
 
-void handle_fs_cb(uv_fs_t *req) {
+static void handle_fs_cb(uv_fs_t *req) {
 	vclosure *cb = UV_REQ_DATA(req);
 	if (req->result < 0)
 		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(req->result))));
@@ -201,7 +207,7 @@ void handle_fs_cb(uv_fs_t *req) {
 }
 
 #define UV_FS_HANDLER(name, type2, setup) \
-	void name(uv_fs_t *req) { \
+	static void name(uv_fs_t *req) { \
 		vclosure *cb = UV_REQ_DATA(req); \
 		if (req->result < 0) \
 			hl_call2(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(req->result))), type2, (type2)0); \
@@ -343,7 +349,7 @@ typedef struct {
 	vclosure *cb_connection;
 } uv_w_stream_t;
 
-void handle_stream_cb(uv_req_t *req, int status) {
+static void handle_stream_cb(uv_req_t *req, int status) {
 	vclosure *cb = UV_REQ_DATA(req);
 	if (status < 0)
 		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))));
@@ -353,7 +359,7 @@ void handle_stream_cb(uv_req_t *req, int status) {
 	free(req);
 }
 
-void handle_stream_cb_connection(uv_stream_t *stream, int status) {
+static void handle_stream_cb_connection(uv_stream_t *stream, int status) {
 	vclosure *cb = UV_HANDLE_DATA_SUB(stream, uv_w_stream_t)->cb_connection;
 	if (status < 0)
 		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))));
@@ -361,12 +367,12 @@ void handle_stream_cb_connection(uv_stream_t *stream, int status) {
 		hl_call1(void, cb, vdynamic *, NULL);
 }
 
-void handle_stream_cb_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+static void handle_stream_cb_alloc(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
 	buf->base = hl_gc_alloc_noptr(suggested_size);
 	buf->len = suggested_size;
 }
 
-void handle_stream_cb_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
+static void handle_stream_cb_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
 	vclosure *cb = UV_HANDLE_DATA_SUB(stream, uv_w_stream_t)->cb_read;
 	if (nread < 0)
 		hl_call3(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(nread))), vbyte *, NULL, int, 0);
@@ -489,3 +495,51 @@ UV_TCP_CAST(w_tcp_write, w_write, uv_stream_t, uv_buf_t *buf COMMA vclosure *cb,
 UV_TCP_CAST(w_tcp_shutdown, HL_NAME(w_shutdown), uv_stream_t, vclosure *cb, cb, _CB);
 UV_TCP_CAST(w_tcp_close, w_close, uv_handle_t, vclosure *cb, cb, _CB);
 UV_TCP_CAST(w_tcp_read_start, w_read_start, uv_stream_t, vclosure *cb, cb, _CB_BYTES);
+
+// ------------- DNS ------------------------------------------------
+
+static void handle_dns_gai(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
+	vclosure *cb = UV_REQ_DATA(req);
+	if (status < 0)
+		hl_call2(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))), varray *, NULL);
+	else {
+		int count = 0;
+		struct addrinfo *cur;
+		for (cur = res; cur != NULL; cur = cur->ai_next) {
+			if (cur->ai_family == AF_INET || cur->ai_family == AF_INET6)
+				count++;
+		}
+		varray *arr = hl_alloc_array(&hlt_dyn, count);
+		cur = res;
+		for (int i = 0; i < count; i++) {
+			if (cur->ai_family == AF_INET)
+				hl_aptr(arr, vdynamic *)[i] = construct_addrinfo_ipv4(((struct sockaddr_in *)cur->ai_addr)->sin_addr.s_addr);
+			else if (cur->ai_family == AF_INET6)
+				hl_aptr(arr, vdynamic *)[i] = construct_addrinfo_ipv6(((struct sockaddr_in6 *)cur->ai_addr)->sin6_addr.s6_addr);
+			cur = cur->ai_next;
+		}
+		uv_freeaddrinfo(res);
+		hl_call2(void, cb, vdynamic *, NULL, varray *, arr);
+	}
+	hl_remove_root(UV_REQ_DATA(req));
+	free(req);
+}
+
+HL_PRIM void HL_NAME(w_getaddrinfo)(uv_loop_t *loop, vbyte *node, vbyte *service, int hint_flags, int hint_family, int hint_socktype, int hint_protocol, vclosure *cb) {
+	struct addrinfo hints = {
+		.ai_flags = hint_flags,
+		.ai_family = hint_family,
+		.ai_socktype = hint_socktype,
+		.ai_protocol = hint_protocol,
+		.ai_addrlen = 0,
+		.ai_addr = NULL,
+		.ai_canonname = NULL,
+		.ai_next = NULL
+	};
+	UV_ALLOC_CHECK(req, uv_getaddrinfo_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_getaddrinfo(loop, req, handle_dns_gai, (char *)node, (char *)service, &hints), free(req));
+	hl_add_root(UV_REQ_DATA(req));
+}
+
+DEFINE_PRIM(_VOID, w_getaddrinfo, _LOOP _BYTES _BYTES _I32 _I32 _I32 _I32 _CB_GAI)
