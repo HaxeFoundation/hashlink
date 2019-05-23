@@ -177,15 +177,15 @@ if(BUILD_TESTING)
 
     #####################
     # uvsample.hl
-
-    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-        COMMAND ${HAXE_COMPILER}
-            -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-            -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
-    )
-    add_custom_target(uvsample.hl ALL
-        DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-    )
+#
+#    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+#        COMMAND ${HAXE_COMPILER}
+#            -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+#            -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
+#    )
+#    add_custom_target(uvsample.hl ALL
+#        DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+#    )
 
     #####################
     # hello.c
