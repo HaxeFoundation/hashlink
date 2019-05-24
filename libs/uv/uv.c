@@ -74,6 +74,7 @@
 #define _CB_SCANDIR _FUN(_VOID, _ERROR _ARR)
 #define _CB_GAI _FUN(_VOID, _ERROR _ARR)
 #define _CB_GNI _FUN(_VOID, _ERROR _BYTES _BYTES)
+#define _CB_UDP_RECV _FUN(_VOID, _ERROR _BYTES _I32 _DYN)
 
 // ------------- UTILITY MACROS -------------------------------------
 
@@ -92,16 +93,25 @@ static vdynamic * (*construct_fs_stat)(int, int, int, int, int, int, int, int, i
 static vdynamic * (*construct_fs_dirent)(const char *name, int type);
 static vdynamic * (*construct_addrinfo_ipv4)(int ip);
 static vdynamic * (*construct_addrinfo_ipv6)(vbyte *ip);
+static vdynamic * (*construct_addrport)(vdynamic *addr, int port);
 
-HL_PRIM void HL_NAME(glue_register)(vclosure *c_error, vclosure *c_fs_stat, vclosure *c_fs_dirent, vclosure *c_addrinfo_ipv4, vclosure *c_addrinfo_ipv6) {
+HL_PRIM void HL_NAME(glue_register)(
+	vclosure *c_error,
+	vclosure *c_fs_stat,
+	vclosure *c_fs_dirent,
+	vclosure *c_addrinfo_ipv4,
+	vclosure *c_addrinfo_ipv6,
+	vclosure *c_addrport
+) {
 	construct_error = (vdynamic * (*)(vbyte *))c_error->fun;
 	construct_fs_stat = (vdynamic * (*)(int, int, int, int, int, int, int, int, int, int, int, int))c_fs_stat->fun;
 	construct_fs_dirent = (vdynamic * (*)(const char *, int))c_fs_dirent->fun;
 	construct_addrinfo_ipv4 = (vdynamic * (*)(int))c_addrinfo_ipv4->fun;
 	construct_addrinfo_ipv6 = (vdynamic * (*)(vbyte *))c_addrinfo_ipv6->fun;
+	construct_addrport = (vdynamic * (*)(vdynamic *, int))c_addrport->fun;
 }
 
-DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32) _FUN(_DYN, _BYTES _I32) _FUN(_DYN, _I32) _FUN(_DYN, _BYTES));
+DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32) _FUN(_DYN, _BYTES _I32) _FUN(_DYN, _I32) _FUN(_DYN, _BYTES) _FUN(_DYN, _DYN _I32));
 
 // ------------- ERROR HANDLING -------------------------------------
 
@@ -406,6 +416,20 @@ static void w_read_start(uv_stream_t *stream, vclosure *cb) {
 //DEFINE_PRIM(_VOID, read_stop, _STREAM);
 UV_REQ_WRAP(shutdown, uv_shutdown_t, uv_stream_t *stream, stream, _STREAM _CB, (void (*)(uv_shutdown_t *, int))handle_stream_cb);
 
+// ------------- NETWORK MACROS -------------------------------------
+
+#define UV_SOCKADDR_IPV4(var, host, port) \
+	struct sockaddr_in var; \
+	var.sin_family = AF_INET; \
+	var.sin_port = htons((unsigned short)port); \
+	var.sin_addr.s_addr = htonl(host);
+#define UV_SOCKADDR_IPV6(var, host, port) \
+	struct sockaddr_in6 var; \
+	memset(&var, 0, sizeof(var)); \
+	var.sin6_family = AF_INET6; \
+	var.sin6_port = htons((unsigned short)port); \
+	memcpy(var.sin6_addr.s6_addr, host, 16);
+
 // ------------- TCP ------------------------------------------------
 
 HL_PRIM uv_tcp_t *HL_NAME(w_tcp_init)(uv_loop_t *loop) {
@@ -432,27 +456,17 @@ HL_PRIM uv_tcp_t *HL_NAME(w_tcp_accept)(uv_loop_t *loop, uv_tcp_t *server) {
 }
 
 HL_PRIM void HL_NAME(w_tcp_bind_ipv4)(uv_tcp_t *handle, int host, int port) {
-	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons((unsigned short)port);
-	addr.sin_addr.s_addr = htonl(host);
+	UV_SOCKADDR_IPV4(addr, host, port);
 	UV_ERROR_CHECK(uv_tcp_bind(handle, (const struct sockaddr *)&addr, 0));
 }
 
 HL_PRIM void HL_NAME(w_tcp_bind_ipv6)(uv_tcp_t *handle, vbyte *host, int port) {
-	struct sockaddr_in6 addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin6_family = AF_INET6;
-	addr.sin6_port = htons((unsigned short)port);
-	memcpy(addr.sin6_addr.s6_addr, host, 16);
+	UV_SOCKADDR_IPV6(addr, host, port);
 	UV_ERROR_CHECK(uv_tcp_bind(handle, (const struct sockaddr *)&addr, 0));
 }
 
 HL_PRIM void HL_NAME(w_tcp_connect_ipv4)(uv_tcp_t *handle, int host, int port, vclosure *cb) {
-	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons((unsigned short)port);
-	addr.sin_addr.s_addr = htonl(host);
+	UV_SOCKADDR_IPV4(addr, host, port);
 	UV_ALLOC_CHECK(req, uv_connect_t);
 	UV_REQ_DATA(req) = (void *)cb;
 	UV_ERROR_CHECK_C(uv_tcp_connect(req, handle, (const struct sockaddr *)&addr, (void (*)(uv_connect_t *, int))handle_stream_cb), free(req));
@@ -460,11 +474,7 @@ HL_PRIM void HL_NAME(w_tcp_connect_ipv4)(uv_tcp_t *handle, int host, int port, v
 }
 
 HL_PRIM void HL_NAME(w_tcp_connect_ipv6)(uv_tcp_t *handle, vbyte *host, int port, vclosure *cb) {
-	struct sockaddr_in6 addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin6_family = AF_INET6;
-	addr.sin6_port = htons((unsigned short)port);
-	memcpy(addr.sin6_addr.s6_addr, host, 16);
+	UV_SOCKADDR_IPV6(addr, host, port);
 	UV_ALLOC_CHECK(req, uv_connect_t);
 	UV_REQ_DATA(req) = (void *)cb;
 	UV_ERROR_CHECK_C(uv_tcp_connect(req, handle, (const struct sockaddr *)&addr, (void (*)(uv_connect_t *, int))handle_stream_cb), free(req));
@@ -496,6 +506,90 @@ UV_TCP_CAST(w_tcp_write, w_write, uv_stream_t, uv_buf_t *buf COMMA vclosure *cb,
 UV_TCP_CAST(w_tcp_shutdown, HL_NAME(w_shutdown), uv_stream_t, vclosure *cb, cb, _CB);
 UV_TCP_CAST(w_tcp_close, w_close, uv_handle_t, vclosure *cb, cb, _CB);
 UV_TCP_CAST(w_tcp_read_start, w_read_start, uv_stream_t, vclosure *cb, cb, _CB_BYTES);
+
+// ------------- UDP ------------------------------------------------
+
+typedef struct {
+	uv_w_handle_t w_handle;
+	vclosure *cb_read;
+} uv_w_udp_t;
+
+static void handle_udp_cb_recv(uv_udp_t *handle, long int nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned int flags) {
+	vclosure *cb = UV_HANDLE_DATA_SUB(handle, uv_w_udp_t)->cb_read;
+	if (nread < 0)
+		hl_call4(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(nread))), vbyte *, NULL, int, 0, vdynamic *, NULL);
+	else {
+		vdynamic *w_addrport = NULL;
+		if (addr != NULL) {
+			vdynamic *w_addr;
+			if (addr->sa_family == AF_INET) {
+				w_addr = construct_addrinfo_ipv4(((struct sockaddr_in *)addr)->sin_addr.s_addr);
+				w_addrport = construct_addrport(w_addr, ((struct sockaddr_in *)addr)->sin_port);
+			} else if (addr->sa_family == AF_INET6) {
+				w_addr = construct_addrinfo_ipv6(((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr);
+				w_addrport = construct_addrport(w_addr, ((struct sockaddr_in6 *)addr)->sin6_port);
+			}
+		}
+		hl_call4(void, cb, vdynamic *, NULL, vbyte *, (vbyte *)buf->base, int, buf->len, vdynamic *, w_addrport);
+	}
+}
+
+HL_PRIM uv_udp_t *HL_NAME(w_udp_init)(uv_loop_t *loop) {
+	UV_ALLOC_CHECK(handle, uv_udp_t);
+	UV_ERROR_CHECK_C(uv_udp_init(loop, handle), free(handle));
+	UV_ALLOC_CHECK_C(data, uv_w_udp_t, free(handle));
+	memset(data, 0, sizeof(uv_w_udp_t));
+	UV_HANDLE_DATA(handle) = data;
+	return handle;
+}
+
+HL_PRIM void HL_NAME(w_udp_bind_ipv4)(uv_udp_t *handle, int host, int port) {
+	UV_SOCKADDR_IPV4(addr, host, port);
+	UV_ERROR_CHECK(uv_udp_bind(handle, (const struct sockaddr *)&addr, 0));
+}
+
+HL_PRIM void HL_NAME(w_udp_bind_ipv6)(uv_udp_t *handle, vbyte *host, int port) {
+	UV_SOCKADDR_IPV6(addr, host, port);
+	UV_ERROR_CHECK(uv_udp_bind(handle, (const struct sockaddr *)&addr, 0));
+}
+
+HL_PRIM void HL_NAME(w_udp_send_ipv4)(uv_udp_t *handle, const uv_buf_t *buf, int host, int port, vclosure *cb) {
+	// note: signature different due to no struct passing support in HL
+	// currently only a single uv_buf_t can be passed at a time
+	UV_SOCKADDR_IPV4(addr, host, port);
+	UV_ALLOC_CHECK(req, uv_udp_send_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_udp_send(req, handle, buf, 1, (const struct sockaddr *)&addr, (void (*)(uv_udp_send_t *, int))handle_stream_cb), free(req));
+	hl_add_root(UV_REQ_DATA(req));
+}
+
+HL_PRIM void HL_NAME(w_udp_send_ipv6)(uv_udp_t *handle, const uv_buf_t *buf, vbyte *host, int port, vclosure *cb) {
+	// note: signature different due to no struct passing support in HL
+	// currently only a single uv_buf_t can be passed at a time
+	UV_SOCKADDR_IPV6(addr, host, port);
+	UV_ALLOC_CHECK(req, uv_udp_send_t);
+	UV_REQ_DATA(req) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_udp_send(req, handle, buf, 1, (const struct sockaddr *)&addr, (void (*)(uv_udp_send_t *, int))handle_stream_cb), free(req));
+	hl_add_root(UV_REQ_DATA(req));
+}
+
+HL_PRIM void HL_NAME(w_udp_recv_start)(uv_udp_t *handle, vclosure *cb) {
+	UV_HANDLE_DATA_SUB(handle, uv_w_udp_t)->cb_read = cb;
+	UV_ERROR_CHECK(uv_udp_recv_start(handle, handle_stream_cb_alloc, handle_udp_cb_recv));
+}
+
+HL_PRIM void HL_NAME(w_udp_recv_stop)(uv_udp_t *handle) {
+	UV_HANDLE_DATA_SUB(handle, uv_w_udp_t)->cb_read = NULL;
+	UV_ERROR_CHECK(uv_udp_recv_stop(handle));
+}
+
+DEFINE_PRIM(_UDP, w_udp_init, _LOOP);
+DEFINE_PRIM(_VOID, w_udp_bind_ipv4, _UDP _I32 _I32);
+DEFINE_PRIM(_VOID, w_udp_bind_ipv6, _UDP _BYTES _I32);
+DEFINE_PRIM(_VOID, w_udp_send_ipv4, _UDP _BUF _I32 _I32 _CB);
+DEFINE_PRIM(_VOID, w_udp_send_ipv6, _UDP _BUF _BYTES _I32 _CB);
+DEFINE_PRIM(_VOID, w_udp_recv_start, _UDP _CB_UDP_RECV);
+DEFINE_PRIM(_VOID, w_udp_recv_stop, _UDP);
 
 // ------------- DNS ------------------------------------------------
 
@@ -554,10 +648,7 @@ static void handle_dns_gni(uv_getnameinfo_t *req, int status, const char *hostna
 }
 
 HL_PRIM void HL_NAME(w_getnameinfo_ipv4)(uv_loop_t *loop, int ip, int flags, vclosure *cb) {
-	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = 0;
-	addr.sin_addr.s_addr = htonl(ip);
+	UV_SOCKADDR_IPV4(addr, ip, 0);
 	UV_ALLOC_CHECK(req, uv_getnameinfo_t);
 	UV_REQ_DATA(req) = (void *)cb;
 	UV_ERROR_CHECK_C(uv_getnameinfo(loop, req, handle_dns_gni, (const struct sockaddr *)&addr, flags), free(req));
@@ -565,10 +656,7 @@ HL_PRIM void HL_NAME(w_getnameinfo_ipv4)(uv_loop_t *loop, int ip, int flags, vcl
 }
 
 HL_PRIM void HL_NAME(w_getnameinfo_ipv6)(uv_loop_t *loop, vbyte *ip, int flags, vclosure *cb) {
-	struct sockaddr_in6 addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin6_family = AF_INET6;
-	memcpy(addr.sin6_addr.s6_addr, ip, 16);
+	UV_SOCKADDR_IPV6(addr, ip, 0);
 	UV_ALLOC_CHECK(req, uv_getnameinfo_t);
 	UV_REQ_DATA(req) = (void *)cb;
 	UV_ERROR_CHECK_C(uv_getnameinfo(loop, req, handle_dns_gni, (const struct sockaddr *)&addr, flags), free(req));
