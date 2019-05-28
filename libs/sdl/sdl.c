@@ -81,6 +81,8 @@ typedef struct {
 	int fingerId;
 } event_data;
 
+static SDL_Joystick *accelerometer;
+
 HL_PRIM bool HL_NAME(init_once)() {
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 	if( SDL_Init(SDL_INIT_EVERYTHING) != 0 ) {
@@ -96,6 +98,7 @@ HL_PRIM bool HL_NAME(init_once)() {
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+	SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "1");
 #else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -272,6 +275,17 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->controller = e.caxis.which;
 			event->button = e.caxis.axis;
 			event->value = e.caxis.value;
+			break;
+		case SDL_JOYDEVICEADDED:
+#			ifdef HL_MOBILE
+			accelerometer = SDL_JoystickOpen(0);
+#			endif
+			break;
+		case SDL_JOYAXISMOTION:
+			event->type = GControllerAxis;
+			event->controller = e.jaxis.which;
+			event->button = e.jaxis.axis;
+			event->value = e.jaxis.value;
 			break;
 		default:
 			//printf("Unknown event type 0x%X\\n", e.type);
