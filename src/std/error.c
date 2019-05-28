@@ -100,7 +100,7 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 		t->flags &= ~HL_EXC_IS_THROW;
 	}
 	t->flags &= ~HL_EXC_RETHROW;
-	if( t->exc_handler && call_handler ) hl_dyn_call(t->exc_handler,&v,1);
+	if( t->exc_handler && call_handler ) hl_dyn_call_safe(t->exc_handler,&v,1,&call_handler);
 	if( throw_jump == NULL ) throw_jump = longjmp;
 	throw_jump(trap->buf,1);
 	HL_UNREACHABLE;
