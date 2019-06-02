@@ -143,8 +143,16 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 #	ifdef HL_XBO
 	OutputDebugStringW((LPCWSTR)msg);
 #	else
+
+#	ifdef HL_WIN_DESKTOP
+	_setmode(_fileno(stdout),_O_U8TEXT);
+#	endif
 	uprintf(USTR("%s"),(uchar*)msg);
 	fflush(stdout);
+#	ifdef HL_WIN_DESKTOP
+	_setmode(_fileno(stdout),_O_TEXT);
+#	endif
+
 #	endif
 	hl_blocking(false);
 }
@@ -601,8 +609,6 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 	hl_file = hlfile;
 #	ifdef HL_WIN_DESKTOP
 	setlocale(LC_CTYPE, ""); // printf to current locale
-	_setmode(_fileno(stdout),_O_U8TEXT); // set output to utf8
-	_setmode(_fileno(stderr),_O_U8TEXT);
 #	endif
 }
 
