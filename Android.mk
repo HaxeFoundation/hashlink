@@ -30,8 +30,6 @@ src/hl.h \
 src/hlc.h \
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH) \
                     $(LOCAL_PATH)/. \
-                    $(LOCAL_PATH)/.. \
-                    $(LOCAL_PATH)/../src
                     $(LOCAL_PATH)/./include \
                     $(LOCAL_PATH)/./include/bullet \
                     $(LOCAL_PATH)/./include/ffmpeg \
@@ -48,7 +46,6 @@ LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH) \
 					$(LOCAL_PATH)/./include/vorbis \
 					$(LOCAL_PATH)/./include/zlib \
 LOCAL_C_INCLUDES := $(LOCAL_PATH) \
-                    $(LOCAL_PATH)/../src
                     $(LOCAL_PATH)/./include \
                     $(LOCAL_PATH)/./include/bullet \
                     $(LOCAL_PATH)/./include/ffmpeg \
