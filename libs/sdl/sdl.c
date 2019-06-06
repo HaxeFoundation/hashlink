@@ -46,6 +46,13 @@ typedef enum {
 	TouchDown = 200,
 	TouchUp,
 	TouchMove,
+	JoystickAxisMotion = 300,
+	JoystickBallMotion,
+	JoystickHatMotion,
+	JoystickButtonDown,
+	JoystickButtonUp,
+	JoystickAdded,
+	JoystickRemoved,
 } event_type;
 
 typedef enum {
@@ -77,11 +84,10 @@ typedef struct {
 	int keyCode;
 	bool keyRepeat;
 	int controller;
+	int joystick;
 	int value;
 	int fingerId;
 } event_data;
-
-static SDL_Joystick *accelerometer;
 
 HL_PRIM bool HL_NAME(init_once)() {
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
@@ -276,16 +282,42 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->button = e.caxis.axis;
 			event->value = e.caxis.value;
 			break;
-		case SDL_JOYDEVICEADDED:
-#			ifdef HL_MOBILE
-			accelerometer = SDL_JoystickOpen(0);
-#			endif
-			break;
 		case SDL_JOYAXISMOTION:
-			event->type = GControllerAxis;
-			event->controller = e.jaxis.which;
+			event->type = JoystickAxisMotion;
+			event->joystick = e.jaxis.which;
 			event->button = e.jaxis.axis;
 			event->value = e.jaxis.value;
+			break;
+		case SDL_JOYBALLMOTION:
+			event->type = JoystickBallMotion;
+			event->joystick = e.jball.which;
+			event->button = e.jball.ball;
+			event->mouseXRel = e.jball.xrel;
+			event->mouseYRel = e.jball.yrel;
+			break;
+		case SDL_JOYHATMOTION:
+			event->type = JoystickHatMotion;
+			event->joystick = e.jhat.which;
+			event->button = e.jhat.hat;
+			event->value = e.jhat.value;
+			break;
+		case SDL_JOYBUTTONDOWN:
+			event->type = JoystickButtonDown;
+			event->joystick = e.jbutton.which;
+			event->button = e.jbutton.button;
+			break;
+		case SDL_JOYBUTTONUP:
+			event->type = JoystickButtonUp;
+			event->joystick = e.jbutton.which;
+			event->button = e.jbutton.button;
+			break;
+		case SDL_JOYDEVICEADDED:
+			event->type = JoystickAdded;
+			event->joystick = e.jdevice.which;
+			break;
+		case SDL_JOYDEVICEREMOVED:
+			event->type = JoystickRemoved;
+			event->joystick = e.jdevice.which;
 			break;
 		default:
 			//printf("Unknown event type 0x%X\\n", e.type);
