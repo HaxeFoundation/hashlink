@@ -665,6 +665,49 @@ DEFINE_PRIM(_VOID, haptic_close, THAPTIC);
 DEFINE_PRIM(_I32, haptic_rumble_init, THAPTIC);
 DEFINE_PRIM(_I32, haptic_rumble_play, THAPTIC _F64 _I32);
 
+// joystick
+
+HL_PRIM int HL_NAME(joy_count)() {
+	return SDL_NumJoysticks();
+}
+
+HL_PRIM SDL_Joystick *HL_NAME(joy_open)(int idx) {
+	return SDL_JoystickOpen(idx);
+}
+
+HL_PRIM void HL_NAME(joy_close)(SDL_Joystick *joystick) {
+	SDL_JoystickClose(joystick);
+}
+
+HL_PRIM int HL_NAME(joy_get_axis)(SDL_Joystick *joystick, int axisIdx ){
+	return SDL_JoystickGetAxis(joystick, axisIdx);
+}
+
+HL_PRIM int HL_NAME(joy_get_hat)(SDL_Joystick *joystick, int hatIdx ){
+	return SDL_JoystickGetHat(joystick, hatIdx);
+}
+
+HL_PRIM bool HL_NAME(joy_get_button)(SDL_Joystick *joystick, int btnIdx) {
+	return SDL_JoystickGetButton(joystick, btnIdx) == 1;
+}
+
+HL_PRIM int HL_NAME(joy_get_id)(SDL_Joystick *joystick) {
+	return SDL_JoystickInstanceID(joystick);
+}
+
+HL_PRIM vbyte *HL_NAME(joy_get_name)(SDL_Joystick *joystick) {
+	return (vbyte*)SDL_JoystickName(joystick);
+}
+
+#define TGCTRL _ABSTRACT(sdl_joystick)
+DEFINE_PRIM(_I32, joy_count, _NO_ARG);
+DEFINE_PRIM(TGCTRL, joy_open, _I32);
+DEFINE_PRIM(_VOID, joy_close, TGCTRL);
+DEFINE_PRIM(_I32, joy_get_axis, TGCTRL _I32);
+DEFINE_PRIM(_I32, joy_get_hat, TGCTRL _I32);
+DEFINE_PRIM(_BOOL, joy_get_button, TGCTRL _I32);
+DEFINE_PRIM(_I32, joy_get_id, TGCTRL);
+DEFINE_PRIM(_BYTES, joy_get_name, TGCTRL);
 
 // surface
 

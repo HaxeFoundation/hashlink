@@ -18,6 +18,10 @@ class Joystick {
 		return joyGetAxis(ptr,axisId);
 	}
 
+	public inline function getHat( hatId : Int ){
+		return joyGetHat(ptr,hatId);
+	}
+
 	public inline function getButton( btnId : Int ){
 		return joyGetButton(ptr,btnId);
 	}
@@ -47,6 +51,10 @@ class Joystick {
 	}
 
 	static function joyGetAxis( joystick : JoystickPtr, axisId : Int ) : Int {
+		return 0;
+	}
+
+	static function joyGetHat( joystick : JoystickPtr, hatId : Int ) : Int {
 		return 0;
 	}
 
