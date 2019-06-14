@@ -105,6 +105,7 @@ typedef enum {
 	CVTSD2SI,
 	CVTSD2SS,
 	CVTSS2SD,
+	CVTSS2SI,
 	STMXCSR,
 	LDMXCSR,
 	// 8-16 bits
@@ -473,6 +474,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "CVTSD2SI", 0xF20F2D },
 	{ "CVTSD2SS", 0xF20F5A },
 	{ "CVTSS2SD", 0xF30F5A },
+	{ "CVTSS2SI", 0xF30F2D },
 	{ "STMXCSR", 0, LONG_RM(0x0FAE,3) },
 	{ "LDMXCSR", 0, LONG_RM(0x0FAE,2) },
 	// 8 bits,
@@ -3056,7 +3058,17 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx,LDMXCSR,pmem(&p,Esp,-4),UNUSED);
 				store(ctx, dst, w, true);
 			} else if (ra->t->kind == HF32) {
-				ASSERT(0);
+				preg *r = alloc_fpu(ctx, ra, true);
+				preg *w = alloc_cpu(ctx, dst, false);
+				preg *tmp = alloc_reg(ctx, RCPU);
+				op32(ctx, STMXCSR, pmem(&p, Esp, -4), UNUSED);
+				op32(ctx, MOV, tmp, &p);
+				op32(ctx, OR, tmp, pconst(&p, 0x6000)); // set round towards 0
+				op32(ctx, MOV, pmem(&p, Esp, -4), tmp);
+				op32(ctx, LDMXCSR, &p, UNUSED);
+				op32(ctx, CVTSS2SI, w, r);
+				op32(ctx, LDMXCSR, pmem(&p, Esp, -4), UNUSED);
+				store(ctx, dst, w, true);
 			} else if( dst->t->kind == HI64 && ra->t->kind == HI32 ) {
 				ASSERT(0); // todo : more i64 native support
 			} else {
