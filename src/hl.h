@@ -223,10 +223,6 @@ typedef wchar_t	uchar;
 #	define uprintf		wprintf
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
-#	ifdef HL_WIN_DESKTOP
-#		define printf		hl_win_cprintf
-HL_API void hl_win_cprintf( const char *fmt, ... );
-#	endif
 HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
 #	define utod(s,end)	wcstod(s,end)
 #	define utoi(s,end)	wcstol(s,end,10)
