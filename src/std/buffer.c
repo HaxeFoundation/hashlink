@@ -384,6 +384,10 @@ HL_PRIM void hl_buffer_val( hl_buffer *b, vdynamic *v ) {
 }
 
 HL_PRIM uchar *hl_to_string( vdynamic *v ) {
+	if( v == NULL )
+		return USTR("null");
+	if( v->t->kind == HBOOL )
+		return v->v.b ? USTR("true") : USTR("false");
 	hl_buffer *b = hl_alloc_buffer();
 	hl_buffer_val(b,v);
 	hl_buffer_char(b,0);

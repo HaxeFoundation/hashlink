@@ -36,7 +36,7 @@ To install hashlink binaries on your system you can then call:
 
 ## Building on Windows
 
-Open `hl.sln` using Visual Studio Code and compile.
+Open `hl.sln` using Visual Studio C++ and compile.
 
 To build all of HashLink libraries it is required to download several additional distributions, read each library README file (in hashlink/libs/xxx/README.md) for additional information.
 
