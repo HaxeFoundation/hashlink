@@ -138,6 +138,61 @@ HL_PRIM vbyte *hl_sys_locale() {
 #endif
 }
 
+static int ustrlen_utf8( const uchar *str ) {
+	int size = 0;
+	while(1) {
+		uchar c = *str++;
+		if( c == 0 ) break;
+		if( c < 0x80 )
+			size++;
+		else if( c < 0x800 )
+			size += 2;
+		else if( c >= 0xD800 && c <= 0xDFFF ) {
+			str++;
+			size += 4;
+		} else
+			size += 3;
+	}
+	return size;
+}
+static int fix_utostr( char *out, int out_size, const uchar *str ) {
+	char *start = out;
+	char *end = out + out_size - 1; // final 0
+	if( out_size <= 0 ) return 0;
+	while( out < end ) {
+		unsigned int c = *str++;
+		if( c == 0 ) break;
+		if( c < 0x80 )
+			*out++ = (char)c;
+		else if( c < 0x800 ) {
+			if( out + 2 > end ) break;
+			*out++ = (char)(0xC0|(c>>6));
+			*out++ = 0x80|(c&63);
+		} else if( c >= 0xD800 && c <= 0xDFFF ) { // surrogate pair
+			if( out + 4 > end ) break;
+			unsigned int full = (((c - 0xD800) << 10) | ((*str++) - 0xDC00)) + 0x10000;
+			*out++ = (char)(0xF0|(full>>18));
+			*out++ = 0x80|((full>>12)&63);
+			*out++ = 0x80|((full>>6)&63);
+			*out++ = 0x80|(full&63);
+		} else {
+			if( out + 3 > end ) break;
+			*out++ = (char)(0xE0|(c>>12));
+			*out++ = 0x80|((c>>6)&63);
+			*out++ = 0x80|(c&63);
+		}
+	}
+	*out = 0;
+	return (int)(out - start);
+}
+static char *utos( const uchar *s ) {
+	int len = ustrlen_utf8(s);
+	char *out = (char*)malloc(len + 1);
+	if( fix_utostr(out,len+1,s) < 0 )
+		*out = 0;
+	return out;
+}
+
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
 #	ifdef HL_XBO
@@ -145,12 +200,18 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 #	else
 
 #	ifdef HL_WIN_DESKTOP
-	_setmode(_fileno(stdout),_O_U8TEXT);
-#	endif
+	fflush(stdout);
+	_setmode(_fileno(stdout),_O_BINARY);
+
+	char *cstr = utos((uchar *)msg);
+	printf("%s",cstr);
+	free(cstr);
+
+	fflush(stdout);
+	_setmode(_fileno(stdout),_O_TEXT);
+#	else
 	uprintf(USTR("%s"),(uchar*)msg);
 	fflush(stdout);
-#	ifdef HL_WIN_DESKTOP
-	_setmode(_fileno(stdout),_O_TEXT);
 #	endif
 
 #	endif
