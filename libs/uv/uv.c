@@ -216,6 +216,12 @@ static void handle_fs_cb(uv_fs_t *req) {
 	hl_remove_root(UV_REQ_DATA(req));
 	free(req);
 }
+static void handle_fs_cb_sync(uv_fs_t *req) {
+	/* TODO: should we call uv_fs_req_cleanup on error here? */
+	UV_ERROR_CHECK_C(req->result, free(req));
+	uv_fs_req_cleanup(req);
+	free(req);
+}
 
 #define UV_FS_HANDLER(name, type2, setup) \
 	static void name(uv_fs_t *req) { \
@@ -230,6 +236,15 @@ static void handle_fs_cb(uv_fs_t *req) {
 		uv_fs_req_cleanup(req); \
 		hl_remove_root(UV_REQ_DATA(req)); \
 		free(req); \
+	} \
+	static type2 name ## _sync(uv_fs_t *req) { \
+		/* TODO: should we call uv_fs_req_cleanup on error here? */ \
+		UV_ERROR_CHECK_C(req->result, free(req)); \
+		type2 value2; \
+		setup; \
+		uv_fs_req_cleanup(req); \
+		free(req); \
+		return value2; \
 	}
 
 UV_FS_HANDLER(handle_fs_cb_bytes, vbyte *, value2 = (vbyte *)hl_to_utf16((const char *)req->ptr));
@@ -286,16 +301,27 @@ UV_FS_HANDLER(handle_fs_cb_scandir, varray *, {
 		hl_add_root(UV_REQ_DATA(req)); \
 	} \
 	DEFINE_PRIM(_VOID, w_ ## name, _LOOP ffi);
+#define UV_REQ_WRAP_LOOP_SYNC(name, ret, reqtype, sign, call, ffiret, ffi, handler, doret) \
+	HL_PRIM ret HL_NAME(w_ ## name ## _sync)(uv_loop_t *loop, sign) { \
+		UV_ALLOC_CHECK(req, reqtype); \
+		UV_ERROR_CHECK_C(uv_ ## name(loop, req, call, NULL), free(req)); \
+		doret handler ## _sync(req); \
+	} \
+	DEFINE_PRIM(ffiret, w_ ## name ## _sync, _LOOP ffi);
 
 #define COMMA ,
-#define UV_WRAP1_LOOP(name, reqtype, arg1, sign, handler) \
-	UV_REQ_WRAP_LOOP(name, reqtype, arg1 _arg1, _arg1, sign, handler)
-#define UV_WRAP2_LOOP(name, reqtype, arg1, arg2, sign, handler) \
-	UV_REQ_WRAP_LOOP(name, reqtype, arg1 _arg1 COMMA arg2 _arg2, _arg1 COMMA _arg2, sign, handler)
-#define UV_WRAP3_LOOP(name, reqtype, arg1, arg2, arg3, sign, handler) \
-	UV_REQ_WRAP_LOOP(name, reqtype, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3, _arg1 COMMA _arg2 COMMA _arg3, sign, handler)
-#define UV_WRAP4_LOOP(name, reqtype, arg1, arg2, arg3, arg4, sign, handler) \
-	UV_REQ_WRAP_LOOP(name, reqtype, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, sign, handler)
+#define FS_WRAP1_LOOP(name, ret, arg1, ffiret, ffi, ffihandler, handler, doret) \
+	UV_REQ_WRAP_LOOP(name, uv_fs_t, arg1 _arg1, _arg1, ffi ffihandler, handler); \
+	UV_REQ_WRAP_LOOP_SYNC(name, ret, uv_fs_t, arg1 _arg1, _arg1, ffiret, ffi, handler, doret)
+#define FS_WRAP2_LOOP(name, ret, arg1, arg2, ffiret, ffi, ffihandler, handler, doret) \
+	UV_REQ_WRAP_LOOP(name, uv_fs_t, arg1 _arg1 COMMA arg2 _arg2, _arg1 COMMA _arg2, ffi ffihandler, handler); \
+	UV_REQ_WRAP_LOOP_SYNC(name, ret, uv_fs_t, arg1 _arg1 COMMA arg2 _arg2, _arg1 COMMA _arg2, ffiret, ffi, handler, doret)
+#define FS_WRAP3_LOOP(name, ret, arg1, arg2, arg3, ffiret, ffi, ffihandler, handler, doret) \
+	UV_REQ_WRAP_LOOP(name, uv_fs_t, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3, _arg1 COMMA _arg2 COMMA _arg3, ffi ffihandler, handler); \
+	UV_REQ_WRAP_LOOP_SYNC(name, ret, uv_fs_t, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3, _arg1 COMMA _arg2 COMMA _arg3, ffiret, ffi, handler, doret)
+#define FS_WRAP4_LOOP(name, ret, arg1, arg2, arg3, arg4, ffiret, ffi, ffihandler, handler, doret) \
+	UV_REQ_WRAP_LOOP(name, uv_fs_t, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, ffi ffihandler, handler); \
+	UV_REQ_WRAP_LOOP_SYNC(name, ret, uv_fs_t, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, ffiret, ffi, handler, doret)
 
 HL_PRIM void HL_NAME(w_fs_read)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset, vclosure *cb) {
 	// note: signature different due to no struct passing support in HL
@@ -315,42 +341,35 @@ HL_PRIM void HL_NAME(w_fs_write)(uv_loop_t *loop, uv_file file, const uv_buf_t *
 	hl_add_root(UV_REQ_DATA(req));
 }
 
-HL_PRIM void HL_NAME(w_fs_scandir)(uv_loop_t *loop, const char *path, int flags, vclosure *cb) {
-	UV_ALLOC_CHECK(req, uv_fs_t);
-	UV_REQ_DATA(req) = (void *)cb;
-	UV_ERROR_CHECK_C(uv_fs_scandir(loop, req, path, flags, handle_fs_cb_scandir), free(req));
-	hl_add_root(UV_REQ_DATA(req));
-}
-
-DEFINE_PRIM(_VOID, w_fs_scandir, _LOOP _BYTES _I32 _CB_SCANDIR);
 DEFINE_PRIM(_VOID, w_fs_read, _LOOP _FILE _BUF _I32 _CB_INT);
 DEFINE_PRIM(_VOID, w_fs_write, _LOOP _FILE _BUF _I32 _CB_INT);
 
-UV_WRAP1_LOOP(fs_close, uv_fs_t, uv_file, _FILE _CB, handle_fs_cb);
-UV_WRAP3_LOOP(fs_open, uv_fs_t, const char*, int, int, _BYTES _I32 _I32 _CB_FILE, handle_fs_cb_file);
-UV_WRAP1_LOOP(fs_unlink, uv_fs_t, const char*, _BYTES _CB, handle_fs_cb);
-UV_WRAP2_LOOP(fs_mkdir, uv_fs_t, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
-UV_WRAP1_LOOP(fs_mkdtemp, uv_fs_t, const char*, _BYTES _CB_STR, handle_fs_cb_path);
-UV_WRAP1_LOOP(fs_rmdir, uv_fs_t, const char*, _BYTES _CB, handle_fs_cb);
-UV_WRAP1_LOOP(fs_stat, uv_fs_t, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
-UV_WRAP1_LOOP(fs_fstat, uv_fs_t, uv_file, _FILE _CB_STAT, handle_fs_cb_stat);
-UV_WRAP1_LOOP(fs_lstat, uv_fs_t, const char*, _BYTES _CB_STAT, handle_fs_cb_stat);
-UV_WRAP2_LOOP(fs_rename, uv_fs_t, const char*, const char*, _BYTES _BYTES _CB, handle_fs_cb);
-UV_WRAP1_LOOP(fs_fsync, uv_fs_t, uv_file, _FILE _CB, handle_fs_cb);
-UV_WRAP1_LOOP(fs_fdatasync, uv_fs_t, uv_file, _FILE _CB, handle_fs_cb);
-UV_WRAP2_LOOP(fs_ftruncate, uv_fs_t, uv_file, int64_t, _FILE _I64 _CB, handle_fs_cb);
-UV_WRAP4_LOOP(fs_sendfile, uv_fs_t, uv_file, uv_file, int64_t, size_t, _FILE _FILE _I64 _I64 _CB, handle_fs_cb);
-UV_WRAP2_LOOP(fs_access, uv_fs_t, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
-UV_WRAP2_LOOP(fs_chmod, uv_fs_t, const char*, int, _BYTES _I32 _CB, handle_fs_cb);
-UV_WRAP2_LOOP(fs_fchmod, uv_fs_t, uv_file, int, _FILE _I32 _CB, handle_fs_cb);
-UV_WRAP3_LOOP(fs_utime, uv_fs_t, const char*, double, double, _BYTES _F64 _F64 _CB, handle_fs_cb);
-UV_WRAP3_LOOP(fs_futime, uv_fs_t, uv_file, double, double, _FILE _F64 _F64 _CB, handle_fs_cb);
-UV_WRAP2_LOOP(fs_link, uv_fs_t, const char*, const char*, _BYTES _BYTES _CB, handle_fs_cb);
-UV_WRAP3_LOOP(fs_symlink, uv_fs_t, const char*, const char*, int, _BYTES _BYTES _I32 _CB, handle_fs_cb);
-UV_WRAP1_LOOP(fs_readlink, uv_fs_t, const char*, _BYTES _CB_STR, handle_fs_cb_bytes);
-UV_WRAP1_LOOP(fs_realpath, uv_fs_t, const char*, _BYTES _CB_STR, handle_fs_cb_bytes);
-UV_WRAP3_LOOP(fs_chown, uv_fs_t, const char*, uv_uid_t, uv_gid_t, _BYTES _I32 _I32 _CB, handle_fs_cb);
-UV_WRAP3_LOOP(fs_fchown, uv_fs_t, uv_file, uv_uid_t, uv_gid_t, _FILE _I32 _I32 _CB, handle_fs_cb);
+FS_WRAP1_LOOP(fs_close, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
+FS_WRAP3_LOOP(fs_open, uv_file, const char*, int, int, _FILE, _BYTES _I32 _I32, _CB_FILE, handle_fs_cb_file, return);
+FS_WRAP1_LOOP(fs_unlink, void, const char*, _VOID, _BYTES, _CB, handle_fs_cb, );
+FS_WRAP2_LOOP(fs_mkdir, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP1_LOOP(fs_mkdtemp, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_path, return);
+FS_WRAP1_LOOP(fs_rmdir, void, const char*, _VOID, _BYTES, _CB, handle_fs_cb, );
+FS_WRAP2_LOOP(fs_scandir, varray *, const char *, int, _ARR, _BYTES _I32, _CB_SCANDIR, handle_fs_cb_scandir, return);
+FS_WRAP1_LOOP(fs_stat, vdynamic *, const char*, _STAT, _BYTES, _CB_STAT, handle_fs_cb_stat, return);
+FS_WRAP1_LOOP(fs_fstat, vdynamic *, uv_file, _STAT, _FILE, _CB_STAT, handle_fs_cb_stat, return);
+FS_WRAP1_LOOP(fs_lstat, vdynamic *, const char*, _STAT, _BYTES, _CB_STAT, handle_fs_cb_stat, return);
+FS_WRAP2_LOOP(fs_rename, void, const char*, const char*, _VOID, _BYTES _BYTES, _CB, handle_fs_cb, );
+FS_WRAP1_LOOP(fs_fsync, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
+FS_WRAP1_LOOP(fs_fdatasync, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
+FS_WRAP2_LOOP(fs_ftruncate, void, uv_file, int64_t, _VOID, _FILE _I64, _CB, handle_fs_cb, );
+FS_WRAP4_LOOP(fs_sendfile, void, uv_file, uv_file, int64_t, size_t, _VOID, _FILE _FILE _I64 _I64, _CB, handle_fs_cb, );
+FS_WRAP2_LOOP(fs_access, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP2_LOOP(fs_chmod, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP2_LOOP(fs_fchmod, void, uv_file, int, _VOID, _FILE _I32, _CB, handle_fs_cb, );
+FS_WRAP3_LOOP(fs_utime, void, const char*, double, double, _VOID, _BYTES _F64 _F64, _CB, handle_fs_cb, );
+FS_WRAP3_LOOP(fs_futime, void, uv_file, double, double, _VOID, _FILE _F64 _F64, _CB, handle_fs_cb, );
+FS_WRAP2_LOOP(fs_link, void, const char*, const char*, _VOID, _BYTES _BYTES, _CB, handle_fs_cb, );
+FS_WRAP3_LOOP(fs_symlink, void, const char*, const char*, int, _VOID, _BYTES _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP1_LOOP(fs_readlink, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_bytes, return);
+FS_WRAP1_LOOP(fs_realpath, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_bytes, return);
+FS_WRAP3_LOOP(fs_chown, void, const char*, uv_uid_t, uv_gid_t, _VOID, _BYTES _I32 _I32, _CB, handle_fs_cb, );
+FS_WRAP3_LOOP(fs_fchown, void, uv_file, uv_uid_t, uv_gid_t, _VOID, _FILE _I32 _I32, _CB, handle_fs_cb, );
 
 // ------------- STREAM ---------------------------------------------
 
