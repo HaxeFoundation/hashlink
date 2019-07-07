@@ -12,9 +12,9 @@ package sdl;
 	public var keyCode : Int;
 	public var keyRepeat : Bool;
 	public var controller : Int;
-	public var joystick : Int;
 	public var value : Int;
 	public var fingerId : Int;
+	public var joystick : Int;
 	public function new() {
 	}
 }

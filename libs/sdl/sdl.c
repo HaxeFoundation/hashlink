@@ -84,9 +84,9 @@ typedef struct {
 	int keyCode;
 	bool keyRepeat;
 	int controller;
-	int joystick;
 	int value;
 	int fingerId;
+	int joystick;
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
