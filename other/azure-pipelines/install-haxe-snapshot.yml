@@ -1,0 +1,31 @@
+parameters:
+  platform: '' # can be linux64, mac, windows, or windows64
+
+steps:
+  - ${{ if startsWith(parameters.platform, 'windows') }}:
+    - powershell: |
+        Invoke-WebRequest https://build.haxe.org/builds/haxe/${{parameters.platform}}/haxe_latest.zip -OutFile $(Agent.TempDirectory)/haxe_latest.zip
+        Expand-Archive $(Agent.TempDirectory)/haxe_latest.zip -DestinationPath $(Agent.TempDirectory)
+        Remove-Item $(Agent.TempDirectory)/haxe_latest.zip
+        $HAXEPATH = Get-Item $(Agent.TempDirectory)/haxe_*
+        $HAXE_STD_PATH = "$HAXEPATH\std"
+        Write-Host "##vso[task.prependpath]$HAXEPATH"
+        Write-Host "##vso[task.setvariable variable=HAXE_STD_PATH]$HAXE_STD_PATH"
+      displayName: Install Haxe using snapshot from S3
+  - ${{ if not(startsWith(parameters.platform, 'windows')) }}:
+    - bash: |
+        set -ex
+        DOWNLOADDIR=$(Agent.TempDirectory)
+        curl -sSL https://build.haxe.org/builds/haxe/${{parameters.platform}}/haxe_latest.tar.gz -o $(Agent.TempDirectory)/haxe_latest.tar.gz
+        tar -xf $(Agent.TempDirectory)/haxe_latest.tar.gz -C $(Agent.TempDirectory)
+        rm $(Agent.TempDirectory)/haxe_latest.tar.gz
+        HAXEPATH=`echo $(Agent.TempDirectory)/haxe_*`
+        sudo mkdir -p /usr/local/bin
+        sudo mkdir -p /usr/local/share/haxe
+        sudo ln -s $HAXEPATH/{haxe,haxelib}  /usr/local/bin/
+        sudo ln -s $HAXEPATH/std             /usr/local/share/haxe/std
+        set +x
+        echo "##vso[task.setvariable variable=HAXE_STD_PATH]/usr/local/share/haxe/std"
+      displayName: Install Haxe using snapshot from S3
+  - script: haxe -version
+    displayName: Print Haxe version

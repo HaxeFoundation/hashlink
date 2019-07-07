@@ -1,0 +1,53 @@
+variables:
+  - group: variables-haxe
+
+stages:
+  - stage: StageTest
+    jobs:
+      - template: other/azure-pipelines/build-linux.yml
+        parameters:
+          name: Linux64_CMake
+          buildSystem: cmake
+      - template: other/azure-pipelines/build-linux.yml
+        parameters:
+          name: Linux32_CMake
+          arch: i386
+          buildSystem: cmake
+
+      - template: other/azure-pipelines/build-linux.yml
+        parameters:
+          name: Linux64_Make
+          buildSystem: make
+      - template: other/azure-pipelines/build-linux.yml
+        parameters:
+          name: Linux32_Make
+          arch: i386
+          buildSystem: make
+
+      - template: other/azure-pipelines/build-mac.yml
+        parameters:
+          name: Mac_CMake
+          buildSystem: cmake
+      - template: other/azure-pipelines/build-mac.yml
+        parameters:
+          name: Mac_Make
+          buildSystem: make
+
+      - template: other/azure-pipelines/build-windows.yml
+        parameters:
+          name: Windows64_CMake
+          vmImage: 'vs2015-win2012r2'
+          buildSystem: cmake
+          cmakeGenerator: 'Visual Studio 14 2015 Win64'
+      - template: other/azure-pipelines/build-windows.yml
+        parameters:
+          name: Windows32_CMake
+          vmImage: 'vs2015-win2012r2'
+          buildSystem: cmake
+          cmakeGenerator: 'Visual Studio 14 2015'
+
+      - template: other/azure-pipelines/build-windows.yml
+        parameters:
+          name: Windows_VS
+          vmImage: 'vs2015-win2012r2'
+          buildSystem: vs
