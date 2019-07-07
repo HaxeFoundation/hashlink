@@ -22,6 +22,9 @@ class Sdl {
 		glOptions(major, minor, depth, stencil, flags, samples);
 	}
 
+	public static function setHint(name:String, value:String) {
+		return @:privateAccess hintValue(name.toUtf8(), value.toUtf8());
+	}
 
 	public static dynamic function onGlContextRetry() {
 		return false;
@@ -47,6 +50,7 @@ class Sdl {
 
 	static function initOnce() return false;
 	static function eventLoop( e : Event ) return false;
+	static function hintValue( name : hl.Bytes, value : hl.Bytes ) return false;
 
 	static var event = new Event();
 	public static function processEvents( onEvent : Event -> Bool ) {
@@ -116,4 +120,52 @@ class Sdl {
 		return @:privateAccess String.fromUTF8(detect_keyboard_layout());
 	}
 
+}
+
+@:enum
+abstract SDLHint(String) from String to String {
+
+	var SDL_HINT_FRAMEBUFFER_ACCELERATION =                 "SDL_FRAMEBUFFER_ACCELERATION";
+	var SDL_HINT_RENDER_DRIVER =                            "SDL_RENDER_DRIVER";
+	var SDL_HINT_RENDER_OPENGL_SHADERS =                    "SDL_RENDER_OPENGL_SHADERS";
+	var SDL_HINT_RENDER_DIRECT3D_THREADSAFE =               "SDL_RENDER_DIRECT3D_THREADSAFE";
+	var SDL_HINT_RENDER_DIRECT3D11_DEBUG =                  "SDL_RENDER_DIRECT3D11_DEBUG";
+	var SDL_HINT_RENDER_SCALE_QUALITY =                     "SDL_RENDER_SCALE_QUALITY";
+	var SDL_HINT_RENDER_VSYNC =                             "SDL_RENDER_VSYNC";
+	var SDL_HINT_VIDEO_ALLOW_SCREENSAVER =                  "SDL_VIDEO_ALLOW_SCREENSAVER";
+	var SDL_HINT_VIDEO_X11_XVIDMODE =                       "SDL_VIDEO_X11_XVIDMODE";
+	var SDL_HINT_VIDEO_X11_XINERAMA =                       "SDL_VIDEO_X11_XINERAMA";
+	var SDL_HINT_VIDEO_X11_XRANDR =                         "SDL_VIDEO_X11_XRANDR";
+	var SDL_HINT_VIDEO_X11_NET_WM_PING =                    "SDL_VIDEO_X11_NET_WM_PING";
+	var SDL_HINT_WINDOW_FRAME_USABLE_WHILE_CURSOR_HIDDEN =  "SDL_WINDOW_FRAME_USABLE_WHILE_CURSOR_HIDDEN";
+	var SDL_HINT_WINDOWS_ENABLE_MESSAGELOOP =               "SDL_WINDOWS_ENABLE_MESSAGELOOP";
+	var SDL_HINT_GRAB_KEYBOARD =                            "SDL_GRAB_KEYBOARD";
+	var SDL_HINT_MOUSE_RELATIVE_MODE_WARP =                 "SDL_MOUSE_RELATIVE_MODE_WARP";
+	var SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS =             "SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS";
+	var SDL_HINT_IDLE_TIMER_DISABLED =                      "SDL_IOS_IDLE_TIMER_DISABLED";
+	var SDL_HINT_ORIENTATIONS =                             "SDL_IOS_ORIENTATIONS";
+	var SDL_HINT_ACCELEROMETER_AS_JOYSTICK =                "SDL_ACCELEROMETER_AS_JOYSTICK";
+	var SDL_HINT_XINPUT_ENABLED =                           "SDL_XINPUT_ENABLED";
+	var SDL_HINT_XINPUT_USE_OLD_JOYSTICK_MAPPING =          "SDL_XINPUT_USE_OLD_JOYSTICK_MAPPING";
+	var SDL_HINT_GAMECONTROLLERCONFIG =                     "SDL_GAMECONTROLLERCONFIG";
+	var SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS =         "SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS";
+	var SDL_HINT_ALLOW_TOPMOST =                            "SDL_ALLOW_TOPMOST";
+	var SDL_HINT_TIMER_RESOLUTION =                         "SDL_TIMER_RESOLUTION";
+	var SDL_HINT_THREAD_STACK_SIZE =                        "SDL_THREAD_STACK_SIZE";
+	var SDL_HINT_VIDEO_HIGHDPI_DISABLED =                   "SDL_VIDEO_HIGHDPI_DISABLED";
+	var SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK =       "SDL_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK";
+	var SDL_HINT_VIDEO_WIN_D3DCOMPILER =                    "SDL_VIDEO_WIN_D3DCOMPILER";
+	var SDL_HINT_VIDEO_WINDOW_SHARE_PIXEL_FORMAT =          "SDL_VIDEO_WINDOW_SHARE_PIXEL_FORMAT";
+	var SDL_HINT_WINRT_PRIVACY_POLICY_URL =                 "SDL_WINRT_PRIVACY_POLICY_URL";
+	var SDL_HINT_WINRT_PRIVACY_POLICY_LABEL =               "SDL_WINRT_PRIVACY_POLICY_LABEL";
+	var SDL_HINT_WINRT_HANDLE_BACK_BUTTON =                 "SDL_WINRT_HANDLE_BACK_BUTTON";
+	var SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES =              "SDL_VIDEO_MAC_FULLSCREEN_SPACES";
+	var SDL_HINT_MAC_BACKGROUND_APP =                       "SDL_MAC_BACKGROUND_APP";
+	var SDL_HINT_ANDROID_APK_EXPANSION_MAIN_FILE_VERSION =  "SDL_ANDROID_APK_EXPANSION_MAIN_FILE_VERSION";
+	var SDL_HINT_ANDROID_APK_EXPANSION_PATCH_FILE_VERSION = "SDL_ANDROID_APK_EXPANSION_PATCH_FILE_VERSION";
+	var SDL_HINT_IME_INTERNAL_EDITING =                     "SDL_IME_INTERNAL_EDITING";
+	var SDL_HINT_ANDROID_SEPARATE_MOUSE_AND_TOUCH =         "SDL_ANDROID_SEPARATE_MOUSE_AND_TOUCH";
+	var SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT =              "SDL_EMSCRIPTEN_KEYBOARD_ELEMENT";
+	var SDL_HINT_NO_SIGNAL_HANDLERS =                       "SDL_NO_SIGNAL_HANDLERS";
+	var SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4 =               "SDL_WINDOWS_NO_CLOSE_ON_ALT_F4";
 }

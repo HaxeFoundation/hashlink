@@ -12,6 +12,7 @@ package sdl;
 	public var keyCode : Int;
 	public var keyRepeat : Bool;
 	public var controller : Int;
+	public var joystick : Int;
 	public var value : Int;
 	public var fingerId : Int;
 	public function new() {
@@ -37,6 +38,13 @@ package sdl;
 	var TouchDown	= 200;
 	var TouchUp		= 201;
 	var TouchMove	= 202;
+	var JoystickAxisMotion	= 300;
+	var JoystickBallMotion	= 301;
+	var JoystickHatMotion	= 302;
+	var JoystickButtonDown	= 303;
+	var JoystickButtonUp	= 304;
+	var JoystickAdded		= 305;
+	var JoystickRemoved		= 306;
 }
 
 @:enum abstract WindowStateChange(Int) {
