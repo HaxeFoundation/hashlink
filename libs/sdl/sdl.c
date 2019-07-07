@@ -702,15 +702,15 @@ HL_PRIM vbyte *HL_NAME(joy_get_name)(SDL_Joystick *joystick) {
 	return (vbyte*)SDL_JoystickName(joystick);
 }
 
-#define TGCTRL _ABSTRACT(sdl_joystick)
+#define TJOY _ABSTRACT(sdl_joystick)
 DEFINE_PRIM(_I32, joy_count, _NO_ARG);
-DEFINE_PRIM(TGCTRL, joy_open, _I32);
-DEFINE_PRIM(_VOID, joy_close, TGCTRL);
-DEFINE_PRIM(_I32, joy_get_axis, TGCTRL _I32);
-DEFINE_PRIM(_I32, joy_get_hat, TGCTRL _I32);
-DEFINE_PRIM(_BOOL, joy_get_button, TGCTRL _I32);
-DEFINE_PRIM(_I32, joy_get_id, TGCTRL);
-DEFINE_PRIM(_BYTES, joy_get_name, TGCTRL);
+DEFINE_PRIM(TJOY, joy_open, _I32);
+DEFINE_PRIM(_VOID, joy_close, TJOY);
+DEFINE_PRIM(_I32, joy_get_axis, TJOY _I32);
+DEFINE_PRIM(_I32, joy_get_hat, TJOY _I32);
+DEFINE_PRIM(_BOOL, joy_get_button, TJOY _I32);
+DEFINE_PRIM(_I32, joy_get_id, TJOY);
+DEFINE_PRIM(_BYTES, joy_get_name, TJOY);
 
 // surface
 
