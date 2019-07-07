@@ -49,7 +49,7 @@ class Sdl {
 	static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int, samples : Int ) {}
 
 	static function initOnce() return false;
-	static function eventLoop( e : Event ) return false;
+	static function eventLoop( e : Dynamic ) return false;
 	static function hintValue( name : hl.Bytes, value : hl.Bytes ) return false;
 
 	static var event = new Event();
