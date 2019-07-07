@@ -10,6 +10,7 @@ package sdl;
 	public var wheelDelta : Int;
 	public var state : WindowStateChange;
 	public var keyCode : Int;
+	public var scanCode : Int;
 	public var keyRepeat : Bool;
 	public var controller : Int;
 	public var value : Int;

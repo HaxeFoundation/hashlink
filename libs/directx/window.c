@@ -46,6 +46,7 @@ typedef struct {
 	int wheelDelta;
 	WindowStateChange state;
 	int keyCode;
+	int scanCode;
 	bool keyRepeat;
 	int controller;
 	int value;
@@ -176,11 +177,12 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		// see 
 		e = addEvent(wnd,(umsg == WM_KEYUP || umsg == WM_SYSKEYUP) ? KeyUp : KeyDown);
 		e->keyCode = (int)wparam;
+		e->scanCode = (lparam >> 16) & 0xFF;
 		e->keyRepeat = repeat;
 		// L/R location
 		if( e->keyCode == VK_SHIFT ) {
 			bool right = MapVirtualKey((lparam >> 16) & 0xFF, MAPVK_VSC_TO_VK_EX) == VK_RSHIFT;
-			e->keyCode |= right ? 512 : 256;			
+			e->keyCode |= right ? 512 : 256;
 			e->keyRepeat = false;
 			shift_downs[right?1:0] = e->type == KeyDown;
 		}
