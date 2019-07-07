@@ -613,7 +613,7 @@ HL_API double hl_dyn_castd( void *data, hl_type *t );
 #define hl_invalid_comparison 0xAABBCCDD
 HL_API int hl_dyn_compare( vdynamic *a, vdynamic *b );
 HL_API vdynamic *hl_make_dyn( void *data, hl_type *t );
-HL_API void hl_write_dyn( void *data, hl_type *t, vdynamic *v );
+HL_API void hl_write_dyn( void *data, hl_type *t, vdynamic *v, bool is_tmp );
 
 HL_API void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
 HL_API void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
