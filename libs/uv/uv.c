@@ -60,7 +60,7 @@
 
 // Haxe types
 
-#define _ERROR _OBJ(_OBJ(_BYTES _I32))
+#define _ERROR _DYN
 #define _STAT _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32)
 
 // Callback types
@@ -323,26 +323,43 @@ UV_FS_HANDLER(handle_fs_cb_scandir, varray *, {
 	UV_REQ_WRAP_LOOP(name, uv_fs_t, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, ffi ffihandler, handler); \
 	UV_REQ_WRAP_LOOP_SYNC(name, ret, uv_fs_t, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, ffiret, ffi, handler, doret)
 
+/**
+	FIXME:
+		w_fs_read, w_fs_write, w_fs_read_sync, and w_fs_write_sync
+		have a signature different from libuv due to no struct passing support in
+		hashlink; currently only a single uv_buf_t can be passed at a time.
+**/
+
 HL_PRIM void HL_NAME(w_fs_read)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset, vclosure *cb) {
-	// note: signature different due to no struct passing support in HL
-	// currently only a single uv_buf_t can be passed at a time
 	UV_ALLOC_CHECK(req, uv_fs_t);
 	UV_REQ_DATA(req) = (void *)cb;
 	UV_ERROR_CHECK_C(uv_fs_read(loop, req, file, buf, 1, offset, handle_fs_cb_int), free(req));
 	hl_add_root(UV_REQ_DATA(req));
 }
 
+HL_PRIM int HL_NAME(w_fs_read_sync)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset) {
+	UV_ALLOC_CHECK(req, uv_fs_t);
+	UV_ERROR_CHECK_C(uv_fs_read(loop, req, file, buf, 1, offset, NULL), free(req));
+	return handle_fs_cb_int_sync(req);
+}
+
 HL_PRIM void HL_NAME(w_fs_write)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset, vclosure *cb) {
-	// note: signature different due to no struct passing support in HL
-	// currently only a single uv_buf_t can be passed at a time
 	UV_ALLOC_CHECK(req, uv_fs_t);
 	UV_REQ_DATA(req) = (void *)cb;
 	UV_ERROR_CHECK_C(uv_fs_write(loop, req, file, buf, 1, offset, handle_fs_cb_int), free(req));
 	hl_add_root(UV_REQ_DATA(req));
 }
 
+HL_PRIM int HL_NAME(w_fs_write_sync)(uv_loop_t *loop, uv_file file, const uv_buf_t *buf, int32_t offset) {
+	UV_ALLOC_CHECK(req, uv_fs_t);
+	UV_ERROR_CHECK_C(uv_fs_write(loop, req, file, buf, 1, offset, NULL), free(req));
+	return handle_fs_cb_int_sync(req);
+}
+
 DEFINE_PRIM(_VOID, w_fs_read, _LOOP _FILE _BUF _I32 _CB_INT);
+DEFINE_PRIM(_I32, w_fs_read_sync, _LOOP _FILE _BUF _I32);
 DEFINE_PRIM(_VOID, w_fs_write, _LOOP _FILE _BUF _I32 _CB_INT);
+DEFINE_PRIM(_I32, w_fs_write_sync, _LOOP _FILE _BUF _I32);
 
 FS_WRAP1_LOOP(fs_close, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
 FS_WRAP3_LOOP(fs_open, uv_file, const char*, int, int, _FILE, _BYTES _I32 _I32, _CB_FILE, handle_fs_cb_file, return);
@@ -357,8 +374,8 @@ FS_WRAP1_LOOP(fs_lstat, vdynamic *, const char*, _STAT, _BYTES, _CB_STAT, handle
 FS_WRAP2_LOOP(fs_rename, void, const char*, const char*, _VOID, _BYTES _BYTES, _CB, handle_fs_cb, );
 FS_WRAP1_LOOP(fs_fsync, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
 FS_WRAP1_LOOP(fs_fdatasync, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
-FS_WRAP2_LOOP(fs_ftruncate, void, uv_file, int64_t, _VOID, _FILE _I64, _CB, handle_fs_cb, );
-FS_WRAP4_LOOP(fs_sendfile, void, uv_file, uv_file, int64_t, size_t, _VOID, _FILE _FILE _I64 _I64, _CB, handle_fs_cb, );
+FS_WRAP2_LOOP(fs_ftruncate, void, uv_file, int64_t, _VOID, _FILE _I32, _CB, handle_fs_cb, );
+FS_WRAP4_LOOP(fs_sendfile, void, uv_file, uv_file, int64_t, size_t, _VOID, _FILE _FILE _I32 _I32, _CB, handle_fs_cb, );
 FS_WRAP2_LOOP(fs_access, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
 FS_WRAP2_LOOP(fs_chmod, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
 FS_WRAP2_LOOP(fs_fchmod, void, uv_file, int, _VOID, _FILE _I32, _CB, handle_fs_cb, );
