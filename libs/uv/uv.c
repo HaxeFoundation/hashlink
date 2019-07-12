@@ -72,6 +72,7 @@
 #define _CB_FILE _FUN(_VOID, _ERROR _FILE)
 #define _CB_STAT _FUN(_VOID, _ERROR _STAT)
 #define _CB_SCANDIR _FUN(_VOID, _ERROR _ARR)
+#define _CB_FS_EVENT _FUN(_VOID, _ERROR _BYTES _I32)
 #define _CB_GAI _FUN(_VOID, _ERROR _ARR)
 #define _CB_GNI _FUN(_VOID, _ERROR _BYTES _BYTES)
 #define _CB_UDP_RECV _FUN(_VOID, _ERROR _BYTES _I32 _DYN)
@@ -88,7 +89,7 @@
 
 // ------------- HAXE CONSTRUCTORS ----------------------------------
 
-static vdynamic * (*construct_error)(vbyte *);
+static vdynamic * (*construct_error)(vbyte *, int);
 static vdynamic * (*construct_fs_stat)(int, int, int, int, int, int, int, int, int, int, int, int);
 static vdynamic * (*construct_fs_dirent)(const char *name, int type);
 static vdynamic * (*construct_addrinfo_ipv4)(int ip);
@@ -103,7 +104,7 @@ HL_PRIM void HL_NAME(glue_register)(
 	vclosure *c_addrinfo_ipv6,
 	vclosure *c_addrport
 ) {
-	construct_error = (vdynamic * (*)(vbyte *))c_error->fun;
+	construct_error = (vdynamic * (*)(vbyte *, int))c_error->fun;
 	construct_fs_stat = (vdynamic * (*)(int, int, int, int, int, int, int, int, int, int, int, int))c_fs_stat->fun;
 	construct_fs_dirent = (vdynamic * (*)(const char *, int))c_fs_dirent->fun;
 	construct_addrinfo_ipv4 = (vdynamic * (*)(int))c_addrinfo_ipv4->fun;
@@ -111,25 +112,25 @@ HL_PRIM void HL_NAME(glue_register)(
 	construct_addrport = (vdynamic * (*)(vdynamic *, int))c_addrport->fun;
 }
 
-DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32) _FUN(_DYN, _BYTES _I32) _FUN(_DYN, _I32) _FUN(_DYN, _BYTES) _FUN(_DYN, _DYN _I32));
+DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES _I32) _FUN(_DYN, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32) _FUN(_DYN, _BYTES _I32) _FUN(_DYN, _I32) _FUN(_DYN, _BYTES) _FUN(_DYN, _DYN _I32));
 
 // ------------- ERROR HANDLING -------------------------------------
 
 #define UV_ALLOC_CHECK(var, type) \
 	type *var = UV_ALLOC(type); \
 	if (var == NULL) { \
-		hl_throw(construct_error((vbyte *)"malloc " #type " failed")); \
+		hl_throw(construct_error((vbyte *)"malloc " #type " failed", 0)); \
 	} else {}
 #define UV_ALLOC_CHECK_C(var, type, cleanup) \
 	type *var = UV_ALLOC(type); \
 	if (var == NULL) { \
 		cleanup; \
-		hl_throw(construct_error((vbyte *)"malloc " #type " failed")); \
+		hl_throw(construct_error((vbyte *)"malloc " #type " failed", 0)); \
 	} else {}
 #define UV_ERROR_CHECK(expr) do { \
 		int __tmp_result = expr; \
 		if (__tmp_result < 0) { \
-			vdynamic *err = construct_error((vbyte *)strdup(uv_strerror(__tmp_result))); \
+			vdynamic *err = construct_error((vbyte *)strdup(uv_strerror(__tmp_result)), __tmp_result); \
 			hl_throw(err); \
 		} \
 	} while (0)
@@ -137,7 +138,7 @@ DEFINE_PRIM(_VOID, glue_register, _FUN(_DYN, _BYTES) _FUN(_DYN, _I32 _I32 _I32 _
 		int __tmp_result = expr; \
 		if (__tmp_result < 0) { \
 			cleanup; \
-			vdynamic *err = construct_error((vbyte *)strdup(uv_strerror(__tmp_result))); \
+			vdynamic *err = construct_error((vbyte *)strdup(uv_strerror(__tmp_result)), __tmp_result); \
 			hl_throw(err); \
 		} \
 	} while (0)
@@ -209,7 +210,7 @@ static void w_close(uv_handle_t *handle, vclosure *cb) {
 static void handle_fs_cb(uv_fs_t *req) {
 	vclosure *cb = UV_REQ_DATA(req);
 	if (req->result < 0)
-		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(req->result))));
+		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(req->result)), req->result));
 	else
 		hl_call1(void, cb, vdynamic *, NULL);
 	uv_fs_req_cleanup(req);
@@ -227,7 +228,7 @@ static void handle_fs_cb_sync(uv_fs_t *req) {
 	static void name(uv_fs_t *req) { \
 		vclosure *cb = UV_REQ_DATA(req); \
 		if (req->result < 0) \
-			hl_call2(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(req->result))), type2, (type2)0); \
+			hl_call2(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(req->result)), req->result), type2, (type2)0); \
 		else { \
 			type2 value2; \
 			setup; \
@@ -388,6 +389,38 @@ FS_WRAP1_LOOP(fs_realpath, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle
 FS_WRAP3_LOOP(fs_chown, void, const char*, uv_uid_t, uv_gid_t, _VOID, _BYTES _I32 _I32, _CB, handle_fs_cb, );
 FS_WRAP3_LOOP(fs_fchown, void, uv_file, uv_uid_t, uv_gid_t, _VOID, _FILE _I32 _I32, _CB, handle_fs_cb, );
 
+// ------------- FILESYSTEM EVENTS ----------------------------------
+
+static void handle_fs_event_cb(uv_fs_event_t *handle, const char *filename, int events, int status) {
+	vclosure *cb = UV_HANDLE_DATA(handle);
+	if (status < 0)
+		hl_call3(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status)), status), vbyte *, NULL, int, 0);
+	else
+		hl_call3(void, cb, vdynamic *, NULL, vbyte *, (vbyte *)hl_to_utf16((const char *)filename), int, events);
+}
+
+HL_PRIM uv_fs_event_t *HL_NAME(w_fs_event_init)(uv_loop_t *loop) {
+	UV_ALLOC_CHECK(handle, uv_fs_event_t);
+	UV_ERROR_CHECK_C(uv_fs_event_init(loop, handle), free(handle));
+	return handle;
+}
+
+HL_PRIM void HL_NAME(w_fs_event_start)(uv_fs_event_t *handle, const char *path, int flags, vclosure *cb) {
+	UV_HANDLE_DATA(handle) = (void *)cb;
+	UV_ERROR_CHECK_C(uv_fs_event_start(handle, handle_fs_event_cb, path, flags), free(handle));
+	hl_add_root(UV_HANDLE_DATA(handle));
+}
+
+HL_PRIM void HL_NAME(w_fs_event_stop)(uv_fs_event_t *handle) {
+	UV_ERROR_CHECK_C(uv_fs_event_stop(handle), free(handle));
+	hl_remove_root(UV_HANDLE_DATA(handle));
+	free(handle);
+}
+
+DEFINE_PRIM(_FS_EVENT, w_fs_event_init, _LOOP);
+DEFINE_PRIM(_VOID, w_fs_event_start, _FS_EVENT _BYTES _I32 _CB_FS_EVENT);
+DEFINE_PRIM(_VOID, w_fs_event_stop, _FS_EVENT);
+
 // ------------- STREAM ---------------------------------------------
 
 typedef struct {
@@ -399,7 +432,7 @@ typedef struct {
 static void handle_stream_cb(uv_req_t *req, int status) {
 	vclosure *cb = UV_REQ_DATA(req);
 	if (status < 0)
-		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))));
+		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status)), status));
 	else
 		hl_call1(void, cb, vdynamic *, NULL);
 	hl_remove_root(UV_REQ_DATA(req));
@@ -409,7 +442,7 @@ static void handle_stream_cb(uv_req_t *req, int status) {
 static void handle_stream_cb_connection(uv_stream_t *stream, int status) {
 	vclosure *cb = UV_HANDLE_DATA_SUB(stream, uv_w_stream_t)->cb_connection;
 	if (status < 0)
-		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))));
+		hl_call1(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status)), status));
 	else
 		hl_call1(void, cb, vdynamic *, NULL);
 }
@@ -422,7 +455,7 @@ static void handle_stream_cb_alloc(uv_handle_t *handle, size_t suggested_size, u
 static void handle_stream_cb_read(uv_stream_t *stream, long int nread, const uv_buf_t *buf) {
 	vclosure *cb = UV_HANDLE_DATA_SUB(stream, uv_w_stream_t)->cb_read;
 	if (nread < 0)
-		hl_call3(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(nread))), vbyte *, NULL, int, 0);
+		hl_call3(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(nread)), nread), vbyte *, NULL, int, 0);
 	else
 		hl_call3(void, cb, vdynamic *, NULL, vbyte *, (vbyte *)buf->base, int, buf->len);
 }
@@ -553,7 +586,7 @@ typedef struct {
 static void handle_udp_cb_recv(uv_udp_t *handle, long int nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned int flags) {
 	vclosure *cb = UV_HANDLE_DATA_SUB(handle, uv_w_udp_t)->cb_read;
 	if (nread < 0)
-		hl_call4(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(nread))), vbyte *, NULL, int, 0, vdynamic *, NULL);
+		hl_call4(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(nread)), nread), vbyte *, NULL, int, 0, vdynamic *, NULL);
 	else {
 		vdynamic *w_addrport = NULL;
 		if (addr != NULL) {
@@ -632,7 +665,7 @@ DEFINE_PRIM(_VOID, w_udp_recv_stop, _UDP);
 static void handle_dns_gai(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
 	vclosure *cb = UV_REQ_DATA(req);
 	if (status < 0)
-		hl_call2(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))), varray *, NULL);
+		hl_call2(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status)), status), varray *, NULL);
 	else {
 		int count = 0;
 		struct addrinfo *cur;
@@ -676,7 +709,7 @@ HL_PRIM void HL_NAME(w_getaddrinfo)(uv_loop_t *loop, vbyte *node, vbyte *service
 static void handle_dns_gni(uv_getnameinfo_t *req, int status, const char *hostname, const char *service) {
 	vclosure *cb = UV_REQ_DATA(req);
 	if (status < 0)
-		hl_call3(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status))), vbyte *, NULL, vbyte *, NULL);
+		hl_call3(void, cb, vdynamic *, construct_error((vbyte *)strdup(uv_strerror(status)), status), vbyte *, NULL, vbyte *, NULL);
 	else 
 		hl_call3(void, cb, vdynamic *, NULL, vbyte *, (vbyte *)hostname, vbyte *, (vbyte *)service);
 	hl_remove_root(UV_REQ_DATA(req));
