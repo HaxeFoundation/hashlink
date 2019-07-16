@@ -59,7 +59,7 @@ static void HL_NAME(finalize_request)(sqlite_result *r, bool exc ) {
 	r->bools = NULL;
 }
 static void HL_NAME(finalize_result)(sqlite_result *r ) {
-	if (r) HL_NAME(finalize_request)(r, false);
+	if (r && r->db) HL_NAME(finalize_request)(r, false);
 }
 
 /**
@@ -72,9 +72,10 @@ HL_PRIM void HL_NAME(close)( sqlite_database *db ) {
 	if (sqlite3_close(db->db) != SQLITE_OK) {
 		// No exception : we shouldn't alloc memory in a finalizer anyway
 	}
+	db->db = NULL;
 }
 static void HL_NAME(finalize_database)( sqlite_database *db ) {
-	if (db) HL_NAME(close)(db);
+	if (db && db->db) HL_NAME(close)(db);
 }
 
 
