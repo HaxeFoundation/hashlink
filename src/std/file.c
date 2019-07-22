@@ -199,7 +199,7 @@ HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
 	hl_blocking(false);
 	content = (vbyte*)hl_gc_alloc_noptr(size ? len : len+1);
 	hl_blocking(true);
-	if( !size ) content[len] = 0; // final 0 for UTF8
+	if( !size ) content[len] = 0; else if( !len ) content = (vbyte*)""; // final 0 for UTF8
 	while( len > 0 ) {
 		int d = (int)fread((char*)content + p,1,len,f);
 		if( d <= 0 ) {
