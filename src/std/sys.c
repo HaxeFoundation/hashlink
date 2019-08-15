@@ -163,14 +163,18 @@ HL_PRIM void hl_sys_exit( int code ) {
 
 HL_PRIM double hl_sys_time() {
 #ifdef HL_WIN
+	#define EPOCH_DIFF	(134774*24*60*60.0)
 	static double freq = 0.;
 	LARGE_INTEGER time;
+	FILETIME ft;
 	if( freq == 0 ) {
 		QueryPerformanceFrequency(&time);
 		freq = (double)time.QuadPart;
 	}
-	QueryPerformanceCounter(&time);
-	return ((double)time.QuadPart) / freq;
+	GetSystemTimePreciseAsFileTime(&ft);
+	time.LowPart = ft.dwLowDateTime;
+	time.HighPart = ft.dwHighDateTime;
+	return ((double)time.QuadPart) / freq - EPOCH_DIFF;
 #else
 	struct timeval tv;
 	if( gettimeofday(&tv,NULL) != 0 )
