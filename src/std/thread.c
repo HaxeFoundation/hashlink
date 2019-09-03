@@ -348,7 +348,6 @@ typedef struct _hl_lock hl_lock;
 struct _hl_lock {
 	void (*free)( hl_lock * );
 #if !defined(HL_THREADS)
-	void *value;
 #elif defined(HL_WIN)
 	HANDLE wait;
 #else
