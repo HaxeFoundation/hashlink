@@ -104,7 +104,7 @@ HL_PRIM int hl_regexp_matched_pos( ereg *e, int m, int *len ) {
 }
 
 HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
-	int res = pcre16_exec(e->p,&limit,(PCRE_SPTR16)s,pos+len,pos,PCRE_NO_UTF8_CHECK,e->matches,e->nmatches * 3);
+	int res = pcre16_exec(e->p,&limit,(PCRE_SPTR16)s,pos+len,pos,PCRE_NO_UTF16_CHECK,e->matches,e->nmatches * 3);
 	e->matched = res >= 0;
 	if( res >= 0 )
 		return true;
