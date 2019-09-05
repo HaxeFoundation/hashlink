@@ -177,11 +177,7 @@ HL_PRIM double hl_sys_time() {
 	QueryPerformanceCounter(&time);
 
 	if( time_diff == 0 ) {
-		#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
 		GetSystemTimeAsFileTime(&ft);
-		#else
-		GetSystemTimePreciseAsFileTime(&ft);
-		#endif
 		start_time.LowPart = ft.dwLowDateTime;
 		start_time.HighPart = ft.dwHighDateTime;
 		time_diff = ((double)start_time.QuadPart - (double)time.QuadPart) / freq - EPOCH_DIFF;
