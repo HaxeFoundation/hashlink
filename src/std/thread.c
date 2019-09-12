@@ -383,7 +383,6 @@ HL_PRIM hl_lock *hl_lock_create() {
 
 HL_PRIM void hl_lock_release( hl_lock *l ) {
 #	if !defined(HL_THREADS)
-	return true;
 #	elif defined(HL_WIN)
 	ReleaseSemaphore(l->wait,1,NULL);
 #	else
