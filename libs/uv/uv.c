@@ -102,6 +102,17 @@
 #define UV_REQ_DATA(r) (((uv_req_t *)(r))->data)
 #define UV_REQ_DATA_A(r) ((void *)(&UV_REQ_DATA(r)))
 
+// allocate a request, add its callback to GC roots
+#define UV_ALLOC_REQ(name, type, cb) \
+	UV_ALLOC_CHECK(name, type); \
+	UV_REQ_DATA(UV_UNWRAP(name, type)) = (void *)cb; \
+	hl_add_root(UV_REQ_DATA_A(UV_UNWRAP(name, type)));
+
+// free a request, remove its callback from GC roots
+#define UV_FREE_REQ(name) \
+	hl_remove_root(UV_REQ_DATA_A(name)); \
+	free(name);
+
 // malloc a single value of the given type
 #define UV_ALLOC(t) ((t *)malloc(sizeof(t)))
 
@@ -260,8 +271,7 @@ static void handle_fs_cb(uv_fs_t *req) {
 	else
 		hl_call1(void, cb, vdynamic *, NULL);
 	uv_fs_req_cleanup(req);
-	hl_remove_root(UV_REQ_DATA_A(req));
-	free(req);
+	UV_FREE_REQ(req);
 }
 static void handle_fs_cb_sync(uv_fs_t **req_w) {
 	uv_fs_t *req = Fs_val(req_w);
@@ -282,8 +292,7 @@ static void handle_fs_cb_sync(uv_fs_t **req_w) {
 			hl_call2(void, cb, vdynamic *, NULL, type2, value2); \
 		} \
 		uv_fs_req_cleanup(req); \
-		hl_remove_root(UV_REQ_DATA_A(req)); \
-		free(req); \
+		UV_FREE_REQ(req); \
 	} \
 	static type2 name ## _sync(uv_fs_t **req_w) { \
 		uv_fs_t *req = Fs_val(req_w); \
@@ -346,17 +355,15 @@ UV_FS_HANDLER(handle_fs_cb_scandir, varray *, {
 
 #define FS_WRAP(name, ret, sign, precall, call, ffiret, ffi, ffihandler, handler, doret) \
 	HL_PRIM void HL_NAME(w_ ## name)(uv_loop_t **loop, sign, vclosure *cb) { \
-		UV_ALLOC_CHECK(req, uv_fs_t); \
-		UV_REQ_DATA(Fs_val(req)) = (void *)cb; \
-		hl_add_root(UV_REQ_DATA_A(Fs_val(req))); \
+		UV_ALLOC_REQ(req, uv_fs_t, cb); \
 		precall \
-		UV_ERROR_CHECK_C(uv_ ## name(Loop_val(loop), Fs_val(req), call, handler), free(Fs_val(req))); \
+		UV_ERROR_CHECK_C(uv_ ## name(Loop_val(loop), Fs_val(req), call, handler), UV_FREE_REQ(Fs_val(req))); \
 	} \
 	DEFINE_PRIM(_VOID, w_ ## name, _LOOP ffi ffihandler); \
 	HL_PRIM ret HL_NAME(w_ ## name ## _sync)(uv_loop_t **loop, sign) { \
 		UV_ALLOC_CHECK(req, uv_fs_t); \
 		precall \
-		UV_ERROR_CHECK_C(uv_ ## name(Loop_val(loop), Fs_val(req), call, NULL), free(Fs_val(req))); \
+		UV_ERROR_CHECK_C(uv_ ## name(Loop_val(loop), Fs_val(req), call, NULL), UV_FREE_REQ(Fs_val(req))); \
 		doret handler ## _sync(req); \
 	} \
 	DEFINE_PRIM(ffiret, w_ ## name ## _sync, _LOOP ffi);
@@ -620,8 +627,7 @@ static void handle_stream_cb(uv_req_t *req, int status) {
 		hl_call1(void, cb, vdynamic *, construct_error(status));
 	else
 		hl_call1(void, cb, vdynamic *, NULL);
-	hl_remove_root(UV_REQ_DATA_A(req));
-	free(req);
+	UV_FREE_REQ(req);
 }
 
 static void handle_stream_cb_connection(uv_stream_t *stream, int status) {
@@ -646,10 +652,8 @@ static void handle_stream_cb_read(uv_stream_t *stream, long int nread, const uv_
 }
 
 HL_PRIM void HL_NAME(w_shutdown)(uv_stream_t **stream, vclosure *cb) {
-	UV_ALLOC_CHECK(req, uv_shutdown_t);
-	UV_REQ_DATA(Shutdown_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(Shutdown_val(req)));
-	UV_ERROR_CHECK_C(uv_shutdown(Shutdown_val(req), Stream_val(stream), (void (*)(uv_shutdown_t *, int))handle_stream_cb), free(Shutdown_val(req)));
+	UV_ALLOC_REQ(req, uv_shutdown_t, cb);
+	UV_ERROR_CHECK_C(uv_shutdown(Shutdown_val(req), Stream_val(stream), (void (*)(uv_shutdown_t *, int))handle_stream_cb), UV_FREE_REQ(Shutdown_val(req)));
 }
 DEFINE_PRIM(_VOID, w_shutdown, _STREAM _CB);
 
@@ -660,11 +664,9 @@ HL_PRIM void HL_NAME(w_listen)(uv_stream_t **stream, int backlog, vclosure *cb) 
 DEFINE_PRIM(_VOID, w_listen, _STREAM _I32 _CB);
 
 HL_PRIM void HL_NAME(w_write)(uv_stream_t **stream, const vbyte *data, int length, vclosure *cb) {
-	UV_ALLOC_CHECK(req, uv_write_t);
-	UV_REQ_DATA(Write_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(Write_val(req)));
+	UV_ALLOC_REQ(req, uv_write_t, cb);
 	uv_buf_t buf = uv_buf_init((char *)data, length);
-	UV_ERROR_CHECK_C(uv_write(Write_val(req), Stream_val(stream), &buf, 1, (void (*)(uv_write_t *, int))handle_stream_cb), free(Write_val(req)));
+	UV_ERROR_CHECK_C(uv_write(Write_val(req), Stream_val(stream), &buf, 1, (void (*)(uv_write_t *, int))handle_stream_cb), UV_FREE_REQ(Write_val(req)));
 }
 DEFINE_PRIM(_VOID, w_write, _STREAM _BYTES _I32 _CB);
 
@@ -736,19 +738,15 @@ DEFINE_PRIM(_VOID, w_tcp_bind_ipv6, _TCP _BYTES _I32 _BOOL);
 
 HL_PRIM void HL_NAME(w_tcp_connect_ipv4)(uv_tcp_t **handle, int host, int port, vclosure *cb) {
 	UV_SOCKADDR_IPV4(addr, host, port);
-	UV_ALLOC_CHECK(req, uv_connect_t);
-	UV_REQ_DATA(Connect_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(Connect_val(req)));
-	UV_ERROR_CHECK_C(uv_tcp_connect(Connect_val(req), Tcp_val(handle), (const struct sockaddr *)&addr, (void (*)(uv_connect_t *, int))handle_stream_cb), free(Connect_val(req)));
+	UV_ALLOC_REQ(req, uv_connect_t, cb);
+	UV_ERROR_CHECK_C(uv_tcp_connect(Connect_val(req), Tcp_val(handle), (const struct sockaddr *)&addr, (void (*)(uv_connect_t *, int))handle_stream_cb), UV_FREE_REQ(Connect_val(req)));
 }
 DEFINE_PRIM(_VOID, w_tcp_connect_ipv4, _TCP _I32 _I32 _CB);
 
 HL_PRIM void HL_NAME(w_tcp_connect_ipv6)(uv_tcp_t **handle, vbyte *host, int port, vclosure *cb) {
 	UV_SOCKADDR_IPV6(addr, host, port);
-	UV_ALLOC_CHECK(req, uv_connect_t);
-	UV_REQ_DATA(Connect_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(Connect_val(req)));
-	UV_ERROR_CHECK_C(uv_tcp_connect(Connect_val(req), Tcp_val(handle), (const struct sockaddr *)&addr, (void (*)(uv_connect_t *, int))handle_stream_cb), free(Connect_val(req)));
+	UV_ALLOC_REQ(req, uv_connect_t, cb);
+	UV_ERROR_CHECK_C(uv_tcp_connect(Connect_val(req), Tcp_val(handle), (const struct sockaddr *)&addr, (void (*)(uv_connect_t *, int))handle_stream_cb), UV_FREE_REQ(Connect_val(req)));
 }
 DEFINE_PRIM(_VOID, w_tcp_connect_ipv6, _TCP _BYTES _I32 _CB);
 
@@ -846,21 +844,17 @@ DEFINE_PRIM(_VOID, w_udp_bind_ipv6, _UDP _BYTES _I32 _BOOL);
 
 HL_PRIM void HL_NAME(w_udp_send_ipv4)(uv_udp_t **handle, vbyte *data, int length, int host, int port, vclosure *cb) {
 	UV_SOCKADDR_IPV4(addr, host, port);
-	UV_ALLOC_CHECK(req, uv_udp_send_t);
-	UV_REQ_DATA(UdpSend_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(UdpSend_val(req)));
+	UV_ALLOC_REQ(req, uv_udp_send_t, cb);
 	uv_buf_t buf = uv_buf_init((char *)data, length);
-	UV_ERROR_CHECK_C(uv_udp_send(UdpSend_val(req), Udp_val(handle), &buf, 1, (const struct sockaddr *)&addr, (void (*)(uv_udp_send_t *, int))handle_stream_cb), free(UdpSend_val(req)));
+	UV_ERROR_CHECK_C(uv_udp_send(UdpSend_val(req), Udp_val(handle), &buf, 1, (const struct sockaddr *)&addr, (void (*)(uv_udp_send_t *, int))handle_stream_cb), UV_FREE_REQ(UdpSend_val(req)));
 }
 DEFINE_PRIM(_VOID, w_udp_send_ipv4, _UDP _BYTES _I32 _I32 _I32 _CB);
 
 HL_PRIM void HL_NAME(w_udp_send_ipv6)(uv_udp_t **handle, vbyte *data, int length, vbyte *host, int port, vclosure *cb) {
 	UV_SOCKADDR_IPV6(addr, host, port);
-	UV_ALLOC_CHECK(req, uv_udp_send_t);
-	UV_REQ_DATA(UdpSend_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(UdpSend_val(req)));
+	UV_ALLOC_REQ(req, uv_udp_send_t, cb);
 	uv_buf_t buf = uv_buf_init((char *)data, length);
-	UV_ERROR_CHECK_C(uv_udp_send(UdpSend_val(req), Udp_val(handle), &buf, 1, (const struct sockaddr *)&addr, (void (*)(uv_udp_send_t *, int))handle_stream_cb), free(UdpSend_val(req)));
+	UV_ERROR_CHECK_C(uv_udp_send(UdpSend_val(req), Udp_val(handle), &buf, 1, (const struct sockaddr *)&addr, (void (*)(uv_udp_send_t *, int))handle_stream_cb), UV_FREE_REQ(UdpSend_val(req)));
 }
 DEFINE_PRIM(_VOID, w_udp_send_ipv6, _UDP _BYTES _I32 _BYTES _I32 _CB);
 
@@ -967,14 +961,11 @@ static void handle_dns_gai_cb(uv_getaddrinfo_t *req, int status, struct addrinfo
 		uv_freeaddrinfo(res);
 		hl_call2(void, cb, vdynamic *, NULL, varray *, arr);
 	}
-	hl_remove_root(UV_REQ_DATA_A(req));
-	free(req);
+	UV_FREE_REQ(req);
 }
 
 HL_PRIM void HL_NAME(w_dns_getaddrinfo)(uv_loop_t **loop, vbyte *node, bool flag_addrconfig, bool flag_v4mapped, int hint_family, vclosure *cb) {
-	UV_ALLOC_CHECK(req, uv_getaddrinfo_t);
-	UV_REQ_DATA(GetAddrInfo_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(GetAddrInfo_val(req)));
+	UV_ALLOC_REQ(req, uv_getaddrinfo_t, cb);
 	int hint_flags_u = 0;
 	if (flag_addrconfig)
 		hint_flags_u |= AI_ADDRCONFIG;
@@ -995,7 +986,7 @@ HL_PRIM void HL_NAME(w_dns_getaddrinfo)(uv_loop_t **loop, vbyte *node, bool flag
 		.ai_canonname = NULL,
 		.ai_next = NULL
 	};
-	UV_ERROR_CHECK_C(uv_getaddrinfo(Loop_val(loop), GetAddrInfo_val(req), handle_dns_gai_cb, (char *)node, NULL, &hints), free(GetAddrInfo_val(req)));
+	UV_ERROR_CHECK_C(uv_getaddrinfo(Loop_val(loop), GetAddrInfo_val(req), handle_dns_gai_cb, (char *)node, NULL, &hints), UV_FREE_REQ(GetAddrInfo_val(req)));
 }
 DEFINE_PRIM(_VOID, w_dns_getaddrinfo, _LOOP _BYTES _BOOL _BOOL _I32 _CB_GAI);
 
@@ -1006,24 +997,19 @@ static void handle_dns_gni(uv_getnameinfo_t *req, int status, const char *hostna
 		hl_call3(void, cb, vdynamic *, construct_error(status), vbyte *, NULL, vbyte *, NULL);
 	else 
 		hl_call3(void, cb, vdynamic *, NULL, vbyte *, (vbyte *)hostname, vbyte *, (vbyte *)service);
-	hl_remove_root(UV_REQ_DATA_A(req));
-	free(req);
+	UV_FREE_REQ(req);
 }
 
 HL_PRIM void HL_NAME(w_getnameinfo_ipv4)(uv_loop_t *loop, int ip, int flags, vclosure *cb) {
 	UV_SOCKADDR_IPV4(addr, ip, 0);
-	UV_ALLOC_CHECK(req, uv_getnameinfo_t);
-	UV_REQ_DATA(req) = (void *)cb;
-	UV_ERROR_CHECK_C(uv_getnameinfo(loop, req, handle_dns_gni, (const struct sockaddr *)&addr, flags), free(req));
-	hl_add_root(UV_REQ_DATA_A(req));
+	UV_ALLOC_REQ(req, uv_getnameinfo_t, cb);
+	UV_ERROR_CHECK_C(uv_getnameinfo(loop, req, handle_dns_gni, (const struct sockaddr *)&addr, flags), UV_FREE_REQ(GetNameInfo_val(req)));
 }
 
 HL_PRIM void HL_NAME(w_getnameinfo_ipv6)(uv_loop_t *loop, vbyte *ip, int flags, vclosure *cb) {
 	UV_SOCKADDR_IPV6(addr, ip, 0);
-	UV_ALLOC_CHECK(req, uv_getnameinfo_t);
-	UV_REQ_DATA(req) = (void *)cb;
-	UV_ERROR_CHECK_C(uv_getnameinfo(loop, req, handle_dns_gni, (const struct sockaddr *)&addr, flags), free(req));
-	hl_add_root(UV_REQ_DATA_A(req));
+	UV_ALLOC_REQ(req, uv_getnameinfo_t, cb);
+	UV_ERROR_CHECK_C(uv_getnameinfo(loop, req, handle_dns_gni, (const struct sockaddr *)&addr, flags), UV_FREE_REQ(GetNameInfo_val(req)));
 }
 
 DEFINE_PRIM(_VOID, w_getnameinfo_ipv4, _LOOP _I32 _I32 _CB_GNI);
@@ -1190,9 +1176,7 @@ HL_PRIM void HL_NAME(w_pipe_bind_ipc)(uv_pipe_t **handle, const char *path) {
 DEFINE_PRIM(_VOID, w_pipe_bind_ipc, _PIPE _BYTES);
 
 HL_PRIM void HL_NAME(w_pipe_connect_ipc)(uv_pipe_t **handle, const char *path, vclosure *cb) {
-	UV_ALLOC_CHECK(req, uv_connect_t);
-	UV_REQ_DATA(Connect_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(Connect_val(req)));
+	UV_ALLOC_REQ(req, uv_connect_t, cb);
 	uv_pipe_connect(Connect_val(req), Pipe_val(handle), path, (void (*)(uv_connect_t *, int))handle_stream_cb);
 }
 DEFINE_PRIM(_VOID, w_pipe_connect_ipc, _PIPE _BYTES _CB);
@@ -1249,11 +1233,9 @@ HL_PRIM vbyte *HL_NAME(w_pipe_getpeername)(uv_pipe_t **handle) {
 DEFINE_PRIM(_BYTES, w_pipe_getpeername, _PIPE);
 
 HL_PRIM void HL_NAME(w_pipe_write_handle)(uv_pipe_t **handle, vbyte *data, int length, uv_stream_t **send_handle, vclosure *cb) {
-	UV_ALLOC_CHECK(req, uv_write_t);
-	UV_REQ_DATA(Write_val(req)) = (void *)cb;
-	hl_add_root(UV_REQ_DATA_A(Write_val(req)));
+	UV_ALLOC_REQ(req, uv_write_t, cb);
 	uv_buf_t buf = uv_buf_init((char *)data, length);
-	UV_ERROR_CHECK_C(uv_write2(Write_val(req), Stream_val(handle), &buf, 1, Stream_val(send_handle), (void (*)(uv_write_t *, int))handle_stream_cb), free(Write_val(req)));
+	UV_ERROR_CHECK_C(uv_write2(Write_val(req), Stream_val(handle), &buf, 1, Stream_val(send_handle), (void (*)(uv_write_t *, int))handle_stream_cb), UV_FREE_REQ(Write_val(req)));
 }
 DEFINE_PRIM(_VOID, w_pipe_write_handle, _PIPE _BYTES _I32 _STREAM _CB);
 
