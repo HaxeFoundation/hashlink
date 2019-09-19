@@ -167,8 +167,6 @@ HL_PRIM double hl_sys_time() {
 	static double time_diff = 0.;
 	static double freq = 0.;
 	LARGE_INTEGER time;
-	LARGE_INTEGER start_time;
-	FILETIME ft;
 
 	if( freq == 0 ) {
 		QueryPerformanceFrequency(&time);
@@ -176,12 +174,16 @@ HL_PRIM double hl_sys_time() {
 	}
 	QueryPerformanceCounter(&time);
 
+#	ifndef HL_CONSOLE
 	if( time_diff == 0 ) {
+		FILETIME ft;
+		LARGE_INTEGER start_time;
 		GetSystemTimeAsFileTime(&ft);
 		start_time.LowPart = ft.dwLowDateTime;
 		start_time.HighPart = ft.dwHighDateTime;
 		time_diff = ((double)start_time.QuadPart - (double)time.QuadPart) / freq - EPOCH_DIFF;
 	}
+#	endif
 
 	return time_diff + ((double)time.QuadPart) / freq;
 #else
