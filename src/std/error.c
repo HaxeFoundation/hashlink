@@ -33,7 +33,11 @@ HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
     HWND consoleWnd = GetConsoleWindow();
     DWORD pid;
     GetWindowThreadProcessId(consoleWnd, &pid);
-    if( consoleWnd == NULL || GetActiveWindow() != NULL || GetCurrentProcessId() == pid ) MessageBoxA(NULL,msg,"Fatal Error", MB_OK | MB_ICONERROR);
+    if( consoleWnd == NULL || GetActiveWindow() != NULL || GetCurrentProcessId() == pid ) {
+		char buf[256];
+		sprintf(buf,"%s\n\n%s(%d)",msg,file,line);
+		MessageBoxA(NULL,buf,"Fatal Error", MB_OK | MB_ICONERROR);
+	}
 #	endif
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
 	hl_blocking(false);
