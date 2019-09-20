@@ -109,7 +109,7 @@ HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
 	if( res >= 0 )
 		return true;
 	if( res != PCRE_ERROR_NOMATCH )
-		hl_error("An error occured while running pcre_exec");
+		hl_error("An error occurred while running pcre_exec");
 	return false;
 }
 
