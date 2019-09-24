@@ -41,6 +41,7 @@
 #define _FS_EVENT _UV(uv_fs_event_t)
 #define _FS_POLL _UV(uv_fs_poll_t)
 #define _SIGNAL _UV(uv_signal_t)
+#define _MUTEX _UV(uv_mutex_t)
 
 // Request types
 
@@ -125,6 +126,7 @@
 #define GetAddrInfo_val(v) UV_UNWRAP(v, uv_getaddrinfo_t)
 #define Handle_val(v) UV_UNWRAP(v, uv_handle_t)
 #define Loop_val(v) UV_UNWRAP(v, uv_loop_t)
+#define Mutex_val(v) UV_UNWRAP(v, uv_mutex_t)
 #define Pipe_val(v) UV_UNWRAP(v, uv_pipe_t)
 #define Process_val(v) UV_UNWRAP(v, uv_process_t)
 #define Shutdown_val(v) UV_UNWRAP(v, uv_shutdown_t)
@@ -133,6 +135,7 @@
 #define Timer_val(v) UV_UNWRAP(v, uv_timer_t)
 #define Udp_val(v) UV_UNWRAP(v, uv_udp_t)
 #define UdpSend_val(v) UV_UNWRAP(v, uv_udp_send_t)
+#define Work_val(v) UV_UNWRAP(v, uv_work_t)
 #define Write_val(v) UV_UNWRAP(v, uv_write_t)
 
 // ------------- HAXE CONSTRUCTORS ----------------------------------
@@ -1180,6 +1183,54 @@ HL_PRIM void HL_NAME(w_pipe_write_handle)(uv_pipe_t **handle, vbyte *data, int l
 	UV_ERROR_CHECK_C(uv_write2(Write_val(req), Stream_val(handle), &buf, 1, Stream_val(send_handle), (void (*)(uv_write_t *, int))handle_stream_cb), UV_FREE_REQ(Write_val(req)));
 }
 DEFINE_PRIM(_VOID, w_pipe_write_handle, _PIPE _BYTES _I32 _STREAM _CB);
+
+// ------------- THREADS --------------------------------------------
+
+static void handle_thread_cb(uv_work_t *req) {
+	vclosure *cb = UV_REQ_DATA(req);
+	hl_call0(void, cb);
+}
+
+static void handle_thread_done_cb(uv_work_t *req, int status) {
+	// TODO: what to do with status? throw in main thread if <0 ?
+	UV_FREE_REQ(req);
+}
+
+HL_PRIM uv_work_t **HL_NAME(w_thread_create)(uv_loop_t **loop, vclosure *cb) {
+	UV_ALLOC_REQ(req, uv_work_t, cb);
+	UV_ERROR_CHECK_C(uv_queue_work(Loop_val(loop), Work_val(req), handle_thread_cb, handle_thread_done_cb), UV_FREE_REQ(Work_val(req)));
+	return req;
+}
+DEFINE_PRIM(_WORK, w_thread_create, _CB);
+
+HL_PRIM void HL_NAME(w_thread_kill)(uv_work_t **thread) {
+	uv_cancel((uv_req_t *)Work_val(thread));
+}
+DEFINE_PRIM(_VOID, w_thread_kill, _WORK);
+
+// ------------- MUTEX ----------------------------------------------
+
+HL_PRIM uv_mutex_t **HL_NAME(w_mutex_init)(void) {
+	UV_ALLOC_CHECK(handle, uv_mutex_t);
+	UV_ERROR_CHECK_C(uv_mutex_init(Mutex_val(handle)), free(Mutex_val(handle)));
+	return handle;
+}
+DEFINE_PRIM(_MUTEX, w_mutex_init, _NO_ARG);
+
+HL_PRIM void HL_NAME(w_mutex_lock)(uv_mutex_t **handle) {
+	uv_mutex_lock(Mutex_val(handle));
+}
+DEFINE_PRIM(_VOID, w_mutex_lock, _MUTEX);
+
+HL_PRIM void HL_NAME(w_mutex_trylock)(uv_mutex_t **handle) {
+	UV_ERROR_CHECK(uv_mutex_trylock(Mutex_val(handle)));
+}
+DEFINE_PRIM(_VOID, w_mutex_trylock, _MUTEX);
+
+HL_PRIM void HL_NAME(w_mutex_unlock)(uv_mutex_t **handle) {
+	uv_mutex_unlock(Mutex_val(handle));
+}
+DEFINE_PRIM(_VOID, w_mutex_unlock, _MUTEX);
 
 // ------------- CASTS ----------------------------------------------
 
