@@ -42,7 +42,6 @@ jobs:
               libalut-dev \
               libmbedtls-dev \
               libturbojpeg0-dev \
-              libuv1-dev \
               libopenal-dev \
               neko \
               curl \
@@ -65,12 +64,22 @@ jobs:
               libalut-dev:${{ parameters.arch }} \
               libmbedtls-dev:${{ parameters.arch }} \
               libturbojpeg0-dev:i386 \
-              libuv1-dev:${{ parameters.arch }} \
               libopenal-dev:${{ parameters.arch }} \
               neko \
               curl \
               ca-certificates
           displayName: Install dependencies
+      - script: |
+          set -ex
+          curl -sSL -o "$(Agent.TempDirectory)/libuv-1.31.0.tar.gz" --retry 3 https://github.com/libuv/libuv/archive/v1.31.0.tar.gz
+          tar -xf $(Agent.TempDirectory)/libuv-1.31.0.tar.gz -C $(Agent.TempDirectory)
+          pushd $(Agent.TempDirectory)/libuv-1.31.0
+          sh autogen.sh
+          ./configure
+          make
+          sudo make install
+          popd
+        displayName: Install libuv 1.31.0
       - template: install-haxe-snapshot.yml
         parameters:
           platform: linux64
