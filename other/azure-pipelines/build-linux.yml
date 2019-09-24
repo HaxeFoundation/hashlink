@@ -36,6 +36,7 @@ jobs:
               gcc \
               autotools-dev \
               autoconf \
+              libtool \
               libz-dev \
               zlib1g-dev \
               libpng-dev \
@@ -60,6 +61,7 @@ jobs:
               gcc-multilib \
               autotools-dev \
               autoconf \
+              libtool \
               libz-dev:${{ parameters.arch }} \
               zlib1g-dev:${{ parameters.arch }} \
               libpng-dev:${{ parameters.arch }} \
