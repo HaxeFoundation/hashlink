@@ -363,7 +363,7 @@ UV_FS_HANDLER(handle_fs_cb_scandir, varray *, {
 	HL_PRIM ret HL_NAME(w_ ## name ## _sync)(uv_loop_t **loop, sign) { \
 		UV_ALLOC_CHECK(req, uv_fs_t); \
 		precall \
-		UV_ERROR_CHECK_C(uv_ ## name(Loop_val(loop), Fs_val(req), call, NULL), UV_FREE_REQ(Fs_val(req))); \
+		UV_ERROR_CHECK_C(uv_ ## name(Loop_val(loop), Fs_val(req), call, NULL), free(Fs_val(req))); \
 		doret handler ## _sync(req); \
 	} \
 	DEFINE_PRIM(ffiret, w_ ## name ## _sync, _LOOP ffi);
@@ -751,12 +751,11 @@ HL_PRIM void HL_NAME(w_tcp_connect_ipv6)(uv_tcp_t **handle, vbyte *host, int por
 DEFINE_PRIM(_VOID, w_tcp_connect_ipv6, _TCP _BYTES _I32 _CB);
 
 static vdynamic *w_getname(struct sockaddr_storage *addr) {
-	vdynamic *w_addr;
 	if (addr->ss_family == AF_INET) {
-		w_addr = construct_addrinfo_ipv4(ntohl(((struct sockaddr_in *)addr)->sin_addr.s_addr));
+		vdynamic *w_addr = construct_addrinfo_ipv4(ntohl(((struct sockaddr_in *)addr)->sin_addr.s_addr));
 		return construct_addrport(w_addr, ntohs(((struct sockaddr_in *)addr)->sin_port));
 	} else if (addr->ss_family == AF_INET6) {
-		w_addr = construct_addrinfo_ipv6(((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr);
+		vdynamic *w_addr = construct_addrinfo_ipv6(((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr);
 		return construct_addrport(w_addr, ntohs(((struct sockaddr_in6 *)addr)->sin6_port));
 	}
 	UV_ERROR(0);
@@ -943,6 +942,7 @@ static void handle_dns_gai_cb(uv_getaddrinfo_t *req, int status, struct addrinfo
 	if (status < 0)
 		hl_call2(void, cb, vdynamic *, construct_error(status), varray *, NULL);
 	else {
+		// TODO: use linked list
 		int count = 0;
 		struct addrinfo *cur;
 		for (cur = res; cur != NULL; cur = cur->ai_next) {
@@ -1187,7 +1187,6 @@ HL_PRIM int HL_NAME(w_pipe_pending_count)(uv_pipe_t **handle) {
 DEFINE_PRIM(_I32, w_pipe_pending_count, _PIPE);
 
 HL_PRIM vdynamic *HL_NAME(w_pipe_accept_pending)(uv_loop_t **loop, uv_pipe_t **handle) {
-
 	switch (uv_pipe_pending_type(Pipe_val(handle))) {
 		case UV_NAMED_PIPE: {
 			UV_ALLOC_CHECK(client, uv_pipe_t);
@@ -1197,7 +1196,7 @@ HL_PRIM vdynamic *HL_NAME(w_pipe_accept_pending)(uv_loop_t **loop, uv_pipe_t **h
 				UV_ERROR(0);
 			UV_ERROR_CHECK_C(uv_accept(Stream_val(handle), Stream_val(client)), free(Pipe_val(client)));
 			return construct_pipe_accept_pipe(client);
-		}; break;
+		} break;
 		case UV_TCP: {
 			UV_ALLOC_CHECK(client, uv_tcp_t);
 			UV_ERROR_CHECK_C(uv_tcp_init(Loop_val(loop), Tcp_val(client)), free(Tcp_val(client)));
@@ -1206,7 +1205,7 @@ HL_PRIM vdynamic *HL_NAME(w_pipe_accept_pending)(uv_loop_t **loop, uv_pipe_t **h
 				UV_ERROR(0);
 			UV_ERROR_CHECK_C(uv_accept(Stream_val(handle), Stream_val(client)), free(Tcp_val(client)));
 			return construct_pipe_accept_socket(client);
-		}; break;
+		} break;
 		default:
 			UV_ERROR(0);
 			break;
