@@ -8,8 +8,8 @@
 # include <stdlib.h>
 #endif
 
-#if (UV_VERSION_MAJOR <= 0)
-#	error "libuv1-dev required, uv version 0.x found"
+#if (UV_VERSION_HEX < (1 << 16 | 31 << 8))
+#	error "Compiling HashLink requires libuv version 1.31.0+"
 #endif
 
 // ------------- TYPES ----------------------------------------------
@@ -184,6 +184,26 @@ DEFINE_PRIM(
 		_FUN(_DYN, _PIPE)
 );
 
+HL_PRIM varray *HL_NAME(glue_file_open_flags)(void) {
+	int values[] = {UV_FS_O_APPEND, UV_FS_O_CREAT, UV_FS_O_DIRECT, UV_FS_O_DIRECTORY, UV_FS_O_DSYNC, UV_FS_O_EXCL, UV_FS_O_NOATIME, UV_FS_O_NOCTTY, UV_FS_O_NOFOLLOW, UV_FS_O_NONBLOCK, UV_FS_O_RDONLY, UV_FS_O_RDWR, UV_FS_O_SYNC, UV_FS_O_TRUNC, UV_FS_O_WRONLY};
+	varray *ret = hl_alloc_array(&hlt_i32, sizeof(values) / sizeof(values[0]));
+	for (int i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+		hl_aptr(ret, int)[i] = values[i];
+	}
+	return ret;
+}
+DEFINE_PRIM(_ARR, glue_file_open_flags, _NO_ARG);
+
+HL_PRIM varray *HL_NAME(glue_error_codes)(void) {
+	int values[] = {UV_E2BIG, UV_EACCES, UV_EADDRINUSE, UV_EADDRNOTAVAIL, UV_EAFNOSUPPORT, UV_EAGAIN, UV_EAI_ADDRFAMILY, UV_EAI_AGAIN, UV_EAI_BADFLAGS, UV_EAI_BADHINTS, UV_EAI_CANCELED, UV_EAI_FAIL, UV_EAI_FAMILY, UV_EAI_MEMORY, UV_EAI_NODATA, UV_EAI_NONAME, UV_EAI_OVERFLOW, UV_EAI_PROTOCOL, UV_EAI_SERVICE, UV_EAI_SOCKTYPE, UV_EALREADY, UV_EBADF, UV_EBUSY, UV_ECANCELED, UV_ECHARSET, UV_ECONNABORTED, UV_ECONNREFUSED, UV_ECONNRESET, UV_EDESTADDRREQ, UV_EEXIST, UV_EFAULT, UV_EFBIG, UV_EHOSTUNREACH, UV_EINTR, UV_EINVAL, UV_EIO, UV_EISCONN, UV_EISDIR, UV_ELOOP, UV_EMFILE, UV_EMSGSIZE, UV_ENAMETOOLONG, UV_ENETDOWN, UV_ENETUNREACH, UV_ENFILE, UV_ENOBUFS, UV_ENODEV, UV_ENOENT, UV_ENOMEM, UV_ENONET, UV_ENOPROTOOPT, UV_ENOSPC, UV_ENOSYS, UV_ENOTCONN, UV_ENOTDIR, UV_ENOTEMPTY, UV_ENOTSOCK, UV_ENOTSUP, UV_EPERM, UV_EPIPE, UV_EPROTO, UV_EPROTONOSUPPORT, UV_EPROTOTYPE, UV_ERANGE, UV_EROFS, UV_ESHUTDOWN, UV_ESPIPE, UV_ESRCH, UV_ETIMEDOUT, UV_ETXTBSY, UV_EXDEV, UV_UNKNOWN, UV_EOF, UV_ENXIO, UV_EMLINK, UV_EHOSTDOWN, 0};
+	varray *ret = hl_alloc_array(&hlt_i32, sizeof(values) / sizeof(values[0]));
+	for (int i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+		hl_aptr(ret, int)[i] = values[i];
+	}
+	return ret;
+}
+DEFINE_PRIM(_ARR, glue_error_codes, _NO_ARG);
+
 // ------------- ERROR HANDLING -------------------------------------
 
 /**
@@ -354,19 +374,19 @@ UV_FS_HANDLER(handle_fs_cb_scandir, varray *, {
 **/
 
 #define FS_WRAP(name, ret, sign, precall, call, ffiret, ffi, ffihandler, handler, doret) \
-	HL_PRIM void HL_NAME(w_ ## name)(uv_loop_t **loop, sign, vclosure *cb) { \
+	HL_PRIM void HL_NAME(w_fs_ ## name)(uv_loop_t **loop, sign, vclosure *cb) { \
 		UV_ALLOC_REQ(req, uv_fs_t, cb); \
 		precall \
-		UV_ERROR_CHECK_C(uv_ ## name(Loop_val(loop), Fs_val(req), call, handler), UV_FREE_REQ(Fs_val(req))); \
+		UV_ERROR_CHECK_C(uv_fs_ ## name(Loop_val(loop), Fs_val(req), call, handler), UV_FREE_REQ(Fs_val(req))); \
 	} \
-	DEFINE_PRIM(_VOID, w_ ## name, _LOOP ffi ffihandler); \
-	HL_PRIM ret HL_NAME(w_ ## name ## _sync)(uv_loop_t **loop, sign) { \
+	DEFINE_PRIM(_VOID, w_fs_ ## name, _LOOP ffi ffihandler); \
+	HL_PRIM ret HL_NAME(w_fs_ ## name ## _sync)(uv_loop_t **loop, sign) { \
 		UV_ALLOC_CHECK(req, uv_fs_t); \
 		precall \
-		UV_ERROR_CHECK_C(uv_ ## name(Loop_val(loop), Fs_val(req), call, NULL), free(Fs_val(req))); \
+		UV_ERROR_CHECK_C(uv_fs_ ## name(Loop_val(loop), Fs_val(req), call, NULL), free(Fs_val(req))); \
 		doret handler ## _sync(req); \
 	} \
-	DEFINE_PRIM(ffiret, w_ ## name ## _sync, _LOOP ffi);
+	DEFINE_PRIM(ffiret, w_fs_ ## name ## _sync, _LOOP ffi);
 
 #define COMMA ,
 #define FS_WRAP1(name, ret, arg1, ffiret, ffi, ffihandler, handler, doret) \
@@ -378,32 +398,34 @@ UV_FS_HANDLER(handle_fs_cb_scandir, varray *, {
 #define FS_WRAP4(name, ret, arg1, arg2, arg3, arg4, ffiret, ffi, ffihandler, handler, doret) \
 	FS_WRAP(name, ret, arg1 _arg1 COMMA arg2 _arg2 COMMA arg3 _arg3 COMMA arg4 _arg4, , _arg1 COMMA _arg2 COMMA _arg3 COMMA _arg4, ffiret, ffi, ffihandler, handler, doret);
 
-FS_WRAP1(fs_close, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
-FS_WRAP3(fs_open, uv_file, const char*, int, int, _FILE, _BYTES _I32 _I32, _CB_FILE, handle_fs_cb_file, return);
-FS_WRAP1(fs_unlink, void, const char*, _VOID, _BYTES, _CB, handle_fs_cb, );
-FS_WRAP2(fs_mkdir, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
-FS_WRAP1(fs_mkdtemp, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_path, return);
-FS_WRAP1(fs_rmdir, void, const char*, _VOID, _BYTES, _CB, handle_fs_cb, );
-FS_WRAP2(fs_scandir, varray *, const char *, int, _ARR, _BYTES _I32, _CB_SCANDIR, handle_fs_cb_scandir, return);
-FS_WRAP1(fs_stat, vdynamic *, const char*, _STAT, _BYTES, _CB_STAT, handle_fs_cb_stat, return);
-FS_WRAP1(fs_fstat, vdynamic *, uv_file, _STAT, _FILE, _CB_STAT, handle_fs_cb_stat, return);
-FS_WRAP1(fs_lstat, vdynamic *, const char*, _STAT, _BYTES, _CB_STAT, handle_fs_cb_stat, return);
-FS_WRAP2(fs_rename, void, const char*, const char*, _VOID, _BYTES _BYTES, _CB, handle_fs_cb, );
-FS_WRAP1(fs_fsync, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
-FS_WRAP1(fs_fdatasync, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
-FS_WRAP2(fs_ftruncate, void, uv_file, int64_t, _VOID, _FILE _I32, _CB, handle_fs_cb, );
-FS_WRAP4(fs_sendfile, void, uv_file, uv_file, int64_t, size_t, _VOID, _FILE _FILE _I32 _I32, _CB, handle_fs_cb, );
-FS_WRAP2(fs_access, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
-FS_WRAP2(fs_chmod, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
-FS_WRAP2(fs_fchmod, void, uv_file, int, _VOID, _FILE _I32, _CB, handle_fs_cb, );
-FS_WRAP3(fs_utime, void, const char*, double, double, _VOID, _BYTES _F64 _F64, _CB, handle_fs_cb, );
-FS_WRAP3(fs_futime, void, uv_file, double, double, _VOID, _FILE _F64 _F64, _CB, handle_fs_cb, );
-FS_WRAP2(fs_link, void, const char*, const char*, _VOID, _BYTES _BYTES, _CB, handle_fs_cb, );
-FS_WRAP3(fs_symlink, void, const char*, const char*, int, _VOID, _BYTES _BYTES _I32, _CB, handle_fs_cb, );
-FS_WRAP1(fs_readlink, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_bytes, return);
-FS_WRAP1(fs_realpath, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_bytes, return);
-FS_WRAP3(fs_chown, void, const char*, uv_uid_t, uv_gid_t, _VOID, _BYTES _I32 _I32, _CB, handle_fs_cb, );
-FS_WRAP3(fs_fchown, void, uv_file, uv_uid_t, uv_gid_t, _VOID, _FILE _I32 _I32, _CB, handle_fs_cb, );
+FS_WRAP1(close, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
+FS_WRAP3(open, uv_file, const char*, int, int, _FILE, _BYTES _I32 _I32, _CB_FILE, handle_fs_cb_file, return);
+FS_WRAP1(unlink, void, const char*, _VOID, _BYTES, _CB, handle_fs_cb, );
+FS_WRAP2(mkdir, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP1(mkdtemp, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_path, return);
+FS_WRAP1(rmdir, void, const char*, _VOID, _BYTES, _CB, handle_fs_cb, );
+FS_WRAP2(scandir, varray *, const char *, int, _ARR, _BYTES _I32, _CB_SCANDIR, handle_fs_cb_scandir, return);
+FS_WRAP1(stat, vdynamic *, const char*, _STAT, _BYTES, _CB_STAT, handle_fs_cb_stat, return);
+FS_WRAP1(fstat, vdynamic *, uv_file, _STAT, _FILE, _CB_STAT, handle_fs_cb_stat, return);
+FS_WRAP1(lstat, vdynamic *, const char*, _STAT, _BYTES, _CB_STAT, handle_fs_cb_stat, return);
+FS_WRAP2(rename, void, const char*, const char*, _VOID, _BYTES _BYTES, _CB, handle_fs_cb, );
+FS_WRAP1(fsync, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
+FS_WRAP1(fdatasync, void, uv_file, _VOID, _FILE, _CB, handle_fs_cb, );
+FS_WRAP2(ftruncate, void, uv_file, int64_t, _VOID, _FILE _I32, _CB, handle_fs_cb, );
+FS_WRAP3(copyfile, void, const char *, const char *, int, _VOID, _BYTES _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP4(sendfile, void, uv_file, uv_file, int64_t, size_t, _VOID, _FILE _FILE _I32 _I32, _CB, handle_fs_cb, );
+FS_WRAP2(access, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP2(chmod, void, const char*, int, _VOID, _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP2(fchmod, void, uv_file, int, _VOID, _FILE _I32, _CB, handle_fs_cb, );
+FS_WRAP3(utime, void, const char*, double, double, _VOID, _BYTES _F64 _F64, _CB, handle_fs_cb, );
+FS_WRAP3(futime, void, uv_file, double, double, _VOID, _FILE _F64 _F64, _CB, handle_fs_cb, );
+FS_WRAP2(link, void, const char*, const char*, _VOID, _BYTES _BYTES, _CB, handle_fs_cb, );
+FS_WRAP3(symlink, void, const char*, const char*, int, _VOID, _BYTES _BYTES _I32, _CB, handle_fs_cb, );
+FS_WRAP1(readlink, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_bytes, return);
+FS_WRAP1(realpath, vbyte *, const char*, _BYTES, _BYTES, _CB_STR, handle_fs_cb_bytes, return);
+FS_WRAP3(chown, void, const char*, uv_uid_t, uv_gid_t, _VOID, _BYTES _I32 _I32, _CB, handle_fs_cb, );
+FS_WRAP3(fchown, void, uv_file, uv_uid_t, uv_gid_t, _VOID, _FILE _I32 _I32, _CB, handle_fs_cb, );
+FS_WRAP3(lchown, void, const char*, uv_uid_t, uv_gid_t, _VOID, _BYTES _I32 _I32, _CB, handle_fs_cb, );
 
 /**
 	`fs_read` and `fs_write` require a tiny bit of setup just before the libuv
@@ -414,7 +436,7 @@ FS_WRAP3(fs_fchown, void, uv_file, uv_uid_t, uv_gid_t, _VOID, _FILE _I32 _I32, _
 	mirrored in the Haxe API, so only a single-buffer call is used.
 **/
 
-FS_WRAP(fs_read,
+FS_WRAP(read,
 	int,
 	uv_file file COMMA vbyte *data COMMA int offset COMMA int length COMMA int position,
 	uv_buf_t buf = uv_buf_init((char *)(&data[offset]), length);,
@@ -425,7 +447,7 @@ FS_WRAP(fs_read,
 	handle_fs_cb_int,
 	return);
 
-FS_WRAP(fs_write,
+FS_WRAP(write,
 	int,
 	uv_file file COMMA vbyte *data COMMA int offset COMMA int length COMMA int position,
 	uv_buf_t buf = uv_buf_init((char *)(&data[offset]), length);,
@@ -489,68 +511,15 @@ typedef struct {
 	} u;
 } uv_w_handle_t;
 
-static uv_w_handle_t *alloc_data_fs_event(vclosure *cb_fs_event) {
+static uv_w_handle_t *alloc_data(void) {
 	uv_w_handle_t *data = calloc(1, sizeof(uv_w_handle_t));
 	if (data != NULL) {
 		data->cb_close = NULL;
 		hl_add_root(&(data->cb_close));
-		data->u.fs_event.cb_fs_event = cb_fs_event;
-		hl_add_root(&(data->u.fs_event.cb_fs_event));
-	}
-	return data;
-}
-
-static uv_w_handle_t *alloc_data_tcp(vclosure *cb_read, vclosure *cb_connection) {
-	uv_w_handle_t *data = calloc(1, sizeof(uv_w_handle_t));
-	if (data != NULL) {
-		data->cb_close = NULL;
-		hl_add_root(&(data->cb_close));
-		data->u.tcp.cb_read = cb_read;
-		hl_add_root(&(data->u.tcp.cb_read));
-		data->u.tcp.cb_connection = cb_connection;
-		hl_add_root(&(data->u.tcp.cb_connection));
-	}
-	return data;
-}
-
-static uv_w_handle_t *alloc_data_udp(vclosure *cb_read) {
-	uv_w_handle_t *data = calloc(1, sizeof(uv_w_handle_t));
-	if (data != NULL) {
-		data->cb_close = NULL;
-		hl_add_root(&(data->cb_close));
-		data->u.udp.cb_read = cb_read;
-		hl_add_root(&(data->u.udp.cb_read));
-	}
-	return data;
-}
-
-static uv_w_handle_t *alloc_data_timer(vclosure *cb_timer) {
-	uv_w_handle_t *data = calloc(1, sizeof(uv_w_handle_t));
-	if (data != NULL) {
-		data->cb_close = NULL;
-		hl_add_root(&(data->cb_close));
-		data->u.timer.cb_timer = cb_timer;
-		hl_add_root(&(data->u.timer.cb_timer));
-	}
-	return data;
-}
-
-static uv_w_handle_t *alloc_data_process(vclosure *cb_exit) {
-	uv_w_handle_t *data = calloc(1, sizeof(uv_w_handle_t));
-	if (data != NULL) {
-		data->cb_close = NULL;
-		hl_add_root(&(data->cb_close));
-		data->u.process.cb_exit = cb_exit;
-		hl_add_root(&(data->u.process.cb_exit));
-	}
-	return data;
-}
-
-static uv_w_handle_t *alloc_data_pipe(void) {
-	uv_w_handle_t *data = calloc(1, sizeof(uv_w_handle_t));
-	if (data != NULL) {
-		data->cb_close = NULL;
-		hl_add_root(&(data->cb_close));
+		data->u.all.cb1 = NULL;
+		hl_add_root(&(data->u.all.cb1));
+		data->u.all.cb2 = NULL;
+		hl_add_root(&(data->u.all.cb2));
 	}
 	return data;
 }
@@ -598,9 +567,9 @@ static void handle_fs_event_cb(uv_fs_event_t *handle, const char *filename, int 
 HL_PRIM uv_fs_event_t **HL_NAME(w_fs_event_start)(uv_loop_t **loop, const char *path, bool recursive, vclosure *cb) {
 	UV_ALLOC_CHECK(handle, uv_fs_event_t);
 	UV_ERROR_CHECK_C(uv_fs_event_init(Loop_val(loop), FsEvent_val(handle)), free(FsEvent_val(handle)));
-	UV_HANDLE_DATA(FsEvent_val(handle)) = alloc_data_fs_event(cb);
-	if (UV_HANDLE_DATA(FsEvent_val(handle)) == NULL)
+	if ((UV_HANDLE_DATA(FsEvent_val(handle)) = alloc_data()) == NULL)
 		UV_ERROR(0);
+	UV_HANDLE_DATA_SUB(FsEvent_val(handle), fs_event).cb_fs_event = cb;
 	UV_ERROR_CHECK_C(
 		uv_fs_event_start(FsEvent_val(handle), handle_fs_event_cb, path, recursive ? UV_FS_EVENT_RECURSIVE : 0),
 		{ unalloc_data(UV_HANDLE_DATA(FsEvent_val(handle))); free(FsEvent_val(handle)); }
@@ -700,8 +669,7 @@ DEFINE_PRIM(_VOID, w_read_stop, _STREAM);
 HL_PRIM uv_tcp_t **HL_NAME(w_tcp_init)(uv_loop_t **loop) {
 	UV_ALLOC_CHECK(handle, uv_tcp_t);
 	UV_ERROR_CHECK_C(uv_tcp_init(Loop_val(loop), Tcp_val(handle)), free(Tcp_val(handle)));
-	UV_HANDLE_DATA(Tcp_val(handle)) = alloc_data_tcp(NULL, NULL);
-	if (UV_HANDLE_DATA(Tcp_val(handle)) == NULL)
+	if ((UV_HANDLE_DATA(Tcp_val(handle)) = alloc_data()) == NULL)
 		UV_ERROR(0);
 	return handle;
 }
@@ -777,26 +745,6 @@ HL_PRIM vdynamic *HL_NAME(w_tcp_getpeername)(uv_tcp_t **handle) {
 }
 DEFINE_PRIM(_DYN, w_tcp_getpeername, _TCP);
 
-/*
-HL_PRIM void HL_NAME(w_tcp_read_stop)(uv_tcp_t *stream) {
-	uv_read_stop((uv_stream_t *)stream);
-}
-
-DEFINE_PRIM(_VOID, w_tcp_read_stop, _TCP);
-
-#define UV_TCP_CAST(name, basename, basetype, sign, call, ffi) \
-	HL_PRIM void HL_NAME(name)(uv_tcp_t *stream, sign) { \
-		basename((basetype *)stream, call); \
-	} \
-	DEFINE_PRIM(_VOID, name, _TCP ffi);
-
-UV_TCP_CAST(w_tcp_listen, w_listen, uv_stream_t, int backlog COMMA vclosure *cb, backlog COMMA cb, _I32 _CB);
-//UV_TCP_CAST(w_tcp_write, w_write, uv_stream_t, uv_buf_t *buf COMMA vclosure *cb, buf COMMA cb, _BUF _CB);
-UV_TCP_CAST(w_tcp_shutdown, HL_NAME(w_shutdown), uv_stream_t, vclosure *cb, cb, _CB);
-UV_TCP_CAST(w_tcp_close, w_close, uv_handle_t, vclosure *cb, cb, _CB);
-UV_TCP_CAST(w_tcp_read_start, w_read_start, uv_stream_t, vclosure *cb, cb, _CB_BYTES);
-*/
-
 // ------------- UDP ------------------------------------------------
 
 static void handle_udp_cb_recv(uv_udp_t *handle, long int nread, const uv_buf_t *buf, const struct sockaddr *addr, unsigned int flags) {
@@ -822,8 +770,7 @@ static void handle_udp_cb_recv(uv_udp_t *handle, long int nread, const uv_buf_t 
 HL_PRIM uv_udp_t **HL_NAME(w_udp_init)(uv_loop_t **loop) {
 	UV_ALLOC_CHECK(handle, uv_udp_t);
 	UV_ERROR_CHECK_C(uv_udp_init(Loop_val(loop), Udp_val(handle)), free(Udp_val(handle)));
-	UV_HANDLE_DATA(Udp_val(handle)) = alloc_data_udp(NULL);
-	if (UV_HANDLE_DATA(Udp_val(handle)) == NULL)
+	if ((UV_HANDLE_DATA(Udp_val(handle)) = alloc_data()) == NULL)
 		UV_ERROR(0);
 	return handle;
 }
@@ -1026,9 +973,9 @@ static void handle_timer_cb(uv_timer_t *handle) {
 HL_PRIM uv_timer_t **HL_NAME(w_timer_start)(uv_loop_t **loop, int timeout, vclosure *cb) {
 	UV_ALLOC_CHECK(handle, uv_timer_t);
 	UV_ERROR_CHECK_C(uv_timer_init(Loop_val(loop), Timer_val(handle)), free(Timer_val(handle)));
-	UV_HANDLE_DATA(Timer_val(handle)) = alloc_data_timer(cb);
-	if (UV_HANDLE_DATA(Timer_val(handle)) == NULL)
+	if ((UV_HANDLE_DATA(Timer_val(handle)) = alloc_data()) == NULL)
 		UV_ERROR(0);
+	UV_HANDLE_DATA_SUB(Timer_val(handle), timer).cb_timer = cb;
 	UV_ERROR_CHECK_C(
 		uv_timer_start(Timer_val(handle), handle_timer_cb, timeout, timeout),
 		{ unalloc_data(UV_HANDLE_DATA(Timer_val(handle))); free(Timer_val(handle)); }
@@ -1073,9 +1020,9 @@ typedef struct {
 
 HL_PRIM uv_process_t **HL_NAME(w_spawn)(uv_loop_t **loop, vclosure *cb, const char *file, varray *args, varray *env, const char *cwd, int flags, varray *stdio, int uid, int gid) {
 	UV_ALLOC_CHECK(handle, uv_process_t);
-	UV_HANDLE_DATA(Process_val(handle)) = alloc_data_process(cb);
-	if (UV_HANDLE_DATA(Process_val(handle)) == NULL)
+	if ((UV_HANDLE_DATA(Process_val(handle)) = alloc_data()) == NULL)
 		UV_ERROR(0);
+	UV_HANDLE_DATA_SUB(Process_val(handle), process).cb_exit = cb;
 	char **args_u = malloc(sizeof(char *) * (args->size + 1));
 	for (int i = 0; i < args->size; i++)
 		args_u[i] = strdup(hl_aptr(args, char *)[i]);
@@ -1147,8 +1094,7 @@ DEFINE_PRIM(_I32, w_process_get_pid, _PROCESS);
 HL_PRIM uv_pipe_t **HL_NAME(w_pipe_init)(uv_loop_t **loop, bool ipc) {
 	UV_ALLOC_CHECK(handle, uv_pipe_t);
 	UV_ERROR_CHECK_C(uv_pipe_init(Loop_val(loop), Pipe_val(handle), ipc ? 1 : 0), free(Pipe_val(handle)));
-	UV_HANDLE_DATA(Pipe_val(handle)) = alloc_data_pipe();
-	if (UV_HANDLE_DATA(Pipe_val(handle)) == NULL)
+	if ((UV_HANDLE_DATA(Pipe_val(handle)) = alloc_data()) == NULL)
 		UV_ERROR(0);
 	return handle;
 }
@@ -1162,8 +1108,7 @@ DEFINE_PRIM(_VOID, w_pipe_open, _PIPE _I32);
 HL_PRIM uv_pipe_t **HL_NAME(w_pipe_accept)(uv_loop_t **loop, uv_pipe_t **server) {
 	UV_ALLOC_CHECK(client, uv_pipe_t);
 	UV_ERROR_CHECK_C(uv_pipe_init(Loop_val(loop), Pipe_val(client), 0), free(Pipe_val(client)));
-	UV_HANDLE_DATA(Pipe_val(client)) = alloc_data_pipe();
-	if (UV_HANDLE_DATA(Pipe_val(client)) == NULL)
+	if ((UV_HANDLE_DATA(Pipe_val(client)) = alloc_data()) == NULL)
 		UV_ERROR(0);
 	UV_ERROR_CHECK_C(uv_accept(Stream_val(server), Stream_val(client)), free(Pipe_val(client)));
 	return client;
@@ -1191,8 +1136,7 @@ HL_PRIM vdynamic *HL_NAME(w_pipe_accept_pending)(uv_loop_t **loop, uv_pipe_t **h
 		case UV_NAMED_PIPE: {
 			UV_ALLOC_CHECK(client, uv_pipe_t);
 			UV_ERROR_CHECK_C(uv_pipe_init(Loop_val(loop), Pipe_val(client), 0), free(Pipe_val(client)));
-			UV_HANDLE_DATA(Pipe_val(client)) = alloc_data_pipe();
-			if (UV_HANDLE_DATA(Pipe_val(client)) == NULL)
+			if ((UV_HANDLE_DATA(Pipe_val(client)) = alloc_data()) == NULL)
 				UV_ERROR(0);
 			UV_ERROR_CHECK_C(uv_accept(Stream_val(handle), Stream_val(client)), free(Pipe_val(client)));
 			return construct_pipe_accept_pipe(client);
@@ -1200,8 +1144,7 @@ HL_PRIM vdynamic *HL_NAME(w_pipe_accept_pending)(uv_loop_t **loop, uv_pipe_t **h
 		case UV_TCP: {
 			UV_ALLOC_CHECK(client, uv_tcp_t);
 			UV_ERROR_CHECK_C(uv_tcp_init(Loop_val(loop), Tcp_val(client)), free(Tcp_val(client)));
-			UV_HANDLE_DATA(Tcp_val(client)) = alloc_data_tcp(NULL,NULL);
-			if (UV_HANDLE_DATA(Tcp_val(client)) == NULL)
+			if ((UV_HANDLE_DATA(Tcp_val(client)) = alloc_data()) == NULL)
 				UV_ERROR(0);
 			UV_ERROR_CHECK_C(uv_accept(Stream_val(handle), Stream_val(client)), free(Tcp_val(client)));
 			return construct_pipe_accept_socket(client);
