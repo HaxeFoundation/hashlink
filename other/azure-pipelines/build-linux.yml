@@ -34,6 +34,8 @@ jobs:
               cmake \
               make \
               gcc \
+              autotools-dev \
+              autoconf \
               libz-dev \
               zlib1g-dev \
               libpng-dev \
@@ -56,6 +58,8 @@ jobs:
               cmake \
               make \
               gcc-multilib \
+              autotools-dev \
+              autoconf \
               libz-dev:${{ parameters.arch }} \
               zlib1g-dev:${{ parameters.arch }} \
               libpng-dev:${{ parameters.arch }} \
