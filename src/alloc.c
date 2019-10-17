@@ -113,6 +113,8 @@ struct _gc_pheader {
 	int free_blocks;
 	unsigned char *sizes;
 	unsigned char *bmp;
+	int sizes_ref;
+	int sizes_ref2;
 	gc_pheader *next_page;
 #ifdef GC_DEBUG
 	int page_id;
@@ -481,8 +483,12 @@ retry:
 	if( p->max_blocks > GC_PAGE_SIZE )
 		hl_fatal("Too many blocks for this page");
 	if( varsize ) {
-		p->sizes = base + start_pos;
-		start_pos += p->max_blocks;
+		if( p->max_blocks <= 8 )
+			p->sizes = (unsigned char*)&p->sizes_ref;
+		else {
+			p->sizes = base + start_pos;
+			start_pos += p->max_blocks;
+		}
 		MZERO(p->sizes,p->max_blocks);
 	}
 	m = start_pos % block;
