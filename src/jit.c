@@ -2420,6 +2420,7 @@ static vdynamic *jit_wrapper_call( vclosure_wrapper *c, char *stack_args, void *
 	call_regs cregs = {0};
 	if( nargs > MAX_ARGS )
 		hl_error("Too many arguments for wrapped call");
+	cregs.nextCpu++; // skip fptr in HL64 - was passed as arg0
 	for(i=0;i<nargs;i++) {
 		hl_type *t = c->cl.t->fun->args[i];
 		int creg = select_call_reg(&cregs,t,i);
@@ -2427,11 +2428,11 @@ static vdynamic *jit_wrapper_call( vclosure_wrapper *c, char *stack_args, void *
 			args[i] = hl_is_dynamic(t) ? *(vdynamic**)stack_args : hl_make_dyn(stack_args,t);
 			stack_args += stack_size(t);
 		} else if( hl_is_dynamic(t) ) {
-			args[i] = *(vdynamic**)(regs + call_reg_index(creg) + 1);
+			args[i] = *(vdynamic**)(regs + call_reg_index(creg));
 		} else if( t->kind == HF32 || t->kind == HF64 ) {
 			args[i] = hl_make_dyn(regs + CALL_NREGS + creg - XMM(0),&hlt_f64);
 		} else {
-			args[i] = hl_make_dyn(regs + call_reg_index(creg) + 1,t);
+			args[i] = hl_make_dyn(regs + call_reg_index(creg),t);
 		}
 	}
 	return hl_dyn_call(c->wrappedFun,args,nargs);
@@ -2503,10 +2504,14 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	op32(ctx,CMP,tmp,pconst(&p,HF32));
 	XJump_small(JEq,jfloat2);
 
+	// 64 bits : ESP + EIP (+WIN64PAD) 
+	// 32 bits : ESP + EIP + PARAM0
+	int args_pos = IS_64 ? ((IS_WINCALL64 ? 32 : 0) + HL_WSIZE * 2) : (HL_WSIZE*3);
+
 	size = begin_native_call(ctx,3);
 	op64(ctx, LEA, tmp, pmem(&p,Ebp,-HL_WSIZE*CALL_NREGS*2));
 	set_native_arg(ctx, tmp);
-	op64(ctx, LEA, tmp, pmem(&p,Ebp,HL_WSIZE*3));
+	op64(ctx, LEA, tmp, pmem(&p,Ebp,args_pos));
 	set_native_arg(ctx, tmp);
 	set_native_arg(ctx, cl);
 	call_native(ctx, jit_wrapper_ptr, size);
@@ -2517,7 +2522,7 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	size = begin_native_call(ctx,3);
 	op64(ctx, LEA, tmp, pmem(&p,Ebp,-HL_WSIZE*CALL_NREGS*2));
 	set_native_arg(ctx, tmp);
-	op64(ctx, LEA, tmp, pmem(&p,Ebp,HL_WSIZE*3));
+	op64(ctx, LEA, tmp, pmem(&p,Ebp,args_pos));
 	set_native_arg(ctx, tmp);
 	set_native_arg(ctx, cl);
 	call_native(ctx, jit_wrapper_d, size);
