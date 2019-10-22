@@ -2258,14 +2258,12 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	}
 	pad = (-size) & 15;
 	size += pad;
-	pos = pad;
+	pos = 0;
 	for(i=0;i<t->fun->nargs;i++) {
 		// RTL
-		int j = t->fun->nargs - 1 - i;
-		hl_type *at = t->fun->args[j];
-		void *v = args[j];
-		int creg = mapped_reg(&cregs,j);
-		int tsize = stack_size(at);
+		hl_type *at = t->fun->args[i];
+		void *v = args[i];
+		int creg = mapped_reg(&cregs,i);
 		void *store;
 		if( creg >= 0 ) {
 			if( REG_IS_FPU(creg) ) {
@@ -2301,12 +2299,9 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 				break;
 			}
 		} else {
+			int tsize = stack_size(at);
 			store = stack + pos;
 			pos += tsize;
-			// we need to fix this ! for instance by pushing back with 32 bits instead of 64
-			// or maybe better : don't reverse the stack and prepare it in good order
-			if( IS_64 && !hl_is_ptr(at) && at->kind != HF64 ) 
-				hl_error("TODO : alignment 64 bits");
 			switch( at->kind ) {
 			case HBOOL:
 			case HUI8:
@@ -2319,43 +2314,43 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 			case HF32:
 				*(int*)store = *(int*)v;
 				break;
-#			ifndef HL_64
 			case HF64:
-			case HI64:
-				// will be reversed when pushed back
-				*(int*)store = *((int*)v + 1);
-				*((int*)store + 1) = *(int*)v;
+				*(double*)store = *(double*)v;
 				break;
-#			endif
+			case HI64:
+				*(int64*)store = *(int64*)v;
+				break;
 			default:
 				*(void**)store = v;
 				break;
 			}
 		}
 	}
+	pos += pad;
 	pos >>= IS_64 ? 3 : 2;
 	switch( t->fun->ret->kind ) {
 	case HUI8:
 	case HUI16:
 	case HI32:
 	case HBOOL:
-		ret->v.i = ((int (*)(void *, void *, int))call_jit_c2hl)(f, &stack, pos);
+		ret->v.i = ((int (*)(void *, void *, void *))call_jit_c2hl)(f, (void**)&stack + pos, &stack);
 		return &ret->v.i;
 	case HF32:
-		ret->v.f = ((float (*)(void *, void *, int))call_jit_c2hl)(f, &stack, pos);
+		ret->v.f = ((float (*)(void *, void *, void *))call_jit_c2hl)(f, (void**)&stack + pos, &stack);
 		return &ret->v.f;
 	case HF64:
-		ret->v.d = ((double (*)(void *, void *, int))call_jit_c2hl)(f, &stack, pos);
+		ret->v.d = ((double (*)(void *, void *, void *))call_jit_c2hl)(f, (void**)&stack + pos, &stack);
 		return &ret->v.d;
 	default:
-		return ((void *(*)(void *, void *, int))call_jit_c2hl)(f, &stack, pos);
+		return ((void *(*)(void *, void *, void *))call_jit_c2hl)(f, (void**)&stack + pos, &stack);
 	}
 }
 
 static void jit_c2hl( jit_ctx *ctx ) {
 	//	create the function that will be called by callback_c2hl
 	//	it will make sure to prepare the stack/regs according to native calling conventions
-	int jstart, jcall, jloop;
+	int jeq, jloop, jstart;
+	preg *fptr, *stack, *stend;
 	preg p;
 
 	op64(ctx,PUSH,PEBP,UNUSED);
@@ -2363,29 +2358,12 @@ static void jit_c2hl( jit_ctx *ctx ) {
 
 #	ifdef HL_64
 	
-	preg *fptr = REG_AT(CALL_REGS[0]);
-	preg *stack = REG_AT(CALL_REGS[1]);
-	preg *pos = REG_AT(CALL_REGS[2]);
-
-	// push stack args
-	XJump(JAlways,jstart);
-	jloop = BUF_POS();
-	op64(ctx,PUSH,pmem(&p,stack->id,0),UNUSED);
-	op64(ctx,ADD,stack,pconst(&p,HL_WSIZE));
-	op64(ctx,SUB,pos,pconst(&p,1));
-	
-	patch_jump(ctx, jstart);
-	op64(ctx,CMP,pos,pconst(&p,0));
-	XJump(JNeq,jcall);
-	patch_jump_to(ctx, jcall, jloop);
-
-	// only use tmps which are not call regs !
-	preg *tmp = PEAX;
-	preg *tmp2 = REG_AT(R10);
-	op64(ctx, MOV, tmp, stack);
-	op64(ctx, MOV, tmp2, fptr);
-	stack = tmp;
-	fptr = tmp2;
+	fptr = REG_AT(R10);
+	stack = PEAX;
+	stend = REG_AT(R11);
+	op64(ctx, MOV, fptr, REG_AT(CALL_REGS[0]));
+	op64(ctx, MOV, stack, REG_AT(CALL_REGS[1]));
+	op64(ctx, MOV, stend, REG_AT(CALL_REGS[2]));
 
 	// set native call regs
 	int i;
@@ -2393,8 +2371,6 @@ static void jit_c2hl( jit_ctx *ctx ) {
 		op64(ctx,MOV,REG_AT(CALL_REGS[i]),pmem(&p,stack->id,i*HL_WSIZE));
 	for(i=0;i<CALL_NREGS;i++)
 		op64(ctx,MOVSD,REG_AT(XMM(i)),pmem(&p,stack->id,(i+CALL_NREGS)*HL_WSIZE));
-	
-	op_call(ctx,fptr,0);
 
 #	else
 
@@ -2410,24 +2386,26 @@ static void jit_c2hl( jit_ctx *ctx ) {
 #	endif
 
 	// mov arguments to regs
-	op64(ctx,MOV,REG_AT(Ecx),pmem(&p,Ebp,HL_WSIZE*2));
-	op64(ctx,MOV,REG_AT(Edx),pmem(&p,Ebp,HL_WSIZE*3));
-	op64(ctx,MOV,REG_AT(Eax),pmem(&p,Ebp,HL_WSIZE*4));
-
-	XJump(JAlways,jstart);
-	jloop = BUF_POS();
-	op64(ctx,PUSH,pmem(&p,Edx,0),UNUSED);
-	op64(ctx,ADD,REG_AT(Edx),pconst(&p,HL_WSIZE));
-	op64(ctx,SUB,REG_AT(Eax),pconst(&p,1));
-
-	patch_jump(ctx, jstart);
-	op64(ctx,CMP,REG_AT(Eax),pconst(&p,0));
-	XJump(JNeq,jcall);
-	patch_jump_to(ctx, jcall, jloop);
-
-	op_call(ctx,REG_AT(Ecx),0);
+	fptr = REG_AT(Eax);
+	stack = REG_AT(Edx);
+	stend = REG_AT(Ecx);
+	op64(ctx,MOV,fptr,pmem(&p,Ebp,HL_WSIZE*2));
+	op64(ctx,MOV,stack,pmem(&p,Ebp,HL_WSIZE*3));
+	op64(ctx,MOV,stend,pmem(&p,Ebp,HL_WSIZE*4));
 
 #	endif
+
+	// push stack args
+	jstart = BUF_POS();
+	op64(ctx,CMP,stack,stend);
+	XJump(JEq,jeq);
+	op64(ctx,SUB,stack,pconst(&p,HL_WSIZE));
+	op64(ctx,PUSH,pmem(&p,stack->id,0),UNUSED);
+	XJump(JAlways,jloop);
+	patch_jump(ctx,jeq);
+	patch_jump_to(ctx, jloop, jstart);
+
+	op_call(ctx,fptr,0);
 
 	// cleanup and ret
 	op64(ctx,MOV,PESP,PEBP);
