@@ -594,6 +594,11 @@ resume:
 					if( avail > p->free_blocks ) p->free_blocks = avail;
 					avail = 0;
 					next += bits - 1;
+					if( next >= p->max_blocks ) {
+						p->next_block = next;
+						p = p->next_page;
+						goto loop;
+					}
 					if( p->sizes[next] == 0 ) hl_fatal("assert");
 					next += p->sizes[next];
 					if( next + nblocks > p->max_blocks ) {
@@ -1057,6 +1062,7 @@ static void hl_gc_init() {
 	if( getenv("HL_DUMP_MEMORY") )
 		gc_flags |= GC_DUMP_MEM;
 #	endif
+	gc_stats.mark_bytes = 4; // prevent reading out of bmp
 	memset(&gc_threads,0,sizeof(gc_threads));
 	gc_threads.global_lock = hl_mutex_alloc(false);
 #	ifdef HL_THREADS
