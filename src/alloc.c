@@ -1178,6 +1178,11 @@ void hl_free( hl_alloc *a ) {
 #	else
 	static void *start_address = NULL;
 #	endif
+#	ifdef HL_64
+	static char *jit_address = (char*)0x000076CA9F000000;
+#	else
+	static void *jit_address = NULL;
+#	endif
 #endif
 HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #ifdef __APPLE__
@@ -1186,9 +1191,11 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #       endif
 #endif
 #if defined(HL_WIN)
-	void *ptr = VirtualAlloc(start_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
-#	ifdef STATIC_ADDRESS
-	start_address += size + ((-size) & (GC_PAGE_SIZE - 1));
+retry_jit_alloc:
+	void *ptr = VirtualAlloc(jit_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
+#	ifdef HL_64
+	jit_address += size + ((-size) & (GC_PAGE_SIZE - 1));
+	if( !ptr ) goto retry_jit_alloc;
 #	endif
 	return ptr;
 #elif defined(HL_CONSOLE)
