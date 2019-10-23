@@ -137,19 +137,16 @@ HL_PRIM void hl_dump_stack() {
 HL_PRIM varray *hl_exception_stack() {
 	hl_thread_info *t = hl_get_thread();
 	varray *a = hl_alloc_array(&hlt_bytes, t->exc_stack_count);
-	int i;
+	int i, pos = 0;
 	for(i=0;i<t->exc_stack_count;i++) {
 		void *addr = t->exc_stack_trace[i];
 		uchar sym[512];
 		int size = 512;
 		uchar *str = resolve_symbol_func(addr, sym, &size);
-		if( str == NULL ) {
-			int iaddr = (int)(int_val)addr;
-			str = sym;
-			size = usprintf(str,512,USTR("@0x%X"),iaddr);
-		}
-		hl_aptr(a,vbyte*)[i] = hl_copy_bytes((vbyte*)str,sizeof(uchar)*(size+1));
+		if( str == NULL ) continue;
+		hl_aptr(a,vbyte*)[pos++] = hl_copy_bytes((vbyte*)str,sizeof(uchar)*(size+1));
 	}
+	a->size = pos;
 	return a;
 }
 
