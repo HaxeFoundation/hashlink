@@ -1168,22 +1168,6 @@ void hl_free( hl_alloc *a ) {
 		a->cur = NULL;
 }
 
-#ifdef HL_WIN
-#	if defined(GC_DEBUG) && defined(HL_64)
-#		define STATIC_ADDRESS
-#	endif
-#	ifdef STATIC_ADDRESS
-	// force out of 32 bits addresses to check loss of precision
-	static char *start_address = (char*)0x100000000;
-#	else
-	static void *start_address = NULL;
-#	endif
-#	ifdef HL_64
-	static char *jit_address = (char*)0x000076CA9F000000;
-#	else
-	static void *jit_address = NULL;
-#	endif
-#endif
 HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #ifdef __APPLE__
 #  	ifndef MAP_ANONYMOUS
@@ -1191,11 +1175,14 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #       endif
 #endif
 #if defined(HL_WIN)
-retry_jit_alloc:
+#ifdef HL_64
+	static char *jit_address = (char*)0x000076CA9F000000;
+	retry_jit_alloc:
 	void *ptr = VirtualAlloc(jit_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
-#	ifdef HL_64
 	jit_address += size + ((-size) & (GC_PAGE_SIZE - 1));
 	if( !ptr ) goto retry_jit_alloc;
+#	else
+	void *ptr = VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
 #	endif
 	return ptr;
 #elif defined(HL_CONSOLE)
@@ -1224,6 +1211,15 @@ static void *base_addr = (void*)0x40000000;
 
 static void *gc_alloc_page_memory( int size ) {
 #if defined(HL_WIN)
+#	if defined(GC_DEBUG) && defined(HL_64)
+#		define STATIC_ADDRESS
+#	endif
+#	ifdef STATIC_ADDRESS
+	// force out of 32 bits addresses to check loss of precision
+	static char *start_address = (char*)0x100000000;
+#	else
+	static void *start_address = NULL;
+#	endif
 	void *ptr = VirtualAlloc(start_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
 #	ifdef STATIC_ADDRESS
 	if( ptr == NULL && start_address ) {
