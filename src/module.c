@@ -111,7 +111,10 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 
 static int module_capture_stack( void **stack, int size ) {
 	void **stack_ptr = (void**)&stack;
+#if defined(HL_64) && defined(HL_WIN)
+#else
 	void *stack_bottom = stack_ptr;
+#endif
 	void *stack_top = hl_get_thread()->stack_top;
 	int count = 0;
 	if( modules_count == 1 ) {
@@ -124,6 +127,13 @@ static int module_capture_stack( void **stack, int size ) {
 			code_size -= s;
 		}
 		while( stack_ptr < (void**)stack_top ) {
+#if defined(HL_64) && defined(HL_WIN)
+			void *module_addr = *stack_ptr++; // EIP
+			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
+				if( count == size ) break;
+				stack[count++] = module_addr;
+			}
+#else
 			void *stack_addr = *stack_ptr++; // EBP
 			if( stack_addr > stack_bottom && stack_addr < stack_top ) {
 				void *module_addr = *stack_ptr; // EIP
@@ -132,12 +142,18 @@ static int module_capture_stack( void **stack, int size ) {
 					stack[count++] = module_addr;
 				}
 			}
+#endif
 		}
 	} else {
 		while( stack_ptr < (void**)stack_top ) {
+#if defined(HL_64) && defined(HL_WIN)
+			void *module_addr = *stack_ptr++; // EIP
+			{
+#else
 			void *stack_addr = *stack_ptr++; // EBP
 			if( stack_addr > stack_bottom && stack_addr < stack_top ) {
 				void *module_addr = *stack_ptr; // EIP
+#endif
 				int i;
 				for(i=0;i<modules_count;i++) {
 					hl_module *m = cur_modules[i];
