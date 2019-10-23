@@ -1174,16 +1174,16 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 #     		define MAP_ANONYMOUS MAP_ANON
 #       endif
 #endif
-#if defined(HL_WIN)
-#ifdef HL_64
+#if defined(HL_WIN) && defined(HL_64)
 	static char *jit_address = (char*)0x000076CA9F000000;
-	retry_jit_alloc:
-	void *ptr = VirtualAlloc(jit_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
+	void *ptr;
+retry_jit_alloc:
+	ptr = VirtualAlloc(jit_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
 	jit_address += size + ((-size) & (GC_PAGE_SIZE - 1));
 	if( !ptr ) goto retry_jit_alloc;
-#	else
+	return ptr;
+#elif defined(HL_WIN)
 	void *ptr = VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
-#	endif
 	return ptr;
 #elif defined(HL_CONSOLE)
 	return NULL;
