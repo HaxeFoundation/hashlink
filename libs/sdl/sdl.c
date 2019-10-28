@@ -211,6 +211,8 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			break;
 		case SDL_WINDOWEVENT:
 			event->type = WindowState;
+			printf("%d,%d\n",GetTickCount(),e.window.event);
+			fflush(stdout);
 			switch (e.window.event) {
 			case SDL_WINDOWEVENT_SHOWN:
 				event->state = Show;
@@ -224,7 +226,7 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			case SDL_WINDOWEVENT_MOVED:
 				event->state = Move;
 				break;
-			case SDL_WINDOWEVENT_RESIZED:
+			case SDL_WINDOWEVENT_SIZE_CHANGED:
 				event->state = Resize;
 				break;
 			case SDL_WINDOWEVENT_MINIMIZED:
