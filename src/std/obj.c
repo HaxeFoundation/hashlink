@@ -587,8 +587,8 @@ static void hl_dynobj_remap_virtuals( vdynobj *o, hl_field_lookup *f, int_val ad
 			for(i=0;i<v->t->virt->nfields;i++)
 				if( hl_vfields(v)[i] && hl_is_ptr(v->t->virt->fields[i].t) == is_ptr )
 					((char**)hl_vfields(v))[i] += address_offset;
-		if( vf && hl_same_type(vf->t,f->t) )
-			hl_vfields(v)[vf->field_index] = hl_dynobj_field(o, f);
+		if( vf )
+			hl_vfields(v)[vf->field_index] = hl_same_type(vf->t,f->t) ? hl_dynobj_field(o, f) : NULL;
 		v = v->next;
 	}
 }
