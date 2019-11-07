@@ -1179,8 +1179,11 @@ HL_PRIM void *hl_alloc_executable_memory( int size ) {
 	void *ptr;
 retry_jit_alloc:
 	ptr = VirtualAlloc(jit_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
+	if( !ptr ) {
+		jit_address = (char*)(((int_val)jit_address)>>1); // fix for Win7 - will eventually reach NULL
+		goto retry_jit_alloc;
+	}
 	jit_address += size + ((-size) & (GC_PAGE_SIZE - 1));
-	if( !ptr ) goto retry_jit_alloc;
 	return ptr;
 #elif defined(HL_WIN)
 	void *ptr = VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
