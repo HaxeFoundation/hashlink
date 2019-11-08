@@ -40,6 +40,11 @@ if(WITH_SQLITE)
     add_subdirectory(sqlite)
 endif()
 
+option(WITH_MYSQL "Build mysql.hdll." ON)
+if(WITH_MYSQL)
+    add_subdirectory(mysql)
+endif()
+
 if(WIN32)
     option(WITH_SSL "Build ssl.hdll." ON)
     if(WITH_SSL)
