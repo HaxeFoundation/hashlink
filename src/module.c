@@ -430,24 +430,6 @@ static void hl_module_init_indexes( hl_module *m ) {
 	}
 }
 
-static void hl_module_hash( hl_module *m ) {
-	int i;
-	m->functions_signs = malloc(sizeof(int) * (m->code->nfunctions + m->code->nnatives));
-	for(i=0;i<m->code->nfunctions;i++) {
-		hl_function *f = m->code->functions + i;
-		m->functions_signs[i] = hl_code_hash_fun_sign(f);
-	}
-	for(i=0;i<m->code->nnatives;i++) {
-		hl_native *n = m->code->natives + i;
-		m->functions_signs[i + m->code->nfunctions] = hl_code_hash_native(n);
-	}
-	m->functions_hashes = malloc(sizeof(int) * m->code->nfunctions);
-	for(i=0;i<m->code->nfunctions;i++) {
-		hl_function *f = m->code->functions + i;
-		m->functions_hashes[i] = hl_code_hash_fun(m->code,f, m->functions_indexes, m->functions_signs);
-	}
-}
-
 static void hl_module_init_natives( hl_module *m ) {
 	char tmp[256];
 	int i;
@@ -493,6 +475,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 			hl_add_root(m->globals_data+m->globals_indexes[i]);
 	}
 	// inits
+	if( hot_reload ) m->hash = hl_code_hash_alloc(m->code);
 	hl_module_init_natives(m);
 	hl_module_init_indexes(m);
 	// JIT
@@ -574,7 +557,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	hl_gc_set_dump_types(hl_module_types_dump);
 	hl_jit_free(ctx, hot_reload);
 	if( hot_reload ) {
-		hl_module_hash(m);
+		hl_code_hash_finalize(m->hash);
 		m->jit_ctx = ctx;
 	}
 	return 1;
@@ -583,23 +566,25 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	int i1,i2;
 	bool has_changes = false;
+	int changes_count = 0;
 	jit_ctx *ctx = m1->jit_ctx;
 
 	hl_module *m2 = hl_module_alloc(c);
+	m2->hash = hl_code_hash_alloc(c);	
 	hl_module_init_natives(m2);
 	hl_module_init_indexes(m2);
-	hl_module_hash(m2);	
 	hl_jit_reset(ctx, m2);
+	hl_code_hash_finalize(m2->hash);
 
 	for(i2=0;i2<m2->code->nfunctions;i2++) {
 		hl_function *f2 = m2->code->functions + i2;
-		int sign2 = m2->functions_signs[i2];
+		int sign2 = m2->hash->functions_signs[i2];
 		if( f2->field.name == NULL ) {
-			m2->functions_hashes[i2] = -1;
+			m2->hash->functions_hashes[i2] = -1;
 			continue;
 		}
 		for(i1=0;i1<m1->code->nfunctions;i1++) {
-			int sign1 = m1->functions_signs[i1];
+			int sign1 = m1->hash->functions_signs[i1];
 			if( sign1 == sign2 ) {
 				hl_function *f1 = m1->code->functions + i1;
 				if( (f1->obj != NULL) != (f2->obj != NULL) || !f1->field.name || !f2->field.name ) {
@@ -611,17 +596,21 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 					continue;
 				}
 
-				int hash2 = m2->functions_hashes[i2];
-				int hash1 = m1->functions_hashes[i1];
-				m2->functions_hashes[i2] = i1; // index reference
+				int hash2 = m2->hash->functions_hashes[i2];
+				int hash1 = m1->hash->functions_hashes[i1];
+				m2->hash->functions_hashes[i2] = i1; // index reference
 				if( hash1 == hash2 )
 					break;
+#				ifdef HL_DEBUG
 				uprintf(USTR("%s."), fun_obj(f1)->name);
 				uprintf(USTR("%s"), fun_field_name(f1));
 				if( !f1->obj )
 					printf("~%d", f1->ref);
-				printf(" has been modified\n");
-				m1->functions_hashes[i1] = hash2; // update hash
+				printf(" has been modified [%d]\n", f1->nops);
+#				endif
+				changes_count++;
+
+				m1->hash->functions_hashes[i1] = hash2; // update hash
 				int fpos = hl_jit_function(ctx, m2, f2);
 				if( fpos < 0 ) return false;
 				m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
@@ -633,40 +622,70 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 			// not found (signature changed or new method) : inject new method!
 			int fpos = hl_jit_function(ctx, m2, f2);
 			if( fpos < 0 ) return false;
-			m2->functions_hashes[i2] = -1;
+			m2->hash->functions_hashes[i2] = -1;
 			m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
+#			ifdef HL_DEBUG
 			uprintf(USTR("%s."), fun_obj(f2)->name);
 			uprintf(USTR("%s"), fun_field_name(f2));
 			if( !f2->obj )
 				printf("~%d", f2->ref);
 			printf(" has been added\n");
+#			endif
+			changes_count++;
 			has_changes = true;
 			// should be added to m1 functions for later reload?
 		}
 	}
 	if( !has_changes ) {
 		printf("No changes found\n");
+		fflush(stdout);
 		hl_jit_free(ctx, true);
 		return false;
 	}
+
+	// patch same types
+	for(i1=0;i1<m1->code->ntypes;i1++) {
+		hl_type *p = m1->code->types + i1;
+		if( p->kind != HOBJ && p->kind != HSTRUCT ) continue;
+		for(i2=0;i2<c->ntypes;i2++) {
+			hl_type *t = c->types + i2;
+			if( p->kind != t->kind ) continue;
+			if( ucmp(p->obj->name,t->obj->name) != 0 ) continue;
+			if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
+				if( p->obj->global_value && t->obj->global_value ) {
+					// set old global value
+					*t->obj->global_value = *p->obj->global_value;
+					// point to old value address
+					t->obj->global_value = p->obj->global_value; 
+				}
+				t->obj = p->obj; // alias the types ! they are different pointers but have the same layout
+			} else {
+				uprintf(USTR("Type %s has changed\n"),t->obj->name);
+				changes_count++;
+			}
+			break;
+		}
+	}
+
 	m2->jit_code = hl_jit_code(ctx, m2, &m2->codesize, &m2->jit_debug, m1);
 	hl_jit_free(ctx,true);
 
 	if( m2->jit_code == NULL ) {
 		printf("Couldn't JIT result\n");
+		fflush(stdout);
 		return false;
 	}
 	
 	int i;
 	for(i=0;i<m2->code->nfunctions;i++) {
 		hl_function *f2 = m2->code->functions + i;
-		if( m2->functions_hashes[i] < -1 ) continue;
+		if( m2->hash->functions_hashes[i] < -1 ) continue;
 		if( m2->functions_ptrs[f2->findex] == NULL ) continue;
 		void *ptr = ((unsigned char*)m2->jit_code) + ((int_val)m2->functions_ptrs[f2->findex]);
 		m2->functions_ptrs[f2->findex] = ptr;
 		// update real function ptr
-		if( m2->functions_hashes[i] < 0 ) continue;
-		hl_function *f1 = m1->code->functions + m2->functions_hashes[i];
+		if( m2->hash->functions_hashes[i] < 0 ) continue;
+		hl_function *f1 = m1->code->functions + m2->hash->functions_hashes[i];
 		hl_jit_patch_method(m1->functions_ptrs[f1->findex], m1->functions_ptrs + f1->findex);
 		m1->functions_ptrs[f1->findex] = ptr;
 	}
@@ -675,19 +694,23 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		if( t->kind == HOBJ || t->kind == HSTRUCT ) hl_flush_proto(t);
 	}
 
+	if( changes_count > 0 ) {
+		printf("%d changes\n", changes_count);
+		fflush(stdout);
+	}
+
 	return true;
 }
 
 void hl_module_free( hl_module *m ) {
 	hl_free(&m->ctx.alloc);
 	hl_free_executable_memory(m->code, m->codesize);
+	hl_code_hash_free(m->hash);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->ctx.functions_types);
 	free(m->globals_indexes);
 	free(m->globals_data);
-	free(m->functions_hashes);
-	free(m->functions_signs);
 	if( m->jit_debug ) {
 		int i;
 		for(i=0;i<m->code->nfunctions;i++)

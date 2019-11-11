@@ -4162,7 +4162,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 			fabs = m->functions_ptrs[c->target];
 			if( fabs == NULL ) {
 				// read absolute address from previous module
-				int old_idx = m->functions_hashes[m->functions_indexes[c->target]];
+				int old_idx = m->hash->functions_hashes[m->functions_indexes[c->target]];
 				if( old_idx < 0 )
 					return NULL;
 				fabs = previous->functions_ptrs[(previous->code->functions + old_idx)->findex];
@@ -4199,7 +4199,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 			void *fabs = m->functions_ptrs[fidx];
 			if( fabs == NULL ) {
 				// read absolute address from previous module
-				int old_idx = m->functions_hashes[m->functions_indexes[fidx]];
+				int old_idx = m->hash->functions_hashes[m->functions_indexes[fidx]];
 				if( old_idx < 0 )
 					return NULL;
 				fabs = previous->functions_ptrs[(previous->code->functions + old_idx)->findex];
