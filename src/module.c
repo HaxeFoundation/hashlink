@@ -705,7 +705,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 void hl_module_free( hl_module *m ) {
 	hl_free(&m->ctx.alloc);
 	hl_free_executable_memory(m->code, m->codesize);
-	hl_code_hash_free(m->hash);
+	if( m->hash ) hl_code_hash_free(m->hash);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->ctx.functions_types);
