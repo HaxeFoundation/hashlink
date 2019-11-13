@@ -236,13 +236,16 @@ HL_PRIM varray *HL_NAME(result_next)( sqlite_result *r ) {
 			case SQLITE_TEXT:
 			{
 				uchar *text16 = (uchar *)sqlite3_column_text16(r->r, i);
-				v = hl_make_dyn(&text16, &hlt_bytes);
+				vbyte *vb = hl_copy_bytes((vbyte *)text16, (int)(ustrlen(text16) + 1) * sizeof(uchar));
+				v = hl_make_dyn(&vb, &hlt_bytes);
 				break;
 			}
 			case SQLITE_BLOB:
 			{
+				int size = sqlite3_column_bytes(r->r, i);
 				vbyte *blob = (vbyte *)sqlite3_column_blob(r->r, i);
-				v = hl_make_dyn(&blob, &hlt_bytes);
+				vbyte *vb = hl_copy_bytes(blob, size+1);
+				v = hl_make_dyn(&vb, &hlt_bytes);
 				break;
 			}
 			default:
