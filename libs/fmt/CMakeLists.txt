@@ -132,6 +132,7 @@ else()
     add_library(fmt.hdll SHARED
         fmt.c
         sha1.c
+        dxt.c
     )
 endif()
 
