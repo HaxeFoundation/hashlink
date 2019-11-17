@@ -75,7 +75,7 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 	return true;
 }
 
-static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
+uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr ) {
 	int *debug_addr;
 	int file, line;
 	int size = *outSize;
@@ -95,6 +95,7 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	// extract debug info
 	fdebug = m->code->functions + fidx;
 	debug_addr = fdebug->debug + ((fpos&0xFFFF) * 2);
+	if( r_debug_addr ) *r_debug_addr = debug_addr;
 	file = debug_addr[0];
 	line = debug_addr[1];
 	if( fdebug->obj )
@@ -103,19 +104,21 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 		pos += usprintf(out,size - pos,USTR("%s.~%s.%d("),fdebug->field.ref->obj->name, fdebug->field.ref->field.name, fdebug->ref);
 	else
 		pos += usprintf(out,size - pos,USTR("fun$%d("),fdebug->findex);
-	pos += hl_from_utf8(out + pos,size - pos,m->code->debugfiles[file]);
+	pos += hl_from_utf8(out + pos,size - pos,m->code->debugfiles[file&0x7FFFFFFF]);
 	pos += usprintf(out + pos, size - pos, USTR(":%d)"), line);
 	*outSize = pos;
 	return out;
 }
 
-static int module_capture_stack( void **stack, int size ) {
-	void **stack_ptr = (void**)&stack;
+static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
+	return hl_module_resolve_symbol_full(addr,out,outSize,NULL);
+}
+
+int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out, int size ) {
 #if defined(HL_64) && defined(HL_WIN)
 #else
 	void *stack_bottom = stack_ptr;
 #endif
-	void *stack_top = hl_get_thread()->stack_top;
 	int count = 0;
 	if( modules_count == 1 ) {
 		hl_module *m = cur_modules[0];
@@ -131,7 +134,7 @@ static int module_capture_stack( void **stack, int size ) {
 			void *module_addr = *stack_ptr++; // EIP
 			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
 				if( count == size ) break;
-				stack[count++] = module_addr;
+				out[count++] = module_addr;
 			}
 #else
 			void *stack_addr = *stack_ptr++; // EBP
@@ -139,7 +142,7 @@ static int module_capture_stack( void **stack, int size ) {
 				void *module_addr = *stack_ptr; // EIP
 				if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
 					if( count == size ) break;
-					stack[count++] = module_addr;
+					out[count++] = module_addr;
 				}
 			}
 #endif
@@ -170,7 +173,7 @@ static int module_capture_stack( void **stack, int size ) {
 							code_size -= s;
 							if( module_addr < (void*)code || module_addr >= (void*)(code + code_size) ) continue;
 						}
-						stack[count++] = module_addr;
+						out[count++] = module_addr;
 						break;
 					}
 				}
@@ -178,6 +181,10 @@ static int module_capture_stack( void **stack, int size ) {
 		}
 	}
 	return count;
+}
+
+static int module_capture_stack( void **stack, int size ) {
+	return hl_module_capture_stack_range(hl_get_thread()->stack_top, (void**)&stack, stack, size);
 }
 
 static void hl_module_types_dump( void (*fdump)( void *, int) ) {

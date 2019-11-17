@@ -147,6 +147,9 @@ h_bool hl_module_patch( hl_module *m, hl_code *code );
 void hl_module_free( hl_module *m );
 h_bool hl_module_debug( hl_module *m, int port, h_bool wait );
 
+void hl_profile_start( int sample_count );
+void hl_profile_end();
+
 jit_ctx *hl_jit_alloc();
 void hl_jit_free( jit_ctx *ctx, h_bool can_reset );
 void hl_jit_reset( jit_ctx *ctx, hl_module *m );

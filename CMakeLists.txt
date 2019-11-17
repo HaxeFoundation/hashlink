@@ -133,6 +133,7 @@ add_executable(hl
     src/main.c
     src/module.c
     src/debugger.c
+	src/profile.c
 )
 
 target_link_libraries(hl libhl)

@@ -157,7 +157,14 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(false);
 }
 
+
+static void *f_before_exit = NULL;
+HL_PRIM void hl_sys_before_exit( void *fptr ) {
+	f_before_exit = fptr;
+}
+
 HL_PRIM void hl_sys_exit( int code ) {
+	if( f_before_exit ) ((void(*)())f_before_exit)();
 	exit(code);
 }
 

@@ -1,0 +1,3 @@
+-hl profiler.hl
+-main ProfileGen
+-dce no

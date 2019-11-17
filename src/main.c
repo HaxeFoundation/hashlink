@@ -143,6 +143,7 @@ int main(int argc, pchar *argv[]) {
 	int debug_port = -1;
 	bool debug_wait = false;
 	bool hot_reload = false;
+	int profile_count = -1;
 	main_context ctx;
 	bool isExc = false;
 	int first_boot_arg = -1;
@@ -167,6 +168,11 @@ int main(int argc, pchar *argv[]) {
 		}
 		if( pcompare(arg,PSTR("--hot-reload")) == 0 ) {
 			hot_reload = true;
+			continue;
+		}
+		if( pcompare(arg,PSTR("--profile")) == 0 ) {
+			if( argc-- == 0 ) break;
+			profile_count = ptoi(*argv++);
 			continue;
 		}
 		if( *arg == '-' || *arg == '+' ) {
@@ -222,7 +228,9 @@ int main(int argc, pchar *argv[]) {
 	ctx.c.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
 	ctx.c.hasValue = 0;
 	setup_handler();
+	if( profile_count > 0 ) hl_profile_start(profile_count);
 	ctx.ret = hl_dyn_call_safe(&ctx.c,NULL,0,&isExc);
+	if( profile_count > 0 ) hl_profile_end();
 	if( isExc ) {
 		varray *a = hl_exception_stack();
 		int i;
