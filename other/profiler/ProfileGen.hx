@@ -140,6 +140,15 @@ class ProfileGen {
 		var tid = frames[0].thread;
 		var json : Dynamic = [
 			{
+    			pid : 0,
+    			tid : tid,
+ 	 			ts : 0,
+				ph : "M",
+				cat : "__metadata",
+				name : "thread_name",
+				args : { name : "CrBrowserMain" }
+			},
+			{
 				pid : 0,
 				tid : tid,
 				ts : 0,
@@ -184,7 +193,7 @@ class ProfileGen {
 				}
 			}
 		];
-		sys.io.File.saveContent("Profile.json", haxe.Json.stringify(json,"\t"));
+		sys.io.File.saveContent("Profile.json", haxe.Json.stringify(json));
 	}
 
 }
