@@ -63,7 +63,7 @@ typedef struct {
 
 static struct {
 	int sample_count;
-	volatile bool profiling;
+	volatile int profiling_pause;
 	volatile bool stopLoop;
 	volatile bool waitLoop;
 	thread_handle *handles;
@@ -164,11 +164,9 @@ static void read_thread_data( thread_handle *t ) {
 static void hl_profile_loop( void *_ ) {
 	double wait_time = 1. / data.sample_count;
 	double next = hl_sys_time();
-	int skip = 0;
 	data.tmpMemory = malloc(MAX_STACK_SIZE);
 	while( !data.stopLoop ) {
-		if( hl_sys_time() < next || !data.profiling ) {
-			skip++;
+		if( hl_sys_time() < next || data.profiling_pause ) {
 			data.waitLoop = false;
 			continue;
 		}
@@ -206,7 +204,6 @@ static void profile_event( int code, vbyte *data, int dataLen );
 void hl_profile_start( int sample_count ) {
 #	if defined(HL_THREADS) && defined(HL_WIN_DESKTOP)
 	data.sample_count = sample_count;
-	data.profiling = true;
 	hl_thread_start(hl_profile_loop,NULL,false);
 	hl_setup_profiler(profile_event,hl_profile_end);
 #	endif
@@ -231,8 +228,7 @@ static bool read_profile_data( profile_reader *r, void *ptr, int size ) {
 static void profile_dump() {
 	if( !data.first_record ) return;
 	
-	bool prev_prof = data.profiling;
-	data.profiling = false;
+	data.profiling_pause++;
 	printf("Writing profiling data...\n");
 	fflush(stdout);
 
@@ -288,7 +284,7 @@ static void profile_dump() {
 	}
 	fclose(f);
 	printf("%d profile samples saved\n", samples);
-	data.profiling = prev_prof;
+	data.profiling_pause--;
 }
 
 void hl_profile_end() {
@@ -299,18 +295,17 @@ void hl_profile_end() {
 static void profile_event( int code, vbyte *ptr, int dataLen ) {
 	switch( code ) {
 	case -1:
-		data.profiling = false;
+		data.profiling_pause++;
 		break;
 	case -2:
-		data.profiling = true;
+		data.profiling_pause--;
 		break;
 	case -3:
 		profile_dump();
 		break;
 	default:
 		if( code < 0 ) return;
-		bool old = data.profiling;
-		data.profiling = false;
+		data.profiling_pause++;
 		data.waitLoop = true;
 		while( data.waitLoop ) {}
 		double time = hl_sys_time();
@@ -319,7 +314,7 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		record_data(&code,sizeof(int));
 		record_data(&dataLen,sizeof(int));
 		record_data(ptr,dataLen);
-		data.profiling = old;
+		data.profiling_pause--;
 		break;
 	}
 }
