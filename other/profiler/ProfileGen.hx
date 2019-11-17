@@ -30,6 +30,7 @@ class StackLink {
 	public var elt : StackElement;
 	public var parent : StackLink;
 	public var children : Map<String,StackLink> = new Map();
+	public var written : Bool;
 	public function new(elt) {
 		id = UID++;
 		this.elt = elt;
@@ -45,29 +46,36 @@ class StackLink {
 	}
 }
 
+class Frame {
+	public var samples : Array<{ thread : Int, time : Float, stack : Array<StackElement> }> = [];
+	public var endTime : Null<Float>;
+	public function new() {
+	}
+}
+
 class ProfileGen {
 
 	static function makeStacks( st : Array<StackLink> ) {
-		var m = new Map();
+		var write = [];
 		for( s in st ) {
 			var s = s;
 			while( s != null ) {
-				if( m.exists(s.id) ) break;
-				m.set(s.id, s);
+				if( s.written ) break;
+				s.written = true;
+				write.push(s);
 				s = s.parent;
 			}
 		}
-		var unique = Lambda.array(m);
-		unique.sort(function(s1,s2) return s1.id - s2.id);
-		return [for( s in unique ) {
+		write.sort(function(s1,s2) return s1.id - s2.id);
+		return [for( s in write ) {
 			callFrame : s.elt.file == null ? cast {
 				functionName : s.elt.desc,
 				scriptId : 0,
 			} : {
 				functionName : s.elt.desc,
 				scriptId : 1,
-				url : "file://"+s.elt.file.split("\\").join("/"),
-				lineNumber : s.elt.line,
+				url : s.elt.file.split("\\").join("/"),
+				lineNumber : s.elt.line - 1,
 			},
 			id : s.id,
 			parent : s.parent == null ? null : s.parent.id,
@@ -84,61 +92,59 @@ class ProfileGen {
 		var version = f.readInt32();
 		var sampleCount = f.readInt32();
 		var cache = new Map();
-		var frames = [];
 		var rootElt = new StackElement("(root)");
+		var curFrame = new Frame();
+		var frames = [curFrame];
 		while( true ) {
 			var time = try f.readDouble() catch( e : haxe.io.Eof ) break;
 			var tid = f.readInt32();
-			var count = f.readInt32();
-			var stack = [];
-			for( i in 0...count ) {
-				var file = f.readInt32();
-				if( file == -1 )
-					continue;
-				var line = f.readInt32();
-				var elt : StackElement;
-				if( file < 0 ) {
-					file &= 0x7FFFFFFF;
-					elt = cache.get(file+"-"+line);
-					if( elt == null ) throw "assert";
-				} else {
-					var len = f.readInt32();
-					var buf = new StringBuf();
-					for( i in 0...len ) buf.addChar(f.readUInt16());
-					var str = buf.toString();
-					elt = new StackElement(str);
-					cache.set(file+"-"+line, elt);
+			var msgId = f.readInt32();
+			if( msgId < 0 ) {
+				var count = msgId & 0x7FFFFFFF;
+				var stack = [];
+				for( i in 0...count ) {
+					var file = f.readInt32();
+					if( file == -1 )
+						continue;
+					var line = f.readInt32();
+					var elt : StackElement;
+					if( file < 0 ) {
+						file &= 0x7FFFFFFF;
+						elt = cache.get(file+"-"+line);
+						if( elt == null ) throw "assert";
+					} else {
+						var len = f.readInt32();
+						var buf = new StringBuf();
+						for( i in 0...len ) buf.addChar(f.readUInt16());
+						var str = buf.toString();
+						elt = new StackElement(str);
+						cache.set(file+"-"+line, elt);
+					}
+					stack[i] = elt;
 				}
-				stack[i] = elt;
+				curFrame.samples.push({ time : time, thread : tid, stack : stack });
+			} else {
+				var size = f.readInt32();
+				var data = f.read(size);
+				switch( msgId ) {
+				case 0:
+					curFrame.endTime = time;
+					curFrame = new Frame();
+					frames.push(curFrame);
+				default:
+					Sys.println("Unknown profile message #"+msgId);
+				}
 			}
-			frames.push({ time : time, thread : tid, stack : stack });
-		}
-		var lastT = frames[0].time - 1 / sampleCount;
-		var defStart = frames[0].stack[frames[0].stack.length - 1];
-		var rootStack = new StackLink(rootElt);
-		var timeDeltas = [];
-		var allStacks = [];
-		for( f in frames ) {
-			var st = rootStack;
-			var start = 0;
-			if( f.stack[f.stack.length-1].desc == defStart.desc ) start++;
-			for( i in start...f.stack.length ) {
-				var s = f.stack[f.stack.length - 1 - i];
-				if( s == null ) continue;
-				st = st.getChildren(s);
-			}
-			allStacks.push(st);
-			timeDeltas.push(Std.int((f.time - lastT)*1000000));
-			lastT = f.time;
 		}
 
-		var t0 = frames[0].time;
+		var s0 = frames[0].samples[0];
+		var tid = s0.thread;
+
 		function timeStamp(t:Float) {
-			return Std.int((t - t0) * 1000000);
+			return Std.int((t - s0.time) * 1000000);
 		}
 
-		var tid = frames[0].thread;
-		var json : Dynamic = [
+		var json : Array<Dynamic> = [
 			{
     			pid : 0,
     			tid : tid,
@@ -157,24 +163,49 @@ class ProfileGen {
 			    name : "Profile",
 				id : "0x1",
 				args: { data : { startTime : 0 } },
-			},
-			{
+			}
+		];
+		var lastT = s0.time - 1 / sampleCount;
+		var rootStack = new StackLink(rootElt);
+
+		for( f in frames ) {
+			if( f.samples.length == 0 ) continue;
+			json.push({
 				pid : 0,
 				tid : tid,
-				ts : 0,
+				ts : timeStamp(f.samples[0].time),
 				ph : "B",
 				cat : "devtools.timeline",
 				name : "FunctionCall",
-			},
-			{
+			});
+			json.push({
 				pid : 0,
 				tid : tid,
-				ts : timeStamp(frames[frames.length-1].time),
+				ts : timeStamp(f.endTime == null ? f.samples[f.samples.length-1].time : f.endTime),
 				ph : "E",
 				cat : "devtools.timeline",
 				name : "FunctionCall"
-			},
-			{
+			});
+		}
+		for( f in frames ) {
+			if( f.samples.length == 0 ) continue;
+
+			var timeDeltas = [];
+			var allStacks = [];
+
+			for( s in f.samples) {
+				var st = rootStack;
+				var start = 0;
+				for( i in start...s.stack.length ) {
+					var s = s.stack[s.stack.length - 1 - i];
+					if( s == null || s.file == "?" ) continue;
+					st = st.getChildren(s);
+				}
+				allStacks.push(st);
+				timeDeltas.push(Std.int((s.time - lastT)*1000000));
+				lastT = s.time;
+			}
+			json.push({
 				pid : 0,
 				tid : tid,
 				ts : 0,
@@ -191,9 +222,10 @@ class ProfileGen {
 						timeDeltas : timeDeltas,
 					}
 				}
-			}
-		];
-		sys.io.File.saveContent("Profile.json", haxe.Json.stringify(json));
+			});
+			lastT = f.endTime;
+		}
+		sys.io.File.saveContent("Profile.json", haxe.Json.stringify(json,"\t"));
 	}
 
 }

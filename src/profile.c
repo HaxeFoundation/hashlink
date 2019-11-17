@@ -27,7 +27,7 @@
 
 HL_API double hl_sys_time( void );
 HL_API void *hl_gc_threads_info( void );
-HL_API void hl_sys_before_exit( void * );
+HL_API void hl_setup_profiler( void *, void * );
 int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out, int size );
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr );
 
@@ -63,6 +63,9 @@ typedef struct {
 
 static struct {
 	int sample_count;
+	volatile bool profiling;
+	volatile bool stopLoop;
+	volatile bool waitLoop;
 	thread_handle *handles;
 	void **tmpMemory;
 	void *stackOut[MAX_STACK_COUNT];
@@ -145,15 +148,16 @@ static void read_thread_data( thread_handle *t ) {
 	if( size > MAX_STACK_SIZE-32 ) size = MAX_STACK_SIZE-32;
 	memcpy(data.tmpMemory + 2,stack,size);
 	pause_thread(t, false);
-	data.tmpMemory[0] = eip; 
+	data.tmpMemory[0] = eip;
 	data.tmpMemory[1] = stack;
 	size += sizeof(void*) * 2;
 
 	int count = hl_module_capture_stack_range((char*)data.tmpMemory+size, (void**)data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
+	int eventId = count | 0x80000000;
 	double time = hl_sys_time();
 	record_data(&time,sizeof(double));
 	record_data(&t->tid,sizeof(int));
-	record_data(&count,sizeof(int));
+	record_data(&eventId,sizeof(int));
 	record_data(data.stackOut,sizeof(void*)*count);
 }
 
@@ -162,9 +166,10 @@ static void hl_profile_loop( void *_ ) {
 	double next = hl_sys_time();
 	int skip = 0;
 	data.tmpMemory = malloc(MAX_STACK_SIZE);
-	while( true ) {
-		if( hl_sys_time() < next ) {
+	while( !data.stopLoop ) {
+		if( hl_sys_time() < next || !data.profiling ) {
 			skip++;
+			data.waitLoop = false;
 			continue;
 		}
 		hl_gc_threads *threads = (hl_gc_threads*)hl_gc_threads_info();
@@ -196,11 +201,14 @@ static void hl_profile_loop( void *_ ) {
 	}
 }
 
+static void profile_event( int code, vbyte *data, int dataLen );
+
 void hl_profile_start( int sample_count ) {
 #	if defined(HL_THREADS) && defined(HL_WIN_DESKTOP)
 	data.sample_count = sample_count;
+	data.profiling = true;
 	hl_thread_start(hl_profile_loop,NULL,false);
-	hl_sys_before_exit(hl_profile_end);
+	hl_setup_profiler(profile_event,hl_profile_end);
 #	endif
 }
 
@@ -220,8 +228,14 @@ static bool read_profile_data( profile_reader *r, void *ptr, int size ) {
 	return true;
 }
 
-void hl_profile_end() {
+static void profile_dump() {
 	if( !data.first_record ) return;
+	
+	bool prev_prof = data.profiling;
+	data.profiling = false;
+	printf("Writing profiling data...\n");
+	fflush(stdout);
+
 	FILE *f = fopen("hlprofile.dump","wb");
 	int version = HL_VERSION;
 	fwrite("PROF",1,4,f);
@@ -231,38 +245,82 @@ void hl_profile_end() {
 	r.r = data.first_record;
 	r.pos = 0;
 	int samples = 0;
-	int skipCount = 0, total = 0;
 	while( true ) {
 		double time;
-		int i, tid, count;
+		int i, tid, eventId;
 		if( !read_profile_data(&r,&time, sizeof(double)) ) break;
 		read_profile_data(&r,&tid,sizeof(int));
-		read_profile_data(&r,&count,sizeof(int));
-		read_profile_data(&r,data.stackOut,sizeof(void*)*count);
+		read_profile_data(&r,&eventId,sizeof(int));
 		fwrite(&time,1,8,f);
 		fwrite(&tid,1,4,f);
-		fwrite(&count,1,4,f);
-		total += count;
-		for(i=0;i<count;i++) {
-			uchar outStr[256];
-			int outSize = 256;
-			int *debug_addr = NULL;
-			if( hl_module_resolve_symbol_full(data.stackOut[i],outStr,&outSize,&debug_addr) == NULL ) {
-				int bad = -1;
-				fwrite(&bad,1,4,f);
-			} else {
-				fwrite(debug_addr,1,8,f);
-				if( (debug_addr[0] & 0x80000000) == 0 ) {
-					debug_addr[0] |= 0x80000000;
-					fwrite(&outSize,1,4,f);
-					fwrite(outStr,1,outSize*sizeof(uchar),f);
-				} else
-					skipCount++;
+		fwrite(&eventId,1,4,f);
+		if( eventId < 0 ) {
+			int count = eventId & 0x7FFFFFFF;
+			read_profile_data(&r,data.stackOut,sizeof(void*)*count);
+			for(i=0;i<count;i++) {
+				uchar outStr[256];
+				int outSize = 256;
+				int *debug_addr = NULL;
+				if( hl_module_resolve_symbol_full(data.stackOut[i],outStr,&outSize,&debug_addr) == NULL ) {
+					int bad = -1;
+					fwrite(&bad,1,4,f);
+				} else {
+					fwrite(debug_addr,1,8,f);
+					if( (debug_addr[0] & 0x80000000) == 0 ) {
+						debug_addr[0] |= 0x80000000;
+						fwrite(&outSize,1,4,f);
+						fwrite(outStr,1,outSize*sizeof(uchar),f);
+					}
+				}
+			}
+			samples++;
+		} else {
+			int size;
+			read_profile_data(&r,&size, sizeof(int));
+			fwrite(&size,1,4,f);
+			while( size ) {
+				int k = size > MAX_STACK_SIZE ? MAX_STACK_SIZE : size;
+				read_profile_data(&r,data.tmpMemory,k);
+				fwrite(data.tmpMemory,1,k,f);
+				size -= k;
 			}
 		}
-		samples++;
 	}
 	fclose(f);
 	printf("%d profile samples saved\n", samples);
+	data.profiling = prev_prof;
+}
+
+void hl_profile_end() {
+	profile_dump();
+	data.stopLoop = true;
+}
+
+static void profile_event( int code, vbyte *ptr, int dataLen ) {
+	switch( code ) {
+	case -1:
+		data.profiling = false;
+		break;
+	case -2:
+		data.profiling = true;
+		break;
+	case -3:
+		profile_dump();
+		break;
+	default:
+		if( code < 0 ) return;
+		bool old = data.profiling;
+		data.profiling = false;
+		data.waitLoop = true;
+		while( data.waitLoop ) {}
+		double time = hl_sys_time();
+		record_data(&time,sizeof(double));
+		record_data(&hl_get_thread()->thread_id,sizeof(int));
+		record_data(&code,sizeof(int));
+		record_data(&dataLen,sizeof(int));
+		record_data(ptr,dataLen);
+		data.profiling = old;
+		break;
+	}
 }
 
