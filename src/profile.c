@@ -70,14 +70,16 @@ static struct {
 	profile_data *first_record;
 } data = {0};
 
-static void *get_thread_stackptr( thread_handle *t ) {
+static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 #ifdef HL_WIN_DESKTOP
 	CONTEXT c;
 	c.ContextFlags = CONTEXT_CONTROL;
 	if( !GetThreadContext(t->h,&c) ) return NULL;
 #	ifdef HL_64
+	*eip = (void*)c.Rip;
 	return (void*)c.Rsp;
 #	else
+	*eip = (void*)c.Eip;
 	return (void*)c.Esp;
 #	endif
 #else
@@ -132,17 +134,20 @@ static void record_data( void *ptr, int size ) {
 static void read_thread_data( thread_handle *t ) {
 	if( !pause_thread(t,true) )
 		return;
-
-	void *stack = get_thread_stackptr(t);
+	void *eip;
+	void *stack = get_thread_stackptr(t,&eip);
 	if( !stack ) {
 		pause_thread(t,false);
 		return;
 	}
 
 	int size = (int)((unsigned char*)t->inf->stack_top - (unsigned char*)stack);
-	if( size > MAX_STACK_SIZE ) size = MAX_STACK_SIZE;
-	memcpy(data.tmpMemory,stack,size);
+	if( size > MAX_STACK_SIZE-32 ) size = MAX_STACK_SIZE-32;
+	memcpy(data.tmpMemory + 2,stack,size);
 	pause_thread(t, false);
+	data.tmpMemory[0] = eip; 
+	data.tmpMemory[1] = stack;
+	size += sizeof(void*) * 2;
 
 	int count = hl_module_capture_stack_range((char*)data.tmpMemory+size, (void**)data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
 	double time = hl_sys_time();
