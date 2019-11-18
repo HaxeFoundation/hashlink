@@ -166,7 +166,9 @@ static void hl_profile_loop( void *_ ) {
 	double next = hl_sys_time();
 	data.tmpMemory = malloc(MAX_STACK_SIZE);
 	while( !data.stopLoop ) {
-		if( hl_sys_time() < next || data.profiling_pause ) {
+		double t = hl_sys_time();
+		if( t < next || data.profiling_pause ) {
+			if( !(t < next) ) next = t; 
 			data.waitLoop = false;
 			continue;
 		}
