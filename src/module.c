@@ -95,9 +95,12 @@ uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int 
 	// extract debug info
 	fdebug = m->code->functions + fidx;
 	debug_addr = fdebug->debug + ((fpos&0xFFFF) * 2);
-	if( r_debug_addr ) *r_debug_addr = debug_addr;
 	file = debug_addr[0];
 	line = debug_addr[1];
+	if( r_debug_addr ) {
+		*r_debug_addr = debug_addr;
+		if( file < 0 ) return NULL; // already cached
+	}
 	if( fdebug->obj )
 		pos += usprintf(out,size - pos,USTR("%s.%s("),fdebug->obj->name,fdebug->field.name);
 	else if( fdebug->field.ref )

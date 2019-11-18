@@ -257,7 +257,8 @@ static void profile_dump() {
 				uchar outStr[256];
 				int outSize = 256;
 				int *debug_addr = NULL;
-				if( hl_module_resolve_symbol_full(data.stackOut[i],outStr,&outSize,&debug_addr) == NULL ) {
+				hl_module_resolve_symbol_full(data.stackOut[i],outStr,&outSize,&debug_addr);
+				if( debug_addr == NULL ) {
 					int bad = -1;
 					fwrite(&bad,1,4,f);
 				} else {
