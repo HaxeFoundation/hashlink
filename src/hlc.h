@@ -74,11 +74,6 @@
 #	endif
 #endif
 
-static void hl_null_access() {
-	hl_error("Null access");
-	HL_UNREACHABLE;
-}
-
 #endif
 
 extern void *hlc_static_call(void *fun, hl_type *t, void **args, vdynamic *out);

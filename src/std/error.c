@@ -110,6 +110,11 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	HL_UNREACHABLE;
 }
 
+HL_PRIM void hl_null_access() {
+	hl_error("Null access");
+	HL_UNREACHABLE;
+}
+
 HL_PRIM void hl_throw_buffer( hl_buffer *b ) {
 	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);	
 	d->v.ptr = hl_buffer_content(b,NULL);

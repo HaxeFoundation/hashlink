@@ -589,6 +589,7 @@ HL_API vdynamic *hl_alloc_strbytes( const uchar *msg, ... );
 HL_API void hl_assert( void );
 HL_API HL_NO_RETURN( void hl_throw( vdynamic *v ) );
 HL_API HL_NO_RETURN( void hl_rethrow( vdynamic *v ) );
+HL_API HL_NO_RETURN( void hl_null_access( void ) );
 HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
 HL_API void hl_dump_stack( void );
