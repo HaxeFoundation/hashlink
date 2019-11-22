@@ -206,7 +206,7 @@ class ProfileGen {
 				name : "FunctionCall"
 			}
 		];
-		var lastT = s0.time;
+		var lastT = 0;
 		var rootStack = new StackLink(rootElt);
 
 		for( f in frames ) {
@@ -246,8 +246,9 @@ class ProfileGen {
 				}
 				lines.push(line);
 				allStacks.push(st);
-				timeDeltas.push(Std.int((s.time - lastT)*1000000));
-				lastT = s.time;
+				var t = Std.int((s.time - s0.time) * 1000000);
+				timeDeltas.push(t - lastT);
+				lastT = t;
 			}
 			json.push({
 				pid : 0,
