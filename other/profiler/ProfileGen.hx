@@ -53,6 +53,19 @@ class Frame {
 	}
 }
 
+class Thread {
+
+	public var tid : Int;
+	public var curFrame : Frame;
+	public var frames : Array<Frame>;
+
+	public function new(tid) {
+		this.tid = tid;
+		curFrame = new Frame();
+		frames = [curFrame];
+	}
+}
+
 class ProfileGen {
 
 	static function makeStacks( st : Array<StackLink> ) {
@@ -111,12 +124,22 @@ class ProfileGen {
 		var version = f.readInt32();
 		var sampleCount = f.readInt32();
 		var rootElt = new StackElement("(root)");
-		var curFrame = new Frame();
-		var frames = [curFrame];
+		var hthreads = new Map();
+		var threads = [];
+		var tcur : Thread = null;
 		var fileMaps : Array<Map<Int,StackElement>> = [];
 		while( true ) {
 			var time = try f.readDouble() catch( e : haxe.io.Eof ) break;
 			var tid = f.readInt32();
+			if( tcur == null || tid != tcur.tid ) {
+				tcur = hthreads.get(tid);
+				if( tcur == null ) {
+					tcur = new Thread(tid);
+					tcur.curFrame.startTime = time;
+					hthreads.set(tid,tcur);
+					threads.push(tcur);
+				}
+			}
 			var msgId = f.readInt32();
 			if( msgId < 0 ) {
 				var count = msgId & 0x7FFFFFFF;
@@ -146,129 +169,120 @@ class ProfileGen {
 					}
 					stack[i] = elt;
 				}
-				curFrame.samples.push({ time : time, thread : tid, stack : stack });
+				tcur.curFrame.samples.push({ time : time, thread : tid, stack : stack });
 			} else {
 				var size = f.readInt32();
 				var data = f.read(size);
 				switch( msgId ) {
 				case 0:
-					curFrame = new Frame();
-					curFrame.startTime = time;
-					frames.push(curFrame);
+					tcur.curFrame = new Frame();
+					tcur.curFrame.startTime = time;
+					tcur.frames.push(tcur.curFrame);
 				default:
 					Sys.println("Unknown profile message #"+msgId);
 				}
 			}
 		}
 
-		var s0 = frames[0].samples[0];
-		var tid = s0.thread;
-		frames[0].startTime = s0.time;
-
-		function timeStamp(t:Float) {
-			return Std.int((t - s0.time) * 1000000) + 1;
-		}
-
+		var mainTid = threads[0].tid;
 		var json : Array<Dynamic> = [
 			{
     			pid : 0,
-    			tid : tid,
+    			tid : mainTid,
  	 			ts : 0,
 				ph : "M",
 				cat : "__metadata",
 				name : "thread_name",
 				args : { name : "CrBrowserMain" }
-			},
-			{
+			}
+		];
+
+		var count = 1;
+		var t0 = threads[0].frames[0].samples[0].time;
+
+		for( thread in threads ) {
+			var tid = thread.tid;
+
+			function timeStamp(t:Float) {
+				return Std.int((t - t0) * 1000000) + 1;
+			}
+
+			var lastT = 0.;
+			var rootStack = new StackLink(rootElt);
+			var profileId = count++;
+
+			json.push({
 				pid : 0,
 				tid : tid,
 				ts : 0,
 				ph : "P",
 				cat : "disabled-by-default-v8.cpu_profiler",
 			    name : "Profile",
-				id : "0x1",
+				id : "0x"+profileId,
 				args: { data : { startTime : 0 } },
-			},
-			{
-				pid : 0,
-				tid : tid,
-				ts : 0,
-				ph : "B",
-				cat : "devtools.timeline",
-				name : "FunctionCall",
-			},
-			{
-				pid : 0,
-				tid : tid,
-				ts : 1,
-				ph : "E",
-				cat : "devtools.timeline",
-				name : "FunctionCall"
-			}
-		];
-		var lastT = 0;
-		var rootStack = new StackLink(rootElt);
-
-		for( f in frames ) {
-			if( f.samples.length == 0 ) continue;
-			json.push({
-				pid : 0,
-				tid : tid,
-				ts : timeStamp(f.startTime),
-				ph : "B",
-				cat : "devtools.timeline",
-				name : "FunctionCall",
 			});
-			json.push({
-				pid : 0,
-				tid : tid,
-				ts : timeStamp(f.samples[f.samples.length-1].time),
-				ph : "E",
-				cat : "devtools.timeline",
-				name : "FunctionCall"
-			});
-		}
-		for( f in frames ) {
-			if( f.samples.length == 0 ) continue;
 
-			var timeDeltas = [];
-			var allStacks = [];
-			var lines = [];
-
-			for( s in f.samples) {
-				var st = rootStack;
-				var line = 0;
-				for( i in 0...s.stack.length ) {
-					var s = s.stack[s.stack.length - 1 - i];
-					if( s == null || s.file == "?" ) continue;
-					line = s.line;
-					st = st.getChildren(s);
-				}
-				lines.push(line);
-				allStacks.push(st);
-				var t = Std.int((s.time - s0.time) * 1000000);
-				timeDeltas.push(t - lastT);
-				lastT = t;
+			for( f in thread.frames ) {
+				if( f.samples.length == 0 ) continue;
+				json.push({
+					pid : 0,
+					tid : tid,
+					ts : timeStamp(f.startTime),
+					ph : "B",
+					cat : "devtools.timeline",
+					name : "FunctionCall",
+				});
+				json.push({
+					pid : 0,
+					tid : tid,
+					ts : timeStamp(f.samples[f.samples.length-1].time),
+					ph : "E",
+					cat : "devtools.timeline",
+					name : "FunctionCall"
+				});
 			}
-			json.push({
-				pid : 0,
-				tid : tid,
-				ts : 0,
-				ph : "P",
-				cat : "disabled-by-default-v8.cpu_profiler",
-				name : "ProfileChunk",
-				id : "0x1",
-				args : {
-					data : {
-						cpuProfile : {
-							nodes : makeStacks(allStacks),
-							samples : [for( s in allStacks ) s.id],
-							//lines : lines,
-						},
-						timeDeltas : timeDeltas,
+			for( f in thread.frames ) {
+				if( f.samples.length == 0 ) continue;
+
+				var timeDeltas = [];
+				var allStacks = [];
+				var lines = [];
+
+				for( s in f.samples) {
+					var st = rootStack;
+					var line = 0;
+					for( i in 0...s.stack.length ) {
+						var s = s.stack[s.stack.length - 1 - i];
+						if( s == null || s.file == "?" ) continue;
+						line = s.line;
+						st = st.getChildren(s);
 					}
+					lines.push(line);
+					allStacks.push(st);
+					var t = Math.ffloor((s.time - t0) * 1000000);
+					timeDeltas.push(t - lastT);
+					lastT = t;
 				}
-			});
+				json.push({
+					pid : 0,
+					tid : tid,
+					ts : 0,
+					ph : "P",
+					cat : "disabled-by-default-v8.cpu_profiler",
+					name : "ProfileChunk",
+					id : "0x"+profileId,
+					args : {
+						data : {
+							cpuProfile : {
+								nodes : makeStacks(allStacks),
+								samples : [for( s in allStacks ) s.id],
+								//lines : lines,
+							},
+							timeDeltas : timeDeltas,
+						}
+					}
+				});
+			}
 		}
 		sys.io.File.saveContent(outFile, debug ? haxe.Json.stringify(json,"\t") : haxe.Json.stringify(json));
 	}
