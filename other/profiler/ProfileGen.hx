@@ -98,12 +98,16 @@ class ProfileGen {
 	static function main() {
 		var args = Sys.args();
 		var outFile = null;
+		var file = null;
 		var debug = false;
 
 		while( args.length > 0 ) {
 			var arg = args[0];
-			if( arg.charCodeAt(0) != "-".code ) continue;
 			args.shift();
+			if( arg.charCodeAt(0) != "-".code ) {
+				file = arg;
+				continue;
+			}
 			switch( arg ) {
 			case "-debug":
 				debug = true;
@@ -114,7 +118,6 @@ class ProfileGen {
 			}
 		}
 
-		var file = args.shift();
 		if( file == null ) file = "hlprofile.dump";
 		if( sys.FileSystem.isDirectory(file) ) file += "/hlprofile.dump";
 		if( outFile == null ) outFile = file;
