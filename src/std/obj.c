@@ -392,7 +392,7 @@ HL_API void hl_flush_proto( hl_type *ot ) {
 	hl_type_obj *o = ot->obj;
 	hl_runtime_obj *rt = ot->obj->rt;
 	hl_module_context *m = o->m;
-	if( !rt ) return;
+	if( !rt || !ot->vobj_proto ) return;
 	for(i=0;i<o->nbindings;i++) {
 		hl_runtime_binding *b = rt->bindings + i;
 		int mid = o->bindings[(i<<1)|1];

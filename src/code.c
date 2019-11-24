@@ -994,10 +994,8 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 
 	// new globals
 	for(i=0;i<count;i++)
-		if( remap[i] == -1 ) {
+		if( remap[i] == -1 )
 			remap[i] = count + extra++;
-			printf("GLOBAL %d->%d CHANGED\n",i,remap[i]);
-		}
 
 	hl_type **nglobals;
 	ALLOC(nglobals,hl_type*,count + extra);
@@ -1022,11 +1020,11 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 		case HSTRUCT:
 		case HOBJ:
 			if( t->obj->global_value )
-				t->obj->global_value = (void*)(int_val)remap[(int)(int_val)t->obj->global_value - 1];
+				t->obj->global_value = (void*)(int_val)(remap[(int)(int_val)t->obj->global_value - 1] + 1);
 			break;
 		case HENUM:
 			if( t->tenum->global_value )
-				t->tenum->global_value = (void*)(int_val)remap[(int)(int_val)t->tenum->global_value - 1];
+				t->tenum->global_value = (void*)(int_val)(remap[(int)(int_val)t->tenum->global_value - 1] + 1);
 			break;
 		}
 	}

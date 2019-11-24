@@ -118,6 +118,7 @@ typedef struct {
 typedef struct {
 	hl_code *code;
 	int codesize;
+	int globals_size;
 	int *globals_indexes;
 	unsigned char *globals_data;
 	void **functions_ptrs;
