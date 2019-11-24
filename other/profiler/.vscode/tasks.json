@@ -1,0 +1,15 @@
+{
+// Consultez https://go.microsoft.com/fwlink/?LinkId=733558
+	// pour voir la documentation sur le format de tasks.json
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "haxe",
+			"args": "active configuration",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		}
+	]
+}

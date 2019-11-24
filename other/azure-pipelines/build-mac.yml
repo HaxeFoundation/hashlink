@@ -1,0 +1,56 @@
+parameters:
+  name: 'BuildMac'
+  vmImage: 'macOS-10.13'
+  buildSystem: 'cmake' # either 'cmake' or 'make'
+  cmakeConfig: 'RelWithDebInfo'
+
+jobs:
+  - job: ${{ parameters.name }}
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    steps:
+      - script: |
+          set -ex
+          brew update
+          brew install neko
+          brew bundle
+        displayName: Install dependencies
+      - template: install-haxe-snapshot.yml
+        parameters:
+          platform: mac
+      - script: |
+          set -ex
+          haxelib setup ~/haxelib
+          haxelib install hashlink
+          haxelib list
+        displayName: Install hashlink haxelib
+      - ${{ if eq(parameters.buildSystem, 'cmake') }}:
+        - script: cmake . -DCMAKE_BUILD_TYPE=${{ parameters.cmakeConfig }}
+          displayName: CMake
+        - script: make
+          displayName: Build
+        - script: |
+            set -ex
+            otool -L ./bin/hl
+          displayName: Check runtime dependencies
+        - script: ctest --verbose
+          displayName: Test
+        - script: make package
+          displayName: Package
+        - task: PublishPipelineArtifact@0
+          inputs:
+            artifactName: ${{ parameters.name }}Binaries
+            targetPath: bin/hashlink-1.10.0-Darwin.tar.gz
+      - ${{ if eq(parameters.buildSystem, 'make') }}:
+        - script: make
+          displayName: Build
+        - script: sudo make install
+          displayName: Install
+        - script: |
+            set -ex
+            haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
+            ./hl hello.hl
+            haxe -hl src/_main.c -cp other/tests -main HelloWorld
+            make hlc
+            ./hlc
+          displayName: Test

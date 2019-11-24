@@ -126,10 +126,10 @@ HL_PRIM int hl_from_utf8( uchar *out, int outLen, const char *str ) {
 		} else {
 			c2 = (unsigned)*str++;
 			c3 = (unsigned)*str++;
-			c = ((c & 0x0F) << 18) | ((c2 & 0x7F) << 12) | ((c3 & 0x7F) << 6) | ((*str++) & 0x7F);
+			c = (((c & 0x0F) << 18) | ((c2 & 0x7F) << 12) | ((c3 & 0x7F) << 6) | ((*str++) & 0x7F)) - 0x10000;
 			// surrogate pair
 			if( p++ == outLen ) break;
-			*out++ = (uchar)((c >> 10) + 0xD7C0);
+			*out++ = (uchar)((c >> 10) + 0xD800);
 			*out++ = (uchar)((c & 0x3FF) | 0xDC00);
 			continue;
 		}
@@ -359,8 +359,8 @@ HL_PRIM vbyte *hl_url_decode( vbyte *str, int *len ) {
 				if( *cstr++ != '%' ) break;
 				p4 = decode_hex(&cstr);
 				if( p4 < 0 ) break;
-				k = ((p1 & 0x0F) << 18) | ((p2 & 0x7F) << 12) | ((p3 & 0x7F) << 6) | (p4 & 0x7F);
-				hl_buffer_char(b,(uchar)((k >> 10) + 0xD7C0));
+				k = (((p1 & 0x0F) << 18) | ((p2 & 0x7F) << 12) | ((p3 & 0x7F) << 6) | (p4 & 0x7F)) - 0x10000;
+				hl_buffer_char(b,(uchar)((k >> 10) + 0xD800));
 				c = (uchar)((k & 0x3FF) | 0xDC00);
 			}
 		}

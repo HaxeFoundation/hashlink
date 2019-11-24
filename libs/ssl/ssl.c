@@ -36,6 +36,10 @@ typedef int SOCKET;
 mbedtls_x509_crt *hl_init_cert_chain();
 #endif
 
+#if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS)
+#	define MSG_NOSIGNAL 0
+#endif
+
 // Duplicate from socket.c
 typedef struct _hl_socket {
 	SOCKET sock;
@@ -134,14 +138,14 @@ static bool is_block_error() {
 }
 
 static int net_read(void *fd, unsigned char *buf, size_t len) {
-	int r = recv((SOCKET)(int_val)fd, (char *)buf, (int)len, 0);
+	int r = recv((SOCKET)(int_val)fd, (char *)buf, (int)len, MSG_NOSIGNAL);
 	if( r == SOCKET_ERROR && is_block_error() )
 		return MBEDTLS_ERR_SSL_WANT_READ;
 	return r;
 }
 
 static int net_write(void *fd, const unsigned char *buf, size_t len) {
-	int r = send((SOCKET)(int_val)fd, (char *)buf, (int)len, 0);
+	int r = send((SOCKET)(int_val)fd, (char *)buf, (int)len, MSG_NOSIGNAL);
 	if( r == SOCKET_ERROR && is_block_error() )
 		return MBEDTLS_ERR_SSL_WANT_WRITE;
 	return r;

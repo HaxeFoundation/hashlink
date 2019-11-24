@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x190
+#define HL_VERSION	0x010A00
 
 #if defined(_WIN32)
 #	define HL_WIN
@@ -589,6 +589,7 @@ HL_API vdynamic *hl_alloc_strbytes( const uchar *msg, ... );
 HL_API void hl_assert( void );
 HL_API HL_NO_RETURN( void hl_throw( vdynamic *v ) );
 HL_API HL_NO_RETURN( void hl_rethrow( vdynamic *v ) );
+HL_API HL_NO_RETURN( void hl_null_access( void ) );
 HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
 HL_API void hl_dump_stack( void );
@@ -613,7 +614,7 @@ HL_API double hl_dyn_castd( void *data, hl_type *t );
 #define hl_invalid_comparison 0xAABBCCDD
 HL_API int hl_dyn_compare( vdynamic *a, vdynamic *b );
 HL_API vdynamic *hl_make_dyn( void *data, hl_type *t );
-HL_API void hl_write_dyn( void *data, hl_type *t, vdynamic *v );
+HL_API void hl_write_dyn( void *data, hl_type *t, vdynamic *v, bool is_tmp );
 
 HL_API void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
 HL_API void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
@@ -643,6 +644,21 @@ HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
 HL_API void *hl_dyn_call_obj( vdynamic *obj, hl_type *ft, int hfield, void **args, vdynamic *ret );
 HL_API vdynamic *hl_dyn_call( vclosure *c, vdynamic **args, int nargs );
 HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool *isException );
+
+/*
+	These macros should be only used when the closure `cl` has been type checked beforehand
+	so you are sure it's of the used typed. Otherwise use hl_dyn_call
+*/
+#define hl_call0(ret,cl) \
+	(cl->hasValue ? ((ret(*)(vdynamic*))cl->fun)(cl->value) : ((ret(*)())cl->fun)()) 
+#define hl_call1(ret,cl,t,v) \
+	(cl->hasValue ? ((ret(*)(vdynamic*,t))cl->fun)(cl->value,v) : ((ret(*)(t))cl->fun)(v))
+#define hl_call2(ret,cl,t1,v1,t2,v2) \
+	(cl->hasValue ? ((ret(*)(vdynamic*,t1,t2))cl->fun)(cl->value,v1,v2) : ((ret(*)(t1,t2))cl->fun)(v1,v2))
+#define hl_call3(ret,cl,t1,v1,t2,v2,t3,v3) \
+	(cl->hasValue ? ((ret(*)(vdynamic*,t1,t2,t3))cl->fun)(cl->value,v1,v2,v3) : ((ret(*)(t1,t2,t3))cl->fun)(v1,v2,v3))
+#define hl_call4(ret,cl,t1,v1,t2,v2,t3,v3,t4,v4) \
+	(cl->hasValue ? ((ret(*)(vdynamic*,t1,t2,t3,t4))cl->fun)(cl->value,v1,v2,v3,v4) : ((ret(*)(t1,t2,t3,t4))cl->fun)(v1,v2,v3,v4))
 
 // ----------------------- THREADS --------------------------------------------------
 

@@ -277,6 +277,10 @@ class Texture2dDesc {
 	public var bind : ResourceBind;
 	public var access : ResourceAccess;
 	public var misc : ResourceMisc;
+	#if hlxbo
+	var esramOffset : Int;
+	var esramUsage : Int;
+	#end
 	public function new() {
 		mipLevels = arraySize = sampleCount = 1;
 	}
@@ -309,17 +313,37 @@ class DepthStencilDesc {
 	public var depthEnable : DxBool;
 	public var depthWrite : DxBool;
 	public var depthFunc : ComparisonFunc;
+
 	public var stencilEnable : DxBool;
 	public var stencilReadMask : hl.UI8;
 	public var stencilWriteMask : hl.UI8;
+
 	public var frontFaceFail : StencilOp;
 	public var frontFaceDepthFail : StencilOp;
 	public var frontFacePass : StencilOp;
 	public var frontFaceFunc : ComparisonFunc;
+
 	public var backFaceFail : StencilOp;
 	public var backFaceDepthFail : StencilOp;
 	public var backFacePass : StencilOp;
 	public var backFaceFunc : ComparisonFunc;
+
+	#if hlxbo
+	public var backfaceEnable : DxBool;
+    public var depthBoundsEnable : DxBool;
+    public var colorWritesOnDepthFailEnable : DxBool;
+    public var colorWritesOnDepthPassDisable : DxBool;
+
+    public var stencilReadMaskBack : hl.UI8;
+    public var stencilWriteMaskBack : hl.UI8;
+
+    public var stencilTestRefValueFront : hl.UI8;
+    public var stencilTestRefValueBack : hl.UI8;
+
+    public var stencilOpRefValueFront : hl.UI8;
+    public var stencilOpRefValueBack : hl.UI8;
+	#end
+
 	public function new() {
 	}
 }

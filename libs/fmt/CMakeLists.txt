@@ -1,3 +1,6 @@
+set(MINIMP3_INCLUDE_DIR ${INCLUDES_BASE_DIR}/minimp3)
+set(MIKKTSPACE_INCLUDE_DIR ${INCLUDES_BASE_DIR}/mikktspace)
+
 if(WIN32)
     set(ZLIB_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/zlib)
     set(PNG_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/png)
@@ -113,6 +116,7 @@ if(WIN32)
         ${INCLUDES_BASE_DIR}/vorbis/window.c
         fmt.c
         sha1.c
+        dxt.c
     )
 else()
     find_package(ZLIB REQUIRED)
@@ -131,10 +135,11 @@ else()
     add_library(fmt.hdll SHARED
         fmt.c
         sha1.c
+        dxt.c
+        mikkt.c
+        ${MIKKTSPACE_INCLUDE_DIR}/mikktspace.c
     )
 endif()
-
-set(MINIMP3_INCLUDE_DIR ${INCLUDES_BASE_DIR}/minimp3)
 
 set_as_hdll(fmt)
 
@@ -145,6 +150,7 @@ target_include_directories(fmt.hdll
     ${TurboJPEG_INCLUDE_DIRS}
     ${VORBIS_INCLUDE_DIR}
     ${MINIMP3_INCLUDE_DIR}
+    ${MIKKTSPACE_INCLUDE_DIR}
 )
 
 target_link_libraries(fmt.hdll

@@ -263,6 +263,7 @@
     <ClCompile Include="src\jit.c" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\module.c" />
+    <ClCompile Include="src\profile.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\hl.h" />

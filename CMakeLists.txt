@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 
 set(HL_VERSION_MAJOR 1)
-set(HL_VERSION_MINOR 9)
+set(HL_VERSION_MINOR 10)
 set(HL_VERSION_PATCH 0)
 set(HL_VERSION ${HL_VERSION_MAJOR}.${HL_VERSION_MINOR}.${HL_VERSION_PATCH})
 
@@ -133,6 +133,7 @@ add_executable(hl
     src/main.c
     src/module.c
     src/debugger.c
+	src/profile.c
 )
 
 target_link_libraries(hl libhl)

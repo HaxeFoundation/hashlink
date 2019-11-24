@@ -1,6 +1,6 @@
 
 LBITS := $(shell getconf LONG_BIT)
-ARCH ?= $(LBITS)
+MARCH ?= $(LBITS)
 PREFIX ?= /usr/local
 INSTALL_DIR ?= $(PREFIX)
 
@@ -25,9 +25,9 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o
+HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
 
-FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o
+FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o libs/fmt/dxt.o
 
 SDL = libs/sdl/sdl.o libs/sdl/gl.o
 
@@ -54,7 +54,7 @@ LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
 RELEASE_NAME=win
 
-ifeq ($(ARCH),32)
+ifeq ($(MARCH),32)
 CC=i686-pc-cygwin-gcc
 endif
 
@@ -62,7 +62,7 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(ARCH) -I /opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH) -I /usr/local/opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
 
 ifdef OSX_SDK
@@ -71,7 +71,7 @@ CFLAGS += -isysroot $(ISYSROOT)
 LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-LIBFLAGS += -L/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
+LIBFLAGS += -L/usr/local/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
@@ -80,10 +80,10 @@ RELEASE_NAME = osx
 else
 
 # Linux
-CFLAGS += -m$(ARCH) -fPIC -pthread
+CFLAGS += -m$(MARCH) -fPIC -pthread
 LFLAGS += -lm -Wl,-rpath,. -Wl,--export-dynamic -Wl,--no-undefined
 
-ifeq ($(ARCH),32)
+ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
 LIBFLAGS += -L/opt/libjpeg-turbo/lib
 else
@@ -123,7 +123,7 @@ uninstall:
 libs: $(LIBS)
 
 libhl: ${LIB}
-	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
+	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}

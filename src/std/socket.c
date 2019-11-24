@@ -28,7 +28,7 @@
 #	define _WINSOCKAPI_
 #	include <hl.h>
 #	include <winsock2.h>
-#	define FDSIZE(n)	(sizeof(u_int) + (n) * sizeof(SOCKET))
+#	define FDSIZE(n)	(sizeof(void*) + (n) * sizeof(SOCKET))
 #	define SHUT_WR		SD_SEND
 #	define SHUT_RD		SD_RECEIVE
 #	define SHUT_RDWR	SD_BOTH

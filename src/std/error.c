@@ -33,7 +33,11 @@ HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
     HWND consoleWnd = GetConsoleWindow();
     DWORD pid;
     GetWindowThreadProcessId(consoleWnd, &pid);
-    if( consoleWnd == NULL || GetActiveWindow() != NULL || GetCurrentProcessId() == pid ) MessageBoxA(NULL,msg,"Fatal Error", MB_OK | MB_ICONERROR);
+    if( consoleWnd == NULL || GetActiveWindow() != NULL || GetCurrentProcessId() == pid ) {
+		char buf[256];
+		sprintf(buf,"%s\n\n%s(%d)",msg,file,line);
+		MessageBoxA(NULL,buf,"Fatal Error", MB_OK | MB_ICONERROR);
+	}
 #	endif
 	printf("%s(%d) : FATAL ERROR : %s\n",file,line,msg);
 	hl_blocking(false);
@@ -87,25 +91,27 @@ static bool break_on_trap( hl_thread_info *t, hl_trap_ctx *trap, vdynamic *v ) {
 HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_thread_info *t = hl_get_thread();
 	hl_trap_ctx *trap = t->trap_current;
-	bool was_rethrow = false;
 	bool call_handler = false;
-	if( t->flags & HL_EXC_RETHROW ) {
-		was_rethrow = true;
-		t->flags &= ~HL_EXC_RETHROW;
-	} else
+	if( !(t->flags & HL_EXC_RETHROW) )
 		t->exc_stack_count = capture_stack_func(t->exc_stack_trace, HL_EXC_MAX_STACK);
 	t->exc_value = v;
 	t->trap_current = trap->prev;
-	call_handler = (t->flags&HL_EXC_CATCH_ALL) || trap == t->trap_uncaught || t->trap_current == NULL;
+	call_handler = trap == t->trap_uncaught || t->trap_current == NULL;
 	if( (t->flags&HL_EXC_CATCH_ALL) || break_on_trap(t,trap,v) ) {
 		if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
 		t->flags |= HL_EXC_IS_THROW;
 		hl_debug_break();
 		t->flags &= ~HL_EXC_IS_THROW;
 	}
-	if( t->exc_handler && call_handler ) hl_dyn_call(t->exc_handler,&v,1);
+	t->flags &= ~HL_EXC_RETHROW;
+	if( t->exc_handler && call_handler ) hl_dyn_call_safe(t->exc_handler,&v,1,&call_handler);
 	if( throw_jump == NULL ) throw_jump = longjmp;
 	throw_jump(trap->buf,1);
+	HL_UNREACHABLE;
+}
+
+HL_PRIM void hl_null_access() {
+	hl_error("Null access");
 	HL_UNREACHABLE;
 }
 
@@ -136,19 +142,16 @@ HL_PRIM void hl_dump_stack() {
 HL_PRIM varray *hl_exception_stack() {
 	hl_thread_info *t = hl_get_thread();
 	varray *a = hl_alloc_array(&hlt_bytes, t->exc_stack_count);
-	int i;
+	int i, pos = 0;
 	for(i=0;i<t->exc_stack_count;i++) {
 		void *addr = t->exc_stack_trace[i];
 		uchar sym[512];
 		int size = 512;
 		uchar *str = resolve_symbol_func(addr, sym, &size);
-		if( str == NULL ) {
-			int iaddr = (int)(int_val)addr;
-			str = sym;
-			size = usprintf(str,512,USTR("@0x%X"),iaddr);
-		}
-		hl_aptr(a,vbyte*)[i] = hl_copy_bytes((vbyte*)str,sizeof(uchar)*(size+1));
+		if( str == NULL ) continue;
+		hl_aptr(a,vbyte*)[pos++] = hl_copy_bytes((vbyte*)str,sizeof(uchar)*(size+1));
 	}
+	a->size = pos;
 	return a;
 }
 

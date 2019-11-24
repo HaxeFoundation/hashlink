@@ -59,6 +59,9 @@ static void hl_debug_loop( hl_module *m ) {
 	flags |= 4;
 	loop = true;
 #	endif
+#	ifdef HL_WIN_CALL
+	flags |= 8;
+#	endif
 	hl_get_thread()->flags |= HL_THREAD_INVISIBLE;
 	do {
 		int i;

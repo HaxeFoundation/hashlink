@@ -257,7 +257,7 @@ HL_PRIM int hl_track_entry( int id, hl_type **t, int *count, int *info, varray *
 	*info = b->info;
 	stack->size = b->stack_count;
 	memcpy(hl_aptr(stack,void*), b->stack, b->stack_count * sizeof(void*));
-	return (cur - all_data);
+	return (int)(cur - all_data);
 }
 
 HL_PRIM int hl_track_get_bits( bool thread ) {

@@ -37,6 +37,8 @@
 #	include <windows.h>
 #	include <direct.h>
 #	include <conio.h>
+#	include <fcntl.h>
+#	include <io.h>
 #	define getenv _wgetenv
 #	define putenv _wputenv
 #	define getcwd(buf,size) (void*)(int_val)GetCurrentDirectoryW(size,buf)
@@ -141,26 +143,62 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 #	ifdef HL_XBO
 	OutputDebugStringW((LPCWSTR)msg);
 #	else
+
+#	ifdef HL_WIN_DESKTOP
+	_setmode(_fileno(stdout),_O_U8TEXT);
+#	endif
 	uprintf(USTR("%s"),(uchar*)msg);
 	fflush(stdout);
+#	ifdef HL_WIN_DESKTOP
+	_setmode(_fileno(stdout),_O_TEXT);
+#	endif
+
 #	endif
 	hl_blocking(false);
 }
 
+
+static void *f_before_exit = NULL;
+static void *f_profile_event = NULL;
+HL_PRIM void hl_setup_profiler( void *profile_event, void *before_exit ) {
+	f_before_exit = before_exit;
+	f_profile_event = profile_event;
+}
+
+HL_PRIM void hl_sys_profile_event( int code, vbyte *data, int dataLen ) {
+	if( f_profile_event ) ((void(*)(int,vbyte*,int))f_profile_event)(code,data,dataLen);
+}
+
 HL_PRIM void hl_sys_exit( int code ) {
+	if( f_before_exit ) ((void(*)())f_before_exit)();
 	exit(code);
 }
 
 HL_PRIM double hl_sys_time() {
 #ifdef HL_WIN
+	#define EPOCH_DIFF	(134774*24*60*60.0)
+	static double time_diff = 0.;
 	static double freq = 0.;
 	LARGE_INTEGER time;
+
 	if( freq == 0 ) {
 		QueryPerformanceFrequency(&time);
 		freq = (double)time.QuadPart;
 	}
 	QueryPerformanceCounter(&time);
-	return ((double)time.QuadPart) / freq;
+
+#	ifndef HL_CONSOLE
+	if( time_diff == 0 ) {
+		FILETIME ft;
+		LARGE_INTEGER start_time;
+		GetSystemTimeAsFileTime(&ft);
+		start_time.LowPart = ft.dwLowDateTime;
+		start_time.HighPart = ft.dwHighDateTime;
+		time_diff = ((double)start_time.QuadPart - (double)time.QuadPart) / freq - EPOCH_DIFF;
+	}
+#	endif
+
+	return time_diff + ((double)time.QuadPart) / freq;
 #else
 	struct timeval tv;
 	if( gettimeofday(&tv,NULL) != 0 )
@@ -597,7 +635,7 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 	sys_args = (pchar**)args;
 	sys_nargs = nargs;
 	hl_file = hlfile;
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	setlocale(LC_CTYPE, ""); // printf to current locale
 #	endif
 }
@@ -657,3 +695,4 @@ DEFINE_PRIM(_I32, sys_get_char, _BOOL);
 DEFINE_PRIM(_ARR, sys_args, _NO_ARG);
 DEFINE_PRIM(_I32, sys_getpid, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_check_reload, _NO_ARG);
+DEFINE_PRIM(_VOID, sys_profile_event, _I32 _BYTES _I32);

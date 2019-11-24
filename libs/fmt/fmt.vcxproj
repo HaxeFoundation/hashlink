@@ -127,6 +127,7 @@
     <ClCompile Include="..\..\include\zlib\inftrees.c" />
     <ClCompile Include="..\..\include\zlib\trees.c" />
     <ClCompile Include="..\..\include\zlib\zutil.c" />
+    <ClCompile Include="dxt.c" />
     <ClCompile Include="fmt.c" />
     <ClCompile Include="mikkt.c" />
     <ClCompile Include="sha1.c" />
