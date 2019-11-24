@@ -580,7 +580,8 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	jit_ctx *ctx = m1->jit_ctx;
 
 	hl_module *m2 = hl_module_alloc(c);
-	m2->hash = hl_code_hash_alloc(c);	
+	m2->hash = hl_code_hash_alloc(c);
+	hl_code_hash_remap_globals(m2->hash,m1->hash);
 	hl_module_init_natives(m2);
 	hl_module_init_indexes(m2);
 	hl_jit_reset(ctx, m2);

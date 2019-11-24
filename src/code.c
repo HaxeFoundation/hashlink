@@ -347,7 +347,7 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 #undef CHK_ERROR
 #define CHK_ERROR() if( r->error ) { if( c ) hl_free(&c->alloc); *error_msg = (char*)r->error; return NULL; }
 #define EXIT(msg) { ERROR(msg); CHK_ERROR(); }
-#define ALLOC(v,ptr,count) v = (ptr *)hl_zalloc(&c->alloc,count*sizeof(ptr))
+#define ALLOC(v,ptr,count) v = (ptr *)hl_zalloc(&c->alloc,(count)*sizeof(ptr))
 
 const char *hl_op_name( int op ) {
 	if( op < 0 || op >= OLast )
@@ -814,10 +814,6 @@ static int hash_fun( hl_code_hash *h, hl_function *f ) {
 			HSTR(c->strings[o->p2]);
 			H32(o->p3);
 			break;
-		case OGetGlobal:
-			H32(o->p1);
-			H32(h->globals_signs[o->p2]);
-			break;
 		default:
 			switch( hl_op_nargs[o->op] ) {
 			case 0:
@@ -887,7 +883,6 @@ int hl_code_hash_type( hl_code_hash *h, hl_type *t ) {
 	return hash;
 }
 
-
 hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 	int i;
 	hl_code_hash *h = malloc(sizeof(hl_code_hash));
@@ -950,7 +945,111 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 		}
 		h->globals_signs[k->global] = hash;
 	}
+
+	// look into boot code to identify globals that are constant enum constructors
+	// this is a bit hackish but we need them for remap and there's no metatada
+	hl_function *f = c->functions + h->functions_indexes[c->entrypoint];
+	for(i=4;i<f->nops;i++) {
+		hl_opcode *op = f->ops + i;
+		hl_type *t;
+		switch( op->op ) {
+		case OSetGlobal:
+			t = c->globals[op->p1];
+			if( t->kind == HENUM && f->ops[i-2].op == OGetArray && f->ops[i-3].op == OInt )
+				h->globals_signs[op->p1] = c->ints[f->ops[i-3].p2];
+			break;
+		default:
+			break;
+		}
+	}
+
+	for(i=0;i<c->nglobals;i++)
+		h->globals_signs[i] ^= hl_code_hash_type(h,c->globals[i]);
 	return h;
+}
+
+
+void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
+	hl_code *c = hnew->code;
+	int i;
+	int old_start = 0;
+
+	int count = c->nglobals;
+	int extra =	hold->code->nglobals - count;
+	if( extra < 0 ) extra = 0;
+	int *remap = malloc(sizeof(int) * count);
+
+	for(i=0;i<count;i++) {
+		int k;
+		int h = hnew->globals_signs[i];
+		remap[i] = -1;
+		for(k=old_start;k<hold->code->nglobals;k++) {
+			if( hold->globals_signs[k] == h ) {
+				if( k == old_start ) old_start++;
+				remap[i] = k;
+				break;
+			}
+		}
+	}
+
+	// new globals
+	for(i=0;i<count;i++)
+		if( remap[i] == -1 ) {
+			remap[i] = count + extra++;
+			printf("GLOBAL %d->%d CHANGED\n",i,remap[i]);
+		}
+
+	hl_type **nglobals;
+	ALLOC(nglobals,hl_type*,count + extra);
+	for(i=0;i<count;i++)
+		nglobals[i] = &hlt_void;
+	for(i=0;i<count;i++)
+		nglobals[remap[i]] = c->globals[i];
+	c->globals = nglobals;
+	c->nglobals += extra;
+
+	int *nsigns = malloc(sizeof(int) * (count+extra));
+	for(i=0;i<count;i++)
+		nsigns[i] = -1;
+	for(i=0;i<count;i++)
+		nsigns[remap[i]] = hnew->globals_signs[i];
+	free(hnew->globals_signs);
+	hnew->globals_signs = nsigns;
+
+	for(i=0;i<c->ntypes;i++) {
+		hl_type *t = c->types + i;
+		switch( t->kind ) {
+		case HSTRUCT:
+		case HOBJ:
+			if( t->obj->global_value )
+				t->obj->global_value = (void*)(int_val)remap[(int)(int_val)t->obj->global_value - 1];
+			break;
+		case HENUM:
+			if( t->tenum->global_value )
+				t->tenum->global_value = (void*)(int_val)remap[(int)(int_val)t->tenum->global_value - 1];
+			break;
+		}
+	}
+	for(i=0;i<c->nconstants;i++)
+		c->constants[i].global = remap[c->constants[i].global];
+
+	for(i=0;i<c->nfunctions;i++) {
+		hl_function *f = c->functions + i;
+		int k;
+		for(k=0;k<f->nops;k++) {
+			hl_opcode *op = f->ops + k;
+			switch( op->op ) {
+			case OGetGlobal:
+				op->p2 = remap[op->p2];
+				break;
+			case OSetGlobal:
+				op->p1 = remap[op->p1];
+				break;
+			}
+		}
+	}
+
+	free(remap);
 }
 
 void hl_code_hash_finalize( hl_code_hash *h ) {
