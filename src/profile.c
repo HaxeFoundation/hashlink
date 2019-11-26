@@ -187,7 +187,8 @@ static void hl_profile_loop( void *_ ) {
 				cur = h;
 				if( prev == NULL ) data.handles = h; else prev->next = h;
 			}
-			read_thread_data(cur);
+			if( (t->flags & HL_THREAD_PROFILER_PAUSED) == 0 )
+				read_thread_data(cur);
 			prev = cur;
 			cur = cur->next;
 		}
@@ -298,12 +299,33 @@ void hl_profile_end() {
 static void profile_event( int code, vbyte *ptr, int dataLen ) {
 	switch( code ) {
 	case -1:
-		data.profiling_pause++;
+		hl_get_thread()->flags |= HL_THREAD_PROFILER_PAUSED;
 		break;
 	case -2:
-		data.profiling_pause--;
+		hl_get_thread()->flags &= ~HL_THREAD_PROFILER_PAUSED;
 		break;
 	case -3:
+		data.profiling_pause++;
+		data.waitLoop = true;
+		while( data.waitLoop ) {}
+		profile_data *d = data.first_record;
+		while( d ) {
+			profile_data *n = d->next;
+			free(d->data);
+			free(d);
+			d = n;
+		}
+		data.first_record = NULL;
+		data.record = NULL;
+		data.profiling_pause--;
+		break;
+	case -4:
+		data.profiling_pause++;
+		break;
+	case -5:
+		data.profiling_pause--;
+		break;
+	case -6:
 		profile_dump();
 		break;
 	default:
