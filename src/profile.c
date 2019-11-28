@@ -178,6 +178,8 @@ static void hl_profile_loop( void *_ ) {
 		thread_handle *cur = data.handles;
 		for(i=0;i<threads->count;i++) {
 			hl_thread_info *t = threads->threads[i];
+			if( t->flags & HL_THREAD_INVISIBLE ) continue;
+			
 			if( !cur || cur->tid != t->thread_id ) {
 				thread_handle *h = malloc(sizeof(thread_handle));
 				h->tid = t->thread_id;
