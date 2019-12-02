@@ -45,7 +45,7 @@ jobs:
         displayName: 'Install Neko'
       - template: install-haxe-snapshot.yml
         parameters:
-          platform: windows
+          platform: windows64
       - script: |
           haxelib setup ~/haxelib
           haxelib install hashlink
