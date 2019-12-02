@@ -704,6 +704,8 @@ static int hash_type_rec( hl_code_hash *h, hl_type *t ) {
 				HTYPE(c->params[k]);
 		}
 		break;
+	default:
+		break;
 	}
 	return hash;
 }
@@ -923,6 +925,8 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 			if( t->tenum->global_value )
 				h->globals_signs[(int)(int_val)t->tenum->global_value - 1] = hl_code_hash_type(h,t); 
 			break;
+		default:
+			break;
 		}
 	}
 	for(i=0;i<c->nconstants;i++) {
@@ -1026,6 +1030,8 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 			if( t->tenum->global_value )
 				t->tenum->global_value = (void*)(int_val)(remap[(int)(int_val)t->tenum->global_value - 1] + 1);
 			break;
+		default:
+			break;
 		}
 	}
 	for(i=0;i<c->nconstants;i++)
@@ -1042,6 +1048,8 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 				break;
 			case OSetGlobal:
 				op->p1 = remap[op->p1];
+				break;
+			default:
 				break;
 			}
 		}
