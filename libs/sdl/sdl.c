@@ -459,6 +459,7 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 		// exit borderless
 		SetWindowLong(wnd,GWL_STYLE,save->style);
 		SetWindowPos(wnd,NULL,save->x,save->y,save->w,save->h,0);
+		SDL_SetWindowSize(win, save->w, save->h);
 		free(save);
 		SDL_SetWindowData(win,"save",NULL);
 		save = NULL;
