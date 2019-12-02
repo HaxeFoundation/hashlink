@@ -47,7 +47,6 @@ jobs:
         parameters:
           platform: windows
       - script: |
-          set -ex
           haxelib setup ~/haxelib
           haxelib install hashlink
           haxelib list
