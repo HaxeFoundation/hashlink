@@ -17,10 +17,10 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
       ${{ if eq(parameters.arch, '') }}:
         CMAKE_TOOLCHAIN: ''
-        ARCH: 64
+        MARCH: 64
       ${{ if eq(parameters.arch, 'i386') }}:
         CMAKE_TOOLCHAIN: -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake
-        ARCH: 32
+        MARCH: 32
     steps:
       - script: |
           /tmp/docker exec -t -u 0 ci-container \

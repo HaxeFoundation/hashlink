@@ -11,9 +11,9 @@ jobs:
       vmImage: ${{ parameters.vmImage }}
     variables:
       ${{ if endsWith(parameters.cmakeGenerator, 'Win64') }}:
-        ARCH: 64
+        MARCH: 64
       ${{ if not(endsWith(parameters.cmakeGenerator, 'Win64')) }}:
-        ARCH: 32
+        MARCH: 32
     steps:
       - ${{ if eq(parameters.vmImage, 'vs2015-win2012r2') }}:
         - powershell: |
@@ -33,7 +33,7 @@ jobs:
           Remove-Item openal.zip
         displayName: Install openal
       - powershell: |
-          Invoke-WebRequest https://ffmpeg.zeranoe.com/builds/win$(ARCH)/dev/ffmpeg-3.4.2-win$(ARCH)-dev.zip -OutFile ffmpeg.zip
+          Invoke-WebRequest https://ffmpeg.zeranoe.com/builds/win$(MARCH)/dev/ffmpeg-3.4.2-win$(MARCH)-dev.zip -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath .
           Move-Item ffmpeg-* include/ffmpeg
           Remove-Item ffmpeg.zip
@@ -64,7 +64,7 @@ jobs:
         - task: PublishPipelineArtifact@0
           inputs:
             artifactName: ${{ parameters.name }}Binaries
-            targetPath: bin/hashlink-1.10.0-win$(ARCH).zip
+            targetPath: bin/hashlink-1.10.0-win$(MARCH).zip
       - ${{ if eq(parameters.buildSystem, 'vs') }}:
         - task: MSBuild@1
           inputs:
