@@ -41,7 +41,8 @@ jobs:
       - powershell: |
           Set-Service wuauserv -StartupType Manual
           choco install --no-progress neko -y
-          Write-Host "##vso[task.setvariable variable=NEKOPATH]C:/ProgramData/chocolatey/lib/neko"
+          $nekoPath = (Get-ChildItem C:/ProgramData/chocolatey/lib/neko/*/neko.dll -Recurse).Directory
+          Write-Host "##vso[task.setvariable variable=NEKOPATH]$nekoPath"
         displayName: 'Install Neko'
       - template: install-haxe-snapshot.yml
         parameters:
