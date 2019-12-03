@@ -201,7 +201,8 @@ class ProfileGen {
 		];
 
 		var count = 1;
-		var t0 = threads[0].frames[0].samples[0].time;
+		var f0 = threads[0].frames[0];
+		var t0 = f0.samples.length == 0 ? f0.startTime : f0.samples[0].time;
 
 		for( thread in threads ) {
 			var tid = thread.tid;
