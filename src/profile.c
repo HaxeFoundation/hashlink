@@ -332,6 +332,7 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		break;
 	default:
 		if( code < 0 ) return;
+		if( data.profiling_pause || (hl_get_thread()->flags & HL_THREAD_PROFILER_PAUSED) ) return;
 		data.profiling_pause++;
 		data.waitLoop = true;
 		while( data.waitLoop ) {}
