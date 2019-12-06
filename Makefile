@@ -80,7 +80,7 @@ RELEASE_NAME = osx
 else
 
 # Linux
-CFLAGS += -m$(MARCH) -fPIC -pthread
+CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
 LFLAGS += -lm -Wl,-rpath,. -Wl,--export-dynamic -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
