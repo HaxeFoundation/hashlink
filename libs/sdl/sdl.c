@@ -491,7 +491,7 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 			return true;
 		}
 #	else
-		break;
+		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0;
 #	endif
 	case 3:
 		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN) == 0;
