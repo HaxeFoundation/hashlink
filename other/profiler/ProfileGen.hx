@@ -110,9 +110,9 @@ class ProfileGen {
 				continue;
 			}
 			switch( arg ) {
-			case "-debug":
+			case "-d"|"--debug":
 				debug = true;
-			case "-out":
+			case "-o"|"--out":
 				outFile = args.shift();
 			case "--min-time-ms":
 				mintime = Std.parseFloat(args.shift()) / 1000.0;
