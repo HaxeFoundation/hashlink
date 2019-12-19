@@ -115,7 +115,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 
 	r = (sqlite_result*)hl_gc_alloc_finalizer(sizeof(sqlite_result));
 	r->finalize = HL_NAME(finalize_result);
-	r->db = db;
+	r->db = NULL;
 	
 	if( sqlite3_prepare16_v2(db->db, sql, -1, &r->r, &tl) != SQLITE_OK ) {
 		HL_NAME(error)(db->db, false);
@@ -126,6 +126,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 		hl_error("SQLite error: Cannot execute several SQL requests at the same time");
 	}
 
+	r->db = db;
 	r->ncols = sqlite3_column_count(r->r);
 	r->names = (int*)malloc(sizeof(int)*r->ncols);
 	r->bools = (int*)malloc(sizeof(int)*r->ncols);
