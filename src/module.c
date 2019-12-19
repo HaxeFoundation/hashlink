@@ -80,7 +80,6 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr ) {
 	int *debug_addr;
 	int file, line;
-	int size = *outSize;
 	int pos = 0;
 	int fidx, fpos;
 	hl_function *fdebug;
@@ -103,6 +102,9 @@ uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int 
 		*r_debug_addr = debug_addr;
 		if( file < 0 ) return NULL; // already cached
 	}
+	if( !out )
+		return NULL;
+	int size = *outSize;
 	if( fdebug->obj )
 		pos += usprintf(out,size - pos,USTR("%s.%s("),fdebug->obj->name,fdebug->field.name);
 	else if( fdebug->field.ref )

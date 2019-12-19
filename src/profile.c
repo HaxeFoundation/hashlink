@@ -219,7 +219,7 @@ static bool read_profile_data( profile_reader *r, void *ptr, int size ) {
 		if( r->r == NULL ) return false;
 		int bytes = r->r->currentPos - r->pos;
 		if( bytes > size ) bytes = size;
-		memcpy(ptr, r->r->data + r->pos, bytes);
+		if( ptr ) memcpy(ptr, r->r->data + r->pos, bytes);
 		size -= bytes;
 		r->pos += bytes;
 		if( r->pos == r->r->currentPos ) {
@@ -286,6 +286,28 @@ static void profile_dump() {
 				fwrite(data.tmpMemory,1,k,f);
 				size -= k;
 			}
+		}
+	}
+	// reset debug_addr flags (allow further dumps)
+	r.r = data.first_record;
+	r.pos = 0;
+	while( true ) {
+		int i, eventId;
+		if( !read_profile_data(&r,NULL, sizeof(double) + sizeof(int)) ) break;
+		read_profile_data(&r,&eventId,sizeof(int));
+		if( eventId < 0 ) {
+			int count = eventId & 0x7FFFFFFF;
+			read_profile_data(&r,data.stackOut,sizeof(void*)*count);
+			for(i=0;i<count;i++) {
+				int *debug_addr = NULL;
+				hl_module_resolve_symbol_full(data.stackOut[i],NULL,NULL,&debug_addr);
+				if( debug_addr )
+					debug_addr[0] &= 0x7FFFFFFF;
+			}
+		} else {
+			int size;
+			read_profile_data(&r,&size,sizeof(int));
+			read_profile_data(&r,NULL,size);
 		}
 	}
 	fclose(f);
