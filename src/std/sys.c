@@ -186,18 +186,14 @@ HL_PRIM double hl_sys_time() {
 		freq = (double)time.QuadPart;
 	}
 	QueryPerformanceCounter(&time);
-
-#	ifndef HL_CONSOLE
 	if( time_diff == 0 ) {
 		FILETIME ft;
 		LARGE_INTEGER start_time;
 		GetSystemTimeAsFileTime(&ft);
 		start_time.LowPart = ft.dwLowDateTime;
 		start_time.HighPart = ft.dwHighDateTime;
-		time_diff = ((double)start_time.QuadPart - (double)time.QuadPart) / freq - EPOCH_DIFF;
+		time_diff = (((double)start_time.QuadPart) / 10000000.0) - (((double)time.QuadPart) / freq) - EPOCH_DIFF;
 	}
-#	endif
-
 	return time_diff + ((double)time.QuadPart) / freq;
 #else
 	struct timeval tv;
