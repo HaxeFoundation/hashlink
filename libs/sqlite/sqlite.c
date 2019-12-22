@@ -246,7 +246,12 @@ HL_PRIM varray *HL_NAME(result_next)( sqlite_result *r ) {
 				int size = sqlite3_column_bytes(r->r, i);
 				vbyte *blob = (vbyte *)sqlite3_column_blob(r->r, i);
 				vbyte *vb = hl_copy_bytes(blob, size+1);
-				v = hl_make_dyn(&vb, &hlt_bytes);
+				
+				varray *bytes_data = hl_alloc_array(&hlt_dyn, 2);
+				hl_aptr(bytes_data, vdynamic*)[0] = hl_make_dyn(&vb, &hlt_bytes);
+				hl_aptr(bytes_data, vdynamic*)[1] = hl_make_dyn(&size, &hlt_i32);
+				
+				v = hl_make_dyn(&bytes_data, &hlt_array);
 				break;
 			}
 			default:
