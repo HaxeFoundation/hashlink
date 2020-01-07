@@ -58,7 +58,17 @@ file(GLOB pcre_srcs
     include/pcre/*.c
 )
 file(GLOB mimalloc_srcs
-    include/mimalloc/*.c
+    include/mimalloc/stats.c
+    include/mimalloc/os.c
+    include/mimalloc/memory.c
+    include/mimalloc/segment.c
+    include/mimalloc/page.c
+    include/mimalloc/alloc.c
+    include/mimalloc/alloc-aligned.c
+    include/mimalloc/alloc-posix.c
+    include/mimalloc/heap.c
+    include/mimalloc/options.c
+    include/mimalloc/init.c
 )
 file(GLOB std_srcs
     src/std/array.c
