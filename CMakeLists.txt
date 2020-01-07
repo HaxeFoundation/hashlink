@@ -51,10 +51,14 @@ endforeach()
 include_directories(
     src
     include/pcre
+    include/mimalloc
 )
 
 file(GLOB pcre_srcs
     include/pcre/*.c
+)
+file(GLOB mimalloc_srcs
+    include/mimalloc/*.c
 )
 file(GLOB std_srcs
     src/std/array.c
@@ -94,6 +98,7 @@ endif()
 
 add_library(libhl SHARED
     ${pcre_srcs}
+    ${mimalloc_srcs}
     src/alloc.c
     ${std_srcs}
 )
@@ -133,7 +138,7 @@ add_executable(hl
     src/main.c
     src/module.c
     src/debugger.c
-	src/profile.c
+    src/profile.c
 )
 
 target_link_libraries(hl libhl)

@@ -6,7 +6,7 @@ INSTALL_DIR ?= $(PREFIX)
 
 LIBS=fmt sdl ssl openal ui uv mysql
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mimalloc -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 LIBFLAGS =
 HLFLAGS = -ldl
@@ -17,6 +17,10 @@ PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/p
 	include/pcre/pcre_exec.o include/pcre/pcre_fullinfo.o include/pcre/pcre_globals.o \
 	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o \
 	include/pcre/pcre16_ord2utf16.o include/pcre/pcre16_valid_utf16.o include/pcre/pcre_ucd.o
+
+MIMALLOC = include/mimalloc/stats.o include/mimalloc/os.o include/mimalloc/memory.o include/mimalloc/segment.o \
+	include/mimalloc/page.o include/mimalloc/alloc.o include/mimalloc/alloc-aligned.o include/mimalloc/alloc-posix.o \
+	include/mimalloc/heap.o include/mimalloc/options.o include/mimalloc/init.o
 
 RUNTIME = src/alloc.o
 
@@ -41,7 +45,7 @@ UI = libs/ui/ui_stub.o
 
 MYSQL = libs/mysql/socket.o libs/mysql/sha1.o libs/mysql/my_proto.o libs/mysql/my_api.o libs/mysql/mysql.o
 
-LIB = ${PCRE} ${RUNTIME} ${STD}
+LIB = ${PCRE} ${MIMALLOC} ${RUNTIME} ${STD}
 
 BOOT = src/_main.o
 
@@ -125,7 +129,7 @@ libs: $(LIBS)
 libhl: ${LIB}
 	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
-hlc: ${BOOT}
+hlc: ${BOOT} ${RUNTIME}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
 
 hl: ${HL} libhl
@@ -207,7 +211,7 @@ release_osx:
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${MIMALLOC} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV}
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
