@@ -70,7 +70,7 @@ terms of the MIT license. A copy of the license can be found in the file
 // ------------------------------------------------------
 
 #include <stddef.h>     // size_t
-// #include <stdbool.h>    // bool
+#include <stdbool.h>    // bool
 
 #ifdef __cplusplus
 extern "C" {
