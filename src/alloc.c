@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include "hl.h"
+#include "mimalloc.h"
 #ifdef HL_WIN
 #	include <windows.h>
 #	include <intrin.h>
@@ -228,7 +229,7 @@ static gc_pheader *gc_alloc_page_header( void *base, int size ) {
 	if( !p ) {
 		// alloc pages by chunks so we get good memory locality
 		int i, count = 100;
-		gc_pheader *head = (gc_pheader*)malloc(sizeof(gc_pheader)*count);
+		gc_pheader *head = (gc_pheader*)mi_malloc(sizeof(gc_pheader)*count);
 		p = head;
 		for(i=1;i<count-1;i++) {
 			p->next_page = head + i;
@@ -248,9 +249,9 @@ HL_PRIM void hl_add_root( void *r ) {
 	gc_global_lock(true);
 	if( gc_roots_count == gc_roots_max ) {
 		int nroots = gc_roots_max ? (gc_roots_max << 1) : 16;
-		void ***roots = (void***)malloc(sizeof(void*)*nroots);
+		void ***roots = (void***)mi_malloc(sizeof(void*)*nroots);
 		memcpy(roots,gc_roots,sizeof(void*)*gc_roots_count);
-		free(gc_roots);
+		mi_free(gc_roots);
 		gc_roots = roots;
 		gc_roots_max = nroots;
 	}
@@ -285,7 +286,7 @@ HL_API void hl_register_thread( void *stack_top ) {
 	if( hl_get_thread() )
 		hl_fatal("Thread already registered");
 
-	hl_thread_info *t = (hl_thread_info*)malloc(sizeof(hl_thread_info));
+	hl_thread_info *t = (hl_thread_info*)mi_malloc(sizeof(hl_thread_info));
 	memset(t, 0, sizeof(hl_thread_info));
 	t->thread_id = hl_thread_id();
 	t->stack_top = stack_top;
@@ -295,7 +296,7 @@ HL_API void hl_register_thread( void *stack_top ) {
 	hl_add_root(&t->exc_handler);
 
 	gc_global_lock(true);
-	hl_thread_info **all = (hl_thread_info**)malloc(sizeof(void*) * (gc_threads.count + 1));
+	hl_thread_info **all = (hl_thread_info**)mi_malloc(sizeof(void*) * (gc_threads.count + 1));
 	memcpy(all,gc_threads.threads,sizeof(void*)*gc_threads.count);
 	gc_threads.threads = all;
 	all[gc_threads.count++] = t;
@@ -316,7 +317,7 @@ HL_API void hl_unregister_thread() {
 			gc_threads.count--;
 			break;
 		}
-	free(t);
+	mi_free(t);
 	current_thread = NULL;
 	// don't use gc_global_lock(false)
 	hl_mutex_release(gc_threads.global_lock);
@@ -509,7 +510,7 @@ retry:
 	for(i=0;i<size>>GC_MASK_BITS;i++) {
 		void *ptr = p->base + (i<<GC_MASK_BITS);
 		if( GC_GET_LEVEL1(ptr) == gc_level1_null ) {
-			gc_pheader **level = (gc_pheader**)malloc(sizeof(void*) * (1<<GC_LEVEL1_BITS));
+			gc_pheader **level = (gc_pheader**)mi_malloc(sizeof(void*) * (1<<GC_LEVEL1_BITS));
 			MZERO(level,sizeof(void*) * (1<<GC_LEVEL1_BITS));
 			GC_GET_LEVEL1(ptr) = level;
 		}
@@ -754,7 +755,7 @@ static int mark_stack_size = 0;
 
 HL_PRIM void **hl_gc_mark_grow( void **stack ) {
 	int nsize = mark_stack_size ? (((mark_stack_size * 3) >> 1) & ~1) : 256;
-	void **nstack = (void**)malloc(sizeof(void**) * nsize);
+	void **nstack = (void**)mi_malloc(sizeof(void**) * nsize);
 	void **base_stack = mark_stack_end - mark_stack_size;
 	int avail = (int)(stack - base_stack);
 	if( nstack == NULL ) {
@@ -762,7 +763,7 @@ HL_PRIM void **hl_gc_mark_grow( void **stack ) {
 		return NULL;
 	}
 	memcpy(nstack, base_stack, avail * sizeof(void*));
-	free(base_stack);
+	mi_free(base_stack);
 	mark_stack_size = nsize;
 	mark_stack_end = nstack + nsize;
 	cur_mark_stack = nstack + avail;
@@ -1133,7 +1134,7 @@ void *hl_malloc( hl_alloc *a, int size ) {
 	size += hl_pad_size(size,&hlt_dyn);
 	if( b == NULL || b->size <= size ) {
 		int alloc = size < 4096-sizeof(hl_alloc_block) ? 4096-sizeof(hl_alloc_block) : size;
-		b = (hl_alloc_block *)malloc(sizeof(hl_alloc_block) + alloc);
+		b = (hl_alloc_block *)mi_malloc(sizeof(hl_alloc_block) + alloc);
 		if( b == NULL ) out_of_memory("malloc");
 		b->p = ((unsigned char*)b) + sizeof(hl_alloc_block);
 		b->size = alloc;
@@ -1160,7 +1161,7 @@ void hl_free( hl_alloc *a ) {
 		hl_alloc_block *n = b->next;
 		size = (int)(b->p + b->size - ((unsigned char*)b));
 		prev = (int_val)b;
-		free(b);
+		mi_free(b);
 		b = n;
 	}
 	// check if our allocator was not part of the last free block
@@ -1208,72 +1209,21 @@ HL_PRIM void hl_free_executable_memory( void *c, int size ) {
 #if defined(HL_CONSOLE)
 void *sys_alloc_align( int size, int align );
 void sys_free_align( void *ptr, int size );
-#elif !defined(HL_WIN)
-static void *base_addr = (void*)0x40000000;
 #endif
 
 static void *gc_alloc_page_memory( int size ) {
-#if defined(HL_WIN)
-#	if defined(GC_DEBUG) && defined(HL_64)
-#		define STATIC_ADDRESS
-#	endif
-#	ifdef STATIC_ADDRESS
-	// force out of 32 bits addresses to check loss of precision
-	static char *start_address = (char*)0x100000000;
-#	else
-	static void *start_address = NULL;
-#	endif
-	void *ptr = VirtualAlloc(start_address,size,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
-#	ifdef STATIC_ADDRESS
-	if( ptr == NULL && start_address ) {
-		start_address = NULL;
-		return gc_alloc_page_memory(size);
-	}
-	start_address += size + ((-size) & (GC_PAGE_SIZE - 1));
-#	endif
-	return ptr;
-#elif defined(HL_CONSOLE)
+#if defined(HL_CONSOLE)
 	return sys_alloc_align(size, GC_PAGE_SIZE);
 #else
-	int i = 0;
-	while( gc_will_collide(base_addr,size) ) {
-		base_addr = (char*)base_addr + GC_PAGE_SIZE;
-		i++;
-		// most likely our hashing creates too many collisions
-		if( i >= 1 << (GC_LEVEL0_BITS + GC_LEVEL1_BITS + 2) )
-			return NULL;
-	}
-	void *ptr = mmap(base_addr,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
-	if( ptr == (void*)-1 )
-		return NULL;
-	if( ((int_val)ptr) & (GC_PAGE_SIZE-1) ) {
-		munmap(ptr,size);
-		void *tmp;
-		int tmp_size = (int)((int_val)ptr - (int_val)base_addr);
-		if( tmp_size > 0 ) {
-			base_addr = (void*)((((int_val)ptr) & ~(GC_PAGE_SIZE-1)) + GC_PAGE_SIZE);
-			tmp = ptr;
-		} else {
-			base_addr = (void*)(((int_val)ptr) & ~(GC_PAGE_SIZE-1));
-			tmp = NULL;
-		}
-		if( tmp ) tmp = mmap(tmp,tmp_size,PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
-		ptr = gc_alloc_page_memory(size);
-		if( tmp ) munmap(tmp,tmp_size);
-		return ptr;
-	}
-	base_addr = (char*)ptr+size;
-	return ptr;
+	return mi_malloc_aligned(size, GC_PAGE_SIZE);
 #endif
 }
 
 static void gc_free_page_memory( void *ptr, int size ) {
-#ifdef HL_WIN
-	VirtualFree(ptr, 0, MEM_RELEASE);
-#elif defined(HL_CONSOLE)
+#if defined(HL_CONSOLE)
 	sys_free_align(ptr,size);
 #else
-	munmap(ptr,size);
+	mi_free(ptr);
 #endif
 }
 
