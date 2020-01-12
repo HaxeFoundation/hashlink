@@ -94,7 +94,7 @@ endif()
 
 add_library(libhl SHARED
     ${pcre_srcs}
-    src/alloc.c
+    src/gc.c
     ${std_srcs}
 )
 
