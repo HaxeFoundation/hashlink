@@ -422,13 +422,20 @@ static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 	if( offset%page->alloc.block_size != 0 )
 		return -1;
 	int bid = offset / page->alloc.block_size;
+	if( page->alloc.sizes && page->alloc.sizes[bid] == 0 ) return -1;
+	return bid;
+}
+
+static int gc_allocator_get_block_interior( gc_pheader *page, void **block ) {
+	int offset = (int)((unsigned char*)*block - page->base);
+	int bid = offset / page->alloc.block_size;
 	if( page->alloc.sizes ) {
-		if( page->alloc.sizes[bid] == 0 ) return -1;
-	} else {
-		// no longer required ?
-		if( bid < page->alloc.first_block )
-			return -1;
+		while( page->alloc.sizes[bid] == 0 ) {
+			if( bid == page->alloc.first_block ) return -1;
+			bid--;
+		}
 	}
+	*block = page->base + bid * page->alloc.block_size;
 	return bid;
 }
 

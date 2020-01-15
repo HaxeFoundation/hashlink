@@ -73,6 +73,10 @@ static int_val gc_hash( void *ptr ) {
 #	define GC_MEMCHK
 #endif
 
+#if defined(HL_NX)
+#	define GC_INTERIOR_POINTERS
+#endif
+
 #define out_of_memory(reason)		hl_fatal("Out of Memory (" reason ")")
 
 typedef struct _gc_pheader gc_pheader;
@@ -88,6 +92,9 @@ int gc_allocator_fast_block_size( gc_pheader *page, void *block );
 
 // Get the block id within the given page, or -1 if it's an invalid ptr. The block is already checked within page bounds
 int gc_allocator_get_block_id( gc_pheader *page, void *block );
+
+// Same as get_block_id but handles interior pointers and modify the block value
+int gc_allocator_get_block_id_interior( gc_pheader *page, void **block );
 
 // Called before marking starts: should update each page "bmp" with mark_bits
 void gc_allocator_before_mark( unsigned char *mark_bits );
@@ -581,7 +588,11 @@ static void gc_mark_stack( void *start, void *end ) {
 		void *p = *stack_head++;
 		gc_pheader *page = GC_GET_PAGE(p);
 		if( !page || !INPAGE(p,page) ) continue;
+#		ifdef GC_INTERIOR_POINTERS
+		int bid = gc_allocator_get_block_interior(page, &p);
+#		else
 		int bid = gc_allocator_get_block_id(page, p);
+#		endif
 		if( bid >= 0 && (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 			page->bmp[bid>>3] |= 1<<(bid&7);
 			GC_PUSH_GEN(p,page);
