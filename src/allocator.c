@@ -426,6 +426,7 @@ static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 	return bid;
 }
 
+#ifdef GC_INTERIOR_POINTERS
 static int gc_allocator_get_block_interior( gc_pheader *page, void **block ) {
 	int offset = (int)((unsigned char*)*block - page->base);
 	int bid = offset / page->alloc.block_size;
@@ -438,6 +439,7 @@ static int gc_allocator_get_block_interior( gc_pheader *page, void **block ) {
 	*block = page->base + bid * page->alloc.block_size;
 	return bid;
 }
+#endif
 
 static void gc_allocator_after_mark() {
 	gc_call_finalizers();
