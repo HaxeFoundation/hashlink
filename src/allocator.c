@@ -104,7 +104,6 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	if( m ) start_pos += block - m;
 	p->first_block = start_pos / block;
 	p->next_block = p->first_block;
-	p->free_blocks = p->max_blocks - p->first_block;
 
 	ph->next_page = gc_pages[pid];
 	gc_pages[pid] = ph;
@@ -184,7 +183,6 @@ loop:
 resume:
 				bits = TRAILING_ONES(fetch_bits >> (next&31));
 				if( bits ) {
-					if( avail > p->free_blocks ) p->free_blocks = avail;
 					avail = 0;
 					next += bits - 1;
 					if( next >= p->max_blocks ) {
@@ -217,7 +215,6 @@ resume:
 				}
 				if( next & 31 ) goto resume;
 			}
-			if( avail > p->free_blocks ) p->free_blocks = avail;
 			p->next_block = next;
 		} else if( p->next_block + nblocks <= p->max_blocks )
 			break;
@@ -254,8 +251,6 @@ alloc_var:
 		bid = p->next_block;
 #		endif
 		ph->bmp[bid>>3] |= 1<<(bid&7);
-	} else {
-		p->free_blocks = p->max_blocks - (p->next_block + nblocks);
 	}
 	if( nblocks > 1 ) MZERO(p->sizes + p->next_block, nblocks);
 	p->sizes[p->next_block] = (unsigned char)nblocks;
@@ -389,7 +384,6 @@ static void gc_allocator_before_mark( unsigned char *mark_cur ) {
 		while( p ) {
 			p->bmp = mark_cur;
 			p->alloc.next_block = p->alloc.first_block;
-			p->alloc.free_blocks = 0;
 			mark_cur += (p->alloc.max_blocks + 7) >> 3;
 			p = p->next_page;
 		}
