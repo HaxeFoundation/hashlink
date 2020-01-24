@@ -176,10 +176,6 @@ loop:
 		p = &ph->alloc;
 		if( ph->bmp ) {
 			int next, avail = 0;
-			if( p->free_blocks >= nblocks ) {
-				p->next_block = p->first_block;
-				p->free_blocks = 0;
-			}
 			next = p->next_block;
 			if( next + nblocks > p->max_blocks )
 				goto skip;
