@@ -62,7 +62,6 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 #define	GC_ALIGN		(1 << GC_ALIGN_BITS)
 
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
-static int gc_free_blocks[GC_ALL_PAGES] = {0};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 
 
@@ -170,7 +169,6 @@ static void *gc_alloc_var( int part, int size, int kind ) {
 	gc_allocator_page_data *p;
 	unsigned char *ptr;
 	int nblocks = size >> GC_SBITS[part];
-	int max_free = gc_free_blocks[pid];
 loop:
 	while( ph ) {
 		p = &ph->alloc;
@@ -224,13 +222,7 @@ resume:
 		} else if( p->next_block + nblocks <= p->max_blocks )
 			break;
 skip:
-		if( p->free_blocks > max_free )
-			max_free = p->free_blocks;
 		ph = ph->next_page;
-		if( ph == NULL && max_free >= nblocks ) {
-			max_free = 0;
-			ph = gc_pages[pid];
-		}
 	}
 	if( ph == NULL ) {
 		int psize = GC_PAGE_SIZE;
@@ -269,7 +261,6 @@ alloc_var:
 	p->sizes[p->next_block] = (unsigned char)nblocks;
 	p->next_block += nblocks;
 	gc_free_pages[pid] = ph;
-	gc_free_blocks[pid] = max_free;
 	return ptr;
 }
 
@@ -395,7 +386,6 @@ static void gc_allocator_before_mark( unsigned char *mark_cur ) {
 	for(pid=0;pid<GC_ALL_PAGES;pid++) {
 		gc_pheader *p = gc_pages[pid];
 		gc_free_pages[pid] = p;
-		gc_free_blocks[pid] = 0;
 		while( p ) {
 			p->bmp = mark_cur;
 			p->alloc.next_block = p->alloc.first_block;
