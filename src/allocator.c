@@ -308,6 +308,9 @@ static bool is_zero( void *ptr, int size ) {
 static void gc_flush_empty_pages() {
 	int i;
 	for(i=0;i<GC_ALL_PAGES;i++) {
+		// if page_kind is MEM_KIND_FINALIZER or sizeof(page_block) >= (1<<22)
+		if (!((i & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER || i >= ((GC_PARTITIONS - 1) << PAGE_KIND_BITS)))
+			continue;
 		gc_pheader *ph = gc_pages[i];
 		gc_pheader *prev = NULL;
 		while( ph ) {
