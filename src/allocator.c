@@ -64,6 +64,9 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 
+#define GC_FREELIST_MAX 16
+static void* gc_free_list[1 << PAGE_KIND_BITS][GC_FREELIST_MAX] = {NULL};
+
 
 static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind, bool varsize ) {
 	// increase size based on previously allocated pages
@@ -183,6 +186,12 @@ loop:
 resume:
 				bits = TRAILING_ONES(fetch_bits >> (next&31));
 				if( bits ) {
+					if (avail && part == GC_FIXED_PARTS && avail <= GC_FREELIST_MAX) {
+						void** head = gc_free_list[kind];
+						ptr = ph->base + ((next - avail) << GC_SBITS[part]);
+						*(void**)ptr = head[avail - 1];  // ptr.next = *head
+						head[avail - 1] = ptr;           // *head = ptr;
+					}
 					avail = 0;
 					next += bits - 1;
 					if( next >= p->max_blocks ) {
@@ -259,25 +268,50 @@ alloc_var:
 	return ptr;
 }
 
-static void *gc_allocator_alloc( int *size, int page_kind ) {
-	int sz = *size;
-	sz += (-sz) & (GC_ALIGN - 1);
-	if( sz <= GC_SIZES[GC_FIXED_PARTS-1] && page_kind != MEM_KIND_FINALIZER ) {
-		int part = (sz >> GC_ALIGN_BITS) - 1;
-		*size = GC_SIZES[part];
-		return gc_alloc_fixed(part, page_kind);
-	}
-	int p;
-	for(p=GC_FIXED_PARTS;p<GC_PARTITIONS;p++) {
-		int block = GC_SIZES[p];
-		int query = sz + ((-sz) & (block - 1));
-		if( query < block * 255 ) {
-			*size = query;
-			return gc_alloc_var(p, query, page_kind);
+static void* gc_freelist_pickup(int size, int part, int kind) {
+	if (part == GC_FIXED_PARTS) {           // Currently only for 8-byte blocks
+		int nblocks = size >> GC_SBITS[part];
+		int index = nblocks - 1;
+		if (index < GC_FREELIST_MAX) {
+			void** head = gc_free_list[kind];
+			void* cur = head[index];
+			if (cur) {
+				head[index] = *(void**)cur; // *head = cur.next
+				gc_pheader *page = GC_GET_PAGE(cur);
+				int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
+				MZERO(page->alloc.sizes + bid, nblocks);
+				page->alloc.sizes[bid] = (unsigned char)nblocks;
+				page->bmp[bid >> 3] |= 1 << (bid & 7);
+				return cur;
+			}
 		}
 	}
-	*size = -1;
 	return NULL;
+}
+
+static void gc_allocator_sizes(int *size, int *part, int page_kind) {
+	int sz = *size;
+	sz += (-sz) & (GC_ALIGN - 1);
+	if (sz <= GC_SIZES[GC_FIXED_PARTS - 1] && page_kind != MEM_KIND_FINALIZER) {
+		*part = (sz >> GC_ALIGN_BITS) - 1;
+		*size = GC_SIZES[*part];
+	} else {
+		int p;
+		for (p = GC_FIXED_PARTS; p < GC_PARTITIONS; p++) {
+			int block = GC_SIZES[p];
+			int query = sz + ((-sz) & (block - 1));
+			if (query < block * 255) {
+				*part = p;
+				*size = query;
+				return;
+			}
+		}
+		hl_error("Required memory allocation too big");
+	}
+}
+
+static void *gc_allocator_alloc( int size, int part, int page_kind ) {
+	return part < GC_FIXED_PARTS ? gc_alloc_fixed(part, page_kind) : gc_alloc_var(part, size, page_kind);
 }
 
 static bool is_zero( void *ptr, int size ) {
@@ -388,6 +422,7 @@ static void gc_allocator_before_mark( unsigned char *mark_cur ) {
 			p = p->next_page;
 		}
 	}
+	MZERO(gc_free_list, sizeof(gc_free_list));
 }
 
 #define gc_allocator_fast_block_size(page,block) \

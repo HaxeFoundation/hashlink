@@ -102,11 +102,10 @@ void gc_allocator_before_mark( unsigned char *mark_bits );
 // Called when marking ends: should call finalizers, sweep unused blocks and free empty pages
 void gc_allocator_after_mark();
 
-// Allocate a block with given size using the specified page kind. 
+// Allocate a block with given size using the specified page kind and part
 // Returns NULL if no block could be allocated
-// Sets size to really allocated size (could be larger)
-// Sets size to -1 if allocation refused (required size is invalid)
-void *gc_allocator_alloc( int *size, int page_kind );
+// Sets size to really allocated size.
+void *gc_allocator_alloc( int size, int part, int page_kind );
 
 #else
 #	include "allocator.h"
@@ -442,26 +441,30 @@ static void gc_check_mark();
 void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	void *ptr;
 	int time = 0;
-	int allocated = 0;
+	int allocated = size;
+	int part = 0;
+	int page_kind = flags & PAGE_KIND_MASK;
 	if( size == 0 )
 		return NULL;
+	gc_allocator_sizes(&allocated, &part, page_kind);
+
 	gc_global_lock(true);
-	gc_check_mark();
+	if (gc_flags & GC_PROFILE) time = TIMESTAMP();
+	ptr = gc_freelist_pickup(allocated, part, page_kind);
+	if (ptr == NULL)
+		gc_check_mark();
 #	ifdef GC_MEMCHK
 	size += HL_WSIZE;
 #	endif
-	if( gc_flags & GC_PROFILE ) time = TIMESTAMP();
 	{
-		allocated = size;
 		gc_stats.allocation_count++;
 		gc_stats.total_requested += size;
-		ptr = gc_allocator_alloc(&allocated,flags & PAGE_KIND_MASK);
-		if( ptr == NULL ) {
-			if( allocated < 0 ) {
+		if (ptr == NULL) {
+			ptr = gc_allocator_alloc(allocated, part, page_kind);
+			if (ptr == NULL) {
 				gc_global_lock(false);
-				hl_error("Required memory allocation too big");
+				hl_fatal("TODO");
 			}
-			hl_fatal("TODO");
 		}
 		gc_stats.total_allocated += allocated;
 	}
