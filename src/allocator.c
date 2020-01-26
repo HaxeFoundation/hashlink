@@ -269,7 +269,8 @@ alloc_var:
 }
 
 static void* gc_freelist_pickup(int size, int part, int kind) {
-	if (part == GC_FIXED_PARTS) {           // Currently only for 8-byte blocks
+	gc_pheader *page = gc_free_pages[(part << PAGE_KIND_BITS) | kind];
+	if (part == GC_FIXED_PARTS && page && page->bmp) {
 		int nblocks = size >> GC_SBITS[part];
 		int index = nblocks - 1;
 		if (index < GC_FREELIST_MAX) {
@@ -277,7 +278,7 @@ static void* gc_freelist_pickup(int size, int part, int kind) {
 			void* cur = head[index];
 			if (cur) {
 				head[index] = *(void**)cur; // *head = cur.next
-				gc_pheader *page = GC_GET_PAGE(cur);
+				page = GC_GET_PAGE(cur);
 				int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
 				MZERO(page->alloc.sizes + bid, nblocks);
 				page->alloc.sizes[bid] = (unsigned char)nblocks;
