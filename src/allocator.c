@@ -191,6 +191,7 @@ resume:
 						ptr = ph->base + ((next - avail) << GC_SBITS[part]);
 						*(void**)ptr = head[avail - 1];  // ptr.next = *head
 						head[avail - 1] = ptr;           // *head = ptr;
+						p->next_block = next;
 					}
 					avail = 0;
 					next += bits - 1;
