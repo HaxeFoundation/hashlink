@@ -64,9 +64,11 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 
-#define GC_FREELIST_MAX 16
-static void* gc_free_list[1 << PAGE_KIND_BITS][GC_FREELIST_MAX] = {NULL};
-
+#define GC_FL_MAX 19
+static void* gc_freelist[GC_PARTITIONS - GC_FIXED_PARTS][(1 << PAGE_KIND_BITS) - 1][GC_FL_MAX + 1] = {NULL};
+static const int gc_freelist_starts[GC_PARTITIONS] = {0,0,0,0,0,	3,31,1,1};
+#define GC_FL_HEAD(part, kind) (gc_freelist[((part) - GC_FIXED_PARTS)][kind])
+#define GC_FL_OFFSET(part, nblocks) ((nblocks) - gc_freelist_starts[part])
 
 static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind, bool varsize ) {
 	// increase size based on previously allocated pages
@@ -186,11 +188,16 @@ loop:
 resume:
 				bits = TRAILING_ONES(fetch_bits >> (next&31));
 				if( bits ) {
-					if (avail && part == GC_FIXED_PARTS && avail <= GC_FREELIST_MAX) {
-						void** head = gc_free_list[kind];
-						ptr = ph->base + ((next - avail) << GC_SBITS[part]);
-						*(void**)ptr = head[avail - 1];  // ptr.next = *head
-						head[avail - 1] = ptr;           // *head = ptr;
+					if (avail && part >= GC_FIXED_PARTS && kind != MEM_KIND_FINALIZER) {
+						void** head = GC_FL_HEAD(part, kind);
+						int index = GC_FL_OFFSET(part, avail);
+						if (index > GC_FL_MAX) index = GC_FL_MAX;
+						int bid = next - avail;
+						MZERO(p->sizes + bid, avail);
+						p->sizes[bid] = (unsigned char)avail;
+						ptr = ph->base + (bid << GC_SBITS[part]);
+						*(void**)ptr = head[index];  // ptr.next = *head
+						head[index] = ptr;           // *head = ptr;
 						p->next_block = next;
 					}
 					avail = 0;
@@ -269,22 +276,41 @@ alloc_var:
 	return ptr;
 }
 
-static void* gc_freelist_pickup(int size, int part, int kind) {
+static void* gc_freelist_pickup(int* allocated, int part, int kind) {
 	gc_pheader *page = gc_free_pages[(part << PAGE_KIND_BITS) | kind];
-	if (part == GC_FIXED_PARTS && page && page->bmp) {
-		int nblocks = size >> GC_SBITS[part];
-		int index = nblocks - 1;
-		if (index < GC_FREELIST_MAX) {
-			void** head = gc_free_list[kind];
+	if (part >= GC_FIXED_PARTS && kind != MEM_KIND_FINALIZER && page && page->bmp) {
+		int nblocks = *allocated >> GC_SBITS[part];
+		int index = GC_FL_OFFSET(part, nblocks);
+		if (index < GC_FL_MAX) {
+			void** head = GC_FL_HEAD(part, kind);
 			void* cur = head[index];
 			if (cur) {
 				head[index] = *(void**)cur; // *head = cur.next
 				page = GC_GET_PAGE(cur);
 				int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
-				MZERO(page->alloc.sizes + bid, nblocks);
-				page->alloc.sizes[bid] = (unsigned char)nblocks;
 				page->bmp[bid >> 3] |= 1 << (bid & 7);
 				return cur;
+			}
+		} else {
+			index = GC_FL_MAX;
+			void** head = GC_FL_HEAD(part, kind);
+			void* cur = head[index];
+			void* prev = NULL;
+			while (cur) {
+				page = GC_GET_PAGE(cur);
+				int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
+				int n = page->alloc.sizes[bid];
+				if (n == nblocks || (n > nblocks && n <= nblocks * 2)) {
+					*allocated = n << GC_SBITS[part];
+					if (prev == NULL)
+						head[index] = *(void**)cur;
+					else
+						*(void**)prev = *(void**)cur; // prev.next = cur.next
+					page->bmp[bid >> 3] |= 1 << (bid & 7);
+					return cur;
+				}
+				prev = cur;
+				cur = *(void**)cur;
 			}
 		}
 	}
@@ -424,7 +450,7 @@ static void gc_allocator_before_mark( unsigned char *mark_cur ) {
 			p = p->next_page;
 		}
 	}
-	MZERO(gc_free_list, sizeof(gc_free_list));
+	MZERO(gc_freelist, sizeof(gc_freelist));
 }
 
 #define gc_allocator_fast_block_size(page,block) \

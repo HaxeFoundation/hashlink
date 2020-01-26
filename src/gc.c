@@ -450,7 +450,7 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	if (gc_flags & GC_PROFILE) time = TIMESTAMP();
 
 	gc_global_lock(true);
-	ptr = gc_freelist_pickup(allocated, part, page_kind);
+	ptr = gc_freelist_pickup(&allocated, part, page_kind);
 	if (ptr == NULL)
 		gc_check_mark();
 #	ifdef GC_MEMCHK
