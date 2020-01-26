@@ -256,19 +256,15 @@ alloc_var:
 			if( ptr[i] != 0xDD )
 				hl_fatal("assert");
 	}
-#	endif
-	if( ph->bmp ) {
+	if (ph->bmp) {
 		int bid = p->next_block;
-#		ifdef GC_DEBUG
 		int i;
 		for(i=0;i<nblocks;i++) {
 			if( (ph->bmp[bid>>3]&(1<<(bid&7))) != 0 ) hl_fatal("Alloc on marked block");
 			bid++;
 		}
-		bid = p->next_block;
-#		endif
-		ph->bmp[bid>>3] |= 1<<(bid&7);
 	}
+#	endif
 	if( nblocks > 1 ) MZERO(p->sizes + p->next_block, nblocks);
 	p->sizes[p->next_block] = (unsigned char)nblocks;
 	p->next_block += nblocks;
@@ -286,9 +282,6 @@ static void* gc_freelist_pickup(int* allocated, int part, int kind) {
 			void* cur = head[index];
 			if (cur) {
 				head[index] = *(void**)cur; // *head = cur.next
-				page = GC_GET_PAGE(cur);
-				int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
-				page->bmp[bid >> 3] |= 1 << (bid & 7);
 				return cur;
 			}
 		} else {
@@ -306,7 +299,6 @@ static void* gc_freelist_pickup(int* allocated, int part, int kind) {
 						head[index] = *(void**)cur;
 					else
 						*(void**)prev = *(void**)cur; // prev.next = cur.next
-					page->bmp[bid >> 3] |= 1 << (bid & 7);
 					return cur;
 				}
 				prev = cur;
