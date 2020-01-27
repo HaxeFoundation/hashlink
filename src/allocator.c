@@ -273,8 +273,7 @@ alloc_var:
 }
 
 static void* gc_freelist_pickup(int* allocated, int part, int kind) {
-	gc_pheader *page = gc_free_pages[(part << PAGE_KIND_BITS) | kind];
-	if (part >= GC_FIXED_PARTS && kind != MEM_KIND_FINALIZER && page && page->bmp) {
+	if (part >= GC_FIXED_PARTS && kind != MEM_KIND_FINALIZER) {
 		int nblocks = *allocated >> GC_SBITS[part];
 		int index = GC_FL_OFFSET(part, nblocks);
 		if (index < GC_FL_MAX) {
@@ -290,7 +289,7 @@ static void* gc_freelist_pickup(int* allocated, int part, int kind) {
 			void* cur = head[index];
 			void* prev = NULL;
 			while (cur) {
-				page = GC_GET_PAGE(cur);
+				gc_pheader *page = GC_GET_PAGE(cur);
 				int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
 				int n = page->alloc.sizes[bid];
 				if (n == nblocks || (n > nblocks && n <= nblocks * 2)) {

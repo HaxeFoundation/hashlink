@@ -484,6 +484,30 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	return ptr;
 }
 
+HL_PRIM void hl_bytes_free(void *ptr) {
+	gc_pheader *page = GC_GET_PAGE(ptr);
+	if (!(page && page->alloc.sizes && page->page_kind != MEM_KIND_FINALIZER && INPAGE(ptr, page)))
+		return;
+	gc_allocator_page_data *data = &page->alloc;
+	int bid = gc_allocator_get_block_id(page, ptr);
+	int nblocks = data->sizes[bid];
+	if (!(nblocks && bid >= 0))
+		return;
+	int part = GC_FIXED_PARTS;
+	for (; part < GC_PARTITIONS; part++)
+		if (GC_SIZES[part] == data->block_size)
+			break;
+	void** head = GC_FL_HEAD(part, page->page_kind);
+	int index = GC_FL_OFFSET(part, nblocks);
+	if (index > GC_FL_MAX) index = GC_FL_MAX;
+	gc_global_lock(true);
+	if (head[index] != ptr) {
+		*(void**)ptr = head[index];
+		head[index] = ptr;
+	}
+	gc_global_lock(false);
+}
+
 // -------------------------  MARKING ----------------------------------------------------------
 
 static float gc_mark_threshold = 0.2f;
@@ -1106,3 +1130,4 @@ DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
 DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
 DEFINE_PRIM(_VOID, blocking, _BOOL);
+DEFINE_PRIM(_VOID, bytes_free, _BYTES);
