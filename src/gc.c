@@ -439,13 +439,16 @@ static void gc_free_page( gc_pheader *ph, int block_count ) {
 static void gc_check_mark();
 
 void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
+	if( size == 0 )
+		return NULL;
+#	ifdef GC_MEMCHK
+	size += HL_WSIZE;
+#	endif
 	void *ptr;
 	int time = 0;
 	int allocated = size;
 	int part = 0;
 	int page_kind = flags & PAGE_KIND_MASK;
-	if( size == 0 )
-		return NULL;
 	gc_allocator_sizes(&allocated, &part, page_kind);
 	if (gc_flags & GC_PROFILE) time = TIMESTAMP();
 
@@ -453,9 +456,6 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	ptr = gc_freelist_pickup(&allocated, part, page_kind);
 	if (ptr == NULL)
 		gc_check_mark();
-#	ifdef GC_MEMCHK
-	size += HL_WSIZE;
-#	endif
 	{
 		gc_stats.allocation_count++;
 		gc_stats.total_requested += size;
