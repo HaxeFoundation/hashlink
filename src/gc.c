@@ -506,6 +506,8 @@ HL_PRIM void hl_bytes_free(void *ptr) {
 	if (head[index] != ptr) {
 		*(void**)ptr = head[index];
 		head[index] = ptr;
+		gc_stats.allocation_count--;
+		gc_stats.total_allocated -= nblocks << GC_SIZES[part];
 	}
 	gc_global_lock(false);
 }
