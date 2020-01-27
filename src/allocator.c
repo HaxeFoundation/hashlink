@@ -189,15 +189,17 @@ resume:
 				bits = TRAILING_ONES(fetch_bits >> (next&31));
 				if( bits ) {
 					if (avail && part >= GC_FIXED_PARTS && kind != MEM_KIND_FINALIZER) {
-						void** head = GC_FL_HEAD(part, kind);
 						int index = GC_FL_OFFSET(part, avail);
+						if (index >= 0) {
 						if (index > GC_FL_MAX) index = GC_FL_MAX;
+						void** head = GC_FL_HEAD(part, kind);
 						int bid = next - avail;
 						MZERO(p->sizes + bid, avail);
 						p->sizes[bid] = (unsigned char)avail;
 						ptr = ph->base + (bid << GC_SBITS[part]);
 						*(void**)ptr = head[index];  // ptr.next = *head
 						head[index] = ptr;           // *head = ptr;
+						}
 						p->next_block = next;
 					}
 					avail = 0;
