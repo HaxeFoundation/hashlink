@@ -200,7 +200,6 @@ resume:
 							*(void**)ptr = head[index];  // ptr.next = *head
 							head[index] = ptr;           // *head = ptr;
 						}
-						p->next_block = next;
 					}
 					avail = 0;
 					next += bits - 1;
@@ -275,36 +274,34 @@ alloc_var:
 }
 
 static void* gc_freelist_pickup(int* allocated, int part, int kind) {
-	if (part >= GC_FIXED_PARTS && kind != MEM_KIND_FINALIZER) {
-		int nblocks = *allocated >> GC_SBITS[part];
-		int index = GC_FL_OFFSET(part, nblocks);
-		if (index < GC_FL_MAX) {
-			void** head = GC_FL_HEAD(part, kind);
-			void* cur = head[index];
-			if (cur) {
-				head[index] = *(void**)cur; // *head = cur.next
+	int nblocks = *allocated >> GC_SBITS[part];
+	int index = GC_FL_OFFSET(part, nblocks);
+	if (index < GC_FL_MAX) {
+		void** head = GC_FL_HEAD(part, kind);
+		void* cur = head[index];
+		if (cur) {
+			head[index] = *(void**)cur; // *head = cur.next
+			return cur;
+		}
+	} else {
+		index = GC_FL_MAX;
+		void** head = GC_FL_HEAD(part, kind);
+		void* cur = head[index];
+		void* prev = NULL;
+		while (cur) {
+			gc_pheader *page = GC_GET_PAGE(cur);
+			int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
+			int n = page->alloc.sizes[bid];
+			if (n == nblocks || (n > nblocks && n <= nblocks * 2)) {
+				*allocated = n << GC_SBITS[part];
+				if (prev == NULL)
+					head[index] = *(void**)cur;
+				else
+					*(void**)prev = *(void**)cur; // prev.next = cur.next
 				return cur;
 			}
-		} else {
-			index = GC_FL_MAX;
-			void** head = GC_FL_HEAD(part, kind);
-			void* cur = head[index];
-			void* prev = NULL;
-			while (cur) {
-				gc_pheader *page = GC_GET_PAGE(cur);
-				int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
-				int n = page->alloc.sizes[bid];
-				if (n == nblocks || (n > nblocks && n <= nblocks * 2)) {
-					*allocated = n << GC_SBITS[part];
-					if (prev == NULL)
-						head[index] = *(void**)cur;
-					else
-						*(void**)prev = *(void**)cur; // prev.next = cur.next
-					return cur;
-				}
-				prev = cur;
-				cur = *(void**)cur;
-			}
+			prev = cur;
+			cur = *(void**)cur;
 		}
 	}
 	return NULL;
