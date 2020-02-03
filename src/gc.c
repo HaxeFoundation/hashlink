@@ -499,7 +499,10 @@ HL_PRIM void hl_bytes_free(void *ptr) {
 			break;
 	void** head = GC_FL_HEAD(part, page->page_kind);
 	int index = GC_FL_OFFSET(part, nblocks);
-	if (index > GC_FL_MAX) index = GC_FL_MAX;
+	if (index > GC_FL_MAX) {
+		index = GC_FL_MAX;
+		((void**)ptr)[1] = (void*)nblocks;
+	}
 	if (page->bmp)
 		page->bmp[bid >> 3] |= 1 << (bid & 7);
 	gc_global_lock(true);

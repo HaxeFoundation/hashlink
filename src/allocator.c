@@ -191,12 +191,15 @@ resume:
 					if (avail && kind != MEM_KIND_FINALIZER) {
 						int index = GC_FL_OFFSET(part, avail);
 						if (index >= 0) {
-							if (index > GC_FL_MAX) index = GC_FL_MAX;
 							void** head = GC_FL_HEAD(part, kind);
 							int bid = next - avail;
 							MZERO(p->sizes + bid, avail);
 							p->sizes[bid] = (unsigned char)avail;
 							ptr = ph->base + (bid << GC_SBITS[part]);
+							if (index > GC_FL_MAX) {
+								index = GC_FL_MAX;
+								((void**)ptr)[1] = (void*)avail;
+							}
 							*(void**)ptr = head[index];  // ptr.next = *head
 							head[index] = ptr;           // *head = ptr;
 						}
@@ -289,9 +292,7 @@ static void* gc_freelist_pickup(int* allocated, int part, int kind) {
 		void* cur = head[index];
 		void* prev = NULL;
 		while (cur) {
-			gc_pheader *page = GC_GET_PAGE(cur);
-			int bid = ((unsigned char*)cur - page->base) >> GC_SBITS[part];
-			int n = page->alloc.sizes[bid];
+			int n = (int)((void**)cur)[1];
 			if (n == nblocks || (n > nblocks && n <= nblocks * 2)) {
 				*allocated = n << GC_SBITS[part];
 				if (prev == NULL)
