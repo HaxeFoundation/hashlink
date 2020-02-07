@@ -138,19 +138,26 @@ HL_PRIM vbyte *hl_sys_locale() {
 #endif
 }
 
+#define PR_WIN_UTF8 1
+#define PR_AUTO_FLUSH 2
+static int print_flags = PR_AUTO_FLUSH;
+
+HL_PRIM int hl_sys_set_flags( int flags ) {
+	return print_flags = flags;
+}
+
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
 #	ifdef HL_XBO
 	OutputDebugStringW((LPCWSTR)msg);
-#	else
-
+#	else	
 #	ifdef HL_WIN_DESKTOP
-	_setmode(_fileno(stdout),_O_U8TEXT);
+	if( print_flags & PR_WIN_UTF8 ) _setmode(_fileno(stdout),_O_U8TEXT);
 #	endif
 	uprintf(USTR("%s"),(uchar*)msg);
-	fflush(stdout);
+	if( print_flags & PR_AUTO_FLUSH ) fflush(stdout);
 #	ifdef HL_WIN_DESKTOP
-	_setmode(_fileno(stdout),_O_TEXT);
+	if( print_flags & PR_WIN_UTF8 ) _setmode(_fileno(stdout),_O_TEXT);
 #	endif
 
 #	endif
@@ -692,3 +699,4 @@ DEFINE_PRIM(_ARR, sys_args, _NO_ARG);
 DEFINE_PRIM(_I32, sys_getpid, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_check_reload, _NO_ARG);
 DEFINE_PRIM(_VOID, sys_profile_event, _I32 _BYTES _I32);
+DEFINE_PRIM(_I32, sys_set_flags, _I32);

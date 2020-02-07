@@ -137,6 +137,7 @@ HL_PRIM void hl_dump_stack() {
 		}
 		uprintf(USTR("%s\n"),str);
 	}
+	fflush(stdout);
 }
 
 HL_PRIM varray *hl_exception_stack() {
