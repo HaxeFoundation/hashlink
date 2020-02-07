@@ -168,7 +168,7 @@ static void hl_profile_loop( void *_ ) {
 	while( !data.stopLoop ) {
 		double t = hl_sys_time();
 		if( t < next || data.profiling_pause ) {
-			if( !(t < next) ) next = t; 
+			if( !(t < next) ) next = t;
 			data.waitLoop = false;
 			continue;
 		}
@@ -179,7 +179,7 @@ static void hl_profile_loop( void *_ ) {
 		for(i=0;i<threads->count;i++) {
 			hl_thread_info *t = threads->threads[i];
 			if( t->flags & HL_THREAD_INVISIBLE ) continue;
-			
+
 			if( !cur || cur->tid != t->thread_id ) {
 				thread_handle *h = malloc(sizeof(thread_handle));
 				h->tid = t->thread_id;
@@ -202,15 +202,25 @@ static void hl_profile_loop( void *_ ) {
 		}
 		next += wait_time;
 	}
+	free(data.tmpMemory);
+	data.tmpMemory = NULL;
+	data.sample_count = 0;
+	data.stopLoop = false;
 }
 
 static void profile_event( int code, vbyte *data, int dataLen );
 
-void hl_profile_start( int sample_count ) {
+void hl_profile_setup( int sample_count ) {
 #	if defined(HL_THREADS) && defined(HL_WIN_DESKTOP)
+	hl_setup_profiler(profile_event,hl_profile_end);
+	if( data.sample_count ) return;
+	if( sample_count < 0 ) {
+		// was not started with --profile : pause until we get start event
+		data.profiling_pause++;
+		return;
+	}
 	data.sample_count = sample_count;
 	hl_thread_start(hl_profile_loop,NULL,false);
-	hl_setup_profiler(profile_event,hl_profile_end);
 #	endif
 }
 
@@ -232,7 +242,7 @@ static bool read_profile_data( profile_reader *r, void *ptr, int size ) {
 
 static void profile_dump() {
 	if( !data.first_record ) return;
-	
+
 	data.profiling_pause++;
 	printf("Writing profiling data...\n");
 	fflush(stdout);
@@ -317,7 +327,9 @@ static void profile_dump() {
 
 void hl_profile_end() {
 	profile_dump();
+	if( !data.sample_count ) return;
 	data.stopLoop = true;
+	while( data.stopLoop ) {};
 }
 
 static void profile_event( int code, vbyte *ptr, int dataLen ) {
@@ -351,6 +363,12 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		break;
 	case -6:
 		profile_dump();
+		break;
+	case -7:
+		{
+			uchar *end = NULL;
+			hl_profile_setup( ptr ? utoi((uchar*)ptr,&end) : 1000);
+		}
 		break;
 	default:
 		if( code < 0 ) return;

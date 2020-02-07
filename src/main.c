@@ -228,9 +228,9 @@ int main(int argc, pchar *argv[]) {
 	ctx.c.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
 	ctx.c.hasValue = 0;
 	setup_handler();
-	if( profile_count > 0 ) hl_profile_start(profile_count);
+	hl_profile_setup(profile_count);
 	ctx.ret = hl_dyn_call_safe(&ctx.c,NULL,0,&isExc);
-	if( profile_count > 0 ) hl_profile_end();
+	hl_profile_end();
 	if( isExc ) {
 		varray *a = hl_exception_stack();
 		int i;
