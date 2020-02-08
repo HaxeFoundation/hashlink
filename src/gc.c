@@ -81,7 +81,14 @@ static int_val gc_hash( void *ptr ) {
 
 typedef struct _gc_pheader gc_pheader;
 
-#if 0
+// page + private total reserved data per page
+typedef void (*gc_page_iterator)( gc_pheader *, int );
+// block-ptr + size
+typedef void (*gc_block_iterator)( void *, int );
+
+//#define GC_EXTERN_API
+
+#ifdef GC_EXTERN_API
 typedef void* gc_allocator_page_data;
 
 // Initialize the allocator
@@ -107,6 +114,11 @@ void gc_allocator_after_mark();
 // Sets size to really allocated size (could be larger)
 // Sets size to -1 if allocation refused (required size is invalid)
 void *gc_allocator_alloc( int *size, int page_kind );
+
+// returns the number of pages allocated and private data size (global)
+void gc_get_stats( int *page_count, int *private_data);
+void gc_iter_pages( gc_page_iterator i );
+void gc_iter_live_blocks( gc_pheader *p, gc_block_iterator i );
 
 #else
 #	include "allocator.h"
@@ -143,7 +155,10 @@ static gc_pheader *gc_free_pheaders = NULL;
 
 static gc_pheader *gc_alloc_page( int size, int kind, int block_count );
 static void gc_free_page( gc_pheader *page, int block_count );
+
+#ifndef GC_EXTERN_API
 #include "allocator.c"
+#endif
 
 static struct {
 	int count;
@@ -1022,37 +1037,60 @@ HL_API void hl_gc_set_dump_types( hl_types_dump tdump ) {
 	gc_types_dump = tdump;
 }
 
+static void gc_dump_block( void *block, int size ) {
+	fdump_p(block);
+	fdump_i(size);
+}
+
+static void gc_dump_block_ptr( void *block, int size ) {
+	fdump_p(block);
+	fdump_i(size);
+	if( size >= sizeof(void*) ) fdump_p(*(void**)block);
+}
+
+static void gc_dump_page( gc_pheader *p, int private_data ) {
+	fdump_p(p->base);
+	fdump_i(p->page_kind);
+	fdump_i(p->page_size);
+	fdump_i(private_data);
+	if( p->page_kind & MEM_KIND_NOPTR ) {
+		gc_iter_live_blocks(p, gc_dump_block_ptr); // only dump type
+		fdump_p(NULL);
+	} else {
+		gc_iter_live_blocks(p,gc_dump_block);
+		fdump_p(NULL);
+		fdump_d(p->base, p->page_size);
+	}
+}
+
 HL_API void hl_gc_dump_memory( const char *filename ) {
 	int i;
 	gc_global_lock(true);
 	gc_stop_world(true);
 	gc_mark();
 	fdump = fopen(filename,"wb");
+
 	// header
-	fdump_d("HMD0",4);
+	fdump_d("HMD1",4);
 	fdump_i(((sizeof(void*) == 8)?1:0) | ((sizeof(bool) == 4)?2:0));
+
 	// pages
-/*
-	fdump_i(GC_ALL_PAGES);
-	for(i=0;i<GC_ALL_PAGES;i++) {
-		gc_pheader *p = gc_pages[i];
-		while( p != NULL ) {
-			fdump_p(p->base);
-			fdump_i(p->page_kind);
-			fdump_i(p->page_size);
-			fdump_i(p->block_size);
-			fdump_i(p->first_block);
-			fdump_i(p->max_blocks);
-			fdump_i(p->next_block);
-			fdump_d(p->base,p->page_size);
-			fdump_i((p->bmp ? 1 :0) | (p->sizes?2:0));
-			if( p->bmp ) fdump_d(p->bmp,(p->max_blocks + 7) >> 3);
-			if( p->sizes ) fdump_d(p->sizes,p->max_blocks);
-			p = p->next_page;
-		}
-		fdump_p(NULL);
-	}
-*/
+	int page_count, private_data;
+	gc_get_stats(&page_count, &private_data);
+
+	// all mallocs
+	private_data += sizeof(gc_pheader) * page_count;
+	private_data += sizeof(void*) * gc_roots_max;
+	private_data += gc_threads.count * (sizeof(void*) + sizeof(hl_thread_info));
+	for(i=0;i<1<<GC_LEVEL0_BITS;i++)
+		if( hl_gc_page_map[i] != gc_level1_null )
+			private_data += sizeof(void*) * (1<<GC_LEVEL1_BITS);
+
+	fdump_i(private_data);
+	fdump_i(mark_stack_size); // keep separate
+	fdump_i(page_count);
+	gc_iter_pages(gc_dump_page);
+
 	// roots
 	fdump_i(gc_roots_count);
 	for(i=0;i<gc_roots_count;i++)

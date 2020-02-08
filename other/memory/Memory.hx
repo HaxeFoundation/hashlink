@@ -15,6 +15,10 @@ class Stats {
 		return addPath([t == null ? 0 : t.tid], mem);
 	}
 
+	public inline function makeID( t : TType, field : Int ) {
+		return t.tid | (field << 24);
+	}
+
 	public function addPath( tl : Array<Int>, mem : Int ) {
 		var key = tl.join(" ");
 		var inf = byT.get(key);
@@ -37,7 +41,18 @@ class Stats {
 		for( i in allT ) {
 			totCount += i.count;
 			totMem += i.mem;
-			mem.log(i.count + " count, " + Memory.MB(i.mem) + " " + [for( tid in i.tl ) mem.types[tid].toString()].join(" > "));
+			var tpath = [];
+			for( tid in i.tl ) {
+				var t = mem.types[tid & 0xFFFFFF];
+				var tstr = t.toString();
+				var fid = tid >>> 24;
+				if( fid > 0 ) {
+					var f = t.memFieldsNames[fid-1];
+					if( f != null ) tstr += "." + f;
+				}
+				tpath.push(tstr);
+			}
+			mem.log(i.count + " count, " + Memory.MB(i.mem) + " " + tpath.join(" > "));
 		}
 		if( withSum )
 			mem.log("Total: "+totCount+" count, "+Memory.MB(totMem));
@@ -47,8 +62,6 @@ class Stats {
 
 class Memory {
 
-	static inline var PAGE_BITS = 16;
-
 	public var memoryDump : sys.io.FileInput;
 
 	public var is64 : Bool;
@@ -57,7 +70,12 @@ class Memory {
 
 	public var types : Array<TType>;
 
+	var privateData : Int;
+	var markData : Int;
+
 	var sortByCount : Bool;
+	var displayFields : Bool = true;
+
 	var code : format.hl.Data;
 	var pages : Array<Page>;
 	var roots : Array<Pointer>;
@@ -74,6 +92,9 @@ class Memory {
 	var pointerBlock : PointerMap<Block>;
 	var pointerType : PointerMap<TType>;
 	var falseCandidates : Array<{ b : Block, f : Block, idx : Int }>;
+
+	var currentTypeIndex = 0;
+	var resolveCache : Map<String,TType> = new Map();
 
 	function new() {
 	}
@@ -133,38 +154,49 @@ class Memory {
 			throw "Invalid memory dump file";
 
 		var version = memoryDump.readByte() - "0".code;
+
+		if( version != 1 )
+			throw "Unsupported format version "+version;
+
 		var flags = readInt();
 		is64 = (flags & 1) != 0;
 		bool32 = (flags & 2) != 0;
-
 		ptrBits = is64 ? 3 : 2;
+		var ptrSize = 1 << ptrBits;
+
+		privateData = readInt();
+		markData = readInt();
 
 		// load pages
 		var count = readInt();
 		pages = [];
+		blocks = [];
 		for( i in 0...count ) {
-			while( true ) {
-				var addr = readPointer();
-				if( addr.isNull() ) break;
-				var p = new Page(this);
-				p.addr = addr;
-				p.kind = cast readInt();
-				p.size = readInt();
-				p.blockSize = readInt();
-				p.firstBlock = readInt();
-				p.maxBlocks = readInt();
-				p.nextBlock = readInt();
+			var addr = readPointer();
+			var p = new Page();
+			p.addr = addr;
+			p.kind = cast readInt();
+			p.size = readInt();
+			p.reserved = readInt();
 
+			var readPtr = !p.memHasPtr();
+			while( true ) {
+				var ptr = readPointer();
+				if( ptr.isNull() ) break;
+				var size = readInt();
+				var b = new Block();
+				b.page = p;
+				b.addr = ptr;
+				b.size = size;
+				if( readPtr && size >= ptrSize ) b.typePtr = readPointer();
+				blocks.push(b);
+			}
+
+			if( p.memHasPtr() ) {
 				p.dataPosition = memoryDump.tell();
 				memoryDump.seek(p.size, SeekCur);
-
-				var flags = readInt();
-				if( flags & 1 != 0 )
-					p.bmp = memoryDump.read((p.maxBlocks + 7) >> 3); // 1 bit per block
-				if( flags & 2 != 0 )
-					p.sizes = memoryDump.read(p.maxBlocks); // 1 byte per block
-				pages.push(p);
 			}
+			pages.push(p);
 		}
 
 		// load roots
@@ -194,20 +226,18 @@ class Memory {
 	}
 
 	function printStats() {
-		var totalSize = 0, maxSize = 0;
+		var pagesSize = 0, reserved = 0;
 		var used = 0, gc = 0;
 		for( p in pages ) {
-			maxSize += p.size;
-			totalSize += p.size + p.bmp.length;
-			gc += p.size - (p.maxBlocks - p.firstBlock) * p.blockSize;
-			gc += p.bmp.length;
+			pagesSize += p.size;
+			reserved += p.reserved;
 		}
 		for( b in blocks )
-			used += b.getMemSize();
-		log(pages.length + " pages, " + MB(totalSize) + " memory");
+			used += b.size;
+		log(pages.length + " pages, " + MB(pagesSize) + " memory");
 		log(roots.length + " roots, "+ stacks.length + " stacks");
 		log(code.types.length + " types, " + closuresPointers.length + " closures");
-		log(blocks.length + " live blocks " + MB(used) + " used, " + MB(maxSize - used) + " free, "+MB(gc)+" gc");
+		log(blocks.length + " live blocks " + MB(used) + " used, " + MB(pagesSize - used - reserved) + " free, "+MB(privateData + markData)+" gc");
 	}
 
 	function getTypeNull( t : TType ) {
@@ -227,7 +257,9 @@ class Memory {
 	}
 
 	function goto( b : Block ) {
-		b.page.goto(b.bid);
+		var p = b.page.dataPosition;
+		if( p < 0 ) throw "assert";
+		memoryDump.seek(p + b.addr.sub(b.page.addr), SeekBegin);
 	}
 
 	function check() {
@@ -279,47 +311,30 @@ class Memory {
 			pointerType.set(b.p, t);
 		}
 
-		blocks = [];
-		var pageMem = new PointerMap<Page>();
 		var progress = 0;
 		pointerBlock = new PointerMap();
 
-		for( p in pages ) {
+		for( b in blocks ) {
 			progress++;
-			if( progress % 100 == 0 )
-				Sys.print((Std.int(progress * 1000 / pages.length) / 10) + "%  \r");
-
-			var bid = p.firstBlock;
-			while( bid < p.maxBlocks ) {
-				if( !p.isLiveBlock(bid) ) {
-					bid++;
-					continue;
-				}
-				var sz = p.getBlockSize(bid);
-
-				var b = new Block();
-				b.page = p;
-				b.bid = bid;
-
-				// NoPtr page can also have a type ptr
+			if( progress % 1000 == 0 )
+				Sys.print((Std.int(progress * 1000 / blocks.length) / 10) + "%  \r");
+			if( b.page.memHasPtr() ) {
 				goto(b);
-				b.type = pointerType.get(readPointer());
-				if( b.type != null && b.type.hasPtr && p.kind == PNoPtr )
-					b.type = null; // false positive
-				if( b.type != null && !b.type.isDyn )
-					b.type = getTypeNull(b.type);
-				if( b.type != null )
-					b.typeKind = KHeader;
-
-				blocks.push(b);
-				pointerBlock.set(b.getPointer(), b);
-
-				bid += sz;
+				b.typePtr = readPointer();
 			}
-
-			for( i in 0...(p.size >> PAGE_BITS) )
-				pageMem.set(p.addr.offset(i << PAGE_BITS), p);
-
+			b.type = pointerType.get(b.typePtr);
+			b.typePtr = null;
+			if( b.type != null && b.type.hasPtr && b.page.kind == PNoPtr ) {
+				if( b.type.t.match(HEnum(_)) ) {
+					// most likely one of the constructor without pointer parameter
+				} else
+					b.type = null; // false positive
+			}
+			if( b.type != null && !b.type.isDyn )
+				b.type = getTypeNull(b.type);
+			if( b.type != null )
+				b.typeKind = KHeader;
+			pointerBlock.set(b.addr, b);
 		}
 
 		printStats();
@@ -382,6 +397,24 @@ class Memory {
 				f.b.type.falsePositiveIndexes[f.idx]++;
 			}
 
+		// precompute Arrays (no NativeArray intermediate)
+		function shortCircuit( native, haxe ) {
+			var tnat = resolveType(native, false);
+			var tarr = resolveType(haxe, false);
+			if( tnat == null || tarr == null ) return;
+			for( b in blocks ) {
+				if( b.type == tnat && b.owner != null && b.owner.type == tarr && b.subs != null ) {
+					for( s in b.subs )
+						s.b.addParent(b.owner);
+				}
+			}
+		}
+		shortCircuit("hl.NativeArray","Array<T>");
+		// disable for now, this generates unknowns and "Void" links
+		//shortCircuit("hl_bytes_map","Map<String,Dynamic>");
+		//shortCircuit("hl_int_map","Map<Int,Dynamic>");
+		//shortCircuit("hl_obj_map","Map<{},Dynamic>");
+
 		// assign depths
 
 		Sys.println("Computing depths...");
@@ -419,7 +452,7 @@ class Memory {
 			if( b.owner == null ) {
 				unRef++;
 				if( unRef < 100 )
-					log("  "+b.getPointer().toString() + " is not referenced");
+					log("  "+b.addr.toString() + " is not referenced");
 				continue;
 			}
 
@@ -438,7 +471,7 @@ class Memory {
 				}
 
 			unk++;
-			unkMem += b.getMemSize();
+			unkMem += b.size;
 		}
 
 		var falseCount = 0;
@@ -452,7 +485,7 @@ class Memory {
 		var falses = [for( t in types ) if( t.falsePositive > 0 && (typeStr == null || t.toString().indexOf(typeStr) >= 0) ) t];
 		falses.sort(function(t1, t2) return t1.falsePositive - t2.falsePositive);
 		for( f in falses )
-			log(f.falsePositive+" count " + f + " "+f.falsePositiveIndexes+"\n    "+f.fields);
+			log(f.falsePositive+" count " + f + " "+f.falsePositiveIndexes+"\n    "+[for( f in f.memFields ) f.t.toString()]);
 	}
 
 	function printUnknown() {
@@ -472,7 +505,7 @@ class Memory {
 				byT.set(tid, inf);
 			}
 			inf.count++;
-			inf.mem += b.getMemSize();
+			inf.mem += b.size;
 		}
 		var all = [for( k in byT ) k];
 		all.sort(function(i1, i2) return i1.count - i2.count);
@@ -489,27 +522,28 @@ class Memory {
 			b.removeChildren();
 
 		for( b in blocks ) {
-
 			progress++;
 			if( progress % 10000 == 0 )
 				Sys.print((Std.int(progress * 1000.0 / blocks.length) / 10) + "%  \r");
 
-			if( b.page.kind == PNoPtr )
+			if( !b.page.memHasPtr() )
 				continue;
 
 			if( b.type != null && !b.type.hasPtr )
 				switch(b.type.t) {
 				case HFun(_):
 				default:
-					log("  Scanning "+b.type+" "+b.getPointer().toString());
+					log("  Scanning "+b.type+" "+b.addr.toString());
 				}
 
 			goto(b);
 			var fields = null;
 			var start = 0;
 			var ptrTags = null;
+			var hasFieldNames = false;
 			if( b.type != null ) {
-				fields = b.type.fields;
+				hasFieldNames = b.type.memFieldsNames != null;
+				fields = b.type.memFields;
 				ptrTags = b.type.ptrTags;
 				// enum
 				if( b.type.constructs != null ) {
@@ -519,7 +553,7 @@ class Memory {
 				}
 			}
 
-			for( i in start...(b.getMemSize() >> ptrBits) ) {
+			for( i in start...(b.size >> ptrBits) ) {
 				var r = readPointer();
 
 				//if( ptrTags != null && ((ptrTags.get(i >> 5) >>> (i & 31)) & 1) == 0 ) continue;
@@ -541,11 +575,11 @@ class Memory {
 					falseCandidates.push({ b : b, f:bs, idx : i });
 					continue;
 				}
-				bs.addParent(b);
+				bs.addParent(b,hasFieldNames ? (i+1) : 0);
 
 				if( bs.type == null && ft != null ) {
 					if( ft.t.isDynamic() ) {
-						trace(b.typeKind, b.getPointer().toString(), b.type.toString(), ft.toString());
+						trace(b.typeKind, b.addr.toString(), b.type.toString(), ft.toString());
 						continue;
 					}
 					bs.type = ft;
@@ -560,15 +594,24 @@ class Memory {
 	function printByType() {
 		var ctx = new Stats(this);
 		for( b in blocks )
-			ctx.add(b.type, b.getMemSize());
+			ctx.add(b.type, b.size);
 		ctx.print();
 	}
 
-	function resolveType( str ) {
-		for( t in types )
-			if( t.t.toString() == str )
+	function resolveType( str, showError = true ) {
+		var t = resolveCache.get(str);
+		if( t != null )
+			return t;
+		for( i in currentTypeIndex...types.length ) {
+			var t = types[i];
+			var tstr = t.toString();
+			resolveCache.set(tstr, t);
+			currentTypeIndex = i + 1;
+			if( tstr == str )
 				return t;
-		log("Type not found '"+str+"'");
+		}
+		if( showError )
+			log("Type not found '"+str+"'");
 		return null;
 	}
 
@@ -589,10 +632,10 @@ class Memory {
 						var prev = owner;
 						owner = owner.owner;
 						ol.push(owner);
-						tl.unshift(owner.type == null ? 0 : owner.type.tid);
+						tl.unshift(owner.makeTID(prev,displayFields));
 					}
 				}
-				ctx.addPath(tl, b.getMemSize());
+				ctx.addPath(tl, b.size);
 			}
 		ctx.print();
 	}
@@ -615,7 +658,7 @@ class Memory {
 		while( mark.length > 0 ) {
 			var b = mark.pop();
 			for( s in b.subs )
-				visitRec(s,ctx,texclude,mark);
+				visitRec(s.b,ctx,texclude,mark);
 		}
 		ctx.print(true);
 	}
@@ -624,7 +667,7 @@ class Memory {
 		if( b.mark == Block.MARK_UID ) return;
 		b.mark = Block.MARK_UID;
 		if( b.type != null ) for( t in exclude ) if( b.type.match(t) ) return;
-		ctx.addPath(b.type == null ? [] : [b.type.tid],b.getMemSize());
+		ctx.addPath(b.type == null ? [] : [b.type.tid],b.size);
 		if( b.subs != null )
 			mark.push(b);
 	}
@@ -671,11 +714,11 @@ class Memory {
 						return;
 					mark.set(b, true);
 					tl.push(b.type == null ? 0 : b.type.tid);
-					ctx.addPath(tl, b.getMemSize());
+					ctx.addPath(tl, b.size);
 					if( b.subs != null ) {
 						k--;
 						for( s in b.subs )
-							addRec(tl.copy(),s, k);
+							addRec(tl.copy(),s.b, k);
 					}
 				}
 				addRec([], b, down);
@@ -683,95 +726,8 @@ class Memory {
 		ctx.print();
 	}
 
-	function printPartition() {
-		var part = sys.io.File.write("part.txt",false);
-		for( p in pages ) {
-			var bid = p.firstBlock;
-			part.writeString(p.addr.toString()+ " [" + p.blockSize+"]");
-			while( bid < p.maxBlocks ) {
-				if( !p.isLiveBlock(bid) ) {
-					part.writeByte(".".code);
-					bid++;
-					continue;
-				}
-				var sz = p.getBlockSize(bid);
-				for( i in 0...sz ) part.writeByte("#".code);
-				bid += sz;
-			}
-			part.writeByte("\n".code);
-		}
-		part.close();
-		log("Partition saved in part.txt");
-	}
-
 	public function log(msg:String) {
 		Sys.println(msg);
-	}
-
-	static inline var BMP_BITS = 5;
-
-	function makeBitmap() {
-
-		// VMMap.exe tool can also be used to show address space fragmentation in realtime
-		// although it will not be able to show GC fragmentation
-
-		var totalMem = 2 * 1024. * 1024. * 1024.; // GB of memory
-		var sizeReal = Math.ceil(Math.sqrt(totalMem / (1 << BMP_BITS)));
-		var size = 1, bits = 1;
-		while( size < sizeReal ) {
-			size <<= 1;
-			bits++;
-		}
-		var bytes = haxe.io.Bytes.alloc(size * size * 4);
-		var bmp : hl.BytesAccess<Int> = (bytes : hl.Bytes);
-		for( i in 0...size * size )
-			bmp[i] = 0xFF000000;
-		for( p in pages ) {
-			var index = p.addr.shift(BMP_BITS).low;
-			// reserved
-			for( i in 0...(p.size >> BMP_BITS) )
-				bmp[index+i] = 0xFF808080;
-			for( i in 0...((p.firstBlock * p.blockSize) >> BMP_BITS) )
-				bmp[index + i] = 0xFFFFFF00; // YELLOW = GC MEMORY
-		}
-		for( b in blocks ) {
-			var index = b.getPointer().shift(BMP_BITS).low;
-			var color = b.page.memHasPtr() ? 0xFFFF0000 : 0xFF00FF00; // GREEN = data / RED = objects
-			for( i in 0...b.getMemSize() >> BMP_BITS )
-				bmp[index + i] = color;
-		}
-		var f = sys.io.File.write("bitmap.png");
-		new format.png.Writer(f).write(format.png.Tools.build32BGRA(size, size, bytes));
-		f.close();
-	}
-
-	function printPages() {
-		var perBlockSize = new Map();
-		for( p in pages ) {
-			var inf = perBlockSize.get(p.blockSize);
-			if( inf == null ) {
-				inf = {
-					blockSize : p.blockSize,
-					count : 0,
-					mem : 0.,
-					kinds : [],
-					blocks : [],
-				};
-				perBlockSize.set(p.blockSize, inf);
-			}
-			inf.count++;
-			inf.mem += p.size;
-			inf.kinds[cast p.kind]++;
-		}
-		for( b in blocks ) {
-			var inf = perBlockSize.get(b.page.blockSize);
-			inf.blocks[cast b.page.kind]++;
-		}
-		var all = Lambda.array(perBlockSize);
-		all.sort(function(i1, i2) return i1.blockSize - i2.blockSize);
-		log("Kinds = [Dyn,Raw,NoPtr,Finalizer]");
-		for( i in all )
-			log('BlockSize ${i.blockSize} : ${i.count} pages, ${Std.int(i.mem/1024)} KB, kinds = ${i.kinds}, blocks = ${i.blocks}');
 	}
 
 	static function main() {
@@ -822,12 +778,6 @@ class Memory {
 				m.parents(args.shift());
 			case "subs":
 				m.subs(args.shift(), Std.parseInt(args.shift()));
-			case "part":
-				m.printPartition();
-			case "bitmap":
-				m.makeBitmap();
-			case "pages":
-				m.printPages();
 			case "sort":
 				switch( args.shift() ) {
 				case "mem":
@@ -836,6 +786,15 @@ class Memory {
 					m.sortByCount = true;
 				case mode:
 					Sys.println("Unknown sort mode " + mode);
+				}
+			case "fields":
+				switch( args.shift() ) {
+				case "true":
+					m.displayFields = true;
+				case "false":
+					m.displayFields = false;
+				case mode:
+					Sys.println("Unknown fields mode " + mode);
 				}
 			default:
 				Sys.println("Unknown command " + cmd);

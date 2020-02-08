@@ -449,5 +449,38 @@ static void gc_allocator_after_mark() {
 	gc_flush_empty_pages();
 }
 
+static void gc_get_stats( int *page_count, int *private_data ) {
+	int count = 0;
+	int i;
+	for(i=0;i<GC_ALL_PAGES;i++) {
+		gc_pheader *p = gc_pages[i];
+		while( p ) {
+			count++;
+			p = p->next_page;
+		}
+	}
+	*page_count = count;
+	*private_data = 0; // no malloc
+} 
 
+static void gc_iter_pages( gc_page_iterator iter ) {
+	int i;
+	for(i=0;i<GC_ALL_PAGES;i++) {
+		gc_pheader *p = gc_pages[i];
+		while( p ) {
+			int size = 0;
+			if( p->alloc.sizes && p->alloc.max_blocks > 8 ) size = p->alloc.max_blocks;
+			iter(p,size);
+			p = p->next_page;
+		}
+	}
+}
 
+static void gc_iter_live_blocks( gc_pheader *ph, gc_block_iterator iter ) {
+	int i;
+	gc_allocator_page_data *p = &ph->alloc;
+	for(i=0;i<p->max_blocks;i++) {
+		if( ph->bmp[(i>>3)] & (1<<(i&7)) )
+			iter(ph->base + i*p->block_size,p->sizes?p->sizes[i]*p->block_size:p->block_size);
+	}
+}

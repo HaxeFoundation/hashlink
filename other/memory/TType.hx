@@ -8,7 +8,10 @@ class TType {
 	public var bmp : hl.Bytes;
 	public var hasPtr : Bool;
 	public var isDyn : Bool;
-	public var fields : Array<TType>;
+
+	public var memFields : Array<TType>;
+	public var memFieldsNames : Array<String>;
+
 	public var constructs : Array<Array<TType>>;
 	public var nullWrap : TType;
 	public var ptrTags : haxe.io.Bytes;
@@ -75,7 +78,8 @@ class TType {
 				default:
 				}
 
-			fields = [];
+			memFields = [];
+			memFieldsNames = [];
 
 			var fcount = 0;
 			for( p in protos )
@@ -86,12 +90,13 @@ class TType {
 				for( f in p.fields ) {
 					var size = m.typeSize(f.t);
 					pos = align(pos, size);
-					fields[pos >> m.ptrBits] = m.getType(f.t);
+					memFields[pos >> m.ptrBits] = m.getType(f.t);
+					memFieldsNames[pos >> m.ptrBits] = f.name;
 					if( f.t.isPtr() ) tagPtr(pos >> m.ptrBits);
 					pos += size;
 				}
 
-			fill(fields, pos);
+			fill(memFields, pos);
 		case HEnum(e):
 			constructs = [];
 			for( c in e.constructs ) {
@@ -108,33 +113,35 @@ class TType {
 				constructs.push(fields);
 			}
 		case HVirtual(fl):
-			fields = [
+			memFields = [
 				tvoid, // type
 				m.getType(HDyn), // obj
 				m.getType(HDyn), // next
 			];
+			memFieldsNames = [];
 			var pos = (fl.length + 3) << m.ptrBits;
 			tagPtr(1);
 			tagPtr(2);
 			for( f in fl ) {
 				var size = m.typeSize(f.t);
 				pos = align(pos, size);
-				fields[pos >> m.ptrBits] = m.getType(f.t);
+				memFields[pos >> m.ptrBits] = m.getType(f.t);
+				memFieldsNames[pos >> m.ptrBits] = f.name;
 				if( f.t.isPtr() ) tagPtr(pos >> m.ptrBits);
 				pos += size;
 			}
 
-			fill(fields, pos);
+			fill(memFields, pos);
 			// keep null our fields pointers since they might point to a DynObj data head
 			for( i in 0...fl.length )
-				fields[i+3] = null;
+				memFields[i+3] = null;
 		case HNull(t):
 			if( m.is64 )
-				fields = [tvoid, m.getType(t)];
+				memFields = [tvoid, m.getType(t)];
 			else
-				fields = [tvoid, tvoid, m.getType(t), tvoid];
+				memFields = [tvoid, tvoid, m.getType(t), tvoid];
 		case HFun(_):
-			fields = [tvoid, tvoid, tvoid, m.getType(closure)];
+			memFields = [tvoid, tvoid, tvoid, m.getType(closure)];
 		default:
 		}
 	}
@@ -146,7 +153,12 @@ class TType {
 	}
 
 	public function toString() {
-		return t.toString();
+		switch( t ) {
+		case HAbstract(p):
+			return p;
+		default:
+			return t.toString();
+		}
 	}
 
 }
