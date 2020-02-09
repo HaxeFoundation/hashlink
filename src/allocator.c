@@ -47,13 +47,15 @@ static inline unsigned int TRAILING_ZEROES( unsigned int x ) {
 #define GC_PARTITIONS	9
 #define GC_PART_BITS	4
 #define GC_FIXED_PARTS	5
-static const int GC_SBITS[GC_PARTITIONS] = {0,0,0,0,0,		3,6,14,22};
+#define GC_LARGE_PART	(GC_PARTITIONS-1)
+#define GC_LARGE_BLOCK	(1 << 20)
+static const int GC_SBITS[GC_PARTITIONS] = {0,0,0,0,0,		3,6,13,0};
 
 #ifdef HL_64
-static const int GC_SIZES[GC_PARTITIONS] = {8,16,24,32,40,	8,64,1<<14,1<<22};
+static const int GC_SIZES[GC_PARTITIONS] = {8,16,24,32,40,	8,64,1<<13,0};
 #	define GC_ALIGN_BITS		3
 #else
-static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<14,1<<22};
+static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<13,0};
 #	define GC_ALIGN_BITS		2
 #endif
 
@@ -280,6 +282,12 @@ alloc_var:
 static void *gc_allocator_alloc( int *size, int page_kind ) {
 	int sz = *size;
 	sz += (-sz) & (GC_ALIGN - 1);
+	if( sz >= GC_LARGE_BLOCK ) {
+		sz += (-sz) & (GC_PAGE_SIZE - 1);
+		*size = sz;
+		gc_pheader *ph = gc_allocator_new_page((GC_LARGE_PART << PAGE_KIND_BITS) | page_kind,sz,sz,page_kind,false);
+		return ph->base;
+	}
 	if( sz <= GC_SIZES[GC_FIXED_PARTS-1] && page_kind != MEM_KIND_FINALIZER ) {
 		int part = (sz >> GC_ALIGN_BITS) - 1;
 		*size = GC_SIZES[part];

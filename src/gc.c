@@ -470,6 +470,31 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 		allocated = size;
 		gc_stats.allocation_count++;
 		gc_stats.total_requested += size;
+#		ifdef GC_PRINT_ALLOCS_SIZES
+#		define MAX_WORDS 16
+		static int SIZE_CATEGORIES[MAX_WORDS] = {0};
+		static int LARGE_BLOCKS[33] = {0};
+		int wsize = (size + sizeof(void*) - 1) & ~(sizeof(void*)-1);
+		if( wsize < MAX_WORDS * sizeof(void*) )
+			SIZE_CATEGORIES[wsize/sizeof(void*)]++;
+		else {
+			int k = 0;
+			while( size > (1<<k) && k < 20 ) {
+				k++;
+			}
+			LARGE_BLOCKS[k]++;
+		}
+		if( (gc_stats.allocation_count & 0xFFFF) == 0 ) {
+			int i;
+			for(i=0;i<MAX_WORDS;i++)
+				if( SIZE_CATEGORIES[i] )
+					printf("%d=%.1f ",i*sizeof(void*),(SIZE_CATEGORIES[i] * 100.) / gc_stats.allocation_count);
+			for(i=0;i<33;i++)
+				if( LARGE_BLOCKS[i] )
+					printf("%d=%.2f ",1<<i,(LARGE_BLOCKS[i] * 100.) / gc_stats.allocation_count);
+			printf("%d\n",gc_stats.allocation_count);
+		}
+#		endif
 		ptr = gc_allocator_alloc(&allocated,flags & PAGE_KIND_MASK);
 		if( ptr == NULL ) {
 			if( allocated < 0 ) {
