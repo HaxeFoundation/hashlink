@@ -434,7 +434,7 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	c->alloc = alloc;
 	hl_alloc_init(&c->falloc);
 	if( READ() != 'H' || READ() != 'L' || READ() != 'B' )
-		EXIT("Invalid header");
+		EXIT("Invalid HL bytecode header");
 	r->code = c;
 	c->version = READ();
 	if( c->version <= 1 || c->version > max_version ) {
