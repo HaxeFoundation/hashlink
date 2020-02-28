@@ -1077,6 +1077,10 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 			while( true ) {
 				for(i=0;i<tobj->nfields;i++) {
 					hl_obj_field *f = tobj->fields + i;
+					if( !*f->name ) {
+						a->size--;
+						continue;
+					}
 					hl_aptr(a,vbyte*)[p++] =  (vbyte*)f->name;
 				}
 				if( tobj->super == NULL ) break;
