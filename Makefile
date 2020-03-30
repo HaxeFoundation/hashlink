@@ -184,8 +184,8 @@ release_haxelib_package:
 	rm -rf $(HLIB)_release	
 	
 release_win:
-	(cd ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../hl-$(HL_VER))
-	cp c:/windows/syswow64/msvcr120.dll hl-$(HL_VER)
+	(cd x64/ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
+	cp c:/windows/system32/msvcr120.dll hl-$(HL_VER)
 	cp `which SDL2.dll` hl-$(HL_VER)
 	cp `which OpenAL32.dll` hl-$(HL_VER)
 	zip -r hl-$(HL_VER).zip hl-$(HL_VER)
