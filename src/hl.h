@@ -686,19 +686,15 @@ HL_API void hl_tls_set( hl_tls *l, void *value );
 HL_API void *hl_tls_get( hl_tls *l );
 HL_API void hl_tls_free( hl_tls *l );
 
-// ----------------------- ALLOC --------------------------------------------------
+// ----------------------- GC ALLOC -----------------------------------------------
 
-#define MEM_HAS_PTR(kind)	(!((kind)&2))
-#define MEM_KIND_DYNAMIC	0
-#define MEM_KIND_RAW		1
-#define MEM_KIND_NOPTR		2
-#define MEM_KIND_FINALIZER	3
-#define MEM_ALIGN_DOUBLE	128
-#define MEM_ZERO			256
+#define GC_ALLOC_DYNAMIC 1
+#define GC_ALLOC_NOPTR 2
+#define GC_ALLOC_RAW 4
 
 HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
-HL_API void hl_add_root( void *ptr );
-HL_API void hl_remove_root( void *ptr );
+HL_API void hl_add_root( void **ptr );
+HL_API void hl_remove_root( void **ptr );
 HL_API void hl_gc_major( void );
 HL_API bool hl_is_gc_ptr( void *ptr );
 
@@ -708,10 +704,14 @@ HL_API bool hl_is_blocking( void );
 typedef void (*hl_types_dump)( void (*)( void *, int) );
 HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
 
-#define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(&hlt_bytes,size,MEM_KIND_NOPTR)
-#define hl_gc_alloc(t,size)			hl_gc_alloc_gen(t,size,MEM_KIND_DYNAMIC)
-#define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(&hlt_abstract,size,MEM_KIND_RAW)
-#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract,size,MEM_KIND_FINALIZER)
+#define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(&hlt_bytes, size, GC_ALLOC_NOPTR)
+#define hl_gc_alloc(t, size)			hl_gc_alloc_gen(t, size, GC_ALLOC_DYNAMIC)
+#define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(&hlt_abstract, size, 0)
+// TODO: MEM_KIND_RAW)
+#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract, size, 0)
+// TODO: MEM_KIND_FINALIZER)
+
+// ----------------------- INTERNAL ALLOC -----------------------------------------
 
 HL_API void hl_alloc_init( hl_alloc *a );
 HL_API void *hl_malloc( hl_alloc *a, int size );
@@ -852,12 +852,23 @@ struct _hl_trap_ctx {
 #define HL_TRACK_DYNCALL	8
 #define HL_TRACK_MASK		(HL_TRACK_ALLOC | HL_TRACK_CAST | HL_TRACK_DYNFIELD | HL_TRACK_DYNCALL)
 
+typedef struct gc_block_dummy_s gc_block_dummy_t;
+typedef struct gc_block_header_s gc_block_header_t;
+
 typedef struct {
 	int thread_id;
+
 	// gc vars
 	volatile int gc_blocking;
 	void *stack_top;
 	void *stack_cur;
+	void *lines_start;
+	void *lines_limit;
+	gc_block_dummy_t *sentinels;
+	gc_block_header_t *lines_block; // active block for new allocations
+	gc_block_header_t *full_blocks; // DLL of all full blocks, may become recycled
+	gc_block_header_t *recyclable_blocks; // DLL of recyclable blocks
+
 	// exception handling
 	hl_trap_ctx *trap_current;
 	hl_trap_ctx *trap_uncaught;

@@ -530,8 +530,7 @@ HL_PRIM bool hl_type_enum_eq( venum *a, venum *b ) {
 
 HL_PRIM venum *hl_alloc_enum( hl_type *t, int index ) {
 	hl_enum_construct *c = t->tenum->constructs + index;
-	venum *v = (venum*)hl_gc_alloc_gen(t, c->size, MEM_KIND_DYNAMIC | (c->hasptr ? 0 : MEM_KIND_NOPTR) | MEM_ZERO);
-	v->t = t;
+	venum *v = (venum*)hl_gc_alloc_gen(t, c->size, c->hasptr ? GC_ALLOC_DYNAMIC : GC_ALLOC_NOPTR);
 	v->index = index;
 	return v;
 }

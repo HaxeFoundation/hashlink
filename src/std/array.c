@@ -25,8 +25,7 @@ HL_PRIM varray *hl_alloc_array( hl_type *at, int size ) {
 	int esize = hl_type_size(at);
 	varray *a;
 	if( size < 0 ) hl_error("Invalid array size");
-	a = (varray*)hl_gc_alloc_gen(&hlt_array, sizeof(varray) + esize*size, (hl_is_ptr(at) ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
-	a->t = &hlt_array;
+	a = (varray*)hl_gc_alloc_gen(&hlt_array, sizeof(varray) + esize*size, hl_is_ptr(at) ? GC_ALLOC_DYNAMIC : GC_ALLOC_NOPTR);
 	a->at = at;
 	a->size = size;
 	return a;
