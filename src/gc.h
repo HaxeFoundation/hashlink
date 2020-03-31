@@ -30,6 +30,8 @@ static void gc_free_os_memory(void *ptr, int size);
 // TODO: check collisions
 #define GC_HASH(ptr) (((int_val)(ptr) >> 22) ^ (((int_val)(ptr) >> 22) << 5))
 
+#define GC_STATIC
+
 // GC data structures -----------------------------------------------
 
 typedef enum {
@@ -157,15 +159,15 @@ typedef struct {
 	int capacity;
 } gc_mark_stack_t;
 
-struct {
+typedef struct {
 	unsigned long live_objects;
 	unsigned long live_blocks;
 	unsigned long total_memory;
 	unsigned long cycles;
 	int total_pages;
-} gc_stats;
+} gc_stats_t;
 
-struct {
+typedef struct {
 	unsigned long memory_limit;
 	bool debug_fatal;
 	bool debug_os;
@@ -176,14 +178,14 @@ struct {
 	bool debug_other;
 	bool debug_dump;
 	FILE *dump_file;
-} gc_config;
+} gc_config_t;
 
 // GC page management ----------------------------------------------
 
 // allocates and initialises a GC page
-static gc_page_header_t *gc_alloc_page_memory(void);
+GC_STATIC gc_page_header_t *gc_alloc_page_memory(void);
 // frees a GC page
-static void gc_free_page_memory(gc_page_header_t *header);
+GC_STATIC void gc_free_page_memory(gc_page_header_t *header);
 
 // gets the `block`th block in `page`
 #define GC_PAGE_BLOCK(page, block) ((gc_block_header_t *)((char *)(page) + (block) * GC_BLOCK_SIZE))
@@ -204,10 +206,10 @@ HL_PRIM void hl_add_root(void **);
 HL_PRIM void hl_remove_root(void **);
 
 // thread-local allocator <-> global GC
-static gc_block_header_t *gc_pop_block(void); // size fixed to 4 MiB
-static void gc_push_block(gc_block_header_t *);
-static void *gc_pop_huge(int size);
-static void gc_push_huge(void *);
+GC_STATIC gc_block_header_t *gc_pop_block(void); // size fixed to 4 MiB
+GC_STATIC void gc_push_block(gc_block_header_t *);
+GC_STATIC void *gc_pop_huge(int size);
+GC_STATIC void gc_push_huge(void *);
 
 // thread setup
 HL_API int hl_thread_id(void);
@@ -221,13 +223,13 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags);
 HL_API void hl_gc_major(void);
 
 // GC internals
-static void gc_stop_world(bool);
+GC_STATIC void gc_stop_world(bool);
 
-static void gc_mark(void);
-static void gc_sweep(void); // or collect, compact, copy, etc
+GC_STATIC void gc_mark(void);
+GC_STATIC void gc_sweep(void); // or collect, compact, copy, etc
 
 // marking and sweeping
-static gc_block_header_t *gc_get_block(void *); // NULL if not a GC pointer
+GC_STATIC gc_block_header_t *gc_get_block(void *); // NULL if not a GC pointer
 
 // GC debug
 
@@ -251,12 +253,12 @@ static gc_block_header_t *gc_get_block(void *); // NULL if not a GC pointer
 #define GC_FATAL(msg) do { puts(msg); __builtin_trap(); } while (0)
 
 /*
-static void gc_debug_block(gc_block_header_t *block);
-static void gc_debug_general(void);
-static void gc_dump(const char *);
+GC_STATIC void gc_debug_block(gc_block_header_t *block);
+GC_STATIC void gc_debug_general(void);
+GC_STATIC void gc_dump(const char *);
 */
 
 // GC initialisation
 
-static void gc_init(void);
-static void gc_deinit(void);
+GC_STATIC gc_stats_t *gc_init(void);
+GC_STATIC void gc_deinit(void);

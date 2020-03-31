@@ -23,8 +23,6 @@
 #error "no threads with gc for now"
 #endif
 
-#define GC_STATIC
-
 // utilities --------------------------------------------------------
 
 // branch optimisation
@@ -51,6 +49,11 @@
 		(obj)->next->prev = (obj); \
 	} while (0)
 
+// state structs
+
+static gc_stats_t *gc_stats;
+static gc_config_t *gc_config;
+
 // OS page management ----------------------------------------------
 
 static void *base_addr;
@@ -58,9 +61,9 @@ static void *base_addr;
 // allocates a page-aligned region of memory from the OS
 GC_STATIC void *gc_alloc_os_memory(int size) {
 	GC_DEBUG_DUMP1("gc_alloc_os_memory.enter", size);
-	if (gc_stats.total_memory + size >= gc_config.memory_limit) {
+	if (gc_stats->total_memory + size >= gc_config->memory_limit) {
 		GC_DEBUG_DUMP0("gc_alloc_os_memory.fail.oom");
-		GC_DEBUG(fatal, "using %lu / %lu bytes, need %d more", gc_stats.total_memory, gc_config.memory_limit, size);
+		GC_DEBUG(fatal, "using %lu / %lu bytes, need %d more", gc_stats->total_memory, gc_config->memory_limit, size);
 		GC_FATAL("OOM: memory limit hit");
 	}
 	void *ptr = mmap(base_addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -68,7 +71,7 @@ GC_STATIC void *gc_alloc_os_memory(int size) {
 		GC_DEBUG_DUMP0("gc_alloc_os_memory.fail.other");
 		GC_FATAL("failed to allocate page");
 	}
-	gc_stats.total_memory += size;
+	gc_stats->total_memory += size;
 	if (((int_val)ptr) & (GC_PAGE_SIZE - 1)) {
 		// re-align
 		munmap(ptr,size);
@@ -98,7 +101,7 @@ GC_STATIC void *gc_alloc_os_memory(int size) {
 // returns a region of memory back to the OS
 GC_STATIC void gc_free_os_memory(void *ptr, int size) {
 	munmap(ptr, size);
-	gc_stats.total_memory -= size;
+	gc_stats->total_memory -= size;
 	GC_DEBUG_DUMP2("gc_free_os_memory.success", ptr, size);
 	GC_DEBUG(os, "reclaimed OS page: %p", ptr);
 }
@@ -125,7 +128,7 @@ GC_STATIC void gc_add_page(gc_page_header_t *header) {
 		gc_max_allocated = (char *)header + GC_PAGE_SIZE;
 	}
 
-	gc_stats.total_pages++;
+	gc_stats->total_pages++;
 	gc_page_hash.total_pages++;
 	double load_factor = gc_page_hash.total_pages / gc_page_hash.bucket_count;
 	if (load_factor > 0.75) { // TODO: limit the growth of buckets
@@ -211,16 +214,16 @@ GC_STATIC void gc_free_page_memory(gc_page_header_t *header) {
 	}
 	int bucket = GC_HASH(header) % gc_page_hash.bucket_count;
 	last = &gc_page_hash.buckets[bucket];
-	for (gc_page_header_t *cur = gc_page_hash.buckets[bucket]; cur != NULL; cur = cur->next_page_bucket) {
+	for (gc_page_header_t *cur = *last; cur != NULL; cur = cur->next_page_bucket) {
 		if (cur == header) {
 			*last = cur->next_page_bucket;
 			break;
 		}
-		last = &cur->next_page;
+		last = &cur->next_page_bucket;
 	}
 	// TODO: maybe rearrange if load factor is low?
 	gc_page_hash.total_pages--;
-	gc_stats.total_pages--;
+	gc_stats->total_pages--;
 	gc_free_os_memory(header, header->size);
 	GC_DEBUG_DUMP1("gc_free_page_memory.success", header);
 }
@@ -386,9 +389,9 @@ GC_STATIC void gc_stop_world( bool b ) {
 GC_STATIC gc_block_header_t *gc_pop_block(void) {
 	hl_mutex_acquire(gc_mutex_pool); // TODO: mutexes need to be re-entrant, or lock later
 	if (UNLIKELY(gc_pool_count == 0)) {
-		// if (gc_stats.total_memory * 1.2 >= gc_config.memory_limit) {
-		if (gc_stats.live_blocks > 0) {
-			GC_DEBUG(alloc, "using %lu / %lu bytes", gc_stats.total_memory, gc_config.memory_limit);
+		// if (gc_stats->total_memory * 1.2 >= gc_config->memory_limit) {
+		if (gc_stats->live_blocks > 0) {
+			GC_DEBUG(alloc, "using %lu / %lu bytes", gc_stats->total_memory, gc_config->memory_limit);
 			// GC_FATAL("OOM: memory limit hit");
 			GC_DEBUG(alloc, "memory limit hit, triggering major ...");
 			hl_gc_major();
@@ -398,9 +401,6 @@ GC_STATIC gc_block_header_t *gc_pop_block(void) {
 		}
 	}
 	gc_block_header_t *block = gc_pool;
-	if ((((int_val)block->next) & (int_val)(0x10000 - 1)) != 0) {
-		GC_FATAL("pool corrupted in pop");
-	}
 	gc_pool = block->next;
 	gc_page_header_t *page = GC_BLOCK_PAGE(block);
 	// TODO: mutex per page?
@@ -412,7 +412,7 @@ GC_STATIC gc_block_header_t *gc_pop_block(void) {
 	block->owner_thread = hl_thread_id();
 	GC_DEBUG(alloc, "got block %p", block);
 	GC_DEBUG_DUMP1("gc_pop_block.success", block);
-	gc_stats.live_blocks++;
+	gc_stats->live_blocks++;
 	return block;
 }
 
@@ -431,12 +431,9 @@ GC_STATIC void gc_push_block(gc_block_header_t *block) {
 	SET_BIT0(page->block_bmp, GC_BLOCK_ID(block));
 	// TODO: manage disorder in GC pool (prefer address order)
 	block->next = gc_pool;
-	if ((((int_val)block) & (int_val)(0x10000 - 1)) != 0) {
-		GC_FATAL("pool corrupted in push");
-	}
 	gc_pool = block;
 	gc_pool_count++;
-	gc_stats.live_blocks--;
+	gc_stats->live_blocks--;
 	hl_mutex_release(gc_mutex_pool);
 	GC_DEBUG_DUMP1("gc_push_block.success", block);
 }
@@ -457,7 +454,7 @@ GC_STATIC void gc_push_huge(void *huge) {
 	gc_page_header_t *header = GC_BLOCK_PAGE(huge);
 	GC_DEBUG(alloc, "freed huge %p", huge);
 	GC_DEBUG_DUMP1("gc_push_huge.success", header);
-	gc_free_os_memory(header, header->size);
+	gc_free_page_memory(header);
 }
 
 // thread <-> thread-local allocator -------------------------------
@@ -615,8 +612,8 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 
 // triggers a major GC collection
 HL_API void hl_gc_major(void) {
-	GC_DEBUG_DUMP0("hl_gc_major.entry");
 	gc_stop_world(true);
+	GC_DEBUG_DUMP0("hl_gc_major.entry");
 	gc_mark();
 	gc_sweep();
 	gc_stop_world(false);
@@ -633,6 +630,7 @@ GC_STATIC void gc_push(void *p, void *ref) {
 		if (gc_mark_stack_active == &gc_mark_stack) {
 			GC_DEBUG(mark, "mark stack growth alloc");
 			// ran out of space on original stack, allocate a new one and start using it
+			gc_mark_stack_next.pos = 0;
 			gc_mark_stack_next.capacity = gc_mark_stack.capacity << 1;
 			gc_mark_stack_next.data = malloc(sizeof(gc_mark_stack_entry_t) * gc_mark_stack_next.capacity);
 			gc_mark_stack_active = &gc_mark_stack_next;
@@ -694,7 +692,7 @@ GC_STATIC void gc_mark(void) {
 
 	// TODO: only if debug
 	// reset stats
-	gc_stats.live_objects = 0;
+	gc_stats->live_objects = 0;
 
 	// reset line marks
 	// TODO: is there a better place to do this?
@@ -743,7 +741,7 @@ GC_STATIC void gc_mark(void) {
 
 	// propagate
 	while (gc_mark_total-- > 0) {
-		gc_stats.live_objects++;
+		gc_stats->live_objects++;
 		gc_object_t *p = gc_pop();
 		if (p == NULL)
 			GC_FATAL("popped null");
@@ -770,7 +768,7 @@ GC_STATIC void gc_mark(void) {
 		}
 
 		// scan object
-		void **data = (void **)((void *)p + sizeof(gc_object_t));
+		void **data = (void **)((void *)p + sizeof(hl_type *));
 		if (block->huge_sized) {
 			words = (GC_BLOCK_PAGE(p)->size - 8192) / 8;
 			GC_DEBUG(mark, "scanning huge, %d words", words);
@@ -779,12 +777,12 @@ GC_STATIC void gc_mark(void) {
 		// printf("mark_bits 1 %d\n", p->t->mark_bits[0]);
 		// TODO: p->t->mark_bits should only be null with dynamic_mark
 		if (true) { //meta->dynamic_mark || p->t == NULL || p->t->mark_bits == NULL) {
-			for (int i = 0; i < words; i++) {
+			for (int i = 0; i < words - 1; i++) { // skip hl_type *t
 				gc_push(data[i], &data[i]);
 			}
 		} else {
 			unsigned int *mark_bits = p->t->mark_bits;
-			for (int i = 0; i < words; i++) {
+			for (int i = 0; i < words - 1; i++) { // skip hl_type *t
 				if (GET_BIT(mark_bits, i)) {
 					gc_push(data[i], &data[i]);
 				}
@@ -858,7 +856,7 @@ GC_STATIC void gc_sweep(void) {
 	// change polarity for the next cycle
 	gc_mark_polarity = 1 - gc_mark_polarity;
 
-	gc_stats.cycles++;
+	gc_stats->cycles++;
 }
 
 GC_STATIC gc_block_header_t *gc_get_block(void *p) {
@@ -914,10 +912,10 @@ HL_API vdynamic *hl_alloc_obj( hl_type *t ) {
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
 	if( t->kind == HSTRUCT ) {
 		o = (vobj*)hl_gc_alloc_gen(t, size, rt->hasPtr ? GC_ALLOC_RAW : GC_ALLOC_NOPTR);
-		o->t = NULL;
+		o->t = NULL; // TODO: not needed??? (just pass NULL above?)
 	} else {
 		o = (vobj*)hl_gc_alloc_gen(t, size, rt->hasPtr ? GC_ALLOC_DYNAMIC : GC_ALLOC_NOPTR);
-		o->t = t;
+		o->t = t; // TODO: not needed
 	}
 	for(i=0;i<rt->nbindings;i++) {
 		hl_runtime_binding *b = rt->bindings + i;
@@ -954,7 +952,7 @@ HL_API void hl_gc_set_dump_types( hl_types_dump tdump ) {
 
 // GC initialisation -----------------------------------------------
 
-GC_STATIC void gc_init(void) {
+GC_STATIC gc_stats_t *gc_init(void) {
 	gc_mutex_roots = hl_mutex_alloc(false);
 	gc_mutex_pool = hl_mutex_alloc(false);
 
@@ -979,35 +977,47 @@ GC_STATIC void gc_init(void) {
 	gc_mark_stack_next.pos = 0;
 	gc_mark_stack_next.capacity = 0;
 	gc_mark_stack_active = NULL;
-	gc_stats.live_objects = 0;
-	gc_stats.live_blocks = 0;
-	gc_stats.total_memory = 0;
-	gc_stats.cycles = 0;
-	gc_stats.total_pages = 0;
-	// gc_config.memory_limit = 500 * 1024 * 1024;
-	gc_config.memory_limit = 100 * 1024 * 1024;
-	gc_config.debug_fatal = true;
-	gc_config.debug_os = false;
-	gc_config.debug_page = false;
-	gc_config.debug_alloc = false;
-	gc_config.debug_mark = false;
-	gc_config.debug_sweep = false;
-	gc_config.debug_other = false;
-	gc_config.debug_dump = true;
-	gc_config.dump_file = fopen("gc.dump", "w");
+	gc_stats = (gc_stats_t *)calloc(sizeof(gc_stats_t), 1);
+	gc_stats->live_objects = 0;
+	gc_stats->live_blocks = 0;
+	gc_stats->total_memory = 0;
+	gc_stats->cycles = 0;
+	gc_stats->total_pages = 0;
+	gc_config = (gc_config_t *)calloc(sizeof(gc_config_t), 1);
+	// gc_config->memory_limit = 500 * 1024 * 1024;
+	gc_config->memory_limit = 100 * 1024 * 1024;
+	gc_config->debug_fatal = true;
+	gc_config->debug_os = false;
+	gc_config->debug_page = false;
+	gc_config->debug_alloc = false;
+	gc_config->debug_mark = false;
+	gc_config->debug_sweep = false;
+	gc_config->debug_other = false;
+	gc_config->debug_dump = true;
+	gc_config->dump_file = fopen("gc.dump", "w");
+	return gc_stats;
 }
 
 GC_STATIC void gc_deinit(void) {
 	hl_mutex_free(gc_mutex_roots);
 	hl_mutex_free(gc_mutex_pool);
-	while (gc_last_allocated_page != NULL) {
-		gc_free_page_memory(gc_last_allocated_page);
+	gc_page_header_t *page = gc_last_allocated_page;
+	gc_page_header_t *next = NULL;
+	while (page != NULL) {
+		next = page->next_page;
+		gc_free_os_memory(page, page->size);
+		page = next;
 	}
-	while (gc_last_allocated_huge_page != NULL) {
-		gc_free_page_memory(gc_last_allocated_huge_page);
+	page = gc_last_allocated_huge_page;
+	while (page != NULL) {
+		next = page->next_page;
+		gc_free_os_memory(page, page->size);
+		page = next;
 	}
 	free(gc_page_hash.buckets);
 	free(gc_mark_stack.data);
+	free(gc_stats);
+	free(gc_config);
 }
 
 void hl_cache_free();
