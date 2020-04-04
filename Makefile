@@ -25,7 +25,8 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+HLS = src/code.o src/jit.o src/module.o src/debugger.o src/profile.o
+HL = $(HLS) src/main.o
 
 FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o libs/fmt/dxt.o
 
@@ -104,7 +105,7 @@ ifdef DEBUG
 CFLAGS += -g
 endif
 
-all: libhl hl libs
+all: libhl hl libs libhls
 
 install:
 	mkdir -p $(INSTALL_DIR)
@@ -113,12 +114,14 @@ install:
 	mkdir -p $(INSTALL_DIR)/include
 	cp hl $(INSTALL_DIR)/bin
 	cp libhl.${LIBEXT} $(INSTALL_DIR)/lib
+	cp libhls.a $(INSTALL_DIR)/lib
 	cp *.hdll $(INSTALL_DIR)/lib
-	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_DIR)/include
+	cp src/hl.h src/hlc.h src/hlc_main.c src/opcodes.h src/hlmodule.h $(INSTALL_DIR)/include
 
 uninstall:
 	rm -f $(INSTALL_DIR)/bin/hl $(INSTALL_DIR)/lib/libhl.${LIBEXT} $(INSTALL_DIR)/lib/*.hdll
 	rm -f $(INSTALL_DIR)/include/hl.h $(INSTALL_DIR)/include/hlc.h $(INSTALL_DIR)/include/hlc_main.c
+	rm -f $(INSTALL_DIR)/include/opcodes.h $(INSTALL_DIR)/include/hlmodule.h
 
 libs: $(LIBS)
 
@@ -130,6 +133,9 @@ hlc: ${BOOT}
 
 hl: ${HL} libhl
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
+
+libhls: hl
+	ar rcs libhls.a ${HLS} ${LIB}
 
 fmt: ${FMT} libhl
 	${CC} ${CFLAGS} -I include/mikktspace -I include/minimp3 -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
@@ -206,10 +212,13 @@ release_osx:
 .c.o :
 	${CC} ${CFLAGS} -o $@ -c $<
 
+clean_a:
+	rm -f hls.a
+
 clean_o:
 	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV}
 
-clean: clean_o
+clean: clean_o clean_a
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
 
 .PHONY: libhl hl hlc fmt sdl libs release
