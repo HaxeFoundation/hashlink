@@ -2,9 +2,11 @@
 
 #include <hl.h>
 
-#if defined(_WIN32) || defined(__ANDROID__)
+#if defined(_WIN32) || defined(__ANDROID__) || defined(HL_IOS) || defined(HL_TVOS)
 #	include <SDL.h>
 #	include <SDL_syswm.h>
+#elif defined(HL_MAC)
+#	include <SDL.h>
 #else
 #	include <SDL2/SDL.h>
 #endif
@@ -12,7 +14,6 @@
 #if defined (HL_IOS) || defined(HL_TVOS)
 #	include <OpenGLES/ES3/gl.h>
 #	include <OpenGLES/ES3/glext.h>
-#	include <SDL2/SDL_syswm.h>
 #endif
 
 #ifndef SDL_MAJOR_VERSION

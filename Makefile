@@ -62,7 +62,7 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(MARCH) -I /usr/local/opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH) -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include/SDL2 -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
 
 ifdef OSX_SDK
@@ -151,14 +151,14 @@ uv: ${UV} libhl
 
 mysql: ${MYSQL} libhl
 	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
-	
+
 mesa:
 	(cd libs/mesa && make)
 
 release: release_version release_$(RELEASE_NAME)
 
 release_version:
-	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))	
+	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))
 	rm -rf hl-$(HL_VER)
 	mkdir hl-$(HL_VER)
 	mkdir hl-$(HL_VER)/include
@@ -174,15 +174,15 @@ HLPACK=dx
 else
 HLPACK=$(HLIB)
 endif
-	
+
 release_haxelib_package:
 	rm -rf $(HLIB)_release
 	mkdir $(HLIB)_release
 	(cd libs/$(HLIB) && cp -R $(HLPACK) *.h *.c* haxelib.json ../../$(HLIB)_release | true)
 	zip -r $(HLIB).zip $(HLIB)_release
 	haxelib submit $(HLIB).zip
-	rm -rf $(HLIB)_release	
-	
+	rm -rf $(HLIB)_release
+
 release_win:
 	(cd x64/ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
 	cp c:/windows/system32/msvcr120.dll hl-$(HL_VER)
