@@ -392,13 +392,21 @@ HL_PRIM vdynamic *hl_make_var_args( vclosure *c ) {
 	return (vdynamic*)hl_alloc_closure_ptr(&hlt_var_args,fun_var_args,c);
 }
 
+HL_PRIM void hl_prim_not_loaded() {
+	hl_error("Primitive or library is missing");
+}
+
+HL_PRIM bool hl_is_prim_loaded( vdynamic *f ) {
+	return f && f->t->kind == HFUN && ((vclosure*)f)->fun != hl_prim_not_loaded;
+}
+
 DEFINE_PRIM(_DYN, no_closure, _DYN);
 DEFINE_PRIM(_DYN, make_closure, _DYN _DYN);
 DEFINE_PRIM(_DYN, get_closure_value, _DYN);
 DEFINE_PRIM(_BOOL, fun_compare, _DYN _DYN);
 DEFINE_PRIM(_DYN, make_var_args, _FUN(_DYN,_ARR));
 DEFINE_PRIM(_DYN, call_method, _DYN _ARR);
-
+DEFINE_PRIM(_BOOL, is_prim_loaded, _DYN);
 
 #if defined(HL_VCC) && !defined(HL_XBO)
 static int throw_handler( int code ) {
