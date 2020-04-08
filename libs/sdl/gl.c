@@ -2,12 +2,12 @@
 #include <hl.h>
 
 #if defined(HL_IOS) || defined (HL_TVOS)
-#	include <SDL2/SDL.h>
-#	include <SDL2/SDL_syswm.h>
+#	include <SDL.h>
+#	include <SDL_syswm.h>
 #	include <OpenGLES/ES3/gl.h>
 #	define HL_GLES
 #elif defined(HL_MAC)
-#	include <SDL2/SDL.h>
+#	include <SDL.h>
 #	include <OpenGL/gl3.h>
 #	define glBindImageTexture(...) hl_error("Not supported on OSX")
 #	define glDispatchCompute(...) hl_error("Not supported on OSX")
