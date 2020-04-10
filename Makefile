@@ -6,7 +6,7 @@ INSTALL_DIR ?= $(PREFIX)
 
 LIBS=fmt sdl ssl openal ui uv mysql
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 LIBFLAGS =
 HLFLAGS = -ldl
@@ -77,6 +77,11 @@ LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 RELEASE_NAME = osx
 
+# Mac native debug
+HL_DEBUG = include/mdbg/mdbg.o include/mdbg/mach_excServer.o include/mdbg/mach_excUser.o
+LIB += ${HL_DEBUG}
+LIBS += hldebug
+
 else
 
 # Linux
@@ -113,11 +118,12 @@ install:
 	mkdir -p $(INSTALL_DIR)/include
 	cp hl $(INSTALL_DIR)/bin
 	cp libhl.${LIBEXT} $(INSTALL_DIR)/lib
+	if [ -f libhldebug.${LIBEXT} ]; then cp libhldebug.${LIBEXT} $(INSTALL_DIR)/lib; fi
 	cp *.hdll $(INSTALL_DIR)/lib
 	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_DIR)/include
 
 uninstall:
-	rm -f $(INSTALL_DIR)/bin/hl $(INSTALL_DIR)/lib/libhl.${LIBEXT} $(INSTALL_DIR)/lib/*.hdll
+	rm -f $(INSTALL_DIR)/bin/hl $(INSTALL_DIR)/lib/libhl.${LIBEXT} $(INSTALL_DIR)/lib/libhldebug.${LIBEXT} $(INSTALL_DIR)/lib/*.hdll
 	rm -f $(INSTALL_DIR)/include/hl.h $(INSTALL_DIR)/include/hlc.h $(INSTALL_DIR)/include/hlc_main.c
 
 libs: $(LIBS)
@@ -154,6 +160,9 @@ mysql: ${MYSQL} libhl
 
 mesa:
 	(cd libs/mesa && make)
+
+hldebug: ${HL_DEBUG}
+	${CC} -m${MARCH} ${LIBFLAGS} -shared -o libhldebug.${LIBEXT} src/std/debug.o ${HL_DEBUG} -lpthread -lm
 
 release: release_version release_$(RELEASE_NAME)
 
@@ -207,9 +216,9 @@ release_osx:
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
 
 clean: clean_o
-	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
+	rm -f hl hl.exe libhl.$(LIBEXT) libhldebug.${LIBEXT} *.hdll
 
 .PHONY: libhl hl hlc fmt sdl libs release

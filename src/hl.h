@@ -285,6 +285,11 @@ C_FUNCTION_END
 			    ".long 0b;" \
 			    ".popsection")
 #	endif
+#elif defined(HL_MAC)
+#include <signal.h>
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			raise(SIGTRAP);//__builtin_trap();
 #else
 #	define hl_debug_break()
 #endif
