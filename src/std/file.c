@@ -19,6 +19,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#if defined(__GNUC__) && !defined(__APPLE__)
+#	define _FILE_OFFSET_BITS 64
+#endif
+
 #include <hl.h>
 #include <stdio.h>
 #ifdef HL_CONSOLE
@@ -149,7 +153,7 @@ HL_PRIM bool hl_file_seek( hl_fdesc *f, int pos, int kind ) {
 
 HL_PRIM int hl_file_tell( hl_fdesc *f ) {
 	if( !f ) return -1;
-	return ftell(f->f);
+	return (int)ftell(f->f);
 }
 
 HL_PRIM bool hl_file_seek2( hl_fdesc *f, double pos, int kind ) {
@@ -157,7 +161,7 @@ HL_PRIM bool hl_file_seek2( hl_fdesc *f, double pos, int kind ) {
 #	ifdef HL_WIN
 	return _fseeki64(f->f,(__int64)pos,kind) == 0;
 #	else
-	return fseeko64(f->f,(int64)pos,kind) == 0;
+	return fseek(f->f,(int64)pos,kind) == 0;
 #	endif
 }
 
@@ -166,7 +170,7 @@ HL_PRIM double hl_file_tell2( hl_fdesc *f ) {
 #	ifdef HL_WIN
 	return (double)_ftelli64(f->f);
 #	else
-	return (double)ftello64(f->f);
+	return (double)ftell(f->f);
 #	endif
 }
 
