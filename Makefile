@@ -3,6 +3,9 @@ LBITS := $(shell getconf LONG_BIT)
 MARCH ?= $(LBITS)
 PREFIX ?= /usr/local
 INSTALL_DIR ?= $(PREFIX)
+INSTALL_BIN_DIR ?= $(PREFIX)/bin
+INSTALL_LIB_DIR ?= $(PREFIX)/lib
+INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
 LIBS=fmt sdl ssl openal ui uv mysql
 
@@ -111,18 +114,17 @@ endif
 all: libhl hl libs
 
 install:
-	mkdir -p $(INSTALL_DIR)
-	mkdir -p $(INSTALL_DIR)/bin
-	mkdir -p $(INSTALL_DIR)/lib
-	mkdir -p $(INSTALL_DIR)/include
-	cp hl $(INSTALL_DIR)/bin
-	cp libhl.${LIBEXT} $(INSTALL_DIR)/lib
-	cp *.hdll $(INSTALL_DIR)/lib
-	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_DIR)/include
+	mkdir -p $(INSTALL_BIN_DIR)
+	cp hl $(INSTALL_BIN_DIR)
+	mkdir -p $(INSTALL_LIB_DIR)
+	cp *.hdll $(INSTALL_LIB_DIR)
+	cp libhl.${LIBEXT} $(INSTALL_LIB_DIR)
+	mkdir -p $(INSTALL_INCLUDE_DIR)
+	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
 
 uninstall:
-	rm -f $(INSTALL_DIR)/bin/hl $(INSTALL_DIR)/lib/libhl.${LIBEXT} $(INSTALL_DIR)/lib/*.hdll
-	rm -f $(INSTALL_DIR)/include/hl.h $(INSTALL_DIR)/include/hlc.h $(INSTALL_DIR)/include/hlc_main.c
+	rm -f $(INSTALL_BIN_DIR)/hl $(INSTALL_LIB_DIR)/libhl.${LIBEXT} $(INSTALL_LIB_DIR)/*.hdll
+	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
 
 libs: $(LIBS)
 
