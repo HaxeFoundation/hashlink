@@ -31,7 +31,7 @@ Once dependencies are installed you can simply call:
 
 To be able to use hashlink binary with the debugger you can then call:
 
-`make codesign_osx`
+`sudo make codesign_osx`
 
 To install hashlink binaries on your system you can then call:
 
