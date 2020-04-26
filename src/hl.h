@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x010B00
+#define HL_VERSION	0x010C00
 
 #if defined(_WIN32)
 #	define HL_WIN
@@ -285,6 +285,11 @@ C_FUNCTION_END
 			    ".long 0b;" \
 			    ".popsection")
 #	endif
+#elif defined(HL_MAC)
+#include <signal.h>
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			raise(SIGTRAP);//__builtin_trap();
 #else
 #	define hl_debug_break()
 #endif

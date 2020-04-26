@@ -96,7 +96,7 @@ jobs:
         - task: PublishPipelineArtifact@1
           inputs:
             artifactName: ${{ parameters.name }}Binaries
-            targetPath: bin/hashlink-1.11.0-Linux.tar.gz
+            targetPath: bin/hashlink-1.12.0-Linux.tar.gz
       - ${{ if eq(parameters.buildSystem, 'make') }}:
         - script: make
           displayName: Build

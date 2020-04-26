@@ -6,7 +6,7 @@ INSTALL_DIR ?= $(PREFIX)
 
 LIBS=fmt sdl ssl openal ui uv mysql
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 LIBFLAGS =
 HLFLAGS = -ldl
@@ -76,6 +76,10 @@ LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 RELEASE_NAME = osx
+
+# Mac native debug
+HL_DEBUG = include/mdbg/mdbg.o include/mdbg/mach_excServer.o include/mdbg/mach_excUser.o
+LIB += ${HL_DEBUG}
 
 else
 
@@ -207,7 +211,7 @@ release_osx:
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
