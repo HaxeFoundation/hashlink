@@ -207,9 +207,17 @@ HL_API hl_thread_info *hl_get_thread() {
 	return current_thread;
 }
 
-static void gc_save_context(hl_thread_info *t ) {
+static void gc_save_context(hl_thread_info *t, void *prev_stack ) {
+	void *stack_cur = &t;
 	setjmp(t->gc_regs);
-	t->stack_cur = &t;
+	// some compilers (such as clang) might push/pop some callee registers in call
+	// to gc_save_context (or before) which might hold a gc value !
+	// let's capture them immediately in extra per-thread data
+	t->stack_cur = &prev_stack;
+	int size = (int)((char*)prev_stack - (char*)stack_cur) / sizeof(void*);
+	if( size > HL_MAX_EXTRA_STACK ) hl_fatal("GC_SAVE_CONTEXT");
+	t->extra_stack_size = size;
+	memcpy(t->extra_stack_data, prev_stack, size*sizeof(void*));
 }
 
 #ifndef HL_THREADS
@@ -222,7 +230,7 @@ static void gc_global_lock( bool lock ) {
 	if( lock ) {
 		if( !t )
 			hl_fatal("Can't lock GC in unregistered thread");
-		if( mt ) gc_save_context(t);
+		if( mt ) gc_save_context(t,&lock);
 		t->gc_blocking++;
 		if( mt ) hl_mutex_acquire(gc_threads.global_lock);
 	} else {
@@ -328,7 +336,7 @@ static void gc_stop_world( bool b ) {
 		gc_threads.stopping_world = false;
 	}
 #	else
-	if( b ) gc_save_context(current_thread);
+	if( b ) gc_save_context(current_thread,&b);
 #	endif
 }
 
@@ -676,6 +684,7 @@ static void gc_mark() {
 		cur_mark_stack = mark_stack;
 		gc_mark_stack(t->stack_cur,t->stack_top);
 		gc_mark_stack(&t->gc_regs,(void**)&t->gc_regs + (sizeof(jmp_buf) / sizeof(void*) - 1));
+		gc_mark_stack(&t->extra_stack_data,(void**)&t->extra_stack_data + t->extra_stack_size);
 		mark_stack = cur_mark_stack;
 	}
 
@@ -773,7 +782,7 @@ HL_API void hl_blocking( bool b ) {
 	if( b ) {
 #		ifdef HL_THREADS
 		if( t->gc_blocking == 0 )
-			gc_save_context(t);
+			gc_save_context(t,&b);
 #		endif
 		t->gc_blocking++;
 	} else if( t->gc_blocking == 0 )

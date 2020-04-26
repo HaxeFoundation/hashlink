@@ -19,6 +19,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#if defined(__GNUC__) && !defined(__APPLE__)
+#	define _FILE_OFFSET_BITS 64
+#endif
+
 #include <hl.h>
 #include <stdio.h>
 #ifdef HL_CONSOLE
@@ -149,7 +153,25 @@ HL_PRIM bool hl_file_seek( hl_fdesc *f, int pos, int kind ) {
 
 HL_PRIM int hl_file_tell( hl_fdesc *f ) {
 	if( !f ) return -1;
-	return ftell(f->f);
+	return (int)ftell(f->f);
+}
+
+HL_PRIM bool hl_file_seek2( hl_fdesc *f, double pos, int kind ) {
+	if( !f ) return false;
+#	ifdef HL_WIN
+	return _fseeki64(f->f,(__int64)pos,kind) == 0;
+#	else
+	return fseek(f->f,(int64)pos,kind) == 0;
+#	endif
+}
+
+HL_PRIM double hl_file_tell2( hl_fdesc *f ) {
+	if( !f ) return -1;
+#	ifdef HL_WIN
+	return (double)_ftelli64(f->f);
+#	else
+	return (double)ftell(f->f);
+#	endif
 }
 
 HL_PRIM bool hl_file_eof( hl_fdesc *f ) {
@@ -224,6 +246,8 @@ DEFINE_PRIM(_BOOL, file_write_char, _FILE _I32);
 DEFINE_PRIM(_I32, file_read_char, _FILE);
 DEFINE_PRIM(_BOOL, file_seek, _FILE _I32 _I32);
 DEFINE_PRIM(_I32, file_tell, _FILE);
+DEFINE_PRIM(_BOOL, file_seek2, _FILE _F64 _I32);
+DEFINE_PRIM(_F64, file_tell2, _FILE);
 DEFINE_PRIM(_BOOL, file_eof, _FILE);
 DEFINE_PRIM(_BOOL, file_flush, _FILE);
 DEFINE_PRIM(_FILE, file_stdin, _NO_ARG);
