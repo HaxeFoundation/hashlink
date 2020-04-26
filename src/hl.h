@@ -852,6 +852,8 @@ struct _hl_trap_ctx {
 #define HL_TRACK_DYNCALL	8
 #define HL_TRACK_MASK		(HL_TRACK_ALLOC | HL_TRACK_CAST | HL_TRACK_DYNFIELD | HL_TRACK_DYNCALL)
 
+#define HL_MAX_EXTRA_STACK 64
+
 typedef struct {
 	int thread_id;
 	// gc vars
@@ -868,6 +870,8 @@ typedef struct {
 	// extra
 	jmp_buf gc_regs;
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
+	void *extra_stack_data[HL_MAX_EXTRA_STACK];
+	int extra_stack_size;
 } hl_thread_info;
 
 HL_API hl_thread_info *hl_get_thread();
