@@ -7,6 +7,7 @@ INSTALL_DIR ?= $(PREFIX)
 LIBS=fmt sdl ssl openal ui uv mysql
 
 #CFLAGS = -D GC_ENABLE_DEBUG -Wall -O0 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS -D HL_NO_THREADS
+#CFLAGS = -Wall -O0 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS -D HL_NO_THREADS
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS -D HL_NO_THREADS
 LFLAGS = -L. -lhl
 LIBFLAGS =

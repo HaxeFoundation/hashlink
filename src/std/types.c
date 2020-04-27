@@ -237,7 +237,7 @@ typedef struct tlist {
 	struct tlist *next;
 } tlist;
 
-static void hl_type_str_rec( hl_buffer *b, hl_type *t, tlist *parents ) {
+/*static*/ void hl_type_str_rec( hl_buffer *b, hl_type *t, tlist *parents ) {
 	const uchar *c = TSTR[t->kind];
 	tlist *l, cur;
 	int i;

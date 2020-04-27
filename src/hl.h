@@ -688,9 +688,13 @@ HL_API void hl_tls_free( hl_tls *l );
 
 // ----------------------- GC ALLOC -----------------------------------------------
 
-#define GC_ALLOC_DYNAMIC 1
-#define GC_ALLOC_NOPTR 2
-#define GC_ALLOC_RAW 4
+#define GC_ALLOC_FLAG_RAW 1
+#define GC_ALLOC_FLAG_NOPTR 2
+
+#define GC_ALLOC_DYNAMIC 0
+#define GC_ALLOC_NOPTR (GC_ALLOC_FLAG_NOPTR)
+#define GC_ALLOC_RAW (GC_ALLOC_FLAG_RAW)
+#define GC_ALLOC_FINALIZER (GC_ALLOC_FLAG_NOPTR | GC_ALLOC_FLAG_RAW)
 
 HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
 HL_API void hl_add_root( void **ptr );
@@ -706,10 +710,9 @@ HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
 
 #define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(&hlt_bytes, size, GC_ALLOC_NOPTR)
 #define hl_gc_alloc(t, size)			hl_gc_alloc_gen(t, size, GC_ALLOC_DYNAMIC)
-#define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(&hlt_abstract, size, 0)
-// TODO: MEM_KIND_RAW)
-#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract, size, 0)
-// TODO: MEM_KIND_FINALIZER)
+#define hl_gc_alloc_raw(size)		\
+	(/*printf("allow_raw: %s %d\n", __FILE__, __LINE__), */hl_gc_alloc_gen(&hlt_abstract, size, GC_ALLOC_RAW))
+#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract, size, GC_ALLOC_FINALIZER)
 
 // ----------------------- INTERNAL ALLOC -----------------------------------------
 
@@ -856,6 +859,8 @@ typedef struct gc_block_dummy_s gc_block_dummy_t;
 typedef struct gc_block_header_s gc_block_header_t;
 
 typedef struct {
+	jmp_buf gc_regs;
+
 	int thread_id;
 
 	// gc vars
@@ -876,8 +881,8 @@ typedef struct {
 	vdynamic *exc_value;
 	int flags;
 	int exc_stack_count;
+
 	// extra
-	jmp_buf gc_regs;
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
 } hl_thread_info;
 

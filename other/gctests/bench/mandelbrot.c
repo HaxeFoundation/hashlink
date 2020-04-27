@@ -27,6 +27,11 @@ static double hires_timestamp(void) {
 
 #endif
 
+static hl_module_context mctx = {
+	.functions_ptrs = NULL,
+	.functions_types = NULL
+};
+
 TEST_TYPE(rgb, 3, {0}, {
 	int r;
 	int g;
@@ -71,6 +76,8 @@ static hlt_complex_t *complexSquare(hlt_complex_t *val) {
 }
 
 BEGIN_BENCH_CASE(mandelbrot) {
+	hl_alloc_init(&mctx.alloc);
+
 	varray *palette = hl_alloc_array(&hlt_rgb, MB_MAX_ITERATIONS + 1);
 	hl_add_root((void *)&palette);
 	for (int i = 0; i < MB_MAX_ITERATIONS + 1; i++) {

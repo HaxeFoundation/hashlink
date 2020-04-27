@@ -32,7 +32,7 @@
 		.nmethods = 0, .nbindings = 0, .hasPtr = true, .methods = NULL, \
 		.fields_indexes = NULL, .bindings = NULL, .parent = NULL, .toStringFun = NULL, \
 		.compareFun = NULL, .castFun = NULL, .getFieldFun = NULL, .nlookup = 0, .lookup = NULL }; \
-	hl_type_obj hlto_ ## name = { .rt = &hltr_ ## name }; \
+	hl_type_obj hlto_ ## name = { .m = &mctx, .rt = &hltr_ ## name }; \
 	unsigned int hltm_ ## name[(words + 31) / 32] = bits; \
 	hl_type hlt_ ## name = { HOBJ, .obj = &hlto_ ## name, .mark_bits = hltm_ ## name }; \
 	typedef struct { \

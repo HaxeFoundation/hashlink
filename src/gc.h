@@ -69,6 +69,8 @@ typedef enum {
 	GC_BLOCK_RECYCLED,
 	// TODO: zombie blocks
 	GC_BLOCK_ZOMBIE,
+	// just popped from OS page: no pointers
+	GC_BLOCK_BRAND_NEW,
 	_force_int = 0x7FFFFFFF
 } gc_block_type_t;
 
@@ -82,17 +84,23 @@ typedef union {
 		// uint8_t huge_sized : 1;
 		// when set, object cannot be moved
 		// uint8_t pinned : 1;
+		/*
 		// whether all words of the object are potentially pointers
 		// (set for dynamics and pointer arrays)
 		uint8_t dynamic_mark : 1;
+		*/
+		// TODO:
+		uint8_t raw : 1;
 		// when set, no pointers are traced in the object
 		uint8_t no_ptr : 1;
-		// number of words (sizeof(void *))
+		// number of words (sizeof(void *)) - 1
+		// (i.e. words == 0 means 8 bytes, words == 0xFF means 128 bytes)
 		uint8_t words : 4;
 	};
 	uint8_t flags;
 } gc_metadata_t;
 
+/*
 typedef union {
 	struct {
 		gc_metadata_t base;
@@ -100,6 +108,7 @@ typedef union {
 	};
 	uint16_t flags;
 } gc_metadata_ext_t;
+*/
 
 typedef struct gc_block_header_s {
 	gc_page_header_t page_header; // only set in the first block of page
@@ -111,7 +120,9 @@ typedef struct gc_block_header_s {
 	unsigned char _pad[4];
 	unsigned char line_marks[GC_LINES_PER_BLOCK];
 	gc_metadata_t metadata[GC_LINES_PER_BLOCK * 16];
-	unsigned char _pad2[512];
+	char *debug_objects;
+	unsigned char line_finalize[GC_LINES_PER_BLOCK];
+	unsigned char _pad2[56];
 	gc_line_t lines[GC_LINES_PER_BLOCK];
 } gc_block_header_t;
 
@@ -164,11 +175,17 @@ typedef struct {
 	unsigned long live_blocks;
 	unsigned long total_memory;
 	unsigned long cycles;
+	unsigned long live_memory;
+	unsigned long live_memory_normal;
 	int total_pages;
+	int total_pages_normal;
 } gc_stats_t;
 
 typedef struct {
+	unsigned long min_heap_pages;
 	unsigned long memory_limit;
+	float heap_growth;
+	float min_grow_usage;
 	bool debug_fatal;
 	bool debug_os;
 	bool debug_page;
@@ -187,6 +204,8 @@ GC_STATIC gc_page_header_t *gc_alloc_page_memory(void);
 // frees a GC page
 GC_STATIC void gc_free_page_memory(gc_page_header_t *header);
 
+GC_STATIC void gc_grow_heap(int count);
+	
 // gets the `block`th block in `page`
 #define GC_PAGE_BLOCK(page, block) ((gc_block_header_t *)((char *)(page) + (block) * GC_BLOCK_SIZE))
 // gets the page to which `block` belongs
@@ -199,6 +218,7 @@ GC_STATIC void gc_free_page_memory(gc_page_header_t *header);
 #define GC_LINE_ID(ptr) ((int)((int_val)(ptr) - (int_val)GC_LINE_BLOCK(ptr)) / GC_LINE_SIZE - 64)
 
 #define GC_METADATA(obj) (&(GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024]))
+#define GC_METADATA_EXT(obj) *(unsigned char *)(&GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024 + 1])
 
 // roots -----------------------------------------------------------
 
@@ -234,9 +254,9 @@ GC_STATIC gc_block_header_t *gc_get_block(void *); // NULL if not a GC pointer
 // GC debug
 
 #if GC_ENABLE_DEBUG
-#	define GC_DEBUG(stream, f, ...) do { if (gc_config.debug_ ## stream) printf("[" #stream "] " f "\n", ##__VA_ARGS__); } while (0)
-#	define GC_DEBUG_DUMP_S(id) do { if (gc_config.debug_dump) { fwrite((id), 1, strlen(id) + 1, gc_config.dump_file); fflush(gc_config.dump_file); } } while (0)
-#	define GC_DEBUG_DUMP_R(arg) do { if (gc_config.debug_dump) { fwrite(&(arg), 1, sizeof(arg), gc_config.dump_file); fflush(gc_config.dump_file); } } while (0)
+#	define GC_DEBUG(stream, f, ...) do { if (gc_config->debug_ ## stream) printf("[" #stream "] " f "\n", ##__VA_ARGS__); } while (0)
+#	define GC_DEBUG_DUMP_S(id) do { if (gc_config->debug_dump) { fwrite((id), 1, strlen(id) + 1, gc_config->dump_file); fflush(gc_config->dump_file); } } while (0)
+#	define GC_DEBUG_DUMP_R(arg) do { if (gc_config->debug_dump) { fwrite(&(arg), 1, sizeof(arg), gc_config->dump_file); fflush(gc_config->dump_file); } } while (0)
 #	define GC_DEBUG_DUMP0(id) do { GC_DEBUG_DUMP_S(id); int s = 0; GC_DEBUG_DUMP_R(s); } while (0)
 #	define GC_DEBUG_DUMP1(id, arg1) do { GC_DEBUG_DUMP_S(id); int s = sizeof(arg1); GC_DEBUG_DUMP_R(s); GC_DEBUG_DUMP_R(arg1); } while (0)
 #	define GC_DEBUG_DUMP2(id, arg1, arg2) do { GC_DEBUG_DUMP_S(id); int s = sizeof(arg1) + sizeof(arg2); GC_DEBUG_DUMP_R(s); GC_DEBUG_DUMP_R(arg1); GC_DEBUG_DUMP_R(arg2); } while (0)
@@ -250,10 +270,30 @@ GC_STATIC gc_block_header_t *gc_get_block(void *); // NULL if not a GC pointer
 #	define GC_DEBUG_DUMP2(...)
 #	define GC_DEBUG_DUMP3(...)
 #endif
-#define GC_FATAL(msg) do { puts(msg); __builtin_trap(); } while (0)
+#define GC_FATAL(msg) do { puts(msg); gc_debug_interactive(); __builtin_trap(); } while (0)
+#define GC_ASSERT(cond) do { \
+		if (!(cond)) { \
+			printf("\x1B[38;5;160mGC assertion failed (line %d): " #cond "\n\x1B[0m", __LINE__); \
+			GC_FATAL("!"); \
+		} \
+	} while (0)
+#define GC_ASSERT_M(cond, msg, ...) do { \
+		if (!(cond)) { \
+			printf("\x1B[38;5;160mGC assertion failed (line %d): " #cond "\n\x1B[0m", __LINE__); \
+			printf("info: " msg "\n", ##__VA_ARGS__); \
+			GC_FATAL("!"); \
+		} \
+	} while (0)
 
-/*
 GC_STATIC void gc_debug_block(gc_block_header_t *block);
+GC_STATIC void gc_debug_obj(void **p);
+GC_STATIC void gc_debug_obj_id(void **p);
+GC_STATIC void gc_debug_type(hl_type *t);
+GC_STATIC void gc_debug_interactive(void);
+GC_STATIC void gc_debug_verify_pool(const char *);
+GC_STATIC void *gc_debug_track_id(int, int);
+//GC_STATIC void gc_debug_enable(bool);
+/*
 GC_STATIC void gc_debug_general(void);
 GC_STATIC void gc_dump(const char *);
 */
