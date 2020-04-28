@@ -688,13 +688,13 @@ HL_API void hl_tls_free( hl_tls *l );
 
 // ----------------------- GC ALLOC -----------------------------------------------
 
-#define GC_ALLOC_FLAG_RAW 1
-#define GC_ALLOC_FLAG_NOPTR 2
-
-#define GC_ALLOC_DYNAMIC 0
-#define GC_ALLOC_NOPTR (GC_ALLOC_FLAG_NOPTR)
-#define GC_ALLOC_RAW (GC_ALLOC_FLAG_RAW)
-#define GC_ALLOC_FINALIZER (GC_ALLOC_FLAG_NOPTR | GC_ALLOC_FLAG_RAW)
+#define MEM_HAS_PTR	(!((kind)&2))
+#define MEM_KIND_DYNAMIC	0
+#define MEM_KIND_RAW		1
+#define MEM_KIND_NOPTR		2
+#define MEM_KIND_FINALIZER	3
+#define MEM_ALIGN_DOUBLE	128
+#define MEM_ZERO			256
 
 HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
 HL_API void hl_add_root( void **ptr );
@@ -708,11 +708,10 @@ HL_API bool hl_is_blocking( void );
 typedef void (*hl_types_dump)( void (*)( void *, int) );
 HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
 
-#define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(&hlt_bytes, size, GC_ALLOC_NOPTR)
-#define hl_gc_alloc(t, size)			hl_gc_alloc_gen(t, size, GC_ALLOC_DYNAMIC)
-#define hl_gc_alloc_raw(size)		\
-	(/*printf("allow_raw: %s %d\n", __FILE__, __LINE__), */hl_gc_alloc_gen(&hlt_abstract, size, GC_ALLOC_RAW))
-#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract, size, GC_ALLOC_FINALIZER)
+#define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(&hlt_bytes, size, MEM_KIND_NOPTR)
+#define hl_gc_alloc(t, size)			hl_gc_alloc_gen(t, size, MEM_KIND_DYNAMIC)
+#define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(&hlt_abstract, size, MEM_KIND_RAW)
+#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract, size, MEM_KIND_FINALIZER)
 
 // ----------------------- INTERNAL ALLOC -----------------------------------------
 

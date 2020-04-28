@@ -557,10 +557,10 @@ GC_STATIC gc_object_t *gc_alloc_bump(hl_type *t, int size, int words, int flags)
 	meta->marked = !gc_mark_polarity;
 	int sub_words = words - 1;
 	meta->words = sub_words & 15;
-	if (flags & GC_ALLOC_FLAG_RAW) {
+	if (flags & MEM_KIND_RAW) {
 		meta->raw = 1;
 	}
-	if (flags & GC_ALLOC_FLAG_NOPTR) {
+	if (flags & MEM_KIND_NOPTR) {
 		meta->no_ptr = 1;
 	}
 	// int line_id = GC_LINE_ID(ret);
@@ -577,7 +577,7 @@ GC_STATIC gc_object_t *gc_alloc_bump(hl_type *t, int size, int words, int flags)
 		// GC_DEBUG("allocated medium %p in block %p (%d bytes, %d lines, %d words)", ret, block, size, ret->line_span, words);
 	}
 
-	if (flags == GC_ALLOC_FINALIZER) {
+	if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
 		// TODO: also in a finaliser-specific alloc function (after alloc_gen call)
 		block->line_finalize[GC_LINE_ID(ret)] = 1;
 	}
@@ -660,7 +660,7 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 	// align to words
 	int words = (size + (sizeof(void *) - 1)) / sizeof(void *);
 
-	if (flags == GC_ALLOC_FINALIZER) {
+	if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
 		// TODO: separate function to do this before alloc_gen
 		// (to reduce hot path for non-finaliser objects)
 
@@ -721,7 +721,7 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 		return gc_alloc_bump(t, size, words, flags);
 	} else {
 		// TODO: separate path for huge objects
-if (flags == GC_ALLOC_FINALIZER) {
+if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
 	GC_FATAL("cannot alloc huge finalizer");
 }
 		gc_object_t *obj = gc_pop_huge(size);
@@ -729,10 +729,10 @@ if (flags == GC_ALLOC_FINALIZER) {
 		gc_metadata_t *meta = GC_METADATA(obj);
 		meta->flags = 0;
 		meta->marked = !gc_mark_polarity;
-		if (flags & GC_ALLOC_FLAG_RAW) {
+		if (flags & MEM_KIND_RAW) {
 			meta->raw = 1;
 		}
-		if (flags & GC_ALLOC_FLAG_NOPTR) {
+		if (flags & MEM_KIND_NOPTR) {
 			meta->no_ptr = 1;
 		}
 		gc_stats->live_memory += size;
@@ -1159,7 +1159,7 @@ HL_API bool hl_is_gc_ptr(void *ptr) {
 // HL_API varray *hl_alloc_array( hl_type *t, int size ) { return NULL; }
 
 HL_API vdynamic *hl_alloc_dynamic( hl_type *t ) {
-	return (vdynamic*)hl_gc_alloc_gen(t, sizeof(vdynamic), hl_is_ptr(t) ? GC_ALLOC_DYNAMIC : GC_ALLOC_NOPTR);
+	return (vdynamic*)hl_gc_alloc_gen(t, sizeof(vdynamic), hl_is_ptr(t) ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR);
 }
 
 static const vdynamic vdyn_true = { &hlt_bool, {true} };
@@ -1178,9 +1178,9 @@ HL_API vdynamic *hl_alloc_obj( hl_type *t ) {
 	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
 	if( t->kind == HSTRUCT ) {
-		o = (vobj*)hl_gc_alloc_gen(NULL, size, rt->hasPtr ? GC_ALLOC_RAW : GC_ALLOC_NOPTR);
+		o = (vobj*)hl_gc_alloc_gen(NULL, size, rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR);
 	} else {
-		o = (vobj*)hl_gc_alloc_gen(t, size, rt->hasPtr ? GC_ALLOC_DYNAMIC : GC_ALLOC_NOPTR);
+		o = (vobj*)hl_gc_alloc_gen(t, size, rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR);
 	}
 	for(i=0;i<rt->nbindings;i++) {
 		hl_runtime_binding *b = rt->bindings + i;
@@ -1205,7 +1205,7 @@ HL_API vvirtual *hl_alloc_virtual( hl_type *t ) {
 }
 
 HL_API vdynobj *hl_alloc_dynobj(void) {
-	return (vdynobj*)hl_gc_alloc_gen(&hlt_dynobj,sizeof(vdynobj), GC_ALLOC_DYNAMIC);
+	return (vdynobj*)hl_gc_alloc_gen(&hlt_dynobj,sizeof(vdynobj), MEM_KIND_DYNAMIC);
 }
 
 // HL_API vbyte *hl_alloc_bytes( int size ) { return NULL; }
