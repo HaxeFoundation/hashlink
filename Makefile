@@ -213,7 +213,7 @@ codesign_osx:
 	echo "[req]\ndistinguished_name=codesign_dn\n[codesign_dn]\ncommonName=hl-cert\n[v3_req]\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning" > openssl.cnf
 	openssl req -x509 -newkey rsa:4096 -keyout key.pem -nodes -days 365 -subj '/CN=hl-cert' -outform der -out cert.cer -extensions v3_req -config openssl.cnf
 	sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain cert.cer
-	sudo security import key.pem -k /Library/Keychains/System.keychain
+	sudo security import key.pem -k /Library/Keychains/System.keychain -A
 	codesign --entitlements other/osx/entitlements.xml -fs hl-cert hl
 	rm key.pem cert.cer openssl.cnf
 

@@ -29,8 +29,6 @@ jobs:
           displayName: CMake
         - script: make
           displayName: Build
-        - script: sudo make codesign_osx
-          displayName: Codesign
         - script: |
             set -ex
             otool -L ./bin/hl
