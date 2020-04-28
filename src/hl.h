@@ -688,7 +688,7 @@ HL_API void hl_tls_free( hl_tls *l );
 
 // ----------------------- GC ALLOC -----------------------------------------------
 
-#define MEM_HAS_PTR	(!((kind)&2))
+#define MEM_HAS_PTR(kind)	(!((kind)&2))
 #define MEM_KIND_DYNAMIC	0
 #define MEM_KIND_RAW		1
 #define MEM_KIND_NOPTR		2
