@@ -57,16 +57,16 @@
 		GC_ASSERT_M((obj)->next != NULL, "%p", (obj)); \
 		GC_ASSERT_M((obj)->prev != NULL, "%p", (obj)); \
 		(obj)->next->prev = (obj)->prev; \
-		/* printf("%p->n := %p\n", (obj)->prev, (obj)->next); */ (obj)->prev->next = (obj)->next; \
-		/* printf("%p->n := NULL\n", (obj)->next); */ (obj)->next = NULL; \
+		(obj)->prev->next = (obj)->next; \
+		(obj)->next = NULL; \
 		(obj)->prev = NULL; \
 	} while (0)
 #define DLL_INSERT(obj, head) do { \
 		GC_ASSERT((obj) != NULL); \
 		GC_ASSERT((head) != NULL); \
-		/* printf("%p->n := %p\n", (obj), (head)->next); */ (obj)->next = (head)->next; \
+		(obj)->next = (head)->next; \
 		(obj)->prev = (head); \
-		/* printf("%p->n := %p\n", (head), (obj)); */ (head)->next = (obj); \
+		(head)->next = (obj); \
 		(obj)->next->prev = (obj); \
 	} while (0)
 
@@ -84,7 +84,6 @@ static int page_counter = 0;
 static int huge_counter = 0;
 static gc_page_header_t *tracked_page_addr[500] = {0};
 static gc_page_header_t *tracked_huge_addr[500] = {0};
-// static bool do_log = false;
 
 #define ID_TRACK(page_num, low) \
 	(gc_object_t *)((int_val)tracked_page_addr[page_num] | ((int_val)low & 0x3FFFFF))
@@ -162,8 +161,8 @@ GC_STATIC void gc_add_page(gc_page_header_t *header) {
 	if ((char *)header < (char *)gc_min_allocated) {
 		gc_min_allocated = (char *)header;
 	}
-	if ((char *)header + GC_PAGE_SIZE > (char *)gc_max_allocated) { // TODO: this over-estimates max alloc
-		gc_max_allocated = (char *)header + GC_PAGE_SIZE;
+	if ((char *)header + header->size > (char *)gc_max_allocated) {
+		gc_max_allocated = (char *)header + header->size;
 	}
 
 	gc_stats->total_pages++;
@@ -223,7 +222,6 @@ if (page_counter < 500)
 	gc_pool = &blocks[0];
 	gc_pool_count += GC_BLOCKS_PER_PAGE;
 	hl_mutex_release(gc_mutex_pool);
-//printf("PAGE %p\n", header);
 gc_debug_verify_pool("page");
 
 	GC_DEBUG_DUMP1("gc_alloc_page_normal.success", header);
@@ -232,7 +230,6 @@ gc_debug_verify_pool("page");
 
 // allocates a huge page (containing a single object)
 GC_STATIC gc_page_header_t *gc_alloc_page_huge(int size) {
-//printf("HUGE before\n");
 gc_debug_verify_pool("huge before");
 
 	gc_page_header_t *header = (gc_page_header_t *)gc_alloc_os_memory(sizeof(gc_page_header_t) + size);
@@ -250,7 +247,6 @@ gc_debug_verify_pool("huge before");
 if (huge_counter < 500)
 	tracked_huge_addr[huge_counter++] = header;
 
-//printf("HUGE %p\n", header);
 gc_debug_verify_pool("huge after");
 
 	GC_DEBUG_DUMP2("gc_alloc_page_huge.success", header, size);
@@ -456,9 +452,7 @@ gc_debug_verify_pool("pop before");
 	if (UNLIKELY(gc_pool_count == 0)) {
 		// if (gc_stats->total_memory * 1.2 >= gc_config->memory_limit) {
 		if (gc_stats->live_blocks > 0) {
-			GC_DEBUG(alloc, "using %lu / %lu bytes", gc_stats->total_memory, gc_config->memory_limit);
-			// GC_FATAL("OOM: memory limit hit");
-			GC_DEBUG(alloc, "memory limit hit, triggering major ...");
+			GC_DEBUG(alloc, "using %lu / %lu bytes, triggering major ...", gc_stats->total_memory, gc_config->memory_limit);
 			hl_gc_major();
 		}
 		if (gc_pool_count == 0 && gc_alloc_page_normal() == NULL) {
@@ -472,13 +466,6 @@ gc_debug_verify_pool("pop before");
 	page->free_blocks--;
 	SET_BIT1(page->block_bmp, GC_BLOCK_ID(block));
 	gc_pool_count--;
-/*printf("POP  pool count: %d block: %p page: %p sen: %p %p %p %p pool: %p\n",
-	gc_pool_count, block, page,
-	&current_thread->sentinels[0],
-	&current_thread->sentinels[1],
-	&current_thread->sentinels[2],
-	&current_thread->sentinels[3],
-	gc_pool); fflush(stdout);*/
 	hl_mutex_release(gc_mutex_pool);
 	block->kind = GC_BLOCK_BRAND_NEW;
 	block->owner_thread = hl_thread_id();
@@ -505,7 +492,6 @@ GC_STATIC void gc_push_block(gc_block_header_t *block) {
 	// TODO: manage disorder in GC pool (prefer address order)
 	SLL_PUSH(block, gc_pool);
 	gc_pool_count++;
-//printf("PUSH pool count: %d block: %p (%d) page: %p sen: %p pool: %p\n", gc_pool_count, block, block->kind, page, current_thread ? current_thread->sentinels : NULL, gc_pool); fflush(stdout);
 	gc_stats->live_blocks--;
 	hl_mutex_release(gc_mutex_pool);
 gc_debug_verify_pool("push");
@@ -543,8 +529,6 @@ GC_STATIC gc_object_t *gc_alloc_bump(hl_type *t, int size, int words, int flags)
 	GC_ASSERT(words > 0);
 	GC_ASSERT(size > 0);
 
-// printf("pre alloc type: %p size: %d words: %d flags: %d start: %p\n", t, size, words, flags, current_thread->lines_start);
-
 	gc_object_t *ret = (gc_object_t *)current_thread->lines_start;
 	gc_block_header_t *block = GC_LINE_BLOCK(ret);
 	gc_metadata_t *meta = GC_METADATA(ret);
@@ -552,6 +536,7 @@ GC_STATIC gc_object_t *gc_alloc_bump(hl_type *t, int size, int words, int flags)
 	// clear stale data
 	memset(ret, 0, sizeof(void *) * words);
 
+	// initialise type and metadata
 	ret->t = t;
 	meta->flags = 0;
 	meta->marked = !gc_mark_polarity;
@@ -563,24 +548,17 @@ GC_STATIC gc_object_t *gc_alloc_bump(hl_type *t, int size, int words, int flags)
 	if (flags & MEM_KIND_NOPTR) {
 		meta->no_ptr = 1;
 	}
-	// int line_id = GC_LINE_ID(ret);
-	// gc_block_header_t *block = GC_LINE_BLOCK(ret);
-	// GC_DEBUG("pre-allocation: %p - %p", current_thread->lines_start, current_thread->lines_limit);
-	current_thread->lines_start = (void *)(((char *)current_thread->lines_start) + size);
-	if (LIKELY(size <= GC_LINE_SIZE)) {
-		// GC_DEBUG("allocated small %p in block %p (%d bytes, %d words)", ret, block, size, words);
-	} else {
+	if (UNLIKELY(size > GC_LINE_SIZE)) {
 		meta->medium_sized = 1;
 		GC_METADATA_EXT(ret) = sub_words >> 4;
-		// int last_id = GC_LINE_ID((void *)ret + size);
-		// ret->line_span = (last_id - line_id) + 1;
-		// GC_DEBUG("allocated medium %p in block %p (%d bytes, %d lines, %d words)", ret, block, size, ret->line_span, words);
 	}
-
 	if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
 		// TODO: also in a finaliser-specific alloc function (after alloc_gen call)
 		block->line_finalize[GC_LINE_ID(ret)] = 1;
 	}
+
+	// bump cursor
+	current_thread->lines_start = (void *)(((char *)current_thread->lines_start) + size);
 
 	GC_DEBUG_DUMP3("gc_alloc_bump.success", ret, size, flags);
 	gc_stats->live_memory += size;
@@ -594,18 +572,6 @@ GC_STATIC gc_object_t *gc_alloc_bump(hl_type *t, int size, int words, int flags)
 //		GC_FATAL("overriding existing object");
 //	}
 	SET_BIT1(block->debug_objects, obj_id);
-
-//	if (do_log)
-//		printf("postalloc: %p (%d bytes, %d flags)\n", ret, size, flags);
-
-//gc_page_header_t *page = GC_BLOCK_PAGE(block);
-//if (ret == ID_TRACK(9, 0x2b5c80)) {
-//if (ret >= ID_TRACK(12, 0x188900) && ret < ID_TRACK(12, 0x188980)) {
-//	gc_debug_block(block);
-//	printf("tracked alloc: %p (%d bytes, %d flags)\n", ret, size, flags);
-//	gc_debug_obj(ret);
-// gc_debug_interactive();
-//}
 
 	return ret;
 }
@@ -721,9 +687,10 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 		return gc_alloc_bump(t, size, words, flags);
 	} else {
 		// TODO: separate path for huge objects
-if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
-	GC_FATAL("cannot alloc huge finalizer");
-}
+		if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
+			// TODO: huge finalizer objects
+			GC_FATAL("cannot alloc huge finalizer");
+		}
 		gc_object_t *obj = gc_pop_huge(size);
 		obj->t = t;
 		gc_metadata_t *meta = GC_METADATA(obj);
@@ -752,8 +719,8 @@ GC_STATIC void **get_stack_bottom(void) {
 // spills registers and triggers a major GC collection
 HL_API void hl_gc_major(void) {
 	puts("major cycle...");
+	// TODO: figure this out for the MT case (see master branch)
 	//gc_stop_world(true);
-	//*
 	jmp_buf env;
 	setjmp(env);
 #pragma clang diagnostic push
@@ -761,16 +728,6 @@ HL_API void hl_gc_major(void) {
 	void *(*volatile f)(void) = get_stack_bottom;
 #pragma clang diagnostic pop
 	current_thread->stack_cur = f();
-	/*
-	printf("SPILLED REGISTERS:\n");
-	void **a = &env;
-	void **b = (void **)((char *)a + sizeof(jmp_buf));
-	for (; a < b; a++) {
-		printf("reg: %p\n", *a);
-	}
-	printf("marking thread from %p to %p\n", current_thread->stack_cur, current_thread->stack_top);
-	*/
-	//*/
 	GC_DEBUG_DUMP0("hl_gc_major.entry");
 	gc_mark();
 	gc_sweep();
@@ -816,7 +773,6 @@ GC_STATIC void gc_push(void *p, void *ref) {
 			gc_mark_total++;
 			gc_mark_stack_active->data[gc_mark_stack_active->pos].object = p;
 			gc_mark_stack_active->data[gc_mark_stack_active->pos++].reference = ref;
-//gc_page_header_t *page = GC_BLOCK_PAGE(p);
 			GC_DEBUG(mark, "pushed %p -> %p to %p", ref, p, gc_mark_stack_active->data);
 			GC_DEBUG_DUMP2("gc_push.success", p, ref);
 		}
@@ -843,8 +799,6 @@ GC_STATIC gc_object_t *gc_pop(void) {
 }
 
 HL_PRIM vbyte* hl_type_name( hl_type *t );
-
-static unsigned long debug_scan_ctr = 0;
 
 // marks live objects in the heap
 GC_STATIC void gc_mark(void) {
@@ -891,20 +845,9 @@ GC_STATIC void gc_mark(void) {
 		void **cur = t->stack_cur;
 		void **top = t->stack_top;
 		while (cur < top) {
-//printf("stack: %p: %p\n", cur, *cur);
-			if (*cur == ID_TRACK(9, 0x34ab10)) {
-				gc_debug_obj_id(*cur);
-				printf("tracked push %p -> %p\n", cur, *cur);
-			}
 			gc_push(*cur, NULL);
 			cur++;
-		}/*
-		cur = (void **)(&(t->gc_regs));
-		top = (void **)(((char *)&(t->gc_regs)) + sizeof(jmp_buf));
-		while (cur < top) {
-			printf("reg:   %p\n", *cur);
-			gc_push(*cur++, NULL);
-		}*/
+		}
 	}
 
 	GC_DEBUG_DUMP0("gc_mark.propagate");
@@ -913,37 +856,22 @@ GC_STATIC void gc_mark(void) {
 	while (gc_mark_total-- > 0) {
 		gc_stats->live_objects++;
 		gc_object_t *p = gc_pop();
-//if (debug_scan_ctr == 84)
-//	gc_debug_obj(p);
-//printf("live object: %p %lu\n", p, debug_scan_ctr++);
-		if (p == NULL)
-			GC_FATAL("popped null");
 		gc_metadata_t *meta = GC_METADATA(p);
 		gc_block_header_t *block = GC_LINE_BLOCK(p);
-
-//if (p == ID_TRACK(9, 0x1af08))
-//	puts("popped lock");
 
 		// mark line(s)
 		int line_id = GC_LINE_ID_IN(p, block);
 		int obj_id = ((int_val)p - (int_val)&block->lines[0]) / 8;
 		int words = meta->words;
 
-		/*
-		if (words == 0) {
-			if (GC_BLOCK_PAGE(p)->kind != GC_PAGE_HUGE && !GET_BIT(block->debug_objects, obj_id)) {
-				puts("non-ex!");
-			}
-			gc_debug_obj(p);
-			GC_FATAL("popped 0-word object");
-		}
-		*/
-
 		if (GC_BLOCK_PAGE(p)->kind != GC_PAGE_HUGE && !GET_BIT(block->debug_objects, obj_id)) {
 //gc_debug_block(block);
 //		printf("popped: %p\n", p); fflush(stdout);
 //gc_debug_obj(p);
 //GC_FATAL("not an existing object!");
+			// TODO: these objects probably come from a gc_major triggered from
+			// within gc_pop_block (or similar); in theory, interior pointers should
+			// not get here - then this check and debug_objects can be removed
 			printf("non-ex %p\n", p);
 			continue;
 		}
@@ -1027,10 +955,6 @@ GC_STATIC void gc_sweep(void) {
 		for (int block_id = 0; block_id < GC_BLOCKS_PER_PAGE; block_id++) {
 			if (GET_BIT(page->block_bmp, block_id)) {
 				gc_block_header_t *block = GC_PAGE_BLOCK(page, block_id);
-				//if (block == GC_LINE_BLOCK(ID_TRACK(12, 0x188900))) {
-				//	puts("DEBUG BLOCK");
-				//	gc_debug_obj(ID_TRACK(12, 0x188900));
-				//}
 				int lines_used = (block->line_marks[0] ? 1 : 0);
 				for (int line_id = 0; line_id < GC_LINES_PER_BLOCK; line_id++) {
 					gc_object_t *p = (gc_object_t *)&block->lines[line_id];
@@ -1038,31 +962,11 @@ GC_STATIC void gc_sweep(void) {
 					if (!block->line_marks[line_id] && block->line_finalize[line_id]) {
 						void **f = p;
 						void (*finalize)(void *) = *((void (**)(void *))p);
-/*if (page == tracked_page && ((int_val)p & 0x3FFFFF) == 0x2d2700) {
-	printf("before finalized!\n");
-	gc_debug_obj(p);
-}*/
-//if (p == ID_TRACK(9, 0x2b5c80)) {
-//	puts("DEBUG ABOUT TO FINALISE");
-//	gc_debug_obj(p);
-//	printf("finalising block: %p, line: %d, obj: %p (page: %p, %ld), f: %p ... "/*" (*: %p) ... "*/, block, line_id, p, page, (int_val)p & 0x3FFFFF, finalize); //, finalize != NULL ? *(void **)(*f) : NULL);
-//	fflush(stdout);
-////	gc_debug_interactive();
-//}
-/*if (*(void **)(*f) == (void *)0x0B) {
-	gc_debug_obj(&block->lines[line_id]);
-	GC_FATAL("here!");
-}
-fflush(stdout);*/
 						if (finalize != NULL) {
 							finalize((void *)&block->lines[line_id]);
 							*f = NULL;
 						}
 						block->line_finalize[line_id] = 0;
-//if (p == ID_TRACK(9, 0x2b5c80)) {
-//	puts("ok");
-//	fflush(stdout);
-//}
 					}
 					if (!block->line_marks[line_id] && block->debug_objects) {
 						for (int i = 0; i < 16; i++) {
@@ -1101,7 +1005,6 @@ fflush(stdout);*/
 		gc_metadata_t *meta = GC_METADATA(obj);
 		GC_DEBUG(sweep, "huge %p mark: %d %d", obj, meta->marked, gc_mark_polarity);
 		if (meta->marked != gc_mark_polarity) {
-			//gc_free_page_memory(page);
 			gc_push_huge(obj);
 		}
 	}
@@ -1151,8 +1054,6 @@ HL_API bool hl_is_gc_ptr(void *ptr) {
 	return (gc_get_block(ptr) != NULL);
 }
 
-// HL_API varray *hl_alloc_array( hl_type *t, int size ) { return NULL; }
-
 HL_API vdynamic *hl_alloc_dynamic( hl_type *t ) {
 	return (vdynamic*)hl_gc_alloc_gen(t, sizeof(vdynamic), hl_is_ptr(t) ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR);
 }
@@ -1184,8 +1085,6 @@ HL_API vdynamic *hl_alloc_obj( hl_type *t ) {
 	return (vdynamic*)o;
 }
 
-// HL_API venum *hl_alloc_enum( hl_type *t, int index ) { return NULL; }
-
 HL_API vvirtual *hl_alloc_virtual( hl_type *t ) {
 	vvirtual *v = (vvirtual*)hl_gc_alloc(t, t->virt->dataSize + sizeof(vvirtual) + sizeof(void*) * t->virt->nfields);
 	void **fields = (void**)(v + 1);
@@ -1203,7 +1102,10 @@ HL_API vdynobj *hl_alloc_dynobj(void) {
 	return (vdynobj*)hl_gc_alloc_gen(&hlt_dynobj,sizeof(vdynobj), MEM_KIND_DYNAMIC);
 }
 
-// HL_API vbyte *hl_alloc_bytes( int size ) { return NULL; }
+// alloc functions defined elsewhere:
+//   varray *hl_alloc_array(hl_type *t, int size);
+//   venum *hl_alloc_enum(hl_type *t, int index);
+//   vbyte *hl_alloc_bytes(int size);
 
 static hl_types_dump gc_types_dump = NULL;
 HL_API void hl_gc_set_dump_types( hl_types_dump tdump ) {
@@ -1320,6 +1222,8 @@ void hl_global_free() {
 	hl_cache_free();
 }
 
+#if GC_ENABLE_DEBUG
+
 void gc_debug_block(gc_block_header_t *block) {
 	static char *kind_names[] = {
 		"(not initialised)",
@@ -1334,7 +1238,6 @@ void gc_debug_block(gc_block_header_t *block) {
 		puts("block: NULL");
 		return;
 	}
-	// printf("block: %p, kind: %s, prev: %p, next: %p\n", block, kind_names[block->kind], block->prev, block->next);
 	printf("block: %p\n", block);
 	gc_page_header_t *page = (gc_page_header_t *)block;
 	printf("  (P) next_page: %p\n", page->next_page);
@@ -1542,11 +1445,6 @@ void gc_debug_verify_pool(const char *at) {
 void *gc_debug_track_id(int pagenum, int low) {
 	return ID_TRACK(pagenum, low);
 }
-/*
-void gc_debug_enable(bool dl) {
-	do_log = dl;
-}
-*/
 
 void gc_debug_thread(void) {
 	hl_thread_info *t = current_thread;
@@ -1621,3 +1519,5 @@ void gc_debug_interactive(void) {
 		}
 	}
 }
+
+#endif // GC_ENABLE_DEBUG

@@ -263,6 +263,26 @@ GC_STATIC gc_block_header_t *gc_get_block(void *); // NULL if not a GC pointer
 #	define GC_DEBUG_DUMP1(id, arg1) do { GC_DEBUG_DUMP_S(id); int s = sizeof(arg1); GC_DEBUG_DUMP_R(s); GC_DEBUG_DUMP_R(arg1); } while (0)
 #	define GC_DEBUG_DUMP2(id, arg1, arg2) do { GC_DEBUG_DUMP_S(id); int s = sizeof(arg1) + sizeof(arg2); GC_DEBUG_DUMP_R(s); GC_DEBUG_DUMP_R(arg1); GC_DEBUG_DUMP_R(arg2); } while (0)
 #	define GC_DEBUG_DUMP3(id, arg1, arg2, arg3) do { GC_DEBUG_DUMP_S(id); int s = sizeof(arg1) + sizeof(arg2) + sizeof(arg3); GC_DEBUG_DUMP_R(s); GC_DEBUG_DUMP_R(arg1); GC_DEBUG_DUMP_R(arg2); GC_DEBUG_DUMP_R(arg3); } while (0)
+#	define GC_ASSERT(cond) do { \
+		if (!(cond)) { \
+			printf("\x1B[38;5;160mGC assertion failed (line %d): " #cond "\n\x1B[0m", __LINE__); \
+			GC_FATAL("!"); \
+		} \
+	} while (0)
+#	define GC_ASSERT_M(cond, msg, ...) do { \
+		if (!(cond)) { \
+			printf("\x1B[38;5;160mGC assertion failed (line %d): " #cond "\n\x1B[0m", __LINE__); \
+			printf("info: " msg "\n", ##__VA_ARGS__); \
+			GC_FATAL("!"); \
+		} \
+	} while (0)
+GC_STATIC void gc_debug_block(gc_block_header_t *block);
+GC_STATIC void gc_debug_obj(void **p);
+GC_STATIC void gc_debug_obj_id(void **p);
+GC_STATIC void gc_debug_type(hl_type *t);
+GC_STATIC void gc_debug_interactive(void);
+GC_STATIC void gc_debug_verify_pool(const char *);
+GC_STATIC void *gc_debug_track_id(int, int);
 #else
 #	define GC_DEBUG(...)
 #	define GC_DEBUG_DUMP_S(...)
@@ -271,30 +291,18 @@ GC_STATIC gc_block_header_t *gc_get_block(void *); // NULL if not a GC pointer
 #	define GC_DEBUG_DUMP1(...)
 #	define GC_DEBUG_DUMP2(...)
 #	define GC_DEBUG_DUMP3(...)
+#	define GC_ASSERT(...)
+#	define GC_ASSERT_M(...)
+# define gc_debug_block(...)
+# define gc_debug_obj(...)
+# define gc_debug_obj_id(...)
+# define gc_debug_type(...)
+# define gc_debug_interactive(...)
+# define gc_debug_verify_pool(...)
+# define gc_debug_track_id(...)
 #endif
 #define GC_FATAL(msg) do { puts(msg); gc_debug_interactive(); __builtin_trap(); } while (0)
-#define GC_ASSERT(cond) do { \
-		if (!(cond)) { \
-			printf("\x1B[38;5;160mGC assertion failed (line %d): " #cond "\n\x1B[0m", __LINE__); \
-			GC_FATAL("!"); \
-		} \
-	} while (0)
-#define GC_ASSERT_M(cond, msg, ...) do { \
-		if (!(cond)) { \
-			printf("\x1B[38;5;160mGC assertion failed (line %d): " #cond "\n\x1B[0m", __LINE__); \
-			printf("info: " msg "\n", ##__VA_ARGS__); \
-			GC_FATAL("!"); \
-		} \
-	} while (0)
 
-GC_STATIC void gc_debug_block(gc_block_header_t *block);
-GC_STATIC void gc_debug_obj(void **p);
-GC_STATIC void gc_debug_obj_id(void **p);
-GC_STATIC void gc_debug_type(hl_type *t);
-GC_STATIC void gc_debug_interactive(void);
-GC_STATIC void gc_debug_verify_pool(const char *);
-GC_STATIC void *gc_debug_track_id(int, int);
-//GC_STATIC void gc_debug_enable(bool);
 /*
 GC_STATIC void gc_debug_general(void);
 GC_STATIC void gc_dump(const char *);
