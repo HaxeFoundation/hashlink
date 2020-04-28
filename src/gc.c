@@ -925,7 +925,7 @@ GC_STATIC void gc_mark(void) {
 //	puts("popped lock");
 
 		// mark line(s)
-		int line_id = GC_LINE_ID(p);
+		int line_id = GC_LINE_ID_IN(p, block);
 		int obj_id = ((int_val)p - (int_val)&block->lines[0]) / 8;
 		int words = meta->words;
 
@@ -944,8 +944,8 @@ GC_STATIC void gc_mark(void) {
 //		printf("popped: %p\n", p); fflush(stdout);
 //gc_debug_obj(p);
 //GC_FATAL("not an existing object!");
-//		puts("non-ex");
-continue;
+			printf("non-ex %p\n", p);
+			continue;
 		}
 
 		if (block->huge_sized) {
@@ -954,15 +954,10 @@ continue;
 		} else if (meta->medium_sized) {
 			words |= GC_METADATA_EXT(p) << 4;
 			words++;
-			int last_id = GC_LINE_ID((char *)p + words * 8);
+			int last_id = GC_LINE_ID_IN((char *)p + words * 8, block);
 			int line_span = (last_id - line_id);
 			GC_DEBUG(mark, "marking medium, %d lines", line_span);
-//printf("memset(%p, %d, %d) ... ", &block->line_marks[line_id], 1, line_span); fflush(stdout);
-			// memset(&block->line_marks[line_id], 1, line_span);
-			for (int i = line_id; i < last_id; i++) {
-				block->line_marks[i] = 1;
-			}
-//puts("ok");
+			memset(&block->line_marks[line_id], 1, line_span);
 		} else if (!block->huge_sized) {
 			words++;
 			block->line_marks[line_id] = 1;

@@ -214,8 +214,10 @@ GC_STATIC void gc_grow_heap(int count);
 #define GC_LINE_BLOCK(line) ((gc_block_header_t *)((int_val)(line) & (int_val)(~(GC_BLOCK_SIZE - 1))))
 // gets the index of `block` in its page
 #define GC_BLOCK_ID(block) ((int)(((int_val)(block) - (int_val)GC_BLOCK_PAGE(block)) / GC_BLOCK_SIZE))
+// gets the line index of `ptr` in the given block
+#define GC_LINE_ID_IN(ptr, block) ((int)((int_val)(ptr) - (int_val)(block)) / GC_LINE_SIZE - 64)
 // gets the line index of `ptr` in its block
-#define GC_LINE_ID(ptr) ((int)((int_val)(ptr) - (int_val)GC_LINE_BLOCK(ptr)) / GC_LINE_SIZE - 64)
+#define GC_LINE_ID(ptr) GC_LINE_ID_IN(ptr, GC_LINE_BLOCK(ptr))
 
 #define GC_METADATA(obj) (&(GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024]))
 #define GC_METADATA_EXT(obj) *(unsigned char *)(&GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024 + 1])
