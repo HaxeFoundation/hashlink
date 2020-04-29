@@ -117,11 +117,11 @@ install:
 	mkdir -p $(INSTALL_DIR)/include
 	cp hl $(INSTALL_DIR)/bin
 	cp libhl.${LIBEXT} $(INSTALL_DIR)/lib
-	cp *.hdll $(INSTALL_DIR)/lib
+	cp *.$(LIBEXT) $(INSTALL_DIR)/lib
 	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_DIR)/include
 
 uninstall:
-	rm -f $(INSTALL_DIR)/bin/hl $(INSTALL_DIR)/lib/libhl.${LIBEXT} $(INSTALL_DIR)/lib/*.hdll
+	rm -f $(INSTALL_DIR)/bin/hl $(INSTALL_DIR)/lib/libhl.${LIBEXT} $(INSTALL_DIR)/lib/*.$(LIBEXT)
 	rm -f $(INSTALL_DIR)/include/hl.h $(INSTALL_DIR)/include/hlc.h $(INSTALL_DIR)/include/hlc_main.c
 
 libs: $(LIBS)
@@ -136,25 +136,25 @@ hl: ${HL} libhl
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
 
 fmt: ${FMT} libhl
-	${CC} ${CFLAGS} -I include/mikktspace -I include/minimp3 -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
+	${CC} ${CFLAGS} -I include/mikktspace -I include/minimp3 -shared -o fmt.$(LIBEXT) ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
 sdl: ${SDL} libhl
-	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENGL)
+	${CC} ${CFLAGS} -shared -o sdl.$(LIBEXT) ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENGL)
 
 openal: ${OPENAL} libhl
-	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
+	${CC} ${CFLAGS} -shared -o openal.$(LIBEXT) ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
 
 ssl: ${SSL} libhl
-	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
+	${CC} ${CFLAGS} -shared -o ssl.$(LIBEXT) ${SSL} ${LIBFLAGS} -L. -lhl -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
 
 ui: ${UI} libhl
-	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} -L. -lhl
+	${CC} ${CFLAGS} -shared -o ui.$(LIBEXT) ${UI} ${LIBFLAGS} -L. -lhl
 
 uv: ${UV} libhl
-	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
+	${CC} ${CFLAGS} -shared -o uv.$(LIBEXT) ${UV} ${LIBFLAGS} -L. -lhl -luv
 
 mysql: ${MYSQL} libhl
-	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
+	${CC} ${CFLAGS} -shared -o mysql.$(LIBEXT) ${MYSQL} ${LIBFLAGS} -L. -lhl
 
 mesa:
 	(cd libs/mesa && make)
@@ -188,7 +188,7 @@ release_haxelib_package:
 	rm -rf $(HLIB)_release
 
 release_win:
-	(cd x64/ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
+	(cd x64/ReleaseVS2013 && cp hl.exe libhl.dll *.$(LIBEXT) *.lib ../../hl-$(HL_VER))
 	cp c:/windows/system32/msvcr120.dll hl-$(HL_VER)
 	cp `which SDL2.dll` hl-$(HL_VER)
 	cp `which OpenAL32.dll` hl-$(HL_VER)
@@ -196,12 +196,12 @@ release_win:
 	rm -rf hl-$(HL_VER)
 
 release_linux:
-	cp hl libhl.so *.hdll hl-$(HL_VER)
+	cp hl libhl.so *.$(LIBEXT) hl-$(HL_VER)
 	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
 	rm -rf hl-$(HL_VER)
 
 release_osx:
-	cp hl libhl.dylib *.hdll hl-$(HL_VER)
+	cp hl libhl.dylib *.$(LIBEXT) hl-$(HL_VER)
 	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
 	rm -rf hl-$(HL_VER)
 
@@ -214,6 +214,6 @@ clean_o:
 	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
 
 clean: clean_o
-	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
+	rm -f hl hl.exe libhl.$(LIBEXT) *.$(LIBEXT)
 
 .PHONY: libhl hl hlc fmt sdl libs release
