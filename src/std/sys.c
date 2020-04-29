@@ -181,7 +181,15 @@ HL_PRIM void hl_sys_exit( int code ) {
 	exit(code);
 }
 
+#ifdef HL_DEBUG_REPRO
+static double CURT = 0;
+#endif
+
 HL_PRIM double hl_sys_time() {
+#ifdef HL_DEBUG_REPRO
+	CURT += 0.001;
+	return CURT;
+#endif
 #ifdef HL_WIN
 	#define EPOCH_DIFF	(134774*24*60*60.0)
 	static double time_diff = 0.;
