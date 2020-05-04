@@ -129,6 +129,8 @@ GC_STATIC void *gc_alloc_os_memory(int size) {
 	}
 	gc_stats->total_memory += size;
 	base_addr = (char *)ptr + size;
+	// align up
+	base_addr = (void *)((((int_val)base_addr) & ~(GC_PAGE_SIZE - 1)) + GC_PAGE_SIZE);
 //printf("PAGE ALLOC %d: %p (%d bytes)\n", page_counter++, ptr, size);
 	GC_DEBUG_DUMP2("gc_alloc_os_memory.success", ptr, size);
 	GC_DEBUG(os, "allocated OS page: %p", ptr);
@@ -708,13 +710,16 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 	}
 }
 
-GC_STATIC void **get_stack_bottom(void) {
-	void *x;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-stack-address"
+#ifdef __clang__
+// this only works with clang
+static void *get_stack_bottom(void) {
+	int x;
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wreturn-stack-address"
 	return &x;
-#pragma clang diagnostic pop
+	#pragma clang diagnostic pop
 }
+#endif
 
 // spills registers and triggers a major GC collection
 HL_API void hl_gc_major(void) {
@@ -723,11 +728,15 @@ HL_API void hl_gc_major(void) {
 	//gc_stop_world(true);
 	jmp_buf env;
 	setjmp(env);
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
+#ifdef __clang__
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
 	void *(*volatile f)(void) = get_stack_bottom;
-#pragma clang diagnostic pop
+	#pragma clang diagnostic pop
 	current_thread->stack_cur = f();
+#else
+	current_thread->stack_cur = __builtin_frame_address(0);
+#endif
 	GC_DEBUG_DUMP0("hl_gc_major.entry");
 	gc_mark();
 	gc_sweep();
@@ -1124,6 +1133,7 @@ GC_STATIC void gc_handle_signal(int signum) {
 }
 
 GC_STATIC gc_stats_t *gc_init(void) {
+	puts("new GC init...");
 	gc_mutex_roots = hl_mutex_alloc(false);
 	gc_mutex_pool = hl_mutex_alloc(false);
 	gc_blocked = false;
@@ -1217,7 +1227,6 @@ void hl_global_init() {
 }
 
 void hl_global_free() {
-	printf("%lu\n", gc_stats->cycles);
 	gc_deinit();
 	hl_cache_free();
 }
@@ -1521,3 +1530,22 @@ void gc_debug_interactive(void) {
 }
 
 #endif // GC_ENABLE_DEBUG
+
+// TODO
+void hl_gc_enable(bool a) {}
+void hl_gc_profile(bool a) {}
+void hl_gc_stats(double *a, double *b, double *c) {}
+void hl_gc_dump_memory(vbyte *a) {}
+int hl_gc_get_flags(void) { return 0; }
+void hl_gc_set_flags(int a) {}
+vdynamic *hl_debug_call(int a, vdynamic *b) { return NULL; }
+
+DEFINE_PRIM(_VOID, gc_major, _NO_ARG);
+DEFINE_PRIM(_VOID, gc_enable, _BOOL);
+DEFINE_PRIM(_VOID, gc_profile, _BOOL);
+DEFINE_PRIM(_VOID, gc_stats, _REF(_F64) _REF(_F64) _REF(_F64));
+DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);
+DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
+DEFINE_PRIM(_VOID, gc_set_flags, _I32);
+DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
+DEFINE_PRIM(_VOID, blocking, _BOOL);
