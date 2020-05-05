@@ -712,8 +712,8 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 
 #ifdef __clang__
 // this only works with clang
-static void *get_stack_bottom(void) {
-	int x;
+static void **get_stack_bottom(void) {
+	void *x;
 	#pragma clang diagnostic push
 	#pragma clang diagnostic ignored "-Wreturn-stack-address"
 	return &x;
