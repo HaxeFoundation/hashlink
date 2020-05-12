@@ -76,6 +76,17 @@ HL_PRIM hl_fdesc *hl_file_open( vbyte *name, int mode, bool binary ) {
 	return fd;
 }
 
+HL_PRIM bool hl_file_is_locked( vbyte *name ) {
+#	ifdef HL_WIN
+	HANDLE h = CreateFile((uchar*)name,GENERIC_READ,0,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+	if( h == INVALID_HANDLE_VALUE ) return true;
+	CloseHandle(h);
+	return false;
+#	else
+	return false;
+#	endif
+}
+
 HL_PRIM void hl_file_close( hl_fdesc *f ) {
 	if( !f ) return;
 	if( f->f ) fclose(f->f);
@@ -254,3 +265,5 @@ DEFINE_PRIM(_FILE, file_stdin, _NO_ARG);
 DEFINE_PRIM(_FILE, file_stdout, _NO_ARG);
 DEFINE_PRIM(_FILE, file_stderr, _NO_ARG);
 DEFINE_PRIM(_BYTES, file_contents, _BYTES _REF(_I32));
+DEFINE_PRIM(_BOOL, file_is_locked, _BYTES);
+
