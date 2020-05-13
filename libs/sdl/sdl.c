@@ -185,20 +185,20 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			break;
 		case SDL_FINGERDOWN:
 			event->type = TouchDown;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_FINGERMOTION:
 			event->type = TouchMove;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_FINGERUP:
 			event->type = TouchUp;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_MOUSEWHEEL:
