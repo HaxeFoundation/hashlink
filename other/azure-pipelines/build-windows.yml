@@ -25,13 +25,13 @@ jobs:
           Expand-Archive clip.zip -DestinationPath .
           Move-Item clip-master include/clip
           Remove-Item clip.zip
+        displayName: Install clip
       - powershell: |
           Invoke-WebRequest https://www.libsdl.org/release/SDL2-devel-2.0.5-VC.zip -OutFile SDL.zip
           Expand-Archive SDL.zip -DestinationPath .
           Move-Item SDL2-* include/sdl
           Remove-Item SDL.zip
         displayName: Install sdl
-        displayName: Install clip
       - powershell: |
           Invoke-WebRequest http://openal-soft.org/openal-binaries/openal-soft-1.17.2-bin.zip -OutFile openal.zip
           Expand-Archive openal.zip -DestinationPath .
