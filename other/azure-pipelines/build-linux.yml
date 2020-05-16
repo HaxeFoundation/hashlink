@@ -69,6 +69,7 @@ jobs:
               libopenal-dev:${{ parameters.arch }} \
               neko \
               curl \
+              unzip \
               ca-certificates
           displayName: Install dependencies
       - template: install-haxe-snapshot.yml
@@ -81,6 +82,12 @@ jobs:
           haxelib list
         displayName: Install hashlink haxelib
       - ${{ if eq(parameters.buildSystem, 'cmake') }}:
+        - script: |
+            curl -L https://github.com/dacap/clip/archive/master.zip > clip.zip
+            unzip clip.zip -d .
+            mv clip-master/ include/clip
+            rm clip.zip
+          displayName: Fetch Clip
         - script: cmake . -DCMAKE_BUILD_TYPE=${{ parameters.cmakeConfig }} $(CMAKE_TOOLCHAIN)
           displayName: CMake
         - script: make
