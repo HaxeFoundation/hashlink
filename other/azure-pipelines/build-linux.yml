@@ -46,6 +46,7 @@ jobs:
               libopenal-dev \
               neko \
               curl \
+              unzip \
               ca-certificates
           displayName: Install dependencies
       - ${{ if not(eq(parameters.arch, '')) }}:
