@@ -1,1 +1,5 @@
-add_subdirectory(clip)
+if(WITH_CLIP)
+    set(CLIP_EXAMPLES off)
+    set(CLIP_TESTS off)
+    add_subdirectory(clip)
+endif()
