@@ -360,4 +360,5 @@ endif()
 
 include(CPack)
 
+add_subdirectory(include/clip)
 add_subdirectory(libs)

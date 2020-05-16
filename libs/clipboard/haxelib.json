@@ -1,0 +1,10 @@
+{
+	"name" : "hlclip",
+	"url" : "https://github.com/HaxeFoundation/hl/tree/master/libs/clibboard",
+	"license" : "BSD",
+	"contributors" : ["theikkinen"],
+	"description" : "Clipboard support for Hashlink.",
+	"version" : "1.10.0",
+	"releasenote" : "",
+	"dependencies": { }
+}

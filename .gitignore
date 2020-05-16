@@ -23,10 +23,12 @@ x64
 /hl
 /include/sdl
 /include/openal
+/include/clip
 ReleaseStatic
 /other/benchs/bench.*
 /other/benchs/cpp
 /other/benchs/flashout.txt
+
 
 /bin*
 /build*

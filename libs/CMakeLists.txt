@@ -21,6 +21,8 @@ if(WITH_FMT)
     add_subdirectory(fmt)
 endif()
 
+add_subdirectory(clipboard)
+
 # add_subdirectory(mesa)
 
 if(WIN32)
