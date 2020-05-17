@@ -1,0 +1,10 @@
+{
+	"name" : "hlos",
+	"url" : "https://github.com/HaxeFoundation/hl/tree/master/libs/os",
+	"license" : "BSD",
+	"contributors" : ["theikkinen"],
+	"description" : "Simple OS functionality to Hashlink.",
+	"version" : "1.10.0",
+	"releasenote" : "",
+	"dependencies": { }
+}

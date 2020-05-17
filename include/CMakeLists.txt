@@ -1,4 +1,4 @@
-if(WITH_CLIP)
+if(WITH_OS)
     set(CLIP_EXAMPLES off)
     set(CLIP_TESTS off)
     add_subdirectory(clip)

@@ -21,9 +21,9 @@ if(WITH_FMT)
     add_subdirectory(fmt)
 endif()
 
-option(WITH_CLIP  "Build clip.hdll" ON)
-if(WITH_CLIP)
-    add_subdirectory(clip)
+option(WITH_OS  "Build os.hdll" ON)
+if(WITH_OS)
+    add_subdirectory(os)
 endif()
 
 # add_subdirectory(mesa)
