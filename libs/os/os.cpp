@@ -16,7 +16,7 @@ HL_PRIM bool HL_NAME(set_clipboard_text)(const char * text) {
 HL_PRIM vbyte * HL_NAME(get_clipboard_image_data)() {
     clip::image img;
     if(clip::get_image(img)) {
-        int size = img.spec().width * img.spec().height * (img.spec().bits_per_pixel / 8) * sizeof(vbyte);
+        int size = img.spec().bytes_per_row * img.spec().height;
         vbyte * data = (vbyte *)hl_gc_alloc_raw(size);
         memcpy(data, img.data(), size);
         return (vbyte *) data;
