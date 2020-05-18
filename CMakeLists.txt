@@ -9,7 +9,7 @@ cmake_policy(SET CMP0042 NEW)
 
 option(WITH_OS  "Build os.hdll" ON)
 if(WIN32 OR WITH_OS)
-    project(hashlink C CXX) # C++ required for directx
+    project(hashlink C CXX) # C++ required for directx and clipboard support
 else()
     project(hashlink C)
 endif()
