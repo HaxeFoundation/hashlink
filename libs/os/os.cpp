@@ -44,7 +44,7 @@ HL_PRIM bool HL_NAME(set_clipboard_image)(vbyte * data, int w, int h, int bpp, i
     return clip::set_image(img);
 }
 
-HL_PRIM bool HL_NAME(get_clipboard_image_spec)(int * w, int * h, int * bpp, int * bpr, int * rmask, int * gmask, int * bmask, int * amask, int * rshift, int * gshift, int * bshift, int * ashift) {
+HL_PRIM bool HL_NAME(get_clipboard_image_spec)(int *w, int *h, int *bpp, int *bpr, int *rmask, int *gmask, int *bmask, int *amask, int *rshift, int *gshift, int *bshift, int *ashift) {
     clip::image_spec spec;
     if(clip::get_image_spec(spec)) {
         *w = (int) spec.width;
@@ -72,4 +72,3 @@ DEFINE_PRIM(_BOOL, set_clipboard_text, _BYTES);
 DEFINE_PRIM(_BYTES, get_clipboard_image_data, _NO_ARG);
 DEFINE_PRIM(_BOOL, set_clipboard_image, _BYTES _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, get_clipboard_image_spec, _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));
-
