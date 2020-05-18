@@ -23,6 +23,10 @@ class ClipboardImage {
 		this.data = data;
 		this.spec = spec;
 	}
+	
+	public function setToClipboard () {
+		Clipboard.setClipboardImage(this.data, this.spec);
+	}
 }
 
 @:hlNative("os")
@@ -49,7 +53,14 @@ class Clipboard {
 	}
 
 	public static function getClipboardImage () : ClipboardImage {
-		return new ClipboardImage(getClipboardImageData(), getClipboardImageSpec());
+		var imgData = getClipboardImageData();
+		var imgSpec = getClipboardImageSpec();
+		
+		if(imgData == null || imgSpec == null) {
+			return null;
+		}
+
+		return new ClipboardImage(imgData, imgSpec);
 	}
 	
 	static function set_clipboard_image(data : hl.Bytes, w : Int, h : Int, bpp : Int, bpr : Int, rmask : Int, gmask : Int, bmask : Int, amask : Int, rshift : Int, gshift : Int, bshift : Int, ashift : Int) : Bool {
@@ -73,14 +84,17 @@ class Clipboard {
 		var width = 0, height = 0, bitsPerPixel = 0, bytesPerRow = 0, redMask = 0, greenMask = 0, blueMask = 0, alphaMask = 0, 
 			redShift = 0, greenShift = 0, blueShift = 0, alphaShift = 0;
 
-		get_clipboard_image_spec(width, height, bitsPerPixel, bytesPerRow, redMask, greenMask, blueMask, alphaMask, redShift, greenShift, blueShift, alphaShift);
+		if(get_clipboard_image_spec(width, height, bitsPerPixel, bytesPerRow, redMask, greenMask, blueMask, alphaMask, redShift, greenShift, blueShift, alphaShift)) {
 
-		return {
-			width : width, height : height,
-			bitsPerPixel : bitsPerPixel, bytesPerRow : bytesPerRow,
-			redMask : redMask, greenMask : greenMask, blueMask : blueMask, alphaMask : alphaMask,
-			redShift : redShift, greenShift : greenShift, blueShift : blueShift, alphaShift : alphaShift
-		};
+			return {
+				width : width, height : height,
+				bitsPerPixel : bitsPerPixel, bytesPerRow : bytesPerRow,
+				redMask : redMask, greenMask : greenMask, blueMask : blueMask, alphaMask : alphaMask,
+				redShift : redShift, greenShift : greenShift, blueShift : blueShift, alphaShift : alphaShift
+			};
+		} else {
+			return null;
+		}
 	}
 
 }

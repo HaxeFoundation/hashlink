@@ -25,7 +25,7 @@ HL_PRIM vbyte * HL_NAME(get_clipboard_image_data)() {
     return NULL;
 }   
 
-HL_PRIM bool HL_NAME(set_clipboard_image)(char * data, int w, int h, int bpp, int bpr, int rmask, int gmask, int bmask, int amask, int rshift, int gshift, int bshift, int ashift) {
+HL_PRIM bool HL_NAME(set_clipboard_image)(vbyte * data, int w, int h, int bpp, int bpr, int rmask, int gmask, int bmask, int amask, int rshift, int gshift, int bshift, int ashift) {
     clip::image_spec imgS;
     imgS.width = w;
     imgS.height = h;
