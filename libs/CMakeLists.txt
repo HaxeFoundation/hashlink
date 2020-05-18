@@ -21,7 +21,6 @@ if(WITH_FMT)
     add_subdirectory(fmt)
 endif()
 
-option(WITH_OS  "Build os.hdll" ON)
 if(WITH_OS)
     add_subdirectory(os)
 endif()
