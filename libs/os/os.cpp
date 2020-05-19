@@ -19,7 +19,7 @@ HL_PRIM vbyte * HL_NAME(get_clipboard_image_data)() {
         int size = img.spec().bytes_per_row * img.spec().height;
         vbyte * data = (vbyte *)hl_gc_alloc_raw(size);
         memcpy(data, img.data(), size);
-        return (vbyte *) data;
+        return data;
     }
 
     return NULL;

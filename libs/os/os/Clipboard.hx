@@ -1,5 +1,7 @@
 package os;
 
+import haxe.Exception;
+
 typedef ClipboardImageSpec = {
 	width : Int,
 	height : Int,
@@ -23,8 +25,48 @@ class ClipboardImage {
 		this.data = data;
 		this.spec = spec;
 	}
+
+	public inline function getI32ByteLength () {
+		return spec.width * spec.height * 4;
+	}
+
+	public function convertDataToI32 () {
+		if(spec.bitsPerPixel == 32) {
+			return;
+		}
+
+		var bpr = spec.width * 4;
+
+		var bytes = new hl.Bytes(spec.height * bpr);
+
+		for(y in 0...spec.height) {
+			for(x in 0...spec.width) {
+				var pos = y * bpr + x * 4;
+
+				bytes.setI32(pos, getPixel(x, y));
+			}
+		}
+
+		spec.bitsPerPixel = 32;
+		spec.bytesPerRow = bpr;
+
+		this.data = bytes;
+	}
+
+	public function getPixel (x : Int, y : Int) : Int {
+		var b = Std.int(spec.bitsPerPixel / 8);
+		switch (this.spec.bitsPerPixel) {
+			case 32:
+				return data.getI32(y * spec.bytesPerRow + x * b);
+			case 24:
+				var pos = y * spec.bytesPerRow + x * 3;
+				return (0xFF000000 | data.getI32(pos));
+			case _:
+				throw new Exception("Unhandled bitdepth.");
+		}
+	}
 	
-	public function setToClipboard () {
+	public function toClipboard () {
 		Clipboard.setClipboardImage(this.data, this.spec);
 	}
 }
