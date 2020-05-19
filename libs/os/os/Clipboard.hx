@@ -54,10 +54,9 @@ class ClipboardImage {
 	}
 
 	public function getPixel (x : Int, y : Int) : Int {
-		var b = Std.int(spec.bitsPerPixel / 8);
 		switch (this.spec.bitsPerPixel) {
 			case 32:
-				return data.getI32(y * spec.bytesPerRow + x * b);
+				return data.getI32(y * spec.bytesPerRow + x * 4);
 			case 24:
 				var pos = y * spec.bytesPerRow + x * 3;
 				return (0xFF000000 | data.getI32(pos));
