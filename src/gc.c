@@ -97,11 +97,13 @@ static FILE *dump_file;
 // allocates a page-aligned region of memory from the OS
 GC_STATIC void *gc_alloc_os_memory(int size) {
 	GC_DEBUG_DUMP1("gc_alloc_os_memory.enter", size);
+	/*
 	if (gc_stats->total_memory + size >= gc_config->memory_limit) {
 		GC_DEBUG_DUMP0("gc_alloc_os_memory.fail.oom");
 		GC_DEBUG(fatal, "using %lu / %lu bytes, need %d more", gc_stats->total_memory, gc_config->memory_limit, size);
 		GC_FATAL("OOM: memory limit hit");
 	}
+	*/
 	void *ptr = mmap(base_addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (ptr == (void *)-1) {
 		GC_DEBUG_DUMP0("gc_alloc_os_memory.fail.other");
