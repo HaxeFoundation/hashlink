@@ -697,6 +697,7 @@ HL_API void hl_tls_free( hl_tls *l );
 #define MEM_ZERO			256
 
 HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
+HL_API void *hl_gc_alloc_finalizer( int size );
 HL_API void hl_add_root( void **ptr );
 HL_API void hl_remove_root( void **ptr );
 HL_API void hl_gc_major( void );
@@ -711,7 +712,6 @@ HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
 #define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(&hlt_bytes, size, MEM_KIND_NOPTR)
 #define hl_gc_alloc(t, size)			hl_gc_alloc_gen(t, size, MEM_KIND_DYNAMIC)
 #define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(&hlt_abstract, size, MEM_KIND_RAW)
-#define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract, size, MEM_KIND_FINALIZER)
 
 // ----------------------- INTERNAL ALLOC -----------------------------------------
 

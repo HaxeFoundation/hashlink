@@ -220,7 +220,7 @@ GC_STATIC void gc_grow_heap(int count);
 #define GC_LINE_ID(ptr) GC_LINE_ID_IN(ptr, GC_LINE_BLOCK(ptr))
 
 #define GC_METADATA(obj) (&(GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024]))
-#define GC_METADATA_EXT(obj) *(unsigned char *)(&GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024 + 1])
+#define GC_METADATA_EXT(obj) *(int *)(&GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024 + 1])
 
 // roots -----------------------------------------------------------
 

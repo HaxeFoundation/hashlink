@@ -556,10 +556,6 @@ GC_STATIC gc_object_t *gc_alloc_bump(hl_type *t, int size, int words, int flags)
 		meta->medium_sized = 1;
 		GC_METADATA_EXT(ret) = sub_words >> 4;
 	}
-	if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
-		// TODO: also in a finaliser-specific alloc function (after alloc_gen call)
-		block->line_finalize[GC_LINE_ID(ret)] = 1;
-	}
 
 	// bump cursor
 	current_thread->lines_start = (void *)(((char *)current_thread->lines_start) + size);
@@ -630,39 +626,7 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 	// align to words
 	int words = (size + (sizeof(void *) - 1)) / sizeof(void *);
 
-	if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
-		// TODO: separate function to do this before alloc_gen
-		// (to reduce hot path for non-finaliser objects)
-
-		// align to cache lines
-		words = (((size + 127) / 128) * 128) / sizeof(void *);
-		current_thread->lines_start = (int_val)((char *)current_thread->lines_start + 127) & 0xFFFFFFFFFFFFFF80;
-	}
-
 	size = words * sizeof(void *);
-
-	// never allocate huge objects inside blocks
-	if (size > GC_MEDIUM_SIZE) {
-		// TODO: (statically) separate path for huge objects
-		if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
-			// TODO: huge finalizer objects
-			GC_FATAL("cannot alloc huge finalizer");
-		}
-		gc_object_t *obj = gc_pop_huge(size);
-		obj->t = t;
-		gc_metadata_t *meta = GC_METADATA(obj);
-		meta->flags = 0;
-		meta->marked = !gc_mark_polarity;
-		if (flags & MEM_KIND_RAW) {
-			meta->raw = 1;
-		}
-		if (flags & MEM_KIND_NOPTR) {
-			meta->no_ptr = 1;
-		}
-		gc_stats->live_memory += size;
-		dump_live();
-		return obj;
-	}
 
 	if (LIKELY((char *)current_thread->lines_start + size <= (char *)current_thread->lines_limit)) {
 		return gc_alloc_bump(t, size, words, flags);
@@ -702,7 +666,7 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 		current_thread->lines_start = &current_thread->lines_block->lines[0];
 		current_thread->lines_limit = &current_thread->lines_block->lines[GC_LINES_PER_BLOCK];
 		return gc_alloc_bump(t, size, words, flags);
-	} else { // size <= GC_MEDIUM_SIZE
+	} else if (size <= GC_MEDIUM_SIZE) {
 		current_thread->lines_block->kind = GC_BLOCK_FULL;
 		DLL_INSERT(current_thread->lines_block, current_thread->full_blocks);
 		gc_debug_verify_pool("full insert medium");
@@ -712,7 +676,43 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 		current_thread->lines_start = &current_thread->lines_block->lines[0];
 		current_thread->lines_limit = &current_thread->lines_block->lines[GC_LINES_PER_BLOCK];
 		return gc_alloc_bump(t, size, words, flags);
+	} else {
+		// TODO: (statically) separate path for huge objects
+		if ((flags & MEM_KIND_FINALIZER) == MEM_KIND_FINALIZER) {
+			// TODO: huge finalizer objects
+			GC_FATAL("cannot alloc huge finalizer");
+		}
+		gc_object_t *obj = gc_pop_huge(size);
+		obj->t = t;
+		gc_metadata_t *meta = GC_METADATA(obj);
+		meta->flags = 0;
+		meta->marked = !gc_mark_polarity;
+		if (flags & MEM_KIND_RAW) {
+			meta->raw = 1;
+		}
+		if (flags & MEM_KIND_NOPTR) {
+			meta->no_ptr = 1;
+		}
+		gc_stats->live_memory += size;
+		dump_live();
+		return obj;
 	}
+}
+
+HL_API void *hl_gc_alloc_finalizer(int size) {
+	// align to cache lines
+	int words = (size + (sizeof(void *) - 1)) / sizeof(void *);
+	words = (((size + 127) / 128) * 128) / sizeof(void *);
+	current_thread->lines_start = (int_val)((char *)current_thread->lines_start + 127) & 0xFFFFFFFFFFFFFF80;
+	size = words * sizeof(void *);
+
+	void *ret = hl_gc_alloc_gen(&hlt_abstract, size, MEM_KIND_FINALIZER);
+
+	// mark as finaliser
+	gc_block_header_t *block = GC_LINE_BLOCK(ret);
+	block->line_finalize[GC_LINE_ID(ret)] = 1;
+
+	return ret;
 }
 
 #ifdef __clang__
