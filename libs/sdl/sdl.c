@@ -781,3 +781,21 @@ DEFINE_PRIM(_CURSOR, cursor_create_system, _I32);
 DEFINE_PRIM(_VOID, free_cursor, _CURSOR);
 DEFINE_PRIM(_VOID, set_cursor, _CURSOR);
 DEFINE_PRIM(_ARR, get_devices, _NO_ARG);
+
+// clipboard
+
+HL_PRIM bool HL_NAME(has_clipboard_text)() {
+	return SDL_HasClipboardText();
+}
+
+HL_PRIM const char *HL_NAME(get_clipboard_text)() {
+	return SDL_GetClipboardText();
+}
+
+HL_PRIM int HL_NAME(set_clipboard_text)(vbyte* text) {
+	return SDL_SetClipboardText((char*)text);
+}
+
+DEFINE_PRIM(_BOOL, has_clipboard_text, _NO_ARG);
+DEFINE_PRIM(_BYTES, get_clipboard_text, _NO_ARG);
+DEFINE_PRIM(_I32, set_clipboard_text, _BYTES);
