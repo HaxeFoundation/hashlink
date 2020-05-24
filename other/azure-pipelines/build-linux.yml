@@ -58,6 +58,7 @@ jobs:
               cmake \
               make \
               gcc-multilib \
+              build-essential \
               libz-dev:${{ parameters.arch }} \
               zlib1g-dev:${{ parameters.arch }} \
               libpng-dev:${{ parameters.arch }} \
