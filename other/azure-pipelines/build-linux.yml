@@ -34,6 +34,7 @@ jobs:
               cmake \
               make \
               gcc \
+              build-essential \
               libz-dev \
               zlib1g-dev \
               libpng-dev \
