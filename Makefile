@@ -7,9 +7,10 @@ INSTALL_BIN_DIR ?= $(PREFIX)/bin
 INSTALL_LIB_DIR ?= $(PREFIX)/lib
 INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
-LIBS=fmt sdl ssl openal ui uv mysql
+LIBS=fmt sdl ssl openal ui uv mysql os
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -I include/clip -D LIBHL_EXPORTS
+CXXFLAGS = -Wall -O3 -I src -std=c++11 -I include -I include/clip -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 LIBFLAGS =
 HLFLAGS = -ldl
@@ -37,6 +38,8 @@ SDL = libs/sdl/sdl.o libs/sdl/gl.o
 OPENAL = libs/openal/openal.o
 
 SSL = libs/ssl/ssl.o
+
+OS = libs/os/os.o include/clip/clip.o include/clip/image.o include/clip/clip_none.o
 
 UV = libs/uv/uv.o
 
@@ -102,7 +105,6 @@ RELEASE_NAME = linux
 
 endif
 
-
 ifdef MESA
 LIBS += mesa
 endif
@@ -155,6 +157,9 @@ ui: ${UI} libhl
 
 uv: ${UV} libhl
 	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
+
+os: ${OS} libhl
+	${CXX} ${CXXFLAGS} -I include/clip -shared -o os.hdll ${OS} ${LIBFLAGS} -L. -lhl
 
 mysql: ${MYSQL} libhl
 	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
@@ -223,7 +228,7 @@ codesign_osx:
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${OS} ${HL_DEBUG}
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
