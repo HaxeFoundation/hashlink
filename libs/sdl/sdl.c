@@ -789,7 +789,11 @@ HL_PRIM bool HL_NAME(has_clipboard_text)() {
 }
 
 HL_PRIM const char *HL_NAME(get_clipboard_text)() {
-	return SDL_GetClipboardText();
+	char *text = SDL_GetClipboardText();
+	if (!text) return NULL;
+	vbyte *ret = (vbyte *)hl_to_utf16(text);
+	SDL_free(text);
+	return ret;
 }
 
 HL_PRIM int HL_NAME(set_clipboard_text)(vbyte* text) {
