@@ -46,9 +46,9 @@ BEGIN_TEST_CASE(sanity) {
 	ASSERT(sizeof(hl_type *) == 8);
 	ASSERT(sizeof(gc_page_header_t) == 32);
 	ASSERT(sizeof(gc_metadata_t) == 1);
-	// ASSERT(sizeof(gc_metadata_ext_t) == 2);
 	ASSERT(sizeof(gc_block_header_t) == GC_BLOCK_SIZE);
-	ASSERT(offsetof(gc_block_header_t, lines) == 64 * GC_LINE_SIZE);
+	ASSERT(offsetof(gc_block_header_t, metadata) == 64);
+	ASSERT(offsetof(gc_block_header_t, lines) == 70 * GC_LINE_SIZE);
 
 	ASSERT(GC_PAGE_BLOCK(0x686178650B400000ul, 0) == (gc_block_header_t *)0x686178650B400000ul);
 	ASSERT(GC_PAGE_BLOCK(0x686178650B400000ul, 13) == (gc_block_header_t *)0x686178650B4D0000ul);
@@ -69,15 +69,22 @@ BEGIN_TEST_CASE(sanity) {
 	ASSERT(GC_LINE_BLOCK(0x686178650B4D2123ul) == (gc_block_header_t *)0x686178650B4D0000ul);
 	ASSERT(GC_LINE_BLOCK(0x686178650B4DFF80ul) == (gc_block_header_t *)0x686178650B4D0000ul);
 
-	ASSERT(GC_LINE_ID(0x686178650B4D2000ul) == 0);
-	ASSERT(GC_LINE_ID(0x686178650B4D2123ul) == 2);
-	ASSERT(GC_LINE_ID(0x686178650B4DFF80ul) == 447);
+	ASSERT(GC_LINE_ID(0x686178650B4D2300ul) == 0);
+	ASSERT(GC_LINE_ID(0x686178650B4D2423ul) == 2);
+	ASSERT(GC_LINE_ID(0x686178650B4DFF80ul) == 441);
 
-	ASSERT(GC_METADATA(0x686178650B4D2000ul) == (gc_metadata_t *)0x686178650B4D0200ul);
-	ASSERT(GC_METADATA(0x686178650B4D2010ul) == (gc_metadata_t *)0x686178650B4D0202ul);
-	ASSERT(GC_METADATA(0x686178650B4D2018ul) == (gc_metadata_t *)0x686178650B4D0203ul);
-	ASSERT(GC_METADATA(0x686178650B4D2128ul) == (gc_metadata_t *)0x686178650B4D0225ul);
-	ASSERT(GC_METADATA(0x686178650B4DFFF0ul) == (gc_metadata_t *)0x686178650B4D1DFEul);
+	ASSERT(GC_OBJ_ID(0x686178650B4D2300ul) == 0);
+	ASSERT(GC_OBJ_ID(0x686178650B4D2308ul) == 1);
+	ASSERT(GC_OBJ_ID(0x686178650B4D2310ul) == 2);
+	ASSERT(GC_OBJ_ID(0x686178650B4D2318ul) == 3);
+	ASSERT(GC_OBJ_ID(0x686178650B4D2428ul) == 37);
+	ASSERT(GC_OBJ_ID(0x686178650B4DFFF8ul) == 7071);
+
+	ASSERT(GC_METADATA(0x686178650B4D2300ul) == (gc_metadata_t *)0x686178650B4D0040ul);
+	ASSERT(GC_METADATA(0x686178650B4D2310ul) == (gc_metadata_t *)0x686178650B4D0042ul);
+	ASSERT(GC_METADATA(0x686178650B4D2318ul) == (gc_metadata_t *)0x686178650B4D0043ul);
+	ASSERT(GC_METADATA(0x686178650B4D2428ul) == (gc_metadata_t *)0x686178650B4D0065ul);
+	ASSERT(GC_METADATA(0x686178650B4DFFF0ul) == (gc_metadata_t *)0x686178650B4D1BDEul);
 
 	char cs[] = "\x00\x01\x02\x03\x04\x05";
 	ASSERT(*(int *)(&cs[0]) == 0x03020100);
@@ -342,7 +349,7 @@ int main(int argc, char **argv) {
 	RUN_TEST(big_object);
 	RUN_TEST(simple_array);
 	RUN_TEST(big_array);
-	//RUN_TEST(many_trees);
+	RUN_TEST(many_trees);
 	RUN_TEST(finalizer);
 	puts("---");
 	puts("TOTAL:");

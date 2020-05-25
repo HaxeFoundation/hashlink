@@ -37,7 +37,7 @@ TEST_TYPE(rgb, 3, {0}, {
 	int g;
 	int b;
 });
-TEST_TYPE(complex, 3, {0}, {
+TEST_TYPE(complex, 2, {0}, {
 	double i;
 	double j;
 });

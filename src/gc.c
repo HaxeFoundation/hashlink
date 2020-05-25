@@ -217,9 +217,6 @@ if (page_counter < 500)
 	for (int i = 0; i < GC_BLOCKS_PER_PAGE; i++) {
 		blocks[i].kind = GC_BLOCK_FREE;
 		blocks[i].next = &blocks[i + 1];
-		blocks[i].debug_objects = (char *)calloc(1, 896);
-		if (blocks[i].debug_objects == NULL)
-			GC_FATAL("cannot alloc debug bitmap?");
 	}
 	hl_mutex_acquire(gc_mutex_pool);
 	blocks[GC_BLOCKS_PER_PAGE - 1].next = gc_pool;
@@ -485,9 +482,15 @@ gc_debug_verify_pool("pop after");
 GC_STATIC void gc_push_block(gc_block_header_t *block) {
 	GC_ASSERT(block != NULL);
 	GC_ASSERT(block->kind == GC_BLOCK_FULL);
+
+	// clear old data
 	block->kind = GC_BLOCK_FREE; // TODO: zombie ?
 	block->owner_thread = -1;
+	memset(block->metadata, 0, GC_LINES_PER_BLOCK * 16);
 	memset(block->line_marks, 0, GC_LINES_PER_BLOCK);
+	memset(block->line_finalize, 0, GC_LINES_PER_BLOCK);
+	memset(block->objects_bmp, 0, GC_LINES_PER_BLOCK * 2);
+
 	gc_page_header_t *page = GC_BLOCK_PAGE(block);
 	// TODO: mutex per page?
 	hl_mutex_acquire(gc_mutex_pool);
@@ -505,7 +508,7 @@ gc_debug_verify_pool("push");
 // acquires a huge object
 // this always allocates an OS page
 GC_STATIC void *gc_pop_huge(int size) {
-	gc_page_header_t *header = gc_alloc_page_huge(8192 + size);
+	gc_page_header_t *header = gc_alloc_page_huge((GC_BLOCK_HEADER_LINES * GC_LINE_SIZE) + size);
 	GC_DEBUG(alloc, "allocated huge %d at %p", size, header);
 	GC_DEBUG_DUMP2("gc_pop_huge.success", header, size);
 	gc_block_header_t *block = (gc_block_header_t *)header;
@@ -571,7 +574,7 @@ GC_STATIC gc_object_t *gc_alloc_bump(hl_type *t, int size, int words, int flags)
 //gc_debug_block(block);
 //		GC_FATAL("overriding existing object");
 //	}
-	SET_BIT1(block->debug_objects, obj_id);
+	SET_BIT1(block->objects_bmp, obj_id);
 
 	return ret;
 }
@@ -608,7 +611,7 @@ GC_STATIC bool gc_find_gap(void) {
 	// GC_DEBUG("gap search in %p; line %d, %p", current_thread->lines_block, line, current_thread->lines_start);
 	// found a gap, increase limit as far as possible
 	// TODO: optimise
-	while (current_thread->lines_block->line_marks[line] == 0) {
+	while (current_thread->lines_block->line_marks[line] == 0 && line < GC_LINES_PER_BLOCK) {
 		line++;
 	}
 	current_thread->lines_limit = &current_thread->lines_block->lines[line];
@@ -633,7 +636,7 @@ HL_API void *hl_gc_alloc_gen(hl_type *t, int size, int flags) {
 	}
 
 	// align start to next cache line (for gc_find_gap)
-	current_thread->lines_start = (int_val)((char *)current_thread->lines_start + 127) & 0xFFFFFFFFFFFFFF80;
+	current_thread->lines_start = (int_val)((char *)current_thread->lines_start + GC_LINE_SIZE) & 0xFFFFFFFFFFFFFF80;
 
 	// TODO: list operations should not be interrupted by the GC, mutex per list
 
@@ -875,29 +878,29 @@ GC_STATIC void gc_mark(void) {
 
 		// mark line(s)
 		int line_id = GC_LINE_ID_IN(p, block);
-		int obj_id = ((int_val)p - (int_val)&block->lines[0]) / 8;
+		int obj_id = GC_OBJ_ID(p);
 		int words = meta->words;
 
-		if (GC_BLOCK_PAGE(p)->kind != GC_PAGE_HUGE && !GET_BIT(block->debug_objects, obj_id)) {
+		if (GC_BLOCK_PAGE(p)->kind != GC_PAGE_HUGE && !GET_BIT(block->objects_bmp, obj_id)) {
 //gc_debug_block(block);
 //		printf("popped: %p\n", p); fflush(stdout);
 //gc_debug_obj(p);
 //GC_FATAL("not an existing object!");
 			// TODO: these objects probably come from a gc_major triggered from
 			// within gc_pop_block (or similar); in theory, interior pointers should
-			// not get here - then this check and debug_objects can be removed
+			// not get here - then this check and maybe objects_bmp ? can be removed
 			printf("non-ex %p\n", p);
 			continue;
 		}
 
 		if (block->huge_sized) {
-			words = (GC_BLOCK_PAGE(p)->size - 8192) / 8;
+			words = (GC_BLOCK_PAGE(p)->size - (GC_BLOCK_HEADER_LINES * GC_LINE_SIZE)) / 8;
 			GC_DEBUG(mark, "scanning huge, %d words", words);
 		} else if (meta->medium_sized) {
 			words |= GC_METADATA_EXT(p) << 4;
 			words++;
-			int last_id = GC_LINE_ID_IN((char *)p + words * 8, block);
-			int line_span = (last_id - line_id);
+			int last_id = GC_LINE_ID_IN((char *)p + words * 8 - 1, block);
+			int line_span = (last_id - line_id) + 1;
 			GC_DEBUG(mark, "marking medium, %d lines", line_span);
 			memset(&block->line_marks[line_id], 1, line_span);
 		} else if (!block->huge_sized) {
@@ -982,11 +985,10 @@ GC_STATIC void gc_sweep(void) {
 						}
 						block->line_finalize[line_id] = 0;
 					}
-					if (!block->line_marks[line_id] && block->debug_objects) {
-						for (int i = 0; i < 16; i++) {
-							int obj_id = line_id * 16 + i;
-							SET_BIT0(block->debug_objects, obj_id);
-						}
+					if (!block->line_marks[line_id]) {
+						// clear all 16 bits
+						block->objects_bmp[line_id * 2] = 0;
+						block->objects_bmp[line_id * 2 + 1] = 0;
 					}
 					if (line_id == 0)
 						continue;
@@ -1049,6 +1051,11 @@ GC_STATIC gc_block_header_t *gc_get_block(void *p) {
 				// block header
 				return NULL;
 			}
+			int obj_id = ((int_val)p - (int_val)&ret->lines[0]) / 8;
+			/*if (!GET_BIT(ret->objects_bmp, obj_id)) {
+				// not initialised
+				return NULL;
+			}*/
 			return ret;
 		}
 	}

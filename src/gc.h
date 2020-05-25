@@ -16,13 +16,14 @@ static void gc_free_os_memory(void *ptr, int size);
 
 //   4 MiB pages
 //  64 KiB blocks (64 blocks per page)
-// 128   B lines (8KiB header + 448 lines per block)
+// 128   B lines (8KiB header + 442 lines per block)
 #define GC_PAGE_SIZE  (1 << 22)
 #define GC_BLOCK_SIZE (1 << 16)
 #define GC_LINE_SIZE  (1 << 7)
 
 #define GC_BLOCKS_PER_PAGE 64
-#define GC_LINES_PER_BLOCK 448
+#define GC_LINES_PER_BLOCK 442
+#define GC_BLOCK_HEADER_LINES (512 - GC_LINES_PER_BLOCK)
 
 // up to 8184 (~25% of block size) for medium objects
 #define GC_MEDIUM_SIZE ((1 << 13) - 8)
@@ -118,10 +119,10 @@ typedef struct gc_block_header_s {
 	int owner_thread;
 	int huge_sized;
 	unsigned char _pad[4];
-	unsigned char line_marks[GC_LINES_PER_BLOCK];
 	gc_metadata_t metadata[GC_LINES_PER_BLOCK * 16];
-	char *debug_objects;
+	unsigned char line_marks[GC_LINES_PER_BLOCK];
 	unsigned char line_finalize[GC_LINES_PER_BLOCK];
+	unsigned char objects_bmp[GC_LINES_PER_BLOCK * 2];
 	unsigned char _pad2[56];
 	gc_line_t lines[GC_LINES_PER_BLOCK];
 } gc_block_header_t;
@@ -132,6 +133,7 @@ typedef struct gc_block_dummy_s {
 	gc_block_header_t *next;
 } gc_block_dummy_t;
 
+/*
 typedef struct {
 	// bool gc_blocking;
 	void *lines_start;
@@ -141,6 +143,7 @@ typedef struct {
 	gc_block_header_t *full_blocks; // DLL of all full blocks, may become recycled
 	gc_block_header_t *recyclable_blocks; // DLL of recyclable blocks
 } gc_thread_info_t;
+*/
 
 typedef struct {
 	hl_type *t;
@@ -215,12 +218,14 @@ GC_STATIC void gc_grow_heap(int count);
 // gets the index of `block` in its page
 #define GC_BLOCK_ID(block) ((int)(((int_val)(block) - (int_val)GC_BLOCK_PAGE(block)) / GC_BLOCK_SIZE))
 // gets the line index of `ptr` in the given block
-#define GC_LINE_ID_IN(ptr, block) ((int)((int_val)(ptr) - (int_val)(block)) / GC_LINE_SIZE - 64)
+#define GC_LINE_ID_IN(ptr, block) ((int)((int_val)(ptr) - (int_val)(block)) / GC_LINE_SIZE - GC_BLOCK_HEADER_LINES)
 // gets the line index of `ptr` in its block
 #define GC_LINE_ID(ptr) GC_LINE_ID_IN(ptr, GC_LINE_BLOCK(ptr))
 
-#define GC_METADATA(obj) (&(GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024]))
-#define GC_METADATA_EXT(obj) *(int *)(&GC_LINE_BLOCK(obj)->metadata[((int_val)(obj) - (int_val)GC_LINE_BLOCK(obj)) / 8 - 1024 + 1])
+#define GC_OBJ_ID(obj) ((int_val)(obj) - (int_val)(&GC_LINE_BLOCK(obj)->lines[0])) / 8
+
+#define GC_METADATA(obj) (&(GC_LINE_BLOCK(obj)->metadata[GC_OBJ_ID(obj)]))
+#define GC_METADATA_EXT(obj) *(int *)(&GC_LINE_BLOCK(obj)->metadata[GC_OBJ_ID(obj) + 1])
 
 // roots -----------------------------------------------------------
 
