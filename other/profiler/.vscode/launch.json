@@ -10,7 +10,7 @@
 			"type": "hl",
 			"hxml": "profiler.hxml",
 			"cwd": "${workspaceFolder}",
-			"args": ["-out","Profile.json","-debug"],
+			"args": ["--out","Profile.json","--debug"],
 			"preLaunchTask": {
 				"type": "haxe",
 				"args": "active configuration"

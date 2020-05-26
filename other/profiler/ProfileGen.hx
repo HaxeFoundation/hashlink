@@ -100,6 +100,7 @@ class ProfileGen {
 		var outFile = null;
 		var file = null;
 		var debug = false;
+		var mintime = 0.0;
 
 		while( args.length > 0 ) {
 			var arg = args[0];
@@ -109,10 +110,12 @@ class ProfileGen {
 				continue;
 			}
 			switch( arg ) {
-			case "-debug":
+			case "-d"|"--debug":
 				debug = true;
-			case "-out":
+			case "-o"|"--out":
 				outFile = args.shift();
+			case "--min-time-ms":
+				mintime = Std.parseFloat(args.shift()) / 1000.0;
 			default:
 				throw "Unknown parameter "+arg;
 			}
@@ -178,6 +181,11 @@ class ProfileGen {
 				var data = f.read(size);
 				switch( msgId ) {
 				case 0:
+					if(mintime > 0 && tcur.frames.length > 0) {
+						var lastFrame = tcur.frames[tcur.frames.length-1];
+						if(lastFrame.samples.length == 0 || (lastFrame.samples[lastFrame.samples.length-1].time - lastFrame.startTime) < mintime)
+							tcur.frames.pop();
+					}
 					tcur.curFrame = new Frame();
 					tcur.curFrame.startTime = time;
 					tcur.frames.push(tcur.curFrame);
@@ -201,7 +209,8 @@ class ProfileGen {
 		];
 
 		var count = 1;
-		var t0 = threads[0].frames[0].samples[0].time;
+		var f0 = threads[0].frames[0];
+		var t0 = f0.samples.length == 0 ? f0.startTime : f0.samples[0].time;
 
 		for( thread in threads ) {
 			var tid = thread.tid;

@@ -117,6 +117,8 @@ if(WIN32)
         fmt.c
         sha1.c
         dxt.c
+        mikkt.c
+        ${MIKKTSPACE_INCLUDE_DIR}/mikktspace.c
     )
 else()
     find_package(ZLIB REQUIRED)

@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x010A00
+#define HL_VERSION	0x010C00
 
 #if defined(_WIN32)
 #	define HL_WIN
@@ -285,6 +285,11 @@ C_FUNCTION_END
 			    ".long 0b;" \
 			    ".popsection")
 #	endif
+#elif defined(HL_MAC)
+#include <signal.h>
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			raise(SIGTRAP);//__builtin_trap();
 #else
 #	define hl_debug_break()
 #endif
@@ -843,13 +848,16 @@ struct _hl_trap_ctx {
 #define HL_EXC_CATCH_ALL	2
 #define HL_EXC_IS_THROW		4
 #define HL_THREAD_INVISIBLE	16
-#define HL_TREAD_TRACK_SHIFT 5
+#define HL_THREAD_PROFILER_PAUSED 32
+#define HL_TREAD_TRACK_SHIFT 16
 
 #define HL_TRACK_ALLOC		1
 #define HL_TRACK_CAST		2
 #define HL_TRACK_DYNFIELD	4
 #define HL_TRACK_DYNCALL	8
 #define HL_TRACK_MASK		(HL_TRACK_ALLOC | HL_TRACK_CAST | HL_TRACK_DYNFIELD | HL_TRACK_DYNCALL)
+
+#define HL_MAX_EXTRA_STACK 64
 
 typedef struct {
 	int thread_id;
@@ -867,6 +875,8 @@ typedef struct {
 	// extra
 	jmp_buf gc_regs;
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
+	void *extra_stack_data[HL_MAX_EXTRA_STACK];
+	int extra_stack_size;
 } hl_thread_info;
 
 HL_API hl_thread_info *hl_get_thread();

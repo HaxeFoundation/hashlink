@@ -11,11 +11,11 @@ jobs:
       vmImage: ${{ parameters.vmImage }}
     variables:
       ${{ if endsWith(parameters.cmakeGenerator, 'Win64') }}:
-        ARCH: 64
+        MARCH: 64
       ${{ if not(endsWith(parameters.cmakeGenerator, 'Win64')) }}:
-        ARCH: 32
+        MARCH: 32
     steps:
-      - ${{ if eq(parameters.vmImage, 'vs2015-win2012r2') }}:
+      - ${{ if eq(parameters.vmImage, 'vs2017-win2016') }}:
         - powershell: |
             Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
             Write-Host "##vso[task.prependpath]C:\ProgramData\chocolatey\bin"
@@ -33,7 +33,7 @@ jobs:
           Remove-Item openal.zip
         displayName: Install openal
       - powershell: |
-          Invoke-WebRequest https://ffmpeg.zeranoe.com/builds/win$(ARCH)/dev/ffmpeg-3.4.2-win$(ARCH)-dev.zip -OutFile ffmpeg.zip
+          Invoke-WebRequest https://ffmpeg.zeranoe.com/builds/win$(MARCH)/dev/ffmpeg-3.4.2-win$(MARCH)-dev.zip -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath .
           Move-Item ffmpeg-* include/ffmpeg
           Remove-Item ffmpeg.zip
@@ -41,13 +41,13 @@ jobs:
       - powershell: |
           Set-Service wuauserv -StartupType Manual
           choco install --no-progress neko -y
-          Write-Host "##vso[task.setvariable variable=NEKOPATH]C:/ProgramData/chocolatey/lib/neko"
+          $nekoPath = (Get-ChildItem C:/ProgramData/chocolatey/lib/neko/*/neko.dll -Recurse).Directory
+          Write-Host "##vso[task.setvariable variable=NEKOPATH]$nekoPath"
         displayName: 'Install Neko'
       - template: install-haxe-snapshot.yml
         parameters:
-          platform: windows
+          platform: windows64
       - script: |
-          set -ex
           haxelib setup ~/haxelib
           haxelib install hashlink
           haxelib list
@@ -61,10 +61,10 @@ jobs:
           displayName: Test
         - script: cmake --build . --config ${{ parameters.cmakeConfig }} --target PACKAGE
           displayName: Package binaries
-        - task: PublishPipelineArtifact@0
+        - task: PublishPipelineArtifact@1
           inputs:
             artifactName: ${{ parameters.name }}Binaries
-            targetPath: bin/hashlink-1.10.0-win$(ARCH).zip
+            targetPath: bin/hashlink-1.12.0-win$(MARCH).zip
       - ${{ if eq(parameters.buildSystem, 'vs') }}:
         - task: MSBuild@1
           inputs:

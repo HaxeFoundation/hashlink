@@ -2,9 +2,11 @@
 
 #include <hl.h>
 
-#if defined(_WIN32) || defined(__ANDROID__)
+#if defined(_WIN32) || defined(__ANDROID__) || defined(HL_IOS) || defined(HL_TVOS)
 #	include <SDL.h>
 #	include <SDL_syswm.h>
+#elif defined(HL_MAC)
+#	include <SDL.h>
 #else
 #	include <SDL2/SDL.h>
 #endif
@@ -12,7 +14,6 @@
 #if defined (HL_IOS) || defined(HL_TVOS)
 #	include <OpenGLES/ES3/gl.h>
 #	include <OpenGLES/ES3/glext.h>
-#	include <SDL2/SDL_syswm.h>
 #endif
 
 #ifndef SDL_MAJOR_VERSION
@@ -184,20 +185,20 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			break;
 		case SDL_FINGERDOWN:
 			event->type = TouchDown;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_FINGERMOTION:
 			event->type = TouchMove;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_FINGERUP:
 			event->type = TouchUp;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_MOUSEWHEEL:
@@ -471,6 +472,7 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 		// exit borderless
 		SetWindowLong(wnd,GWL_STYLE,save->style);
 		SetWindowPos(wnd,NULL,save->x,save->y,save->w,save->h,0);
+		SDL_SetWindowSize(win, save->w, save->h);
 		free(save);
 		SDL_SetWindowData(win,"save",NULL);
 		save = NULL;
@@ -502,7 +504,7 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 			return true;
 		}
 #	else
-		break;
+		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0;
 #	endif
 	case 3:
 		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN) == 0;

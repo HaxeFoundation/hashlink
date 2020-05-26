@@ -31,6 +31,10 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #	include <dlfcn.h>
 #endif
 
+#define HOT_RELOAD_EXTRA_GLOBALS	4096
+
+HL_API void hl_prim_not_loaded( const uchar *err );
+
 static hl_module **cur_modules = NULL;
 static int modules_count = 0;
 
@@ -78,7 +82,6 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr ) {
 	int *debug_addr;
 	int file, line;
-	int size = *outSize;
 	int pos = 0;
 	int fidx, fpos;
 	hl_function *fdebug;
@@ -101,6 +104,9 @@ uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int 
 		*r_debug_addr = debug_addr;
 		if( file < 0 ) return NULL; // already cached
 	}
+	if( !out )
+		return NULL;
+	int size = *outSize;
 	if( fdebug->obj )
 		pos += usprintf(out,size - pos,USTR("%s.%s("),fdebug->obj->name,fdebug->field.name);
 	else if( fdebug->field.ref )
@@ -235,6 +241,7 @@ hl_module *hl_module_alloc( hl_code *c ) {
 		m->globals_indexes[i] = gsize;
 		gsize += hl_type_size(c->globals[i]);
 	}
+	m->globals_size = gsize;
 	m->globals_data = (unsigned char*)malloc(gsize);
 	if( m->globals_data == NULL ) {
 		hl_module_free(m);
@@ -297,7 +304,7 @@ static void append_type( char **p, hl_type *t ) {
 
 #define DISABLED_LIB_PTR ((void*)(int_val)2)
 
-static void *resolve_library( const char *lib ) {
+static void *resolve_library( const char *lib, bool is_opt ) {
 	char tmp[256];	
 	void *h;
 
@@ -326,7 +333,7 @@ static void *resolve_library( const char *lib ) {
 #		else
 		h = dlopen("libhl.dll",RTLD_LAZY);
 #		endif
-		if( h == NULL ) hl_fatal1("Failed to load library %s","libhl.dll");
+		if( h == NULL && !is_opt ) hl_fatal1("Failed to load library %s","libhl.dll");
 		return h;
 #	else
 		return RTLD_DEFAULT;
@@ -343,7 +350,7 @@ static void *resolve_library( const char *lib ) {
 	
 	strcpy(tmp+strlen(lib),".hdll");
 	h = dlopen(tmp,RTLD_LAZY);
-	if( h == NULL )
+	if( h == NULL && !is_opt )
 		hl_fatal1("Failed to load library %s",tmp);
 	return h;
 }
@@ -447,11 +454,14 @@ static void hl_module_init_natives( hl_module *m ) {
 	const char *curlib = NULL, *sign;
 	for(i=0;i<m->code->nnatives;i++) {
 		hl_native *n = m->code->natives + i;
+		const char *lib = n->lib;
+		bool is_opt = *lib == '?';
 		char *p = tmp;
 		void *f;
-		if( curlib != n->lib ) {
-			curlib = n->lib;
-			libHandler = resolve_library(n->lib);
+		if( is_opt ) lib++;
+		if( curlib != lib ) {
+			curlib = lib;
+			libHandler = resolve_library(lib, is_opt);
 		}
 		if( libHandler == DISABLED_LIB_PTR ) {
 			m->functions_ptrs[n->findex] = disabled_primitive;
@@ -463,8 +473,13 @@ static void hl_module_init_natives( hl_module *m ) {
 		p += strlen(n->name);
 		*p++ = 0;
 		f = dlsym(libHandler,tmp);
-		if( f == NULL )
+		if( f == NULL ) {
+			if( is_opt ) {
+				m->functions_ptrs[n->findex] = hl_prim_not_loaded;
+				continue;
+			}
 			hl_fatal2("Failed to load function %s@%s",n->lib,n->name);
+		}
 		m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
 		p = tmp;
 		append_type(&p,n->t);
@@ -477,6 +492,19 @@ static void hl_module_init_natives( hl_module *m ) {
 int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
+	// expand globals
+	if( hot_reload ) {
+		int nsize = m->globals_size + HOT_RELOAD_EXTRA_GLOBALS * sizeof(void*);
+		int *nindexes = malloc(sizeof(int) * (m->code->nglobals + HOT_RELOAD_EXTRA_GLOBALS));
+		memcpy(nindexes,m->globals_indexes,sizeof(int)*m->code->nglobals);
+		memset(nindexes + m->code->nglobals,0xFF,HOT_RELOAD_EXTRA_GLOBALS * sizeof(int));
+		free(m->globals_indexes);
+		free(m->globals_data);
+		m->globals_indexes = nindexes;
+		m->globals_data = malloc(nsize);
+		memset(m->globals_data,0,m->globals_size);
+		memset(m->globals_data + m->globals_size,0xFF,HOT_RELOAD_EXTRA_GLOBALS * sizeof(void*));
+	}
 	// RESET globals
 	for(i=0;i<m->code->nglobals;i++) {
 		hl_type *t = m->code->globals[i];
@@ -580,7 +608,17 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	jit_ctx *ctx = m1->jit_ctx;
 
 	hl_module *m2 = hl_module_alloc(c);
-	m2->hash = hl_code_hash_alloc(c);	
+	m2->hash = hl_code_hash_alloc(c);
+	hl_code_hash_remap_globals(m2->hash,m1->hash);
+
+	// share global data
+	// TODO : we should assign indexes for new globals
+	// and eventually init their value correctly
+	free(m2->globals_data);
+	free(m2->globals_indexes);
+	m2->globals_data = m1->globals_data;
+	m2->globals_indexes = m1->globals_indexes;
+	
 	hl_module_init_natives(m2);
 	hl_module_init_indexes(m2);
 	hl_jit_reset(ctx, m2);
@@ -598,11 +636,11 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 			if( sign1 == sign2 ) {
 				hl_function *f1 = m1->code->functions + i1;
 				if( (f1->obj != NULL) != (f2->obj != NULL) || !f1->field.name || !f2->field.name ) {
-					printf("Signature conflict\n");
+					printf("[HotReload] Signature conflict\n");
 					continue;
 				}
 				if( ucmp(fun_obj(f1)->name,fun_obj(f2)->name) != 0 || ucmp(fun_field_name(f1),fun_field_name(f2)) != 0 ) {
-					printf("Signature conflict\n");
+					printf("[HotReload] Signature conflict\n");
 					continue;
 				}
 
@@ -647,7 +685,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		}
 	}
 	if( !has_changes ) {
-		printf("No changes found\n");
+		printf("[HotReload] No changes found\n");
 		fflush(stdout);
 		hl_jit_free(ctx, true);
 		return false;
@@ -662,15 +700,9 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 			if( p->kind != t->kind ) continue;
 			if( ucmp(p->obj->name,t->obj->name) != 0 ) continue;
 			if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
-				if( p->obj->global_value && t->obj->global_value ) {
-					// set old global value
-					*t->obj->global_value = *p->obj->global_value;
-					// point to old value address
-					t->obj->global_value = p->obj->global_value; 
-				}
 				t->obj = p->obj; // alias the types ! they are different pointers but have the same layout
 			} else {
-				uprintf(USTR("Type %s has changed\n"),t->obj->name);
+				uprintf(USTR("[HotReload] Type %s has changed\n"),t->obj->name);
 				changes_count++;
 			}
 			break;
@@ -681,7 +713,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	hl_jit_free(ctx,true);
 
 	if( m2->jit_code == NULL ) {
-		printf("Couldn't JIT result\n");
+		printf("[HotReload] Couldn't JIT result\n");
 		fflush(stdout);
 		return false;
 	}
@@ -705,7 +737,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	}
 
 	if( changes_count > 0 ) {
-		printf("%d changes\n", changes_count);
+		printf("[HotReload] %d changes\n", changes_count);
 		fflush(stdout);
 	}
 

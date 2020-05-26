@@ -392,7 +392,7 @@ HL_API void hl_flush_proto( hl_type *ot ) {
 	hl_type_obj *o = ot->obj;
 	hl_runtime_obj *rt = ot->obj->rt;
 	hl_module_context *m = o->m;
-	if( !rt ) return;
+	if( !rt || !ot->vobj_proto ) return;
 	for(i=0;i<o->nbindings;i++) {
 		hl_runtime_binding *b = rt->bindings + i;
 		int mid = o->bindings[(i<<1)|1];
@@ -1077,6 +1077,10 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 			while( true ) {
 				for(i=0;i<tobj->nfields;i++) {
 					hl_obj_field *f = tobj->fields + i;
+					if( !*f->name ) {
+						a->size--;
+						continue;
+					}
 					hl_aptr(a,vbyte*)[p++] =  (vbyte*)f->name;
 				}
 				if( tobj->super == NULL ) break;

@@ -15,9 +15,6 @@ abstract Pointer(haxe.Int64) {
 	public inline function sub( p : Pointer ) : Int {
 		return haxe.Int64.toInt(this - p.value);
 	}
-	public inline function pageAddress() : Pointer {
-		return new Pointer(haxe.Int64.and(this,haxe.Int64.make(-1,~0xFFFF)));
-	}
 	public inline function toString() {
 		return "0x"+(this.high == 0 ? StringTools.hex(this.high, 8) : "")+StringTools.hex(this.low,8);
 	}
@@ -34,41 +31,17 @@ abstract Pointer(haxe.Int64) {
 }
 
 class Page {
-	var memory : Memory;
 	public var addr : Pointer;
 	public var kind : PageKind;
 	public var size : Int;
-	public var blockSize : Int;
-	public var firstBlock : Int;
-	public var maxBlocks : Int;
-	public var nextBlock : Int;
-	public var dataPosition : Int;
-	public var bmp : haxe.io.Bytes;
-	public var sizes : haxe.io.Bytes;
+	public var reserved : Int;
+	public var dataPosition : Int = -1;
 
-	public function new(m) {
-		memory = m;
+	public function new() {
 	}
 
 	public inline function memHasPtr() {
 		return kind == PDynamic || kind == PRaw;
-	}
-
-	public function isLiveBlock( bid : Int ) {
-		if( sizes != null && sizes.get(bid) == 0 ) return false;
-		return (bmp.get(bid >> 3) & (1 << (bid & 7))) != 0;
-	}
-
-	public function getBlockSize( bid : Int ) {
-		return sizes == null ? 1 : sizes.get(bid);
-	}
-
-	public function goto( bid : Int ) {
-		memory.memoryDump.seek(dataPosition + bid * blockSize, SeekBegin);
-	}
-
-	public function getPointer( bid : Int ) {
-		return addr.offset(bid * blockSize);
 	}
 
 }
@@ -88,11 +61,22 @@ enum BlockTypeKind {
 	KInferred( t : TType, k : BlockTypeKind );
 }
 
+class BlockSub {
+	public var b : Block;
+	public var fid : Int;
+	public function new(b,fid) {
+		this.b = b;
+		this.fid = fid;
+	}
+}
+
 class Block {
 	public static var MARK_UID = 0;
 
 	public var page : Page;
-	public var bid : Int;
+	public var addr : Pointer;
+	public var size : Int;
+	public var typePtr : Pointer;
 	public var owner : Block;
 	public var type(default, set) : TType;
 	public var typeKind : BlockTypeKind;
@@ -100,17 +84,10 @@ class Block {
 	public var depth : Int = -1;
 	public var mark : Int = -1;
 
-	public var subs : Array<Block>; // can be null
+	public var subs : Array<BlockSub>; // can be null
 	public var parents : Array<Block>; // if multiple owners
 
 	public function new() {
-	}
-
-	public inline function getPointer() {
-		return page.getPointer(bid);
-	}
-	public inline function getMemSize() {
-		return page.getBlockSize(bid) * page.blockSize;
 	}
 
 	function set_type( t : TType ) {
@@ -119,7 +96,7 @@ class Block {
 		return type = t;
 	}
 
-	public function addParent(b:Block) {
+	public function addParent(b:Block,fid:Int=0) {
 		if( owner == null ) {
 			owner = b;
 		} else {
@@ -127,7 +104,17 @@ class Block {
 			parents.push(b);
 		}
 		if( b.subs == null ) b.subs = [];
-		b.subs.push(this);
+		b.subs.push(new BlockSub(this,fid));
+	}
+
+	public function makeTID( prev : Block, withField : Bool ) {
+		if( type == null )
+			return 0;
+		if( withField )
+			for( s in subs )
+				if( s.b == prev )
+					return type.tid | (s.fid << 24);
+		return type.tid;
 	}
 
 	public function getParents() {
@@ -140,6 +127,7 @@ class Block {
 		while( all.length > 0 ) {
 			var out = [];
 			for( b in all ) {
+				var b = b.b;
 				if( b.depth < 0 || b.depth > d ) {
 					b.depth = d;
 					if( b.subs != null ) for( s in b.subs ) out.push(s);
@@ -180,7 +168,7 @@ class Block {
 	public function removeChildren() {
 		if( subs != null ) {
 			for( s in subs )
-				s.removeParent(this);
+				s.b.removeParent(this);
 			subs = null;
 		}
 	}

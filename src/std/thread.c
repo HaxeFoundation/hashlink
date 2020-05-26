@@ -397,7 +397,11 @@ HL_PRIM bool hl_lock_wait( hl_lock *l, vdynamic *timeout ) {
 #	if !defined(HL_THREADS)
 	return true;
 #	elif defined(HL_WIN)
-	switch( WaitForSingleObject(l->wait, timeout?(DWORD)((FLOAT)timeout->v.d * 1000.0):INFINITE) ) {
+	DWORD ret;
+	hl_blocking(true);
+	ret = WaitForSingleObject(l->wait, timeout?(DWORD)((FLOAT)timeout->v.d * 1000.0):INFINITE);
+	hl_blocking(false);
+	switch( ret ) {
 	case WAIT_ABANDONED:
 	case WAIT_OBJECT_0:
 		return true;
@@ -408,6 +412,7 @@ HL_PRIM bool hl_lock_wait( hl_lock *l, vdynamic *timeout ) {
 	}
 #	else
 	{
+		hl_blocking(true);
 		pthread_mutex_lock(&l->lock);
 		while( l->counter == 0 ) {
 			if( timeout ) {
@@ -425,6 +430,7 @@ HL_PRIM bool hl_lock_wait( hl_lock *l, vdynamic *timeout ) {
 				t.tv_nsec = (long)delta;
 				if( pthread_cond_timedwait(&l->wait,&l->lock,&t) != 0 ) {
 					pthread_mutex_unlock(&l->lock);
+					hl_blocking(false);
 					return false;
 				}
 			} else
@@ -434,6 +440,7 @@ HL_PRIM bool hl_lock_wait( hl_lock *l, vdynamic *timeout ) {
 		if( l->counter > 0 )
 			pthread_cond_signal(&l->wait);
 		pthread_mutex_unlock(&l->lock);
+		hl_blocking(false);
 		return true;
 	}
 #	endif

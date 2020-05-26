@@ -249,7 +249,7 @@
     <ClCompile Include="include\pcre\pcre_tables.c" />
     <ClCompile Include="include\pcre\pcre_ucd.c" />
     <ClCompile Include="include\pcre\pcre_xclass.c" />
-    <ClCompile Include="src\alloc.c" />
+    <ClCompile Include="src\gc.c" />
     <ClCompile Include="src\std\array.c" />
     <ClCompile Include="src\std\buffer.c" />
     <ClCompile Include="src\std\bytes.c" />

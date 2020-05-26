@@ -168,7 +168,7 @@ static void hl_profile_loop( void *_ ) {
 	while( !data.stopLoop ) {
 		double t = hl_sys_time();
 		if( t < next || data.profiling_pause ) {
-			if( !(t < next) ) next = t; 
+			if( !(t < next) ) next = t;
 			data.waitLoop = false;
 			continue;
 		}
@@ -178,6 +178,8 @@ static void hl_profile_loop( void *_ ) {
 		thread_handle *cur = data.handles;
 		for(i=0;i<threads->count;i++) {
 			hl_thread_info *t = threads->threads[i];
+			if( t->flags & HL_THREAD_INVISIBLE ) continue;
+
 			if( !cur || cur->tid != t->thread_id ) {
 				thread_handle *h = malloc(sizeof(thread_handle));
 				h->tid = t->thread_id;
@@ -187,7 +189,8 @@ static void hl_profile_loop( void *_ ) {
 				cur = h;
 				if( prev == NULL ) data.handles = h; else prev->next = h;
 			}
-			read_thread_data(cur);
+			if( (t->flags & HL_THREAD_PROFILER_PAUSED) == 0 )
+				read_thread_data(cur);
 			prev = cur;
 			cur = cur->next;
 		}
@@ -199,15 +202,25 @@ static void hl_profile_loop( void *_ ) {
 		}
 		next += wait_time;
 	}
+	free(data.tmpMemory);
+	data.tmpMemory = NULL;
+	data.sample_count = 0;
+	data.stopLoop = false;
 }
 
 static void profile_event( int code, vbyte *data, int dataLen );
 
-void hl_profile_start( int sample_count ) {
+void hl_profile_setup( int sample_count ) {
 #	if defined(HL_THREADS) && defined(HL_WIN_DESKTOP)
+	hl_setup_profiler(profile_event,hl_profile_end);
+	if( data.sample_count ) return;
+	if( sample_count < 0 ) {
+		// was not started with --profile : pause until we get start event
+		data.profiling_pause++;
+		return;
+	}
 	data.sample_count = sample_count;
 	hl_thread_start(hl_profile_loop,NULL,false);
-	hl_setup_profiler(profile_event,hl_profile_end);
 #	endif
 }
 
@@ -216,7 +229,7 @@ static bool read_profile_data( profile_reader *r, void *ptr, int size ) {
 		if( r->r == NULL ) return false;
 		int bytes = r->r->currentPos - r->pos;
 		if( bytes > size ) bytes = size;
-		memcpy(ptr, r->r->data + r->pos, bytes);
+		if( ptr ) memcpy(ptr, r->r->data + r->pos, bytes);
 		size -= bytes;
 		r->pos += bytes;
 		if( r->pos == r->r->currentPos ) {
@@ -229,7 +242,7 @@ static bool read_profile_data( profile_reader *r, void *ptr, int size ) {
 
 static void profile_dump() {
 	if( !data.first_record ) return;
-	
+
 	data.profiling_pause++;
 	printf("Writing profiling data...\n");
 	fflush(stdout);
@@ -285,6 +298,28 @@ static void profile_dump() {
 			}
 		}
 	}
+	// reset debug_addr flags (allow further dumps)
+	r.r = data.first_record;
+	r.pos = 0;
+	while( true ) {
+		int i, eventId;
+		if( !read_profile_data(&r,NULL, sizeof(double) + sizeof(int)) ) break;
+		read_profile_data(&r,&eventId,sizeof(int));
+		if( eventId < 0 ) {
+			int count = eventId & 0x7FFFFFFF;
+			read_profile_data(&r,data.stackOut,sizeof(void*)*count);
+			for(i=0;i<count;i++) {
+				int *debug_addr = NULL;
+				hl_module_resolve_symbol_full(data.stackOut[i],NULL,NULL,&debug_addr);
+				if( debug_addr )
+					debug_addr[0] &= 0x7FFFFFFF;
+			}
+		} else {
+			int size;
+			read_profile_data(&r,&size,sizeof(int));
+			read_profile_data(&r,NULL,size);
+		}
+	}
 	fclose(f);
 	printf("%d profile samples saved\n", samples);
 	data.profiling_pause--;
@@ -292,22 +327,52 @@ static void profile_dump() {
 
 void hl_profile_end() {
 	profile_dump();
+	if( !data.sample_count ) return;
 	data.stopLoop = true;
+	while( data.stopLoop ) {};
 }
 
 static void profile_event( int code, vbyte *ptr, int dataLen ) {
 	switch( code ) {
 	case -1:
-		data.profiling_pause++;
+		hl_get_thread()->flags |= HL_THREAD_PROFILER_PAUSED;
 		break;
 	case -2:
-		data.profiling_pause--;
+		hl_get_thread()->flags &= ~HL_THREAD_PROFILER_PAUSED;
 		break;
 	case -3:
+		data.profiling_pause++;
+		data.waitLoop = true;
+		while( data.waitLoop ) {}
+		profile_data *d = data.first_record;
+		while( d ) {
+			profile_data *n = d->next;
+			free(d->data);
+			free(d);
+			d = n;
+		}
+		data.first_record = NULL;
+		data.record = NULL;
+		data.profiling_pause--;
+		break;
+	case -4:
+		data.profiling_pause++;
+		break;
+	case -5:
+		data.profiling_pause--;
+		break;
+	case -6:
 		profile_dump();
+		break;
+	case -7:
+		{
+			uchar *end = NULL;
+			hl_profile_setup( ptr ? utoi((uchar*)ptr,&end) : 1000);
+		}
 		break;
 	default:
 		if( code < 0 ) return;
+		if( data.profiling_pause || (code != 0 && (hl_get_thread()->flags & HL_THREAD_PROFILER_PAUSED)) ) return;
 		data.profiling_pause++;
 		data.waitLoop = true;
 		while( data.waitLoop ) {}

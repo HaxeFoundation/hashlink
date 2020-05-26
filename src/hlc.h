@@ -44,6 +44,9 @@
 #undef STRICT
 #undef TRUE
 #undef FALSE
+#undef CW_USEDEFAULT
+#undef HIDDEN
+#undef RESIZABLE
 
 // disable some warnings triggered by HLC code generator
 
