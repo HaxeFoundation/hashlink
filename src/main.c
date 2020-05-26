@@ -125,6 +125,7 @@ static void setup_handler() {
 	act.sa_handler = handle_signal;
 	act.sa_flags = 0;
 	sigemptyset(&act.sa_mask);
+	signal(SIGPIPE, SIG_IGN);
 	sigaction(SIGSEGV,&act,NULL);
 	sigaction(SIGTERM,&act,NULL);
 }
