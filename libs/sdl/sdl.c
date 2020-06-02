@@ -1,6 +1,7 @@
 #define HL_NAME(n) sdl_##n
 
 #include <hl.h>
+#include <locale.h>
 
 #if defined(_WIN32) || defined(__ANDROID__) || defined(HL_IOS) || defined(HL_TVOS)
 #	include <SDL.h>
@@ -97,6 +98,7 @@ HL_PRIM bool HL_NAME(init_once)() {
 		hl_error("SDL_Init failed: %s", hl_to_utf16(SDL_GetError()));
 		return false;
 	}
+	setlocale(LC_NUMERIC, "C");
 #	ifdef _WIN32
 	// Set the internal windows timer period to 1ms (will give accurate sleep for vsync)
 	timeBeginPeriod(1);
