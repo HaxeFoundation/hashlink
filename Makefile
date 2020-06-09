@@ -11,6 +11,7 @@ LIBS=fmt sdl ssl openal ui uv mysql
 
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
+EXTRA_LFLAGS ?=
 LIBFLAGS =
 HLFLAGS = -ldl
 LIBEXT = so
@@ -133,10 +134,10 @@ libhl: ${LIB}
 	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
 hlc: ${BOOT}
-	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
+	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}
 
 hl: ${HL} libhl
-	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
+	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
 
 fmt: ${FMT} libhl
 	${CC} ${CFLAGS} -I include/mikktspace -I include/minimp3 -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
