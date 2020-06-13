@@ -487,7 +487,7 @@ typedef struct _vclosure {
 	void *fun;
 	int hasValue;
 #	ifdef HL_64
-	int __pad;
+	int stackCount;
 #	endif
 	void *value;
 } vclosure;

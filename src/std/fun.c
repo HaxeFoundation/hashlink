@@ -21,6 +21,8 @@
  */
 #include <hl.h>
 
+HL_PRIM int hl_closure_stack_capture = 0;
+
 static void fun_var_args() {
 	hl_error("Variable fun args was not cast to typed function");
 }
@@ -29,7 +31,7 @@ HL_PRIM vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue ) {
 	vclosure *c = (vclosure*)hl_gc_alloc_noptr(sizeof(vclosure));
 	c->t = t;
 	c->fun = fvalue;
-	c->hasValue = false;
+	c->hasValue = 0;
 	c->value = NULL;
 	return c;
 }
@@ -48,14 +50,21 @@ static hl_type *hl_get_closure_type( hl_type *t ) {
 	return (hl_type*)&ft->closure_type;
 }
 
+int hl_internal_capture_stack( void **stack, int size );
+
 HL_PRIM vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) {
 	hl_type *t = hl_get_closure_type(fullt);
-	vclosure *c = (vclosure*)hl_gc_alloc(t, sizeof(vclosure));
+	vclosure *c = (vclosure*)hl_gc_alloc(t, sizeof(vclosure) + sizeof(void*) * hl_closure_stack_capture);
 	c->t = t;
 	c->fun = fvalue;
 	c->hasValue = 1;
 #	ifdef HL_64
-	c->__pad = 0;
+	int stack = 0;
+	if( hl_closure_stack_capture ) {
+		stack = hl_internal_capture_stack((void**)(c + 1), hl_closure_stack_capture);
+		memset((void**)(c + 1)+stack,0,sizeof(void*)*(hl_closure_stack_capture - stack));
+	}
+	c->stackCount = stack;
 #	endif
 	c->value = v;
 	return c;
@@ -320,6 +329,9 @@ HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args
 				w.cl.t = ft;
 				w.cl.fun = hlc_get_wrapper(ft);
 				w.cl.hasValue = 2;
+#				ifdef HL_64
+				w.cl.stackCount = 0;
+#				endif
 				w.cl.value = &w;
 				w.wrappedFun = tmp;
 				return hl_wrapper_call(&w,args,ret);
@@ -340,11 +352,17 @@ HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args
 					w.cl.t = ft;
 					w.cl.fun = hlc_get_wrapper(ft);
 					w.cl.hasValue = 2;
+#					ifdef HL_64
+					w.cl.stackCount = 0;
+#					endif
 					w.cl.value = &w;
 					if( l->field_index < 0 ) {
 						tmp.t = hl_get_closure_type(l->t);
 						tmp.fun = o->t->obj->rt->methods[-l->field_index-1];
 						tmp.hasValue = 1;
+#						ifdef HL_64
+						tmp.stackCount = 0;
+#						endif
 						tmp.value = o;
 						w.wrappedFun = &tmp;
 					} else {
@@ -378,6 +396,9 @@ HL_PRIM vclosure *hl_make_fun_wrapper( vclosure *v, hl_type *to ) {
 	c->cl.t = to;
 	c->cl.fun = wrap;
 	c->cl.hasValue = 2;
+#	ifdef HL_64
+	c->cl.stackCount = 0;
+#	endif
 	c->cl.value = c;
 	c->wrappedFun = v;
 	return (vclosure*)c;
