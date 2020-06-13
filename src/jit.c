@@ -2239,7 +2239,7 @@ static void jit_nops( jit_ctx *ctx ) {
 static void *call_jit_c2hl = NULL;
 static void *call_jit_hl2c = NULL;
 
-static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
+static void *callback_c2hl( void **f, hl_type *t, void **args, vdynamic *ret ) {
 	/*
 		prepare stack and regs according to prepare_call_args, but by reading runtime type information
 		from the function type. The stack and regs will be setup by the trampoline function.
@@ -2333,16 +2333,16 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	case HUI16:
 	case HI32:
 	case HBOOL:
-		ret->v.i = ((int (*)(void *, void *, void *))call_jit_c2hl)(f, (void**)&stack + pos, &stack);
+		ret->v.i = ((int (*)(void *, void *, void *))call_jit_c2hl)(*f, (void**)&stack + pos, &stack);
 		return &ret->v.i;
 	case HF32:
-		ret->v.f = ((float (*)(void *, void *, void *))call_jit_c2hl)(f, (void**)&stack + pos, &stack);
+		ret->v.f = ((float (*)(void *, void *, void *))call_jit_c2hl)(*f, (void**)&stack + pos, &stack);
 		return &ret->v.f;
 	case HF64:
-		ret->v.d = ((double (*)(void *, void *, void *))call_jit_c2hl)(f, (void**)&stack + pos, &stack);
+		ret->v.d = ((double (*)(void *, void *, void *))call_jit_c2hl)(*f, (void**)&stack + pos, &stack);
 		return &ret->v.d;
 	default:
-		return ((void *(*)(void *, void *, void *))call_jit_c2hl)(f, (void**)&stack + pos, &stack);
+		return ((void *(*)(void *, void *, void *))call_jit_c2hl)(*f, (void**)&stack + pos, &stack);
 	}
 }
 
@@ -4144,7 +4144,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	if( !call_jit_c2hl ) {
 		call_jit_c2hl = code + ctx->c2hl;
 		call_jit_hl2c = code + ctx->hl2c;
-		hl_setup_callbacks(callback_c2hl, get_wrapper);
+		hl_setup_callbacks2(callback_c2hl, get_wrapper, 1);
 #		ifdef JIT_CUSTOM_LONGJUMP
 		hl_setup_longjump(code + ctx->longjump);
 #		endif

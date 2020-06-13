@@ -44,7 +44,6 @@ typedef struct {
 	hl_code *code;
 	hl_module *m;
 	vdynamic *ret;
-	vclosure c;
 	pchar *file;
 	int file_time;
 } main_context;
@@ -139,6 +138,7 @@ int wmain(int argc, pchar *argv[]) {
 #else
 int main(int argc, pchar *argv[]) {
 #endif
+	static vclosure cl;
 	pchar *file = NULL;
 	char *error_msg = NULL;
 	int debug_port = -1;
@@ -225,12 +225,12 @@ int main(int argc, pchar *argv[]) {
 		fprintf(stderr,"Could not start debugger on port %d",debug_port);
 		return 4;
 	}
-	ctx.c.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
-	ctx.c.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
-	ctx.c.hasValue = 0;
+	cl.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
+	cl.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
+	cl.hasValue = 0;
 	setup_handler();
 	hl_profile_setup(profile_count);
-	ctx.ret = hl_dyn_call_safe(&ctx.c,NULL,0,&isExc);
+	ctx.ret = hl_dyn_call_safe(&cl,NULL,0,&isExc);
 	hl_profile_end();
 	if( isExc ) {
 		varray *a = hl_exception_stack();

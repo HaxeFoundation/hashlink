@@ -60,10 +60,7 @@ HL_PRIM vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *v ) 
 	c->hasValue = 1;
 #	ifdef HL_64
 	int stack = 0;
-	if( hl_closure_stack_capture ) {
-		stack = hl_internal_capture_stack((void**)(c + 1), hl_closure_stack_capture);
-		memset((void**)(c + 1)+stack,0,sizeof(void*)*(hl_closure_stack_capture - stack));
-	}
+	if( hl_closure_stack_capture ) stack = hl_internal_capture_stack((void**)(c + 1), hl_closure_stack_capture);
 	c->stackCount = stack;
 #	endif
 	c->value = v;
@@ -124,11 +121,18 @@ typedef void *(*fptr_get_wrapper)(hl_type *t);
 
 static fptr_static_call hlc_static_call = NULL;
 static fptr_get_wrapper hlc_get_wrapper = NULL;
+static int hlc_call_flags = 0;
 
-HL_PRIM void hl_setup_callbacks( void *c, void *w ) {
+HL_PRIM void hl_setup_callbacks2( void *c, void *w, int flags ) {
 	hlc_static_call = (fptr_static_call)c;
 	hlc_get_wrapper = (fptr_get_wrapper)w;
+	hlc_call_flags = flags;
 }
+
+HL_PRIM void hl_setup_callbacks( void *c, void *w ) {
+	hl_setup_callbacks2(c,w,0);
+}
+
 
 #define HL_MAX_ARGS 9
 
@@ -186,7 +190,7 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 		}
 		pargs[i] = p;
 	}
-	ret = hlc_static_call(cl->fun,cl->t,pargs,&out);
+	ret = hlc_static_call(hlc_call_flags & 1 ? &cl->fun : cl->fun,cl->t,pargs,&out);
 	tret = cl->t->fun->ret;
 	if( !hl_is_ptr(tret) ) {
 		vdynamic *r;
@@ -290,7 +294,7 @@ HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 			vargs[p++] = v;
 		}
 	}
-	pret = hlc_static_call(w->fun,w->hasValue ? w->t->fun->parent : w->t,vargs,ret);
+	pret = hlc_static_call(hlc_call_flags & 1 ? &w->fun : w->fun,w->hasValue ? w->t->fun->parent : w->t,vargs,ret);
 	aret = hl_is_ptr(w->t->fun->ret) ? &pret : pret;
 	if( aret == NULL ) aret = &pret;
 	switch( tfun->ret->kind ) {
