@@ -108,6 +108,12 @@ static int throw_handler( int code ) {
 }
 #endif
 
+#if defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return wmain(__argc, __argv);
+}
+#endif
+
 #ifdef HL_WIN_DESKTOP
 int wmain(int argc, uchar *argv[]) {
 #else
