@@ -47,6 +47,7 @@
 #undef CW_USEDEFAULT
 #undef HIDDEN
 #undef RESIZABLE
+#undef __SIGN
 
 // disable some warnings triggered by HLC code generator
 
