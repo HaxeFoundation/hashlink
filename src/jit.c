@@ -1161,9 +1161,9 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 #	endif
 		{
 			preg *tmp;
-			if( size == 8 && (!IS_64 || (to->kind == RSTACK && IS_FLOAT(R(to->id))) || (from->kind == RSTACK && IS_FLOAT(R(from->id)))) ) {
+			if( (!IS_64 && size == 8) || (to->kind == RSTACK && IS_FLOAT(R(to->id))) || (from->kind == RSTACK && IS_FLOAT(R(from->id))) ) {
 				tmp = alloc_reg(ctx, RFPU);
-				op64(ctx,MOVSD,tmp,from);
+				op64(ctx,size == 8 ? MOVSD : MOVSS,tmp,from);
 			} else {
 				tmp = alloc_reg(ctx, RCPU);
 				copy(ctx,tmp,from,size);
@@ -1204,6 +1204,8 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 		r->current = NULL;
 	}
 	v = copy(ctx,&r->stack,v,r->size);
+	if( IS_FLOAT(r) != (v->kind == RFPU) )
+		ASSERT(0);
 	if( bind && r->current != v && (v->kind == RCPU || v->kind == RFPU) ) {
 		scratch(v);
 		r->current = v;
