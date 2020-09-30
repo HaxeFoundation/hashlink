@@ -135,8 +135,8 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_MBUTTONUP: addMouse(MouseUp,2); break;
 	case WM_RBUTTONDOWN: addMouse(MouseDown,3); break;
 	case WM_RBUTTONUP: addMouse(MouseUp,3); break;
-	case WM_XBUTTONUP: addMouse(MouseDown,3 + HIWORD(wparam)); break;
-	case WM_XBUTTONDOWN: addMouse(MouseUp,3 + HIWORD(wparam)); break;
+	case WM_XBUTTONDOWN: addMouse(MouseDown,3 + HIWORD(wparam)); break;
+	case WM_XBUTTONUP: addMouse(MouseUp,3 + HIWORD(wparam)); break;
 	case WM_MOUSEWHEEL: addMouse(MouseWheel,0); e->wheelDelta = ((int)(short)HIWORD(wparam)) / 120; break;
 	case WM_SYSCOMMAND:
 		if( wparam == SC_KEYMENU && (lparam>>16) <= 0 )
