@@ -605,10 +605,12 @@ class Memory {
 		for( i in currentTypeIndex...types.length ) {
 			var t = types[i];
 			var tstr = t.toString();
-			resolveCache.set(tstr, t);
-			currentTypeIndex = i + 1;
-			if( tstr == str )
-				return t;
+			if (tstr != null) {
+				resolveCache.set(tstr, t);
+				currentTypeIndex = i + 1;
+				if( tstr == str )
+					return t;
+			}
 		}
 		if( showError )
 			log("Type not found '"+str+"'");
