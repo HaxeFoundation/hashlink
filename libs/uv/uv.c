@@ -21,6 +21,8 @@ typedef struct sockaddr uv_sockaddr;
 #define EVT_WRITE	0	// write_t
 #define EVT_CONNECT	0	// connect_t
 
+#define EVT_TIMER_TICK 0 // timer
+
 #define EVT_MAX		2
 
 typedef struct {
@@ -153,6 +155,66 @@ DEFINE_PRIM(_BOOL, stream_read_start, _HANDLE _FUN(_VOID,_BYTES _I32));
 DEFINE_PRIM(_VOID, stream_read_stop, _HANDLE);
 DEFINE_PRIM(_BOOL, stream_listen, _HANDLE _I32 _CALLB);
 
+// Timer
+HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
+	uv_timer_t *t = UV_ALLOC(uv_timer_t);
+	if( uv_timer_init(loop,t) < 0) {
+		free(t);
+		//TODO: throw error
+		return NULL;
+	}
+	init_hl_data((uv_handle_t*)t);
+	return t;
+}
+DEFINE_PRIM(_HANDLE, timer_init_wrap, _LOOP);
+
+static void on_timer_tick( uv_timer_t *t ) {
+	trigger_callb((uv_handle_t*)t, EVT_TIMER_TICK, NULL, 0, true);
+}
+
+// TODO: change `timeout` and `repeat` to uint64
+HL_PRIM void HL_NAME(timer_start_wrap)(uv_timer_t *t, vclosure *c, int timeout, int repeat) {
+	register_callb((uv_handle_t*)t,c,EVT_TIMER_TICK);
+	if(uv_timer_start(t,on_timer_tick, (uint64_t)timeout, (uint64_t)repeat) < 0) {
+		clear_callb((uv_handle_t*)t, EVT_TIMER_TICK);
+		//TODO: throw error
+	}
+}
+DEFINE_PRIM(_VOID, timer_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG) _I32 _I32);
+
+HL_PRIM void HL_NAME(timer_stop_wrap)(uv_timer_t *t) {
+	clear_callb((uv_handle_t*)t, EVT_TIMER_TICK);
+	if(uv_timer_stop(t) < 0) {
+		//TODO: throw error
+	}
+}
+DEFINE_PRIM(_VOID, timer_stop_wrap, _HANDLE);
+
+HL_PRIM void HL_NAME(timer_again_wrap)(uv_timer_t *t) {
+	if(uv_timer_again(t) < 0) {
+		//TODO: throw error
+	}
+}
+DEFINE_PRIM(_VOID, timer_again_wrap, _HANDLE);
+
+// TODO: Requires libuv 1.40
+// HL_PRIM int HL_NAME(timer_get_due_in_wrap)(uv_timer_t *t) {
+// 	return (int)uv_timer_get_due_in(t); //TODO: change to uint64_t
+// }
+// DEFINE_PRIM(_I32, timer_get_due_in_wrap, _HANDLE);
+
+HL_PRIM int HL_NAME(timer_get_repeat_wrap)(uv_timer_t *t) {
+	return (int)uv_timer_get_repeat(t); //TODO: change to uint64_t
+}
+DEFINE_PRIM(_I32, timer_get_repeat_wrap, _HANDLE);
+
+//TODO: change `value` to uint64_t
+HL_PRIM int HL_NAME(timer_set_repeat_wrap)(uv_timer_t *t, int value) {
+	uv_timer_set_repeat(t, (uint64_t)value);
+	return value;
+}
+DEFINE_PRIM(_I32, timer_set_repeat_wrap, _HANDLE _I32);
+
 // TCP
 
 #define _TCP _HANDLE
@@ -228,6 +290,17 @@ DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
 DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _TCP _BOOL);
 
 // loop
+
+HL_PRIM uv_loop_t *HL_NAME(loop_init_wrap)( ) {
+	uv_loop_t *loop = UV_ALLOC(uv_loop_t);
+	if( uv_loop_init(loop) < 0) {
+		free(loop);
+		//TODO: throw error
+		return NULL;
+	}
+	return loop;
+}
+DEFINE_PRIM(_LOOP, loop_init_wrap, _NO_ARG);
 
 DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
 DEFINE_PRIM(_I32, loop_close, _LOOP);
