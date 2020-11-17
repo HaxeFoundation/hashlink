@@ -285,10 +285,10 @@ HL_PRIM void HL_NAME(timer_again_wrap)(uv_timer_t *t) {
 DEFINE_PRIM(_VOID, timer_again_wrap, _HANDLE);
 
 // TODO: Requires libuv 1.40
-// HL_PRIM int HL_NAME(timer_get_due_in_wrap)(uv_timer_t *t) {
-// 	return (int)uv_timer_get_due_in(t); //TODO: change to uint64_t
-// }
-// DEFINE_PRIM(_I32, timer_get_due_in_wrap, _HANDLE);
+HL_PRIM int HL_NAME(timer_get_due_in_wrap)(uv_timer_t *t) {
+	return (int)uv_timer_get_due_in(t); //TODO: change to uint64_t
+}
+DEFINE_PRIM(_I32, timer_get_due_in_wrap, _HANDLE);
 
 HL_PRIM int HL_NAME(timer_get_repeat_wrap)(uv_timer_t *t) {
 	return (int)uv_timer_get_repeat(t); //TODO: change to uint64_t
@@ -387,7 +387,7 @@ HL_PRIM uv_loop_t *HL_NAME(loop_init_wrap)( ) {
 	}
 	return loop;
 }
-DEFINE_PRIM(_DYN, loop_init_wrap, _NO_ARG);
+DEFINE_PRIM(_LOOP, loop_init_wrap, _NO_ARG);
 
 DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
 DEFINE_PRIM(_I32, loop_close, _LOOP);
