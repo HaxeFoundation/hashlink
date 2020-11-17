@@ -284,7 +284,6 @@ HL_PRIM void HL_NAME(timer_again_wrap)(uv_timer_t *t) {
 }
 DEFINE_PRIM(_VOID, timer_again_wrap, _HANDLE);
 
-// TODO: Requires libuv 1.40
 HL_PRIM int HL_NAME(timer_get_due_in_wrap)(uv_timer_t *t) {
 	return (int)uv_timer_get_due_in(t); //TODO: change to uint64_t
 }
