@@ -37,6 +37,93 @@ typedef struct {
 #define _CALLB	_FUN(_VOID,_NO_ARG)
 #define UV_ALLOC(t)		((t*)malloc(sizeof(t)))
 
+// Errors
+
+// static int code_uv2hx( int code ) {
+// 	switch(code) {
+// 		case 0: return 0; break;
+// 		case UV_E2BIG: return 1; break;
+// 		case UV_EACCES: return 2; break;
+// 		case UV_EADDRINUSE: return 3; break;
+// 		case UV_EADDRNOTAVAIL: return 4; break;
+// 		case UV_EAFNOSUPPORT: return 5; break;
+// 		case UV_EAGAIN: return 6; break;
+// 		case UV_EAI_ADDRFAMILY: return 7; break;
+// 		case UV_EAI_AGAIN: return 8; break;
+// 		case UV_EAI_BADFLAGS: return 9; break;
+// 		case UV_EAI_BADHINTS: return 10; break;
+// 		case UV_EAI_CANCELED: return 11; break;
+// 		case UV_EAI_FAIL: return 11; break;
+// 		case UV_EAI_FAMILY: return 12; break;
+// 		case UV_EAI_MEMORY: return 13; break;
+// 		case UV_EAI_NODATA: return 14; break;
+// 		case UV_EAI_NONAME: return 15; break;
+// 		case UV_EAI_OVERFLOW: return 16; break;
+// 		case UV_EAI_PROTOCOL: return 17; break;
+// 		case UV_EAI_SERVICE: return 18; break;
+// 		case UV_EAI_SOCKTYPE: return 19; break;
+// 		case UV_EALREADY: return 20; break;
+// 		case UV_EBADF: return 21; break;
+// 		case UV_EBUSY: return 22; break;
+// 		case UV_ECANCELED: return 23; break;
+// 		case UV_ECHARSET: return 24; break;
+// 		case UV_ECONNABORTED: return 25; break;
+// 		case UV_ECONNREFUSED: return 26; break;
+// 		case UV_ECONNRESET: return 27; break;
+// 		case UV_EDESTADDRREQ: return 28; break;
+// 		case UV_EEXIST: return 29; break;
+// 		case UV_EFAULT: return 30; break;
+// 		case UV_EFBIG: return 31; break;
+// 		case UV_EHOSTUNREACH: return 32; break;
+// 		case UV_EINTR: return 33; break;
+// 		case UV_EINVAL: return 34; break;
+// 		case UV_EIO: return 35; break;
+// 		case UV_EISCONN: return 36; break;
+// 		case UV_EISDIR: return 37; break;
+// 		case UV_ELOOP: return 38; break;
+// 		case UV_EMFILE: return 39; break;
+// 		case UV_EMSGSIZE: return 40; break;
+// 		case UV_ENAMETOOLONG: return 41; break;
+// 		case UV_ENETDOWN: return 42; break;
+// 		case UV_ENETUNREACH: return 43; break;
+// 		case UV_ENFILE: return 44; break;
+// 		case UV_ENOBUFS: return 45; break;
+// 		case UV_ENODEV: return 46; break;
+// 		case UV_ENOENT: return 47; break;
+// 		case UV_ENOMEM: return 48; break;
+// 		case UV_ENONET: return 49; break;
+// 		case UV_ENOPROTOOPT: return 50; break;
+// 		case UV_ENOSPC: return 51; break;
+// 		case UV_ENOSYS: return 52; break;
+// 		case UV_ENOTCONN: return 53; break;
+// 		case UV_ENOTDIR: return 54; break;
+// 		case UV_ENOTEMPTY: return 55; break;
+// 		case UV_ENOTSOCK: return 56; break;
+// 		case UV_ENOTSUP: return 57; break;
+// 		case UV_EPERM: return 58; break;
+// 		case UV_EPIPE: return 59; break;
+// 		case UV_EPROTO: return 60; break;
+// 		case UV_EPROTONOSUPPORT: return 61; break;
+// 		case UV_EPROTOTYPE: return 62; break;
+// 		case UV_ERANGE: return 63; break;
+// 		case UV_EROFS: return 64; break;
+// 		case UV_ESHUTDOWN: return 65; break;
+// 		case UV_ESPIPE: return 66; break;
+// 		case UV_ESRCH: return 67; break;
+// 		case UV_ETIMEDOUT: return 68; break;
+// 		case UV_ETXTBSY: return 69; break;
+// 		case UV_EXDEV: return 70; break;
+// 		case UV_UNKNOWN: return 71; break;
+// 		case UV_EOF: return 72; break;
+// 		case UV_ENXIO: return 73; break;
+// 		case UV_EMLINK: return 74; break;
+// 		case UV_EHOSTDOWN: return 75; break;
+// 		case UV_EREMOTEIO: return 76; break;
+// 		case UV_ENOTTY: return 77; break;
+// 		default: return UV_UNKNOWN;
+// 	}
+// }
+
 // HANDLE
 
 static events_data *init_hl_data( uv_handle_t *h ) {
@@ -300,7 +387,7 @@ HL_PRIM uv_loop_t *HL_NAME(loop_init_wrap)( ) {
 	}
 	return loop;
 }
-DEFINE_PRIM(_LOOP, loop_init_wrap, _NO_ARG);
+DEFINE_PRIM(_DYN, loop_init_wrap, _NO_ARG);
 
 DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
 DEFINE_PRIM(_I32, loop_close, _LOOP);
