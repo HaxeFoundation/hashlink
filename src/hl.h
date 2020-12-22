@@ -150,9 +150,14 @@
 #	include <stdint.h>
 #endif
 
-#if defined(HL_VCC) || defined(HL_MINGW)
-#	define EXPORT __declspec( dllexport )
-#	define IMPORT __declspec( dllimport )
+#if (defined(HL_VCC) || defined(HL_MINGW))
+# if defined(LIBHL_STATIC)
+#	  define EXPORT
+#	  define IMPORT
+# else
+#	  define EXPORT __declspec( dllexport )
+#	  define IMPORT __declspec( dllimport )
+# endif
 #else
 #	define EXPORT
 #	define IMPORT extern
@@ -655,7 +660,7 @@ HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool
 	so you are sure it's of the used typed. Otherwise use hl_dyn_call
 */
 #define hl_call0(ret,cl) \
-	(cl->hasValue ? ((ret(*)(vdynamic*))cl->fun)(cl->value) : ((ret(*)())cl->fun)()) 
+	(cl->hasValue ? ((ret(*)(vdynamic*))cl->fun)(cl->value) : ((ret(*)())cl->fun)())
 #define hl_call1(ret,cl,t,v) \
 	(cl->hasValue ? ((ret(*)(vdynamic*,t))cl->fun)(cl->value,v) : ((ret(*)(t))cl->fun)(v))
 #define hl_call2(ret,cl,t1,v1,t2,v2) \
@@ -897,7 +902,7 @@ typedef struct {
 
 HL_API hl_track_info hl_track;
 
-#else 
+#else
 
 #define hl_is_tracking(_) false
 #define hl_track_call(a,b)
