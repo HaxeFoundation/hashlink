@@ -1,7 +1,15 @@
 <Project>
-  <ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(OutputConfig)' == 'Static'">
     <ClCompile>
       <PreprocessorDefinitions>LIBHL_STATIC;AL_LIBTYPE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <PropertyGroup Condition="'$(OutputConfig)' == 'Static'">
+    <ConfigType>StaticLibrary</ConfigType>
+    <TgExt>.lib</TgExt>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutputConfig)' == ''">
+    <ConfigType>DynamicLibrary</ConfigType>
+    <TgExt>.hdll</TgExt>
+  </PropertyGroup>
 </Project>
