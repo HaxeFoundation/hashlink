@@ -7,6 +7,7 @@
   <PropertyGroup Condition="'$(OutputConfig)' == 'Static'">
     <ConfigType>StaticLibrary</ConfigType>
     <TgExt>.lib</TgExt>
+    <AddDeps>Ws2_32.lib;kernel32.lib;gdi32.lib;Shell32.lib;comdlg32.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;xinput9_1_0.lib;dinput8.lib</AddDeps>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OutputConfig)' == ''">
     <ConfigType>DynamicLibrary</ConfigType>
