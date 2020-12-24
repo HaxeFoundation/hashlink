@@ -1,15 +1,14 @@
 <Project>
-  <ItemDefinitionGroup Condition="'$(OutputConfig)' == 'Static'">
+  <ItemDefinitionGroup Condition="'$(SolutionName)' == 'hl_static'">
     <ClCompile>
       <PreprocessorDefinitions>LIBHL_STATIC;AL_LIBTYPE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
-  <PropertyGroup Condition="'$(OutputConfig)' == 'Static'">
+  <PropertyGroup Condition="'$(SolutionName)' == 'hl_static'">
     <ConfigType>StaticLibrary</ConfigType>
     <TgExt>.lib</TgExt>
-    <AddDeps>Ws2_32.lib;kernel32.lib;gdi32.lib;Shell32.lib;comdlg32.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;xinput9_1_0.lib;dinput8.lib</AddDeps>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(OutputConfig)' == ''">
+  <PropertyGroup Condition="'$(SolutionName)' != 'hl_static'">
     <ConfigType>DynamicLibrary</ConfigType>
     <TgExt>.hdll</TgExt>
   </PropertyGroup>
