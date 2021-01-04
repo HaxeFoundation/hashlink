@@ -134,9 +134,9 @@ HL_PRIM hl_socket *hl_socket_new( bool udp ) {
 }
 
 HL_PRIM bool hl_socket_set_broadcast( hl_socket *s, bool b ) {
-	int fast = b;
+	int broadcast = b;
 	if( !s ) return false;
-    return setsockopt(s->sock,SOL_SOCKET,SO_BROADCAST,(char*)&fast,sizeof(fast)) == 0;
+    return setsockopt(s->sock,SOL_SOCKET,SO_BROADCAST,(char*)&broadcast,sizeof(broadcast)) == 0;
 }
 
 HL_PRIM void hl_socket_close( hl_socket *s ) {
