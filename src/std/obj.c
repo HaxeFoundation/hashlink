@@ -308,7 +308,8 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 			hl_obj_proto *p = o->proto + i;
 			if( p->pindex >= 0 ) fptr[p->pindex] = m->functions_ptrs[p->findex];
 		}
-	}
+	} else
+		ot->vobj_proto = (void*)1;
 
 	t->methods = (void**)hl_malloc(alloc, sizeof(void*) * t->nmethods);
 	if( p ) memcpy(t->methods,p->methods,p->nmethods * sizeof(void*));
