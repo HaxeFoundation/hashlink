@@ -528,7 +528,9 @@ struct hl_runtime_obj {
 	vdynamic *(*getFieldFun)( vdynamic *obj, int hfield );
 	// relative
 	int nlookup;
+	int ninterfaces;
 	hl_field_lookup *lookup;
+	int *interfaces;
 };
 
 typedef struct {

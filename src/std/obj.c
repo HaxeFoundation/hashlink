@@ -328,6 +328,19 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 		t->methods[method_index] = m->functions_ptrs[pr->findex];
 	}
 
+	// interfaces
+	t->ninterfaces = 0;
+	for(i=0;i<o->nfields;i++) {
+		if( o->fields[i].hashed_name == 0 )
+			t->ninterfaces++;
+	}
+	t->interfaces = (int*)hl_malloc(alloc,sizeof(int) * t->ninterfaces);
+	t->ninterfaces = 0;
+	for(i=0;i<o->nfields;i++) {
+		if( o->fields[i].hashed_name == 0 )
+			t->interfaces[t->ninterfaces++] = i;
+	}
+
 	// bindings
 	if( p ) {
 		nbindings = p->nbindings;
@@ -503,6 +516,27 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 	case HOBJ:
 		{
 			int i;
+			void **interface_address = NULL;
+			{
+				hl_runtime_obj *rt = obj->t->obj->rt;
+				while( rt ) {
+					for(i=0;i<rt->ninterfaces;i++) {
+						if( rt->t->obj->fields[rt->interfaces[i]].t == vt ) {
+							int start = rt->parent ? rt->parent->nfields : 0;
+							interface_address = (void**)((char*)obj + rt->fields_indexes[rt->interfaces[i]+start]);
+							break;
+						}
+					}
+					rt = rt->parent;
+				}
+			}
+			if( interface_address ) {
+				v = (vvirtual*)*interface_address;
+				if( v ) {
+					printf(".");
+					return v;
+				}
+			}
 			v = (vvirtual*)hl_gc_alloc(vt, sizeof(vvirtual) + sizeof(void*)*vt->virt->nfields);
 			v->t = vt;
 			v->value = obj;
@@ -525,6 +559,8 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 				} else
 					hl_vfields(v)[i] = f == NULL || !hl_same_type(f->t,vt->virt->fields[i].t) ? NULL : (char*)obj + f->field_index;
 			}
+			if( interface_address )
+				*interface_address = v;
 		}
 		break;
 	case HDYNOBJ:
