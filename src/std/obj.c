@@ -532,10 +532,7 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 			}
 			if( interface_address ) {
 				v = (vvirtual*)*interface_address;
-				if( v ) {
-					printf(".");
-					return v;
-				}
+				if( v ) return v;
 			}
 			v = (vvirtual*)hl_gc_alloc(vt, sizeof(vvirtual) + sizeof(void*)*vt->virt->nfields);
 			v->t = vt;
