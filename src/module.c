@@ -267,30 +267,31 @@ static void null_function() {
 	hl_error("Null function ptr");
 }
 
-static void append_type( char **p, hl_type *t ) {
-	*(*p)++ = TYPE_STR[t->kind];
+static void append_type( char **p, hl_type *t, bool is_super ) {
+	if (!is_super) *(*p)++ = TYPE_STR[t->kind];
 	switch( t->kind ) {
 	case HFUN:
 		{
 			int i;
 			for(i=0;i<t->fun->nargs;i++)
-				append_type(p,t->fun->args[i]);
+				append_type(p,t->fun->args[i],false);
 			*(*p)++ = '_';
-			append_type(p,t->fun->ret);
+			append_type(p,t->fun->ret,false);
 			break;
 		}
 	case HREF:
 	case HNULL:
-		append_type(p,t->tparam);
+		append_type(p,t->tparam,false);
 		break;
 	case HSTRUCT:
 		*(*p)++ = 'S';
 	case HOBJ:
+		if (t->obj->super) append_type(p,t->obj->super,true);
 		{
 			int i;
 			for(i=0;i<t->obj->nfields;i++)
-				append_type(p,t->obj->fields[i].t);
-			*(*p)++ = '_';
+				append_type(p,t->obj->fields[i].t,false);
+			if (!is_super) *(*p)++ = '_';
 		}
 		break;
 	case HABSTRACT:
@@ -482,7 +483,7 @@ static void hl_module_init_natives( hl_module *m ) {
 		}
 		m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
 		p = tmp;
-		append_type(&p,n->t);
+		append_type(&p,n->t,false);
 		*p++ = 0;
 		if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
 			hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
