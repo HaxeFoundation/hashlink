@@ -267,6 +267,8 @@ static void null_function() {
 	hl_error("Null function ptr");
 }
 
+static void append_fields( char **p, hl_type *t );
+
 static void append_type( char **p, hl_type *t ) {
 	*(*p)++ = TYPE_STR[t->kind];
 	switch( t->kind ) {
@@ -287,9 +289,7 @@ static void append_type( char **p, hl_type *t ) {
 		*(*p)++ = 'S';
 	case HOBJ:
 		{
-			int i;
-			for(i=0;i<t->obj->nfields;i++)
-				append_type(p,t->obj->fields[i].t);
+			append_fields(p, t);
 			*(*p)++ = '_';
 		}
 		break;
@@ -300,6 +300,14 @@ static void append_type( char **p, hl_type *t ) {
 	default:
 		break;
 	}
+}
+
+static void append_fields( char **p, hl_type *t ) {
+	int i;
+	if( t->obj->super )
+		append_fields(p, t->obj->super);
+	for(i=0;i<t->obj->nfields;i++)
+		append_type(p,t->obj->fields[i].t);
 }
 
 #define DISABLED_LIB_PTR ((void*)(int_val)2)
