@@ -233,7 +233,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			t->tenum = hl_malloc(&r->code->alloc,sizeof(hl_type_enum));
 			t->tenum->name = hl_read_ustring(r);
 			t->tenum->global_value = (void**)(int_val)UINDEX();
-			t->tenum->nconstructs = READ();
+			t->tenum->nconstructs = UINDEX();
 			t->tenum->constructs = (hl_enum_construct*)hl_malloc(&r->code->alloc, sizeof(hl_enum_construct)*t->tenum->nconstructs);
 			for(i=0;i<t->tenum->nconstructs;i++) {
 				hl_enum_construct *c = t->tenum->constructs + i;

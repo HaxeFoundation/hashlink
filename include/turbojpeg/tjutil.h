@@ -27,7 +27,7 @@
  */
 
 #ifdef _WIN32
-	#ifndef __MINGW32__
+	#if defined(_MSC_VER) && _MSC_VER < 1900
 		#include <stdio.h>
 		#define snprintf(str, n, format, ...)  \
 			_snprintf_s(str, n, _TRUNCATE, format, __VA_ARGS__)

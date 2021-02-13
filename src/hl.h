@@ -487,7 +487,7 @@ typedef struct _vclosure {
 	void *fun;
 	int hasValue;
 #	ifdef HL_64
-	int __pad;
+	int stackCount;
 #	endif
 	void *value;
 } vclosure;
@@ -528,7 +528,9 @@ struct hl_runtime_obj {
 	vdynamic *(*getFieldFun)( vdynamic *obj, int hfield );
 	// relative
 	int nlookup;
+	int ninterfaces;
 	hl_field_lookup *lookup;
+	int *interfaces;
 };
 
 typedef struct {
@@ -831,6 +833,7 @@ HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
 HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
 HL_API void hl_sys_init(void **args, int nargs, void *hlfile);
 HL_API void hl_setup_callbacks(void *sc, void *gw);
+HL_API void hl_setup_callbacks2(void *sc, void *gw, int flags);
 HL_API void hl_setup_reload_check( void *freload, void *param );
 
 #include <setjmp.h>
