@@ -105,8 +105,9 @@ HL_PRIM int hl_regexp_matched_pos( ereg *e, int m, int *len ) {
 
 HL_PRIM int hl_regexp_matched_num( ereg *e ) {
 	if( !e->matched )
-		hl_error("Calling matchedNum() on an unmatched regexp"); 
-	return e->nmatches;
+		return -1;
+	else
+		return e->nmatches;
 }
 
 HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
