@@ -171,6 +171,10 @@ class Window {
 		setPosition(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 	}
 
+	public function warpMouse( x : Int, y : Int ) {
+		warpMouseInWindow(win, x, y);
+	}
+
 	function get_width() {
 		var w = 0;
 		winGetSize(win, w, null);
@@ -350,6 +354,9 @@ class Window {
 	
 	static function getWindowGrab( win : WinPtr ) : Bool {
 		return false;
+	}
+	
+	static function warpMouseInWindow( win : WinPtr, x : Int, y : Int ) : Void {
 	}
 
 }
