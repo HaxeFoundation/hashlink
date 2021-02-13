@@ -103,6 +103,13 @@ HL_PRIM int hl_regexp_matched_pos( ereg *e, int m, int *len ) {
 	return start;
 }
 
+HL_PRIM int hl_regexp_matched_num( ereg *e ) {
+	if( !e->matched )
+		return -1;
+	else
+		return e->nmatches;
+}
+
 HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
 	int res = pcre16_exec(e->p,&limit,(PCRE_SPTR16)s,pos+len,pos,PCRE_NO_UTF16_CHECK,e->matches,e->nmatches * 3);
 	e->matched = res >= 0;
@@ -116,5 +123,5 @@ HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
 #define _EREG _ABSTRACT(ereg)
 DEFINE_PRIM( _EREG, regexp_new_options, _BYTES _BYTES);
 DEFINE_PRIM( _I32, regexp_matched_pos, _EREG _I32 _REF(_I32));
+DEFINE_PRIM( _I32, regexp_matched_num, _EREG );
 DEFINE_PRIM( _BOOL, regexp_match, _EREG _BYTES _I32 _I32);
-
