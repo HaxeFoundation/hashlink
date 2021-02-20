@@ -71,7 +71,17 @@ typedef struct {
 typedef struct HWND__ dx_window;
 
 static dx_window *cur_clip_cursor_window = NULL;
-static bool disable_capture = false;
+static DWORD capture_refresh_time = 0;
+typedef enum {
+	SkipUpdate = 1,
+	InTitleClick = 2,
+	LButton = 4,
+	RButton = 8,
+	MButton = 16,
+	XButton1 = 32,
+	XButton2 = 64
+} mouse_capture_flags;
+static int disable_capture = 0;
 static bool capture_mouse = false;
 static bool relative_mouse = false;
 
@@ -89,6 +99,7 @@ static dx_events *get_events(HWND wnd) {
 static void updateClipCursor(HWND wnd) {
 	if ( disable_capture ) {
 		ClipCursor(NULL);
+		capture_refresh_time = GetTickCount();
 		return;
 	}
 	if ( !capture_mouse && !relative_mouse ) {
@@ -98,22 +109,35 @@ static void updateClipCursor(HWND wnd) {
 		cur_clip_cursor_window = wnd;
 		RECT rect;
 
-		GetClientRect(wnd, &rect);
-		ClientToScreen(wnd, (LPPOINT)&rect.left);
-		ClientToScreen(wnd, (LPPOINT)&rect.right);
-
-		ClipCursor(&rect);
+		if ( GetClientRect(wnd, &rect) && !IsRectEmpty(&rect) ) {
+			ClientToScreen(wnd, (LPPOINT)&rect.left);
+			ClientToScreen(wnd, (LPPOINT)&rect.right);
+			ClipCursor(&rect);
+		}
 	}
+	capture_refresh_time = GetTickCount();
+}
+static void checkCaptureFlags( HWND wnd ) {
+	if ( !(GetAsyncKeyState(VK_LBUTTON) & 0x8000) )
+		disable_capture &= ~LButton;
+	if ( !(GetAsyncKeyState(VK_RBUTTON) & 0x8000) )
+		disable_capture &= ~RButton;
+	if ( !(GetAsyncKeyState(VK_MBUTTON) & 0x8000) )
+		disable_capture &= ~MButton;
+	if ( !(GetAsyncKeyState(VK_XBUTTON1) & 0x8000) )
+		disable_capture &= ~XButton1;
+	if ( !(GetAsyncKeyState(VK_XBUTTON2) & 0x8000) )
+		disable_capture &= ~XButton2;
 }
 
-static bool setRelativeMode(HWND wnd, bool enabled) {
+static bool setRelativeMode( HWND wnd, bool enabled ) {
 	RAWINPUTDEVICE mouse = { 0x01, 0x02, 0, NULL }; /* Mouse: UsagePage = 1, Usage = 2 */
 
 	if ( relative_mouse == enabled ) return true;
 	
 	if ( !enabled ) {
 		mouse.dwFlags |= RIDEV_REMOVE;
-		if (show_cursor) SetCursor(cur_cursor);
+		if ( show_cursor ) SetCursor(cur_cursor);
 	} else {
 		SetCursor(NULL);
 	}
@@ -164,13 +188,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		addState(Resize);
 		break;
 	case WM_LBUTTONDOWN: addMouse(MouseDown,1); break;
-	case WM_LBUTTONUP:
-		addMouse(MouseUp,1);
-		if (disable_capture) {
-			disable_capture = false;
-			updateClipCursor(wnd);
-		}
-		break;
+	case WM_LBUTTONUP: addMouse(MouseUp,1); break;
 	case WM_MBUTTONDOWN: addMouse(MouseDown,2); break;
 	case WM_MBUTTONUP: addMouse(MouseUp,2); break;
 	case WM_RBUTTONDOWN: addMouse(MouseDown,3); break;
@@ -302,7 +320,22 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 			shift_downs[1] = false;
 			e = addEvent(wnd,KeyUp);
 			e->keyCode = VK_SHIFT | 512;
-		}			
+		}
+
+		if ( ( capture_mouse || relative_mouse ) && get_events(wnd)->is_focused ) {
+			// Refresh the cursor capture every 3s in case some app hijacks it.
+			if ( disable_capture ) {
+				checkCaptureFlags(wnd);
+				if (!disable_capture || disable_capture == SkipUpdate) {
+					disable_capture = 0;
+					updateClipCursor(wnd);
+				}
+			} else if ( GetTickCount() - capture_refresh_time >= 3000 ) {
+				disable_capture &= ~SkipUpdate;
+				updateClipCursor(wnd);
+			}
+		}
+
 		break;
 	case WM_CHAR:
 		e = addEvent(wnd,TextInput);
@@ -310,20 +343,45 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		e->keyRepeat = (lparam & 0xFFFF) != 0;
 		break;
 	case WM_NCACTIVATE:
-		// Allow user to interact with the titlebar.
-		disable_capture = true;
+		// Allow user to interact with the titlebar without clipping.
+		disable_capture |= SkipUpdate;
 		ClipCursor(NULL);
+		break;
+	case WM_ACTIVATE:
+		// HIWORD(wparam) = minimized flag
+		if (!(bool)HIWORD(wparam) && LOWORD(wparam) != WA_INACTIVE) {
+
+			if ( LOWORD(wparam) == WA_CLICKACTIVE ) {
+				if ( GetAsyncKeyState(VK_LBUTTON) )
+					disable_capture |= LButton;
+				if ( GetAsyncKeyState(VK_RBUTTON) )
+					disable_capture |= RButton;
+				if ( GetAsyncKeyState(VK_MBUTTON) )
+					disable_capture |= MButton;
+				if ( GetAsyncKeyState(VK_XBUTTON1) )
+					disable_capture |= XButton1;
+				if ( GetAsyncKeyState(VK_XBUTTON2) )
+					disable_capture |= XButton2;
+			}
+
+			checkCaptureFlags(wnd);
+			updateClipCursor(wnd);
+		} else {
+			ClipCursor(NULL);
+		}
 		break;
 	case WM_NCLBUTTONDOWN:
-		disable_capture = true;
+		disable_capture |= InTitleClick;
 		ClipCursor(NULL);
 		break;
-	case WM_NCLBUTTONUP:
-		disable_capture = false;
+	case WM_CAPTURECHANGED:
+		disable_capture &= ~InTitleClick;
+		checkCaptureFlags(wnd);
 		updateClipCursor(wnd);
+		break;
 	case WM_SETFOCUS:
-		updateClipCursor(wnd);
 		get_events(wnd)->is_focused = true;
+		updateClipCursor(wnd);
 		addState(Focus);
 		break;
 	case WM_KILLFOCUS:
