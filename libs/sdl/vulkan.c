@@ -239,14 +239,6 @@ const VkImageSubresourceRange RANGE_ALL = {
 	.layerCount = VK_REMAINING_ARRAY_LAYERS,
 };
 
-static VkContext current_context = NULL;
-static VkCommandBuffer current_buffer = NULL;
-
-HL_PRIM void HL_NAME(vk_set_current)( VkContext ctx ) {
-	current_context = ctx;
-	current_buffer = ctx->frames[ctx->currentFrame].buffer;
-}
-
 HL_PRIM bool HL_NAME(vk_begin_frame)( VkContext ctx ) {
 	VkFrame *frame = &ctx->frames[ctx->currentFrame];
 	VkCommandBuffer buffer = frame->buffer;
@@ -280,7 +272,6 @@ HL_PRIM bool HL_NAME(vk_begin_frame)( VkContext ctx ) {
 		0, 0, NULL, 0, NULL, 1, &barrier
 	);
 
-	sdl_vk_set_current(ctx);
 	return true;
 }
 
@@ -332,14 +323,72 @@ HL_PRIM void HL_NAME(vk_end_frame)( VkContext ctx ) {
 	ctx->currentFrame %= FRAME_COUNT;
 }
 
+VkShaderModule HL_NAME(vk_create_shader_module)( VkContext ctx, vbyte *data, int len ) {
+	VkShaderModule module = NULL;
+	VkShaderModuleCreateInfo inf = {
+		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.codeSize = len,
+		.pCode = (const uint32_t*)data,
+	};
+	vkCreateShaderModule(ctx->device,&inf,NULL,&module);
+	return module;
+}
+
+VkPipelineLayout HL_NAME(vk_create_pipeline_layout)( VkContext ctx, VkPipelineLayoutCreateInfo *info ) {
+	VkPipelineLayout p = NULL;
+	vkCreatePipelineLayout(ctx->device, info, NULL, &p);
+	return p;
+}
+
+VkPipeline HL_NAME(vk_create_graphics_pipeline)( VkContext ctx, VkGraphicsPipelineCreateInfo *info ) {
+	VkPipeline p = NULL;
+	vkCreateGraphicsPipelines(ctx->device, NULL, 1, info, NULL, &p);
+	return p;
+}
+
+VkRenderPass HL_NAME(vk_create_render_pass)( VkContext ctx, VkRenderPassCreateInfo *info ) {
+	VkRenderPass p = NULL;
+	vkCreateRenderPass(ctx->device, info, NULL, &p);
+	return p;
+}
+
+vbyte *HL_NAME(vk_make_array)( varray *a ) {
+#ifdef HL_DEBUG
+	if( a->at->kind != HSTRUCT ) hl_error("assert");
+#endif
+	int size = a->at->obj->rt->size;
+	vbyte *ptr = hl_alloc_bytes(size * a->size);
+	int i;
+	for(i=0;i<a->size;i++)
+		memcpy(ptr + i * size, hl_aptr(a,vbyte*)[i], size);
+	return ptr;
+}
+
 #define _VCTX _ABSTRACT(vk_context)
+#define _SHADER_MODULE _ABSTRACT(vk_shader_module)
+#define _GPIPELINE _ABSTRACT(vk_gpipeline)
+#define _PIPELAYOUT _ABSTRACT(vk_pipeline_layout)
+#define _RENDERPASS _ABSTRACT(vk_render_pass)
+
 DEFINE_PRIM(_BOOL, vk_init, _NO_ARG);
 DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32);
 DEFINE_PRIM(_BOOL, vk_begin_frame, _VCTX);
-DEFINE_PRIM(_VOID, vk_set_current, _VCTX);
+DEFINE_PRIM(_BYTES, vk_make_array, _ARR);
 DEFINE_PRIM(_VOID, vk_end_frame, _VCTX);
+DEFINE_PRIM(_SHADER_MODULE, vk_create_shader_module, _VCTX _BYTES _I32 );
+DEFINE_PRIM(_GPIPELINE, vk_create_graphics_pipeline, _VCTX _STRUCT);
+DEFINE_PRIM(_PIPELAYOUT, vk_create_pipeline_layout, _VCTX _STRUCT);
+DEFINE_PRIM(_RENDERPASS, vk_create_render_pass, _VCTX _STRUCT);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
+
+static VkContext current_context = NULL;
+static VkCommandBuffer current_buffer = NULL;
+
+HL_PRIM void HL_NAME(vk_set_current)( VkContext ctx ) {
+	current_context = ctx;
+	current_buffer = ctx->frames[ctx->currentFrame].buffer;
+}
 
 HL_PRIM void HL_NAME(vk_clear_color_image)( double r, double g, double b, double a ) {
 	VkClearColorValue color = { (float)r, (float)g, (float)b, (float)a };
@@ -349,6 +398,7 @@ HL_PRIM void HL_NAME(vk_clear_color_image)( double r, double g, double b, double
 	);
 }
 
+DEFINE_PRIM(_VOID, vk_set_current, _VCTX);
 DEFINE_PRIM(_VOID, vk_clear_color_image, _F64 _F64 _F64 _F64);
 
 
