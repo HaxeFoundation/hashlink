@@ -4,6 +4,8 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
 
+#include <shaderc/shaderc.h>
+
 static VkInstance instance = NULL;
 
 VkInstance vk_get_instance() {
@@ -282,14 +284,6 @@ HL_PRIM bool HL_NAME(vk_begin_frame)( VkContext ctx ) {
 	return true;
 }
 
-HL_PRIM void HL_NAME(vk_clear_color_image)( double r, double g, double b, double a ) {
-	VkClearColorValue color = { (float)r, (float)g, (float)b, (float)a };
-	vkCmdClearColorImage(current_buffer,
-		current_context->swapchainImages[current_context->currentImage], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		&color, 1, &RANGE_ALL
-	);
-}
-
 HL_PRIM void HL_NAME(vk_end_frame)( VkContext ctx ) {
 	VkFrame *frame = &ctx->frames[ctx->currentFrame];
 
@@ -343,5 +337,46 @@ DEFINE_PRIM(_BOOL, vk_init, _NO_ARG);
 DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32);
 DEFINE_PRIM(_BOOL, vk_begin_frame, _VCTX);
 DEFINE_PRIM(_VOID, vk_set_current, _VCTX);
-DEFINE_PRIM(_VOID, vk_clear_color_image, _F64 _F64 _F64 _F64);
 DEFINE_PRIM(_VOID, vk_end_frame, _VCTX);
+
+// ------ COMMAND BUFFER OPERATIONS -----------------------
+
+HL_PRIM void HL_NAME(vk_clear_color_image)( double r, double g, double b, double a ) {
+	VkClearColorValue color = { (float)r, (float)g, (float)b, (float)a };
+	vkCmdClearColorImage(current_buffer,
+		current_context->swapchainImages[current_context->currentImage], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		&color, 1, &RANGE_ALL
+	);
+}
+
+DEFINE_PRIM(_VOID, vk_clear_color_image, _F64 _F64 _F64 _F64);
+
+
+// ------ SHADER COMPILATION ------------------------------
+
+HL_PRIM vbyte *HL_NAME(vk_compile_shader)( vbyte *source, vbyte *shaderFile, vbyte *mainFunction, int shaderKind, int *outSize ) {
+	shaderc_compiler_t compiler = shaderc_compiler_initialize();
+	shaderc_compile_options_t opts = shaderc_compile_options_initialize();
+	shaderc_compile_options_set_optimization_level(opts, shaderc_optimization_level_size);
+	shaderc_compilation_result_t result = shaderc_compile_into_spv(compiler, source, strlen(source), shaderKind, shaderFile, mainFunction, opts);
+	shaderc_compiler_release(compiler);
+	shaderc_compile_options_release(opts);
+	
+	if( shaderc_result_get_compilation_status(result) != shaderc_compilation_status_success ) {
+		const char *str = shaderc_result_get_error_message(result);
+		vbyte *error = hl_copy_bytes(str, (int)strlen(str)+1);
+		shaderc_result_release(result);
+		*outSize = -1;
+		return error;
+	}
+
+	int size = (int)shaderc_result_get_length(result);
+	vbyte *data = hl_alloc_bytes(size);
+	memcpy(data, shaderc_result_get_bytes(result), size);
+	shaderc_result_release(result);
+	
+	*outSize = size;
+	return data;
+}
+
+DEFINE_PRIM(_BYTES, vk_compile_shader, _BYTES _BYTES _BYTES _I32 _REF(_I32));
