@@ -285,8 +285,6 @@ static void append_type( char **p, hl_type *t ) {
 	case HNULL:
 		append_type(p,t->tparam);
 		break;
-	case HSTRUCT:
-		*(*p)++ = 'S';
 	case HOBJ:
 		{
 			append_fields(p, t);
