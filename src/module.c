@@ -753,6 +753,10 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 }
 
 void hl_module_free( hl_module *m ) {
+	for(int i=0;i<m->code->nglobals;i++) {
+		if( hl_is_ptr(m->code->globals[i]) )
+			hl_remove_root(m->globals_data+m->globals_indexes[i]);
+	}
 	hl_free(&m->ctx.alloc);
 	hl_free_executable_memory(m->code, m->codesize);
 	if( m->hash ) hl_code_hash_free(m->hash);
