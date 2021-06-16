@@ -120,6 +120,29 @@ class Sdl {
 		return @:privateAccess String.fromUTF8(detect_keyboard_layout());
 	}
 
+	@:hlNative("?sdl", "set_clipboard_text")
+	private static function _setClipboardText( text : hl.Bytes ) : Bool {
+		return false;
+	}
+
+	public static function setClipboardText( text : String ) : Bool {
+		if( text == null )
+			return false;
+		return @:privateAccess _setClipboardText( text.toUtf8() );
+	}
+
+	@:hlNative("?sdl", "get_clipboard_text")
+	private static function _getClipboardText() : hl.Bytes {
+		return null;
+	}
+
+	public static function getClipboardText() : String {
+		var t = _getClipboardText();
+		if( t == null )
+			return null;
+		else
+			return @:privateAccess String.fromUTF8(t);
+	}
 }
 
 @:enum

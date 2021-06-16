@@ -761,6 +761,19 @@ HL_PRIM void HL_NAME(set_cursor)( SDL_Cursor *c ) {
 	SDL_SetCursor(c);
 }
 
+HL_PRIM bool HL_NAME(set_clipboard_text)(char* text) {
+	return SDL_SetClipboardText(text) == 0;
+}
+
+HL_PRIM char* HL_NAME(get_clipboard_text)() {
+	char* chr = SDL_GetClipboardText();
+	if (chr == NULL)
+		return NULL;
+	vbyte* bytes = hl_copy_bytes(chr, (int) strlen(chr) + 1);
+	SDL_free(chr);
+	return bytes;
+}
+
 #define MAX_DEVICES 16
 HL_PRIM varray *HL_NAME(get_devices)() {
 	varray *a = hl_alloc_array(&hlt_bytes, MAX_DEVICES);
@@ -783,4 +796,6 @@ DEFINE_PRIM(_CURSOR, cursor_create, _SURF _I32 _I32);
 DEFINE_PRIM(_CURSOR, cursor_create_system, _I32);
 DEFINE_PRIM(_VOID, free_cursor, _CURSOR);
 DEFINE_PRIM(_VOID, set_cursor, _CURSOR);
+DEFINE_PRIM(_BOOL, set_clipboard_text, _BYTES);
+DEFINE_PRIM(_BYTES, get_clipboard_text, _NO_ARG);
 DEFINE_PRIM(_ARR, get_devices, _NO_ARG);
