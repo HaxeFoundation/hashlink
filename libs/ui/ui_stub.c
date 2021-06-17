@@ -65,6 +65,14 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 	return NULL;
 }
 
+HL_PRIM bool HL_NAME(ui_set_clipboard_text)(char* text) {
+	return false;
+}
+
+HL_PRIM vbyte* HL_NAME(ui_get_clipboard_text)() {
+	return NULL;
+}
+
 #define _WIN _ABSTRACT(ui_window)
 #define _SENTINEL _ABSTRACT(ui_sentinel)
 
@@ -86,3 +94,6 @@ DEFINE_PRIM(_VOID, ui_sentinel_pause, _SENTINEL _BOOL);
 DEFINE_PRIM(_BOOL, ui_sentinel_is_paused, _SENTINEL);
 
 DEFINE_PRIM(_BYTES, ui_choose_file, _BOOL _DYN);
+
+DEFINE_PRIM(_BOOL, ui_set_clipboard_text, _BYTES);
+DEFINE_PRIM(_BYTES, ui_get_clipboard_text, _NO_ARG);
