@@ -73,7 +73,7 @@ static int_val gc_hash( void *ptr ) {
 #	define GC_MEMCHK
 #endif
 
-#if defined(HL_NX)
+#if defined(HL_NX) || defined(HL_PS)
 #	define GC_INTERIOR_POINTERS
 #endif
 
@@ -762,6 +762,12 @@ static void hl_gc_init() {
 #	endif
 }
 
+static void hl_gc_free() {
+#	ifdef HL_THREADS
+	hl_remove_root(&gc_threads.global_lock);
+#	endif
+}
+
 // ---- UTILITIES ----------------------
 
 HL_API bool hl_is_blocking() {
@@ -806,6 +812,7 @@ void hl_global_init() {
 
 void hl_global_free() {
 	hl_cache_free();
+	hl_gc_free();
 }
 
 struct hl_alloc_block {

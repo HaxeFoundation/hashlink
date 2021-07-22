@@ -244,6 +244,7 @@ int main(int argc, pchar *argv[]) {
 	}
 	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
+	hl_unregister_thread();
 	hl_global_free();
 	return 0;
 }

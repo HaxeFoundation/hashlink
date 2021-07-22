@@ -12,8 +12,10 @@ jobs:
     variables:
       ${{ if endsWith(parameters.cmakeGenerator, 'Win64') }}:
         MARCH: 64
+        FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
       ${{ if not(endsWith(parameters.cmakeGenerator, 'Win64')) }}:
         MARCH: 32
+        FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
     steps:
       - ${{ if eq(parameters.vmImage, 'vs2017-win2016') }}:
         - powershell: |
@@ -33,7 +35,7 @@ jobs:
           Remove-Item openal.zip
         displayName: Install openal
       - powershell: |
-          Invoke-WebRequest https://ffmpeg.zeranoe.com/builds/win$(MARCH)/dev/ffmpeg-3.4.2-win$(MARCH)-dev.zip -OutFile ffmpeg.zip
+          Invoke-WebRequest $(FFMPEG_URL) -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath .
           Move-Item ffmpeg-* include/ffmpeg
           Remove-Item ffmpeg.zip

@@ -267,6 +267,8 @@ static void null_function() {
 	hl_error("Null function ptr");
 }
 
+static void append_fields( char **p, hl_type *t );
+
 static void append_type( char **p, hl_type *t ) {
 	*(*p)++ = TYPE_STR[t->kind];
 	switch( t->kind ) {
@@ -283,13 +285,9 @@ static void append_type( char **p, hl_type *t ) {
 	case HNULL:
 		append_type(p,t->tparam);
 		break;
-	case HSTRUCT:
-		*(*p)++ = 'S';
 	case HOBJ:
 		{
-			int i;
-			for(i=0;i<t->obj->nfields;i++)
-				append_type(p,t->obj->fields[i].t);
+			append_fields(p, t);
 			*(*p)++ = '_';
 		}
 		break;
@@ -300,6 +298,14 @@ static void append_type( char **p, hl_type *t ) {
 	default:
 		break;
 	}
+}
+
+static void append_fields( char **p, hl_type *t ) {
+	int i;
+	if( t->obj->super )
+		append_fields(p, t->obj->super);
+	for(i=0;i<t->obj->nfields;i++)
+		append_type(p,t->obj->fields[i].t);
 }
 
 #define DISABLED_LIB_PTR ((void*)(int_val)2)
@@ -745,6 +751,10 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 }
 
 void hl_module_free( hl_module *m ) {
+	for(int i=0;i<m->code->nglobals;i++) {
+		if( hl_is_ptr(m->code->globals[i]) )
+			hl_remove_root(m->globals_data+m->globals_indexes[i]);
+	}
 	hl_free(&m->ctx.alloc);
 	hl_free_executable_memory(m->code, m->codesize);
 	if( m->hash ) hl_code_hash_free(m->hash);

@@ -319,6 +319,46 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 	return hl_copy_bytes((vbyte*)outputFile, (int)(wcslen(outputFile)+1)*2);
 }
 
+HL_PRIM bool HL_NAME(ui_set_clipboard_text)(char* text) {
+	if (!OpenClipboard(NULL))
+		return false;
+	if (!EmptyClipboard()) {
+		CloseClipboard();
+		return false;
+	}
+	int len = (int) strlen(text);
+	HGLOBAL g = GlobalAlloc(0, (len + 1) * sizeof(TCHAR));
+	if (g == NULL) {
+		CloseClipboard();
+		return false;
+	}
+	char* chr = GlobalLock(g);
+	memcpy(chr, text, len);
+	chr[len] = '\0';
+	GlobalUnlock(g);
+	HANDLE h = SetClipboardData(CF_TEXT, g);
+	CloseClipboard();
+	return h != NULL;
+}
+
+HL_PRIM byte* HL_NAME(ui_get_clipboard_text)() {
+	if (!OpenClipboard(NULL))
+		return NULL;
+	HANDLE d = GetClipboardData(CF_TEXT);
+	if (d == NULL) {
+		CloseClipboard();
+		return NULL;
+	}
+	char* chr = (char*) GlobalLock(d);
+	if (chr == NULL) {
+		CloseClipboard();
+		return NULL;
+	}
+	vbyte* b = hl_copy_bytes(chr, (int) strlen(chr) + 1);
+	GlobalUnlock(d);
+	CloseClipboard();
+	return b;
+}
 
 #define _WIN _ABSTRACT(ui_window)
 #define _SENTINEL _ABSTRACT(ui_sentinel)
@@ -341,3 +381,6 @@ DEFINE_PRIM(_VOID, ui_sentinel_pause, _SENTINEL _BOOL);
 DEFINE_PRIM(_BOOL, ui_sentinel_is_paused, _SENTINEL);
 
 DEFINE_PRIM(_BYTES, ui_choose_file, _BOOL _DYN);
+
+DEFINE_PRIM(_BOOL, ui_set_clipboard_text, _BYTES);
+DEFINE_PRIM(_BYTES, ui_get_clipboard_text, _NO_ARG);

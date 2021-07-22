@@ -528,7 +528,9 @@ struct hl_runtime_obj {
 	vdynamic *(*getFieldFun)( vdynamic *obj, int hfield );
 	// relative
 	int nlookup;
+	int ninterfaces;
 	hl_field_lookup *lookup;
+	int *interfaces;
 };
 
 typedef struct {
@@ -748,7 +750,7 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 // ----------------------- FFI ------------------------------------------------------
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsilfdbBDPOATR??X?N"
+#define TYPE_STR	"vcsilfdbBDPOATR??X?N?S"
 
 #undef  _VOID
 #define _NO_ARG
@@ -770,6 +772,7 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #define _ABSTRACT(name)				"X" #name "_"
 #undef _NULL
 #define _NULL(t)					"N" t
+#define _STRUCT						"S"
 
 #undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)

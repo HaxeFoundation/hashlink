@@ -233,6 +233,22 @@ class GL {
 	public static function compressedTexImage3D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, depth : Int, border : Int, imageSize : Int, image : hl.Bytes ) {
 	}
 
+	@:hlNative("?sdl", "gl_tex_sub_image2d")
+	public static function texSubImage2D( target : Int, level : Int, xoffset : Int, yoffset : Int, width : Int, height : Int, format : Int, type : Int, image : hl.Bytes ) {
+	}
+
+	@:hlNative("?sdl", "gl_tex_sub_image3d")
+	public static function texSubImage3D( target : Int, level : Int, xoffset : Int, yoffset : Int, zoffset : Int, width : Int, height : Int, depth : Int, format : Int, type : Int, image : hl.Bytes ) {
+	}
+
+	@:hlNative("?sdl", "gl_compressed_tex_sub_image2d")
+	public static function compressedTexSubImage2D( target : Int, level : Int, xoffset : Int, yoffset : Int, width : Int, height : Int, format : Int, type : Int, image : hl.Bytes ) {
+	}
+
+	@:hlNative("?sdl", "gl_compressed_tex_sub_image3d")
+	public static function compressedTexSubImage3D( target : Int, level : Int, xoffset : Int, yoffset : Int, zoffset : Int, width : Int, height : Int, depth : Int, format : Int, type : Int, image : hl.Bytes ) {
+	}
+
 	public static function generateMipmap( t : Int ) {
 	}
 
@@ -734,6 +750,8 @@ class GL {
 	public static inline var TEXTURE_WRAP_S                 = 0x2802;
 	public static inline var TEXTURE_WRAP_T                 = 0x2803;
 	public static inline var TEXTURE_LOD_BIAS               = 0x8501;
+	public static inline var TEXTURE_BASE_LEVEL             = 0x813C;
+	public static inline var TEXTURE_MAX_LEVEL              = 0x813D;
 	public static inline var TEXTURE_MAX_ANISOTROPY         = 0x84FE;
 	public static inline var TEXTURE_COMPARE_MODE           = 0x884C;
 	public static inline var TEXTURE_COMPARE_FUNC           = 0x884D;
