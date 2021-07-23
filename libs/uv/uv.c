@@ -349,6 +349,33 @@ HL_PRIM int HL_NAME(timer_set_repeat_wrap)(uv_timer_t *t, int value) {
 }
 DEFINE_PRIM(_I32, timer_set_repeat_wrap, _HANDLE _I32);
 
+// Async
+
+static void on_async( uv_async_t *a ) {
+	events_data *ev = UV_DATA(a);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in async handle");
+	hl_call1(void, c, uv_async_t *, a);
+}
+
+HL_PRIM uv_async_t *HL_NAME(async_init_wrap)( uv_loop_t *loop, vclosure *c ) {
+	UV_CHECK_NULL(loop,NULL);
+	UV_CHECK_NULL(c,NULL);
+	uv_async_t *a = UV_ALLOC(uv_async_t);
+	UV_CHECK_ERROR(uv_async_init(loop,a,on_async),free(a),NULL);
+	init_hl_data((uv_handle_t*)a);
+	register_callb((uv_handle_t*)a,c,0);
+	return a;
+}
+DEFINE_PRIM(_HANDLE, async_init_wrap, _LOOP _FUN(_VOID,_HANDLE));
+
+HL_PRIM void HL_NAME(async_send_wrap)( uv_async_t *a ) {
+	UV_CHECK_NULL(a,);
+	UV_CHECK_ERROR(uv_async_send(a),,);
+}
+DEFINE_PRIM(_VOID, async_send_wrap, _HANDLE);
+
 // TCP
 
 #define _TCP _HANDLE
