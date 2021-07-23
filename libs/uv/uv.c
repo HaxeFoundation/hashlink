@@ -124,19 +124,10 @@ typedef struct {
 // 	}
 // }
 
-// static vdynamic * (*new_UVException)(int);
-
-// HL_PRIM void HL_NAME(exception_init)(vclosure *fn_exception) {
-// 	printf("dfsfsdsfd\n");
-// 	// new_UVException = (vdynamic * (*)(int))fn_exception->fun;
-// }
-
-// DEFINE_PRIM(_VOID, exception_init, _FUN(_DYN, _I32));
-
-// static void hx_error(int uv_errno) {
-// 	hl_throw(new_UVException(errno_uv2hx(uv_errno)));
-// 	// hl_error("%s", hl_to_utf16(uv_err_name(uv_errno)));
-// }
+static void hx_error(int uv_errno) {
+	//TODO: throw hl.uv.UVException
+	hl_error("%s", hl_to_utf16(uv_err_name(uv_errno)));
+}
 
 // HANDLE
 
@@ -185,6 +176,12 @@ HL_PRIM void HL_NAME(close_handle)( uv_handle_t *h, vclosure *c ) {
 }
 
 DEFINE_PRIM(_VOID, close_handle, _HANDLE _CALLB);
+
+DEFINE_PRIM(_I32, is_active, _HANDLE);
+DEFINE_PRIM(_I32, is_closing, _HANDLE);
+DEFINE_PRIM(_VOID, ref, _HANDLE);
+DEFINE_PRIM(_VOID, unref, _HANDLE);
+DEFINE_PRIM(_I32, has_ref, _HANDLE);
 
 // STREAM
 
@@ -260,12 +257,9 @@ DEFINE_PRIM(_BOOL, stream_listen, _HANDLE _I32 _CALLB);
 HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
 	uv_timer_t *t = UV_ALLOC(uv_timer_t);
 	int result = uv_timer_init(loop,t);
-	// const uchar *err = hl_to_utf16(uv_err_name(UV_EACCES));
-	// hl_error("%s", err);
-	// hx_error(UV_ENOENT);
 	if(result < 0) {
 		free(t);
-		//TODO: throw error
+		hx_error(result);
 		return NULL;
 	}
 	init_hl_data((uv_handle_t*)t);
@@ -280,24 +274,27 @@ static void on_timer_tick( uv_timer_t *t ) {
 // TODO: change `timeout` and `repeat` to uint64
 HL_PRIM void HL_NAME(timer_start_wrap)(uv_timer_t *t, vclosure *c, int timeout, int repeat) {
 	register_callb((uv_handle_t*)t,c,EVT_TIMER_TICK);
-	if(uv_timer_start(t,on_timer_tick, (uint64_t)timeout, (uint64_t)repeat) < 0) {
+	int result = uv_timer_start(t,on_timer_tick, (uint64_t)timeout, (uint64_t)repeat);
+	if(result < 0) {
 		clear_callb((uv_handle_t*)t, EVT_TIMER_TICK);
-		//TODO: throw error
+		hx_error(result);
 	}
 }
 DEFINE_PRIM(_VOID, timer_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG) _I32 _I32);
 
 HL_PRIM void HL_NAME(timer_stop_wrap)(uv_timer_t *t) {
 	clear_callb((uv_handle_t*)t, EVT_TIMER_TICK);
-	if(uv_timer_stop(t) < 0) {
-		//TODO: throw error
+	int result = uv_timer_stop(t);
+	if(result < 0) {
+		hx_error(result);
 	}
 }
 DEFINE_PRIM(_VOID, timer_stop_wrap, _HANDLE);
 
 HL_PRIM void HL_NAME(timer_again_wrap)(uv_timer_t *t) {
-	if(uv_timer_again(t) < 0) {
-		//TODO: throw error
+	int result = uv_timer_again(t);
+	if(result < 0) {
+		hx_error(result);
 	}
 }
 DEFINE_PRIM(_VOID, timer_again_wrap, _HANDLE);
