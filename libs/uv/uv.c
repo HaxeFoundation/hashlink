@@ -39,8 +39,8 @@ typedef struct {
 
 // Errors
 
-// static int code_uv2hx( int code ) {
-// 	switch(code) {
+// static int errno_uv2hx( int uv_errno ) {
+// 	switch(uv_errno) {
 // 		case 0: return 0; break;
 // 		case UV_E2BIG: return 1; break;
 // 		case UV_EACCES: return 2; break;
@@ -122,6 +122,20 @@ typedef struct {
 // 		case UV_ENOTTY: return 77; break;
 // 		default: return UV_UNKNOWN;
 // 	}
+// }
+
+// static vdynamic * (*new_UVException)(int);
+
+// HL_PRIM void HL_NAME(exception_init)(vclosure *fn_exception) {
+// 	printf("dfsfsdsfd\n");
+// 	// new_UVException = (vdynamic * (*)(int))fn_exception->fun;
+// }
+
+// DEFINE_PRIM(_VOID, exception_init, _FUN(_DYN, _I32));
+
+// static void hx_error(int uv_errno) {
+// 	hl_throw(new_UVException(errno_uv2hx(uv_errno)));
+// 	// hl_error("%s", hl_to_utf16(uv_err_name(uv_errno)));
 // }
 
 // HANDLE
@@ -245,7 +259,11 @@ DEFINE_PRIM(_BOOL, stream_listen, _HANDLE _I32 _CALLB);
 // Timer
 HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
 	uv_timer_t *t = UV_ALLOC(uv_timer_t);
-	if( uv_timer_init(loop,t) < 0) {
+	int result = uv_timer_init(loop,t);
+	// const uchar *err = hl_to_utf16(uv_err_name(UV_EACCES));
+	// hl_error("%s", err);
+	// hx_error(UV_ENOENT);
+	if(result < 0) {
 		free(t);
 		//TODO: throw error
 		return NULL;
