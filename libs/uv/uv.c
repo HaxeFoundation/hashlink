@@ -42,6 +42,14 @@ typedef struct {
 		return fail_return; \
 	}
 
+#define UV_CHECK_ERROR(action,cleanup,fail_return) \
+	int __result__ = action; \
+	if(__result__ < 0) { \
+		cleanup; \
+		hx_error(__result__); \
+		return fail_return; \
+	}
+
 // Errors
 
 // static int errno_uv2hx( int uv_errno ) {
@@ -180,42 +188,36 @@ HL_PRIM void HL_NAME(close_handle)( uv_handle_t *h, vclosure *c ) {
 	register_callb(h, c, EVT_CLOSE);
 	free_handle(h);
 }
-
 DEFINE_PRIM(_VOID, close_handle, _HANDLE _CALLB);
 
 HL_PRIM bool HL_NAME(is_active_wrap)( uv_handle_t *h ) {
 	UV_CHECK_NULL(h,false);
 	return uv_is_active(h) != 0;
 }
-
 DEFINE_PRIM(_BOOL, is_active_wrap, _HANDLE);
 
 HL_PRIM bool HL_NAME(is_closing_wrap)( uv_handle_t *h ) {
 	UV_CHECK_NULL(h,false);
 	return uv_is_closing(h) != 0;
 }
-
 DEFINE_PRIM(_BOOL, is_closing_wrap, _HANDLE);
 
 HL_PRIM bool HL_NAME(has_ref_wrap)( uv_handle_t *h ) {
 	UV_CHECK_NULL(h,false);
 	return uv_has_ref(h) != 0;
 }
-
 DEFINE_PRIM(_BOOL, has_ref_wrap, _HANDLE);
 
 HL_PRIM void HL_NAME(ref_wrap)( uv_handle_t *h ) {
 	UV_CHECK_NULL(h,);
 	uv_ref(h);
 }
-
 DEFINE_PRIM(_VOID, ref_wrap, _HANDLE);
 
 HL_PRIM void HL_NAME(unref_wrap)( uv_handle_t *h ) {
 	UV_CHECK_NULL(h,);
 	uv_unref(h);
 }
-
 DEFINE_PRIM(_VOID, unref_wrap, _HANDLE);
 
 // STREAM
@@ -292,12 +294,7 @@ DEFINE_PRIM(_BOOL, stream_listen, _HANDLE _I32 _CALLB);
 HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
 	UV_CHECK_NULL(loop,NULL);
 	uv_timer_t *t = UV_ALLOC(uv_timer_t);
-	int result = uv_timer_init(loop,t);
-	if(result < 0) {
-		free(t);
-		hx_error(result);
-		return NULL;
-	}
+	UV_CHECK_ERROR(uv_timer_init(loop,t),free(t),NULL);
 	init_hl_data((uv_handle_t*)t);
 	return t;
 }
@@ -312,30 +309,23 @@ HL_PRIM void HL_NAME(timer_start_wrap)(uv_timer_t *t, vclosure *c, int timeout, 
 	UV_CHECK_NULL(t,);
 	UV_CHECK_NULL(c,);
 	register_callb((uv_handle_t*)t,c,EVT_TIMER_TICK);
-	int result = uv_timer_start(t,on_timer_tick, (uint64_t)timeout, (uint64_t)repeat);
-	if( result < 0 ) {
-		clear_callb((uv_handle_t*)t, EVT_TIMER_TICK);
-		hx_error(result);
-	}
+	UV_CHECK_ERROR(
+		uv_timer_start(t,on_timer_tick, (uint64_t)timeout, (uint64_t)repeat),
+		clear_callb((uv_handle_t*)t, EVT_TIMER_TICK),
+	);
 }
 DEFINE_PRIM(_VOID, timer_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG) _I32 _I32);
 
 HL_PRIM void HL_NAME(timer_stop_wrap)(uv_timer_t *t) {
 	UV_CHECK_NULL(t,);
 	clear_callb((uv_handle_t*)t, EVT_TIMER_TICK);
-	int result = uv_timer_stop(t);
-	if(result < 0) {
-		hx_error(result);
-	}
+	UV_CHECK_ERROR(uv_timer_stop(t),,);
 }
 DEFINE_PRIM(_VOID, timer_stop_wrap, _HANDLE);
 
 HL_PRIM void HL_NAME(timer_again_wrap)(uv_timer_t *t) {
 	UV_CHECK_NULL(t,);
-	int result = uv_timer_again(t);
-	if(result < 0) {
-		hx_error(result);
-	}
+	UV_CHECK_ERROR(uv_timer_again(t),,);
 }
 DEFINE_PRIM(_VOID, timer_again_wrap, _HANDLE);
 
