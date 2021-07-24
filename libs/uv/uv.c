@@ -412,6 +412,39 @@ HL_PRIM void HL_NAME(idle_stop_wrap)( uv_idle_t *h ) {
 }
 DEFINE_PRIM(_VOID, idle_stop_wrap, _HANDLE);
 
+// Prepare
+
+static void on_prepare( uv_prepare_t *h ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in prepare handle");
+	hl_call0(void, c);
+}
+
+HL_PRIM uv_prepare_t *HL_NAME(prepare_init_wrap)( uv_loop_t *loop ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_prepare_t *h = UV_ALLOC(uv_prepare_t);
+	UV_CHECK_ERROR(uv_prepare_init(loop,h),free(h),NULL);
+	init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, prepare_init_wrap, _LOOP);
+
+HL_PRIM void HL_NAME(prepare_start_wrap)( uv_prepare_t *h, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	register_callb((uv_handle_t*)h,c,0);
+	uv_prepare_start(h, on_prepare);
+}
+DEFINE_PRIM(_VOID, prepare_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG));
+
+HL_PRIM void HL_NAME(prepare_stop_wrap)( uv_prepare_t *h ) {
+	UV_CHECK_NULL(h,);
+	uv_prepare_stop(h);
+}
+DEFINE_PRIM(_VOID, prepare_stop_wrap, _HANDLE);
+
 // TCP
 
 #define _TCP _HANDLE
