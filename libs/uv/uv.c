@@ -445,6 +445,39 @@ HL_PRIM void HL_NAME(prepare_stop_wrap)( uv_prepare_t *h ) {
 }
 DEFINE_PRIM(_VOID, prepare_stop_wrap, _HANDLE);
 
+// Check
+
+static void on_check( uv_check_t *h ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in check handle");
+	hl_call0(void, c);
+}
+
+HL_PRIM uv_check_t *HL_NAME(check_init_wrap)( uv_loop_t *loop ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_check_t *h = UV_ALLOC(uv_check_t);
+	UV_CHECK_ERROR(uv_check_init(loop,h),free(h),NULL);
+	init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, check_init_wrap, _LOOP);
+
+HL_PRIM void HL_NAME(check_start_wrap)( uv_check_t *h, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	register_callb((uv_handle_t*)h,c,0);
+	uv_check_start(h, on_check);
+}
+DEFINE_PRIM(_VOID, check_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG));
+
+HL_PRIM void HL_NAME(check_stop_wrap)( uv_check_t *h ) {
+	UV_CHECK_NULL(h,);
+	uv_check_stop(h);
+}
+DEFINE_PRIM(_VOID, check_stop_wrap, _HANDLE);
+
 // TCP
 
 #define _TCP _HANDLE
