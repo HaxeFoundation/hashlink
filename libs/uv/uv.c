@@ -478,6 +478,92 @@ HL_PRIM void HL_NAME(check_stop_wrap)( uv_check_t *h ) {
 }
 DEFINE_PRIM(_VOID, check_stop_wrap, _HANDLE);
 
+// Signal
+
+static int signum_hx2uv( int hx ) {
+	switch(hx) {
+		case -1: return SIGABRT; break;
+		case -2: return SIGFPE; break;
+		case -3: return SIGHUP; break;
+		case -4: return SIGILL; break;
+		case -5: return SIGINT; break;
+		case -6: return SIGKILL; break;
+		case -7: return SIGSEGV; break;
+		case -8: return SIGTERM; break;
+		case -9: return SIGWINCH; break;
+		default: return hx; break;
+	}
+}
+
+static int signum_uv2hx( int uv ) {
+	switch(uv) {
+		case SIGABRT: return -1; break;
+		case SIGFPE: return -2; break;
+		case SIGHUP: return -3; break;
+		case SIGILL: return -4; break;
+		case SIGINT: return -5; break;
+		case SIGKILL: return -6; break;
+		case SIGSEGV: return -7; break;
+		case SIGTERM: return -8; break;
+		case SIGWINCH: return -9; break;
+		default: return uv; break;
+	}
+}
+
+static void on_signal( uv_signal_t *h, int signum ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in signal handle");
+	hl_call1(void, c, int, signum_uv2hx(signum));
+}
+
+static void on_signal_oneshot( uv_signal_t *h, int signum ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in signal handle");
+	clear_callb((uv_handle_t *)h,0);
+	hl_call1(void, c, int, signum_uv2hx(signum));
+}
+
+HL_PRIM uv_signal_t *HL_NAME(signal_init_wrap)( uv_loop_t *loop ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_signal_t *h = UV_ALLOC(uv_signal_t);
+	UV_CHECK_ERROR(uv_signal_init(loop,h),free(h),NULL);
+	init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, signal_init_wrap, _LOOP);
+
+HL_PRIM void HL_NAME(signal_start_wrap)( uv_signal_t *h, int signum, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	register_callb((uv_handle_t*)h,c,0);
+	UV_CHECK_ERROR(uv_signal_start(h, on_signal, signum_hx2uv(signum)),clear_callb((uv_handle_t *)h,0),);
+}
+DEFINE_PRIM(_VOID, signal_start_wrap, _HANDLE _I32 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(signal_start_oneshot_wrap)( uv_signal_t *h, int signum, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	register_callb((uv_handle_t*)h,c,0);
+	UV_CHECK_ERROR(uv_signal_start_oneshot(h, on_signal_oneshot, signum_hx2uv(signum)),clear_callb((uv_handle_t *)h,0),);
+}
+DEFINE_PRIM(_VOID, signal_start_oneshot_wrap, _HANDLE _I32 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(signal_stop_wrap)( uv_signal_t *h ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_signal_stop(h),,);
+}
+DEFINE_PRIM(_VOID, signal_stop_wrap, _HANDLE);
+
+HL_PRIM int HL_NAME(signal_get_sigNum_wrap)(uv_signal_t *h) {
+	UV_CHECK_NULL(h,0);
+	return signum_uv2hx(h->signum);
+}
+DEFINE_PRIM(_I32, signal_get_sigNum_wrap, _HANDLE);
+
 // TCP
 
 #define _TCP _HANDLE
