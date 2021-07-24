@@ -21,8 +21,6 @@ typedef struct sockaddr uv_sockaddr;
 #define EVT_WRITE	0	// write_t
 #define EVT_CONNECT	0	// connect_t
 
-#define EVT_TIMER_TICK 0 // timer
-
 #define EVT_MAX		2
 
 typedef struct {
@@ -153,7 +151,8 @@ static events_data *init_hl_data( uv_handle_t *h ) {
 }
 
 static void register_callb( uv_handle_t *h, vclosure *c, int event_kind ) {
-	if( !h || !h->data ) return;
+	if( !h || !h->data )
+		hl_fatal("Missing handle or handle data");
 	UV_DATA(h)->events[event_kind] = c;
 }
 
@@ -300,25 +299,29 @@ HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
 }
 DEFINE_PRIM(_HANDLE, timer_init_wrap, _LOOP);
 
-static void on_timer_tick( uv_timer_t *t ) {
-	trigger_callb((uv_handle_t*)t, EVT_TIMER_TICK, NULL, 0, true);
+static void on_timer( uv_timer_t *h ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in timer handle");
+	hl_call0(void, c);
 }
 
 // TODO: change `timeout` and `repeat` to uint64
 HL_PRIM void HL_NAME(timer_start_wrap)(uv_timer_t *t, vclosure *c, int timeout, int repeat) {
 	UV_CHECK_NULL(t,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)t,c,EVT_TIMER_TICK);
+	register_callb((uv_handle_t*)t,c,0);
 	UV_CHECK_ERROR(
-		uv_timer_start(t,on_timer_tick, (uint64_t)timeout, (uint64_t)repeat),
-		clear_callb((uv_handle_t*)t, EVT_TIMER_TICK),
+		uv_timer_start(t,on_timer, (uint64_t)timeout, (uint64_t)repeat),
+		clear_callb((uv_handle_t*)t,0),
 	);
 }
 DEFINE_PRIM(_VOID, timer_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG) _I32 _I32);
 
 HL_PRIM void HL_NAME(timer_stop_wrap)(uv_timer_t *t) {
 	UV_CHECK_NULL(t,);
-	clear_callb((uv_handle_t*)t, EVT_TIMER_TICK);
+	clear_callb((uv_handle_t*)t,0);
 	UV_CHECK_ERROR(uv_timer_stop(t),,);
 }
 DEFINE_PRIM(_VOID, timer_stop_wrap, _HANDLE);
@@ -375,6 +378,39 @@ HL_PRIM void HL_NAME(async_send_wrap)( uv_async_t *a ) {
 	UV_CHECK_ERROR(uv_async_send(a),,);
 }
 DEFINE_PRIM(_VOID, async_send_wrap, _HANDLE);
+
+// Idle
+
+static void on_idle( uv_idle_t *h ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in idle handle");
+	hl_call0(void, c);
+}
+
+HL_PRIM uv_idle_t *HL_NAME(idle_init_wrap)( uv_loop_t *loop ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_idle_t *h = UV_ALLOC(uv_idle_t);
+	UV_CHECK_ERROR(uv_idle_init(loop,h),free(h),NULL);
+	init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, idle_init_wrap, _LOOP);
+
+HL_PRIM void HL_NAME(idle_start_wrap)( uv_idle_t *h, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	register_callb((uv_handle_t*)h,c,0);
+	uv_idle_start(h, on_idle);
+}
+DEFINE_PRIM(_VOID, idle_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG));
+
+HL_PRIM void HL_NAME(idle_stop_wrap)( uv_idle_t *h ) {
+	UV_CHECK_NULL(h,);
+	uv_idle_stop(h);
+}
+DEFINE_PRIM(_VOID, idle_stop_wrap, _HANDLE);
 
 // TCP
 
