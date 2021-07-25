@@ -15,13 +15,12 @@ typedef struct sockaddr uv_sockaddr;
 
 #define EVT_CLOSE	1
 
-#define EVT_READ	0	// stream
-#define EVT_LISTEN	2	// stream
+#define EVT_STREAM_READ		0
+#define EVT_STREAM_LISTEN	2
 
-#define EVT_WRITE	0	// write_t
 #define EVT_CONNECT	0	// connect_t
 
-#define EVT_MAX		2
+#define EVT_MAX		2 // !!!!!!!!!!!!!!
 
 typedef struct {
 	vclosure *events[EVT_MAX + 1];
@@ -50,90 +49,90 @@ typedef struct {
 
 // Errors
 
-// static int errno_uv2hx( int uv_errno ) {
-// 	switch(uv_errno) {
-// 		case 0: return 0; break;
-// 		case UV_E2BIG: return 1; break;
-// 		case UV_EACCES: return 2; break;
-// 		case UV_EADDRINUSE: return 3; break;
-// 		case UV_EADDRNOTAVAIL: return 4; break;
-// 		case UV_EAFNOSUPPORT: return 5; break;
-// 		case UV_EAGAIN: return 6; break;
-// 		case UV_EAI_ADDRFAMILY: return 7; break;
-// 		case UV_EAI_AGAIN: return 8; break;
-// 		case UV_EAI_BADFLAGS: return 9; break;
-// 		case UV_EAI_BADHINTS: return 10; break;
-// 		case UV_EAI_CANCELED: return 11; break;
-// 		case UV_EAI_FAIL: return 11; break;
-// 		case UV_EAI_FAMILY: return 12; break;
-// 		case UV_EAI_MEMORY: return 13; break;
-// 		case UV_EAI_NODATA: return 14; break;
-// 		case UV_EAI_NONAME: return 15; break;
-// 		case UV_EAI_OVERFLOW: return 16; break;
-// 		case UV_EAI_PROTOCOL: return 17; break;
-// 		case UV_EAI_SERVICE: return 18; break;
-// 		case UV_EAI_SOCKTYPE: return 19; break;
-// 		case UV_EALREADY: return 20; break;
-// 		case UV_EBADF: return 21; break;
-// 		case UV_EBUSY: return 22; break;
-// 		case UV_ECANCELED: return 23; break;
-// 		case UV_ECHARSET: return 24; break;
-// 		case UV_ECONNABORTED: return 25; break;
-// 		case UV_ECONNREFUSED: return 26; break;
-// 		case UV_ECONNRESET: return 27; break;
-// 		case UV_EDESTADDRREQ: return 28; break;
-// 		case UV_EEXIST: return 29; break;
-// 		case UV_EFAULT: return 30; break;
-// 		case UV_EFBIG: return 31; break;
-// 		case UV_EHOSTUNREACH: return 32; break;
-// 		case UV_EINTR: return 33; break;
-// 		case UV_EINVAL: return 34; break;
-// 		case UV_EIO: return 35; break;
-// 		case UV_EISCONN: return 36; break;
-// 		case UV_EISDIR: return 37; break;
-// 		case UV_ELOOP: return 38; break;
-// 		case UV_EMFILE: return 39; break;
-// 		case UV_EMSGSIZE: return 40; break;
-// 		case UV_ENAMETOOLONG: return 41; break;
-// 		case UV_ENETDOWN: return 42; break;
-// 		case UV_ENETUNREACH: return 43; break;
-// 		case UV_ENFILE: return 44; break;
-// 		case UV_ENOBUFS: return 45; break;
-// 		case UV_ENODEV: return 46; break;
-// 		case UV_ENOENT: return 47; break;
-// 		case UV_ENOMEM: return 48; break;
-// 		case UV_ENONET: return 49; break;
-// 		case UV_ENOPROTOOPT: return 50; break;
-// 		case UV_ENOSPC: return 51; break;
-// 		case UV_ENOSYS: return 52; break;
-// 		case UV_ENOTCONN: return 53; break;
-// 		case UV_ENOTDIR: return 54; break;
-// 		case UV_ENOTEMPTY: return 55; break;
-// 		case UV_ENOTSOCK: return 56; break;
-// 		case UV_ENOTSUP: return 57; break;
-// 		case UV_EPERM: return 58; break;
-// 		case UV_EPIPE: return 59; break;
-// 		case UV_EPROTO: return 60; break;
-// 		case UV_EPROTONOSUPPORT: return 61; break;
-// 		case UV_EPROTOTYPE: return 62; break;
-// 		case UV_ERANGE: return 63; break;
-// 		case UV_EROFS: return 64; break;
-// 		case UV_ESHUTDOWN: return 65; break;
-// 		case UV_ESPIPE: return 66; break;
-// 		case UV_ESRCH: return 67; break;
-// 		case UV_ETIMEDOUT: return 68; break;
-// 		case UV_ETXTBSY: return 69; break;
-// 		case UV_EXDEV: return 70; break;
-// 		case UV_UNKNOWN: return 71; break;
-// 		case UV_EOF: return 72; break;
-// 		case UV_ENXIO: return 73; break;
-// 		case UV_EMLINK: return 74; break;
-// 		case UV_EHOSTDOWN: return 75; break;
-// 		case UV_EREMOTEIO: return 76; break;
-// 		case UV_ENOTTY: return 77; break;
-// 		default: return UV_UNKNOWN;
-// 	}
-// }
+static int errno_uv2hx( int uv_errno ) {
+	switch(uv_errno) {
+		case 0: return 0; break;
+		case UV_E2BIG: return 1; break;
+		case UV_EACCES: return 2; break;
+		case UV_EADDRINUSE: return 3; break;
+		case UV_EADDRNOTAVAIL: return 4; break;
+		case UV_EAFNOSUPPORT: return 5; break;
+		case UV_EAGAIN: return 6; break;
+		case UV_EAI_ADDRFAMILY: return 7; break;
+		case UV_EAI_AGAIN: return 8; break;
+		case UV_EAI_BADFLAGS: return 9; break;
+		case UV_EAI_BADHINTS: return 10; break;
+		case UV_EAI_CANCELED: return 11; break;
+		case UV_EAI_FAIL: return 11; break;
+		case UV_EAI_FAMILY: return 12; break;
+		case UV_EAI_MEMORY: return 13; break;
+		case UV_EAI_NODATA: return 14; break;
+		case UV_EAI_NONAME: return 15; break;
+		case UV_EAI_OVERFLOW: return 16; break;
+		case UV_EAI_PROTOCOL: return 17; break;
+		case UV_EAI_SERVICE: return 18; break;
+		case UV_EAI_SOCKTYPE: return 19; break;
+		case UV_EALREADY: return 20; break;
+		case UV_EBADF: return 21; break;
+		case UV_EBUSY: return 22; break;
+		case UV_ECANCELED: return 23; break;
+		case UV_ECHARSET: return 24; break;
+		case UV_ECONNABORTED: return 25; break;
+		case UV_ECONNREFUSED: return 26; break;
+		case UV_ECONNRESET: return 27; break;
+		case UV_EDESTADDRREQ: return 28; break;
+		case UV_EEXIST: return 29; break;
+		case UV_EFAULT: return 30; break;
+		case UV_EFBIG: return 31; break;
+		case UV_EHOSTUNREACH: return 32; break;
+		case UV_EINTR: return 33; break;
+		case UV_EINVAL: return 34; break;
+		case UV_EIO: return 35; break;
+		case UV_EISCONN: return 36; break;
+		case UV_EISDIR: return 37; break;
+		case UV_ELOOP: return 38; break;
+		case UV_EMFILE: return 39; break;
+		case UV_EMSGSIZE: return 40; break;
+		case UV_ENAMETOOLONG: return 41; break;
+		case UV_ENETDOWN: return 42; break;
+		case UV_ENETUNREACH: return 43; break;
+		case UV_ENFILE: return 44; break;
+		case UV_ENOBUFS: return 45; break;
+		case UV_ENODEV: return 46; break;
+		case UV_ENOENT: return 47; break;
+		case UV_ENOMEM: return 48; break;
+		case UV_ENONET: return 49; break;
+		case UV_ENOPROTOOPT: return 50; break;
+		case UV_ENOSPC: return 51; break;
+		case UV_ENOSYS: return 52; break;
+		case UV_ENOTCONN: return 53; break;
+		case UV_ENOTDIR: return 54; break;
+		case UV_ENOTEMPTY: return 55; break;
+		case UV_ENOTSOCK: return 56; break;
+		case UV_ENOTSUP: return 57; break;
+		case UV_EPERM: return 58; break;
+		case UV_EPIPE: return 59; break;
+		case UV_EPROTO: return 60; break;
+		case UV_EPROTONOSUPPORT: return 61; break;
+		case UV_EPROTOTYPE: return 62; break;
+		case UV_ERANGE: return 63; break;
+		case UV_EROFS: return 64; break;
+		case UV_ESHUTDOWN: return 65; break;
+		case UV_ESPIPE: return 66; break;
+		case UV_ESRCH: return 67; break;
+		case UV_ETIMEDOUT: return 68; break;
+		case UV_ETXTBSY: return 69; break;
+		case UV_EXDEV: return 70; break;
+		case UV_UNKNOWN: return 71; break;
+		case UV_EOF: return 72; break;
+		case UV_ENXIO: return 73; break;
+		case UV_EMLINK: return 74; break;
+		case UV_EHOSTDOWN: return 75; break;
+		case UV_EREMOTEIO: return 76; break;
+		case UV_ENOTTY: return 77; break;
+		default: return 71; //UV_UNKNOWN;
+	}
+}
 
 static void hx_error(int uv_errno) {
 	//TODO: throw hl.uv.UVException
@@ -179,7 +178,12 @@ static void on_close( uv_handle_t *h ) {
 }
 
 static void free_handle( void *h ) {
-	if( h ) uv_close((uv_handle_t*)h, on_close);
+	uv_close((uv_handle_t*)h, on_close);
+}
+
+static void free_request( void *r ) {
+	clear_callb((uv_handle_t*)r,0);
+	free(r);
 }
 
 HL_PRIM void HL_NAME(close_handle)( uv_handle_t *h, vclosure *c ) {
@@ -221,73 +225,130 @@ DEFINE_PRIM(_VOID, unref_wrap, _HANDLE);
 
 // STREAM
 
-static void on_write( uv_write_t *wr, int status ) {
-	vdynamic b;
-	vdynamic *args = &b;
-	b.t = &hlt_bool;
-	b.v.b = status == 0;
-	trigger_callb((uv_handle_t*)wr,EVT_WRITE,&args,1,false);
-	on_close((uv_handle_t*)wr);
+static void on_shutdown( uv_shutdown_t *r, int status ) {
+	events_data *ev = UV_DATA(r);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in shutdown request");
+	free_request(r);
+	hl_call1(void, c, int, errno_uv2hx(status));
 }
 
-HL_PRIM bool HL_NAME(stream_write)( uv_stream_t *s, vbyte *b, int size, vclosure *c ) {
-	uv_write_t *wr = UV_ALLOC(uv_write_t);
-	events_data *d = init_hl_data((uv_handle_t*)wr);
-	// keep a copy of the data
-	uv_buf_t buf;
-	d->write_data = malloc(size);
-	memcpy(d->write_data,b,size);
-	buf.base = d->write_data;
-	buf.len = size;
-	register_callb((uv_handle_t*)wr,c,EVT_WRITE);
-	if( uv_write(wr,s,&buf,1,on_write) < 0 ) {
-		on_close((uv_handle_t*)wr);
-		return false;
-	}
-	return true;
+HL_PRIM void HL_NAME(shutdown_wrap)( uv_stream_t *h, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	uv_shutdown_t *req = UV_ALLOC(uv_shutdown_t);
+	register_callb((uv_handle_t*)req,c,0);
+	UV_CHECK_ERROR(uv_shutdown(req, h, on_shutdown),free_request(req),);
 }
+DEFINE_PRIM(_VOID, shutdown_wrap, _HANDLE _FUN(_VOID,_I32));
+
+static void on_listen( uv_stream_t *h, int status ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[EVT_STREAM_LISTEN] : NULL;
+	if( !c )
+		hl_fatal("No listen callback in stream handle");
+	hl_call1(void, c, int, errno_uv2hx(status));
+}
+
+HL_PRIM void HL_NAME(listen_wrap)( uv_stream_t *h, int backlog, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	register_callb((uv_handle_t*)h,c,EVT_STREAM_LISTEN);
+	UV_CHECK_ERROR(uv_listen(h, backlog, on_listen),clear_callb((uv_handle_t*)h,EVT_STREAM_LISTEN),);
+}
+DEFINE_PRIM(_VOID, listen_wrap, _HANDLE _BYTES _I32 _FUN(_VOID,_BOOL));
+
+HL_PRIM void HL_NAME(accept_wrap)( uv_stream_t *h, uv_stream_t *client ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(client,);
+	UV_CHECK_ERROR(uv_accept(h, client),,);
+}
+DEFINE_PRIM(_VOID, accept_wrap, _HANDLE _HANDLE);
 
 static void on_alloc( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
 	*buf = uv_buf_init(malloc(size), (int)size);
 }
 
-static void on_read( uv_stream_t *s, ssize_t nread, const uv_buf_t *buf ) {
-	vdynamic bytes;
-	vdynamic len;
-	vdynamic *args[2];
-	bytes.t = &hlt_bytes;
-	bytes.v.ptr = buf->base;
-	len.t = &hlt_i32;
-	len.v.i = (int)nread;
-	args[0] = &bytes;
-	args[1] = &len;
-	trigger_callb((uv_handle_t*)s,EVT_READ,args,2,true);
+static void on_read( uv_stream_t *h, ssize_t nread, const uv_buf_t *buf ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[EVT_STREAM_READ] : NULL;
+	if( !c )
+		hl_fatal("No listen callback in stream handle");
+	if( nread < 0 ) {
+		hl_call3(void, c, int, errno_uv2hx(nread), vbyte *, NULL, int, 0);
+	} else {
+		hl_call3(void, c, int, 0, vbyte *, (vbyte *)buf->base, int, nread);
+	}
 	free(buf->base);
 }
 
-HL_PRIM bool HL_NAME(stream_read_start)( uv_stream_t *s, vclosure *c ) {
-	register_callb((uv_handle_t*)s,c,EVT_READ);
-	return uv_read_start(s,on_alloc,on_read) >= 0;
+HL_PRIM void HL_NAME(read_start_wrap)( uv_stream_t *h, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	register_callb((uv_handle_t*)h,c,EVT_STREAM_READ);
+	UV_CHECK_ERROR(uv_read_start(h,on_alloc,on_read), clear_callb((uv_handle_t*)h,EVT_STREAM_READ),);
+}
+DEFINE_PRIM(_VOID, read_start_wrap, _HANDLE _FUN(_VOID,_I32 _BYTES _I32));
+
+HL_PRIM void HL_NAME(read_stop_wrap)( uv_stream_t *h ) {
+	UV_CHECK_NULL(h,);
+	clear_callb((uv_handle_t*)h,EVT_STREAM_READ);
+	uv_read_stop(h);
+}
+DEFINE_PRIM(_VOID, read_stop_wrap, _HANDLE);
+
+static void on_write( uv_write_t *r, int status ) {
+	events_data *ev = UV_DATA(r);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in write request");
+	hl_call1(void, c, int, status < 0 ? errno_uv2hx(status) : 0);
+	free_request(r);
 }
 
-HL_PRIM void HL_NAME(stream_read_stop)( uv_stream_t *s ) {
-	uv_read_stop(s);
-	clear_callb((uv_handle_t*)s,EVT_READ); // clear callback
+HL_PRIM void HL_NAME(write_wrap)( uv_stream_t *h, vbyte *b, int length, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(b,);
+	UV_CHECK_NULL(c,);
+	uv_write_t *r = UV_ALLOC(uv_write_t);
+	events_data *d = init_hl_data((uv_handle_t*)r);
+	// keep a copy of the data
+	uv_buf_t buf;
+	d->write_data = malloc(length);
+	memcpy(d->write_data,b,length);
+	buf.base = d->write_data;
+	buf.len = length;
+	register_callb((uv_handle_t*)r,c,0);
+	UV_CHECK_ERROR(uv_write(r,h,&buf,1,on_write),free_request(r),);
 }
+DEFINE_PRIM(_VOID, write_wrap, _HANDLE _BYTES _I32 _FUN(_VOID,_I32));
 
-static void on_listen( uv_stream_t *s, int status ) {
-	trigger_callb((uv_handle_t*)s, EVT_LISTEN, NULL, 0, true);
+HL_PRIM int HL_NAME(try_write_wrap)( uv_stream_t *h, vbyte *b, int length ) {
+	UV_CHECK_NULL(h,0);
+	UV_CHECK_NULL(b,0);
+	uv_buf_t buf = uv_buf_init((char *)b, length);
+	int result = uv_try_write(h,&buf,1);
+	if( result < 0 ) {
+		hx_error(result);
+		return 0;
+	}
+	return result;
 }
+DEFINE_PRIM(_VOID, try_write_wrap, _HANDLE _BYTES _I32);
 
-HL_PRIM bool HL_NAME(stream_listen)( uv_stream_t *s, int count, vclosure *c ) {
-	register_callb((uv_handle_t*)s,c,EVT_LISTEN);
-	return uv_listen(s,count,on_listen) >= 0;
+HL_PRIM bool HL_NAME(is_readable_wrap)( uv_stream_t *h ) {
+	UV_CHECK_NULL(h,false);
+	return uv_is_readable(h) != 0;
 }
+DEFINE_PRIM(_BOOL, is_readable_wrap, _HANDLE);
 
-DEFINE_PRIM(_BOOL, stream_write, _HANDLE _BYTES _I32 _FUN(_VOID,_BOOL));
-DEFINE_PRIM(_BOOL, stream_read_start, _HANDLE _FUN(_VOID,_BYTES _I32));
-DEFINE_PRIM(_VOID, stream_read_stop, _HANDLE);
-DEFINE_PRIM(_BOOL, stream_listen, _HANDLE _I32 _CALLB);
+HL_PRIM bool HL_NAME(is_writable_wrap)( uv_stream_t *h ) {
+	UV_CHECK_NULL(h,false);
+	return uv_is_writable(h) != 0;
+}
+DEFINE_PRIM(_BOOL, is_writable_wrap, _HANDLE);
+
 
 // Timer
 HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
