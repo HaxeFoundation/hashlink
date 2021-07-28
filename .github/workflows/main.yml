@@ -1,0 +1,117 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build-windows:
+    if: ${{ !contains(join(github.event.commits.*.message),'[skip ci]') }}
+    runs-on: windows-latest
+    steps:
+      # Tests aren't run, so this isn't needed
+      # - name: Install Haxe
+      #   uses: krdlab/setup-haxe@master
+      #   with:
+      #       haxe-version: 4.2.0
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Checkout hashlink
+        uses: actions/checkout@v2
+      - name: Install SDL
+        shell: powershell
+        run: |
+          Invoke-WebRequest https://www.libsdl.org/release/SDL2-devel-2.0.5-VC.zip -OutFile SDL.zip
+          Expand-Archive SDL.zip -DestinationPath .
+          Move-Item SDL2-* include/sdl
+          Remove-Item SDL.zip
+      - name: Install OpenAL
+        shell: powershell
+        run: |
+          Invoke-WebRequest http://openal-soft.org/openal-binaries/openal-soft-1.17.2-bin.zip -OutFile openal.zip
+          Expand-Archive openal.zip -DestinationPath .
+          Move-Item openal-* include/openal
+          Remove-Item openal.zip
+      - name: Build Hashlink
+        run: |
+          MSBuild hl.sln /nologo /clp:ErrorsOnly "-p:Configuration=Release;PlatformToolset=v142;WindowsTargetPlatformVersion=10"
+          copy src\hl.h include
+          copy src\hlc.h include
+          copy src\hlc_main.c include
+          copy x64\Release\*.hdll
+          copy x64\Release\*.lib
+          copy x64\Release\*.exe
+          copy x64\Release\*.dll
+          copy include\openal\bin\Win64\soft_oal.dll OpenAL32.dll
+          copy c:\Windows\System32\msvcr120.dll
+          copy include\sdl\lib\x64\SDL2.dll
+      - name: Upload Artifact
+        uses: "actions/upload-artifact@v2"
+        with:
+          name: windows64-binaries
+          path: |
+            *.hdll
+            *.lib
+            *.exe
+            *.dll
+            include/hl.h
+            include/hlc.h
+            include/hlc_main.c
+  build-linux:
+    if: ${{ !contains(join(github.event.commits.*.message),'[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      # Tests aren't run, so this isn't needed
+      # - name: Install Haxe
+      #   uses: krdlab/setup-haxe@master
+      #   with:
+      #       haxe-version: 4.2.0
+      - name: Update packages
+        run: sudo apt-get update
+        continue-on-error: true
+      - name: Install packages
+        run: sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev
+      - name: Checkout hashlink
+        uses: actions/checkout@v2
+      - name: Build Hashlink
+        run: |
+          make
+          cp src/hl.h src/hlc* include
+      - name: Upload Artifact
+        uses: "actions/upload-artifact@v2"
+        with:
+          name: linux64-binaries
+          path: |
+            *.hdll
+            hl
+            libhl.so
+            include/hl.h
+            include/hlc.h
+            include/hlc_main.c
+  build-mac:
+    if: ${{ !contains(join(github.event.commits.*.message),'[skip ci]') }}
+    runs-on: macos-latest
+    steps:
+      # Tests aren't run, so this isn't needed
+      # - name: Install Haxe
+      #   uses: krdlab/setup-haxe@master
+      #   with:
+      #       haxe-version: 4.2.0
+      - name: Checkout hashlink
+        uses: actions/checkout@v2
+      - name: Install packages
+        run: brew bundle
+      - name: Build Hashlink
+        run: |
+          make
+          sudo make codesign_osx
+          cp src/hl.h src/hlc* include
+      - name: Upload Artifact
+        uses: "actions/upload-artifact@v2"
+        with:
+          name: mac64-binaries
+          path: |
+            *.hdll
+            hl
+            libhl.dylib
+            include/hl.h
+            include/hlc.h
+            include/hlc_main.c
