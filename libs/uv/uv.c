@@ -299,13 +299,11 @@ static void on_close( uv_handle_t *h ) {
 }
 
 static void free_handle( uv_handle_t *h ) {
-	printf("free_handle\n");
 	uv_close(h, on_close);
 }
 
 HL_PRIM void HL_NAME(close_wrap)( uv_handle_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
-	printf("close_wrap\n");
 	handle_register_callback(h, c, EVT_CLOSE);
 	free_handle(h);
 }
