@@ -1,4 +1,5 @@
 import haxe.io.Bytes;
+import haxe.PosInfos;
 import hl.uv.UVError;
 import haxe.Timer;
 import hl.uv.UVException;
@@ -14,16 +15,26 @@ class TcpSample {
 		Timer.delay(client,100);
 	}
 
-	static function handle(success:()->Void):(e:UVError)->Void {
+	static function handle(success:()->Void, ?p:PosInfos):(e:UVError)->Void {
 		return e -> switch e {
 			case UV_NOERR: success();
-			case _: throw new UVException(e);
+			case _: throw new UVException(e, p.fileName + ':' + p.lineNumber + ': ' + e.toString());
 		}
 	}
 
+	static function shutdownAndClose(tcp:Tcp, print:(msg:String)->Void, ?onClose:()->Void) {
+		tcp.shutdown(_ -> {
+			tcp.close(() -> {
+				print('connection closed');
+				if(onClose != null)
+					onClose();
+			});
+		});
+	}
+
 	static function server() {
-		inline function print(msg:String) {
-			Log.print('SERVER: $msg');
+		function print(msg:String) {
+			Sys.println('SERVER: $msg');
 		}
 		var loop = Thread.current().events;
 		var server = Tcp.init(loop, INET);
@@ -32,20 +43,26 @@ class TcpSample {
 			var client = Tcp.init(loop);
 			server.accept(client);
 			print('connection from ' + client.getSockName());
-			client.readStart((e, data, bytesRead) -> handle(() -> {
-				print('incoming request: ' + data.toBytes(bytesRead).toString());
-				client.write(data, bytesRead, handle(() -> {
-					client.shutdown(handle(() -> {
-						client.close(() -> print('client closed'));
+			client.readStart((e, data, bytesRead) -> switch e {
+				case UV_NOERR:
+					print('incoming request: ' + data.toBytes(bytesRead).toString());
+					client.write(data, bytesRead, handle(() -> {
+						shutdownAndClose(client, print, () -> {
+							server.close(() -> print('done'));
+						});
 					}));
-				}));
-			})(e));
+				case UV_EOF:
+					print('client disconnected');
+					client.close(() -> print('connection closed'));
+				case _:
+					throw new UVException(e);
+			});
 		}));
 	}
 
 	static function client() {
-		inline function print(msg:String) {
-			Log.print('CLIENT: $msg');
+		function print(msg:String) {
+			Sys.println('CLIENT: $msg');
 		}
 		var loop = Thread.current().events;
 		var client = Tcp.init(loop, INET);
@@ -53,12 +70,15 @@ class TcpSample {
 			print('connected to ' + client.getPeerName());
 			var data = Bytes.ofString('Hello, world!').getData();
 			client.write(data.bytes, data.length, handle(() -> {
-				client.readStart((e, data, bytesRead) -> handle(() -> {
-					print('response from server: ' + data.toBytes(bytesRead).toString());
-					client.shutdown(handle(() -> {
-						client.close(() -> print('connection closed'));
-					}));
-				})(e));
+				client.readStart((e, data, bytesRead) -> switch e {
+					case UV_NOERR:
+						print('response from server: ' + data.toBytes(bytesRead).toString());
+					case UV_EOF:
+						print('disconnected from server');
+						shutdownAndClose(client, print);
+					case _:
+						throw new UVException(e);
+				});
 			}));
 		}));
 	}
