@@ -228,9 +228,42 @@ static void hx_error(int uv_errno) {
 	hl_error("%s", hl_to_utf16(uv_err_name(uv_errno)));
 }
 
+// Request
+
+static events_data *req_init_hl_data( uv_req_t *r ) {
+	events_data *d = hl_gc_alloc_raw(sizeof(events_data));
+	memset(d,0,sizeof(events_data));
+	hl_add_root(&r->data);
+	r->data = d;
+	return d;
+}
+
+static void req_register_callback( uv_req_t *r, vclosure *c, int event_kind ) {
+	if( !r )
+		hl_fatal("Missing req");
+	if( !r->data )
+		hl_fatal("Missing req data");
+	UV_DATA(r)->events[event_kind] = c;
+}
+
+static void req_clear_callback( uv_req_t *r, int event_kind ) {
+	req_register_callback(r,NULL,event_kind);
+}
+
+static void free_req( uv_req_t *r ) {
+	events_data *ev = UV_DATA(r);
+	if( ev ) {
+		req_clear_callback((uv_req_t *)r, 0);
+		free(ev->write_data);
+		hl_remove_root(&r->data);
+		r->data = NULL;
+	}
+	free(r);
+}
+
 // HANDLE
 
-static events_data *init_hl_data( uv_handle_t *h ) {
+static events_data *handle_init_hl_data( uv_handle_t *h ) {
 	events_data *d = hl_gc_alloc_raw(sizeof(events_data));
 	memset(d,0,sizeof(events_data));
 	hl_add_root(&h->data);
@@ -238,46 +271,42 @@ static events_data *init_hl_data( uv_handle_t *h ) {
 	return d;
 }
 
-static void register_callb( uv_handle_t *h, vclosure *c, int event_kind ) {
-	if( !h || !h->data )
-		hl_fatal("Missing handle or handle data");
+static void handle_register_callback( uv_handle_t *h, vclosure *c, int event_kind ) {
+	if( !h )
+		hl_fatal("Missing handle");
+	if( !h->data )
+		hl_fatal("Missing handle data");
 	UV_DATA(h)->events[event_kind] = c;
 }
 
-static void clear_callb( uv_handle_t *h, int event_kind ) {
-	register_callb(h,NULL,event_kind);
-}
-
-static void trigger_callb( uv_handle_t *h, int event_kind, vdynamic **args, int nargs, bool repeat ) {
-	events_data *ev = UV_DATA(h);
-	vclosure *c = ev ? ev->events[event_kind] : NULL;
-	if( !c ) return;
-	if( !repeat ) ev->events[event_kind] = NULL;
-	hl_dyn_call(c, args, nargs);
+static void handle_clear_callback( uv_handle_t *h, int event_kind ) {
+	handle_register_callback(h,NULL,event_kind);
 }
 
 static void on_close( uv_handle_t *h ) {
 	events_data *ev = UV_DATA(h);
-	if( !ev ) return;
-	trigger_callb(h, EVT_CLOSE, NULL, 0, false);
-	free(ev->write_data);
-	hl_remove_root(&h->data);
-	h->data = NULL;
+	if( ev ) {
+		vclosure *c = ev ? ev->events[EVT_CLOSE] : NULL;
+		if( c ) {
+			hl_call0(void, c);
+			handle_clear_callback(h, EVT_CLOSE);
+		}
+		free(ev->write_data);
+		hl_remove_root(&h->data);
+		h->data = NULL;
+	}
 	free(h);
 }
 
-static void free_handle( void *h ) {
-	uv_close((uv_handle_t*)h, on_close);
-}
-
-static void free_request( void *r ) {
-	clear_callb((uv_handle_t*)r,0);
-	free(r);
+static void free_handle( uv_handle_t *h ) {
+	printf("free_handle\n");
+	uv_close(h, on_close);
 }
 
 HL_PRIM void HL_NAME(close_wrap)( uv_handle_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
-	register_callb(h, c, EVT_CLOSE);
+	printf("close_wrap\n");
+	handle_register_callback(h, c, EVT_CLOSE);
 	free_handle(h);
 }
 DEFINE_PRIM(_VOID, close_wrap, _HANDLE _CALLB);
@@ -319,16 +348,17 @@ static void on_shutdown( uv_shutdown_t *r, int status ) {
 	vclosure *c = ev ? ev->events[0] : NULL;
 	if( !c )
 		hl_fatal("No callback in shutdown request");
-	free_request(r);
 	hl_call1(void, c, int, errno_uv2hx(status));
+	free_req((uv_req_t *)r);
 }
 
 HL_PRIM void HL_NAME(shutdown_wrap)( uv_stream_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
-	uv_shutdown_t *req = UV_ALLOC(uv_shutdown_t);
-	register_callb((uv_handle_t*)req,c,0);
-	UV_CHECK_ERROR(uv_shutdown(req, h, on_shutdown),free_request(req),);
+	uv_shutdown_t *r = UV_ALLOC(uv_shutdown_t);
+	req_init_hl_data((uv_req_t *)r);
+	req_register_callback((uv_req_t*)r,c,0);
+	UV_CHECK_ERROR(uv_shutdown(r, h, on_shutdown),free_req((uv_req_t *)r),);
 }
 DEFINE_PRIM(_VOID, shutdown_wrap, _HANDLE _FUN(_VOID,_I32));
 
@@ -343,8 +373,8 @@ static void on_listen( uv_stream_t *h, int status ) {
 HL_PRIM void HL_NAME(listen_wrap)( uv_stream_t *h, int backlog, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)h,c,EVT_STREAM_LISTEN);
-	UV_CHECK_ERROR(uv_listen(h, backlog, on_listen),clear_callb((uv_handle_t*)h,EVT_STREAM_LISTEN),);
+	handle_register_callback((uv_handle_t*)h,c,EVT_STREAM_LISTEN);
+	UV_CHECK_ERROR(uv_listen(h, backlog, on_listen),handle_clear_callback((uv_handle_t*)h,EVT_STREAM_LISTEN),);
 }
 DEFINE_PRIM(_VOID, listen_wrap, _HANDLE _I32 _FUN(_VOID,_I32));
 
@@ -375,14 +405,14 @@ static void on_read( uv_stream_t *h, ssize_t nread, const uv_buf_t *buf ) {
 HL_PRIM void HL_NAME(read_start_wrap)( uv_stream_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)h,c,EVT_STREAM_READ);
-	UV_CHECK_ERROR(uv_read_start(h,on_alloc,on_read), clear_callb((uv_handle_t*)h,EVT_STREAM_READ),);
+	handle_register_callback((uv_handle_t*)h,c,EVT_STREAM_READ);
+	UV_CHECK_ERROR(uv_read_start(h,on_alloc,on_read), handle_clear_callback((uv_handle_t*)h,EVT_STREAM_READ),);
 }
 DEFINE_PRIM(_VOID, read_start_wrap, _HANDLE _FUN(_VOID,_I32 _BYTES _I32));
 
 HL_PRIM void HL_NAME(read_stop_wrap)( uv_stream_t *h ) {
 	UV_CHECK_NULL(h,);
-	clear_callb((uv_handle_t*)h,EVT_STREAM_READ);
+	handle_clear_callback((uv_handle_t*)h,EVT_STREAM_READ);
 	uv_read_stop(h);
 }
 DEFINE_PRIM(_VOID, read_stop_wrap, _HANDLE);
@@ -393,7 +423,7 @@ static void on_write( uv_write_t *r, int status ) {
 	if( !c )
 		hl_fatal("No callback in write request");
 	hl_call1(void, c, int, status < 0 ? errno_uv2hx(status) : 0);
-	free_request(r);
+	free_req((uv_req_t *)r);
 }
 
 HL_PRIM void HL_NAME(write_wrap)( uv_stream_t *h, vbyte *b, int length, vclosure *c ) {
@@ -401,15 +431,15 @@ HL_PRIM void HL_NAME(write_wrap)( uv_stream_t *h, vbyte *b, int length, vclosure
 	UV_CHECK_NULL(b,);
 	UV_CHECK_NULL(c,);
 	uv_write_t *r = UV_ALLOC(uv_write_t);
-	events_data *d = init_hl_data((uv_handle_t*)r);
+	events_data *d = req_init_hl_data((uv_req_t *)r);
 	// keep a copy of the data
 	uv_buf_t buf;
 	d->write_data = malloc(length);
 	memcpy(d->write_data,b,length);
 	buf.base = d->write_data;
 	buf.len = length;
-	register_callb((uv_handle_t*)r,c,0);
-	UV_CHECK_ERROR(uv_write(r,h,&buf,1,on_write),free_request(r),);
+	req_register_callback((uv_req_t *)r,c,0);
+	UV_CHECK_ERROR(uv_write(r,h,&buf,1,on_write),free_req((uv_req_t *)r),);
 }
 DEFINE_PRIM(_VOID, write_wrap, _HANDLE _BYTES _I32 _FUN(_VOID,_I32));
 
@@ -424,7 +454,7 @@ HL_PRIM int HL_NAME(try_write_wrap)( uv_stream_t *h, vbyte *b, int length ) {
 	}
 	return result;
 }
-DEFINE_PRIM(_VOID, try_write_wrap, _HANDLE _BYTES _I32);
+DEFINE_PRIM(_I32, try_write_wrap, _HANDLE _BYTES _I32);
 
 HL_PRIM bool HL_NAME(is_readable_wrap)( uv_stream_t *h ) {
 	UV_CHECK_NULL(h,false);
@@ -443,7 +473,7 @@ HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
 	UV_CHECK_NULL(loop,NULL);
 	uv_timer_t *t = UV_ALLOC(uv_timer_t);
 	UV_CHECK_ERROR(uv_timer_init(loop,t),free(t),NULL);
-	init_hl_data((uv_handle_t*)t);
+	handle_init_hl_data((uv_handle_t*)t);
 	return t;
 }
 DEFINE_PRIM(_HANDLE, timer_init_wrap, _LOOP);
@@ -460,17 +490,17 @@ static void on_timer( uv_timer_t *h ) {
 HL_PRIM void HL_NAME(timer_start_wrap)(uv_timer_t *t, vclosure *c, int timeout, int repeat) {
 	UV_CHECK_NULL(t,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)t,c,0);
+	handle_register_callback((uv_handle_t*)t,c,0);
 	UV_CHECK_ERROR(
 		uv_timer_start(t,on_timer, (uint64_t)timeout, (uint64_t)repeat),
-		clear_callb((uv_handle_t*)t,0),
+		handle_clear_callback((uv_handle_t*)t,0),
 	);
 }
 DEFINE_PRIM(_VOID, timer_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG) _I32 _I32);
 
 HL_PRIM void HL_NAME(timer_stop_wrap)(uv_timer_t *t) {
 	UV_CHECK_NULL(t,);
-	clear_callb((uv_handle_t*)t,0);
+	handle_clear_callback((uv_handle_t*)t,0);
 	UV_CHECK_ERROR(uv_timer_stop(t),,);
 }
 DEFINE_PRIM(_VOID, timer_stop_wrap, _HANDLE);
@@ -503,12 +533,12 @@ DEFINE_PRIM(_I32, timer_set_repeat_wrap, _HANDLE _I32);
 
 // Async
 
-static void on_async( uv_async_t *a ) {
-	events_data *ev = UV_DATA(a);
+static void on_async( uv_async_t *h ) {
+	events_data *ev = UV_DATA(h);
 	vclosure *c = ev ? ev->events[0] : NULL;
 	if( !c )
 		hl_fatal("No callback in async handle");
-	hl_call1(void, c, uv_async_t *, a);
+	hl_call1(void, c, uv_async_t *, h);
 }
 
 HL_PRIM uv_async_t *HL_NAME(async_init_wrap)( uv_loop_t *loop, vclosure *c ) {
@@ -516,8 +546,8 @@ HL_PRIM uv_async_t *HL_NAME(async_init_wrap)( uv_loop_t *loop, vclosure *c ) {
 	UV_CHECK_NULL(c,NULL);
 	uv_async_t *a = UV_ALLOC(uv_async_t);
 	UV_CHECK_ERROR(uv_async_init(loop,a,on_async),free(a),NULL);
-	init_hl_data((uv_handle_t*)a);
-	register_callb((uv_handle_t*)a,c,0);
+	handle_init_hl_data((uv_handle_t*)a);
+	handle_register_callback((uv_handle_t*)a,c,0);
 	return a;
 }
 DEFINE_PRIM(_HANDLE, async_init_wrap, _LOOP _FUN(_VOID,_HANDLE));
@@ -542,7 +572,7 @@ HL_PRIM uv_idle_t *HL_NAME(idle_init_wrap)( uv_loop_t *loop ) {
 	UV_CHECK_NULL(loop,NULL);
 	uv_idle_t *h = UV_ALLOC(uv_idle_t);
 	UV_CHECK_ERROR(uv_idle_init(loop,h),free(h),NULL);
-	init_hl_data((uv_handle_t*)h);
+	handle_init_hl_data((uv_handle_t*)h);
 	return h;
 }
 DEFINE_PRIM(_HANDLE, idle_init_wrap, _LOOP);
@@ -550,7 +580,7 @@ DEFINE_PRIM(_HANDLE, idle_init_wrap, _LOOP);
 HL_PRIM void HL_NAME(idle_start_wrap)( uv_idle_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)h,c,0);
+	handle_register_callback((uv_handle_t*)h,c,0);
 	uv_idle_start(h, on_idle);
 }
 DEFINE_PRIM(_VOID, idle_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG));
@@ -575,7 +605,7 @@ HL_PRIM uv_prepare_t *HL_NAME(prepare_init_wrap)( uv_loop_t *loop ) {
 	UV_CHECK_NULL(loop,NULL);
 	uv_prepare_t *h = UV_ALLOC(uv_prepare_t);
 	UV_CHECK_ERROR(uv_prepare_init(loop,h),free(h),NULL);
-	init_hl_data((uv_handle_t*)h);
+	handle_init_hl_data((uv_handle_t*)h);
 	return h;
 }
 DEFINE_PRIM(_HANDLE, prepare_init_wrap, _LOOP);
@@ -583,7 +613,7 @@ DEFINE_PRIM(_HANDLE, prepare_init_wrap, _LOOP);
 HL_PRIM void HL_NAME(prepare_start_wrap)( uv_prepare_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)h,c,0);
+	handle_register_callback((uv_handle_t*)h,c,0);
 	uv_prepare_start(h, on_prepare);
 }
 DEFINE_PRIM(_VOID, prepare_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG));
@@ -608,7 +638,7 @@ HL_PRIM uv_check_t *HL_NAME(check_init_wrap)( uv_loop_t *loop ) {
 	UV_CHECK_NULL(loop,NULL);
 	uv_check_t *h = UV_ALLOC(uv_check_t);
 	UV_CHECK_ERROR(uv_check_init(loop,h),free(h),NULL);
-	init_hl_data((uv_handle_t*)h);
+	handle_init_hl_data((uv_handle_t*)h);
 	return h;
 }
 DEFINE_PRIM(_HANDLE, check_init_wrap, _LOOP);
@@ -616,7 +646,7 @@ DEFINE_PRIM(_HANDLE, check_init_wrap, _LOOP);
 HL_PRIM void HL_NAME(check_start_wrap)( uv_check_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)h,c,0);
+	handle_register_callback((uv_handle_t*)h,c,0);
 	uv_check_start(h, on_check);
 }
 DEFINE_PRIM(_VOID, check_start_wrap, _HANDLE _FUN(_VOID,_NO_ARG));
@@ -672,7 +702,7 @@ static void on_signal_oneshot( uv_signal_t *h, int signum ) {
 	vclosure *c = ev ? ev->events[0] : NULL;
 	if( !c )
 		hl_fatal("No callback in signal handle");
-	clear_callb((uv_handle_t *)h,0);
+	handle_clear_callback((uv_handle_t *)h,0);
 	hl_call1(void, c, int, signum_uv2hx(signum));
 }
 
@@ -680,7 +710,7 @@ HL_PRIM uv_signal_t *HL_NAME(signal_init_wrap)( uv_loop_t *loop ) {
 	UV_CHECK_NULL(loop,NULL);
 	uv_signal_t *h = UV_ALLOC(uv_signal_t);
 	UV_CHECK_ERROR(uv_signal_init(loop,h),free(h),NULL);
-	init_hl_data((uv_handle_t*)h);
+	handle_init_hl_data((uv_handle_t*)h);
 	return h;
 }
 DEFINE_PRIM(_HANDLE, signal_init_wrap, _LOOP);
@@ -688,16 +718,16 @@ DEFINE_PRIM(_HANDLE, signal_init_wrap, _LOOP);
 HL_PRIM void HL_NAME(signal_start_wrap)( uv_signal_t *h, int signum, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)h,c,0);
-	UV_CHECK_ERROR(uv_signal_start(h, on_signal, signum_hx2uv(signum)),clear_callb((uv_handle_t *)h,0),);
+	handle_register_callback((uv_handle_t*)h,c,0);
+	UV_CHECK_ERROR(uv_signal_start(h, on_signal, signum_hx2uv(signum)),handle_clear_callback((uv_handle_t *)h,0),);
 }
 DEFINE_PRIM(_VOID, signal_start_wrap, _HANDLE _I32 _FUN(_VOID,_I32));
 
 HL_PRIM void HL_NAME(signal_start_oneshot_wrap)( uv_signal_t *h, int signum, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
-	register_callb((uv_handle_t*)h,c,0);
-	UV_CHECK_ERROR(uv_signal_start_oneshot(h, on_signal_oneshot, signum_hx2uv(signum)),clear_callb((uv_handle_t *)h,0),);
+	handle_register_callback((uv_handle_t*)h,c,0);
+	UV_CHECK_ERROR(uv_signal_start_oneshot(h, on_signal_oneshot, signum_hx2uv(signum)),handle_clear_callback((uv_handle_t *)h,0),);
 }
 DEFINE_PRIM(_VOID, signal_start_oneshot_wrap, _HANDLE _I32 _FUN(_VOID,_I32));
 
@@ -775,9 +805,9 @@ HL_PRIM uv_tcp_t *HL_NAME(tcp_init_wrap)( uv_loop_t *loop, vdynamic *domain ) {
 			case -2: d = AF_INET; break;
 			case -3: d = AF_INET6; break;
 		}
-		UV_CHECK_ERROR(uv_tcp_init_ex(loop,h,d),free_handle(h),NULL);
+		UV_CHECK_ERROR(uv_tcp_init_ex(loop,h,d),free_handle((uv_handle_t *)h),NULL);
 	}
-	init_hl_data((uv_handle_t*)h);
+	handle_init_hl_data((uv_handle_t*)h);
 	return h;
 }
 DEFINE_PRIM(_HANDLE, tcp_init_wrap, _LOOP _NULL(_I32));
@@ -831,23 +861,24 @@ static void on_connect( uv_connect_t *r, int status ) {
 	vclosure *c = ev ? ev->events[0] : NULL;
 	if( !c )
 		hl_fatal("No callback in tcp_connect request");
-	free_request(r);
 	hl_call1(void, c, int, errno_uv2hx(status));
+	free_req((uv_req_t *)r);
 }
 
 HL_PRIM void HL_NAME(tcp_connect_wrap)( uv_tcp_t *h, uv_sockaddr_storage *addr, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(addr,);
 	UV_CHECK_NULL(c,);
-	uv_connect_t *req = UV_ALLOC(uv_connect_t);
-	register_callb((uv_handle_t*)req,c,0);
-	UV_CHECK_ERROR(uv_tcp_connect(req, h,(uv_sockaddr *)addr,on_connect),free_request(req),);
+	uv_connect_t *r = UV_ALLOC(uv_connect_t);
+	req_init_hl_data((uv_req_t *)r);
+	req_register_callback((uv_req_t *)r,c,0);
+	UV_CHECK_ERROR(uv_tcp_connect(r, h,(uv_sockaddr *)addr,on_connect),free_req((uv_req_t *)r),);
 }
 DEFINE_PRIM(_VOID, tcp_connect_wrap, _HANDLE _SOCKADDR _FUN(_VOID,_I32));
 
 HL_PRIM void HL_NAME(tcp_close_reset_wrap)( uv_tcp_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
-	register_callb((uv_handle_t *)h, c, EVT_CLOSE);
+	handle_register_callback((uv_handle_t *)h, c, EVT_CLOSE);
 	uv_tcp_close_reset(h, on_close);
 }
 DEFINE_PRIM(_VOID, tcp_close_reset_wrap, _HANDLE _CALLB);
@@ -856,11 +887,7 @@ DEFINE_PRIM(_VOID, tcp_close_reset_wrap, _HANDLE _CALLB);
 
 HL_PRIM uv_loop_t *HL_NAME(loop_init_wrap)( ) {
 	uv_loop_t *loop = UV_ALLOC(uv_loop_t);
-	if( uv_loop_init(loop) < 0) {
-		free(loop);
-		//TODO: throw error
-		return NULL;
-	}
+	UV_CHECK_ERROR(uv_loop_init(loop),free(loop),NULL);
 	return loop;
 }
 DEFINE_PRIM(_LOOP, loop_init_wrap, _NO_ARG);
