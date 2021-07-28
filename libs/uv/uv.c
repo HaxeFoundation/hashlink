@@ -12,6 +12,9 @@
 #endif
 
 typedef struct sockaddr uv_sockaddr;
+typedef struct sockaddr_in uv_sockaddr_in;
+typedef struct sockaddr_in6 uv_sockaddr_in6;
+typedef struct sockaddr_storage uv_sockaddr_storage;
 
 #define EVT_CLOSE	1
 
@@ -31,6 +34,7 @@ typedef struct {
 
 #define _LOOP	_ABSTRACT(uv_loop)
 #define _HANDLE _ABSTRACT(uv_handle)
+#define _SOCKADDR _ABSTRACT(uv_sockaddr_storage)
 #define _CALLB	_FUN(_VOID,_NO_ARG)
 #define UV_ALLOC(t)		((t*)malloc(sizeof(t)))
 #define UV_CHECK_NULL(handle,fail_return) \
@@ -186,12 +190,12 @@ static void free_request( void *r ) {
 	free(r);
 }
 
-HL_PRIM void HL_NAME(close_handle)( uv_handle_t *h, vclosure *c ) {
+HL_PRIM void HL_NAME(close_wrap)( uv_handle_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
 	register_callb(h, c, EVT_CLOSE);
 	free_handle(h);
 }
-DEFINE_PRIM(_VOID, close_handle, _HANDLE _CALLB);
+DEFINE_PRIM(_VOID, close_wrap, _HANDLE _CALLB);
 
 HL_PRIM bool HL_NAME(is_active_wrap)( uv_handle_t *h ) {
 	UV_CHECK_NULL(h,false);
@@ -348,7 +352,6 @@ HL_PRIM bool HL_NAME(is_writable_wrap)( uv_stream_t *h ) {
 	return uv_is_writable(h) != 0;
 }
 DEFINE_PRIM(_BOOL, is_writable_wrap, _HANDLE);
-
 
 // Timer
 HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
@@ -625,79 +628,53 @@ HL_PRIM int HL_NAME(signal_get_sigNum_wrap)(uv_signal_t *h) {
 }
 DEFINE_PRIM(_I32, signal_get_sigNum_wrap, _HANDLE);
 
-// TCP
+// Sockaddr
 
-#define _TCP _HANDLE
+HL_PRIM uv_sockaddr_storage *HL_NAME(ip4_addr_wrap)( vstring *ip, int port ) {
+	UV_CHECK_NULL(ip,NULL);
+	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+	UV_CHECK_ERROR(uv_ip4_addr(hl_to_utf8(ip->bytes), port, (uv_sockaddr_in *)addr),free(addr),NULL);
+	return addr;
+}
+DEFINE_PRIM(_SOCKADDR, ip4_addr_wrap, _STRING _I32);
 
-HL_PRIM uv_tcp_t *HL_NAME(tcp_init_wrap)( uv_loop_t *loop ) {
-	uv_tcp_t *t = UV_ALLOC(uv_tcp_t);
-	if( uv_tcp_init(loop,t) < 0 ) {
-		free(t);
+HL_PRIM uv_sockaddr_storage *HL_NAME(ip6_addr_wrap)( vstring *ip, int port ) {
+	UV_CHECK_NULL(ip,NULL);
+	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+	UV_CHECK_ERROR(uv_ip6_addr(hl_to_utf8(ip->bytes), port, (uv_sockaddr_in6 *)addr),free(addr),NULL);
+	return addr;
+}
+DEFINE_PRIM(_SOCKADDR, ip6_addr_wrap, _STRING _I32);
+
+HL_PRIM vdynamic *HL_NAME(get_port)( uv_sockaddr_storage *addr ) {
+	UV_CHECK_NULL(addr,NULL);
+	int port;
+	if( addr->ss_family == AF_INET ) {
+		port = ntohs(((uv_sockaddr_in *)addr)->sin_port);
+	} else if( addr->ss_family == AF_INET6 ) {
+		port = ntohs(((uv_sockaddr_in6 *)addr)->sin6_port);
+	} else {
 		return NULL;
 	}
-	init_hl_data((uv_handle_t*)t);
-	return t;
+	return hl_make_dyn(&port, &hlt_i32);
 }
+DEFINE_PRIM(_NULL(_I32), get_port, _SOCKADDR);
 
-static void on_connect( uv_connect_t *cnx, int status ) {
-	vdynamic b;
-	vdynamic *args = &b;
-	b.t = &hlt_bool;
-	b.v.b = status == 0;
-	trigger_callb((uv_handle_t*)cnx,EVT_CONNECT,&args,1,false);
-	on_close((uv_handle_t*)cnx);
-}
-
-HL_PRIM uv_connect_t *HL_NAME(tcp_connect_wrap)( uv_tcp_t *t, int host, int port, vclosure *c ) {
-	uv_connect_t *cnx = UV_ALLOC(uv_connect_t);
-	struct sockaddr_in addr;
-	memset(&addr,0,sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons((unsigned short)port);
-	*(int*)&addr.sin_addr.s_addr = host;
-	if( !t || uv_tcp_connect(cnx,t,(uv_sockaddr *)&addr,on_connect) < 0 ) {
-		free(cnx);
+//How to return vstring instead of vbyte?
+HL_PRIM vbyte *HL_NAME(ip_name_wrap)( uv_sockaddr_storage *addr ) {
+	UV_CHECK_NULL(addr,NULL);
+	vbyte *dst = hl_alloc_bytes(128);
+	if( addr->ss_family == AF_INET ) {
+		UV_CHECK_ERROR(uv_ip4_name((uv_sockaddr_in *)addr, (char *)dst, 128),,NULL); //free bytes?
+	} else if( addr->ss_family == AF_INET6 ) {
+		UV_CHECK_ERROR(uv_ip6_name((uv_sockaddr_in6 *)addr, (char *)dst, 128),,NULL);
+	} else {
 		return NULL;
 	}
-	memset(&addr,0,sizeof(addr));
-	init_hl_data((uv_handle_t*)cnx);
-	register_callb((uv_handle_t*)cnx, c, EVT_CONNECT);
-	return cnx;
+	return dst;
 }
+DEFINE_PRIM(_BYTES, ip_name_wrap, _SOCKADDR);
 
-HL_PRIM bool HL_NAME(tcp_bind_wrap)( uv_tcp_t *t, int host, int port ) {
-	struct sockaddr_in addr;
-	memset(&addr,0,sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons((unsigned short)port);
-	*(int*)&addr.sin_addr.s_addr = host;
-	return uv_tcp_bind(t,(uv_sockaddr *)&addr,0) >= 0;
-}
-
-
-HL_PRIM uv_tcp_t *HL_NAME(tcp_accept_wrap)( uv_tcp_t *t ) {
-	uv_tcp_t *client = UV_ALLOC(uv_tcp_t);
-	if( uv_tcp_init(t->loop, client) < 0 ) {
-		free(client);
-		return NULL;
-	}
-	if( uv_accept((uv_stream_t*)t,(uv_stream_t*)client) < 0 ) {
-		uv_close((uv_handle_t*)client, NULL);
-		return NULL;
-	}
-	init_hl_data((uv_handle_t*)client);
-	return client;
-}
-
-HL_PRIM void HL_NAME(tcp_nodelay_wrap)( uv_tcp_t *t, bool enable ) {
-	uv_tcp_nodelay(t,enable?1:0);
-}
-
-DEFINE_PRIM(_TCP, tcp_init_wrap, _LOOP);
-DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID,_BOOL));
-DEFINE_PRIM(_BOOL, tcp_bind_wrap, _TCP _I32 _I32);
-DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
-DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _TCP _BOOL);
 
 // loop
 
