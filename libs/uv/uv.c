@@ -55,88 +55,173 @@ typedef struct {
 
 static int errno_uv2hx( int uv_errno ) {
 	switch(uv_errno) {
-		case 0: return 0; break;
-		case UV_E2BIG: return 1; break;
-		case UV_EACCES: return 2; break;
-		case UV_EADDRINUSE: return 3; break;
-		case UV_EADDRNOTAVAIL: return 4; break;
-		case UV_EAFNOSUPPORT: return 5; break;
-		case UV_EAGAIN: return 6; break;
-		case UV_EAI_ADDRFAMILY: return 7; break;
-		case UV_EAI_AGAIN: return 8; break;
-		case UV_EAI_BADFLAGS: return 9; break;
-		case UV_EAI_BADHINTS: return 10; break;
-		case UV_EAI_CANCELED: return 11; break;
-		case UV_EAI_FAIL: return 11; break;
-		case UV_EAI_FAMILY: return 12; break;
-		case UV_EAI_MEMORY: return 13; break;
-		case UV_EAI_NODATA: return 14; break;
-		case UV_EAI_NONAME: return 15; break;
-		case UV_EAI_OVERFLOW: return 16; break;
-		case UV_EAI_PROTOCOL: return 17; break;
-		case UV_EAI_SERVICE: return 18; break;
-		case UV_EAI_SOCKTYPE: return 19; break;
-		case UV_EALREADY: return 20; break;
-		case UV_EBADF: return 21; break;
-		case UV_EBUSY: return 22; break;
-		case UV_ECANCELED: return 23; break;
-		case UV_ECHARSET: return 24; break;
-		case UV_ECONNABORTED: return 25; break;
-		case UV_ECONNREFUSED: return 26; break;
-		case UV_ECONNRESET: return 27; break;
-		case UV_EDESTADDRREQ: return 28; break;
-		case UV_EEXIST: return 29; break;
-		case UV_EFAULT: return 30; break;
-		case UV_EFBIG: return 31; break;
-		case UV_EHOSTUNREACH: return 32; break;
-		case UV_EINTR: return 33; break;
-		case UV_EINVAL: return 34; break;
-		case UV_EIO: return 35; break;
-		case UV_EISCONN: return 36; break;
-		case UV_EISDIR: return 37; break;
-		case UV_ELOOP: return 38; break;
-		case UV_EMFILE: return 39; break;
-		case UV_EMSGSIZE: return 40; break;
-		case UV_ENAMETOOLONG: return 41; break;
-		case UV_ENETDOWN: return 42; break;
-		case UV_ENETUNREACH: return 43; break;
-		case UV_ENFILE: return 44; break;
-		case UV_ENOBUFS: return 45; break;
-		case UV_ENODEV: return 46; break;
-		case UV_ENOENT: return 47; break;
-		case UV_ENOMEM: return 48; break;
-		case UV_ENONET: return 49; break;
-		case UV_ENOPROTOOPT: return 50; break;
-		case UV_ENOSPC: return 51; break;
-		case UV_ENOSYS: return 52; break;
-		case UV_ENOTCONN: return 53; break;
-		case UV_ENOTDIR: return 54; break;
-		case UV_ENOTEMPTY: return 55; break;
-		case UV_ENOTSOCK: return 56; break;
-		case UV_ENOTSUP: return 57; break;
-		case UV_EPERM: return 58; break;
-		case UV_EPIPE: return 59; break;
-		case UV_EPROTO: return 60; break;
-		case UV_EPROTONOSUPPORT: return 61; break;
-		case UV_EPROTOTYPE: return 62; break;
-		case UV_ERANGE: return 63; break;
-		case UV_EROFS: return 64; break;
-		case UV_ESHUTDOWN: return 65; break;
-		case UV_ESPIPE: return 66; break;
-		case UV_ESRCH: return 67; break;
-		case UV_ETIMEDOUT: return 68; break;
-		case UV_ETXTBSY: return 69; break;
-		case UV_EXDEV: return 70; break;
-		case UV_UNKNOWN: return 71; break;
-		case UV_EOF: return 72; break;
-		case UV_ENXIO: return 73; break;
-		case UV_EMLINK: return 74; break;
-		case UV_EHOSTDOWN: return 75; break;
-		case UV_EREMOTEIO: return 76; break;
-		case UV_ENOTTY: return 77; break;
-		default: return 71; //UV_UNKNOWN;
+		case 0: return 0;
+		case UV_E2BIG: return 1;
+		case UV_EACCES: return 2;
+		case UV_EADDRINUSE: return 3;
+		case UV_EADDRNOTAVAIL: return 4;
+		case UV_EAFNOSUPPORT: return 5;
+		case UV_EAGAIN: return 6;
+		case UV_EAI_ADDRFAMILY: return 7;
+		case UV_EAI_AGAIN: return 8;
+		case UV_EAI_BADFLAGS: return 9;
+		case UV_EAI_BADHINTS: return 10;
+		case UV_EAI_CANCELED: return 11;
+		case UV_EAI_FAIL: return 12;
+		case UV_EAI_FAMILY: return 13;
+		case UV_EAI_MEMORY: return 14;
+		case UV_EAI_NODATA: return 15;
+		case UV_EAI_NONAME: return 16;
+		case UV_EAI_OVERFLOW: return 17;
+		case UV_EAI_PROTOCOL: return 18;
+		case UV_EAI_SERVICE: return 19;
+		case UV_EAI_SOCKTYPE: return 20;
+		case UV_EALREADY: return 21;
+		case UV_EBADF: return 22;
+		case UV_EBUSY: return 23;
+		case UV_ECANCELED: return 24;
+		case UV_ECHARSET: return 25;
+		case UV_ECONNABORTED: return 26;
+		case UV_ECONNREFUSED: return 27;
+		case UV_ECONNRESET: return 28;
+		case UV_EDESTADDRREQ: return 29;
+		case UV_EEXIST: return 30;
+		case UV_EFAULT: return 31;
+		case UV_EFBIG: return 32;
+		case UV_EHOSTUNREACH: return 33;
+		case UV_EINTR: return 34;
+		case UV_EINVAL: return 35;
+		case UV_EIO: return 36;
+		case UV_EISCONN: return 37;
+		case UV_EISDIR: return 38;
+		case UV_ELOOP: return 39;
+		case UV_EMFILE: return 40;
+		case UV_EMSGSIZE: return 41;
+		case UV_ENAMETOOLONG: return 42;
+		case UV_ENETDOWN: return 43;
+		case UV_ENETUNREACH: return 44;
+		case UV_ENFILE: return 45;
+		case UV_ENOBUFS: return 46;
+		case UV_ENODEV: return 47;
+		case UV_ENOENT: return 48;
+		case UV_ENOMEM: return 49;
+		case UV_ENONET: return 50;
+		case UV_ENOPROTOOPT: return 51;
+		case UV_ENOSPC: return 52;
+		case UV_ENOSYS: return 53;
+		case UV_ENOTCONN: return 54;
+		case UV_ENOTDIR: return 55;
+		case UV_ENOTEMPTY: return 56;
+		case UV_ENOTSOCK: return 57;
+		case UV_ENOTSUP: return 58;
+		case UV_EPERM: return 59;
+		case UV_EPIPE: return 60;
+		case UV_EPROTO: return 61;
+		case UV_EPROTONOSUPPORT: return 62;
+		case UV_EPROTOTYPE: return 63;
+		case UV_ERANGE: return 64;
+		case UV_EROFS: return 65;
+		case UV_ESHUTDOWN: return 66;
+		case UV_ESPIPE: return 67;
+		case UV_ESRCH: return 68;
+		case UV_ETIMEDOUT: return 69;
+		case UV_ETXTBSY: return 70;
+		case UV_EXDEV: return 71;
+		case UV_UNKNOWN: return 72;
+		case UV_EOF: return 73;
+		case UV_ENXIO: return 74;
+		case UV_EMLINK: return 75;
+		case UV_EHOSTDOWN: return 76;
+		case UV_EREMOTEIO: return 77;
+		case UV_ENOTTY: return 78;
+		default: return 72;
 	}
 }
+
+// static int errno_hx2uv( int hx_errno ) {
+// 	switch(hx_errno) {
+// 		case 0: return 0;
+// 		case 1: return UV_E2BIG;
+// 		case 2: return UV_EACCES;
+// 		case 3: return UV_EADDRINUSE;
+// 		case 4: return UV_EADDRNOTAVAIL;
+// 		case 5: return UV_EAFNOSUPPORT;
+// 		case 6: return UV_EAGAIN;
+// 		case 7: return UV_EAI_ADDRFAMILY;
+// 		case 8: return UV_EAI_AGAIN;
+// 		case 9: return UV_EAI_BADFLAGS;
+// 		case 10: return UV_EAI_BADHINTS;
+// 		case 11: return UV_EAI_CANCELED;
+// 		case 12: return UV_EAI_FAIL;
+// 		case 13: return UV_EAI_FAMILY;
+// 		case 14: return UV_EAI_MEMORY;
+// 		case 15: return UV_EAI_NODATA;
+// 		case 16: return UV_EAI_NONAME;
+// 		case 17: return UV_EAI_OVERFLOW;
+// 		case 18: return UV_EAI_PROTOCOL;
+// 		case 19: return UV_EAI_SERVICE;
+// 		case 20: return UV_EAI_SOCKTYPE;
+// 		case 21: return UV_EALREADY;
+// 		case 22: return UV_EBADF;
+// 		case 23: return UV_EBUSY;
+// 		case 24: return UV_ECANCELED;
+// 		case 25: return UV_ECHARSET;
+// 		case 26: return UV_ECONNABORTED;
+// 		case 27: return UV_ECONNREFUSED;
+// 		case 28: return UV_ECONNRESET;
+// 		case 29: return UV_EDESTADDRREQ;
+// 		case 30: return UV_EEXIST;
+// 		case 31: return UV_EFAULT;
+// 		case 32: return UV_EFBIG;
+// 		case 33: return UV_EHOSTUNREACH;
+// 		case 34: return UV_EINTR;
+// 		case 35: return UV_EINVAL;
+// 		case 36: return UV_EIO;
+// 		case 37: return UV_EISCONN;
+// 		case 38: return UV_EISDIR;
+// 		case 39: return UV_ELOOP;
+// 		case 40: return UV_EMFILE;
+// 		case 41: return UV_EMSGSIZE;
+// 		case 42: return UV_ENAMETOOLONG;
+// 		case 43: return UV_ENETDOWN;
+// 		case 44: return UV_ENETUNREACH;
+// 		case 45: return UV_ENFILE;
+// 		case 46: return UV_ENOBUFS;
+// 		case 47: return UV_ENODEV;
+// 		case 48: return UV_ENOENT;
+// 		case 49: return UV_ENOMEM;
+// 		case 50: return UV_ENONET;
+// 		case 51: return UV_ENOPROTOOPT;
+// 		case 52: return UV_ENOSPC;
+// 		case 53: return UV_ENOSYS;
+// 		case 54: return UV_ENOTCONN;
+// 		case 55: return UV_ENOTDIR;
+// 		case 56: return UV_ENOTEMPTY;
+// 		case 57: return UV_ENOTSOCK;
+// 		case 58: return UV_ENOTSUP;
+// 		case 59: return UV_EPERM;
+// 		case 60: return UV_EPIPE;
+// 		case 61: return UV_EPROTO;
+// 		case 62: return UV_EPROTONOSUPPORT;
+// 		case 63: return UV_EPROTOTYPE;
+// 		case 64: return UV_ERANGE;
+// 		case 65: return UV_EROFS;
+// 		case 66: return UV_ESHUTDOWN;
+// 		case 67: return UV_ESPIPE;
+// 		case 68: return UV_ESRCH;
+// 		case 69: return UV_ETIMEDOUT;
+// 		case 70: return UV_ETXTBSY;
+// 		case 71: return UV_EXDEV;
+// 		case 72: return UV_UNKNOWN;
+// 		case 73: return UV_EOF;
+// 		case 74: return UV_ENXIO;
+// 		case 75: return UV_EMLINK;
+// 		case 76: return UV_EHOSTDOWN;
+// 		case 77: return UV_EREMOTEIO;
+// 		case 78: return UV_ENOTTY;
+// 		default: return UV_UNKNOWN;
+// 	}
+// }
 
 static void hx_error(int uv_errno) {
 	//TODO: throw hl.uv.UVException
@@ -261,7 +346,7 @@ HL_PRIM void HL_NAME(listen_wrap)( uv_stream_t *h, int backlog, vclosure *c ) {
 	register_callb((uv_handle_t*)h,c,EVT_STREAM_LISTEN);
 	UV_CHECK_ERROR(uv_listen(h, backlog, on_listen),clear_callb((uv_handle_t*)h,EVT_STREAM_LISTEN),);
 }
-DEFINE_PRIM(_VOID, listen_wrap, _HANDLE _BYTES _I32 _FUN(_VOID,_BOOL));
+DEFINE_PRIM(_VOID, listen_wrap, _HANDLE _I32 _FUN(_VOID,_I32));
 
 HL_PRIM void HL_NAME(accept_wrap)( uv_stream_t *h, uv_stream_t *client ) {
 	UV_CHECK_NULL(h,);
@@ -675,6 +760,97 @@ HL_PRIM vbyte *HL_NAME(ip_name_wrap)( uv_sockaddr_storage *addr ) {
 }
 DEFINE_PRIM(_BYTES, ip_name_wrap, _SOCKADDR);
 
+// TCP
+
+HL_PRIM uv_tcp_t *HL_NAME(tcp_init_wrap)( uv_loop_t *loop, vdynamic *domain ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_tcp_t *h = UV_ALLOC(uv_tcp_t);
+	if( !domain ) {
+		UV_CHECK_ERROR(uv_tcp_init(loop,h),free(h),NULL);
+	} else {
+		int d = domain->v.i;
+		//convert `hl.uv.SockAddr.AddressFamily` values to native ones
+		switch( d ) {
+			case -1: d = AF_UNSPEC; break;
+			case -2: d = AF_INET; break;
+			case -3: d = AF_INET6; break;
+		}
+		UV_CHECK_ERROR(uv_tcp_init_ex(loop,h,d),free_handle(h),NULL);
+	}
+	init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, tcp_init_wrap, _LOOP _NULL(_I32));
+
+HL_PRIM void HL_NAME(tcp_nodelay_wrap)( uv_tcp_t *h, bool enable ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_tcp_nodelay(h,enable?1:0),,);
+}
+DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _HANDLE _BOOL);
+
+HL_PRIM void HL_NAME(tcp_keepalive_wrap)( uv_tcp_t *h, bool enable, int delay ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_tcp_keepalive(h,enable?1:0,delay),,);
+}
+DEFINE_PRIM(_VOID, tcp_keepalive_wrap, _HANDLE _BOOL _I32);
+
+HL_PRIM void HL_NAME(tcp_simultaneous_accepts_wrap)( uv_tcp_t *h, bool enable ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_tcp_simultaneous_accepts(h,enable?1:0),,);
+}
+DEFINE_PRIM(_VOID, tcp_simultaneous_accepts_wrap, _HANDLE _BOOL);
+
+HL_PRIM void HL_NAME(tcp_bind_wrap)( uv_tcp_t *h, uv_sockaddr_storage *addr, vdynamic *ipv6_only ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(addr,);
+	int flags = ipv6_only && ipv6_only->v.b ? UV_TCP_IPV6ONLY : 0;
+	UV_CHECK_ERROR(uv_tcp_bind(h,(uv_sockaddr *)addr,flags),,);
+}
+DEFINE_PRIM(_VOID, tcp_bind_wrap, _HANDLE _SOCKADDR _NULL(_BOOL));
+
+HL_PRIM uv_sockaddr_storage *HL_NAME(tcp_getsockname_wrap)( uv_tcp_t *h ) {
+	UV_CHECK_NULL(h,NULL);
+	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+	int size = sizeof(uv_sockaddr_storage);
+	UV_CHECK_ERROR(uv_tcp_getsockname(h,(uv_sockaddr *)addr,&size),free(addr),NULL);
+	return addr;
+}
+DEFINE_PRIM(_SOCKADDR, tcp_getsockname_wrap, _HANDLE);
+
+HL_PRIM uv_sockaddr_storage *HL_NAME(tcp_getpeername_wrap)( uv_tcp_t *h ) {
+	UV_CHECK_NULL(h,NULL);
+	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+	int size = sizeof(uv_sockaddr_storage);
+	UV_CHECK_ERROR(uv_tcp_getpeername(h,(uv_sockaddr *)addr,&size),free(addr),NULL);
+	return addr;
+}
+DEFINE_PRIM(_SOCKADDR, tcp_getpeername_wrap, _HANDLE);
+
+static void on_connect( uv_connect_t *r, int status ) {
+	events_data *ev = UV_DATA(r);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in tcp_connect request");
+	free_request(r);
+	hl_call1(void, c, int, errno_uv2hx(status));
+}
+
+HL_PRIM void HL_NAME(tcp_connect_wrap)( uv_tcp_t *h, uv_sockaddr_storage *addr, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(addr,);
+	UV_CHECK_NULL(c,);
+	uv_connect_t *req = UV_ALLOC(uv_connect_t);
+	register_callb((uv_handle_t*)req,c,0);
+	UV_CHECK_ERROR(uv_tcp_connect(req, h,(uv_sockaddr *)addr,on_connect),free_request(req),);
+}
+DEFINE_PRIM(_VOID, tcp_connect_wrap, _HANDLE _SOCKADDR _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(tcp_close_reset_wrap)( uv_tcp_t *h, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	register_callb((uv_handle_t *)h, c, EVT_CLOSE);
+	uv_tcp_close_reset(h, on_close);
+}
+DEFINE_PRIM(_VOID, tcp_close_reset_wrap, _HANDLE _CALLB);
 
 // loop
 
