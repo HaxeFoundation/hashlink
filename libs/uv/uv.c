@@ -304,6 +304,10 @@ static void free_handle( uv_handle_t *h ) {
 
 HL_PRIM void HL_NAME(close_wrap)( uv_handle_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
+	if( uv_is_closing(h) ) {
+		hx_error(UV_ECANCELED);
+		return;
+	}
 	handle_register_callback(h, c, EVT_CLOSE);
 	free_handle(h);
 }
