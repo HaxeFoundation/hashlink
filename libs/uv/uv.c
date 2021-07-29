@@ -114,114 +114,31 @@ static int errno_uv2hx( int uv_errno ) {
 		case UV_ENOTEMPTY: return 56;
 		case UV_ENOTSOCK: return 57;
 		case UV_ENOTSUP: return 58;
-		case UV_EPERM: return 59;
-		case UV_EPIPE: return 60;
-		case UV_EPROTO: return 61;
-		case UV_EPROTONOSUPPORT: return 62;
-		case UV_EPROTOTYPE: return 63;
-		case UV_ERANGE: return 64;
-		case UV_EROFS: return 65;
-		case UV_ESHUTDOWN: return 66;
-		case UV_ESPIPE: return 67;
-		case UV_ESRCH: return 68;
-		case UV_ETIMEDOUT: return 69;
-		case UV_ETXTBSY: return 70;
-		case UV_EXDEV: return 71;
-		case UV_UNKNOWN: return 72;
-		case UV_EOF: return 73;
-		case UV_ENXIO: return 74;
-		case UV_EMLINK: return 75;
-		case UV_EHOSTDOWN: return 76;
-		case UV_EREMOTEIO: return 77;
-		case UV_ENOTTY: return 78;
-		default: return 72;
+		// case UV_EOVERFLOW: return 59;
+		case UV_EPERM: return 60;
+		case UV_EPIPE: return 61;
+		case UV_EPROTO: return 62;
+		case UV_EPROTONOSUPPORT: return 63;
+		case UV_EPROTOTYPE: return 64;
+		case UV_ERANGE: return 65;
+		case UV_EROFS: return 66;
+		case UV_ESHUTDOWN: return 67;
+		case UV_ESPIPE: return 68;
+		case UV_ESRCH: return 69;
+		case UV_ETIMEDOUT: return 70;
+		case UV_ETXTBSY: return 71;
+		case UV_EXDEV: return 72;
+		case UV_UNKNOWN: return 73;
+		case UV_EOF: return 74;
+		case UV_ENXIO: return 75;
+		case UV_EMLINK: return 76;
+		case UV_ENOTTY: return 77;
+		case UV_EFTYPE: return 78;
+		case UV_EILSEQ: return 79;
+		// case UV_ESOCKTNOSUPPORT: return 80;
+		default: return 73; //UV_UNKNOWN
 	}
 }
-
-// static int errno_hx2uv( int hx_errno ) {
-// 	switch(hx_errno) {
-// 		case 0: return 0;
-// 		case 1: return UV_E2BIG;
-// 		case 2: return UV_EACCES;
-// 		case 3: return UV_EADDRINUSE;
-// 		case 4: return UV_EADDRNOTAVAIL;
-// 		case 5: return UV_EAFNOSUPPORT;
-// 		case 6: return UV_EAGAIN;
-// 		case 7: return UV_EAI_ADDRFAMILY;
-// 		case 8: return UV_EAI_AGAIN;
-// 		case 9: return UV_EAI_BADFLAGS;
-// 		case 10: return UV_EAI_BADHINTS;
-// 		case 11: return UV_EAI_CANCELED;
-// 		case 12: return UV_EAI_FAIL;
-// 		case 13: return UV_EAI_FAMILY;
-// 		case 14: return UV_EAI_MEMORY;
-// 		case 15: return UV_EAI_NODATA;
-// 		case 16: return UV_EAI_NONAME;
-// 		case 17: return UV_EAI_OVERFLOW;
-// 		case 18: return UV_EAI_PROTOCOL;
-// 		case 19: return UV_EAI_SERVICE;
-// 		case 20: return UV_EAI_SOCKTYPE;
-// 		case 21: return UV_EALREADY;
-// 		case 22: return UV_EBADF;
-// 		case 23: return UV_EBUSY;
-// 		case 24: return UV_ECANCELED;
-// 		case 25: return UV_ECHARSET;
-// 		case 26: return UV_ECONNABORTED;
-// 		case 27: return UV_ECONNREFUSED;
-// 		case 28: return UV_ECONNRESET;
-// 		case 29: return UV_EDESTADDRREQ;
-// 		case 30: return UV_EEXIST;
-// 		case 31: return UV_EFAULT;
-// 		case 32: return UV_EFBIG;
-// 		case 33: return UV_EHOSTUNREACH;
-// 		case 34: return UV_EINTR;
-// 		case 35: return UV_EINVAL;
-// 		case 36: return UV_EIO;
-// 		case 37: return UV_EISCONN;
-// 		case 38: return UV_EISDIR;
-// 		case 39: return UV_ELOOP;
-// 		case 40: return UV_EMFILE;
-// 		case 41: return UV_EMSGSIZE;
-// 		case 42: return UV_ENAMETOOLONG;
-// 		case 43: return UV_ENETDOWN;
-// 		case 44: return UV_ENETUNREACH;
-// 		case 45: return UV_ENFILE;
-// 		case 46: return UV_ENOBUFS;
-// 		case 47: return UV_ENODEV;
-// 		case 48: return UV_ENOENT;
-// 		case 49: return UV_ENOMEM;
-// 		case 50: return UV_ENONET;
-// 		case 51: return UV_ENOPROTOOPT;
-// 		case 52: return UV_ENOSPC;
-// 		case 53: return UV_ENOSYS;
-// 		case 54: return UV_ENOTCONN;
-// 		case 55: return UV_ENOTDIR;
-// 		case 56: return UV_ENOTEMPTY;
-// 		case 57: return UV_ENOTSOCK;
-// 		case 58: return UV_ENOTSUP;
-// 		case 59: return UV_EPERM;
-// 		case 60: return UV_EPIPE;
-// 		case 61: return UV_EPROTO;
-// 		case 62: return UV_EPROTONOSUPPORT;
-// 		case 63: return UV_EPROTOTYPE;
-// 		case 64: return UV_ERANGE;
-// 		case 65: return UV_EROFS;
-// 		case 66: return UV_ESHUTDOWN;
-// 		case 67: return UV_ESPIPE;
-// 		case 68: return UV_ESRCH;
-// 		case 69: return UV_ETIMEDOUT;
-// 		case 70: return UV_ETXTBSY;
-// 		case 71: return UV_EXDEV;
-// 		case 72: return UV_UNKNOWN;
-// 		case 73: return UV_EOF;
-// 		case 74: return UV_ENXIO;
-// 		case 75: return UV_EMLINK;
-// 		case 76: return UV_EHOSTDOWN;
-// 		case 77: return UV_EREMOTEIO;
-// 		case 78: return UV_ENOTTY;
-// 		default: return UV_UNKNOWN;
-// 	}
-// }
 
 static void hx_error(int uv_errno) {
 	//TODO: throw hl.uv.UVException
@@ -745,7 +662,7 @@ DEFINE_PRIM(_I32, signal_get_sigNum_wrap, _HANDLE);
 
 HL_PRIM uv_sockaddr_storage *HL_NAME(ip4_addr_wrap)( vstring *ip, int port ) {
 	UV_CHECK_NULL(ip,NULL);
-	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage); //register in hl gc?
 	UV_CHECK_ERROR(uv_ip4_addr(hl_to_utf8(ip->bytes), port, (uv_sockaddr_in *)addr),free(addr),NULL);
 	return addr;
 }
