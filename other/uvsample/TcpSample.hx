@@ -11,6 +11,7 @@ class TcpSample {
 	static inline var PORT = 22001;
 
 	public static function main() {
+		Log.print('Running TcpSample...');
 		server();
 		Timer.delay(client,100);
 	}
@@ -34,7 +35,7 @@ class TcpSample {
 
 	static function server() {
 		function print(msg:String) {
-			Sys.println('SERVER: $msg');
+			Log.print('SERVER: $msg');
 		}
 		var loop = Thread.current().events;
 		var server = Tcp.init(loop, INET);
@@ -62,7 +63,7 @@ class TcpSample {
 
 	static function client() {
 		function print(msg:String) {
-			Sys.println('CLIENT: $msg');
+			Log.print('CLIENT: $msg');
 		}
 		var loop = Thread.current().events;
 		var client = Tcp.init(loop, INET);

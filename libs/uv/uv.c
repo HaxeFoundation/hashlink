@@ -370,14 +370,28 @@ HL_PRIM int HL_NAME(try_write_wrap)( uv_stream_t *h, vbyte *b, int length ) {
 	UV_CHECK_NULL(h,0);
 	UV_CHECK_NULL(b,0);
 	uv_buf_t buf = uv_buf_init((char *)b, length);
-	int result = uv_try_write(h,&buf,1);
-	if( result < 0 ) {
-		hx_error(result);
-		return 0;
-	}
-	return result;
+	UV_CHECK_ERROR(uv_try_write(h,&buf,1),,0);
+	return __result__;
 }
 DEFINE_PRIM(_I32, try_write_wrap, _HANDLE _BYTES _I32);
+
+HL_PRIM void HL_NAME(write2_wrap)( uv_stream_t *h, vbyte *b, int length, uv_stream_t *send_handle, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(b,);
+	UV_CHECK_NULL(send_handle,);
+	UV_CHECK_NULL(c,);
+	uv_write_t *r = UV_ALLOC(uv_write_t);
+	events_data *d = req_init_hl_data((uv_req_t *)r);
+	// keep a copy of the data
+	uv_buf_t buf;
+	d->write_data = malloc(length);
+	memcpy(d->write_data,b,length);
+	buf.base = d->write_data;
+	buf.len = length;
+	req_register_callback((uv_req_t *)r,c,0);
+	UV_CHECK_ERROR(uv_write2(r,h,&buf,1,send_handle,on_write),free_req((uv_req_t *)r),);
+}
+DEFINE_PRIM(_VOID, write2_wrap, _HANDLE _BYTES _I32 _HANDLE _FUN(_VOID,_I32));
 
 HL_PRIM bool HL_NAME(is_readable_wrap)( uv_stream_t *h ) {
 	UV_CHECK_NULL(h,false);
@@ -783,7 +797,7 @@ static void on_connect( uv_connect_t *r, int status ) {
 	events_data *ev = UV_DATA(r);
 	vclosure *c = ev ? ev->events[0] : NULL;
 	if( !c )
-		hl_fatal("No callback in tcp_connect request");
+		hl_fatal("No callback in connect request");
 	hl_call1(void, c, int, errno_uv2hx(status));
 	free_req((uv_req_t *)r);
 }
@@ -805,6 +819,104 @@ HL_PRIM void HL_NAME(tcp_close_reset_wrap)( uv_tcp_t *h, vclosure *c ) {
 	uv_tcp_close_reset(h, on_close);
 }
 DEFINE_PRIM(_VOID, tcp_close_reset_wrap, _HANDLE _CALLB);
+
+// PIPE
+
+HL_PRIM uv_pipe_t *HL_NAME(pipe_init_wrap)( uv_loop_t *loop, vdynamic *ipc ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_pipe_t *h = UV_ALLOC(uv_pipe_t);
+	UV_CHECK_ERROR(uv_pipe_init(loop,h,(ipc&&ipc->v.b)),free(h),NULL);
+	handle_init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, pipe_init_wrap, _LOOP _NULL(_BOOL));
+
+HL_PRIM void HL_NAME(pipe_bind_wrap)( uv_pipe_t *h, vstring *name ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(name,);
+	UV_CHECK_ERROR(uv_pipe_bind(h,hl_to_utf8(name->bytes)),,);
+}
+DEFINE_PRIM(_VOID, pipe_bind_wrap, _HANDLE _STRING);
+
+HL_PRIM vbyte *HL_NAME(pipe_getsockname_wrap)( uv_pipe_t *h ) {
+	UV_CHECK_NULL(h,NULL);
+	size_t size = 256;
+	vbyte *name = NULL;
+	int result = UV_ENOBUFS;
+	while (result == UV_ENOBUFS) {
+		name = hl_alloc_bytes(size); //free previousely allocated name bytes?
+		result = uv_pipe_getsockname(h,(char *)name,&size);
+	}
+	UV_CHECK_ERROR(result,,NULL); //free bytes?
+	return name;
+}
+DEFINE_PRIM(_BYTES, pipe_getsockname_wrap, _HANDLE);
+
+HL_PRIM vbyte *HL_NAME(pipe_getpeername_wrap)( uv_pipe_t *h ) {
+	UV_CHECK_NULL(h,NULL);
+	size_t size = 256;
+	vbyte *name = NULL;
+	int result = UV_ENOBUFS;
+	while (result == UV_ENOBUFS) {
+		name = hl_alloc_bytes(size); //free previousely allocated name bytes?
+		result = uv_pipe_getpeername(h,(char *)name,&size);
+	}
+	UV_CHECK_ERROR(result,,NULL); //free bytes?
+	return name;
+}
+DEFINE_PRIM(_BYTES, pipe_getpeername_wrap, _HANDLE);
+
+HL_PRIM void HL_NAME(pipe_connect_wrap)( uv_pipe_t *h, vstring *name, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(name,);
+	UV_CHECK_NULL(c,);
+	uv_connect_t *r = UV_ALLOC(uv_connect_t);
+	req_init_hl_data((uv_req_t *)r);
+	req_register_callback((uv_req_t *)r,c,0);
+	uv_pipe_connect(r, h,hl_to_utf8(name->bytes),on_connect);
+}
+DEFINE_PRIM(_VOID, pipe_connect_wrap, _HANDLE _STRING _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(pipe_pending_instances_wrap)( uv_pipe_t *h, int count ) {
+	UV_CHECK_NULL(h,);
+	uv_pipe_pending_instances(h, count);
+}
+DEFINE_PRIM(_VOID, pipe_pending_instances_wrap, _HANDLE _I32);
+
+HL_PRIM int HL_NAME(pipe_pending_count_wrap)( uv_pipe_t *h ) {
+	UV_CHECK_NULL(h,0);
+	UV_CHECK_ERROR(uv_pipe_pending_count(h),,0);
+	return __result__;
+}
+DEFINE_PRIM(_I32, pipe_pending_count_wrap, _HANDLE);
+
+HL_PRIM int HL_NAME(pipe_pending_type_wrap)( uv_pipe_t *h ) {
+	UV_CHECK_NULL(h,0);
+	UV_CHECK_ERROR(uv_pipe_pending_type(h),,0);
+	switch( __result__ ) {
+		case UV_ASYNC: return 1;
+		case UV_CHECK: return 2;
+		case UV_FS_EVENT: return 3;
+		case UV_FS_POLL: return 4;
+		case UV_HANDLE: return 5;
+		case UV_IDLE: return 6;
+		case UV_NAMED_PIPE: return 7;
+		case UV_POLL: return 8;
+		case UV_PREPARE: return 9;
+		case UV_PROCESS: return 10;
+		case UV_STREAM: return 11;
+		case UV_TCP: return 12;
+		case UV_TIMER: return 13;
+		case UV_TTY: return 14;
+		case UV_UDP: return 15;
+		case UV_SIGNAL: return 16;
+		case UV_FILE: return 17;
+		case UV_UNKNOWN_HANDLE:
+		default:
+			return 0;
+	}
+}
+DEFINE_PRIM(_I32, pipe_pending_type_wrap, _HANDLE);
 
 // loop
 
