@@ -34,6 +34,7 @@ typedef struct {
 
 #define _LOOP	_ABSTRACT(uv_loop)
 #define _HANDLE _ABSTRACT(uv_handle)
+#define _REQUEST _ABSTRACT(uv_req)
 #define _SOCKADDR _ABSTRACT(uv_sockaddr_storage)
 #define _CALLB	_FUN(_VOID,_NO_ARG)
 #define UV_ALLOC(t)		((t*)malloc(sizeof(t)))
@@ -177,6 +178,13 @@ static void free_req( uv_req_t *r ) {
 	}
 	free(r);
 }
+
+HL_PRIM void HL_NAME(cancel_wrap)( uv_req_t *r ) {
+	UV_CHECK_NULL(r,);
+	UV_CHECK_ERROR(uv_cancel(r),,);
+	free_req(r);
+}
+DEFINE_PRIM(_VOID, cancel_wrap, _REQUEST);
 
 // HANDLE
 
