@@ -32,29 +32,25 @@ jobs:
           Remove-Item openal.zip
       - name: Build Hashlink
         run: |
-          MSBuild hl.sln /nologo /clp:ErrorsOnly "-p:Configuration=Release;PlatformToolset=v142;WindowsTargetPlatformVersion=10"
-          copy src\hl.h include
-          copy src\hlc.h include
-          copy src\hlc_main.c include
-          copy x64\Release\*.hdll
-          copy x64\Release\*.lib
-          copy x64\Release\*.exe
-          copy x64\Release\*.dll
-          copy include\openal\bin\Win64\soft_oal.dll OpenAL32.dll
-          copy c:\Windows\System32\msvcr120.dll
-          copy include\sdl\lib\x64\SDL2.dll
+          MSBuild hl.sln /nologo /m /clp:ErrorsOnly "-p:Configuration=Release;PlatformToolset=v142;WindowsTargetPlatformVersion=10"
+          mkdir hl-1.12.0
+          mkdir hl-1.12.0/include
+          cp src\hl.h hl-1.12.0/include
+          cp src\hlc.h hl-1.12.0/include
+          cp src\hlc_main.c hl-1.12.0/include
+          cp x64\Release\*.hdll hl-1.12.0
+          cp x64\Release\*.lib hl-1.12.0
+          cp x64\Release\*.exe hl-1.12.0
+          cp x64\Release\*.dll hl-1.12.0
+          cp include\openal\bin\Win64\soft_oal.dll hl-1.12.0/OpenAL32.dll
+          cp c:\Windows\System32\msvcr120.dll hl-1.12.0
+          cp include\sdl\lib\x64\SDL2.dll hl-1.12.0
+          Compress-Archive -DestinationPath hl-1.12.0.zip -Path hl-1.12.0\*
       - name: Upload Artifact
         uses: "actions/upload-artifact@v2"
         with:
           name: windows64-binaries
-          path: |
-            *.hdll
-            *.lib
-            *.exe
-            *.dll
-            include/hl.h
-            include/hlc.h
-            include/hlc_main.c
+          path: hl-1.12.0.zip
   build-linux:
     if: ${{ !contains(join(github.event.commits.*.message),'[skip ci]') }}
     runs-on: ubuntu-latest
@@ -74,18 +70,14 @@ jobs:
       - name: Build Hashlink
         run: |
           make
-          cp src/hl.h src/hlc* include
+          sudo make install
+          sudo ldconfig
+          make release
       - name: Upload Artifact
         uses: "actions/upload-artifact@v2"
         with:
           name: linux64-binaries
-          path: |
-            *.hdll
-            hl
-            libhl.so
-            include/hl.h
-            include/hlc.h
-            include/hlc_main.c
+          path: hl-1.12.0-linux.tgz
   build-mac:
     if: ${{ !contains(join(github.event.commits.*.message),'[skip ci]') }}
     runs-on: macos-latest
@@ -98,20 +90,18 @@ jobs:
       - name: Checkout hashlink
         uses: actions/checkout@v2
       - name: Install packages
-        run: brew bundle
+        run: |
+          brew bundle
+          brew install mbedtls@2
+          brew link mbedtls@2
       - name: Build Hashlink
         run: |
           make
           sudo make codesign_osx
-          cp src/hl.h src/hlc* include
+          sudo make install
+          make release
       - name: Upload Artifact
         uses: "actions/upload-artifact@v2"
         with:
           name: mac64-binaries
-          path: |
-            *.hdll
-            hl
-            libhl.dylib
-            include/hl.h
-            include/hlc.h
-            include/hlc_main.c
+          path: hl-1.12.0-osx.tgz
