@@ -918,6 +918,167 @@ HL_PRIM int HL_NAME(pipe_pending_type_wrap)( uv_pipe_t *h ) {
 }
 DEFINE_PRIM(_I32, pipe_pending_type_wrap, _HANDLE);
 
+// Process
+
+static void on_process_exit(uv_process_t *h, int64_t exit_status, int term_signal) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( c ) {
+		hl_call3(void, c, uv_process_t *, h, int64_t, exit_status, int, signum_uv2hx(term_signal));
+		handle_clear_callback((uv_handle_t *)h, 0);
+	}
+}
+
+typedef struct {
+	hl_type *t;
+	int index;
+	int fd;
+} stdio_fd;
+
+typedef struct {
+	hl_type *t;
+	int index;
+	uv_pipe_t *pipe;
+	int permissions;
+	vdynamic *nonBlock;
+} stdio_pipe;
+
+typedef struct {
+	hl_type *t;
+	int index;
+	uv_stream_t *stream;
+} stdio_stream;
+
+HL_PRIM uv_process_t *HL_NAME(spawn_wrap)( uv_loop_t *loop, vstring *file, varray *args,
+	vclosure *on_exit, varray *stdio, varray *env, vstring *cwd, vdynamic *uid,
+	vdynamic *gid, vdynamic *detached, vdynamic *windowsVerbatimArguments, vdynamic *windowsHide,
+	vdynamic *windowsHideConsole, vdynamic *windowsHideGui ) {
+	UV_CHECK_NULL(loop,NULL);
+	UV_CHECK_NULL(file,NULL);
+	UV_CHECK_NULL(args,NULL);
+
+	uv_process_t *h = UV_ALLOC(uv_process_t);
+
+	uv_process_options_t options = {0};
+	options.file = hl_to_utf8(file->bytes);
+	options.exit_cb = on_process_exit;
+
+	options.args = malloc(sizeof(char *) * (args->size + 1));
+	for (int i = 0; i < args->size; i++)
+		options.args[i] = hl_to_utf8(hl_aptr(args, vstring *)[i]->bytes);
+	options.args[args->size] = NULL;
+
+	if( env ) {
+		options.env = malloc(sizeof(char *) * (env->size + 1));
+		for (int i = 0; i < env->size; i++)
+			options.env[i] = hl_to_utf8(hl_aptr(env, vstring *)[i]->bytes);
+		options.env[env->size] = NULL;
+	}
+	if( stdio ) {
+		options.stdio_count = stdio->size;
+		options.stdio = malloc(sizeof(uv_stdio_container_t) * stdio->size);
+		for (int i = 0; i < stdio->size; i++) {
+			venum *io = hl_aptr(stdio, venum *)[i];
+			if( !io ) {
+				options.stdio[i].flags = UV_IGNORE;
+				continue;
+			}
+			/*
+				On Haxe side:
+				enum ProcessStdio {
+					IGNORE;
+					INHERIT;
+					FD(fd:StdioFd);
+					PIPE(pipe:Pipe, permissions:StdioPipePermissions, ?nonBlock:Bool);
+					STREAM(stream:Stream);
+				}
+			*/
+			stdio_pipe *cfg;
+			switch( io->index ) {
+				case 0:
+					options.stdio[i].flags = UV_IGNORE;
+					break;
+				case 1:
+					options.stdio[i].flags = UV_INHERIT_FD;
+					options.stdio[i].data.fd = i;
+					break;
+				case 2:
+					options.stdio[i].flags = UV_INHERIT_FD;
+					options.stdio[i].data.fd = ((stdio_fd *)io)->fd;
+					break;
+				case 3:
+					cfg = (stdio_pipe *)io;
+					UV_CHECK_NULL(cfg->pipe,NULL);
+					options.stdio[i].flags = UV_CREATE_PIPE;
+					switch( cfg->permissions ) {
+						case 1: options.stdio[i].flags |= UV_READABLE_PIPE; break;
+						case 2: options.stdio[i].flags |= UV_WRITABLE_PIPE; break;
+						case 3:
+						default: options.stdio[i].flags |= UV_READABLE_PIPE | UV_WRITABLE_PIPE; break;
+					}
+					if( cfg->nonBlock && cfg->nonBlock->v.b )
+						options.stdio[i].flags |= UV_OVERLAPPED_PIPE;
+					options.stdio[i].data.stream = (uv_stream_t *)cfg->pipe;
+					break;
+				case 4:
+					UV_CHECK_NULL(((stdio_stream *)io)->stream,NULL);
+					options.stdio[i].flags = UV_INHERIT_STREAM;
+					options.stdio[i].data.stream = ((stdio_stream *)io)->stream;
+					break;
+				default:
+					options.stdio[i].flags = UV_IGNORE;
+					break;
+			}
+		}
+	}
+
+	if( cwd )
+		options.cwd = hl_to_utf8(cwd->bytes);
+	if(uid) {
+		options.uid = uid->v.i;
+		options.flags |= UV_PROCESS_SETUID;
+	}
+	if(gid) {
+		options.gid = gid->v.i;
+		options.flags |= UV_PROCESS_SETGID;
+	}
+	if(detached && detached->v.b)
+		options.flags |= UV_PROCESS_DETACHED;
+	if(windowsVerbatimArguments && windowsVerbatimArguments->v.b)
+		options.flags |= UV_PROCESS_WINDOWS_VERBATIM_ARGUMENTS;
+	if(windowsHide && windowsHide->v.b)
+		options.flags |= UV_PROCESS_WINDOWS_HIDE;
+	if(windowsHideConsole && windowsHideConsole->v.b)
+		options.flags |= UV_PROCESS_WINDOWS_HIDE_CONSOLE;
+	if(windowsHideGui && windowsHideGui->v.b)
+		options.flags |= UV_PROCESS_WINDOWS_HIDE_GUI;
+
+	UV_CHECK_ERROR(uv_spawn(loop,h,&options),free(h),NULL); // free options?
+	handle_init_hl_data((uv_handle_t*)h);
+	if( on_exit )
+		handle_register_callback((uv_handle_t *)h, on_exit, 0);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, spawn_wrap, _LOOP _STRING _ARR _FUN(_VOID, _HANDLE _I64 _I32) _ARR _ARR _STRING _NULL(_I32) _NULL(_I32) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL));
+
+HL_PRIM int HL_NAME(process_pid)( uv_process_t *h ) {
+	return h->pid;
+}
+DEFINE_PRIM(_I32, process_pid, _HANDLE);
+
+DEFINE_PRIM(_VOID, disable_stdio_inheritance, _NO_ARG);
+
+HL_PRIM void HL_NAME(process_kill_wrap)( uv_process_t *h, int signum ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_process_kill(h, signum_hx2uv(signum)),,);
+}
+DEFINE_PRIM(_VOID, process_kill_wrap, _HANDLE _I32);
+
+HL_PRIM void HL_NAME(kill_wrap)( int pid, int signum ) {
+	UV_CHECK_ERROR(uv_kill(pid, signum_hx2uv(signum)),,);
+}
+DEFINE_PRIM(_VOID, kill_wrap, _I32 _I32);
+
 // loop
 
 HL_PRIM uv_loop_t *HL_NAME(loop_init_wrap)( ) {
