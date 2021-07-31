@@ -682,6 +682,18 @@ DEFINE_PRIM(_I32, signal_get_sigNum_wrap, _HANDLE);
 
 // Sockaddr
 
+/**
+ * Convert `hl.uv.SockAddr.AddressFamily` values to corresponding AF_* values
+ */
+static int address_family(int hx_address_family) {
+	switch( hx_address_family ) {
+		case -1: return AF_UNSPEC;
+		case -2: return AF_INET;
+		case -3: return AF_INET6;
+		default: return hx_address_family;
+	}
+}
+
 HL_PRIM uv_sockaddr_storage *HL_NAME(ip4_addr_wrap)( vstring *ip, int port ) {
 	UV_CHECK_NULL(ip,NULL);
 	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage); //register in hl gc?
@@ -735,13 +747,7 @@ HL_PRIM uv_tcp_t *HL_NAME(tcp_init_wrap)( uv_loop_t *loop, vdynamic *domain ) {
 	if( !domain ) {
 		UV_CHECK_ERROR(uv_tcp_init(loop,h),free(h),NULL);
 	} else {
-		int d = domain->v.i;
-		//convert `hl.uv.SockAddr.AddressFamily` values to native ones
-		switch( d ) {
-			case -1: d = AF_UNSPEC; break;
-			case -2: d = AF_INET; break;
-			case -3: d = AF_INET6; break;
-		}
+		int d = address_family(domain->v.i);
 		UV_CHECK_ERROR(uv_tcp_init_ex(loop,h,d),free_handle((uv_handle_t *)h),NULL);
 	}
 	handle_init_hl_data((uv_handle_t*)h);
@@ -1078,6 +1084,218 @@ HL_PRIM void HL_NAME(kill_wrap)( int pid, int signum ) {
 	UV_CHECK_ERROR(uv_kill(pid, signum_hx2uv(signum)),,);
 }
 DEFINE_PRIM(_VOID, kill_wrap, _I32 _I32);
+
+// UDP
+
+HL_PRIM uv_udp_t *HL_NAME(udp_init_wrap)( uv_loop_t *loop, vdynamic *domain, vdynamic *recvmmsg ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_udp_t *h = UV_ALLOC(uv_udp_t);
+	if( !domain && !recvmmsg ) {
+		UV_CHECK_ERROR(uv_udp_init(loop,h),free(h),NULL);
+	} else {
+		int flags = 0;
+		if( domain )
+			flags |= address_family(domain->v.i);
+		if( recvmmsg && recvmmsg->v.b )
+			flags |= UV_UDP_RECVMMSG;
+		UV_CHECK_ERROR(uv_udp_init_ex(loop,h,flags),free_handle((uv_handle_t *)h),NULL);
+	}
+	handle_init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, udp_init_wrap, _LOOP _NULL(_I32) _NULL(_BOOL));
+
+HL_PRIM void HL_NAME(udp_bind_wrap)( uv_udp_t *h, uv_sockaddr_storage *addr, vdynamic *ipv6_only, vdynamic *reuse_addr ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(addr,);
+	int flags = 0;
+	if( ipv6_only && ipv6_only->v.b )
+		flags |= UV_UDP_IPV6ONLY;
+	if( reuse_addr && reuse_addr->v.b )
+		flags |= UV_UDP_REUSEADDR;
+	UV_CHECK_ERROR(uv_udp_bind(h,(uv_sockaddr *)addr,flags),,);
+}
+DEFINE_PRIM(_VOID, udp_bind_wrap, _HANDLE _SOCKADDR _NULL(_BOOL) _NULL(_BOOL));
+
+HL_PRIM void HL_NAME(udp_connect_wrap)( uv_udp_t *h, uv_sockaddr_storage *addr ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_udp_connect(h,(uv_sockaddr *)addr),,);
+}
+DEFINE_PRIM(_VOID, udp_connect_wrap, _HANDLE _SOCKADDR _NULL(_BOOL));
+
+HL_PRIM uv_sockaddr_storage *HL_NAME(udp_getsockname_wrap)( uv_udp_t *h ) {
+	UV_CHECK_NULL(h,NULL);
+	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+	int size = sizeof(uv_sockaddr_storage);
+	UV_CHECK_ERROR(uv_udp_getsockname(h,(uv_sockaddr *)addr,&size),free(addr),NULL);
+	return addr;
+}
+DEFINE_PRIM(_SOCKADDR, udp_getsockname_wrap, _HANDLE);
+
+HL_PRIM uv_sockaddr_storage *HL_NAME(udp_getpeername_wrap)( uv_udp_t *h ) {
+	UV_CHECK_NULL(h,NULL);
+	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+	int size = sizeof(uv_sockaddr_storage);
+	UV_CHECK_ERROR(uv_udp_getpeername(h,(uv_sockaddr *)addr,&size),free(addr),NULL);
+	return addr;
+}
+DEFINE_PRIM(_SOCKADDR, udp_getpeername_wrap, _HANDLE);
+
+static uv_membership udp_membership( int hx_membership ) {
+	switch( hx_membership ) {
+		case 0: return UV_LEAVE_GROUP;
+		case 1: return UV_JOIN_GROUP;
+		default:
+			hl_fatal("Unexpected UdpMembership value");
+			return hx_membership;
+	}
+}
+
+HL_PRIM void HL_NAME(udp_set_membership_wrap)( uv_udp_t *h, vstring *multicast_addr, vstring *interface_addr, int membership ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(multicast_addr,);
+	UV_CHECK_NULL(interface_addr,);
+	char *m_addr = hl_to_utf8(multicast_addr->bytes);
+	char *i_addr = hl_to_utf8(interface_addr->bytes);
+	uv_membership m = udp_membership(membership);
+	UV_CHECK_ERROR(uv_udp_set_membership(h,m_addr,i_addr,m),,);
+}
+DEFINE_PRIM(_VOID, udp_set_membership_wrap, _HANDLE _STRING _STRING _STRING _I32);
+
+HL_PRIM void HL_NAME(udp_set_source_membership_wrap)( uv_udp_t *h, vstring *multicast_addr, vstring *interface_addr, vstring *source_addr, int membership ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(multicast_addr,);
+	UV_CHECK_NULL(interface_addr,);
+	UV_CHECK_NULL(source_addr,);
+	char *m_addr = hl_to_utf8(multicast_addr->bytes);
+	char *i_addr = hl_to_utf8(interface_addr->bytes);
+	char *s_addr = hl_to_utf8(source_addr->bytes);
+	uv_membership m = udp_membership(membership);
+	UV_CHECK_ERROR(uv_udp_set_source_membership(h,m_addr,i_addr,s_addr,m),,);
+}
+DEFINE_PRIM(_VOID, udp_set_source_membership_wrap, _HANDLE _STRING _STRING _STRING _I32);
+
+HL_PRIM void HL_NAME(udp_set_multicast_loop_wrap)( uv_udp_t *h, bool on ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_udp_set_multicast_loop(h,on),,);
+}
+DEFINE_PRIM(_VOID, udp_set_multicast_loop_wrap, _HANDLE _BOOL);
+
+HL_PRIM void HL_NAME(udp_set_multicast_ttl_wrap)( uv_udp_t *h, int ttl ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_udp_set_multicast_ttl(h,ttl),,);
+}
+DEFINE_PRIM(_VOID, udp_set_multicast_ttl_wrap, _HANDLE _I32);
+
+HL_PRIM void HL_NAME(udp_set_multicast_interface_wrap)( uv_udp_t *h, vstring *interface_addr ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(interface_addr,);
+	UV_CHECK_ERROR(uv_udp_set_multicast_interface(h,hl_to_utf8(interface_addr->bytes)),,);
+}
+DEFINE_PRIM(_VOID, udp_set_multicast_interface_wrap, _HANDLE _STRING);
+
+HL_PRIM void HL_NAME(udp_set_broadcast_wrap)( uv_udp_t *h, bool on ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_udp_set_broadcast(h,on),,);
+}
+DEFINE_PRIM(_VOID, udp_set_broadcast_wrap, _HANDLE _BOOL);
+
+HL_PRIM void HL_NAME(udp_set_ttl_wrap)( uv_udp_t *h, int ttl ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_udp_set_ttl(h,ttl),,);
+}
+DEFINE_PRIM(_VOID, udp_set_ttl_wrap, _HANDLE _I32);
+
+static void on_udp_send( uv_udp_send_t *r, int status ) {
+	events_data *ev = UV_DATA(r);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in udp send request");
+	hl_call1(void, c, int, status < 0 ? errno_uv2hx(status) : 0);
+	free_req((uv_req_t *)r);
+}
+
+HL_PRIM void HL_NAME(udp_send_wrap)( uv_udp_t *h, vbyte *data, int length, uv_sockaddr_storage *addr, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	uv_udp_send_t *r = UV_ALLOC(uv_udp_send_t);
+	events_data *d = req_init_hl_data((uv_req_t *)r);
+	uv_buf_t buf;
+	d->write_data = malloc(length);
+	memcpy(d->write_data,data,length);
+	buf.base = d->write_data;
+	buf.len = length;
+	req_register_callback((uv_req_t *)r,c,0);
+	UV_CHECK_ERROR(uv_udp_send(r,h,&buf,1,(uv_sockaddr *)addr,on_udp_send),free_req((uv_req_t *)r),);
+}
+DEFINE_PRIM(_VOID, udp_send_wrap, _HANDLE _BYTES _I32 _SOCKADDR _FUN(_VOID,_I32));
+
+HL_PRIM int HL_NAME(udp_try_send_wrap)( uv_udp_t *h, vbyte *data, int length, uv_sockaddr_storage *addr ) {
+	UV_CHECK_NULL(h,0);
+	uv_buf_t buf = uv_buf_init((char *)data, length);
+	UV_CHECK_ERROR(uv_udp_try_send(h,&buf,1,(uv_sockaddr *)addr),,0);
+	return __result__;
+}
+DEFINE_PRIM(_I32, udp_try_send_wrap, _HANDLE _BYTES _I32 _SOCKADDR);
+
+static void on_udp_recv( uv_udp_t *h, ssize_t nread, const uv_buf_t *buf, const uv_sockaddr *src_addr, unsigned flags ) {
+	events_data *ev = UV_DATA(h);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No recv callback in udp handle");
+
+	uv_sockaddr_storage *addr = NULL;
+	if( src_addr ) {
+		addr = UV_ALLOC(uv_sockaddr_storage);
+		memcpy(addr, src_addr, sizeof(uv_sockaddr_storage));
+	}
+
+	vdynamic *hx_flags = (vdynamic*)hl_alloc_dynobj();
+	hl_dyn_seti(hx_flags, hl_hash_utf8("mmsgChunk"), &hlt_bool, 0 != (flags & UV_UDP_MMSG_CHUNK));
+	hl_dyn_seti(hx_flags, hl_hash_utf8("mmsgFree"), &hlt_bool, 0 != (flags & UV_UDP_MMSG_FREE));
+	hl_dyn_seti(hx_flags, hl_hash_utf8("partial"), &hlt_bool, 0 != (flags & UV_UDP_PARTIAL));
+
+	if( nread < 0 ) {
+		hl_call5(void, c, int, errno_uv2hx(nread), vbyte *, NULL, int, 0, uv_sockaddr_storage *, addr, vdynamic *, hx_flags);
+	} else {
+		hl_call5(void, c, int, 0, vbyte *, (vbyte *)buf->base, int, nread, uv_sockaddr_storage *, addr, vdynamic *, hx_flags);
+	}
+	if( (nread <= 0 && !addr) || (flags & UV_UDP_MMSG_FREE) )
+		free(buf->base);
+}
+
+HL_PRIM void HL_NAME(udp_recv_start_wrap)( uv_udp_t *h, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(c,);
+	handle_register_callback((uv_handle_t *)h,c,0);
+	UV_CHECK_ERROR(uv_udp_recv_start(h,on_alloc,on_udp_recv),handle_clear_callback((uv_handle_t*)h,0),);
+}
+DEFINE_PRIM(_VOID, udp_recv_start_wrap, _HANDLE _FUN(_VOID,_I32 _BYTES _I32 _SOCKADDR _DYN));
+
+HL_PRIM bool HL_NAME(udp_using_recvmmsg_wrap)( uv_udp_t *h ) {
+	UV_CHECK_NULL(h,false);
+	UV_CHECK_ERROR(uv_udp_using_recvmmsg(h),,false);
+	return __result__  == 1;
+}
+DEFINE_PRIM(_BOOL, udp_using_recvmmsg_wrap, _HANDLE);
+
+HL_PRIM void HL_NAME(udp_recv_stop_wrap)( uv_udp_t *h ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_udp_recv_stop(h),,);
+}
+DEFINE_PRIM(_VOID, udp_recv_stop_wrap, _HANDLE);
+
+HL_PRIM int HL_NAME(udp_get_send_queue_size_wrap)( uv_udp_t *h ) {
+	UV_CHECK_NULL(h,0);
+	return uv_udp_get_send_queue_size(h);
+}
+DEFINE_PRIM(_I32, udp_get_send_queue_size_wrap, _HANDLE);
+
+HL_PRIM int HL_NAME(udp_get_send_queue_count_wrap)( uv_udp_t *h ) {
+	UV_CHECK_NULL(h,0);
+	return uv_udp_get_send_queue_count(h);
+}
+DEFINE_PRIM(_I32, udp_get_send_queue_count_wrap, _HANDLE);
 
 // loop
 
