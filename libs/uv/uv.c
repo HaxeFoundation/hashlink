@@ -710,7 +710,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(ip6_addr_wrap)( vstring *ip, int port ) {
 }
 DEFINE_PRIM(_SOCKADDR, ip6_addr_wrap, _STRING _I32);
 
-HL_PRIM vdynamic *HL_NAME(get_port)( uv_sockaddr_storage *addr ) {
+HL_PRIM vdynamic *HL_NAME(sockaddr_get_port)( uv_sockaddr_storage *addr ) {
 	UV_CHECK_NULL(addr,NULL);
 	int port;
 	if( addr->ss_family == AF_INET ) {
@@ -722,7 +722,15 @@ HL_PRIM vdynamic *HL_NAME(get_port)( uv_sockaddr_storage *addr ) {
 	}
 	return hl_make_dyn(&port, &hlt_i32);
 }
-DEFINE_PRIM(_NULL(_I32), get_port, _SOCKADDR);
+DEFINE_PRIM(_NULL(_I32), sockaddr_get_port, _SOCKADDR);
+
+HL_PRIM uv_sockaddr_storage *HL_NAME(sockaddr_cast_ptr)( vdynamic *ptr ) {
+	UV_CHECK_NULL(ptr,NULL);
+	if( ptr->t->kind != HABSTRACT || 0 != memcmp(ptr->t->abs_name,USTR("uv_sockaddr_storage"),38) )
+		hl_error("Invalid usage of hl.uv.SockAddr.castPtr()");
+	return (uv_sockaddr_storage *)ptr->v.ptr;
+}
+DEFINE_PRIM(_SOCKADDR, sockaddr_cast_ptr, _DYN);
 
 //How to return vstring instead of vbyte?
 HL_PRIM vbyte *HL_NAME(ip_name_wrap)( uv_sockaddr_storage *addr ) {
@@ -1296,6 +1304,160 @@ HL_PRIM int HL_NAME(udp_get_send_queue_count_wrap)( uv_udp_t *h ) {
 	return uv_udp_get_send_queue_count(h);
 }
 DEFINE_PRIM(_I32, udp_get_send_queue_count_wrap, _HANDLE);
+
+// DNS
+
+// typedef struct {
+// 	int family;
+// 	int sockType;
+// 	int protocol;
+// 	uv_sockaddr_storage *addr;
+// 	vstring *canonName;
+// } hx_addrinfo
+
+static void on_getaddrinfo( uv_getaddrinfo_t *r, int status, struct addrinfo *res ) {
+	events_data *ev = UV_DATA(r);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in getaddrinfo request");
+
+	int count = 0;
+	struct addrinfo *current = res;
+	while( current ) {
+		++count;
+		current = current->ai_next;
+	}
+
+	varray *addresses = hl_alloc_array(&hlt_dyn, count);
+	current = res;
+	int hfamily = hl_hash_utf8("family");
+	int hsockType = hl_hash_utf8("sockType");
+	int hprotocol = hl_hash_utf8("protocol");
+	int haddr = hl_hash_utf8("addr");
+	int hcanonName = hl_hash_utf8("canonName");
+	int i = 0;
+	hl_type hlt_sockaddr = { HABSTRACT, {USTR("uv_sockaddr_storage")} };
+	vdynamic *entry;
+	while( current ) {
+		entry = (vdynamic *)hl_alloc_dynobj();
+		uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+		memcpy(addr, current->ai_addr, current->ai_addrlen);
+		hl_dyn_setp(entry,haddr,&hlt_sockaddr,addr);
+		hl_dyn_seti(entry,hprotocol,&hlt_i32,current->ai_protocol);
+		if( current->ai_canonname ) {
+			vbyte *canonname = hl_copy_bytes((vbyte *)current->ai_canonname, strlen(current->ai_canonname));
+			hl_dyn_setp(entry,hcanonName,&hlt_bytes,canonname);
+		}
+		int family;
+		switch( current->ai_family ) {
+			case PF_UNSPEC: family = -1; break;
+			case PF_INET: family = -2; break;
+			case PF_INET6: family = -3; break;
+			default: family = current->ai_family; break;
+		}
+		hl_dyn_seti(entry,hfamily,&hlt_i32,family);
+		int socktype;
+		switch( current->ai_socktype ) {
+			case SOCK_STREAM: socktype = -1; break;
+			case SOCK_DGRAM: socktype = -2; break;
+			case SOCK_RAW: socktype = -3; break;
+			default: socktype = current->ai_socktype; break;
+		}
+		hl_dyn_seti(entry,hsockType,&hlt_i32,socktype);
+		hl_aptr(addresses, vdynamic*)[i] = entry;
+		current = current->ai_next;
+		++i;
+	}
+	freeaddrinfo(res);
+
+	hl_call2(void,c,int,errno_uv2hx(status),varray *,addresses);
+	free_req((uv_req_t *)r);
+}
+
+HL_PRIM void HL_NAME(getaddrinfo_wrap)( uv_loop_t *l, vstring *name, vstring *service, vdynamic *flags,
+	vdynamic *family, vdynamic *socktype, vdynamic *protocol, vclosure *c ) {
+	UV_CHECK_NULL(l,);
+	UV_CHECK_NULL(( name || service ),);
+	UV_CHECK_NULL(c,);
+	uv_getaddrinfo_t *r = UV_ALLOC(uv_getaddrinfo_t);
+	req_init_hl_data((uv_req_t *)r);
+	req_register_callback((uv_req_t *)r,c,0);
+	char *c_name = name ? hl_to_utf8(name->bytes) : NULL;
+	char *c_service = service ? hl_to_utf8(service->bytes) : NULL;
+	struct addrinfo hints = {0};
+	if( family )
+		switch( family->v.i ) {
+			case -1: hints.ai_family = PF_UNSPEC; break;
+			case -2: hints.ai_family = PF_INET; break;
+			case -3: hints.ai_family = PF_INET6; break;
+			default: hints.ai_family = family->v.i; break;
+		}
+	if( socktype )
+		switch( socktype->v.i ) {
+			case -1: hints.ai_socktype = SOCK_STREAM; break;
+			case -2: hints.ai_socktype = SOCK_DGRAM; break;
+			case -3: hints.ai_socktype = SOCK_RAW; break;
+			default: hints.ai_socktype = socktype->v.i; break;
+		}
+	if( protocol )
+		hints.ai_protocol = protocol->v.i;
+	if( flags ) {
+		if( hl_dyn_geti(flags,hl_hash_utf8("passive"),&hlt_bool) )
+			hints.ai_flags |= AI_PASSIVE;
+		if( hl_dyn_geti(flags,hl_hash_utf8("canonName"),&hlt_bool) )
+			hints.ai_flags |= AI_CANONNAME;
+		if( hl_dyn_geti(flags,hl_hash_utf8("numericHost"),&hlt_bool) )
+			hints.ai_flags |= AI_NUMERICHOST;
+		if( hl_dyn_geti(flags,hl_hash_utf8("numericServ"),&hlt_bool) )
+			hints.ai_flags |= AI_NUMERICSERV;
+		if( hl_dyn_geti(flags,hl_hash_utf8("v4Mapped"),&hlt_bool) )
+			hints.ai_flags |= AI_V4MAPPED;
+		if( hl_dyn_geti(flags,hl_hash_utf8("all"),&hlt_bool) )
+			hints.ai_flags |= AI_ALL;
+		if( hl_dyn_geti(flags,hl_hash_utf8("addrConfig"),&hlt_bool) )
+			hints.ai_flags |= AI_ADDRCONFIG;
+	}
+	UV_CHECK_ERROR(uv_getaddrinfo(l,r,on_getaddrinfo,c_name,c_service,&hints),free_req((uv_req_t *)r),);
+}
+DEFINE_PRIM(_VOID, getaddrinfo_wrap, _LOOP _STRING _STRING _DYN _NULL(_I32) _NULL(_I32) _NULL(_I32) _FUN(_VOID,_I32 _ARR));
+
+static void on_getnameinfo( uv_getnameinfo_t *r, int status, const char *hostname, const char *service ) {
+	events_data *ev = UV_DATA(r);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in getaddrinfo request");
+	vbyte * bhost = NULL;
+	if( hostname )
+		bhost = hl_copy_bytes((const vbyte *)hostname, strlen(hostname));
+	vbyte * bservice = NULL;
+	if( service )
+		bservice = hl_copy_bytes((const vbyte *)service, strlen(service));
+	hl_call3(void,c,int,errno_uv2hx(status),vbyte *,bhost,vbyte *,bservice);
+	free_req((uv_req_t *)r);
+}
+
+HL_PRIM void HL_NAME(getnameinfo_wrap)( uv_loop_t *l, uv_sockaddr_storage *addr, vdynamic *namereqd, vdynamic *dgram,
+	vdynamic *nofqdn, vdynamic *numerichost, vdynamic *numericserv, vclosure *c ) {
+	UV_CHECK_NULL(l,);
+	UV_CHECK_NULL(addr,);
+	UV_CHECK_NULL(c,);
+	uv_getnameinfo_t *r = UV_ALLOC(uv_getnameinfo_t);
+	req_init_hl_data((uv_req_t *)r);
+	req_register_callback((uv_req_t *)r,c,0);
+	int flags = 0;
+	if( namereqd && namereqd->v.b )
+		flags |= NI_NAMEREQD;
+	if( dgram && dgram->v.b )
+		flags |= NI_DGRAM;
+	if( nofqdn && nofqdn->v.b )
+		flags |= NI_NOFQDN;
+	if( numerichost && numerichost->v.b )
+		flags |= NI_NUMERICHOST;
+	if( numericserv && numericserv->v.b )
+		flags |= NI_NUMERICSERV;
+	UV_CHECK_ERROR(uv_getnameinfo(l,r,on_getnameinfo,(uv_sockaddr *)addr,flags),free_req((uv_req_t *)r),);
+}
+DEFINE_PRIM(_VOID, getnameinfo_wrap, _LOOP _SOCKADDR _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _FUN(_VOID,_I32 _BYTES _BYTES));
 
 // loop
 
