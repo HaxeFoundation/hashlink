@@ -43,7 +43,6 @@ typedef struct {
 		hl_null_access(); \
 		return fail_return; \
 	}
-
 #define UV_CHECK_ERROR(action,cleanup,fail_return) \
 	int __result__ = action; \
 	if(__result__ < 0) { \
@@ -141,10 +140,16 @@ static int errno_uv2hx( int uv_errno ) {
 	}
 }
 
+static int hx_errno( int result ) {
+	return result < 0 ? errno_uv2hx(result) : 0;
+}
+
 static void hx_error(int uv_errno) {
 	//TODO: throw hl.uv.UVException
 	hl_error("%s", hl_to_utf16(uv_err_name(uv_errno)));
 }
+
+DEFINE_PRIM(_BYTES, strerror, _I32);
 
 // Request
 
@@ -855,12 +860,17 @@ DEFINE_PRIM(_VOID, pipe_bind_wrap, _HANDLE _STRING);
 HL_PRIM vbyte *HL_NAME(pipe_getsockname_wrap)( uv_pipe_t *h ) {
 	UV_CHECK_NULL(h,NULL);
 	size_t size = 256;
-	vbyte *name = NULL;
+	char *buf = NULL;
 	int result = UV_ENOBUFS;
 	while (result == UV_ENOBUFS) {
-		name = hl_alloc_bytes(size); //free previousely allocated name bytes?
-		result = uv_pipe_getsockname(h,(char *)name,&size);
+		if( buf )
+			free(buf);
+		buf = malloc(size);
+		result = uv_pipe_getsockname(h,buf,&size);
 	}
+	vbyte *name = hl_alloc_bytes(size);
+	memcpy(name,buf,size);
+	free(buf);
 	UV_CHECK_ERROR(result,,NULL); //free bytes?
 	return name;
 }
@@ -1307,14 +1317,6 @@ DEFINE_PRIM(_I32, udp_get_send_queue_count_wrap, _HANDLE);
 
 // DNS
 
-// typedef struct {
-// 	int family;
-// 	int sockType;
-// 	int protocol;
-// 	uv_sockaddr_storage *addr;
-// 	vstring *canonName;
-// } hx_addrinfo
-
 static void on_getaddrinfo( uv_getaddrinfo_t *r, int status, struct addrinfo *res ) {
 	events_data *ev = UV_DATA(r);
 	vclosure *c = ev ? ev->events[0] : NULL;
@@ -1494,4 +1496,86 @@ HL_PRIM void HL_NAME(stop_wrap)( uv_loop_t *loop ) {
 }
 DEFINE_PRIM(_VOID, stop_wrap, _LOOP);
 
-DEFINE_PRIM(_BYTES, strerror, _I32);
+// File system
+
+static void on_fs_open( uv_fs_t *r ) {
+	events_data *ev = UV_DATA(r);
+	vclosure *c = ev ? ev->events[0] : NULL;
+	if( !c )
+		hl_fatal("No callback in fs_open request");
+
+	hl_call2(void, c, int, hx_errno(r->result), int, r->result);
+	free_req((uv_req_t *)r);
+}
+
+HL_PRIM void HL_NAME(fs_open_wrap)( uv_loop_t *loop, vstring *path, varray *flags, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(flags,);
+
+	int i_flags = 0;
+	int mode = 0;
+	for( int i=0; i<flags->size; i++ ){
+		venum *flag = hl_aptr(flags, venum*)[i];
+		if( !flag ) {
+			continue;
+		}
+		switch( flag->index ) {
+			case 0: i_flags |= UV_FS_O_APPEND; break;
+			case 1:
+				i_flags |= UV_FS_O_CREAT;
+				mode = ((struct {hl_type *t;int index;int mode;} *)flag)->mode;
+				break;
+			case 2: i_flags |= UV_FS_O_DIRECT; break;
+			case 3: i_flags |= UV_FS_O_DIRECTORY; break;
+			case 4: i_flags |= UV_FS_O_DSYNC; break;
+			case 5: i_flags |= UV_FS_O_EXCL; break;
+			case 6: i_flags |= UV_FS_O_EXLOCK; break;
+			case 7: i_flags |= UV_FS_O_FILEMAP; break;
+			case 8: i_flags |= UV_FS_O_NOATIME; break;
+			case 9: i_flags |= UV_FS_O_NOCTTY; break;
+			case 10: i_flags |= UV_FS_O_NOFOLLOW; break;
+			case 11: i_flags |= UV_FS_O_NONBLOCK; break;
+			case 12: i_flags |= UV_FS_O_RANDOM; break;
+			case 13: i_flags |= UV_FS_O_RDONLY; break;
+			case 14: i_flags |= UV_FS_O_RDWR; break;
+			case 15: i_flags |= UV_FS_O_SEQUENTIAL; break;
+			case 16: i_flags |= UV_FS_O_SHORT_LIVED; break;
+			case 17: i_flags |= UV_FS_O_SYMLINK; break;
+			case 18: i_flags |= UV_FS_O_SYNC; break;
+			case 19: i_flags |= UV_FS_O_TEMPORARY; break;
+			case 20: i_flags |= UV_FS_O_TRUNC; break;
+			case 21: i_flags |= UV_FS_O_WRONLY; break;
+		}
+	}
+	uv_fs_t *r = UV_ALLOC(uv_fs_t);
+	req_init_hl_data((uv_req_t *)r);
+	req_register_callback((uv_req_t *)r,c,0);
+	UV_CHECK_ERROR(uv_fs_open(loop,r,hl_to_utf8(path->bytes),i_flags,mode,on_fs_open),free_req((uv_req_t *)r),);
+}
+DEFINE_PRIM(_VOID, fs_open_wrap, _LOOP _STRING _ARR _FUN(_VOID, _I32 _I32));
+
+HL_PRIM void HL_NAME(fs_close_wrap)( uv_loop_t *loop, uv_file file, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	
+}
+DEFINE_PRIM(_VOID, fs_close_wrap, _LOOP _STRING _ARR _FUN(_VOID, _I32 _I32));
+
+// Miscellaneous
+
+HL_PRIM vbyte *HL_NAME(os_tmpdir_wrap)() {
+	size_t size = 256;
+	char *buf = NULL;
+	int result = UV_ENOBUFS;
+	while (result == UV_ENOBUFS) {
+		if( buf )
+			free(buf);
+		buf = malloc(size);
+		result = uv_os_tmpdir(buf,&size);
+	}
+	vbyte *path = hl_alloc_bytes(size);
+	memcpy(path,buf,size);
+	free(buf);
+	UV_CHECK_ERROR(result,,NULL); // free bytes?
+	return path;
+}
+DEFINE_PRIM(_BYTES, os_tmpdir_wrap, _NO_ARG);
