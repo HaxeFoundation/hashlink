@@ -27,17 +27,19 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 
 typedef struct {
 	vclosure *events[EVT_MAX + 1];
-	void *write_data;
+	void *data;
 } events_data;
 
 #define UV_DATA(h)		((events_data*)((h)->data))
 
-#define _LOOP	_ABSTRACT(uv_loop)
-#define _HANDLE _ABSTRACT(uv_handle)
-#define _REQUEST _ABSTRACT(uv_req)
-#define _SOCKADDR _ABSTRACT(uv_sockaddr_storage)
-#define _CALLB	_FUN(_VOID,_NO_ARG)
-#define UV_ALLOC(t)		((t*)malloc(sizeof(t)))
+#define _LOOP		_ABSTRACT(uv_loop)
+#define _HANDLE		_ABSTRACT(uv_handle)
+#define _REQUEST	_ABSTRACT(uv_req)
+#define _SOCKADDR	_ABSTRACT(uv_sockaddr_storage)
+#define _CALLB		_FUN(_VOID,_NO_ARG)
+#define _TIMESPEC	_OBJ(_I64 _I64)
+#define _STAT		_OBJ(_I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _TIMESPEC _TIMESPEC _TIMESPEC _TIMESPEC)
+#define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
 #define UV_ALLOC_REQ(t,r,c) \
 	t *r = UV_ALLOC(t); \
 	req_init_hl_data((uv_req_t *)r); \
@@ -60,6 +62,11 @@ typedef struct {
 	vclosure *c = __ev__ ? __ev__->events[callback_idx] : NULL; \
 	if( !c ) \
 		hl_fatal(fail_msg);
+#define UV_COPY_DATA(buf,holder,buffer,length) \
+	events_data *__ev__ = UV_DATA(holder); \
+	__ev__->data = malloc(length); \
+	memcpy(__ev__->data,buffer,length); \
+	uv_buf_t buf = uv_buf_init(__ev__->data, length);
 
 // Errors
 
@@ -186,12 +193,27 @@ static void req_clear_callback( uv_req_t *r, int event_kind ) {
 static void free_req( uv_req_t *r ) {
 	events_data *ev = UV_DATA(r);
 	if( ev ) {
-		req_clear_callback((uv_req_t *)r, 0);
-		free(ev->write_data);
-		hl_remove_root(&r->data);
+		req_clear_callback(r, 0);
+		if( ev->data ) {
+			free(ev->data);
+			hl_remove_root(&r->data);
+		}
 		r->data = NULL;
 	}
 	free(r);
+}
+
+static void free_fs_req( uv_fs_t *r ) {
+	events_data *ev = UV_DATA(r);
+	if( ev ) {
+		req_clear_callback((uv_req_t *)r, 0);
+		if( ev->data ) {
+			free(ev->data);
+			hl_remove_root(&r->data);
+		}
+		r->data = NULL;
+	}
+	uv_fs_req_cleanup(r);
 }
 
 HL_PRIM void HL_NAME(cancel_wrap)( uv_req_t *r ) {
@@ -231,8 +253,10 @@ static void on_close( uv_handle_t *h ) {
 			hl_call0(void, c);
 			handle_clear_callback(h, EVT_CLOSE);
 		}
-		free(ev->write_data);
-		hl_remove_root(&h->data);
+		if( ev->data ) {
+			free(ev->data);
+			hl_remove_root(&h->data);
+		}
 		h->data = NULL;
 	}
 	free(h);
@@ -346,7 +370,7 @@ DEFINE_PRIM(_VOID, read_stop_wrap, _HANDLE);
 
 static void on_write( uv_write_t *r, int status ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in write request");
-	hl_call1(void, c, int, status < 0 ? errno_uv2hx(status) : 0);
+	hl_call1(void, c, int, hx_errno(status));
 	free_req((uv_req_t *)r);
 }
 
@@ -355,13 +379,7 @@ HL_PRIM void HL_NAME(write_wrap)( uv_stream_t *h, vbyte *b, int length, vclosure
 	UV_CHECK_NULL(b,);
 	UV_CHECK_NULL(c,);
 	UV_ALLOC_REQ(uv_write_t,r,c);
-	events_data *d = UV_DATA(r);
-	// keep a copy of the data
-	uv_buf_t buf;
-	d->write_data = malloc(length);
-	memcpy(d->write_data,b,length);
-	buf.base = d->write_data;
-	buf.len = length;
+	UV_COPY_DATA(buf,r,b,length);
 	UV_CHECK_ERROR(uv_write(r,h,&buf,1,on_write),free_req((uv_req_t *)r),);
 }
 DEFINE_PRIM(_VOID, write_wrap, _HANDLE _BYTES _I32 _FUN(_VOID,_I32));
@@ -381,13 +399,7 @@ HL_PRIM void HL_NAME(write2_wrap)( uv_stream_t *h, vbyte *b, int length, uv_stre
 	UV_CHECK_NULL(send_handle,);
 	UV_CHECK_NULL(c,);
 	UV_ALLOC_REQ(uv_write_t,r,c);
-	events_data *d = UV_DATA(r);
-	// keep a copy of the data
-	uv_buf_t buf;
-	d->write_data = malloc(length);
-	memcpy(d->write_data,b,length);
-	buf.base = d->write_data;
-	buf.len = length;
+	UV_COPY_DATA(buf,r,b,length);
 	UV_CHECK_ERROR(uv_write2(r,h,&buf,1,send_handle,on_write),free_req((uv_req_t *)r),);
 }
 DEFINE_PRIM(_VOID, write2_wrap, _HANDLE _BYTES _I32 _HANDLE _FUN(_VOID,_I32));
@@ -921,7 +933,7 @@ static void on_process_exit(uv_process_t *h, int64_t exit_status, int term_signa
 	events_data *ev = UV_DATA(h);
 	vclosure *c = ev ? ev->events[0] : NULL;
 	if( c ) {
-		hl_call3(void, c, uv_process_t *, h, int64_t, exit_status, int, signum_uv2hx(term_signal));
+		hl_call3(void, c, uv_process_t *, h, int64, exit_status, int, signum_uv2hx(term_signal));
 		handle_clear_callback((uv_handle_t *)h, 0);
 	}
 }
@@ -1190,7 +1202,7 @@ DEFINE_PRIM(_VOID, udp_set_ttl_wrap, _HANDLE _I32);
 
 static void on_udp_send( uv_udp_send_t *r, int status ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in udp send request");
-	hl_call1(void, c, int, status < 0 ? errno_uv2hx(status) : 0);
+	hl_call1(void, c, int, hx_errno(status));
 	free_req((uv_req_t *)r);
 }
 
@@ -1200,9 +1212,9 @@ HL_PRIM void HL_NAME(udp_send_wrap)( uv_udp_t *h, vbyte *data, int length, uv_so
 	UV_ALLOC_REQ(uv_udp_send_t,r,c);
 	events_data *d = UV_DATA(r);
 	uv_buf_t buf;
-	d->write_data = malloc(length);
-	memcpy(d->write_data,data,length);
-	buf.base = d->write_data;
+	d->data = malloc(length);
+	memcpy(d->data,data,length);
+	buf.base = d->data;
 	buf.len = length;
 	UV_CHECK_ERROR(uv_udp_send(r,h,&buf,1,(uv_sockaddr *)addr,on_udp_send),free_req((uv_req_t *)r),);
 }
@@ -1454,6 +1466,7 @@ static void on_fs_open( uv_fs_t *r ) {
 HL_PRIM void HL_NAME(fs_open_wrap)( uv_loop_t *loop, vstring *path, varray *flags, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
 	UV_CHECK_NULL(flags,);
+	UV_CHECK_NULL(c,);
 
 	int i_flags = 0;
 	int mode = 0;
@@ -1493,13 +1506,176 @@ HL_PRIM void HL_NAME(fs_open_wrap)( uv_loop_t *loop, vstring *path, varray *flag
 	UV_ALLOC_REQ(uv_fs_t,r,c);
 	UV_CHECK_ERROR(uv_fs_open(loop,r,hl_to_utf8(path->bytes),i_flags,mode,on_fs_open),free_req((uv_req_t *)r),);
 }
-DEFINE_PRIM(_VOID, fs_open_wrap, _LOOP _STRING _ARR _FUN(_VOID, _I32 _I32));
+DEFINE_PRIM(_VOID, fs_open_wrap, _LOOP _STRING _ARR _FUN(_VOID,_I32 _I32));
 
-HL_PRIM void HL_NAME(fs_close_wrap)( uv_loop_t *loop, uv_file file, vclosure *c ) {
-	UV_CHECK_NULL(loop,);
-	UV_ALLOC_REQ(uv_fs_t,r,c);
+static void on_fs_common( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs request");
+	hl_call1(void,c,int,hx_errno(r->result));
+	free_fs_req(r);
 }
-DEFINE_PRIM(_VOID, fs_close_wrap, _LOOP _STRING _ARR _FUN(_VOID, _I32 _I32));
+
+HL_PRIM void HL_NAME(fs_close_wrap)( uv_file file, uv_loop_t *loop, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_close(loop,r,file,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_close_wrap, _I32 _LOOP _FUN(_VOID,_I32));
+
+static void on_fs_write( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs_write request");
+	hl_call2(void, c, int, hx_errno(r->result),int64,r->result<0?0:r->result);
+	free_fs_req(r);
+}
+
+HL_PRIM void HL_NAME(fs_write_wrap)( uv_file file, uv_loop_t *loop, vbyte *data, int length, int64 offset, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(data,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_COPY_DATA(buf,r,data,length);
+	UV_CHECK_ERROR(uv_fs_write(loop,r,file,&buf,1,offset,on_fs_write),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_write_wrap, _I32 _LOOP _BYTES _I32 _I64 _FUN(_VOID,_I32 _I64));
+
+static void on_fs_read( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs_read request");
+	hl_call2(void,c,int,hx_errno(r->result),int64,r->result<0?0:r->result);
+	free_fs_req(r);
+}
+
+HL_PRIM void HL_NAME(fs_read_wrap)( uv_file file, uv_loop_t *loop, vbyte *buf, int length, int64 offset, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(buf,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	uv_buf_t b = uv_buf_init((char *)buf, length);
+	UV_CHECK_ERROR(uv_fs_read(loop,r,file,&b,1,offset,on_fs_read),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_read_wrap, _I32 _LOOP _BYTES _I32 _I64 _FUN(_VOID,_I32 _I64));
+
+HL_PRIM void HL_NAME(fs_unlink_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_unlink(loop,r,hl_to_utf8(path->bytes),on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_unlink_wrap, _LOOP _STRING _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_mkdir_wrap)( uv_loop_t *loop, vstring *path, int mode, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_mkdir(loop,r,hl_to_utf8(path->bytes),mode,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_mkdir_wrap, _LOOP _STRING _I32 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_rmdir_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_rmdir(loop,r,hl_to_utf8(path->bytes),on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_rmdir_wrap, _LOOP _STRING _FUN(_VOID,_I32));
+
+static void on_fs_mkdtemp( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs_mkdtemp request");
+	hl_call2(void,c,int,hx_errno(r->result),vbyte *,(vbyte *)(r->result<0?NULL:r->path));
+	free_fs_req(r);
+}
+
+HL_PRIM void HL_NAME(fs_mkdtemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(tpl,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_mkdtemp(loop,r,hl_to_utf8(tpl->bytes),on_fs_mkdtemp),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_mkdtemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _BYTES));
+
+static void on_fs_mkstemp( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs_mkstemp request");
+	hl_call3(void,c,int,hx_errno(r->result),int,r->result,vbyte *,(vbyte *)(r->result<0?NULL:r->path));
+	free_fs_req(r);
+}
+
+HL_PRIM void HL_NAME(fs_mkstemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(tpl,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_mkstemp(loop,r,hl_to_utf8(tpl->bytes),on_fs_mkstemp),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_mkstemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _I32 _BYTES));
+
+typedef struct {
+	hl_type *t;
+	int64 sec;
+	int64 nsec;
+} hx_timespec;
+
+typedef struct {
+	hl_type *t;
+	int64 dev; //uint64
+	int64 mode; //uint64
+	int64 nlink; //uint64
+	int64 uid; //uint64
+	int64 gid; //uint64
+	int64 rdev; //uint64
+	int64 ino; //uint64
+	int64 size; //uint64
+	int64 blksize; //uint64
+	int64 blocks; //uint64
+	int64 flags; //uint64
+	int64 gen; //uint64
+	hx_timespec *atim;
+	hx_timespec *mtim;
+	hx_timespec *ctim;
+	hx_timespec *birthtim;
+} hx_stat;
+
+static void on_fs_stat( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs stat request");
+	events_data *ev = UV_DATA(r);
+	hx_stat *stat = ev->data;
+	stat->dev = r->statbuf.st_dev;
+	stat->mode = r->statbuf.st_mode;
+	stat->nlink = r->statbuf.st_nlink;
+	stat->uid = r->statbuf.st_uid;
+	stat->gid = r->statbuf.st_gid;
+	stat->rdev = r->statbuf.st_rdev;
+	stat->ino = r->statbuf.st_ino;
+	stat->size = r->statbuf.st_size;
+	stat->blksize = r->statbuf.st_blksize;
+	stat->blocks = r->statbuf.st_blocks;
+	stat->flags = r->statbuf.st_flags;
+	stat->gen = r->statbuf.st_gen;
+	stat->atim->sec = r->statbuf.st_atim.tv_sec;
+	stat->atim->nsec = r->statbuf.st_atim.tv_nsec;
+	stat->mtim->sec = r->statbuf.st_mtim.tv_sec;
+	stat->mtim->nsec = r->statbuf.st_mtim.tv_nsec;
+	stat->ctim->sec = r->statbuf.st_ctim.tv_sec;
+	stat->ctim->nsec = r->statbuf.st_ctim.tv_nsec;
+	stat->birthtim->sec = r->statbuf.st_birthtim.tv_sec;
+	stat->birthtim->nsec = r->statbuf.st_birthtim.tv_nsec;
+	ev->data = NULL;
+	hl_call2(void,c,int,hx_errno(r->result),hx_stat *,(r->result<0?NULL:stat));
+	free_fs_req(r);
+}
+
+HL_PRIM void HL_NAME(fs_stat_wrap)( uv_loop_t *loop, vstring *path, hx_stat *stat, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(stat,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	r->data = stat;
+	UV_CHECK_ERROR(uv_fs_stat(loop,r,hl_to_utf8(path->bytes),on_fs_stat),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_stat_wrap, _LOOP _STRING _STAT _FUN(_VOID,_I32 _STAT));
 
 // Miscellaneous
 

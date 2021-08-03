@@ -79,6 +79,7 @@ file(GLOB std_srcs
     src/std/ucs2.c
     src/std/thread.c
     src/std/process.c
+    src/std/num.c
 )
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
