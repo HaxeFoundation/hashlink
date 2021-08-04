@@ -27,20 +27,20 @@ class FileSample {
 
 	public static function main() {
 		var actions:Actions = [
-			// createWriteSyncReadUnlink,
-			// mkdirRenameRmdir,
-			// mkdtempRmdir,
-			// mkstempUnlink,
-			// statFStat,
-			// statFs,
-			// truncate,
-			// copyFile,
+			createWriteSyncReadUnlink,
+			mkdirRenameRmdir,
+			mkdtempRmdir,
+			mkstempUnlink,
+			statFStat,
+			statFs,
+			truncate,
+			copyFile,
 			// sendFile, // Throws EBADF and idk why
-			// access,
-			// chmod,
-			// utime,
-			// linkSymlinkReadLinkRealPath,
-			// chown,
+			access,
+			chmod,
+			utime,
+			linkSymlinkReadLinkRealPath,
+			chown,
 			openReadCloseDir,
 		];
 		actions.next();

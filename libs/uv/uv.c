@@ -1598,12 +1598,18 @@ HL_PRIM void HL_NAME(fs_mkdtemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *
 }
 DEFINE_PRIM(_VOID, fs_mkdtemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _BYTES));
 
+static void on_fs_mkstemp( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs_mkstemp request");
+	hl_call3(void,c,int,hx_errno(r->result),int,r->result,vbyte *,(vbyte *)(r->result<0?NULL:r->path));
+	free_fs_req(r);
+}
+
 HL_PRIM void HL_NAME(fs_mkstemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
 	UV_CHECK_NULL(tpl,);
 	UV_CHECK_NULL(c,);
 	UV_ALLOC_REQ(uv_fs_t,r,c);
-	UV_CHECK_ERROR(uv_fs_mkstemp(loop,r,hl_to_utf8(tpl->bytes),on_fs_path),free_fs_req(r),);
+	UV_CHECK_ERROR(uv_fs_mkstemp(loop,r,hl_to_utf8(tpl->bytes),on_fs_mkstemp),free_fs_req(r),);
 }
 DEFINE_PRIM(_VOID, fs_mkstemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _I32 _BYTES));
 
