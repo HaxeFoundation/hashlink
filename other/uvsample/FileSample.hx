@@ -1,3 +1,4 @@
+import hl.uv.Loop;
 import haxe.Constraints.Function;
 import haxe.xml.Access;
 import hl.I64;
@@ -119,8 +120,8 @@ class FileSample {
 
 	static function stat(actions:Actions) {
 		var path = Misc.tmpDir();
-		Log.print('Stat on path...');
-		File.stat(loop,path, (e, stat) -> handle(() -> {
+		Log.print('Stat on $path...');
+		File.stat(loop, path, (e, stat) -> handle(() -> {
 			Log.print('Got stat: $stat');
 			Log.print('Done');
 			runNext(actions);

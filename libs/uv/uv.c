@@ -68,6 +68,12 @@ typedef struct {
 	memcpy(__ev__->data,buffer,length); \
 	uv_buf_t buf = uv_buf_init(__ev__->data, length);
 
+static void dyn_set_i64( vdynamic *obj, int field, int64 value ) {
+	vdynamic *v = hl_alloc_dynamic(&hlt_i64);
+	v->v.i64 = value;
+	hl_dyn_setp(obj, field, &hlt_dyn, v);
+}
+
 // Errors
 
 static int errno_uv2hx( int uv_errno ) {
@@ -1611,71 +1617,52 @@ HL_PRIM void HL_NAME(fs_mkstemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *
 }
 DEFINE_PRIM(_VOID, fs_mkstemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _I32 _BYTES));
 
-typedef struct {
-	hl_type *t;
-	int64 sec;
-	int64 nsec;
-} hx_timespec;
-
-typedef struct {
-	hl_type *t;
-	int64 dev; //uint64
-	int64 mode; //uint64
-	int64 nlink; //uint64
-	int64 uid; //uint64
-	int64 gid; //uint64
-	int64 rdev; //uint64
-	int64 ino; //uint64
-	int64 size; //uint64
-	int64 blksize; //uint64
-	int64 blocks; //uint64
-	int64 flags; //uint64
-	int64 gen; //uint64
-	hx_timespec *atim;
-	hx_timespec *mtim;
-	hx_timespec *ctim;
-	hx_timespec *birthtim;
-} hx_stat;
+static vdynamic *alloc_timespec_dyn( uv_timespec_t *spec ) {
+	vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
+	dyn_set_i64(obj, hl_hash_utf8("sec"), spec->tv_sec);
+	dyn_set_i64(obj, hl_hash_utf8("nsec"), spec->tv_nsec);
+	return obj;
+}
 
 static void on_fs_stat( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs stat request");
 	events_data *ev = UV_DATA(r);
-	hx_stat *stat = ev->data;
-	stat->dev = r->statbuf.st_dev;
-	stat->mode = r->statbuf.st_mode;
-	stat->nlink = r->statbuf.st_nlink;
-	stat->uid = r->statbuf.st_uid;
-	stat->gid = r->statbuf.st_gid;
-	stat->rdev = r->statbuf.st_rdev;
-	stat->ino = r->statbuf.st_ino;
-	stat->size = r->statbuf.st_size;
-	stat->blksize = r->statbuf.st_blksize;
-	stat->blocks = r->statbuf.st_blocks;
-	stat->flags = r->statbuf.st_flags;
-	stat->gen = r->statbuf.st_gen;
-	stat->atim->sec = r->statbuf.st_atim.tv_sec;
-	stat->atim->nsec = r->statbuf.st_atim.tv_nsec;
-	stat->mtim->sec = r->statbuf.st_mtim.tv_sec;
-	stat->mtim->nsec = r->statbuf.st_mtim.tv_nsec;
-	stat->ctim->sec = r->statbuf.st_ctim.tv_sec;
-	stat->ctim->nsec = r->statbuf.st_ctim.tv_nsec;
-	stat->birthtim->sec = r->statbuf.st_birthtim.tv_sec;
-	stat->birthtim->nsec = r->statbuf.st_birthtim.tv_nsec;
+	if( r->result < 0 ) {
+		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
+	} else {
+		vdynamic *stat = (vdynamic*)hl_alloc_dynobj();
+		vdynamic *mode = hl_alloc_dynamic(&hlt_i64);
+		mode->v.i64 = r->statbuf.st_mode;
+		dyn_set_i64(stat, hl_hash_utf8("dev"), r->statbuf.st_dev);
+		dyn_set_i64(stat, hl_hash_utf8("mode"), r->statbuf.st_mode);
+		dyn_set_i64(stat, hl_hash_utf8("nlink"), r->statbuf.st_nlink);
+		dyn_set_i64(stat, hl_hash_utf8("uid"), r->statbuf.st_uid);
+		dyn_set_i64(stat, hl_hash_utf8("gid"), r->statbuf.st_gid);
+		dyn_set_i64(stat, hl_hash_utf8("rdev"), r->statbuf.st_rdev);
+		dyn_set_i64(stat, hl_hash_utf8("ino"), r->statbuf.st_ino);
+		dyn_set_i64(stat, hl_hash_utf8("size"), r->statbuf.st_size);
+		dyn_set_i64(stat, hl_hash_utf8("blksize"), r->statbuf.st_blksize);
+		dyn_set_i64(stat, hl_hash_utf8("blocks"), r->statbuf.st_blocks);
+		dyn_set_i64(stat, hl_hash_utf8("flags"), r->statbuf.st_flags);
+		dyn_set_i64(stat, hl_hash_utf8("gen"), r->statbuf.st_gen);
+		hl_dyn_setp(stat, hl_hash_utf8("atim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_atim));
+		hl_dyn_setp(stat, hl_hash_utf8("mtim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_mtim));
+		hl_dyn_setp(stat, hl_hash_utf8("ctim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_ctim));
+		hl_dyn_setp(stat, hl_hash_utf8("birthtim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_birthtim));
+		hl_call2(void,c,int,0,vdynamic *,stat);
+	}
 	ev->data = NULL;
-	hl_call2(void,c,int,hx_errno(r->result),hx_stat *,(r->result<0?NULL:stat));
 	free_fs_req(r);
 }
 
-HL_PRIM void HL_NAME(fs_stat_wrap)( uv_loop_t *loop, vstring *path, hx_stat *stat, vclosure *c ) {
+HL_PRIM void HL_NAME(fs_stat_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
 	UV_CHECK_NULL(path,);
-	UV_CHECK_NULL(stat,);
 	UV_CHECK_NULL(c,);
 	UV_ALLOC_REQ(uv_fs_t,r,c);
-	r->data = stat;
 	UV_CHECK_ERROR(uv_fs_stat(loop,r,hl_to_utf8(path->bytes),on_fs_stat),free_fs_req(r),);
 }
-DEFINE_PRIM(_VOID, fs_stat_wrap, _LOOP _STRING _STAT _FUN(_VOID,_I32 _STAT));
+DEFINE_PRIM(_VOID, fs_stat_wrap, _LOOP _STRING _FUN(_VOID,_I32 _DYN));
 
 // Miscellaneous
 
