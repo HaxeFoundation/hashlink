@@ -785,6 +785,17 @@ typedef struct {
 	int length;
 } vstring;
 
+#undef _ARRBYTES
+#define _ARRBYTES					_OBJ(_I32 _BYTES _I32)
+
+// hl.types.ArrayBytes
+typedef struct {
+	hl_type *t;
+	int length;
+	vbyte *bytes;
+	int size;
+} varray_bytes;
+
 #define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 

@@ -35,6 +35,7 @@ typedef struct {
 #define _LOOP		_ABSTRACT(uv_loop)
 #define _HANDLE		_ABSTRACT(uv_handle)
 #define _REQUEST	_ABSTRACT(uv_req)
+#define _DIR		_ABSTRACT(uv_dir)
 #define _SOCKADDR	_ABSTRACT(uv_sockaddr_storage)
 #define _CALLB		_FUN(_VOID,_NO_ARG)
 #define _TIMESPEC	_OBJ(_I64 _I64)
@@ -72,6 +73,10 @@ static void dyn_set_i64( vdynamic *obj, int field, int64 value ) {
 	vdynamic *v = hl_alloc_dynamic(&hlt_i64);
 	v->v.i64 = value;
 	hl_dyn_setp(obj, field, &hlt_dyn, v);
+}
+
+static int bytes_geti32( vbyte *b, int pos ) {
+	return b[pos] | (b[pos + 1] << 8) | (b[pos + 2] << 16) | (b[pos + 3] << 24);
 }
 
 // Errors
@@ -1520,6 +1525,24 @@ static void on_fs_common( uv_fs_t *r ) {
 	free_fs_req(r);
 }
 
+static void on_fs_bytes_handled( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs request");
+	hl_call2(void,c,int,hx_errno(r->result),int64,r->result<0?0:r->result);
+	free_fs_req(r);
+}
+
+static void on_fs_path( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs request");
+	hl_call2(void,c,int,hx_errno(r->result),vbyte *,(vbyte *)(r->result<0?NULL:r->path));
+	free_fs_req(r);
+}
+
+static void on_fs_bytes( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs request");
+	hl_call2(void,c,int,hx_errno(r->result),vbyte *,(vbyte *)(r->result<0?NULL:r->ptr));
+	free_fs_req(r);
+}
+
 HL_PRIM void HL_NAME(fs_close_wrap)( uv_file file, uv_loop_t *loop, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
 	UV_CHECK_NULL(c,);
@@ -1528,27 +1551,15 @@ HL_PRIM void HL_NAME(fs_close_wrap)( uv_file file, uv_loop_t *loop, vclosure *c 
 }
 DEFINE_PRIM(_VOID, fs_close_wrap, _I32 _LOOP _FUN(_VOID,_I32));
 
-static void on_fs_write( uv_fs_t *r ) {
-	UV_GET_CLOSURE(c,r,0,"No callback in fs_write request");
-	hl_call2(void, c, int, hx_errno(r->result),int64,r->result<0?0:r->result);
-	free_fs_req(r);
-}
-
 HL_PRIM void HL_NAME(fs_write_wrap)( uv_file file, uv_loop_t *loop, vbyte *data, int length, int64 offset, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
 	UV_CHECK_NULL(data,);
 	UV_CHECK_NULL(c,);
 	UV_ALLOC_REQ(uv_fs_t,r,c);
 	UV_COPY_DATA(buf,r,data,length);
-	UV_CHECK_ERROR(uv_fs_write(loop,r,file,&buf,1,offset,on_fs_write),free_fs_req(r),);
+	UV_CHECK_ERROR(uv_fs_write(loop,r,file,&buf,1,offset,on_fs_bytes_handled),free_fs_req(r),);
 }
 DEFINE_PRIM(_VOID, fs_write_wrap, _I32 _LOOP _BYTES _I32 _I64 _FUN(_VOID,_I32 _I64));
-
-static void on_fs_read( uv_fs_t *r ) {
-	UV_GET_CLOSURE(c,r,0,"No callback in fs_read request");
-	hl_call2(void,c,int,hx_errno(r->result),int64,r->result<0?0:r->result);
-	free_fs_req(r);
-}
 
 HL_PRIM void HL_NAME(fs_read_wrap)( uv_file file, uv_loop_t *loop, vbyte *buf, int length, int64 offset, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
@@ -1556,7 +1567,7 @@ HL_PRIM void HL_NAME(fs_read_wrap)( uv_file file, uv_loop_t *loop, vbyte *buf, i
 	UV_CHECK_NULL(c,);
 	UV_ALLOC_REQ(uv_fs_t,r,c);
 	uv_buf_t b = uv_buf_init((char *)buf, length);
-	UV_CHECK_ERROR(uv_fs_read(loop,r,file,&b,1,offset,on_fs_read),free_fs_req(r),);
+	UV_CHECK_ERROR(uv_fs_read(loop,r,file,&b,1,offset,on_fs_bytes_handled),free_fs_req(r),);
 }
 DEFINE_PRIM(_VOID, fs_read_wrap, _I32 _LOOP _BYTES _I32 _I64 _FUN(_VOID,_I32 _I64));
 
@@ -1578,6 +1589,24 @@ HL_PRIM void HL_NAME(fs_mkdir_wrap)( uv_loop_t *loop, vstring *path, int mode, v
 }
 DEFINE_PRIM(_VOID, fs_mkdir_wrap, _LOOP _STRING _I32 _FUN(_VOID,_I32));
 
+HL_PRIM void HL_NAME(fs_mkdtemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(tpl,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_mkdtemp(loop,r,hl_to_utf8(tpl->bytes),on_fs_path),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_mkdtemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _BYTES));
+
+HL_PRIM void HL_NAME(fs_mkstemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(tpl,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_mkstemp(loop,r,hl_to_utf8(tpl->bytes),on_fs_path),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_mkstemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _I32 _BYTES));
+
 HL_PRIM void HL_NAME(fs_rmdir_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
 	UV_CHECK_NULL(path,);
@@ -1587,52 +1616,90 @@ HL_PRIM void HL_NAME(fs_rmdir_wrap)( uv_loop_t *loop, vstring *path, vclosure *c
 }
 DEFINE_PRIM(_VOID, fs_rmdir_wrap, _LOOP _STRING _FUN(_VOID,_I32));
 
-static void on_fs_mkdtemp( uv_fs_t *r ) {
-	UV_GET_CLOSURE(c,r,0,"No callback in fs_mkdtemp request");
-	hl_call2(void,c,int,hx_errno(r->result),vbyte *,(vbyte *)(r->result<0?NULL:r->path));
+static void on_fs_opendir( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs_opendir request");
+	hl_call2(void,c,int,hx_errno(r->result),uv_dir_t *,(r->result<0?NULL:r->ptr));
 	free_fs_req(r);
 }
 
-HL_PRIM void HL_NAME(fs_mkdtemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *c ) {
+HL_PRIM void HL_NAME(fs_opendir_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
-	UV_CHECK_NULL(tpl,);
+	UV_CHECK_NULL(path,);
 	UV_CHECK_NULL(c,);
 	UV_ALLOC_REQ(uv_fs_t,r,c);
-	UV_CHECK_ERROR(uv_fs_mkdtemp(loop,r,hl_to_utf8(tpl->bytes),on_fs_mkdtemp),free_fs_req(r),);
+	UV_CHECK_ERROR(uv_fs_opendir(loop,r,hl_to_utf8(path->bytes),on_fs_opendir),free_fs_req(r),);
 }
-DEFINE_PRIM(_VOID, fs_mkdtemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _BYTES));
+DEFINE_PRIM(_VOID, fs_opendir_wrap, _LOOP _STRING _FUN(_VOID,_I32 _DIR));
 
-static void on_fs_mkstemp( uv_fs_t *r ) {
-	UV_GET_CLOSURE(c,r,0,"No callback in fs_mkstemp request");
-	hl_call3(void,c,int,hx_errno(r->result),int,r->result,vbyte *,(vbyte *)(r->result<0?NULL:r->path));
+HL_PRIM void HL_NAME(fs_closedir_wrap)( uv_dir_t *dir, uv_loop_t *loop, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(dir,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_closedir(loop,r,dir,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_closedir_wrap, _DIR _LOOP _FUN(_VOID,_I32));
+
+static void on_fs_readdir( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in fs_readdir request");
+	if( r->result < 0 ) {
+		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
+	} else {
+		uv_dir_t *dir = r->ptr;
+		varray *entries = hl_alloc_array(&hlt_dyn, r->result);
+		int hash_type = hl_hash_utf8("type");
+		int hash_name = hl_hash_utf8("name");
+		for(int i = 0; i < r->result; i++) {
+			vdynamic *entry = (vdynamic*)hl_alloc_dynobj();
+
+			int entry_type = 0;
+			switch( dir->dirents[i].type ) {
+				case UV_DIRENT_UNKNOWN: entry_type = 1; break;
+				case UV_DIRENT_FILE: entry_type = 2; break;
+				case UV_DIRENT_DIR: entry_type = 3; break;
+				case UV_DIRENT_LINK: entry_type = 4; break;
+				case UV_DIRENT_FIFO: entry_type = 5; break;
+				case UV_DIRENT_SOCKET: entry_type = 6; break;
+				case UV_DIRENT_CHAR: entry_type = 7; break;
+				case UV_DIRENT_BLOCK: entry_type = 8; break;
+			}
+			hl_dyn_seti(entry, hash_type, &hlt_i32, entry_type);
+
+			const char *c_name = dir->dirents[i].name;
+			vbyte *name = hl_copy_bytes((const vbyte *)c_name, strlen(c_name));
+			hl_dyn_setp(entry, hash_name, &hlt_bytes, name);
+
+			hl_aptr(entries,vdynamic *)[i] = entry;
+		}
+		hl_call2(void,c,int,0,varray *,entries);
+	}
 	free_fs_req(r);
 }
 
-HL_PRIM void HL_NAME(fs_mkstemp_wrap)( uv_loop_t *loop, vstring *tpl, vclosure *c ) {
+HL_PRIM void HL_NAME(fs_readdir_wrap)( uv_dir_t *dir, uv_loop_t *loop, int num_entries, vclosure *c ) {
 	UV_CHECK_NULL(loop,);
-	UV_CHECK_NULL(tpl,);
+	UV_CHECK_NULL(dir,);
 	UV_CHECK_NULL(c,);
 	UV_ALLOC_REQ(uv_fs_t,r,c);
-	UV_CHECK_ERROR(uv_fs_mkstemp(loop,r,hl_to_utf8(tpl->bytes),on_fs_mkstemp),free_fs_req(r),);
+	dir->nentries = num_entries;
+	dir->dirents = malloc(sizeof(uv_dirent_t) * num_entries);
+	UV_CHECK_ERROR(uv_fs_readdir(loop,r,dir,on_fs_readdir),free_fs_req(r),);
 }
-DEFINE_PRIM(_VOID, fs_mkstemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _I32 _BYTES));
+DEFINE_PRIM(_VOID, fs_readdir_wrap, _DIR _LOOP _I32 _FUN(_VOID,_I32 _ARR));
 
 static vdynamic *alloc_timespec_dyn( uv_timespec_t *spec ) {
 	vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
-	dyn_set_i64(obj, hl_hash_utf8("sec"), spec->tv_sec);
-	dyn_set_i64(obj, hl_hash_utf8("nsec"), spec->tv_nsec);
+	hl_dyn_seti(obj, hl_hash_utf8("sec"), &hlt_i32, spec->tv_sec);
+	hl_dyn_seti(obj, hl_hash_utf8("nsec"), &hlt_i32, spec->tv_nsec);
 	return obj;
 }
 
 static void on_fs_stat( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs stat request");
-	events_data *ev = UV_DATA(r);
 	if( r->result < 0 ) {
 		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
 	} else {
 		vdynamic *stat = (vdynamic*)hl_alloc_dynobj();
-		vdynamic *mode = hl_alloc_dynamic(&hlt_i64);
-		mode->v.i64 = r->statbuf.st_mode;
 		dyn_set_i64(stat, hl_hash_utf8("dev"), r->statbuf.st_dev);
 		dyn_set_i64(stat, hl_hash_utf8("mode"), r->statbuf.st_mode);
 		dyn_set_i64(stat, hl_hash_utf8("nlink"), r->statbuf.st_nlink);
@@ -1651,7 +1718,6 @@ static void on_fs_stat( uv_fs_t *r ) {
 		hl_dyn_setp(stat, hl_hash_utf8("birthtim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_birthtim));
 		hl_call2(void,c,int,0,vdynamic *,stat);
 	}
-	ev->data = NULL;
 	free_fs_req(r);
 }
 
@@ -1663,6 +1729,258 @@ HL_PRIM void HL_NAME(fs_stat_wrap)( uv_loop_t *loop, vstring *path, vclosure *c 
 	UV_CHECK_ERROR(uv_fs_stat(loop,r,hl_to_utf8(path->bytes),on_fs_stat),free_fs_req(r),);
 }
 DEFINE_PRIM(_VOID, fs_stat_wrap, _LOOP _STRING _FUN(_VOID,_I32 _DYN));
+
+HL_PRIM void HL_NAME(fs_fstat_wrap)( uv_file file, uv_loop_t *loop, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_fstat(loop,r,file,on_fs_stat),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_fstat_wrap, _I32 _LOOP _FUN(_VOID,_I32 _DYN));
+
+HL_PRIM void HL_NAME(fs_lstat_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_lstat(loop,r,hl_to_utf8(path->bytes),on_fs_stat),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_lstat_wrap, _LOOP _STRING _FUN(_VOID,_I32 _DYN));
+
+static void on_fs_statfs( uv_fs_t *r ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in statfs request");
+	events_data *ev = UV_DATA(r);
+	if( r->result < 0 ) {
+		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
+	} else {
+		uv_statfs_t *stat = r->ptr;
+		vdynamic *obj = (vdynamic *)hl_alloc_dynobj();
+		dyn_set_i64(obj, hl_hash_utf8("type"), stat->f_type);
+		dyn_set_i64(obj, hl_hash_utf8("bsize"), stat->f_bsize);
+		dyn_set_i64(obj, hl_hash_utf8("blocks"), stat->f_blocks);
+		dyn_set_i64(obj, hl_hash_utf8("bfree"), stat->f_bfree);
+		dyn_set_i64(obj, hl_hash_utf8("bavail"), stat->f_bavail);
+		dyn_set_i64(obj, hl_hash_utf8("files"), stat->f_files);
+		dyn_set_i64(obj, hl_hash_utf8("ffree"), stat->f_ffree);
+
+		varray *spare = hl_alloc_array(&hlt_i64, 4);
+		for (int i = 0; i < 4; i++)
+			hl_aptr(spare,int64)[i] = stat->f_spare[i];
+		hl_dyn_setp(obj, hl_hash_utf8("spare"), &hlt_array, spare);
+
+		hl_call2(void,c,int,0,vdynamic *,obj);
+	}
+	ev->data = NULL;
+	free_fs_req(r);
+}
+
+HL_PRIM void HL_NAME(fs_statfs_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_statfs(loop,r,hl_to_utf8(path->bytes),on_fs_statfs),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_statfs_wrap, _LOOP _STRING _FUN(_VOID,_I32 _DYN));
+
+HL_PRIM void HL_NAME(fs_rename_wrap)( uv_loop_t *loop, vstring *path, vstring *new_path, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(new_path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_rename(loop,r,hl_to_utf8(path->bytes),hl_to_utf8(new_path->bytes),on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_rename_wrap, _LOOP _STRING _STRING _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_fsync_wrap)( uv_file file, uv_loop_t *loop, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_fsync(loop,r,file,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_fsync_wrap, _I32 _LOOP _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_fdatasync_wrap)( uv_file file, uv_loop_t *loop, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_fdatasync(loop,r,file,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_fdatasync_wrap, _I32 _LOOP _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_ftruncate_wrap)( uv_file file, uv_loop_t *loop, int64 offset, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_ftruncate(loop,r,file,offset,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_ftruncate_wrap, _I32 _LOOP _I64 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_copyfile_wrap)( uv_loop_t *loop, vstring *path, vstring *new_path, varray_bytes *flags, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(new_path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	int i_flags = 0;
+	if( flags ) {
+		for(int i = 0; i < flags->length; i++) {
+			switch( bytes_geti32(flags->bytes, i * 4) ) {
+				case 1: i_flags |= UV_FS_COPYFILE_EXCL; break;
+				case 2: i_flags |= UV_FS_COPYFILE_FICLONE; break;
+				case 3: i_flags |= UV_FS_COPYFILE_FICLONE_FORCE; break;
+			}
+		}
+	}
+	UV_CHECK_ERROR(uv_fs_copyfile(loop,r,hl_to_utf8(path->bytes),hl_to_utf8(new_path->bytes),i_flags,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_copyfile_wrap, _LOOP _STRING _STRING _ARRBYTES _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_sendfile_wrap)( uv_file src, uv_loop_t *loop, uv_file dst, int64 in_offset, int64 length, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_sendfile(loop,r,src,dst,in_offset,length,on_fs_bytes_handled),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_sendfile_wrap, _I32 _LOOP _I32 _I64 _I64 _FUN(_VOID,_I32 _I64));
+
+HL_PRIM void HL_NAME(fs_access_wrap)( uv_loop_t *loop, vstring *path, varray_bytes *mode, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(mode,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	int i_mode = 0;
+	if( mode ) {
+		for(int i = 0; i < mode->length; i++) {
+			switch( bytes_geti32(mode->bytes, i * 4) ) {
+				case 0: i_mode |= F_OK; break;
+				case 1: i_mode |= R_OK; break;
+				case 2: i_mode |= W_OK; break;
+				case 3: i_mode |= X_OK; break;
+			}
+		}
+	}
+	UV_CHECK_ERROR(uv_fs_access(loop,r,hl_to_utf8(path->bytes),i_mode,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_access_wrap, _LOOP _STRING _ARRBYTES _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_chmod_wrap)( uv_loop_t *loop, vstring *path, int mode, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_chmod(loop,r,hl_to_utf8(path->bytes),mode,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_chmod_wrap, _LOOP _STRING _I32 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_fchmod_wrap)( uv_file file, uv_loop_t *loop, int mode, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_fchmod(loop,r,file,mode,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_fchmod_wrap, _I32 _LOOP _I32 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_utime_wrap)( uv_loop_t *loop, vstring *path, double atime, double mtime, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_utime(loop,r,hl_to_utf8(path->bytes),atime,mtime,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_utime_wrap, _LOOP _STRING _F64 _F64 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_futime_wrap)( uv_file file, uv_loop_t *loop, double atime, double mtime, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_futime(loop,r,file,atime,mtime,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_futime_wrap, _I32 _LOOP _F64 _F64 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_lutime_wrap)( uv_loop_t *loop, vstring *path, double atime, double mtime, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_lutime(loop,r,hl_to_utf8(path->bytes),atime,mtime,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_lutime_wrap, _LOOP _STRING _F64 _F64 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_link_wrap)( uv_loop_t *loop, vstring *path, vstring *link, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(link,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_link(loop,r,hl_to_utf8(path->bytes),hl_to_utf8(link->bytes),on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_link_wrap, _LOOP _STRING _STRING _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_symlink_wrap)( uv_loop_t *loop, vstring *path, vstring *link, varray_bytes *flags, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(link,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	int i_flags = 0;
+	if( flags ) {
+		for(int i = 0; i < flags->length; i++) {
+			switch( bytes_geti32(flags->bytes, i * 4) ) {
+				case 0: i_flags |= UV_FS_SYMLINK_DIR; break;
+				case 1: i_flags |= UV_FS_SYMLINK_JUNCTION; break;
+			}
+		}
+	}
+	UV_CHECK_ERROR(uv_fs_symlink(loop,r,hl_to_utf8(path->bytes),hl_to_utf8(link->bytes),i_flags,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_symlink_wrap, _LOOP _STRING _STRING _ARRBYTES _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_readlink_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_readlink(loop,r,hl_to_utf8(path->bytes),on_fs_bytes),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_readlink_wrap, _LOOP _STRING _FUN(_VOID,_I32 _BYTES));
+
+HL_PRIM void HL_NAME(fs_realpath_wrap)( uv_loop_t *loop, vstring *path, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_realpath(loop,r,hl_to_utf8(path->bytes),on_fs_bytes),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_realpath_wrap, _LOOP _STRING _FUN(_VOID,_I32 _BYTES));
+
+HL_PRIM void HL_NAME(fs_chown_wrap)( uv_loop_t *loop, vstring *path, int uid, int gid, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_chown(loop,r,hl_to_utf8(path->bytes),uid,gid,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_chown_wrap, _LOOP _STRING _I32 _I32 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_fchown_wrap)( uv_file file, uv_loop_t *loop, int uid, int gid, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_fchown(loop,r,file,uid,gid,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_fchown_wrap, _I32 _LOOP _I32 _I32 _FUN(_VOID,_I32));
+
+HL_PRIM void HL_NAME(fs_lchown_wrap)( uv_loop_t *loop, vstring *path, int uid, int gid, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_fs_t,r,c);
+	UV_CHECK_ERROR(uv_fs_lchown(loop,r,hl_to_utf8(path->bytes),uid,gid,on_fs_common),free_fs_req(r),);
+}
+DEFINE_PRIM(_VOID, fs_lchown_wrap, _LOOP _STRING _I32 _I32 _FUN(_VOID,_I32));
 
 // Miscellaneous
 
