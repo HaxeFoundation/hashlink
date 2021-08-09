@@ -158,7 +158,7 @@ endif()
 if(BUILD_TESTING)
 
     find_program(
-        HAXE_COMPILERs
+        HAXE_COMPILER
         haxe
     )
 
