@@ -105,7 +105,7 @@ int utoi( const uchar *str, uchar **end ) {
 
 int ucmp( const uchar *a, const uchar *b ) {
 	while(true) {
-		int d = (unsigned)*a - (unsigned)*b; 
+		int d = (unsigned)*a - (unsigned)*b;
 		if( d ) return d;
 		if( !*a ) return 0;
 		a++;
@@ -202,7 +202,15 @@ sprintf_loop:
 					switch( c ) {
 					case 'd':
 						cfmt[i++] = 0;
-						size = sprintf(tmp,cfmt,va_arg(arglist,int));
+						if( cfmt[i - 3] == 'l') {
+							if( cfmt[i - 4] == 'l' ) {
+								size = sprintf(tmp,cfmt,va_arg(arglist,long long));
+							} else {
+								size = sprintf(tmp,cfmt,va_arg(arglist,long));
+							}
+						} else {
+							size = sprintf(tmp,cfmt,va_arg(arglist,int));
+						}
 						goto sprintf_add;
 					case 'f':
 						cfmt[i++] = 0;

@@ -26,13 +26,6 @@ HL_PRIM int64 hl_num_i64_of_string( vstring *s ) {
 }
 DEFINE_PRIM(_I64, num_i64_of_string, _STRING);
 
-HL_PRIM vbyte *hl_num_i64_to_bytes( int64 i ) {
-	char buf[20];
-	int length = sprintf(buf, "%lld", i);
-	return hl_copy_bytes((vbyte *)buf, length);
-}
-DEFINE_PRIM(_BYTES, num_i64_to_bytes, _I64);
-
 HL_PRIM int64 hl_num_i64_add( int64 a, int64 b ) {
 	return a + b;
 }
