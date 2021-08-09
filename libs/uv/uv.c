@@ -172,9 +172,20 @@ static int hx_errno( int result ) {
 	return result < 0 ? errno_uv2hx(result) : 0;
 }
 
+static vclosure *c_exception;
+
+HL_PRIM void HL_NAME(init_exception)( vclosure *c ) {
+	c_exception = c;
+}
+DEFINE_PRIM(_VOID, init_exception, _FUN(_DYN, _I32));
+
 static void hx_error(int uv_errno) {
-	//TODO: throw hl.uv.UVException
-	hl_error("%s", hl_to_utf16(uv_err_name(uv_errno)));
+	if( c_exception ) {
+		vdynamic *exc = hl_call1(vdynamic *, c_exception, int, errno_uv2hx(uv_errno));
+		hl_throw(exc);
+	} else {
+		hl_error("%s", hl_to_utf16(uv_err_name(uv_errno)));
+	}
 }
 
 DEFINE_PRIM(_BYTES, strerror, _I32);
