@@ -79,6 +79,7 @@ file(GLOB std_srcs
     src/std/ucs2.c
     src/std/thread.c
     src/std/process.c
+    src/std/num.c
 )
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -157,7 +158,7 @@ endif()
 if(BUILD_TESTING)
 
     find_program(
-        HAXE_COMPILER
+        HAXE_COMPILERs
         haxe
     )
 
