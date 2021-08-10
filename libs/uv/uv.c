@@ -1704,10 +1704,31 @@ HL_PRIM void HL_NAME(fs_readdir_wrap)( uv_dir_t *dir, uv_loop_t *loop, int num_e
 }
 DEFINE_PRIM(_VOID, fs_readdir_wrap, _DIR _LOOP _I32 _FUN(_VOID,_I32 _ARR));
 
-static vdynamic *alloc_timespec_dyn( uv_timespec_t *spec ) {
+static vdynamic *alloc_timespec_dyn( const uv_timespec_t *spec ) {
 	vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
 	hl_dyn_seti(obj, hl_hash_utf8("sec"), &hlt_i32, spec->tv_sec);
 	hl_dyn_seti(obj, hl_hash_utf8("nsec"), &hlt_i32, spec->tv_nsec);
+	return obj;
+}
+
+static vdynamic *alloc_stat( const uv_stat_t *stat ) {
+	vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
+	dyn_set_i64(obj, hl_hash_utf8("dev"), stat->st_dev);
+	dyn_set_i64(obj, hl_hash_utf8("mode"), stat->st_mode);
+	dyn_set_i64(obj, hl_hash_utf8("nlink"), stat->st_nlink);
+	dyn_set_i64(obj, hl_hash_utf8("uid"), stat->st_uid);
+	dyn_set_i64(obj, hl_hash_utf8("gid"), stat->st_gid);
+	dyn_set_i64(obj, hl_hash_utf8("rdev"), stat->st_rdev);
+	dyn_set_i64(obj, hl_hash_utf8("ino"), stat->st_ino);
+	dyn_set_i64(obj, hl_hash_utf8("size"), stat->st_size);
+	dyn_set_i64(obj, hl_hash_utf8("blksize"), stat->st_blksize);
+	dyn_set_i64(obj, hl_hash_utf8("blocks"), stat->st_blocks);
+	dyn_set_i64(obj, hl_hash_utf8("flags"), stat->st_flags);
+	dyn_set_i64(obj, hl_hash_utf8("gen"), stat->st_gen);
+	hl_dyn_setp(obj, hl_hash_utf8("atim"), &hlt_dyn, alloc_timespec_dyn(&stat->st_atim));
+	hl_dyn_setp(obj, hl_hash_utf8("mtim"), &hlt_dyn, alloc_timespec_dyn(&stat->st_mtim));
+	hl_dyn_setp(obj, hl_hash_utf8("ctim"), &hlt_dyn, alloc_timespec_dyn(&stat->st_ctim));
+	hl_dyn_setp(obj, hl_hash_utf8("birthtim"), &hlt_dyn, alloc_timespec_dyn(&stat->st_birthtim));
 	return obj;
 }
 
@@ -1716,24 +1737,7 @@ static void on_fs_stat( uv_fs_t *r ) {
 	if( r->result < 0 ) {
 		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
 	} else {
-		vdynamic *stat = (vdynamic*)hl_alloc_dynobj();
-		dyn_set_i64(stat, hl_hash_utf8("dev"), r->statbuf.st_dev);
-		dyn_set_i64(stat, hl_hash_utf8("mode"), r->statbuf.st_mode);
-		dyn_set_i64(stat, hl_hash_utf8("nlink"), r->statbuf.st_nlink);
-		dyn_set_i64(stat, hl_hash_utf8("uid"), r->statbuf.st_uid);
-		dyn_set_i64(stat, hl_hash_utf8("gid"), r->statbuf.st_gid);
-		dyn_set_i64(stat, hl_hash_utf8("rdev"), r->statbuf.st_rdev);
-		dyn_set_i64(stat, hl_hash_utf8("ino"), r->statbuf.st_ino);
-		dyn_set_i64(stat, hl_hash_utf8("size"), r->statbuf.st_size);
-		dyn_set_i64(stat, hl_hash_utf8("blksize"), r->statbuf.st_blksize);
-		dyn_set_i64(stat, hl_hash_utf8("blocks"), r->statbuf.st_blocks);
-		dyn_set_i64(stat, hl_hash_utf8("flags"), r->statbuf.st_flags);
-		dyn_set_i64(stat, hl_hash_utf8("gen"), r->statbuf.st_gen);
-		hl_dyn_setp(stat, hl_hash_utf8("atim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_atim));
-		hl_dyn_setp(stat, hl_hash_utf8("mtim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_mtim));
-		hl_dyn_setp(stat, hl_hash_utf8("ctim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_ctim));
-		hl_dyn_setp(stat, hl_hash_utf8("birthtim"), &hlt_dyn, alloc_timespec_dyn(&r->statbuf.st_birthtim));
-		hl_call2(void,c,int,0,vdynamic *,stat);
+		hl_call2(void,c,int,0,vdynamic *,alloc_stat(&r->statbuf));
 	}
 	free_fs_req(r);
 }
@@ -2051,6 +2055,37 @@ HL_PRIM void HL_NAME(fs_event_stop_wrap)( uv_fs_event_t *h ) {
 	UV_CHECK_ERROR(uv_fs_event_stop(h),,);
 }
 DEFINE_PRIM(_VOID, fs_event_stop_wrap, _HANDLE);
+
+// Fs poll
+
+HL_PRIM uv_fs_poll_t *HL_NAME(fs_poll_init_wrap)( uv_loop_t *loop ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_fs_poll_t *h = UV_ALLOC(uv_fs_poll_t);
+	UV_CHECK_ERROR(uv_fs_poll_init(loop,h),free(h),NULL);
+	handle_init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, fs_poll_init_wrap, _LOOP);
+
+static void on_fs_poll( uv_fs_poll_t *h, int status, const uv_stat_t *prev, const uv_stat_t *curr ) {
+	UV_GET_CLOSURE(c,h,0,"No callback in fs_poll handle");
+	hl_call3(void,c,int,0,vdynamic *,(prev?alloc_stat(prev):NULL),vdynamic *,(curr?alloc_stat(curr):NULL));
+}
+
+HL_PRIM void HL_NAME(fs_poll_start_wrap)( uv_fs_poll_t *h, vstring *path, int interval, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	handle_register_callback((uv_handle_t*)h,c,0);
+	UV_CHECK_ERROR(uv_fs_poll_start(h,on_fs_poll,hl_to_utf8(path->bytes),interval),handle_clear_callback((uv_handle_t *)h,0),);
+}
+DEFINE_PRIM(_VOID, fs_poll_start_wrap, _HANDLE _STRING _I32 _FUN(_VOID,_I32 _DYN _DYN));
+
+HL_PRIM void HL_NAME(fs_poll_stop_wrap)( uv_fs_poll_t *h ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_fs_poll_stop(h),,);
+}
+DEFINE_PRIM(_VOID, fs_poll_stop_wrap, _HANDLE);
 
 // Miscellaneous
 
