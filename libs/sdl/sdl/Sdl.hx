@@ -1,5 +1,21 @@
 package sdl;
 
+typedef Display = {
+	var handle : Window.DisplayHandle;
+	var name : String;
+	var left : Int;
+	var top : Int;
+	var right : Int;
+	var bottom : Int;
+};
+
+typedef ScreenMode = {
+	var format : Int;
+	var width : Int;
+	var height : Int;
+	var framerate : Int;
+};
+
 @:hlNative("sdl")
 class Sdl {
 
@@ -79,6 +95,10 @@ class Sdl {
 		return 0;
 	}
 
+	public static function getFramerate() : Int {
+		return 0;
+	}
+
 	public static function message( title : String, text : String, error = false ) {
 		@:privateAccess messageBox(title.toUtf8(), text.toUtf8(), error);
 	}
@@ -88,6 +108,23 @@ class Sdl {
 
 	static function detectWin32() {
 		return false;
+	}
+
+	static function get_display_modes(displayId : Int) : hl.NativeArray<Dynamic> {
+		return null;
+	}
+
+	public static function getDisplayModes(display : Window.DisplayHandle) : Array<ScreenMode> {
+		return [ for(m in get_display_modes(display)) m ];
+	}
+
+	public static function getDisplays() : Array<Display> {
+		var i = 0;
+		return [ for(d in get_displays() ) @:privateAccess { handle: d.handle, name: '${String.fromUTF8(d.name)} (${++i})', left: d.left, top: d.top, right: d.right, bottom: d.bottom } ];
+	}
+
+	static function get_displays() : hl.NativeArray<Dynamic> {
+		return null;
 	}
 
 	static function get_devices() : hl.NativeArray<hl.Bytes> {
