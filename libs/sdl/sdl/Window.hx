@@ -2,6 +2,7 @@ package sdl;
 
 private typedef WinPtr = hl.Abstract<"sdl_window">;
 private typedef GLContext = hl.Abstract<"sdl_gl">;
+typedef DisplayHandle = Null<Int>;
 
 @:enum abstract DisplayMode(Int) {
 	var Windowed = 0;
@@ -57,6 +58,7 @@ class Window {
 	public var x(get, never) : Int;
 	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
+	public var currentMonitor(get, never) : Int;
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
 
@@ -138,9 +140,14 @@ class Window {
 	function set_displayMode(mode) {
 		if( mode == displayMode )
 			return mode;
-		if( winSetFullscreen(win, cast mode) )
+		if( winSetFullscreen(win, mode) ) {
 			displayMode = mode;
+		}
 		return displayMode;
+	}
+
+	function get_currentMonitor() {
+		return winDisplayHandle(win);
 	}
 
 	function set_visible(b) {
@@ -295,6 +302,14 @@ class Window {
 
 	static function winSetFullscreen( win : WinPtr, mode : DisplayMode ) {
 		return false;
+	}
+
+	static function winSetDisplayMode( win : WinPtr, width : Int, height : Int, framerate : Int ) {
+		return false;
+	}
+
+	static function winDisplayHandle( win : WinPtr ) : Int {
+		return 0;
 	}
 
 	static function winSetSize( win : WinPtr, width : Int, height : Int ) {
