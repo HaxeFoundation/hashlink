@@ -194,8 +194,10 @@ class FileSample {
 						// 	&& stat.flags == fstat.flags
 						// 	&& stat.gen == fstat.gen;
 						// Log.print('fstat equals stat: $ok');
-						Log.print('Done');
-						actions.next();
+						deleteFiles([path], () -> {
+							Log.print('Done');
+							actions.next();
+						});
 					})(e));
 				}));
 			})(e));
@@ -222,8 +224,10 @@ class FileSample {
 					file.close(loop, handle(() -> {
 						readFile(path, data -> {
 							Log.print('Content after truncation (length=${data.length}): $data');
-							Log.print('Done');
-							actions.next();
+							deleteFiles([path], () -> {
+								Log.print('Done');
+								actions.next();
+							});
 						});
 					}));
 				}));
@@ -282,8 +286,10 @@ class FileSample {
 		createFile(path, Bytes.ofString('123'), () -> {
 			Log.print('chmod on $path...');
 			File.chmod(loop, path, 420, handle(() -> {
-				Log.print('Done');
-				actions.next();
+				deleteFiles([path], () -> {
+					Log.print('Done');
+					actions.next();
+				});
 			}));
 		});
 	}
@@ -293,8 +299,10 @@ class FileSample {
 		createFile(path, Bytes.ofString('123'), () -> {
 			Log.print('utime on $path...');
 			File.utime(loop, path, Date.now().getTime(), Date.now().getTime(), handle(() -> {
-				Log.print('Done');
-				actions.next();
+				deleteFiles([path], () -> {
+					Log.print('Done');
+					actions.next();
+				});
 			}));
 		});
 	}
@@ -335,8 +343,10 @@ class FileSample {
 		createFile(path, Bytes.ofString(''), () -> {
 			Log.print('chown on $path...');
 			File.chown(loop, path, -1, -1, handle(() -> {
-				Log.print('Done');
-				actions.next();
+				deleteFiles([path], () -> {
+					Log.print('Done');
+					actions.next();
+				});
 			}));
 		});
 	}
