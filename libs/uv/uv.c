@@ -2204,7 +2204,7 @@ HL_PRIM varray *HL_NAME(loadavg_wrap)() {
 }
 DEFINE_PRIM(_ARR, loadavg_wrap, _NO_ARG);
 
-static vbyte *os_dir( int (*fn)(char *buf, size_t *size) ) {
+static vbyte *os_str( int (*fn)(char *buf, size_t *size) ) {
 	size_t size = 256;
 	char *buf = NULL;
 	int result = UV_ENOBUFS;
@@ -2222,12 +2222,12 @@ static vbyte *os_dir( int (*fn)(char *buf, size_t *size) ) {
 }
 
 HL_PRIM vbyte *HL_NAME(os_homedir_wrap)() {
-	return os_dir(uv_os_homedir);
+	return os_str(uv_os_homedir);
 }
 DEFINE_PRIM(_BYTES, os_homedir_wrap, _NO_ARG);
 
 HL_PRIM vbyte *HL_NAME(os_tmpdir_wrap)() {
-	return os_dir(uv_os_tmpdir);
+	return os_str(uv_os_tmpdir);
 }
 DEFINE_PRIM(_BYTES, os_tmpdir_wrap, _NO_ARG);
 
@@ -2245,3 +2245,61 @@ HL_PRIM vdynamic *HL_NAME(os_getpasswd_wrap)() {
 	return obj;
 }
 DEFINE_PRIM(_DYN, os_getpasswd_wrap, _NO_ARG);
+
+DEFINE_PRIM(_I64, get_free_memory, _NO_ARG);
+DEFINE_PRIM(_I64, get_total_memory, _NO_ARG);
+DEFINE_PRIM(_I64, get_constrained_memory, _NO_ARG);
+DEFINE_PRIM(_I64, hrtime, _NO_ARG);
+
+HL_PRIM vbyte *HL_NAME(os_gethostname_wrap)() {
+	return os_str(uv_os_gethostname);
+}
+DEFINE_PRIM(_BYTES, os_gethostname_wrap, _NO_ARG);
+
+HL_PRIM int HL_NAME(os_getpriority_wrap)( int pid ) {
+	int priority;
+	UV_CHECK_ERROR(uv_os_getpriority(pid,&priority),,0);
+	return priority;
+}
+DEFINE_PRIM(_I32, os_getpriority_wrap, _I32);
+
+HL_PRIM void HL_NAME(os_setpriority_wrap)( int pid, int priority ) {
+	UV_CHECK_ERROR(uv_os_setpriority(pid,priority),,);
+}
+DEFINE_PRIM(_VOID, os_setpriority_wrap, _I32 _I32);
+
+HL_PRIM vdynamic *HL_NAME(os_uname_wrap)() {
+	uv_utsname_t u;
+	UV_CHECK_ERROR(uv_os_uname(&u),,NULL);
+	vdynamic *obj = (vdynamic *)hl_alloc_dynobj();
+	hl_dyn_setp(obj, hl_hash_utf8("machine"), &hlt_bytes, hl_copy_bytes((vbyte *)u.machine, strlen(u.machine)));
+	hl_dyn_setp(obj, hl_hash_utf8("release"), &hlt_bytes, hl_copy_bytes((vbyte *)u.release, strlen(u.release)));
+	hl_dyn_setp(obj, hl_hash_utf8("sysname"), &hlt_bytes, hl_copy_bytes((vbyte *)u.sysname, strlen(u.sysname)));
+	hl_dyn_setp(obj, hl_hash_utf8("version"), &hlt_bytes, hl_copy_bytes((vbyte *)u.version, strlen(u.version)));
+	return obj;
+}
+DEFINE_PRIM(_DYN, os_uname_wrap, _NO_ARG);
+
+HL_PRIM vdynamic *HL_NAME(gettimeofday_wrap)() {
+	uv_timeval64_t t;
+	UV_CHECK_ERROR(uv_gettimeofday(&t),,NULL);
+	vdynamic *obj = (vdynamic *)hl_alloc_dynobj();
+	dyn_set_i64(obj, hl_hash_utf8("sec"), t.tv_sec);
+	dyn_set_i64(obj, hl_hash_utf8("usec"), t.tv_usec);
+	return obj;
+}
+DEFINE_PRIM(_DYN, gettimeofday_wrap, _NO_ARG);
+
+static void on_random( uv_random_t* r, int status, void* buf, size_t buflen ) {
+	UV_GET_CLOSURE(c,r,0,"No callback in random request");
+	hl_call1(void,c,int,errno_uv2hx(status));
+}
+
+HL_PRIM void HL_NAME(random_wrap)( uv_loop_t *loop, vbyte *buf, int length, int flags, vclosure *c ) {
+	UV_CHECK_NULL(loop,);
+	UV_CHECK_NULL(buf,);
+	UV_CHECK_NULL(c,);
+	UV_ALLOC_REQ(uv_random_t,r,c);
+	UV_CHECK_ERROR(uv_random(loop,r,buf,length,flags,on_random),free_req((uv_req_t *)r),);
+}
+DEFINE_PRIM(_VOID, random_wrap, _LOOP _BYTES _I32 _I32 _FUN(_VOID,_I32));
