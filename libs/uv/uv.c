@@ -1999,6 +1999,59 @@ HL_PRIM void HL_NAME(fs_lchown_wrap)( uv_loop_t *loop, vstring *path, int uid, i
 }
 DEFINE_PRIM(_VOID, fs_lchown_wrap, _LOOP _STRING _I32 _I32 _FUN(_VOID,_I32));
 
+// Fs event
+
+HL_PRIM uv_fs_event_t *HL_NAME(fs_event_init_wrap)( uv_loop_t *loop ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_fs_event_t *h = UV_ALLOC(uv_fs_event_t);
+	UV_CHECK_ERROR(uv_fs_event_init(loop,h),free(h),NULL);
+	handle_init_hl_data((uv_handle_t*)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, fs_event_init_wrap, _LOOP);
+
+static void on_fs_event( uv_fs_event_t *h, const char *filename, int events, int status ) {
+	UV_GET_CLOSURE(c,h,0,"No callback in fs_event handle");
+	if( status < 0 ) {
+		hl_call3(void,c,int,errno_uv2hx(status),vbyte *,NULL,varray *,NULL);
+	} else {
+		int size = (0 != (UV_RENAME & events)) + (0 != (UV_CHANGE & events));
+		varray *a_events = hl_alloc_array(&hlt_i32, size);
+		int i = 0;
+		if( UV_RENAME & events )
+			hl_aptr(a_events,int)[i++] = UV_RENAME;
+		if( UV_CHANGE & events )
+			hl_aptr(a_events,int)[i++] = UV_CHANGE;
+		vbyte *path = hl_copy_bytes((const vbyte *)filename, strlen(filename));
+		hl_call3(void,c,int,0,vbyte *,path,varray *,a_events);
+	}
+}
+
+HL_PRIM void HL_NAME(fs_event_start_wrap)( uv_fs_event_t *h, vstring *path, varray_bytes *flags, vclosure *c ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_NULL(path,);
+	UV_CHECK_NULL(c,);
+	handle_register_callback((uv_handle_t*)h,c,0);
+	unsigned int i_flags = 0;
+	if( flags ) {
+		for(int i = 0; i < flags->length; i++) {
+			switch( bytes_geti32(flags->bytes, i * 4) ) {
+				case 1: i_flags |= UV_FS_EVENT_WATCH_ENTRY; break;
+				case 2: i_flags |= UV_FS_EVENT_STAT; break;
+				case 3: i_flags |= UV_FS_EVENT_RECURSIVE; break;
+			}
+		}
+	}
+	UV_CHECK_ERROR(uv_fs_event_start(h,on_fs_event,hl_to_utf8(path->bytes),i_flags),handle_clear_callback((uv_handle_t *)h,0),);
+}
+DEFINE_PRIM(_VOID, fs_event_start_wrap, _HANDLE _STRING _ARRBYTES _FUN(_VOID,_I32 _BYTES _ARR));
+
+HL_PRIM void HL_NAME(fs_event_stop_wrap)( uv_fs_event_t *h ) {
+	UV_CHECK_NULL(h,);
+	UV_CHECK_ERROR(uv_fs_event_stop(h),,);
+}
+DEFINE_PRIM(_VOID, fs_event_stop_wrap, _HANDLE);
+
 // Miscellaneous
 
 HL_PRIM vbyte *HL_NAME(os_tmpdir_wrap)() {
