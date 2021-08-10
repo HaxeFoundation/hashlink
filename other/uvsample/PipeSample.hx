@@ -1,3 +1,5 @@
+import sys.FileSystem;
+import hl.uv.Misc;
 import hl.uv.SockAddr;
 import hl.uv.Tcp;
 import haxe.io.Bytes;
@@ -9,9 +11,10 @@ import sys.thread.Thread;
 import haxe.Timer;
 
 class PipeSample {
-	static inline var NAME = 'testpipe';
+	static var NAME = 'testpipe';
 
 	static public function main() {
+		NAME = Misc.tmpDir() + '/' + NAME;
 		#if CLIENT
 		Log.print('Running PipeSample client...');
 		client();
@@ -30,6 +33,8 @@ class PipeSample {
 	}
 
 	static function server() {
+		if(FileSystem.exists(NAME))
+			FileSystem.deleteFile(NAME);
 		function print(msg:String)
 			Log.print('SERVER: $msg');
 		var loop = Thread.current().events;

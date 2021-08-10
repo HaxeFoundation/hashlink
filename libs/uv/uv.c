@@ -69,6 +69,8 @@ typedef struct {
 	memcpy(__ev__->data,buffer,length); \
 	uv_buf_t buf = uv_buf_init(__ev__->data, length);
 
+hl_type hlt_sockaddr = { HABSTRACT, {USTR("uv_sockaddr_storage")} };
+
 static void dyn_set_i64( vdynamic *obj, int field, int64 value ) {
 	vdynamic *v = hl_alloc_dynamic(&hlt_i64);
 	v->v.i64 = value;
@@ -859,7 +861,7 @@ HL_PRIM void HL_NAME(pipe_bind_wrap)( uv_pipe_t *h, vstring *name ) {
 }
 DEFINE_PRIM(_VOID, pipe_bind_wrap, _HANDLE _STRING);
 
-HL_PRIM vbyte *HL_NAME(pipe_getsockname_wrap)( uv_pipe_t *h ) {
+static vbyte *pipe_getname( uv_pipe_t *h, int (*fn)(const uv_pipe_t *h, char *buf, size_t *size) ) {
 	UV_CHECK_NULL(h,NULL);
 	size_t size = 256;
 	char *buf = NULL;
@@ -868,7 +870,7 @@ HL_PRIM vbyte *HL_NAME(pipe_getsockname_wrap)( uv_pipe_t *h ) {
 		if( buf )
 			free(buf);
 		buf = malloc(size);
-		result = uv_pipe_getsockname(h,buf,&size);
+		result = fn(h,buf,&size);
 	}
 	vbyte *name = hl_alloc_bytes(size);
 	memcpy(name,buf,size);
@@ -876,24 +878,14 @@ HL_PRIM vbyte *HL_NAME(pipe_getsockname_wrap)( uv_pipe_t *h ) {
 	UV_CHECK_ERROR(result,,NULL); //free bytes?
 	return name;
 }
+
+HL_PRIM vbyte *HL_NAME(pipe_getsockname_wrap)( uv_pipe_t *h ) {
+	return pipe_getname(h, uv_pipe_getsockname);
+}
 DEFINE_PRIM(_BYTES, pipe_getsockname_wrap, _HANDLE);
 
 HL_PRIM vbyte *HL_NAME(pipe_getpeername_wrap)( uv_pipe_t *h ) {
-	UV_CHECK_NULL(h,NULL);
-	size_t size = 256;
-	char *buf = NULL;
-	int result = UV_ENOBUFS;
-	while (result == UV_ENOBUFS) {
-		if( buf )
-			free(buf);
-		buf = malloc(size);
-		result = uv_pipe_getpeername(h,buf,&size);
-	}
-	vbyte *name = hl_alloc_bytes(size);
-	memcpy(name,buf,size);
-	free(buf);
-	UV_CHECK_ERROR(result,,NULL); //free bytes?
-	return name;
+	return pipe_getname(h, uv_pipe_getpeername);
 }
 DEFINE_PRIM(_BYTES, pipe_getpeername_wrap, _HANDLE);
 
@@ -1326,7 +1318,6 @@ static void on_getaddrinfo( uv_getaddrinfo_t *r, int status, struct addrinfo *re
 	int haddr = hl_hash_utf8("addr");
 	int hcanonName = hl_hash_utf8("canonName");
 	int i = 0;
-	hl_type hlt_sockaddr = { HABSTRACT, {USTR("uv_sockaddr_storage")} };
 	vdynamic *entry;
 	while( current ) {
 		entry = (vdynamic *)hl_alloc_dynobj();
@@ -1706,12 +1697,12 @@ DEFINE_PRIM(_VOID, fs_readdir_wrap, _DIR _LOOP _I32 _FUN(_VOID,_I32 _ARR));
 
 static vdynamic *alloc_timespec_dyn( const uv_timespec_t *spec ) {
 	vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
-	hl_dyn_seti(obj, hl_hash_utf8("sec"), &hlt_i32, spec->tv_sec);
-	hl_dyn_seti(obj, hl_hash_utf8("nsec"), &hlt_i32, spec->tv_nsec);
+	hl_dyn_seti(obj, hl_hash_utf8("sec"), &hlt_i64, (int64)spec->tv_sec);
+	hl_dyn_seti(obj, hl_hash_utf8("nsec"), &hlt_i64, (int64)spec->tv_nsec);
 	return obj;
 }
 
-static vdynamic *alloc_stat( const uv_stat_t *stat ) {
+static vdynamic *alloc_stat_dyn( const uv_stat_t *stat ) {
 	vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
 	dyn_set_i64(obj, hl_hash_utf8("dev"), stat->st_dev);
 	dyn_set_i64(obj, hl_hash_utf8("mode"), stat->st_mode);
@@ -1737,7 +1728,7 @@ static void on_fs_stat( uv_fs_t *r ) {
 	if( r->result < 0 ) {
 		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
 	} else {
-		hl_call2(void,c,int,0,vdynamic *,alloc_stat(&r->statbuf));
+		hl_call2(void,c,int,0,vdynamic *,alloc_stat_dyn(&r->statbuf));
 	}
 	free_fs_req(r);
 }
@@ -2069,7 +2060,7 @@ DEFINE_PRIM(_HANDLE, fs_poll_init_wrap, _LOOP);
 
 static void on_fs_poll( uv_fs_poll_t *h, int status, const uv_stat_t *prev, const uv_stat_t *curr ) {
 	UV_GET_CLOSURE(c,h,0,"No callback in fs_poll handle");
-	hl_call3(void,c,int,0,vdynamic *,(prev?alloc_stat(prev):NULL),vdynamic *,(curr?alloc_stat(curr):NULL));
+	hl_call3(void,c,int,0,vdynamic *,(prev?alloc_stat_dyn(prev):NULL),vdynamic *,(curr?alloc_stat_dyn(curr):NULL));
 }
 
 HL_PRIM void HL_NAME(fs_poll_start_wrap)( uv_fs_poll_t *h, vstring *path, int interval, vclosure *c ) {
@@ -2089,7 +2080,131 @@ DEFINE_PRIM(_VOID, fs_poll_stop_wrap, _HANDLE);
 
 // Miscellaneous
 
-HL_PRIM vbyte *HL_NAME(os_tmpdir_wrap)() {
+HL_PRIM int64 HL_NAME(resident_set_memory_wrap)() {
+	size_t rss;
+	UV_CHECK_ERROR(uv_resident_set_memory(&rss),,0);
+	return rss;
+}
+DEFINE_PRIM(_I64, resident_set_memory_wrap, _NO_ARG);
+
+HL_PRIM double HL_NAME(uptime_wrap)() {
+	double uptime;
+	UV_CHECK_ERROR(uv_uptime(&uptime),,0);
+	return uptime;
+}
+DEFINE_PRIM(_F64, uptime_wrap, _NO_ARG);
+
+static vdynamic *alloc_timeval_dyn( const uv_timeval_t *tv ) {
+	vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
+	hl_dyn_seti(obj, hl_hash_utf8("sec"), &hlt_i64, (int64)tv->tv_sec);
+	hl_dyn_seti(obj, hl_hash_utf8("usec"), &hlt_i64, (int64)tv->tv_usec);
+	return obj;
+}
+
+HL_PRIM vdynamic *HL_NAME(getrusage_wrap)() {
+	uv_rusage_t rusage = {0};
+	UV_CHECK_ERROR(uv_getrusage(&rusage),,NULL);
+	vdynamic *obj = (vdynamic *)hl_alloc_dynobj();
+	hl_dyn_setp(obj, hl_hash_utf8("utime"), &hlt_dyn, alloc_timeval_dyn(&rusage.ru_utime));
+	hl_dyn_setp(obj, hl_hash_utf8("stime"), &hlt_dyn, alloc_timeval_dyn(&rusage.ru_stime));
+	dyn_set_i64(obj, hl_hash_utf8("maxrss"), rusage.ru_maxrss);
+	dyn_set_i64(obj, hl_hash_utf8("ixrss"), rusage.ru_ixrss);
+	dyn_set_i64(obj, hl_hash_utf8("idrss"), rusage.ru_idrss);
+	dyn_set_i64(obj, hl_hash_utf8("isrss"), rusage.ru_isrss);
+	dyn_set_i64(obj, hl_hash_utf8("minflt"), rusage.ru_minflt);
+	dyn_set_i64(obj, hl_hash_utf8("majflt"), rusage.ru_majflt);
+	dyn_set_i64(obj, hl_hash_utf8("nswap"), rusage.ru_nswap);
+	dyn_set_i64(obj, hl_hash_utf8("inblock"), rusage.ru_inblock);
+	dyn_set_i64(obj, hl_hash_utf8("oublock"), rusage.ru_oublock);
+	dyn_set_i64(obj, hl_hash_utf8("msgsnd"), rusage.ru_msgsnd);
+	dyn_set_i64(obj, hl_hash_utf8("msgrcv"), rusage.ru_msgrcv);
+	dyn_set_i64(obj, hl_hash_utf8("nsignals"), rusage.ru_nsignals);
+	dyn_set_i64(obj, hl_hash_utf8("nvcsw"), rusage.ru_nvcsw);
+	dyn_set_i64(obj, hl_hash_utf8("nivcsw"), rusage.ru_nivcsw);
+	return obj;
+}
+DEFINE_PRIM(_DYN, getrusage_wrap, _NO_ARG);
+
+DEFINE_PRIM(_I32, os_getpid, _NO_ARG);
+DEFINE_PRIM(_I32, os_getppid, _NO_ARG);
+
+HL_PRIM varray *HL_NAME(cpu_info_wrap)() {
+	uv_cpu_info_t *infos;
+	int count;
+	UV_CHECK_ERROR(uv_cpu_info(&infos, &count),,NULL);
+	int hash_user = hl_hash_utf8("user");
+	int hash_nice = hl_hash_utf8("nice");
+	int hash_sys = hl_hash_utf8("sys");
+	int hash_idle = hl_hash_utf8("idle");
+	int hash_irq = hl_hash_utf8("irq");
+	int hash_model = hl_hash_utf8("model");
+	int hash_speed = hl_hash_utf8("speed");
+	int hash_cpuTimes = hl_hash_utf8("cpuTimes");
+	varray *a = hl_alloc_array(&hlt_dyn, count);
+	for(int i = 0; i < count; i++) {
+		vdynamic *times = (vdynamic *)hl_alloc_dynobj();
+		dyn_set_i64(times, hash_user, infos[i].cpu_times.user);
+		dyn_set_i64(times, hash_nice, infos[i].cpu_times.nice);
+		dyn_set_i64(times, hash_sys, infos[i].cpu_times.sys);
+		dyn_set_i64(times, hash_idle, infos[i].cpu_times.idle);
+		dyn_set_i64(times, hash_irq, infos[i].cpu_times.irq);
+
+		vdynamic *info = (vdynamic *)hl_alloc_dynobj();
+		hl_dyn_setp(info, hash_model, &hlt_bytes, hl_copy_bytes((vbyte *)infos[i].model, strlen(infos[i].model) + 1));
+		hl_dyn_seti(info, hash_speed, &hlt_i32, infos[i].speed);
+		hl_dyn_setp(info, hash_cpuTimes, &hlt_dyn, times);
+
+		hl_aptr(a,vdynamic *)[i] = info;
+	}
+	uv_free_cpu_info(infos, count);
+	return a;
+}
+DEFINE_PRIM(_ARR, cpu_info_wrap, _NO_ARG);
+
+HL_PRIM varray *HL_NAME(interface_addresses_wrap)() {
+	uv_interface_address_t *addresses;
+	int count;
+	UV_CHECK_ERROR(uv_interface_addresses(&addresses, &count),,NULL);
+	int hash_name = hl_hash_utf8("name");
+	int hash_physAddr = hl_hash_utf8("physAddr");
+	int hash_isInternal = hl_hash_utf8("isInternal");
+	int hash_address = hl_hash_utf8("address");
+	int hash_netmask = hl_hash_utf8("netmask");
+	varray *a = hl_alloc_array(&hlt_dyn, count);
+	for(int i = 0; i < count; i++) {
+		vdynamic *info = (vdynamic *)hl_alloc_dynobj();
+
+		hl_dyn_setp(info, hash_name, &hlt_bytes, hl_copy_bytes((vbyte *)addresses[i].name, strlen(addresses[i].name)));
+		hl_dyn_setp(info, hash_physAddr, &hlt_bytes, hl_copy_bytes((vbyte *)addresses[i].phys_addr, 6));
+		hl_dyn_seti(info, hash_isInternal, &hlt_bool, addresses[i].is_internal);
+
+		uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+		memcpy(addr, &addresses[i].address, sizeof(addresses[i].address));
+		hl_dyn_setp(info, hash_address, &hlt_sockaddr, addr);
+
+		uv_sockaddr_storage *mask = UV_ALLOC(uv_sockaddr_storage);
+		memcpy(mask, &addresses[i].netmask, sizeof(addresses[i].netmask));
+		hl_dyn_setp(info, hash_netmask, &hlt_sockaddr, mask);
+
+		hl_aptr(a,vdynamic *)[i] = info;
+	}
+	uv_free_interface_addresses(addresses, count);
+	return a;
+}
+DEFINE_PRIM(_ARR, interface_addresses_wrap, _NO_ARG);
+
+HL_PRIM varray *HL_NAME(loadavg_wrap)() {
+	double avg[3];
+	uv_loadavg(avg);
+	varray *a = hl_alloc_array(&hlt_f64, 3);
+	hl_aptr(a,double)[0] = avg[0];
+	hl_aptr(a,double)[1] = avg[1];
+	hl_aptr(a,double)[2] = avg[2];
+	return a;
+}
+DEFINE_PRIM(_ARR, loadavg_wrap, _NO_ARG);
+
+static vbyte *os_dir( int (*fn)(char *buf, size_t *size) ) {
 	size_t size = 256;
 	char *buf = NULL;
 	int result = UV_ENOBUFS;
@@ -2097,7 +2212,7 @@ HL_PRIM vbyte *HL_NAME(os_tmpdir_wrap)() {
 		if( buf )
 			free(buf);
 		buf = malloc(size);
-		result = uv_os_tmpdir(buf,&size);
+		result = fn(buf,&size);
 	}
 	vbyte *path = hl_alloc_bytes(size);
 	memcpy(path,buf,size);
@@ -2105,4 +2220,28 @@ HL_PRIM vbyte *HL_NAME(os_tmpdir_wrap)() {
 	UV_CHECK_ERROR(result,,NULL); // free bytes?
 	return path;
 }
+
+HL_PRIM vbyte *HL_NAME(os_homedir_wrap)() {
+	return os_dir(uv_os_homedir);
+}
+DEFINE_PRIM(_BYTES, os_homedir_wrap, _NO_ARG);
+
+HL_PRIM vbyte *HL_NAME(os_tmpdir_wrap)() {
+	return os_dir(uv_os_tmpdir);
+}
 DEFINE_PRIM(_BYTES, os_tmpdir_wrap, _NO_ARG);
+
+HL_PRIM vdynamic *HL_NAME(os_getpasswd_wrap)() {
+	uv_passwd_t p;
+	UV_CHECK_ERROR(uv_os_get_passwd(&p),,NULL);
+	vdynamic *obj = (vdynamic *)hl_alloc_dynobj();
+	hl_dyn_setp(obj, hl_hash_utf8("username"), &hlt_bytes, hl_copy_bytes((vbyte *)p.username, strlen(p.username)));
+	hl_dyn_setp(obj, hl_hash_utf8("homedir"), &hlt_bytes, hl_copy_bytes((vbyte *)p.homedir, strlen(p.homedir)));
+	dyn_set_i64(obj, hl_hash_utf8("uid"), p.uid);
+	dyn_set_i64(obj, hl_hash_utf8("gid"), p.gid);
+	if( p.shell )
+		hl_dyn_setp(obj, hl_hash_utf8("shell"), &hlt_bytes, hl_copy_bytes((vbyte *)p.shell, strlen(p.shell)));
+	uv_os_free_passwd(&p);
+	return obj;
+}
+DEFINE_PRIM(_DYN, os_getpasswd_wrap, _NO_ARG);
