@@ -14,6 +14,12 @@ typedef DisplayHandle = Null<Int>;
 	var FullscreenResize = 3;
 }
 
+typedef DisplaySetting = {
+	width : Int,
+	height : Int,
+	framerate : Int
+}
+
 @:hlNative("sdl")
 class Window {
 
@@ -58,7 +64,8 @@ class Window {
 	public var x(get, never) : Int;
 	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
-	public var currentMonitor(get, never) : Int;
+	public var displaySetting : DisplaySetting;
+	public var currentMonitor(get, default) : Int;
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
 
@@ -138,10 +145,11 @@ class Window {
 	}
 
 	function set_displayMode(mode) {
-		if( mode == displayMode )
-			return mode;
 		if( winSetFullscreen(win, mode) ) {
 			displayMode = mode;
+			if(mode == Fullscreen || mode == FullscreenResize) {
+				@:privateAccess sdl.Window.winSetDisplayMode(win, displaySetting.width, displaySetting.height, displaySetting.framerate);
+			}
 		}
 		return displayMode;
 	}

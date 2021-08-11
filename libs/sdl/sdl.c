@@ -515,7 +515,7 @@ HL_PRIM bool HL_NAME(win_set_display_mode)(SDL_Window *win, int width, int heigh
 	for (int i = 0; i < SDL_GetNumDisplayModes(display_idx); i++) {
 		if (SDL_GetDisplayMode(display_idx, i, &mode) == 0) {
 			if (mode.w == width && mode.h == height && mode.refresh_rate == framerate) {
-				return SDL_SetWindowDisplayMode(win, &mode) == 0;
+				return SDL_SetWindowDisplayMode(win, &mode) >= 0;
 			}
 		}
 	}
@@ -834,6 +834,16 @@ HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
 	return arr;
 }
 
+HL_PRIM vdynobj* HL_NAME(get_current_display_mode)(int display_id) {
+	SDL_DisplayMode mode;
+	SDL_GetCurrentDisplayMode(display_id, &mode);
+	vdynamic* obj = (vdynamic*)hl_alloc_dynobj();
+	hl_dyn_seti(obj, hl_hash_utf8("width"), &hlt_i32, mode.w);
+	hl_dyn_seti(obj, hl_hash_utf8("height"), &hlt_i32, mode.h);
+	hl_dyn_seti(obj, hl_hash_utf8("framerate"), &hlt_i32, mode.refresh_rate);
+	return (vdynobj*) obj;
+}
+
 #define MAX_DEVICES 16
 HL_PRIM varray *HL_NAME(get_devices)() {
 	varray *a = hl_alloc_array(&hlt_bytes, MAX_DEVICES);
@@ -860,4 +870,5 @@ DEFINE_PRIM(_BOOL, set_clipboard_text, _BYTES);
 DEFINE_PRIM(_BYTES, get_clipboard_text, _NO_ARG);
 DEFINE_PRIM(_ARR, get_displays, _NO_ARG);
 DEFINE_PRIM(_ARR, get_display_modes, _I32);
+DEFINE_PRIM(_DYN, get_current_display_mode, _I32);
 DEFINE_PRIM(_ARR, get_devices, _NO_ARG);

@@ -3,6 +3,20 @@ import haxe.EntryPoint;
 
 private typedef WinPtr = hl.Abstract<"dx_window">;
 
+typedef Monitor = {
+	name : String,
+	left : Int,
+	right : Int,
+	top : Int,
+	bottom : Int
+}
+
+typedef DisplaySetting = {
+	width : Int,
+	height : Int,
+	framerate : Int
+}
+
 @:enum abstract DisplayMode(Int) {
 	var Windowed = 0;
 	var Fullscreen = 1;
@@ -37,6 +51,8 @@ class Window {
 	public var displayMode(default, set) : DisplayMode;
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
+	public var displaySetting : DisplaySetting;
+	public var selectedMonitor : String;
 	public var vsync : Bool;
 
 	public function new( title : String, width : Int, height : Int, x : Int = CW_USEDEFAULT, y : Int = CW_USEDEFAULT, windowFlags : Int = RESIZABLE ) {
@@ -52,23 +68,18 @@ class Window {
 	}
 
 	function set_displayMode(mode) {
-		if( mode == displayMode )
-			return mode;
 		displayMode = mode;
-		var fs = mode != Windowed;
-		if( savedSize == null ) {
-			if( !fs ) return mode;
-			savedSize = { x : x, y : y, width : width, height : height };
-			winSetFullscreen(win,true);
-			Driver.fullScreen = mode == Fullscreen;
-		} else {
-			Driver.fullScreen = mode == Fullscreen;
-			if( fs )
-				return mode;
+		if(mode == Windowed) {
+			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.toUtf8() : null, null);
 			winSetFullscreen(win, false);
-			resize(savedSize.width, savedSize.height);
-			setPosition(savedSize.x, savedSize.y);
-			savedSize = null;
+		}
+		else if(mode == Borderless) {
+			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.toUtf8() : null, null);
+			winSetFullscreen(win,true);
+		}
+		else {
+			var r = dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.toUtf8() : null, displaySetting);
+			winSetFullscreen(win,true);
 		}
 		return mode;
 	}
@@ -181,6 +192,34 @@ class Window {
 
 	public function clipCursor( enable : Bool ) : Void {
 		winClipCursor(enable ? win : null);
+	}
+
+	public static function getDisplaySettings(monitor : String) : Array<DisplaySetting> {
+		return [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.toUtf8() : null)) s];
+	}
+
+	public static function getCurrentDisplaySetting(monitor : String) : DisplaySetting {
+		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.toUtf8() : null);
+	}
+
+	public static function getMonitors() : Array<Monitor> {
+		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUTF8(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
+	}
+
+	static function winGetDisplaySettings(monitor : hl.Bytes) : hl.NativeArray<Dynamic> {
+		return null;
+	}
+
+	static function winGetCurrentDisplaySetting(monitor : hl.Bytes) : Dynamic {
+		return null;
+	}
+
+	public static function winChangeDisplaySetting(monitor : hl.Bytes, ds : Dynamic) : Int {
+		return 0;
+	}
+
+	static function winGetMonitors() : hl.NativeArray<Dynamic> {
+		return null;
 	}
 
 	static function winCreateEx( x : Int, y : Int, width : Int, height : Int, windowFlags : Int ) : WinPtr {

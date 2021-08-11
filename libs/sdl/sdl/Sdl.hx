@@ -118,6 +118,14 @@ class Sdl {
 		return [ for(m in get_display_modes(display)) m ];
 	}
 
+	static function get_current_display_mode(displayId : Int) : Dynamic {
+		return null;
+	}
+
+	public static function getCurrentDisplayMode(display : Window.DisplayHandle) : ScreenMode {
+		return get_current_display_mode(display);
+	}
+
 	public static function getDisplays() : Array<Display> {
 		var i = 0;
 		return [ for(d in get_displays() ) @:privateAccess { handle: d.handle, name: '${String.fromUTF8(d.name)} (${++i})', left: d.left, top: d.top, right: d.right, bottom: d.bottom } ];
