@@ -2303,3 +2303,65 @@ HL_PRIM void HL_NAME(random_wrap)( uv_loop_t *loop, vbyte *buf, int length, int 
 	UV_CHECK_ERROR(uv_random(loop,r,buf,length,flags,on_random),free_req((uv_req_t *)r),);
 }
 DEFINE_PRIM(_VOID, random_wrap, _LOOP _BYTES _I32 _I32 _FUN(_VOID,_I32));
+
+// Tty
+
+HL_PRIM uv_tty_t *HL_NAME(tty_init_wrap)( uv_loop_t *loop, int fd ) {
+	UV_CHECK_NULL(loop,NULL);
+	uv_tty_t *h = UV_ALLOC(uv_tty_t);
+	UV_CHECK_ERROR(uv_tty_init(loop,h,fd,0),free_handle((uv_handle_t *)h),NULL);
+	handle_init_hl_data((uv_handle_t *)h);
+	return h;
+}
+DEFINE_PRIM(_HANDLE, tty_init_wrap, _LOOP _I32);
+
+HL_PRIM void HL_NAME(tty_set_mode_wrap)( uv_tty_t *h, int mode ) {
+	UV_CHECK_NULL(h,);
+	uv_tty_mode_t uv_mode = UV_TTY_MODE_NORMAL;
+	switch( mode ) {
+		case 0: uv_mode = UV_TTY_MODE_NORMAL; break;
+		case 1: uv_mode = UV_TTY_MODE_RAW; break;
+		case 2: uv_mode = UV_TTY_MODE_IO; break;
+	}
+	UV_CHECK_ERROR(uv_tty_set_mode(h,uv_mode),,);
+}
+DEFINE_PRIM(_VOID, tty_set_mode_wrap, _HANDLE _I32);
+
+HL_PRIM void HL_NAME(tty_reset_mode_wrap)() {
+	UV_CHECK_ERROR(uv_tty_reset_mode(),,);
+}
+DEFINE_PRIM(_VOID, tty_reset_mode_wrap, _NO_ARG);
+
+HL_PRIM vdynamic *HL_NAME(tty_get_winsize_wrap)( uv_tty_t *h ) {
+	UV_CHECK_NULL(h,NULL);
+	int width;
+	int height;
+	UV_CHECK_ERROR(uv_tty_get_winsize(h,&width,&height),,NULL);
+	vdynamic *obj = (vdynamic *)hl_alloc_dynobj();
+	hl_dyn_seti(obj, hl_hash_utf8("width"), &hlt_i32, width);
+	hl_dyn_seti(obj, hl_hash_utf8("height"), &hlt_i32, height);
+	return obj;
+}
+DEFINE_PRIM(_DYN, tty_get_winsize_wrap, _HANDLE);
+
+HL_PRIM void HL_NAME(tty_set_vterm_state_wrap)( int state ) {
+	uv_tty_vtermstate_t uv_state = UV_TTY_SUPPORTED;
+	switch( state ) {
+		case 0: uv_state = UV_TTY_SUPPORTED; break;
+		case 1: uv_state = UV_TTY_UNSUPPORTED; break;
+	}
+	uv_tty_set_vterm_state(uv_state);
+}
+DEFINE_PRIM(_VOID, tty_set_vterm_state_wrap, _I32);
+
+HL_PRIM int HL_NAME(tty_get_vterm_state_wrap)() {
+	uv_tty_vtermstate_t state;
+	UV_CHECK_ERROR(uv_tty_get_vterm_state(&state),,UV_TTY_SUPPORTED);
+	switch( state ) {
+		case UV_TTY_SUPPORTED: return 0;
+		case UV_TTY_UNSUPPORTED:
+		default: return 1;
+	}
+}
+DEFINE_PRIM(_I32, tty_get_vterm_state_wrap, _NO_ARG);
+
