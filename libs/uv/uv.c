@@ -21,8 +21,7 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 #define EVT_STREAM_READ		0
 #define EVT_STREAM_LISTEN	2
 
-#define THREAD_POOL_AFTER	0
-#define THREAD_POOL_WORK	2
+#define EVT_CONNECT	0	// connect_t
 
 #define EVT_MAX		2 // !!!!!!!!!!!!!!
 
@@ -2304,28 +2303,3 @@ HL_PRIM void HL_NAME(random_wrap)( uv_loop_t *loop, vbyte *buf, int length, int 
 	UV_CHECK_ERROR(uv_random(loop,r,buf,length,flags,on_random),free_req((uv_req_t *)r),);
 }
 DEFINE_PRIM(_VOID, random_wrap, _LOOP _BYTES _I32 _I32 _FUN(_VOID,_I32));
-
-// Thread pool
-
-static void on_work( uv_work_t *r ) {
-	UV_GET_CLOSURE(c,r,THREAD_POOL_WORK,"No work callback in queue_work request");
-	hl_call0(void, c);
-}
-
-static void on_after_work( uv_work_t *r, int status ) {
-	UV_GET_CLOSURE(c,r,THREAD_POOL_AFTER,"No after_work callback in queue_work request");
-	hl_call1(void, c, int, errno_uv2hx(status));
-	free_req((uv_req_t *) r);
-}
-
-HL_PRIM void HL_NAME(queue_work_wrap)( uv_loop_t *loop, vclosure *c_work, vclosure *c_after ) {
-	UV_CHECK_NULL(loop,);
-	UV_CHECK_NULL(c_work,);
-	UV_CHECK_NULL(c_after,);
-	UV_ALLOC_REQ(uv_work_t,r,NULL);
-	req_register_callback((uv_req_t *)r,c_work,THREAD_POOL_WORK);
-	req_register_callback((uv_req_t *)r,c_after,THREAD_POOL_AFTER);
-	UV_CHECK_ERROR(uv_queue_work(loop,r,on_work,on_after_work),free_req((uv_req_t *)r),);
-}
-DEFINE_PRIM(_VOID, queue_work_wrap, _LOOP _FUN(_VOID,_NO_ARG) _FUN(_VOID,_I32));
-

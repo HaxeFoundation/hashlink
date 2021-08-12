@@ -8,7 +8,6 @@ class UVSample {
 		// FileSample.main();
 		// FsEventSample.main();
 		// FsPollSample.main();
-		// MiscSample.main();
-		ThreadPoolSample.main();
+		MiscSample.main();
 	}
 }
