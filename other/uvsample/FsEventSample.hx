@@ -10,7 +10,7 @@ class FsEventSample {
 	public static function main() {
 		var loop = Thread.current().events;
 		var event = FsEvent.init(loop);
-		var path = Misc.tmpDir() + '/test-file';
+		var path = Misc.tmpDir() + '/test-file-fsevent';
 		File.saveContent(path, 'Hello, world');
 		event.start(path, null, (e, path, events) -> switch e {
 			case UV_NOERR:

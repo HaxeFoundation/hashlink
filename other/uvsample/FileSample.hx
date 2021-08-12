@@ -53,12 +53,12 @@ class FileSample {
 		}
 	}
 
-	static function createFile(path:String, content:Bytes, callback:()->Void) {
+	static function createFile(path:String, content:Bytes, callback:()->Void, ?pos:PosInfos) {
 		File.open(loop, path, [O_CREAT(420),O_TRUNC,O_WRONLY], (e, file) -> handle(() -> {
 			file.write(loop, content.getData(), content.length, I64.ofInt(0), (e, bytesWritten) -> handle(() -> {
-				file.close(loop, handle(callback));
-			})(e));
-		})(e));
+				file.close(loop, handle(callback, pos));
+			}, pos)(e));
+		}, pos)(e));
 	}
 
 	static function readFile(path:String, callback:(data:Bytes)->Void) {
@@ -214,7 +214,7 @@ class FileSample {
 	}
 
 	static function truncate(actions:Actions) {
-		var path = Misc.tmpDir() + '/test-file';
+		var path = Misc.tmpDir() + '/test-file-truncate';
 		var content = '1234567890';
 		Log.print('Writing content for truncation at $path: $content');
 		createFile(path, Bytes.ofString(content), () -> {
@@ -236,7 +236,7 @@ class FileSample {
 	}
 
 	static function copyFile(actions:Actions) {
-		var path = Misc.tmpDir() + '/test-file';
+		var path = Misc.tmpDir() + '/test-file-copy';
 		var newPath = '$path-copy';
 		createFile(path, Bytes.ofString('123'), () -> {
 			Log.print('Copy $path to $newPath');
@@ -250,7 +250,7 @@ class FileSample {
 	}
 
 	static function sendFile(actions:Actions) {
-		var path = Misc.tmpDir() + '/test-file';
+		var path = Misc.tmpDir() + '/test-file-send';
 		var newPath = '$path-copy';
 		createFile(path, Bytes.ofString('12345678'), () -> {
 			File.open(loop, path, [O_RDONLY], (e, src) -> handle(() -> {
@@ -282,7 +282,7 @@ class FileSample {
 	}
 
 	static function chmod(actions:Actions) {
-		var path = Misc.tmpDir() + '/test-file';
+		var path = Misc.tmpDir() + '/test-file-chmod';
 		createFile(path, Bytes.ofString('123'), () -> {
 			Log.print('chmod on $path...');
 			File.chmod(loop, path, 420, handle(() -> {
@@ -295,7 +295,7 @@ class FileSample {
 	}
 
 	static function utime(actions:Actions) {
-		var path = Misc.tmpDir() + '/test-file';
+		var path = Misc.tmpDir() + '/test-file-utime';
 		createFile(path, Bytes.ofString('123'), () -> {
 			Log.print('utime on $path...');
 			File.utime(loop, path, Date.now().getTime(), Date.now().getTime(), handle(() -> {
@@ -308,7 +308,7 @@ class FileSample {
 	}
 
 	static function linkSymlinkReadLinkRealPath(actions:Actions) {
-		var path = Misc.tmpDir() + '/test-file';
+		var path = Misc.tmpDir() + '/test-file-l';
 		var newPath = Misc.tmpDir() + '/test-file-link';
 		createFile(path, Bytes.ofString('123'), () -> {
 			Log.print('link $path to $newPath...');
@@ -339,7 +339,7 @@ class FileSample {
 			return;
 		}
 
-		var path = Misc.tmpDir() + '/test-file';
+		var path = Misc.tmpDir() + '/test-file-chown';
 		createFile(path, Bytes.ofString(''), () -> {
 			Log.print('chown on $path...');
 			File.chown(loop, path, -1, -1, handle(() -> {
