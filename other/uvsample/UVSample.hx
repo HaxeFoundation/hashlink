@@ -9,6 +9,7 @@ class UVSample {
 		// FsEventSample.main();
 		// FsPollSample.main();
 		// MiscSample.main();
-		TtySample.main();
+		// TtySample.main();
+		VersionSample.main();
 	}
 }

@@ -2365,3 +2365,42 @@ HL_PRIM int HL_NAME(tty_get_vterm_state_wrap)() {
 }
 DEFINE_PRIM(_I32, tty_get_vterm_state_wrap, _NO_ARG);
 
+// version
+
+HL_PRIM vbyte *HL_NAME(version_string_wrap)() {
+	const char *v = uv_version_string();
+	return hl_copy_bytes((vbyte *)v, strlen(v));
+}
+DEFINE_PRIM(_BYTES, version_string_wrap, _NO_ARG);
+
+HL_PRIM int HL_NAME(version_major)() {
+	return UV_VERSION_MAJOR;
+}
+DEFINE_PRIM(_I32, version_major, _NO_ARG);
+
+HL_PRIM int HL_NAME(version_minor)() {
+	return UV_VERSION_MINOR;
+}
+DEFINE_PRIM(_I32, version_minor, _NO_ARG);
+
+HL_PRIM int HL_NAME(version_patch)() {
+	return UV_VERSION_PATCH;
+}
+DEFINE_PRIM(_I32, version_patch, _NO_ARG);
+
+HL_PRIM bool HL_NAME(version_is_release)() {
+	return UV_VERSION_IS_RELEASE;
+}
+DEFINE_PRIM(_BOOL, version_is_release, _NO_ARG);
+
+HL_PRIM vbyte *HL_NAME(version_suffix)() {
+	return (vbyte *)UV_VERSION_SUFFIX;
+}
+DEFINE_PRIM(_BYTES, version_suffix, _NO_ARG);
+
+HL_PRIM int HL_NAME(version_hex)() {
+	return UV_VERSION_HEX;
+}
+DEFINE_PRIM(_I32, version_hex, _NO_ARG);
+
+
