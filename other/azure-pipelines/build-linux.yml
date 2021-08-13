@@ -48,8 +48,7 @@ jobs:
               ca-certificates
             curl -fsSL -o "libuv-v1.42.0.tar.gz" --retry 3 https://dist.libuv.org/dist/v1.42.0/libuv-v1.42.0.tar.gz
             tar -xf libuv-v1.42.0.tar.gz
-            ls -la ./
-            cd libuv-v1.42.0.tar.gz
+            cd libuv-v1.42.0
             sh autogen.sh
             ./configure
             make
@@ -79,8 +78,7 @@ jobs:
               ca-certificates
             curl -fsSL -o "libuv-v1.42.0.tar.gz" --retry 3 https://dist.libuv.org/dist/v1.42.0/libuv-v1.42.0.tar.gz
             tar -xf libuv-v1.42.0.tar.gz
-            ls -la ./
-            cd libuv-v1.42.0.tar.gz
+            cd libuv-v1.42.0
             sh autogen.sh
             ./configure
             make
