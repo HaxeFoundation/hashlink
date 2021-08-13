@@ -144,7 +144,7 @@ static int errno_uv2hx( int uv_errno ) {
 		case UV_ENOTEMPTY: return 56;
 		case UV_ENOTSOCK: return 57;
 		case UV_ENOTSUP: return 58;
-		// case UV_EOVERFLOW: return 59;
+		case UV_EOVERFLOW: return 59;
 		case UV_EPERM: return 60;
 		case UV_EPIPE: return 61;
 		case UV_EPROTO: return 62;
@@ -165,7 +165,7 @@ static int errno_uv2hx( int uv_errno ) {
 		case UV_ENOTTY: return 77;
 		case UV_EFTYPE: return 78;
 		case UV_EILSEQ: return 79;
-		// case UV_ESOCKTNOSUPPORT: return 80;
+		case UV_ESOCKTNOSUPPORT: return 80;
 		default: return 73; //UV_UNKNOWN
 	}
 }
