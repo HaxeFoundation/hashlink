@@ -68,17 +68,15 @@ jobs:
               neko \
               curl \
               ca-certificates
+            curl -fsSL -o "libuv-v1.42.0.tar.gz" --retry 3 https://dist.libuv.org/dist/v1.42.0/libuv-v1.42.0.tar.gz
+            tar -xf libuv-v1.42.0.tar.gz
+            cd libuv-v1.42.0.tar.gz
+            sh autogen.sh
+            ./configure
+            make
+            make check
+            sudo make install
           displayName: Install dependencies
-      - script: |
-          curl -fsSL -o "libuv-v1.42.0.tar.gz" --retry 3 https://dist.libuv.org/dist/v1.42.0/libuv-v1.42.0.tar.gz
-          tar -xf libuv-v1.42.0.tar.gz
-          cd libuv-v1.42.0.tar.gz
-          sh autogen.sh
-          ./configure
-          make
-          make check
-          make install
-        displayName: Install libuv
       - template: install-haxe-snapshot.yml
         parameters:
           platform: linux64
