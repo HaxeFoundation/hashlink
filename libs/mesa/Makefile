@@ -2,7 +2,7 @@ MESA_CFLAGS=-fPIC -O3
 CFLAGS = -fPIC -D HL_MESA -I ../sdl -I $(MESA)/include -I ../../src
 LFLAGS = -lm -lstdc++ -L $(LLVM_LIBDIR) -lLLVM -ldl -lpthread -lz -L../.. -lhl
 
-MESA_CONFIG= \
+MESA_CONFIG= --enable-autotools \
 	--enable-opengl --disable-gles1 --disable-gles2 --disable-egl \
 	--disable-dri --disable-gbm --disable-glx \
 	--disable-osmesa --enable-gallium-osmesa \
