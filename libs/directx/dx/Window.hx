@@ -195,15 +195,47 @@ class Window {
 	}
 
 	public static function getDisplaySettings(monitor : String) : Array<DisplaySetting> {
-		return [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.toUtf8() : null)) s];
+		var a : Array<DisplaySetting> = [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.toUtf8() : null)) s];
+		a.sort((a, b) -> {
+			if(b.width > a.width) 1;
+			else if(b.width < a.width) -1;
+			else if(b.height > a.height) 1;
+			else if(b.height < a.height) -1;
+			else if(b.framerate > a.framerate) 1;
+			else if(b.framerate < a.framerate) -1;
+			else 0;
+		});
+		var last = null;
+		return a.filter(function(e) {
+			if(e.width == 1152 && e.height == 864 && e.framerate == 60)
+				trace("coucou !");
+			if(last == null) {
+				last = e;
+				return true;
+			}
+			else if(last.width == e.width && last.height == e.height && last.framerate == e.framerate) {
+				return false;
+			}
+			last = e;
+			return true;
+		});
 	}
 
 	public static function getCurrentDisplaySetting(monitor : String) : DisplaySetting {
 		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.toUtf8() : null);
 	}
 
+	public static function getRegistryDisplaySetting(monitor : String) : DisplaySetting {
+		return winGetRegistryDisplaySetting(monitor != null ? @:privateAccess monitor.toUtf8() : null);
+	}
+
 	public static function getMonitors() : Array<Monitor> {
+		var last = null;
 		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUTF8(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
+	}
+
+	public function getCurrentMonitor() : String {
+		return @:privateAccess String.fromUTF8(winGetMonitorFromWindow(win));
 	}
 
 	static function winGetDisplaySettings(monitor : hl.Bytes) : hl.NativeArray<Dynamic> {
@@ -214,11 +246,19 @@ class Window {
 		return null;
 	}
 
+	static function winGetRegistryDisplaySetting(monitor : hl.Bytes) : Dynamic {
+		return null;
+	}
+
 	public static function winChangeDisplaySetting(monitor : hl.Bytes, ds : Dynamic) : Int {
 		return 0;
 	}
 
 	static function winGetMonitors() : hl.NativeArray<Dynamic> {
+		return null;
+	}
+
+	static function winGetMonitorFromWindow( win : WinPtr ) : hl.Bytes {
 		return null;
 	}
 
