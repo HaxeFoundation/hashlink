@@ -11,6 +11,386 @@
 #	error "libuv1-dev required, uv version 0.x found"
 #endif
 
+// Errors
+
+#define HL_UV_NOERR 0
+#define HL_UV_E2BIG 1
+#define HL_UV_EACCES 2
+#define HL_UV_EADDRINUSE 3
+#define HL_UV_EADDRNOTAVAIL 4
+#define HL_UV_EAFNOSUPPORT 5
+#define HL_UV_EAGAIN 6
+#define HL_UV_EAI_ADDRFAMILY 7
+#define HL_UV_EAI_AGAIN 8
+#define HL_UV_EAI_BADFLAGS 9
+#define HL_UV_EAI_BADHINTS 10
+#define HL_UV_EAI_CANCELED 11
+#define HL_UV_EAI_FAIL 12
+#define HL_UV_EAI_FAMILY 13
+#define HL_UV_EAI_MEMORY 14
+#define HL_UV_EAI_NODATA 15
+#define HL_UV_EAI_NONAME 16
+#define HL_UV_EAI_OVERFLOW 17
+#define HL_UV_EAI_PROTOCOL 18
+#define HL_UV_EAI_SERVICE 19
+#define HL_UV_EAI_SOCKTYPE 20
+#define HL_UV_EALREADY 21
+#define HL_UV_EBADF 22
+#define HL_UV_EBUSY 23
+#define HL_UV_ECANCELED 24
+#define HL_UV_ECHARSET 25
+#define HL_UV_ECONNABORTED 26
+#define HL_UV_ECONNREFUSED 27
+#define HL_UV_ECONNRESET 28
+#define HL_UV_EDESTADDRREQ 29
+#define HL_UV_EEXIST 30
+#define HL_UV_EFAULT 31
+#define HL_UV_EFBIG 32
+#define HL_UV_EHOSTUNREACH 33
+#define HL_UV_EINTR 34
+#define HL_UV_EINVAL 35
+#define HL_UV_EIO 36
+#define HL_UV_EISCONN 37
+#define HL_UV_EISDIR 38
+#define HL_UV_ELOOP 39
+#define HL_UV_EMFILE 40
+#define HL_UV_EMSGSIZE 41
+#define HL_UV_ENAMETOOLONG 42
+#define HL_UV_ENETDOWN 43
+#define HL_UV_ENETUNREACH 44
+#define HL_UV_ENFILE 45
+#define HL_UV_ENOBUFS 46
+#define HL_UV_ENODEV 47
+#define HL_UV_ENOENT 48
+#define HL_UV_ENOMEM 49
+#define HL_UV_ENONET 50
+#define HL_UV_ENOPROTOOPT 51
+#define HL_UV_ENOSPC 52
+#define HL_UV_ENOSYS 53
+#define HL_UV_ENOTCONN 54
+#define HL_UV_ENOTDIR 55
+#define HL_UV_ENOTEMPTY 56
+#define HL_UV_ENOTSOCK 57
+#define HL_UV_ENOTSUP 58
+#define HL_UV_EOVERFLOW 59
+#define HL_UV_EPERM 60
+#define HL_UV_EPIPE 61
+#define HL_UV_EPROTO 62
+#define HL_UV_EPROTONOSUPPORT 63
+#define HL_UV_EPROTOTYPE 64
+#define HL_UV_ERANGE 65
+#define HL_UV_EROFS 66
+#define HL_UV_ESHUTDOWN 67
+#define HL_UV_ESPIPE 68
+#define HL_UV_ESRCH 69
+#define HL_UV_ETIMEDOUT 70
+#define HL_UV_ETXTBSY 71
+#define HL_UV_EXDEV 72
+#define HL_UV_UNKNOWN 73
+#define HL_UV_EOF 74
+#define HL_UV_ENXIO 75
+#define HL_UV_EMLINK 76
+#define HL_UV_ENOTTY 77
+#define HL_UV_EFTYPE 78
+#define HL_UV_EILSEQ 79
+#define HL_UV_ESOCKTNOSUPPORT 80
+
+static int errno_uv2hl( int uv_errno ) {
+	switch(uv_errno) {
+		case 0: return HL_UV_NOERR;
+		case UV_E2BIG: return HL_UV_E2BIG;
+		case UV_EACCES: return HL_UV_EACCES;
+		case UV_EADDRINUSE: return HL_UV_EADDRINUSE;
+		case UV_EADDRNOTAVAIL: return HL_UV_EADDRNOTAVAIL;
+		case UV_EAFNOSUPPORT: return HL_UV_EAFNOSUPPORT;
+		case UV_EAGAIN: return HL_UV_EAGAIN;
+		case UV_EAI_ADDRFAMILY: return HL_UV_EAI_ADDRFAMILY;
+		case UV_EAI_AGAIN: return HL_UV_EAI_AGAIN;
+		case UV_EAI_BADFLAGS: return HL_UV_EAI_BADFLAGS;
+		case UV_EAI_BADHINTS: return HL_UV_EAI_BADHINTS;
+		case UV_EAI_CANCELED: return HL_UV_EAI_CANCELED;
+		case UV_EAI_FAIL: return HL_UV_EAI_FAIL;
+		case UV_EAI_FAMILY: return HL_UV_EAI_FAMILY;
+		case UV_EAI_MEMORY: return HL_UV_EAI_MEMORY;
+		case UV_EAI_NODATA: return HL_UV_EAI_NODATA;
+		case UV_EAI_NONAME: return HL_UV_EAI_NONAME;
+		case UV_EAI_OVERFLOW: return HL_UV_EAI_OVERFLOW;
+		case UV_EAI_PROTOCOL: return HL_UV_EAI_PROTOCOL;
+		case UV_EAI_SERVICE: return HL_UV_EAI_SERVICE;
+		case UV_EAI_SOCKTYPE: return HL_UV_EAI_SOCKTYPE;
+		case UV_EALREADY: return HL_UV_EALREADY;
+		case UV_EBADF: return HL_UV_EBADF;
+		case UV_EBUSY: return HL_UV_EBUSY;
+		case UV_ECANCELED: return HL_UV_ECANCELED;
+		case UV_ECHARSET: return HL_UV_ECHARSET;
+		case UV_ECONNABORTED: return HL_UV_ECONNABORTED;
+		case UV_ECONNREFUSED: return HL_UV_ECONNREFUSED;
+		case UV_ECONNRESET: return HL_UV_ECONNRESET;
+		case UV_EDESTADDRREQ: return HL_UV_EDESTADDRREQ;
+		case UV_EEXIST: return HL_UV_EEXIST;
+		case UV_EFAULT: return HL_UV_EFAULT;
+		case UV_EFBIG: return HL_UV_EFBIG;
+		case UV_EHOSTUNREACH: return HL_UV_EHOSTUNREACH;
+		case UV_EINTR: return HL_UV_EINTR;
+		case UV_EINVAL: return HL_UV_EINVAL;
+		case UV_EIO: return HL_UV_EIO;
+		case UV_EISCONN: return HL_UV_EISCONN;
+		case UV_EISDIR: return HL_UV_EISDIR;
+		case UV_ELOOP: return HL_UV_ELOOP;
+		case UV_EMFILE: return HL_UV_EMFILE;
+		case UV_EMSGSIZE: return HL_UV_EMSGSIZE;
+		case UV_ENAMETOOLONG: return HL_UV_ENAMETOOLONG;
+		case UV_ENETDOWN: return HL_UV_ENETDOWN;
+		case UV_ENETUNREACH: return HL_UV_ENETUNREACH;
+		case UV_ENFILE: return HL_UV_ENFILE;
+		case UV_ENOBUFS: return HL_UV_ENOBUFS;
+		case UV_ENODEV: return HL_UV_ENODEV;
+		case UV_ENOENT: return HL_UV_ENOENT;
+		case UV_ENOMEM: return HL_UV_ENOMEM;
+		case UV_ENONET: return HL_UV_ENONET;
+		case UV_ENOPROTOOPT: return HL_UV_ENOPROTOOPT;
+		case UV_ENOSPC: return HL_UV_ENOSPC;
+		case UV_ENOSYS: return HL_UV_ENOSYS;
+		case UV_ENOTCONN: return HL_UV_ENOTCONN;
+		case UV_ENOTDIR: return HL_UV_ENOTDIR;
+		case UV_ENOTEMPTY: return HL_UV_ENOTEMPTY;
+		case UV_ENOTSOCK: return HL_UV_ENOTSOCK;
+		case UV_ENOTSUP: return HL_UV_ENOTSUP;
+		case UV_EOVERFLOW: return HL_UV_EOVERFLOW;
+		case UV_EPERM: return HL_UV_EPERM;
+		case UV_EPIPE: return HL_UV_EPIPE;
+		case UV_EPROTO: return HL_UV_EPROTO;
+		case UV_EPROTONOSUPPORT: return HL_UV_EPROTONOSUPPORT;
+		case UV_EPROTOTYPE: return HL_UV_EPROTOTYPE;
+		case UV_ERANGE: return HL_UV_ERANGE;
+		case UV_EROFS: return HL_UV_EROFS;
+		case UV_ESHUTDOWN: return HL_UV_ESHUTDOWN;
+		case UV_ESPIPE: return HL_UV_ESPIPE;
+		case UV_ESRCH: return HL_UV_ESRCH;
+		case UV_ETIMEDOUT: return HL_UV_ETIMEDOUT;
+		case UV_ETXTBSY: return HL_UV_ETXTBSY;
+		case UV_EXDEV: return HL_UV_EXDEV;
+		case UV_UNKNOWN: return HL_UV_UNKNOWN;
+		case UV_EOF: return HL_UV_EOF;
+		case UV_ENXIO: return HL_UV_ENXIO;
+		case UV_EMLINK: return HL_UV_EMLINK;
+		case UV_ENOTTY: return HL_UV_ENOTTY;
+		case UV_EFTYPE: return HL_UV_EFTYPE;
+		case UV_EILSEQ: return HL_UV_EILSEQ;
+		case UV_ESOCKTNOSUPPORT: return HL_UV_ESOCKTNOSUPPORT;
+		default: return HL_UV_UNKNOWN;
+	}
+}
+
+static int errno_hl2uv( int uv_errno ) {
+	switch(uv_errno) {
+		case HL_UV_E2BIG: return UV_E2BIG;
+		case HL_UV_EACCES: return UV_EACCES;
+		case HL_UV_EADDRINUSE: return UV_EADDRINUSE;
+		case HL_UV_EADDRNOTAVAIL: return UV_EADDRNOTAVAIL;
+		case HL_UV_EAFNOSUPPORT: return UV_EAFNOSUPPORT;
+		case HL_UV_EAGAIN: return UV_EAGAIN;
+		case HL_UV_EAI_ADDRFAMILY: return UV_EAI_ADDRFAMILY;
+		case HL_UV_EAI_AGAIN: return UV_EAI_AGAIN;
+		case HL_UV_EAI_BADFLAGS: return UV_EAI_BADFLAGS;
+		case HL_UV_EAI_BADHINTS: return UV_EAI_BADHINTS;
+		case HL_UV_EAI_CANCELED: return UV_EAI_CANCELED;
+		case HL_UV_EAI_FAIL: return UV_EAI_FAIL;
+		case HL_UV_EAI_FAMILY: return UV_EAI_FAMILY;
+		case HL_UV_EAI_MEMORY: return UV_EAI_MEMORY;
+		case HL_UV_EAI_NODATA: return UV_EAI_NODATA;
+		case HL_UV_EAI_NONAME: return UV_EAI_NONAME;
+		case HL_UV_EAI_OVERFLOW: return UV_EAI_OVERFLOW;
+		case HL_UV_EAI_PROTOCOL: return UV_EAI_PROTOCOL;
+		case HL_UV_EAI_SERVICE: return UV_EAI_SERVICE;
+		case HL_UV_EAI_SOCKTYPE: return UV_EAI_SOCKTYPE;
+		case HL_UV_EALREADY: return UV_EALREADY;
+		case HL_UV_EBADF: return UV_EBADF;
+		case HL_UV_EBUSY: return UV_EBUSY;
+		case HL_UV_ECANCELED: return UV_ECANCELED;
+		case HL_UV_ECHARSET: return UV_ECHARSET;
+		case HL_UV_ECONNABORTED: return UV_ECONNABORTED;
+		case HL_UV_ECONNREFUSED: return UV_ECONNREFUSED;
+		case HL_UV_ECONNRESET: return UV_ECONNRESET;
+		case HL_UV_EDESTADDRREQ: return UV_EDESTADDRREQ;
+		case HL_UV_EEXIST: return UV_EEXIST;
+		case HL_UV_EFAULT: return UV_EFAULT;
+		case HL_UV_EFBIG: return UV_EFBIG;
+		case HL_UV_EHOSTUNREACH: return UV_EHOSTUNREACH;
+		case HL_UV_EINTR: return UV_EINTR;
+		case HL_UV_EINVAL: return UV_EINVAL;
+		case HL_UV_EIO: return UV_EIO;
+		case HL_UV_EISCONN: return UV_EISCONN;
+		case HL_UV_EISDIR: return UV_EISDIR;
+		case HL_UV_ELOOP: return UV_ELOOP;
+		case HL_UV_EMFILE: return UV_EMFILE;
+		case HL_UV_EMSGSIZE: return UV_EMSGSIZE;
+		case HL_UV_ENAMETOOLONG: return UV_ENAMETOOLONG;
+		case HL_UV_ENETDOWN: return UV_ENETDOWN;
+		case HL_UV_ENETUNREACH: return UV_ENETUNREACH;
+		case HL_UV_ENFILE: return UV_ENFILE;
+		case HL_UV_ENOBUFS: return UV_ENOBUFS;
+		case HL_UV_ENODEV: return UV_ENODEV;
+		case HL_UV_ENOENT: return UV_ENOENT;
+		case HL_UV_ENOMEM: return UV_ENOMEM;
+		case HL_UV_ENONET: return UV_ENONET;
+		case HL_UV_ENOPROTOOPT: return UV_ENOPROTOOPT;
+		case HL_UV_ENOSPC: return UV_ENOSPC;
+		case HL_UV_ENOSYS: return UV_ENOSYS;
+		case HL_UV_ENOTCONN: return UV_ENOTCONN;
+		case HL_UV_ENOTDIR: return UV_ENOTDIR;
+		case HL_UV_ENOTEMPTY: return UV_ENOTEMPTY;
+		case HL_UV_ENOTSOCK: return UV_ENOTSOCK;
+		case HL_UV_ENOTSUP: return UV_ENOTSUP;
+		case HL_UV_EOVERFLOW: return UV_EOVERFLOW;
+		case HL_UV_EPERM: return UV_EPERM;
+		case HL_UV_EPIPE: return UV_EPIPE;
+		case HL_UV_EPROTO: return UV_EPROTO;
+		case HL_UV_EPROTONOSUPPORT: return UV_EPROTONOSUPPORT;
+		case HL_UV_EPROTOTYPE: return UV_EPROTOTYPE;
+		case HL_UV_ERANGE: return UV_ERANGE;
+		case HL_UV_EROFS: return UV_EROFS;
+		case HL_UV_ESHUTDOWN: return UV_ESHUTDOWN;
+		case HL_UV_ESPIPE: return UV_ESPIPE;
+		case HL_UV_ESRCH: return UV_ESRCH;
+		case HL_UV_ETIMEDOUT: return UV_ETIMEDOUT;
+		case HL_UV_ETXTBSY: return UV_ETXTBSY;
+		case HL_UV_EXDEV: return UV_EXDEV;
+		case HL_UV_UNKNOWN: return UV_UNKNOWN;
+		case HL_UV_EOF: return UV_EOF;
+		case HL_UV_ENXIO: return UV_ENXIO;
+		case HL_UV_EMLINK: return UV_EMLINK;
+		case HL_UV_ENOTTY: return UV_ENOTTY;
+		case HL_UV_EFTYPE: return UV_EFTYPE;
+		case HL_UV_EILSEQ: return UV_EILSEQ;
+		case HL_UV_ESOCKTNOSUPPORT: return UV_ESOCKTNOSUPPORT;
+		default: return UV_UNKNOWN;
+	}
+}
+
+static int hl_uv_errno( int result ) {
+	return result < 0 ? errno_uv2hl(result) : 0;
+}
+
+HL_PRIM int HL_NAME(translate_uv_error)( int uv_errno ) {
+	return errno_uv2hl(uv_errno);
+}
+DEFINE_PRIM(_I32, translate_uv_error, _I32);
+
+HL_PRIM int HL_NAME(translate_to_uv_error)( int hl_errno ) {
+	return errno_hl2uv(hl_errno);
+}
+DEFINE_PRIM(_I32, translate_to_uv_error, _I32);
+
+// Common macros
+
+#define _U64	_I64
+
+#define _POINTER			_ABSTRACT(void_pointer)
+#define _HANDLE				_ABSTRACT(uv_handle)
+#define _REQUEST			_ABSTRACT(uv_req)
+#define _LOOP				_ABSTRACT(uv_loop)
+#define _ASYNC				_HANDLE
+#define _CHECK				_HANDLE
+#define _TIMER				_HANDLE
+#define _GETADDRINFO		_ABSTRACT(uv_getaddrinfo_t)
+
+#define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
+#define DATA(t,h)	((t)h->data)
+
+#define DEFINE_PRIM_ALLOC(r,t) \
+	HL_PRIM t *HL_NAME(alloc_##t)() { \
+		return UV_ALLOC(t); \
+	} \
+	DEFINE_PRIM(r, alloc_##t, _NO_ARG);
+
+// Handle
+
+#define HANDLE_DATA_FIELDS \
+	hl_type *t; \
+	vclosure *onClose;
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+} vhandle_data;
+
+#define _HANDLE_DATA	_OBJ(_FUN(_VOID,_NO_ARG))
+
+HL_PRIM void *HL_NAME(handle_data_to_pointer)( vhandle_data *v ) {
+	return v;
+}
+DEFINE_PRIM(_POINTER, handle_data_to_pointer, _HANDLE_DATA);
+
+HL_PRIM vhandle_data *HL_NAME(handle_data_of_pointer)( void *v ) {
+	return v;
+}
+DEFINE_PRIM(_HANDLE_DATA, handle_data_of_pointer, _POINTER);
+
+HL_PRIM void HL_NAME(handle_set_data_with_gc)( uv_handle_t *h, vhandle_data *new_data ) {
+	void *current_data = uv_handle_get_data(h);
+	if( current_data == new_data )
+		return;
+	if( current_data )
+		hl_remove_root(current_data);
+	if( new_data )
+		hl_add_root(new_data);
+	uv_handle_set_data(h, new_data);
+}
+DEFINE_PRIM(_VOID, handle_set_data_with_gc, _HANDLE _HANDLE_DATA);
+
+static void on_uv_close_cb( uv_handle_t *h ) {
+	vhandle_data *data = DATA(vhandle_data *, h);
+	if( data ) {
+		if( data->onClose )
+			hl_call0(void, data->onClose);
+		hl_remove_root(data);
+	}
+	free(h);
+}
+
+// Async
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onSend;
+} vasync_data;
+
+DEFINE_PRIM_ALLOC(_ASYNC, uv_async_t);
+
+static void on_uv_async_cb( uv_async_t *h ) {
+	vclosure *c = DATA(vasync_data *, h)->onSend;
+	hl_call1(void, c, uv_async_t *, h);
+}
+
+// Timer
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onTick;
+} vtimer_data;
+
+DEFINE_PRIM_ALLOC(_TIMER, uv_timer_t);
+
+static void on_uv_timer_cb( uv_timer_t *h ) {
+	vclosure *c = DATA(vtimer_data *, h)->onTick;
+	hl_call1(void, c, uv_timer_t *, h);
+}
+
+// Loop
+
+#define _RUN_MODE _I32
+
+DEFINE_PRIM_ALLOC(_LOOP,uv_loop_t);
+
+
+
+
+#define _DIR		_ABSTRACT(uv_dir)
+#define _SOCKADDR	_ABSTRACT(uv_sockaddr_storage)
+#define _CALLB		_FUN(_VOID,_NO_ARG)
+#define _TIMESPEC	_OBJ(_I64 _I64)
+#define _STAT		_OBJ(_I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _TIMESPEC _TIMESPEC _TIMESPEC _TIMESPEC)
+
 typedef struct sockaddr uv_sockaddr;
 typedef struct sockaddr_in uv_sockaddr_in;
 typedef struct sockaddr_in6 uv_sockaddr_in6;
@@ -31,16 +411,6 @@ typedef struct {
 } events_data;
 
 #define UV_DATA(h)		((events_data*)((h)->data))
-
-#define _LOOP		_ABSTRACT(uv_loop)
-#define _HANDLE		_ABSTRACT(uv_handle)
-#define _REQUEST	_ABSTRACT(uv_req)
-#define _DIR		_ABSTRACT(uv_dir)
-#define _SOCKADDR	_ABSTRACT(uv_sockaddr_storage)
-#define _CALLB		_FUN(_VOID,_NO_ARG)
-#define _TIMESPEC	_OBJ(_I64 _I64)
-#define _STAT		_OBJ(_I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _TIMESPEC _TIMESPEC _TIMESPEC _TIMESPEC)
-#define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
 #define UV_ALLOC_REQ(t,r,c) \
 	t *r = UV_ALLOC(t); \
 	req_init_hl_data((uv_req_t *)r); \
@@ -81,98 +451,7 @@ static int bytes_geti32( vbyte *b, int pos ) {
 	return b[pos] | (b[pos + 1] << 8) | (b[pos + 2] << 16) | (b[pos + 3] << 24);
 }
 
-// Errors
-
-static int errno_uv2hx( int uv_errno ) {
-	switch(uv_errno) {
-		case 0: return 0;
-		case UV_E2BIG: return 1;
-		case UV_EACCES: return 2;
-		case UV_EADDRINUSE: return 3;
-		case UV_EADDRNOTAVAIL: return 4;
-		case UV_EAFNOSUPPORT: return 5;
-		case UV_EAGAIN: return 6;
-		case UV_EAI_ADDRFAMILY: return 7;
-		case UV_EAI_AGAIN: return 8;
-		case UV_EAI_BADFLAGS: return 9;
-		case UV_EAI_BADHINTS: return 10;
-		case UV_EAI_CANCELED: return 11;
-		case UV_EAI_FAIL: return 12;
-		case UV_EAI_FAMILY: return 13;
-		case UV_EAI_MEMORY: return 14;
-		case UV_EAI_NODATA: return 15;
-		case UV_EAI_NONAME: return 16;
-		case UV_EAI_OVERFLOW: return 17;
-		case UV_EAI_PROTOCOL: return 18;
-		case UV_EAI_SERVICE: return 19;
-		case UV_EAI_SOCKTYPE: return 20;
-		case UV_EALREADY: return 21;
-		case UV_EBADF: return 22;
-		case UV_EBUSY: return 23;
-		case UV_ECANCELED: return 24;
-		case UV_ECHARSET: return 25;
-		case UV_ECONNABORTED: return 26;
-		case UV_ECONNREFUSED: return 27;
-		case UV_ECONNRESET: return 28;
-		case UV_EDESTADDRREQ: return 29;
-		case UV_EEXIST: return 30;
-		case UV_EFAULT: return 31;
-		case UV_EFBIG: return 32;
-		case UV_EHOSTUNREACH: return 33;
-		case UV_EINTR: return 34;
-		case UV_EINVAL: return 35;
-		case UV_EIO: return 36;
-		case UV_EISCONN: return 37;
-		case UV_EISDIR: return 38;
-		case UV_ELOOP: return 39;
-		case UV_EMFILE: return 40;
-		case UV_EMSGSIZE: return 41;
-		case UV_ENAMETOOLONG: return 42;
-		case UV_ENETDOWN: return 43;
-		case UV_ENETUNREACH: return 44;
-		case UV_ENFILE: return 45;
-		case UV_ENOBUFS: return 46;
-		case UV_ENODEV: return 47;
-		case UV_ENOENT: return 48;
-		case UV_ENOMEM: return 49;
-		case UV_ENONET: return 50;
-		case UV_ENOPROTOOPT: return 51;
-		case UV_ENOSPC: return 52;
-		case UV_ENOSYS: return 53;
-		case UV_ENOTCONN: return 54;
-		case UV_ENOTDIR: return 55;
-		case UV_ENOTEMPTY: return 56;
-		case UV_ENOTSOCK: return 57;
-		case UV_ENOTSUP: return 58;
-		case UV_EOVERFLOW: return 59;
-		case UV_EPERM: return 60;
-		case UV_EPIPE: return 61;
-		case UV_EPROTO: return 62;
-		case UV_EPROTONOSUPPORT: return 63;
-		case UV_EPROTOTYPE: return 64;
-		case UV_ERANGE: return 65;
-		case UV_EROFS: return 66;
-		case UV_ESHUTDOWN: return 67;
-		case UV_ESPIPE: return 68;
-		case UV_ESRCH: return 69;
-		case UV_ETIMEDOUT: return 70;
-		case UV_ETXTBSY: return 71;
-		case UV_EXDEV: return 72;
-		case UV_UNKNOWN: return 73;
-		case UV_EOF: return 74;
-		case UV_ENXIO: return 75;
-		case UV_EMLINK: return 76;
-		case UV_ENOTTY: return 77;
-		case UV_EFTYPE: return 78;
-		case UV_EILSEQ: return 79;
-		case UV_ESOCKTNOSUPPORT: return 80;
-		default: return 73; //UV_UNKNOWN
-	}
-}
-
-static int hx_errno( int result ) {
-	return result < 0 ? errno_uv2hx(result) : 0;
-}
+// exceptions
 
 static vclosure *c_exception;
 
@@ -183,14 +462,12 @@ DEFINE_PRIM(_VOID, init_exception, _FUN(_DYN, _I32));
 
 static void hx_error(int uv_errno) {
 	if( c_exception ) {
-		vdynamic *exc = hl_call1(vdynamic *, c_exception, int, errno_uv2hx(uv_errno));
+		vdynamic *exc = hl_call1(vdynamic *, c_exception, int, errno_uv2hl(uv_errno));
 		hl_throw(exc);
 	} else {
 		hl_error("%s", hl_to_utf16(uv_err_name(uv_errno)));
 	}
 }
-
-DEFINE_PRIM(_BYTES, strerror, _I32);
 
 // Request
 
@@ -331,7 +608,7 @@ DEFINE_PRIM(_VOID, unref_wrap, _HANDLE);
 
 static void on_shutdown( uv_shutdown_t *r, int status ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in shutdown request");
-	hl_call1(void, c, int, errno_uv2hx(status));
+	hl_call1(void, c, int, errno_uv2hl(status));
 	free_req((uv_req_t *)r);
 }
 
@@ -345,7 +622,7 @@ DEFINE_PRIM(_VOID, shutdown_wrap, _HANDLE _FUN(_VOID,_I32));
 
 static void on_listen( uv_stream_t *h, int status ) {
 	UV_GET_CLOSURE(c,h,EVT_STREAM_LISTEN,"No listen callback in stream handle");
-	hl_call1(void, c, int, errno_uv2hx(status));
+	hl_call1(void, c, int, errno_uv2hl(status));
 }
 
 HL_PRIM void HL_NAME(listen_wrap)( uv_stream_t *h, int backlog, vclosure *c ) {
@@ -370,7 +647,7 @@ static void on_alloc( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
 static void on_read( uv_stream_t *h, ssize_t nread, const uv_buf_t *buf ) {
 	UV_GET_CLOSURE(c,h,EVT_STREAM_READ,"No listen callback in stream handle");
 	if( nread < 0 ) {
-		hl_call3(void, c, int, errno_uv2hx(nread), vbyte *, NULL, int, 0);
+		hl_call3(void, c, int, errno_uv2hl(nread), vbyte *, NULL, int, 0);
 	} else {
 		hl_call3(void, c, int, 0, vbyte *, (vbyte *)buf->base, int, nread);
 	}
@@ -394,7 +671,7 @@ DEFINE_PRIM(_VOID, read_stop_wrap, _HANDLE);
 
 static void on_write( uv_write_t *r, int status ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in write request");
-	hl_call1(void, c, int, hx_errno(status));
+	hl_call1(void, c, int, hl_uv_errno(status));
 	free_req((uv_req_t *)r);
 }
 
@@ -823,7 +1100,7 @@ DEFINE_PRIM(_SOCKADDR, tcp_getpeername_wrap, _HANDLE);
 
 static void on_connect( uv_connect_t *r, int status ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in connect request");
-	hl_call1(void, c, int, errno_uv2hx(status));
+	hl_call1(void, c, int, errno_uv2hl(status));
 	free_req((uv_req_t *)r);
 }
 
@@ -1216,7 +1493,7 @@ DEFINE_PRIM(_VOID, udp_set_ttl_wrap, _HANDLE _I32);
 
 static void on_udp_send( uv_udp_send_t *r, int status ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in udp send request");
-	hl_call1(void, c, int, hx_errno(status));
+	hl_call1(void, c, int, hl_uv_errno(status));
 	free_req((uv_req_t *)r);
 }
 
@@ -1257,7 +1534,7 @@ static void on_udp_recv( uv_udp_t *h, ssize_t nread, const uv_buf_t *buf, const 
 	hl_dyn_seti(hx_flags, hl_hash_utf8("partial"), &hlt_bool, 0 != (flags & UV_UDP_PARTIAL));
 
 	if( nread < 0 ) {
-		hl_call5(void, c, int, errno_uv2hx(nread), vbyte *, NULL, int, 0, uv_sockaddr_storage *, addr, vdynamic *, hx_flags);
+		hl_call5(void, c, int, errno_uv2hl(nread), vbyte *, NULL, int, 0, uv_sockaddr_storage *, addr, vdynamic *, hx_flags);
 	} else {
 		hl_call5(void, c, int, 0, vbyte *, (vbyte *)buf->base, int, nread, uv_sockaddr_storage *, addr, vdynamic *, hx_flags);
 	}
@@ -1351,7 +1628,7 @@ static void on_getaddrinfo( uv_getaddrinfo_t *r, int status, struct addrinfo *re
 	}
 	freeaddrinfo(res);
 
-	hl_call2(void,c,int,errno_uv2hx(status),varray *,addresses);
+	hl_call2(void,c,int,errno_uv2hl(status),varray *,addresses);
 	free_req((uv_req_t *)r);
 }
 
@@ -1408,7 +1685,7 @@ static void on_getnameinfo( uv_getnameinfo_t *r, int status, const char *hostnam
 	vbyte * bservice = NULL;
 	if( service )
 		bservice = hl_copy_bytes((const vbyte *)service, strlen(service));
-	hl_call3(void,c,int,errno_uv2hx(status),vbyte *,bhost,vbyte *,bservice);
+	hl_call3(void,c,int,errno_uv2hl(status),vbyte *,bhost,vbyte *,bservice);
 	free_req((uv_req_t *)r);
 }
 
@@ -1442,7 +1719,7 @@ HL_PRIM uv_loop_t *HL_NAME(loop_init_wrap)( ) {
 }
 DEFINE_PRIM(_LOOP, loop_init_wrap, _NO_ARG);
 
-DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
+// DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
 
 HL_PRIM void HL_NAME(loop_close_wrap)( uv_loop_t *loop ) {
 	UV_CHECK_NULL(loop,);
@@ -1472,7 +1749,7 @@ DEFINE_PRIM(_VOID, stop_wrap, _LOOP);
 
 static void on_fs_open( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs_open request");
-	hl_call2(void, c, int, hx_errno(r->result), int, r->result);
+	hl_call2(void, c, int, hl_uv_errno(r->result), int, r->result);
 	free_req((uv_req_t *)r);
 }
 
@@ -1523,25 +1800,25 @@ DEFINE_PRIM(_VOID, fs_open_wrap, _LOOP _STRING _ARR _FUN(_VOID,_I32 _I32));
 
 static void on_fs_common( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs request");
-	hl_call1(void,c,int,hx_errno(r->result));
+	hl_call1(void,c,int,hl_uv_errno(r->result));
 	free_fs_req(r);
 }
 
 static void on_fs_bytes_handled( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs request");
-	hl_call2(void,c,int,hx_errno(r->result),int64,r->result<0?0:r->result);
+	hl_call2(void,c,int,hl_uv_errno(r->result),int64,r->result<0?0:r->result);
 	free_fs_req(r);
 }
 
 static void on_fs_path( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs request");
-	hl_call2(void,c,int,hx_errno(r->result),vbyte *,(vbyte *)(r->result<0?NULL:r->path));
+	hl_call2(void,c,int,hl_uv_errno(r->result),vbyte *,(vbyte *)(r->result<0?NULL:r->path));
 	free_fs_req(r);
 }
 
 static void on_fs_bytes( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs request");
-	hl_call2(void,c,int,hx_errno(r->result),vbyte *,(vbyte *)(r->result<0?NULL:r->ptr));
+	hl_call2(void,c,int,hl_uv_errno(r->result),vbyte *,(vbyte *)(r->result<0?NULL:r->ptr));
 	free_fs_req(r);
 }
 
@@ -1602,7 +1879,7 @@ DEFINE_PRIM(_VOID, fs_mkdtemp_wrap, _LOOP _STRING _FUN(_VOID,_I32 _BYTES));
 
 static void on_fs_mkstemp( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs_mkstemp request");
-	hl_call3(void,c,int,hx_errno(r->result),int,r->result,vbyte *,(vbyte *)(r->result<0?NULL:r->path));
+	hl_call3(void,c,int,hl_uv_errno(r->result),int,r->result,vbyte *,(vbyte *)(r->result<0?NULL:r->path));
 	free_fs_req(r);
 }
 
@@ -1626,7 +1903,7 @@ DEFINE_PRIM(_VOID, fs_rmdir_wrap, _LOOP _STRING _FUN(_VOID,_I32));
 
 static void on_fs_opendir( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs_opendir request");
-	hl_call2(void,c,int,hx_errno(r->result),uv_dir_t *,(r->result<0?NULL:r->ptr));
+	hl_call2(void,c,int,hl_uv_errno(r->result),uv_dir_t *,(r->result<0?NULL:r->ptr));
 	free_fs_req(r);
 }
 
@@ -1651,7 +1928,7 @@ DEFINE_PRIM(_VOID, fs_closedir_wrap, _DIR _LOOP _FUN(_VOID,_I32));
 static void on_fs_readdir( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs_readdir request");
 	if( r->result < 0 ) {
-		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
+		hl_call2(void,c,int,hl_uv_errno(r->result),vdynamic *,NULL);
 	} else {
 		uv_dir_t *dir = r->ptr;
 		varray *entries = hl_alloc_array(&hlt_dyn, r->result);
@@ -1726,7 +2003,7 @@ static vdynamic *alloc_stat_dyn( const uv_stat_t *stat ) {
 static void on_fs_stat( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in fs stat request");
 	if( r->result < 0 ) {
-		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
+		hl_call2(void,c,int,hl_uv_errno(r->result),vdynamic *,NULL);
 	} else {
 		hl_call2(void,c,int,0,vdynamic *,alloc_stat_dyn(&r->statbuf));
 	}
@@ -1763,7 +2040,7 @@ static void on_fs_statfs( uv_fs_t *r ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in statfs request");
 	events_data *ev = UV_DATA(r);
 	if( r->result < 0 ) {
-		hl_call2(void,c,int,hx_errno(r->result),vdynamic *,NULL);
+		hl_call2(void,c,int,hl_uv_errno(r->result),vdynamic *,NULL);
 	} else {
 		uv_statfs_t *stat = r->ptr;
 		vdynamic *obj = (vdynamic *)hl_alloc_dynobj();
@@ -2008,7 +2285,7 @@ DEFINE_PRIM(_HANDLE, fs_event_init_wrap, _LOOP);
 static void on_fs_event( uv_fs_event_t *h, const char *filename, int events, int status ) {
 	UV_GET_CLOSURE(c,h,0,"No callback in fs_event handle");
 	if( status < 0 ) {
-		hl_call3(void,c,int,errno_uv2hx(status),vbyte *,NULL,varray *,NULL);
+		hl_call3(void,c,int,errno_uv2hl(status),vbyte *,NULL,varray *,NULL);
 	} else {
 		int size = (0 != (UV_RENAME & events)) + (0 != (UV_CHANGE & events));
 		varray *a_events = hl_alloc_array(&hlt_i32, size);
@@ -2292,7 +2569,7 @@ DEFINE_PRIM(_DYN, gettimeofday_wrap, _NO_ARG);
 
 static void on_random( uv_random_t* r, int status, void* buf, size_t buflen ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in random request");
-	hl_call1(void,c,int,errno_uv2hx(status));
+	hl_call1(void,c,int,errno_uv2hl(status));
 }
 
 HL_PRIM void HL_NAME(random_wrap)( uv_loop_t *loop, vbyte *buf, int length, int flags, vclosure *c ) {
@@ -2403,4 +2680,4 @@ HL_PRIM int HL_NAME(version_hex)() {
 }
 DEFINE_PRIM(_I32, version_hex, _NO_ARG);
 
-
+#include "uv_generated.c"

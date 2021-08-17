@@ -112,7 +112,7 @@ class UVGenerator {
 			case 'int64_t': '_I64';
 			case 'uint64_t': '_I64';
 			case 'char*': '_BYTES';
-			case 'void*': '_DYN';
+			case 'void*': '_POINTER';
 			case 'void': '_VOID';
 			case 'unsigned int': '_U32';
 			case 'ssize_t': '_I64';
