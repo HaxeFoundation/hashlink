@@ -1,5 +1,6 @@
 class UVSample {
 	static function main() {
+		CheckSample.main();
 		// TcpSample.main();
 		// DnsSample.main();
 		// UdpSample.main();
@@ -10,6 +11,6 @@ class UVSample {
 		// FsPollSample.main();
 		// MiscSample.main();
 		// TtySample.main();
-		VersionSample.main();
+		// VersionSample.main();
 	}
 }

@@ -364,6 +364,20 @@ static void on_uv_async_cb( uv_async_t *h ) {
 	hl_call1(void, c, uv_async_t *, h);
 }
 
+// Check
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onCheck;
+} vcheck_data;
+
+DEFINE_PRIM_ALLOC(_CHECK, check);
+
+static void on_uv_check_cb( uv_check_t *h ) {
+	vclosure *c = DATA(vcheck_data *, h)->onCheck;
+	hl_call0(void, c);
+}
+
 // Timer
 
 typedef struct {

@@ -5,14 +5,14 @@ DEFINE_PRIM(_I32, async_init_with_cb, _LOOP _ASYNC);
 
 DEFINE_PRIM(_I32, async_send, _ASYNC);
 
-// DEFINE_PRIM(_I32, check_init, _LOOP _CHECK);
+DEFINE_PRIM(_I32, check_init, _LOOP _CHECK);
 
-// HL_PRIM int HL_NAME(check_start_with_cb)( uv_check_t* check ) {
-// 	return uv_check_start(check, on_uv_check_cb);
-// }
-// DEFINE_PRIM(_I32, check_start_with_cb, _CHECK);
+HL_PRIM int HL_NAME(check_start_with_cb)( uv_check_t* check ) {
+	return uv_check_start(check, on_uv_check_cb);
+}
+DEFINE_PRIM(_I32, check_start_with_cb, _CHECK);
 
-// DEFINE_PRIM(_I32, check_stop, _CHECK);
+DEFINE_PRIM(_I32, check_stop, _CHECK);
 
 // HL_PRIM int HL_NAME(getaddrinfo_with_cb)( uv_loop_t* loop, uv_getaddrinfo_t* req, const char* node, const char* service, const struct addrinfo* hints ) {
 // 	return uv_getaddrinfo(loop, req, on_uv_getaddrinfo_cb, node, service, hints);
