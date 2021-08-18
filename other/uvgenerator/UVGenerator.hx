@@ -152,6 +152,13 @@ class UVGenerator {
 		}
 	}
 
+	static function mapHLArg(a:TypeAndName):String {
+		var type = mapHLType(a.type);
+		if(a.name.endsWith(']'))
+			type = '_REF($type)';
+		return type;
+	}
+
 	static final reCapitalize = ~/_[a-z]/g;
 
 	static function snakeToPascalCase(str:String):String {
@@ -233,7 +240,7 @@ class UVGenerator {
 	static function cBinding(sig:FunctionSignature):String {
 		var args = switch sig.arguments {
 			case [{type:'void'}]: '_NO_ARG';
-			case _: sig.arguments.map(a -> mapHLType(a.type)).join(' ');
+			case _: sig.arguments.map(mapHLArg).join(' ');
 		}
 		return 'DEFINE_PRIM(${mapHLType(sig.returnType)}, ${functionName(sig.name)}, $args);\n';
 	}
@@ -253,7 +260,11 @@ class UVGenerator {
 				if(a.type.endsWith('_cb'))
 					allowNoCallback.contains(a.type) ? 'use_${a.type}?$cbName:NULL' : cbName
 				else
-					a.name;
+					if(a.name.endsWith(']')) {
+						var openPos = a.name.lastIndexOf('[');
+						a.name.substring(0, openPos);
+					} else
+						a.name;
 			})
 			.join(', ');
 		var ret = sig.returnType == 'void' ? '' : 'return ';
@@ -262,7 +273,7 @@ class UVGenerator {
 
 		var args = sig.arguments
 			.filter(a -> !a.type.endsWith('_cb') || allowNoCallback.contains(a.type))
-			.map(a -> a.type.endsWith('_cb') && allowNoCallback.contains(a.type) ? '_BOOL' : mapHLType(a.type))
+			.map(a -> a.type.endsWith('_cb') && allowNoCallback.contains(a.type) ? '_BOOL' : mapHLArg(a))
 			.join(' ');
 		lines.push('DEFINE_PRIM(${mapHLType(sig.returnType)}, $fnName, $args);');
 

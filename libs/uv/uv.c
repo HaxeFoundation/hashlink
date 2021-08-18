@@ -14,6 +14,7 @@
 // Common macros
 
 #define _U64	_I64
+#define _U32	_I32
 
 #define _POINTER			_ABSTRACT(void_pointer)
 #define _HANDLE				_ABSTRACT(uv_handle)
@@ -28,6 +29,105 @@
 #define _ADDRINFO			_ABSTRACT(struct_addrinfo)
 #define _HANDLE_TYPE		_I32
 #define _OS_FD				_ABSTRACT(uv_os_fd)
+#define _FS					_REQ
+#define _UID_T				_I32
+#define _GID_T				_I32
+#define _FILE				_I32
+#define _BUF				_ABSTRACT(uv_buf)
+#define _DIR				_ABSTRACT(uv_dir)
+#define _FS_POLL			_HANDLE
+#define _IDLE				_HANDLE
+#define _RANDOM				_REQ
+#define _PIPE				_HANDLE
+#define _CONNECT			_REQ
+#define _PREPARE			_HANDLE
+#define _PROCESS			_HANDLE
+#define _SIGNAL				_HANDLE
+#define _SHUTDOWN			_REQ
+#define _STREAM				_HANDLE
+#define _WRITE				_REQ
+#define _TCP				_HANDLE
+#define _TTY				_HANDLE
+#define _UDP				_HANDLE
+#define _UDP_SEND			_REQ
+
+typedef struct sockaddr uv_sockaddr;
+typedef struct sockaddr_in uv_sockaddr_in;
+typedef struct sockaddr_in6 uv_sockaddr_in6;
+typedef struct sockaddr_storage uv_sockaddr_storage;
+
+// TODO {
+	#define _DIRENT				_I32
+	#define _FS_TYPE			_I32
+	#define _STAT				_I32
+	#define _OS_FD_T			_I32
+	#define _FS_EVENT			_I32
+	#define _MALLOC_FUNC		_I32
+	#define _REALLOC_FUNC		_I32
+	#define _CALLOC_FUNC		_I32
+	#define _FREE_FUNC			_I32
+	#define _RUSAGE				_I32
+	#define _INTERFACE_ADDRESS	_I32
+	#define _SOCKADDR_IN		_I32
+	#define _SOCKADDR_IN6		_I32
+	#define _CPU_INFO			_I32
+	#define _PASSWD				_I32
+	#define _ENV_ITEM			_I32
+	#define _TIMEVAL64			_I32
+	#define _PROCESS_OPTIONS	_I32
+	#define _REQ_TYPE			_I32
+	#define _OS_SOCK_T			_I32
+	#define _TTY_MODE_T			_I32
+	#define _TTY_VTERMSTATE_T	_I32
+	#define _TTY_VTERMSTATE		_I32
+	#define _MEMBERSHIP			_I32
+	#define _UTSNAME			_I32
+
+	static void on_uv_fs_poll_cb( uv_fs_poll_t *h, int status, const uv_stat_t *prev, const uv_stat_t *curr ) {
+	}
+
+	static void on_uv_fs_event_cb( uv_fs_event_t *h, const char *filename, int events, int status ) {
+	}
+
+	static void on_uv_idle_cb( uv_idle_t *h ) {
+	}
+
+	static void on_uv_walk_cb( uv_handle_t* handle, void* arg ) {
+	}
+
+	static void on_uv_random_cb( uv_random_t* r, int status, void* buf, size_t buflen ) {
+	}
+
+	static void on_uv_connect_cb( uv_connect_t *r, int status ) {
+	}
+
+	static void on_uv_prepare_cb( uv_prepare_t *h ) {
+	}
+
+	static void on_uv_signal_cb( uv_signal_t *h, int signum ) {
+	}
+
+	static void on_uv_shutdown_cb( uv_shutdown_t *r, int status ) {
+	}
+
+	static void on_uv_connection_cb( uv_stream_t *h, int status ) {
+	}
+
+	static void on_uv_alloc_cb( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
+	}
+
+	static void on_uv_write_cb( uv_write_t *r, int status ) {
+	}
+
+	static void on_uv_read_cb( uv_stream_t *h, ssize_t nread, const uv_buf_t *buf ) {
+	}
+
+	static void on_uv_udp_send_cb( uv_udp_send_t *r, int status ) {
+	}
+
+	static void on_uv_udp_recv_cb( uv_udp_t *h, ssize_t nread, const uv_buf_t *buf, const uv_sockaddr *src_addr, unsigned flags ) {
+	}
+// }
 
 #define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
 #define DATA(t,h)	((t)h->data)
@@ -46,11 +146,6 @@
 			hl_add_root(new_data); \
 		h->data = new_data; \
 	}
-
-typedef struct sockaddr uv_sockaddr;
-typedef struct sockaddr_in uv_sockaddr_in;
-typedef struct sockaddr_in6 uv_sockaddr_in6;
-typedef struct sockaddr_storage uv_sockaddr_storage;
 
 HL_PRIM void HL_NAME(free)( vdynamic *v ) {
 	if( v ) {
@@ -376,8 +471,13 @@ static void on_uv_close_cb( uv_handle_t *h ) {
 	hl_type *t;
 
 typedef struct {
-	REQ_DATA_FIELDS;
+	REQ_DATA_FIELDS
 } vreq_data;
+
+typedef struct {
+	REQ_DATA_FIELDS
+	vclosure *callback;
+} vreq_cb_data;
 
 #define _REQ_DATA	_OBJ()
 
@@ -445,11 +545,6 @@ static void on_uv_timer_cb( uv_timer_t *h ) {
 DEFINE_PRIM_ALLOC(_LOOP, loop);
 
 // DNS
-
-typedef struct {
-	REQ_DATA_FIELDS;
-	vclosure *callback;
-} vdns_data;
 
 DEFINE_PRIM_ALLOC(_GETADDRINFO, getaddrinfo);
 DEFINE_PRIM_ALLOC(_GETNAMEINFO, getnameinfo);
@@ -565,13 +660,20 @@ HL_PRIM struct addrinfo *HL_NAME(addrinfo_next)( struct addrinfo *ai ) {
 DEFINE_PRIM(_ADDRINFO, addrinfo_next, _ADDRINFO);
 
 static void on_uv_getaddrinfo_cb( uv_getaddrinfo_t *r, int status, struct addrinfo *res ) {
-	vclosure *c = DATA(vdns_data *,r)->callback;
+	vclosure *c = DATA(vreq_cb_data *,r)->callback;
 	hl_call2(void,c,int,errno_uv2hl(status),struct addrinfo *,res);
 }
 
 static void on_uv_getnameinfo_cb( uv_getnameinfo_t *r, int status, const char *hostname, const char *service ) {
-	vclosure *c = DATA(vdns_data *,r)->callback;
+	vclosure *c = DATA(vreq_cb_data *,r)->callback;
 	hl_call3(void,c,int,errno_uv2hl(status),const char *,hostname,const char *,service);
+}
+
+// File system
+
+static void on_uv_fs_cb( uv_fs_t *r ) {
+	vclosure *c = DATA(vreq_cb_data *,r)->callback;
+	hl_call1(void,c,uv_fs_t *,r);
 }
 
 // auto-generated libuv bindings
@@ -581,10 +683,8 @@ static void on_uv_getnameinfo_cb( uv_getnameinfo_t *r, int status, const char *h
 
 // TODO: remove everything below
 
-#define _DIR		_ABSTRACT(uv_dir)
 #define _CALLB		_FUN(_VOID,_NO_ARG)
 #define _TIMESPEC	_OBJ(_I64 _I64)
-#define _STAT		_OBJ(_I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _TIMESPEC _TIMESPEC _TIMESPEC _TIMESPEC)
 
 #define EVT_CLOSE	1
 
@@ -1546,8 +1646,6 @@ HL_PRIM int HL_NAME(process_pid)( uv_process_t *h ) {
 	return h->pid;
 }
 DEFINE_PRIM(_I32, process_pid, _HANDLE);
-
-DEFINE_PRIM(_VOID, disable_stdio_inheritance, _NO_ARG);
 
 HL_PRIM void HL_NAME(process_kill_wrap)( uv_process_t *h, int signum ) {
 	UV_CHECK_NULL(h,);
@@ -2592,9 +2690,6 @@ HL_PRIM vdynamic *HL_NAME(getrusage_wrap)() {
 }
 DEFINE_PRIM(_DYN, getrusage_wrap, _NO_ARG);
 
-DEFINE_PRIM(_I32, os_getpid, _NO_ARG);
-DEFINE_PRIM(_I32, os_getppid, _NO_ARG);
-
 HL_PRIM varray *HL_NAME(cpu_info_wrap)() {
 	uv_cpu_info_t *infos;
 	int count;
@@ -2712,11 +2807,6 @@ HL_PRIM vdynamic *HL_NAME(os_getpasswd_wrap)() {
 	return obj;
 }
 DEFINE_PRIM(_DYN, os_getpasswd_wrap, _NO_ARG);
-
-DEFINE_PRIM(_I64, get_free_memory, _NO_ARG);
-DEFINE_PRIM(_I64, get_total_memory, _NO_ARG);
-DEFINE_PRIM(_I64, get_constrained_memory, _NO_ARG);
-DEFINE_PRIM(_I64, hrtime, _NO_ARG);
 
 HL_PRIM vbyte *HL_NAME(os_gethostname_wrap)() {
 	return os_str(uv_os_gethostname);
