@@ -143,9 +143,8 @@ class UVGenerator {
 				if(type.endsWith('_t*'))
 					type = type.substring(0, type.length - 3);
 				'_' + type.toUpperCase();
-			case _ if(type.startsWith('struct ')):
-				type = '_' + type.substr('struct '.length).toUpperCase();
-				type.endsWith('*') ? '_REF(${type.substr(0, type.length - 1)})' : type;
+			case _ if(type.startsWith('struct ') && type.endsWith("*")):
+				'_' + type.substring('struct '.length, type.length - 1).toUpperCase();
 			case _ if(type.startsWith('const ')):
 				mapHLType(type.substr('const '.length));
 			case _:
@@ -162,8 +161,6 @@ class UVGenerator {
 	static function mapHXType(type:String):String {
 		if(type.startsWith('const '))
 			type = type.substr('const '.length);
-		if(type.startsWith('struct '))
-			type = type.substr('struct '.length);
 
 		return switch type {
 			case 'void*': 'Pointer';
@@ -175,6 +172,8 @@ class UVGenerator {
 			case 'ssize_t': 'I64';
 			case _ if(type.startsWith('unsigned ')):
 				'U' + mapHXType(type.substr('unsigned '.length));
+			case _ if(type.startsWith('struct ') && type.endsWith('*')):
+				mapHXType(type.substring('struct '.length, type.length - 1));
 			case _ if(type.startsWith('uv_') && type.endsWith('_t*')):
 				type = type.substr(3, type.length - 3 - 3);
 				snakeToPascalCase(type);

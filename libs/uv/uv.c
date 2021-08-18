@@ -17,12 +17,15 @@
 
 #define _POINTER			_ABSTRACT(void_pointer)
 #define _HANDLE				_ABSTRACT(uv_handle)
-#define _REQUEST			_ABSTRACT(uv_req)
+#define _REQ				_ABSTRACT(uv_req)
 #define _LOOP				_ABSTRACT(uv_loop)
 #define _ASYNC				_HANDLE
 #define _CHECK				_HANDLE
 #define _TIMER				_HANDLE
-#define _GETADDRINFO		_ABSTRACT(uv_getaddrinfo_t)
+#define _SOCKADDR			_ABSTRACT(uv_sockaddr_storage)
+#define _GETADDRINFO		_REQ
+#define _GETNAMEINFO		_REQ
+#define _ADDRINFO			_ABSTRACT(struct_addrinfo)
 #define _HANDLE_TYPE		_I32
 #define _OS_FD				_ABSTRACT(uv_os_fd)
 
@@ -34,6 +37,30 @@
 		return UV_ALLOC(uv_##t##_t); \
 	} \
 	DEFINE_PRIM(r, alloc_##t, _NO_ARG);
+
+#define UV_SET_DATA(h,new_data) \
+	if( h->data != new_data ) { \
+		if( h->data ) \
+			hl_remove_root(h->data); \
+		if( new_data ) \
+			hl_add_root(new_data); \
+		h->data = new_data; \
+	}
+
+typedef struct sockaddr uv_sockaddr;
+typedef struct sockaddr_in uv_sockaddr_in;
+typedef struct sockaddr_in6 uv_sockaddr_in6;
+typedef struct sockaddr_storage uv_sockaddr_storage;
+
+HL_PRIM void HL_NAME(free)( vdynamic *v ) {
+	if( v ) {
+		if( v->v.ptr )
+			free(v->v.ptr);
+		if( v->v.bytes )
+			free(v->v.bytes);
+	}
+}
+DEFINE_PRIM(_VOID, free, _DYN);
 
 // Errors
 
@@ -329,14 +356,7 @@ HL_PRIM vhandle_data *HL_NAME(handle_data_of_pointer)( void *v ) {
 DEFINE_PRIM(_HANDLE_DATA, handle_data_of_pointer, _POINTER);
 
 HL_PRIM void HL_NAME(handle_set_data_with_gc)( uv_handle_t *h, vhandle_data *new_data ) {
-	void *current_data = uv_handle_get_data(h);
-	if( current_data == new_data )
-		return;
-	if( current_data )
-		hl_remove_root(current_data);
-	if( new_data )
-		hl_add_root(new_data);
-	uv_handle_set_data(h, new_data);
+	UV_SET_DATA(h, new_data);
 }
 DEFINE_PRIM(_VOID, handle_set_data_with_gc, _HANDLE _HANDLE_DATA);
 
@@ -349,6 +369,32 @@ static void on_uv_close_cb( uv_handle_t *h ) {
 	}
 	free(h);
 }
+
+// Request
+
+#define REQ_DATA_FIELDS \
+	hl_type *t;
+
+typedef struct {
+	REQ_DATA_FIELDS;
+} vreq_data;
+
+#define _REQ_DATA	_OBJ()
+
+HL_PRIM void *HL_NAME(req_data_to_pointer)( vreq_data *v ) {
+	return v;
+}
+DEFINE_PRIM(_POINTER, req_data_to_pointer, _REQ_DATA);
+
+HL_PRIM vreq_data *HL_NAME(req_data_of_pointer)( void *v ) {
+	return v;
+}
+DEFINE_PRIM(_REQ_DATA, req_data_of_pointer, _POINTER);
+
+HL_PRIM void HL_NAME(req_set_data_with_gc)( uv_req_t *r, vreq_data *new_data ) {
+	UV_SET_DATA(r, new_data);
+}
+DEFINE_PRIM(_VOID, req_set_data_with_gc, _REQ _REQ_DATA);
 
 // Async
 
@@ -398,22 +444,147 @@ static void on_uv_timer_cb( uv_timer_t *h ) {
 
 DEFINE_PRIM_ALLOC(_LOOP, loop);
 
+// DNS
+
+typedef struct {
+	REQ_DATA_FIELDS;
+	vclosure *callback;
+} vdns_data;
+
+DEFINE_PRIM_ALLOC(_GETADDRINFO, getaddrinfo);
+DEFINE_PRIM_ALLOC(_GETNAMEINFO, getnameinfo);
+
+//see hl.uv.Dns.AddrInfoFlags
+#define HL_UV_AI_PASSIVE		1
+#define HL_UV_AI_CANONNAME		2
+#define HL_UV_AI_NUMERICHOST	4
+#define HL_UV_AI_V4MAPPED		8
+#define HL_UV_AI_ALL			16
+#define HL_UV_AI_ADDRCONFIG		32
+#define HL_UV_AI_NUMERICSERV	64
+
+//see hl.uv.Dns.NameInfoFlags
+#define HL_UV_NI_NUMERICHOST	1
+#define HL_UV_NI_NUMERICSERV	2
+#define HL_UV_NI_NOFQDN			4
+#define HL_UV_NI_NAMEREQD		8
+#define HL_UV_NI_DGRAM			16
+
+HL_PRIM int HL_NAME(nameinfo_flags_to_native)( int flags ) {
+	int native = 0;
+	if( flags & HL_UV_NI_NUMERICHOST ) native |= NI_NUMERICHOST;
+	if( flags & HL_UV_NI_NUMERICSERV ) native |= NI_NUMERICSERV;
+	if( flags & HL_UV_NI_NOFQDN ) native |= NI_NOFQDN;
+	if( flags & HL_UV_NI_NAMEREQD ) native |= NI_NAMEREQD;
+	if( flags & HL_UV_NI_DGRAM ) native |= NI_DGRAM;
+	return native;
+}
+DEFINE_PRIM(_I32, nameinfo_flags_to_native, _I32);
+
+//see hl.uv.SockAddr.AddressFamily
+#define HL_UV_UNSPEC	-1
+#define HL_UV_INET		-2
+#define HL_UV_INET6		-3
+
+//see hl.uv.SockAddr.SocketType
+#define HL_UV_STREAM	-1
+#define HL_UV_DGRAM		-2
+#define HL_UV_RAW		-3
+
+HL_PRIM struct addrinfo *HL_NAME(alloc_addrinfo)( int flags, int family, int socktype, int protocol ) {
+	struct addrinfo *info = UV_ALLOC(struct addrinfo);
+
+	info->ai_flags = 0;
+	if( flags & HL_UV_AI_PASSIVE )		info->ai_flags |= AI_PASSIVE;
+	if( flags & HL_UV_AI_CANONNAME )	info->ai_flags |= AI_CANONNAME;
+	if( flags & HL_UV_AI_NUMERICHOST )	info->ai_flags |= AI_NUMERICHOST;
+	if( flags & HL_UV_AI_V4MAPPED )		info->ai_flags |= AI_V4MAPPED;
+	if( flags & HL_UV_AI_ALL )			info->ai_flags |= AI_ALL;
+	if( flags & HL_UV_AI_ADDRCONFIG )	info->ai_flags |= AI_ADDRCONFIG;
+	if( flags & HL_UV_AI_NUMERICSERV )	info->ai_flags |= AI_NUMERICSERV;
+
+	switch( family ) {
+		case HL_UV_UNSPEC: info->ai_family = PF_UNSPEC; break;
+		case HL_UV_INET: info->ai_family = PF_INET; break;
+		case HL_UV_INET6: info->ai_family = PF_INET6; break;
+		default: info->ai_family = family; break;
+	}
+
+	switch( socktype ) {
+		case HL_UV_STREAM: info->ai_socktype = SOCK_STREAM; break;
+		case HL_UV_DGRAM: info->ai_socktype = SOCK_DGRAM; break;
+		case HL_UV_RAW: info->ai_socktype = SOCK_RAW; break;
+		default: info->ai_socktype = socktype; break;
+	}
+
+	info->ai_protocol = protocol;
+	return info;
+}
+DEFINE_PRIM(_ADDRINFO, alloc_addrinfo, _I32 _I32 _I32 _I32);
+
+HL_PRIM int HL_NAME(addrinfo_family)( struct addrinfo *ai ) {
+	switch( ai->ai_family ) {
+		case PF_UNSPEC: return 0;
+		case PF_INET: return -1;
+		case PF_INET6: return -2;
+		default: return ai->ai_family;
+	}
+}
+DEFINE_PRIM(_I32, addrinfo_family, _ADDRINFO);
+
+HL_PRIM int HL_NAME(addrinfo_socktype)( struct addrinfo *ai ) {
+	switch( ai->ai_socktype ) {
+		case SOCK_STREAM: return -1;
+		case SOCK_DGRAM: return -2;
+		case SOCK_RAW: return -3;
+		default: return ai->ai_socktype;
+	}
+}
+DEFINE_PRIM(_I32, addrinfo_socktype, _ADDRINFO);
+
+HL_PRIM int HL_NAME(addrinfo_protocol)( struct addrinfo *ai ) {
+	return ai->ai_protocol;
+}
+DEFINE_PRIM(_I32, addrinfo_protocol, _ADDRINFO);
+
+HL_PRIM uv_sockaddr_storage *HL_NAME(addrinfo_addr)( struct addrinfo *ai ) {
+	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
+	memcpy(addr, ai->ai_addr, ai->ai_addrlen);
+	return addr;
+}
+DEFINE_PRIM(_SOCKADDR, addrinfo_addr, _ADDRINFO);
+
+HL_PRIM vbyte *HL_NAME(addrinfo_canonname)( struct addrinfo *ai ) {
+	return (vbyte *)ai->ai_canonname;
+}
+DEFINE_PRIM(_BYTES, addrinfo_canonname, _ADDRINFO);
+
+HL_PRIM struct addrinfo *HL_NAME(addrinfo_next)( struct addrinfo *ai ) {
+	return ai->ai_next;
+}
+DEFINE_PRIM(_ADDRINFO, addrinfo_next, _ADDRINFO);
+
+static void on_uv_getaddrinfo_cb( uv_getaddrinfo_t *r, int status, struct addrinfo *res ) {
+	vclosure *c = DATA(vdns_data *,r)->callback;
+	hl_call2(void,c,int,errno_uv2hl(status),struct addrinfo *,res);
+}
+
+static void on_uv_getnameinfo_cb( uv_getnameinfo_t *r, int status, const char *hostname, const char *service ) {
+	vclosure *c = DATA(vdns_data *,r)->callback;
+	hl_call3(void,c,int,errno_uv2hl(status),const char *,hostname,const char *,service);
+}
+
 // auto-generated libuv bindings
 #include "uv_generated.c"
+
 
 
 // TODO: remove everything below
 
 #define _DIR		_ABSTRACT(uv_dir)
-#define _SOCKADDR	_ABSTRACT(uv_sockaddr_storage)
 #define _CALLB		_FUN(_VOID,_NO_ARG)
 #define _TIMESPEC	_OBJ(_I64 _I64)
 #define _STAT		_OBJ(_I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _I64 _TIMESPEC _TIMESPEC _TIMESPEC _TIMESPEC)
-
-typedef struct sockaddr uv_sockaddr;
-typedef struct sockaddr_in uv_sockaddr_in;
-typedef struct sockaddr_in6 uv_sockaddr_in6;
-typedef struct sockaddr_storage uv_sockaddr_storage;
 
 #define EVT_CLOSE	1
 
@@ -541,7 +712,7 @@ HL_PRIM void HL_NAME(cancel_wrap)( uv_req_t *r ) {
 	UV_CHECK_ERROR(uv_cancel(r),,);
 	free_req(r);
 }
-DEFINE_PRIM(_VOID, cancel_wrap, _REQUEST);
+DEFINE_PRIM(_VOID, cancel_wrap, _REQ);
 
 // HANDLE
 

@@ -14,17 +14,17 @@ DEFINE_PRIM(_I32, check_start_with_cb, _CHECK);
 
 DEFINE_PRIM(_I32, check_stop, _CHECK);
 
-// HL_PRIM int HL_NAME(getaddrinfo_with_cb)( uv_loop_t* loop, uv_getaddrinfo_t* req, const char* node, const char* service, const struct addrinfo* hints ) {
-// 	return uv_getaddrinfo(loop, req, on_uv_getaddrinfo_cb, node, service, hints);
-// }
-// DEFINE_PRIM(_I32, getaddrinfo_with_cb, _LOOP _GETADDRINFO _BYTES _BYTES _REF(_ADDRINFO));
+HL_PRIM int HL_NAME(getaddrinfo_with_cb)( uv_loop_t* loop, uv_getaddrinfo_t* req, const char* node, const char* service, const struct addrinfo* hints ) {
+	return uv_getaddrinfo(loop, req, on_uv_getaddrinfo_cb, node, service, hints);
+}
+DEFINE_PRIM(_I32, getaddrinfo_with_cb, _LOOP _GETADDRINFO _BYTES _BYTES _ADDRINFO);
 
-// DEFINE_PRIM(_VOID, freeaddrinfo, _REF(_ADDRINFO));
+DEFINE_PRIM(_VOID, freeaddrinfo, _ADDRINFO);
 
-// HL_PRIM int HL_NAME(getnameinfo_with_cb)( uv_loop_t* loop, uv_getnameinfo_t* req, const struct sockaddr* addr, int flags ) {
-// 	return uv_getnameinfo(loop, req, on_uv_getnameinfo_cb, addr, flags);
-// }
-// DEFINE_PRIM(_I32, getnameinfo_with_cb, _LOOP _GETNAMEINFO _REF(_SOCKADDR) _I32);
+HL_PRIM int HL_NAME(getnameinfo_with_cb)( uv_loop_t* loop, uv_getnameinfo_t* req, const struct sockaddr* addr, int flags ) {
+	return uv_getnameinfo(loop, req, on_uv_getnameinfo_cb, addr, flags);
+}
+DEFINE_PRIM(_I32, getnameinfo_with_cb, _LOOP _GETNAMEINFO _SOCKADDR _I32);
 
 DEFINE_PRIM(_BYTES, strerror, _I32);
 
@@ -369,13 +369,13 @@ DEFINE_PRIM(_VOID, stop, _LOOP);
 
 // DEFINE_PRIM(_VOID, loadavg, _F64);
 
-// DEFINE_PRIM(_I32, ip4_addr, _BYTES _I32 _REF(_SOCKADDR_IN));
+// DEFINE_PRIM(_I32, ip4_addr, _BYTES _I32 _SOCKADDR_IN);
 
-// DEFINE_PRIM(_I32, ip6_addr, _BYTES _I32 _REF(_SOCKADDR_IN6));
+// DEFINE_PRIM(_I32, ip6_addr, _BYTES _I32 _SOCKADDR_IN6);
 
-// DEFINE_PRIM(_I32, ip4_name, _REF(_SOCKADDR_IN) _BYTES _U64);
+// DEFINE_PRIM(_I32, ip4_name, _SOCKADDR_IN _BYTES _U64);
 
-// DEFINE_PRIM(_I32, ip6_name, _REF(_SOCKADDR_IN6) _BYTES _U64);
+// DEFINE_PRIM(_I32, ip6_name, _SOCKADDR_IN6 _BYTES _U64);
 
 // DEFINE_PRIM(_I32, inet_ntop, _I32 _POINTER _BYTES _U64);
 
@@ -482,13 +482,13 @@ DEFINE_PRIM(_VOID, stop, _LOOP);
 
 // DEFINE_PRIM(_I32, process_get_pid, _PROCESS);
 
-// DEFINE_PRIM(_I32, cancel, _REQ);
+DEFINE_PRIM(_I32, cancel, _REQ);
 
 // DEFINE_PRIM(_U64, req_size, _REQ_TYPE);
 
-// DEFINE_PRIM(_POINTER, req_get_data, _REQ);
+DEFINE_PRIM(_POINTER, req_get_data, _REQ);
 
-// DEFINE_PRIM(_POINTER, req_set_data, _REQ _POINTER);
+DEFINE_PRIM(_POINTER, req_set_data, _REQ _POINTER);
 
 // DEFINE_PRIM(_REQ_TYPE, req_get_type, _REQ);
 
@@ -561,16 +561,16 @@ DEFINE_PRIM(_VOID, stop, _LOOP);
 
 // DEFINE_PRIM(_I32, tcp_simultaneous_accepts, _TCP _I32);
 
-// DEFINE_PRIM(_I32, tcp_bind, _TCP _REF(_SOCKADDR) _U32);
+// DEFINE_PRIM(_I32, tcp_bind, _TCP _SOCKADDR _U32);
 
-// DEFINE_PRIM(_I32, tcp_getsockname, _TCP _REF(_SOCKADDR) _REF(_I32));
+// DEFINE_PRIM(_I32, tcp_getsockname, _TCP _SOCKADDR _REF(_I32));
 
-// DEFINE_PRIM(_I32, tcp_getpeername, _TCP _REF(_SOCKADDR) _REF(_I32));
+// DEFINE_PRIM(_I32, tcp_getpeername, _TCP _SOCKADDR _REF(_I32));
 
 // HL_PRIM int HL_NAME(tcp_connect_with_cb)( uv_connect_t* req, uv_tcp_t* handle, const struct sockaddr* addr ) {
 // 	return uv_tcp_connect(req, handle, addr, on_uv_connect_cb);
 // }
-// DEFINE_PRIM(_I32, tcp_connect_with_cb, _CONNECT _TCP _REF(_SOCKADDR));
+// DEFINE_PRIM(_I32, tcp_connect_with_cb, _CONNECT _TCP _SOCKADDR);
 
 // HL_PRIM int HL_NAME(tcp_close_reset_with_cb)( uv_tcp_t* handle ) {
 // 	return uv_tcp_close_reset(handle, on_uv_close_cb);
@@ -614,13 +614,13 @@ DEFINE_PRIM(_I64, timer_get_due_in, _TIMER);
 
 // DEFINE_PRIM(_I32, udp_open, _UDP _OS_SOCK_T);
 
-// DEFINE_PRIM(_I32, udp_bind, _UDP _REF(_SOCKADDR) _U32);
+// DEFINE_PRIM(_I32, udp_bind, _UDP _SOCKADDR _U32);
 
-// DEFINE_PRIM(_I32, udp_connect, _UDP _REF(_SOCKADDR));
+// DEFINE_PRIM(_I32, udp_connect, _UDP _SOCKADDR);
 
-// DEFINE_PRIM(_I32, udp_getpeername, _UDP _REF(_SOCKADDR) _REF(_I32));
+// DEFINE_PRIM(_I32, udp_getpeername, _UDP _SOCKADDR _REF(_I32));
 
-// DEFINE_PRIM(_I32, udp_getsockname, _UDP _REF(_SOCKADDR) _REF(_I32));
+// DEFINE_PRIM(_I32, udp_getsockname, _UDP _SOCKADDR _REF(_I32));
 
 // DEFINE_PRIM(_I32, udp_set_membership, _UDP _BYTES _BYTES _MEMBERSHIP);
 
@@ -639,9 +639,9 @@ DEFINE_PRIM(_I64, timer_get_due_in, _TIMER);
 // HL_PRIM int HL_NAME(udp_send_with_cb)( uv_udp_send_t* req, uv_udp_t* handle, const uv_buf_t bufs[], unsigned int nbufs, const struct sockaddr* addr ) {
 // 	return uv_udp_send(req, handle, bufs[], nbufs, addr, on_uv_udp_send_cb);
 // }
-// DEFINE_PRIM(_I32, udp_send_with_cb, _UDP_SEND _UDP _BUF _U32 _REF(_SOCKADDR));
+// DEFINE_PRIM(_I32, udp_send_with_cb, _UDP_SEND _UDP _BUF _U32 _SOCKADDR);
 
-// DEFINE_PRIM(_I32, udp_try_send, _UDP _BUF _U32 _REF(_SOCKADDR));
+// DEFINE_PRIM(_I32, udp_try_send, _UDP _BUF _U32 _SOCKADDR);
 
 // HL_PRIM int HL_NAME(udp_recv_start_with_cb)( uv_udp_t* handle ) {
 // 	return uv_udp_recv_start(handle, on_uv_alloc_cb, on_uv_udp_recv_cb);
