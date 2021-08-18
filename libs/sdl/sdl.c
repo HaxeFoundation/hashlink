@@ -405,6 +405,10 @@ HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 	return "unknown";
 }
 
+HL_PRIM const char *HL_NAME(get_pref_path)(const char *org, const char *app) {
+	return SDL_GetPrefPath(org, app);
+}
+
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
 DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, event_loop, _DYN );
@@ -419,6 +423,7 @@ DEFINE_PRIM(_VOID, text_input, _BOOL);
 DEFINE_PRIM(_I32, set_relative_mouse_mode, _BOOL);
 DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 DEFINE_PRIM(_BOOL, hint_value, _BYTES _BYTES);
+DEFINE_PRIM(_BYTES, get_pref_path, _BYTES _BYTES);
 
 // Window
 

@@ -143,6 +143,14 @@ class Sdl {
 		else
 			return @:privateAccess String.fromUTF8(t);
 	}
+
+	static function get_pref_path(org: hl.Bytes, app: hl.Bytes) : hl.Bytes {
+		return null;
+	}
+
+	public static function getPrefPath(org: String, app: String) {
+		return @:privateAccess String.fromUTF8(get_pref_path(org.toUtf8(), app.toUtf8()));
+	}
 }
 
 @:enum
