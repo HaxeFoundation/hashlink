@@ -11,6 +11,30 @@
 #	error "libuv1-dev required, uv version 0.x found"
 #endif
 
+// Common macros
+
+#define _U64	_I64
+
+#define _POINTER			_ABSTRACT(void_pointer)
+#define _HANDLE				_ABSTRACT(uv_handle)
+#define _REQUEST			_ABSTRACT(uv_req)
+#define _LOOP				_ABSTRACT(uv_loop)
+#define _ASYNC				_HANDLE
+#define _CHECK				_HANDLE
+#define _TIMER				_HANDLE
+#define _GETADDRINFO		_ABSTRACT(uv_getaddrinfo_t)
+#define _HANDLE_TYPE		_I32
+#define _OS_FD				_ABSTRACT(uv_os_fd)
+
+#define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
+#define DATA(t,h)	((t)h->data)
+
+#define DEFINE_PRIM_ALLOC(r,t) \
+	HL_PRIM uv_##t##_t *HL_NAME(alloc_##t)() { \
+		return UV_ALLOC(uv_##t##_t); \
+	} \
+	DEFINE_PRIM(r, alloc_##t, _NO_ARG);
+
 // Errors
 
 #define HL_UV_NOERR 0
@@ -282,30 +306,6 @@ HL_PRIM int HL_NAME(translate_to_uv_error)( int hl_errno ) {
 }
 DEFINE_PRIM(_I32, translate_to_uv_error, _I32);
 
-// Common macros
-
-#define _U64	_I64
-
-#define _POINTER			_ABSTRACT(void_pointer)
-#define _HANDLE				_ABSTRACT(uv_handle)
-#define _REQUEST			_ABSTRACT(uv_req)
-#define _LOOP				_ABSTRACT(uv_loop)
-#define _ASYNC				_HANDLE
-#define _CHECK				_HANDLE
-#define _TIMER				_HANDLE
-#define _GETADDRINFO		_ABSTRACT(uv_getaddrinfo_t)
-#define _HANDLE_TYPE		_I32
-#define _OS_FD				_ABSTRACT(uv_os_fd)
-
-#define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
-#define DATA(t,h)	((t)h->data)
-
-#define DEFINE_PRIM_ALLOC(r,t) \
-	HL_PRIM t *HL_NAME(alloc_##t)() { \
-		return UV_ALLOC(t); \
-	} \
-	DEFINE_PRIM(r, alloc_##t, _NO_ARG);
-
 // Handle
 
 #define HANDLE_DATA_FIELDS \
@@ -357,7 +357,7 @@ typedef struct {
 	vclosure *onSend;
 } vasync_data;
 
-DEFINE_PRIM_ALLOC(_ASYNC, uv_async_t);
+DEFINE_PRIM_ALLOC(_ASYNC, async);
 
 static void on_uv_async_cb( uv_async_t *h ) {
 	vclosure *c = DATA(vasync_data *, h)->onSend;
@@ -371,7 +371,7 @@ typedef struct {
 	vclosure *onTick;
 } vtimer_data;
 
-DEFINE_PRIM_ALLOC(_TIMER, uv_timer_t);
+DEFINE_PRIM_ALLOC(_TIMER, timer);
 
 static void on_uv_timer_cb( uv_timer_t *h ) {
 	vclosure *c = DATA(vtimer_data *, h)->onTick;
@@ -382,10 +382,13 @@ static void on_uv_timer_cb( uv_timer_t *h ) {
 
 #define _RUN_MODE _I32
 
-DEFINE_PRIM_ALLOC(_LOOP,uv_loop_t);
+DEFINE_PRIM_ALLOC(_LOOP, loop);
+
+// auto-generated libuv bindings
+#include "uv_generated.c"
 
 
-
+// TODO: remove everything below
 
 #define _DIR		_ABSTRACT(uv_dir)
 #define _SOCKADDR	_ABSTRACT(uv_sockaddr_storage)
@@ -2681,5 +2684,3 @@ HL_PRIM int HL_NAME(version_hex)() {
 	return UV_VERSION_HEX;
 }
 DEFINE_PRIM(_I32, version_hex, _NO_ARG);
-
-#include "uv_generated.c"

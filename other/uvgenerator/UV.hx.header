@@ -30,21 +30,29 @@ package hl.uv;
 typedef UInt = Int;
 typedef U64 = I64;
 
+typedef UvRunMode = Loop.LoopRunMode;
+
 /**
 	Automatically generated bindings for libuv.
 	Avoid using this module directly.
 	BACKWARD COMPATIBILITY OF THIS MODULE IS NOT MAINTAINED.
 **/
 @:hlNative("uv")
-class UV {
-	static public inline function resolve(result:Int):Int {
+extern class UV {
+	extern static public inline function resolve(result:Int):Int {
 		if(result < 0)
 			throw new UVException(translate_uv_error(result));
-		return this;
+		return result;
 	}
 
-	static public function translate_uv_error(uvErrno:Int):UVError return UV_NOERR;
-	static public function translate_to_uv_error(errno:Int):Int return 0;
-	static public function handle_set_data_with_gc(data:HandleData):Void {}
+	static public function translate_uv_error(uvErrno:Int):UVError;
+	static public function translate_to_uv_error(errno:Int):Int;
+	static public function handle_data_of_pointer(ptr:Pointer):HandleData;
+	static public function handle_data_to_pointer(data:HandleData):Pointer;
+	static public function handle_set_data_with_gc(handle:Handle, data:HandleData):Void;
+	static public function alloc_loop():Loop;
+	static public function alloc_async():Async;
+	static public function alloc_timer():Timer;
 
 // Auto generated
+

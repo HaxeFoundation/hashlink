@@ -208,11 +208,7 @@ class UVGenerator {
 		function compose(name:String, args:Array<String>) {
 			var args = args.join(', ');
 			var ret = mapHXType(sig.returnType);
-			var body = switch ret {
-				case 'Void': '{}';
-				case _: 'return cast null;';
-			}
-			return '\tstatic public function $name($args):$ret $body\n';
+			return '\tstatic public function $name($args):$ret;\n';
 		}
 		function mapArg(a:TypeAndName):String {
 			if(a.name.endsWith(']')) {
@@ -236,7 +232,10 @@ class UVGenerator {
 	}
 
 	static function cBinding(sig:FunctionSignature):String {
-		var args = sig.arguments.map(a -> mapHLType(a.type)).join(' ');
+		var args = switch sig.arguments {
+			case [{type:'void'}]: '_NO_ARG';
+			case _: sig.arguments.map(a -> mapHLType(a.type)).join(' ');
+		}
 		return 'DEFINE_PRIM(${mapHLType(sig.returnType)}, ${functionName(sig.name)}, $args);\n';
 	}
 
