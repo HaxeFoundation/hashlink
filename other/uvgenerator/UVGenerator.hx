@@ -21,17 +21,24 @@ typedef FunctionSignature = {
 class Skip extends Exception {}
 
 class UVGenerator {
+	static inline var DOCS = 'include/libuv/docs/src';
+	static inline var UV_GENERATED_C = 'libs/uv/uv_generated.c';
+	static inline var UV_HX = 'other/uvgenerator/UV.hx';
+	static inline var UV_HX_HEADER = 'other/uvgenerator/UV.hx.header';
+
 	static final skipDocs = ['api', 'dll', 'guide', 'index', 'migration_010_100',
 		'poll', 'threading', 'threadpool', 'upgrading'];
-	static final skipFunctions = ['uv_loop_configure'];
+	static final skipFunctions = ['uv_loop_configure']; // TODO: don't skip these
 	static final allowNoCallback = ['uv_fs_cb'];
 
 	static function main() {
 		var root = rootDir();
-		var uvGeneratedC = Path.join([root, 'libs', 'uv', 'uv_generated.c']);
-		var docsDir = Path.join([root, 'include', 'libuv', 'docs', 'src']);
-		var outFile = File.write(uvGeneratedC);
+		var docsDir = Path.join([root, DOCS]);
 		var scan = DirSync.scan(docsDir).resolve();
+		var cFile = File.write(Path.join([root, UV_GENERATED_C]));
+		var hxFile = File.write(Path.join([root, UV_HX]));
+
+		hxFile.writeString(File.getContent(Path.join([root, UV_HX_HEADER])));
 
 		var entry = null;
 		while(null != (entry = scan.next())) {
@@ -53,24 +60,29 @@ class UVGenerator {
 					} catch(e:Skip) {
 						continue;
 					}
-					var needsWrapper = false;
-					for(a in sig.arguments)
-						if(a.type.endsWith('_cb')) {
-							needsWrapper = true;
-							break;
-						}
-					var str = needsWrapper ? generateWrapperWithCb(sig) : generateBinding(sig);
-					outFile.writeString(str);
+					var cStr = needsCbWrapper(sig) ? cWrapperWithCb(sig) : cBinding(sig);
+					cFile.writeString(cStr);
+					hxFile.writeString(hxBinding(sig));
 				} catch(e) {
 					Sys.stderr().writeString('Error on line: $line\n${e.details()}\n');
 					Sys.exit(1);
 				}
-				outFile.writeString('\n');
+				cFile.writeString('\n');
 			}
 		}
+		hxFile.writeString('}\n');
 
-		outFile.close();
+		cFile.close();
+		hxFile.close();
 		scan.end();
+	}
+
+	static function needsCbWrapper(sig:FunctionSignature):Bool {
+		for(a in sig.arguments)
+			if(a.type.endsWith('_cb')) {
+				return true;
+			}
+		return false;
 	}
 
 	static function rootDir(?p:PosInfos):String {
@@ -106,7 +118,7 @@ class UVGenerator {
 			}
 	}
 
-	static function mapType(type:String):String {
+	static function mapHLType(type:String):String {
 		return switch type {
 			case 'int': '_I32';
 			case 'int64_t': '_I64';
@@ -125,7 +137,7 @@ class UVGenerator {
 			case 'uv_pid_t': '_I32';
 			case 'uv_buf_t': '_BUF';
 			case _ if(type.endsWith('**')):
-				'_REF(' + mapType(type.substr(0, type.length - 1)) + ')';
+				'_REF(' + mapHLType(type.substr(0, type.length - 1)) + ')';
 			case _ if(type.startsWith('uv_')):
 				type = type.substr(3);
 				if(type.endsWith('_t*'))
@@ -135,9 +147,45 @@ class UVGenerator {
 				type = '_' + type.substr('struct '.length).toUpperCase();
 				type.endsWith('*') ? '_REF(${type.substr(0, type.length - 1)})' : type;
 			case _ if(type.startsWith('const ')):
-				mapType(type.substr('const '.length));
+				mapHLType(type.substr('const '.length));
 			case _:
 				throw 'Unknown type: "$type"';
+		}
+	}
+
+	static final reCapitalize = ~/_[a-z]/g;
+
+	static function snakeToPascalCase(str:String):String {
+		return str.charAt(0).toUpperCase() + reCapitalize.map(str.substr(1), r -> r.matched(0).replace('_', '').toUpperCase());
+	}
+
+	static function mapHXType(type:String):String {
+		if(type.startsWith('const '))
+			type = type.substr('const '.length);
+		if(type.startsWith('struct '))
+			type = type.substr('struct '.length);
+
+		return switch type {
+			case 'void*': 'Pointer';
+			case 'char*': 'Bytes';
+			case 'double': 'Float';
+			case 'int64_t': 'I64';
+			case 'uint64_t': 'U64';
+			case 'size_t': 'U64';
+			case 'ssize_t': 'I64';
+			case _ if(type.startsWith('unsigned ')):
+				'U' + mapHXType(type.substr('unsigned '.length));
+			case _ if(type.startsWith('uv_') && type.endsWith('_t*')):
+				type = type.substr(3, type.length - 3 - 3);
+				snakeToPascalCase(type);
+			case _ if(type.startsWith('uv_') && type.endsWith('_t')):
+				type = type.substr(3, type.length - 3 - 2);
+				snakeToPascalCase(type);
+			case _ if(type.endsWith('*')):
+				var hxType = mapHXType(type.substr(0, type.length - 1));
+				'Ref<$hxType>';
+			case _:
+				snakeToPascalCase(type);
 		}
 	}
 
@@ -148,19 +196,52 @@ class UVGenerator {
 			throw 'Function name is expected to start with "uv_": "$name"';
 	}
 
+	static function functionNameWithCb(name:String):String {
+		return '${functionName(name)}_with_cb';
+	}
+
 	static function callbackName(type:String):String {
-		// if(type.startsWith('uv_'))
-		// 	type = type.substr('uv_'.length);
 		return 'on_${type}';
 	}
 
-	static function generateBinding(sig:FunctionSignature):String {
-		var args = sig.arguments.map(a -> mapType(a.type)).join(' ');
-		return 'DEFINE_PRIM(${mapType(sig.returnType)}, ${functionName(sig.name)}, $args);\n';
+	static function hxBinding(sig:FunctionSignature):String {
+		function compose(name:String, args:Array<String>) {
+			var args = args.join(', ');
+			var ret = mapHXType(sig.returnType);
+			var body = switch ret {
+				case 'Void': '{}';
+				case _: 'return cast null;';
+			}
+			return '\tstatic public function $name($args):$ret $body\n';
+		}
+		function mapArg(a:TypeAndName):String {
+			if(a.name.endsWith(']')) {
+				var openPos = a.name.lastIndexOf('[');
+				return '${a.name.substring(0, openPos)}:Ref<${mapHXType(a.type)}>';
+			} else {
+				return '${a.name}:${mapHXType(a.type)}';
+			}
+		}
+		if(needsCbWrapper(sig)) {
+			var fnName = functionNameWithCb(sig.name);
+			var args = sig.arguments
+				.filter(a -> !a.type.endsWith('_cb') || allowNoCallback.contains(a.type))
+				.map(a -> a.type.endsWith('_cb') && allowNoCallback.contains(a.type) ? 'use_${a.type}:Bool' : mapArg(a));
+			return compose(fnName, args);
+		} else {
+			var fnName = functionName(sig.name);
+			var args = sig.arguments.filter(a -> a.type != 'void').map(mapArg);
+			return compose(fnName, args);
+		}
 	}
 
-	static function generateWrapperWithCb(sig:FunctionSignature):String {
-		var fnName = '${functionName(sig.name)}_with_cb';
+	static function cBinding(sig:FunctionSignature):String {
+		var args = sig.arguments.map(a -> mapHLType(a.type)).join(' ');
+		return 'DEFINE_PRIM(${mapHLType(sig.returnType)}, ${functionName(sig.name)}, $args);\n';
+	}
+
+	static function cWrapperWithCb(sig:FunctionSignature):String {
+		var fnName = functionNameWithCb(sig.name);
 
 		var args = sig.arguments
 			.filter(a -> !a.type.endsWith('_cb') || allowNoCallback.contains(a.type))
@@ -183,9 +264,9 @@ class UVGenerator {
 
 		var args = sig.arguments
 			.filter(a -> !a.type.endsWith('_cb') || allowNoCallback.contains(a.type))
-			.map(a -> a.type.endsWith('_cb') && allowNoCallback.contains(a.type) ? '_BOOL' : mapType(a.type))
+			.map(a -> a.type.endsWith('_cb') && allowNoCallback.contains(a.type) ? '_BOOL' : mapHLType(a.type))
 			.join(' ');
-		lines.push('DEFINE_PRIM(${mapType(sig.returnType)}, $fnName, $args);');
+		lines.push('DEFINE_PRIM(${mapHLType(sig.returnType)}, $fnName, $args);');
 
 		return lines.join('\n') + '\n';
 	}

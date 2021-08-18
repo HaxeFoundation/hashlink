@@ -294,6 +294,8 @@ DEFINE_PRIM(_I32, translate_to_uv_error, _I32);
 #define _CHECK				_HANDLE
 #define _TIMER				_HANDLE
 #define _GETADDRINFO		_ABSTRACT(uv_getaddrinfo_t)
+#define _HANDLE_TYPE		_I32
+#define _OS_FD				_ABSTRACT(uv_os_fd)
 
 #define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
 #define DATA(t,h)	((t)h->data)
