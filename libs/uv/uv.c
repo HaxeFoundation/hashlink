@@ -50,6 +50,28 @@
 #define _TTY				_HANDLE
 #define _UDP				_HANDLE
 #define _UDP_SEND			_REQ
+#define _STAT				_ABSTRACT(uv_stat)
+#define _ADDRINFO			_ABSTRACT(struct_addrinfo)
+#define _DIRENT				_ABSTRACT(uv_dirent)
+#define _STAT				_ABSTRACT(uv_stat)
+#define _STATFS				_ABSTRACT(uv_statfs)
+#define _RUSAGE				_ABSTRACT(uv_rusage)
+#define _CPU_INFO			_ABSTRACT(uv_cpuinfo)
+#define _INTERFACE_ADDRESS	_ABSTRACT(uv_interface_address)
+#define _SOCKADDR_IN		_ABSTRACT(struct_sockaddr_in)
+#define _SOCKADDR_IN6		_ABSTRACT(struct_sockaddr_in6)
+#define _PASSWD				_ABSTRACT(uv_passwd)
+#define _UTSNAME			_ABSTRACT(uv_utsname)
+#define _TIMEVAL			_ABSTRACT(uv_timeval)
+#define _TIMEVAL64			_ABSTRACT(uv_timeval64)
+#define _PROCESS_OPTIONS	_ABSTRACT(uv_process_options)
+#define _REQ_TYPE			_I32
+#define _TTY_MODE_T			_I32
+#define _TTY_VTERMSTATE_T	_I32
+#define _TTY_VTERMSTATE		_REF(_TTY_VTERMSTATE_T)
+#define _MEMBERSHIP			_I32
+#define _FS_TYPE			_I32
+#define _FS_EVENT			_HANDLE
 
 typedef struct sockaddr uv_sockaddr;
 typedef struct sockaddr_in uv_sockaddr_in;
@@ -57,31 +79,6 @@ typedef struct sockaddr_in6 uv_sockaddr_in6;
 typedef struct sockaddr_storage uv_sockaddr_storage;
 
 // TODO {
-	#define _DIRENT				_I32
-	#define _FS_TYPE			_I32
-	#define _STAT				_I32
-	#define _OS_FD_T			_I32
-	#define _FS_EVENT			_I32
-	#define _MALLOC_FUNC		_I32
-	#define _REALLOC_FUNC		_I32
-	#define _CALLOC_FUNC		_I32
-	#define _FREE_FUNC			_I32
-	#define _RUSAGE				_I32
-	#define _INTERFACE_ADDRESS	_I32
-	#define _SOCKADDR_IN		_I32
-	#define _SOCKADDR_IN6		_I32
-	#define _CPU_INFO			_I32
-	#define _PASSWD				_I32
-	#define _ENV_ITEM			_I32
-	#define _TIMEVAL64			_I32
-	#define _PROCESS_OPTIONS	_I32
-	#define _REQ_TYPE			_I32
-	#define _OS_SOCK_T			_I32
-	#define _TTY_MODE_T			_I32
-	#define _TTY_VTERMSTATE_T	_I32
-	#define _TTY_VTERMSTATE		_I32
-	#define _MEMBERSHIP			_I32
-	#define _UTSNAME			_I32
 
 	static void on_uv_fs_poll_cb( uv_fs_poll_t *h, int status, const uv_stat_t *prev, const uv_stat_t *curr ) {
 	}
