@@ -428,6 +428,15 @@ HL_PRIM int HL_NAME(translate_to_uv_error)( int hl_errno ) {
 }
 DEFINE_PRIM(_I32, translate_to_uv_error, _I32);
 
+// Buf
+
+HL_PRIM void HL_NAME(check_bufs)( uv_buf_t bufs[], int length ) {
+	for(int i = 0; i < length; i++) {
+		printf("%s\n", bufs[i].base);
+	}
+}
+DEFINE_PRIM(_VOID, check_bufs, _REF(_BUF) _I32);
+
 // Handle
 
 #define HANDLE_DATA_FIELDS \

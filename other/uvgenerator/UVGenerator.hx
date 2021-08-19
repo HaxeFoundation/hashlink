@@ -28,7 +28,10 @@ class UVGenerator {
 
 	static final skipDocs = ['api', 'dll', 'guide', 'index', 'migration_010_100',
 		'poll', 'threading', 'threadpool', 'upgrading'];
-	static final skipFunctions = ['uv_loop_configure']; // TODO: don't skip these
+	static final skipFunctions = ['uv_replace_allocator', 'uv_get_osfhandle',
+		'uv_fileno', 'uv_open_osfhandle', 'uv_print_all_handles', 'uv_print_active_handles',
+		'uv_os_environ', 'uv_os_free_environ', 'uv_tcp_open', 'uv_udp_open', 'uv_socketpair',
+		'uv_loop_configure']; // TODO: don't skip uv_loop_configure
 	static final allowNoCallback = ['uv_fs_cb'];
 
 	static function main() {
@@ -177,6 +180,43 @@ class UVGenerator {
 			case 'uint64_t': 'U64';
 			case 'size_t': 'U64';
 			case 'ssize_t': 'I64';
+			case 'uv_buf_t': 'Buffer';
+			case 'uv_req_t*': 'Request';
+			case 'uv_req_type': 'RequestType';
+			case 'uv_handle_t*': 'Handle';
+			case 'uv_handle_type': 'HandleType';
+			case 'uv_file': 'File';
+			case 'uv_run_mode': 'LoopRunMode';
+			case 'sockaddr': 'SockAddr';
+			case 'addrinfo': 'RawAddrInfo';
+			case 'uv_getaddrinfo_t*': 'AddrInfoRequest';
+			case 'uv_getnameinfo_t*': 'NameInfoRequest';
+			case 'uv_fs_t*': 'FsRequest';
+			case 'uv_dirent_t*': 'RawDirent';
+			case 'uv_uid_t': 'Int';
+			case 'uv_gid_t': 'Int';
+			case 'uv_fs_type': 'FsRequestType';
+			case 'uv_stat_t*': 'RawStat';
+			case 'uv_statfs_t*': 'RawStatFs';
+			case 'uv_rusage_t*': 'RawRUsage';
+			case 'uv_cpu_info_t*': 'RawCpuInfo';
+			case 'uv_pid_t': 'Int';
+			case 'uv_interface_address_t*': 'RawInterfaceAddress';
+			case 'sockaddr_in': 'RawSockAddrIn';
+			case 'sockaddr_in6': 'RawSockAddrIn6';
+			case 'uv_passwd_t*': 'RawPasswd';
+			case 'uv_utsname_t*': 'RawUtsName';
+			case 'uv_timeval_t*': 'RawTimeVal';
+			case 'uv_timeval64_t*': 'RawTimeVal64';
+			case 'uv_random_t*': 'RandomRequest';
+			case 'uv_connect_t*': 'ConnectRequest';
+			case 'uv_process_options_t*': 'RawProcessOptions';
+			case 'uv_shutdown_t*': 'ShutdownRequest';
+			case 'uv_write_t*': 'WriteRequest';
+			case 'uv_tty_vtermstate_t': 'TtyVTermState';
+			case 'uv_tty_vtermstate_t*': 'Ref<TtyVTermState>';
+			case 'uv_membership': 'UdpMembership';
+			case 'uv_udp_send_t*': 'UdpSendRequest';
 			case _ if(type.startsWith('unsigned ')):
 				'U' + mapHXType(type.substr('unsigned '.length));
 			case _ if(type.startsWith('struct ') && type.endsWith('*')):
@@ -221,7 +261,9 @@ class UVGenerator {
 				var openPos = a.name.lastIndexOf('[');
 				return '${a.name.substring(0, openPos)}:Ref<${mapHXType(a.type)}>';
 			} else {
-				return '${a.name}:${mapHXType(a.type)}';
+				var type = mapHXType(a.type);
+				var name = a.name == '' ? type.toLowerCase() : a.name;
+				return '${name}:${type}';
 			}
 		}
 		if(needsCbWrapper(sig)) {

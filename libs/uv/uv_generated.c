@@ -232,10 +232,6 @@ DEFINE_PRIM(_BYTES, fs_get_path, _FS);
 
 DEFINE_PRIM(_STAT, fs_get_statbuf, _FS);
 
-DEFINE_PRIM(_OS_FD_T, get_osfhandle, _I32);
-
-DEFINE_PRIM(_I32, open_osfhandle, _OS_FD_T);
-
 DEFINE_PRIM(_I32, fs_event_init, _LOOP _FS_EVENT);
 
 HL_PRIM int HL_NAME(fs_event_start_with_cb)( uv_fs_event_t* handle, const char* path, unsigned int flags ) {
@@ -278,8 +274,6 @@ DEFINE_PRIM(_U64, handle_size, _HANDLE_TYPE);
 DEFINE_PRIM(_I32, send_buffer_size, _HANDLE _REF(_I32));
 
 DEFINE_PRIM(_I32, recv_buffer_size, _HANDLE _REF(_I32));
-
-DEFINE_PRIM(_I32, fileno, _HANDLE _OS_FD);
 
 DEFINE_PRIM(_LOOP, handle_get_loop, _HANDLE);
 
@@ -336,8 +330,6 @@ DEFINE_PRIM(_POINTER, loop_set_data, _LOOP _POINTER);
 DEFINE_PRIM(_I64, metrics_idle_time, _LOOP);
 
 DEFINE_PRIM(_HANDLE_TYPE, guess_handle, _FILE);
-
-DEFINE_PRIM(_I32, replace_allocator, _MALLOC_FUNC _REALLOC_FUNC _CALLOC_FUNC _FREE_FUNC);
 
 DEFINE_PRIM(_VOID, library_shutdown, _NO_ARG);
 
@@ -406,14 +398,6 @@ DEFINE_PRIM(_I64, get_total_memory, _NO_ARG);
 DEFINE_PRIM(_I64, get_constrained_memory, _NO_ARG);
 
 DEFINE_PRIM(_I64, hrtime, _NO_ARG);
-
-DEFINE_PRIM(_VOID, print_all_handles, _LOOP _FILE);
-
-DEFINE_PRIM(_VOID, print_active_handles, _LOOP _FILE);
-
-DEFINE_PRIM(_I32, os_environ, _REF(_ENV_ITEM) _REF(_I32));
-
-DEFINE_PRIM(_VOID, os_free_environ, _ENV_ITEM _I32);
 
 DEFINE_PRIM(_I32, os_getenv, _BYTES _BYTES _REF(_I64));
 
@@ -553,8 +537,6 @@ DEFINE_PRIM(_I32, tcp_init, _LOOP _TCP);
 
 DEFINE_PRIM(_I32, tcp_init_ex, _LOOP _TCP _U32);
 
-DEFINE_PRIM(_I32, tcp_open, _TCP _OS_SOCK_T);
-
 DEFINE_PRIM(_I32, tcp_nodelay, _TCP _I32);
 
 DEFINE_PRIM(_I32, tcp_keepalive, _TCP _I32 _U32);
@@ -576,8 +558,6 @@ HL_PRIM int HL_NAME(tcp_close_reset_with_cb)( uv_tcp_t* handle ) {
 	return uv_tcp_close_reset(handle, on_uv_close_cb);
 }
 DEFINE_PRIM(_I32, tcp_close_reset_with_cb, _TCP);
-
-DEFINE_PRIM(_I32, socketpair, _I32 _I32 _REF(_OS_SOCK_T) _I32 _I32);
 
 DEFINE_PRIM(_I32, timer_init, _LOOP _TIMER);
 
@@ -611,8 +591,6 @@ DEFINE_PRIM(_I32, tty_get_vterm_state, _TTY_VTERMSTATE);
 DEFINE_PRIM(_I32, udp_init, _LOOP _UDP);
 
 DEFINE_PRIM(_I32, udp_init_ex, _LOOP _UDP _U32);
-
-DEFINE_PRIM(_I32, udp_open, _UDP _OS_SOCK_T);
 
 DEFINE_PRIM(_I32, udp_bind, _UDP _SOCKADDR _U32);
 
