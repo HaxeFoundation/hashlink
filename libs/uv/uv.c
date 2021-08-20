@@ -135,6 +135,12 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	} \
 	DEFINE_PRIM(r, alloc_##t, _NO_ARG);
 
+#define DEFINE_PRIM_STRUCT_FIELD(hl_return,c_return,hl_struct,c_struct,field) \
+	HL_PRIM c_return HL_NAME(c_struct##_##field)( struct c_struct *s ) { \
+		return (c_return)s->field; \
+	} \
+	DEFINE_PRIM(hl_return, c_struct##_##field, hl_struct);
+
 #define UV_SET_DATA(h,new_data) \
 	if( h->data != new_data ) { \
 		if( h->data ) \
@@ -623,7 +629,7 @@ HL_PRIM struct addrinfo *HL_NAME(alloc_addrinfo)( int flags, int family, int soc
 }
 DEFINE_PRIM(_ADDRINFO, alloc_addrinfo, _I32 _I32 _I32 _I32);
 
-HL_PRIM int HL_NAME(addrinfo_family)( struct addrinfo *ai ) {
+HL_PRIM int HL_NAME(addrinfo_ai_family)( struct addrinfo *ai ) {
 	switch( ai->ai_family ) {
 		case PF_UNSPEC: return 0;
 		case PF_INET: return -1;
@@ -631,9 +637,9 @@ HL_PRIM int HL_NAME(addrinfo_family)( struct addrinfo *ai ) {
 		default: return ai->ai_family;
 	}
 }
-DEFINE_PRIM(_I32, addrinfo_family, _ADDRINFO);
+DEFINE_PRIM(_I32, addrinfo_ai_family, _ADDRINFO);
 
-HL_PRIM int HL_NAME(addrinfo_socktype)( struct addrinfo *ai ) {
+HL_PRIM int HL_NAME(addrinfo_ai_socktype)( struct addrinfo *ai ) {
 	switch( ai->ai_socktype ) {
 		case SOCK_STREAM: return -1;
 		case SOCK_DGRAM: return -2;
@@ -641,29 +647,18 @@ HL_PRIM int HL_NAME(addrinfo_socktype)( struct addrinfo *ai ) {
 		default: return ai->ai_socktype;
 	}
 }
-DEFINE_PRIM(_I32, addrinfo_socktype, _ADDRINFO);
+DEFINE_PRIM(_I32, addrinfo_ai_socktype, _ADDRINFO);
 
-HL_PRIM int HL_NAME(addrinfo_protocol)( struct addrinfo *ai ) {
-	return ai->ai_protocol;
-}
-DEFINE_PRIM(_I32, addrinfo_protocol, _ADDRINFO);
-
-HL_PRIM uv_sockaddr_storage *HL_NAME(addrinfo_addr)( struct addrinfo *ai ) {
+HL_PRIM uv_sockaddr_storage *HL_NAME(addrinfo_ai_addr)( struct addrinfo *ai ) {
 	uv_sockaddr_storage *addr = UV_ALLOC(uv_sockaddr_storage);
 	memcpy(addr, ai->ai_addr, ai->ai_addrlen);
 	return addr;
 }
-DEFINE_PRIM(_SOCKADDR, addrinfo_addr, _ADDRINFO);
+DEFINE_PRIM(_SOCKADDR, addrinfo_ai_addr, _ADDRINFO);
 
-HL_PRIM vbyte *HL_NAME(addrinfo_canonname)( struct addrinfo *ai ) {
-	return (vbyte *)ai->ai_canonname;
-}
-DEFINE_PRIM(_BYTES, addrinfo_canonname, _ADDRINFO);
-
-HL_PRIM struct addrinfo *HL_NAME(addrinfo_next)( struct addrinfo *ai ) {
-	return ai->ai_next;
-}
-DEFINE_PRIM(_ADDRINFO, addrinfo_next, _ADDRINFO);
+DEFINE_PRIM_STRUCT_FIELD(_I32, int, _ADDRINFO, addrinfo, ai_protocol);
+DEFINE_PRIM_STRUCT_FIELD(_BYTES, vbyte *, _ADDRINFO, addrinfo, ai_canonname);
+DEFINE_PRIM_STRUCT_FIELD(_ADDRINFO, struct addrinfo *, _ADDRINFO, addrinfo, ai_next);
 
 static void on_uv_getaddrinfo_cb( uv_getaddrinfo_t *r, int status, struct addrinfo *res ) {
 	vclosure *c = DATA(vreq_cb_data *,r)->callback;
