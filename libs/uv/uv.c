@@ -141,6 +141,18 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	} \
 	DEFINE_PRIM(hl_return, c_struct##_##field, hl_struct);
 
+#define DEFINE_PRIM_TO_POINTER(hl_type,uv_name) \
+	HL_PRIM void *HL_NAME(uv_name##_to_pointer)( uv_##uv_name##_t *v ) { \
+		return v; \
+	} \
+	DEFINE_PRIM(_POINTER, uv_name##_to_pointer, hl_type);
+
+#define DEFINE_PRIM_OF_POINTER(hl_type,uv_name) \
+	HL_PRIM uv_##uv_name##_t *HL_NAME(uv_name##_of_pointer)( void *ptr ) { \
+		return ptr; \
+	} \
+	DEFINE_PRIM(hl_type, uv_name##_of_pointer, _POINTER);
+
 #define UV_SET_DATA(h,new_data) \
 	if( h->data != new_data ) { \
 		if( h->data ) \
@@ -150,15 +162,15 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 		h->data = new_data; \
 	}
 
-HL_PRIM void HL_NAME(free)( vdynamic *v ) {
-	if( v ) {
-		if( v->v.ptr )
-			free(v->v.ptr);
-		if( v->v.bytes )
-			free(v->v.bytes);
-	}
+HL_PRIM void HL_NAME(free)( void *ptr ) {
+	free(ptr);
 }
-DEFINE_PRIM(_VOID, free, _DYN);
+DEFINE_PRIM(_VOID, free, _POINTER);
+
+HL_PRIM void *HL_NAME(bytes_to_pointer)( vbyte *bytes ) {
+	return bytes;
+}
+DEFINE_PRIM(_POINTER, bytes_to_pointer, _BYTES);
 
 // Errors
 
@@ -422,7 +434,7 @@ static int hl_uv_errno( int result ) {
 }
 
 HL_PRIM int HL_NAME(translate_uv_error)( int uv_errno ) {
-	return errno_uv2hl(uv_errno);
+	return uv_errno < 0 ? errno_uv2hl(uv_errno) : 0;
 }
 DEFINE_PRIM(_I32, translate_uv_error, _I32);
 
@@ -448,33 +460,23 @@ DEFINE_PRIM(_VOID, check_bufs, _REF(_BUF) _I32);
 
 typedef struct {
 	HANDLE_DATA_FIELDS;
-} vhandle_data;
+} uv_handle_data_t;
 
 #define _HANDLE_DATA	_OBJ(_FUN(_VOID,_NO_ARG))
 
-HL_PRIM void *HL_NAME(handle_data_to_pointer)( vhandle_data *v ) {
-	return v;
-}
-DEFINE_PRIM(_POINTER, handle_data_to_pointer, _HANDLE_DATA);
+DEFINE_PRIM_TO_POINTER(_HANDLE, handle);
+DEFINE_PRIM_OF_POINTER(_HANDLE, handle);
+DEFINE_PRIM_TO_POINTER(_HANDLE_DATA, handle_data);
+DEFINE_PRIM_OF_POINTER(_HANDLE_DATA, handle_data);
 
-HL_PRIM vhandle_data *HL_NAME(handle_data_of_pointer)( void *v ) {
-	return v;
-}
-DEFINE_PRIM(_HANDLE_DATA, handle_data_of_pointer, _POINTER);
-
-HL_PRIM void HL_NAME(handle_set_data_with_gc)( uv_handle_t *h, vhandle_data *new_data ) {
+HL_PRIM void HL_NAME(handle_set_data_with_gc)( uv_handle_t *h, uv_handle_data_t *new_data ) {
 	UV_SET_DATA(h, new_data);
 }
 DEFINE_PRIM(_VOID, handle_set_data_with_gc, _HANDLE _HANDLE_DATA);
 
 static void on_uv_close_cb( uv_handle_t *h ) {
-	vhandle_data *data = DATA(vhandle_data *, h);
-	if( data ) {
-		if( data->onClose )
-			hl_call0(void, data->onClose);
-		hl_remove_root(data);
-	}
-	free(h);
+	uv_handle_data_t *data = DATA(uv_handle_data_t *, h);
+	hl_call0(void, data->onClose);
 }
 
 // Request
@@ -484,26 +486,21 @@ static void on_uv_close_cb( uv_handle_t *h ) {
 
 typedef struct {
 	REQ_DATA_FIELDS
-} vreq_data;
+} uv_req_data_t;
 
 typedef struct {
 	REQ_DATA_FIELDS
 	vclosure *callback;
-} vreq_cb_data;
+} uv_req_cb_data_t;
 
 #define _REQ_DATA	_OBJ()
 
-HL_PRIM void *HL_NAME(req_data_to_pointer)( vreq_data *v ) {
-	return v;
-}
-DEFINE_PRIM(_POINTER, req_data_to_pointer, _REQ_DATA);
+DEFINE_PRIM_TO_POINTER(_REQ,req);
+DEFINE_PRIM_OF_POINTER(_REQ,req);
+DEFINE_PRIM_TO_POINTER(_REQ_DATA,req_data);
+DEFINE_PRIM_OF_POINTER(_REQ_DATA,req_data);
 
-HL_PRIM vreq_data *HL_NAME(req_data_of_pointer)( void *v ) {
-	return v;
-}
-DEFINE_PRIM(_REQ_DATA, req_data_of_pointer, _POINTER);
-
-HL_PRIM void HL_NAME(req_set_data_with_gc)( uv_req_t *r, vreq_data *new_data ) {
+HL_PRIM void HL_NAME(req_set_data_with_gc)( uv_req_t *r, uv_req_data_t *new_data ) {
 	UV_SET_DATA(r, new_data);
 }
 DEFINE_PRIM(_VOID, req_set_data_with_gc, _REQ _REQ_DATA);
@@ -513,12 +510,12 @@ DEFINE_PRIM(_VOID, req_set_data_with_gc, _REQ _REQ_DATA);
 typedef struct {
 	HANDLE_DATA_FIELDS;
 	vclosure *onSend;
-} vasync_data;
+} uv_async_data_t;
 
 DEFINE_PRIM_ALLOC(_ASYNC, async);
 
 static void on_uv_async_cb( uv_async_t *h ) {
-	vclosure *c = DATA(vasync_data *, h)->onSend;
+	vclosure *c = DATA(uv_async_data_t *, h)->onSend;
 	hl_call1(void, c, uv_async_t *, h);
 }
 
@@ -527,12 +524,12 @@ static void on_uv_async_cb( uv_async_t *h ) {
 typedef struct {
 	HANDLE_DATA_FIELDS;
 	vclosure *onCheck;
-} vcheck_data;
+} uv_check_data_t;
 
 DEFINE_PRIM_ALLOC(_CHECK, check);
 
 static void on_uv_check_cb( uv_check_t *h ) {
-	vclosure *c = DATA(vcheck_data *, h)->onCheck;
+	vclosure *c = DATA(uv_check_data_t *, h)->onCheck;
 	hl_call0(void, c);
 }
 
@@ -661,21 +658,29 @@ DEFINE_PRIM_STRUCT_FIELD(_BYTES, vbyte *, _ADDRINFO, addrinfo, ai_canonname);
 DEFINE_PRIM_STRUCT_FIELD(_ADDRINFO, struct addrinfo *, _ADDRINFO, addrinfo, ai_next);
 
 static void on_uv_getaddrinfo_cb( uv_getaddrinfo_t *r, int status, struct addrinfo *res ) {
-	vclosure *c = DATA(vreq_cb_data *,r)->callback;
+	vclosure *c = DATA(uv_req_cb_data_t *,r)->callback;
 	hl_call2(void,c,int,errno_uv2hl(status),struct addrinfo *,res);
 }
 
 static void on_uv_getnameinfo_cb( uv_getnameinfo_t *r, int status, const char *hostname, const char *service ) {
-	vclosure *c = DATA(vreq_cb_data *,r)->callback;
+	vclosure *c = DATA(uv_req_cb_data_t *,r)->callback;
 	hl_call3(void,c,int,errno_uv2hl(status),const char *,hostname,const char *,service);
 }
 
 // File system
 
+DEFINE_PRIM_ALLOC(_FS, fs);
+
 static void on_uv_fs_cb( uv_fs_t *r ) {
-	vclosure *c = DATA(vreq_cb_data *,r)->callback;
-	hl_call1(void,c,uv_fs_t *,r);
+	vclosure *c = DATA(uv_req_cb_data_t *, r)->callback;
+	hl_call1(void, c, uv_fs_t *, r);
 }
+
+HL_PRIM uv_dir_t *HL_NAME(pointer_to_dir)( void *ptr ) {
+	return ptr;
+}
+DEFINE_PRIM(_DIR, pointer_to_dir, _POINTER);
+
 
 // auto-generated libuv bindings
 #include "uv_generated.c"
