@@ -41,7 +41,6 @@ class FileSample {
 			utime,
 			linkSymlinkReadLinkRealPath,
 			chown,
-			openReadCloseDir,
 		];
 		actions.next();
 	}
@@ -349,20 +348,5 @@ class FileSample {
 				});
 			}));
 		});
-	}
-
-	static function openReadCloseDir(actions:Actions) {
-		var path = Misc.tmpDir();
-		Log.print('Reading 3 entries from dir $path...');
-		Dir.open(loop, path, (e, dir) -> handle(() -> {
-			dir.read(loop, 3, (e, entries) -> handle(() -> {
-				for(i in 0...entries.length)
-					Log.print('\t${entries[i]}');
-				dir.close(loop, handle(() -> {
-					Log.print('Done');
-					actions.next();
-				}));
-			})(e));
-		})(e));
 	}
 }

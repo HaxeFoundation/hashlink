@@ -135,11 +135,17 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	} \
 	DEFINE_PRIM(r, alloc_##t, _NO_ARG);
 
-#define DEFINE_PRIM_STRUCT_FIELD(hl_return,c_return,hl_struct,c_struct,field) \
+#define DEFINE_PRIM_C_FIELD(hl_return,c_return,hl_struct,c_struct,field) \
 	HL_PRIM c_return HL_NAME(c_struct##_##field)( struct c_struct *s ) { \
 		return (c_return)s->field; \
 	} \
 	DEFINE_PRIM(hl_return, c_struct##_##field, hl_struct);
+
+#define DEFINE_PRIM_UV_FIELD(hl_return,c_return,hl_struct,uv_name,field) \
+	HL_PRIM c_return HL_NAME(uv_name##_##field)( uv_##uv_name##_t *s ) { \
+		return (c_return)s->field; \
+	} \
+	DEFINE_PRIM(hl_return, uv_name##_##field, hl_struct);
 
 #define DEFINE_PRIM_TO_POINTER(hl_type,uv_name) \
 	HL_PRIM void *HL_NAME(uv_name##_to_pointer)( uv_##uv_name##_t *v ) { \
@@ -148,10 +154,10 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	DEFINE_PRIM(_POINTER, uv_name##_to_pointer, hl_type);
 
 #define DEFINE_PRIM_OF_POINTER(hl_type,uv_name) \
-	HL_PRIM uv_##uv_name##_t *HL_NAME(uv_name##_of_pointer)( void *ptr ) { \
+	HL_PRIM uv_##uv_name##_t *HL_NAME(pointer_to_##uv_name)( void *ptr ) { \
 		return ptr; \
 	} \
-	DEFINE_PRIM(hl_type, uv_name##_of_pointer, _POINTER);
+	DEFINE_PRIM(hl_type, pointer_to_##uv_name, _POINTER);
 
 #define UV_SET_DATA(h,new_data) \
 	if( h->data != new_data ) { \
@@ -653,9 +659,9 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(addrinfo_ai_addr)( struct addrinfo *ai ) {
 }
 DEFINE_PRIM(_SOCKADDR, addrinfo_ai_addr, _ADDRINFO);
 
-DEFINE_PRIM_STRUCT_FIELD(_I32, int, _ADDRINFO, addrinfo, ai_protocol);
-DEFINE_PRIM_STRUCT_FIELD(_BYTES, vbyte *, _ADDRINFO, addrinfo, ai_canonname);
-DEFINE_PRIM_STRUCT_FIELD(_ADDRINFO, struct addrinfo *, _ADDRINFO, addrinfo, ai_next);
+DEFINE_PRIM_C_FIELD(_I32, int, _ADDRINFO, addrinfo, ai_protocol);
+DEFINE_PRIM_C_FIELD(_BYTES, vbyte *, _ADDRINFO, addrinfo, ai_canonname);
+DEFINE_PRIM_C_FIELD(_ADDRINFO, struct addrinfo *, _ADDRINFO, addrinfo, ai_next);
 
 static void on_uv_getaddrinfo_cb( uv_getaddrinfo_t *r, int status, struct addrinfo *res ) {
 	vclosure *c = DATA(uv_req_cb_data_t *,r)->callback;
@@ -676,10 +682,24 @@ static void on_uv_fs_cb( uv_fs_t *r ) {
 	hl_call1(void, c, uv_fs_t *, r);
 }
 
-HL_PRIM uv_dir_t *HL_NAME(pointer_to_dir)( void *ptr ) {
-	return ptr;
+DEFINE_PRIM_OF_POINTER(_DIR,dir);
+
+HL_PRIM void HL_NAME(dir_init)( uv_dir_t *dir, int num_entries ) {
+	dir->nentries = num_entries;
+	dir->dirents = malloc(sizeof(uv_dirent_t) * num_entries);
 }
-DEFINE_PRIM(_DIR, pointer_to_dir, _POINTER);
+DEFINE_PRIM(_VOID, dir_init, _DIR _I32);
+
+HL_PRIM uv_dirent_t *HL_NAME(dir_dirent)( uv_dir_t *dir, int index ) {
+	return &dir->dirents[index];
+}
+DEFINE_PRIM(_DIRENT, dir_dirent, _DIR _I32);
+
+DEFINE_PRIM_UV_FIELD(_I32, int, _DIR, dir, nentries);
+DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _DIRENT, dirent, name);
+DEFINE_PRIM_UV_FIELD(_I32, int, _DIRENT, dirent, type);
+DEFINE_PRIM_TO_POINTER(_DIRENT, dirent);
+
 
 
 // auto-generated libuv bindings

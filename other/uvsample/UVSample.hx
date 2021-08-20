@@ -7,6 +7,7 @@ class UVSample {
 		// PipeSample.main();
 		// ProcessSample.main();
 		// FileSample.main();
+		DirSample.main();
 		// FsEventSample.main();
 		// FsPollSample.main();
 		// MiscSample.main();
