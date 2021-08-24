@@ -27,43 +27,53 @@
 
 package hl.uv;
 
+import hl.uv.Handle;
+import hl.uv.Request;
 import hl.uv.SockAddr;
 import hl.uv.Dns;
 import hl.uv.Dir;
 import hl.uv.Loop;
 import hl.uv.File;
+import hl.uv.Tty;
+import hl.uv.Udp;
 
 typedef UvUidT = Int;
 typedef UvGidT = Int;
+typedef UvPidT = Int;
+typedef UvHandleType = HandleType;
+typedef UvReqType = RequestType;
 typedef UvRunMode = LoopRunMode;
 typedef UvFsType = FsRequestType;
+typedef UvTtyModeT = TtyMode;
+typedef UvTtyVtermstateT = TtyVTermState;
+typedef UvTtyVtermstateTStar = Ref<TtyVTermState>;
+typedef UvMembership = UdpMembership;
 
 abstract UvFile(Int) {}
 
-abstract RefUvUdpSendT(RefUvReqT) to RefUvReqT {}
-abstract RefUvWriteT(RefUvReqT) to RefUvReqT {}
-abstract RefUvShutdownT(RefUvReqT) to RefUvReqT {}
-abstract RefUvRandomT(RefUvReqT) to RefUvReqT {}
-abstract RefUvGetnameinfoT(RefUvReqT) to RefUvReqT {}
-abstract RefUvGetaddrinfoT(RefUvReqT) to RefUvReqT {}
-abstract RefUvFsT(RefUvReqT) to RefUvReqT {}
-abstract RefUvConnectT(RefUvReqT) to RefUvReqT {}
+abstract UvUdpSendTStar(UvReqTStar) to UvReqTStar {}
+abstract UvWriteTStar(UvReqTStar) to UvReqTStar {}
+abstract UvShutdownTStar(UvReqTStar) to UvReqTStar {}
+abstract UvRandomTStar(UvReqTStar) to UvReqTStar {}
+abstract UvGetnameinfoTStar(UvReqTStar) to UvReqTStar {}
+abstract UvGetaddrinfoTStar(UvReqTStar) to UvReqTStar {}
+abstract UvFsTStar(UvReqTStar) to UvReqTStar {}
+abstract UvConnectTStar(UvReqTStar) to UvReqTStar {}
 
-abstract RefUvUdpT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvTtyT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvTimerT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvTcpT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvStreamT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvSignalT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvRusageT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvProcessT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvPrepareT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvPipeT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvIdleT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvFsPollT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvFsEventT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvCheckT(RefUvHandleT) to RefUvHandleT {}
-abstract RefUvAsyncT(RefUvHandleT) to RefUvHandleT {}
+abstract UvUdpTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvTtyTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvTimerTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvTcpTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvStreamTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvSignalTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvProcessTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvPrepareTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvPipeTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvIdleTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvFsPollTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvFsEventTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvCheckTStar(UvHandleTStar) to UvHandleTStar {}
+abstract UvAsyncTStar(UvHandleTStar) to UvHandleTStar {}
 
 //TODO: implement these
 private typedef UInt = Int;
@@ -103,33 +113,33 @@ extern class UV {
 	static public function bytes_to_pointer(bytes:Bytes):Pointer;
 	static public function translate_uv_error(uvErrno:Int):UVError;
 	static public function translate_to_uv_error(errno:Int):Int;
-	static public function handle_to_pointer(data:RefUvHandleT):Pointer;
-	static public function handle_set_data_with_gc<T:RefUvHandleT>(handle:RefUvHandleT, data:Handle<T>):Void;
-	static public function req_set_data_with_gc<T:RefUvReqT>(req:RefUvReqT, data:Request<T>):Void;
-	static public function req_to_pointer(req:RefUvReqT):Pointer;
-	static public function alloc_loop():RefUvLoopT;
-	static public function loop_to_pointer(req:RefUvLoopT):Pointer;
-	static public function alloc_async():RefUvAsyncT;
-	static public function alloc_timer():RefUvTimerT;
-	static public function alloc_check():RefUvCheckT;
-	static public function alloc_getaddrinfo():RefUvGetaddrinfoT;
-	static public function alloc_getnameinfo():RefUvGetnameinfoT;
-	static public function alloc_addrinfo(flags:Int, family:AddressFamily, socktype:SocketType, protocol:Int):RefCAddrinfo;
-	static public function addrinfo_ai_family(ai:RefCAddrinfo):AddressFamily;
-	static public function addrinfo_ai_socktype(ai:RefCAddrinfo):SocketType;
-	static public function addrinfo_ai_protocol(ai:RefCAddrinfo):Int;
-	static public function addrinfo_ai_addr(ai:RefCAddrinfo):SockAddr;
-	static public function addrinfo_ai_canonname(ai:RefCAddrinfo):Bytes;
-	static public function addrinfo_ai_next(ai:RefCAddrinfo):Null<RefCAddrinfo>;
+	static public function handle_to_pointer(data:UvHandleTStar):Pointer;
+	static public function handle_set_data_with_gc<T:UvHandleTStar>(handle:UvHandleTStar, data:Handle<T>):Void;
+	static public function req_set_data_with_gc<T:UvReqTStar>(req:UvReqTStar, data:Request<T>):Void;
+	static public function req_to_pointer(req:UvReqTStar):Pointer;
+	static public function alloc_loop():UvLoopTStar;
+	static public function loop_to_pointer(req:UvLoopTStar):Pointer;
+	static public function alloc_async():UvAsyncTStar;
+	static public function alloc_timer():UvTimerTStar;
+	static public function alloc_check():UvCheckTStar;
+	static public function alloc_getaddrinfo():UvGetaddrinfoTStar;
+	static public function alloc_getnameinfo():UvGetnameinfoTStar;
+	static public function alloc_addrinfo(flags:Int, family:AddressFamily, socktype:SocketType, protocol:Int):CAddrinfoStar;
+	static public function addrinfo_ai_family(ai:CAddrinfoStar):AddressFamily;
+	static public function addrinfo_ai_socktype(ai:CAddrinfoStar):SocketType;
+	static public function addrinfo_ai_protocol(ai:CAddrinfoStar):Int;
+	static public function addrinfo_ai_addr(ai:CAddrinfoStar):SockAddr;
+	static public function addrinfo_ai_canonname(ai:CAddrinfoStar):Bytes;
+	static public function addrinfo_ai_next(ai:CAddrinfoStar):Null<CAddrinfoStar>;
 	static public function nameinfo_flags_to_native(ai:NameInfoFlags):Int;
-	static public function alloc_fs():RefUvFsT;
-	static public function pointer_to_dir(req:Pointer):RefUvDirT;
-	static public function dir_init(dir:RefUvDirT, num_entries:Int):Void;
-	static public function dir_nentries(dir:RefUvDirT):Int;
-	static public function dir_dirent(dir:RefUvDirT, index:Int):RefUvDirentT;
-	static public function dirent_to_pointer(dirent:RefUvDirentT):Pointer;
-	static public function dirent_name(dirent:RefUvDirentT):Bytes;
-	static public function dirent_type(dirent:RefUvDirentT):DirEntryType;
+	static public function alloc_fs():UvFsTStar;
+	static public function pointer_to_dir(req:Pointer):UvDirTStar;
+	static public function dir_init(dir:UvDirTStar, num_entries:Int):Void;
+	static public function dir_nentries(dir:UvDirTStar):Int;
+	static public function dir_dirent(dir:UvDirTStar, index:Int):UvDirentTStar;
+	static public function dirent_to_pointer(dirent:UvDirentTStar):Pointer;
+	static public function dirent_name(dirent:UvDirentTStar):Bytes;
+	static public function dirent_type(dirent:UvDirentTStar):DirEntryType;
 
 // Auto generated content :
 

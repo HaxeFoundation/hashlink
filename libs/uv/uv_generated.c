@@ -335,12 +335,6 @@ DEFINE_PRIM(_VOID, library_shutdown, _NO_ARG);
 
 DEFINE_PRIM(_BUF, buf_init, _BYTES _U32);
 
-DEFINE_PRIM(_REF(_BYTES), setup_args, _I32 _REF(_BYTES));
-
-DEFINE_PRIM(_I32, get_process_title, _BYTES _U64);
-
-DEFINE_PRIM(_I32, set_process_title, _BYTES);
-
 DEFINE_PRIM(_I32, resident_set_memory, _REF(_I64));
 
 DEFINE_PRIM(_I32, uptime, _REF(_F64));

@@ -33,7 +33,7 @@
 #define _UID_T				_I32
 #define _GID_T				_I32
 #define _FILE				_I32
-#define _BUF				_ABSTRACT(uv_buf)
+#define _BUF				_ABSTRACT(uv_buf_t)
 #define _DIR				_ABSTRACT(uv_dir_t_star)
 #define _FS_POLL			_HANDLE
 #define _IDLE				_HANDLE
@@ -54,10 +54,10 @@
 #define _STAT				_ABSTRACT(uv_stat_t_star)
 #define _STATFS				_ABSTRACT(uv_statfs_t_star)
 #define _RUSAGE				_ABSTRACT(uv_rusage_t_star)
-#define _CPU_INFO			_ABSTRACT(uv_cpuinfo_t_star)
+#define _CPU_INFO			_ABSTRACT(uv_cpu_info_t_star)
 #define _INTERFACE_ADDRESS	_ABSTRACT(uv_interface_address_t_star)
-#define _SOCKADDR_IN		_ABSTRACT(struct_sockaddr_in)
-#define _SOCKADDR_IN6		_ABSTRACT(struct_sockaddr_in6)
+#define _SOCKADDR_IN		_ABSTRACT(sockaddr_in_star)
+#define _SOCKADDR_IN6		_ABSTRACT(sockaddr_in6_star)
 #define _PASSWD				_ABSTRACT(uv_passwd_t_star)
 #define _UTSNAME			_ABSTRACT(uv_utsname_t_star)
 #define _TIMEVAL			_ABSTRACT(uv_timeval_t_star)
@@ -509,7 +509,7 @@ DEFINE_PRIM_OF_POINTER(_REQ_DATA,req_data);
 HL_PRIM void HL_NAME(req_set_data_with_gc)( uv_req_t *r, uv_req_data_t *new_data ) {
 	UV_SET_DATA(r, new_data);
 }
-DEFINE_PRIM(_VOID, req_set_data_with_gc, _REQ _OBJ());
+DEFINE_PRIM(_VOID, req_set_data_with_gc, _REQ _REQ_DATA);
 
 // Async
 

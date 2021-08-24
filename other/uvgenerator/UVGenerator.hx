@@ -30,7 +30,8 @@ class UVGenerator {
 		'poll', 'threading', 'threadpool', 'upgrading'];
 	static final skipFunctions = ['uv_replace_allocator', 'uv_get_osfhandle',
 		'uv_fileno', 'uv_open_osfhandle', 'uv_print_all_handles', 'uv_print_active_handles',
-		'uv_os_environ', 'uv_os_free_environ', 'uv_tcp_open', 'uv_udp_open', 'uv_socketpair',
+		'uv_os_environ', 'uv_os_free_environ', 'uv_setup_args', 'uv_get_process_title',
+		'uv_set_process_title', 'uv_tcp_open', 'uv_udp_open', 'uv_socketpair',
 		'uv_loop_configure']; // TODO: don't skip uv_loop_configure
 	static final allowNoCallback = ['uv_fs_cb'];
 
@@ -193,35 +194,35 @@ class UVGenerator {
 		return str.charAt(0).toUpperCase() + reCapitalize.map(str.substr(1), r -> r.matched(0).replace('_', '').toUpperCase());
 	}
 
-	static function mapHXType(type:String, isRef:Bool = false):String {
+	static function mapHXType(type:String):String {
 		if(type.startsWith('const '))
 			type = type.substr('const '.length);
 
+		var isRef = type.endsWith('*');
+		if(isRef)
+			type = type.substr(0, type.length - 1);
+
+		inline function handleRef(t:String)
+			return isRef ? 'Ref<$t>' : t;
+
 		return switch type {
-			case 'void*': 'Pointer';
-			case 'void': 'Void';
-			case 'int': 'Int';
-			case 'int*': 'Ref<Int>';
-			case 'char*': 'Bytes';
-			case 'double': 'Float';
-			case 'double*': 'Ref<Float>';
-			case 'int64_t': 'I64';
-			case 'int64_t*': 'Ref<I64>';
-			case 'uint64_t': 'U64';
-			case 'uint64_t*': 'Ref<U64>';
-			case 'size_t': 'U64';
-			case 'size_t*': 'Ref<U64>';
-			case 'ssize_t': 'I64';
-			case 'ssize_t*': 'Ref<I64>';
+			case 'void': isRef ? 'Pointer' : 'Void';
+			case 'char': isRef ? 'Bytes' : 'Int';
+			case 'int': handleRef('Int');
+			case 'double': handleRef('Float');
+			case 'int64_t': handleRef('I64');
+			case 'uint64_t': handleRef('U64');
+			case 'size_t': handleRef('U64');
+			case 'ssize_t': handleRef('I64');
 			case _ if(type.startsWith('unsigned ')):
-				'U' + mapHXType(type.substr('unsigned '.length));
-			case _ if(type.startsWith('struct ')):
-				mapHXType(type.substr('struct '.length));
+				handleRef('U' + mapHXType(type.substr('unsigned '.length)));
 			case _ if(type.endsWith('*')):
-				mapHXType(type.substr(0, type.length - 1), true);
+				handleRef(mapHXType(type));
 			case _:
+				if(type.startsWith('struct '))
+					type = type.substr('struct '.length);
 				var hxType = snakeToPascalCase(type);
-				var finalName = (isRef ? 'Ref' : '') + (type.startsWith('uv_') ? hxType : 'C$hxType');
+				var finalName = (type.startsWith('uv_') ? hxType : 'C$hxType') + (isRef ? 'Star' : '');
 				if(!predefinedHxTypes.exists(finalName))
 					hxTypesToGenerate.set(finalName, type + (isRef ? '_star' : ''));
 				finalName;
