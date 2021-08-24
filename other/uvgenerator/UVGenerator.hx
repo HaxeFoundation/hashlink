@@ -34,6 +34,9 @@ class UVGenerator {
 		'uv_loop_configure']; // TODO: don't skip uv_loop_configure
 	static final allowNoCallback = ['uv_fs_cb'];
 
+	static final predefinedHxTypes = new Map<String,String>();
+	static final hxTypesToGenerate = new Map<String,String>();
+
 	static function main() {
 		var root = rootDir();
 		var docsDir = Path.join([root, DOCS]);
@@ -41,7 +44,9 @@ class UVGenerator {
 		var cFile = File.write(Path.join([root, UV_GENERATED_C]));
 		var hxFile = File.write(Path.join([root, UV_HX]));
 
-		hxFile.writeString(File.getContent(Path.join([root, UV_HX_HEADER])));
+		var hxHeader = File.getContent(Path.join([root, UV_HX_HEADER]));
+		collectPredefinedHxTypesToMap(hxHeader, predefinedHxTypes);
+		hxFile.writeString(hxHeader);
 
 		var entry = null;
 		while(null != (entry = scan.next())) {
@@ -73,11 +78,31 @@ class UVGenerator {
 				cFile.writeString('\n');
 			}
 		}
-		hxFile.writeString('}\n');
+		hxFile.writeString('}\n\n');
+
+		hxFile.writeString(generateHXTypes(hxTypesToGenerate));
 
 		cFile.close();
 		hxFile.close();
 		scan.end();
+	}
+
+	static function collectPredefinedHxTypesToMap(hxCode:String, map:Map<String,String>) {
+		var re = ~/(abstract|typedef|class)\s+([^ (<]+)/;
+		var pos = 0;
+		while(re.matchSub(hxCode, pos)) {
+			map.set(re.matched(2), re.matched(1));
+			var p = re.matchedPos();
+			pos = p.pos + p.len;
+		}
+	}
+
+	static function generateHXTypes(types:Map<String,String>):String {
+		var lines = [];
+		for(hx => c in types) {
+			lines.push('abstract $hx(Abstract<"$c">) {}');
+		}
+		return lines.join('\n');
 	}
 
 	static function needsCbWrapper(sig:FunctionSignature):Bool {
@@ -168,70 +193,38 @@ class UVGenerator {
 		return str.charAt(0).toUpperCase() + reCapitalize.map(str.substr(1), r -> r.matched(0).replace('_', '').toUpperCase());
 	}
 
-	static function mapHXType(type:String):String {
+	static function mapHXType(type:String, isRef:Bool = false):String {
 		if(type.startsWith('const '))
 			type = type.substr('const '.length);
 
 		return switch type {
 			case 'void*': 'Pointer';
+			case 'void': 'Void';
+			case 'int': 'Int';
+			case 'int*': 'Ref<Int>';
 			case 'char*': 'Bytes';
 			case 'double': 'Float';
+			case 'double*': 'Ref<Float>';
 			case 'int64_t': 'I64';
+			case 'int64_t*': 'Ref<I64>';
 			case 'uint64_t': 'U64';
+			case 'uint64_t*': 'Ref<U64>';
 			case 'size_t': 'U64';
+			case 'size_t*': 'Ref<U64>';
 			case 'ssize_t': 'I64';
-			case 'uv_buf_t': 'Buffer';
-			case 'uv_req_t*': 'Request';
-			case 'uv_req_type': 'RequestType';
-			case 'uv_handle_t*': 'Handle';
-			case 'uv_handle_type': 'HandleType';
-			case 'uv_file': 'File';
-			case 'uv_run_mode': 'LoopRunMode';
-			case 'sockaddr': 'SockAddr';
-			case 'addrinfo': 'RawAddrInfo';
-			case 'uv_getaddrinfo_t*': 'AddrInfoRequest';
-			case 'uv_getnameinfo_t*': 'NameInfoRequest';
-			case 'uv_fs_t*': 'FsRequest';
-			case 'uv_dirent_t*': 'RawDirent';
-			case 'uv_uid_t': 'Int';
-			case 'uv_gid_t': 'Int';
-			case 'uv_fs_type': 'FsRequestType';
-			case 'uv_stat_t*': 'RawStat';
-			case 'uv_statfs_t*': 'RawStatFs';
-			case 'uv_rusage_t*': 'RawRUsage';
-			case 'uv_cpu_info_t*': 'RawCpuInfo';
-			case 'uv_pid_t': 'Int';
-			case 'uv_interface_address_t*': 'RawInterfaceAddress';
-			case 'sockaddr_in': 'RawSockAddrIn';
-			case 'sockaddr_in6': 'RawSockAddrIn6';
-			case 'uv_passwd_t*': 'RawPasswd';
-			case 'uv_utsname_t*': 'RawUtsName';
-			case 'uv_timeval_t*': 'RawTimeVal';
-			case 'uv_timeval64_t*': 'RawTimeVal64';
-			case 'uv_random_t*': 'RandomRequest';
-			case 'uv_connect_t*': 'ConnectRequest';
-			case 'uv_process_options_t*': 'RawProcessOptions';
-			case 'uv_shutdown_t*': 'ShutdownRequest';
-			case 'uv_write_t*': 'WriteRequest';
-			case 'uv_tty_vtermstate_t': 'TtyVTermState';
-			case 'uv_tty_vtermstate_t*': 'Ref<TtyVTermState>';
-			case 'uv_membership': 'UdpMembership';
-			case 'uv_udp_send_t*': 'UdpSendRequest';
+			case 'ssize_t*': 'Ref<I64>';
 			case _ if(type.startsWith('unsigned ')):
 				'U' + mapHXType(type.substr('unsigned '.length));
-			case _ if(type.startsWith('struct ') && type.endsWith('*')):
-				mapHXType(type.substring('struct '.length, type.length - 1));
-			case _ if(type.startsWith('uv_') && type.endsWith('_t*')):
-				type = type.substr(3, type.length - 3 - 3);
-				snakeToPascalCase(type);
-			case _ if(type.startsWith('uv_') && type.endsWith('_t')):
-				type = type.substr(3, type.length - 3 - 2);
-				snakeToPascalCase(type);
+			case _ if(type.startsWith('struct ')):
+				mapHXType(type.substr('struct '.length));
 			case _ if(type.endsWith('*')):
-				var hxType = mapHXType(type.substr(0, type.length - 1));
-				'Ref<$hxType>';
+				mapHXType(type.substr(0, type.length - 1), true);
 			case _:
-				snakeToPascalCase(type);
+				var hxType = snakeToPascalCase(type);
+				var finalName = (isRef ? 'Ref' : '') + (type.startsWith('uv_') ? hxType : 'C$hxType');
+				if(!predefinedHxTypes.exists(finalName))
+					hxTypesToGenerate.set(finalName, type + (isRef ? '_star' : ''));
+				finalName;
 		}
 	}
 

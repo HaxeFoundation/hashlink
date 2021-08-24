@@ -17,16 +17,16 @@
 #define _U32	_I32
 
 #define _POINTER			_ABSTRACT(void_pointer)
-#define _HANDLE				_ABSTRACT(uv_handle)
-#define _REQ				_ABSTRACT(uv_req)
-#define _LOOP				_ABSTRACT(uv_loop)
+#define _HANDLE				_ABSTRACT(uv_handle_t_star)
+#define _REQ				_ABSTRACT(uv_req_t_star)
+#define _LOOP				_ABSTRACT(uv_loop_t_star)
 #define _ASYNC				_HANDLE
 #define _CHECK				_HANDLE
 #define _TIMER				_HANDLE
-#define _SOCKADDR			_ABSTRACT(uv_sockaddr_storage)
+#define _SOCKADDR			_ABSTRACT(sockaddr_star)
 #define _GETADDRINFO		_REQ
 #define _GETNAMEINFO		_REQ
-#define _ADDRINFO			_ABSTRACT(struct_addrinfo)
+#define _ADDRINFO			_ABSTRACT(addrinfo_star)
 #define _HANDLE_TYPE		_I32
 #define _OS_FD				_ABSTRACT(uv_os_fd)
 #define _FS					_REQ
@@ -34,7 +34,7 @@
 #define _GID_T				_I32
 #define _FILE				_I32
 #define _BUF				_ABSTRACT(uv_buf)
-#define _DIR				_ABSTRACT(uv_dir)
+#define _DIR				_ABSTRACT(uv_dir_t_star)
 #define _FS_POLL			_HANDLE
 #define _IDLE				_HANDLE
 #define _RANDOM				_REQ
@@ -50,21 +50,19 @@
 #define _TTY				_HANDLE
 #define _UDP				_HANDLE
 #define _UDP_SEND			_REQ
-#define _STAT				_ABSTRACT(uv_stat)
-#define _ADDRINFO			_ABSTRACT(struct_addrinfo)
-#define _DIRENT				_ABSTRACT(uv_dirent)
-#define _STAT				_ABSTRACT(uv_stat)
-#define _STATFS				_ABSTRACT(uv_statfs)
-#define _RUSAGE				_ABSTRACT(uv_rusage)
-#define _CPU_INFO			_ABSTRACT(uv_cpuinfo)
-#define _INTERFACE_ADDRESS	_ABSTRACT(uv_interface_address)
+#define _DIRENT				_ABSTRACT(uv_dirent_t_star)
+#define _STAT				_ABSTRACT(uv_stat_t_star)
+#define _STATFS				_ABSTRACT(uv_statfs_t_star)
+#define _RUSAGE				_ABSTRACT(uv_rusage_t_star)
+#define _CPU_INFO			_ABSTRACT(uv_cpuinfo_t_star)
+#define _INTERFACE_ADDRESS	_ABSTRACT(uv_interface_address_t_star)
 #define _SOCKADDR_IN		_ABSTRACT(struct_sockaddr_in)
 #define _SOCKADDR_IN6		_ABSTRACT(struct_sockaddr_in6)
-#define _PASSWD				_ABSTRACT(uv_passwd)
-#define _UTSNAME			_ABSTRACT(uv_utsname)
-#define _TIMEVAL			_ABSTRACT(uv_timeval)
-#define _TIMEVAL64			_ABSTRACT(uv_timeval64)
-#define _PROCESS_OPTIONS	_ABSTRACT(uv_process_options)
+#define _PASSWD				_ABSTRACT(uv_passwd_t_star)
+#define _UTSNAME			_ABSTRACT(uv_utsname_t_star)
+#define _TIMEVAL			_ABSTRACT(uv_timeval_t_star)
+#define _TIMEVAL64			_ABSTRACT(uv_timeval64_t_star)
+#define _PROCESS_OPTIONS	_ABSTRACT(uv_process_options_t_star)
 #define _REQ_TYPE			_I32
 #define _TTY_MODE_T			_I32
 #define _TTY_VTERMSTATE_T	_I32
@@ -462,13 +460,14 @@ DEFINE_PRIM(_VOID, check_bufs, _REF(_BUF) _I32);
 
 #define HANDLE_DATA_FIELDS \
 	hl_type *t; \
+	uv_handle_t *_h; \
 	vclosure *onClose;
 
 typedef struct {
 	HANDLE_DATA_FIELDS;
 } uv_handle_data_t;
 
-#define _HANDLE_DATA	_OBJ(_FUN(_VOID,_NO_ARG))
+#define _HANDLE_DATA	_OBJ(_HANDLE _FUN(_VOID,_NO_ARG))
 
 DEFINE_PRIM_TO_POINTER(_HANDLE, handle);
 DEFINE_PRIM_OF_POINTER(_HANDLE, handle);
@@ -488,7 +487,8 @@ static void on_uv_close_cb( uv_handle_t *h ) {
 // Request
 
 #define REQ_DATA_FIELDS \
-	hl_type *t;
+	hl_type *t; \
+	uv_req_t *r;
 
 typedef struct {
 	REQ_DATA_FIELDS
@@ -499,7 +499,7 @@ typedef struct {
 	vclosure *callback;
 } uv_req_cb_data_t;
 
-#define _REQ_DATA	_OBJ()
+#define _REQ_DATA	_OBJ(_REQ)
 
 DEFINE_PRIM_TO_POINTER(_REQ,req);
 DEFINE_PRIM_OF_POINTER(_REQ,req);
@@ -509,7 +509,7 @@ DEFINE_PRIM_OF_POINTER(_REQ_DATA,req_data);
 HL_PRIM void HL_NAME(req_set_data_with_gc)( uv_req_t *r, uv_req_data_t *new_data ) {
 	UV_SET_DATA(r, new_data);
 }
-DEFINE_PRIM(_VOID, req_set_data_with_gc, _REQ _REQ_DATA);
+DEFINE_PRIM(_VOID, req_set_data_with_gc, _REQ _OBJ());
 
 // Async
 
@@ -550,7 +550,7 @@ DEFINE_PRIM_ALLOC(_TIMER, timer);
 
 static void on_uv_timer_cb( uv_timer_t *h ) {
 	vclosure *c = DATA(vtimer_data *, h)->onTick;
-	hl_call1(void, c, uv_timer_t *, h);
+	hl_call0(void, c);
 }
 
 // Loop
@@ -558,6 +558,7 @@ static void on_uv_timer_cb( uv_timer_t *h ) {
 #define _RUN_MODE _I32
 
 DEFINE_PRIM_ALLOC(_LOOP, loop);
+DEFINE_PRIM_TO_POINTER(_LOOP, loop);
 
 // DNS
 
@@ -665,12 +666,12 @@ DEFINE_PRIM_C_FIELD(_ADDRINFO, struct addrinfo *, _ADDRINFO, addrinfo, ai_next);
 
 static void on_uv_getaddrinfo_cb( uv_getaddrinfo_t *r, int status, struct addrinfo *res ) {
 	vclosure *c = DATA(uv_req_cb_data_t *,r)->callback;
-	hl_call2(void,c,int,errno_uv2hl(status),struct addrinfo *,res);
+	hl_call2(void,c,int,status,struct addrinfo *,res);
 }
 
 static void on_uv_getnameinfo_cb( uv_getnameinfo_t *r, int status, const char *hostname, const char *service ) {
 	vclosure *c = DATA(uv_req_cb_data_t *,r)->callback;
-	hl_call3(void,c,int,errno_uv2hl(status),const char *,hostname,const char *,service);
+	hl_call3(void,c,int,status,const char *,hostname,const char *,service);
 }
 
 // File system
