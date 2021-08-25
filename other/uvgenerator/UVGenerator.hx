@@ -181,10 +181,15 @@ class UVGenerator {
 		}
 	}
 
+	static function isUvBuf(cType:String):Bool {
+		return cType == 'uv_buf_t' || cType == 'const uv_buf_t';
+	}
+
 	static function mapHLArg(a:TypeAndName):String {
 		var type = mapHLType(a.type);
-		if(a.name.endsWith(']'))
-			type = '_REF($type)';
+		if(a.name.endsWith(']')) {
+			type = isUvBuf(a.type) ? '${type}_ARR' : '_REF($type)';
+		}
 		return type;
 	}
 
@@ -253,7 +258,9 @@ class UVGenerator {
 		function mapArg(a:TypeAndName):String {
 			if(a.name.endsWith(']')) {
 				var openPos = a.name.lastIndexOf('[');
-				return '${a.name.substring(0, openPos)}:Ref<${mapHXType(a.type)}>';
+				var hxType = mapHXType(a.type);
+				hxType = isUvBuf(a.type) ? hxType + 'Arr' : 'Ref<$hxType>';
+				return '${a.name.substring(0, openPos)}:$hxType';
 			} else {
 				var type = mapHXType(a.type);
 				var name = a.name == '' ? type.toLowerCase() : a.name;

@@ -51,7 +51,7 @@ DEFINE_PRIM(_I32, fs_open_with_cb, _LOOP _FS _BYTES _I32 _I32 _BOOL);
 HL_PRIM int HL_NAME(fs_read_with_cb)( uv_loop_t* loop, uv_fs_t* req, uv_file file, const uv_buf_t bufs[], unsigned int nbufs, int64_t offset, bool use_uv_fs_cb ) {
 	return uv_fs_read(loop, req, file, bufs, nbufs, offset, use_uv_fs_cb?on_uv_fs_cb:NULL);
 }
-DEFINE_PRIM(_I32, fs_read_with_cb, _LOOP _FS _FILE _REF(_BUF) _U32 _I64 _BOOL);
+DEFINE_PRIM(_I32, fs_read_with_cb, _LOOP _FS _FILE _BUF_ARR _U32 _I64 _BOOL);
 
 HL_PRIM int HL_NAME(fs_unlink_with_cb)( uv_loop_t* loop, uv_fs_t* req, const char* path, bool use_uv_fs_cb ) {
 	return uv_fs_unlink(loop, req, path, use_uv_fs_cb?on_uv_fs_cb:NULL);
@@ -61,7 +61,7 @@ DEFINE_PRIM(_I32, fs_unlink_with_cb, _LOOP _FS _BYTES _BOOL);
 HL_PRIM int HL_NAME(fs_write_with_cb)( uv_loop_t* loop, uv_fs_t* req, uv_file file, const uv_buf_t bufs[], unsigned int nbufs, int64_t offset, bool use_uv_fs_cb ) {
 	return uv_fs_write(loop, req, file, bufs, nbufs, offset, use_uv_fs_cb?on_uv_fs_cb:NULL);
 }
-DEFINE_PRIM(_I32, fs_write_with_cb, _LOOP _FS _FILE _REF(_BUF) _U32 _I64 _BOOL);
+DEFINE_PRIM(_I32, fs_write_with_cb, _LOOP _FS _FILE _BUF_ARR _U32 _I64 _BOOL);
 
 HL_PRIM int HL_NAME(fs_mkdir_with_cb)( uv_loop_t* loop, uv_fs_t* req, const char* path, int mode, bool use_uv_fs_cb ) {
 	return uv_fs_mkdir(loop, req, path, mode, use_uv_fs_cb?on_uv_fs_cb:NULL);
@@ -508,16 +508,16 @@ DEFINE_PRIM(_I32, read_stop, _STREAM);
 HL_PRIM int HL_NAME(write_with_cb)( uv_write_t* req, uv_stream_t* handle, const uv_buf_t bufs[], unsigned int nbufs ) {
 	return uv_write(req, handle, bufs, nbufs, on_uv_write_cb);
 }
-DEFINE_PRIM(_I32, write_with_cb, _WRITE _STREAM _REF(_BUF) _U32);
+DEFINE_PRIM(_I32, write_with_cb, _WRITE _STREAM _BUF_ARR _U32);
 
 HL_PRIM int HL_NAME(write2_with_cb)( uv_write_t* req, uv_stream_t* handle, const uv_buf_t bufs[], unsigned int nbufs, uv_stream_t* send_handle ) {
 	return uv_write2(req, handle, bufs, nbufs, send_handle, on_uv_write_cb);
 }
-DEFINE_PRIM(_I32, write2_with_cb, _WRITE _STREAM _REF(_BUF) _U32 _STREAM);
+DEFINE_PRIM(_I32, write2_with_cb, _WRITE _STREAM _BUF_ARR _U32 _STREAM);
 
-DEFINE_PRIM(_I32, try_write, _STREAM _REF(_BUF) _U32);
+DEFINE_PRIM(_I32, try_write, _STREAM _BUF_ARR _U32);
 
-DEFINE_PRIM(_I32, try_write2, _STREAM _REF(_BUF) _U32 _STREAM);
+DEFINE_PRIM(_I32, try_write2, _STREAM _BUF_ARR _U32 _STREAM);
 
 DEFINE_PRIM(_I32, is_readable, _STREAM);
 
@@ -611,9 +611,9 @@ DEFINE_PRIM(_I32, udp_set_ttl, _UDP _I32);
 HL_PRIM int HL_NAME(udp_send_with_cb)( uv_udp_send_t* req, uv_udp_t* handle, const uv_buf_t bufs[], unsigned int nbufs, const struct sockaddr* addr ) {
 	return uv_udp_send(req, handle, bufs, nbufs, addr, on_uv_udp_send_cb);
 }
-DEFINE_PRIM(_I32, udp_send_with_cb, _UDP_SEND _UDP _REF(_BUF) _U32 _SOCKADDR);
+DEFINE_PRIM(_I32, udp_send_with_cb, _UDP_SEND _UDP _BUF_ARR _U32 _SOCKADDR);
 
-DEFINE_PRIM(_I32, udp_try_send, _UDP _REF(_BUF) _U32 _SOCKADDR);
+DEFINE_PRIM(_I32, udp_try_send, _UDP _BUF_ARR _U32 _SOCKADDR);
 
 HL_PRIM int HL_NAME(udp_recv_start_with_cb)( uv_udp_t* handle ) {
 	return uv_udp_recv_start(handle, on_uv_alloc_cb, on_uv_udp_recv_cb);
