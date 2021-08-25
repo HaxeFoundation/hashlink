@@ -180,7 +180,7 @@ HL_PRIM double hl_parse_float( vbyte *bytes, int pos, int len ) {
 	uchar *str = (uchar*)(bytes+pos);
 	uchar *end = NULL;
 	double d;
-	while( *str == ' ' ) str++; 
+	while( *str == ' ' ) str++;
 	d = utod(str,&end);
 	if( end == str )
 		return hl_nan();
@@ -252,6 +252,7 @@ HL_PRIM int hl_string_compare( vbyte *a, vbyte *b, int len ) {
 }
 
 DEFINE_PRIM(_BYTES,alloc_bytes,_I32);
+DEFINE_PRIM(_BYTES,copy_bytes,_BYTES _I32);
 DEFINE_PRIM(_VOID,bytes_blit,_BYTES _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_I32,bytes_compare,_BYTES _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_I32,bytes_compare16,_BYTES _BYTES _I32);

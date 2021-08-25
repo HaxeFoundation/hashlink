@@ -1,7 +1,7 @@
 class UVSample {
 	static function main() {
 		CheckSample.main();
-		// TcpSample.main();
+		TcpSample.main();
 		DnsSample.main();
 		// UdpSample.main();
 		// PipeSample.main();

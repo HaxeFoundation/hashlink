@@ -24,6 +24,9 @@
 #define _CHECK				_HANDLE
 #define _TIMER				_HANDLE
 #define _SOCKADDR			_ABSTRACT(sockaddr_star)
+#define _SOCKADDR_IN		_ABSTRACT(sockaddr_in_star)
+#define _SOCKADDR_IN6		_ABSTRACT(sockaddr_in6_star)
+#define _SOCKADDR_STORAGE	_ABSTRACT(sockaddr_storage_star)
 #define _GETADDRINFO		_REQ
 #define _GETNAMEINFO		_REQ
 #define _ADDRINFO			_ABSTRACT(addrinfo_star)
@@ -34,6 +37,7 @@
 #define _GID_T				_I32
 #define _FILE				_I32
 #define _BUF				_ABSTRACT(uv_buf_t)
+#define _BUF_ARR			_ABSTRACT(uv_buf_t_arr)
 #define _DIR				_ABSTRACT(uv_dir_t_star)
 #define _FS_POLL			_HANDLE
 #define _IDLE				_HANDLE
@@ -56,8 +60,6 @@
 #define _RUSAGE				_ABSTRACT(uv_rusage_t_star)
 #define _CPU_INFO			_ABSTRACT(uv_cpu_info_t_star)
 #define _INTERFACE_ADDRESS	_ABSTRACT(uv_interface_address_t_star)
-#define _SOCKADDR_IN		_ABSTRACT(sockaddr_in_star)
-#define _SOCKADDR_IN6		_ABSTRACT(sockaddr_in6_star)
 #define _PASSWD				_ABSTRACT(uv_passwd_t_star)
 #define _UTSNAME			_ABSTRACT(uv_utsname_t_star)
 #define _TIMEVAL			_ABSTRACT(uv_timeval_t_star)
@@ -93,28 +95,10 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	static void on_uv_random_cb( uv_random_t* r, int status, void* buf, size_t buflen ) {
 	}
 
-	static void on_uv_connect_cb( uv_connect_t *r, int status ) {
-	}
-
 	static void on_uv_prepare_cb( uv_prepare_t *h ) {
 	}
 
 	static void on_uv_signal_cb( uv_signal_t *h, int signum ) {
-	}
-
-	static void on_uv_shutdown_cb( uv_shutdown_t *r, int status ) {
-	}
-
-	static void on_uv_connection_cb( uv_stream_t *h, int status ) {
-	}
-
-	static void on_uv_alloc_cb( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
-	}
-
-	static void on_uv_write_cb( uv_write_t *r, int status ) {
-	}
-
-	static void on_uv_read_cb( uv_stream_t *h, ssize_t nread, const uv_buf_t *buf ) {
 	}
 
 	static void on_uv_udp_send_cb( uv_udp_send_t *r, int status ) {
@@ -127,11 +111,11 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 #define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
 #define DATA(t,h)	((t)h->data)
 
-#define DEFINE_PRIM_ALLOC(r,t) \
-	HL_PRIM uv_##t##_t *HL_NAME(alloc_##t)() { \
-		return UV_ALLOC(uv_##t##_t); \
+#define DEFINE_PRIM_ALLOC(hl_type,uv_name) \
+	HL_PRIM uv_##uv_name##_t *HL_NAME(alloc_##uv_name)() { \
+		return UV_ALLOC(uv_##uv_name##_t); \
 	} \
-	DEFINE_PRIM(r, alloc_##t, _NO_ARG);
+	DEFINE_PRIM(hl_type, alloc_##uv_name, _NO_ARG);
 
 #define DEFINE_PRIM_C_FIELD(hl_return,c_return,hl_struct,c_struct,field) \
 	HL_PRIM c_return HL_NAME(c_struct##_##field)( struct c_struct *s ) { \
@@ -449,12 +433,39 @@ DEFINE_PRIM(_I32, translate_to_uv_error, _I32);
 
 // Buf
 
-HL_PRIM void HL_NAME(check_bufs)( uv_buf_t bufs[], int length ) {
-	for(int i = 0; i < length; i++) {
-		printf("%s\n", bufs[i].base);
-	}
+// HL_PRIM void HL_NAME(check_bufs)( const uv_buf_t bufs[], int length ) {
+// 	for(int i = 0; i < length; i++) {
+// 		printf("len: %ld; base: %s\n", bufs[i].len, bufs[i].base);
+// 	}
+// }
+// DEFINE_PRIM(_VOID, check_bufs, _REF(_BUF) _I32);
+
+// HL_PRIM uv_buf_t HL_NAME(buf_init_wrap)( vbyte *bytes, int length ) {
+// 	printf("%d\n", length);
+// 	uv_buf_t b = uv_buf_init((char *)bytes, length);
+// 	printf("%ld\n", b.len);
+// 	return b;
+// }
+// DEFINE_PRIM(_BUF, buf_init_wrap, _BYTES _U32);
+
+// HL_PRIM void HL_NAME(check_bufs)( const uv_buf_t bufs[], int length ) {
+// 	for(int i = 0; i < length; i++) {
+// 		printf("len: %ld; base: %s\n", bufs[i].len, bufs[i].base);
+// 	}
+// }
+// DEFINE_PRIM(_VOID, check_bufs, _REF(_BUF) _I32);
+
+HL_PRIM uv_buf_t *HL_NAME(alloc_buf)( vbyte *bytes, int length ) {
+	uv_buf_t *buf = UV_ALLOC(uv_buf_t);
+	buf->base = (char *)bytes;
+	buf->len = length;
+	return buf;
 }
-DEFINE_PRIM(_VOID, check_bufs, _REF(_BUF) _I32);
+DEFINE_PRIM(_BUF_ARR, alloc_buf, _BYTES _I32);
+
+DEFINE_PRIM_TO_POINTER(_BUF_ARR, buf);
+DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _BUF_ARR, buf, base);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _BUF_ARR, buf, len);
 
 // Handle
 
@@ -488,7 +499,7 @@ static void on_uv_close_cb( uv_handle_t *h ) {
 
 #define REQ_DATA_FIELDS \
 	hl_type *t; \
-	uv_req_t *r;
+	uv_req_t *_r;
 
 typedef struct {
 	REQ_DATA_FIELDS
@@ -544,12 +555,12 @@ static void on_uv_check_cb( uv_check_t *h ) {
 typedef struct {
 	HANDLE_DATA_FIELDS;
 	vclosure *onTick;
-} vtimer_data;
+} uv_timer_data;
 
 DEFINE_PRIM_ALLOC(_TIMER, timer);
 
 static void on_uv_timer_cb( uv_timer_t *h ) {
-	vclosure *c = DATA(vtimer_data *, h)->onTick;
+	vclosure *c = DATA(uv_timer_data *, h)->onTick;
 	hl_call0(void, c);
 }
 
@@ -559,6 +570,28 @@ static void on_uv_timer_cb( uv_timer_t *h ) {
 
 DEFINE_PRIM_ALLOC(_LOOP, loop);
 DEFINE_PRIM_TO_POINTER(_LOOP, loop);
+
+// SockAddr
+
+HL_PRIM struct sockaddr_storage *HL_NAME(alloc_sockaddr_storage)() {
+	return UV_ALLOC(struct sockaddr_storage);
+}
+DEFINE_PRIM(_SOCKADDR_STORAGE, alloc_sockaddr_storage, _NO_ARG);
+
+HL_PRIM int HL_NAME(sockaddr_storage_size)() {
+	return sizeof(struct sockaddr_storage);
+}
+DEFINE_PRIM(_I32, sockaddr_storage_size, _NO_ARG);
+
+HL_PRIM void *HL_NAME(sockaddr_storage_to_pointer)( struct sockaddr_storage *addr ) {
+	return addr;
+}
+DEFINE_PRIM(_POINTER, sockaddr_storage_to_pointer, _SOCKADDR_STORAGE);
+
+HL_PRIM struct sockaddr *HL_NAME(sockaddr_of_storage)( struct sockaddr_storage *addr ) {
+	return (struct sockaddr *)addr;
+}
+DEFINE_PRIM(_SOCKADDR, sockaddr_of_storage, _SOCKADDR_STORAGE);
 
 // DNS
 
@@ -597,6 +630,26 @@ DEFINE_PRIM(_I32, nameinfo_flags_to_native, _I32);
 #define HL_UV_INET		-2
 #define HL_UV_INET6		-3
 
+HL_PRIM int HL_NAME(address_family_to_pf)( int family ) {
+	switch( family ) {
+		case HL_UV_UNSPEC: return PF_UNSPEC;
+		case HL_UV_INET: return PF_INET;
+		case HL_UV_INET6: return PF_INET6;
+		default: return family;
+	}
+}
+DEFINE_PRIM(_I32, address_family_to_pf, _I32)
+
+HL_PRIM int HL_NAME(address_family_to_af)( int family ) {
+	switch( family ) {
+		case HL_UV_UNSPEC: return AF_UNSPEC;
+		case HL_UV_INET: return AF_INET;
+		case HL_UV_INET6: return AF_INET6;
+		default: return family;
+	}
+}
+DEFINE_PRIM(_I32, address_family_to_af, _I32)
+
 //see hl.uv.SockAddr.SocketType
 #define HL_UV_STREAM	-1
 #define HL_UV_DGRAM		-2
@@ -614,12 +667,7 @@ HL_PRIM struct addrinfo *HL_NAME(alloc_addrinfo)( int flags, int family, int soc
 	if( flags & HL_UV_AI_ADDRCONFIG )	info->ai_flags |= AI_ADDRCONFIG;
 	if( flags & HL_UV_AI_NUMERICSERV )	info->ai_flags |= AI_NUMERICSERV;
 
-	switch( family ) {
-		case HL_UV_UNSPEC: info->ai_family = PF_UNSPEC; break;
-		case HL_UV_INET: info->ai_family = PF_INET; break;
-		case HL_UV_INET6: info->ai_family = PF_INET6; break;
-		default: info->ai_family = family; break;
-	}
+	info->ai_family = uv_address_family_to_pf(family);
 
 	switch( socktype ) {
 		case HL_UV_STREAM: info->ai_socktype = SOCK_STREAM; break;
@@ -658,7 +706,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(addrinfo_ai_addr)( struct addrinfo *ai ) {
 	memcpy(addr, ai->ai_addr, ai->ai_addrlen);
 	return addr;
 }
-DEFINE_PRIM(_SOCKADDR, addrinfo_ai_addr, _ADDRINFO);
+DEFINE_PRIM(_SOCKADDR_STORAGE, addrinfo_ai_addr, _ADDRINFO);
 
 DEFINE_PRIM_C_FIELD(_I32, int, _ADDRINFO, addrinfo, ai_protocol);
 DEFINE_PRIM_C_FIELD(_BYTES, vbyte *, _ADDRINFO, addrinfo, ai_canonname);
@@ -673,6 +721,51 @@ static void on_uv_getnameinfo_cb( uv_getnameinfo_t *r, int status, const char *h
 	vclosure *c = DATA(uv_req_cb_data_t *,r)->callback;
 	hl_call3(void,c,int,status,const char *,hostname,const char *,service);
 }
+
+// Stream
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onConnection;
+	vclosure *onRead;
+} uv_stream_data_t;
+
+DEFINE_PRIM_ALLOC(_WRITE, write);
+DEFINE_PRIM_ALLOC(_CONNECT, connect);
+DEFINE_PRIM_ALLOC(_SHUTDOWN, shutdown);
+
+static void on_uv_write_cb( uv_write_t *r, int status ) {
+	vclosure *c = DATA(uv_req_cb_data_t *, r)->callback;
+	hl_call0(void, c);
+}
+
+static void on_uv_connect_cb( uv_connect_t *r, int status ) {
+	vclosure *c = DATA(uv_req_cb_data_t *, r)->callback;
+	hl_call1(void, c, int, status);
+}
+
+static void on_uv_shutdown_cb( uv_shutdown_t *r, int status ) {
+	vclosure *c = DATA(uv_req_cb_data_t *, r)->callback;
+	hl_call1(void, c, int, status);
+}
+
+static void on_uv_connection_cb( uv_stream_t *h, int status ) {
+	vclosure *c = DATA(uv_stream_data_t *, h)->onConnection;
+	hl_call1(void, c, int, status);
+}
+
+static void on_uv_alloc_cb( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
+	*buf = uv_buf_init(malloc(size), (int)size);
+}
+
+static void on_uv_read_cb( uv_stream_t *h, ssize_t nread, const uv_buf_t *buf ) {
+	vclosure *c = DATA(uv_stream_data_t *, h)->onRead;
+	hl_call2(void, c, int64, nread, const uv_buf_t *, buf);
+}
+
+// TCP
+
+DEFINE_PRIM_ALLOC(_TCP, tcp);
 
 // File system
 
@@ -700,7 +793,6 @@ DEFINE_PRIM_UV_FIELD(_I32, int, _DIR, dir, nentries);
 DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _DIRENT, dirent, name);
 DEFINE_PRIM_UV_FIELD(_I32, int, _DIRENT, dirent, type);
 DEFINE_PRIM_TO_POINTER(_DIRENT, dirent);
-
 
 
 // auto-generated libuv bindings
@@ -1308,7 +1400,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(ip4_addr_wrap)( vstring *ip, int port ) {
 	UV_CHECK_ERROR(uv_ip4_addr(hl_to_utf8(ip->bytes), port, (uv_sockaddr_in *)addr),free(addr),NULL);
 	return addr;
 }
-DEFINE_PRIM(_SOCKADDR, ip4_addr_wrap, _STRING _I32);
+DEFINE_PRIM(_SOCKADDR_STORAGE, ip4_addr_wrap, _STRING _I32);
 
 HL_PRIM uv_sockaddr_storage *HL_NAME(ip6_addr_wrap)( vstring *ip, int port ) {
 	UV_CHECK_NULL(ip,NULL);
@@ -1316,7 +1408,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(ip6_addr_wrap)( vstring *ip, int port ) {
 	UV_CHECK_ERROR(uv_ip6_addr(hl_to_utf8(ip->bytes), port, (uv_sockaddr_in6 *)addr),free(addr),NULL);
 	return addr;
 }
-DEFINE_PRIM(_SOCKADDR, ip6_addr_wrap, _STRING _I32);
+DEFINE_PRIM(_SOCKADDR_STORAGE, ip6_addr_wrap, _STRING _I32);
 
 HL_PRIM vdynamic *HL_NAME(sockaddr_get_port)( uv_sockaddr_storage *addr ) {
 	UV_CHECK_NULL(addr,NULL);
@@ -1330,7 +1422,7 @@ HL_PRIM vdynamic *HL_NAME(sockaddr_get_port)( uv_sockaddr_storage *addr ) {
 	}
 	return hl_make_dyn(&port, &hlt_i32);
 }
-DEFINE_PRIM(_NULL(_I32), sockaddr_get_port, _SOCKADDR);
+DEFINE_PRIM(_NULL(_I32), sockaddr_get_port, _SOCKADDR_STORAGE);
 
 HL_PRIM uv_sockaddr_storage *HL_NAME(sockaddr_cast_ptr)( vdynamic *ptr ) {
 	UV_CHECK_NULL(ptr,NULL);
@@ -1338,7 +1430,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(sockaddr_cast_ptr)( vdynamic *ptr ) {
 		hl_error("Invalid usage of hl.uv.SockAddr.castPtr()");
 	return (uv_sockaddr_storage *)ptr->v.ptr;
 }
-DEFINE_PRIM(_SOCKADDR, sockaddr_cast_ptr, _DYN);
+DEFINE_PRIM(_SOCKADDR_STORAGE, sockaddr_cast_ptr, _DYN);
 
 //How to return vstring instead of vbyte?
 HL_PRIM vbyte *HL_NAME(ip_name_wrap)( uv_sockaddr_storage *addr ) {
@@ -1353,7 +1445,7 @@ HL_PRIM vbyte *HL_NAME(ip_name_wrap)( uv_sockaddr_storage *addr ) {
 	}
 	return dst;
 }
-DEFINE_PRIM(_BYTES, ip_name_wrap, _SOCKADDR);
+DEFINE_PRIM(_BYTES, ip_name_wrap, _SOCKADDR_STORAGE);
 
 // TCP
 
@@ -1395,7 +1487,7 @@ HL_PRIM void HL_NAME(tcp_bind_wrap)( uv_tcp_t *h, uv_sockaddr_storage *addr, vdy
 	int flags = ipv6_only && ipv6_only->v.b ? UV_TCP_IPV6ONLY : 0;
 	UV_CHECK_ERROR(uv_tcp_bind(h,(uv_sockaddr *)addr,flags),,);
 }
-DEFINE_PRIM(_VOID, tcp_bind_wrap, _HANDLE _SOCKADDR _NULL(_BOOL));
+DEFINE_PRIM(_VOID, tcp_bind_wrap, _HANDLE _SOCKADDR_STORAGE _NULL(_BOOL));
 
 HL_PRIM uv_sockaddr_storage *HL_NAME(tcp_getsockname_wrap)( uv_tcp_t *h ) {
 	UV_CHECK_NULL(h,NULL);
@@ -1404,7 +1496,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(tcp_getsockname_wrap)( uv_tcp_t *h ) {
 	UV_CHECK_ERROR(uv_tcp_getsockname(h,(uv_sockaddr *)addr,&size),free(addr),NULL);
 	return addr;
 }
-DEFINE_PRIM(_SOCKADDR, tcp_getsockname_wrap, _HANDLE);
+DEFINE_PRIM(_SOCKADDR_STORAGE, tcp_getsockname_wrap, _HANDLE);
 
 HL_PRIM uv_sockaddr_storage *HL_NAME(tcp_getpeername_wrap)( uv_tcp_t *h ) {
 	UV_CHECK_NULL(h,NULL);
@@ -1413,7 +1505,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(tcp_getpeername_wrap)( uv_tcp_t *h ) {
 	UV_CHECK_ERROR(uv_tcp_getpeername(h,(uv_sockaddr *)addr,&size),free(addr),NULL);
 	return addr;
 }
-DEFINE_PRIM(_SOCKADDR, tcp_getpeername_wrap, _HANDLE);
+DEFINE_PRIM(_SOCKADDR_STORAGE, tcp_getpeername_wrap, _HANDLE);
 
 static void on_connect( uv_connect_t *r, int status ) {
 	UV_GET_CLOSURE(c,r,0,"No callback in connect request");
@@ -1428,7 +1520,7 @@ HL_PRIM void HL_NAME(tcp_connect_wrap)( uv_tcp_t *h, uv_sockaddr_storage *addr, 
 	UV_ALLOC_REQ(uv_connect_t,r,c);
 	UV_CHECK_ERROR(uv_tcp_connect(r, h,(uv_sockaddr *)addr,on_connect),free_req((uv_req_t *)r),);
 }
-DEFINE_PRIM(_VOID, tcp_connect_wrap, _HANDLE _SOCKADDR _FUN(_VOID,_I32));
+DEFINE_PRIM(_VOID, tcp_connect_wrap, _HANDLE _SOCKADDR_STORAGE _FUN(_VOID,_I32));
 
 HL_PRIM void HL_NAME(tcp_close_reset_wrap)( uv_tcp_t *h, vclosure *c ) {
 	UV_CHECK_NULL(h,);
@@ -1715,13 +1807,13 @@ HL_PRIM void HL_NAME(udp_bind_wrap)( uv_udp_t *h, uv_sockaddr_storage *addr, vdy
 		flags |= UV_UDP_REUSEADDR;
 	UV_CHECK_ERROR(uv_udp_bind(h,(uv_sockaddr *)addr,flags),,);
 }
-DEFINE_PRIM(_VOID, udp_bind_wrap, _HANDLE _SOCKADDR _NULL(_BOOL) _NULL(_BOOL));
+DEFINE_PRIM(_VOID, udp_bind_wrap, _HANDLE _SOCKADDR_STORAGE _NULL(_BOOL) _NULL(_BOOL));
 
 HL_PRIM void HL_NAME(udp_connect_wrap)( uv_udp_t *h, uv_sockaddr_storage *addr ) {
 	UV_CHECK_NULL(h,);
 	UV_CHECK_ERROR(uv_udp_connect(h,(uv_sockaddr *)addr),,);
 }
-DEFINE_PRIM(_VOID, udp_connect_wrap, _HANDLE _SOCKADDR _NULL(_BOOL));
+DEFINE_PRIM(_VOID, udp_connect_wrap, _HANDLE _SOCKADDR_STORAGE _NULL(_BOOL));
 
 HL_PRIM uv_sockaddr_storage *HL_NAME(udp_getsockname_wrap)( uv_udp_t *h ) {
 	UV_CHECK_NULL(h,NULL);
@@ -1730,7 +1822,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(udp_getsockname_wrap)( uv_udp_t *h ) {
 	UV_CHECK_ERROR(uv_udp_getsockname(h,(uv_sockaddr *)addr,&size),free(addr),NULL);
 	return addr;
 }
-DEFINE_PRIM(_SOCKADDR, udp_getsockname_wrap, _HANDLE);
+DEFINE_PRIM(_SOCKADDR_STORAGE, udp_getsockname_wrap, _HANDLE);
 
 HL_PRIM uv_sockaddr_storage *HL_NAME(udp_getpeername_wrap)( uv_udp_t *h ) {
 	UV_CHECK_NULL(h,NULL);
@@ -1739,7 +1831,7 @@ HL_PRIM uv_sockaddr_storage *HL_NAME(udp_getpeername_wrap)( uv_udp_t *h ) {
 	UV_CHECK_ERROR(uv_udp_getpeername(h,(uv_sockaddr *)addr,&size),free(addr),NULL);
 	return addr;
 }
-DEFINE_PRIM(_SOCKADDR, udp_getpeername_wrap, _HANDLE);
+DEFINE_PRIM(_SOCKADDR_STORAGE, udp_getpeername_wrap, _HANDLE);
 
 static uv_membership udp_membership( int hx_membership ) {
 	switch( hx_membership ) {
@@ -1824,7 +1916,7 @@ HL_PRIM void HL_NAME(udp_send_wrap)( uv_udp_t *h, vbyte *data, int length, uv_so
 	buf.len = length;
 	UV_CHECK_ERROR(uv_udp_send(r,h,&buf,1,(uv_sockaddr *)addr,on_udp_send),free_req((uv_req_t *)r),);
 }
-DEFINE_PRIM(_VOID, udp_send_wrap, _HANDLE _BYTES _I32 _SOCKADDR _FUN(_VOID,_I32));
+DEFINE_PRIM(_VOID, udp_send_wrap, _HANDLE _BYTES _I32 _SOCKADDR_STORAGE _FUN(_VOID,_I32));
 
 HL_PRIM int HL_NAME(udp_try_send_wrap)( uv_udp_t *h, vbyte *data, int length, uv_sockaddr_storage *addr ) {
 	UV_CHECK_NULL(h,0);
@@ -1832,7 +1924,7 @@ HL_PRIM int HL_NAME(udp_try_send_wrap)( uv_udp_t *h, vbyte *data, int length, uv
 	UV_CHECK_ERROR(uv_udp_try_send(h,&buf,1,(uv_sockaddr *)addr),,0);
 	return __result__;
 }
-DEFINE_PRIM(_I32, udp_try_send_wrap, _HANDLE _BYTES _I32 _SOCKADDR);
+DEFINE_PRIM(_I32, udp_try_send_wrap, _HANDLE _BYTES _I32 _SOCKADDR_STORAGE);
 
 static void on_udp_recv( uv_udp_t *h, ssize_t nread, const uv_buf_t *buf, const uv_sockaddr *src_addr, unsigned flags ) {
 	UV_GET_CLOSURE(c,h,0,"No recv callback in udp handle");
@@ -1863,7 +1955,7 @@ HL_PRIM void HL_NAME(udp_recv_start_wrap)( uv_udp_t *h, vclosure *c ) {
 	handle_register_callback((uv_handle_t *)h,c,0);
 	UV_CHECK_ERROR(uv_udp_recv_start(h,on_alloc,on_udp_recv),handle_clear_callback((uv_handle_t*)h,0),);
 }
-DEFINE_PRIM(_VOID, udp_recv_start_wrap, _HANDLE _FUN(_VOID,_I32 _BYTES _I32 _SOCKADDR _DYN));
+DEFINE_PRIM(_VOID, udp_recv_start_wrap, _HANDLE _FUN(_VOID,_I32 _BYTES _I32 _SOCKADDR_STORAGE _DYN));
 
 HL_PRIM bool HL_NAME(udp_using_recvmmsg_wrap)( uv_udp_t *h ) {
 	UV_CHECK_NULL(h,false);
@@ -2023,7 +2115,7 @@ HL_PRIM void HL_NAME(getnameinfo_wrap)( uv_loop_t *l, uv_sockaddr_storage *addr,
 		flags |= NI_NUMERICSERV;
 	UV_CHECK_ERROR(uv_getnameinfo(l,r,on_getnameinfo,(uv_sockaddr *)addr,flags),free_req((uv_req_t *)r),);
 }
-DEFINE_PRIM(_VOID, getnameinfo_wrap, _LOOP _SOCKADDR _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _FUN(_VOID,_I32 _BYTES _BYTES));
+DEFINE_PRIM(_VOID, getnameinfo_wrap, _LOOP _SOCKADDR_STORAGE _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _NULL(_BOOL) _FUN(_VOID,_I32 _BYTES _BYTES));
 
 // loop
 
