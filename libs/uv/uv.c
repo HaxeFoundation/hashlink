@@ -789,6 +789,10 @@ static void on_uv_read_cb( uv_stream_t *h, ssize_t nread, const uv_buf_t *buf ) 
 
 DEFINE_PRIM_ALLOC(_TCP, tcp);
 
+// Pipe
+
+DEFINE_PRIM_ALLOC(_PIPE, pipe);
+
 // UDP
 
 typedef struct {
