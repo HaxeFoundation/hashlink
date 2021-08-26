@@ -31,7 +31,7 @@ class UVGenerator {
 	static final skipFunctions = ['uv_replace_allocator', 'uv_get_osfhandle',
 		'uv_fileno', 'uv_open_osfhandle', 'uv_print_all_handles', 'uv_print_active_handles',
 		'uv_os_environ', 'uv_os_free_environ', 'uv_setup_args', 'uv_get_process_title',
-		'uv_set_process_title', 'uv_tcp_open', 'uv_udp_open', 'uv_socketpair',
+		'uv_set_process_title', 'uv_tcp_open', 'uv_udp_open', 'uv_socketpair', 'uv_buf_init',
 		'uv_loop_configure']; // TODO: don't skip uv_loop_configure
 	static final allowNoCallback = ['uv_fs_cb'];
 

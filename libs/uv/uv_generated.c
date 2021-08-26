@@ -333,8 +333,6 @@ DEFINE_PRIM(_HANDLE_TYPE, guess_handle, _FILE);
 
 DEFINE_PRIM(_VOID, library_shutdown, _NO_ARG);
 
-DEFINE_PRIM(_BUF, buf_init, _BYTES _U32);
-
 DEFINE_PRIM(_I32, resident_set_memory, _REF(_I64));
 
 DEFINE_PRIM(_I32, uptime, _REF(_F64));

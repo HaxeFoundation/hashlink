@@ -32,7 +32,12 @@ class UdpSample {
 					if(addr == null && !flags.mmsgChunk)
 						udp.close(() -> print('Done'));
 				}
-				print('...with flags $flags');
+				var o = {
+					mmsgChunk: flags.mmsgChunk,
+					mmsgFree: flags.mmsgFree,
+					partial: flags.partial,
+				}
+				print('...with flags $o');
 			case _:
 				throw new UVException(e);
 		});

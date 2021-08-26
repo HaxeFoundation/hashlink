@@ -100,12 +100,6 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 
 	static void on_uv_signal_cb( uv_signal_t *h, int signum ) {
 	}
-
-	static void on_uv_udp_send_cb( uv_udp_send_t *r, int status ) {
-	}
-
-	static void on_uv_udp_recv_cb( uv_udp_t *h, ssize_t nread, const uv_buf_t *buf, const uv_sockaddr *src_addr, unsigned flags ) {
-	}
 // }
 
 #define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
@@ -463,6 +457,12 @@ HL_PRIM uv_buf_t *HL_NAME(alloc_buf)( vbyte *bytes, int length ) {
 }
 DEFINE_PRIM(_BUF_ARR, alloc_buf, _BYTES _I32);
 
+HL_PRIM void HL_NAME(buf_set)( uv_buf_t *buf, vbyte *bytes, int length ) { // TODO: change `length` to `int64`
+	buf->base = (char *)bytes;
+	buf->len = length;
+}
+DEFINE_PRIM(_VOID, buf_set, _BUF_ARR _BYTES _I32);
+
 DEFINE_PRIM_TO_POINTER(_BUF_ARR, buf);
 DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _BUF_ARR, buf, base);
 DEFINE_PRIM_UV_FIELD(_U64, int64, _BUF_ARR, buf, len);
@@ -477,6 +477,14 @@ DEFINE_PRIM_UV_FIELD(_U64, int64, _BUF_ARR, buf, len);
 typedef struct {
 	HANDLE_DATA_FIELDS;
 } uv_handle_data_t;
+
+#define HANDLE_DATA_WITH_ALLOC_FIELDS \
+	HANDLE_DATA_FIELDS; \
+	vclosure *onAlloc;
+
+typedef struct {
+	HANDLE_DATA_WITH_ALLOC_FIELDS;
+} uv_handle_data_with_alloc_t;
 
 #define _HANDLE_DATA	_OBJ(_HANDLE _FUN(_VOID,_NO_ARG))
 
@@ -493,6 +501,13 @@ DEFINE_PRIM(_VOID, handle_set_data_with_gc, _HANDLE _HANDLE_DATA);
 static void on_uv_close_cb( uv_handle_t *h ) {
 	uv_handle_data_t *data = DATA(uv_handle_data_t *, h);
 	hl_call0(void, data->onClose);
+}
+
+static void on_uv_alloc_cb( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
+	vclosure *c = DATA(uv_handle_data_with_alloc_t *, h)->onAlloc;
+	hl_call2(void, c, uv_buf_t *, buf, int, (int)size);
+	if( buf->base )
+		hl_add_root(buf->base);
 }
 
 // Request
@@ -592,6 +607,15 @@ HL_PRIM struct sockaddr *HL_NAME(sockaddr_of_storage)( struct sockaddr_storage *
 	return (struct sockaddr *)addr;
 }
 DEFINE_PRIM(_SOCKADDR, sockaddr_of_storage, _SOCKADDR_STORAGE);
+
+HL_PRIM struct sockaddr_storage *HL_NAME(sockaddr_to_storage)( struct sockaddr *addr ) {
+	if( !addr )
+		return NULL;
+	struct sockaddr_storage *storage = UV_ALLOC(struct sockaddr_storage);
+	memcpy(storage, addr, sizeof(struct sockaddr_storage));
+	return storage;
+}
+DEFINE_PRIM(_SOCKADDR_STORAGE, sockaddr_to_storage, _SOCKADDR);
 
 // DNS
 
@@ -725,7 +749,7 @@ static void on_uv_getnameinfo_cb( uv_getnameinfo_t *r, int status, const char *h
 // Stream
 
 typedef struct {
-	HANDLE_DATA_FIELDS;
+	HANDLE_DATA_WITH_ALLOC_FIELDS;
 	vclosure *onConnection;
 	vclosure *onRead;
 } uv_stream_data_t;
@@ -736,7 +760,7 @@ DEFINE_PRIM_ALLOC(_SHUTDOWN, shutdown);
 
 static void on_uv_write_cb( uv_write_t *r, int status ) {
 	vclosure *c = DATA(uv_req_cb_data_t *, r)->callback;
-	hl_call0(void, c);
+	hl_call1(void, c, int, status);
 }
 
 static void on_uv_connect_cb( uv_connect_t *r, int status ) {
@@ -754,18 +778,38 @@ static void on_uv_connection_cb( uv_stream_t *h, int status ) {
 	hl_call1(void, c, int, status);
 }
 
-static void on_uv_alloc_cb( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
-	*buf = uv_buf_init(malloc(size), (int)size);
-}
-
 static void on_uv_read_cb( uv_stream_t *h, ssize_t nread, const uv_buf_t *buf ) {
 	vclosure *c = DATA(uv_stream_data_t *, h)->onRead;
+	if( buf->base )
+		hl_remove_root(buf->base);
 	hl_call2(void, c, int64, nread, const uv_buf_t *, buf);
 }
 
 // TCP
 
 DEFINE_PRIM_ALLOC(_TCP, tcp);
+
+// UDP
+
+typedef struct {
+	HANDLE_DATA_WITH_ALLOC_FIELDS;
+	vclosure *onRecv;
+} uv_udp_data_t;
+
+DEFINE_PRIM_ALLOC(_UDP, udp);
+DEFINE_PRIM_ALLOC(_UDP_SEND, udp_send);
+
+static void on_uv_udp_send_cb( uv_udp_send_t *r, int status ) {
+	vclosure *c = DATA(uv_req_cb_data_t *, r)->callback;
+	hl_call1(void, c, int, status);
+}
+
+static void on_uv_udp_recv_cb( uv_udp_t *h, ssize_t nread, const uv_buf_t *buf, const uv_sockaddr *src_addr, unsigned flags ) {
+	vclosure *c = DATA(uv_udp_data_t *, h)->onRecv;
+	if( (nread <= 0 && !src_addr) || (flags & UV_UDP_MMSG_FREE) )
+		hl_remove_root(buf->base);
+	hl_call4(void, c, int64, nread, const uv_buf_t *, buf, const uv_sockaddr *, src_addr, unsigned, flags);
+}
 
 // File system
 
