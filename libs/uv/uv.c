@@ -136,12 +136,6 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	} \
 	DEFINE_PRIM(hl_return, uv_name##_##field, hl_struct);
 
-#define DEFINE_PRIM_TO_POINTER(hl_type,uv_name) \
-	HL_PRIM void *HL_NAME(uv_name##_to_pointer)( uv_##uv_name##_t *v ) { \
-		return v; \
-	} \
-	DEFINE_PRIM(_POINTER, uv_name##_to_pointer, hl_type);
-
 #define DEFINE_PRIM_OF_POINTER(hl_type,uv_name) \
 	HL_PRIM uv_##uv_name##_t *HL_NAME(pointer_to_##uv_name)( void *ptr ) { \
 		return ptr; \
@@ -156,21 +150,6 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 			hl_add_root(new_data); \
 		h->data = new_data; \
 	}
-
-HL_PRIM void HL_NAME(free)( void *ptr ) {
-	free(ptr);
-}
-DEFINE_PRIM(_VOID, free, _POINTER);
-
-HL_PRIM void *HL_NAME(bytes_to_pointer)( vbyte *bytes ) {
-	return bytes;
-}
-DEFINE_PRIM(_POINTER, bytes_to_pointer, _BYTES);
-
-HL_PRIM vbyte *HL_NAME(bytes_of_pointer)( void *ptr ) {
-	return ptr;
-}
-DEFINE_PRIM(_BYTES, bytes_of_pointer, _POINTER);
 
 // Errors
 
@@ -443,50 +422,18 @@ HL_PRIM int HL_NAME(translate_to_uv_error)( int hl_errno ) {
 }
 DEFINE_PRIM(_I32, translate_to_uv_error, _I32);
 
-// C arrays
+// Various utils
+
+DEFINE_PRIM_FREE(_BYTES, bytes);
 
 HL_PRIM vbyte **HL_NAME(alloc_char_array)( int length ) {
 	return malloc(sizeof(vbyte *) * length);
 }
 DEFINE_PRIM(_REF(_BYTES), alloc_char_array, _I32);
 
-HL_PRIM void HL_NAME(free_char_array)( vbyte **a ) {
-	free(a);
-}
-DEFINE_PRIM(_VOID, free_char_array, _REF(_BYTES));
-
-HL_PRIM void HL_NAME(print_char_array)( void **arr ) {
-	int i = -1;
-	while( arr[++i] ) {
-		char *item = arr[i];
-		printf("index %d; str %s\n", i, item);
-	};
-}
-DEFINE_PRIM(_VOID, print_char_array, _REF(_POINTER));
+DEFINE_PRIM_FREE(_REF(_BYTES), char_array);
 
 // Buf
-
-// HL_PRIM void HL_NAME(check_bufs)( const uv_buf_t bufs[], int length ) {
-// 	for(int i = 0; i < length; i++) {
-// 		printf("len: %ld; base: %s\n", bufs[i].len, bufs[i].base);
-// 	}
-// }
-// DEFINE_PRIM(_VOID, check_bufs, _REF(_BUF) _I32);
-
-// HL_PRIM uv_buf_t HL_NAME(buf_init_wrap)( vbyte *bytes, int length ) {
-// 	printf("%d\n", length);
-// 	uv_buf_t b = uv_buf_init((char *)bytes, length);
-// 	printf("%ld\n", b.len);
-// 	return b;
-// }
-// DEFINE_PRIM(_BUF, buf_init_wrap, _BYTES _U32);
-
-// HL_PRIM void HL_NAME(check_bufs)( const uv_buf_t bufs[], int length ) {
-// 	for(int i = 0; i < length; i++) {
-// 		printf("len: %ld; base: %s\n", bufs[i].len, bufs[i].base);
-// 	}
-// }
-// DEFINE_PRIM(_VOID, check_bufs, _REF(_BUF) _I32);
 
 HL_PRIM uv_buf_t *HL_NAME(alloc_buf)( vbyte *bytes, int length ) {
 	uv_buf_t *buf = UV_ALLOC(uv_buf_t);
@@ -502,7 +449,7 @@ HL_PRIM void HL_NAME(buf_set)( uv_buf_t *buf, vbyte *bytes, int length ) { // TO
 }
 DEFINE_PRIM(_VOID, buf_set, _BUF_ARR _BYTES _I32);
 
-DEFINE_PRIM_TO_POINTER(_BUF_ARR, buf);
+DEFINE_PRIM_FREE(_BUF_ARR, buf);
 DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _BUF_ARR, buf, base);
 DEFINE_PRIM_UV_FIELD(_U64, int64, _BUF_ARR, buf, len);
 
@@ -527,10 +474,7 @@ typedef struct {
 
 #define _HANDLE_DATA	_OBJ(_HANDLE _FUN(_VOID,_NO_ARG))
 
-DEFINE_PRIM_TO_POINTER(_HANDLE, handle);
-DEFINE_PRIM_OF_POINTER(_HANDLE, handle);
-DEFINE_PRIM_TO_POINTER(_HANDLE_DATA, handle_data);
-DEFINE_PRIM_OF_POINTER(_HANDLE_DATA, handle_data);
+DEFINE_PRIM_FREE(_HANDLE, handle);
 
 HL_PRIM void HL_NAME(handle_set_data_with_gc)( uv_handle_t *h, uv_handle_data_t *new_data ) {
 	UV_SET_DATA(h, new_data);
@@ -566,10 +510,7 @@ typedef struct {
 
 #define _REQ_DATA	_OBJ(_REQ)
 
-DEFINE_PRIM_TO_POINTER(_REQ,req);
-DEFINE_PRIM_OF_POINTER(_REQ,req);
-DEFINE_PRIM_TO_POINTER(_REQ_DATA,req_data);
-DEFINE_PRIM_OF_POINTER(_REQ_DATA,req_data);
+DEFINE_PRIM_FREE(_REQ,req);
 
 HL_PRIM void HL_NAME(req_set_data_with_gc)( uv_req_t *r, uv_req_data_t *new_data ) {
 	UV_SET_DATA(r, new_data);
@@ -623,9 +564,11 @@ static void on_uv_timer_cb( uv_timer_t *h ) {
 #define _RUN_MODE _I32
 
 DEFINE_PRIM_ALLOC(_LOOP, loop);
-DEFINE_PRIM_TO_POINTER(_LOOP, loop);
+DEFINE_PRIM_FREE(_LOOP, loop);
 
 // SockAddr
+
+DEFINE_PRIM_FREE(_SOCKADDR_STORAGE, sockaddr_storage);
 
 HL_PRIM struct sockaddr_storage *HL_NAME(alloc_sockaddr_storage)() {
 	return UV_ALLOC(struct sockaddr_storage);
@@ -636,11 +579,6 @@ HL_PRIM int HL_NAME(sockaddr_storage_size)() {
 	return sizeof(struct sockaddr_storage);
 }
 DEFINE_PRIM(_I32, sockaddr_storage_size, _NO_ARG);
-
-HL_PRIM void *HL_NAME(sockaddr_storage_to_pointer)( struct sockaddr_storage *addr ) {
-	return addr;
-}
-DEFINE_PRIM(_POINTER, sockaddr_storage_to_pointer, _SOCKADDR_STORAGE);
 
 HL_PRIM struct sockaddr *HL_NAME(sockaddr_of_storage)( struct sockaddr_storage *addr ) {
 	return (struct sockaddr *)addr;
@@ -1005,6 +943,7 @@ static void on_uv_fs_cb( uv_fs_t *r ) {
 }
 
 DEFINE_PRIM_OF_POINTER(_DIR,dir);
+DEFINE_PRIM_FREE(_DIR,dir);
 
 HL_PRIM void HL_NAME(dir_init)( uv_dir_t *dir, int num_entries ) {
 	dir->nentries = num_entries;
@@ -1020,7 +959,7 @@ DEFINE_PRIM(_DIRENT, dir_dirent, _DIR _I32);
 DEFINE_PRIM_UV_FIELD(_I32, int, _DIR, dir, nentries);
 DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _DIRENT, dirent, name);
 DEFINE_PRIM_UV_FIELD(_I32, int, _DIRENT, dirent, type);
-DEFINE_PRIM_TO_POINTER(_DIRENT, dirent);
+DEFINE_PRIM_FREE(_DIRENT, dirent);
 
 
 // auto-generated libuv bindings
