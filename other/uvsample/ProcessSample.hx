@@ -22,7 +22,9 @@ class ProcessSample {
 				p.close(() -> Log.print('process closed'));
 			},
 		}
-		var p = Process.spawn(Thread.current().events, cmd, [cmd], opt);
+		var args = [cmd];
+		// args.push('non-existent-path');
+		var p = Process.spawn(Thread.current().events, cmd, args, opt);
 		Log.print('pid ${p.pid}');
 		// p.kill(SIGINT);
 		// Process.killPid(p.pid, SIGINT);

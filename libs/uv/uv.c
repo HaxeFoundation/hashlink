@@ -64,6 +64,7 @@
 #define _UTSNAME			_ABSTRACT(uv_utsname_t_star)
 #define _TIMEVAL			_ABSTRACT(uv_timeval_t_star)
 #define _TIMEVAL64			_ABSTRACT(uv_timeval64_t_star)
+#define _STDIO_CONTAINER	_ABSTRACT(uv_stdio_container_t_star)
 #define _PROCESS_OPTIONS	_ABSTRACT(uv_process_options_t_star)
 #define _REQ_TYPE			_I32
 #define _TTY_MODE_T			_I32
@@ -105,11 +106,23 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 #define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
 #define DATA(t,h)	((t)h->data)
 
+#define UV_CHECK_NULL(v,fail_return) \
+	if( !v ) { \
+		hl_null_access(); \
+		return fail_return; \
+	}
+
 #define DEFINE_PRIM_ALLOC(hl_type,uv_name) \
 	HL_PRIM uv_##uv_name##_t *HL_NAME(alloc_##uv_name)() { \
 		return UV_ALLOC(uv_##uv_name##_t); \
 	} \
 	DEFINE_PRIM(hl_type, alloc_##uv_name, _NO_ARG);
+
+#define DEFINE_PRIM_FREE(hl_type, name) \
+	HL_PRIM void HL_NAME(free_##name)( void *ptr ) { \
+		free(ptr); \
+	} \
+	DEFINE_PRIM(_VOID, free_##name, hl_type);
 
 #define DEFINE_PRIM_C_FIELD(hl_return,c_return,hl_struct,c_struct,field) \
 	HL_PRIM c_return HL_NAME(c_struct##_##field)( struct c_struct *s ) { \
@@ -153,6 +166,11 @@ HL_PRIM void *HL_NAME(bytes_to_pointer)( vbyte *bytes ) {
 	return bytes;
 }
 DEFINE_PRIM(_POINTER, bytes_to_pointer, _BYTES);
+
+HL_PRIM vbyte *HL_NAME(bytes_of_pointer)( void *ptr ) {
+	return ptr;
+}
+DEFINE_PRIM(_BYTES, bytes_of_pointer, _POINTER);
 
 // Errors
 
@@ -424,6 +442,27 @@ HL_PRIM int HL_NAME(translate_to_uv_error)( int hl_errno ) {
 	return errno_hl2uv(hl_errno);
 }
 DEFINE_PRIM(_I32, translate_to_uv_error, _I32);
+
+// C arrays
+
+HL_PRIM vbyte **HL_NAME(alloc_char_array)( int length ) {
+	return malloc(sizeof(vbyte *) * length);
+}
+DEFINE_PRIM(_REF(_BYTES), alloc_char_array, _I32);
+
+HL_PRIM void HL_NAME(free_char_array)( vbyte **a ) {
+	free(a);
+}
+DEFINE_PRIM(_VOID, free_char_array, _REF(_BYTES));
+
+HL_PRIM void HL_NAME(print_char_array)( void **arr ) {
+	int i = -1;
+	while( arr[++i] ) {
+		char *item = arr[i];
+		printf("index %d; str %s\n", i, item);
+	};
+}
+DEFINE_PRIM(_VOID, print_char_array, _REF(_POINTER));
 
 // Buf
 
@@ -815,6 +854,147 @@ static void on_uv_udp_recv_cb( uv_udp_t *h, ssize_t nread, const uv_buf_t *buf, 
 	hl_call4(void, c, int64, nread, const uv_buf_t *, buf, const uv_sockaddr *, src_addr, unsigned, flags);
 }
 
+// Signal
+
+HL_PRIM int HL_NAME(translate_to_sys_signal)( int hx ) {
+	switch(hx) {
+		case -1: return SIGABRT; break;
+		case -2: return SIGFPE; break;
+		case -3: return SIGHUP; break;
+		case -4: return SIGILL; break;
+		case -5: return SIGINT; break;
+		case -6: return SIGKILL; break;
+		case -7: return SIGSEGV; break;
+		case -8: return SIGTERM; break;
+		case -9: return SIGWINCH; break;
+		default: return hx; break;
+	}
+}
+DEFINE_PRIM(_I32, translate_to_sys_signal, _I32);
+
+HL_PRIM int HL_NAME(translate_sys_signal)( int uv ) {
+	switch(uv) {
+		case SIGABRT: return -1; break;
+		case SIGFPE: return -2; break;
+		case SIGHUP: return -3; break;
+		case SIGILL: return -4; break;
+		case SIGINT: return -5; break;
+		case SIGKILL: return -6; break;
+		case SIGSEGV: return -7; break;
+		case SIGTERM: return -8; break;
+		case SIGWINCH: return -9; break;
+		default: return uv; break;
+	}
+}
+DEFINE_PRIM(_I32, translate_sys_signal, _I32);
+
+// Process
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onExit;
+} uv_process_data_t;
+
+DEFINE_PRIM_ALLOC(_PROCESS, process);
+
+static void on_uv_exit_cb(uv_process_t *h, int64_t exit_status, int term_signal) {
+	vclosure *c = DATA(uv_process_data_t *, h)->onExit;
+	if( c )
+		hl_call3(void, c, uv_process_data_t *, h->data, int64, exit_status, int, uv_translate_sys_signal(term_signal));
+}
+
+// Constructors of hl.uv.Process.ProcessStdio enum
+typedef struct { //ProcessStdio.FD
+	hl_type *t;
+	int index;
+	int fd;
+} stdio_fd;
+
+typedef struct { //ProcessStdio.PIPE
+	hl_type *t;
+	int index;
+	uv_pipe_t *pipe;
+	int permissions;
+	vdynamic *nonBlock;
+} stdio_pipe;
+
+typedef struct { //ProcessStdio.STREAM
+	hl_type *t;
+	int index;
+	uv_stream_t *stream;
+} stdio_stream;
+
+HL_PRIM uv_stdio_container_t *HL_NAME(alloc_stdio_container)( varray *stdio, int count ) {
+	uv_stdio_container_t *container = malloc(sizeof(uv_stdio_container_t) * stdio->size);
+	for (int i = 0; i < count; i++) {
+		venum *io = hl_aptr(stdio, venum *)[i];
+		if( !io ) {
+			container[i].flags = UV_IGNORE;
+			continue;
+		}
+		// On Haxe side: enum ProcessStdio
+		stdio_pipe *cfg;
+		switch( io->index ) {
+			case 0: // IGNORE
+				container[i].flags = UV_IGNORE;
+				break;
+			case 1: // INHERIT
+				container[i].flags = UV_INHERIT_FD;
+				container[i].data.fd = i;
+				break;
+			case 2: // FD(fd:StdioFd)
+				container[i].flags = UV_INHERIT_FD;
+				container[i].data.fd = ((stdio_fd *)io)->fd;
+				break;
+			case 3: // PIPE
+				cfg = (stdio_pipe *)io;
+				UV_CHECK_NULL(cfg->pipe,NULL);
+				container[i].flags = UV_CREATE_PIPE;
+				container[i].flags |= cfg->permissions;
+				// switch( cfg->permissions ) {
+				// 	case 1: container[i].flags |= UV_READABLE_PIPE; break;
+				// 	case 2: container[i].flags |= UV_WRITABLE_PIPE; break;
+				// 	case 3:
+				// 	default: container[i].flags |= UV_READABLE_PIPE | UV_WRITABLE_PIPE; break;
+				// }
+				if( cfg->nonBlock && cfg->nonBlock->v.b )
+					container[i].flags |= UV_OVERLAPPED_PIPE;
+				container[i].data.stream = (uv_stream_t *)cfg->pipe;
+				break;
+			case 4: // STREAM
+				UV_CHECK_NULL(((stdio_stream *)io)->stream,NULL);
+				container[i].flags = UV_INHERIT_STREAM;
+				container[i].data.stream = ((stdio_stream *)io)->stream;
+				break;
+			default:
+				container[i].flags = UV_IGNORE;
+				break;
+		}
+	}
+	return container;
+}
+DEFINE_PRIM(_STDIO_CONTAINER, alloc_stdio_container, _ARR _I32);
+DEFINE_PRIM_FREE(_STDIO_CONTAINER, stdio_container);
+
+HL_PRIM uv_process_options_t *HL_NAME(alloc_process_options)( vbyte *file, vbyte **args, vbyte **env,
+	vbyte *cwd, int flags, int stdio_count, uv_stdio_container_t *stdio, uv_uid_t uid, uv_gid_t gid ) {
+
+	uv_process_options_t *options = UV_ALLOC(uv_process_options_t);
+	options->file = (char *)file;
+	options->exit_cb = on_uv_exit_cb;
+	options->args = (char **)args;
+	options->env = (char **)env;
+	options->cwd = (char *)cwd;
+	options->flags = flags;
+	options->uid = uid;
+	options->gid = gid;
+	options->stdio_count = stdio_count;
+	options->stdio = stdio;
+	return options;
+}
+DEFINE_PRIM(_PROCESS_OPTIONS, alloc_process_options, _BYTES _REF(_BYTES) _REF(_BYTES) _BYTES _I32 _I32 _STDIO_CONTAINER _I32 _I32);
+DEFINE_PRIM_FREE(_PROCESS_OPTIONS, process_options);
+
 // File system
 
 DEFINE_PRIM_ALLOC(_FS, fs);
@@ -873,11 +1053,6 @@ typedef struct {
 	req_init_hl_data((uv_req_t *)r); \
 	if( c ) \
 		req_register_callback((uv_req_t *)r,c,0);
-#define UV_CHECK_NULL(handle,fail_return) \
-	if( !handle ) { \
-		hl_null_access(); \
-		return fail_return; \
-	}
 #define UV_CHECK_ERROR(action,cleanup,fail_return) \
 	int __result__ = action; \
 	if(__result__ < 0) { \
@@ -1350,45 +1525,15 @@ DEFINE_PRIM(_VOID, check_stop_wrap, _HANDLE);
 
 // Signal
 
-static int signum_hx2uv( int hx ) {
-	switch(hx) {
-		case -1: return SIGABRT; break;
-		case -2: return SIGFPE; break;
-		case -3: return SIGHUP; break;
-		case -4: return SIGILL; break;
-		case -5: return SIGINT; break;
-		case -6: return SIGKILL; break;
-		case -7: return SIGSEGV; break;
-		case -8: return SIGTERM; break;
-		case -9: return SIGWINCH; break;
-		default: return hx; break;
-	}
-}
-
-static int signum_uv2hx( int uv ) {
-	switch(uv) {
-		case SIGABRT: return -1; break;
-		case SIGFPE: return -2; break;
-		case SIGHUP: return -3; break;
-		case SIGILL: return -4; break;
-		case SIGINT: return -5; break;
-		case SIGKILL: return -6; break;
-		case SIGSEGV: return -7; break;
-		case SIGTERM: return -8; break;
-		case SIGWINCH: return -9; break;
-		default: return uv; break;
-	}
-}
-
 static void on_signal( uv_signal_t *h, int signum ) {
 	UV_GET_CLOSURE(c,h,0,"No callback in signal handle");
-	hl_call1(void, c, int, signum_uv2hx(signum));
+	hl_call1(void, c, int, uv_translate_sys_signal(signum));
 }
 
 static void on_signal_oneshot( uv_signal_t *h, int signum ) {
 	UV_GET_CLOSURE(c,h,0,"No callback in signal handle");
 	handle_clear_callback((uv_handle_t *)h,0);
-	hl_call1(void, c, int, signum_uv2hx(signum));
+	hl_call1(void, c, int, uv_translate_sys_signal(signum));
 }
 
 HL_PRIM uv_signal_t *HL_NAME(signal_init_wrap)( uv_loop_t *loop ) {
@@ -1404,7 +1549,7 @@ HL_PRIM void HL_NAME(signal_start_wrap)( uv_signal_t *h, int signum, vclosure *c
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
 	handle_register_callback((uv_handle_t*)h,c,0);
-	UV_CHECK_ERROR(uv_signal_start(h, on_signal, signum_hx2uv(signum)),handle_clear_callback((uv_handle_t *)h,0),);
+	UV_CHECK_ERROR(uv_signal_start(h, on_signal, uv_translate_to_sys_signal(signum)),handle_clear_callback((uv_handle_t *)h,0),);
 }
 DEFINE_PRIM(_VOID, signal_start_wrap, _HANDLE _I32 _FUN(_VOID,_I32));
 
@@ -1412,7 +1557,7 @@ HL_PRIM void HL_NAME(signal_start_oneshot_wrap)( uv_signal_t *h, int signum, vcl
 	UV_CHECK_NULL(h,);
 	UV_CHECK_NULL(c,);
 	handle_register_callback((uv_handle_t*)h,c,0);
-	UV_CHECK_ERROR(uv_signal_start_oneshot(h, on_signal_oneshot, signum_hx2uv(signum)),handle_clear_callback((uv_handle_t *)h,0),);
+	UV_CHECK_ERROR(uv_signal_start_oneshot(h, on_signal_oneshot, uv_translate_to_sys_signal(signum)),handle_clear_callback((uv_handle_t *)h,0),);
 }
 DEFINE_PRIM(_VOID, signal_start_oneshot_wrap, _HANDLE _I32 _FUN(_VOID,_I32));
 
@@ -1424,7 +1569,7 @@ DEFINE_PRIM(_VOID, signal_stop_wrap, _HANDLE);
 
 HL_PRIM int HL_NAME(signal_get_sigNum_wrap)(uv_signal_t *h) {
 	UV_CHECK_NULL(h,0);
-	return signum_uv2hx(h->signum);
+	return uv_translate_sys_signal(h->signum);
 }
 DEFINE_PRIM(_I32, signal_get_sigNum_wrap, _HANDLE);
 
@@ -1681,30 +1826,10 @@ static void on_process_exit(uv_process_t *h, int64_t exit_status, int term_signa
 	events_data *ev = UV_DATA(h);
 	vclosure *c = ev ? ev->events[0] : NULL;
 	if( c ) {
-		hl_call3(void, c, uv_process_t *, h, int64, exit_status, int, signum_uv2hx(term_signal));
+		hl_call3(void, c, uv_process_t *, h, int64, exit_status, int, uv_translate_sys_signal(term_signal));
 		handle_clear_callback((uv_handle_t *)h, 0);
 	}
 }
-
-typedef struct {
-	hl_type *t;
-	int index;
-	int fd;
-} stdio_fd;
-
-typedef struct {
-	hl_type *t;
-	int index;
-	uv_pipe_t *pipe;
-	int permissions;
-	vdynamic *nonBlock;
-} stdio_pipe;
-
-typedef struct {
-	hl_type *t;
-	int index;
-	uv_stream_t *stream;
-} stdio_stream;
 
 HL_PRIM uv_process_t *HL_NAME(spawn_wrap)( uv_loop_t *loop, vstring *file, varray *args,
 	vclosure *on_exit, varray *stdio, varray *env, vstring *cwd, vdynamic *uid,
@@ -1816,12 +1941,12 @@ DEFINE_PRIM(_I32, process_pid, _HANDLE);
 
 HL_PRIM void HL_NAME(process_kill_wrap)( uv_process_t *h, int signum ) {
 	UV_CHECK_NULL(h,);
-	UV_CHECK_ERROR(uv_process_kill(h, signum_hx2uv(signum)),,);
+	UV_CHECK_ERROR(uv_process_kill(h, uv_translate_to_sys_signal(signum)),,);
 }
 DEFINE_PRIM(_VOID, process_kill_wrap, _HANDLE _I32);
 
 HL_PRIM void HL_NAME(kill_wrap)( int pid, int signum ) {
-	UV_CHECK_ERROR(uv_kill(pid, signum_hx2uv(signum)),,);
+	UV_CHECK_ERROR(uv_kill(pid, uv_translate_to_sys_signal(signum)),,);
 }
 DEFINE_PRIM(_VOID, kill_wrap, _I32 _I32);
 
