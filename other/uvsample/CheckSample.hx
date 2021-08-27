@@ -1,3 +1,4 @@
+import hl.I64;
 import hl.uv.Timer;
 import hl.uv.Check;
 import sys.thread.Thread;
@@ -9,7 +10,7 @@ class CheckSample {
 		timer.start(() -> {
 			timer.stop();
 			timer.close();
-		}, 10, 10);
+		}, I64.ofInt(10), I64.ofInt(10));
 
 		var check = Check.init(loop);
 		check.start(() -> {

@@ -961,6 +961,9 @@ DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _DIRENT, dirent, name);
 DEFINE_PRIM_UV_FIELD(_I32, int, _DIRENT, dirent, type);
 DEFINE_PRIM_FREE(_DIRENT, dirent);
 
+// Tty
+
+DEFINE_PRIM_ALLOC(_TTY, tty);
 
 // auto-generated libuv bindings
 #include "uv_generated.c"

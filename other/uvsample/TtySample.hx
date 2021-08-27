@@ -15,6 +15,11 @@ class TtySample {
 		tty.setMode(TTY_MODE_NORMAL);
 		print('window size: ' + tty.getWinSize());
 		Tty.resetMode();
+		// var state = Tty.getVTermState();
+		// print('vterm state: ' + state);
+		// print('changing vterm state...');
+		// Tty.setVTermState(state == TTY_SUPPORTED ? TTY_UNSUPPORTED : TTY_SUPPORTED);
+		// print('vterm state: ' + Tty.getVTermState());
 		tty.close(() -> print('Done'));
 	}
 }
