@@ -87,9 +87,6 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	static void on_uv_random_cb( uv_random_t* r, int status, void* buf, size_t buflen ) {
 	}
 
-	static void on_uv_prepare_cb( uv_prepare_t *h ) {
-	}
-
 	static void on_uv_signal_cb( uv_signal_t *h, int signum ) {
 	}
 // }
@@ -533,6 +530,20 @@ DEFINE_PRIM_ALLOC(_CHECK, check);
 
 static void on_uv_check_cb( uv_check_t *h ) {
 	vclosure *c = DATA(uv_check_data_t *, h)->onCheck;
+	hl_call0(void, c);
+}
+
+// Prepare
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onPrepare;
+} uv_prepare_data_t;
+
+DEFINE_PRIM_ALLOC(_PREPARE, prepare);
+
+static void on_uv_prepare_cb( uv_prepare_t *h ) {
+	vclosure *c = DATA(uv_prepare_data_t *, h)->onPrepare;
 	hl_call0(void, c);
 }
 
