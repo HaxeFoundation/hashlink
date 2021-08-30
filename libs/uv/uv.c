@@ -84,9 +84,6 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	static void on_uv_fs_poll_cb( uv_fs_poll_t *h, int status, const uv_stat_t *prev, const uv_stat_t *curr ) {
 	}
 
-	static void on_uv_fs_event_cb( uv_fs_event_t *h, const char *filename, int events, int status ) {
-	}
-
 	static void on_uv_idle_cb( uv_idle_t *h ) {
 	}
 
@@ -964,6 +961,20 @@ DEFINE_PRIM_FREE(_DIRENT, dirent);
 // Tty
 
 DEFINE_PRIM_ALLOC(_TTY, tty);
+
+// Fs event
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onEvent;
+} uv_fs_event_data_t;
+
+static void on_uv_fs_event_cb( uv_fs_event_t *h, const char *filename, int events, int status ) {
+	vclosure *c = DATA(uv_fs_event_data_t *, h)->onEvent;
+	hl_call3(void, c, int, status, vbyte *, (vbyte *)filename, int, events);
+}
+
+DEFINE_PRIM_ALLOC(_FS_EVENT, fs_event);
 
 // version
 
