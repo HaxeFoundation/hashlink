@@ -57,6 +57,7 @@
 #define _DIRENT				_ABSTRACT(uv_dirent_t_star)
 #define _STAT				_ABSTRACT(uv_stat_t_star)
 #define _STATFS				_ABSTRACT(uv_statfs_t_star)
+#define _TIMESPEC			_ABSTRACT(uv_timespec_t_star)
 #define _RUSAGE				_ABSTRACT(uv_rusage_t_star)
 #define _CPU_INFO			_ABSTRACT(uv_cpu_info_t_star)
 #define _INTERFACE_ADDRESS	_ABSTRACT(uv_interface_address_t_star)
@@ -80,9 +81,6 @@ typedef struct sockaddr_in6 uv_sockaddr_in6;
 typedef struct sockaddr_storage uv_sockaddr_storage;
 
 // TODO {
-
-	static void on_uv_fs_poll_cb( uv_fs_poll_t *h, int status, const uv_stat_t *prev, const uv_stat_t *curr ) {
-	}
 
 	static void on_uv_idle_cb( uv_idle_t *h ) {
 	}
@@ -958,6 +956,33 @@ DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _DIRENT, dirent, name);
 DEFINE_PRIM_UV_FIELD(_I32, int, _DIRENT, dirent, type);
 DEFINE_PRIM_FREE(_DIRENT, dirent);
 
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_dev);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_mode);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_nlink);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_uid);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_gid);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_rdev);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_ino);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_size);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_blksize);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_blocks);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_flags);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_gen);
+
+#define DEFINE_PRIM_STAT_TIME(field) \
+	HL_PRIM uv_timespec_t *HL_NAME(stat_##field)( uv_stat_t *stat ) { \
+		return &stat->field; \
+	} \
+	DEFINE_PRIM(_TIMESPEC, stat_##field, _STAT);
+
+DEFINE_PRIM_STAT_TIME(st_atim);
+DEFINE_PRIM_STAT_TIME(st_mtim);
+DEFINE_PRIM_STAT_TIME(st_ctim);
+DEFINE_PRIM_STAT_TIME(st_birthtim);
+
+DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMESPEC, timespec, tv_sec);
+DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMESPEC, timespec, tv_nsec);
+
 // Tty
 
 DEFINE_PRIM_ALLOC(_TTY, tty);
@@ -975,6 +1000,20 @@ static void on_uv_fs_event_cb( uv_fs_event_t *h, const char *filename, int event
 }
 
 DEFINE_PRIM_ALLOC(_FS_EVENT, fs_event);
+
+// Fs poll
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onChange;
+} uv_fs_poll_data_t;
+
+static void on_uv_fs_poll_cb( uv_fs_poll_t *h, int status, const uv_stat_t *prev, const uv_stat_t *curr ) {
+	vclosure *c = DATA(uv_fs_poll_data_t *, h)->onChange;
+	hl_call3(void, c, int, status, const uv_stat_t *, prev, const uv_stat_t *, curr);
+}
+
+DEFINE_PRIM_ALLOC(_FS_POLL, fs_poll);
 
 // version
 
@@ -1005,7 +1044,7 @@ DEFINE_PRIM_VERSION(suffix, UV_VERSION_SUFFIX, _BYTES, vbyte *);
 // TODO: remove everything below
 
 #define _CALLB		_FUN(_VOID,_NO_ARG)
-#define _TIMESPEC	_OBJ(_I64 _I64)
+#define _TIMESPEC_OBJ	_OBJ(_I64 _I64)
 
 #define EVT_CLOSE	1
 
