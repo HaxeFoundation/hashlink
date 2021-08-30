@@ -448,13 +448,18 @@ DEFINE_PRIM_UV_FIELD(_U64, int64, _BUF_ARR, buf, len);
 	uv_handle_t *_h; \
 	vclosure *onClose;
 
+#define HANDLE_DATA_WITH_ALLOC_FIELDS \
+	HANDLE_DATA_FIELDS; \
+	vclosure *onAlloc;
+
 typedef struct {
 	HANDLE_DATA_FIELDS;
 } uv_handle_data_t;
 
-#define HANDLE_DATA_WITH_ALLOC_FIELDS \
-	HANDLE_DATA_FIELDS; \
-	vclosure *onAlloc;
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *callback;
+} uv_handle_cb_data_t;
 
 typedef struct {
 	HANDLE_DATA_WITH_ALLOC_FIELDS;
@@ -507,71 +512,46 @@ DEFINE_PRIM(_VOID, req_set_data_with_gc, _REQ _REQ_DATA);
 
 // Async
 
-typedef struct {
-	HANDLE_DATA_FIELDS;
-	vclosure *onSend;
-} uv_async_data_t;
-
 DEFINE_PRIM_ALLOC(_ASYNC, async);
 
 static void on_uv_async_cb( uv_async_t *h ) {
-	vclosure *c = DATA(uv_async_data_t *, h)->onSend;
+	vclosure *c = DATA(uv_handle_cb_data_t *, h)->callback;
 	hl_call1(void, c, uv_async_t *, h);
 }
 
 // Check
 
-typedef struct {
-	HANDLE_DATA_FIELDS;
-	vclosure *onCheck;
-} uv_check_data_t;
-
 DEFINE_PRIM_ALLOC(_CHECK, check);
 
 static void on_uv_check_cb( uv_check_t *h ) {
-	vclosure *c = DATA(uv_check_data_t *, h)->onCheck;
+	vclosure *c = DATA(uv_handle_cb_data_t *, h)->callback;
 	hl_call0(void, c);
 }
 
 // Prepare
 
-typedef struct {
-	HANDLE_DATA_FIELDS;
-	vclosure *onPrepare;
-} uv_prepare_data_t;
-
 DEFINE_PRIM_ALLOC(_PREPARE, prepare);
 
 static void on_uv_prepare_cb( uv_prepare_t *h ) {
-	vclosure *c = DATA(uv_prepare_data_t *, h)->onPrepare;
+	vclosure *c = DATA(uv_handle_cb_data_t *, h)->callback;
 	hl_call0(void, c);
 }
 
 // Idle
 
-typedef struct {
-	HANDLE_DATA_FIELDS;
-	vclosure *onIdle;
-} uv_idle_data_t;
-
 DEFINE_PRIM_ALLOC(_IDLE, idle);
 
 static void on_uv_idle_cb( uv_idle_t *h ) {
-	vclosure *c = DATA(uv_idle_data_t *, h)->onIdle;
+	vclosure *c = DATA(uv_handle_cb_data_t *, h)->callback;
 	hl_call0(void, c);
 }
 
 // Timer
 
-typedef struct {
-	HANDLE_DATA_FIELDS;
-	vclosure *onTick;
-} uv_timer_data;
-
 DEFINE_PRIM_ALLOC(_TIMER, timer);
 
 static void on_uv_timer_cb( uv_timer_t *h ) {
-	vclosure *c = DATA(uv_timer_data *, h)->onTick;
+	vclosure *c = DATA(uv_handle_cb_data_t *, h)->callback;
 	hl_call0(void, c);
 }
 
@@ -1010,13 +990,8 @@ DEFINE_PRIM_ALLOC(_TTY, tty);
 
 // Fs event
 
-typedef struct {
-	HANDLE_DATA_FIELDS;
-	vclosure *onEvent;
-} uv_fs_event_data_t;
-
 static void on_uv_fs_event_cb( uv_fs_event_t *h, const char *filename, int events, int status ) {
-	vclosure *c = DATA(uv_fs_event_data_t *, h)->onEvent;
+	vclosure *c = DATA(uv_handle_cb_data_t *, h)->callback;
 	hl_call3(void, c, int, status, vbyte *, (vbyte *)filename, int, events);
 }
 
@@ -1024,13 +999,8 @@ DEFINE_PRIM_ALLOC(_FS_EVENT, fs_event);
 
 // Fs poll
 
-typedef struct {
-	HANDLE_DATA_FIELDS;
-	vclosure *onChange;
-} uv_fs_poll_data_t;
-
 static void on_uv_fs_poll_cb( uv_fs_poll_t *h, int status, const uv_stat_t *prev, const uv_stat_t *curr ) {
-	vclosure *c = DATA(uv_fs_poll_data_t *, h)->onChange;
+	vclosure *c = DATA(uv_handle_cb_data_t *, h)->callback;
 	hl_call3(void, c, int, status, const uv_stat_t *, prev, const uv_stat_t *, curr);
 }
 
