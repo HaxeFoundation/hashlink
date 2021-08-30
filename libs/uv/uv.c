@@ -86,9 +86,6 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 
 	static void on_uv_random_cb( uv_random_t* r, int status, void* buf, size_t buflen ) {
 	}
-
-	static void on_uv_signal_cb( uv_signal_t *h, int signum ) {
-	}
 // }
 
 #define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
@@ -1005,6 +1002,17 @@ static void on_uv_fs_poll_cb( uv_fs_poll_t *h, int status, const uv_stat_t *prev
 }
 
 DEFINE_PRIM_ALLOC(_FS_POLL, fs_poll);
+
+// Signal
+
+static void on_uv_signal_cb( uv_signal_t *h, int signum ) {
+	vclosure *c = DATA(uv_handle_cb_data_t *, h)->callback;
+	hl_call1(void, c, int, signum);
+}
+
+DEFINE_PRIM_ALLOC(_SIGNAL, signal);
+DEFINE_PRIM_UV_FIELD(_I32, int, _SIGNAL, signal, signum);
+
 
 // version
 
