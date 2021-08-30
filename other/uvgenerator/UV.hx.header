@@ -85,8 +85,8 @@ abstract UvStdioContainerTStar(Abstract<"uv_stdio_container_t_star">) {}
 abstract UvTimespecTStar(Abstract<"uv_timespec_t_star">) {}
 
 //TODO: implement these
-private typedef UInt = Int;
-private typedef U64 = I64;
+typedef UInt = Int;
+typedef U64 = I64;
 
 /**
 	Automatically generated bindings for libuv.
@@ -147,6 +147,7 @@ extern class UV {
 	static public function alloc_async():UvAsyncTStar;
 	static public function alloc_timer():UvTimerTStar;
 	static public function alloc_check():UvCheckTStar;
+	static public function alloc_idle():UvIdleTStar;
 	static public function alloc_tcp():UvTcpTStar;
 	static public function alloc_sockaddr_storage():CSockaddrStorageStar;
 	static public function sockaddr_storage_size():Int;

@@ -2,6 +2,7 @@ class UVSample {
 	static function main() {
 		run();
 		// CheckSample.main();
+		// IdleSample.main();
 		// TcpSample.main();
 		// DnsSample.main();
 		// UdpSample.main();

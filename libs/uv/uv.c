@@ -81,10 +81,6 @@ typedef struct sockaddr_in6 uv_sockaddr_in6;
 typedef struct sockaddr_storage uv_sockaddr_storage;
 
 // TODO {
-
-	static void on_uv_idle_cb( uv_idle_t *h ) {
-	}
-
 	static void on_uv_walk_cb( uv_handle_t* handle, void* arg ) {
 	}
 
@@ -537,6 +533,20 @@ DEFINE_PRIM_ALLOC(_CHECK, check);
 
 static void on_uv_check_cb( uv_check_t *h ) {
 	vclosure *c = DATA(uv_check_data_t *, h)->onCheck;
+	hl_call0(void, c);
+}
+
+// Idle
+
+typedef struct {
+	HANDLE_DATA_FIELDS;
+	vclosure *onIdle;
+} uv_idle_data_t;
+
+DEFINE_PRIM_ALLOC(_IDLE, idle);
+
+static void on_uv_idle_cb( uv_idle_t *h ) {
+	vclosure *c = DATA(uv_idle_data_t *, h)->onIdle;
 	hl_call0(void, c);
 }
 
