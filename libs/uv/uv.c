@@ -60,6 +60,7 @@
 #define _TIMESPEC			_ABSTRACT(uv_timespec_t_star)
 #define _RUSAGE				_ABSTRACT(uv_rusage_t_star)
 #define _CPU_INFO			_ABSTRACT(uv_cpu_info_t_star)
+#define _CPU_TIMES			_ABSTRACT(uv_cpu_times_t_star)
 #define _INTERFACE_ADDRESS	_ABSTRACT(uv_interface_address_t_star)
 #define _PASSWD				_ABSTRACT(uv_passwd_t_star)
 #define _UTSNAME			_ABSTRACT(uv_utsname_t_star)
@@ -74,6 +75,8 @@
 #define _MEMBERSHIP			_I32
 #define _FS_TYPE			_I32
 #define _FS_EVENT			_HANDLE
+
+typedef struct uv_cpu_times_s uv_cpu_times_t;
 
 typedef struct sockaddr uv_sockaddr;
 typedef struct sockaddr_in uv_sockaddr_in;
@@ -120,6 +123,13 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 		return (c_return)s->field; \
 	} \
 	DEFINE_PRIM(hl_return, uv_name##_##field, hl_struct);
+
+#define DEFINE_PRIM_UV_FIELD_REF(hl_return,c_return,hl_struct,uv_name,field) \
+	HL_PRIM c_return HL_NAME(uv_name##_##field)( uv_##uv_name##_t *s ) { \
+		return &s->field; \
+	} \
+	DEFINE_PRIM(hl_return, uv_name##_##field, hl_struct);
+
 
 #define DEFINE_PRIM_OF_POINTER(hl_type,uv_name) \
 	HL_PRIM uv_##uv_name##_t *HL_NAME(pointer_to_##uv_name)( void *ptr ) { \
@@ -967,16 +977,10 @@ DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_blocks);
 DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_flags);
 DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_gen);
 
-#define DEFINE_PRIM_STAT_TIME(field) \
-	HL_PRIM uv_timespec_t *HL_NAME(stat_##field)( uv_stat_t *stat ) { \
-		return &stat->field; \
-	} \
-	DEFINE_PRIM(_TIMESPEC, stat_##field, _STAT);
-
-DEFINE_PRIM_STAT_TIME(st_atim);
-DEFINE_PRIM_STAT_TIME(st_mtim);
-DEFINE_PRIM_STAT_TIME(st_ctim);
-DEFINE_PRIM_STAT_TIME(st_birthtim);
+DEFINE_PRIM_UV_FIELD_REF(_TIMESPEC, uv_timespec_t *, _STAT, stat, st_atim);
+DEFINE_PRIM_UV_FIELD_REF(_TIMESPEC, uv_timespec_t *, _STAT, stat, st_mtim);
+DEFINE_PRIM_UV_FIELD_REF(_TIMESPEC, uv_timespec_t *, _STAT, stat, st_ctim);
+DEFINE_PRIM_UV_FIELD_REF(_TIMESPEC, uv_timespec_t *, _STAT, stat, st_birthtim);
 
 DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMESPEC, timespec, tv_sec);
 DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMESPEC, timespec, tv_nsec);
@@ -1034,6 +1038,48 @@ DEFINE_PRIM_VERSION(patch, UV_VERSION_PATCH, _I32, int);
 DEFINE_PRIM_VERSION(hex, UV_VERSION_HEX, _I32, int);
 DEFINE_PRIM_VERSION(is_release, UV_VERSION_IS_RELEASE, _BOOL, bool);
 DEFINE_PRIM_VERSION(suffix, UV_VERSION_SUFFIX, _BYTES, vbyte *);
+
+// Misc
+
+DEFINE_PRIM_ALLOC(_RUSAGE, rusage);
+DEFINE_PRIM_ALLOC(_TIMEVAL64, timeval64);
+DEFINE_PRIM_ALLOC(_CPU_INFO, cpu_info);
+
+DEFINE_PRIM_FREE(_RUSAGE, rusage);
+DEFINE_PRIM_FREE(_TIMEVAL64, timeval64);
+
+DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMEVAL, timeval, tv_sec);
+DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMEVAL, timeval, tv_usec);
+DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMEVAL64, timeval64, tv_sec);
+DEFINE_PRIM_UV_FIELD(_I32, int, _TIMEVAL64, timeval64, tv_usec);
+
+DEFINE_PRIM_UV_FIELD_REF(_TIMEVAL, uv_timeval_t *, _RUSAGE, rusage, ru_utime);
+DEFINE_PRIM_UV_FIELD_REF(_TIMEVAL, uv_timeval_t *, _RUSAGE, rusage, ru_stime);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_maxrss);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_ixrss);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_idrss);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_isrss);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_minflt);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_majflt);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_nswap);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_inblock);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_oublock);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_msgsnd);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_msgrcv);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_nsignals);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_nvcsw);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_nivcsw);
+
+DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _CPU_INFO, cpu_info, model);
+DEFINE_PRIM_UV_FIELD(_I32, int, _CPU_INFO, cpu_info, speed);
+DEFINE_PRIM_UV_FIELD_REF(_CPU_TIMES, uv_cpu_times_t *, _CPU_INFO, cpu_info, cpu_times);
+
+DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, user);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, nice);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, sys);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, idle);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, irq);
+
 
 // auto-generated libuv bindings
 #include "uv_generated.c"
