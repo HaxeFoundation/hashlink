@@ -960,30 +960,7 @@ HL_PRIM uv_dirent_t *HL_NAME(dir_dirent)( uv_dir_t *dir, int index ) {
 DEFINE_PRIM(_DIRENT, dir_dirent, _DIR _I32);
 
 DEFINE_PRIM_UV_FIELD(_I32, int, _DIR, dir, nentries);
-DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _DIRENT, dirent, name);
-DEFINE_PRIM_UV_FIELD(_I32, int, _DIRENT, dirent, type);
 DEFINE_PRIM_FREE(_DIRENT, dirent);
-
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_dev);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_mode);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_nlink);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_uid);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_gid);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_rdev);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_ino);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_size);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_blksize);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_blocks);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_flags);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _STAT, stat, st_gen);
-
-DEFINE_PRIM_UV_FIELD_REF(_TIMESPEC, uv_timespec_t *, _STAT, stat, st_atim);
-DEFINE_PRIM_UV_FIELD_REF(_TIMESPEC, uv_timespec_t *, _STAT, stat, st_mtim);
-DEFINE_PRIM_UV_FIELD_REF(_TIMESPEC, uv_timespec_t *, _STAT, stat, st_ctim);
-DEFINE_PRIM_UV_FIELD_REF(_TIMESPEC, uv_timespec_t *, _STAT, stat, st_birthtim);
-
-DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMESPEC, timespec, tv_sec);
-DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMESPEC, timespec, tv_nsec);
 
 // Tty
 
@@ -1017,7 +994,6 @@ static void on_uv_signal_cb( uv_signal_t *h, int signum ) {
 DEFINE_PRIM_ALLOC(_SIGNAL, signal);
 DEFINE_PRIM_UV_FIELD(_I32, int, _SIGNAL, signal, signum);
 
-
 // version
 
 #define DEFINE_PRIM_VERSION(name, value, hl_type, c_type) \
@@ -1041,34 +1017,10 @@ DEFINE_PRIM_VERSION(suffix, UV_VERSION_SUFFIX, _BYTES, vbyte *);
 
 // Misc
 
-DEFINE_PRIM_ALLOC(_RUSAGE, rusage);
-DEFINE_PRIM_ALLOC(_TIMEVAL64, timeval64);
 DEFINE_PRIM_ALLOC(_CPU_INFO, cpu_info);
 
 DEFINE_PRIM_FREE(_RUSAGE, rusage);
 DEFINE_PRIM_FREE(_TIMEVAL64, timeval64);
-
-DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMEVAL, timeval, tv_sec);
-DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMEVAL, timeval, tv_usec);
-DEFINE_PRIM_UV_FIELD(_I64, int64, _TIMEVAL64, timeval64, tv_sec);
-DEFINE_PRIM_UV_FIELD(_I32, int, _TIMEVAL64, timeval64, tv_usec);
-
-DEFINE_PRIM_UV_FIELD_REF(_TIMEVAL, uv_timeval_t *, _RUSAGE, rusage, ru_utime);
-DEFINE_PRIM_UV_FIELD_REF(_TIMEVAL, uv_timeval_t *, _RUSAGE, rusage, ru_stime);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_maxrss);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_ixrss);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_idrss);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_isrss);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_minflt);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_majflt);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_nswap);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_inblock);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_oublock);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_msgsnd);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_msgrcv);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_nsignals);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_nvcsw);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _RUSAGE, rusage, ru_nivcsw);
 
 DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _CPU_INFO, cpu_info, model);
 DEFINE_PRIM_UV_FIELD(_I32, int, _CPU_INFO, cpu_info, speed);
