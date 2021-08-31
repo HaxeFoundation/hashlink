@@ -14,17 +14,6 @@ class MiscSample {
 		print('RUsage: ' + Misc.getRUsage());
 		print('Pid: ' + Misc.getPid());
 		print('PPid: ' + Misc.getPPid());
-		print('Cpu infos:\n  ' + Misc.cpuInfo().map(Std.string).join('\n  '));
-		print('Inteface addresses:\n  ' + Misc.interfaceAddresses().map(i -> {
-			Std.string({
-				name:i.name,
-				physAddr:i.physAddr,
-				isInternal:i.isInternal,
-				address:i.address.name(),
-				netmask:i.netmask.name(),
-			});
-		}).join('\n  '));
-		print('Load avg: ' + Misc.loadAvg());
 		print('Home dir: ' + Misc.homeDir());
 		print('Passwd: ' + Misc.getPasswd());
 		print('Free mem: ' + Misc.getFreeMemory());

@@ -37,7 +37,7 @@
 #define _GID_T				_I32
 #define _FILE				_I32
 #define _BUF				_ABSTRACT(uv_buf_t)
-#define _BUF_ARR			_ABSTRACT(uv_buf_t_arr)
+#define _BUF_ARRAY			_ABSTRACT(uv_buf_t_arr)
 #define _DIR				_ABSTRACT(uv_dir_t_star)
 #define _FS_POLL			_HANDLE
 #define _IDLE				_HANDLE
@@ -436,17 +436,17 @@ HL_PRIM uv_buf_t *HL_NAME(alloc_buf)( vbyte *bytes, int length ) {
 	buf->len = length;
 	return buf;
 }
-DEFINE_PRIM(_BUF_ARR, alloc_buf, _BYTES _I32);
+DEFINE_PRIM(_BUF_ARRAY, alloc_buf, _BYTES _I32);
 
 HL_PRIM void HL_NAME(buf_set)( uv_buf_t *buf, vbyte *bytes, int length ) { // TODO: change `length` to `int64`
 	buf->base = (char *)bytes;
 	buf->len = length;
 }
-DEFINE_PRIM(_VOID, buf_set, _BUF_ARR _BYTES _I32);
+DEFINE_PRIM(_VOID, buf_set, _BUF_ARRAY _BYTES _I32);
 
-DEFINE_PRIM_FREE(_BUF_ARR, buf);
-DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _BUF_ARR, buf, base);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _BUF_ARR, buf, len);
+DEFINE_PRIM_FREE(_BUF_ARRAY, buf);
+DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _BUF_ARRAY, buf, base);
+DEFINE_PRIM_UV_FIELD(_U64, int64, _BUF_ARRAY, buf, len);
 
 // Handle
 
@@ -1017,21 +1017,8 @@ DEFINE_PRIM_VERSION(suffix, UV_VERSION_SUFFIX, _BYTES, vbyte *);
 
 // Misc
 
-DEFINE_PRIM_ALLOC(_CPU_INFO, cpu_info);
-
 DEFINE_PRIM_FREE(_RUSAGE, rusage);
 DEFINE_PRIM_FREE(_TIMEVAL64, timeval64);
-
-DEFINE_PRIM_UV_FIELD(_BYTES, vbyte *, _CPU_INFO, cpu_info, model);
-DEFINE_PRIM_UV_FIELD(_I32, int, _CPU_INFO, cpu_info, speed);
-DEFINE_PRIM_UV_FIELD_REF(_CPU_TIMES, uv_cpu_times_t *, _CPU_INFO, cpu_info, cpu_times);
-
-DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, user);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, nice);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, sys);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, idle);
-DEFINE_PRIM_UV_FIELD(_U64, int64, _CPU_TIMES, cpu_times, irq);
-
 
 // auto-generated libuv bindings
 #include "uv_generated.c"

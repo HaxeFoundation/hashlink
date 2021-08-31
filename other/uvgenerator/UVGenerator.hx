@@ -37,7 +37,8 @@ class UVGenerator {
 		'uv_fileno', 'uv_open_osfhandle', 'uv_print_all_handles', 'uv_print_active_handles',
 		'uv_os_environ', 'uv_os_free_environ', 'uv_setup_args', 'uv_get_process_title',
 		'uv_set_process_title', 'uv_tcp_open', 'uv_udp_open', 'uv_socketpair', 'uv_buf_init',
-		'uv_inet_ntop', 'uv_inet_pton', 'uv_loop_configure']; // TODO: don't skip uv_loop_configure
+		'uv_inet_ntop', 'uv_inet_pton', 'uv_loadavg', 'uv_cpu_info', 'uv_interface_addressses',
+		'uv_loop_configure']; // TODO: don't skip uv_loop_configure
 	static final skipStructs = ['uv_process_options_t', 'uv_utsname_t', 'uv_env_item_t', 'uv_dir_t',
 		'uv_interface_address_t', 'uv_cpu_info_t'];
 	static final skipStructFields = ['f_spare[4]', 'phys_addr[6]'];
@@ -245,7 +246,7 @@ class UVGenerator {
 	static function mapHLArg(a:TypeAndName):String {
 		var type = mapHLType(a.type);
 		if(a.name.endsWith(']')) {
-			type = isUvBuf(a.type) ? '${type}_ARR' : '_REF($type)';
+			type = isUvBuf(a.type) ? '${type}_ARRAY' : '_REF($type)';
 		}
 		return type;
 	}
