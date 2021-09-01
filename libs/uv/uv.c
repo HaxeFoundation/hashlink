@@ -7,8 +7,8 @@
 #	include <uv.h>
 #endif
 
-#if (UV_VERSION_MAJOR <= 0)
-#	error "libuv1-dev required, uv version 0.x found"
+#if (UV_VERSION_MAJOR <= 0 || UV_VERSION_MINOR < 42)
+#	error "libuv 1.42 or newer required"
 #endif
 
 // Common macros
