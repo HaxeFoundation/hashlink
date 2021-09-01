@@ -157,6 +157,7 @@ extern class UV {
 	static public function alloc_sockaddr_storage():CSockaddrStorageStar;
 	static public function sockaddr_storage_size():Int;
 	static public function sockaddr_storage_ss_family(addr:CSockaddrStorageStar):Int;
+	static public function sockaddr_storage_port(addr:CSockaddrStorageStar):Null<Int>;
 	static public function free_sockaddr_storage(addr:CSockaddrStorageStar):Void;
 	static public function sockaddr_of_storage(addr:CSockaddrStorageStar):CSockaddrStar;
 	static public function sockaddr_to_storage(addr:CSockaddrStar):CSockaddrStorageStar;
@@ -182,7 +183,7 @@ extern class UV {
 	static public function addrinfo_ai_family(ai:CAddrinfoStar):AddressFamily;
 	static public function addrinfo_ai_socktype(ai:CAddrinfoStar):SocketType;
 	static public function addrinfo_ai_protocol(ai:CAddrinfoStar):Int;
-	static public function addrinfo_ai_addr(ai:CAddrinfoStar):SockAddr;
+	static public function addrinfo_ai_addr(ai:CAddrinfoStar):CSockaddrStorageStar;
 	static public function addrinfo_ai_canonname(ai:CAddrinfoStar):Bytes;
 	static public function addrinfo_ai_next(ai:CAddrinfoStar):Null<CAddrinfoStar>;
 	static public function nameinfo_flags_to_native(ai:NameInfoFlags):Int;

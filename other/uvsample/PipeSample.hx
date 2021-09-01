@@ -48,7 +48,7 @@ class PipeSample {
 			client.readStart((e, data, bytesRead) -> switch e {
 				case UV_NOERR:
 					print('incoming request: ' + data.toBytes(bytesRead).toString());
-					var addr = SockAddr.ipv4('93.184.216.34', 80); //http://example.com
+					var addr = Ip4Addr('93.184.216.34', 80); //http://example.com
 					tcp.connect(addr, handle(() -> {
 						print('tcp connected to ' + addr);
 						client.write2(data, bytesRead, tcp, handle(() -> print('tcp sent')));

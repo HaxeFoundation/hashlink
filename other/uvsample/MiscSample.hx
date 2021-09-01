@@ -25,9 +25,6 @@ class MiscSample {
 			});
 		}).join('\n  '));
 		print('Load avg: ' + Misc.loadAvg());
-		var addr = Misc.ip4Addr('127.0.0.1', 80);
-		print('Ip4Addr: ' + addr);
-		print('IpName: ' + Misc.ipName(addr));
 		print('Cwd: ' + Misc.cwd());
 		print('Home dir: ' + Misc.homeDir());
 		print('Temp dir: ' + Misc.tmpDir());

@@ -83,12 +83,6 @@ typedef struct sockaddr_in uv_sockaddr_in;
 typedef struct sockaddr_in6 uv_sockaddr_in6;
 typedef struct sockaddr_storage uv_sockaddr_storage;
 
-// TODO {
-	static void on_uv_walk_cb( uv_handle_t* handle, void* arg ) {
-	}
-
-// }
-
 #define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
 #define DATA(t,h)	((t)h->data)
 
@@ -587,6 +581,20 @@ DEFINE_PRIM_FREE(_LOOP, loop);
 // SockAddr
 
 DEFINE_PRIM_FREE(_SOCKADDR_STORAGE, sockaddr_storage);
+
+HL_PRIM vdynamic *HL_NAME(sockaddr_storage_port)( uv_sockaddr_storage *addr ) {
+	UV_CHECK_NULL(addr,NULL);
+	int port;
+	if( addr->ss_family == AF_INET ) {
+		port = ntohs(((uv_sockaddr_in *)addr)->sin_port);
+	} else if( addr->ss_family == AF_INET6 ) {
+		port = ntohs(((uv_sockaddr_in6 *)addr)->sin6_port);
+	} else {
+		return NULL;
+	}
+	return hl_make_dyn(&port, &hlt_i32);
+}
+DEFINE_PRIM(_NULL(_I32), sockaddr_storage_port, _SOCKADDR_STORAGE);
 
 DEFINE_PRIM_C_FIELD(_I32, int, _SOCKADDR_STORAGE, sockaddr_storage, ss_family);
 

@@ -39,7 +39,7 @@ class TcpSample {
 		}
 		var loop = Thread.current().events;
 		var server = Tcp.init(loop, INET);
-		server.bind(SockAddr.ipv4('0.0.0.0', PORT));
+		server.bind(Ip4Addr('0.0.0.0', PORT));
 		server.listen(32, handle(() -> {
 			var client = Tcp.init(loop);
 			server.accept(client);
@@ -67,7 +67,7 @@ class TcpSample {
 		}
 		var loop = Thread.current().events;
 		var client = Tcp.init(loop, INET);
-		client.connect(SockAddr.ipv4('127.0.0.1', PORT), handle(() -> {
+		client.connect(Ip4Addr('127.0.0.1', PORT), handle(() -> {
 			print('connected to ' + client.getPeerName());
 			var data = Bytes.ofString('Hello, world!').getData();
 			client.write(data.bytes, data.length, handle(() -> {

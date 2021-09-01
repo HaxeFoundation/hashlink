@@ -254,10 +254,6 @@ DEFINE_PRIM(_I32, backend_fd, _LOOP);
 DEFINE_PRIM(_I32, backend_timeout, _LOOP);
 DEFINE_PRIM(_U64, now, _LOOP);
 DEFINE_PRIM(_VOID, update_time, _LOOP);
-HL_PRIM void HL_NAME(walk_with_cb)( uv_loop_t* loop, void* arg ) {
-	uv_walk(loop, on_uv_walk_cb, arg);
-}
-DEFINE_PRIM(_VOID, walk_with_cb, _LOOP _POINTER);
 DEFINE_PRIM(_I32, loop_fork, _LOOP);
 DEFINE_PRIM(_POINTER, loop_get_data, _LOOP);
 DEFINE_PRIM(_POINTER, loop_set_data, _LOOP _POINTER);

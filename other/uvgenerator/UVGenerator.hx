@@ -39,7 +39,7 @@ class UVGenerator {
 		'uv_os_environ', 'uv_os_free_environ', 'uv_setup_args', 'uv_get_process_title',
 		'uv_set_process_title', 'uv_tcp_open', 'uv_udp_open', 'uv_socketpair', 'uv_buf_init',
 		'uv_inet_ntop', 'uv_inet_pton', 'uv_loadavg', 'uv_interface_addressses',
-		'uv_loop_configure']; // TODO: don't skip uv_loop_configure
+		'uv_walk', 'uv_loop_configure']; // TODO: don't skip uv_loop_configure
 	static final skipStructs = ['uv_process_options_t', 'uv_utsname_t', 'uv_env_item_t', 'uv_dir_t',
 		'uv_stdio_container_t'];
 	static final skipStructFields = ['f_spare[4]', 'phys_addr[6]'];

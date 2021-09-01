@@ -20,7 +20,7 @@ class UdpSample {
 		}
 		var loop = Thread.current().events;
 		var udp = Udp.init(loop, INET,true);
-		udp.bind(SockAddr.ipv4('0.0.0.0', PORT));
+		udp.bind(Ip4Addr('0.0.0.0', PORT));
 		var cnt = 0;
 		udp.recvStart((e, data, bytesRead, addr, flags) -> switch e {
 			case UV_NOERR:
@@ -49,7 +49,7 @@ class UdpSample {
 		}
 		var udp = Udp.init(Thread.current().events, INET);
 		var data = Bytes.ofString('Hello, UDP!');
-		udp.send(data.getData(), data.length, SockAddr.ipv4('127.0.0.1', PORT), e -> switch e {
+		udp.send(data.getData(), data.length, Ip4Addr('127.0.0.1', PORT), e -> switch e {
 			case UV_NOERR:
 				print('Message sent');
 				udp.close(() -> print('Done'));
