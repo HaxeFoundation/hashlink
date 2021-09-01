@@ -137,6 +137,7 @@ extern class UV {
 	static public function alloc_char_array(length:Int):Ref<Bytes>;
 	static public function free_char_array(a:Ref<Bytes>):Void;
 	static public function free_bytes(bytes:Bytes):Void;
+	static public function pointer_of_bytes(bytes:Bytes):Pointer;
 	static public function translate_uv_error(uvErrno:Int):UVError;
 	static public function translate_to_uv_error(errno:Int):Int;
 	static public function translate_sys_signal(sigNum:Int):SigNum;
@@ -155,9 +156,12 @@ extern class UV {
 	static public function alloc_tcp():UvTcpTStar;
 	static public function alloc_sockaddr_storage():CSockaddrStorageStar;
 	static public function sockaddr_storage_size():Int;
+	static public function sockaddr_storage_ss_family(addr:CSockaddrStorageStar):Int;
 	static public function free_sockaddr_storage(addr:CSockaddrStorageStar):Void;
 	static public function sockaddr_of_storage(addr:CSockaddrStorageStar):CSockaddrStar;
 	static public function sockaddr_to_storage(addr:CSockaddrStar):CSockaddrStorageStar;
+	static public function sockaddr_in_of_storage(addr:CSockaddrStorageStar):CSockaddrInStar;
+	static public function sockaddr_in6_of_storage(addr:CSockaddrStorageStar):CSockaddrIn6Star;
 	static public function alloc_udp():UvUdpTStar;
 	static public function alloc_udp_send():UvUdpSendTStar;
 	static public function alloc_pipe():UvPipeTStar;
@@ -172,6 +176,7 @@ extern class UV {
 	static public function alloc_shutdown():UvShutdownTStar;
 	static public function alloc_write():UvWriteTStar;
 	static public function alloc_connect():UvConnectTStar;
+	static public function address_family_of_af(afFamily:Int):AddressFamily;
 	static public function address_family_to_af(family:AddressFamily):Int;
 	static public function address_family_to_pf(family:AddressFamily):Int;
 	static public function addrinfo_ai_family(ai:CAddrinfoStar):AddressFamily;
@@ -205,6 +210,20 @@ extern class UV {
 	static public function version_suffix():Bytes;
 	static public function version_is_release():Bool;
 	static public function free_rusage(rusage:UvRusageTStar):Void;
+	static public function free_timeval64(tv:UvTimeval64TStar):Void;
+	static public function cpu_info_get(infos:UvCpuInfoTStar, index:Int):UvCpuInfoTStar;
+	static public function interface_address_get(addresses:UvInterfaceAddressTStar, index:Int):UvInterfaceAddressTStar;
+	static public function interface_address_address(addr:UvInterfaceAddressTStar):CSockaddrStorageStar;
+	static public function interface_address_netmask(addr:UvInterfaceAddressTStar):CSockaddrStorageStar;
+	static public function interface_address_phys_addr(addr:UvInterfaceAddressTStar):Bytes;
+	static public function loadavg_array():NativeArray<Float>;
+	static public function alloc_utsname():UvUtsnameTStar;
+	static public function free_utsname(u:UvUtsnameTStar):Void;
+	static public function utsname_sysname(u:UvUtsnameTStar):Bytes;
+	static public function utsname_release(u:UvUtsnameTStar):Bytes;
+	static public function utsname_version(u:UvUtsnameTStar):Bytes;
+	static public function utsname_machine(u:UvUtsnameTStar):Bytes;
+	static public function alloc_random():UvRandomTStar;
 
 // Auto generated content :
 

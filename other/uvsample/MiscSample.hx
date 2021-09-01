@@ -14,7 +14,23 @@ class MiscSample {
 		print('RUsage: ' + Misc.getRUsage());
 		print('Pid: ' + Misc.getPid());
 		print('PPid: ' + Misc.getPPid());
+		print('Cpu infos:\n  ' + Misc.cpuInfo().map(Std.string).join('\n  '));
+		print('Inteface addresses:\n  ' + Misc.interfaceAddresses().map(i -> {
+			Std.string({
+				name:i.name,
+				physAddr:i.physAddr,
+				isInternal:i.isInternal,
+				address:i.address.name(),
+				netmask:i.netmask.name(),
+			});
+		}).join('\n  '));
+		print('Load avg: ' + Misc.loadAvg());
+		var addr = Misc.ip4Addr('127.0.0.1', 80);
+		print('Ip4Addr: ' + addr);
+		print('IpName: ' + Misc.ipName(addr));
+		print('Cwd: ' + Misc.cwd());
 		print('Home dir: ' + Misc.homeDir());
+		print('Temp dir: ' + Misc.tmpDir());
 		print('Passwd: ' + Misc.getPasswd());
 		print('Free mem: ' + Misc.getFreeMemory());
 		print('Total mem: ' + Misc.getTotalMemory());
@@ -27,9 +43,12 @@ class MiscSample {
 		print('Uname: ' + Misc.uname());
 		print('Time of day: ' + Misc.getTimeOfDay());
 		var buf = new Bytes(20);
+		Misc.randomSync(buf, 20, 0);
+		print('Sync  random bytes hex: ' + haxe.io.Bytes.ofData(new haxe.io.BytesData(buf, 20)).toHex());
+		var buf = new Bytes(20);
 		Misc.random(Thread.current().events, buf, 20, 0, e -> switch e {
 			case UV_NOERR:
-				print('Random bytes hex: ' + haxe.io.Bytes.ofData(new haxe.io.BytesData(buf, 20)).toHex());
+				print('Async random bytes hex: ' + haxe.io.Bytes.ofData(new haxe.io.BytesData(buf, 20)).toHex());
 			case _:
 				throw new UVException(e);
 		});

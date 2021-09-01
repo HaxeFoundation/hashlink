@@ -87,8 +87,6 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	static void on_uv_walk_cb( uv_handle_t* handle, void* arg ) {
 	}
 
-	static void on_uv_random_cb( uv_random_t* r, int status, void* buf, size_t buflen ) {
-	}
 // }
 
 #define UV_ALLOC(t)	((t*)malloc(sizeof(t)))
@@ -118,6 +116,12 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	} \
 	DEFINE_PRIM(hl_return, c_struct##_##field, hl_struct);
 
+#define DEFINE_PRIM_C_FIELD_REF(hl_return,c_return,hl_struct,c_struct,field) \
+	HL_PRIM c_return HL_NAME(c_struct##_##field)( struct c_struct *s ) { \
+		return &s->field; \
+	} \
+	DEFINE_PRIM(hl_return, c_struct##_##field, hl_struct);
+
 #define DEFINE_PRIM_UV_FIELD(hl_return,c_return,hl_struct,uv_name,field) \
 	HL_PRIM c_return HL_NAME(uv_name##_##field)( uv_##uv_name##_t *s ) { \
 		return (c_return)s->field; \
@@ -126,7 +130,7 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 
 #define DEFINE_PRIM_UV_FIELD_REF(hl_return,c_return,hl_struct,uv_name,field) \
 	HL_PRIM c_return HL_NAME(uv_name##_##field)( uv_##uv_name##_t *s ) { \
-		return &s->field; \
+		return (c_return)&s->field; \
 	} \
 	DEFINE_PRIM(hl_return, uv_name##_##field, hl_struct);
 
@@ -136,6 +140,12 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 		return ptr; \
 	} \
 	DEFINE_PRIM(hl_type, pointer_to_##uv_name, _POINTER);
+
+#define DEFINE_PRIM_TO_POINTER(hl_type,uv_name) \
+	HL_PRIM void *HL_NAME(pointer_of_##uv_name)( uv_##uv_name##_t *v ) { \
+		return v; \
+	} \
+	DEFINE_PRIM(_POINTER, pointer_of_##uv_name, hl_type);
 
 #define UV_SET_DATA(h,new_data) \
 	if( h->data != new_data ) { \
@@ -426,6 +436,11 @@ HL_PRIM vbyte **HL_NAME(alloc_char_array)( int length ) {
 }
 DEFINE_PRIM(_REF(_BYTES), alloc_char_array, _I32);
 
+HL_PRIM void *HL_NAME(pointer_of_bytes)( vbyte *bytes ) {
+	return bytes;
+}
+DEFINE_PRIM(_POINTER, pointer_of_bytes, _BYTES);
+
 DEFINE_PRIM_FREE(_REF(_BYTES), char_array);
 
 // Buf
@@ -573,6 +588,8 @@ DEFINE_PRIM_FREE(_LOOP, loop);
 
 DEFINE_PRIM_FREE(_SOCKADDR_STORAGE, sockaddr_storage);
 
+DEFINE_PRIM_C_FIELD(_I32, int, _SOCKADDR_STORAGE, sockaddr_storage, ss_family);
+
 HL_PRIM struct sockaddr_storage *HL_NAME(alloc_sockaddr_storage)() {
 	return UV_ALLOC(struct sockaddr_storage);
 }
@@ -583,10 +600,15 @@ HL_PRIM int HL_NAME(sockaddr_storage_size)() {
 }
 DEFINE_PRIM(_I32, sockaddr_storage_size, _NO_ARG);
 
-HL_PRIM struct sockaddr *HL_NAME(sockaddr_of_storage)( struct sockaddr_storage *addr ) {
-	return (struct sockaddr *)addr;
-}
-DEFINE_PRIM(_SOCKADDR, sockaddr_of_storage, _SOCKADDR_STORAGE);
+#define DEFINE_PRIM_OF_SOCKADDR_STORAGE(hl_type, name) \
+	HL_PRIM struct name *HL_NAME(name##_of_storage)( struct sockaddr_storage *addr ) { \
+		return (struct name *)addr; \
+	} \
+	DEFINE_PRIM(hl_type, name##_of_storage, _SOCKADDR_STORAGE);
+
+DEFINE_PRIM_OF_SOCKADDR_STORAGE(_SOCKADDR, sockaddr);
+DEFINE_PRIM_OF_SOCKADDR_STORAGE(_SOCKADDR_IN, sockaddr_in);
+DEFINE_PRIM_OF_SOCKADDR_STORAGE(_SOCKADDR_IN6, sockaddr_in6);
 
 HL_PRIM struct sockaddr_storage *HL_NAME(sockaddr_to_storage)( struct sockaddr *addr ) {
 	if( !addr )
@@ -653,6 +675,16 @@ HL_PRIM int HL_NAME(address_family_to_af)( int family ) {
 	}
 }
 DEFINE_PRIM(_I32, address_family_to_af, _I32)
+
+HL_PRIM int HL_NAME(address_family_of_af)( int af_family ) {
+	switch( af_family ) {
+		case AF_UNSPEC: return HL_UV_UNSPEC;
+		case AF_INET: return HL_UV_INET;
+		case AF_INET6: return HL_UV_INET6;
+		default: return af_family;
+	}
+}
+DEFINE_PRIM(_I32, address_family_of_af, _I32)
 
 //see hl.uv.SockAddr.SocketType
 #define HL_UV_STREAM	-1
@@ -1019,6 +1051,57 @@ DEFINE_PRIM_VERSION(suffix, UV_VERSION_SUFFIX, _BYTES, vbyte *);
 
 DEFINE_PRIM_FREE(_RUSAGE, rusage);
 DEFINE_PRIM_FREE(_TIMEVAL64, timeval64);
+
+HL_PRIM uv_cpu_info_t *HL_NAME(cpu_info_get)( uv_cpu_info_t *infos, int index ) {
+	return &infos[index];
+}
+DEFINE_PRIM(_CPU_INFO, cpu_info_get, _CPU_INFO _I32);
+
+HL_PRIM uv_interface_address_t *HL_NAME(interface_address_get)( uv_interface_address_t *addresses, int index ) {
+	return &addresses[index];
+}
+DEFINE_PRIM(_INTERFACE_ADDRESS, interface_address_get, _INTERFACE_ADDRESS _I32);
+
+#define DEFINE_PRIM_INTERFACE_ADDRESS_ADDR(field) \
+	HL_PRIM uv_sockaddr_storage *HL_NAME(interface_address_##field)( uv_interface_address_t *addr ) { \
+		uv_sockaddr_storage *result = UV_ALLOC(uv_sockaddr_storage); \
+		memcpy(result, &addr->field, sizeof(addr->field)); \
+		return result; \
+	} \
+	DEFINE_PRIM(_SOCKADDR_STORAGE, interface_address_##field, _INTERFACE_ADDRESS);
+
+DEFINE_PRIM_INTERFACE_ADDRESS_ADDR(address);
+DEFINE_PRIM_INTERFACE_ADDRESS_ADDR(netmask);
+
+HL_PRIM char *HL_NAME(interface_address_phys_addr)( uv_interface_address_t *addr ) {
+	return addr->phys_addr;
+}
+DEFINE_PRIM(_BYTES, interface_address_phys_addr, _INTERFACE_ADDRESS);
+
+HL_PRIM varray *HL_NAME(loadavg_array)() {
+	double avg[3];
+	uv_loadavg(avg);
+	varray *a = hl_alloc_array(&hlt_f64, 3);
+	hl_aptr(a,double)[0] = avg[0];
+	hl_aptr(a,double)[1] = avg[1];
+	hl_aptr(a,double)[2] = avg[2];
+	return a;
+}
+DEFINE_PRIM(_ARR, loadavg_array, _NO_ARG);
+
+DEFINE_PRIM_ALLOC(_UTSNAME, utsname);
+DEFINE_PRIM_FREE(_UTSNAME, utsname);
+DEFINE_PRIM_UV_FIELD_REF(_BYTES, vbyte *, _UTSNAME, utsname, sysname);
+DEFINE_PRIM_UV_FIELD_REF(_BYTES, vbyte *, _UTSNAME, utsname, release);
+DEFINE_PRIM_UV_FIELD_REF(_BYTES, vbyte *, _UTSNAME, utsname, version);
+DEFINE_PRIM_UV_FIELD_REF(_BYTES, vbyte *, _UTSNAME, utsname, machine);
+
+DEFINE_PRIM_ALLOC(_RANDOM, random);
+
+static void on_uv_random_cb( uv_random_t* r, int status, void* buf, size_t buflen ) {
+	vclosure *c = DATA(uv_req_cb_data_t *, r)->callback;
+	hl_call1(void, c, int, status);
+}
 
 // auto-generated libuv bindings
 #include "uv_generated.c"

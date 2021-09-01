@@ -19,6 +19,7 @@ typedef FunctionSignature = {
 }
 
 typedef StructSignature = {
+	var type:String;
 	var name:String;
 	var fields:Array<TypeAndName>;
 }
@@ -37,12 +38,12 @@ class UVGenerator {
 		'uv_fileno', 'uv_open_osfhandle', 'uv_print_all_handles', 'uv_print_active_handles',
 		'uv_os_environ', 'uv_os_free_environ', 'uv_setup_args', 'uv_get_process_title',
 		'uv_set_process_title', 'uv_tcp_open', 'uv_udp_open', 'uv_socketpair', 'uv_buf_init',
-		'uv_inet_ntop', 'uv_inet_pton', 'uv_loadavg', 'uv_cpu_info', 'uv_interface_addressses',
+		'uv_inet_ntop', 'uv_inet_pton', 'uv_loadavg', 'uv_interface_addressses',
 		'uv_loop_configure']; // TODO: don't skip uv_loop_configure
 	static final skipStructs = ['uv_process_options_t', 'uv_utsname_t', 'uv_env_item_t', 'uv_dir_t',
-		'uv_interface_address_t', 'uv_cpu_info_t'];
+		'uv_stdio_container_t'];
 	static final skipStructFields = ['f_spare[4]', 'phys_addr[6]'];
-	static final allowNoCallback = ['uv_fs_cb'];
+	static final allowNoCallback = ['uv_fs_cb', 'uv_random_cb'];
 
 	static final predefinedHxTypes = new Map<String,String>();
 	static final hxTypesToGenerate = new Map<String,String>();
@@ -81,8 +82,8 @@ class UVGenerator {
 						cFile.writeString(cStr);
 						hxFile.writeString(hxBinding(sig));
 					} else if(line.startsWith('typedef struct ') && line.endsWith('{')) {
-						for(sig in parseStruct(lines)) {
-							if(skipStructs.contains(sig.name))
+						for(sig in parseStruct(line, lines)) {
+							if(sig.name == null || skipStructs.contains(sig.name))
 								continue;
 							cFile.writeString(cStructBinding(sig));
 							hxFile.writeString(hxStructBinding(sig));
@@ -136,9 +137,24 @@ class UVGenerator {
 		return new Path(new Path(new Path(generatorPath).dir).dir).dir;
 	}
 
-	static function parseStruct(lines:Array<String>):Array<StructSignature> {
+	static function parseStructType(firstLine:String):Null<String> {
+		var start = firstLine.indexOf('struct ');
+		if(start < 0)
+			return null;
+		start += 'struct '.length;
+		var end = firstLine.indexOf(' ', start);
+		if(end < 0)
+			return null;
+		var name = firstLine.substring(start, end);
+		if(name.endsWith('_s'))
+			name = name.substr(0, name.length - 2) + '_t';
+		return name;
+	}
+
+	static function parseStruct(firstLine:String, lines:Array<String>):Array<StructSignature> {
 		var result = [];
 		var fields = [];
+		var type = parseStructType(firstLine);
 		var name = null;
 		while(lines.length > 0) {
 			var line = lines.shift();
@@ -151,10 +167,17 @@ class UVGenerator {
 				line = line.substr(0, commentPos) + line.substr(line.indexOf('*/') + 2);
 			line = line.trim();
 			//leave unions for manual handling
-			if(line.startsWith('union '))
+			if(line.startsWith('union {')) {
+				parseStruct(line, lines);
 				continue;
+			}
 			if(line.startsWith('struct ') && line.endsWith('{')) {
-				result = result.concat(parseStruct(lines));
+				var sub = parseStruct(line, lines);
+				if(sub.length > 0) {
+					result = result.concat(sub);
+					fields.push({name:sub[0].name, type:sub[0].type});
+					sub[0].name = sub[0].type;
+				}
 			} else {
 				var splitPos = line.lastIndexOf(' ');
 				if(line.endsWith(';'))
@@ -167,7 +190,7 @@ class UVGenerator {
 				}
 			}
 		}
-		result.push({name:name, fields:fields});
+		result.unshift({type:type, name:name, fields:fields});
 		return result;
 	}
 
@@ -223,6 +246,7 @@ class UVGenerator {
 			case 'uv_pid_t': '_I32';
 			case 'uv_buf_t': '_BUF';
 			case 'uv_dirent_type_t': '_I32';
+			case 'cpu_times*': '_CPU_TIMES';
 			case _ if(type.endsWith('**')):
 				'_REF(' + mapHLType(type.substr(0, type.length - 1)) + ')';
 			case _ if(type.startsWith('uv_')):
@@ -385,14 +409,22 @@ class UVGenerator {
 		return lines.join('\n') + '\n';
 	}
 
-	static function validateStructName(name:String):String {
-		if(!name.startsWith('uv_') || !name.endsWith('_t'))
-			throw new Skip('Struct $name does not conform naming pattern.');
-		return name.substring('uv_'.length, name.length - '_t'.length);
+	static function detectStruct(name:String):{name:String, definePrim:String} {
+		if(name.startsWith('uv_') && name.endsWith('_t')) {
+			return {
+				name: name.substring('uv_'.length, name.length - '_t'.length),
+				definePrim: 'DEFINE_PRIM_UV_FIELD'
+			}
+		} else {
+			return {
+				name: name,
+				definePrim: 'DEFINE_PRIM_C_FIELD'
+			}
+		}
 	}
 
 	static function cStructBinding(sig:StructSignature):String {
-		var name = validateStructName(sig.name);
+		var s = detectStruct(sig.name);
 		var cStruct = sig.name + '*';
 		var hlStruct = mapHLType(cStruct);
 		var result = sig.fields
@@ -400,17 +432,17 @@ class UVGenerator {
 			.map(f -> {
 				if(structFieldNeedsRef(f.type)) {
 					var hlType = mapHLType(f.type + '*');
-					'DEFINE_PRIM_UV_FIELD_REF($hlType, ${f.type} *, $hlStruct, $name, ${f.name});';
+					'${s.definePrim}_REF($hlType, ${f.type} *, $hlStruct, ${s.name}, ${f.name});';
 				} else {
-					'DEFINE_PRIM_UV_FIELD(${mapHLType(f.type)}, ${f.type}, $hlStruct, $name, ${f.name});';
+					'${s.definePrim}(${mapHLType(f.type)}, ${f.type}, $hlStruct, ${s.name}, ${f.name});';
 				}
 			});
-		result.push('DEFINE_PRIM_ALLOC($hlStruct, $name);');
+		result.push('DEFINE_PRIM_ALLOC($hlStruct, ${s.name});');
 		return result.join('\n') + '\n';
 	}
 
 	static function hxStructBinding(sig:StructSignature):String {
-		var name = validateStructName(sig.name);
+		var name = detectStruct(sig.name).name;
 		var cStruct = sig.name + '*';
 		var hxStruct = mapHXType(cStruct);
 		var result = sig.fields
