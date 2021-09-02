@@ -7,7 +7,6 @@ import sys.thread.Thread;
 class DirSample {
 	public static function main() {
 		var path = Misc.tmpDir();
-
 		runSync(path);
 		runAsync(path);
 	}
