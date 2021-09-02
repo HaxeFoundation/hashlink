@@ -985,8 +985,9 @@ static void on_uv_fs_cb( uv_fs_t *r ) {
 	hl_call1(void, c, uv_fs_t *, r);
 }
 
-DEFINE_PRIM_OF_POINTER(_DIR,dir);
-DEFINE_PRIM_FREE(_DIR,dir);
+DEFINE_PRIM_OF_POINTER(_STATFS, statfs);
+DEFINE_PRIM_OF_POINTER(_DIR, dir);
+DEFINE_PRIM_FREE(_DIR, dir);
 
 HL_PRIM void HL_NAME(dir_init)( uv_dir_t *dir, int num_entries ) {
 	dir->nentries = num_entries;
@@ -1001,6 +1002,45 @@ DEFINE_PRIM(_DIRENT, dir_dirent, _DIR _I32);
 
 DEFINE_PRIM_UV_FIELD(_I32, int, _DIR, dir, nentries);
 DEFINE_PRIM_FREE(_DIRENT, dirent);
+
+HL_PRIM int HL_NAME(translate_to_sys_file_open_flag)( int hx_flag ) {
+	switch( hx_flag ) {
+		case 0: return UV_FS_O_APPEND;
+		case 1: return UV_FS_O_CREAT;
+		case 2: return UV_FS_O_DIRECT;
+		case 3: return UV_FS_O_DIRECTORY;
+		case 4: return UV_FS_O_DSYNC;
+		case 5: return UV_FS_O_EXCL;
+		case 6: return UV_FS_O_EXLOCK;
+		case 7: return UV_FS_O_FILEMAP;
+		case 8: return UV_FS_O_NOATIME;
+		case 9: return UV_FS_O_NOCTTY;
+		case 10: return UV_FS_O_NOFOLLOW;
+		case 11: return UV_FS_O_NONBLOCK;
+		case 12: return UV_FS_O_RANDOM;
+		case 13: return UV_FS_O_RDONLY;
+		case 14: return UV_FS_O_RDWR;
+		case 15: return UV_FS_O_SEQUENTIAL;
+		case 16: return UV_FS_O_SHORT_LIVED;
+		case 17: return UV_FS_O_SYMLINK;
+		case 18: return UV_FS_O_SYNC;
+		case 19: return UV_FS_O_TEMPORARY;
+		case 20: return UV_FS_O_TRUNC;
+		case 21: return UV_FS_O_WRONLY;
+		default: hl_error("Unknown file open flag index: %d", hx_flag);
+	}
+}
+DEFINE_PRIM(_I32, translate_to_sys_file_open_flag, _I32);
+
+HL_PRIM varray *HL_NAME(statfs_f_spare)( uv_statfs_t *stat ) {
+	varray *a = hl_alloc_array(&hlt_i64, 4);
+	hl_aptr(a,double)[0] = stat->f_spare[0];
+	hl_aptr(a,double)[1] = stat->f_spare[1];
+	hl_aptr(a,double)[2] = stat->f_spare[2];
+	hl_aptr(a,double)[3] = stat->f_spare[3];
+	return a;
+}
+DEFINE_PRIM(_ARR, statfs_f_spare, _STATFS);
 
 // Tty
 

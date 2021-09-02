@@ -174,7 +174,7 @@ class FileSample {
 		Log.print('fstat on $path...');
 		File.open(loop, path, [O_CREAT(420)], (e, file) -> handle(() -> {
 			file.fstat(loop, (e, fstat) -> handle(() -> {
-				Log.print('got fstat');
+				Log.print('got fstat: $fstat');
 				file.close(loop, handle(() -> {
 					Log.print('stat on $path');
 					File.stat(loop, path, (e, stat) -> handle(() -> {
