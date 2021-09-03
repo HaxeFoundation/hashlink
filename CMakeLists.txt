@@ -247,6 +247,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
         COMMAND ${HAXE_COMPILER}
+            -D SAMPLE=All
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
             -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
     )
