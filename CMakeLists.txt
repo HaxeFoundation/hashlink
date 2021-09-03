@@ -245,26 +245,28 @@ if(BUILD_TESTING)
     #####################
     # uvsample.c
 
-    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
-        COMMAND ${HAXE_COMPILER}
-            -D SAMPLE=All
-            -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
-            -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
-    )
-    add_executable(uvsample
-        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
-    )
-    set_target_properties(uvsample
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample
-    )
-    target_include_directories(uvsample
-        PRIVATE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample
-    )
-    target_link_libraries(uvsample
-        libhl
-        uv.hdll
-    )
+    # TODO: uncomment when https://github.com/HaxeFoundation/haxe/pull/10342 is merged
+
+    #add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
+    #    COMMAND ${HAXE_COMPILER}
+    #        -D SAMPLE=All
+    #        -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
+    #        -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
+    #)
+    #add_executable(uvsample
+    #    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
+    #)
+    #set_target_properties(uvsample
+    #    PROPERTIES
+    #    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample
+    #)
+    #target_include_directories(uvsample
+    #    PRIVATE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample
+    #)
+    #target_link_libraries(uvsample
+    #    libhl
+    #    uv.hdll
+    #)
 
     #####################
     # Tests
