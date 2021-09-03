@@ -1,8 +1,8 @@
 import hl.uv.Process;
 import sys.thread.Thread;
 
-class ProcessSample {
-	public static function main() {
+class ProcessSample extends UVSample {
+	public function run() {
 		// Process.disableStdioInheritance();
 
 		var env = Sys.environment();
@@ -18,14 +18,14 @@ class ProcessSample {
 			stdio: [INHERIT, INHERIT, INHERIT],
 			env: env,
 			onExit: (p, exitCode, termSignal) -> {
-				Log.print('process finished: exitCode $exitCode, termSignal $termSignal');
-				p.close(() -> Log.print('process closed'));
+				print('process finished: exitCode $exitCode, termSignal $termSignal');
+				p.close(() -> print('process closed'));
 			},
 		}
 		var args = [cmd];
 		// args.push('non-existent-path');
 		var p = Process.spawn(Thread.current().events, cmd, args, opt);
-		Log.print('pid ${p.pid}');
+		print('pid ${p.pid}');
 		// p.kill(SIGINT);
 		// Process.killPid(p.pid, SIGINT);
 	}

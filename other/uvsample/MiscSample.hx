@@ -3,12 +3,8 @@ import hl.uv.UVException;
 import sys.thread.Thread;
 import hl.uv.Misc;
 
-class MiscSample {
-	static function print(msg:String) {
-		Log.print('MiscSample: $msg');
-	}
-
-	public static function main() {
+class MiscSample extends UVSample {
+	public function run() {
 		print('Resident set memory: ' + Misc.residentSetMemory());
 		print('Uptime: ' + Misc.uptime());
 		print('RUsage: ' + Misc.getRUsage());

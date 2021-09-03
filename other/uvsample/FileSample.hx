@@ -12,16 +12,16 @@ abstract Actions(Array<Function>) from Array<Function> {
 	public function next() {
 		var fn = this.shift();
 		if(fn != null) {
-			Log.print('-----------');
+			print('-----------');
 			fn(this);
 		}
 	}
 }
 
-class FileSample {
+class FileSample extends UVSample {
 	static final loop = Thread.current().events;
 
-	public static function main() {
+	public function run() {
 		var actions:Actions = [
 			createWriteSyncReadUnlink,
 			mkdirRenameRmdir,
@@ -41,14 +41,14 @@ class FileSample {
 		actions.next();
 	}
 
-	static function handle(success:()->Void, ?p:PosInfos):(e:UVError)->Void {
+	function handle(success:()->Void, ?p:PosInfos):(e:UVError)->Void {
 		return e -> switch e {
 			case UV_NOERR: success();
 			case _: throw new UVException(e, p.fileName + ':' + p.lineNumber + ': ' + e.toString());
 		}
 	}
 
-	static function createFile(path:String, content:Bytes, callback:()->Void, ?pos:PosInfos) {
+	function createFile(path:String, content:Bytes, callback:()->Void, ?pos:PosInfos) {
 		File.open(loop, path, [O_CREAT(420),O_TRUNC,O_WRONLY], (e, file) -> handle(() -> {
 			file.write(loop, content.getData(), content.length, I64.ofInt(0), (e, bytesWritten) -> handle(() -> {
 				file.close(loop, handle(callback, pos));
@@ -56,7 +56,7 @@ class FileSample {
 		}, pos)(e));
 	}
 
-	static function readFile(path:String, callback:(data:Bytes)->Void) {
+	function readFile(path:String, callback:(data:Bytes)->Void) {
 		File.open(loop, path, [O_RDONLY], (e, file) -> handle(() -> {
 			var buf = new hl.Bytes(10240);
 			file.read(loop, buf, 10240, I64.ofInt(0), (e, bytesRead) -> handle(() -> {
@@ -67,7 +67,7 @@ class FileSample {
 		})(e));
 	}
 
-	static function deleteFiles(files:Array<String>, callback:()->Void) {
+	function deleteFiles(files:Array<String>, callback:()->Void) {
 		var finished = 0;
 		for(path in files) {
 			File.unlink(loop, path, handle(() -> {
@@ -78,20 +78,20 @@ class FileSample {
 		}
 	}
 
-	static function createWriteSyncReadUnlink(actions:Actions) {
+	function createWriteSyncReadUnlink(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-file';
-		Log.print('Creating $path for writing...');
+		print('Creating $path for writing...');
 		File.open(loop, path, [O_CREAT(420), O_WRONLY], (e, file) -> handle(() -> {
-			Log.print('Writing...');
+			print('Writing...');
 			var data = Bytes.ofString('Hello, world!');
 			file.write(loop, data.getData(), data.length, I64.ofInt(0), (e, bytesWritten) -> handle(() -> {
-				Log.print('$bytesWritten bytes written: $data');
-				Log.print('fsync...');
+				print('$bytesWritten bytes written: $data');
+				print('fsync...');
 				file.fsync(loop, handle(() -> {
-					Log.print('fdatasync...');
+					print('fdatasync...');
 					file.fdataSync(loop, handle(() -> {
 						file.close(loop, handle(() -> {
-							Log.print('closed $path');
+							print('closed $path');
 							readUnlink(path, actions);
 						}));
 					}));
@@ -100,81 +100,81 @@ class FileSample {
 		})(e));
 	}
 
-	static function readUnlink(path:String, actions:Actions) {
-		Log.print('Opening $path for reading...');
+	function readUnlink(path:String, actions:Actions) {
+		print('Opening $path for reading...');
 		File.open(loop, path, [O_RDONLY], (e, file) -> handle(() -> {
-			Log.print('Reading...');
+			print('Reading...');
 			var buf = new hl.Bytes(1024);
 			file.read(loop, buf, 1024, I64.ofInt(0), (e, bytesRead) -> handle(() -> {
-				Log.print('$bytesRead bytes read: ' + buf.toBytes(bytesRead.toInt()));
+				print('$bytesRead bytes read: ' + buf.toBytes(bytesRead.toInt()));
 				file.close(loop, handle(() -> {
-					Log.print('closed $path');
+					print('closed $path');
 					unlink(path, actions);
 				}));
 			})(e));
 		})(e));
 	}
 
-	static function unlink(path:String, actions:Actions) {
-		Log.print('Unlinking $path...');
+	function unlink(path:String, actions:Actions) {
+		print('Unlinking $path...');
 		File.unlink(loop, path, handle(() -> {
 			actions.next();
 		}));
 	}
 
-	static function mkdirRenameRmdir(actions:Actions) {
+	function mkdirRenameRmdir(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-dir';
 		var newPath = Misc.tmpDir() + '/test-dir2';
-		Log.print('Creating directory $path...');
+		print('Creating directory $path...');
 		File.mkdir(loop, path, 511, handle(() -> {
-			Log.print('Renaming $path to $newPath...');
+			print('Renaming $path to $newPath...');
 			File.rename(loop, path, newPath, handle(() -> {
-				Log.print('Removing directory $newPath...');
+				print('Removing directory $newPath...');
 				File.rmdir(loop, newPath, handle(() -> {
-					Log.print('Done');
+					print('Done');
 					actions.next();
 				}));
 			}));
 		}));
 	}
 
-	static function mkdtempRmdir(actions:Actions) {
+	function mkdtempRmdir(actions:Actions) {
 		var tpl = Misc.tmpDir() + '/test-dir-XXXXXX';
-		Log.print('Creating temp directory with tpl $tpl...');
+		print('Creating temp directory with tpl $tpl...');
 		File.mkdtemp(loop, tpl, (e, path) -> handle(() -> {
-			Log.print('Removing directory $path...');
+			print('Removing directory $path...');
 			File.rmdir(loop, path, handle(() -> {
-				Log.print('Done');
+				print('Done');
 				actions.next();
 			}));
 		})(e));
 	}
 
-	static function mkstempUnlink(actions:Actions) {
+	function mkstempUnlink(actions:Actions) {
 		var tpl = Misc.tmpDir() + '/test-file-XXXXXX';
-		Log.print('Creating temp file with tpl $tpl...');
+		print('Creating temp file with tpl $tpl...');
 		File.mkstemp(loop, tpl, (e, file, path) -> handle(() -> {
-			Log.print('Closing $path...');
+			print('Closing $path...');
 			file.close(loop, handle(() -> {
-				Log.print('Unlinking $path...');
+				print('Unlinking $path...');
 				File.unlink(loop, path, handle(() -> {
-					Log.print('Done');
+					print('Done');
 					actions.next();
 				}));
 			}));
 		})(e));
 	}
 
-	static function statFStat(actions:Actions) {
+	function statFStat(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-file';
-		Log.print('fstat on $path...');
+		print('fstat on $path...');
 		File.open(loop, path, [O_CREAT(420)], (e, file) -> handle(() -> {
 			file.fstat(loop, (e, fstat) -> handle(() -> {
-				Log.print('got fstat: $fstat');
+				print('got fstat: $fstat');
 				file.close(loop, handle(() -> {
-					Log.print('stat on $path');
+					print('stat on $path');
 					File.stat(loop, path, (e, stat) -> handle(() -> {
-						Log.print('got stat: $stat');
+						print('got stat: $stat');
 						// TODO: jit error on I64 == I64
 						// var ok = stat.dev == fstat.dev;
 						// 	&& stat.mode == fstat.mode
@@ -188,9 +188,9 @@ class FileSample {
 						// 	&& stat.blocks == fstat.blocks
 						// 	&& stat.flags == fstat.flags
 						// 	&& stat.gen == fstat.gen;
-						// Log.print('fstat equals stat: $ok');
+						// print('fstat equals stat: $ok');
 						deleteFiles([path], () -> {
-							Log.print('Done');
+							print('Done');
 							actions.next();
 						});
 					})(e));
@@ -199,28 +199,28 @@ class FileSample {
 		})(e));
 	}
 
-	static function statFs(actions:Actions) {
-		Log.print('statfs on .');
+	function statFs(actions:Actions) {
+		print('statfs on .');
 		File.statFs(loop, '.', (e, stat) -> handle(() -> {
-			Log.print('got statfs: $stat');
-			Log.print('Done');
+			print('got statfs: $stat');
+			print('Done');
 			actions.next();
 		})(e));
 	}
 
-	static function truncate(actions:Actions) {
+	function truncate(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-file-truncate';
 		var content = '1234567890';
-		Log.print('Writing content for truncation at $path: $content');
+		print('Writing content for truncation at $path: $content');
 		createFile(path, Bytes.ofString(content), () -> {
 			File.open(loop, path, [O_WRONLY], (e, file) -> handle(() -> {
-				Log.print('truncating at 5...');
+				print('truncating at 5...');
 				file.ftruncate(loop, I64.ofInt(5), handle(() -> {
 					file.close(loop, handle(() -> {
 						readFile(path, data -> {
-							Log.print('Content after truncation (length=${data.length}): $data');
+							print('Content after truncation (length=${data.length}): $data');
 							deleteFiles([path], () -> {
-								Log.print('Done');
+								print('Done');
 								actions.next();
 							});
 						});
@@ -230,33 +230,33 @@ class FileSample {
 		});
 	}
 
-	static function copyFile(actions:Actions) {
+	function copyFile(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-file-copy';
 		var newPath = '$path-copy';
 		createFile(path, Bytes.ofString('123'), () -> {
-			Log.print('Copy $path to $newPath');
+			print('Copy $path to $newPath');
 			File.copyFile(loop, path, newPath, [EXCL], handle(() -> {
 				deleteFiles([path, newPath], () -> {
-					Log.print('Done');
+					print('Done');
 					actions.next();
 				});
 			}));
 		});
 	}
 
-	static function sendFile(actions:Actions) {
+	function sendFile(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-file-send';
 		var newPath = '$path-copy';
 		createFile(path, Bytes.ofString('12345678'), () -> {
 			File.open(loop, path, [O_RDONLY], (e, src) -> handle(() -> {
 				File.open(loop, newPath, [O_CREAT(420), O_WRONLY], (e, dst) -> handle(() -> {
-					Log.print('sendFile from $path to $newPath...');
+					print('sendFile from $path to $newPath...');
 					src.sendFile(loop, dst, I64.ofInt(0), I64.ofInt(20), (e, outOffset) -> handle(() -> {
-						Log.print('sendfile stopped at $outOffset');
+						print('sendfile stopped at $outOffset');
 						src.close(loop, handle(() -> {
 							dst.close(loop, handle(() -> {
 								deleteFiles([path, newPath], () -> {
-									Log.print('Done');
+									print('Done');
 									actions.next();
 								});
 							}));
@@ -267,57 +267,57 @@ class FileSample {
 		});
 	}
 
-	static function access(actions:Actions) {
+	function access(actions:Actions) {
 		var path = Misc.tmpDir();
-		Log.print('Checking write permissions on $path...');
+		print('Checking write permissions on $path...');
 		File.access(loop, path, [W_OK], handle(() -> {
-			Log.print('Done');
+			print('Done');
 			actions.next();
 		}));
 	}
 
-	static function chmod(actions:Actions) {
+	function chmod(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-file-chmod';
 		createFile(path, Bytes.ofString('123'), () -> {
-			Log.print('chmod on $path...');
+			print('chmod on $path...');
 			File.chmod(loop, path, 420, handle(() -> {
 				deleteFiles([path], () -> {
-					Log.print('Done');
+					print('Done');
 					actions.next();
 				});
 			}));
 		});
 	}
 
-	static function utime(actions:Actions) {
+	function utime(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-file-utime';
 		createFile(path, Bytes.ofString('123'), () -> {
-			Log.print('utime on $path...');
+			print('utime on $path...');
 			File.utime(loop, path, Date.now().getTime(), Date.now().getTime(), handle(() -> {
 				deleteFiles([path], () -> {
-					Log.print('Done');
+					print('Done');
 					actions.next();
 				});
 			}));
 		});
 	}
 
-	static function linkSymlinkReadLinkRealPath(actions:Actions) {
+	function linkSymlinkReadLinkRealPath(actions:Actions) {
 		var path = Misc.tmpDir() + '/test-file-l';
 		var newPath = Misc.tmpDir() + '/test-file-link';
 		createFile(path, Bytes.ofString('123'), () -> {
-			Log.print('link $path to $newPath...');
+			print('link $path to $newPath...');
 			File.link(loop, path, newPath, handle(() -> {
 				deleteFiles([newPath], () -> {
-					Log.print('symlink $path to $newPath...');
+					print('symlink $path to $newPath...');
 					File.symlink(loop, path, newPath, [SYMLINK_JUNCTION], handle(() -> {
-						Log.print('readlink at $newPath...');
+						print('readlink at $newPath...');
 						File.readLink(loop, newPath, (e, target) -> handle(() -> {
-							Log.print('Link content: $target');
+							print('Link content: $target');
 							File.readLink(loop, newPath, (e, real) -> handle(() -> {
-								Log.print('Real path of $newPath: $real');
+								print('Real path of $newPath: $real');
 								deleteFiles([path, newPath], () -> {
-									Log.print('Done');
+									print('Done');
 									actions.next();
 								});
 							})(e));
@@ -328,7 +328,7 @@ class FileSample {
 		});
 	}
 
-	static function chown(actions:Actions) {
+	function chown(actions:Actions) {
 		if(Sys.systemName() == 'Windows') {
 			actions.next();
 			return;
@@ -336,10 +336,10 @@ class FileSample {
 
 		var path = Misc.tmpDir() + '/test-file-chown';
 		createFile(path, Bytes.ofString(''), () -> {
-			Log.print('chown on $path...');
+			print('chown on $path...');
 			File.chown(loop, path, -1, -1, handle(() -> {
 				deleteFiles([path], () -> {
-					Log.print('Done');
+					print('Done');
 					actions.next();
 				});
 			}));

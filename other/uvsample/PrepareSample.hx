@@ -3,8 +3,8 @@ import hl.uv.Timer;
 import hl.uv.Prepare;
 import sys.thread.Thread;
 
-class PrepareSample {
-	public static function main() {
+class PrepareSample extends UVSample {
+	public function run() {
 		var loop = Thread.current().events;
 		var timer = Timer.init(loop);
 		timer.start(() -> {
@@ -14,7 +14,7 @@ class PrepareSample {
 
 		var prepare = Prepare.init(loop);
 		prepare.start(() -> {
-			Log.print('Prepare');
+			print('Prepare');
 			prepare.stop();
 			prepare.close();
 		});

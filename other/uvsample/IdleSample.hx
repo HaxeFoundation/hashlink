@@ -3,8 +3,8 @@ import hl.uv.Timer;
 import hl.uv.Idle;
 import sys.thread.Thread;
 
-class IdleSample {
-	public static function main() {
+class IdleSample extends UVSample {
+	public function run() {
 		var loop = Thread.current().events;
 		var timer = Timer.init(loop);
 		timer.start(() -> {
@@ -14,7 +14,7 @@ class IdleSample {
 
 		var idle = Idle.init(loop);
 		idle.start(() -> {
-			Log.print('Idle');
+			print('Idle');
 			idle.stop();
 			idle.close();
 		});

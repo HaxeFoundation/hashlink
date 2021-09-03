@@ -1,3 +1,4 @@
+import haxe.PosInfos;
 import haxe.Timer;
 import haxe.io.Bytes;
 import hl.uv.UVException;
@@ -5,18 +6,17 @@ import hl.uv.SockAddr;
 import hl.uv.Udp;
 import sys.thread.Thread;
 
-class UdpSample {
+class UdpSample extends UVSample {
 	static inline var PORT = 22002;
 
-	public static function main() {
-		Log.print('Running UdpSample...');
+	public function run() {
 		server();
 		Timer.delay(client,100);
 	}
 
-	static function server() {
-		function print(msg:String) {
-			Log.print('RECEIVER: $msg');
+	function server() {
+		function print(msg:String, ?p:PosInfos) {
+			this.print('RECEIVER: $msg', p);
 		}
 		var loop = Thread.current().events;
 		var udp = Udp.init(loop, INET,true);
@@ -43,9 +43,9 @@ class UdpSample {
 		});
 	}
 
-	static function client() {
-		function print(msg:String) {
-			Log.print('SENDER: $msg');
+	function client() {
+		function print(msg:String, ?p:PosInfos) {
+			this.print('SENDER: $msg', p);
 		}
 		var udp = Udp.init(Thread.current().events, INET);
 		var data = Bytes.ofString('Hello, UDP!');

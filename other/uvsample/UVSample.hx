@@ -1,26 +1,20 @@
-class UVSample {
+import haxe.PosInfos;
+
+abstract class UVSample {
 	static function main() {
-		run();
-		// CheckSample.main();
-		// PrepareSample.main();
-		// IdleSample.main();
-		// TcpSample.main();
-		// DnsSample.main();
-		// UdpSample.main();
-		// PipeSample.main();
-		// ProcessSample.main();
-		// FileSyncSample.main();
-		// FileSample.main();
-		// DirSample.main();
-		// FsEventSample.main();
-		// FsPollSample.main();
-		// MiscSample.main();
-		// TtySample.main();
-		// SignalSample.main();
-		// VersionSample.main();
+		pickSample();
 	}
 
-	macro static public function run() {
+	public function new() {}
+
+	abstract public function run():Void;
+
+	public function print(msg:String, ?pos:PosInfos) {
+		var sampleName = pos.fileName.substr(0, pos.fileName.length - '.hx'.length);
+		Log.print('${pos.fileName}:${pos.lineNumber}: $msg');
+	}
+
+	macro static public function pickSample() {
 		var sample = haxe.macro.Context.definedValue('SAMPLE');
 		if(sample == null || sample == '')
 			sample = Sys.getEnv('SAMPLE');
@@ -30,6 +24,10 @@ class UVSample {
 			Sys.exit(1);
 		}
 		sample += 'Sample';
-		return macro $i{sample}.main();
+		var cls = switch haxe.macro.TypeTools.toComplexType(haxe.macro.Context.getType(sample)) {
+			case TPath(tp): tp;
+			case _: haxe.macro.Context.error('Unsupported sample type', haxe.macro.Context.currentPos());
+		}
+		return macro new $cls().run();
 	}
 }

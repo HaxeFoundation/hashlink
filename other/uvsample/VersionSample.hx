@@ -2,12 +2,8 @@ import hl.uv.Version;
 import hl.uv.UVException;
 import sys.thread.Thread;
 
-class VersionSample {
-	static function print(msg:String) {
-		Log.print('VersionSample: $msg');
-	}
-
-	public static function main() {
+class VersionSample extends UVSample {
+	public function run() {
 		print('string ' + Version.string());
 		print('major ' + Version.major);
 		print('minor ' + Version.minor);

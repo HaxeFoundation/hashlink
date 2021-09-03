@@ -3,8 +3,8 @@ import hl.uv.Timer;
 import hl.uv.Check;
 import sys.thread.Thread;
 
-class CheckSample {
-	public static function main() {
+class CheckSample extends UVSample {
+	public function run() {
 		var loop = Thread.current().events;
 		var timer = Timer.init(loop);
 		timer.start(() -> {
@@ -14,7 +14,7 @@ class CheckSample {
 
 		var check = Check.init(loop);
 		check.start(() -> {
-			Log.print('Check');
+			print('Check');
 			check.stop();
 			check.close();
 		});

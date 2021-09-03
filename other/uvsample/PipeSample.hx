@@ -10,18 +10,18 @@ import haxe.PosInfos;
 import sys.thread.Thread;
 import haxe.Timer;
 
-class PipeSample {
+class PipeSample extends UVSample {
 	static var NAME = 'testpipe';
 
-	static public function main() {
+	public function run() {
 		NAME = Misc.tmpDir() + '/' + NAME;
 		#if CLIENT
-		Log.print('Running PipeSample client...');
-		client();
+			print('Running PipeSample client...');
+			client();
 		#else
-		Log.print('Running PipeSample server...');
-		Log.print('waiting for connections');
-		server();
+			print('Running PipeSample server...');
+			print('waiting for connections');
+			server();
 		#end
 	}
 
@@ -35,8 +35,8 @@ class PipeSample {
 	static function server() {
 		if(FileSystem.exists(NAME))
 			FileSystem.deleteFile(NAME);
-		function print(msg:String)
-			Log.print('SERVER: $msg');
+		function print(msg:String, ?p:PosInfos)
+			print('SERVER: $msg', p);
 		var loop = Thread.current().events;
 		var server = Pipe.init(loop);
 		server.bind(NAME);
@@ -69,8 +69,8 @@ class PipeSample {
 	}
 
 	static function client() {
-		function print(msg:String)
-			Log.print('CLIENT: $msg');
+		function print(msg:String, ?p:PosInfos)
+			print('CLIENT: $msg', p);
 		var loop = Thread.current().events;
 		var client = Pipe.init(loop, true);
 		client.connect(NAME, handle(() -> {

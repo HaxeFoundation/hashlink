@@ -7,23 +7,22 @@ import sys.thread.Thread;
 import hl.uv.Tcp;
 import hl.uv.SockAddr;
 
-class TcpSample {
+class TcpSample extends UVSample {
 	static inline var PORT = 22001;
 
-	public static function main() {
-		Log.print('Running TcpSample...');
+	public function run() {
 		server();
 		Timer.delay(client,100);
 	}
 
-	static function handle(success:()->Void, ?p:PosInfos):(e:UVError)->Void {
+	function handle(success:()->Void, ?p:PosInfos):(e:UVError)->Void {
 		return e -> switch e {
 			case UV_NOERR: success();
 			case _: throw new UVException(e, p.fileName + ':' + p.lineNumber + ': ' + e.toString());
 		}
 	}
 
-	static function shutdownAndClose(tcp:Tcp, print:(msg:String)->Void, ?onClose:()->Void) {
+	function shutdownAndClose(tcp:Tcp, print:(msg:String)->Void, ?onClose:()->Void) {
 		tcp.shutdown(_ -> {
 			tcp.close(() -> {
 				print('connection closed');
@@ -33,7 +32,7 @@ class TcpSample {
 		});
 	}
 
-	static function server() {
+	function server() {
 		function print(msg:String) {
 			Log.print('SERVER: $msg');
 		}
@@ -61,7 +60,7 @@ class TcpSample {
 		}));
 	}
 
-	static function client() {
+	function client() {
 		function print(msg:String) {
 			Log.print('CLIENT: $msg');
 		}
