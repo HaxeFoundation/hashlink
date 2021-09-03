@@ -247,24 +247,30 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\include\libuv\src\fs-poll.c" />
+    <ClCompile Include="..\..\include\libuv\src\idna.c" />
     <ClCompile Include="..\..\include\libuv\src\inet.c" />
+    <ClCompile Include="..\..\include\libuv\src\random.c" />
+    <ClCompile Include="..\..\include\libuv\src\strscpy.c" />
     <ClCompile Include="..\..\include\libuv\src\threadpool.c" />
+    <ClCompile Include="..\..\include\libuv\src\timer.c" />
     <ClCompile Include="..\..\include\libuv\src\uv-common.c" />
+    <ClCompile Include="..\..\include\libuv\src\uv-data-getter-setters.c" />
     <ClCompile Include="..\..\include\libuv\src\version.c" />
     <ClCompile Include="..\..\include\libuv\src\win\async.c" />
     <ClCompile Include="..\..\include\libuv\src\win\core.c" />
+    <ClCompile Include="..\..\include\libuv\src\win\detect-wakeup.c" />
     <ClCompile Include="..\..\include\libuv\src\win\dl.c" />
     <ClCompile Include="..\..\include\libuv\src\win\error.c" />
-    <ClCompile Include="..\..\include\libuv\src\win\fs-event.c" />
     <ClCompile Include="..\..\include\libuv\src\win\fs.c" />
+    <ClCompile Include="..\..\include\libuv\src\win\fs-event.c" />
     <ClCompile Include="..\..\include\libuv\src\win\getaddrinfo.c" />
     <ClCompile Include="..\..\include\libuv\src\win\getnameinfo.c" />
     <ClCompile Include="..\..\include\libuv\src\win\handle.c" />
     <ClCompile Include="..\..\include\libuv\src\win\loop-watcher.c" />
     <ClCompile Include="..\..\include\libuv\src\win\pipe.c" />
     <ClCompile Include="..\..\include\libuv\src\win\poll.c" />
-    <ClCompile Include="..\..\include\libuv\src\win\process-stdio.c" />
     <ClCompile Include="..\..\include\libuv\src\win\process.c" />
+    <ClCompile Include="..\..\include\libuv\src\win\process-stdio.c" />
     <ClCompile Include="..\..\include\libuv\src\win\req.c" />
     <ClCompile Include="..\..\include\libuv\src\win\signal.c" />
     <ClCompile Include="..\..\include\libuv\src\win\snprintf.c" />
@@ -281,9 +287,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\libuv\src\heap-inl.h" />
+    <ClInclude Include="..\..\include\libuv\src\idna.h" />
     <ClInclude Include="..\..\include\libuv\src\queue.h" />
+    <ClInclude Include="..\..\include\libuv\src\strscpy.h" />
     <ClInclude Include="..\..\include\libuv\src\uv-common.h" />
     <ClInclude Include="..\..\include\libuv\src\win\atomicops-inl.h" />
+    <ClInclude Include="..\..\include\libuv\src\win\fs-fd-hash-inl.h" />
     <ClInclude Include="..\..\include\libuv\src\win\handle-inl.h" />
     <ClInclude Include="..\..\include\libuv\src\win\internal.h" />
     <ClInclude Include="..\..\include\libuv\src\win\req-inl.h" />
