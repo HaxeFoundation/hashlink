@@ -86,6 +86,7 @@ jobs:
             ./configure
             make
             sudo make install
+            uname -a
           displayName: Install dependencies
       - template: install-haxe-snapshot.yml
         parameters:
