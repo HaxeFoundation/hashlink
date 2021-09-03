@@ -280,18 +280,20 @@ if(BUILD_TESTING)
     add_test(NAME threads.hl
         COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
     )
-    add_test(NAME uvsample.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-    )
+    # TODO: uncomment when https://github.com/HaxeFoundation/haxe/pull/10342 is merged
+    #add_test(NAME uvsample.hl
+    #    COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+    #)
     add_test(NAME hello
         COMMAND hello
     )
     add_test(NAME threads
         COMMAND threads
     )
-    add_test(NAME uvsample
-        COMMAND uvsample
-    )
+    # TODO: uncomment when https://github.com/HaxeFoundation/haxe/pull/10342 is merged
+    #add_test(NAME uvsample
+    #    COMMAND uvsample
+    #)
     add_test(NAME version
         COMMAND hl --version
     )
