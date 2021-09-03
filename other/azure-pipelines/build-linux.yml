@@ -83,7 +83,7 @@ jobs:
             tar -xf libuv-v1.42.0.tar.gz
             cd libuv-v1.42.0
             sh autogen.sh
-            ./configure
+            ./configure --host=i686-linux-gnu "CFLAGS=-m32" "CXXFLAGS=-m32" "LDFLAGS=-m32"
             make
             sudo make install
             uname -a
