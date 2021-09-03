@@ -34,7 +34,7 @@ class TcpSample extends UVSample {
 
 	function server() {
 		function print(msg:String) {
-			Log.print('SERVER: $msg');
+			this.print('SERVER: $msg');
 		}
 		var loop = Thread.current().events;
 		var server = Tcp.init(loop, INET);
@@ -62,7 +62,7 @@ class TcpSample extends UVSample {
 
 	function client() {
 		function print(msg:String) {
-			Log.print('CLIENT: $msg');
+			this.print('CLIENT: $msg');
 		}
 		var loop = Thread.current().events;
 		var client = Tcp.init(loop, INET);

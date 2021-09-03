@@ -17,7 +17,6 @@ class AllSample extends UVSample {
 		new TtySample().run();
 		new SignalSample().run();
 		new VersionSample().run();
-		// This one requires manual execution
 		new PipeSample().run();
 	}
 }

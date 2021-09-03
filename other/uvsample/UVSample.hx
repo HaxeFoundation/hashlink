@@ -10,8 +10,7 @@ abstract class UVSample {
 	abstract public function run():Void;
 
 	public function print(msg:String, ?pos:PosInfos) {
-		var sampleName = pos.fileName.substr(0, pos.fileName.length - '.hx'.length);
-		Log.print('${pos.fileName}:${pos.lineNumber}: $msg');
+		Log.print(msg, pos);
 	}
 
 	macro static public function pickSample() {

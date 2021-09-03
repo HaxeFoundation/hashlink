@@ -9,10 +9,10 @@ import sys.thread.Thread;
 import hl.uv.File;
 
 abstract Actions(Array<Function>) from Array<Function> {
-	public function next() {
+	public function next(?p:PosInfos) {
 		var fn = this.shift();
 		if(fn != null) {
-			print('-----------');
+			Log.print('-----------', p);
 			fn(this);
 		}
 	}

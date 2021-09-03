@@ -15,14 +15,13 @@ class PipeSample extends UVSample {
 
 	public function run() {
 		NAME = Misc.tmpDir() + '/' + NAME;
-		#if CLIENT
+		print('Running PipeSample server...');
+		print('waiting for connections');
+		server();
+		haxe.Timer.delay(() -> {
 			print('Running PipeSample client...');
 			client();
-		#else
-			print('Running PipeSample server...');
-			print('waiting for connections');
-			server();
-		#end
+		}, 200);
 	}
 
 	static function handle(success:()->Void, ?p:PosInfos):(e:UVError)->Void {
@@ -32,11 +31,11 @@ class PipeSample extends UVSample {
 		}
 	}
 
-	static function server() {
+	function server() {
 		if(FileSystem.exists(NAME))
 			FileSystem.deleteFile(NAME);
 		function print(msg:String, ?p:PosInfos)
-			print('SERVER: $msg', p);
+			this.print('SERVER: $msg', p);
 		var loop = Thread.current().events;
 		var server = Pipe.init(loop);
 		server.bind(NAME);
@@ -68,9 +67,9 @@ class PipeSample extends UVSample {
 		}));
 	}
 
-	static function client() {
+	function client() {
 		function print(msg:String, ?p:PosInfos)
-			print('CLIENT: $msg', p);
+			this.print('CLIENT: $msg', p);
 		var loop = Thread.current().events;
 		var client = Pipe.init(loop, true);
 		client.connect(NAME, handle(() -> {

@@ -12,7 +12,7 @@ class FsPollSample extends UVSample {
 		var poll = FsPoll.init(loop);
 		var path = Misc.tmpDir() + '/test-file';
 		File.saveContent(path, 'Hello, world');
-		poll.start(path, 1000, (e, previous, current) -> switch e {
+		poll.start(path, 100, (e, previous, current) -> switch e {
 			case UV_NOERR:
 				print('FS Poll at $path:');
 				print('\tprev: $previous');
