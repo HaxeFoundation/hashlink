@@ -145,9 +145,9 @@ typedef struct sockaddr_storage uv_sockaddr_storage;
 	if( h->data != new_data ) { \
 		if( h->data ) \
 			hl_remove_root(h->data); \
-		if( new_data ) \
-			hl_add_root(new_data); \
 		h->data = new_data; \
+		if( h->data ) \
+			hl_add_root(&h->data); \
 	}
 
 // Errors
@@ -495,7 +495,7 @@ static void on_uv_alloc_cb( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
 	vclosure *c = DATA(uv_handle_data_with_alloc_t *, h)->onAlloc;
 	hl_call2(void, c, uv_buf_t *, buf, int, (int)size);
 	if( buf->base )
-		hl_add_root(buf->base);
+		hl_add_root(&buf->base);
 }
 
 // Request

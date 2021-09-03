@@ -1,3 +1,5 @@
+import hl.uv.Process;
+import hl.uv.Misc;
 import hl.uv.Signal;
 import sys.thread.Thread;
 
@@ -11,5 +13,7 @@ class SignalSample extends UVSample {
 			signal.stop();
 			signal.close();
 		});
+		var selfPid = Misc.getPid();
+		Process.killPid(selfPid, SIGINT);
 	}
 }
