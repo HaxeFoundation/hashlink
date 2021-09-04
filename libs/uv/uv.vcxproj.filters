@@ -77,9 +77,6 @@
     <ClCompile Include="..\..\include\libuv\src\win\process-stdio.c">
       <Filter>libuv</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\req.c">
-      <Filter>libuv</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\signal.c">
       <Filter>libuv</Filter>
     </ClCompile>
@@ -93,9 +90,6 @@
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\thread.c">
-      <Filter>libuv</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\timer.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\tty.c">

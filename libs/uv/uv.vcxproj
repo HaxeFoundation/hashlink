@@ -271,13 +271,11 @@
     <ClCompile Include="..\..\include\libuv\src\win\poll.c" />
     <ClCompile Include="..\..\include\libuv\src\win\process.c" />
     <ClCompile Include="..\..\include\libuv\src\win\process-stdio.c" />
-    <ClCompile Include="..\..\include\libuv\src\win\req.c" />
     <ClCompile Include="..\..\include\libuv\src\win\signal.c" />
     <ClCompile Include="..\..\include\libuv\src\win\snprintf.c" />
     <ClCompile Include="..\..\include\libuv\src\win\stream.c" />
     <ClCompile Include="..\..\include\libuv\src\win\tcp.c" />
     <ClCompile Include="..\..\include\libuv\src\win\thread.c" />
-    <ClCompile Include="..\..\include\libuv\src\win\timer.c" />
     <ClCompile Include="..\..\include\libuv\src\win\tty.c" />
     <ClCompile Include="..\..\include\libuv\src\win\udp.c" />
     <ClCompile Include="..\..\include\libuv\src\win\util.c" />
