@@ -455,26 +455,24 @@ DEFINE_PRIM_UV_FIELD(_U64, int64, _BUF_ARRAY, buf, len);
 
 // Handle
 
-#define HANDLE_DATA_FIELDS \
-	hl_type *t; \
-	uv_handle_t *_h; \
-	vclosure *onClose;
-
-#define HANDLE_DATA_WITH_ALLOC_FIELDS \
-	HANDLE_DATA_FIELDS; \
-	vclosure *onAlloc;
-
 typedef struct {
-	HANDLE_DATA_FIELDS;
+	hl_type *t;
+	uv_handle_t *_h;
+	vclosure *onClose;
 } uv_handle_data_t;
 
 typedef struct {
-	HANDLE_DATA_FIELDS;
+	hl_type *t;
+	uv_handle_t *_h;
+	vclosure *onClose;
 	vclosure *callback;
 } uv_handle_cb_data_t;
 
 typedef struct {
-	HANDLE_DATA_WITH_ALLOC_FIELDS;
+	hl_type *t;
+	uv_handle_t *_h;
+	vclosure *onClose;
+	vclosure *onAlloc;
 } uv_handle_data_with_alloc_t;
 
 #define _HANDLE_DATA	_OBJ(_HANDLE _FUN(_VOID,_NO_ARG))
@@ -500,16 +498,14 @@ static void on_uv_alloc_cb( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
 
 // Request
 
-#define REQ_DATA_FIELDS \
-	hl_type *t; \
-	uv_req_t *_r;
-
 typedef struct {
-	REQ_DATA_FIELDS
+	hl_type *t;
+	uv_req_t *_r;
 } uv_req_data_t;
 
 typedef struct {
-	REQ_DATA_FIELDS
+	hl_type *t;
+	uv_req_t *_r;
 	vclosure *callback;
 } uv_req_cb_data_t;
 
@@ -753,7 +749,10 @@ static void on_uv_getnameinfo_cb( uv_getnameinfo_t *r, int status, const char *h
 // Stream
 
 typedef struct {
-	HANDLE_DATA_WITH_ALLOC_FIELDS;
+	hl_type *t;
+	uv_handle_t *_h;
+	vclosure *onClose;
+	vclosure *onAlloc;
 	vclosure *onConnection;
 	vclosure *onRead;
 } uv_stream_data_t;
@@ -800,7 +799,10 @@ DEFINE_PRIM_ALLOC(_PIPE, pipe);
 // UDP
 
 typedef struct {
-	HANDLE_DATA_WITH_ALLOC_FIELDS;
+	hl_type *t;
+	uv_handle_t *_h;
+	vclosure *onClose;
+	vclosure *onAlloc;
 	vclosure *onRecv;
 } uv_udp_data_t;
 
@@ -856,7 +858,9 @@ DEFINE_PRIM(_I32, translate_sys_signal, _I32);
 // Process
 
 typedef struct {
-	HANDLE_DATA_FIELDS;
+	hl_type *t;
+	uv_handle_t *_h;
+	vclosure *onClose;
 	vclosure *onExit;
 } uv_process_data_t;
 
