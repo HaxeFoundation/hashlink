@@ -31,7 +31,7 @@
 
 #include "uv.h"
 #include "internal.h"
-#include "queue.h"
+#include "../queue.h"
 #include "handle-inl.h"
 #include "heap-inl.h"
 #include "req-inl.h"
