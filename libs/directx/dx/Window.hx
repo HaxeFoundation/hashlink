@@ -24,7 +24,6 @@ typedef DisplaySetting = {
 		Fullscreen not exclusive.
 	**/
 	var Borderless = 2;
-	var FullscreenResize = 3;
 }
 
 @:hlNative("directx")

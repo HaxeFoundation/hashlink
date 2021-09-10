@@ -11,7 +11,6 @@ typedef DisplayHandle = Null<Int>;
 		Fullscreen not exclusive.
 	**/
 	var Borderless = 2;
-	var FullscreenResize = 3;
 }
 
 typedef DisplaySetting = {
@@ -147,7 +146,7 @@ class Window {
 	function set_displayMode(mode) {
 		if( winSetFullscreen(win, mode) ) {
 			displayMode = mode;
-			if(mode == Fullscreen || mode == FullscreenResize) {
+			if(mode == Fullscreen) {
 				try @:privateAccess sdl.Window.winSetDisplayMode(win, displaySetting.width, displaySetting.height, displaySetting.framerate) catch(_) {}
 			}
 		}
