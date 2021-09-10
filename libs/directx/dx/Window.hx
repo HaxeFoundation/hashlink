@@ -2,9 +2,10 @@ package dx;
 import haxe.EntryPoint;
 
 private typedef WinPtr = hl.Abstract<"dx_window">;
+typedef MonitorHandle = String;
 
 typedef Monitor = {
-	name : String,
+	name : MonitorHandle,
 	left : Int,
 	right : Int,
 	top : Int,
@@ -20,9 +21,6 @@ typedef DisplaySetting = {
 @:enum abstract DisplayMode(Int) {
 	var Windowed = 0;
 	var Fullscreen = 1;
-	/**
-		Fullscreen not exclusive.
-	**/
 	var Borderless = 2;
 }
 
@@ -37,7 +35,6 @@ class Window {
 	public static inline var RESIZABLE = 0x000002;
 
 	var win : WinPtr;
-	var savedSize : { x : Int, y : Int, width : Int, height : Int };
 	public var title(default, set) : String;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
@@ -51,7 +48,7 @@ class Window {
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
 	public var displaySetting : DisplaySetting;
-	public var selectedMonitor : String;
+	public var selectedMonitor : MonitorHandle;
 	public var vsync : Bool;
 
 	public function new( title : String, width : Int, height : Int, x : Int = CW_USEDEFAULT, y : Int = CW_USEDEFAULT, windowFlags : Int = RESIZABLE ) {
@@ -69,15 +66,15 @@ class Window {
 	function set_displayMode(mode) {
 		displayMode = mode;
 		if(mode == Windowed) {
-			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.toUtf8() : null, null);
+			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, null);
 			winSetFullscreen(win, false);
 		}
 		else if(mode == Borderless) {
-			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.toUtf8() : null, null);
+			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, null);
 			winSetFullscreen(win,true);
 		}
 		else {
-			var r = dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.toUtf8() : null, displaySetting);
+			var r = dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, displaySetting);
 			winSetFullscreen(win,true);
 		}
 		return mode;
@@ -194,7 +191,7 @@ class Window {
 	}
 
 	public static function getDisplaySettings(monitor : String) : Array<DisplaySetting> {
-		var a : Array<DisplaySetting> = [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.toUtf8() : null)) s];
+		var a : Array<DisplaySetting> = [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.bytes : null)) s];
 		a.sort((a, b) -> {
 			if(b.width > a.width) 1;
 			else if(b.width < a.width) -1;
@@ -219,20 +216,20 @@ class Window {
 	}
 
 	public static function getCurrentDisplaySetting(monitor : String) : DisplaySetting {
-		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.toUtf8() : null);
+		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null);
 	}
 
 	public static function getRegistryDisplaySetting(monitor : String) : DisplaySetting {
-		return winGetRegistryDisplaySetting(monitor != null ? @:privateAccess monitor.toUtf8() : null);
+		return winGetRegistryDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null);
 	}
 
 	public static function getMonitors() : Array<Monitor> {
 		var last = null;
-		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUTF8(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
+		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUCS2(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
 	}
 
 	public function getCurrentMonitor() : String {
-		return @:privateAccess String.fromUTF8(winGetMonitorFromWindow(win));
+		return @:privateAccess String.fromUCS2(winGetMonitorFromWindow(win));
 	}
 
 	@:hlNative("?directx", "win_get_display_settings")

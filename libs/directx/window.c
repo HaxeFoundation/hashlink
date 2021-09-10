@@ -584,16 +584,16 @@ BOOL on_get_monitors(HMONITOR monitor, HDC hdc, LPRECT rect, LPARAM param) {
 	get_monitors_data *data = (get_monitors_data*)param;
 	varray* arr = data->arr;
 
-	MONITORINFOEXA info;
-	info.cbSize = sizeof(MONITORINFOEXA);
-	GetMonitorInfoA(monitor, (LPMONITORINFO)&info);
+	MONITORINFOEXW info;
+	info.cbSize = sizeof(MONITORINFOEXW);
+	GetMonitorInfoW(monitor, (LPMONITORINFO)&info);
 
 	vdynamic* dynobj = (vdynamic*)hl_alloc_dynobj();
 	hl_dyn_seti(dynobj, hl_hash_utf8("left"), &hlt_i32, rect->left);
 	hl_dyn_seti(dynobj, hl_hash_utf8("right"), &hlt_i32, rect->right);
 	hl_dyn_seti(dynobj, hl_hash_utf8("top"), &hlt_i32, rect->top);
 	hl_dyn_seti(dynobj, hl_hash_utf8("bottom"), &hlt_i32, rect->bottom);
-	hl_dyn_setp(dynobj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes(info.szDevice, (int)strlen(info.szDevice) + 1));
+	hl_dyn_setp(dynobj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes((vbyte*)info.szDevice, (int)(wcslen(info.szDevice)+1)*2));
 	hl_aptr(arr, vdynobj*)[data->idx++] = (vdynobj*)dynobj;
 	return TRUE;
 }
@@ -607,23 +607,23 @@ HL_PRIM varray* HL_NAME(win_get_monitors)() {
 	return data.arr;
 }
 
-HL_PRIM char* HL_NAME(win_get_monitor_from_window)(HWND wnd) {
+HL_PRIM wchar_t* HL_NAME(win_get_monitor_from_window)(HWND wnd) {
 	HMONITOR handle = MonitorFromWindow(wnd, MONITOR_DEFAULTTOPRIMARY);
 
-	MONITORINFOEXA info;
-	info.cbSize = sizeof(MONITORINFOEXA);
-	GetMonitorInfoA(handle, (LPMONITORINFO)&info);
+	MONITORINFOEXW info;
+	info.cbSize = sizeof(MONITORINFOEXW);
+	GetMonitorInfoW(handle, (LPMONITORINFO)&info);
 	return info.szDevice;
 }
 
-HL_PRIM varray* HL_NAME(win_get_display_settings)(char* device) {
-	DEVMODEA ds;
-	ds.dmSize = sizeof(DEVMODEA);
+HL_PRIM varray* HL_NAME(win_get_display_settings)(wchar_t* device) {
+	DEVMODEW ds;
+	ds.dmSize = sizeof(DEVMODEW);
 	int len = 0;
-	while (EnumDisplaySettingsA(device, len, &ds))
+	while (EnumDisplaySettingsW(device, len, &ds))
 		len++;
 	varray* arr = hl_alloc_array(&hlt_dynobj, len);
-	for (int i = 0; EnumDisplaySettingsA(device, i, &ds); i++) {
+	for (int i = 0; EnumDisplaySettingsW(device, i, &ds); i++) {
 		vdynamic* dynobj = (vdynamic*) hl_alloc_dynobj();
 		hl_dyn_seti(dynobj, hl_hash_utf8("width"), &hlt_i32, ds.dmPelsWidth);
 		hl_dyn_seti(dynobj, hl_hash_utf8("height"), &hlt_i32, ds.dmPelsHeight);
@@ -633,10 +633,10 @@ HL_PRIM varray* HL_NAME(win_get_display_settings)(char* device) {
 	return arr;
 }
 
-HL_PRIM vdynamic* HL_NAME(win_get_current_display_setting)(char* device) {
-	DEVMODEA ds;
-	ds.dmSize = sizeof(DEVMODEA);
-	EnumDisplaySettingsA(device, ENUM_CURRENT_SETTINGS, &ds);
+HL_PRIM vdynamic* HL_NAME(win_get_current_display_setting)(wchar_t* device) {
+	DEVMODEW ds;
+	ds.dmSize = sizeof(DEVMODEW);
+	EnumDisplaySettingsW(device, ENUM_CURRENT_SETTINGS, &ds);
 	vdynamic* dynobj = (vdynamic*) hl_alloc_dynobj();
 	hl_dyn_seti(dynobj, hl_hash_utf8("width"), &hlt_i32, ds.dmPelsWidth);
 	hl_dyn_seti(dynobj, hl_hash_utf8("height"), &hlt_i32, ds.dmPelsHeight);
@@ -644,10 +644,10 @@ HL_PRIM vdynamic* HL_NAME(win_get_current_display_setting)(char* device) {
 	return dynobj;
 }
 
-HL_PRIM vdynamic* HL_NAME(win_get_registry_display_setting)(char* device) {
-	DEVMODEA ds;
-	ds.dmSize = sizeof(DEVMODEA);
-	EnumDisplaySettingsA(device, ENUM_REGISTRY_SETTINGS, &ds);
+HL_PRIM vdynamic* HL_NAME(win_get_registry_display_setting)(wchar_t* device) {
+	DEVMODEW ds;
+	ds.dmSize = sizeof(DEVMODEW);
+	EnumDisplaySettingsW(device, ENUM_REGISTRY_SETTINGS, &ds);
 	vdynamic* dynobj = (vdynamic*)hl_alloc_dynobj();
 	hl_dyn_seti(dynobj, hl_hash_utf8("width"), &hlt_i32, ds.dmPelsWidth);
 	hl_dyn_seti(dynobj, hl_hash_utf8("height"), &hlt_i32, ds.dmPelsHeight);
@@ -655,23 +655,23 @@ HL_PRIM vdynamic* HL_NAME(win_get_registry_display_setting)(char* device) {
 	return dynobj;
 }
 
-HL_PRIM int HL_NAME(win_change_display_setting)(char* device, vdynamic* ds) {
+HL_PRIM int HL_NAME(win_change_display_setting)(wchar_t* device, vdynamic* ds) {
 	bool found = false;
-	DEVMODEA devMode;
-	devMode.dmSize = sizeof(DEVMODEA);
+	DEVMODEW devMode;
+	devMode.dmSize = sizeof(DEVMODEW);
 	if (ds != NULL) {
 		int width = hl_dyn_geti(ds, hl_hash_utf8("width"), &hlt_i32);
 		int height = hl_dyn_geti(ds, hl_hash_utf8("height"), &hlt_i32);
 		int framerate = hl_dyn_geti(ds, hl_hash_utf8("framerate"), &hlt_i32);
 
-		for (int i = 0; EnumDisplaySettingsA(device, i, &devMode); i++) {
+		for (int i = 0; EnumDisplaySettingsW(device, i, &devMode); i++) {
 			if (devMode.dmPelsWidth == width && devMode.dmPelsHeight == height && devMode.dmDisplayFrequency == framerate) {
 				found = true;
 				break;
 			}
 		}
 	}
-	return ChangeDisplaySettingsExA(device, found ? &devMode : NULL, NULL, found ? CDS_FULLSCREEN : 0, NULL);
+	return ChangeDisplaySettingsExW(device, found ? &devMode : NULL, NULL, found ? CDS_FULLSCREEN : 0, NULL);
 }
 
 #define TWIN _ABSTRACT(dx_window)

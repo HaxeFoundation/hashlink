@@ -86,17 +86,44 @@ class Sdl {
 	public static function delay(time:Int) {
 	}
 
+	public static function getScreenWidth(win : sdl.Window) : Int {
+		return 
+			if(win == null)
+				get_screen_width();
+			else
+				get_screen_width_of_window(@:privateAccess win.win);
+	}
 
-	public static function getScreenWidth() : Int {
+	public static function getScreenHeight(win : sdl.Window) : Int {
+		return
+			if(win == null)
+				get_screen_height();
+			else
+				get_screen_height_of_window(@:privateAccess win.win);
+	}
+
+	@:hlNative("?sdl", "get_screen_width")
+	public static function get_screen_width() : Int {
 		return 0;
 	}
 
-	public static function getScreenHeight() : Int {
+	@:hlNative("?sdl", "get_screen_height")
+	public static function get_screen_height() : Int {
 		return 0;
 	}
 
 	@:hlNative("?sdl", "get_framerate")
-	public static function getFramerate() : Int {
+	public static function get_framerate(win : sdl.Window.WinPtr) : Int {
+		return 0;
+	}
+
+	@:hlNative("?sdl", "get_screen_width_of_window")
+	public static function get_screen_width_of_window(win: sdl.Window.WinPtr) : Int {
+		return 0;
+	}
+
+	@:hlNative("?sdl", "get_screen_height_of_display")
+	public static function get_screen_height_of_window(win: sdl.Window.WinPtr) : Int {
 		return 0;
 	}
 

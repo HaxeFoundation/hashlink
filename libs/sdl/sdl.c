@@ -21,6 +21,9 @@
 #	error "SDL2 SDK not found in hl/include/sdl/"
 #endif
 
+#define TWIN _ABSTRACT(sdl_window)
+#define TGL _ABSTRACT(sdl_gl)
+
 typedef struct {
 	int x;
 	int y;
@@ -91,8 +94,6 @@ typedef struct {
 	int fingerId;
 	int joystick;
 } event_data;
-
-SDL_Window *win;
 
 HL_PRIM bool HL_NAME(init_once)() {
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
@@ -354,17 +355,29 @@ HL_PRIM void HL_NAME(delay)( int time ) {
 
 HL_PRIM int HL_NAME(get_screen_width)() {
 	SDL_DisplayMode e;
-	SDL_GetCurrentDisplayMode(win != NULL ? SDL_GetWindowDisplayIndex(win) : 0, &e);
+	SDL_GetCurrentDisplayMode(0, &e);
 	return e.w;
 }
 
 HL_PRIM int HL_NAME(get_screen_height)() {
 	SDL_DisplayMode e;
+	SDL_GetCurrentDisplayMode(0, &e);
+	return e.h;
+}
+
+HL_PRIM int HL_NAME(get_screen_width_of_window)(SDL_Window* win) {
+	SDL_DisplayMode e;
+	SDL_GetCurrentDisplayMode(win != NULL ? SDL_GetWindowDisplayIndex(win) : 0, &e);
+	return e.w;
+}
+
+HL_PRIM int HL_NAME(get_screen_height_of_window)(SDL_Window* win) {
+	SDL_DisplayMode e;
 	SDL_GetCurrentDisplayMode(win != NULL ? SDL_GetWindowDisplayIndex(win) : 0, &e);
 	return e.h;
 }
 
-HL_PRIM int HL_NAME(get_framerate)() {
+HL_PRIM int HL_NAME(get_framerate)(SDL_Window* win) {
 	SDL_DisplayMode e;
 	SDL_GetCurrentDisplayMode(win != NULL ? SDL_GetWindowDisplayIndex(win) : 0, &e);
 	return e.refresh_rate;
@@ -419,7 +432,9 @@ DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
-DEFINE_PRIM(_I32, get_framerate, _NO_ARG);
+DEFINE_PRIM(_I32, get_screen_width_of_window, TWIN);
+DEFINE_PRIM(_I32, get_screen_height_of_window, TWIN);
+DEFINE_PRIM(_I32, get_framerate, TWIN);
 DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
@@ -435,9 +450,9 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 #ifdef	HL_MOBILE
 	SDL_DisplayMode displayMode;
 	SDL_GetDesktopDisplayMode(0, &displayMode);
-	win = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | sdlFlags);
+	SDL_Window* win = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | sdlFlags);
 #else
-	win = SDL_CreateWindow("", x, y, width, height, SDL_WINDOW_OPENGL | sdlFlags);
+	SDL_Window* win = SDL_CreateWindow("", x, y, width, height, SDL_WINDOW_OPENGL | sdlFlags);
 #endif
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
@@ -614,8 +629,6 @@ HL_PRIM void HL_NAME(win_destroy)(SDL_Window *win, SDL_GLContext gl) {
 	SDL_GL_DeleteContext(gl);
 }
 
-#define TWIN _ABSTRACT(sdl_window)
-#define TGL _ABSTRACT(sdl_gl)
 DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(TGL, win_get_glcontext, TWIN);
