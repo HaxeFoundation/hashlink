@@ -207,8 +207,6 @@ class Window {
 		});
 		var last = null;
 		return a.filter(function(e) {
-			if(e.width == 1152 && e.height == 864 && e.framerate == 60)
-				trace("coucou !");
 			if(last == null) {
 				last = e;
 				return true;
@@ -238,26 +236,32 @@ class Window {
 		return @:privateAccess String.fromUTF8(winGetMonitorFromWindow(win));
 	}
 
+	@:hlNative("?directx", "win_get_display_settings")
 	static function winGetDisplaySettings(monitor : hl.Bytes) : hl.NativeArray<Dynamic> {
 		return null;
 	}
 
+	@:hlNative("?directx", "win_get_current_display_setting")
 	static function winGetCurrentDisplaySetting(monitor : hl.Bytes) : Dynamic {
 		return null;
 	}
 
+	@:hlNative("?directx", "win_get_registry_display_setting")
 	static function winGetRegistryDisplaySetting(monitor : hl.Bytes) : Dynamic {
 		return null;
 	}
 
+	@:hlNative("?directx", "win_change_display_setting")
 	public static function winChangeDisplaySetting(monitor : hl.Bytes, ds : Dynamic) : Int {
 		return 0;
 	}
 
+	@:hlNative("?directx", "win_get_monitors")
 	static function winGetMonitors() : hl.NativeArray<Dynamic> {
 		return null;
 	}
 
+	@:hlNative("?directx", "win_get_monitor_from_window")
 	static function winGetMonitorFromWindow( win : WinPtr ) : hl.Bytes {
 		return null;
 	}

@@ -312,10 +312,12 @@ class Window {
 		return false;
 	}
 
+	@:hlNative("?sdl", "win_set_display_mode")
 	static function winSetDisplayMode( win : WinPtr, width : Int, height : Int, framerate : Int ) {
 		return false;
 	}
 
+	@:hlNative("?sdl", "win_display_handle")
 	static function winDisplayHandle( win : WinPtr ) : Int {
 		return 0;
 	}
@@ -357,5 +359,4 @@ class Window {
 
 	static function setVsync( b : Bool ) {
 	}
-
 }

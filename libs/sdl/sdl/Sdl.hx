@@ -95,6 +95,7 @@ class Sdl {
 		return 0;
 	}
 
+	@:hlNative("?sdl", "get_framerate")
 	public static function getFramerate() : Int {
 		return 0;
 	}
@@ -118,6 +119,7 @@ class Sdl {
 		return [ for(m in get_display_modes(display)) m ];
 	}
 
+	@:hlNative("?sdl", "get_current_display_mode")
 	static function get_current_display_mode(displayId : Int) : Dynamic {
 		return null;
 	}
@@ -126,6 +128,7 @@ class Sdl {
 		return get_current_display_mode(display);
 	}
 
+	@:hlNative("?sdl", "get_desktop_display_mode")
 	static function get_desktop_display_mode(displayId : Int) : Dynamic {
 		return null;
 	}
