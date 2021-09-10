@@ -148,7 +148,7 @@ class Window {
 		if( winSetFullscreen(win, mode) ) {
 			displayMode = mode;
 			if(mode == Fullscreen || mode == FullscreenResize) {
-				@:privateAccess sdl.Window.winSetDisplayMode(win, displaySetting.width, displaySetting.height, displaySetting.framerate);
+				try @:privateAccess sdl.Window.winSetDisplayMode(win, displaySetting.width, displaySetting.height, displaySetting.framerate) catch(_) {}
 			}
 		}
 		return displayMode;
