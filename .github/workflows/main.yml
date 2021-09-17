@@ -7,11 +7,10 @@ jobs:
     if: ${{ !contains(join(github.event.commits.*.message),'[skip ci]') }}
     runs-on: windows-latest
     steps:
-      # Tests aren't run, so this isn't needed
-      # - name: Install Haxe
-      #   uses: krdlab/setup-haxe@master
-      #   with:
-      #       haxe-version: 4.2.0
+      - name: Install Haxe
+        uses: krdlab/setup-haxe@master
+        with:
+            haxe-version: 4.2.0
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
       - name: Checkout hashlink
@@ -51,15 +50,22 @@ jobs:
         with:
           name: windows64-binaries
           path: hl-1.12.0.zip
+      - name: Run tests
+        run : |
+          haxe -m HelloWorld -cp other/tests -hl test/hello.hl
+          x64/Release/hl test/hello.hl
+          haxe -m Threads -cp other/tests -hl test/threads.hl
+          x64/Release/hl test/threads.hl
+          haxe -m UVSample -cp other/uvsample -hl test/uvsample.hl
+          x64/Release/hl test/uvsample.hl
   build-linux:
     if: ${{ !contains(join(github.event.commits.*.message),'[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
-      # Tests aren't run, so this isn't needed
-      # - name: Install Haxe
-      #   uses: krdlab/setup-haxe@master
-      #   with:
-      #       haxe-version: 4.2.0
+      - name: Install Haxe
+        uses: krdlab/setup-haxe@master
+        with:
+            haxe-version: 4.2.0
       - name: Update packages
         run: sudo apt-get update
         continue-on-error: true
@@ -73,6 +79,14 @@ jobs:
           sudo make install
           sudo ldconfig
           make release
+      - name: Run tests
+        run : |
+          haxe -m HelloWorld -cp other/tests -hl test/hello.hl
+          hl test/hello.hl
+          haxe -m Threads -cp other/tests -hl test/threads.hl
+          hl test/threads.hl
+          haxe -m UVSample -cp other/uvsample -hl test/uvsample.hl
+          hl test/uvsample.hl
       - name: Upload Artifact
         uses: "actions/upload-artifact@v2"
         with:
@@ -82,11 +96,10 @@ jobs:
     if: ${{ !contains(join(github.event.commits.*.message),'[skip ci]') }}
     runs-on: macos-latest
     steps:
-      # Tests aren't run, so this isn't needed
-      # - name: Install Haxe
-      #   uses: krdlab/setup-haxe@master
-      #   with:
-      #       haxe-version: 4.2.0
+      - name: Install Haxe
+        uses: krdlab/setup-haxe@master
+        with:
+            haxe-version: 4.2.0
       - name: Checkout hashlink
         uses: actions/checkout@v2
       - name: Install packages
@@ -100,6 +113,14 @@ jobs:
           sudo make codesign_osx
           sudo make install
           make release
+      - name: Run tests
+        run : |
+          haxe -m HelloWorld -cp other/tests -hl test/hello.hl
+          hl test/hello.hl
+          haxe -m Threads -cp other/tests -hl test/threads.hl
+          hl test/threads.hl
+          haxe -m UVSample -cp other/uvsample -hl test/uvsample.hl
+          hl test/uvsample.hl
       - name: Upload Artifact
         uses: "actions/upload-artifact@v2"
         with:
