@@ -1,6 +1,10 @@
 name: CI
 
-on: [push, pull_request]
+on: 
+  push:
+  pull_request:
+  release:
+    types: [published, edited]
 
 jobs:
   build-windows:
@@ -10,7 +14,7 @@ jobs:
       - name: Install Haxe
         uses: krdlab/setup-haxe@master
         with:
-            haxe-version: 4.2.0
+          haxe-version: 4.2.0
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
       - name: Checkout hashlink
@@ -44,14 +48,14 @@ jobs:
           cp include\openal\bin\Win64\soft_oal.dll hl-1.12.0/OpenAL32.dll
           cp c:\Windows\System32\msvcr120.dll hl-1.12.0
           cp include\sdl\lib\x64\SDL2.dll hl-1.12.0
-          Compress-Archive -DestinationPath hl-1.12.0.zip -Path hl-1.12.0\*
+          Compress-Archive -DestinationPath hl-1.12.0-win.zip -Path hl-1.12.0\*
       - name: Upload Artifact
         uses: "actions/upload-artifact@v2"
         with:
           name: windows64-binaries
-          path: hl-1.12.0.zip
+          path: hl-1.12.0-win.zip
       - name: Run tests
-        run : |
+        run: |
           haxe -m HelloWorld -cp other/tests -hl test/hello.hl
           x64/Release/hl test/hello.hl
           haxe -m Threads -cp other/tests -hl test/threads.hl
@@ -65,7 +69,7 @@ jobs:
       - name: Install Haxe
         uses: krdlab/setup-haxe@master
         with:
-            haxe-version: 4.2.0
+          haxe-version: 4.2.0
       - name: Update packages
         run: sudo apt-get update
         continue-on-error: true
@@ -80,7 +84,7 @@ jobs:
           sudo ldconfig
           make release
       - name: Run tests
-        run : |
+        run: |
           haxe -m HelloWorld -cp other/tests -hl test/hello.hl
           hl test/hello.hl
           haxe -m Threads -cp other/tests -hl test/threads.hl
@@ -99,7 +103,7 @@ jobs:
       - name: Install Haxe
         uses: krdlab/setup-haxe@master
         with:
-            haxe-version: 4.2.0
+          haxe-version: 4.2.0
       - name: Checkout hashlink
         uses: actions/checkout@v2
       - name: Install packages
@@ -114,7 +118,7 @@ jobs:
           sudo make install
           make release
       - name: Run tests
-        run : |
+        run: |
           haxe -m HelloWorld -cp other/tests -hl test/hello.hl
           hl test/hello.hl
           haxe -m Threads -cp other/tests -hl test/threads.hl
@@ -126,3 +130,13 @@ jobs:
         with:
           name: mac64-binaries
           path: hl-1.12.0-osx.tgz
+  make-release:
+    needs: [build-windows, build-mac, build-linux]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+      - run: gh release upload ${{ github.event.release.tag_name }} windows64-binaries/hl-1.12.0-win.zip mac64-binaries/hl-1.12.0-osx.tgz linux64-binaries/hl-1.12.0-linux.tgz
