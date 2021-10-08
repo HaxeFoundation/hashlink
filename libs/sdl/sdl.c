@@ -845,9 +845,13 @@ HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
 	return arr;
 }
 
-HL_PRIM vdynobj* HL_NAME(get_current_display_mode)(int display_id) {
+HL_PRIM vdynobj* HL_NAME(get_current_display_mode)(int display_id, bool registry) {
 	SDL_DisplayMode mode;
-	int r = SDL_GetCurrentDisplayMode(display_id, &mode);
+	int r;
+	if(registry)
+		r = SDL_GetDesktopDisplayMode(display_id, &mode);
+	else
+		r = SDL_GetCurrentDisplayMode(display_id, &mode);
 	if (r < 0) {
 		printf("can't find mode for %d : %d\n", display_id, r);
 		return NULL;
@@ -857,20 +861,6 @@ HL_PRIM vdynobj* HL_NAME(get_current_display_mode)(int display_id) {
 	hl_dyn_seti(obj, hl_hash_utf8("height"), &hlt_i32, mode.h);
 	hl_dyn_seti(obj, hl_hash_utf8("framerate"), &hlt_i32, mode.refresh_rate);
 	return (vdynobj*) obj;
-}
-
-HL_PRIM vdynobj* HL_NAME(get_desktop_display_mode)(int display_id) {
-	SDL_DisplayMode mode;
-	int r = SDL_GetDesktopDisplayMode(display_id, &mode);
-	if (r < 0) {
-		printf("can't find mode for %d : %d\n", display_id, r);
-		return NULL;
-	}
-	vdynamic* obj = (vdynamic*)hl_alloc_dynobj();
-	hl_dyn_seti(obj, hl_hash_utf8("width"), &hlt_i32, mode.w);
-	hl_dyn_seti(obj, hl_hash_utf8("height"), &hlt_i32, mode.h);
-	hl_dyn_seti(obj, hl_hash_utf8("framerate"), &hlt_i32, mode.refresh_rate);
-	return (vdynobj*)obj;
 }
 
 #define MAX_DEVICES 16
@@ -899,6 +889,5 @@ DEFINE_PRIM(_BOOL, set_clipboard_text, _BYTES);
 DEFINE_PRIM(_BYTES, get_clipboard_text, _NO_ARG);
 DEFINE_PRIM(_ARR, get_displays, _NO_ARG);
 DEFINE_PRIM(_ARR, get_display_modes, _I32);
-DEFINE_PRIM(_DYN, get_current_display_mode, _I32);
-DEFINE_PRIM(_DYN, get_desktop_display_mode, _I32);
+DEFINE_PRIM(_DYN, get_current_display_mode, _I32 _BOOL);
 DEFINE_PRIM(_ARR, get_devices, _NO_ARG);

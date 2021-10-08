@@ -633,22 +633,11 @@ HL_PRIM varray* HL_NAME(win_get_display_settings)(wchar_t* device) {
 	return arr;
 }
 
-HL_PRIM vdynamic* HL_NAME(win_get_current_display_setting)(wchar_t* device) {
+HL_PRIM vdynamic* HL_NAME(win_get_current_display_setting)(wchar_t* device, bool registry) {
 	DEVMODEW ds;
 	ds.dmSize = sizeof(DEVMODEW);
-	EnumDisplaySettingsW(device, ENUM_CURRENT_SETTINGS, &ds);
+	EnumDisplaySettingsW(device, registry ? ENUM_REGISTRY_SETTINGS : ENUM_CURRENT_SETTINGS, &ds);
 	vdynamic* dynobj = (vdynamic*) hl_alloc_dynobj();
-	hl_dyn_seti(dynobj, hl_hash_utf8("width"), &hlt_i32, ds.dmPelsWidth);
-	hl_dyn_seti(dynobj, hl_hash_utf8("height"), &hlt_i32, ds.dmPelsHeight);
-	hl_dyn_seti(dynobj, hl_hash_utf8("framerate"), &hlt_i32, ds.dmDisplayFrequency);
-	return dynobj;
-}
-
-HL_PRIM vdynamic* HL_NAME(win_get_registry_display_setting)(wchar_t* device) {
-	DEVMODEW ds;
-	ds.dmSize = sizeof(DEVMODEW);
-	EnumDisplaySettingsW(device, ENUM_REGISTRY_SETTINGS, &ds);
-	vdynamic* dynobj = (vdynamic*)hl_alloc_dynobj();
 	hl_dyn_seti(dynobj, hl_hash_utf8("width"), &hlt_i32, ds.dmPelsWidth);
 	hl_dyn_seti(dynobj, hl_hash_utf8("height"), &hlt_i32, ds.dmPelsHeight);
 	hl_dyn_seti(dynobj, hl_hash_utf8("framerate"), &hlt_i32, ds.dmDisplayFrequency);
@@ -695,8 +684,7 @@ DEFINE_PRIM(_VOID, win_destroy, TWIN);
 DEFINE_PRIM(_BOOL, win_get_next_event, TWIN _DYN);
 DEFINE_PRIM(_VOID, win_clip_cursor, TWIN);
 DEFINE_PRIM(_ARR, win_get_display_settings, _BYTES);
-DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES);
-DEFINE_PRIM(_DYN, win_get_registry_display_setting, _BYTES);
+DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES _BOOL);
 DEFINE_PRIM(_I32, win_change_display_setting, _BYTES _DYN);
 DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);

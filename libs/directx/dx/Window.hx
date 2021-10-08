@@ -107,6 +107,70 @@ class Window {
 		winCenter(win, centerPrimary);
 	}
 
+	public function destroy() {
+		winDestroy(win);
+		win = null;
+		windows.remove(this);
+	}
+
+	public function maximize() {
+		winResize(win, 0);
+	}
+
+	public function minimize() {
+		winResize(win, 1);
+	}
+
+	public function restore() {
+		winResize(win, 2);
+	}
+
+	public function getNextEvent( e : Event ) : Bool {
+		return winGetNextEvent(win, e);
+	}
+
+	public function clipCursor( enable : Bool ) : Void {
+		winClipCursor(enable ? win : null);
+	}
+
+	public static function getDisplaySettings(monitor : MonitorHandle) : Array<DisplaySetting> {
+		var a : Array<DisplaySetting> = [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.bytes : null)) s];
+		a.sort((a, b) -> {
+			if(b.width > a.width) 1;
+			else if(b.width < a.width) -1;
+			else if(b.height > a.height) 1;
+			else if(b.height < a.height) -1;
+			else if(b.framerate > a.framerate) 1;
+			else if(b.framerate < a.framerate) -1;
+			else 0;
+		});
+		var last = null;
+		return a.filter(function(e) {
+			if(last == null) {
+				last = e;
+				return true;
+			}
+			else if(last.width == e.width && last.height == e.height && last.framerate == e.framerate) {
+				return false;
+			}
+			last = e;
+			return true;
+		});
+	}
+
+	public static function getCurrentDisplaySetting(monitor : MonitorHandle, registry : Bool = false) : DisplaySetting {
+		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null, registry);
+	}
+
+	public static function getMonitors() : Array<Monitor> {
+		var last = null;
+		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUCS2(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
+	}
+
+	public function getCurrentMonitor() : MonitorHandle {
+		return @:privateAccess String.fromUCS2(winGetMonitorFromWindow(win));
+	}
+
 	function get_width() {
 		var w = 0;
 		winGetSize(win, w, null);
@@ -164,86 +228,13 @@ class Window {
 		return v;
 	}
 
-	public function destroy() {
-		winDestroy(win);
-		win = null;
-		windows.remove(this);
-	}
-
-	public function maximize() {
-		winResize(win, 0);
-	}
-
-	public function minimize() {
-		winResize(win, 1);
-	}
-
-	public function restore() {
-		winResize(win, 2);
-	}
-
-	public function getNextEvent( e : Event ) : Bool {
-		return winGetNextEvent(win, e);
-	}
-
-	public function clipCursor( enable : Bool ) : Void {
-		winClipCursor(enable ? win : null);
-	}
-
-	public static function getDisplaySettings(monitor : String) : Array<DisplaySetting> {
-		var a : Array<DisplaySetting> = [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.bytes : null)) s];
-		a.sort((a, b) -> {
-			if(b.width > a.width) 1;
-			else if(b.width < a.width) -1;
-			else if(b.height > a.height) 1;
-			else if(b.height < a.height) -1;
-			else if(b.framerate > a.framerate) 1;
-			else if(b.framerate < a.framerate) -1;
-			else 0;
-		});
-		var last = null;
-		return a.filter(function(e) {
-			if(last == null) {
-				last = e;
-				return true;
-			}
-			else if(last.width == e.width && last.height == e.height && last.framerate == e.framerate) {
-				return false;
-			}
-			last = e;
-			return true;
-		});
-	}
-
-	public static function getCurrentDisplaySetting(monitor : String) : DisplaySetting {
-		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null);
-	}
-
-	public static function getRegistryDisplaySetting(monitor : String) : DisplaySetting {
-		return winGetRegistryDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null);
-	}
-
-	public static function getMonitors() : Array<Monitor> {
-		var last = null;
-		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUCS2(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
-	}
-
-	public function getCurrentMonitor() : String {
-		return @:privateAccess String.fromUCS2(winGetMonitorFromWindow(win));
-	}
-
 	@:hlNative("?directx", "win_get_display_settings")
 	static function winGetDisplaySettings(monitor : hl.Bytes) : hl.NativeArray<Dynamic> {
 		return null;
 	}
 
 	@:hlNative("?directx", "win_get_current_display_setting")
-	static function winGetCurrentDisplaySetting(monitor : hl.Bytes) : Dynamic {
-		return null;
-	}
-
-	@:hlNative("?directx", "win_get_registry_display_setting")
-	static function winGetRegistryDisplaySetting(monitor : hl.Bytes) : Dynamic {
+	static function winGetCurrentDisplaySetting(monitor : hl.Bytes, registry : Bool) : Dynamic {
 		return null;
 	}
 

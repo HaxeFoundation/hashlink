@@ -86,7 +86,7 @@ class Sdl {
 	public static function delay(time:Int) {
 	}
 
-	public static function getScreenWidth(win : sdl.Window) : Int {
+	public static function getScreenWidth(?win : sdl.Window) : Int {
 		return 
 			if(win == null)
 				get_screen_width();
@@ -94,7 +94,7 @@ class Sdl {
 				get_screen_width_of_window(@:privateAccess win.win);
 	}
 
-	public static function getScreenHeight(win : sdl.Window) : Int {
+	public static function getScreenHeight(?win : sdl.Window) : Int {
 		return
 			if(win == null)
 				get_screen_height();
@@ -102,81 +102,28 @@ class Sdl {
 				get_screen_height_of_window(@:privateAccess win.win);
 	}
 
-	@:hlNative("?sdl", "get_screen_width")
-	public static function get_screen_width() : Int {
-		return 0;
-	}
-
-	@:hlNative("?sdl", "get_screen_height")
-	public static function get_screen_height() : Int {
-		return 0;
-	}
-
 	@:hlNative("?sdl", "get_framerate")
-	public static function get_framerate(win : sdl.Window.WinPtr) : Int {
-		return 0;
-	}
-
-	@:hlNative("?sdl", "get_screen_width_of_window")
-	public static function get_screen_width_of_window(win: sdl.Window.WinPtr) : Int {
-		return 0;
-	}
-
-	@:hlNative("?sdl", "get_screen_height_of_display")
-	public static function get_screen_height_of_window(win: sdl.Window.WinPtr) : Int {
+	public static function getFramerate(win : sdl.Window.WinPtr) : Int {
 		return 0;
 	}
 
 	public static function message( title : String, text : String, error = false ) {
 		@:privateAccess messageBox(title.toUtf8(), text.toUtf8(), error);
 	}
-
-	static function messageBox( title : hl.Bytes, text : hl.Bytes, error : Bool ) {
-	}
-
-	static function detectWin32() {
-		return false;
-	}
-
-	static function get_display_modes(displayId : Int) : hl.NativeArray<Dynamic> {
-		return null;
-	}
-
+	
 	public static function getDisplayModes(display : Window.DisplayHandle) : Array<ScreenMode> {
 		return [ for(m in get_display_modes(display)) m ];
 	}
 
-	@:hlNative("?sdl", "get_current_display_mode")
-	static function get_current_display_mode(displayId : Int) : Dynamic {
-		return null;
-	}
-
-	public static function getCurrentDisplayMode(display : Window.DisplayHandle) : ScreenMode {
-		return get_current_display_mode(display);
-	}
-
-	@:hlNative("?sdl", "get_desktop_display_mode")
-	static function get_desktop_display_mode(displayId : Int) : Dynamic {
-		return null;
-	}
-
-	public static function getDesktopDisplayMode(display : Window.DisplayHandle) : ScreenMode {
-		return get_desktop_display_mode(display);
+	public static function getCurrentDisplayMode(display : Window.DisplayHandle, registry : Bool = false) : ScreenMode {
+		return get_current_display_mode(display, registry);
 	}
 
 	public static function getDisplays() : Array<Display> {
 		var i = 0;
 		return [ for(d in get_displays() ) @:privateAccess { handle: d.handle, name: '${String.fromUTF8(d.name)} (${++i})', left: d.left, top: d.top, right: d.right, bottom: d.bottom } ];
 	}
-
-	static function get_displays() : hl.NativeArray<Dynamic> {
-		return null;
-	}
-
-	static function get_devices() : hl.NativeArray<hl.Bytes> {
-		return null;
-	}
-
+	
 	public static function getDevices() {
 		var a = [];
 		var arr = get_devices();
@@ -194,6 +141,70 @@ class Sdl {
 	public static function setRelativeMouseMode( enable : Bool ) : Int {
 		return 0;
 	}
+	
+	public static function setClipboardText( text : String ) : Bool {
+		if( text == null )
+			return false;
+		return @:privateAccess _setClipboardText( text.toUtf8() );
+	}
+
+	public static function getClipboardText() : String {
+		var t = _getClipboardText();
+		if( t == null )
+			return null;
+		else
+			return @:privateAccess String.fromUTF8(t);
+	}
+
+	@:hlNative("?sdl", "get_screen_width")
+	static function get_screen_width() : Int {
+		return 0;
+	}
+
+	@:hlNative("?sdl", "get_screen_height")
+	static function get_screen_height() : Int {
+		return 0;
+	}
+
+	@:hlNative("?sdl", "get_screen_width_of_window")
+	static function get_screen_width_of_window(win: sdl.Window.WinPtr) : Int {
+		return 0;
+	}
+
+	@:hlNative("?sdl", "get_screen_height_of_display")
+	static function get_screen_height_of_window(win: sdl.Window.WinPtr) : Int {
+		return 0;
+	}
+
+	static function messageBox( title : hl.Bytes, text : hl.Bytes, error : Bool ) {
+	}
+
+	static function detectWin32() {
+		return false;
+	}
+
+	static function get_display_modes(displayId : Int) : hl.NativeArray<Dynamic> {
+		return null;
+	}
+
+	@:hlNative("?sdl", "get_current_display_mode")
+	static function get_current_display_mode(displayId : Int, registry : Bool) : Dynamic {
+		return null;
+	}
+
+
+	@:hlNative("?sdl", "get_desktop_display_mode")
+	static function get_desktop_display_mode(displayId : Int) : Dynamic {
+		return null;
+	}
+
+	static function get_displays() : hl.NativeArray<Dynamic> {
+		return null;
+	}
+
+	static function get_devices() : hl.NativeArray<hl.Bytes> {
+		return null;
+	}
 
 	static function detect_keyboard_layout() : hl.Bytes {
 		return null;
@@ -208,23 +219,9 @@ class Sdl {
 		return false;
 	}
 
-	public static function setClipboardText( text : String ) : Bool {
-		if( text == null )
-			return false;
-		return @:privateAccess _setClipboardText( text.toUtf8() );
-	}
-
 	@:hlNative("?sdl", "get_clipboard_text")
 	private static function _getClipboardText() : hl.Bytes {
 		return null;
-	}
-
-	public static function getClipboardText() : String {
-		var t = _getClipboardText();
-		if( t == null )
-			return null;
-		else
-			return @:privateAccess String.fromUTF8(t);
 	}
 }
 

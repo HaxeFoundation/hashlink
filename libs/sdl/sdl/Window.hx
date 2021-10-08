@@ -61,6 +61,7 @@ class Window {
 	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
 	public var displaySetting : DisplaySetting;
+	public var currentMonitor(get, default) : Int;
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
 
@@ -149,10 +150,6 @@ class Window {
 		return displayMode;
 	}
 
-	public function getCurrentMonitor() {
-		return winDisplayHandle(win);
-	}
-
 	function set_visible(b) {
 		if( visible == b )
 			return b;
@@ -226,6 +223,10 @@ class Window {
 		var y = 0;
 		winGetPosition(win, null, y);
 		return y;
+	}
+
+	function get_currentMonitor() {
+		return winDisplayHandle(win);
 	}
 
 	function set_vsync(v) {
