@@ -580,7 +580,7 @@ typedef struct {
 	varray* arr;
 } get_monitors_data;
 
-BOOL on_get_monitors(HMONITOR monitor, HDC hdc, LPRECT rect, LPARAM param) {
+BOOL CALLBACK on_get_monitors(HMONITOR monitor, HDC hdc, LPRECT rect, LPARAM param) {
 	get_monitors_data *data = (get_monitors_data*)param;
 	varray* arr = data->arr;
 
