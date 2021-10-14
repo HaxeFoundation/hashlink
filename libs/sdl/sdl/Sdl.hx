@@ -183,6 +183,7 @@ class Sdl {
 		return false;
 	}
 
+	@:hlNative("?sdl", "get_display_modes")
 	static function get_display_modes(displayId : Int) : hl.NativeArray<Dynamic> {
 		return null;
 	}
@@ -198,6 +199,7 @@ class Sdl {
 		return null;
 	}
 
+	@:hlNative("?sdl", "get_displays")
 	static function get_displays() : hl.NativeArray<Dynamic> {
 		return null;
 	}
