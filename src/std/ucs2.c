@@ -67,12 +67,16 @@ uchar *ustrdup( const uchar *str ) {
 	return d;
 }
 
+static bool is_space_char( uchar c ) {
+	return c == ' ' || c == '\r' || c == '\n' || c == '\t';
+}
+
 double utod( const uchar *str, uchar **end ) {
 	char buf[31];
 	char *bend;
 	int i = 0;
 	double v;
-	while( *str == ' ' ) str++;
+	while( is_space_char(*str) ) str++;
 	while( i < 30 ) {
 		int c = *str++;
 		if( (c < '0' || c > '9') && c != '.' && c != 'e' && c != 'E' && c != '-' && c != '+' )
@@ -90,7 +94,7 @@ int utoi( const uchar *str, uchar **end ) {
 	char *bend;
 	int i = 0;
 	int v;
-	while( *str == ' ' ) str++;
+	while( is_space_char(*str) ) str++;
 	while( i < 16 ) {
 		int c = *str++;
 		if( (c < '0' || c > '9') && c != '-' )
