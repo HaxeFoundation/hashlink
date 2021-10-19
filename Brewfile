@@ -7,6 +7,6 @@ brew "sdl2"
 brew "libogg"
 brew "libvorbis"
 brew "openal-soft"
-brew "mbedtls"
+brew "mbedtls@2", link: true
 brew "libuv"
 brew "openssl"
