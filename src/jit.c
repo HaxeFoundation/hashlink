@@ -3935,7 +3935,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 
 				size = begin_native_call(ctx, 1);
 				set_native_arg(ctx,trap);
-				call_native(ctx,setjmp,size);
+#ifdef HL_MINGW
+                call_native(ctx, _setjmp, size);
+#else
+				call_native(ctx, setjmp, size);
+#endif
 				op64(ctx,TEST,PEAX,PEAX);
 				XJump_small(JZero,jenter);
 				op64(ctx,ADD,PESP,pconst(&p,trap_size));
