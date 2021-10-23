@@ -134,7 +134,7 @@ static void setup_handler() {
 #endif
 
 #ifdef HL_WIN
-#ifdef HL_WIN_DESKTOP
+#if defined(HL_WIN_DESKTOP) && defined(HL_MINGW)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow) {
     int argc = 0;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
