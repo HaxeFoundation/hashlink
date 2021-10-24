@@ -15,6 +15,18 @@ abstract VkRenderPass(hl.Abstract<"vk_render_pass">) {
 abstract VkDescriptorSetLayout(hl.Abstract<"vk_descriptor_set">) {
 }
 
+abstract VkFramebuffer(hl.Abstract<"vk_framebuffer">) {
+}
+
+abstract VkImageView(hl.Abstract<"vk_image_view">) {
+}
+
+abstract VkBuffer(hl.Abstract<"vk_buffer">) {
+}
+
+abstract VkDeviceMemory(hl.Abstract<"vk_device_memory">) {
+}
+
 enum abstract VkStructureType(Int) {
 	var APPLICATION_INFO = 0;
 	var INSTANCE_CREATE_INFO = 1;
@@ -762,21 +774,21 @@ enum abstract VkDynamicState(Int) {
 }
 
 enum abstract VkDescriptorType(Int) {
-    var SAMPLER = 0;
-    var COMBINED_IMAGE_SAMPLER = 1;
-    var SAMPLED_IMAGE = 2;
-    var STORAGE_IMAGE = 3;
-    var UNIFORM_TEXEL_BUFFER = 4;
-    var STORAGE_TEXEL_BUFFER = 5;
-    var UNIFORM_BUFFER = 6;
-    var STORAGE_BUFFER = 7;
-    var UNIFORM_BUFFER_DYNAMIC = 8;
-    var STORAGE_BUFFER_DYNAMIC = 9;
-    var INPUT_ATTACHMENT = 10;
-    var INLINE_UNIFORM_BLOCK_EXT = 1000138000;
-    var ACCELERATION_STRUCTURE_KHR = 1000150000;
-    var ACCELERATION_STRUCTURE_NV = 1000165000;
-    var MUTABLE_VALVE = 1000351000;
+	var SAMPLER = 0;
+	var COMBINED_IMAGE_SAMPLER = 1;
+	var SAMPLED_IMAGE = 2;
+	var STORAGE_IMAGE = 3;
+	var UNIFORM_TEXEL_BUFFER = 4;
+	var STORAGE_TEXEL_BUFFER = 5;
+	var UNIFORM_BUFFER = 6;
+	var STORAGE_BUFFER = 7;
+	var UNIFORM_BUFFER_DYNAMIC = 8;
+	var STORAGE_BUFFER_DYNAMIC = 9;
+	var INPUT_ATTACHMENT = 10;
+	var INLINE_UNIFORM_BLOCK_EXT = 1000138000;
+	var ACCELERATION_STRUCTURE_KHR = 1000150000;
+	var ACCELERATION_STRUCTURE_NV = 1000165000;
+	var MUTABLE_VALVE = 1000351000;
 }
 
 @:struct class VkPipelineDynamic {
@@ -798,11 +810,11 @@ enum abstract VkDescriptorType(Int) {
 }
 
 @:struct class VkDescriptorSetLayoutBinding {
-    public var binding : Int;
+	public var binding : Int;
 	public var descriptorType : VkDescriptorType;
 	public var descriptorCount : Int;
-    public var stageFlags : haxe.EnumFlags<VkShaderStageFlag>;
-    public var immutableSamplers : Any; //VkSampler
+	public var stageFlags : haxe.EnumFlags<VkShaderStageFlag>;
+	public var immutableSamplers : Any; //VkSampler
 	public function new() {}
 }
 
@@ -1033,16 +1045,181 @@ enum VkDependencyFlag {
 	}
 }
 
-@:hlNative("?sdl","vk_img_")
-abstract VkImage(hl.Abstract<"vk_image">) {
-
-	public function clearColor( r : Float, g : Float, b : Float, a : Float ) {
+@:struct class VkClearValue {
+	public var colorR : Single;
+	public var colorG : Single;
+	public var colorB : Single;
+	public var colorA : Single;
+	public var depth : Single;
+	public var stencil : Int;
+	public function new() {
 	}
-
-	public function clearDepthStencil( depth : Float, stencil : Int ) {
-	}
-
 }
+
+@:struct class VkRenderPassBeginInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var renderPass : VkRenderPass;
+	public var framebuffer : VkFramebuffer;
+	public var renderAreaOffsetX : Int;
+	public var renderAreaOffsetY : Int;
+	public var renderAreaExtentX : Int;
+	public var renderAreaExtentY : Int;
+	public var clearValueCount : Int;
+	public var clearValues : ArrayStruct<VkClearValue>;
+	public function new() {
+		type = RENDER_PASS_BEGIN_INFO;
+	}
+}
+
+enum abstract VkSubpassContents(Int) {
+	var INLINE = 0;
+	var SECONDARY_COMMAND_BUFFERS = 1;
+}
+
+enum VkFramebufferCreateFlag {
+	IMAGELESS_BIT;
+}
+
+@:struct class VkFramebufferInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var flags : haxe.EnumFlags<VkFramebufferCreateFlag>;
+	public var renderPass : VkRenderPass;
+	public var attachmentCount : Int;
+	public var attachments : ArrayStruct<VkImageView>;
+	public var width : Int;
+	public var height : Int;
+	public var layers : Int;
+	public function new() {
+		type = FRAMEBUFFER_CREATE_INFO;
+	}
+}
+
+enum VkImageViewCreateFlag {
+	FRAGMENT_DENSITY_MAP_DYNAMIC_BIT_EXT;
+	FRAGMENT_DENSITY_MAP_DEFERRED_BIT_EXT;
+}
+
+enum abstract VkImageViewType(Int) {
+	var TYPE_1D = 0;
+	var TYPE_2D = 1;
+	var TYPE_3D = 2;
+	var TYPE_CUBE = 3;
+	var TYPE_1D_ARRAY = 4;
+	var TYPE_2D_ARRAY = 5;
+	var TYPE_CUBE_ARRAY = 6;
+}
+
+enum abstract VkComponentSwizzle(Int) {
+	var IDENTITY = 0;
+	var ZERO = 1;
+	var ONE = 2;
+	var R = 3;
+	var G = 4;
+	var B = 5;
+	var A = 6;
+}
+
+enum VkImageAspectFlag {
+	COLOR;
+	DEPTH;
+	STENCIL;
+	METADATA;
+	PLANE_0;
+	PLANE_1;
+	PLANE_2;
+	MEMORY_PLANE_0;
+	MEMORY_PLANE_1;
+	MEMORY_PLANE_2;
+	MEMORY_PLANE_3;
+}
+
+@:struct class VkImageViewInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var flags : haxe.EnumFlags<VkImageViewCreateFlag>;
+	public var image : VkImage;
+	public var viewType : VkImageViewType;
+	public var format : VkFormat;
+	public var componentR : VkComponentSwizzle;
+	public var componentG : VkComponentSwizzle;
+	public var componentB : VkComponentSwizzle;
+	public var componentA : VkComponentSwizzle;
+	// 	subresourceRange : VkImageSubresourceRange;
+	public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
+	public var baseMipLevel : Int;
+	public var levelCount : Int;
+	public var baseArrayLayer : Int;
+	public var layerCount : Int;
+	public function new() {
+		type = IMAGE_VIEW_CREATE_INFO;
+	}
+}
+
+enum VkBufferCreateFlag {
+	SPARSE_BINDING;
+	SPARSE_RESIDENCY;
+	SPARSE_ALIASED;
+	PROTECTED;
+	DEVICE_ADDRESS_CAPTURE_REPLAY;
+}
+
+enum VkBufferUsageFlag {
+	TRANSFER_SRC;
+	TRANSFER_DST;
+	UNIFORM_TEXEL_BUFFER;
+	STORAGE_TEXEL_BUFFER;
+	UNIFORM_BUFFER;
+	STORAGE_BUFFER;
+	INDEX_BUFFER;
+	VERTEX_BUFFER;
+	INDIRECT_BUFFER;
+}
+
+enum abstract VkSharingMode(Int) {
+	var EXCLUSIVE = 0;
+	var CONCURRENT = 1;
+}
+
+@:struct class VkBufferCreateInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var flags : haxe.EnumFlags<VkBufferCreateFlag>;
+	var __align : Int;
+	public var size : Int;
+	public var size64 : Int;
+	public var usage : haxe.EnumFlags<VkBufferUsageFlag>;
+	public var sharingMode : VkSharingMode;
+	public var queueFamilyIndexCount : Int;
+	public var queueFamilyIndices : IntArray<Int>;
+	public function new() {
+		type = BUFFER_CREATE_INFO;
+	}
+}
+
+@:struct class VkMemoryRequirements {
+	public var size : Int;
+	public var size64 : Int;
+	public var alignment : Int;
+	public var alignment64 : Int;
+	public var memoryTypeBits : Int;
+	public function new() {}
+}
+
+@:struct class VkMemoryAllocateInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var size : Int;
+	public var size64 : Int;
+	public var memoryTypeIndex : Int;
+	public function new() {
+		type = MEMORY_ALLOCATE_INFO;
+	}
+}
+
+@:hlNative("?sdl","vk_img_")
+abstract VkImage(hl.Abstract<"vk_image">) {}
 
 @:hlNative("?sdl","vk_")
 abstract VkContext(hl.Abstract<"vk_context">) {
@@ -1055,7 +1232,11 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 		return false;
 	}
 
-	public function setCurrent() : VkImage {
+	public function getCurrentImage() : VkImage {
+		return null;
+	}
+
+	public function getCurrentCommandBuffer() : VkCommandBuffer {
 		return null;
 	}
 
@@ -1082,11 +1263,57 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 		return null;
 	}
 
+	public function createFramebuffer( inf : VkFramebufferInfo ) : VkFramebuffer {
+		return null;
+	}
+
+	public function createImageView( inf : VkImageViewInfo ) : VkImageView {
+		return null;
+	}
+
+	public function createBuffer( inf : VkBufferCreateInfo ) : VkBuffer {
+		return null;
+	}
+
+	public function getBufferMemoryRequirements( b : VkBuffer, inf : VkMemoryRequirements ) {
+	}
+
+	public function allocateMemory( inf : VkMemoryAllocateInfo ) : VkDeviceMemory {
+		return null;
+	}
+
+	public function bindBufferMemory( b : VkBuffer, mem : VkDeviceMemory, memOffset : Int ) {
+		return false;
+	}
+
 }
 
 enum abstract ShaderKind(Int) {
 	var Vertex = 0;
 	var Fragment = 1;
+}
+
+@:hlNative("?sdl","vk_")
+abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
+
+	public function clearColorImage( img : VkImage, r : Float, g : Float, b : Float, a : Float ) {
+	}
+
+	public function clearDepthStencilImage( img : VkImage, depth : Float, stencil : Int ) {
+	}
+
+	public function drawIndexed( indexCount : Int, instanceCount : Int, firstIndex : Int, vertexOffset : Int, firstInstance : Int ) {
+	}
+
+	public function bindPipeline( bindPoint : VkPipelineBindPoint, pipeline : VkGraphicsPipeline ) {
+	}
+
+	public function bindIndexBuffer( buffer : VkBuffer, offset : Int, indexType : Int ) {
+	}
+
+	public function beginRenderPass( begin : VkRenderPassBeginInfo, contents : VkSubpassContents ) {
+	}
+
 }
 
 @:hlNative("?sdl","vk_")
@@ -1103,12 +1330,6 @@ class Vulkan {
 			throw error+"\n\nin\n\n"+[for( i => l in lines ) StringTools.rpad((i+1)+":"," ",8)+l].join("\n");
 		}
 		return @:privateAccess new haxe.io.Bytes(bytes, outSize);
-	}
-
-	public static function drawIndexed( indexCount : Int, instanceCount : Int, firstIndex : Int, vertexOffset : Int, firstInstance : Int ) {
-	}
-
-	public static function bindPipeline( bindPoint : VkPipelineBindPoint, pipeline : VkGraphicsPipeline ) {
 	}
 
 	static function compile_shader( source : hl.Bytes, shaderFile : hl.Bytes, mainFunction : hl.Bytes, kind : ShaderKind, outSize : hl.Ref<Int> ) : hl.Bytes {

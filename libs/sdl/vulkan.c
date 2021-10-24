@@ -38,6 +38,22 @@ HL_PRIM bool HL_NAME(vk_init)( bool enable_validation ) {
 	return true;
 }
 
+vbyte *HL_NAME(vk_make_array)( varray *a ) {
+	if( a->size == 0 )
+		return NULL;
+	if( a->at->kind == HABSTRACT )
+		return hl_copy_bytes(hl_aptr(a,vbyte), a->size * sizeof(void*));
+#ifdef HL_DEBUG
+	if( a->at->kind != HSTRUCT ) hl_error("assert");
+#endif
+	int size = a->at->kind == HABSTRACT ? sizeof(void*) : a->at->obj->rt->size;
+	vbyte *ptr = hl_alloc_bytes(size * a->size);
+	int i;
+	for(i=0;i<a->size;i++)
+		memcpy(ptr + i * size, hl_aptr(a,vbyte*)[i], size);
+	return ptr;
+}
+
 // ------------------------------------------ CONTEXT INIT --------------------------------------------
 
 #define MAX_SWAPCHAIN_IMAGES 3
@@ -364,20 +380,32 @@ VkDescriptorSetLayout HL_NAME(vk_create_descriptor_set_layout)( VkContext ctx, V
 	return p;
 }
 
-vbyte *HL_NAME(vk_make_array)( varray *a ) {
-	if( a->size == 0 )
-		return NULL;
-	if( a->at->kind == HABSTRACT )
-		return hl_copy_bytes(hl_aptr(a,vbyte), a->size * sizeof(void*));
-#ifdef HL_DEBUG
-	if( a->at->kind != HSTRUCT ) hl_error("assert");
-#endif
-	int size = a->at->kind == HABSTRACT ? sizeof(void*) : a->at->obj->rt->size;
-	vbyte *ptr = hl_alloc_bytes(size * a->size);
-	int i;
-	for(i=0;i<a->size;i++)
-		memcpy(ptr + i * size, hl_aptr(a,vbyte*)[i], size);
-	return ptr;
+VkBuffer HL_NAME(vk_create_buffer)( VkContext ctx, VkBufferCreateInfo *info ) {
+	VkBuffer b = NULL;
+	vkCreateBuffer(ctx->device, info, NULL, &b);
+	return b;
+}
+
+void HL_NAME(vk_get_buffer_memory_requirements)( VkContext ctx, VkBuffer buf, VkMemoryRequirements *info ) {
+	vkGetBufferMemoryRequirements(ctx->device,buf,info);
+}
+
+VkDeviceMemory HL_NAME(vk_allocate_memory)( VkContext ctx, VkMemoryAllocateInfo *inf ) {
+	VkDeviceMemory m = NULL;
+	vkAllocateMemory(ctx->device, inf, NULL, &m);
+	return m;
+}
+
+bool HL_NAME(vk_bind_buffer_memory)( VkContext ctx, VkBuffer buf, VkDeviceMemory mem, int offset ) {
+	return vkBindBufferMemory(ctx->device, buf, mem, offset) == VK_SUCCESS;
+}
+
+VkImage HL_NAME(vk_get_current_image)( VkContext ctx ) {
+	return ctx->swapchainImages[ctx->currentImage];
+}
+
+VkCommandBuffer HL_NAME(vk_get_current_command_buffer)( VkContext ctx ) {
+	return ctx->frames[ctx->currentFrame].buffer;
 }
 
 #define _VCTX _ABSTRACT(vk_context)
@@ -387,6 +415,9 @@ vbyte *HL_NAME(vk_make_array)( varray *a ) {
 #define _RENDERPASS _ABSTRACT(vk_render_pass)
 #define _IMG _ABSTRACT(vk_image)
 #define _DESCRIPTOR_SET _ABSTRACT(vk_descriptor_set)
+#define _BUFFER _ABSTRACT(vk_buffer)
+#define _MEMORY _ABSTRACT(vk_device_memory)
+#define _CMD _ABSTRACT(vk_command_buffer)
 
 DEFINE_PRIM(_BOOL, vk_init, _BOOL);
 DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32);
@@ -398,41 +429,47 @@ DEFINE_PRIM(_GPIPELINE, vk_create_graphics_pipeline, _VCTX _STRUCT);
 DEFINE_PRIM(_PIPELAYOUT, vk_create_pipeline_layout, _VCTX _STRUCT);
 DEFINE_PRIM(_RENDERPASS, vk_create_render_pass, _VCTX _STRUCT);
 DEFINE_PRIM(_DESCRIPTOR_SET, vk_create_descriptor_set_layout, _VCTX _STRUCT);
+DEFINE_PRIM(_BUFFER, vk_create_buffer, _VCTX _STRUCT);
+DEFINE_PRIM(_VOID, vk_get_buffer_memory_requirements, _VCTX _BUFFER _STRUCT);
+DEFINE_PRIM(_MEMORY, vk_allocate_memory, _VCTX _STRUCT);
+DEFINE_PRIM(_BOOL, vk_bind_buffer_memory, _VCTX _BUFFER _MEMORY _I32);
+DEFINE_PRIM(_IMG, vk_get_current_image, _VCTX);
+DEFINE_PRIM(_CMD, vk_get_current_command_buffer, _VCTX);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
 
-static VkContext current_context = NULL;
-static VkCommandBuffer current_buffer = NULL;
-
-HL_PRIM VkImage HL_NAME(vk_set_current)( VkContext ctx ) {
-	current_context = ctx;
-	current_buffer = ctx->frames[ctx->currentFrame].buffer;
-	return ctx->swapchainImages[ctx->currentImage];
-}
-
-HL_PRIM void HL_NAME(vk_img_clear_color)( VkImage img, double r, double g, double b, double a ) {
+HL_PRIM void HL_NAME(vk_clear_color_image)( VkCommandBuffer out, VkImage img, double r, double g, double b, double a ) {
 	VkClearColorValue color = { (float)r, (float)g, (float)b, (float)a };
-	vkCmdClearColorImage(current_buffer, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1, &RANGE_ALL);
+	vkCmdClearColorImage(out, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1, &RANGE_ALL);
 }
 
-HL_PRIM void HL_NAME(vk_img_clear_depth_stencil)( VkImage img, double d, int stencil ) {
+HL_PRIM void HL_NAME(vk_clear_depth_stencil_image)( VkCommandBuffer out, VkImage img, double d, int stencil ) {
 	VkClearDepthStencilValue ds = { (float)d, (uint32_t)stencil };
-	vkCmdClearDepthStencilImage(current_buffer, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ds, 1, &RANGE_ALL);
+	vkCmdClearDepthStencilImage(out, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ds, 1, &RANGE_ALL);
 }
 
-HL_PRIM void HL_NAME(vk_draw_indexed)( int indexCount, int instanceCount, int firstIndex, int vertexOffset, int firstInstance ) {
-	vkCmdDrawIndexed(current_buffer,indexCount,instanceCount,firstIndex,vertexOffset,firstInstance);
+HL_PRIM void HL_NAME(vk_draw_indexed)( VkCommandBuffer out, int indexCount, int instanceCount, int firstIndex, int vertexOffset, int firstInstance ) {
+	vkCmdDrawIndexed(out,indexCount,instanceCount,firstIndex,vertexOffset,firstInstance);
 }
 
-HL_PRIM void HL_NAME(vk_bind_pipeline)( int bindPoint, VkPipeline pipeline ) {
-	vkCmdBindPipeline(current_buffer, (VkPipelineBindPoint)bindPoint, pipeline);
+HL_PRIM void HL_NAME(vk_bind_pipeline)( VkCommandBuffer out, int bindPoint, VkPipeline pipeline ) {
+	vkCmdBindPipeline(out, (VkPipelineBindPoint)bindPoint, pipeline);
 }
 
-DEFINE_PRIM(_IMG, vk_set_current, _VCTX);
-DEFINE_PRIM(_VOID, vk_img_clear_color, _IMG _F64 _F64 _F64 _F64);
-DEFINE_PRIM(_VOID, vk_img_clear_depth_stencil, _IMG _F64 _I32);
-DEFINE_PRIM(_VOID, vk_draw_indexed, _I32 _I32 _I32 _I32 _I32);
-DEFINE_PRIM(_VOID, vk_bind_pipeline, _I32 _GPIPELINE);
+HL_PRIM void HL_NAME(vk_begin_render_pass)( VkCommandBuffer out, VkRenderPassBeginInfo *info, int contents ) {
+	vkCmdBeginRenderPass(out, info, (VkSubpassContents)contents);
+}
+
+HL_PRIM void HL_NAME(vk_bind_index_buffer)( VkCommandBuffer out, VkBuffer buf, int offset, int type ) {
+	vkCmdBindIndexBuffer(out, buf, offset, type);
+}
+
+DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMG _F64 _F64 _F64 _F64);
+DEFINE_PRIM(_VOID, vk_clear_depth_stencil_image, _CMD _IMG _F64 _I32);
+DEFINE_PRIM(_VOID, vk_draw_indexed, _CMD _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, vk_bind_pipeline, _CMD _I32 _GPIPELINE);
+DEFINE_PRIM(_VOID, vk_begin_render_pass, _CMD _STRUCT _I32);
+DEFINE_PRIM(_VOID, vk_bind_index_buffer, _CMD _BUFFER _I32 _I32);
 
 // ------ SHADER COMPILATION ------------------------------
 
