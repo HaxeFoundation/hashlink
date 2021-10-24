@@ -358,11 +358,21 @@ VkRenderPass HL_NAME(vk_create_render_pass)( VkContext ctx, VkRenderPassCreateIn
 	return p;
 }
 
+VkDescriptorSetLayout HL_NAME(vk_create_descriptor_set_layout)( VkContext ctx, VkDescriptorSetLayoutCreateInfo *info ) {
+	VkDescriptorSetLayout p = NULL;
+	vkCreateDescriptorSetLayout(ctx->device, info, NULL, &p);
+	return p;
+}
+
 vbyte *HL_NAME(vk_make_array)( varray *a ) {
+	if( a->size == 0 )
+		return NULL;
+	if( a->at->kind == HABSTRACT )
+		return hl_copy_bytes(hl_aptr(a,vbyte), a->size * sizeof(void*));
 #ifdef HL_DEBUG
 	if( a->at->kind != HSTRUCT ) hl_error("assert");
 #endif
-	int size = a->at->obj->rt->size;
+	int size = a->at->kind == HABSTRACT ? sizeof(void*) : a->at->obj->rt->size;
 	vbyte *ptr = hl_alloc_bytes(size * a->size);
 	int i;
 	for(i=0;i<a->size;i++)
@@ -376,6 +386,7 @@ vbyte *HL_NAME(vk_make_array)( varray *a ) {
 #define _PIPELAYOUT _ABSTRACT(vk_pipeline_layout)
 #define _RENDERPASS _ABSTRACT(vk_render_pass)
 #define _IMG _ABSTRACT(vk_image)
+#define _DESCRIPTOR_SET _ABSTRACT(vk_descriptor_set)
 
 DEFINE_PRIM(_BOOL, vk_init, _BOOL);
 DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32);
@@ -386,6 +397,7 @@ DEFINE_PRIM(_SHADER_MODULE, vk_create_shader_module, _VCTX _BYTES _I32 );
 DEFINE_PRIM(_GPIPELINE, vk_create_graphics_pipeline, _VCTX _STRUCT);
 DEFINE_PRIM(_PIPELAYOUT, vk_create_pipeline_layout, _VCTX _STRUCT);
 DEFINE_PRIM(_RENDERPASS, vk_create_render_pass, _VCTX _STRUCT);
+DEFINE_PRIM(_DESCRIPTOR_SET, vk_create_descriptor_set_layout, _VCTX _STRUCT);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
 
@@ -408,10 +420,19 @@ HL_PRIM void HL_NAME(vk_img_clear_depth_stencil)( VkImage img, double d, int ste
 	vkCmdClearDepthStencilImage(current_buffer, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ds, 1, &RANGE_ALL);
 }
 
+HL_PRIM void HL_NAME(vk_draw_indexed)( int indexCount, int instanceCount, int firstIndex, int vertexOffset, int firstInstance ) {
+	vkCmdDrawIndexed(current_buffer,indexCount,instanceCount,firstIndex,vertexOffset,firstInstance);
+}
+
+HL_PRIM void HL_NAME(vk_bind_pipeline)( int bindPoint, VkPipeline pipeline ) {
+	vkCmdBindPipeline(current_buffer, (VkPipelineBindPoint)bindPoint, pipeline);
+}
+
 DEFINE_PRIM(_IMG, vk_set_current, _VCTX);
 DEFINE_PRIM(_VOID, vk_img_clear_color, _IMG _F64 _F64 _F64 _F64);
 DEFINE_PRIM(_VOID, vk_img_clear_depth_stencil, _IMG _F64 _I32);
-
+DEFINE_PRIM(_VOID, vk_draw_indexed, _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, vk_bind_pipeline, _I32 _GPIPELINE);
 
 // ------ SHADER COMPILATION ------------------------------
 

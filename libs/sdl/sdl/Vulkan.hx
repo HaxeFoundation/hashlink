@@ -12,6 +12,9 @@ abstract VkPipelineLayout(hl.Abstract<"vk_pipeline_layout">) {
 abstract VkRenderPass(hl.Abstract<"vk_render_pass">) {
 }
 
+abstract VkDescriptorSetLayout(hl.Abstract<"vk_descriptor_set">) {
+}
+
 enum abstract VkStructureType(Int) {
 	var APPLICATION_INFO = 0;
 	var INSTANCE_CREATE_INFO = 1;
@@ -448,7 +451,7 @@ abstract VkBool32(Int) {
 	public var topology : VkPrimitiveTopology;
 	public var primitiveRestartEnable : VkBool32;
 	public function new() {
-		type = PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		type = PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	}
 }
 
@@ -758,6 +761,24 @@ enum abstract VkDynamicState(Int) {
 	var STENCIL_OP_EXT = 1000267011;
 }
 
+enum abstract VkDescriptorType(Int) {
+    var SAMPLER = 0;
+    var COMBINED_IMAGE_SAMPLER = 1;
+    var SAMPLED_IMAGE = 2;
+    var STORAGE_IMAGE = 3;
+    var UNIFORM_TEXEL_BUFFER = 4;
+    var STORAGE_TEXEL_BUFFER = 5;
+    var UNIFORM_BUFFER = 6;
+    var STORAGE_BUFFER = 7;
+    var UNIFORM_BUFFER_DYNAMIC = 8;
+    var STORAGE_BUFFER_DYNAMIC = 9;
+    var INPUT_ATTACHMENT = 10;
+    var INLINE_UNIFORM_BLOCK_EXT = 1000138000;
+    var ACCELERATION_STRUCTURE_KHR = 1000150000;
+    var ACCELERATION_STRUCTURE_NV = 1000165000;
+    var MUTABLE_VALVE = 1000351000;
+}
+
 @:struct class VkPipelineDynamic {
 	public var type : VkStructureType;
 	public var next : NextPtr;
@@ -776,12 +797,32 @@ enum abstract VkDynamicState(Int) {
 	public function new() {}
 }
 
+@:struct class VkDescriptorSetLayoutBinding {
+    public var binding : Int;
+	public var descriptorType : VkDescriptorType;
+	public var descriptorCount : Int;
+    public var stageFlags : haxe.EnumFlags<VkShaderStageFlag>;
+    public var immutableSamplers : Any; //VkSampler
+	public function new() {}
+}
+
+@:struct class VkDescriptorSetLayoutInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var flags : UnusedFlags;
+	public var bindingCount : Int;
+	public var bindings : ArrayStruct<VkDescriptorSetLayoutBinding>;
+	public function new() {
+		type = DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	}
+}
+
 @:struct class VkPipelineLayoutInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var setLayoutCount : Int;
-	public var setLayouts : NextPtr; // ArrayStruct<VkPipelineSetLayout>
+	public var setLayouts : ArrayStruct<VkDescriptorSetLayout>;
 	public var pushConstantRangeCount : Int;
 	public var pushConstantRanges : ArrayStruct<VkPushConstantRange>;
 	public function new() {
@@ -806,15 +847,15 @@ enum abstract VkAttachmentStoreOp(Int) {
 }
 
 @:struct class VkAttachmentDescription {
-	var flags : haxe.EnumFlags<VkAttachmentDescriptionFlag>;
-	var format : VkFormat;
-	var samples : Int;
-	var loadOp : VkAttachmentLoadOp;
-	var storeOp : VkAttachmentStoreOp;
-	var stencilLoadOp : VkAttachmentLoadOp;
-	var stencilStoreOp : VkAttachmentStoreOp;
-	var initialLayout : VkImageLayout;
-	var finalLayout : VkImageLayout;
+	public var flags : haxe.EnumFlags<VkAttachmentDescriptionFlag>;
+	public var format : VkFormat;
+	public var samples : Int;
+	public var loadOp : VkAttachmentLoadOp;
+	public var storeOp : VkAttachmentStoreOp;
+	public var stencilLoadOp : VkAttachmentLoadOp;
+	public var stencilStoreOp : VkAttachmentStoreOp;
+	public var initialLayout : VkImageLayout;
+	public var finalLayout : VkImageLayout;
 	public function new() {}
 }
 
@@ -862,16 +903,16 @@ enum abstract VkImageLayout(Int) {
 }
 
 @:struct class VkSubpassDescription {
-	var flags : haxe.EnumFlags<VkSubpassDescriptionFlag>;
-	var pipelineBindPoint : VkPipelineBindPoint;
-	var inputAttachmentCount : Int;
-	var inputAttachments : ArrayStruct<VkAttachmentReference>;
-	var colorAttachmentCount : Int;
-	var colorAttachments : ArrayStruct<VkAttachmentReference>;
-	var resolveAttachments : ArrayStruct<VkAttachmentReference>;
-	var depthStencilAttachment : ArrayStruct<VkAttachmentReference>;
-	var preserveAttachmentCount : Int;
-	var preserveAttachments : IntArray<Int>;
+	public var flags : haxe.EnumFlags<VkSubpassDescriptionFlag>;
+	public var pipelineBindPoint : VkPipelineBindPoint;
+	public var inputAttachmentCount : Int;
+	public var inputAttachments : ArrayStruct<VkAttachmentReference>;
+	public var colorAttachmentCount : Int;
+	public var colorAttachments : ArrayStruct<VkAttachmentReference>;
+	public var resolveAttachments : ArrayStruct<VkAttachmentReference>;
+	public var depthStencilAttachment : ArrayStruct<VkAttachmentReference>;
+	public var preserveAttachmentCount : Int;
+	public var preserveAttachments : IntArray<Int>;
 	public function new() {}
 }
 
@@ -1037,6 +1078,10 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 		return null;
 	}
 
+	public function createDescriptorSetLayout( inf : VkDescriptorSetLayoutInfo ) : VkDescriptorSetLayout {
+		return null;
+	}
+
 }
 
 enum abstract ShaderKind(Int) {
@@ -1058,6 +1103,12 @@ class Vulkan {
 			throw error+"\n\nin\n\n"+[for( i => l in lines ) StringTools.rpad((i+1)+":"," ",8)+l].join("\n");
 		}
 		return @:privateAccess new haxe.io.Bytes(bytes, outSize);
+	}
+
+	public static function drawIndexed( indexCount : Int, instanceCount : Int, firstIndex : Int, vertexOffset : Int, firstInstance : Int ) {
+	}
+
+	public static function bindPipeline( bindPoint : VkPipelineBindPoint, pipeline : VkGraphicsPipeline ) {
 	}
 
 	static function compile_shader( source : hl.Bytes, shaderFile : hl.Bytes, mainFunction : hl.Bytes, kind : ShaderKind, outSize : hl.Ref<Int> ) : hl.Bytes {
