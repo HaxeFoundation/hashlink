@@ -45,7 +45,7 @@ class Window {
 
 	var win : WinPtr;
 	var glctx : GLContext;
-	var vkctx : Vulkan.VKContext;
+	var vkctx : Vulkan.VkContext;
 	var lastFrame : Float;
 	public var title(default, set) : String;
 	public var vsync(default, set) : Bool;
@@ -62,15 +62,15 @@ class Window {
 	public var opacity(get, set) : Float;
 
 	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE ) {
-	
+
 		var vk = (sdlFlags & SDL_WINDOW_VULKAN) != 0;
-		if( vk && !vkInit() )
+		if( vk && !vkInit(Vulkan.ENABLE_VALIDATION) )
 			throw "Failed to initialize Vulkan";
-	
+
 		while( true ) {
 			win = winCreateEx(x, y, width, height, sdlFlags);
 			if( win == null ) throw "Failed to create window";
-			
+
 			if( vk ) {
 				vkctx = winGetVulkan(win);
 				if( vkctx == null ) {
@@ -354,15 +354,15 @@ class Window {
 
 	static function setVsync( b : Bool ) {
 	}
-	
+
 	@:hlNative("?sdl","vk_init")
-	static function vkInit() : Bool {
+	static function vkInit( debug : Bool ) : Bool {
 		return false;
 	}
 
 	@:hlNative("?sdl","win_get_vulkan")
-	static function winGetVulkan( win : WinPtr ) : Vulkan.VKContext {
+	static function winGetVulkan( win : WinPtr ) : Vulkan.VkContext {
 		return null;
 	}
-	
+
 }

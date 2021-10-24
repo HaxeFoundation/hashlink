@@ -12,7 +12,7 @@ VkInstance vk_get_instance() {
 	return instance;
 }
 
-HL_PRIM bool HL_NAME(vk_init)() {
+HL_PRIM bool HL_NAME(vk_init)( bool enable_validation ) {
 	if( instance )
 		return true;
 	VkApplicationInfo appInfo = {
@@ -26,10 +26,16 @@ HL_PRIM bool HL_NAME(vk_init)() {
 	VkInstanceCreateInfo info = {
 		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 		.pApplicationInfo = &appInfo,
-		.enabledExtensionCount = 2,
-		.ppEnabledExtensionNames = (const char* const[]) { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME },
+		.enabledLayerCount = enable_validation ? 1 : 0,
+		.enabledExtensionCount = enable_validation ? 3 : 2,
+		.ppEnabledLayerNames = (const char* const[]) { "VK_LAYER_KHRONOS_validation" },
+		.ppEnabledExtensionNames = (const char* const[]) { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME },
 	};
-	return vkCreateInstance(&info, NULL, &instance) == VK_SUCCESS;
+	
+	if( vkCreateInstance(&info, NULL, &instance) != VK_SUCCESS )
+		return false;
+
+	return true;
 }
 
 // ------------------------------------------ CONTEXT INIT --------------------------------------------
@@ -61,8 +67,6 @@ typedef struct _VkContext {
 	VkFrame frames[FRAME_COUNT];
 
 } *VkContext;
-
-
 
 void *vk_init_context( VkSurfaceKHR surface ) {
 	VkContext ctx = (VkContext)malloc(sizeof(struct _VkContext));
@@ -321,6 +325,8 @@ HL_PRIM void HL_NAME(vk_end_frame)( VkContext ctx ) {
 
 	ctx->currentFrame++;
 	ctx->currentFrame %= FRAME_COUNT;
+	ctx->currentImage++;
+	ctx->currentImage %= ctx->swapchainImageCount;
 }
 
 VkShaderModule HL_NAME(vk_create_shader_module)( VkContext ctx, vbyte *data, int len ) {
@@ -369,8 +375,9 @@ vbyte *HL_NAME(vk_make_array)( varray *a ) {
 #define _GPIPELINE _ABSTRACT(vk_gpipeline)
 #define _PIPELAYOUT _ABSTRACT(vk_pipeline_layout)
 #define _RENDERPASS _ABSTRACT(vk_render_pass)
+#define _IMG _ABSTRACT(vk_image)
 
-DEFINE_PRIM(_BOOL, vk_init, _NO_ARG);
+DEFINE_PRIM(_BOOL, vk_init, _BOOL);
 DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32);
 DEFINE_PRIM(_BOOL, vk_begin_frame, _VCTX);
 DEFINE_PRIM(_BYTES, vk_make_array, _ARR);
@@ -385,21 +392,25 @@ DEFINE_PRIM(_RENDERPASS, vk_create_render_pass, _VCTX _STRUCT);
 static VkContext current_context = NULL;
 static VkCommandBuffer current_buffer = NULL;
 
-HL_PRIM void HL_NAME(vk_set_current)( VkContext ctx ) {
+HL_PRIM VkImage HL_NAME(vk_set_current)( VkContext ctx ) {
 	current_context = ctx;
 	current_buffer = ctx->frames[ctx->currentFrame].buffer;
+	return ctx->swapchainImages[ctx->currentImage];
 }
 
-HL_PRIM void HL_NAME(vk_clear_color_image)( double r, double g, double b, double a ) {
+HL_PRIM void HL_NAME(vk_img_clear_color)( VkImage img, double r, double g, double b, double a ) {
 	VkClearColorValue color = { (float)r, (float)g, (float)b, (float)a };
-	vkCmdClearColorImage(current_buffer,
-		current_context->swapchainImages[current_context->currentImage], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		&color, 1, &RANGE_ALL
-	);
+	vkCmdClearColorImage(current_buffer, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1, &RANGE_ALL);
 }
 
-DEFINE_PRIM(_VOID, vk_set_current, _VCTX);
-DEFINE_PRIM(_VOID, vk_clear_color_image, _F64 _F64 _F64 _F64);
+HL_PRIM void HL_NAME(vk_img_clear_depth_stencil)( VkImage img, double d, int stencil ) {
+	VkClearDepthStencilValue ds = { (float)d, (uint32_t)stencil };
+	vkCmdClearDepthStencilImage(current_buffer, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ds, 1, &RANGE_ALL);
+}
+
+DEFINE_PRIM(_IMG, vk_set_current, _VCTX);
+DEFINE_PRIM(_VOID, vk_img_clear_color, _IMG _F64 _F64 _F64 _F64);
+DEFINE_PRIM(_VOID, vk_img_clear_depth_stencil, _IMG _F64 _I32);
 
 
 // ------ SHADER COMPILATION ------------------------------

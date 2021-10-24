@@ -992,9 +992,19 @@ enum VkDependencyFlag {
 	}
 }
 
+@:hlNative("?sdl","vk_img_")
+abstract VkImage(hl.Abstract<"vk_image">) {
+
+	public function clearColor( r : Float, g : Float, b : Float, a : Float ) {
+	}
+
+	public function clearDepthStencil( depth : Float, stencil : Int ) {
+	}
+
+}
 
 @:hlNative("?sdl","vk_")
-abstract VKContext(hl.Abstract<"vk_context">) {
+abstract VkContext(hl.Abstract<"vk_context">) {
 
 	public function initSwapchain( width : Int, height : Int ) : Bool {
 		return false;
@@ -1004,7 +1014,8 @@ abstract VKContext(hl.Abstract<"vk_context">) {
 		return false;
 	}
 
-	public function setCurrent() {
+	public function setCurrent() : VkImage {
+		return null;
 	}
 
 	public function endFrame() {
@@ -1036,8 +1047,7 @@ enum abstract ShaderKind(Int) {
 @:hlNative("?sdl","vk_")
 class Vulkan {
 
-	public static function clearColorImage( r : Float, g : Float, b : Float, a : Float ) {
-	}
+	public static var ENABLE_VALIDATION = false;
 
 	public static function compileShader( source : String, fileName : String, mainFunction : String, kind : ShaderKind ) {
 		var outSize = -1;
