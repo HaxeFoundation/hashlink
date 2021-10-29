@@ -145,6 +145,10 @@ add_executable(hl
 	src/profile.c
 )
 
+if (UNIX AND NOT APPLE)
+    set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+endif()
+
 target_link_libraries(hl libhl)
 
 if(WIN32)
