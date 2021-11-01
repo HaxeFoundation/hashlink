@@ -22,7 +22,23 @@
 #include <hl.h>
 #include <stdarg.h>
 
-#ifndef HL_NATIVE_UCHAR_FUN
+static bool is_space_char( uchar c ) {
+	return c > 8 && c < 14;
+}
+
+#ifdef HL_NATIVE_UCHAR_FUN
+
+HL_PRIM double utod( const uchar *str, uchar **end ) {
+	while( is_space_char(*str) ) str++;
+	return _utod(str,end);
+}
+
+HL_PRIM int utoi( const uchar *str, uchar **end ) {
+	while( is_space_char(*str) ) str++;
+	return _utoi(str,end);
+}
+
+#else
 
 #ifdef HL_ANDROID
 #	include <android/log.h>
@@ -65,10 +81,6 @@ uchar *ustrdup( const uchar *str ) {
 	uchar *d = (uchar*)malloc(size);
 	memcpy(d,str,size);
 	return d;
-}
-
-static bool is_space_char( uchar c ) {
-	return c == ' ' || c == '\r' || c == '\n' || c == '\t';
 }
 
 double utod( const uchar *str, uchar **end ) {
