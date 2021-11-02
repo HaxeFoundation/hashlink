@@ -607,13 +607,14 @@ HL_PRIM varray* HL_NAME(win_get_monitors)() {
 	return data.arr;
 }
 
-HL_PRIM wchar_t* HL_NAME(win_get_monitor_from_window)(HWND wnd) {
+HL_PRIM vbyte* HL_NAME(win_get_monitor_from_window)(HWND wnd) {
 	HMONITOR handle = MonitorFromWindow(wnd, MONITOR_DEFAULTTOPRIMARY);
 
-	MONITORINFOEXW info;
-	info.cbSize = sizeof(MONITORINFOEXW);
-	GetMonitorInfoW(handle, (LPMONITORINFO)&info);
-	return info.szDevice;
+	MONITORINFOEX info;
+	info.cbSize = sizeof(MONITORINFOEX);
+	if (!GetMonitorInfo(handle, (LPMONITORINFO)&info))
+		return NULL;
+	return hl_copy_bytes((vbyte*)info.szDevice, (int)(wcslen(info.szDevice) + 1) * 2);
 }
 
 HL_PRIM varray* HL_NAME(win_get_display_settings)(wchar_t* device) {
