@@ -577,6 +577,8 @@ HL_API char *hl_to_utf8( const uchar *bytes );
 HL_API uchar *hl_to_utf16( const char *str );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
 HL_API hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid );
+HL_API hl_field_lookup *hl_obj_resolve_field( hl_type_obj *o, int hfield );
+HL_API void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t );
 
 HL_API int hl_hash( vbyte *name );
 HL_API int hl_hash_utf8( const char *str ); // no cache
@@ -674,6 +676,7 @@ HL_API hl_thread *hl_thread_current( void );
 HL_API void hl_thread_yield(void);
 HL_API void hl_register_thread( void *stack_top );
 HL_API void hl_unregister_thread( void );
+HL_API void hl_enter_thread_stack( int dummy );
 
 HL_API hl_mutex *hl_mutex_alloc( bool gc_thread );
 HL_API void hl_mutex_acquire( hl_mutex *l );

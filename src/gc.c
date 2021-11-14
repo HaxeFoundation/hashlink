@@ -310,6 +310,15 @@ HL_API void hl_unregister_thread() {
 	hl_mutex_release(gc_threads.global_lock);
 }
 
+/**
+ * When the calling language doesn't have a C-style stack
+ * that is scannable for GC references, this method can be called to 
+ * reset the GC thread top to something C can understand.
+ */
+HL_API void hl_enter_thread_stack( int dummy ) {
+	current_thread->stack_top = &dummy;
+}
+
 HL_API void *hl_gc_threads_info() {
 	return &gc_threads;
 }
