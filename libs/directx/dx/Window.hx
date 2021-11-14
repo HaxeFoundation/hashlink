@@ -2,15 +2,26 @@ package dx;
 import haxe.EntryPoint;
 
 private typedef WinPtr = hl.Abstract<"dx_window">;
+typedef MonitorHandle = String;
+
+typedef Monitor = {
+	name : MonitorHandle,
+	left : Int,
+	right : Int,
+	top : Int,
+	bottom : Int
+}
+
+typedef DisplaySetting = {
+	width : Int,
+	height : Int,
+	framerate : Int
+}
 
 @:enum abstract DisplayMode(Int) {
 	var Windowed = 0;
 	var Fullscreen = 1;
-	/**
-		Fullscreen not exclusive.
-	**/
 	var Borderless = 2;
-	var FullscreenResize = 3;
 }
 
 @:hlNative("directx")
@@ -24,7 +35,6 @@ class Window {
 	public static inline var RESIZABLE = 0x000002;
 
 	var win : WinPtr;
-	var savedSize : { x : Int, y : Int, width : Int, height : Int };
 	public var title(default, set) : String;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
@@ -37,6 +47,8 @@ class Window {
 	public var displayMode(default, set) : DisplayMode;
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
+	public var displaySetting : DisplaySetting;
+	public var selectedMonitor : MonitorHandle;
 	public var vsync : Bool;
 
 	public function new( title : String, width : Int, height : Int, x : Int = CW_USEDEFAULT, y : Int = CW_USEDEFAULT, windowFlags : Int = RESIZABLE ) {
@@ -52,23 +64,18 @@ class Window {
 	}
 
 	function set_displayMode(mode) {
-		if( mode == displayMode )
-			return mode;
 		displayMode = mode;
-		var fs = mode != Windowed;
-		if( savedSize == null ) {
-			if( !fs ) return mode;
-			savedSize = { x : x, y : y, width : width, height : height };
-			winSetFullscreen(win,true);
-			Driver.fullScreen = mode == Fullscreen;
-		} else {
-			Driver.fullScreen = mode == Fullscreen;
-			if( fs )
-				return mode;
+		if(mode == Windowed) {
+			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, null);
 			winSetFullscreen(win, false);
-			resize(savedSize.width, savedSize.height);
-			setPosition(savedSize.x, savedSize.y);
-			savedSize = null;
+		}
+		else if(mode == Borderless) {
+			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, null);
+			winSetFullscreen(win,true);
+		}
+		else {
+			var r = dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, displaySetting);
+			winSetFullscreen(win,true);
 		}
 		return mode;
 	}
@@ -98,6 +105,70 @@ class Window {
 
 	public function center( centerPrimary : Bool = true ) {
 		winCenter(win, centerPrimary);
+	}
+
+	public function destroy() {
+		winDestroy(win);
+		win = null;
+		windows.remove(this);
+	}
+
+	public function maximize() {
+		winResize(win, 0);
+	}
+
+	public function minimize() {
+		winResize(win, 1);
+	}
+
+	public function restore() {
+		winResize(win, 2);
+	}
+
+	public function getNextEvent( e : Event ) : Bool {
+		return winGetNextEvent(win, e);
+	}
+
+	public function clipCursor( enable : Bool ) : Void {
+		winClipCursor(enable ? win : null);
+	}
+
+	public static function getDisplaySettings(monitor : MonitorHandle) : Array<DisplaySetting> {
+		var a : Array<DisplaySetting> = [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.bytes : null)) s];
+		a.sort((a, b) -> {
+			if(b.width > a.width) 1;
+			else if(b.width < a.width) -1;
+			else if(b.height > a.height) 1;
+			else if(b.height < a.height) -1;
+			else if(b.framerate > a.framerate) 1;
+			else if(b.framerate < a.framerate) -1;
+			else 0;
+		});
+		var last = null;
+		return a.filter(function(e) {
+			if(last == null) {
+				last = e;
+				return true;
+			}
+			else if(last.width == e.width && last.height == e.height && last.framerate == e.framerate) {
+				return false;
+			}
+			last = e;
+			return true;
+		});
+	}
+
+	public static function getCurrentDisplaySetting(monitor : MonitorHandle, registry : Bool = false) : DisplaySetting {
+		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null, registry);
+	}
+
+	public static function getMonitors() : Array<Monitor> {
+		var last = null;
+		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUCS2(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
+	}
+
+	public function getCurrentMonitor() : MonitorHandle {
+		return @:privateAccess String.fromUCS2(winGetMonitorFromWindow(win));
 	}
 
 	function get_width() {
@@ -157,30 +228,29 @@ class Window {
 		return v;
 	}
 
-	public function destroy() {
-		winDestroy(win);
-		win = null;
-		windows.remove(this);
+	@:hlNative("?directx", "win_get_display_settings")
+	static function winGetDisplaySettings(monitor : hl.Bytes) : hl.NativeArray<Dynamic> {
+		return null;
 	}
 
-	public function maximize() {
-		winResize(win, 0);
+	@:hlNative("?directx", "win_get_current_display_setting")
+	static function winGetCurrentDisplaySetting(monitor : hl.Bytes, registry : Bool) : Dynamic {
+		return null;
 	}
 
-	public function minimize() {
-		winResize(win, 1);
+	@:hlNative("?directx", "win_change_display_setting")
+	public static function winChangeDisplaySetting(monitor : hl.Bytes, ds : Dynamic) : Int {
+		return 0;
 	}
 
-	public function restore() {
-		winResize(win, 2);
+	@:hlNative("?directx", "win_get_monitors")
+	static function winGetMonitors() : hl.NativeArray<Dynamic> {
+		return null;
 	}
 
-	public function getNextEvent( e : Event ) : Bool {
-		return winGetNextEvent(win, e);
-	}
-
-	public function clipCursor( enable : Bool ) : Void {
-		winClipCursor(enable ? win : null);
+	@:hlNative("?directx", "win_get_monitor_from_window")
+	static function winGetMonitorFromWindow( win : WinPtr ) : hl.Bytes {
+		return null;
 	}
 
 	static function winCreateEx( x : Int, y : Int, width : Int, height : Int, windowFlags : Int ) : WinPtr {

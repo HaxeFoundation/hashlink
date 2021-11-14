@@ -33,6 +33,8 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 
 #define HOT_RELOAD_EXTRA_GLOBALS	4096
 
+HL_API void hl_prim_not_loaded( const uchar *err );
+
 static hl_module **cur_modules = NULL;
 static int modules_count = 0;
 
@@ -265,6 +267,8 @@ static void null_function() {
 	hl_error("Null function ptr");
 }
 
+static void append_fields( char **p, hl_type *t );
+
 static void append_type( char **p, hl_type *t ) {
 	*(*p)++ = TYPE_STR[t->kind];
 	switch( t->kind ) {
@@ -281,13 +285,9 @@ static void append_type( char **p, hl_type *t ) {
 	case HNULL:
 		append_type(p,t->tparam);
 		break;
-	case HSTRUCT:
-		*(*p)++ = 'S';
 	case HOBJ:
 		{
-			int i;
-			for(i=0;i<t->obj->nfields;i++)
-				append_type(p,t->obj->fields[i].t);
+			append_fields(p, t);
 			*(*p)++ = '_';
 		}
 		break;
@@ -300,9 +300,17 @@ static void append_type( char **p, hl_type *t ) {
 	}
 }
 
+static void append_fields( char **p, hl_type *t ) {
+	int i;
+	if( t->obj->super )
+		append_fields(p, t->obj->super);
+	for(i=0;i<t->obj->nfields;i++)
+		append_type(p,t->obj->fields[i].t);
+}
+
 #define DISABLED_LIB_PTR ((void*)(int_val)2)
 
-static void *resolve_library( const char *lib ) {
+static void *resolve_library( const char *lib, bool is_opt ) {
 	char tmp[256];	
 	void *h;
 
@@ -331,7 +339,7 @@ static void *resolve_library( const char *lib ) {
 #		else
 		h = dlopen("libhl.dll",RTLD_LAZY);
 #		endif
-		if( h == NULL ) hl_fatal1("Failed to load library %s","libhl.dll");
+		if( h == NULL && !is_opt ) hl_fatal1("Failed to load library %s","libhl.dll");
 		return h;
 #	else
 		return RTLD_DEFAULT;
@@ -348,7 +356,7 @@ static void *resolve_library( const char *lib ) {
 	
 	strcpy(tmp+strlen(lib),".hdll");
 	h = dlopen(tmp,RTLD_LAZY);
-	if( h == NULL )
+	if( h == NULL && !is_opt )
 		hl_fatal1("Failed to load library %s",tmp);
 	return h;
 }
@@ -452,11 +460,14 @@ static void hl_module_init_natives( hl_module *m ) {
 	const char *curlib = NULL, *sign;
 	for(i=0;i<m->code->nnatives;i++) {
 		hl_native *n = m->code->natives + i;
+		const char *lib = n->lib;
+		bool is_opt = *lib == '?';
 		char *p = tmp;
 		void *f;
-		if( curlib != n->lib ) {
-			curlib = n->lib;
-			libHandler = resolve_library(n->lib);
+		if( is_opt ) lib++;
+		if( curlib != lib ) {
+			curlib = lib;
+			libHandler = resolve_library(lib, is_opt);
 		}
 		if( libHandler == DISABLED_LIB_PTR ) {
 			m->functions_ptrs[n->findex] = disabled_primitive;
@@ -468,8 +479,13 @@ static void hl_module_init_natives( hl_module *m ) {
 		p += strlen(n->name);
 		*p++ = 0;
 		f = dlsym(libHandler,tmp);
-		if( f == NULL )
+		if( f == NULL ) {
+			if( is_opt ) {
+				m->functions_ptrs[n->findex] = hl_prim_not_loaded;
+				continue;
+			}
 			hl_fatal2("Failed to load function %s@%s",n->lib,n->name);
+		}
 		m->functions_ptrs[n->findex] = ((void *(*)( const char **p ))f)(&sign);
 		p = tmp;
 		append_type(&p,n->t);
@@ -735,6 +751,10 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 }
 
 void hl_module_free( hl_module *m ) {
+	for(int i=0;i<m->code->nglobals;i++) {
+		if( hl_is_ptr(m->code->globals[i]) )
+			hl_remove_root(m->globals_data+m->globals_indexes[i]);
+	}
 	hl_free(&m->ctx.alloc);
 	hl_free_executable_memory(m->code, m->codesize);
 	if( m->hash ) hl_code_hash_free(m->hash);

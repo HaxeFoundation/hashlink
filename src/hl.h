@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x010B00
+#define HL_VERSION	0x010C00
 
 #if defined(_WIN32)
 #	define HL_WIN
@@ -224,8 +224,8 @@ typedef wchar_t	uchar;
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
 HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
-#	define utod(s,end)	wcstod(s,end)
-#	define utoi(s,end)	wcstol(s,end,10)
+#	define _utod(s,end)	wcstod(s,end)
+#	define _utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
 #	define utostr(out,size,str) wcstombs(out,str,size)
 #elif defined(HL_MAC)
@@ -247,19 +247,19 @@ typedef char16_t uchar;
 #	define USTR(str)	u##str
 #endif
 
-#ifndef HL_NATIVE_UCHAR_FUN
 C_FUNCTION_BEGIN
-HL_API int ustrlen( const uchar *str );
-HL_API uchar *ustrdup( const uchar *str );
 HL_API double utod( const uchar *str, uchar **end );
 HL_API int utoi( const uchar *str, uchar **end );
+#ifndef HL_NATIVE_UCHAR_FUN
+HL_API int ustrlen( const uchar *str );
+HL_API uchar *ustrdup( const uchar *str );
 HL_API int ucmp( const uchar *a, const uchar *b );
 HL_API int utostr( char *out, int out_size, const uchar *str );
 HL_API int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
 HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
 HL_API void uprintf( const uchar *fmt, const uchar *str );
-C_FUNCTION_END
 #endif
+C_FUNCTION_END
 
 #if defined(HL_VCC)
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
@@ -285,6 +285,11 @@ C_FUNCTION_END
 			    ".long 0b;" \
 			    ".popsection")
 #	endif
+#elif defined(HL_MAC)
+#include <signal.h>
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			raise(SIGTRAP);//__builtin_trap();
 #else
 #	define hl_debug_break()
 #endif
@@ -482,7 +487,7 @@ typedef struct _vclosure {
 	void *fun;
 	int hasValue;
 #	ifdef HL_64
-	int __pad;
+	int stackCount;
 #	endif
 	void *value;
 } vclosure;
@@ -523,7 +528,9 @@ struct hl_runtime_obj {
 	vdynamic *(*getFieldFun)( vdynamic *obj, int hfield );
 	// relative
 	int nlookup;
+	int ninterfaces;
 	hl_field_lookup *lookup;
+	int *interfaces;
 };
 
 typedef struct {
@@ -746,7 +753,7 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 // ----------------------- FFI ------------------------------------------------------
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsilfdbBDPOATR??X?N"
+#define TYPE_STR	"vcsilfdbBDPOATR??X?N?S"
 
 #undef  _VOID
 #define _NO_ARG
@@ -768,6 +775,7 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #define _ABSTRACT(name)				"X" #name "_"
 #undef _NULL
 #define _NULL(t)					"N" t
+#define _STRUCT						"S"
 
 #undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)
@@ -829,6 +837,7 @@ HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
 HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
 HL_API void hl_sys_init(void **args, int nargs, void *hlfile);
 HL_API void hl_setup_callbacks(void *sc, void *gw);
+HL_API void hl_setup_callbacks2(void *sc, void *gw, int flags);
 HL_API void hl_setup_reload_check( void *freload, void *param );
 
 #include <setjmp.h>
@@ -855,6 +864,8 @@ struct _hl_trap_ctx {
 #define HL_TRACK_DYNCALL	8
 #define HL_TRACK_MASK		(HL_TRACK_ALLOC | HL_TRACK_CAST | HL_TRACK_DYNFIELD | HL_TRACK_DYNCALL)
 
+#define HL_MAX_EXTRA_STACK 64
+
 typedef struct {
 	int thread_id;
 	// gc vars
@@ -871,6 +882,8 @@ typedef struct {
 	// extra
 	jmp_buf gc_regs;
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
+	void *extra_stack_data[HL_MAX_EXTRA_STACK];
+	int extra_stack_size;
 } hl_thread_info;
 
 HL_API hl_thread_info *hl_get_thread();

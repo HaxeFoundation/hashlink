@@ -12,10 +12,12 @@ jobs:
     variables:
       ${{ if endsWith(parameters.cmakeGenerator, 'Win64') }}:
         MARCH: 64
+        FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
       ${{ if not(endsWith(parameters.cmakeGenerator, 'Win64')) }}:
         MARCH: 32
+        FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
     steps:
-      - ${{ if eq(parameters.vmImage, 'vs2015-win2012r2') }}:
+      - ${{ if eq(parameters.vmImage, 'vs2017-win2016') }}:
         - powershell: |
             Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
             Write-Host "##vso[task.prependpath]C:\ProgramData\chocolatey\bin"
@@ -33,7 +35,7 @@ jobs:
           Remove-Item openal.zip
         displayName: Install openal
       - powershell: |
-          Invoke-WebRequest https://ffmpeg.zeranoe.com/builds/win$(MARCH)/dev/ffmpeg-3.4.2-win$(MARCH)-dev.zip -OutFile ffmpeg.zip
+          Invoke-WebRequest $(FFMPEG_URL) -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath .
           Move-Item ffmpeg-* include/ffmpeg
           Remove-Item ffmpeg.zip
@@ -61,10 +63,10 @@ jobs:
           displayName: Test
         - script: cmake --build . --config ${{ parameters.cmakeConfig }} --target PACKAGE
           displayName: Package binaries
-        - task: PublishPipelineArtifact@0
+        - task: PublishPipelineArtifact@1
           inputs:
             artifactName: ${{ parameters.name }}Binaries
-            targetPath: bin/hashlink-1.10.0-win$(MARCH).zip
+            targetPath: bin/hashlink-1.12.0-win$(MARCH).zip
       - ${{ if eq(parameters.buildSystem, 'vs') }}:
         - task: MSBuild@1
           inputs:

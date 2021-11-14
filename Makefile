@@ -3,11 +3,15 @@ LBITS := $(shell getconf LONG_BIT)
 MARCH ?= $(LBITS)
 PREFIX ?= /usr/local
 INSTALL_DIR ?= $(PREFIX)
+INSTALL_BIN_DIR ?= $(PREFIX)/bin
+INSTALL_LIB_DIR ?= $(PREFIX)/lib
+INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
 LIBS=fmt sdl ssl openal ui uv mysql
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
+EXTRA_LFLAGS ?=
 LIBFLAGS =
 HLFLAGS = -ldl
 LIBEXT = so
@@ -66,7 +70,7 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(MARCH) -I /usr/local/opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH) -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include/SDL2 -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
 
 ifdef OSX_SDK
@@ -80,6 +84,10 @@ LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 RELEASE_NAME = osx
+
+# Mac native debug
+HL_DEBUG = include/mdbg/mdbg.o include/mdbg/mach_excServer.o include/mdbg/mach_excUser.o
+LIB += ${HL_DEBUG}
 
 else
 
@@ -111,18 +119,18 @@ endif
 all: libhl hl libs
 
 install:
-	mkdir -p $(INSTALL_DIR)
-	mkdir -p $(INSTALL_DIR)/bin
-	mkdir -p $(INSTALL_DIR)/lib
-	mkdir -p $(INSTALL_DIR)/include
-	cp hl $(INSTALL_DIR)/bin
-	cp libhl.${LIBEXT} $(INSTALL_DIR)/lib
-	cp *.hdll $(INSTALL_DIR)/lib
-	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_DIR)/include
+	$(UNAME)==Darwin && make uninstall
+	mkdir -p $(INSTALL_BIN_DIR)
+	cp hl $(INSTALL_BIN_DIR)
+	mkdir -p $(INSTALL_LIB_DIR)
+	cp *.hdll $(INSTALL_LIB_DIR)
+	cp libhl.${LIBEXT} $(INSTALL_LIB_DIR)
+	mkdir -p $(INSTALL_INCLUDE_DIR)
+	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
 
 uninstall:
-	rm -f $(INSTALL_DIR)/bin/hl $(INSTALL_DIR)/lib/libhl.${LIBEXT} $(INSTALL_DIR)/lib/*.hdll
-	rm -f $(INSTALL_DIR)/include/hl.h $(INSTALL_DIR)/include/hlc.h $(INSTALL_DIR)/include/hlc_main.c
+	rm -f $(INSTALL_BIN_DIR)/hl $(INSTALL_LIB_DIR)/libhl.${LIBEXT} $(INSTALL_LIB_DIR)/*.hdll
+	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
 
 libs: $(LIBS)
 
@@ -133,10 +141,10 @@ libhl-jit: ${LIBHL_JIT} libhl
 	${CC} -o libhl-jit.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIBHL_JIT} ${LFLAGS} ${HLFLAGS}
 
 hlc: ${BOOT}
-	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
+	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}
 
 hl: ${HL} libhl
-	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
+	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
 
 fmt: ${FMT} libhl
 	${CC} ${CFLAGS} -I include/mikktspace -I include/minimp3 -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
@@ -158,14 +166,14 @@ uv: ${UV} libhl
 
 mysql: ${MYSQL} libhl
 	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
-	
+
 mesa:
 	(cd libs/mesa && make)
 
 release: release_version release_$(RELEASE_NAME)
 
 release_version:
-	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))	
+	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))
 	rm -rf hl-$(HL_VER)
 	mkdir hl-$(HL_VER)
 	mkdir hl-$(HL_VER)/include
@@ -181,15 +189,15 @@ HLPACK=dx
 else
 HLPACK=$(HLIB)
 endif
-	
+
 release_haxelib_package:
 	rm -rf $(HLIB)_release
 	mkdir $(HLIB)_release
 	(cd libs/$(HLIB) && cp -R $(HLPACK) *.h *.c* haxelib.json ../../$(HLIB)_release | true)
 	zip -r $(HLIB).zip $(HLIB)_release
 	haxelib submit $(HLIB).zip
-	rm -rf $(HLIB)_release	
-	
+	rm -rf $(HLIB)_release
+
 release_win:
 	(cd x64/ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
 	cp c:/windows/system32/msvcr120.dll hl-$(HL_VER)
@@ -208,13 +216,22 @@ release_osx:
 	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
 	rm -rf hl-$(HL_VER)
 
+codesign_osx:
+	sudo security delete-identity -c hl-cert || echo
+	echo "[req]\ndistinguished_name=codesign_dn\n[codesign_dn]\ncommonName=hl-cert\n[v3_req]\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning" > openssl.cnf
+	openssl req -x509 -newkey rsa:4096 -keyout key.pem -nodes -days 365 -subj '/CN=hl-cert' -outform der -out cert.cer -extensions v3_req -config openssl.cnf
+	sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain cert.cer
+	sudo security import key.pem -k /Library/Keychains/System.keychain -A
+	codesign --entitlements other/osx/entitlements.xml -fs hl-cert hl
+	rm key.pem cert.cer openssl.cnf
+
 .SUFFIXES : .c .o
 
 .c.o :
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${LIBHL_JIT} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${LIBHL_JIT} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
 
 clean: clean_o
 	rm -f hl hl.exe libhl-jit.$(LIBEXT) libhl.$(LIBEXT) *.hdll

@@ -2,12 +2,12 @@
 #include <hl.h>
 
 #if defined(HL_IOS) || defined (HL_TVOS)
-#	include <SDL2/SDL.h>
-#	include <SDL2/SDL_syswm.h>
+#	include <SDL.h>
+#	include <SDL_syswm.h>
 #	include <OpenGLES/ES3/gl.h>
 #	define HL_GLES
 #elif defined(HL_MAC)
-#	include <SDL2/SDL.h>
+#	include <SDL.h>
 #	include <OpenGL/gl3.h>
 #	define glBindImageTexture(...) hl_error("Not supported on OSX")
 #	define glDispatchCompute(...) hl_error("Not supported on OSX")
@@ -332,6 +332,22 @@ HL_PRIM void HL_NAME(gl_compressed_tex_image2d)( int target, int level, int inte
 
 HL_PRIM void HL_NAME(gl_compressed_tex_image3d)( int target, int level, int internalFormat, int width, int height, int depth, int border, int imageSize, vbyte *image ) {
 	glCompressedTexImage3D(target,level,internalFormat,width,height,depth,border,imageSize,image);
+}
+
+HL_PRIM void HL_NAME(gl_tex_sub_image2d)(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, vbyte *image) {
+	glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, image);
+}
+
+HL_PRIM void HL_NAME(gl_tex_sub_image3d)(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, int type, vbyte *image) {
+	glTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, image);
+}
+
+HL_PRIM void HL_NAME(gl_compressed_tex_sub_image2d)(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, vbyte *image) {
+	glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, image);
+}
+
+HL_PRIM void HL_NAME(gl_compressed_tex_sub_image3d)(int target, int level, int xoffset, int yoffset, int zoffset, int width, int height, int depth, int format, int type, vbyte *image) {
+	glCompressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, image);
 }
 
 HL_PRIM void HL_NAME(gl_generate_mipmap)( int t ) {
@@ -672,6 +688,10 @@ DEFINE_PRIM(_VOID,gl_tex_image3d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _B
 DEFINE_PRIM(_VOID,gl_tex_image2d_multisample,_I32 _I32 _I32 _I32 _I32 _BOOL);
 DEFINE_PRIM(_VOID,gl_compressed_tex_image2d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID,gl_compressed_tex_image3d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_tex_sub_image2d, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_tex_sub_image3d, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_compressed_tex_sub_image2d, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_compressed_tex_sub_image3d, _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID,gl_generate_mipmap,_I32);
 DEFINE_PRIM(_VOID,gl_delete_texture,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_blit_framebuffer,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32);

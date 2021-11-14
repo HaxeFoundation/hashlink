@@ -1,16 +1,19 @@
 package sdl;
 
-private typedef WinPtr = hl.Abstract<"sdl_window">;
+typedef WinPtr = hl.Abstract<"sdl_window">;
 private typedef GLContext = hl.Abstract<"sdl_gl">;
+typedef DisplayHandle = Null<Int>;
 
 @:enum abstract DisplayMode(Int) {
 	var Windowed = 0;
 	var Fullscreen = 1;
-	/**
-		Fullscreen not exclusive.
-	**/
 	var Borderless = 2;
-	var FullscreenResize = 3;
+}
+
+typedef DisplaySetting = {
+	width : Int,
+	height : Int,
+	framerate : Int
 }
 
 @:hlNative("sdl")
@@ -57,6 +60,8 @@ class Window {
 	public var x(get, never) : Int;
 	public var y(get, never) : Int;
 	public var displayMode(default, set) : DisplayMode;
+	public var displaySetting : DisplaySetting;
+	public var currentMonitor(get, default) : Int;
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
 
@@ -136,10 +141,12 @@ class Window {
 	}
 
 	function set_displayMode(mode) {
-		if( mode == displayMode )
-			return mode;
-		if( winSetFullscreen(win, cast mode) )
+		if( winSetFullscreen(win, mode) ) {
 			displayMode = mode;
+			if(mode == Fullscreen) {
+				try @:privateAccess sdl.Window.winSetDisplayMode(win, displaySetting.width, displaySetting.height, displaySetting.framerate) catch(_) {}
+			}
+		}
 		return displayMode;
 	}
 
@@ -216,6 +223,10 @@ class Window {
 		var y = 0;
 		winGetPosition(win, null, y);
 		return y;
+	}
+
+	function get_currentMonitor() {
+		return winDisplayHandle(win);
 	}
 
 	function set_vsync(v) {
@@ -297,6 +308,16 @@ class Window {
 		return false;
 	}
 
+	@:hlNative("?sdl", "win_set_display_mode")
+	static function winSetDisplayMode( win : WinPtr, width : Int, height : Int, framerate : Int ) {
+		return false;
+	}
+
+	@:hlNative("?sdl", "win_display_handle")
+	static function winDisplayHandle( win : WinPtr ) : Int {
+		return 0;
+	}
+
 	static function winSetSize( win : WinPtr, width : Int, height : Int ) {
 	}
 
@@ -334,5 +355,4 @@ class Window {
 
 	static function setVsync( b : Bool ) {
 	}
-
 }

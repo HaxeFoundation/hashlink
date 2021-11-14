@@ -98,6 +98,11 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	result = D3D11CreateDeviceAndSwapChain(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels + restrictLevel,maxLevels - restrictLevel,D3D11_SDK_VERSION,&desc,&d->swapchain,&d->device,&d->feature,&d->context);
 
 #ifdef HL_WIN_DESKTOP
+	if( result == E_INVALIDARG ) {
+		// disable flags not available in DX<11.1
+		flags &= ~D3D11_CREATE_DEVICE_DISABLE_GPU_TIMEOUT;
+		d->init_flags = flags;
+	}
 	if( result == DXGI_ERROR_SDK_COMPONENT_MISSING && (flags & D3D11_CREATE_DEVICE_DEBUG) != 0 ) {
 		// no debug driver available, retry
 		flags &= ~D3D11_CREATE_DEVICE_DEBUG;

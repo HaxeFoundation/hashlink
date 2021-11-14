@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 
 set(HL_VERSION_MAJOR 1)
-set(HL_VERSION_MINOR 11)
+set(HL_VERSION_MINOR 12)
 set(HL_VERSION_PATCH 0)
 set(HL_VERSION ${HL_VERSION_MAJOR}.${HL_VERSION_MINOR}.${HL_VERSION_PATCH})
 
@@ -50,6 +50,7 @@ endforeach()
 
 include_directories(
     src
+    include
     include/pcre
 )
 
@@ -79,6 +80,14 @@ file(GLOB std_srcs
     src/std/thread.c
     src/std/process.c
 )
+
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    list(APPEND std_srcs
+        include/mdbg/mdbg.c
+        include/mdbg/mach_excServer.c
+        include/mdbg/mach_excUser.c
+    )
+endif()
 
 if(ANDROID)
     list(APPEND std_srcs

@@ -156,6 +156,16 @@ HL_PRIM varray *hl_exception_stack() {
 	return a;
 }
 
+HL_PRIM int hl_exception_stack_raw( varray *arr ) {
+	hl_thread_info *t = hl_get_thread();
+	if( arr ) memcpy(hl_aptr(arr,void*), t->exc_stack_trace, t->exc_stack_count*sizeof(void*));
+	return t->exc_stack_count;
+}
+
+HL_PRIM int hl_call_stack_raw( varray *arr ) {
+	return capture_stack_func(hl_aptr(arr,void*), arr->size);
+}
+
 HL_PRIM void hl_rethrow( vdynamic *v ) {
 	hl_get_thread()->flags |= HL_EXC_RETHROW;
 	hl_throw(v);
@@ -211,6 +221,10 @@ static void _sigtrap_handler(int signum) {
 }
 #endif
 
+#ifdef HL_MAC
+	extern bool is_debugger_attached(void);
+#endif
+
 HL_PRIM bool hl_detect_debugger() {
 #	if defined(HL_WIN)
 	return (bool)IsDebuggerPresent();
@@ -221,6 +235,8 @@ HL_PRIM bool hl_detect_debugger() {
 		raise(SIGTRAP);
 	}
 	return (bool)debugger_present;
+#	elif defined(HL_MAC)
+	return is_debugger_attached();
 #	else
 	return false;
 #	endif
@@ -240,6 +256,8 @@ HL_PRIM HL_NO_OPT void hl_assert() {
 #define _SYMBOL _ABSTRACT(hl_symbol)
 
 DEFINE_PRIM(_ARR,exception_stack,_NO_ARG);
+DEFINE_PRIM(_I32,exception_stack_raw,_ARR);
+DEFINE_PRIM(_I32,call_stack_raw,_ARR);
 DEFINE_PRIM(_VOID,set_error_handler,_FUN(_VOID,_DYN));
 DEFINE_PRIM(_VOID,breakpoint,_NO_ARG);
 DEFINE_PRIM(_BYTES,resolve_symbol, _SYMBOL _BYTES _REF(_I32));
