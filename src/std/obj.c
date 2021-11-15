@@ -590,9 +590,12 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 			o->virtuals = v;
 			// recast
 			if( need_recast ) {
+				bool extra_check = vt->virt->nfields > 63;
 				for(i=0;i<vt->virt->nfields;i++)
 					if( need_recast & (((int64)1) << ((int64)i)) ) {
 						hl_obj_field *f = vt->virt->fields + i;
+						if( extra_check && hl_lookup_find(o->lookup,o->nfields,f->hashed_name) == NULL )
+							continue;
 						if( hl_is_ptr(f->t) )
 							hl_dyn_setp(obj,f->hashed_name,f->t,hl_dyn_getp(obj,f->hashed_name,f->t));
 						else if( f->t->kind == HF64 )
