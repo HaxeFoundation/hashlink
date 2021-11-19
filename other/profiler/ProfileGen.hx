@@ -175,6 +175,11 @@ class ProfileGen {
 					}
 					stack[i] = elt;
 				}
+				if( tcur.curFrame.samples.length == 100000 ) {
+					tcur.curFrame = new Frame();
+					tcur.curFrame.startTime = time;
+					tcur.frames.push(tcur.curFrame);			
+				}
 				tcur.curFrame.samples.push({ time : time, thread : tid, stack : stack });
 			} else {
 				var size = f.readInt32();
