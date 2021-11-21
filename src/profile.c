@@ -201,6 +201,8 @@ static void read_thread_data( thread_handle *t ) {
 #endif
 	int eventId = count | 0x80000000;
 	double time = hl_sys_time();
+	struct { int count; bool stop; } *gc = hl_gc_threads_info();
+	if( gc->stop ) eventId |= 0x40000000;
 	record_data(&time,sizeof(double));
 	record_data(&t->tid,sizeof(int));
 	record_data(&eventId,sizeof(int));
@@ -321,7 +323,7 @@ static void profile_dump() {
 		fwrite(&tid,1,4,f);
 		fwrite(&eventId,1,4,f);
 		if( eventId < 0 ) {
-			int count = eventId & 0x7FFFFFFF;
+			int count = eventId & 0x3FFFFFFF;
 			read_profile_data(&r,data.stackOut,sizeof(void*)*count);
 			for(i=0;i<count;i++) {
 				uchar outStr[256];
@@ -361,7 +363,7 @@ static void profile_dump() {
 		if( !read_profile_data(&r,NULL, sizeof(double) + sizeof(int)) ) break;
 		read_profile_data(&r,&eventId,sizeof(int));
 		if( eventId < 0 ) {
-			int count = eventId & 0x7FFFFFFF;
+			int count = eventId & 0x3FFFFFFF;
 			read_profile_data(&r,data.stackOut,sizeof(void*)*count);
 			for(i=0;i<count;i++) {
 				int *debug_addr = NULL;
