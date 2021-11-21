@@ -317,7 +317,7 @@ class Memory {
 		for( b in blocks ) {
 			progress++;
 			if( progress % 1000 == 0 )
-				Sys.print((Std.int(progress * 1000 / blocks.length) / 10) + "%  \r");
+				Sys.print((Std.int((progress / blocks.length) * 1000.0) / 10) + "%  \r");
 			if( b.page.memHasPtr() ) {
 				goto(b);
 				b.typePtr = readPointer();
