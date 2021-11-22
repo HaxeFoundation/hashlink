@@ -1,6 +1,6 @@
 
 class StackElement {
-	static var UID = 1;
+	static var UID = 0;
 	public var id : Int;
 	public var desc : String;
 	public var file : String;
@@ -129,6 +129,7 @@ class ProfileGen {
 		if( f.readString(4) != "PROF" ) throw "Invalid profiler file";
 		var version = f.readInt32();
 		var sampleCount = f.readInt32();
+		var gcMajor = new StackElement("GC Major");
 		var rootElt = new StackElement("(root)");
 		var hthreads = new Map();
 		var threads = [];
@@ -148,7 +149,7 @@ class ProfileGen {
 			}
 			var msgId = f.readInt32();
 			if( msgId < 0 ) {
-				var count = msgId & 0x7FFFFFFF;
+				var count = msgId & 0x3FFFFFFF;
 				var stack = [];
 				for( i in 0...count ) {
 					var file = f.readInt32();
@@ -174,6 +175,13 @@ class ProfileGen {
 						m.set(line,elt);
 					}
 					stack[i] = elt;
+				}
+				if( msgId & 0x40000000 != 0 )
+					stack.unshift(gcMajor);
+				if( tcur.curFrame.samples.length == 100000 ) {
+					tcur.curFrame = new Frame();
+					tcur.curFrame.startTime = time;
+					tcur.frames.push(tcur.curFrame);
 				}
 				tcur.curFrame.samples.push({ time : time, thread : tid, stack : stack });
 			} else {
