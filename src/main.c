@@ -240,12 +240,13 @@ int main(int argc, pchar *argv[]) {
 			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
 		hl_debug_break();
 		hl_global_free();
+		hl_unregister_thread();
 		return 1;
 	}
 	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
-	hl_unregister_thread();
 	hl_global_free();
+	hl_unregister_thread();
 	return 0;
 }
 
