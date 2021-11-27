@@ -163,6 +163,8 @@ HL_PRIM int hl_exception_stack_raw( varray *arr ) {
 }
 
 HL_PRIM int hl_call_stack_raw( varray *arr ) {
+	if( !arr )
+		return capture_stack_func(NULL,0);
 	return capture_stack_func(hl_aptr(arr,void*), arr->size);
 }
 
