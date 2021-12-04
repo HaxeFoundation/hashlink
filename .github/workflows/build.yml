@@ -22,12 +22,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: linux-i386
-            runner: ubuntu-18.04
-            haxe_latest_dist: linux64/haxe_latest.tar.gz
+          # cannot build 32 bit binaries anymore:
+          # a) ubuntu-18.04 only supprots GLIBC 2.27 but 2.29 is required: https://www.digitalocean.com/community/questions/how-install-glibc-2-29-or-higher-in-ubuntu-18-04
+          # b) ubuntu-20.04 does no longer provide i386 packages
+          #- target: linux-i386
+          #  runner: ubuntu-18.04
+          #  haxe_latest_dist: linux64/haxe_latest.tar.gz
 
           - target: linux-amd64
-            runner: ubuntu-18.04
+            runner: ubuntu-20.04
             haxe_latest_dist: linux64/haxe_latest.tar.gz
 
           - target: darwin
@@ -39,8 +42,9 @@ jobs:
             #runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
+            msbuild_Configuration: ReleaseVS2017
             msbuild_Platform: Win32
-            msbuild_PlatformToolset: v140
+            msbuild_PlatformToolset: v141
             msbuild_WindowsTargetPlatformVersion: 8.1
 
           - target: win64
@@ -48,8 +52,9 @@ jobs:
             #runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
+            msbuild_Configuration: ReleaseVS2017
             msbuild_Platform: x64
-            msbuild_PlatformToolset: v140
+            msbuild_PlatformToolset: v141
             msbuild_WindowsTargetPlatformVersion: 8.1
 
     steps:
@@ -148,7 +153,8 @@ jobs:
           echo "HAXE_STD_PATH=$(cygpath -w '/tmp/haxe/std')" >> $GITHUB_ENV
         else
           mkdir /tmp/haxe
-          curl -fsSL --retry 3 --retry-delay 5 "$download_url" | tar xzv -C /tmp/haxe --strip-components=1
+          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.tar.gz
+          tar xzvf /tmp/haxe.tar.gz -C /tmp/haxe --strip-components=1
           echo "/tmp/haxe/" >> $GITHUB_PATH
           echo "HAXE_STD_PATH=/tmp/haxe/std" >> $GITHUB_ENV
         fi
@@ -183,8 +189,8 @@ jobs:
             ;;
 
           win*)
-            MSBuild.exe hl.sln //nologo //clp:ErrorsOnly \
-              //p:Configuration=Release \
+            MSBuild.exe hl.sln //nologo //m //clp:ErrorsOnly \
+              //p:Configuration=${{ matrix.msbuild_Configuration }} \
               //p:Platform=${{ matrix.msbuild_Platform }} \
               //p:PlatformToolset=${{ matrix.msbuild_PlatformToolset }} \
               //p:WindowsTargetPlatformVersion=${{ matrix.msbuild_WindowsTargetPlatformVersion }} 
@@ -200,10 +206,10 @@ jobs:
 
         case "${{ matrix.target }}" in
           win32)
-            Release/hl.exe --version
+            ${{ matrix.msbuild_Configuration }}/hl.exe --version
             ;;
           win64)
-            x64/Release/hl.exe --version
+            x64/${{ matrix.msbuild_Configuration }}/hl.exe --version
             ;;
           *)
             ./hl --version
@@ -247,14 +253,14 @@ jobs:
             ;;
 
           win32)
-            cp Release/*.{dll,exe,lib,hdll} $dist_folder/
+            cp ${{ matrix.msbuild_Configuration }}/*.{dll,exe,lib,hdll} $dist_folder/
             cp /c/Windows/System32/msvcr120.dll $dist_folder/
             cp include/openal/bin/Win32/soft_oal.dll $dist_folder/OpenAL32.dll
             cp include/sdl/lib/x86/SDL2.dll $dist_folder/
             ;;
 
           win64)
-            cp x64/Release/*.{dll,exe,lib,hdll} $dist_folder/
+            cp x64/${{ matrix.msbuild_Configuration }}/*.{dll,exe,lib,hdll} $dist_folder/
             cp /c/Windows/System32/msvcr120.dll $dist_folder/
             cp include/openal/bin/Win64/soft_oal.dll $dist_folder/OpenAL32.dll
             cp include/sdl/lib/x64/SDL2.dll $dist_folder/
