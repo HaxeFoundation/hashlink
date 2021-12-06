@@ -182,17 +182,13 @@
 #else
 #	define C_FUNCTION_BEGIN
 #	define C_FUNCTION_END
-#	ifndef true
-#		define true 1
-#		define false 0
-		typedef unsigned char bool;
-#	endif
 #endif
 
 typedef intptr_t int_val;
 typedef long long int64;
 typedef unsigned long long uint64;
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <memory.h>

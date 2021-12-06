@@ -116,7 +116,7 @@ static void hl_debug_loop( hl_module *m ) {
 	debugger_stopped = true;
 }
 
-bool hl_module_debug( hl_module *m, int port, bool wait ) {
+h_bool hl_module_debug( hl_module *m, int port, h_bool wait ) {
 	hl_socket *s;
 	hl_socket_init();
 	s = hl_socket_new(false);
