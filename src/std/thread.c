@@ -19,6 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
 #include <hl.h>
 
 #if !defined(HL_THREADS)
@@ -187,7 +188,7 @@ DEFINE_PRIM(_VOID, mutex_free, _MUTEX);
 
 // ------------------ SEMAPHORE
 
-HL_API hl_semaphore *hl_semaphore_alloc(int value) {
+HL_PRIM hl_semaphore *hl_semaphore_alloc(int value) {
 #	if !defined(HL_THREADS)
 	static struct _hl_semaphore null_semaphore = {0};
 	return (hl_condition *)&null_semaphore;
@@ -210,7 +211,7 @@ HL_API hl_semaphore *hl_semaphore_alloc(int value) {
 #	endif
 }
 
-HL_API void hl_semaphore_acquire(hl_semaphore *sem) {
+HL_PRIM void hl_semaphore_acquire(hl_semaphore *sem) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	WaitForSingleObject(sem->sem, INFINITE);
@@ -223,7 +224,7 @@ HL_API void hl_semaphore_acquire(hl_semaphore *sem) {
 #	endif
 }
 
-HL_API bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
+HL_PRIM bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	return WaitForSingleObject(sem->sem,
@@ -232,7 +233,7 @@ HL_API bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
 #	else
 #	ifdef __APPLE__
 	return dispatch_semaphore_wait(
-	           sem, dispatch_time(DISPATCH_TIME_NOW,
+	           sem->sem, dispatch_time(DISPATCH_TIME_NOW,
 	                              (int64_t)((timeout ? timeout->v.d : 0) *
 	                                        1000 * 1000 * 1000))) == 0;
 #	else
@@ -258,20 +259,20 @@ HL_API bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
 #	endif
 }
 
-HL_API void hl_semaphore_release(hl_semaphore *sem) {
+HL_PRIM void hl_semaphore_release(hl_semaphore *sem) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	ReleaseSemaphore(sem->sem, 1, NULL);
 #	else
 #	ifdef __APPLE__
-	dispatch_semaphore_signal(&sem->sem);
+	dispatch_semaphore_signal(sem->sem);
 #	else
 	sem_post(&sem->sem);
 #	endif
 #	endif
 }
 
-HL_API void hl_semaphore_free(hl_semaphore *sem) {
+HL_PRIM void hl_semaphore_free(hl_semaphore *sem) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	if (sem->free) {
@@ -280,7 +281,9 @@ HL_API void hl_semaphore_free(hl_semaphore *sem) {
 	}
 #	else
 	if (sem->free) {
+#ifndef __APPLE__
 		sem_destroy(&sem->sem);
+#endif
 		sem->free = NULL;
 	}
 #	endif
@@ -294,7 +297,7 @@ DEFINE_PRIM(_VOID, semaphore_release, _SEMAPHORE);
 DEFINE_PRIM(_VOID, semaphore_free, _SEMAPHORE);
 // ------------------ CONDITION
 
-HL_API hl_condition *hl_condition_alloc() {
+HL_PRIM hl_condition *hl_condition_alloc() {
 #	if !defined(HL_THREADS)
 	static struct _hl_condition null_condition = {0};
 	return (hl_condition *)&null_condition;
@@ -321,7 +324,7 @@ HL_API hl_condition *hl_condition_alloc() {
 	return cond;
 #	endif
 }
-HL_API void hl_condition_acquire(hl_condition *cond) {
+HL_PRIM void hl_condition_acquire(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	EnterCriticalSection(&cond->cs);
@@ -330,7 +333,7 @@ HL_API void hl_condition_acquire(hl_condition *cond) {
 #	endif
 }
 
-HL_API bool hl_condition_try_acquire(hl_condition *cond) {
+HL_PRIM bool hl_condition_try_acquire(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	return (bool)TryEnterCriticalSection(&cond->cs);
@@ -339,7 +342,7 @@ HL_API bool hl_condition_try_acquire(hl_condition *cond) {
 #	endif
 }
 
-HL_API void hl_condition_release(hl_condition *cond) {
+HL_PRIM void hl_condition_release(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	LeaveCriticalSection(&cond->cs);
@@ -347,7 +350,7 @@ HL_API void hl_condition_release(hl_condition *cond) {
 	pthread_mutex_unlock(&cond->mutex);
 #	endif
 }
-HL_API void hl_condition_wait(hl_condition *cond) {
+HL_PRIM void hl_condition_wait(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	SleepConditionVariableCS(&cond->cond, &cond->cs, INFINITE);
@@ -356,7 +359,7 @@ HL_API void hl_condition_wait(hl_condition *cond) {
 #	endif
 }
 
-HL_API bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
+HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	SleepConditionVariableCS(&cond->cond, &cond->cs,
@@ -378,7 +381,7 @@ HL_API bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 #	endif
 }
 
-HL_API void hl_condition_signal(hl_condition *cond) {
+HL_PRIM void hl_condition_signal(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	WakeConditionVariable(&cond->cond);
@@ -386,7 +389,7 @@ HL_API void hl_condition_signal(hl_condition *cond) {
 	pthread_cond_signal(&cond->cond);
 #	endif
 }
-HL_API void hl_condition_broadcast(hl_condition *cond) {
+HL_PRIM void hl_condition_broadcast(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	WakeAllConditionVariable(&cond->cond);
@@ -394,7 +397,7 @@ HL_API void hl_condition_broadcast(hl_condition *cond) {
 	pthread_cond_broadcast(&cond->cond);
 #	endif
 }
-HL_API void hl_condition_free(hl_condition *cond) {
+HL_PRIM void hl_condition_free(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
 	if (cond->free) {
@@ -534,7 +537,7 @@ static void hl_deque_free( hl_deque *q ) {
 #	endif
 }
 
-HL_API hl_deque *hl_deque_alloc() {
+HL_PRIM hl_deque *hl_deque_alloc() {
 	hl_deque *q = (hl_deque*)hl_gc_alloc_finalizer(sizeof(hl_deque));
 	q->free = hl_deque_free;
 	q->first = NULL;
@@ -551,7 +554,7 @@ HL_API hl_deque *hl_deque_alloc() {
 	return q;
 }
 
-HL_API void hl_deque_add( hl_deque *q, vdynamic *msg ) {
+HL_PRIM void hl_deque_add( hl_deque *q, vdynamic *msg ) {
 	tqueue *t = (tqueue*)hl_gc_alloc_raw(sizeof(tqueue));
 	t->msg = msg;
 	t->next = NULL;
@@ -565,7 +568,7 @@ HL_API void hl_deque_add( hl_deque *q, vdynamic *msg ) {
 	UNLOCK(q->lock);
 }
 
-HL_API void hl_deque_push( hl_deque *q, vdynamic *msg ) {
+HL_PRIM void hl_deque_push( hl_deque *q, vdynamic *msg ) {
 	tqueue *t = (tqueue*)hl_gc_alloc_raw(sizeof(tqueue));
 	t->msg = msg;
 	LOCK(q->lock);
@@ -577,7 +580,7 @@ HL_API void hl_deque_push( hl_deque *q, vdynamic *msg ) {
 	UNLOCK(q->lock);
 }
 
-HL_API vdynamic *hl_deque_pop( hl_deque *q, bool block ) {
+HL_PRIM vdynamic *hl_deque_pop( hl_deque *q, bool block ) {
 	vdynamic *msg;
 	hl_blocking(true);
 	LOCK(q->lock);
