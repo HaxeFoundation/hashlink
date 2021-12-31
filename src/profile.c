@@ -427,6 +427,9 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 			hl_profile_setup( ptr ? utoi((uchar*)ptr,&end) : 1000);
 		}
 		break;
+	case -8:
+		hl_get_thread()->flags |= HL_THREAD_INVISIBLE;
+		break;
 	default:
 		if( code < 0 ) return;
 		if( data.profiling_pause || (code != 0 && (hl_get_thread()->flags & HL_THREAD_PROFILER_PAUSED)) ) return;

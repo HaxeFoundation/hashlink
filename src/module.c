@@ -142,16 +142,23 @@ int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out
 #if defined(HL_64) && defined(HL_WIN)
 			void *module_addr = *stack_ptr++; // EIP
 			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-				if( count == size ) break;
-				out[count++] = module_addr;
+				if( out ) {
+					if( count == size ) break;
+					out[count++] = module_addr;
+				} else
+					count++;
 			}
 #else
 			void *stack_addr = *stack_ptr++; // EBP
 			if( stack_addr > stack_bottom && stack_addr < stack_top ) {
 				void *module_addr = *stack_ptr; // EIP
 				if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-					if( count == size ) break;
-					out[count++] = module_addr;
+					if( out ) {
+						if( count == size ) break;
+						out[count++] = module_addr;
+					} else {
+						count++;
+					}
 				}
 			}
 #endif
@@ -172,7 +179,7 @@ int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out
 					unsigned char *code = m->jit_code;
 					int code_size = m->codesize;
 					if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-						if( count == size ) {
+						if( out && count == size ) {
 							stack_ptr = stack_top;
 							break;
 						}
@@ -182,7 +189,10 @@ int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out
 							code_size -= s;
 							if( module_addr < (void*)code || module_addr >= (void*)(code + code_size) ) continue;
 						}
-						out[count++] = module_addr;
+						if( out )							
+							out[count++] = module_addr;
+						else
+							count++;
 						break;
 					}
 				}

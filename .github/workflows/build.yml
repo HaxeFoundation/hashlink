@@ -1,0 +1,351 @@
+# https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    # https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+
+  ###########################################################
+  build:
+  ###########################################################
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # cannot build 32 bit binaries anymore:
+          # a) ubuntu-18.04 only supprots GLIBC 2.27 but 2.29 is required: https://www.digitalocean.com/community/questions/how-install-glibc-2-29-or-higher-in-ubuntu-18-04
+          # b) ubuntu-20.04 does no longer provide i386 packages
+          #- target: linux-i386
+          #  runner: ubuntu-18.04
+          #  haxe_latest_dist: linux64/haxe_latest.tar.gz
+
+          - target: linux-amd64
+            runner: ubuntu-20.04
+            haxe_latest_dist: linux64/haxe_latest.tar.gz
+
+          - target: darwin
+            runner: macos-10.15
+            haxe_latest_dist: mac/haxe_latest.tar.gz
+
+          - target: win32
+            runner: windows-2016  # has VS2017 preinstalled which supports PlatformToolset <= v141, WindowsTargetPlatformVersion 8.1
+            #runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
+            haxe_latest_dist: windows64/haxe_latest.zip
+            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
+            msbuild_Configuration: ReleaseVS2017
+            msbuild_Platform: Win32
+            msbuild_PlatformToolset: v141
+            msbuild_WindowsTargetPlatformVersion: 8.1
+
+          - target: win64
+            runner: windows-2016  # has VS2017 preinstalled which supports PlatformToolset <= v141, WindowsTargetPlatformVersion 8.1
+            #runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
+            haxe_latest_dist: windows64/haxe_latest.zip
+            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
+            msbuild_Configuration: ReleaseVS2017
+            msbuild_Platform: x64
+            msbuild_PlatformToolset: v141
+            msbuild_WindowsTargetPlatformVersion: 8.1
+
+    steps:
+    - name: "SCM Checkout" 
+      uses: actions/checkout@v2
+
+    - name: Add msbuild to PATH
+      if: startsWith(matrix.target, 'win')
+      uses: microsoft/setup-msbuild@v1.0.3
+
+    - name: "Install: Required Dev Packages"
+      run: |
+        set -eux
+
+        case "${{ matrix.target }}" in
+          linux-i386)
+            echo "MARCH=32" >> $GITHUB_ENV
+            sudo dpkg --add-architecture i386
+            sudo apt-get update -y
+            sudo apt-get install --no-install-recommends -y \
+              gcc-multilib \
+              libalut-dev:i386 \
+              libmbedtls-dev:i386 \
+              libopenal-dev:i386 \
+              libpng-dev:i386 \
+              libsdl2-dev:i386 \
+              libturbojpeg0-dev:i386 \
+              libuv1-dev:i386 \
+              libvorbis-dev:i386 \
+              libz-dev:i386 \
+              zlib1g-dev:i386
+            ;;
+
+          linux-amd64)
+            echo "MARCH=64" >> $GITHUB_ENV
+            sudo apt-get update -y
+            sudo apt-get install --no-install-recommends -y \
+              libmbedtls-dev \
+              libopenal-dev \
+              libpng-dev \
+              libsdl2-dev \
+              libturbojpeg-dev \
+              libuv1-dev \
+              libvorbis-dev
+            ;;
+
+          darwin*)
+            brew update
+            brew bundle
+            ;;
+
+          win*)
+            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/sdl.zip https://www.libsdl.org/release/SDL2-devel-2.0.5-VC.zip
+            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/openal.zip https://openal-soft.org/openal-binaries/openal-soft-1.17.2-bin.zip
+            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/ffmpeg.zip ${{ matrix.ffmpeg_url }}
+            7z x /tmp/sdl.zip    -oinclude; mv include/SDL2*   include/sdl
+            7z x /tmp/openal.zip -oinclude; mv include/openal* include/openal
+            7z x /tmp/ffmpeg.zip -oinclude; mv include/ffmpeg* include/ffmpeg
+            ;;
+        esac
+
+
+    - name: "Install: Neko"
+      run: |
+        set -eux
+
+        case "${{ matrix.target }}" in
+          linux*)
+            sudo apt-get install --no-install-recommends -y neko
+            ;;
+
+          darwin*)
+            brew install neko
+            ;;
+
+          win*)
+            choco install --no-progress neko -y
+            nekopath=$(find C:/ProgramData/chocolatey/lib/neko -name neko.dll -printf '%h\n')
+            echo "NEKOPATH=$nekopath" >> $GITHUB_ENV
+            ;;
+        esac
+        neko || true # print neko version
+
+
+    - name: "Install: Haxe latest"
+      run: |
+        set -eux
+
+        download_url="https://build.haxe.org/builds/haxe/${{ matrix.haxe_latest_dist }}"
+        echo "Downloading [$download_url]..."
+        if [[ ${{ matrix.target }} == win* ]]; then
+          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.zip
+          7z x /tmp/haxe.zip -o/tmp
+          mv -v /tmp/haxe_* /tmp/haxe
+          cygpath -w '/tmp/haxe/' >> $GITHUB_PATH
+          echo "HAXE_STD_PATH=$(cygpath -w '/tmp/haxe/std')" >> $GITHUB_ENV
+        else
+          mkdir /tmp/haxe
+          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.tar.gz
+          tar xzvf /tmp/haxe.tar.gz -C /tmp/haxe --strip-components=1
+          echo "/tmp/haxe/" >> $GITHUB_PATH
+          echo "HAXE_STD_PATH=/tmp/haxe/std" >> $GITHUB_ENV
+        fi
+
+        /tmp/haxe/haxe --version
+
+
+    - name: "Configure: Haxelib"
+      run: |
+        set -eux
+
+        haxelib setup ~/haxelib
+        haxelib install hashlink
+        haxelib list
+
+
+    - name: "Build: HashLink"
+      run: |
+        set -eux
+
+        case "${{ matrix.target }}" in
+          linux*)
+            make
+            sudo make install
+            sudo ldconfig
+            ;;
+
+          darwin*)
+            make
+            sudo make codesign_osx
+            sudo make install
+            ;;
+
+          win*)
+            MSBuild.exe hl.sln //nologo //m //clp:ErrorsOnly \
+              //p:Configuration=${{ matrix.msbuild_Configuration }} \
+              //p:Platform=${{ matrix.msbuild_Platform }} \
+              //p:PlatformToolset=${{ matrix.msbuild_PlatformToolset }} \
+              //p:WindowsTargetPlatformVersion=${{ matrix.msbuild_WindowsTargetPlatformVersion }} 
+            ;;
+        esac
+
+        ls -l .
+
+
+    - name: "Test"
+      run: |
+        set -eux
+
+        case "${{ matrix.target }}" in
+          win32)
+            ${{ matrix.msbuild_Configuration }}/hl.exe --version
+            ;;
+          win64)
+            x64/${{ matrix.msbuild_Configuration }}/hl.exe --version
+            ;;
+          *)
+            ./hl --version
+            case ${{ matrix.target }} in
+              linux*)  ldd -v ./hl ;;
+              darwin*) otool -L ./hl ;;
+            esac
+
+            haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
+            ./hl hello.hl
+
+            haxe -hl src/_main.c -cp other/tests -main HelloWorld
+            make hlc
+            ./hlc
+        esac
+
+
+    - name: "Package"
+      run: |
+        set -eux
+
+        dist_folder=hashlink-$(git rev-parse --short $GITHUB_SHA)-${{ matrix.target }}
+
+        #
+        # Collect files for the distribution
+        #
+        mkdir -p $dist_folder/include
+        cp src/hl.h $dist_folder/include
+        cp src/hlc.h $dist_folder/include
+        cp src/hlc_main.c $dist_folder/include
+
+        case "${{ matrix.target }}" in
+          linux*)
+            cp hl $dist_folder/
+            cp *.{hdll,so} $dist_folder/
+            ;;
+
+          darwin*)
+            cp hl $dist_folder/
+            cp *.{hdll,dylib} $dist_folder/
+            ;;
+
+          win32)
+            cp ${{ matrix.msbuild_Configuration }}/*.{dll,exe,lib,hdll} $dist_folder/
+            cp /c/Windows/System32/msvcr120.dll $dist_folder/
+            cp include/openal/bin/Win32/soft_oal.dll $dist_folder/OpenAL32.dll
+            cp include/sdl/lib/x86/SDL2.dll $dist_folder/
+            ;;
+
+          win64)
+            cp x64/${{ matrix.msbuild_Configuration }}/*.{dll,exe,lib,hdll} $dist_folder/
+            cp /c/Windows/System32/msvcr120.dll $dist_folder/
+            cp include/openal/bin/Win64/soft_oal.dll $dist_folder/OpenAL32.dll
+            cp include/sdl/lib/x64/SDL2.dll $dist_folder/
+            ;;
+        esac
+
+        #
+        # Create the tar.gz/zip
+        #
+        case "${{ matrix.target }}" in
+          win*)
+            # 7z switches: https://sevenzip.osdn.jp/chm/cmdline/switches/
+            7z a -spf -y -mx9 -bt hashlink-latest-${{ matrix.target }}.zip $dist_folder
+            echo "HASHLINK_DISTRIBUTION=hashlink-latest-${{ matrix.target }}.zip" >> $GITHUB_ENV
+            ;;
+
+          *)
+            tar cvfz hashlink-latest-${{ matrix.target }}.tar.gz $dist_folder
+            echo "HASHLINK_DISTRIBUTION=hashlink-latest-${{ matrix.target }}.tar.gz" >> $GITHUB_ENV
+            ;;
+        esac
+
+    - name: "Share: build artifact"
+      uses: actions/upload-artifact@v2
+      with:
+        path: ${{ env.HASHLINK_DISTRIBUTION }}
+
+
+  ###########################################################
+  publish-latest-release:
+  ###########################################################
+    runs-on: ubuntu-latest
+    needs: 
+      - build
+    if: github.ref == 'refs/heads/master'
+    concurrency: publish-latest-release # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idconcurrency
+
+    steps:
+
+    - name: "SCM Checkout" 
+      # only required by "hub release create" to prevent "fatal: Not a git repository"
+      uses: actions/checkout@v2
+
+    - name: "Get: all build artifacts"
+      uses: actions/download-artifact@v2
+
+    - name: "Delete previous 'latest' release"
+      run: |
+        set -eu
+
+        api_base_url="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
+
+        # delete 'latest' github release
+        release_id=$(curl -fsL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/$GITHUB_REPOSITORY/releases | jq -r '.[] | select(.name == "latest") | .id')
+        if [[ -n $release_id ]]; then
+           echo "Deleting release [$api_base_url/releases/$release_id]..."
+           curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -fsSL -X DELETE "$api_base_url/releases/$release_id"
+        fi
+
+        # delete 'latest' git tag
+        tag_url="$api_base_url/git/refs/tags/latest"
+        if curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -fsLo /dev/null --head "$tag_url"; then
+           echo "Deleting tag [$tag_url]..."
+           curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -fsSL -X DELETE "$tag_url"
+        fi
+
+    - name: "Create 'latest' Release"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -eux
+
+        # https://hub.github.com/hub-release.1.html
+        hub release create "latest" \
+          --prerelease \
+          --message "latest" \
+          --attach "artifact/hashlink-latest-darwin.tar.gz" \
+          --attach "artifact/hashlink-latest-linux-amd64.tar.gz" \
+          --attach "artifact/hashlink-latest-win32.zip" \
+          --attach "artifact/hashlink-latest-win64.zip"
+          #--attach "artifact/hashlink-latest-linux-i386.tar.gz"
+
+    - name: "Delete intermediate build artifacts"
+      uses: geekyeggo/delete-artifact@1-glob-support # https://github.com/GeekyEggo/delete-artifact/
+      with:
+        name: "*"
+        useGlob: true
+        failOnError: false

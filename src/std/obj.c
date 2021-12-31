@@ -1027,6 +1027,8 @@ HL_PRIM vdynamic *hl_obj_get_field( vdynamic *obj, int hfield ) {
 }
 
 HL_PRIM void hl_obj_set_field( vdynamic *obj, int hfield, vdynamic *v ) {
+	if( obj == NULL )
+		hl_error("Null access");
 	if( v == NULL ) {
 		hl_dyn_setp(obj,hfield,&hlt_dyn,NULL);
 		return;

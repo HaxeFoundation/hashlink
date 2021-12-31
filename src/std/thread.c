@@ -19,6 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
 #include <hl.h>
 
 #if !defined(HL_THREADS)
@@ -26,6 +27,14 @@
 struct _hl_mutex {
 	void (*free)( hl_mutex * );
 	void *_unused;
+};
+
+struct _hl_semaphore {
+  void (*free)(hl_semaphore *);
+};
+
+struct _hl_condition {
+  void (*free)(hl_condition *);
 };
 
 struct _hl_tls {
@@ -41,6 +50,17 @@ struct _hl_mutex {
 	bool is_gc;
 };
 
+struct _hl_semaphore {
+	void (*free)(hl_semaphore *);
+	HANDLE sem;
+};
+
+struct _hl_condition {
+	void (*free)(hl_condition *);
+	CRITICAL_SECTION cs;
+	CONDITION_VARIABLE cond;
+};
+
 struct _hl_tls {
 	void (*free)( hl_tls * );
 	DWORD tid;
@@ -53,11 +73,31 @@ struct _hl_tls {
 #	include <sys/syscall.h>
 #	include <sys/time.h>
 
+#ifdef __APPLE__
+#include <dispatch/dispatch.h>
+#else
+#include <semaphore.h>
+#endif
 
 struct _hl_mutex {
 	void (*free)( hl_mutex * );
 	pthread_mutex_t lock;
 	bool is_gc;
+};
+
+struct _hl_semaphore {
+	void (*free)(hl_semaphore *);
+#	ifdef __APPLE__
+	dispatch_semaphore_t sem;
+#	else
+	sem_t sem;
+#endif
+};
+
+struct _hl_condition {
+	void (*free)(hl_condition *);
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
 };
 
 struct _hl_tls {
@@ -145,6 +185,243 @@ DEFINE_PRIM(_VOID, mutex_acquire, _MUTEX);
 DEFINE_PRIM(_BOOL, mutex_try_acquire, _MUTEX);
 DEFINE_PRIM(_VOID, mutex_release, _MUTEX);
 DEFINE_PRIM(_VOID, mutex_free, _MUTEX);
+
+// ------------------ SEMAPHORE
+
+HL_PRIM hl_semaphore *hl_semaphore_alloc(int value) {
+#	if !defined(HL_THREADS)
+	static struct _hl_semaphore null_semaphore = {0};
+	return (hl_condition *)&null_semaphore;
+#	elif defined(HL_WIN)
+	hl_semaphore *sem =
+	    (hl_semaphore *)hl_gc_alloc_finalizer(sizeof(hl_semaphore));
+	sem->free = hl_semaphore_free;
+	sem->sem = CreateSemaphoreW(NULL, value, 0x7FFFFFFF, NULL);
+	return sem;
+#	else
+	hl_semaphore *sem =
+	    (hl_semaphore *)hl_gc_alloc_finalizer(sizeof(hl_semaphore));
+	sem->free = hl_semaphore_free;
+#	ifdef __APPLE__
+	sem->sem = dispatch_semaphore_create(value);
+#	else
+	sem_init(&sem->sem, false, value);
+#	endif
+	return sem;
+#	endif
+}
+
+HL_PRIM void hl_semaphore_acquire(hl_semaphore *sem) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	WaitForSingleObject(sem->sem, INFINITE);
+#	else
+#	ifdef __APPLE__
+	dispatch_semaphore_wait(sem->sem, DISPATCH_TIME_FOREVER);
+#	else
+	sem_wait(&sem->sem);
+#	endif
+#	endif
+}
+
+HL_PRIM bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	return WaitForSingleObject(sem->sem,
+	                           timeout ? (DWORD)((FLOAT)timeout->v.d * 1000.0)
+	                                   : 0) == WAIT_OBJECT_0;
+#	else
+#	ifdef __APPLE__
+	return dispatch_semaphore_wait(
+	           sem->sem, dispatch_time(DISPATCH_TIME_NOW,
+	                              (int64_t)((timeout ? timeout->v.d : 0) *
+	                                        1000 * 1000 * 1000))) == 0;
+#	else
+	if (timeout) {
+		struct timeval tv;
+		struct timespec t;
+		double delta = timeout->v.d;
+		int idelta = (int)delta, idelta2;
+		delta -= idelta;
+		delta *= 1.0e9;
+		gettimeofday(&tv, NULL);
+		delta += tv.tv_usec * 1000.0;
+		idelta2 = (int)(delta / 1e9);
+		delta -= idelta2 * 1e9;
+		t.tv_sec = tv.tv_sec + idelta + idelta2;
+		t.tv_nsec = (long)delta;
+		return sem_timedwait(&sem->sem, &t) == 0;
+	} else {
+
+		return sem_trywait(&sem->sem) == 0;
+	}
+#	endif
+#	endif
+}
+
+HL_PRIM void hl_semaphore_release(hl_semaphore *sem) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	ReleaseSemaphore(sem->sem, 1, NULL);
+#	else
+#	ifdef __APPLE__
+	dispatch_semaphore_signal(sem->sem);
+#	else
+	sem_post(&sem->sem);
+#	endif
+#	endif
+}
+
+HL_PRIM void hl_semaphore_free(hl_semaphore *sem) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	if (sem->free) {
+		CloseHandle(sem->sem);
+		sem->free = NULL;
+	}
+#	else
+	if (sem->free) {
+#ifndef __APPLE__
+		sem_destroy(&sem->sem);
+#endif
+		sem->free = NULL;
+	}
+#	endif
+}
+
+#define _SEMAPHORE _ABSTRACT(hl_semaphore)
+DEFINE_PRIM(_SEMAPHORE, semaphore_alloc, _I32);
+DEFINE_PRIM(_VOID, semaphore_acquire, _SEMAPHORE);
+DEFINE_PRIM(_BOOL, semaphore_try_acquire, _SEMAPHORE _NULL(_F64));
+DEFINE_PRIM(_VOID, semaphore_release, _SEMAPHORE);
+DEFINE_PRIM(_VOID, semaphore_free, _SEMAPHORE);
+// ------------------ CONDITION
+
+HL_PRIM hl_condition *hl_condition_alloc() {
+#	if !defined(HL_THREADS)
+	static struct _hl_condition null_condition = {0};
+	return (hl_condition *)&null_condition;
+#	elif defined(HL_WIN)
+	hl_condition *cond =
+	    (hl_condition *)hl_gc_alloc_finalizer(sizeof(hl_condition));
+	cond->free = hl_condition_free;
+	InitializeCriticalSection(&cond->cs);
+	InitializeConditionVariable(&cond->cond);
+	return cond;
+#	else
+	hl_condition *cond =
+	    (hl_condition *)hl_gc_alloc_finalizer(sizeof(hl_condition));
+	cond->free = hl_condition_free;
+	pthread_condattr_t attr;
+	pthread_condattr_init(&attr);
+	pthread_cond_init(&cond->cond, &attr);
+	pthread_condattr_destroy(&attr);
+	pthread_mutexattr_t mutexattr;
+	pthread_mutexattr_init(&mutexattr);
+	pthread_mutexattr_settype(&mutexattr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&cond->mutex, &mutexattr);
+	pthread_mutexattr_destroy(&mutexattr);
+	return cond;
+#	endif
+}
+HL_PRIM void hl_condition_acquire(hl_condition *cond) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	EnterCriticalSection(&cond->cs);
+#	else
+	pthread_mutex_lock(&cond->mutex);
+#	endif
+}
+
+HL_PRIM bool hl_condition_try_acquire(hl_condition *cond) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	return (bool)TryEnterCriticalSection(&cond->cs);
+#	else
+	return pthread_mutex_trylock(&cond->mutex) == 0;
+#	endif
+}
+
+HL_PRIM void hl_condition_release(hl_condition *cond) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	LeaveCriticalSection(&cond->cs);
+#	else
+	pthread_mutex_unlock(&cond->mutex);
+#	endif
+}
+HL_PRIM void hl_condition_wait(hl_condition *cond) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	SleepConditionVariableCS(&cond->cond, &cond->cs, INFINITE);
+#	else
+	pthread_cond_wait(&cond->cond, &cond->mutex);
+#	endif
+}
+
+HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	SleepConditionVariableCS(&cond->cond, &cond->cs,
+	                         (DWORD)((FLOAT)timeout * 1000.0));
+#	else
+	struct timeval tv;
+	struct timespec t;
+	double delta = timeout;
+	int idelta = (int)delta, idelta2;
+	delta -= idelta;
+	delta *= 1.0e9;
+	gettimeofday(&tv, NULL);
+	delta += tv.tv_usec * 1000.0;
+	idelta2 = (int)(delta / 1e9);
+	delta -= idelta2 * 1e9;
+	t.tv_sec = tv.tv_sec + idelta + idelta2;
+	t.tv_nsec = (long)delta;
+	return pthread_cond_timedwait(&cond->cond, &cond->mutex, &t) == 0;
+#	endif
+}
+
+HL_PRIM void hl_condition_signal(hl_condition *cond) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	WakeConditionVariable(&cond->cond);
+#	else
+	pthread_cond_signal(&cond->cond);
+#	endif
+}
+HL_PRIM void hl_condition_broadcast(hl_condition *cond) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	WakeAllConditionVariable(&cond->cond);
+#	else
+	pthread_cond_broadcast(&cond->cond);
+#	endif
+}
+HL_PRIM void hl_condition_free(hl_condition *cond) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	if (cond->free) {
+		DeleteCriticalSection(&cond->cs);
+		cond->free = NULL;
+	}
+#	else
+	if (cond->free) {
+		pthread_cond_destroy(&cond->cond);
+		pthread_mutex_destroy(&cond->mutex);
+		cond->free = NULL;
+	}
+#	endif
+}
+
+#define _CONDITION _ABSTRACT(hl_condition)
+DEFINE_PRIM(_CONDITION, condition_alloc, _NO_ARG)
+DEFINE_PRIM(_VOID, condition_acquire, _CONDITION)
+DEFINE_PRIM(_BOOL, condition_try_acquire, _CONDITION)
+DEFINE_PRIM(_VOID, condition_release, _CONDITION)
+DEFINE_PRIM(_VOID, condition_wait, _CONDITION)
+DEFINE_PRIM(_BOOL, condition_timed_wait, _CONDITION _F64)
+DEFINE_PRIM(_VOID, condition_signal, _CONDITION)
+DEFINE_PRIM(_VOID, condition_broadcast, _CONDITION)
 
 // ----------------- THREAD LOCAL
 
@@ -260,7 +537,7 @@ static void hl_deque_free( hl_deque *q ) {
 #	endif
 }
 
-HL_API hl_deque *hl_deque_alloc() {
+HL_PRIM hl_deque *hl_deque_alloc() {
 	hl_deque *q = (hl_deque*)hl_gc_alloc_finalizer(sizeof(hl_deque));
 	q->free = hl_deque_free;
 	q->first = NULL;
@@ -277,7 +554,7 @@ HL_API hl_deque *hl_deque_alloc() {
 	return q;
 }
 
-HL_API void hl_deque_add( hl_deque *q, vdynamic *msg ) {
+HL_PRIM void hl_deque_add( hl_deque *q, vdynamic *msg ) {
 	tqueue *t = (tqueue*)hl_gc_alloc_raw(sizeof(tqueue));
 	t->msg = msg;
 	t->next = NULL;
@@ -291,7 +568,7 @@ HL_API void hl_deque_add( hl_deque *q, vdynamic *msg ) {
 	UNLOCK(q->lock);
 }
 
-HL_API void hl_deque_push( hl_deque *q, vdynamic *msg ) {
+HL_PRIM void hl_deque_push( hl_deque *q, vdynamic *msg ) {
 	tqueue *t = (tqueue*)hl_gc_alloc_raw(sizeof(tqueue));
 	t->msg = msg;
 	LOCK(q->lock);
@@ -303,7 +580,7 @@ HL_API void hl_deque_push( hl_deque *q, vdynamic *msg ) {
 	UNLOCK(q->lock);
 }
 
-HL_API vdynamic *hl_deque_pop( hl_deque *q, bool block ) {
+HL_PRIM vdynamic *hl_deque_pop( hl_deque *q, bool block ) {
 	vdynamic *msg;
 	hl_blocking(true);
 	LOCK(q->lock);
