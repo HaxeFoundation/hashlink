@@ -23,9 +23,19 @@
 #include <hlmodule.h>
 
 #ifdef HL_LINUX
-#include <signal.h>
 #include <semaphore.h>
+#include <signal.h>
+#include <sys/syscall.h>
 #include <unistd.h>
+#endif
+
+#if defined(__GLIBC__)
+#if __GLIBC_PREREQ(2, 30)
+// tgkill is present
+#else
+// int tgkill(pid_t tgid, pid_t tid, int sig)
+#define tgkill(tgid, tid, sig) syscall(SYS_tgkill, tgid, tid, sig)
+#endif
 #endif
 
 #define MAX_STACK_SIZE (8 << 20)
