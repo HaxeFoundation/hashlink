@@ -82,12 +82,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$$makePath(::relDir::);$(HASHLINK)/include;$(HASHLINK)/src;$(IncludePath)</IncludePath>
-    <LibraryPath>$(HASHLINK);$(HASHLINK)/$(Configuration);$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(HASHLINK);$(HASHLINK)/$(Configuration)VS2015;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$$makePath(::relDir::);$(HASHLINK)/include;$(HASHLINK)/src;$(IncludePath)</IncludePath>
-    <LibraryPath>$(HASHLINK);$(HASHLINK)/x64/$(Configuration);$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(HASHLINK);$(HASHLINK)/x64/$(Configuration)VS2015;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

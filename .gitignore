@@ -37,7 +37,7 @@ ReleaseStatic
 /src/Makefile
 /include/ffmpeg
 shiroLibs
-ReleaseVS2013
+ReleaseVS*
 /include/bullet
 /libs/bullet/sample/sample.js
 /libs/bullet/bullet_js.cpp
