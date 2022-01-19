@@ -109,7 +109,7 @@ int utoi( const uchar *str, uchar **end ) {
 	while( is_space_char(*str) ) str++;
 	while( i < 16 ) {
 		int c = *str++;
-		if( (c < '0' || c > '9') && c != '-' )
+		if( (c < '0' || c > '9') && c != '-' && c != '+')
 			break;
 		buf[i++] = (char)c;
 	}
