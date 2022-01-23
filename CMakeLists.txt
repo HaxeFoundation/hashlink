@@ -79,6 +79,7 @@ file(GLOB std_srcs
     src/std/ucs2.c
     src/std/thread.c
     src/std/process.c
+    src/std/num.c
 )
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -188,14 +189,17 @@ if(BUILD_TESTING)
     #####################
     # uvsample.hl
 
-    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-        COMMAND ${HAXE_COMPILER}
-            -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-            -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
-    )
-    add_custom_target(uvsample.hl ALL
-        DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-    )
+    # TODO: uncomment when https://github.com/HaxeFoundation/haxe/pull/10342 is merged
+
+    #add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+    #    COMMAND ${HAXE_COMPILER}
+    #        -D SAMPLE=All
+    #        -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+    #        -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
+    #)
+    #add_custom_target(uvsample.hl ALL
+    #    DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+    #)
 
     #####################
     # hello.c
@@ -244,25 +248,28 @@ if(BUILD_TESTING)
     #####################
     # uvsample.c
 
-    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
-        COMMAND ${HAXE_COMPILER}
-            -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
-            -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
-    )
-    add_executable(uvsample
-        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
-    )
-    set_target_properties(uvsample
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample
-    )
-    target_include_directories(uvsample
-        PRIVATE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample
-    )
-    target_link_libraries(uvsample
-        libhl
-        uv.hdll
-    )
+    # TODO: uncomment when https://github.com/HaxeFoundation/haxe/pull/10342 is merged
+
+    #add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
+    #    COMMAND ${HAXE_COMPILER}
+    #        -D SAMPLE=All
+    #        -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
+    #        -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
+    #)
+    #add_executable(uvsample
+    #    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
+    #)
+    #set_target_properties(uvsample
+    #    PROPERTIES
+    #    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample
+    #)
+    #target_include_directories(uvsample
+    #    PRIVATE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample
+    #)
+    #target_link_libraries(uvsample
+    #    libhl
+    #    uv.hdll
+    #)
 
     #####################
     # Tests
@@ -273,18 +280,20 @@ if(BUILD_TESTING)
     add_test(NAME threads.hl
         COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
     )
-    add_test(NAME uvsample.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-    )
+    # TODO: uncomment when https://github.com/HaxeFoundation/haxe/pull/10342 is merged
+    #add_test(NAME uvsample.hl
+    #    COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+    #)
     add_test(NAME hello
         COMMAND hello
     )
     add_test(NAME threads
         COMMAND threads
     )
-    add_test(NAME uvsample
-        COMMAND uvsample
-    )
+    # TODO: uncomment when https://github.com/HaxeFoundation/haxe/pull/10342 is merged
+    #add_test(NAME uvsample
+    #    COMMAND uvsample
+    #)
     add_test(NAME version
         COMMAND hl --version
     )

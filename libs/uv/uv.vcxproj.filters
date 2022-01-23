@@ -5,13 +5,28 @@
     <ClCompile Include="..\..\include\libuv\src\fs-poll.c">
       <Filter>libuv</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\idna.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\inet.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\random.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\strscpy.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\threadpool.c">
       <Filter>libuv</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\timer.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\uv-common.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\uv-data-getter-setters.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\version.c">
@@ -21,6 +36,9 @@
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\core.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\win\detect-wakeup.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\dl.c">
@@ -59,9 +77,6 @@
     <ClCompile Include="..\..\include\libuv\src\win\process-stdio.c">
       <Filter>libuv</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\req.c">
-      <Filter>libuv</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\signal.c">
       <Filter>libuv</Filter>
     </ClCompile>
@@ -75,9 +90,6 @@
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\thread.c">
-      <Filter>libuv</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\timer.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\tty.c">
@@ -105,13 +117,22 @@
     <ClInclude Include="..\..\include\libuv\src\heap-inl.h">
       <Filter>libuv</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\libuv\src\idna.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\libuv\src\queue.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\src\strscpy.h">
       <Filter>libuv</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\libuv\src\uv-common.h">
       <Filter>libuv</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\libuv\src\win\atomicops-inl.h">
+      <Filter>libuv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\libuv\src\win\fs-fd-hash-inl.h">
       <Filter>libuv</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\libuv\src\win\handle-inl.h">

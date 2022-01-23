@@ -6,31 +6,35 @@ if(WIN32)
     target_sources(uv.hdll
         PRIVATE
             ${INCLUDES_BASE_DIR}/libuv/src/fs-poll.c
+            ${INCLUDES_BASE_DIR}/libuv/src/idna.c
             ${INCLUDES_BASE_DIR}/libuv/src/inet.c
+            ${INCLUDES_BASE_DIR}/libuv/src/random.c
+            ${INCLUDES_BASE_DIR}/libuv/src/strscpy.c
             ${INCLUDES_BASE_DIR}/libuv/src/threadpool.c
+            ${INCLUDES_BASE_DIR}/libuv/src/timer.c
             ${INCLUDES_BASE_DIR}/libuv/src/uv-common.c
+            ${INCLUDES_BASE_DIR}/libuv/src/uv-data-getter-setters.c
             ${INCLUDES_BASE_DIR}/libuv/src/version.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/async.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/core.c
+            ${INCLUDES_BASE_DIR}/libuv/src/win/detect-wakeup.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/dl.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/error.c
-            ${INCLUDES_BASE_DIR}/libuv/src/win/fs-event.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/fs.c
+            ${INCLUDES_BASE_DIR}/libuv/src/win/fs-event.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/getaddrinfo.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/getnameinfo.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/handle.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/loop-watcher.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/pipe.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/poll.c
-            ${INCLUDES_BASE_DIR}/libuv/src/win/process-stdio.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/process.c
-            ${INCLUDES_BASE_DIR}/libuv/src/win/req.c
+            ${INCLUDES_BASE_DIR}/libuv/src/win/process-stdio.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/signal.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/snprintf.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/stream.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/tcp.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/thread.c
-            ${INCLUDES_BASE_DIR}/libuv/src/win/timer.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/tty.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/udp.c
             ${INCLUDES_BASE_DIR}/libuv/src/win/util.c

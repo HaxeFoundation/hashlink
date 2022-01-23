@@ -34,6 +34,8 @@ jobs:
               cmake \
               make \
               gcc \
+              automake \
+              libtool \
               libz-dev \
               zlib1g-dev \
               libpng-dev \
@@ -42,11 +44,17 @@ jobs:
               libalut-dev \
               libmbedtls-dev \
               libturbojpeg0-dev \
-              libuv1-dev \
               libopenal-dev \
               neko \
               curl \
               ca-certificates
+            curl -fsSL -o "libuv-v1.42.0.tar.gz" --retry 3 https://dist.libuv.org/dist/v1.42.0/libuv-v1.42.0.tar.gz
+            tar -xf libuv-v1.42.0.tar.gz
+            cd libuv-v1.42.0
+            sh autogen.sh
+            ./configure
+            make
+            sudo make install
           displayName: Install dependencies
       - ${{ if not(eq(parameters.arch, '')) }}:
         - script: |
@@ -57,6 +65,8 @@ jobs:
               cmake \
               make \
               gcc-multilib \
+              automake \
+              libtool \
               libz-dev:${{ parameters.arch }} \
               zlib1g-dev:${{ parameters.arch }} \
               libpng-dev:${{ parameters.arch }} \
@@ -65,11 +75,18 @@ jobs:
               libalut-dev:${{ parameters.arch }} \
               libmbedtls-dev:${{ parameters.arch }} \
               libturbojpeg0-dev:i386 \
-              libuv1-dev:${{ parameters.arch }} \
               libopenal-dev:${{ parameters.arch }} \
               neko \
               curl \
               ca-certificates
+            curl -fsSL -o "libuv-v1.42.0.tar.gz" --retry 3 https://dist.libuv.org/dist/v1.42.0/libuv-v1.42.0.tar.gz
+            tar -xf libuv-v1.42.0.tar.gz
+            cd libuv-v1.42.0
+            sh autogen.sh
+            ./configure --host=i686-linux-gnu "CFLAGS=-m32" "CXXFLAGS=-m32" "LDFLAGS=-m32"
+            make
+            sudo make install
+            uname -a
           displayName: Install dependencies
       - template: install-haxe-snapshot.yml
         parameters:

@@ -653,7 +653,7 @@ HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool
 	so you are sure it's of the used typed. Otherwise use hl_dyn_call
 */
 #define hl_call0(ret,cl) \
-	(cl->hasValue ? ((ret(*)(vdynamic*))cl->fun)(cl->value) : ((ret(*)())cl->fun)()) 
+	(cl->hasValue ? ((ret(*)(vdynamic*))cl->fun)(cl->value) : ((ret(*)())cl->fun)())
 #define hl_call1(ret,cl,t,v) \
 	(cl->hasValue ? ((ret(*)(vdynamic*,t))cl->fun)(cl->value,v) : ((ret(*)(t))cl->fun)(v))
 #define hl_call2(ret,cl,t1,v1,t2,v2) \
@@ -662,6 +662,8 @@ HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool
 	(cl->hasValue ? ((ret(*)(vdynamic*,t1,t2,t3))cl->fun)(cl->value,v1,v2,v3) : ((ret(*)(t1,t2,t3))cl->fun)(v1,v2,v3))
 #define hl_call4(ret,cl,t1,v1,t2,v2,t3,v3,t4,v4) \
 	(cl->hasValue ? ((ret(*)(vdynamic*,t1,t2,t3,t4))cl->fun)(cl->value,v1,v2,v3,v4) : ((ret(*)(t1,t2,t3,t4))cl->fun)(v1,v2,v3,v4))
+#define hl_call5(ret,cl,t1,v1,t2,v2,t3,v3,t4,v4,t5,v5) \
+	(cl->hasValue ? ((ret(*)(vdynamic*,t1,t2,t3,t4,t5))cl->fun)(cl->value,v1,v2,v3,v4,v5) : ((ret(*)(t1,t2,t3,t4,t5))cl->fun)(v1,v2,v3,v4,v5))
 
 // ----------------------- THREADS --------------------------------------------------
 
@@ -799,6 +801,17 @@ typedef struct {
 	int length;
 } vstring;
 
+#undef _ARRBYTES
+#define _ARRBYTES					_OBJ(_I32 _BYTES _I32)
+
+// hl.types.ArrayBytes
+typedef struct {
+	hl_type *t;
+	int length;
+	vbyte *bytes;
+	int size;
+} varray_bytes;
+
 #define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 
@@ -916,7 +929,7 @@ typedef struct {
 
 HL_API hl_track_info hl_track;
 
-#else 
+#else
 
 #define hl_is_tracking(_) false
 #define hl_track_call(a,b)

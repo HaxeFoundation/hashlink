@@ -46,8 +46,8 @@ void uv_fatal_error(const int errorno, const char* syscall) {
     errmsg = "Unknown error";
   }
 
-  /* FormatMessage messages include a newline character already, */
-  /* so don't add another. */
+  /* FormatMessage messages include a newline character already, so don't add
+   * another. */
   if (syscall) {
     fprintf(stderr, "%s: (%d) %s", syscall, errorno, errmsg);
   } else {
@@ -58,7 +58,7 @@ void uv_fatal_error(const int errorno, const char* syscall) {
     LocalFree(buf);
   }
 
-  *((char*)NULL) = 0xff; /* Force debug break */
+  DebugBreak();
   abort();
 }
 
@@ -71,6 +71,8 @@ int uv_translate_sys_error(int sys_errno) {
   switch (sys_errno) {
     case ERROR_NOACCESS:                    return UV_EACCES;
     case WSAEACCES:                         return UV_EACCES;
+    case ERROR_ELEVATION_REQUIRED:          return UV_EACCES;
+    case ERROR_CANT_ACCESS_FILE:            return UV_EACCES;
     case ERROR_ADDRESS_ALREADY_ASSOCIATED:  return UV_EADDRINUSE;
     case WSAEADDRINUSE:                     return UV_EADDRINUSE;
     case WSAEADDRNOTAVAIL:                  return UV_EADDRNOTAVAIL;
@@ -103,7 +105,6 @@ int uv_translate_sys_error(int sys_errno) {
     case ERROR_SYMLINK_NOT_SUPPORTED:       return UV_EINVAL;
     case WSAEINVAL:                         return UV_EINVAL;
     case WSAEPFNOSUPPORT:                   return UV_EINVAL;
-    case WSAESOCKTNOSUPPORT:                return UV_EINVAL;
     case ERROR_BEGINNING_OF_MEDIA:          return UV_EIO;
     case ERROR_BUS_RESET:                   return UV_EIO;
     case ERROR_CRC:                         return UV_EIO;
@@ -131,6 +132,7 @@ int uv_translate_sys_error(int sys_errno) {
     case WSAENOBUFS:                        return UV_ENOBUFS;
     case ERROR_BAD_PATHNAME:                return UV_ENOENT;
     case ERROR_DIRECTORY:                   return UV_ENOENT;
+    case ERROR_ENVVAR_NOT_FOUND:            return UV_ENOENT;
     case ERROR_FILE_NOT_FOUND:              return UV_ENOENT;
     case ERROR_INVALID_NAME:                return UV_ENOENT;
     case ERROR_INVALID_DRIVE:               return UV_ENOENT;
@@ -165,6 +167,7 @@ int uv_translate_sys_error(int sys_errno) {
     case ERROR_NOT_SAME_DEVICE:             return UV_EXDEV;
     case ERROR_INVALID_FUNCTION:            return UV_EISDIR;
     case ERROR_META_EXPANSION_TOO_LONG:     return UV_E2BIG;
+    case WSAESOCKTNOSUPPORT:                return UV_ESOCKTNOSUPPORT;
     default:                                return UV_UNKNOWN;
   }
 }
