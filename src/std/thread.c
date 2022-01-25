@@ -632,6 +632,7 @@ typedef struct _hl_lock hl_lock;
 struct _hl_lock {
 	void (*free)( hl_lock * );
 #if !defined(HL_THREADS)
+	int counter;
 #elif defined(HL_WIN)
 	HANDLE wait;
 #else
@@ -655,6 +656,7 @@ HL_PRIM hl_lock *hl_lock_create() {
 	hl_lock *l = (hl_lock*)hl_gc_alloc_finalizer(sizeof(hl_lock));
 	l->free = hl_lock_free;
 #	if !defined(HL_THREADS)
+	l->counter = 0;
 #	elif defined(HL_WIN)
 	l->wait = CreateSemaphore(NULL,0,(1 << 30),NULL);
 #	else
@@ -667,6 +669,7 @@ HL_PRIM hl_lock *hl_lock_create() {
 
 HL_PRIM void hl_lock_release( hl_lock *l ) {
 #	if !defined(HL_THREADS)
+	l->counter++;
 #	elif defined(HL_WIN)
 	ReleaseSemaphore(l->wait,1,NULL);
 #	else
@@ -679,6 +682,8 @@ HL_PRIM void hl_lock_release( hl_lock *l ) {
 
 HL_PRIM bool hl_lock_wait( hl_lock *l, vdynamic *timeout ) {
 #	if !defined(HL_THREADS)
+	if( l->counter == 0 ) return false;
+	l->counter--;
 	return true;
 #	elif defined(HL_WIN)
 	DWORD ret;
