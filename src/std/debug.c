@@ -30,17 +30,6 @@
 
 #ifdef HL_MAC
 #	include <mdbg/mdbg.h>
-
-static int get_reg( int r ) {
-	switch( r ) {
-		case 0: return REG_RSP;
-		case 1: return REG_RBP;
-		case 2: return REG_RIP;
-		case 3: return REG_RFLAGS;
-		case 4: return REG_DR0 + (r-4);
-	}
-	return -1;
-}
 #endif
 
 #if defined(HL_WIN)
@@ -173,6 +162,25 @@ HL_API bool hl_debug_flush( int pid, vbyte *addr, int size ) {
 #	endif
 }
 
+#ifdef HL_MAC
+static int get_reg( int r ) {
+	switch( r ) {
+		case 0: return REG_RSP;
+		case 1: return REG_RBP;
+		case 2: return REG_RIP;
+		case 3: return REG_RFLAGS;
+		case 4: return REG_DR0;
+		case 5: return REG_DR1;
+		case 6: return REG_DR2;
+		case 7: return REG_DR3;
+		case 8: return REG_DR6;
+		case 9: return REG_DR7;
+		case 10: return REG_RAX;
+	}
+	return -1;
+}
+#endif
+
 #ifdef USE_PTRACE
 static void *get_reg( int r ) {
 		struct user_regs_struct *regs = NULL;
@@ -188,6 +196,7 @@ static void *get_reg( int r ) {
 		case 2: return &regs->eip;
 #		endif
 		case 3: return &regs->eflags;
+		case 10: return &regs->rax;
 		default: return &user->u_debugreg[r-4];
 		}
 		return NULL;
@@ -275,6 +284,7 @@ HL_API bool hl_debug_resume( int pid, int thread ) {
 		case 7: return &c->Dr3; \
 		case 8: return &c->Dr6; \
 		case 9: return &c->Dr7; \
+		case 10: return GET_REG(ax); \
 		default: return GET_REG(ax); \
 		} \
 	}
@@ -304,6 +314,8 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 			return NULL;
 		if( reg == 3 )
 			return (void*)(int_val)c.EFlags;
+		if( reg == 11 )
+			return NULL; // TODO
 		return (void*)(int_val)*GetContextReg32(&c,reg);
 	}
 #	else
@@ -315,6 +327,8 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 		return NULL;
 	if( reg == 3 )
 		return (void*)(int_val)c.EFlags;
+	if( reg == 11 )
+		return (void*)(int_val)c.FltSave.XmmRegisters[0].Low;
 	return (void*)*GetContextReg(&c,reg);
 #	elif defined(HL_MAC)
 	return mdbg_read_register(pid, thread, get_reg(reg), is64);
@@ -335,6 +349,8 @@ HL_API bool hl_debug_write_register( int pid, int thread, int reg, void *value, 
 			return false;
 		if( reg == 3 )
 			c.EFlags = (int)(int_val)value;
+		else if( reg == 11 )
+			return false; // TODO
 		else
 			*GetContextReg32(&c,reg) = (DWORD)(int_val)value;
 		return (bool)Wow64SetThreadContext(OpenTID(thread),&c);
@@ -348,6 +364,8 @@ HL_API bool hl_debug_write_register( int pid, int thread, int reg, void *value, 
 		return false;
 	if( reg == 3 )
 		c.EFlags = (int)(int_val)value;
+	else if( reg == 11 )
+		c.FltSave.XmmRegisters[0].Low = (int_val)value;
 	else
 		*GetContextReg(&c,reg) = (REGDATA)value;
 	return (bool)SetThreadContext(OpenTID(thread),&c);
