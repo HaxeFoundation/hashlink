@@ -332,7 +332,11 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 	if( reg == 3 )
 		return (void*)(int_val)c.EFlags;
 	if( reg == 11 )
+#ifdef HL_64
 		return (void*)(int_val)c.FltSave.XmmRegisters[0].Low;
+#else
+		return (void*)*(int_val*)&c.ExtendedRegisters[10*16];
+#endif
 	return (void*)*GetContextReg(&c,reg);
 #	elif defined(HL_MAC)
 	return mdbg_read_register(pid, thread, get_reg(reg), is64);
@@ -377,7 +381,11 @@ HL_API bool hl_debug_write_register( int pid, int thread, int reg, void *value, 
 	if( reg == 3 )
 		c.EFlags = (int)(int_val)value;
 	else if( reg == 11 )
+#		ifdef HL_64
 		c.FltSave.XmmRegisters[0].Low = (int_val)value;
+#		else
+		*(int_val*)&c.ExtendedRegisters[10*16] = (int_val)value;
+#		endif
 	else
 		*GetContextReg(&c,reg) = (REGDATA)value;
 	return (bool)SetThreadContext(OpenTID(thread),&c);
