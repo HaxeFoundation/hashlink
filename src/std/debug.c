@@ -185,18 +185,22 @@ static int get_reg( int r ) {
 static void *get_reg( int r ) {
 		struct user_regs_struct *regs = NULL;
 		struct user *user = NULL;
+		struct user_fpregs_struct *fp = NULL;
 		switch( r ) {
+		case -1: return &regs->u_fpstate;
 #		ifdef HL_64
 		case 0: return &regs->rsp;
 		case 1: return &regs->rbp;
 		case 2: return &regs->rip;
+		case 10: return &regs->rax;
 #		else
 		case 0: return &regs->esp;
 		case 1: return &regs->ebp;
 		case 2: return &regs->eip;
+		case 10: return &regs->eax;
 #		endif
+		case 11: return -1;
 		case 3: return &regs->eflags;
-		case 10: return &regs->rax;
 		default: return &user->u_debugreg[r-4];
 		}
 		return NULL;
@@ -333,7 +337,15 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 #	elif defined(HL_MAC)
 	return mdbg_read_register(pid, thread, get_reg(reg), is64);
 #	elif defined(USE_PTRACE)
-	return (void*)ptrace(PTRACE_PEEKUSER,thread,get_reg(reg),0);
+	void *r = get_reg(reg);
+	if( ((int_val)r) < 0 ) {
+		// peek FP ptr
+		char *addr = (char*)ptrace(PTRACE_PEEKUSER,thread,get_reg(-1),0);
+		void *out = NULL;
+		hl_debug_read(pid, addr + (-((int_val)r)-1) * 16, &out, sizeof(void*));
+		return out;
+	}
+	return (void*)ptrace(PTRACE_PEEKUSER,thread,r,0);
 #	else
 	return NULL;
 #	endif
