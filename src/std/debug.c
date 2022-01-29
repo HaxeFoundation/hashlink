@@ -187,7 +187,7 @@ static void *get_reg( int r ) {
 		struct user *user = NULL;
 		struct user_fpregs_struct *fp = NULL;
 		switch( r ) {
-		case -1: return &regs->u_fpstate;
+		case -1: return &user->u_fpstate;
 #		ifdef HL_64
 		case 0: return &regs->rsp;
 		case 1: return &regs->rbp;
@@ -199,7 +199,7 @@ static void *get_reg( int r ) {
 		case 2: return &regs->eip;
 		case 10: return &regs->eax;
 #		endif
-		case 11: return -1;
+		case 11: return (void*)(-((int_val)&fp->xmm_space[0])-1);
 		case 3: return &regs->eflags;
 		default: return &user->u_debugreg[r-4];
 		}
@@ -342,7 +342,7 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 		// peek FP ptr
 		char *addr = (char*)ptrace(PTRACE_PEEKUSER,thread,get_reg(-1),0);
 		void *out = NULL;
-		hl_debug_read(pid, addr + (-((int_val)r)-1) * 16, &out, sizeof(void*));
+		hl_debug_read(pid, addr + (-((int_val)r)-1), (vbyte*)&out, sizeof(void*));
 		return out;
 	}
 	return (void*)ptrace(PTRACE_PEEKUSER,thread,r,0);
