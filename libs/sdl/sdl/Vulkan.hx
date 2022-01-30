@@ -1218,6 +1218,12 @@ enum abstract VkSharingMode(Int) {
 	}
 }
 
+@:struct class VkDeviceSize {
+	public var low : Int;
+	public var high : Int;
+	public function new(v=0) { low = v; }
+}
+
 enum VkMemoryPropertyFlag {
     DEVICE_LOCAL;
     HOST_VISIBLE;
@@ -1338,7 +1344,13 @@ abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
 	public function bindIndexBuffer( buffer : VkBuffer, offset : Int, indexType : Int ) {
 	}
 
+	public function bindVertexBuffers( first : Int, count : Int, buffers : ArrayStruct<VkBuffer>, offsets : ArrayStruct<VkDeviceSize> ) {
+	}
+
 	public function beginRenderPass( begin : VkRenderPassBeginInfo, contents : VkSubpassContents ) {
+	}
+
+	public function endRenderPass() {
 	}
 
 }

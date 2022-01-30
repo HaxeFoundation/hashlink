@@ -507,12 +507,22 @@ HL_PRIM void HL_NAME(vk_bind_index_buffer)( VkCommandBuffer out, VkBuffer buf, i
 	vkCmdBindIndexBuffer(out, buf, offset, type);
 }
 
+HL_PRIM void HL_NAME(vk_bind_vertex_buffers)( VkCommandBuffer out, int first, int count, VkBuffer *buffers, VkDeviceSize *sizes ) {
+	vkCmdBindVertexBuffers(out, first, count, buffers, sizes);
+}
+
+HL_PRIM void HL_NAME(vk_end_render_pass)( VkCommandBuffer out ) {
+	vkCmdEndRenderPass(out);
+}
+
 DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMAGE _F64 _F64 _F64 _F64);
 DEFINE_PRIM(_VOID, vk_clear_depth_stencil_image, _CMD _IMAGE _F64 _I32);
 DEFINE_PRIM(_VOID, vk_draw_indexed, _CMD _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, vk_bind_pipeline, _CMD _I32 _GPIPELINE);
 DEFINE_PRIM(_VOID, vk_begin_render_pass, _CMD _STRUCT _I32);
 DEFINE_PRIM(_VOID, vk_bind_index_buffer, _CMD _BUFFER _I32 _I32);
+DEFINE_PRIM(_VOID, vk_bind_vertex_buffers, _CMD _I32 _I32 _BYTES _BYTES);
+DEFINE_PRIM(_VOID, vk_end_render_pass, _CMD);
 
 // ------ SHADER COMPILATION ------------------------------
 
