@@ -69,6 +69,7 @@ typedef struct {
 typedef struct _VkContext {
 	VkSurfaceKHR surface;
 	VkPhysicalDevice pdevice;
+	VkPhysicalDeviceMemoryProperties memProps;
 	VkDevice device;
 	VkQueue queue;
 	int queueFamily;
@@ -97,7 +98,6 @@ void *vk_init_context( VkSurfaceKHR surface ) {
 	VkQueueFamilyProperties queueFamilyProperties[MAX_QUEUE_COUNT];
 	VkPhysicalDeviceProperties deviceProperties;
 	VkPhysicalDeviceFeatures deviceFeatures;
-	VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
 
 	vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, 0);
 	physicalDeviceCount = physicalDeviceCount > MAX_DEVICE_COUNT ? MAX_DEVICE_COUNT : physicalDeviceCount;
@@ -110,7 +110,6 @@ void *vk_init_context( VkSurfaceKHR surface ) {
 		vkGetPhysicalDeviceQueueFamilyProperties(deviceHandles[i], &queueFamilyCount, queueFamilyProperties);
 		vkGetPhysicalDeviceProperties(deviceHandles[i], &deviceProperties);
 		vkGetPhysicalDeviceFeatures(deviceHandles[i], &deviceFeatures);
-		vkGetPhysicalDeviceMemoryProperties(deviceHandles[i], &deviceMemoryProperties);
 		for(int j=0; j<queueFamilyCount; j++) {
 			VkBool32 supportsPresent = VK_FALSE;
 			vkGetPhysicalDeviceSurfaceSupportKHR(deviceHandles[i], j, ctx->surface, &supportsPresent);
@@ -145,6 +144,7 @@ void *vk_init_context( VkSurfaceKHR surface ) {
 		return NULL;
 
 	vkGetDeviceQueue(ctx->device, ctx->queueFamily, 0, &ctx->queue);
+	vkGetPhysicalDeviceMemoryProperties(ctx->pdevice, &ctx->memProps);
 
 	VkCommandPoolCreateInfo poolInf = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -177,7 +177,14 @@ void *vk_init_context( VkSurfaceKHR surface ) {
 	return ctx;
 }
 
-
+int HL_NAME(vk_find_memory_type)( VkContext ctx, int allowed, int req ) {
+	unsigned int i;
+    for(i=0;i<ctx->memProps.memoryTypeCount;i++) {
+		if( (allowed & (1<< i)) && (ctx->memProps.memoryTypes[i].propertyFlags & req) == req )
+			return i;
+    }
+    return -1;
+}
 
 bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
 
@@ -410,6 +417,16 @@ VkDeviceMemory HL_NAME(vk_allocate_memory)( VkContext ctx, VkMemoryAllocateInfo 
 	return m;
 }
 
+vbyte *HL_NAME(vk_map_memory)( VkContext ctx, VkDeviceMemory mem, int offset, int size, int flags ) {
+	void *ptr = NULL;
+	vkMapMemory(ctx->device, mem, offset, size, flags, &ptr);
+	return ptr;
+}
+
+void HL_NAME(vk_unmap_memory)( VkContext ctx, VkDeviceMemory mem ) {
+	vkUnmapMemory(ctx->device, mem);
+}
+
 bool HL_NAME(vk_bind_buffer_memory)( VkContext ctx, VkBuffer buf, VkDeviceMemory mem, int offset ) {
 	return vkBindBufferMemory(ctx->device, buf, mem, offset) == VK_SUCCESS;
 }
@@ -444,6 +461,7 @@ DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32);
 DEFINE_PRIM(_BOOL, vk_begin_frame, _VCTX);
 DEFINE_PRIM(_BYTES, vk_make_array, _ARR);
 DEFINE_PRIM(_VOID, vk_end_frame, _VCTX);
+DEFINE_PRIM(_I32, vk_find_memory_type, _VCTX _I32 _I32);
 DEFINE_PRIM(_SHADER_MODULE, vk_create_shader_module, _VCTX _BYTES _I32 );
 DEFINE_PRIM(_GPIPELINE, vk_create_graphics_pipeline, _VCTX _STRUCT);
 DEFINE_PRIM(_PIPELAYOUT, vk_create_pipeline_layout, _VCTX _STRUCT);
@@ -454,6 +472,8 @@ DEFINE_PRIM(_DESCRIPTOR_SET, vk_create_descriptor_set_layout, _VCTX _STRUCT);
 DEFINE_PRIM(_BUFFER, vk_create_buffer, _VCTX _STRUCT);
 DEFINE_PRIM(_VOID, vk_get_buffer_memory_requirements, _VCTX _BUFFER _STRUCT);
 DEFINE_PRIM(_MEMORY, vk_allocate_memory, _VCTX _STRUCT);
+DEFINE_PRIM(_BYTES, vk_map_memory, _VCTX _MEMORY _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, vk_unmap_memory, _VCTX _MEMORY);
 DEFINE_PRIM(_BOOL, vk_bind_buffer_memory, _VCTX _BUFFER _MEMORY _I32);
 DEFINE_PRIM(_IMAGE, vk_get_current_image, _VCTX);
 DEFINE_PRIM(_I32, vk_get_current_image_format, _VCTX);
