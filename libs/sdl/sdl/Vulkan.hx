@@ -1078,7 +1078,7 @@ enum abstract VkSubpassContents(Int) {
 }
 
 enum VkFramebufferCreateFlag {
-	IMAGELESS_BIT;
+	IMAGELESS;
 }
 
 @:struct class VkFramebufferInfo {
@@ -1234,6 +1234,11 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 
 	public function getCurrentImage() : VkImage {
 		return null;
+	}
+
+	@:hlNative("?sdl","vk_get_current_image_format")
+	public function getCurrentImageFormat() : VkFormat {
+		return UNDEFINED;
 	}
 
 	public function getCurrentCommandBuffer() : VkCommandBuffer {

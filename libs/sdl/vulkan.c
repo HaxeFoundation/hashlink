@@ -75,6 +75,7 @@ typedef struct _VkContext {
 
 	VkSwapchainKHR swapchain;
 	int swapchainImageCount;
+	VkFormat imageFormat;
 	VkImage swapchainImages[MAX_SWAPCHAIN_IMAGES];
 
 	unsigned int currentFrame;
@@ -247,6 +248,7 @@ bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
 
 	vkGetSwapchainImagesKHR(ctx->device, ctx->swapchain, &ctx->swapchainImageCount, NULL);
 	vkGetSwapchainImagesKHR(ctx->device, ctx->swapchain, &ctx->swapchainImageCount, ctx->swapchainImages);
+	ctx->imageFormat = format.format;
 
 	return true;
 }
@@ -374,6 +376,18 @@ VkRenderPass HL_NAME(vk_create_render_pass)( VkContext ctx, VkRenderPassCreateIn
 	return p;
 }
 
+VkImageView HL_NAME(vk_create_image_view)( VkContext ctx, VkImageViewCreateInfo *info ) {
+	VkImageView i = NULL;
+	vkCreateImageView(ctx->device, info, NULL, &i);
+	return i;
+}
+
+VkFramebuffer HL_NAME(vk_create_framebuffer)( VkContext ctx, VkFramebufferCreateInfo *info ) {
+	VkFramebuffer b = NULL;
+	vkCreateFramebuffer(ctx->device, info, NULL, &b);
+	return b;
+}
+
 VkDescriptorSetLayout HL_NAME(vk_create_descriptor_set_layout)( VkContext ctx, VkDescriptorSetLayoutCreateInfo *info ) {
 	VkDescriptorSetLayout p = NULL;
 	vkCreateDescriptorSetLayout(ctx->device, info, NULL, &p);
@@ -404,6 +418,10 @@ VkImage HL_NAME(vk_get_current_image)( VkContext ctx ) {
 	return ctx->swapchainImages[ctx->currentImage];
 }
 
+VkFormat HL_NAME(vk_get_current_image_format)( VkContext ctx ) {
+	return ctx->imageFormat;
+}
+
 VkCommandBuffer HL_NAME(vk_get_current_command_buffer)( VkContext ctx ) {
 	return ctx->frames[ctx->currentFrame].buffer;
 }
@@ -413,7 +431,9 @@ VkCommandBuffer HL_NAME(vk_get_current_command_buffer)( VkContext ctx ) {
 #define _GPIPELINE _ABSTRACT(vk_gpipeline)
 #define _PIPELAYOUT _ABSTRACT(vk_pipeline_layout)
 #define _RENDERPASS _ABSTRACT(vk_render_pass)
-#define _IMG _ABSTRACT(vk_image)
+#define _IMAGE _ABSTRACT(vk_image)
+#define _IMAGE_VIEW _ABSTRACT(vk_image_view)
+#define _FRAMEBUFFER _ABSTRACT(vk_framebuffer)
 #define _DESCRIPTOR_SET _ABSTRACT(vk_descriptor_set)
 #define _BUFFER _ABSTRACT(vk_buffer)
 #define _MEMORY _ABSTRACT(vk_device_memory)
@@ -428,12 +448,15 @@ DEFINE_PRIM(_SHADER_MODULE, vk_create_shader_module, _VCTX _BYTES _I32 );
 DEFINE_PRIM(_GPIPELINE, vk_create_graphics_pipeline, _VCTX _STRUCT);
 DEFINE_PRIM(_PIPELAYOUT, vk_create_pipeline_layout, _VCTX _STRUCT);
 DEFINE_PRIM(_RENDERPASS, vk_create_render_pass, _VCTX _STRUCT);
+DEFINE_PRIM(_IMAGE_VIEW, vk_create_image_view, _VCTX _STRUCT);
+DEFINE_PRIM(_FRAMEBUFFER, vk_create_framebuffer, _VCTX _STRUCT);
 DEFINE_PRIM(_DESCRIPTOR_SET, vk_create_descriptor_set_layout, _VCTX _STRUCT);
 DEFINE_PRIM(_BUFFER, vk_create_buffer, _VCTX _STRUCT);
 DEFINE_PRIM(_VOID, vk_get_buffer_memory_requirements, _VCTX _BUFFER _STRUCT);
 DEFINE_PRIM(_MEMORY, vk_allocate_memory, _VCTX _STRUCT);
 DEFINE_PRIM(_BOOL, vk_bind_buffer_memory, _VCTX _BUFFER _MEMORY _I32);
-DEFINE_PRIM(_IMG, vk_get_current_image, _VCTX);
+DEFINE_PRIM(_IMAGE, vk_get_current_image, _VCTX);
+DEFINE_PRIM(_I32, vk_get_current_image_format, _VCTX);
 DEFINE_PRIM(_CMD, vk_get_current_command_buffer, _VCTX);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
@@ -464,8 +487,8 @@ HL_PRIM void HL_NAME(vk_bind_index_buffer)( VkCommandBuffer out, VkBuffer buf, i
 	vkCmdBindIndexBuffer(out, buf, offset, type);
 }
 
-DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMG _F64 _F64 _F64 _F64);
-DEFINE_PRIM(_VOID, vk_clear_depth_stencil_image, _CMD _IMG _F64 _I32);
+DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMAGE _F64 _F64 _F64 _F64);
+DEFINE_PRIM(_VOID, vk_clear_depth_stencil_image, _CMD _IMAGE _F64 _I32);
 DEFINE_PRIM(_VOID, vk_draw_indexed, _CMD _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, vk_bind_pipeline, _CMD _I32 _GPIPELINE);
 DEFINE_PRIM(_VOID, vk_begin_render_pass, _CMD _STRUCT _I32);
