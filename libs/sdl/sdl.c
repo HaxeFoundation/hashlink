@@ -58,6 +58,10 @@ typedef enum {
 	JoystickButtonUp,
 	JoystickAdded,
 	JoystickRemoved,
+	DropStart = 400,
+	DropFile,
+	DropText,
+	DropEnd,
 } event_type;
 
 typedef enum {
@@ -93,6 +97,7 @@ typedef struct {
 	int value;
 	int fingerId;
 	int joystick;
+	vbyte* dropFile;
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
@@ -330,6 +335,18 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 		case SDL_JOYDEVICEREMOVED:
 			event->type = JoystickRemoved;
 			event->joystick = e.jdevice.which;
+			break;
+		case SDL_DROPBEGIN:
+			event->type = DropStart;
+			break;
+		case SDL_DROPFILE: case SDL_DROPTEXT:
+			vbyte* bytes = hl_copy_bytes(e.drop.file, (int) strlen(e.drop.file) + 1);
+			SDL_free(e.drop.file);
+			event->type = e.type == SDL_DROPFILE ? DropFile : DropText;
+			event->dropFile = bytes;
+			break;
+		case SDL_DROPCOMPLETE:
+			event->type = DropEnd;
 			break;
 		default:
 			//printf("Unknown event type 0x%X\\n", e.type);
@@ -811,6 +828,14 @@ HL_PRIM char* HL_NAME(get_clipboard_text)() {
 	return bytes;
 }
 
+HL_PRIM void HL_NAME(set_drag_and_drop_enabled)( bool enabled ) {
+	return SDL_EventState(SDL_DROPFILE, enabled ? SDL_ENABLE : SDL_DISABLE);
+}
+
+HL_PRIM bool HL_NAME(get_drag_and_drop_enabled)() {
+	return SDL_EventState(SDL_DROPFILE, SDL_QUERY);
+}
+
 HL_PRIM varray* HL_NAME(get_displays)() {
 	int n = SDL_GetNumVideoDisplays();
 	varray* arr = hl_alloc_array(&hlt_dynobj, n);
@@ -887,6 +912,8 @@ DEFINE_PRIM(_VOID, free_cursor, _CURSOR);
 DEFINE_PRIM(_VOID, set_cursor, _CURSOR);
 DEFINE_PRIM(_BOOL, set_clipboard_text, _BYTES);
 DEFINE_PRIM(_BYTES, get_clipboard_text, _NO_ARG);
+DEFINE_PRIM(_VOID, set_drag_and_drop_enabled, _BOOL);
+DEFINE_PRIM(_BOOL, get_drag_and_drop_enabled, _NO_ARG);
 DEFINE_PRIM(_ARR, get_displays, _NO_ARG);
 DEFINE_PRIM(_ARR, get_display_modes, _I32);
 DEFINE_PRIM(_DYN, get_current_display_mode, _I32 _BOOL);

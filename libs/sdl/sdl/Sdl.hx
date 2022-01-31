@@ -225,6 +225,9 @@ class Sdl {
 	private static function _getClipboardText() : hl.Bytes {
 		return null;
 	}
+	
+	public static function setDragAndDropEnabled( v : Bool ): Void {}
+	public static function getDragAndDropEnabled(): Bool { return false; }
 }
 
 @:enum
