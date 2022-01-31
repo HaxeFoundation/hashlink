@@ -339,12 +339,13 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 		case SDL_DROPBEGIN:
 			event->type = DropStart;
 			break;
-		case SDL_DROPFILE: case SDL_DROPTEXT:
-			vbyte* bytes = hl_copy_bytes(e.drop.file, (int) strlen(e.drop.file) + 1);
+		case SDL_DROPFILE: case SDL_DROPTEXT: {
+			vbyte* bytes = hl_copy_bytes(e.drop.file, (int)strlen(e.drop.file) + 1);
 			SDL_free(e.drop.file);
 			event->type = e.type == SDL_DROPFILE ? DropFile : DropText;
 			event->dropFile = bytes;
 			break;
+		}
 		case SDL_DROPCOMPLETE:
 			event->type = DropEnd;
 			break;
