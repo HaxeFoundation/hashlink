@@ -830,7 +830,7 @@ HL_PRIM char* HL_NAME(get_clipboard_text)() {
 }
 
 HL_PRIM void HL_NAME(set_drag_and_drop_enabled)( bool enabled ) {
-	return SDL_EventState(SDL_DROPFILE, enabled ? SDL_ENABLE : SDL_DISABLE);
+	SDL_EventState(SDL_DROPFILE, enabled ? SDL_ENABLE : SDL_DISABLE);
 }
 
 HL_PRIM bool HL_NAME(get_drag_and_drop_enabled)() {
