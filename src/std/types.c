@@ -540,10 +540,16 @@ HL_PRIM venum *hl_alloc_enum_dyn( hl_type *t, int index, varray *args, int nargs
 	hl_enum_construct *c = t->tenum->constructs + index;
 	venum *e;
 	int i;
-	if( c->nparams != nargs || args->size < nargs )
+	if( c->nparams < nargs || args->size < nargs )
 		return NULL;
+	if( nargs < c->nparams ) {
+		// allow missing params if they are null-able
+		for(i=nargs;i<c->nparams;i++)
+			if( !hl_is_ptr(c->params[i]) )
+				return NULL;
+	}
 	e = hl_alloc_enum(t, index);
-	for(i=0;i<c->nparams;i++)
+	for(i=0;i<nargs;i++)
 		hl_write_dyn((char*)e+c->offsets[i],c->params[i],hl_aptr(args,vdynamic*)[i],false);
 	return e;
 }
