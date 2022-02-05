@@ -32,10 +32,7 @@ HL_PRIM bool HL_NAME(vk_init)( bool enable_validation ) {
 		.ppEnabledExtensionNames = (const char* const[]) { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME },
 	};
 	
-	if( vkCreateInstance(&info, NULL, &instance) != VK_SUCCESS )
-		return false;
-
-	return true;
+	return vkCreateInstance(&info, NULL, &instance) == VK_SUCCESS;
 }
 
 vbyte *HL_NAME(vk_make_ref)( vdynamic *v ) {
@@ -48,10 +45,12 @@ vbyte *HL_NAME(vk_make_array)( varray *a ) {
 		return NULL;
 	if( a->at->kind == HABSTRACT )
 		return hl_copy_bytes(hl_aptr(a,vbyte), a->size * sizeof(void*));
+	if( a->at->kind == HI32 )
+		return hl_copy_bytes(hl_aptr(a,vbyte), a->size * sizeof(int));
 #ifdef HL_DEBUG
 	if( a->at->kind != HSTRUCT ) hl_error("assert");
 #endif
-	int size = a->at->kind == HABSTRACT ? sizeof(void*) : a->at->obj->rt->size;
+	int size = a->at->obj->rt->size;
 	vbyte *ptr = hl_alloc_bytes(size * a->size);
 	int i;
 	for(i=0;i<a->size;i++)
@@ -61,43 +60,21 @@ vbyte *HL_NAME(vk_make_array)( varray *a ) {
 
 // ------------------------------------------ CONTEXT INIT --------------------------------------------
 
-#define MAX_SWAPCHAIN_IMAGES 3
-#define FRAME_COUNT 2
-
-typedef struct {
-	VkCommandBuffer buffer;
-	VkFence fence;
-	VkFence wait;
-	VkSemaphore imageAvailable;
-	VkSemaphore renderFinished;
-} VkFrame;
-
 typedef struct _VkContext {
 	VkSurfaceKHR surface;
 	VkPhysicalDevice pdevice;
 	VkPhysicalDeviceMemoryProperties memProps;
 	VkDevice device;
 	VkQueue queue;
-	int queueFamily;
-
 	VkSwapchainKHR swapchain;
-	int swapchainImageCount;
-	VkFormat imageFormat;
-	VkImage swapchainImages[MAX_SWAPCHAIN_IMAGES];
-	VkFence imagesFences[MAX_SWAPCHAIN_IMAGES];
-
-	unsigned int currentFrame;
-	unsigned int currentImage;
-	VkCommandPool commandPool;
-	VkFrame frames[FRAME_COUNT];
-
 } *VkContext;
 
-void *vk_init_context( VkSurfaceKHR surface ) {
+VkContext HL_NAME(vk_init_context)( VkSurfaceKHR surface, int *outQueue ) {
 	VkContext ctx = (VkContext)malloc(sizeof(struct _VkContext));
 	memset(ctx,0,sizeof(struct _VkContext));
 	ctx->surface = surface;
 
+	int queueFamily = 0;
 	int physicalDeviceCount;
 #	define MAX_DEVICE_COUNT 16
 #	define MAX_QUEUE_COUNT 16
@@ -121,7 +98,7 @@ void *vk_init_context( VkSurfaceKHR surface ) {
 			VkBool32 supportsPresent = VK_FALSE;
 			vkGetPhysicalDeviceSurfaceSupportKHR(deviceHandles[i], j, ctx->surface, &supportsPresent);
 			if (supportsPresent && (queueFamilyProperties[j].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-				ctx->queueFamily = j;
+				queueFamily = j;
 				ctx->pdevice = deviceHandles[i];
 				break;
 			}
@@ -131,7 +108,7 @@ void *vk_init_context( VkSurfaceKHR surface ) {
 
 	VkDeviceQueueCreateInfo qinf = {
 		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-		.queueFamilyIndex = ctx->queueFamily,
+		.queueFamilyIndex = queueFamily,
 		.queueCount = 1,
 		.pQueuePriorities = (const float[]) { 1.0f }
 	};
@@ -150,37 +127,9 @@ void *vk_init_context( VkSurfaceKHR surface ) {
 	if( vkCreateDevice(ctx->pdevice, &dinf, NULL, &ctx->device) != VK_SUCCESS )
 		return NULL;
 
-	vkGetDeviceQueue(ctx->device, ctx->queueFamily, 0, &ctx->queue);
+	vkGetDeviceQueue(ctx->device, queueFamily, 0, &ctx->queue);
 	vkGetPhysicalDeviceMemoryProperties(ctx->pdevice, &ctx->memProps);
-
-	VkCommandPoolCreateInfo poolInf = {
-		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-		.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-		.queueFamilyIndex = ctx->queueFamily,
-	};
-	vkCreateCommandPool(ctx->device, &poolInf, 0, &ctx->commandPool);
-
-	VkCommandBuffer cbuffers[FRAME_COUNT];
-	VkCommandBufferAllocateInfo commandBufferAllocInfo = {
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = ctx->commandPool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = FRAME_COUNT,
-	};
-	vkAllocateCommandBuffers(ctx->device, &commandBufferAllocInfo, cbuffers);
-
-	VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-	VkFenceCreateInfo fenceCreateInfo = {
-		.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-		.flags = VK_FENCE_CREATE_SIGNALED_BIT
-	};
-	for(int i=0;i<FRAME_COUNT;i++) {
-		VkFrame *f = &ctx->frames[i];
-		f->buffer = cbuffers[i];
-		vkCreateSemaphore(ctx->device, &semaphoreCreateInfo, 0, &f->imageAvailable);
-		vkCreateSemaphore(ctx->device, &semaphoreCreateInfo, 0, &f->renderFinished);
-		vkCreateFence(ctx->device, &fenceCreateInfo, 0, &f->fence);
-	}
+	*outQueue = queueFamily;
 	return ctx;
 }
 
@@ -193,7 +142,7 @@ int HL_NAME(vk_find_memory_type)( VkContext ctx, int allowed, int req ) {
     return -1;
 }
 
-bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
+bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height, varray *outImages, VkFormat *outFormat ) {
 
 	vkDeviceWaitIdle(ctx->device);
 
@@ -204,7 +153,7 @@ bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
 
 	int formatCount = 1;
 	VkSurfaceFormatKHR format;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(ctx->pdevice, ctx->surface, &formatCount, 0); // suppress validation layer
+	vkGetPhysicalDeviceSurfaceFormatsKHR(ctx->pdevice, ctx->surface, &formatCount, 0);
 	formatCount = 1;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(ctx->pdevice, ctx->surface, &formatCount, &format);
 	format.format = format.format == VK_FORMAT_UNDEFINED ? VK_FORMAT_B8G8R8A8_UNORM : format.format;
@@ -216,9 +165,6 @@ bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
 	vkGetPhysicalDeviceSurfacePresentModesKHR(ctx->pdevice, ctx->surface, &modeCount, NULL);
 	modeCount = modeCount > MAX_PRESENT_MODE_COUNT ? MAX_PRESENT_MODE_COUNT : modeCount;
 	vkGetPhysicalDeviceSurfacePresentModesKHR(ctx->pdevice, ctx->surface, &modeCount, modes);
-
-	VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;   // always supported.
-	ctx->swapchainImageCount = 2;
 
 	VkSurfaceCapabilitiesKHR scaps;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(ctx->pdevice, ctx->surface, &scaps);
@@ -233,7 +179,7 @@ bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
 	VkSwapchainCreateInfoKHR swapInfo = {
 		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		.surface = ctx->surface,
-		.minImageCount = ctx->swapchainImageCount,
+		.minImageCount = outImages->size,
 		.imageFormat = format.format,
 		.imageColorSpace = format.colorSpace,
 		.imageExtent = swapchainExtent,
@@ -242,71 +188,18 @@ bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
 		.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		.preTransform = scaps.currentTransform,
 		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-		.presentMode = presentMode,
+		.presentMode = VK_PRESENT_MODE_FIFO_KHR, // always supported
 		.clipped = VK_TRUE,
 	};
 
 	if( vkCreateSwapchainKHR(ctx->device, &swapInfo, 0, &ctx->swapchain) != VK_SUCCESS )
 		return false;
 
-	vkGetSwapchainImagesKHR(ctx->device, ctx->swapchain, &ctx->swapchainImageCount, NULL);
-	vkGetSwapchainImagesKHR(ctx->device, ctx->swapchain, &ctx->swapchainImageCount, ctx->swapchainImages);
-	ctx->imageFormat = format.format;
+	vkGetSwapchainImagesKHR(ctx->device, ctx->swapchain, &outImages->size, NULL);
+	vkGetSwapchainImagesKHR(ctx->device, ctx->swapchain, &outImages->size, hl_aptr(outImages,void));
+	*outFormat = format.format;
 
 	return true;
-}
-
-HL_PRIM bool HL_NAME(vk_begin_frame)( VkContext ctx ) {
-	VkFrame *frame = &ctx->frames[ctx->currentFrame];
-	VkCommandBuffer buffer = frame->buffer;
-
-	vkWaitForFences(ctx->device, 1, &frame->fence, VK_TRUE, UINT64_MAX);
-
-	if( vkAcquireNextImageKHR(ctx->device, ctx->swapchain, UINT64_MAX, frame->imageAvailable, VK_NULL_HANDLE, &ctx->currentImage) != VK_SUCCESS )
-		return false;
-
-	if( ctx->imagesFences[ctx->currentImage] )
-		vkWaitForFences(ctx->device, 1, &ctx->imagesFences[ctx->currentImage], VK_TRUE, UINT64_MAX);
-	ctx->imagesFences[ctx->currentImage] = frame->fence;
-	vkResetFences(ctx->device, 1, &frame->fence);
-
-	VkCommandBufferBeginInfo beginInfo = {
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-	};
-	vkBeginCommandBuffer(buffer, &beginInfo);
-
-	return true;
-}
-
-HL_PRIM void HL_NAME(vk_end_frame)( VkContext ctx ) {
-	VkFrame *frame = &ctx->frames[ctx->currentFrame];
-	vkEndCommandBuffer(frame->buffer);
-
-	VkSubmitInfo submitInfo = {
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &frame->imageAvailable,
-		.pWaitDstStageMask = (VkPipelineStageFlags[]) { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT },
-		.commandBufferCount = 1,
-		.pCommandBuffers = &frame->buffer,
-		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &frame->renderFinished,
-	};
-	vkQueueSubmit(ctx->queue, 1, &submitInfo, frame->fence);
-
-	VkPresentInfoKHR presentInfo = {
-		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &frame->renderFinished,
-		.swapchainCount = 1,
-		.pSwapchains = &ctx->swapchain,
-		.pImageIndices = &ctx->currentImage,
-	};
-	vkQueuePresentKHR(ctx->queue, &presentInfo);
-
-	ctx->currentFrame++;
-	ctx->currentFrame %= FRAME_COUNT;
 }
 
 VkShaderModule HL_NAME(vk_create_shader_module)( VkContext ctx, vbyte *data, int len ) {
@@ -386,16 +279,58 @@ bool HL_NAME(vk_bind_buffer_memory)( VkContext ctx, VkBuffer buf, VkDeviceMemory
 	return vkBindBufferMemory(ctx->device, buf, mem, offset) == VK_SUCCESS;
 }
 
-VkImage HL_NAME(vk_get_current_image)( VkContext ctx ) {
-	return ctx->swapchainImages[ctx->currentImage];
+VkCommandPool HL_NAME(vk_create_command_pool)( VkContext ctx, VkCommandPoolCreateInfo *inf ) {
+	VkCommandPool pool = NULL;
+	vkCreateCommandPool(ctx->device,inf,NULL,&pool);
+	return pool;
 }
 
-VkFormat HL_NAME(vk_get_current_image_format)( VkContext ctx ) {
-	return ctx->imageFormat;
+bool HL_NAME(vk_allocate_command_buffers)( VkContext ctx, VkCommandBufferAllocateInfo *inf, varray *buffers ) {
+	return vkAllocateCommandBuffers(ctx->device, inf, hl_aptr(buffers,void)) == VK_SUCCESS;
 }
 
-VkCommandBuffer HL_NAME(vk_get_current_command_buffer)( VkContext ctx ) {
-	return ctx->frames[ctx->currentFrame].buffer;
+VkFence HL_NAME(vk_create_fence)( VkContext ctx, VkFenceCreateInfo *inf ) {
+	VkFence fence = NULL;
+	vkCreateFence(ctx->device,inf,NULL,&fence);
+	return fence;
+}
+
+VkSemaphore HL_NAME(vk_create_semaphore)( VkContext ctx, VkSemaphoreCreateInfo *inf ) {
+	VkSemaphore s = NULL;
+	vkCreateSemaphore(ctx->device,inf,NULL,&s);
+	return s;
+}
+
+void HL_NAME(vk_reset_fence)( VkContext ctx, VkFence f ) {
+	vkResetFences(ctx->device,1,&f);
+}
+
+bool HL_NAME(vk_wait_for_fence)( VkContext ctx, VkFence f, double timeout ) {
+	uint64_t t = (uint64_t)timeout;
+	return vkWaitForFences(ctx->device, 1, &f, TRUE, t) == VK_SUCCESS;
+}
+
+int HL_NAME(vk_get_next_image_index)( VkContext ctx, VkSemaphore lock ) {
+	int image = -1;
+	if( vkAcquireNextImageKHR(ctx->device, ctx->swapchain, UINT64_MAX, lock, VK_NULL_HANDLE, &image) != VK_SUCCESS )
+		return -1;
+	return image;
+}
+
+void HL_NAME(vk_queue_submit)( VkContext ctx, VkSubmitInfo *inf, VkFence fence ) {
+	vkQueueSubmit(ctx->queue, 1, inf, fence);
+}
+
+void HL_NAME(vk_present)( VkContext ctx, VkSemaphore sem, int image ) {
+	VkPresentInfoKHR presentInfo = {
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &sem,
+		.swapchainCount = 1,
+		.pSwapchains = &ctx->swapchain,
+		.pImageIndices = &image,
+	};
+	vkQueuePresentKHR(ctx->queue, &presentInfo);
 }
 
 #define _VCTX _ABSTRACT(vk_context)
@@ -410,19 +345,26 @@ VkCommandBuffer HL_NAME(vk_get_current_command_buffer)( VkContext ctx ) {
 #define _BUFFER _ABSTRACT(vk_buffer)
 #define _MEMORY _ABSTRACT(vk_device_memory)
 #define _CMD _ABSTRACT(vk_command_buffer)
+#define _CMD_POOL _ABSTRACT(vk_command_pool)
+#define _FENCE _ABSTRACT(vk_fence)
+#define _SEMAPHORE _ABSTRACT(vk_semaphore)
 
 DEFINE_PRIM(_BOOL, vk_init, _BOOL);
-DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32);
-DEFINE_PRIM(_BOOL, vk_begin_frame, _VCTX);
+DEFINE_PRIM(_VCTX, vk_init_context, _BYTES _REF(_I32));
+DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32 _ARR _REF(_I32));
 DEFINE_PRIM(_BYTES, vk_make_array, _ARR);
 DEFINE_PRIM(_BYTES, vk_make_ref, _DYN);
-DEFINE_PRIM(_VOID, vk_end_frame, _VCTX);
 DEFINE_PRIM(_I32, vk_find_memory_type, _VCTX _I32 _I32);
 DEFINE_PRIM(_SHADER_MODULE, vk_create_shader_module, _VCTX _BYTES _I32 );
 DEFINE_PRIM(_GPIPELINE, vk_create_graphics_pipeline, _VCTX _STRUCT);
 DEFINE_PRIM(_PIPELAYOUT, vk_create_pipeline_layout, _VCTX _STRUCT);
 DEFINE_PRIM(_RENDERPASS, vk_create_render_pass, _VCTX _STRUCT);
 DEFINE_PRIM(_IMAGE_VIEW, vk_create_image_view, _VCTX _STRUCT);
+DEFINE_PRIM(_FENCE, vk_create_fence, _VCTX _STRUCT);
+DEFINE_PRIM(_BOOL, vk_wait_for_fence, _VCTX _FENCE _F64);
+DEFINE_PRIM(_VOID, vk_reset_fence, _VCTX _FENCE);
+DEFINE_PRIM(_CMD_POOL, vk_create_command_pool, _VCTX _STRUCT);
+DEFINE_PRIM(_BOOL, vk_allocate_command_buffers, _VCTX _STRUCT _ARR);
 DEFINE_PRIM(_FRAMEBUFFER, vk_create_framebuffer, _VCTX _STRUCT);
 DEFINE_PRIM(_DESCRIPTOR_SET, vk_create_descriptor_set_layout, _VCTX _STRUCT);
 DEFINE_PRIM(_BUFFER, vk_create_buffer, _VCTX _STRUCT);
@@ -431,11 +373,20 @@ DEFINE_PRIM(_MEMORY, vk_allocate_memory, _VCTX _STRUCT);
 DEFINE_PRIM(_BYTES, vk_map_memory, _VCTX _MEMORY _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, vk_unmap_memory, _VCTX _MEMORY);
 DEFINE_PRIM(_BOOL, vk_bind_buffer_memory, _VCTX _BUFFER _MEMORY _I32);
-DEFINE_PRIM(_IMAGE, vk_get_current_image, _VCTX);
-DEFINE_PRIM(_I32, vk_get_current_image_format, _VCTX);
-DEFINE_PRIM(_CMD, vk_get_current_command_buffer, _VCTX);
+DEFINE_PRIM(_SEMAPHORE, vk_create_semaphore, _VCTX _STRUCT);
+DEFINE_PRIM(_I32, vk_get_next_image_index, _VCTX _SEMAPHORE);
+DEFINE_PRIM(_VOID, vk_queue_submit, _VCTX _STRUCT _FENCE);
+DEFINE_PRIM(_VOID, vk_present, _VCTX _SEMAPHORE _I32);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
+
+HL_PRIM void HL_NAME(vk_command_begin)( VkCommandBuffer out, VkCommandBufferBeginInfo *inf ) {
+	vkBeginCommandBuffer(out,inf);
+}
+
+HL_PRIM void HL_NAME(vk_command_end)( VkCommandBuffer out ) {
+	vkEndCommandBuffer(out);
+}
 
 HL_PRIM void HL_NAME(vk_clear_color_image)( VkCommandBuffer out, VkImage img, VkImageLayout layout, VkClearColorValue *colors, int count, VkImageSubresourceRange *range) {
 	vkCmdClearColorImage(out, img, layout, colors, count, range);
@@ -473,6 +424,8 @@ HL_PRIM void HL_NAME(vk_end_render_pass)( VkCommandBuffer out ) {
 	vkCmdEndRenderPass(out);
 }
 
+DEFINE_PRIM(_VOID, vk_command_begin, _CMD _STRUCT);
+DEFINE_PRIM(_VOID, vk_command_end, _CMD);
 DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMAGE _I32 _BYTES _I32 _STRUCT);
 DEFINE_PRIM(_VOID, vk_clear_depth_stencil_image, _CMD _IMAGE _I32 _BYTES _I32 _STRUCT);
 DEFINE_PRIM(_VOID, vk_clear_attachments, _CMD _I32 _BYTES _I32 _BYTES);

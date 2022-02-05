@@ -45,7 +45,7 @@ class Window {
 
 	var win : WinPtr;
 	var glctx : GLContext;
-	var vkctx : Vulkan.VkContext;
+	var vkctx : Vulkan.VkSurface;
 	var lastFrame : Float;
 	public var title(default, set) : String;
 	public var vsync(default, set) : Bool;
@@ -77,8 +77,6 @@ class Window {
 					destroy();
 					throw "Failed to create Vulkan Context";
 				}
-				if( !vkctx.initSwapchain(width, height) )
-					throw "Failed to init Vulkan Swapchain";
 			} else {
 				glctx = winGetGLContext(win);
 				if( glctx == null || !GL.init() || !testGL() ) {
@@ -361,7 +359,7 @@ class Window {
 	}
 
 	@:hlNative("?sdl","win_get_vulkan")
-	static function winGetVulkan( win : WinPtr ) : Vulkan.VkContext {
+	static function winGetVulkan( win : WinPtr ) : Vulkan.VkSurface {
 		return null;
 	}
 

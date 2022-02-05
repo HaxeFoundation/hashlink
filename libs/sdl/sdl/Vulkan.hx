@@ -1,5 +1,8 @@
 package sdl;
 
+abstract VkSurface(hl.Bytes) {
+}
+
 abstract VkShaderModule(hl.Abstract<"vk_shader_module">) {
 }
 
@@ -139,6 +142,58 @@ abstract IntArray<T>(hl.Bytes) {
 
 abstract NextPtr(hl.Bytes) {
 }
+
+enum VkCommandPoolCreateFlag {
+	TRANSIENT;
+	RESET_COMMAND_BUFFER;
+	PROTECTED;
+}
+
+@:struct class VkCommandPoolCreateInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+    public var flags : haxe.EnumFlags<VkCommandPoolCreateFlag>;
+	public var queueFamilyIndex : Int;
+	public function new() {
+		type = COMMAND_POOL_CREATE_INFO;
+	}
+}
+
+@:enum abstract VkCommandBufferLevel(Int) {
+	var PRIMARY = 0;
+	var SECONDARY = 1;
+}
+
+@:struct class VkCommandBufferAllocateInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var commandPool : VkCommandPool;
+    public var level : VkCommandBufferLevel;
+    public var commandBufferCount : Int;
+	public function new() {
+		type = COMMAND_BUFFER_ALLOCATE_INFO;
+	}
+}
+
+abstract VkCommandPool(hl.Abstract<"vk_command_pool">) {
+}
+
+enum VkFenceCreateFlag {
+	SIGNALED;
+}
+
+@:struct class VkFenceCreateInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var flags : haxe.EnumFlags<VkFenceCreateFlag>;
+	public function new() {
+		type = FENCE_CREATE_INFO;
+	}
+}
+
+abstract VkFence(hl.Abstract<"vk_fence">) {
+}
+
 
 @:struct class VkPipelineShaderStage {
 	public var type : VkStructureType;
@@ -818,7 +873,7 @@ enum abstract VkDescriptorType(Int) {
 	public function new() {}
 }
 
-@:struct class VkDescriptorSetLayoutInfo {
+@:struct class VkDescriptorSetLayoutCreateInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
 	public var flags : UnusedFlags;
@@ -829,7 +884,7 @@ enum abstract VkDescriptorType(Int) {
 	}
 }
 
-@:struct class VkPipelineLayoutInfo {
+@:struct class VkPipelineLayoutCreateInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
 	public var flags : UnusedFlags;
@@ -1005,7 +1060,7 @@ enum VkDependencyFlag {
 	public function new() {}
 }
 
-@:struct class VkRenderPassInfo {
+@:struct class VkRenderPassCreateInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
 	public var flags : UnusedFlags;
@@ -1020,7 +1075,7 @@ enum VkDependencyFlag {
 	}
 }
 
-@:struct class VkGraphicsPipelineInfo {
+@:struct class VkGraphicsPipelineCreateInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkPipelineCreateFlags>;
@@ -1081,7 +1136,7 @@ enum VkFramebufferCreateFlag {
 	IMAGELESS;
 }
 
-@:struct class VkFramebufferInfo {
+@:struct class VkFramebufferCreateInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkFramebufferCreateFlag>;
@@ -1135,7 +1190,7 @@ enum VkImageAspectFlag {
 	MEMORY_PLANE_3;
 }
 
-@:struct class VkImageViewInfo {
+@:struct class VkImageViewCreateInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkImageViewCreateFlag>;
@@ -1235,91 +1290,7 @@ enum VkMemoryPropertyFlag {
 	DEVICE_UNCACHED_AMD;
 }
 
-@:hlNative("?sdl","vk_img_")
-abstract VkImage(hl.Abstract<"vk_image">) {}
 
-@:hlNative("?sdl","vk_")
-abstract VkContext(hl.Abstract<"vk_context">) {
-
-	public function initSwapchain( width : Int, height : Int ) : Bool {
-		return false;
-	}
-
-	public function beginFrame() : Bool {
-		return false;
-	}
-
-	public function getCurrentImage() : VkImage {
-		return null;
-	}
-
-	@:hlNative("?sdl","vk_get_current_image_format")
-	public function getCurrentImageFormat() : VkFormat {
-		return UNDEFINED;
-	}
-
-	public function getCurrentCommandBuffer() : VkCommandBuffer {
-		return null;
-	}
-
-	public function endFrame() {
-	}
-
-	public function createShaderModule( source : hl.Bytes, len : Int ) : VkShaderModule {
-		return null;
-	}
-
-	public function createGraphicsPipeline( inf : VkGraphicsPipelineInfo ) : VkGraphicsPipeline {
-		return null;
-	}
-
-	public function createPipelineLayout( inf : VkPipelineLayoutInfo ) : VkPipelineLayout {
-		return null;
-	}
-
-	public function createRenderPass( inf : VkRenderPassInfo ) : VkRenderPass {
-		return null;
-	}
-
-	public function createDescriptorSetLayout( inf : VkDescriptorSetLayoutInfo ) : VkDescriptorSetLayout {
-		return null;
-	}
-
-	public function createFramebuffer( inf : VkFramebufferInfo ) : VkFramebuffer {
-		return null;
-	}
-
-	public function createImageView( inf : VkImageViewInfo ) : VkImageView {
-		return null;
-	}
-
-	public function createBuffer( inf : VkBufferCreateInfo ) : VkBuffer {
-		return null;
-	}
-
-	public function getBufferMemoryRequirements( b : VkBuffer, inf : VkMemoryRequirements ) {
-	}
-
-	public function allocateMemory( inf : VkMemoryAllocateInfo ) : VkDeviceMemory {
-		return null;
-	}
-
-	public function bindBufferMemory( b : VkBuffer, mem : VkDeviceMemory, memOffset : Int ) {
-		return false;
-	}
-
-	public function findMemoryType( allowed : Int, required : haxe.EnumFlags<VkMemoryPropertyFlag> ) : Int {
-		return 0;
-	}
-
-	public function mapMemory( mem : VkDeviceMemory, offset : Int, size : Int, flags : Int ) : hl.Bytes {
-		return null;
-	}
-
-	public function unmapMemory( mem : VkDeviceMemory ) {
-	}
-
-}
 
 enum abstract ShaderKind(Int) {
 	var Vertex = 0;
@@ -1392,6 +1363,146 @@ enum abstract ShaderKind(Int) {
 	}
 }
 
+abstract VkSemaphore(hl.Abstract<"vk_semaphore">) {}
+
+@:struct class VkSemaphoreCreateInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	var unusedFlags : Int;
+	public function new() {
+		type = SEMAPHORE_CREATE_INFO;
+	}
+}
+
+enum VkCommandBufferUsageFlag {
+	ONE_TIME_SUBMIT;
+	RENDER_PASS_CONTINUE;
+	SIMULTANEOUS_USE;
+}
+
+@:struct class VkCommandBufferBeginInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var flags : haxe.EnumFlags<VkCommandBufferUsageFlag>;
+	public var pInheritanceInfo : {};
+	public function new() {
+		type = COMMAND_BUFFER_BEGIN_INFO;
+	}
+}
+
+@:struct class VkSubmitInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var waitSemaphoreCount : Int;
+	public var pWaitSemaphores : ArrayStruct<VkSemaphore>;
+	public var pWaitDstStageMask : ArrayStruct<haxe.EnumFlags<VkPipelineStageFlag>>;
+	public var commandBufferCount : Int;
+	public var pCommandBuffers : ArrayStruct<VkCommandBuffer>;
+	public var signalSemaphoreCount : Int;
+	public var pSignalSemaphores : ArrayStruct<VkSemaphore>;
+	public function new() {
+		type = SUBMIT_INFO;
+	}
+}
+
+abstract VkImage(hl.Abstract<"vk_image">) {}
+
+@:hlNative("?sdl","vk_")
+abstract VkContext(hl.Abstract<"vk_context">) {
+
+	public function initSwapchain( width : Int, height : Int, outImages : hl.NativeArray<VkImage>, outFormat : hl.Ref<VkFormat> ) : Bool {
+		return false;
+	}
+
+	public function createCommandPool( inf : VkCommandPoolCreateInfo ) : VkCommandPool {
+		return null;
+	}
+
+	public function allocateCommandBuffers( inf : VkCommandBufferAllocateInfo, buffers : hl.NativeArray<VkCommandBuffer> ) : Bool {
+		return false;
+	}
+
+	public function getNextImageIndex( sem : VkSemaphore ) : Int {
+		return 0;
+	}
+
+	public function createSemaphore( inf : VkSemaphoreCreateInfo ) : VkSemaphore {
+		return null;
+	}
+
+	public function waitForFence( fence : VkFence, timeout : Float ) : Bool {
+		return false;
+	}
+
+	public function resetFence( fence : VkFence ) {
+	}
+
+	public function createFence( inf : VkFenceCreateInfo ) : VkFence {
+		return null;
+	}
+
+	public function createShaderModule( source : hl.Bytes, len : Int ) : VkShaderModule {
+		return null;
+	}
+
+	public function createGraphicsPipeline( inf : VkGraphicsPipelineCreateInfo ) : VkGraphicsPipeline {
+		return null;
+	}
+
+	public function createPipelineLayout( inf : VkPipelineLayoutCreateInfo ) : VkPipelineLayout {
+		return null;
+	}
+
+	public function createRenderPass( inf : VkRenderPassCreateInfo ) : VkRenderPass {
+		return null;
+	}
+
+	public function createDescriptorSetLayout( inf : VkDescriptorSetLayoutCreateInfo ) : VkDescriptorSetLayout {
+		return null;
+	}
+
+	public function createFramebuffer( inf : VkFramebufferCreateInfo ) : VkFramebuffer {
+		return null;
+	}
+
+	public function createImageView( inf : VkImageViewCreateInfo ) : VkImageView {
+		return null;
+	}
+
+	public function createBuffer( inf : VkBufferCreateInfo ) : VkBuffer {
+		return null;
+	}
+
+	public function getBufferMemoryRequirements( b : VkBuffer, inf : VkMemoryRequirements ) {
+	}
+
+	public function allocateMemory( inf : VkMemoryAllocateInfo ) : VkDeviceMemory {
+		return null;
+	}
+
+	public function bindBufferMemory( b : VkBuffer, mem : VkDeviceMemory, memOffset : Int ) {
+		return false;
+	}
+
+	public function findMemoryType( allowed : Int, required : haxe.EnumFlags<VkMemoryPropertyFlag> ) : Int {
+		return 0;
+	}
+
+	public function mapMemory( mem : VkDeviceMemory, offset : Int, size : Int, flags : Int ) : hl.Bytes {
+		return null;
+	}
+
+	public function unmapMemory( mem : VkDeviceMemory ) {
+	}
+
+	public function queueSubmit( submit : VkSubmitInfo, fence : VkFence ) {
+	}
+
+	public function present( sem : VkSemaphore, currentImage : Int ) {
+	}
+
+}
+
 @:hlNative("?sdl","vk_")
 abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
 
@@ -1422,12 +1533,24 @@ abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
 	public function endRenderPass() {
 	}
 
+	@:hlNative("?sdl","vk_command_begin")
+	public function begin( inf : VkCommandBufferBeginInfo ) {
+	}
+
+	@:hlNative("?sdl","vk_command_end")
+	public function end() {
+	}
+
 }
 
 @:hlNative("?sdl","vk_")
 class Vulkan {
 
 	public static var ENABLE_VALIDATION = false;
+
+	public static function initContext( surface : VkSurface, queueFamily : hl.Ref<Int> ) : VkContext {
+		return null;
+	}
 
 	public static function compileShader( source : String, fileName : String, mainFunction : String, kind : ShaderKind ) {
 		var outSize = -1;
