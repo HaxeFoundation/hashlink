@@ -154,6 +154,10 @@ int HL_NAME(vk_find_memory_type)( VkContext ctx, int allowed, int req ) {
     return -1;
 }
 
+void HL_NAME(vk_get_pdevice_format_props)( VkContext ctx, VkFormat format, VkFormatProperties *props ) {
+	vkGetPhysicalDeviceFormatProperties(ctx->pdevice, format, props);
+}
+
 bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height, varray *outImages, VkFormat *outFormat ) {
 
 	vkDeviceWaitIdle(ctx->device);
@@ -291,6 +295,20 @@ bool HL_NAME(vk_bind_buffer_memory)( VkContext ctx, VkBuffer buf, VkDeviceMemory
 	return vkBindBufferMemory(ctx->device, buf, mem, offset) == VK_SUCCESS;
 }
 
+VkImage HL_NAME(vk_create_image)( VkContext ctx, VkImageCreateInfo *info ) {
+	VkImage i = NULL;
+	vkCreateImage(ctx->device, info, NULL, &i);
+	return i;
+}
+
+void HL_NAME(vk_get_image_memory_requirements)( VkContext ctx, VkImage img, VkMemoryRequirements *info ) {
+	vkGetImageMemoryRequirements(ctx->device,img,info);
+}
+
+bool HL_NAME(vk_bind_image_memory)( VkContext ctx, VkImage img, VkDeviceMemory mem, int offset ) {
+	return vkBindImageMemory(ctx->device, img, mem, offset) == VK_SUCCESS;
+}
+
 VkCommandPool HL_NAME(vk_create_command_pool)( VkContext ctx, VkCommandPoolCreateInfo *inf ) {
 	VkCommandPool pool = NULL;
 	vkCreateCommandPool(ctx->device,inf,NULL,&pool);
@@ -383,6 +401,9 @@ DEFINE_PRIM(_FRAMEBUFFER, vk_create_framebuffer, _VCTX _STRUCT);
 DEFINE_PRIM(_DESCRIPTOR_SET, vk_create_descriptor_set_layout, _VCTX _STRUCT);
 DEFINE_PRIM(_BUFFER, vk_create_buffer, _VCTX _STRUCT);
 DEFINE_PRIM(_VOID, vk_get_buffer_memory_requirements, _VCTX _BUFFER _STRUCT);
+DEFINE_PRIM(_IMAGE, vk_create_image, _VCTX _STRUCT);
+DEFINE_PRIM(_VOID, vk_get_image_memory_requirements, _VCTX _IMAGE _STRUCT);
+DEFINE_PRIM(_BOOL, vk_bind_image_memory, _VCTX _IMAGE _MEMORY _I32);
 DEFINE_PRIM(_MEMORY, vk_allocate_memory, _VCTX _STRUCT);
 DEFINE_PRIM(_BYTES, vk_map_memory, _VCTX _MEMORY _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, vk_unmap_memory, _VCTX _MEMORY);
@@ -391,6 +412,7 @@ DEFINE_PRIM(_SEMAPHORE, vk_create_semaphore, _VCTX _STRUCT);
 DEFINE_PRIM(_I32, vk_get_next_image_index, _VCTX _SEMAPHORE);
 DEFINE_PRIM(_VOID, vk_queue_submit, _VCTX _STRUCT _FENCE);
 DEFINE_PRIM(_VOID, vk_present, _VCTX _SEMAPHORE _I32);
+DEFINE_PRIM(_VOID, vk_get_pdevice_format_props, _VCTX _I32 _STRUCT);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
 

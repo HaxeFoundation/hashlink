@@ -1107,13 +1107,20 @@ enum VkDependencyFlag {
 }
 
 @:struct class VkClearValue {
-	public var colorR : Single;
-	public var colorG : Single;
-	public var colorB : Single;
-	public var colorA : Single;
-	public var depth : Single;
-	public var stencil : Int;
+	public var r : Single;
+	public var g : Single;
+	public var b : Single;
+	public var a : Single;
+	public var depth(get,set) : Single;
+	public var stencil(get,set) : Int;
 	public function new() {
+	}
+	inline function get_depth() return r;
+	inline function set_depth(v) return r = v;
+	inline function get_stencil() return haxe.io.FPHelper.floatToI32(g);
+	inline function set_stencil(v:Int) {
+		g = haxe.io.FPHelper.floatToI32(v);
+		return v;
 	}
 }
 
@@ -1303,22 +1310,7 @@ enum abstract ShaderKind(Int) {
 	var Fragment = 1;
 }
 
-@:struct class VkClearColorValue {
-	public var r : Single;
-	public var g : Single;
-	public var b : Single;
-	public var a : Single;
-	public var v1 : Int;
-	public var v2 : Int;
-	public var v3 : Int;
-	public var v4 : Int;
-	public var u1 : Int;
-	public var u2 : Int;
-	public var u3 : Int;
-	public var u4 : Int;
-	public function new() {
-	}
-}
+typedef VkClearColorValue = VkClearValue;
 
 @:struct class VkClearDepthStencilValue {
 	public var depth : Single;
@@ -1344,17 +1336,16 @@ enum abstract ShaderKind(Int) {
 	public var g : Single;
 	public var b : Single;
 	public var a : Single;
-	public var v1 : Int;
-	public var v2 : Int;
-	public var v3 : Int;
-	public var v4 : Int;
-	public var u1 : Int;
-	public var u2 : Int;
-	public var u3 : Int;
-	public var u4 : Int;
-	public var depth : Single;
-	public var stencil : Int;
+	public var depth(get,set) : Single;
+	public var stencil(get,set) : Int;
 	public function new() {
+	}
+	inline function get_depth() return r;
+	inline function set_depth(v) return r = v;
+	inline function get_stencil() return haxe.io.FPHelper.floatToI32(g);
+	inline function set_stencil(v:Int) {
+		g = haxe.io.FPHelper.floatToI32(v);
+		return v;
 	}
 }
 
@@ -1531,6 +1522,119 @@ abstract VkImage(hl.Abstract<"vk_image">) {}
 	public var nonCoherentAtomSize : hl.I64;
 }
 
+@:struct class VkFormatProperties {
+	public var linearTilingFeatures : Int;
+	public var optimalTilingFeatures : Int;
+	public var bufferFeatures : Int;
+	public function new() {}
+}
+
+@:enum abstract VkFormatFeature(Int) {
+	var SAMPLED_IMAGE = 0x00000001;
+	var STORAGE_IMAGE = 0x00000002;
+	var STORAGE_IMAGE_ATOMIC = 0x00000004;
+	var UNIFORM_TEXEL_BUFFER = 0x00000008;
+	var STORAGE_TEXEL_BUFFER = 0x00000010;
+	var STORAGE_TEXEL_BUFFER_ATOMIC = 0x00000020;
+	var VERTEX_BUFFER = 0x00000040;
+	var COLOR_ATTACHMENT = 0x00000080;
+	var COLOR_ATTACHMENT_BLEND = 0x00000100;
+	var DEPTH_STENCIL_ATTACHMENT = 0x00000200;
+	var BLIT_SRC = 0x00000400;
+	var BLIT_DST = 0x00000800;
+	var SAMPLED_IMAGE_FILTER_LINEAR = 0x00001000;
+	var TRANSFER_SRC = 0x00004000;
+	var TRANSFER_DST = 0x00008000;
+	var MIDPOINT_CHROMA_SAMPLES = 0x00020000;
+	var SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER = 0x00040000;
+	var SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER = 0x00080000;
+	var SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT = 0x00100000;
+	var SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE = 0x00200000;
+	var DISJOINT = 0x00400000;
+	var COSITED_CHROMA_SAMPLES = 0x00800000;
+	var SAMPLED_IMAGE_FILTER_MINMAX = 0x00010000;
+	var SAMPLED_IMAGE_FILTER_CUBIC = 0x00002000;
+	var ACCELERATION_STRUCTURE_VERTEX_BUFFER = 0x20000000;
+	var FRAGMENT_DENSITY_MAP = 0x01000000;
+	var FRAGMENT_SHADING_RATE_ATTACHMENT = 0x40000000;
+	@:op(a|b) inline function or(f:VkFormatFeature) {
+		return this | f.toInt();
+	}
+	inline function toInt() {
+		return this;
+	}
+}
+
+enum VkImageCreateFlag {
+	SPARSE_BINDING;
+	SPARSE_RESIDENCY;
+	SPARSE_ALIASED;
+	MUTABLE_FORMAT;
+	CUBE_COMPATIBLE;
+// Provided by VK_VERSION_1_1
+	_2D_ARRAY_COMPATIBLE;
+	SPLIT_INSTANCE_BIND_REGIONS;
+	BLOCK_TEXEL_VIEW_COMPATIBLE;
+	EXTENDED_USAGE;
+	DISJOINT;
+	ALIAS;
+	PROTECTED;
+// Provided by VK_EXT_sample_locations
+	SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_EXT;
+// Provided by VK_NV_corner_sampled_image
+	CORNER_SAMPLED_NV;
+// Provided by VK_EXT_fragment_density_map
+	SUBSAMPLED_EXT;
+}
+
+@:enum abstract VkImageTiling(Int) {
+	var OPTIMAL = 0;
+	var LINEAR = 1;
+}
+
+@:enum abstract VkImageType(Int) {
+	var TYPE_1D = 0;
+	var TYPE_2D = 1;
+	var TYPE_3D = 2;
+}
+
+enum VkImageUsageFlag {
+	TRANSFER_SRC;
+	TRANSFER_DST;
+	SAMPLED;
+	STORAGE;
+	COLOR_ATTACHMENT;
+	DEPTH_STENCIL_ATTACHMENT;
+	TRANSIENT_ATTACHMENT;
+	INPUT_ATTACHMENT;
+	SHADING_RATE_IMAGE_NV;
+	FRAGMENT_DENSITY_MAP_EXT;
+}
+
+@:struct class VkImageCreateInfo {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var flags : haxe.EnumFlags<VkImageCreateFlag>;
+	public var imageType : VkImageType;
+	public var format : VkFormat;
+	public var width : Int;
+	public var height : Int;
+	public var depth : Int;
+	public var mipLevels : Int;
+	public var arrayLayers : Int;
+	public var samples : Int;
+	public var tiling : VkImageTiling;
+	public var usage : haxe.EnumFlags<VkImageUsageFlag>;
+	public var sharingMode : VkSharingMode;
+	public var queueFamilyIndexCount : Int;
+	public var pQueueFamilyIndices : ArrayStruct<Int>;
+	public var initialLayout : VkImageLayout;
+
+	public function new() {
+		type = IMAGE_CREATE_INFO;
+	}
+}
+
 @:hlNative("?sdl","vk_")
 abstract VkContext(hl.Abstract<"vk_context">) {
 
@@ -1540,6 +1644,9 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 
 	public function getDeviceName() {
 		return @:privateAccess String.fromUTF8(get_device_name());
+	}
+
+	public function getPdeviceFormatProps( format : VkFormat, props : VkFormatProperties ) {
 	}
 
 	function get_device_name() : hl.Bytes {
@@ -1617,6 +1724,17 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 	}
 
 	public function bindBufferMemory( b : VkBuffer, mem : VkDeviceMemory, memOffset : Int ) {
+		return false;
+	}
+
+	public function createImage( inf : VkImageCreateInfo ) : VkImage {
+		return null;
+	}
+
+	public function getImageMemoryRequirements( b : VkImage, inf : VkMemoryRequirements ) {
+	}
+
+	public function bindImageMemory( b : VkImage, mem : VkDeviceMemory, memOffset : Int ) {
 		return false;
 	}
 
