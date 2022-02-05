@@ -995,13 +995,13 @@ enum VkDependencyFlag {
 }
 
 @:struct class VkSubpassDependency {
-	var srcSubpass : Int;
-	var dstSubpass : Int;
-	var srcStageMask : haxe.EnumFlags<VkPipelineStageFlag>;
-	var dstStageMask : haxe.EnumFlags<VkPipelineStageFlag>;
-	var srcAccessMask : haxe.EnumFlags<VkAccessFlag>;
-	var dstAccessMask : haxe.EnumFlags<VkAccessFlag>;
-	var dependencyFlags : haxe.EnumFlags<VkDependencyFlag>;
+	public var srcSubpass : Int;
+	public var dstSubpass : Int;
+	public var srcStageMask : haxe.EnumFlags<VkPipelineStageFlag>;
+	public var dstStageMask : haxe.EnumFlags<VkPipelineStageFlag>;
+	public var srcAccessMask : haxe.EnumFlags<VkAccessFlag>;
+	public var dstAccessMask : haxe.EnumFlags<VkAccessFlag>;
+	public var dependencyFlags : haxe.EnumFlags<VkDependencyFlag>;
 	public function new() {}
 }
 
@@ -1326,13 +1326,82 @@ enum abstract ShaderKind(Int) {
 	var Fragment = 1;
 }
 
+@:struct class VkClearColorValue {
+	public var r : Single;
+	public var g : Single;
+	public var b : Single;
+	public var a : Single;
+	public var v1 : Int;
+	public var v2 : Int;
+	public var v3 : Int;
+	public var v4 : Int;
+	public var u1 : Int;
+	public var u2 : Int;
+	public var u3 : Int;
+	public var u4 : Int;
+	public function new() {
+	}
+}
+
+@:struct class VkClearDepthStencilValue {
+	public var depth : Single;
+	public var stencil : Int;
+	public function new() {
+	}
+}
+
+@:struct class VkImageSubResourceRange {
+	public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
+	public var baseMipLevel : Int;
+	public var levelCount : Int;
+	public var baseArrayLayer : Int;
+	public var layerCount : Int;
+	public function new() {
+	}
+}
+
+@:struct class VkClearAttachment {
+	public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
+    public var colorAttachment : Int;
+	public var r : Single;
+	public var g : Single;
+	public var b : Single;
+	public var a : Single;
+	public var v1 : Int;
+	public var v2 : Int;
+	public var v3 : Int;
+	public var v4 : Int;
+	public var u1 : Int;
+	public var u2 : Int;
+	public var u3 : Int;
+	public var u4 : Int;
+	public var depth : Single;
+	public var stencil : Int;
+	public function new() {
+	}
+}
+
+@:struct class VkClearRect {
+	public var offsetX : Int;
+	public var offsetY : Int;
+	public var extendX : Int;
+	public var extendY : Int;
+	public var baseArrayLayer : Int;
+	public var layerCount : Int;
+	public function new() {
+	}
+}
+
 @:hlNative("?sdl","vk_")
 abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
 
-	public function clearColorImage( img : VkImage, r : Float, g : Float, b : Float, a : Float ) {
+	public function clearColorImage( img : VkImage, layout : VkImageLayout, colors : ArrayStruct<VkClearColorValue>, colorCount : Int, range : VkImageSubResourceRange ) {
 	}
 
-	public function clearDepthStencilImage( img : VkImage, depth : Float, stencil : Int ) {
+	public function clearDepthStencilImage( img : VkImage, layout : VkImageLayout, values : ArrayStruct<VkClearDepthStencilValue>, valuesCount : Int, range : VkImageSubResourceRange ) {
+	}
+
+	public function clearAttachments( attachCount : Int, attachs : ArrayStruct<VkClearAttachment>, rectCount : Int, rects : ArrayStruct<VkClearRect> ) {
 	}
 
 	public function drawIndexed( indexCount : Int, instanceCount : Int, firstIndex : Int, vertexOffset : Int, firstInstance : Int ) {
@@ -1372,6 +1441,10 @@ class Vulkan {
 	}
 
 	static function compile_shader( source : hl.Bytes, shaderFile : hl.Bytes, mainFunction : hl.Bytes, kind : ShaderKind, outSize : hl.Ref<Int> ) : hl.Bytes {
+		return null;
+	}
+
+	public static function makeRef<T>( arr : T ) : ArrayStruct<T> {
 		return null;
 	}
 

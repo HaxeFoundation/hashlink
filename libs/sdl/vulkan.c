@@ -38,6 +38,11 @@ HL_PRIM bool HL_NAME(vk_init)( bool enable_validation ) {
 	return true;
 }
 
+vbyte *HL_NAME(vk_make_ref)( vdynamic *v ) {
+	if( v->t->kind != HSTRUCT ) hl_error("assert");
+	return v->v.ptr;
+}
+
 vbyte *HL_NAME(vk_make_array)( varray *a ) {
 	if( a->size == 0 )
 		return NULL;
@@ -62,6 +67,7 @@ vbyte *HL_NAME(vk_make_array)( varray *a ) {
 typedef struct {
 	VkCommandBuffer buffer;
 	VkFence fence;
+	VkFence wait;
 	VkSemaphore imageAvailable;
 	VkSemaphore renderFinished;
 } VkFrame;
@@ -78,6 +84,7 @@ typedef struct _VkContext {
 	int swapchainImageCount;
 	VkFormat imageFormat;
 	VkImage swapchainImages[MAX_SWAPCHAIN_IMAGES];
+	VkFence imagesFences[MAX_SWAPCHAIN_IMAGES];
 
 	unsigned int currentFrame;
 	unsigned int currentImage;
@@ -213,17 +220,6 @@ bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
 	VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;   // always supported.
 	ctx->swapchainImageCount = 2;
 
-	// using MAILBOX will be same as no vsync
-	/*
-	for(int i=0; i<modeCount; i++) {
-		if( modes[i] == VK_PRESENT_MODE_MAILBOX_KHR ) {
-			presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-			ctx->swapchainImageCount = 3;
-			break;
-		}
-	}
-	*/
-
 	VkSurfaceCapabilitiesKHR scaps;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(ctx->pdevice, ctx->surface, &scaps);
 
@@ -260,14 +256,6 @@ bool HL_NAME(vk_init_swapchain)( VkContext ctx, int width, int height ) {
 	return true;
 }
 
-const VkImageSubresourceRange RANGE_ALL = {
-	.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-	.baseMipLevel = 0,
-	.levelCount = VK_REMAINING_MIP_LEVELS,
-	.baseArrayLayer = 0,
-	.layerCount = VK_REMAINING_ARRAY_LAYERS,
-};
-
 HL_PRIM bool HL_NAME(vk_begin_frame)( VkContext ctx ) {
 	VkFrame *frame = &ctx->frames[ctx->currentFrame];
 	VkCommandBuffer buffer = frame->buffer;
@@ -277,6 +265,9 @@ HL_PRIM bool HL_NAME(vk_begin_frame)( VkContext ctx ) {
 	if( vkAcquireNextImageKHR(ctx->device, ctx->swapchain, UINT64_MAX, frame->imageAvailable, VK_NULL_HANDLE, &ctx->currentImage) != VK_SUCCESS )
 		return false;
 
+	if( ctx->imagesFences[ctx->currentImage] )
+		vkWaitForFences(ctx->device, 1, &ctx->imagesFences[ctx->currentImage], VK_TRUE, UINT64_MAX);
+	ctx->imagesFences[ctx->currentImage] = frame->fence;
 	vkResetFences(ctx->device, 1, &frame->fence);
 
 	VkCommandBufferBeginInfo beginInfo = {
@@ -285,45 +276,11 @@ HL_PRIM bool HL_NAME(vk_begin_frame)( VkContext ctx ) {
 	};
 	vkBeginCommandBuffer(buffer, &beginInfo);
 
-	VkImageMemoryBarrier barrier = {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		  .srcAccessMask = 0,
-			.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			.srcQueueFamilyIndex = ctx->queueFamily,
-			.dstQueueFamilyIndex = ctx->queueFamily,
-			.image = ctx->swapchainImages[ctx->currentImage],
-			.subresourceRange = RANGE_ALL,
-	};
-	vkCmdPipelineBarrier(buffer,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-		0, 0, NULL, 0, NULL, 1, &barrier
-	);
-
 	return true;
 }
 
 HL_PRIM void HL_NAME(vk_end_frame)( VkContext ctx ) {
 	VkFrame *frame = &ctx->frames[ctx->currentFrame];
-
-	VkImageMemoryBarrier barrier2 = {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-		.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-		.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-		.srcQueueFamilyIndex = ctx->queueFamily,
-		.dstQueueFamilyIndex = ctx->queueFamily,
-		.image = ctx->swapchainImages[ctx->currentImage],
-		.subresourceRange = RANGE_ALL,
-	};
-	vkCmdPipelineBarrier(frame->buffer,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-		0, 0, NULL, 0, NULL, 1,
-		&barrier2
-	);
-
 	vkEndCommandBuffer(frame->buffer);
 
 	VkSubmitInfo submitInfo = {
@@ -350,8 +307,6 @@ HL_PRIM void HL_NAME(vk_end_frame)( VkContext ctx ) {
 
 	ctx->currentFrame++;
 	ctx->currentFrame %= FRAME_COUNT;
-	ctx->currentImage++;
-	ctx->currentImage %= ctx->swapchainImageCount;
 }
 
 VkShaderModule HL_NAME(vk_create_shader_module)( VkContext ctx, vbyte *data, int len ) {
@@ -460,6 +415,7 @@ DEFINE_PRIM(_BOOL, vk_init, _BOOL);
 DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32);
 DEFINE_PRIM(_BOOL, vk_begin_frame, _VCTX);
 DEFINE_PRIM(_BYTES, vk_make_array, _ARR);
+DEFINE_PRIM(_BYTES, vk_make_ref, _DYN);
 DEFINE_PRIM(_VOID, vk_end_frame, _VCTX);
 DEFINE_PRIM(_I32, vk_find_memory_type, _VCTX _I32 _I32);
 DEFINE_PRIM(_SHADER_MODULE, vk_create_shader_module, _VCTX _BYTES _I32 );
@@ -481,14 +437,16 @@ DEFINE_PRIM(_CMD, vk_get_current_command_buffer, _VCTX);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
 
-HL_PRIM void HL_NAME(vk_clear_color_image)( VkCommandBuffer out, VkImage img, double r, double g, double b, double a ) {
-	VkClearColorValue color = { (float)r, (float)g, (float)b, (float)a };
-	vkCmdClearColorImage(out, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1, &RANGE_ALL);
+HL_PRIM void HL_NAME(vk_clear_color_image)( VkCommandBuffer out, VkImage img, VkImageLayout layout, VkClearColorValue *colors, int count, VkImageSubresourceRange *range) {
+	vkCmdClearColorImage(out, img, layout, colors, count, range);
 }
 
-HL_PRIM void HL_NAME(vk_clear_depth_stencil_image)( VkCommandBuffer out, VkImage img, double d, int stencil ) {
-	VkClearDepthStencilValue ds = { (float)d, (uint32_t)stencil };
-	vkCmdClearDepthStencilImage(out, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ds, 1, &RANGE_ALL);
+HL_PRIM void HL_NAME(vk_clear_attachments)( VkCommandBuffer out, int count, VkClearAttachment *attachs, int rectCount, VkClearRect *rects ) {
+	vkCmdClearAttachments(out, count, attachs, rectCount, rects);
+}
+
+HL_PRIM void HL_NAME(vk_clear_depth_stencil_image)( VkCommandBuffer out, VkImage img, VkImageLayout layout, VkClearDepthStencilValue *values, int count, VkImageSubresourceRange *range) {
+	vkCmdClearDepthStencilImage(out, img, layout, values, count, range);
 }
 
 HL_PRIM void HL_NAME(vk_draw_indexed)( VkCommandBuffer out, int indexCount, int instanceCount, int firstIndex, int vertexOffset, int firstInstance ) {
@@ -515,8 +473,9 @@ HL_PRIM void HL_NAME(vk_end_render_pass)( VkCommandBuffer out ) {
 	vkCmdEndRenderPass(out);
 }
 
-DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMAGE _F64 _F64 _F64 _F64);
-DEFINE_PRIM(_VOID, vk_clear_depth_stencil_image, _CMD _IMAGE _F64 _I32);
+DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMAGE _I32 _BYTES _I32 _STRUCT);
+DEFINE_PRIM(_VOID, vk_clear_depth_stencil_image, _CMD _IMAGE _I32 _BYTES _I32 _STRUCT);
+DEFINE_PRIM(_VOID, vk_clear_attachments, _CMD _I32 _BYTES _I32 _BYTES);
 DEFINE_PRIM(_VOID, vk_draw_indexed, _CMD _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, vk_bind_pipeline, _CMD _I32 _GPIPELINE);
 DEFINE_PRIM(_VOID, vk_begin_render_pass, _CMD _STRUCT _I32);
