@@ -133,6 +133,18 @@ VkContext HL_NAME(vk_init_context)( VkSurfaceKHR surface, int *outQueue ) {
 	return ctx;
 }
 
+vbyte *HL_NAME(vk_get_device_name)( VkContext ctx ) {
+	VkPhysicalDeviceProperties props;
+	vkGetPhysicalDeviceProperties(ctx->pdevice, &props);
+	return hl_copy_bytes(props.deviceName, (int)strlen(props.deviceName)+1);
+}
+
+VkPhysicalDeviceLimits *HL_NAME(vk_get_limits)( VkContext ctx ) {
+	VkPhysicalDeviceProperties props;
+	vkGetPhysicalDeviceProperties(ctx->pdevice, &props);
+	return (VkPhysicalDeviceLimits*)hl_copy_bytes((vbyte*)&props.limits, sizeof(VkPhysicalDeviceLimits));
+}
+
 int HL_NAME(vk_find_memory_type)( VkContext ctx, int allowed, int req ) {
 	unsigned int i;
     for(i=0;i<ctx->memProps.memoryTypeCount;i++) {
@@ -354,6 +366,8 @@ DEFINE_PRIM(_VCTX, vk_init_context, _BYTES _REF(_I32));
 DEFINE_PRIM(_BOOL, vk_init_swapchain, _VCTX _I32 _I32 _ARR _REF(_I32));
 DEFINE_PRIM(_BYTES, vk_make_array, _ARR);
 DEFINE_PRIM(_BYTES, vk_make_ref, _DYN);
+DEFINE_PRIM(_STRUCT, vk_get_limits, _VCTX);
+DEFINE_PRIM(_BYTES, vk_get_device_name, _VCTX);
 DEFINE_PRIM(_I32, vk_find_memory_type, _VCTX _I32 _I32);
 DEFINE_PRIM(_SHADER_MODULE, vk_create_shader_module, _VCTX _BYTES _I32 );
 DEFINE_PRIM(_GPIPELINE, vk_create_graphics_pipeline, _VCTX _STRUCT);
@@ -424,6 +438,10 @@ HL_PRIM void HL_NAME(vk_end_render_pass)( VkCommandBuffer out ) {
 	vkCmdEndRenderPass(out);
 }
 
+HL_PRIM void HL_NAME(vk_push_constants)( VkCommandBuffer out, VkPipelineLayout layout, VkShaderStageFlags flags, int offset, int size, vbyte *data ) {
+	vkCmdPushConstants(out, layout, flags, offset, size, data);
+}
+
 DEFINE_PRIM(_VOID, vk_command_begin, _CMD _STRUCT);
 DEFINE_PRIM(_VOID, vk_command_end, _CMD);
 DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMAGE _I32 _BYTES _I32 _STRUCT);
@@ -434,6 +452,7 @@ DEFINE_PRIM(_VOID, vk_bind_pipeline, _CMD _I32 _GPIPELINE);
 DEFINE_PRIM(_VOID, vk_begin_render_pass, _CMD _STRUCT _I32);
 DEFINE_PRIM(_VOID, vk_bind_index_buffer, _CMD _BUFFER _I32 _I32);
 DEFINE_PRIM(_VOID, vk_bind_vertex_buffers, _CMD _I32 _I32 _BYTES _BYTES);
+DEFINE_PRIM(_VOID, vk_push_constants, _CMD _PIPELAYOUT _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID, vk_end_render_pass, _CMD);
 
 // ------ SHADER COMPILATION ------------------------------

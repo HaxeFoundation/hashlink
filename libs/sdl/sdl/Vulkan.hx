@@ -152,7 +152,7 @@ enum VkCommandPoolCreateFlag {
 @:struct class VkCommandPoolCreateInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
-    public var flags : haxe.EnumFlags<VkCommandPoolCreateFlag>;
+	public var flags : haxe.EnumFlags<VkCommandPoolCreateFlag>;
 	public var queueFamilyIndex : Int;
 	public function new() {
 		type = COMMAND_POOL_CREATE_INFO;
@@ -168,8 +168,8 @@ enum VkCommandPoolCreateFlag {
 	public var type : VkStructureType;
 	public var next : NextPtr;
 	public var commandPool : VkCommandPool;
-    public var level : VkCommandBufferLevel;
-    public var commandBufferCount : Int;
+	public var level : VkCommandBufferLevel;
+	public var commandBufferCount : Int;
 	public function new() {
 		type = COMMAND_BUFFER_ALLOCATE_INFO;
 	}
@@ -858,7 +858,7 @@ enum abstract VkDescriptorType(Int) {
 }
 
 @:struct class VkPushConstantRange {
-	public var stageFlags : UnusedFlags;
+	public var stageFlags : haxe.EnumFlags<VkShaderStageFlag>;
 	public var offset : Int;
 	public var size : Int;
 	public function new() {}
@@ -873,10 +873,16 @@ enum abstract VkDescriptorType(Int) {
 	public function new() {}
 }
 
+enum VkDescriptorSetLayoutCreateFlag {
+	PUSH_DESCRIPTOR_KHR;
+	UPDATE_AFTER_BIND_POOL;
+	HOST_ONLY_POOL_VALVE;
+}
+
 @:struct class VkDescriptorSetLayoutCreateInfo {
 	public var type : VkStructureType;
 	public var next : NextPtr;
-	public var flags : UnusedFlags;
+	public var flags : haxe.EnumFlags<VkDescriptorSetLayoutCreateFlag>;
 	public var bindingCount : Int;
 	public var bindings : ArrayStruct<VkDescriptorSetLayoutBinding>;
 	public function new() {
@@ -1280,10 +1286,10 @@ enum abstract VkSharingMode(Int) {
 }
 
 enum VkMemoryPropertyFlag {
-    DEVICE_LOCAL;
-    HOST_VISIBLE;
-    HOST_COHERENT;
-    HOST_CACHED;
+	DEVICE_LOCAL;
+	HOST_VISIBLE;
+	HOST_COHERENT;
+	HOST_CACHED;
 	LAZILY_ALLOCATED;
 	PROTECTED;
 	DEVICE_COHERENT_AMD;
@@ -1333,7 +1339,7 @@ enum abstract ShaderKind(Int) {
 
 @:struct class VkClearAttachment {
 	public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
-    public var colorAttachment : Int;
+	public var colorAttachment : Int;
 	public var r : Single;
 	public var g : Single;
 	public var b : Single;
@@ -1407,8 +1413,138 @@ enum VkCommandBufferUsageFlag {
 
 abstract VkImage(hl.Abstract<"vk_image">) {}
 
+@:struct class VkPhysicalDeviceLimits {
+	public var maxImageDimension1D : Int;
+	public var maxImageDimension2D : Int;
+	public var maxImageDimension3D : Int;
+	public var maxImageDimensionCube : Int;
+	public var maxImageArrayLayers : Int;
+	public var maxTexelBufferElements : Int;
+	public var maxUniformBufferRange : Int;
+	public var maxStorageBufferRange : Int;
+	public var maxPushConstantsSize : Int;
+	public var maxMemoryAllocationCount : Int;
+	public var maxSamplerAllocationCount : Int;
+	public var bufferImageGranularity : Int;
+	public var bufferImageGranularityHigh : Int;
+	public var sparseAddressSpaceSize : hl.I64;
+	public var maxBoundDescriptorSets : Int;
+	public var maxPerStageDescriptorSamplers : Int;
+	public var maxPerStageDescriptorUniformBuffers : Int;
+	public var maxPerStageDescriptorStorageBuffers : Int;
+	public var maxPerStageDescriptorSampledImages : Int;
+	public var maxPerStageDescriptorStorageImages : Int;
+	public var maxPerStageDescriptorInputAttachments : Int;
+	public var maxPerStageResources : Int;
+	public var maxDescriptorSetSamplers : Int;
+	public var maxDescriptorSetUniformBuffers : Int;
+	public var maxDescriptorSetUniformBuffersDynamic : Int;
+	public var maxDescriptorSetStorageBuffers : Int;
+	public var maxDescriptorSetStorageBuffersDynamic : Int;
+	public var maxDescriptorSetSampledImages : Int;
+	public var maxDescriptorSetStorageImages : Int;
+	public var maxDescriptorSetInputAttachments : Int;
+	public var maxVertexInputAttributes : Int;
+	public var maxVertexInputBindings : Int;
+	public var maxVertexInputAttributeOffset : Int;
+	public var maxVertexInputBindingStride : Int;
+	public var maxVertexOutputComponents : Int;
+	public var maxTessellationGenerationLevel : Int;
+	public var maxTessellationPatchSize : Int;
+	public var maxTessellationControlPerVertexInputComponents : Int;
+	public var maxTessellationControlPerVertexOutputComponents : Int;
+	public var maxTessellationControlPerPatchOutputComponents : Int;
+	public var maxTessellationControlTotalOutputComponents : Int;
+	public var maxTessellationEvaluationInputComponents : Int;
+	public var maxTessellationEvaluationOutputComponents : Int;
+	public var maxGeometryShaderInvocations : Int;
+	public var maxGeometryInputComponents : Int;
+	public var maxGeometryOutputComponents : Int;
+	public var maxGeometryOutputVertices : Int;
+	public var maxGeometryTotalOutputComponents : Int;
+	public var maxFragmentInputComponents : Int;
+	public var maxFragmentOutputAttachments : Int;
+	public var maxFragmentDualSrcAttachments : Int;
+	public var maxFragmentCombinedOutputResources : Int;
+	public var maxComputeSharedMemorySize : Int;
+	public var maxComputeWorkGroupCount : Int;
+	public var maxComputeWorkGroupCount1 : Int;
+	public var maxComputeWorkGroupCount2 : Int;
+	public var maxComputeWorkGroupInvocations : Int;
+	public var maxComputeWorkGroupSize : Int;
+	public var maxComputeWorkGroupSize1 : Int;
+	public var maxComputeWorkGroupSize2 : Int;
+	public var subPixelPrecisionBits : Int;
+	public var subTexelPrecisionBits : Int;
+	public var mipmapPrecisionBits : Int;
+	public var maxDrawIndexedIndexValue : Int;
+	public var maxDrawIndirectCount : Int;
+	public var maxSamplerLodBias : Single;
+	public var maxSamplerAnisotropy : Single;
+	public var maxViewports : Int;
+	public var maxViewportDimensionsW : Int;
+	public var maxViewportDimensionsH : Int;
+	public var viewportBoundsRange : Single;
+	public var viewportBoundsRange2 : Single;
+	public var viewportSubPixelBits : Int;
+	public var minMemoryMapAlignment : hl.I64;
+	public var minTexelBufferOffsetAlignment : hl.I64;
+	public var minUniformBufferOffsetAlignment : hl.I64;
+	public var minStorageBufferOffsetAlignment : hl.I64;
+	public var minTexelOffset : Int;
+	public var maxTexelOffset : Int;
+	public var minTexelGatherOffset : Int;
+	public var maxTexelGatherOffset : Int;
+	public var minInterpolationOffset : Single;
+	public var maxInterpolationOffset : Single;
+	public var subPixelInterpolationOffsetBits : Int;
+	public var maxFramebufferWidth : Int;
+	public var maxFramebufferHeight : Int;
+	public var maxFramebufferLayers : Int;
+	public var framebufferColorSampleCounts : Int;
+	public var framebufferDepthSampleCounts : Int;
+	public var framebufferStencilSampleCounts : Int;
+	public var framebufferNoAttachmentsSampleCounts : Int;
+	public var maxColorAttachments : Int;
+	public var sampledImageColorSampleCounts : Int;
+	public var sampledImageIntegerSampleCounts : Int;
+	public var sampledImageDepthSampleCounts : Int;
+	public var sampledImageStencilSampleCounts : Int;
+	public var storageImageSampleCounts : Int;
+	public var maxSampleMaskWords : Int;
+	public var timestampComputeAndGraphics : VkBool32;
+	public var timestampPeriod : Single;
+	public var maxClipDistances : Int;
+	public var maxCullDistances : Int;
+	public var maxCombinedClipAndCullDistances : Int;
+	public var discreteQueuePriorities : Int;
+	public var pointSizeRange : Single;
+	public var pointSizeRange2 : Single;
+	public var lineWidthRange : Single;
+	public var lineWidthRange2 : Single;
+	public var pointSizeGranularity : Single;
+	public var lineWidthGranularity : Single;
+	public var strictLines : VkBool32;
+	public var standardSampleLocations : VkBool32;
+	public var optimalBufferCopyOffsetAlignment : hl.I64;
+	public var optimalBufferCopyRowPitchAlignment : hl.I64;
+	public var nonCoherentAtomSize : hl.I64;
+}
+
 @:hlNative("?sdl","vk_")
 abstract VkContext(hl.Abstract<"vk_context">) {
+
+	public function getLimits() : VkPhysicalDeviceLimits {
+		return null;
+	}
+
+	public function getDeviceName() {
+		return @:privateAccess String.fromUTF8(get_device_name());
+	}
+
+	function get_device_name() : hl.Bytes {
+		return null;
+	}
 
 	public function initSwapchain( width : Int, height : Int, outImages : hl.NativeArray<VkImage>, outFormat : hl.Ref<VkFormat> ) : Bool {
 		return false;
@@ -1531,6 +1667,9 @@ abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
 	}
 
 	public function endRenderPass() {
+	}
+
+	public function pushConstants( layout : VkPipelineLayout, flags : haxe.EnumFlags<VkShaderStageFlag>, offset : Int, size : Int, data : hl.Bytes ) {
 	}
 
 	@:hlNative("?sdl","vk_command_begin")
