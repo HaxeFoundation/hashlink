@@ -724,6 +724,7 @@ HL_API void hl_add_root( void *ptr );
 HL_API void hl_remove_root( void *ptr );
 HL_API void hl_gc_major( void );
 HL_API bool hl_is_gc_ptr( void *ptr );
+HL_API int hl_gc_get_memsize( void *ptr );
 
 HL_API void hl_blocking( bool b );
 HL_API bool hl_is_blocking( void );

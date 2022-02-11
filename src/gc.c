@@ -741,6 +741,13 @@ HL_API bool hl_is_gc_ptr( void *ptr ) {
 	return true;
 }
 
+HL_API int hl_gc_get_memsize( void *ptr ) {
+	gc_pheader *page = GC_GET_PAGE(ptr);
+	if( !page || !INPAGE(ptr,page) ) return -1;
+	return gc_allocator_fast_block_size(page,ptr);
+}
+
+
 static bool gc_is_active = true;
 
 static void gc_check_mark() {
