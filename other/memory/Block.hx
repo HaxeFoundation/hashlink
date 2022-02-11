@@ -124,6 +124,7 @@ class Block {
 	public function markDepth() {
 		var d = depth + 1;
 		var all = subs;
+		if( all == null ) return;
 		while( all.length > 0 ) {
 			var out = [];
 			for( b in all ) {
