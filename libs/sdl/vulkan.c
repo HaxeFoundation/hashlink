@@ -316,7 +316,7 @@ VkCommandPool HL_NAME(vk_create_command_pool)( VkContext ctx, VkCommandPoolCreat
 }
 
 bool HL_NAME(vk_allocate_command_buffers)( VkContext ctx, VkCommandBufferAllocateInfo *inf, varray *buffers ) {
-	return vkAllocateCommandBuffers(ctx->device, inf, hl_aptr(buffers,void)) == VK_SUCCESS;
+	return vkAllocateCommandBuffers(ctx->device, inf, hl_aptr(buffers,VkCommandBuffer)) == VK_SUCCESS;
 }
 
 VkFence HL_NAME(vk_create_fence)( VkContext ctx, VkFenceCreateInfo *inf ) {
@@ -351,6 +351,10 @@ void HL_NAME(vk_queue_submit)( VkContext ctx, VkSubmitInfo *inf, VkFence fence )
 	vkQueueSubmit(ctx->queue, 1, inf, fence);
 }
 
+void HL_NAME(vk_queue_wait_idle)( VkContext ctx ) {
+	vkQueueWaitIdle(ctx->queue);
+}
+
 void HL_NAME(vk_present)( VkContext ctx, VkSemaphore sem, int image ) {
 	VkPresentInfoKHR presentInfo = {
 		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -361,6 +365,42 @@ void HL_NAME(vk_present)( VkContext ctx, VkSemaphore sem, int image ) {
 		.pImageIndices = &image,
 	};
 	vkQueuePresentKHR(ctx->queue, &presentInfo);
+}
+
+void HL_NAME(vk_destroy_buffer)( VkContext ctx, VkBuffer buf ) {
+	vkDestroyBuffer(ctx->device, buf, NULL);
+}
+
+void HL_NAME(vk_destroy_image)( VkContext ctx, VkImage img ) {
+	vkDestroyImage(ctx->device, img, NULL);
+}
+
+void HL_NAME(vk_destroy_image_view)( VkContext ctx, VkImageView view ) {
+	vkDestroyImageView(ctx->device, view, NULL);
+}
+
+void HL_NAME(vk_free_memory)( VkContext ctx, VkDeviceMemory mem ) {
+	vkFreeMemory(ctx->device, mem, NULL);
+}
+
+void HL_NAME(vk_destroy_fence)( VkContext ctx, VkFence fence ) {
+	vkDestroyFence(ctx->device, fence, NULL);
+}
+
+void HL_NAME(vk_destroy_semaphore)( VkContext ctx, VkSemaphore sem ) {
+	vkDestroySemaphore(ctx->device, sem, NULL);
+}
+
+void HL_NAME(vk_destroy_command_pool)( VkContext ctx, VkCommandPool pool ) {
+	vkDestroyCommandPool(ctx->device, pool, NULL);
+}
+
+void HL_NAME(vk_free_command_buffers)( VkContext ctx, VkCommandPool pool, varray *cmd ) {
+	vkFreeCommandBuffers(ctx->device, pool, cmd->size, hl_aptr(cmd,VkCommandBuffer));
+}
+
+void HL_NAME(vk_destroy_framebuffer)( VkContext ctx, VkFramebuffer fb ) {
+	vkDestroyFramebuffer(ctx->device, fb, NULL);
 }
 
 #define _VCTX _ABSTRACT(vk_context)
@@ -411,8 +451,18 @@ DEFINE_PRIM(_BOOL, vk_bind_buffer_memory, _VCTX _BUFFER _MEMORY _I32);
 DEFINE_PRIM(_SEMAPHORE, vk_create_semaphore, _VCTX _STRUCT);
 DEFINE_PRIM(_I32, vk_get_next_image_index, _VCTX _SEMAPHORE);
 DEFINE_PRIM(_VOID, vk_queue_submit, _VCTX _STRUCT _FENCE);
+DEFINE_PRIM(_VOID, vk_queue_wait_idle, _VCTX);
 DEFINE_PRIM(_VOID, vk_present, _VCTX _SEMAPHORE _I32);
 DEFINE_PRIM(_VOID, vk_get_pdevice_format_props, _VCTX _I32 _STRUCT);
+DEFINE_PRIM(_VOID, vk_destroy_image, _VCTX _IMAGE);
+DEFINE_PRIM(_VOID, vk_destroy_image_view, _VCTX _IMAGE_VIEW);
+DEFINE_PRIM(_VOID, vk_destroy_framebuffer, _VCTX _FRAMEBUFFER);
+DEFINE_PRIM(_VOID, vk_free_command_buffers, _VCTX _CMD_POOL _ARR);
+DEFINE_PRIM(_VOID, vk_destroy_command_pool, _VCTX _CMD_POOL);
+DEFINE_PRIM(_VOID, vk_destroy_buffer, _VCTX _BUFFER);
+DEFINE_PRIM(_VOID, vk_destroy_fence, _VCTX _FENCE);
+DEFINE_PRIM(_VOID, vk_destroy_semaphore, _VCTX _SEMAPHORE);
+DEFINE_PRIM(_VOID, vk_free_memory, _VCTX _MEMORY);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
 
@@ -464,6 +514,14 @@ HL_PRIM void HL_NAME(vk_push_constants)( VkCommandBuffer out, VkPipelineLayout l
 	vkCmdPushConstants(out, layout, flags, offset, size, data);
 }
 
+HL_PRIM void HL_NAME(vk_copy_buffer_to_image)( VkCommandBuffer out, VkBuffer buf, VkImage img, VkImageLayout layout, int count, VkBufferImageCopy *regions ) {
+	vkCmdCopyBufferToImage(out, buf, img, layout, count, regions);
+}
+
+HL_PRIM void HL_NAME(vk_pipeline_barrier)( VkCommandBuffer out, VkPipelineStageFlags srcMask, VkPipelineStageFlags dstMask, VkDependencyFlags flags, int memCount, VkMemoryBarrier *memBarriers, int bufferCount, VkBufferMemoryBarrier *bufBarriers, int imageCount, VkImageMemoryBarrier *imgBarriers ) {
+	vkCmdPipelineBarrier(out, srcMask, dstMask, flags, memCount, memBarriers, bufferCount, bufBarriers, imageCount, imgBarriers);
+}
+
 DEFINE_PRIM(_VOID, vk_command_begin, _CMD _STRUCT);
 DEFINE_PRIM(_VOID, vk_command_end, _CMD);
 DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMAGE _I32 _BYTES _I32 _STRUCT);
@@ -476,6 +534,8 @@ DEFINE_PRIM(_VOID, vk_bind_index_buffer, _CMD _BUFFER _I32 _I32);
 DEFINE_PRIM(_VOID, vk_bind_vertex_buffers, _CMD _I32 _I32 _BYTES _BYTES);
 DEFINE_PRIM(_VOID, vk_push_constants, _CMD _PIPELAYOUT _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID, vk_end_render_pass, _CMD);
+DEFINE_PRIM(_VOID, vk_copy_buffer_to_image, _CMD _BUFFER _IMAGE _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID, vk_pipeline_barrier, _CMD _I32 _I32 _I32 _I32 _BYTES _I32 _BYTES _I32 _BYTES);
 
 // ------ SHADER COMPILATION ------------------------------
 

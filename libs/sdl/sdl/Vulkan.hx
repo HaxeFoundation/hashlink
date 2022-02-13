@@ -1635,6 +1635,69 @@ enum VkImageUsageFlag {
 	}
 }
 
+@:struct class VkBufferImageCopy {
+    public var bufferOffset : hl.I64;
+    public var bufferRowLength : Int;
+    public var bufferImageHeight : Int;
+    public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
+	public var mipLevel : Int;
+	public var baseArrayLayer : Int;
+	public var layerCount : Int;
+    public var imageOffsetX : Int;
+    public var imageOffsetY : Int;
+    public var imageOffsetZ : Int;
+    public var imageWidth : Int;
+    public var imageHeight : Int;
+    public var imageDepth : Int;
+	public function new() {
+	}
+}
+
+@:struct class VkMemoryBarrier {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var srcAccessMask : haxe.EnumFlags<VkAccessFlag>;
+	public var dstAccessMask : haxe.EnumFlags<VkAccessFlag>;
+	public function new() {
+		type = MEMORY_BARRIER;
+	}
+}
+
+@:struct class VkBufferMemoryBarrier {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var srcAccessMask : haxe.EnumFlags<VkAccessFlag>;
+	public var dstAccessMask : haxe.EnumFlags<VkAccessFlag>;
+    public var srcQueueFamilyIndex : Int;
+    public var dstQueueFamilyIndex : Int;
+    public var buffer : VkBuffer;
+    public var offset : hl.I64;
+    public var size : hl.I64;
+	public function new() {
+		type = BUFFER_MEMORY_BARRIER;
+	}
+}
+
+@:struct class VkImageMemoryBarrier {
+	public var type : VkStructureType;
+	public var next : NextPtr;
+	public var srcAccessMask : haxe.EnumFlags<VkAccessFlag>;
+	public var dstAccessMask : haxe.EnumFlags<VkAccessFlag>;
+	public var oldLayout : VkImageLayout;
+	public var newLayout : VkImageLayout;
+    public var srcQueueFamilyIndex : Int;
+    public var dstQueueFamilyIndex : Int;
+    public var image : VkImage;
+    public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
+    public var baseMipLevel : Int;
+    public var levelCount : Int;
+    public var baseArrayLayer : Int;
+    public var layerCount : Int;
+	public function new() {
+		type = IMAGE_MEMORY_BARRIER;
+	}
+}
+
 @:hlNative("?sdl","vk_")
 abstract VkContext(hl.Abstract<"vk_context">) {
 
@@ -1752,7 +1815,37 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 	public function queueSubmit( submit : VkSubmitInfo, fence : VkFence ) {
 	}
 
+	public function queueWaitIdle() {
+	}
+
 	public function present( sem : VkSemaphore, currentImage : Int ) {
+	}
+
+	public function destroyImage( img : VkImage ) {
+	}
+
+	public function destroyImageView( view : VkImageView ) {
+	}
+
+	public function destroyFramebuffer( buf : VkFramebuffer ) {
+	}
+
+	public function freeCommandBuffers( pool : VkCommandPool, arr : hl.NativeArray<VkCommandBuffer> ) {
+	}
+
+	public function destroyCommandPool( pool : VkCommandPool ) {
+	}
+
+	public function destroyBuffer( buf : VkBuffer ) {
+	}
+
+	public function destroyFence( fence : VkFence ) {
+	}
+
+	public function destroySemaphore( sem : VkSemaphore ) {
+	}
+
+	public function freeMemory( mem : VkDeviceMemory ) {
 	}
 
 }
@@ -1788,6 +1881,16 @@ abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
 	}
 
 	public function pushConstants( layout : VkPipelineLayout, flags : haxe.EnumFlags<VkShaderStageFlag>, offset : Int, size : Int, data : hl.Bytes ) {
+	}
+
+	public function copyBufferToImage( buf : VkBuffer, img : VkImage, layout : VkImageLayout, count : Int, regions : ArrayStruct<VkBufferImageCopy> ) {
+	}
+
+	public function pipelineBarrier(
+		srcMask : haxe.EnumFlags<VkPipelineStageFlag>, dstMask : haxe.EnumFlags<VkPipelineStageFlag>, flags : haxe.EnumFlags<VkDependencyFlag>,
+		memCount : Int, memBarriers : ArrayStruct<VkMemoryBarrier>,
+		bufferCount : Int, bufBarriers : ArrayStruct<VkBufferMemoryBarrier>,
+		imageCount : Int, imgBarriers : ArrayStruct<VkImageMemoryBarrier> ) {
 	}
 
 	@:hlNative("?sdl","vk_command_begin")
