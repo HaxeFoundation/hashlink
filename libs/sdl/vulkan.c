@@ -319,11 +319,32 @@ bool HL_NAME(vk_allocate_command_buffers)( VkContext ctx, VkCommandBufferAllocat
 	return vkAllocateCommandBuffers(ctx->device, inf, hl_aptr(buffers,VkCommandBuffer)) == VK_SUCCESS;
 }
 
+VkDescriptorPool HL_NAME(vk_create_descriptor_pool)( VkContext ctx, VkDescriptorPoolCreateInfo *inf ) {
+	VkDescriptorPool pool = NULL;
+	vkCreateDescriptorPool(ctx->device,inf,NULL,&pool);
+	return pool;
+}
+
+bool HL_NAME(vk_allocate_descriptor_sets)( VkContext ctx, VkDescriptorSetAllocateInfo *inf, varray *sets ) {
+	return vkAllocateDescriptorSets(ctx->device, inf, hl_aptr(sets,VkDescriptorSet)) == VK_SUCCESS;
+}
+
+void HL_NAME(vk_update_descriptor_sets)( VkContext ctx, int writeCount, VkWriteDescriptorSet *write, int copyCount, VkCopyDescriptorSet *copy ) {
+	vkUpdateDescriptorSets(ctx->device, writeCount, write, copyCount, copy);
+}
+
+VkSampler HL_NAME(vk_create_sampler)( VkContext ctx, VkSamplerCreateInfo *inf ) {
+	VkSampler sampler = NULL;
+	vkCreateSampler(ctx->device, inf, NULL, &sampler);
+	return sampler;
+}
+
 VkFence HL_NAME(vk_create_fence)( VkContext ctx, VkFenceCreateInfo *inf ) {
 	VkFence fence = NULL;
 	vkCreateFence(ctx->device,inf,NULL,&fence);
 	return fence;
 }
+
 
 VkSemaphore HL_NAME(vk_create_semaphore)( VkContext ctx, VkSemaphoreCreateInfo *inf ) {
 	VkSemaphore s = NULL;
@@ -403,6 +424,14 @@ void HL_NAME(vk_destroy_framebuffer)( VkContext ctx, VkFramebuffer fb ) {
 	vkDestroyFramebuffer(ctx->device, fb, NULL);
 }
 
+void HL_NAME(vk_destroy_descriptor_pool)( VkContext ctx, VkDescriptorPool pool ) {
+	vkDestroyDescriptorPool(ctx->device, pool, NULL);
+}
+
+void HL_NAME(vk_destroy_sampler)( VkContext ctx, VkSampler sampler ) {
+	vkDestroySampler(ctx->device, sampler, NULL);
+}
+
 #define _VCTX _ABSTRACT(vk_context)
 #define _SHADER_MODULE _ABSTRACT(vk_shader_module)
 #define _GPIPELINE _ABSTRACT(vk_gpipeline)
@@ -411,13 +440,16 @@ void HL_NAME(vk_destroy_framebuffer)( VkContext ctx, VkFramebuffer fb ) {
 #define _IMAGE _ABSTRACT(vk_image)
 #define _IMAGE_VIEW _ABSTRACT(vk_image_view)
 #define _FRAMEBUFFER _ABSTRACT(vk_framebuffer)
-#define _DESCRIPTOR_SET _ABSTRACT(vk_descriptor_set)
+#define _DLAYOUT _ABSTRACT(vk_descriptor_layout)
 #define _BUFFER _ABSTRACT(vk_buffer)
 #define _MEMORY _ABSTRACT(vk_device_memory)
 #define _CMD _ABSTRACT(vk_command_buffer)
 #define _CMD_POOL _ABSTRACT(vk_command_pool)
 #define _FENCE _ABSTRACT(vk_fence)
 #define _SEMAPHORE _ABSTRACT(vk_semaphore)
+#define _DPOOL _ABSTRACT(vk_descriptor_pool)
+#define _DSET _ABSTRACT(vk_descriptor_set)
+#define _SAMPLER _ABSTRACT(vk_sampler)
 
 DEFINE_PRIM(_BOOL, vk_init, _BOOL);
 DEFINE_PRIM(_VCTX, vk_init_context, _BYTES _REF(_I32));
@@ -438,7 +470,8 @@ DEFINE_PRIM(_VOID, vk_reset_fence, _VCTX _FENCE);
 DEFINE_PRIM(_CMD_POOL, vk_create_command_pool, _VCTX _STRUCT);
 DEFINE_PRIM(_BOOL, vk_allocate_command_buffers, _VCTX _STRUCT _ARR);
 DEFINE_PRIM(_FRAMEBUFFER, vk_create_framebuffer, _VCTX _STRUCT);
-DEFINE_PRIM(_DESCRIPTOR_SET, vk_create_descriptor_set_layout, _VCTX _STRUCT);
+DEFINE_PRIM(_DLAYOUT, vk_create_descriptor_set_layout, _VCTX _STRUCT);
+DEFINE_PRIM(_SAMPLER, vk_create_sampler, _VCTX _STRUCT);
 DEFINE_PRIM(_BUFFER, vk_create_buffer, _VCTX _STRUCT);
 DEFINE_PRIM(_VOID, vk_get_buffer_memory_requirements, _VCTX _BUFFER _STRUCT);
 DEFINE_PRIM(_IMAGE, vk_create_image, _VCTX _STRUCT);
@@ -454,6 +487,9 @@ DEFINE_PRIM(_VOID, vk_queue_submit, _VCTX _STRUCT _FENCE);
 DEFINE_PRIM(_VOID, vk_queue_wait_idle, _VCTX);
 DEFINE_PRIM(_VOID, vk_present, _VCTX _SEMAPHORE _I32);
 DEFINE_PRIM(_VOID, vk_get_pdevice_format_props, _VCTX _I32 _STRUCT);
+DEFINE_PRIM(_DPOOL, vk_create_descriptor_pool, _VCTX _STRUCT);
+DEFINE_PRIM(_BOOL, vk_allocate_descriptor_sets, _VCTX _STRUCT _ARR);
+DEFINE_PRIM(_VOID, vk_update_descriptor_sets, _VCTX _I32 _BYTES _I32 _BYTES);
 DEFINE_PRIM(_VOID, vk_destroy_image, _VCTX _IMAGE);
 DEFINE_PRIM(_VOID, vk_destroy_image_view, _VCTX _IMAGE_VIEW);
 DEFINE_PRIM(_VOID, vk_destroy_framebuffer, _VCTX _FRAMEBUFFER);
@@ -463,6 +499,8 @@ DEFINE_PRIM(_VOID, vk_destroy_buffer, _VCTX _BUFFER);
 DEFINE_PRIM(_VOID, vk_destroy_fence, _VCTX _FENCE);
 DEFINE_PRIM(_VOID, vk_destroy_semaphore, _VCTX _SEMAPHORE);
 DEFINE_PRIM(_VOID, vk_free_memory, _VCTX _MEMORY);
+DEFINE_PRIM(_VOID, vk_destroy_descriptor_pool, _VCTX _DPOOL);
+DEFINE_PRIM(_VOID, vk_destroy_sampler, _VCTX _SAMPLER);
 
 // ------ COMMAND BUFFER OPERATIONS -----------------------
 
@@ -522,6 +560,10 @@ HL_PRIM void HL_NAME(vk_pipeline_barrier)( VkCommandBuffer out, VkPipelineStageF
 	vkCmdPipelineBarrier(out, srcMask, dstMask, flags, memCount, memBarriers, bufferCount, bufBarriers, imageCount, imgBarriers);
 }
 
+HL_PRIM void HL_NAME(vk_bind_descriptor_sets)( VkCommandBuffer out, VkPipelineBindPoint bind, VkPipelineLayout layout, int first, int count, VkDescriptorSet *sets, int offsetCount, int *offsets ) {
+	vkCmdBindDescriptorSets(out, bind, layout, first, count, sets, offsetCount, offsets);
+}
+
 DEFINE_PRIM(_VOID, vk_command_begin, _CMD _STRUCT);
 DEFINE_PRIM(_VOID, vk_command_end, _CMD);
 DEFINE_PRIM(_VOID, vk_clear_color_image, _CMD _IMAGE _I32 _BYTES _I32 _STRUCT);
@@ -536,6 +578,7 @@ DEFINE_PRIM(_VOID, vk_push_constants, _CMD _PIPELAYOUT _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID, vk_end_render_pass, _CMD);
 DEFINE_PRIM(_VOID, vk_copy_buffer_to_image, _CMD _BUFFER _IMAGE _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID, vk_pipeline_barrier, _CMD _I32 _I32 _I32 _I32 _BYTES _I32 _BYTES _I32 _BYTES);
+DEFINE_PRIM(_VOID, vk_bind_descriptor_sets, _CMD _I32 _PIPELAYOUT _I32 _I32 _BYTES _I32 _BYTES);
 
 // ------ SHADER COMPILATION ------------------------------
 

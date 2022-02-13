@@ -15,7 +15,7 @@ abstract VkPipelineLayout(hl.Abstract<"vk_pipeline_layout">) {
 abstract VkRenderPass(hl.Abstract<"vk_render_pass">) {
 }
 
-abstract VkDescriptorSetLayout(hl.Abstract<"vk_descriptor_set">) {
+abstract VkDescriptorSetLayout(hl.Abstract<"vk_descriptor_layout">) {
 }
 
 abstract VkFramebuffer(hl.Abstract<"vk_framebuffer">) {
@@ -24,10 +24,22 @@ abstract VkFramebuffer(hl.Abstract<"vk_framebuffer">) {
 abstract VkImageView(hl.Abstract<"vk_image_view">) {
 }
 
+abstract VkBufferView(hl.Abstract<"vk_buffer_view">) {
+}
+
+abstract VkSampler(hl.Abstract<"vk_sampler">) {
+}
+
 abstract VkBuffer(hl.Abstract<"vk_buffer">) {
 }
 
 abstract VkDeviceMemory(hl.Abstract<"vk_device_memory">) {
+}
+
+abstract VkDescriptorPool(hl.Abstract<"vk_descriptor_pool">) {
+}
+
+abstract VkDescriptorSet(hl.Abstract<"vk_descriptor_set">) {
 }
 
 enum abstract VkStructureType(Int) {
@@ -150,8 +162,8 @@ enum VkCommandPoolCreateFlag {
 }
 
 @:struct class VkCommandPoolCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkCommandPoolCreateFlag>;
 	public var queueFamilyIndex : Int;
 	public function new() {
@@ -165,8 +177,8 @@ enum VkCommandPoolCreateFlag {
 }
 
 @:struct class VkCommandBufferAllocateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var commandPool : VkCommandPool;
 	public var level : VkCommandBufferLevel;
 	public var commandBufferCount : Int;
@@ -183,8 +195,8 @@ enum VkFenceCreateFlag {
 }
 
 @:struct class VkFenceCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkFenceCreateFlag>;
 	public function new() {
 		type = FENCE_CREATE_INFO;
@@ -196,8 +208,8 @@ abstract VkFence(hl.Abstract<"vk_fence">) {
 
 
 @:struct class VkPipelineShaderStage {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkPipelineShaderStageCreateFlag>;
 	public var stage : haxe.EnumFlags<VkShaderStageFlag>;
 	public var module : VkShaderModule;
@@ -478,8 +490,8 @@ abstract UnusedFlags(Int) {
 }
 
 @:struct class VkPipelineVertexInput {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var vertexBindingDescriptionCount : Int;
 	public var vertexBindingDescriptions : ArrayStruct<VkVertexInputBindingDescription>;
@@ -512,8 +524,8 @@ abstract VkBool32(Int) {
 }
 
 @:struct class VkPipelineInputAssembly {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var topology : VkPrimitiveTopology;
 	public var primitiveRestartEnable : VkBool32;
@@ -523,8 +535,8 @@ abstract VkBool32(Int) {
 }
 
 @:struct class VkPipelineTessellation {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var patchControlPoints : Int;
 	public function new() {
@@ -551,8 +563,8 @@ abstract VkBool32(Int) {
 }
 
 @:struct class VkPipelineViewport {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var viewportCount : Int;
 	public var viewports : ArrayStruct<VkViewport>;
@@ -583,8 +595,8 @@ enum abstract VkFrontFace(Int) {
 }
 
 @:struct class VkPipelineRasterization {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var depthClampEnable : VkBool32;
 	public var rasterizerDiscardEnable : VkBool32;
@@ -602,8 +614,8 @@ enum abstract VkFrontFace(Int) {
 }
 
 @:struct class VkPipelineMultisample {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var rasterizationSamples : Int;
 	public var sampleShadingEnable : VkBool32;
@@ -639,8 +651,8 @@ enum abstract VkStencilOp(Int) {
 }
 
 @:struct class VkPipelineDepthStencil {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var depthTestEnable : VkBool32;
 	public var depthWriteEnable : VkBool32;
@@ -779,8 +791,8 @@ enum abstract VkBlendOp(Int) {
 }
 
 @:struct class VkPipelineColorBlend {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var logicOpEnable : VkBool32;
 	public var logicOp : VkLogicOp;
@@ -847,8 +859,8 @@ enum abstract VkDescriptorType(Int) {
 }
 
 @:struct class VkPipelineDynamic {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var dynamicStateCount : Int;
 	public var dynamicStates : IntArray<VkDynamicState>;
@@ -880,8 +892,8 @@ enum VkDescriptorSetLayoutCreateFlag {
 }
 
 @:struct class VkDescriptorSetLayoutCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkDescriptorSetLayoutCreateFlag>;
 	public var bindingCount : Int;
 	public var bindings : ArrayStruct<VkDescriptorSetLayoutBinding>;
@@ -891,8 +903,8 @@ enum VkDescriptorSetLayoutCreateFlag {
 }
 
 @:struct class VkPipelineLayoutCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var setLayoutCount : Int;
 	public var setLayouts : ArrayStruct<VkDescriptorSetLayout>;
@@ -1067,8 +1079,8 @@ enum VkDependencyFlag {
 }
 
 @:struct class VkRenderPassCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : UnusedFlags;
 	public var attachmentCount : Int;
 	public var attachments : ArrayStruct<VkAttachmentDescription>;
@@ -1082,8 +1094,8 @@ enum VkDependencyFlag {
 }
 
 @:struct class VkGraphicsPipelineCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkPipelineCreateFlags>;
 	public var stageCount : Int;
 	public var stages : ArrayStruct<VkPipelineShaderStage>;
@@ -1125,8 +1137,8 @@ enum VkDependencyFlag {
 }
 
 @:struct class VkRenderPassBeginInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var renderPass : VkRenderPass;
 	public var framebuffer : VkFramebuffer;
 	public var renderAreaOffsetX : Int;
@@ -1150,8 +1162,8 @@ enum VkFramebufferCreateFlag {
 }
 
 @:struct class VkFramebufferCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkFramebufferCreateFlag>;
 	public var renderPass : VkRenderPass;
 	public var attachmentCount : Int;
@@ -1204,8 +1216,8 @@ enum VkImageAspectFlag {
 }
 
 @:struct class VkImageViewCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkImageViewCreateFlag>;
 	public var image : VkImage;
 	public var viewType : VkImageViewType;
@@ -1251,8 +1263,8 @@ enum abstract VkSharingMode(Int) {
 }
 
 @:struct class VkBufferCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkBufferCreateFlag>;
 	var __align : Int;
 	public var size : Int;
@@ -1276,8 +1288,8 @@ enum abstract VkSharingMode(Int) {
 }
 
 @:struct class VkMemoryAllocateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var size : Int;
 	public var size64 : Int;
 	public var memoryTypeIndex : Int;
@@ -1302,8 +1314,6 @@ enum VkMemoryPropertyFlag {
 	DEVICE_COHERENT_AMD;
 	DEVICE_UNCACHED_AMD;
 }
-
-
 
 enum abstract ShaderKind(Int) {
 	var Vertex = 0;
@@ -1363,8 +1373,8 @@ typedef VkClearColorValue = VkClearValue;
 abstract VkSemaphore(hl.Abstract<"vk_semaphore">) {}
 
 @:struct class VkSemaphoreCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	var unusedFlags : Int;
 	public function new() {
 		type = SEMAPHORE_CREATE_INFO;
@@ -1378,8 +1388,8 @@ enum VkCommandBufferUsageFlag {
 }
 
 @:struct class VkCommandBufferBeginInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkCommandBufferUsageFlag>;
 	public var pInheritanceInfo : {};
 	public function new() {
@@ -1388,8 +1398,8 @@ enum VkCommandBufferUsageFlag {
 }
 
 @:struct class VkSubmitInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var waitSemaphoreCount : Int;
 	public var pWaitSemaphores : ArrayStruct<VkSemaphore>;
 	public var pWaitDstStageMask : ArrayStruct<haxe.EnumFlags<VkPipelineStageFlag>>;
@@ -1612,8 +1622,8 @@ enum VkImageUsageFlag {
 }
 
 @:struct class VkImageCreateInfo {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var flags : haxe.EnumFlags<VkImageCreateFlag>;
 	public var imageType : VkImageType;
 	public var format : VkFormat;
@@ -1636,26 +1646,26 @@ enum VkImageUsageFlag {
 }
 
 @:struct class VkBufferImageCopy {
-    public var bufferOffset : hl.I64;
-    public var bufferRowLength : Int;
-    public var bufferImageHeight : Int;
-    public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
+	public var bufferOffset : hl.I64;
+	public var bufferRowLength : Int;
+	public var bufferImageHeight : Int;
+	public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
 	public var mipLevel : Int;
 	public var baseArrayLayer : Int;
 	public var layerCount : Int;
-    public var imageOffsetX : Int;
-    public var imageOffsetY : Int;
-    public var imageOffsetZ : Int;
-    public var imageWidth : Int;
-    public var imageHeight : Int;
-    public var imageDepth : Int;
+	public var imageOffsetX : Int;
+	public var imageOffsetY : Int;
+	public var imageOffsetZ : Int;
+	public var imageWidth : Int;
+	public var imageHeight : Int;
+	public var imageDepth : Int;
 	public function new() {
 	}
 }
 
 @:struct class VkMemoryBarrier {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var srcAccessMask : haxe.EnumFlags<VkAccessFlag>;
 	public var dstAccessMask : haxe.EnumFlags<VkAccessFlag>;
 	public function new() {
@@ -1664,37 +1674,181 @@ enum VkImageUsageFlag {
 }
 
 @:struct class VkBufferMemoryBarrier {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var srcAccessMask : haxe.EnumFlags<VkAccessFlag>;
 	public var dstAccessMask : haxe.EnumFlags<VkAccessFlag>;
-    public var srcQueueFamilyIndex : Int;
-    public var dstQueueFamilyIndex : Int;
-    public var buffer : VkBuffer;
-    public var offset : hl.I64;
-    public var size : hl.I64;
+	public var srcQueueFamilyIndex : Int;
+	public var dstQueueFamilyIndex : Int;
+	public var buffer : VkBuffer;
+	public var offset : hl.I64;
+	public var size : hl.I64;
 	public function new() {
 		type = BUFFER_MEMORY_BARRIER;
 	}
 }
 
 @:struct class VkImageMemoryBarrier {
-	public var type : VkStructureType;
-	public var next : NextPtr;
+	var type : VkStructureType;
+	var next : NextPtr;
 	public var srcAccessMask : haxe.EnumFlags<VkAccessFlag>;
 	public var dstAccessMask : haxe.EnumFlags<VkAccessFlag>;
 	public var oldLayout : VkImageLayout;
 	public var newLayout : VkImageLayout;
-    public var srcQueueFamilyIndex : Int;
-    public var dstQueueFamilyIndex : Int;
-    public var image : VkImage;
-    public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
-    public var baseMipLevel : Int;
-    public var levelCount : Int;
-    public var baseArrayLayer : Int;
-    public var layerCount : Int;
+	public var srcQueueFamilyIndex : Int;
+	public var dstQueueFamilyIndex : Int;
+	public var image : VkImage;
+	public var aspectMask : haxe.EnumFlags<VkImageAspectFlag>;
+	public var baseMipLevel : Int;
+	public var levelCount : Int;
+	public var baseArrayLayer : Int;
+	public var layerCount : Int;
 	public function new() {
 		type = IMAGE_MEMORY_BARRIER;
+	}
+}
+
+@:struct class VkDescriptorPoolSize {
+	public var type : VkDescriptorType;
+	public var descriptorCount : Int;
+	public function new() {
+	}
+}
+
+enum VkDescriptorPoolCreateFlag {
+	FREE_DESCRIPTOR_SET;
+	UPDATE_AFTER_BIND;
+	HOST_ONLY_VALVE;
+}
+
+@:struct class VkDescriptorPoolCreateInfo {
+	var type : VkStructureType;
+	var next : NextPtr;
+	public var flags : haxe.EnumFlags<VkDescriptorPoolCreateFlag>;
+	public var maxSets : Int;
+	public var poolSizeCount : Int;
+	public var pPoolSizes : ArrayStruct<VkDescriptorPoolSize>;
+	public function new() {
+		type = DESCRIPTOR_POOL_CREATE_INFO;
+	}
+}
+
+@:struct class VkDescriptorSetAllocateInfo {
+	var type : VkStructureType;
+	var next : NextPtr;
+	public var descriptorPool : VkDescriptorPool;
+	public var descriptorSetCount : Int;
+	public var pSetLayouts : ArrayStruct<VkDescriptorSetLayout>;
+	public function new() {
+		type = DESCRIPTOR_SET_ALLOCATE_INFO;
+	}
+}
+
+@:struct class VkDescriptorImageInfo {
+	public var sampler : VkSampler;
+	public var imageView : VkImageView;
+	public var imageLayout : VkImageLayout;
+	public function new() {
+	}
+}
+
+
+@:struct class VkDescriptorBufferInfo {
+	public var buffer : VkBuffer;
+	public var offset : hl.I64;
+	public var range : hl.I64;
+	public function new() {
+	}
+}
+
+@:struct class VkWriteDescriptorSet {
+	var type : VkStructureType;
+	var next : NextPtr;
+	public var dstSet : VkDescriptorSet;
+	public var dstBinding : Int;
+	public var dstArrayElement : Int;
+	public var descriptorCount : Int;
+	public var descriptorType : VkDescriptorType;
+	public var pImageInfo : ArrayStruct<VkDescriptorImageInfo>;
+	public var pBufferInfo : ArrayStruct<VkDescriptorBufferInfo>;
+	public var pTexelBufferView : ArrayStruct<VkBufferView>;
+	public function new() {
+		type = WRITE_DESCRIPTOR_SET;
+	}
+}
+
+@:struct class VkCopyDescriptorSet {
+	var type : VkStructureType;
+	var next : NextPtr;
+	public var srcSet : VkDescriptorSet;
+	public var srcBinding : Int;
+	public var srcArrayElement : Int;
+	public var dstSet : VkDescriptorSet;
+	public var dstBinding : Int;
+	public var dstArrayElement : Int;
+	public var descriptorCount : Int;
+	public function new() {
+		type = COPY_DESCRIPTOR_SET;
+	}
+}
+
+enum VkSamplerCreateFlag {
+	SUBSAMPLED_EXT;
+	SUBSAMPLED_COARSE_EXT;
+}
+
+@:enum abstract VkFilter(Int) {
+	var NEAREST = 0;
+	var LINEAR = 1;
+	var CUBIC_IMG = 1000015000;
+}
+
+@:enum abstract VkSamplerMipmapMode(Int) {
+	var NEAREST = 0;
+	var LINEAR = 1;
+}
+
+
+@:enum abstract VkSamplerAddressMode(Int) {
+	var REPEAT = 0;
+	var MIRRORED_REPEAT = 1;
+	var CLAMP_TO_EDGE = 2;
+	var CLAMP_TO_BORDER = 3;
+	var MIRROR_CLAMP_TO_EDGE = 4;
+}
+
+@:enum abstract VkBorderColor(Int) {
+	var FLOAT_TRANSPARENT_BLACK = 0;
+	var INT_TRANSPARENT_BLACK = 1;
+	var FLOAT_OPAQUE_BLACK = 2;
+	var INT_OPAQUE_BLACK = 3;
+	var FLOAT_OPAQUE_WHITE = 4;
+	var INT_OPAQUE_WHITE = 5;
+	var FLOAT_CUSTOM_EXT = 1000287003;
+	var INT_CUSTOM_EXT = 1000287004;
+}
+
+@:struct class VkSamplerCreateInfo {
+	var type : VkStructureType;
+	var next : NextPtr;
+	public var flags : haxe.EnumFlags<VkSamplerCreateFlag>;
+	public var magFilter : VkFilter;
+	public var minFilter : VkFilter;
+	public var mipmapMode : VkSamplerMipmapMode;
+	public var addressModeU : VkSamplerAddressMode;
+	public var addressModeV : VkSamplerAddressMode;
+	public var addressModeW : VkSamplerAddressMode;
+	public var mipLodBias : Single;
+	public var anisotropyEnable : VkBool32;
+	public var maxAnisotropy : Single;
+	public var compareEnable : VkBool32;
+	public var compareOp : VkCompareOp;
+	public var minLod : Single;
+	public var maxLod : Single;
+	public var borderColor : VkBorderColor;
+	public var unnormalizedCoordinates : VkBool32;
+	public function new() {
+		type = SAMPLER_CREATE_INFO;
 	}
 }
 
@@ -1732,6 +1886,10 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 		return 0;
 	}
 
+	public function createSampler( inf : VkSamplerCreateInfo ) : VkSampler {
+		return null;
+	}
+
 	public function createSemaphore( inf : VkSemaphoreCreateInfo ) : VkSemaphore {
 		return null;
 	}
@@ -1765,6 +1923,17 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 
 	public function createDescriptorSetLayout( inf : VkDescriptorSetLayoutCreateInfo ) : VkDescriptorSetLayout {
 		return null;
+	}
+
+	public function createDescriptorPool( inf : VkDescriptorPoolCreateInfo ) : VkDescriptorPool {
+		return null;
+	}
+
+	public function allocateDescriptorSets( inf : VkDescriptorSetAllocateInfo, sets : hl.NativeArray<VkDescriptorSet> ) : Bool {
+		return false;
+	}
+
+	public function updateDescriptorSets( writeCount : Int, write : ArrayStruct<VkWriteDescriptorSet>, copyCount : Int, copy : ArrayStruct<VkCopyDescriptorSet> ) {
 	}
 
 	public function createFramebuffer( inf : VkFramebufferCreateInfo ) : VkFramebuffer {
@@ -1848,10 +2017,24 @@ abstract VkContext(hl.Abstract<"vk_context">) {
 	public function freeMemory( mem : VkDeviceMemory ) {
 	}
 
+	public function destroyDescriptorPool( pool : VkDescriptorPool ) {
+	}
+
+	public function destroySampler( sampler : VkSampler ) {
+	}
+
 }
 
 @:hlNative("?sdl","vk_")
 abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
+
+	@:hlNative("?sdl","vk_command_begin")
+	public function begin( inf : VkCommandBufferBeginInfo ) {
+	}
+
+	@:hlNative("?sdl","vk_command_end")
+	public function end() {
+	}
 
 	public function clearColorImage( img : VkImage, layout : VkImageLayout, colors : ArrayStruct<VkClearColorValue>, colorCount : Int, range : VkImageSubResourceRange ) {
 	}
@@ -1893,12 +2076,7 @@ abstract VkCommandBuffer(hl.Abstract<"vk_command_buffer">) {
 		imageCount : Int, imgBarriers : ArrayStruct<VkImageMemoryBarrier> ) {
 	}
 
-	@:hlNative("?sdl","vk_command_begin")
-	public function begin( inf : VkCommandBufferBeginInfo ) {
-	}
-
-	@:hlNative("?sdl","vk_command_end")
-	public function end() {
+	public function bindDescriptorSets( bind : VkPipelineBindPoint, layout : VkPipelineLayout, first : Int, count : Int, sets : ArrayStruct<VkDescriptorSet>, offsetCount : Int, offsets : hl.Bytes ) {
 	}
 
 }
