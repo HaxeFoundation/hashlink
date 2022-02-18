@@ -1,10 +1,9 @@
--cp classes
--cp ../std/
+-cp src
 -main Main
+-lib hx3compat
+
+--each
 -hl bin/_main.c
 
 --next
-
--cp classes
--main Main
 -hl bin/test.b
