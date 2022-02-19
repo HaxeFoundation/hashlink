@@ -274,7 +274,7 @@ if(BUILD_TESTING)
         COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
     )
     add_test(NAME uvsample.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl 6001
     )
     add_test(NAME hello
         COMMAND hello
@@ -283,7 +283,7 @@ if(BUILD_TESTING)
         COMMAND threads
     )
     add_test(NAME uvsample
-        COMMAND uvsample
+        COMMAND uvsample 6002
     )
     add_test(NAME version
         COMMAND hl --version
