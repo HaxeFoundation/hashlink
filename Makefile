@@ -9,13 +9,15 @@ INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
 LIBS=fmt sdl ssl openal ui uv mysql
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 EXTRA_LFLAGS ?=
 LIBFLAGS =
 HLFLAGS = -ldl
 LIBEXT = so
 LIBTURBOJPEG = -lturbojpeg
+
+PCRE_INCLUDE = -I include/pcre
 
 PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/pcre_dfa_exec.o \
 	include/pcre/pcre_exec.o include/pcre/pcre_fullinfo.o include/pcre/pcre_globals.o \
@@ -30,6 +32,8 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/track.o
 
 HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+
+FMT_INCLUDE = -I include/mikktspace -I include/minimp3
 
 FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o libs/fmt/dxt.o
 
@@ -66,7 +70,9 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(MARCH) -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include/SDL2 -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH) -I include -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include \
+	-I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include/SDL2 -I /usr/local/opt/libvorbis/include \
+	-I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
 
 ifdef OSX_SDK
@@ -130,6 +136,12 @@ uninstall:
 
 libs: $(LIBS)
 
+./include/pcre/%.o: include/pcre/%.c
+	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
+
+src/std/regexp.o: src/std/regexp.c
+	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
+
 libhl: ${LIB}
 	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
@@ -139,8 +151,11 @@ hlc: ${BOOT}
 hl: ${HL} libhl
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
 
+libs/fmt/%.o: libs/fmt/%.c
+	${CC} ${CFLAGS} -o $@ -c $< ${FMT_INCLUDE}
+
 fmt: ${FMT} libhl
-	${CC} ${CFLAGS} -I include/mikktspace -I include/minimp3 -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
+	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
 sdl: ${SDL} libhl
 	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENGL)
