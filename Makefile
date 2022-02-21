@@ -7,7 +7,7 @@ INSTALL_BIN_DIR ?= $(PREFIX)/bin
 INSTALL_LIB_DIR ?= $(PREFIX)/lib
 INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
-LIBS=fmt sdl ssl openal ui uv mysql
+LIBS=fmt sdl ssl openal ui uv mysql sqlite
 
 CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
@@ -48,6 +48,8 @@ UV = libs/uv/uv.o
 UI = libs/ui/ui_stub.o
 
 MYSQL = libs/mysql/socket.o libs/mysql/sha1.o libs/mysql/my_proto.o libs/mysql/my_api.o libs/mysql/mysql.o
+
+SQLITE = libs/sqlite/sqlite.o
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -175,6 +177,9 @@ uv: ${UV} libhl
 mysql: ${MYSQL} libhl
 	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
 
+sqlite: ${SQLITE} libhl
+	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L -lhl -lsqlite3
+
 mesa:
 	(cd libs/mesa && make)
 
@@ -239,7 +244,7 @@ codesign_osx:
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${SQLITE} ${HL_DEBUG}
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
