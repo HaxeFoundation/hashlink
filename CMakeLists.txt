@@ -271,15 +271,22 @@ if(BUILD_TESTING)
     #####################
     # Tests
 
-    add_test(NAME hello.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
-    )
-    add_test(NAME threads.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
-    )
-    add_test(NAME uvsample.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-    )
+    set(JIT_TEST_ENABLED TRUE)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+        set(JIT_TEST_ENABLED FALSE)
+    endif()
+
+    if(JIT_TEST_ENABLED)
+        add_test(NAME hello.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+        )
+        add_test(NAME threads.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
+        )
+        add_test(NAME uvsample.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+        )
+    endif()
     add_test(NAME hello
         COMMAND hello
     )
