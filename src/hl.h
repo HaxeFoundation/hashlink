@@ -154,7 +154,11 @@
 #	define EXPORT __declspec( dllexport )
 #	define IMPORT __declspec( dllimport )
 #else
+#if defined(HL_GCC) || defined(HL_CLANG)
+#	define EXPORT __attribute__((visibility("default")))
+#else
 #	define EXPORT
+#endif
 #	define IMPORT extern
 #endif
 
