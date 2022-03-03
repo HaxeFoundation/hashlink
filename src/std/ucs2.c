@@ -33,11 +33,6 @@ HL_PRIM double utod( const uchar *str, uchar **end ) {
 	return _utod(str,end);
 }
 
-HL_PRIM int utoi( const uchar *str, uchar **end ) {
-	while( is_space_char(*str) ) str++;
-	return _utoi(str,end);
-}
-
 #else
 
 #ifdef HL_ANDROID
@@ -57,7 +52,7 @@ int ustrlen( const uchar *str ) {
 	return (int)(p - str);
 }
 
-int ustrlen_utf8( const uchar *str ) {
+static int ustrlen_utf8( const uchar *str ) {
 	int size = 0;
 	while(1) {
 		uchar c = *str++;
@@ -101,27 +96,30 @@ double utod( const uchar *str, uchar **end ) {
 	return v;
 }
 
-int utoi( const uchar *str, uchar **end ) {
+int utoi( const uchar *str, size_t len, uchar **end ) {
 	char buf[17];
 	char *bend;
+	int result;
 	int i = 0;
-	int v;
-	while( is_space_char(*str) ) str++;
+	uchar sign = str[0];
+	if( sign == '-' || sign == '+' ) {
+		buf[i++] = (char)sign;
+	}
 	while( i < 16 ) {
-		int c = *str++;
-		if( (c < '0' || c > '9') && c != '-' && c != '+')
+		int c = str[i];
+		if( c < '0' || c > '9' )
 			break;
 		buf[i++] = (char)c;
 	}
 	buf[i] = 0;
-	v = strtol(buf,&bend,10);
-	*end = (uchar*)(str - 1) + (bend - buf);
-	return v;
+	result = strtol(buf,&bend,10);
+	*end = str + (bend - buf);
+	return result;
 }
 
 int ucmp( const uchar *a, const uchar *b ) {
 	while(true) {
-		int d = (unsigned)*a - (unsigned)*b; 
+		int d = (unsigned)*a - (unsigned)*b;
 		if( d ) return d;
 		if( !*a ) return 0;
 		a++;

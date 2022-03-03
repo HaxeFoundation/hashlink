@@ -434,7 +434,8 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 	case -7:
 		{
 			uchar *end = NULL;
-			hl_profile_setup( ptr ? utoi((uchar*)ptr,&end) : 1000);
+			size_t actual_len = dataLen / sizeof(uchar);
+			hl_profile_setup( ptr ? utoi((uchar*)ptr,actual_len,&end) : 1000);
 		}
 		break;
 	case -8:
@@ -456,4 +457,3 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		break;
 	}
 }
-
