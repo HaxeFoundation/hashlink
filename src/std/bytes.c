@@ -176,19 +176,21 @@ HL_PRIM void hl_bsort_f64( vbyte *bytes, int pos, int len, vclosure *cmp ) {
 	merge_sort_rec_f64(&m,0,len);
 }
 
+static inline bool is_space_char(uchar c) {
+	return c == 32 || (c > 8 && c < 14);
+}
+
 HL_PRIM double hl_parse_float( vbyte *bytes, int pos, int len ) {
 	uchar *str = (uchar*)(bytes+pos);
 	uchar *end = NULL;
-	double d;
-	while( *str == ' ' ) str++;
-	d = utod(str,&end);
+	while( is_space_char(*str) ) {
+		str++;
+		len--;
+	}
+	double d = utod(str,len,&end);
 	if( end == str )
 		return hl_nan();
 	return d;
-}
-
-static inline bool is_space_char( uchar c ) {
-	return c == 32 || (c > 8 && c < 14);
 }
 
 static inline bool has_hex_prefix( const uchar *c, int len, bool is_signed ) {
