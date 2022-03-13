@@ -433,7 +433,7 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		break;
 	case -7:
 		{
-			uchar *end = NULL;
+			const uchar *end = NULL;
 			size_t actual_len = dataLen / sizeof(uchar);
 			hl_profile_setup( ptr ? utoi((uchar*)ptr,actual_len,&end) : 1000);
 		}

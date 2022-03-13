@@ -67,7 +67,7 @@ uchar *ustrdup( const uchar *str ) {
 	return d;
 }
 
-double utod( const uchar *str, size_t len, uchar **end ) {
+double utod( const uchar *str, size_t len, const uchar **const end ) {
 	char buf[31];
 	char *bend;
 	double result;
@@ -84,7 +84,7 @@ double utod( const uchar *str, size_t len, uchar **end ) {
 	return result;
 }
 
-int utoi( const uchar *str, size_t len, uchar **end ) {
+int utoi( const uchar *str, size_t len, const uchar **const end ) {
 	char buf[17];
 	char *bend;
 	int result;
