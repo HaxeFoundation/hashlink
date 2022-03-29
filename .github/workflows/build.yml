@@ -22,15 +22,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # cannot build 32 bit binaries anymore:
-          # a) ubuntu-18.04 only supprots GLIBC 2.27 but 2.29 is required: https://www.digitalocean.com/community/questions/how-install-glibc-2-29-or-higher-in-ubuntu-18-04
-          # b) ubuntu-20.04 does no longer provide i386 packages
+          # TODO cannot build 32 bit binaries. compile errors
           #- target: linux-i386
           #  runner: ubuntu-18.04
           #  haxe_latest_dist: linux64/haxe_latest.tar.gz
 
           - target: linux-amd64
-            runner: ubuntu-20.04
+            runner: ubuntu-18.04
             haxe_latest_dist: linux64/haxe_latest.tar.gz
 
           - target: darwin
@@ -38,8 +36,8 @@ jobs:
             haxe_latest_dist: mac/haxe_latest.tar.gz
 
           - target: win32
-            runner: windows-2016  # has VS2017 preinstalled which supports PlatformToolset <= v141, WindowsTargetPlatformVersion 8.1
-            #runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
+            #runner: windows-2016 # has VS2017 preinstalled which supports PlatformToolset <= v141, WindowsTargetPlatformVersion 8.1
+            runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
             msbuild_Configuration: ReleaseVS2017
@@ -48,8 +46,8 @@ jobs:
             msbuild_WindowsTargetPlatformVersion: 8.1
 
           - target: win64
-            runner: windows-2016  # has VS2017 preinstalled which supports PlatformToolset <= v141, WindowsTargetPlatformVersion 8.1
-            #runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
+            #runner: windows-2016 # has VS2017 preinstalled which supports PlatformToolset <= v141, WindowsTargetPlatformVersion 8.1
+            runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
             msbuild_Configuration: ReleaseVS2017
@@ -61,10 +59,24 @@ jobs:
     - name: "SCM Checkout" 
       uses: actions/checkout@v2
 
+    - name: "Install: Visual C++ build tools workload for Visual Studio 2017 Build Tools"
+      if: startsWith(matrix.target, 'win')
+      run: choco install visualstudio2017buildtools visualstudio2017-workload-vctools
+      
+    - name: "Install: Windows 8.1 SDK"
+      shell: powershell
+      if: startsWith(matrix.target, 'win')
+      # https://github.com/actions/virtual-environments/issues/842#issuecomment-643382166
+      run: |
+        Invoke-WebRequest -Method Get -Uri https://go.microsoft.com/fwlink/p/?LinkId=323507 -OutFile sdksetup.exe -UseBasicParsing
+        Start-Process -Wait sdksetup.exe -ArgumentList "/q", "/norestart", "/features", "OptionId.WindowsDesktopSoftwareDevelopmentKit", "OptionId.NetFxSoftwareDevelopmentKit"
+
     - name: Add msbuild to PATH
       if: startsWith(matrix.target, 'win')
       uses: microsoft/setup-msbuild@v1.0.3
-
+      with:
+        vs-version: '[15.0,16.0)'
+    
     - name: "Install: Required Dev Packages"
       run: |
         set -eux
