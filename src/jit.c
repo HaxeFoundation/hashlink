@@ -112,6 +112,7 @@ typedef enum {
 	MOV8,
 	CMP8,
 	TEST8,
+	PUSH8,
 	MOV16,
 	CMP16,
 	TEST16,
@@ -416,6 +417,7 @@ typedef struct {
 
 #define FLAG_LONGOP	0x80000000
 #define FLAG_16B	0x40000000
+#define FLAG_8B		0x20000000
 
 #define RM(op,id) ((op) | (((id)+1)<<8))
 #define GET_RM(op)	(((op) >> ((op) < 0 ? 24 : 8)) & 15)
@@ -481,6 +483,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
 	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
+	{ "PUSH8", 0, 0, 0x6A | FLAG_8B },
 	{ "MOV16", OP16(0x8B), OP16(0x89), OP16(0xB8) },
 	{ "CMP16", OP16(0x3B), OP16(0x39) },
 	{ "TEST16", OP16(0x85) },
@@ -515,7 +518,7 @@ static bool is_reg8( preg *a ) {
 
 static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
-	int r64 = mode64 && (o != PUSH && o != POP && o != CALL) ? 8 : 0;
+	int r64 = mode64 && (o != PUSH && o != POP && o != CALL && o != PUSH8) ? 8 : 0;
 	switch( o ) {
 	case CMP8:
 	case TEST8:
@@ -628,7 +631,7 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 		{
 			int_val cval = a->holds ? (int_val)a->holds : a->id;
 			OP(f->r_const);
-			W((int)cval);
+			if( f->r_const & FLAG_8B ) B((int)cval); else W((int)cval);
 		}
 		break;
 	case ID2(RMEM,RUNUSED):
@@ -2584,6 +2587,26 @@ static void jit_null_access( jit_ctx *ctx ) {
 	call_native_consts(ctx, jit_fail, &arg, 1);
 }
 
+static void jit_null_fail( int fhash ) {
+	vbyte *field = hl_field_name(fhash);
+	hl_buffer *b = hl_alloc_buffer();
+	hl_buffer_str(b, USTR("Null access ."));
+	hl_buffer_str(b, (uchar*)field);
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
+	d->v.ptr = hl_buffer_content(b,NULL);
+	hl_throw(d);
+}
+
+static void jit_null_field_access( jit_ctx *ctx ) {
+	preg p;
+	op64(ctx,PUSH,PEBP,UNUSED);
+	op64(ctx,MOV,PEBP,PESP);
+	int size = begin_native_call(ctx, 1);
+	int args_pos = (IS_WINCALL64 ? 32 : 0) + HL_WSIZE*2;
+	set_native_arg(ctx, pmem(&p,Ebp,args_pos));
+	call_native(ctx,jit_null_fail,size);
+}
+
 static void jit_assert( jit_ctx *ctx ) {
 	op64(ctx,PUSH,PEBP,UNUSED);
 	op64(ctx,MOV,PEBP,PESP);
@@ -2621,6 +2644,7 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 #	endif
 	ctx->static_functions[0] = (void*)(int_val)jit_build(ctx,jit_null_access);
 	ctx->static_functions[1] = (void*)(int_val)jit_build(ctx,jit_assert);
+	ctx->static_functions[2] = (void*)(int_val)jit_build(ctx,jit_null_field_access);
 }
 
 void hl_jit_reset( jit_ctx *ctx, hl_module *m ) {
@@ -3773,11 +3797,29 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				preg *r = alloc_cpu(ctx,dst,true);
 				op64(ctx,TEST,r,r);
 				XJump_small(JNotZero,jz);
-				pad_before_call(ctx, 0);
+
+				hl_opcode *next = f->ops + opCount + 1;
+				bool null_field_access = false;
+				if( next->op == OField && next->p2 == o->p1 ) {
+					hl_obj_field *f = NULL;
+					if( dst->t->kind == HOBJ || dst->t->kind == HSTRUCT )
+						f = hl_obj_field_fetch(dst->t, next->p3);
+					else if( dst->t->kind == HVIRTUAL )
+						f = dst->t->virt->fields + next->p3;
+					if( f == NULL ) ASSERT(dst->t->kind);
+ 					null_field_access = true;
+					pad_before_call(ctx, HL_WSIZE);
+					if( f->hashed_name < 256 )
+						op64(ctx,PUSH8,pconst(&p,f->hashed_name),UNUSED);
+					else
+						op32(ctx,PUSH,pconst(&p,f->hashed_name),UNUSED);
+				} else {
+					pad_before_call(ctx, 0);
+				}
 
 				jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
 				j->pos = BUF_POS();
-				j->target = -1;
+				j->target = null_field_access ? -3 : -1;
 				j->next = ctx->calls;
 				ctx->calls = j;
 
@@ -4042,12 +4084,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
 				j->pos = BUF_POS();
-				j->target = -1;
+				j->target = -2;
 				j->next = ctx->calls;
 				ctx->calls = j;
 
 				op64(ctx,MOV,PEAX,pconst64(&p,RESERVE_ADDRESS));
-				op_call(ctx,PEAX,-2);
+				op_call(ctx,PEAX,-1);
 			}
 			break;
 		case ONop:
