@@ -65,6 +65,7 @@ typedef enum {
 	DIV,
 	IDIV,
 	CDQ,
+	CDQE,
 	POP,
 	RET,
 	CALL,
@@ -304,6 +305,18 @@ struct jit_ctx {
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
 #define jit_error(msg)	_jit_error(ctx,msg,__LINE__)
+
+#ifndef HL_64
+#	ifdef HL_DEBUG
+#		define error_i64() jit_error("i64-32")
+#	else
+void error_i64() { 
+	printf("The module you are loading is using 64 bit ints that are not supported by the HL32.\nPlease run using HL64 or compile with -D hl-legacy32");
+	jit_exit();
+}
+#	endif
+#endif
+
 static void _jit_error( jit_ctx *ctx, const char *msg, int line );
 static void on_jit_error( const char *msg, int_val line );
 
@@ -436,6 +449,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "DIV", RM(0xF7,6), RM(0xF7,6) },
 	{ "IDIV", RM(0xF7,7), RM(0xF7,7) },
 	{ "CDQ", 0x99 },
+	{ "CDQE", 0x98 },
 	{ "POP", 0x58, RM(0x8F,0) },
 	{ "RET", 0xC3 },
 	{ "CALL", RM(0xFF,2), RM(0xFF,2), 0xE8 },
@@ -1227,6 +1241,10 @@ static void store_result( jit_ctx *ctx, vreg *r ) {
 		scratch(r->current);
 		op64(ctx,FSTP32,&r->stack,UNUSED);
 		break;
+	case HI64:
+		scratch(r->current);
+		error_i64();
+		break;
 #	endif
 	default:
 		store(ctx,r,IS_FLOAT(r) ? REG_AT(XMM(0)) : PEAX,true);
@@ -1236,6 +1254,12 @@ static void store_result( jit_ctx *ctx, vreg *r ) {
 
 static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
 	preg *r = fetch(from);
+#	ifndef HL_64
+	if( to->t->kind == HI64 ) {
+		error_i64();
+		return;
+	}
+#	endif
 	if( from->t->kind == HF32 && r->kind != RFPU )
 		r = alloc_fpu(ctx,from,true);
 	store(ctx, to, r, true);
@@ -1602,12 +1626,12 @@ static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
 }
 
 
-static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op ) {
+static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 	preg *pa = fetch(a), *pb = fetch(b), *out = NULL;
 	CpuOp o;
 	if( IS_FLOAT(a) ) {
 		bool isf32 = a->t->kind == HF32;
-		switch( op->op ) {
+		switch( bop ) {
 		case OAdd: o = isf32 ? ADDSS : ADDSD; break;
 		case OSub: o = isf32 ? SUBSS : SUBSD; break;
 		case OMul: o = isf32 ? MULSS : MULSD; break;
@@ -1633,11 +1657,18 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				return fetch(dst);
 			}
 		default:
-			printf("%s\n", hl_op_name(op->op));
-			ASSERT(op->op);
+			printf("%s\n", hl_op_name(bop));
+			ASSERT(bop);
 		}
 	} else {
-		switch( op->op ) {
+		bool is64 =	a->t->kind == HI64;
+#	ifndef HL_64
+		if( is64 ) {
+			error_i64();
+			return fetch(a);
+		}
+#	endif
+		switch( bop ) {
 		case OAdd: o = ADD; break;
 		case OSub: o = SUB; break;
 		case OMul: o = IMUL; break;
@@ -1649,16 +1680,16 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OSShr:
 			if( !b->current || b->current->kind != RCPU || b->current->id != Ecx ) {
 				scratch(REG_AT(Ecx));
-				op32(ctx,MOV,REG_AT(Ecx),pb);
+				op(ctx,MOV,REG_AT(Ecx),pb,is64);
 				RLOCK(REG_AT(Ecx));
 				pa = fetch(a);
 			} else
 				RLOCK(b->current);
 			if( pa->kind != RCPU ) {
 				pa = alloc_reg(ctx, RCPU);
-				op32(ctx,MOV,pa,fetch(a));
+				op(ctx,MOV,pa,fetch(a), is64);
 			}
-			op32(ctx,op->op == OShl ? SHL : (op->op == OUShr ? SHR : SAR), pa, UNUSED);
+			op(ctx,bop == OShl ? SHL : (bop == OUShr ? SHR : SAR), pa, UNUSED,is64);
 			if( dst ) store(ctx, dst, pa, true);
 			return pa;
 		case OSDiv:
@@ -1666,15 +1697,15 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		case OSMod:
 		case OUMod:
 			{
-				preg *out = op->op == OSMod || op->op == OUMod ? REG_AT(Edx) : PEAX;
+				preg *out = bop == OSMod || bop == OUMod ? REG_AT(Edx) : PEAX;
 				preg *r;
 				int jz, jend;
 				if( pa->kind == RCPU && pa->id == Eax ) RLOCK(pa);
 				r = alloc_cpu(ctx,b,true);
 				// integer div 0 => 0
-				op32(ctx,TEST,r,r);
+				op(ctx,TEST,r,r,is64);
 				XJump_small(JNotZero,jz);
-				op32(ctx,XOR,out,out);
+				op(ctx,XOR,out,out,is64);
 				XJump_small(JAlways,jend);
 				patch_jump(ctx,jz);
 				pa = fetch(a);
@@ -1685,11 +1716,11 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				}
 				scratch(REG_AT(Edx));
 				scratch(REG_AT(Eax));
-				if( op->op == OUDiv || op->op == OUMod )
-					op32(ctx, XOR, REG_AT(Edx), REG_AT(Edx));
+				if( bop == OUDiv || bop == OUMod )
+					op(ctx, XOR, REG_AT(Edx), REG_AT(Edx), is64);
 				else
-					op32(ctx, CDQ, UNUSED, UNUSED); // sign-extend Eax into Eax:Edx
-				op32(ctx, op->op == OUDiv || op->op == OUMod ? DIV : IDIV, fetch(b), UNUSED);
+					op(ctx, CDQ, UNUSED, UNUSED, is64); // sign-extend Eax into Eax:Edx
+				op(ctx, bop == OUDiv || bop == OUMod ? DIV : IDIV, fetch(b), UNUSED, is64);
 				patch_jump(ctx, jend);
 				if( dst ) store(ctx, dst, out, true);
 				return out;
@@ -1716,8 +1747,8 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 			}
 			break;
 		default:
-			printf("%s\n", hl_op_name(op->op));
-			ASSERT(op->op);
+			printf("%s\n", hl_op_name(bop));
+			ASSERT(bop);
 		}
 	}
 	switch( RTYPE(a) ) {
@@ -1753,14 +1784,14 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				out = pa;
 			} else {
 				alloc_cpu(ctx,a, true);
-				return op_binop(ctx,dst,a,b,op);
+				return op_binop(ctx,dst,a,b,bop);
 			}
 			break;
 		case ID2(RSTACK,RSTACK):
 			alloc_cpu(ctx, a, true);
-			return op_binop(ctx, dst, a, b, op);
+			return op_binop(ctx, dst, a, b, bop);
 		default:
-			printf("%s(%d,%d)\n", hl_op_name(op->op), pa->kind, pb->kind);
+			printf("%s(%d,%d)\n", hl_op_name(bop), pa->kind, pb->kind);
 			ASSERT(ID2(pa->kind, pb->kind));
 		}
 		if( dst ) store(ctx, dst, out, true);
@@ -1778,6 +1809,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 	case HDYN:
 	case HTYPE:
 	case HABSTRACT:
+	case HI64:
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
 		case ID2(RCPU,RSTACK):
@@ -1792,14 +1824,14 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 				out = pa;
 			} else {
 				alloc_cpu(ctx,a, true);
-				return op_binop(ctx,dst,a,b,op);
+				return op_binop(ctx,dst,a,b,bop);
 			}
 			break;
 		case ID2(RSTACK,RSTACK):
 			alloc_cpu(ctx, a, true);
-			return op_binop(ctx, dst, a, b, op);
+			return op_binop(ctx, dst, a, b, bop);
 		default:
-			printf("%s(%d,%d)\n", hl_op_name(op->op), pa->kind, pb->kind);
+			printf("%s(%d,%d)\n", hl_op_name(bop), pa->kind, pb->kind);
 			ASSERT(ID2(pa->kind, pb->kind));
 		}
 		if( dst ) store(ctx, dst, out, true);
@@ -1812,10 +1844,10 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RFPU,RFPU):
 			op64(ctx,o,pa,pb);
-			if( o == COMISD && op->op != OJSGt ) {
+			if( o == COMISD && bop != OJSGt ) {
 				int jnotnan;
 				XJump_small(JNParity,jnotnan);
-				switch( op->op ) {
+				switch( bop ) {
 				case OJSLt:
 				case OJNotLt:
 					{
@@ -1844,7 +1876,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 					op64(ctx,TEST,PESP,PESP);
 					break;
 				default:
-					ASSERT(op->op);
+					ASSERT(bop);
 				}
 				patch_jump(ctx,jnotnan);
 			}
@@ -1852,7 +1884,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_opcode *op 
 			out = pa;
 			break;
 		default:
-			printf("%s(%d,%d)\n", hl_op_name(op->op), pa->kind, pb->kind);
+			printf("%s(%d,%d)\n", hl_op_name(bop), pa->kind, pb->kind);
 			ASSERT(ID2(pa->kind, pb->kind));
 		}
 		if( dst ) store(ctx, dst, out, true);
@@ -2189,7 +2221,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 		// make sure we have valid 8 bits registers
 		if( a->size == 1 ) alloc_cpu8(ctx,a,true);
 		if( b->size == 1 ) alloc_cpu8(ctx,b,true);
-		op_binop(ctx,NULL,a,b,op);
+		op_binop(ctx,NULL,a,b,op->op);
 		break;
 	}
 	register_jump(ctx,do_jump(ctx,op->op, IS_FLOAT(a)),targetPos);
@@ -2932,7 +2964,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OXor:
 		case OSMod:
 		case OUMod:
-			op_binop(ctx, dst, ra, rb, o);
+			op_binop(ctx, dst, ra, rb, o->op);
 			break;
 		case ONeg:
 			{
@@ -2942,6 +2974,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,XORPD,pa,pa);
 					op64(ctx,ra->t->kind == HF32 ? SUBSS : SUBSD,pa,pb);
 					store(ctx,dst,pa,true);
+				} else if( ra->t->kind == HI64 ) {
+#					ifdef HL_64
+					preg *pa = alloc_reg(ctx,RCPU);
+					preg *pb = alloc_cpu(ctx,ra,true);
+					op64(ctx,XOR,pa,pa);
+					op64(ctx,SUB,pa,pb);
+					store(ctx,dst,pa,true);					
+#					else
+					error_i64();
+#					endif
 				} else {
 					preg *pa = alloc_reg(ctx,RCPU);
 					preg *pb = alloc_cpu(ctx,ra,true);
@@ -3079,7 +3121,23 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx, LDMXCSR, pmem(&p, Esp, -4), UNUSED);
 				store(ctx, dst, w, true);
 			} else if( dst->t->kind == HI64 && ra->t->kind == HI32 ) {
-				ASSERT(0); // todo : more i64 native support
+				if( ra->current != PEAX ) {
+					op32(ctx, MOV, PEAX, fetch(ra));
+					scratch(PEAX);
+				}
+#				ifdef HL_64
+				op64(ctx, CDQE, UNUSED, UNUSED); // sign-extend Eax into Rax
+				store(ctx, dst, PEAX, true);
+#				else
+				op32(ctx, CDQ, UNUSED, UNUSED); // sign-extend Eax into Eax:Edx
+				scratch(REG_AT(Edx));
+				op32(ctx, MOV, fetch(dst), PEAX);
+				dst->stackPos += 4;
+				op32(ctx, MOV, fetch(dst), REG_AT(Edx));
+				dst->stackPos -= 4;
+			} else if( dst->t->kind == HI32 && ra->t->kind == HI64 ) {
+				error_i64();
+#				endif
 			} else {
 				preg *r = alloc_cpu(ctx,dst,false);
 				copy_from(ctx, r, ra);
@@ -3309,6 +3367,12 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OField:
 			{
+#				ifndef HL_64
+				if( dst->t->kind == HI64 ) {
+					error_i64();
+					break;
+				}
+#				endif 
 				switch( ra->t->kind ) {
 				case HOBJ:
 				case HSTRUCT:
