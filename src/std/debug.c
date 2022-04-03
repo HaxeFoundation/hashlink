@@ -193,13 +193,14 @@ static void *get_reg( int r ) {
 		case 1: return &regs->rbp;
 		case 2: return &regs->rip;
 		case 10: return &regs->rax;
+		case 11: return (void*)(-((int_val)&fp->xmm_space[0])-1);
 #		else
 		case 0: return &regs->esp;
 		case 1: return &regs->ebp;
 		case 2: return &regs->eip;
 		case 10: return &regs->eax;
+		case 11: return -1;
 #		endif
-		case 11: return (void*)(-((int_val)&fp->xmm_space[0])-1);
 		case 3: return &regs->eflags;
 		default: return &user->u_debugreg[r-4];
 		}
