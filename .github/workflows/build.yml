@@ -351,7 +351,7 @@ jobs:
           --attach "artifact/hashlink-latest-darwin.tar.gz" \
           --attach "artifact/hashlink-latest-linux-amd64.tar.gz" \
           --attach "artifact/hashlink-latest-win32.zip" \
-          --attach "artifact/hashlink-latest-win64.zip"
+          --attach "artifact/hashlink-latest-win64.zip" \
           --attach "artifact/hashlink-latest-linux-i386.tar.gz"
 
     - name: "Delete intermediate build artifacts"
