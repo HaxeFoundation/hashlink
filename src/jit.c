@@ -1275,10 +1275,10 @@ static void copy_from( jit_ctx *ctx, preg *to, vreg *from ) {
 
 static void store_const( jit_ctx *ctx, vreg *r, int c ) {
 	preg p;
-	if( r->size > 4 )
-		ASSERT(r->size);
 	if( c == 0 )
-		op32(ctx,XOR,alloc_cpu(ctx,r,false),alloc_cpu(ctx,r,false));
+		op(ctx,XOR,alloc_cpu(ctx,r,false),alloc_cpu(ctx,r,false),r->size == 8);
+	else if( r->size == 8 )
+		op64(ctx,MOV,alloc_cpu(ctx,r,false),pconst64(&p,c));
 	else
 		op32(ctx,MOV,alloc_cpu(ctx,r,false),pconst(&p,c));
 	store(ctx,r,r->current,false);
