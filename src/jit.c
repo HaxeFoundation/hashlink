@@ -3873,7 +3873,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					if( f == NULL ) ASSERT(dst->t->kind);
  					null_field_access = true;
 					pad_before_call(ctx, HL_WSIZE);
-					if( f->hashed_name < 256 )
+					if( f->hashed_name >= 0 && f->hashed_name < 256 )
 						op64(ctx,PUSH8,pconst(&p,f->hashed_name),UNUSED);
 					else
 						op32(ctx,PUSH,pconst(&p,f->hashed_name),UNUSED);
