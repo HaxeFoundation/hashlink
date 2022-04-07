@@ -991,7 +991,7 @@ static void *gc_alloc_page_memory( int size ) {
 			tmp = NULL;
 		}
 		if( tmp ) tmp = mmap(tmp,tmp_size,PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
-		recursions++
+		recursions++;
 		ptr = gc_alloc_page_memory(size);
 		recursions--;
 		if( tmp ) munmap(tmp,tmp_size);
