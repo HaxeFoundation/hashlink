@@ -224,8 +224,8 @@ typedef wchar_t	uchar;
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
 HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
-#	define utod(s,len,end)		wcstod(s,end)
-#	define utoi(s,len,end)		wcstol(s,end,10)
+#	define utod(s,end)	wcstod(s,end)
+#	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
 #	define utostr(out,size,str) wcstombs(out,str,size)
 #elif defined(HL_MAC)
@@ -251,8 +251,8 @@ typedef char16_t uchar;
 
 C_FUNCTION_BEGIN
 #ifndef HL_NATIVE_UCHAR_FUN
-HL_API double utod( const uchar *str, size_t len, const uchar **const end );
-HL_API int utoi( const uchar *str, size_t len, const uchar **const end );
+HL_API double utod( const uchar *str, const uchar **const end );
+HL_API int utoi( const uchar *str, const uchar **const end );
 HL_API int ustrlen( const uchar *str );
 HL_API uchar *ustrdup( const uchar *str );
 HL_API int ucmp( const uchar *a, const uchar *b );

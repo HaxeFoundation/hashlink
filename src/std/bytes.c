@@ -182,11 +182,8 @@ static inline bool is_space_char(uchar c) {
 
 HL_PRIM double hl_parse_float( vbyte *bytes, int pos, int len ) {
 	const uchar *str = (uchar*)(bytes+pos), *end = NULL;
-	while( is_space_char(*str) ) {
-		str++;
-		len--;
-	}
-	double d = utod(str,len,&end);
+	while( is_space_char(*str) ) str++;
+	double d = utod(str,&end);
 	if( end == str )
 		return hl_nan();
 	return d;
@@ -200,14 +197,12 @@ static inline bool has_hex_prefix( const uchar *c, int len, bool is_signed ) {
 
 HL_PRIM vdynamic *hl_parse_int( vbyte *bytes, int pos, int len ) {
 	const uchar *c = (uchar*)(bytes + pos);
+	const uchar *const start = c;
 	int h;
-	while( is_space_char(*c) ) {
-		c++;
-		len--;
-	}
+	while( is_space_char(*c) ) c++;
 	uchar sign = c[0];
 	bool is_signed = sign == '-' || sign == '+';
-	if( has_hex_prefix(c,len,is_signed) ) {
+	if( has_hex_prefix(c,len+start-c,is_signed) ) {
 		h = 0;
 		c += is_signed ? 3 : 2;
 		while( *c ) {
@@ -224,7 +219,7 @@ HL_PRIM vdynamic *hl_parse_int( vbyte *bytes, int pos, int len ) {
 		if( sign == '-' ) h = -h;
 	} else {
 		const uchar *end = NULL;
-		h = utoi(c,len,&end);
+		h = utoi(c,&end);
 		if( c == end )
 			return NULL;
 	}
