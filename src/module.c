@@ -242,7 +242,7 @@ hl_module *hl_module_alloc( hl_code *c ) {
 	memset(m,0,sizeof(hl_module));
 	m->code = c;
 	m->globals_indexes = (int*)malloc(sizeof(int)*c->nglobals);
-	if( m == NULL ) {
+	if( m->globals_indexes == NULL ) {
 		hl_module_free(m);
 		return NULL;
 	}
@@ -505,6 +505,50 @@ static void hl_module_init_natives( hl_module *m ) {
 	}
 }
 
+static void hl_module_init_constant( hl_module *m, hl_constant *c ) {
+	hl_type *t = m->code->globals[c->global];
+	hl_runtime_obj *rt;
+	vdynamic **global = (vdynamic**)(m->globals_data + m->globals_indexes[c->global]);
+	vdynamic *v = NULL;
+	switch (t->kind) {
+	case HOBJ:
+	case HSTRUCT:
+		rt = hl_get_obj_rt(t);
+		v = (vdynamic*)hl_malloc(&m->ctx.alloc,rt->size);
+		v->t = t;
+		for(int i=0;i<c->nfields;i++) {
+			int idx = c->fields[i];
+			hl_type *ft = t->obj->fields[i].t;
+			void *addr = (char*)v + rt->fields_indexes[i];
+			switch (ft->kind) {
+			case HI32:
+				*(int*)addr = m->code->ints[idx];
+				break;
+			case HBOOL:
+				*(bool*)addr = idx != 0;
+				break;
+			case HF64:
+				*(double*)addr = m->code->floats[idx];
+				break;
+			case HBYTES:
+				*(const void**)addr = hl_get_ustring(m->code, idx);
+				break;
+			case HTYPE:
+				*(hl_type**)addr = m->code->types + idx;
+				break;
+			default:
+				*(void**)addr = *(void**)(m->globals_data + m->globals_indexes[idx]);
+				break;
+			}
+		}
+		break;
+	default:
+		hl_fatal("assert");
+	}
+	*global = v;
+	hl_remove_root(global);
+}
+
 int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
@@ -553,49 +597,8 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	}
 	// INIT constants
 	for(i=0;i<m->code->nconstants;i++) {
-		int j;
 		hl_constant *c = m->code->constants + i;
-		hl_type *t = m->code->globals[c->global];
-		hl_runtime_obj *rt;
-		vdynamic **global = (vdynamic**)(m->globals_data + m->globals_indexes[c->global]);
-		vdynamic *v = NULL;
-		switch (t->kind) {
-		case HOBJ:
-		case HSTRUCT:
-			rt = hl_get_obj_rt(t);
-			v = (vdynamic*)hl_malloc(&m->ctx.alloc,rt->size);
-			v->t = t;
-			for (j = 0; j<c->nfields; j++) {
-				int idx = c->fields[j];
-				hl_type *ft = t->obj->fields[j].t;
-				void *addr = (char*)v + rt->fields_indexes[j];
-				switch (ft->kind) {
-				case HI32:
-					*(int*)addr = m->code->ints[idx];
-					break;
-				case HBOOL:
-					*(bool*)addr = idx != 0;
-					break;
-				case HF64:
-					*(double*)addr = m->code->floats[idx];
-					break;
-				case HBYTES:
-					*(const void**)addr = hl_get_ustring(m->code, idx);
-					break;
-				case HTYPE:
-					*(hl_type**)addr = m->code->types + idx;
-					break;
-				default:
-					*(void**)addr = *(void**)(m->globals_data + m->globals_indexes[idx]);
-					break;
-				}
-			}
-			break;
-		default:
-			hl_fatal("assert");
-		}
-		*global = v;
-		hl_remove_root(global);
+		hl_module_init_constant(m, c);
 	}
 
 	// DONE
@@ -618,7 +621,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 }
 
 h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
-	int i1,i2;
+	int i,i1,i2;
 	bool has_changes = false;
 	int changes_count = 0;
 	jit_ctx *ctx = m1->jit_ctx;
@@ -628,17 +631,32 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	hl_code_hash_remap_globals(m2->hash,m1->hash);
 
 	// share global data
-	// TODO : we should assign indexes for new globals
-	// and eventually init their value correctly
 	free(m2->globals_data);
 	free(m2->globals_indexes);
 	m2->globals_data = m1->globals_data;
 	m2->globals_indexes = m1->globals_indexes;
+	int gsize = m1->globals_size;
+	for(i=m1->code->nglobals;i<m2->code->nglobals;i++) {
+		hl_type *t = c->globals[i];
+		gsize += hl_pad_size(gsize, t);
+		m2->globals_indexes[i] = gsize;
+		gsize += hl_type_size(t);
+		if( hl_is_ptr(t) )
+			hl_add_root(m2->globals_data+m2->globals_indexes[i]);
+	}
+	memset(m2->globals_data+m2->globals_size,0,gsize - m2->globals_size);
+	m2->globals_size = gsize;
 	
 	hl_module_init_natives(m2);
 	hl_module_init_indexes(m2);
 	hl_jit_reset(ctx, m2);
 	hl_code_hash_finalize(m2->hash);
+
+	for(i=0;i<m2->code->nconstants;i++) {
+		hl_constant *c = m2->code->constants + i;
+		if( c->global >= m1->code->nglobals )
+			hl_module_init_constant(m2, c);
+	}
 
 	for(i2=0;i2<m2->code->nfunctions;i2++) {
 		hl_function *f2 = m2->code->functions + i2;
@@ -734,7 +752,6 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		return false;
 	}
 	
-	int i;
 	for(i=0;i<m2->code->nfunctions;i++) {
 		hl_function *f2 = m2->code->functions + i;
 		if( m2->hash->functions_hashes[i] < -1 ) continue;
