@@ -2659,8 +2659,10 @@ static int jit_build( jit_ctx *ctx, void (*fbuild)( jit_ctx *) ) {
 static void hl_jit_init_module( jit_ctx *ctx, hl_module *m ) {
 	int i;
 	ctx->m = m;
-	if( m->code->hasdebug )
+	if( m->code->hasdebug ) {
 		ctx->debug = (hl_debug_infos*)malloc(sizeof(hl_debug_infos) * m->code->nfunctions);
+		memset(ctx->debug, -1, sizeof(hl_debug_infos) * m->code->nfunctions);
+	}
 	for(i=0;i<m->code->nfloats;i++) {
 		jit_buf(ctx);
 		*ctx->buf.d++ = m->code->floats[i];

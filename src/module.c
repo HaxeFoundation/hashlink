@@ -58,9 +58,12 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 	}
 	if( min == 0 )
 		return false; // hl_callback
-	*fidx = (min - 1);
-	dbg = m->jit_debug + (min - 1);
-	fdebug = m->code->functions + (min - 1);
+	do {
+		min--;
+		*fidx = min;
+		dbg = m->jit_debug + min;
+		fdebug = m->code->functions + min;
+	} while( !dbg->offsets );
 	// lookup inside function
 	min = 0;
 	max = fdebug->nops;
@@ -549,6 +552,16 @@ static void hl_module_init_constant( hl_module *m, hl_constant *c ) {
 	hl_remove_root(global);
 }
 
+static void hl_module_add( hl_module *m ) {
+	hl_module **old_modules = cur_modules;
+	hl_module **new_modules = (hl_module**)malloc(sizeof(void*)*(modules_count + 1));
+	memcpy(new_modules, old_modules, sizeof(void*)*modules_count);
+	new_modules[modules_count] = m;
+	cur_modules = new_modules;
+	modules_count++;
+	free(old_modules);
+}
+
 int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
@@ -601,15 +614,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 		hl_module_init_constant(m, c);
 	}
 
-	// DONE
-	hl_module **old_modules = cur_modules;
-	hl_module **new_modules = (hl_module**)malloc(sizeof(void*)*(modules_count + 1));
-	memcpy(new_modules, old_modules, sizeof(void*)*modules_count);
-	new_modules[modules_count] = m;
-	cur_modules = new_modules;
-	modules_count++;
-	free(old_modules);
-
+	hl_module_add(m);
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_gc_set_dump_types(hl_module_types_dump);
 	hl_jit_free(ctx, hot_reload);
@@ -744,6 +749,20 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	}
 
 	m2->jit_code = hl_jit_code(ctx, m2, &m2->codesize, &m2->jit_debug, m1);
+
+	// patch missing debug info
+	int start = -1;
+	if( m2->jit_debug ) {
+		for(i=0;i<c->nfunctions;i++) {
+			if( m2->jit_debug[i].start < 0 ) {
+				m2->jit_debug[i].start = start;
+				m2->jit_debug[i].offsets = NULL;
+			} else {
+				start = m2->jit_debug[i].start;
+			}
+		}
+	}
+
 	hl_jit_free(ctx,true);
 
 	if( m2->jit_code == NULL ) {
@@ -773,6 +792,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		printf("[HotReload] %d changes\n", changes_count);
 		fflush(stdout);
 	}
+	hl_module_add(m2);
 
 	return true;
 }
