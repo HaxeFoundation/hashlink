@@ -649,7 +649,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		if( hl_is_ptr(t) )
 			hl_add_root(m2->globals_data+m2->globals_indexes[i]);
 	}
-	memset(m2->globals_data+m2->globals_size,0,gsize - m2->globals_size);
+	memset(m2->globals_data+m1->globals_size,0,gsize - m1->globals_size);
 	m2->globals_size = gsize;
 	
 	hl_module_init_natives(m2);
