@@ -151,7 +151,7 @@ HL_PRIM void hl_cache_free() {
 
 HL_PRIM hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid ) {
 	hl_runtime_obj *rt;
-	if( t->kind != HOBJ )
+	if( t->kind != HOBJ && t->kind != HSTRUCT )
 		return NULL;
 	rt = hl_get_obj_rt(t);
 	if( fid < 0 || fid >= rt->nfields )
@@ -590,9 +590,12 @@ vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj ) {
 			o->virtuals = v;
 			// recast
 			if( need_recast ) {
+				bool extra_check = vt->virt->nfields > 63;
 				for(i=0;i<vt->virt->nfields;i++)
 					if( need_recast & (((int64)1) << ((int64)i)) ) {
 						hl_obj_field *f = vt->virt->fields + i;
+						if( extra_check && hl_lookup_find(o->lookup,o->nfields,f->hashed_name) == NULL )
+							continue;
 						if( hl_is_ptr(f->t) )
 							hl_dyn_setp(obj,f->hashed_name,f->t,hl_dyn_getp(obj,f->hashed_name,f->t));
 						else if( f->t->kind == HF64 )
@@ -1024,6 +1027,8 @@ HL_PRIM vdynamic *hl_obj_get_field( vdynamic *obj, int hfield ) {
 }
 
 HL_PRIM void hl_obj_set_field( vdynamic *obj, int hfield, vdynamic *v ) {
+	if( obj == NULL )
+		hl_error("Null access");
 	if( v == NULL ) {
 		hl_dyn_setp(obj,hfield,&hlt_dyn,NULL);
 		return;

@@ -116,7 +116,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 	r = (sqlite_result*)hl_gc_alloc_finalizer(sizeof(sqlite_result));
 	r->finalize = HL_NAME(finalize_result);
 	r->db = NULL;
-	
+
 	if( sqlite3_prepare16_v2(db->db, sql, -1, &r->r, &tl) != SQLITE_OK ) {
 		HL_NAME(error)(db->db, false);
 	}
@@ -150,7 +150,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 					hl_buffer_str(b, sqlite3_column_name16(r->r,i));
 					hl_buffer_str(b, USTR(" and "));
 					hl_buffer_str(b, sqlite3_column_name16(r->r,j));
-					
+
 					sqlite3_finalize(r->r);
 					hl_error("%s",hl_buffer_content(b, NULL));
 				}
@@ -161,7 +161,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 	// changes in an update/delete
 	if( db->last != NULL )
 		HL_NAME(finalize_request)(db->last, false);
-	
+
 	db->last = r;
 	return db->last;
 }
@@ -246,11 +246,11 @@ HL_PRIM varray *HL_NAME(result_next)( sqlite_result *r ) {
 				int size = sqlite3_column_bytes(r->r, i);
 				vbyte *blob = (vbyte *)sqlite3_column_blob(r->r, i);
 				vbyte *vb = hl_copy_bytes(blob, size+1);
-				
+
 				varray *bytes_data = hl_alloc_array(&hlt_dyn, 2);
 				hl_aptr(bytes_data, vdynamic*)[0] = hl_make_dyn(&vb, &hlt_bytes);
 				hl_aptr(bytes_data, vdynamic*)[1] = hl_make_dyn(&size, &hlt_i32);
-				
+
 				v = hl_make_dyn(&bytes_data, &hlt_array);
 				break;
 			}
@@ -326,7 +326,7 @@ DEFINE_PRIM(_RESULT,     request, _CONNECTION _BYTES);
 DEFINE_PRIM(_I32,        last_id, _CONNECTION);
 
 DEFINE_PRIM(_ARR,          result_next,      _RESULT);
-DEFINE_PRIM(_NULL(_BYTES), result_get,       _RESULT _I32);
+DEFINE_PRIM(_BYTES,        result_get,       _RESULT _I32);
 DEFINE_PRIM(_NULL(_I32),   result_get_int,   _RESULT _I32);
 DEFINE_PRIM(_NULL(_F64),   result_get_float, _RESULT _I32);
 DEFINE_PRIM(_NULL(_I32),   result_get_length, _RESULT);

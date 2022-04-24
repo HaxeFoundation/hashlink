@@ -79,7 +79,7 @@ HL_PRIM void hl_set_error_handler( vclosure *d ) {
 
 static bool break_on_trap( hl_thread_info *t, hl_trap_ctx *trap, vdynamic *v ) {
 	while( true ) {
-		if( trap == NULL || trap == t->trap_uncaught || t->trap_current == NULL ) return true;
+		if( trap == NULL || trap == t->trap_uncaught || t->trap_current == NULL || trap->prev == NULL ) return true;
 		if( !trap->tcheck || !v ) return false;
 		hl_type *ot = ((hl_type**)trap->tcheck)[1]; // it's an obj with first field is a hl_type
 		if( !ot || hl_safe_cast(v->t,ot) ) return false;
@@ -163,6 +163,8 @@ HL_PRIM int hl_exception_stack_raw( varray *arr ) {
 }
 
 HL_PRIM int hl_call_stack_raw( varray *arr ) {
+	if( !arr )
+		return capture_stack_func(NULL,0);
 	return capture_stack_func(hl_aptr(arr,void*), arr->size);
 }
 

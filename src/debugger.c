@@ -41,6 +41,7 @@ HL_API int hl_closure_stack_capture;
 static hl_socket *debug_socket = NULL;
 static hl_socket *client_socket = NULL;
 static bool debugger_connected = false;
+static bool debugger_stopped = false;
 
 #define send hl_send_data
 static void send( void *ptr, int size ) {
@@ -69,6 +70,7 @@ static void hl_debug_loop( hl_module *m ) {
 		int i;
 		vbyte cmd;
 		hl_socket *s = hl_socket_accept(debug_socket);
+		if( s == NULL ) break;
 		client_socket = s;
 		send("HLD1",4);
 		send(&flags,4);
@@ -111,9 +113,10 @@ static void hl_debug_loop( hl_module *m ) {
 		debugger_connected = true;
 		client_socket = NULL;
 	} while( loop );
+	debugger_stopped = true;
 }
 
-bool hl_module_debug( hl_module *m, int port, bool wait ) {
+h_bool hl_module_debug( hl_module *m, int port, h_bool wait ) {
 	hl_socket *s;
 	hl_socket_init();
 	s = hl_socket_new(false);
@@ -138,6 +141,18 @@ bool hl_module_debug( hl_module *m, int port, bool wait ) {
 	// imply --debug-wait
 	hl_debug_loop(m);
 	hl_socket_close(debug_socket);
+	debug_socket = NULL;
 #	endif
 	return true;
+}
+
+void hl_module_debug_stop() {
+	if( !debug_socket ) return;
+#	ifdef HL_THREADS
+	hl_socket_close(debug_socket);
+	while( !debugger_stopped )
+		hl_sys_sleep(0.01);
+	hl_remove_root(&debug_socket);
+	hl_remove_root(&client_socket);
+#	endif
 }

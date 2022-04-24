@@ -41,7 +41,7 @@ int ustrlen( const uchar *str ) {
 	return (int)(p - str);
 }
 
-int ustrlen_utf8( const uchar *str ) {
+static int ustrlen_utf8( const uchar *str ) {
 	int size = 0;
 	while(1) {
 		uchar c = *str++;
@@ -67,49 +67,47 @@ uchar *ustrdup( const uchar *str ) {
 	return d;
 }
 
-static bool is_space_char( uchar c ) {
-	return c == ' ' || c == '\r' || c == '\n' || c == '\t';
-}
-
-double utod( const uchar *str, uchar **end ) {
+double utod( const uchar *str, const uchar **end ) {
 	char buf[31];
 	char *bend;
+	double result;
 	int i = 0;
-	double v;
-	while( is_space_char(*str) ) str++;
 	while( i < 30 ) {
-		int c = *str++;
+		int c = str[i];
 		if( (c < '0' || c > '9') && c != '.' && c != 'e' && c != 'E' && c != '-' && c != '+' )
 			break;
 		buf[i++] = (char)c;
 	}
 	buf[i] = 0;
-	v = strtod(buf,&bend);
-	*end = (uchar*)(str - 1) + (bend - buf);
-	return v;
+	result = strtod(buf,&bend);
+	*end = str + (bend - buf);
+	return result;
 }
 
-int utoi( const uchar *str, uchar **end ) {
+int utoi( const uchar *str, const uchar **end ) {
 	char buf[17];
 	char *bend;
+	int result;
 	int i = 0;
-	int v;
-	while( is_space_char(*str) ) str++;
+	uchar sign = str[0];
+	if( sign == '-' || sign == '+' ) {
+		buf[i++] = (char)sign;
+	}
 	while( i < 16 ) {
-		int c = *str++;
-		if( (c < '0' || c > '9') && c != '-' )
+		int c = str[i];
+		if( c < '0' || c > '9' )
 			break;
 		buf[i++] = (char)c;
 	}
 	buf[i] = 0;
-	v = strtol(buf,&bend,10);
-	*end = (uchar*)(str - 1) + (bend - buf);
-	return v;
+	result = strtol(buf,&bend,10);
+	*end = str + (bend - buf);
+	return result;
 }
 
 int ucmp( const uchar *a, const uchar *b ) {
 	while(true) {
-		int d = (unsigned)*a - (unsigned)*b; 
+		int d = (unsigned)*a - (unsigned)*b;
 		if( d ) return d;
 		if( !*a ) return 0;
 		a++;

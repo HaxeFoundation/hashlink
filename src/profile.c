@@ -22,6 +22,22 @@
 #include <hl.h>
 #include <hlmodule.h>
 
+#ifdef HL_LINUX
+#include <semaphore.h>
+#include <signal.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
+
+#if defined(__GLIBC__)
+#if __GLIBC_PREREQ(2, 30)
+// tgkill is present
+#else
+// int tgkill(pid_t tgid, pid_t tid, int sig)
+#define tgkill(tgid, tid, sig) syscall(SYS_tgkill, tgid, tid, sig)
+#endif
+#endif
+
 #define MAX_STACK_SIZE (8 << 20)
 #define MAX_STACK_COUNT 2048
 
@@ -73,6 +89,25 @@ static struct {
 	profile_data *first_record;
 } data = {0};
 
+#ifdef HL_LINUX
+static struct
+{
+	sem_t msg2;
+	sem_t msg3;
+	sem_t msg4;
+	ucontext_t context;
+} shared_context;
+
+static void sigprof_handler(int sig, siginfo_t *info, void *ucontext)
+{
+	ucontext_t *ctx = ucontext;
+	shared_context.context = *ctx;
+	sem_post(&shared_context.msg2);
+	sem_wait(&shared_context.msg3);
+	sem_post(&shared_context.msg4);
+}
+#endif
+
 static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 #ifdef HL_WIN_DESKTOP
 	CONTEXT c;
@@ -84,6 +119,14 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 #	else
 	*eip = (void*)c.Eip;
 	return (void*)c.Esp;
+#	endif
+#elif defined(HL_LINUX)
+#	ifdef HL_64
+	*eip = (void*)shared_context.context.uc_mcontext.gregs[REG_RIP];
+	return (void*)shared_context.context.uc_mcontext.gregs[REG_RSP];
+#	else
+	*eip = (void*)shared_context.context.uc_mcontext.gregs[REG_EIP];
+	return (void*)shared_context.context.uc_mcontext.gregs[REG_ESP];
 #	endif
 #else
 	return NULL;
@@ -109,6 +152,14 @@ static bool pause_thread( thread_handle *t, bool b ) {
 	else {
 		ResumeThread(t->h);
 		return true;
+	}
+#elif defined(HL_LINUX)
+	if( b ) {
+		tgkill(getpid(), t->tid, SIGPROF);
+		return sem_wait(&shared_context.msg2) == 0;
+	} else {
+		sem_post(&shared_context.msg3);
+		return sem_wait(&shared_context.msg4) == 0;
 	}
 #else
 	return false;
@@ -144,6 +195,10 @@ static void read_thread_data( thread_handle *t ) {
 		return;
 	}
 
+#ifdef HL_LINUX
+    int count = hl_module_capture_stack_range(t->inf->stack_top, stack, data.stackOut, MAX_STACK_COUNT);
+    pause_thread(t, false);
+#else
 	int size = (int)((unsigned char*)t->inf->stack_top - (unsigned char*)stack);
 	if( size > MAX_STACK_SIZE-32 ) size = MAX_STACK_SIZE-32;
 	memcpy(data.tmpMemory + 2,stack,size);
@@ -153,8 +208,11 @@ static void read_thread_data( thread_handle *t ) {
 	size += sizeof(void*) * 2;
 
 	int count = hl_module_capture_stack_range((char*)data.tmpMemory+size, (void**)data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
+#endif
 	int eventId = count | 0x80000000;
 	double time = hl_sys_time();
+	struct { int count; bool stop; } *gc = hl_gc_threads_info();
+	if( gc->stop ) eventId |= 0x40000000;
 	record_data(&time,sizeof(double));
 	record_data(&t->tid,sizeof(int));
 	record_data(&eventId,sizeof(int));
@@ -211,7 +269,7 @@ static void hl_profile_loop( void *_ ) {
 static void profile_event( int code, vbyte *data, int dataLen );
 
 void hl_profile_setup( int sample_count ) {
-#	if defined(HL_THREADS) && defined(HL_WIN_DESKTOP)
+#	if defined(HL_THREADS) && (defined(HL_WIN_DESKTOP) || defined(HL_LINUX))
 	hl_setup_profiler(profile_event,hl_profile_end);
 	if( data.sample_count ) return;
 	if( sample_count < 0 ) {
@@ -220,6 +278,15 @@ void hl_profile_setup( int sample_count ) {
 		return;
 	}
 	data.sample_count = sample_count;
+#	ifdef HL_LINUX
+	sem_init(&shared_context.msg2, 0, 0);
+	sem_init(&shared_context.msg3, 0, 0);
+	sem_init(&shared_context.msg4, 0, 0);
+	struct sigaction action = {0};
+	action.sa_sigaction = sigprof_handler;
+	action.sa_flags = SA_SIGINFO;
+	sigaction(SIGPROF, &action, NULL);
+#	endif
 	hl_thread_start(hl_profile_loop,NULL,false);
 #	endif
 }
@@ -266,7 +333,7 @@ static void profile_dump() {
 		fwrite(&tid,1,4,f);
 		fwrite(&eventId,1,4,f);
 		if( eventId < 0 ) {
-			int count = eventId & 0x7FFFFFFF;
+			int count = eventId & 0x3FFFFFFF;
 			read_profile_data(&r,data.stackOut,sizeof(void*)*count);
 			for(i=0;i<count;i++) {
 				uchar outStr[256];
@@ -306,7 +373,7 @@ static void profile_dump() {
 		if( !read_profile_data(&r,NULL, sizeof(double) + sizeof(int)) ) break;
 		read_profile_data(&r,&eventId,sizeof(int));
 		if( eventId < 0 ) {
-			int count = eventId & 0x7FFFFFFF;
+			int count = eventId & 0x3FFFFFFF;
 			read_profile_data(&r,data.stackOut,sizeof(void*)*count);
 			for(i=0;i<count;i++) {
 				int *debug_addr = NULL;
@@ -366,9 +433,12 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		break;
 	case -7:
 		{
-			uchar *end = NULL;
+			const uchar *end = NULL;
 			hl_profile_setup( ptr ? utoi((uchar*)ptr,&end) : 1000);
 		}
+		break;
+	case -8:
+		hl_get_thread()->flags |= HL_THREAD_INVISIBLE;
 		break;
 	default:
 		if( code < 0 ) return;
@@ -386,4 +456,3 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		break;
 	}
 }
-
