@@ -911,8 +911,12 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 	h->types_hashes = types_hashes;
 
 	h->globals_signs = malloc(sizeof(int) * c->nglobals);
-	for(i=0;i<c->nglobals;i++)
+	for(i=0;i<c->nglobals;i++) {
+		hl_type *t = c->globals[i];
 		h->globals_signs[i] = i | 0x80000000;
+		if( t->kind == HABSTRACT )
+			h->globals_signs[i] = hl_code_hash_type(h,t); // some global abstracts allocated by compiler
+	}
 	for(i=0;i<c->ntypes;i++) {
 		hl_type *t = c->types + i;
 		switch( t->kind ) {
@@ -1011,6 +1015,13 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 		nglobals[remap[i]] = c->globals[i];
 	c->globals = nglobals;
 	c->nglobals = new_count;
+
+#	ifdef HL_DEBUG
+	for(i=old_count;i<new_count;i++) {
+		hl_type *t = c->globals[i];
+		uprintf(USTR("New global %s\n"),hl_type_str(t));
+	}
+#	endif
 
 	int *nsigns = malloc(sizeof(int) * c->nglobals);
 	for(i=0;i<new_count;i++)

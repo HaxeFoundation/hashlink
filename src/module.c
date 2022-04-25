@@ -733,16 +733,41 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	// patch same types
 	for(i1=0;i1<m1->code->ntypes;i1++) {
 		hl_type *p = m1->code->types + i1;
-		if( p->kind != HOBJ && p->kind != HSTRUCT ) continue;
+		switch( p->kind ) {
+		case HOBJ:
+		case HSTRUCT:
+			break;
+		case HENUM:
+			if( !p->tenum->global_value ) continue;
+			break;
+		default:
+			continue;
+		}
 		for(i2=0;i2<c->ntypes;i2++) {
 			hl_type *t = c->types + i2;
 			if( p->kind != t->kind ) continue;
-			if( ucmp(p->obj->name,t->obj->name) != 0 ) continue;
-			if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
-				t->obj = p->obj; // alias the types ! they are different pointers but have the same layout
-			} else {
-				uprintf(USTR("[HotReload] Type %s has changed\n"),t->obj->name);
-				changes_count++;
+			switch( p->kind ) {
+			case HOBJ:
+			case HSTRUCT:
+				if( ucmp(p->obj->name,t->obj->name) != 0 ) continue;
+				if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
+					t->obj = p->obj; // alias the types ! they are different pointers but have the same layout
+				} else {
+					uprintf(USTR("[HotReload] Type %s has changed\n"),t->obj->name);
+					changes_count++;
+				}
+				break;
+			case HENUM:
+				if( ucmp(p->tenum->name,t->tenum->name) != 0 ) continue;
+				if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
+					t->tenum = p->tenum; // alias the types ! they are different pointers but have the same layout
+				} else {
+					uprintf(USTR("[HotReload] Type %s has changed\n"),t->tenum->name);
+					changes_count++;
+				}
+				break;
+			default:
+				break;
 			}
 			break;
 		}
