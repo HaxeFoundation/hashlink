@@ -732,6 +732,30 @@ class Memory {
 		Sys.println(msg);
 	}
 
+	static function parseArgs(str: String) {
+		str = StringTools.trim(str);
+		var i = 0;
+		var tok = "";
+		var args = [];
+		var escape = false;
+		while(i != str.length) {
+			var c = str.charAt(i++);
+			if(c == '"') {
+				escape = !escape;
+			}
+			else {
+				if(c == " " && !escape) {
+					if(tok.length > 0) args.push(tok);
+					tok = "";
+				}
+				else 
+					tok += c;
+			}
+		}
+		if(tok.length > 0) args.push(tok);
+		return args;
+	}
+
 	static function main() {
 		var m = new Memory();
 
@@ -759,7 +783,7 @@ class Memory {
 		var stdin = Sys.stdin();
 		while( true ) {
 			Sys.print("> ");
-			var args = ~/ +/g.split(StringTools.trim(stdin.readLine()));
+			var args = parseArgs(stdin.readLine());
 			var cmd = args.shift();
 			switch( cmd ) {
 			case "exit", "quit", "q":

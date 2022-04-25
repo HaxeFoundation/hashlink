@@ -151,7 +151,7 @@ HL_PRIM void hl_cache_free() {
 
 HL_PRIM hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid ) {
 	hl_runtime_obj *rt;
-	if( t->kind != HOBJ )
+	if( t->kind != HOBJ && t->kind != HSTRUCT )
 		return NULL;
 	rt = hl_get_obj_rt(t);
 	if( fid < 0 || fid >= rt->nfields )

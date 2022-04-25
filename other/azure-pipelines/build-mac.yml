@@ -1,6 +1,6 @@
 parameters:
   name: 'BuildMac'
-  vmImage: 'macOS-10.14'
+  vmImage: 'macOS-10.15'
   buildSystem: 'cmake' # either 'cmake' or 'make'
   cmakeConfig: 'RelWithDebInfo'
 

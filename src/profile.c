@@ -456,4 +456,3 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		break;
 	}
 }
-

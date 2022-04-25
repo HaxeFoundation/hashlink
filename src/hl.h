@@ -154,7 +154,11 @@
 #	define EXPORT __declspec( dllexport )
 #	define IMPORT __declspec( dllimport )
 #else
+#if defined(HL_GCC) || defined(HL_CLANG)
+#	define EXPORT __attribute__((visibility("default")))
+#else
 #	define EXPORT
+#endif
 #	define IMPORT extern
 #endif
 
@@ -220,8 +224,8 @@ typedef wchar_t	uchar;
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
 HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
-#	define _utod(s,end)	wcstod(s,end)
-#	define _utoi(s,end)	wcstol(s,end,10)
+#	define utod(s,end)	wcstod(s,end)
+#	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
 #	define utostr(out,size,str) wcstombs(out,str,size)
 #elif defined(HL_MAC)
@@ -233,8 +237,10 @@ typedef uint16_t uchar;
 #if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_MAC)
 #include <stddef.h>
 #include <stdint.h>
+#if !defined(__cplusplus) || __cplusplus < 201103L
 typedef uint16_t char16_t;
 typedef uint32_t char32_t;
+#endif
 #else
 #	include <uchar.h>
 #endif
@@ -244,9 +250,9 @@ typedef char16_t uchar;
 #endif
 
 C_FUNCTION_BEGIN
+#ifndef HL_NATIVE_UCHAR_FUN
 HL_API double utod( const uchar *str, uchar **end );
 HL_API int utoi( const uchar *str, uchar **end );
-#ifndef HL_NATIVE_UCHAR_FUN
 HL_API int ustrlen( const uchar *str );
 HL_API uchar *ustrdup( const uchar *str );
 HL_API int ucmp( const uchar *a, const uchar *b );
@@ -653,7 +659,7 @@ HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool
 	so you are sure it's of the used typed. Otherwise use hl_dyn_call
 */
 #define hl_call0(ret,cl) \
-	(cl->hasValue ? ((ret(*)(vdynamic*))cl->fun)(cl->value) : ((ret(*)())cl->fun)()) 
+	(cl->hasValue ? ((ret(*)(vdynamic*))cl->fun)(cl->value) : ((ret(*)())cl->fun)())
 #define hl_call1(ret,cl,t,v) \
 	(cl->hasValue ? ((ret(*)(vdynamic*,t))cl->fun)(cl->value,v) : ((ret(*)(t))cl->fun)(v))
 #define hl_call2(ret,cl,t1,v1,t2,v2) \
@@ -917,7 +923,7 @@ typedef struct {
 
 HL_API hl_track_info hl_track;
 
-#else 
+#else
 
 #define hl_is_tracking(_) false
 #define hl_track_call(a,b)

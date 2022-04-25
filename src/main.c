@@ -41,10 +41,10 @@ typedef char pchar;
 #endif
 
 typedef struct {
+	pchar *file;
 	hl_code *code;
 	hl_module *m;
 	vdynamic *ret;
-	pchar *file;
 	int file_time;
 } main_context;
 

@@ -979,7 +979,8 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 	int old_start = 0;
 
 	int count = c->nglobals;
-	int extra =	hold->code->nglobals - count;
+	int old_count = hold->code->nglobals;
+	int extra =	old_count - count;
 	if( extra < 0 ) extra = 0;
 	int *remap = malloc(sizeof(int) * count);
 
@@ -987,7 +988,7 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 		int k;
 		int h = hnew->globals_signs[i];
 		remap[i] = -1;
-		for(k=old_start;k<hold->code->nglobals;k++) {
+		for(k=old_start;k<old_count;k++) {
 			if( hold->globals_signs[k] == h ) {
 				if( k == old_start ) old_start++;
 				remap[i] = k;
@@ -999,20 +1000,21 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 	// new globals
 	for(i=0;i<count;i++)
 		if( remap[i] == -1 )
-			remap[i] = count + extra++;
+			remap[i] = old_count + extra++;
 
 	hl_type **nglobals;
-	ALLOC(nglobals,hl_type*,count + extra);
-	for(i=0;i<count;i++)
-		nglobals[i] = &hlt_void;
+	int new_count = old_count + extra;
+	ALLOC(nglobals,hl_type*,new_count);
+	for(i=0;i<new_count;i++)
+		nglobals[i] = i < old_count ? hold->code->globals[i] : &hlt_void;
 	for(i=0;i<count;i++)
 		nglobals[remap[i]] = c->globals[i];
 	c->globals = nglobals;
-	c->nglobals += extra;
+	c->nglobals = new_count;
 
-	int *nsigns = malloc(sizeof(int) * (count+extra));
-	for(i=0;i<count;i++)
-		nsigns[i] = -1;
+	int *nsigns = malloc(sizeof(int) * c->nglobals);
+	for(i=0;i<new_count;i++)
+		nsigns[i] = i < old_count ? hold->globals_signs[i] : -1;
 	for(i=0;i<count;i++)
 		nsigns[remap[i]] = hnew->globals_signs[i];
 	free(hnew->globals_signs);
