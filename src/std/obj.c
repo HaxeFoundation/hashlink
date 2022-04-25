@@ -71,6 +71,10 @@ static hl_field_lookup *obj_resolve_field( hl_type_obj *o, int hfield ) {
 	return NULL;
 }
 
+HL_PRIM hl_field_lookup *hl_obj_resolve_field( hl_type_obj *o, int hfield ) {
+	return obj_resolve_field(o, hfield);
+}
+
 static int hl_cache_count = 0;
 static int hl_cache_size = 0;
 static hl_mutex *hl_cache_lock = NULL;
@@ -742,7 +746,7 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 
 // -------------------- DYNAMIC GET ------------------------------------
 
-static void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t ) {
+HL_API void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t ) {
 	switch( d->t->kind ) {
 	case HDYNOBJ:
 		{

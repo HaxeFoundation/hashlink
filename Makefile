@@ -29,7 +29,11 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+HL_COMMON = src/code.o src/jit.o src/module.o src/debugger.o src/profile.o
+
+HL = src/main.o $(HL_COMMON)
+
+LIBHL_JIT = $(HL_COMMON)
 
 FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o libs/fmt/dxt.o
 
@@ -133,6 +137,9 @@ libs: $(LIBS)
 libhl: ${LIB}
 	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
+libhl-jit: ${LIBHL_JIT} libhl
+	${CC} -o libhl-jit.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIBHL_JIT} ${LFLAGS} ${HLFLAGS}
+
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}
 
@@ -224,9 +231,9 @@ codesign_osx:
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${LIBHL_JIT} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
 
 clean: clean_o
-	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
+	rm -f hl hl.exe libhl-jit.$(LIBEXT) libhl.$(LIBEXT) *.hdll
 
-.PHONY: libhl hl hlc fmt sdl libs release
+.PHONY: libhl libhl-jit hl hlc fmt sdl libs release
