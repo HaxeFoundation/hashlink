@@ -464,6 +464,12 @@ static void hl_module_init_indexes( hl_module *m ) {
 			}
 		}
 	}
+
+	static hl_type_obj obj_entry = {0};
+	hl_function *fent = m->code->functions + m->functions_indexes[m->code->entrypoint];
+	obj_entry.name = USTR("");
+	fent->obj = &obj_entry;
+	fent->field.name = USTR("init");
 }
 
 static void hl_module_init_natives( hl_module *m ) {
@@ -818,6 +824,13 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		fflush(stdout);
 	}
 	hl_module_add(m2);
+
+	// call entry point (will only update types)
+	vclosure cl;
+	cl.t = c->functions[m2->functions_indexes[c->entrypoint]].type;
+	cl.fun = m2->functions_ptrs[c->entrypoint];
+	cl.hasValue = 0;
+	hl_dyn_call(&cl,NULL,0);
 
 	return true;
 }
