@@ -251,8 +251,8 @@ typedef char16_t uchar;
 
 C_FUNCTION_BEGIN
 #ifndef HL_NATIVE_UCHAR_FUN
-HL_API double utod( const uchar *str, const uchar **end );
-HL_API int utoi( const uchar *str, const uchar **end );
+HL_API double utod( const uchar *str, uchar **end );
+HL_API int utoi( const uchar *str, uchar **end );
 HL_API int ustrlen( const uchar *str );
 HL_API uchar *ustrdup( const uchar *str );
 HL_API int ucmp( const uchar *a, const uchar *b );

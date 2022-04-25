@@ -67,7 +67,7 @@ uchar *ustrdup( const uchar *str ) {
 	return d;
 }
 
-double utod( const uchar *str, const uchar **end ) {
+double utod( const uchar *str, uchar **end ) {
 	char buf[31];
 	char *bend;
 	double result;
@@ -84,7 +84,7 @@ double utod( const uchar *str, const uchar **end ) {
 	return result;
 }
 
-int utoi( const uchar *str, const uchar **end ) {
+int utoi( const uchar *str, uchar **end ) {
 	char buf[17];
 	char *bend;
 	int result;
@@ -179,6 +179,10 @@ void uprintf( const uchar *fmt, const uchar *str ) {
 #endif
 
 #if !defined(HL_NATIVE_UCHAR_FUN) || defined(HL_WIN)
+
+#ifdef HL_VCC
+#pragma warning(disable:4774)
+#endif
 
 HL_PRIM int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist ) {
 	uchar *start = out;
