@@ -663,7 +663,7 @@ HL_PRIM void hl_setup_reload_check( void *freload, void *param ) {
 }
 
 HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
-	if( debug_alt_file ) {
+	if( debug_alt_file && reload_param ) {
 		*((vbyte**)reload_param) = debug_alt_file;
 	}
 	return reload_fun && ((bool(*)(void*))reload_fun)(reload_param);
