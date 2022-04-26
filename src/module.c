@@ -758,6 +758,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 				if( ucmp(p->obj->name,t->obj->name) != 0 ) continue;
 				if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
 					t->obj = p->obj; // alias the types ! they are different pointers but have the same layout
+					t->vobj_proto = p->vobj_proto;
 				} else {
 					uprintf(USTR("[HotReload] Type %s has changed\n"),t->obj->name);
 					changes_count++;
@@ -826,11 +827,13 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	hl_module_add(m2);
 
 	// call entry point (will only update types)
-	vclosure cl;
-	cl.t = c->functions[m2->functions_indexes[c->entrypoint]].type;
-	cl.fun = m2->functions_ptrs[c->entrypoint];
-	cl.hasValue = 0;
-	hl_dyn_call(&cl,NULL,0);
+	if( m2->functions_ptrs[c->entrypoint] ) {
+		vclosure cl;
+		cl.t = c->functions[m2->functions_indexes[c->entrypoint]].type;
+		cl.fun = m2->functions_ptrs[c->entrypoint];
+		cl.hasValue = 0;
+		hl_dyn_call(&cl,NULL,0);
+	}
 
 	return true;
 }

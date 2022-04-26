@@ -408,12 +408,24 @@ HL_API void hl_flush_proto( hl_type *ot ) {
 	hl_module_context *m = o->m;
 	if( !rt || !ot->vobj_proto ) return;
 	for(i=0;i<o->nbindings;i++) {
-		hl_runtime_binding *b = rt->bindings + i;
+		int fid = o->bindings[i<<1];
 		int mid = o->bindings[(i<<1)|1];
-		if( b->closure )
-			b->ptr = m->functions_ptrs[mid];
-		else
-			((vclosure*)b->ptr)->fun = m->functions_ptrs[mid];
+		hl_runtime_binding *b = NULL;
+		int j;
+		for(j=0;j<rt->nbindings;j++)
+			if( rt->bindings[j].fid == fid ) {
+				b = rt->bindings + j;
+				break;
+			}
+		void *ptr = m->functions_ptrs[mid];
+		if( b->closure ) {
+			if( b->ptr != ptr )
+				b->ptr = ptr;
+		} else {
+			vclosure *c = (vclosure*)b->ptr;
+			if( c->fun != ptr )
+				c->fun = ptr;
+		}
 	}
 }
 
