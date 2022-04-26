@@ -350,7 +350,7 @@ static preg *pconst( preg *r, int c ) {
 
 static preg *pconst64( preg *r, int_val c ) {
 #ifdef HL_64
-	if( (c&0xFFFFFFFF) == c )
+	if( ((int)c) == c )
 		return pconst(r,(int)c);
 	r->kind = RCONST;
 	r->id = 0xC064C064;
@@ -4241,6 +4241,10 @@ void hl_jit_patch_method( void *old_fun, void **new_fun_table ) {
 	*b++ = 0x20;
 }
 
+static void missing_closure() {
+	hl_error("Missing static closure");
+}
+
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
 	jlist *c;
 	int size = BUF_POS();
@@ -4311,8 +4315,9 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 				// read absolute address from previous module
 				int old_idx = m->hash->functions_hashes[m->functions_indexes[fidx]];
 				if( old_idx < 0 )
-					return NULL;
-				fabs = previous->functions_ptrs[(previous->code->functions + old_idx)->findex];
+					fabs = missing_closure;
+				else
+					fabs = previous->functions_ptrs[(previous->code->functions + old_idx)->findex];
 			} else {
 				// relative
 				fabs = (unsigned char*)code + (int)(int_val)fabs;
