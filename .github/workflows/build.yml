@@ -96,7 +96,8 @@ jobs:
               libuv1-dev:i386 \
               libvorbis-dev:i386 \
               libz-dev:i386 \
-              zlib1g-dev:i386
+              zlib1g-dev:i386 \
+              libsqlite3-dev:i386
             ;;
 
           linux-amd64)
@@ -109,7 +110,8 @@ jobs:
               libsdl2-dev \
               libturbojpeg-dev \
               libuv1-dev \
-              libvorbis-dev
+              libvorbis-dev \
+              libsqlite3-dev
             ;;
 
           darwin*)

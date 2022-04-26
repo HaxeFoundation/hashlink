@@ -12,21 +12,22 @@
 HashLink is distributed with some graphics libraries allowing to develop various applications, you can manually disable the libraries you want to compile in Makefile.
 Here's the dependencies that you install in order to compile all the libraries:
 
-  * fmt: libpng-dev libturbojpeg-dev libvorbis-dev
-  * openal: libopenal-dev
-  * sdl: libsdl2-dev
-  * ssl: libmbedtls-dev
-  * uv: libuv1-dev
+* fmt: libpng-dev libturbojpeg-dev libvorbis-dev
+* openal: libopenal-dev
+* sdl: libsdl2-dev
+* ssl: libmbedtls-dev
+* uv: libuv1-dev
+* sqlite: libsqlite3-dev
 
 To install all dependencies on the latest **Ubuntu**, for example:
 
-`sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev`
+`sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev libsqlite3-dev`
 
 For 16.04, see [this note](https://github.com/HaxeFoundation/hashlink/issues/147).
 
 To install all dependencies on the latest **Fedora**, for example:
 
-`sudo dnf install libpng-devel turbojpeg-devel libvorbis-devel openal-soft-devel SDL2-devel mesa-libGLU-devel mbedtls-devel libuv-devel`
+`sudo dnf install libpng-devel turbojpeg-devel libvorbis-devel openal-soft-devel SDL2-devel mesa-libGLU-devel mbedtls-devel libuv-devel  sqlite-devel`
 
 **And on OSX:**
 
