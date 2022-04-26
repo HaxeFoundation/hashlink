@@ -89,7 +89,7 @@ else
 
 # Linux
 CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
-LFLAGS += -lm -Wl,-rpath,. -Wl,--export-dynamic -Wl,--no-undefined
+LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
