@@ -3546,7 +3546,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					op64(ctx,TEST,r,r);
 					save_regs(ctx);
 
-					if( o->p3 < 7 ) {
+					if( o->p3 < 6 ) {
 						XJump_small(JNotZero,jhasfield);
 					} else {
 						XJump(JNotZero,jhasfield);
