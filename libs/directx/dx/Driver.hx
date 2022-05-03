@@ -1,5 +1,7 @@
 package dx;
 
+#if !dx12
+
 typedef DriverInstance = hl.Abstract<"dx_driver">;
 
 typedef Pointer = hl.Abstract<"dx_pointer">;
@@ -757,3 +759,5 @@ class Driver {
 	}
 
 }
+
+#end

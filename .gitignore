@@ -20,6 +20,7 @@ x64
 *.a
 *.opendb
 *.VC.db
+.vs
 /hl
 /include/sdl
 /include/openal
