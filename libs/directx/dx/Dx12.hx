@@ -106,6 +106,26 @@ abstract Address(Int64) from Int64 {
 	}
 }
 
+@:hlNative("dx12","compiler_")
+abstract ShaderCompiler(hl.Abstract<"dx_compiler">) {
+	public function new() {
+		this = cast create();
+	}
+	public function compile( source : String, profile : String, args : Array<String> ) : haxe.io.Bytes {
+		var outLen = 0;
+		var nargs = new hl.NativeArray(args.length);
+		for( i in 0...args.length )
+			nargs[i] = @:privateAccess args[i].bytes;
+		var bytes = do_compile(cast this, @:privateAccess source.bytes, @:privateAccess profile.bytes, nargs, outLen);
+		return @:privateAccess new haxe.io.Bytes(bytes, outLen);
+	}
+	@:hlNative("dx12","compiler_compile")
+	static function do_compile( comp : ShaderCompiler, source : hl.Bytes, profile : hl.Bytes, args : hl.NativeArray<hl.Bytes>, out : hl.Ref<Int> ) : hl.Bytes {
+		return null;
+	}
+	static function create() : ShaderCompiler { return null; }
+}
+
 @:hlNative("dx12","descriptor_heap_")
 abstract DescriptorHeap(Resource) {
 	public function new(desc) {
