@@ -5,6 +5,7 @@
 #include <dxgi.h>
 #include <dxgi1_5.h>
 #include <d3d12.h>
+#include <dxcapi.h>
 #endif
 
 #define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret == E_OUTOFMEMORY ) return NULL; if( __ret != S_OK ) ReportDxError(__ret,__LINE__); }
@@ -155,6 +156,7 @@ void HL_NAME(flush_messages)() {
 		SIZE_T len = 0;
 		drv->infoQueue->GetMessage(i, NULL, &len);
 		D3D12_MESSAGE *msg = (D3D12_MESSAGE*)malloc(len);
+		if( msg == NULL ) break;
 		drv->infoQueue->GetMessage(i, msg, &len);
 		printf("%s\n",msg->pDescription);
 		free(msg);
@@ -191,6 +193,53 @@ DEFINE_PRIM(_VOID, resource_release, _RES);
 DEFINE_PRIM(_VOID, signal, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
+
+// ---- SHADERS
+
+typedef struct {
+	IDxcLibrary *library;
+	IDxcCompiler *compiler;
+} dx_compiler;
+
+dx_compiler *HL_NAME(compiler_create)() {
+	dx_compiler *comp = (dx_compiler*)hl_gc_alloc_raw(sizeof(dx_compiler));
+	memset(comp,0,sizeof(dx_compiler));
+	CHKERR(DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(&comp->library)));
+	CHKERR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&comp->compiler)));
+	return comp;
+}
+
+vbyte *HL_NAME(compiler_compile)( dx_compiler *comp, uchar *source, uchar *profile, varray *args, int *dataLen ) {
+	IDxcBlobEncoding *blob = NULL;
+	IDxcOperationResult *result = NULL;
+	comp->library->CreateBlobWithEncodingFromPinned(source,(int)ustrlen(source)*2,DXC_CP_UTF16,&blob);
+	if( blob == NULL )
+		hl_error("Could not create blob");
+	comp->compiler->Compile(blob,L"",L"main",profile,hl_aptr(args,LPCWSTR),args->size,NULL,0,NULL,&result);
+	HRESULT hr;
+	result->GetStatus(&hr);
+	if( !SUCCEEDED(hr) ) {
+		IDxcBlobEncoding *error = NULL;
+		result->GetErrorBuffer(&error);
+		uchar *c = hl_to_utf16((char*)error->GetBufferPointer());
+		blob->Release();
+		result->Release();
+		error->Release();
+		hl_error("%s",c);
+	}
+	IDxcBlob *out = NULL;
+	result->GetResult(&out);
+	*dataLen = (int)out->GetBufferSize();
+	vbyte *bytes = hl_copy_bytes((vbyte*)out->GetBufferPointer(), *dataLen);
+	out->Release();
+	blob->Release();
+	result->Release();
+	return bytes;
+}
+
+#define _COMPILER _ABSTRACT(dx_compiler)
+DEFINE_PRIM(_COMPILER, compiler_create, _NO_ARG);
+DEFINE_PRIM(_BYTES, compiler_compile, _COMPILER _BYTES _BYTES _ARR _REF(_I32));
 
 // ---- HEAPS
 
