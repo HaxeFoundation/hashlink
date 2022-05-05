@@ -329,8 +329,9 @@ typedef enum {
 	HNULL	= 19,
 	HMETHOD = 20,
 	HSTRUCT	= 21,
+	HPACKED = 22,
 	// ---------
-	HLAST	= 22,
+	HLAST	= 23,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 

@@ -3381,6 +3381,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					{
 						hl_runtime_obj *rt = hl_get_obj_rt(ra->t);
 						preg *rr = alloc_cpu(ctx,ra, true);
+						if( dst->t->kind == HSTRUCT ) {
+							hl_type *ft = hl_obj_field_fetch(ra->t,o->p3)->t;
+							if( ft->kind == HPACKED ) {
+								preg *r = alloc_reg(ctx,RCPU);
+								op64(ctx,LEA,r,pmem(&p,(CpuReg)rr->id,rt->fields_indexes[o->p3]));
+								store(ctx,dst,r,true);
+								break;
+							}
+						}
 						copy_to(ctx,dst,pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p3]));
 					}
 					break;
@@ -3487,6 +3496,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(0);
 				hl_runtime_obj *rt = hl_get_obj_rt(r->t);
 				preg *rr = alloc_cpu(ctx,r, true);
+				if( dst->t->kind == HSTRUCT ) {
+					hl_type *ft = hl_obj_field_fetch(r->t,o->p2)->t;
+					if( ft->kind == HPACKED ) {
+						preg *r = alloc_reg(ctx,RCPU);
+						op64(ctx,LEA,r,pmem(&p,(CpuReg)rr->id,rt->fields_indexes[o->p2]));
+						store(ctx,dst,r,true);
+						break;
+					}
+				}
 				copy_to(ctx,dst,pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]));
 			}
 			break;

@@ -37,7 +37,7 @@ static const uchar *TSTR[] = {
 	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("i64"), USTR("f32"), USTR("f64"),
 	USTR("bool"), USTR("bytes"), USTR("dynamic"), NULL, NULL,
 	USTR("array"), USTR("type"), NULL, NULL, USTR("dynobj"),
-	NULL, NULL, NULL, NULL, NULL
+	NULL, NULL, NULL, NULL, NULL, NULL
 };
 
 static int T_SIZES[] = {
@@ -63,6 +63,7 @@ static int T_SIZES[] = {
 	HL_WSIZE, // NULL
 	HL_WSIZE, // METHOD
 	HL_WSIZE, // STRUCT
+	0, // PACKED
 };
 
 HL_PRIM int hl_type_size( hl_type *t ) {
@@ -124,6 +125,7 @@ HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 		return true;
 	case HREF:
 	case HNULL:
+	case HPACKED:
 		return hl_same_type(a->tparam, b->tparam);
 	case HFUN:
 	case HMETHOD:
@@ -175,6 +177,7 @@ HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 		true, // HNULL
 		false, // HMETHOD
 		false, // HSTRUCT
+		false, // HPACKED
 	};
 	return T_IS_DYNAMIC[t->kind];
 }
@@ -226,6 +229,8 @@ HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 			return true;
 		}
 		break;
+	case HPACKED:
+		return hl_safe_cast(t->tparam, to);
 	default:
 		break;
 	}
@@ -304,6 +309,11 @@ static void hl_type_str_rec( hl_buffer *b, hl_type *t, tlist *parents ) {
 		break;
 	case HNULL:
 		hl_buffer_str(b,USTR("null<"));
+		hl_type_str_rec(b,t->tparam,l);
+		hl_buffer_char(b,'>');
+		break;
+	case HPACKED:
+		hl_buffer_str(b, USTR("packed<"));
 		hl_type_str_rec(b,t->tparam,l);
 		hl_buffer_char(b,'>');
 		break;
