@@ -25,8 +25,6 @@
 
 typedef struct _ereg ereg;
 
-static pcre2_match_context *match_context;
-
 struct _ereg {
 	void (*finalize)( ereg * );
 	/* The compiled regex code */
@@ -94,9 +92,6 @@ HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	r->n_groups++;
 	r->match_data = pcre2_match_data_create_from_pattern(r->regex,NULL);
 
-	// this is reinitialised for each new regex object...
-	match_context = pcre2_match_context_create(NULL);
-	pcre2_set_depth_limit(match_context,3500); // adapted based on Windows 1MB stack size
 	return r;
 }
 
@@ -120,7 +115,7 @@ HL_PRIM int hl_regexp_matched_num( ereg *e ) {
 }
 
 HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
-	int res = pcre2_match(e->regex,(PCRE2_SPTR)s,pos+len,pos,PCRE2_NO_UTF_CHECK,e->match_data,match_context);
+	int res = pcre2_match(e->regex,(PCRE2_SPTR)s,pos+len,pos,PCRE2_NO_UTF_CHECK,e->match_data,NULL);
 	e->matched = res >= 0;
 	if( res >= 0 )
 		return true;
