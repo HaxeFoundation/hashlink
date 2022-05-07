@@ -25,31 +25,31 @@
 
 typedef struct _ereg ereg;
 
-static pcre2_match_context_16 *match_context;
+static pcre2_match_context *match_context;
 
 struct _ereg {
 	void (*finalize)( ereg * );
 	/* The compiled regex code */
-	pcre2_code_16 *regex;
+	pcre2_code *regex;
 	/* Number of capture groups */
 	int n_groups;
 
 	/* Pointer to the allocated memory for match data */
-	pcre2_match_data_16 *match_data;
+	pcre2_match_data *match_data;
 	/* Whether the last string was matched successfully */
 	bool matched;
 };
 
 static void regexp_finalize( ereg *e ) {
-	pcre2_code_free_16(e->regex);
-	pcre2_match_data_free_16(e->match_data);
+	pcre2_code_free(e->regex);
+	pcre2_match_data_free(e->match_data);
 }
 
 HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	ereg *r;
 	int error_code;
 	size_t error_offset;
-	pcre2_code_16 *p;
+	pcre2_code *p;
 	uchar *o = (uchar*)opts;
 	int options = PCRE2_UCP | PCRE2_UTF;
 	while( *o ) {
@@ -72,12 +72,12 @@ HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 			return NULL;
 		}
 	}
-	p = pcre2_compile_16((PCRE2_SPTR16)str,PCRE2_ZERO_TERMINATED,options,&error_code,&error_offset,NULL);
+	p = pcre2_compile((PCRE2_SPTR)str,PCRE2_ZERO_TERMINATED,options,&error_code,&error_offset,NULL);
 	if( p == NULL ) {
 		hl_buffer *b = hl_alloc_buffer();
 		vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
-		PCRE2_UCHAR16 error_buffer[256];
-		pcre2_get_error_message_16(error_code,error_buffer,sizeof(error_buffer));
+		PCRE2_UCHAR error_buffer[256];
+		pcre2_get_error_message(error_code,error_buffer,sizeof(error_buffer));
 		hl_buffer_str(b,USTR("Regexp compilation error : "));
 		hl_buffer_str(b,error_buffer);
 		hl_buffer_str(b,USTR(" in "));
@@ -90,19 +90,19 @@ HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	r->regex = p;
 	r->matched = 0;
 	r->n_groups = 0;
-	pcre2_pattern_info_16(p,PCRE2_INFO_CAPTURECOUNT,&r->n_groups);
+	pcre2_pattern_info(p,PCRE2_INFO_CAPTURECOUNT,&r->n_groups);
 	r->n_groups++;
-	r->match_data = pcre2_match_data_create_from_pattern_16(r->regex,NULL);
+	r->match_data = pcre2_match_data_create_from_pattern(r->regex,NULL);
 
 	// this is reinitialised for each new regex object...
-	match_context = pcre2_match_context_create_16(NULL);
-	pcre2_set_depth_limit_16(match_context, 3500); // adapted based on Windows 1MB stack size
+	match_context = pcre2_match_context_create(NULL);
+	pcre2_set_depth_limit(match_context,3500); // adapted based on Windows 1MB stack size
 	return r;
 }
 
 HL_PRIM int hl_regexp_matched_pos( ereg *e, int m, int *len ) {
 	int start;
-	size_t *matches = pcre2_get_ovector_pointer_16(e->match_data);
+	size_t *matches = pcre2_get_ovector_pointer(e->match_data);
 	if( !e->matched )
 		hl_error("Calling regexp_matched_pos() on an unmatched regexp");
 	if( m < 0 || m >= e->n_groups )
@@ -120,12 +120,12 @@ HL_PRIM int hl_regexp_matched_num( ereg *e ) {
 }
 
 HL_PRIM bool hl_regexp_match( ereg *e, vbyte *s, int pos, int len ) {
-	int res = pcre2_match_16(e->regex,(PCRE2_SPTR16)s,pos+len,pos,PCRE2_NO_UTF_CHECK,e->match_data,match_context);
+	int res = pcre2_match(e->regex,(PCRE2_SPTR)s,pos+len,pos,PCRE2_NO_UTF_CHECK,e->match_data,match_context);
 	e->matched = res >= 0;
 	if( res >= 0 )
 		return true;
 	if( res != PCRE2_ERROR_NOMATCH )
-		hl_error("An error occurred while running pcre2_match_16()");
+		hl_error("An error occurred while running pcre2_match()");
 	return false;
 }
 
