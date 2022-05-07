@@ -22,6 +22,10 @@
 #include <hl.h>
 
 HL_PRIM varray *hl_alloc_array( hl_type *at, int size ) {
+	if( size == 0 && at->kind == HDYN ) {
+		static varray empty_array = { &hlt_array, &hlt_dyn };
+		return &empty_array;
+	}
 	int esize = hl_type_size(at);
 	varray *a;
 	if( size < 0 ) hl_error("Invalid array size");
