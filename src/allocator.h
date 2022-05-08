@@ -10,8 +10,7 @@ typedef struct _gc_freelist {
 	int current;
 	int count;
 	int size_bits;
-	struct _gc_freelist *cached_next;
-	gc_fl first;
+	gc_fl *data;
 } gc_freelist;
 
 typedef struct {
@@ -20,7 +19,7 @@ typedef struct {
 	int first_block;
 	bool need_flush;
 	// mutable
-	gc_freelist *free;
+	gc_freelist free;
 	unsigned char *sizes;
 	int sizes_ref;
 	int sizes_ref2;

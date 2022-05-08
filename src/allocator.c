@@ -66,50 +66,59 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<13,0};
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 
-static gc_freelist *cached_fl[32] = {NULL};
+#define MAX_FL_CACHED 16
+
+typedef struct {
+	int count;
+	gc_fl *data[MAX_FL_CACHED];
+} cached_slot;
+
+static cached_slot cached_slots[32] = {0};
 static int free_lists_size = 0;
 static int free_lists_count = 0;
 
-static gc_freelist *alloc_freelist( int size ) {
-	gc_freelist *fl = cached_fl[size];
-	if( !fl ) fl = cached_fl[size+1];
-	if( fl ) {
-		cached_fl[fl->size_bits] = fl->cached_next; 
+static void alloc_freelist( gc_freelist *fl, int size ) {
+	cached_slot *slot = &cached_slots[size];
+	if( slot->count ) {
+		fl->data = slot->data[--slot->count];
+		fl->size_bits = size;
 		fl->count = 0;
 		fl->current = 0;
-		fl->cached_next = NULL;
-		return fl;
+		return;
 	}
-	int bytes = sizeof(gc_freelist) + sizeof(gc_fl) * ((1<<size)-1);
+	int bytes = (int)sizeof(gc_fl) * (1<<size);
 	free_lists_size += bytes;
 	free_lists_count++;
-	fl = (gc_freelist*)malloc(bytes);
+	fl->data = (gc_fl*)malloc(bytes);
 	fl->count = 0;
 	fl->current = 0;
 	fl->size_bits = size;
-	fl->cached_next = NULL;
-	return fl;
 }
 
 static void free_freelist( gc_freelist *fl ) {
-	fl->cached_next = cached_fl[fl->size_bits];
-	cached_fl[fl->size_bits] = fl;
+	cached_slot *slot = &cached_slots[fl->size_bits];
+	if( slot->count == MAX_FL_CACHED ) {
+		free(fl->data);
+		free_lists_size -= (int)sizeof(gc_fl) * (1 << fl->size_bits);
+		return;
+	}
+	slot->data[slot->count++] = fl->data;
 }
 
 
-#define GET_FL(fl,pos) ((&(fl)->first) + (pos))
+#define GET_FL(fl,pos) ((fl)->data + (pos))
 
-static void freelist_append( gc_freelist **flref, int pos, int count ) {
-	gc_freelist *fl = *flref;
+static void freelist_append( gc_freelist *fl, int pos, int count ) {
 	if( fl->count == 1<<fl->size_bits ) {
 #		ifdef GC_DEBUG
 		if( fl->current ) hl_fatal("assert");
 #		endif
-		gc_freelist *fl2 = alloc_freelist(fl->size_bits + 1);
-		memcpy(GET_FL(fl2,0),GET_FL(fl,0),sizeof(gc_fl)*fl->count);
-		fl2->count = fl->count;
+		gc_freelist fl2;
+		alloc_freelist(&fl2, fl->size_bits + 1);
+		memcpy(GET_FL(&fl2,0),GET_FL(fl,0),sizeof(gc_fl)*fl->count);
 		free_freelist(fl);
-		*flref = fl = fl2;
+		fl->size_bits++;
+		fl->data = fl2.data;
 	}
 	gc_fl *p = GET_FL(fl,fl->count++);
 	p->pos = (fl_cursor)pos;
@@ -156,7 +165,7 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	int fl_bits = 1;
 	while( fl_bits < 8 && (1<<fl_bits) < (p->max_blocks>>3) ) fl_bits++;
 	p->first_block = start_pos / block;
-	p->free = alloc_freelist(fl_bits);
+	alloc_freelist(&p->free,fl_bits);
 	freelist_append(&p->free,p->first_block, p->max_blocks - p->first_block);
 	p->need_flush = false;
 
@@ -172,11 +181,12 @@ static void flush_free_list( gc_pheader *ph ) {
 
 	int bid = p->first_block;
 	int last = p->max_blocks;
-	gc_freelist *new_fl = alloc_freelist(p->free->size_bits);
-	gc_freelist *old_fl = p->free;
+	gc_freelist new_fl;
+	alloc_freelist(&new_fl,p->free.size_bits);
+	gc_freelist old_fl = p->free;
 	gc_fl *cur_pos = NULL;
-	int reuse_index = old_fl->current;
-	gc_fl *reuse = reuse_index < old_fl->count ? GET_FL(old_fl,reuse_index++) : NULL;
+	int reuse_index = old_fl.current;
+	gc_fl *reuse = reuse_index < old_fl.count ? GET_FL(&old_fl,reuse_index++) : NULL;
 	int next_bid = reuse ? reuse->pos : -1;
 	unsigned char *bmp = ph->bmp;
 
@@ -186,9 +196,9 @@ static void flush_free_list( gc_pheader *ph ) {
 				cur_pos->count += reuse->count;
 			} else {
 				freelist_append(&new_fl,reuse->pos,reuse->count);
-				cur_pos = GET_FL(new_fl,new_fl->count - 1);
+				cur_pos = GET_FL(&new_fl,new_fl.count - 1);
 			}
-			reuse = reuse_index < old_fl->count ? GET_FL(old_fl,reuse_index++) : NULL;
+			reuse = reuse_index < old_fl.count ? GET_FL(&old_fl,reuse_index++) : NULL;
 			bid = cur_pos->count + cur_pos->pos;
 			next_bid = reuse ? reuse->pos : -1;
 			continue;
@@ -205,12 +215,12 @@ static void flush_free_list( gc_pheader *ph ) {
 				cur_pos->count += count;
 			else {
 				freelist_append(&new_fl,bid,count);
-				cur_pos = GET_FL(new_fl,new_fl->count - 1);
+				cur_pos = GET_FL(&new_fl,new_fl.count - 1);
 			}
 		}
 		bid += count;
 	}
-	free_freelist(old_fl);
+	free_freelist(&old_fl);
 	p->free = new_fl;
 	p->need_flush = false;
 #ifdef __GC_DEBUG
@@ -237,7 +247,7 @@ static void *gc_alloc_fixed( int part, int kind ) {
 		p = &ph->alloc;
 		if( p->need_flush )
 			flush_free_list(ph);
-		gc_freelist *fl = p->free;
+		gc_freelist *fl = &p->free;
 		if( fl->current < fl->count ) {
 			gc_fl *c = GET_FL(fl,fl->current);
 			bid = c->pos++;
@@ -253,8 +263,8 @@ static void *gc_alloc_fixed( int part, int kind ) {
 	if( ph == NULL ) {
 		ph = gc_allocator_new_page(pid, GC_SIZES[part], GC_PAGE_SIZE, kind, false);
 		p = &ph->alloc;
-		bid = p->free->first.pos++;
-		p->free->first.count--;
+		bid = p->free.data->pos++;
+		p->free.data->count--;
 	}
 	unsigned char *ptr = ph->base + bid * p->block_size;
 #	ifdef GC_DEBUG
@@ -284,7 +294,7 @@ static void *gc_alloc_var( int part, int size, int kind ) {
 		p = &ph->alloc;
 		if( p->need_flush )
 			flush_free_list(ph);
-		gc_freelist *fl = p->free;
+		gc_freelist *fl = &p->free;
 		int k;
 		for(k=fl->current;k<fl->count;k++) {
 			gc_fl *c = GET_FL(fl,k);
@@ -308,8 +318,8 @@ static void *gc_alloc_var( int part, int size, int kind ) {
 		ph = gc_allocator_new_page(pid, GC_SIZES[part], psize, kind, true);
 		p = &ph->alloc;
 		bid = p->first_block;
-		p->free->first.pos += nblocks;
-		p->free->first.count -= nblocks;
+		p->free.data->pos += nblocks;
+		p->free.data->count -= nblocks;
 	}
 alloc_var:
 	ptr = ph->base + bid * p->block_size;
@@ -392,7 +402,7 @@ static void gc_flush_empty_pages() {
 					gc_pages[i] = next;
 				if( gc_free_pages[i] == ph )
 					gc_free_pages[i] = next;
-				free_freelist(p->free);
+				free_freelist(&p->free);
 				gc_free_page(ph, p->max_blocks);
 			} else
 				prev = ph;
