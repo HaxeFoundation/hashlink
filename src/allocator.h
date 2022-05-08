@@ -1,7 +1,9 @@
 
+typedef unsigned short fl_cursor;
+
 typedef struct {
-	int pos;
-	int count;
+	fl_cursor pos;
+	fl_cursor count;
 } gc_fl;
 
 typedef struct _gc_freelist {

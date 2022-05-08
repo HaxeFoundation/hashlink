@@ -68,6 +68,7 @@ static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 
 static gc_freelist *cached_fl[32] = {NULL};
 static int free_lists_size = 0;
+static int free_lists_count = 0;
 
 static gc_freelist *alloc_freelist( int size ) {
 	gc_freelist *fl = cached_fl[size];
@@ -81,6 +82,7 @@ static gc_freelist *alloc_freelist( int size ) {
 	}
 	int bytes = sizeof(gc_freelist) + sizeof(gc_fl) * ((1<<size)-1);
 	free_lists_size += bytes;
+	free_lists_count++;
 	fl = (gc_freelist*)malloc(bytes);
 	fl->count = 0;
 	fl->current = 0;
@@ -104,14 +106,14 @@ static void freelist_append( gc_freelist **flref, int pos, int count ) {
 		if( fl->current ) hl_fatal("assert");
 #		endif
 		gc_freelist *fl2 = alloc_freelist(fl->size_bits + 1);
-		memcpy(GET_FL(fl2,0),GET_FL(fl,0),sizeof(int)*fl->count*2);
+		memcpy(GET_FL(fl2,0),GET_FL(fl,0),sizeof(gc_fl)*fl->count);
 		fl2->count = fl->count;
 		free_freelist(fl);
 		*flref = fl = fl2;
 	}
 	gc_fl *p = GET_FL(fl,fl->count++);
-	p->pos = pos;
-	p->count = count;
+	p->pos = (fl_cursor)pos;
+	p->count = (fl_cursor)count;
 }
 
 static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind, bool varsize ) {
@@ -151,8 +153,10 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	}
 	int m = start_pos % block;
 	if( m ) start_pos += block - m;
+	int fl_bits = 1;
+	while( fl_bits < 8 && (1<<fl_bits) < (p->max_blocks>>3) ) fl_bits++;
 	p->first_block = start_pos / block;
-	p->free = alloc_freelist(8);
+	p->free = alloc_freelist(fl_bits);
 	freelist_append(&p->free,p->first_block, p->max_blocks - p->first_block);
 	p->need_flush = false;
 
@@ -189,7 +193,7 @@ static void flush_free_list( gc_pheader *ph ) {
 			next_bid = reuse ? reuse->pos : -1;
 			continue;
 		}
-		int count;
+		fl_cursor count;
 		if( p->sizes ) {
 			count = p->sizes[bid];
 			if( !count ) count = 1;
@@ -274,7 +278,7 @@ static void *gc_alloc_var( int part, int size, int kind ) {
 	gc_pheader *ph = gc_free_pages[pid];
 	gc_allocator_page_data *p = NULL;
 	unsigned char *ptr;
-	int nblocks = size >> GC_SBITS[part];
+	fl_cursor nblocks = (fl_cursor)(size >> GC_SBITS[part]);
 	int bid = -1;
 	while( ph ) {
 		p = &ph->alloc;
