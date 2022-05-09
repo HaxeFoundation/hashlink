@@ -24,6 +24,7 @@ typedef struct {
 } dx_driver;
 
 static dx_driver *static_driver = NULL;
+static int CURRENT_NODEMASK = 0;
 
 void dx12_flush_messages();
 
@@ -89,7 +90,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
 		desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 		desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		desc.NodeMask = 0;
+		desc.NodeMask = CURRENT_NODEMASK;
 		CHKERR(drv->device->CreateCommandQueue(&desc,IID_PPV_ARGS(&drv->commandQueue)));
 	}
 
@@ -237,9 +238,39 @@ vbyte *HL_NAME(compiler_compile)( dx_compiler *comp, uchar *source, uchar *profi
 	return bytes;
 }
 
+vbyte *HL_NAME(serialize_root_signature)( D3D12_ROOT_SIGNATURE_DESC *signature, D3D_ROOT_SIGNATURE_VERSION version, int *dataLen ) {
+	ID3DBlob *data = NULL;
+	ID3DBlob *error = NULL;
+	HRESULT r = D3D12SerializeRootSignature(signature,version, &data, &error);
+	if( !SUCCEEDED(r) ) {
+		uchar *c = error ? hl_to_utf16((char*)error->GetBufferPointer()) : USTR("Invalid argument");
+		if( error ) error->Release();
+		hl_error("%s",c);
+	}
+	*dataLen = (int)data->GetBufferSize();
+	vbyte *bytes = hl_copy_bytes((vbyte*)data->GetBufferPointer(), *dataLen);
+	data->Release();
+	return bytes;
+}
+
+ID3D12RootSignature *HL_NAME(rootsignature_create)( vbyte *bytes, int len ) {
+	ID3D12RootSignature *sign = NULL;
+	DXERR(static_driver->device->CreateRootSignature(CURRENT_NODEMASK, bytes, len, IID_PPV_ARGS(&sign)));
+	return sign;
+}
+
+ID3D12PipelineState *HL_NAME(create_graphics_pipeline_state)( D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc ) {
+	ID3D12PipelineState *state = NULL;
+	DXERR(static_driver->device->CreateGraphicsPipelineState(desc,IID_PPV_ARGS(&state)));
+	return state;
+}
+
 #define _COMPILER _ABSTRACT(dx_compiler)
 DEFINE_PRIM(_COMPILER, compiler_create, _NO_ARG);
 DEFINE_PRIM(_BYTES, compiler_compile, _COMPILER _BYTES _BYTES _ARR _REF(_I32));
+DEFINE_PRIM(_BYTES, serialize_root_signature, _STRUCT _I32 _REF(_I32));
+DEFINE_PRIM(_RES, rootsignature_create, _BYTES _I32);
+DEFINE_PRIM(_RES, create_graphics_pipeline_state, _STRUCT);
 
 // ---- HEAPS
 
@@ -306,9 +337,9 @@ void HL_NAME(command_allocator_reset)( ID3D12CommandAllocator *a ) {
 	CHKERR(a->Reset());
 }
 
-ID3D12GraphicsCommandList *HL_NAME(command_list_create)( int nodeMask, D3D12_COMMAND_LIST_TYPE type, ID3D12CommandAllocator *alloc, ID3D12PipelineState *initState ) {
+ID3D12GraphicsCommandList *HL_NAME(command_list_create)( D3D12_COMMAND_LIST_TYPE type, ID3D12CommandAllocator *alloc, ID3D12PipelineState *initState ) {
 	ID3D12GraphicsCommandList *l = NULL;
-	DXERR(static_driver->device->CreateCommandList(nodeMask,type,alloc,initState,IID_PPV_ARGS(&l)));
+	DXERR(static_driver->device->CreateCommandList(CURRENT_NODEMASK,type,alloc,initState,IID_PPV_ARGS(&l)));
 	return l;
 }
 
@@ -335,7 +366,7 @@ void HL_NAME(command_list_clear_render_target_view)( ID3D12GraphicsCommandList *
 
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
 DEFINE_PRIM(_VOID, command_allocator_reset, _RES);
-DEFINE_PRIM(_RES, command_list_create, _I32 _I32 _RES _RES);
+DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);
 DEFINE_PRIM(_VOID, command_list_close, _RES);
 DEFINE_PRIM(_VOID, command_list_reset, _RES _RES _RES);
 DEFINE_PRIM(_VOID, command_list_resource_barrier, _RES _STRUCT);
