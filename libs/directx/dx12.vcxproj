@@ -9,12 +9,12 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseVS2017|Win32">
-      <Configuration>ReleaseVS2017</Configuration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseVS2017|x64">
-      <Configuration>ReleaseVS2017</Configuration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
@@ -22,7 +22,7 @@
     <ClCompile Include="dx12.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{EC79BC9F-9947-4BCC-92F9-14F90CDE4B04}</ProjectGuid>
+    <ProjectGuid>{F9A2435E-D545-43EB-B471-A4497D96A71B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>directx</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
@@ -34,7 +34,7 @@
     <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2017|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
@@ -47,7 +47,7 @@
     <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2017|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
@@ -62,13 +62,13 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2017|Win32'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2017|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -77,26 +77,28 @@
     <TargetExt>.hdll</TargetExt>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration)</LibraryPath>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src</IncludePath>
+    <IntDir>$(Configuration)\dx12\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;../../x64/$(Configuration)</LibraryPath>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src</IncludePath>
-    <OutDir>$(SolutionDir)..\..\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\dx12\</IntDir>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2017|Win32'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration)</LibraryPath>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src</IncludePath>
+    <IntDir>$(Configuration)\dx12\</IntDir>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2017|x64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;../../x64/$(Configuration)</LibraryPath>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src</IncludePath>
-    <OutDir>$(SolutionDir)..\..\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Configuration)\dx12\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -127,7 +129,7 @@
       <AdditionalDependencies>libhl.lib;D3D12.lib;dxgi.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2017|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
@@ -146,7 +148,7 @@
       <AdditionalDependencies>libhl.lib;D3D12.lib;dxgi.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2017|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
