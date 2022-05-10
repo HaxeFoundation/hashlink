@@ -212,7 +212,7 @@ release_haxelib_package:
 	rm -rf $(HLIB)_release
 
 release_win:
-	(cd x64/ReleaseVS2015 && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
+	(cd x64/Release && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
 	cp c:/windows/system32/vcruntime140.dll hl-$(HL_VER)
 	cp `which SDL2.dll` hl-$(HL_VER)
 	cp `which OpenAL32.dll` hl-$(HL_VER)

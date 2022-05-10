@@ -39,9 +39,9 @@ jobs:
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
-            msbuild_Configuration: ReleaseVS2017
+            msbuild_Configuration: Release
             msbuild_Platform: Win32
-            msbuild_PlatformToolset: v141
+            msbuild_PlatformToolset: v142
             msbuild_WindowsTargetPlatformVersion: 8.1
 
           - target: win64
@@ -49,9 +49,9 @@ jobs:
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
-            msbuild_Configuration: ReleaseVS2017
+            msbuild_Configuration: Release
             msbuild_Platform: x64
-            msbuild_PlatformToolset: v141
+            msbuild_PlatformToolset: v142
             msbuild_WindowsTargetPlatformVersion: 8.1
 
     steps:
