@@ -117,6 +117,10 @@
 #	pragma warning(disable:4820) // windows include
 #	pragma warning(disable:4668) // windows include
 #	pragma warning(disable:4738) // return float bad performances
+#	pragma warning(disable:4061) // explicit values in switch
+#	if (_MSC_VER >= 1920)
+#		pragma warning(disable:5045) // spectre
+#	endif
 #endif
 
 #if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CYGWIN)

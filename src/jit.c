@@ -1231,8 +1231,8 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 }
 
 static void store_result( jit_ctx *ctx, vreg *r ) {
-	switch( r->t->kind ) {
 #	ifndef HL_64
+	switch( r->t->kind ) {
 	case HF64:
 		scratch(r->current);
 		op64(ctx,FSTP,&r->stack,UNUSED);
@@ -1245,11 +1245,13 @@ static void store_result( jit_ctx *ctx, vreg *r ) {
 		scratch(r->current);
 		error_i64();
 		break;
-#	endif
 	default:
+#	endif
 		store(ctx,r,IS_FLOAT(r) ? REG_AT(XMM(0)) : PEAX,true);
+#	ifndef HL_64
 		break;
 	}
+#	endif
 }
 
 static void op_mov( jit_ctx *ctx, vreg *to, vreg *from ) {
