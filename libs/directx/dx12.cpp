@@ -98,15 +98,15 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
 	return drv;
 }
 
-HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count ) {
+HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORMAT format ) {
 	dx_driver *drv = static_driver;
 	if( drv->swapchain ) {
-		drv->swapchain->ResizeBuffers(buffer_count, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+		drv->swapchain->ResizeBuffers(buffer_count, width, height, format, 0);
 	} else {
 		DXGI_SWAP_CHAIN_DESC1 desc = {};
 		desc.Width = width;
 		desc.Height = height;
-		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.Format = format;
 		desc.BufferCount = buffer_count;
 		desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -129,22 +129,8 @@ int HL_NAME(get_current_back_buffer_index)() {
 	return static_driver->swapchain->GetCurrentBackBufferIndex();
 }
 
-ID3D12Resource *HL_NAME(get_back_buffer)( int index ) {
-	ID3D12Resource *buf = NULL;
-	static_driver->swapchain->GetBuffer(index, IID_PPV_ARGS(&buf));
-	return buf;
-}
-
-void HL_NAME(create_render_target_view)( ID3D12Resource *res, D3D12_RENDER_TARGET_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
-	static_driver->device->CreateRenderTargetView(res,desc,descriptor);
-}
-
 void HL_NAME(signal)( ID3D12Fence *fence, int64 value ) {
 	static_driver->commandQueue->Signal(fence,value);
-}
-
-void HL_NAME(resource_release)( IUnknown *res ) {
-	res->Release();
 }
 
 void HL_NAME(flush_messages)() {
@@ -185,15 +171,61 @@ uchar *HL_NAME(get_device_name)() {
 #define _RES _ABSTRACT(dx_resource)
 
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32);
-DEFINE_PRIM(_BOOL, resize, _I32 _I32 _I32);
+DEFINE_PRIM(_BOOL, resize, _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, present, _BOOL);
 DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
-DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
-DEFINE_PRIM(_RES, get_back_buffer, _I32);
-DEFINE_PRIM(_VOID, resource_release, _RES);
 DEFINE_PRIM(_VOID, signal, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
+
+// ---- RESOURCES
+
+ID3D12Resource *HL_NAME(get_back_buffer)( int index ) {
+	ID3D12Resource *buf = NULL;
+	static_driver->swapchain->GetBuffer(index, IID_PPV_ARGS(&buf));
+	return buf;
+}
+
+ID3D12Resource *HL_NAME(create_committed_resource)( D3D12_HEAP_PROPERTIES *heapProperties, D3D12_HEAP_FLAGS heapFlags, D3D12_RESOURCE_DESC *desc, D3D12_RESOURCE_STATES initialState, D3D12_CLEAR_VALUE *clearValue ) {
+	ID3D12Resource *res = NULL;
+	DXERR(static_driver->device->CreateCommittedResource(heapProperties, heapFlags, desc, initialState, clearValue, IID_PPV_ARGS(&res)));
+	return res;
+}
+
+void HL_NAME(create_render_target_view)( ID3D12Resource *res, D3D12_RENDER_TARGET_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+	static_driver->device->CreateRenderTargetView(res,desc,descriptor);
+}
+
+void HL_NAME(create_depth_stencil_view)( ID3D12Resource *res, D3D12_DEPTH_STENCIL_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+	static_driver->device->CreateDepthStencilView(res,desc,descriptor);
+}
+
+int64 HL_NAME(resource_get_gpu_virtual_address)( ID3D12Resource *res ) {
+	return res->GetGPUVirtualAddress();
+}
+
+void HL_NAME(resource_release)( IUnknown *res ) {
+	res->Release();
+}
+
+void *HL_NAME(resource_map)( ID3D12Resource *res, int subres, D3D12_RANGE *range ) {
+	void *data = NULL;
+	DXERR(res->Map(subres, range, &data));
+	return data;
+}
+
+void HL_NAME(resource_unmap)( ID3D12Resource *res, int subres, D3D12_RANGE *range ) {
+	res->Unmap(subres, range);
+}
+
+DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
+DEFINE_PRIM(_VOID, create_depth_stencil_view, _RES _STRUCT _I64);
+DEFINE_PRIM(_RES, create_committed_resource, _STRUCT _I32 _STRUCT _I32 _STRUCT);
+DEFINE_PRIM(_RES, get_back_buffer, _I32);
+DEFINE_PRIM(_VOID, resource_release, _RES);
+DEFINE_PRIM(_I64, resource_get_gpu_virtual_address, _RES);
+DEFINE_PRIM(_BYTES, resource_map, _RES _I32 _STRUCT);
+DEFINE_PRIM(_VOID, resource_unmap, _RES _I32 _STRUCT);
 
 // ---- SHADERS
 
@@ -261,6 +293,7 @@ ID3D12RootSignature *HL_NAME(rootsignature_create)( vbyte *bytes, int len ) {
 
 ID3D12PipelineState *HL_NAME(create_graphics_pipeline_state)( D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc ) {
 	ID3D12PipelineState *state = NULL;
+	// if shader is considered invalid, maybe you're missing dxil.dll
 	DXERR(static_driver->device->CreateGraphicsPipelineState(desc,IID_PPV_ARGS(&state)));
 	return state;
 }
@@ -364,6 +397,54 @@ void HL_NAME(command_list_clear_render_target_view)( ID3D12GraphicsCommandList *
 	l->ClearRenderTargetView(view,colors,0,NULL);
 }
 
+void HL_NAME(command_list_clear_depth_stencil_view)( ID3D12GraphicsCommandList *l, D3D12_CPU_DESCRIPTOR_HANDLE view, D3D12_CLEAR_FLAGS flags, FLOAT depth, int stencil ) {
+	l->ClearDepthStencilView(view,flags,depth,(UINT8)stencil,0,NULL);
+}
+
+void HL_NAME(command_list_draw_instanced)( ID3D12GraphicsCommandList *l, int vertexCountPerInstance, int instanceCount, int startVertexLocation, int startInstanceLocation ) {
+	l->DrawInstanced(vertexCountPerInstance, instanceCount, startVertexLocation, startInstanceLocation);
+}
+
+void HL_NAME(command_list_draw_indexed_instanced)( ID3D12GraphicsCommandList *l, int indexCountPerInstance, int instanceCount, int startIndexLocation, int baseVertexLocation, int startInstanceLocation ) {
+	l->DrawIndexedInstanced(indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+}
+
+void HL_NAME(command_list_set_graphics_root_signature)( ID3D12GraphicsCommandList *l, ID3D12RootSignature *sign ) {
+	l->SetGraphicsRootSignature(sign);
+}
+
+void HL_NAME(command_list_set_pipeline_state)( ID3D12GraphicsCommandList *l, ID3D12PipelineState *pipe ) {
+	l->SetPipelineState(pipe);
+}
+
+void HL_NAME(command_list_ia_set_vertex_buffers)( ID3D12GraphicsCommandList *l, int startSlot, int numViews, D3D12_VERTEX_BUFFER_VIEW *views ) {
+	l->IASetVertexBuffers(startSlot, numViews, views);
+}
+
+void HL_NAME(command_list_ia_set_index_buffer)( ID3D12GraphicsCommandList *l, D3D12_INDEX_BUFFER_VIEW *view ) {
+	l->IASetIndexBuffer(view);
+}
+
+void HL_NAME(command_list_ia_set_primitive_topology)( ID3D12GraphicsCommandList *l, D3D12_PRIMITIVE_TOPOLOGY topo ) {
+	l->IASetPrimitiveTopology(topo);
+}
+
+void HL_NAME(command_list_copy_buffer_region)( ID3D12GraphicsCommandList *l, ID3D12Resource *dst, int64 dstOffset, ID3D12Resource *src, int64 srcOffset, int64 numBytes ) {
+	l->CopyBufferRegion(dst, dstOffset, src, srcOffset, numBytes);
+}
+
+void HL_NAME(command_list_om_set_render_targets)( ID3D12GraphicsCommandList *l, int count, D3D12_CPU_DESCRIPTOR_HANDLE *handles, BOOL flag, D3D12_CPU_DESCRIPTOR_HANDLE *depthStencils ) {
+	l->OMSetRenderTargets(count,handles,flag,depthStencils);
+}
+
+void HL_NAME(command_list_rs_set_viewports)( ID3D12GraphicsCommandList *l, int count, D3D12_VIEWPORT *viewports ) {
+	l->RSSetViewports(count, viewports);
+}
+
+void HL_NAME(command_list_rs_set_scissor_rects)( ID3D12GraphicsCommandList *l, int count, D3D12_RECT *rects ) {
+	l->RSSetScissorRects(count, rects);
+}
+
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
 DEFINE_PRIM(_VOID, command_allocator_reset, _RES);
 DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);
@@ -372,3 +453,15 @@ DEFINE_PRIM(_VOID, command_list_reset, _RES _RES _RES);
 DEFINE_PRIM(_VOID, command_list_resource_barrier, _RES _STRUCT);
 DEFINE_PRIM(_VOID, command_list_execute, _RES);
 DEFINE_PRIM(_VOID, command_list_clear_render_target_view, _RES _I64 _STRUCT);
+DEFINE_PRIM(_VOID, command_list_clear_depth_stencil_view, _RES _I64 _I32 _F32 _I32);
+DEFINE_PRIM(_VOID, command_list_draw_instanced, _RES _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, command_list_draw_indexed_instanced, _RES _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, command_list_set_graphics_root_signature, _RES _RES);
+DEFINE_PRIM(_VOID, command_list_set_pipeline_state, _RES _RES);
+DEFINE_PRIM(_VOID, command_list_ia_set_vertex_buffers, _RES _I32 _I32 _STRUCT);
+DEFINE_PRIM(_VOID, command_list_ia_set_index_buffer, _RES _STRUCT);
+DEFINE_PRIM(_VOID, command_list_ia_set_primitive_topology, _RES _I32);
+DEFINE_PRIM(_VOID, command_list_copy_buffer_region, _RES _RES _I64 _RES _I64 _I64);
+DEFINE_PRIM(_VOID, command_list_om_set_render_targets, _RES _I32 _BYTES _I32 _BYTES);
+DEFINE_PRIM(_VOID, command_list_rs_set_viewports, _RES _I32 _STRUCT);
+DEFINE_PRIM(_VOID, command_list_rs_set_scissor_rects, _RES _I32 _STRUCT);
