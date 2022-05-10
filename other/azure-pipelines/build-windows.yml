@@ -17,7 +17,7 @@ jobs:
         MARCH: 32
         FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
     steps:
-      - ${{ if eq(parameters.vmImage, 'vs2017-win2016') }}:
+      - ${{ if eq(parameters.vmImage, 'windows2019') }}:
         - powershell: |
             Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
             Write-Host "##vso[task.prependpath]C:\ProgramData\chocolatey\bin"
@@ -66,7 +66,7 @@ jobs:
         - task: PublishPipelineArtifact@1
           inputs:
             artifactName: ${{ parameters.name }}Binaries
-            targetPath: bin/hashlink-1.12.0-win$(MARCH).zip
+            targetPath: bin/hashlink-1.13.0-win$(MARCH).zip
       - ${{ if eq(parameters.buildSystem, 'vs') }}:
         - task: MSBuild@1
           inputs:
