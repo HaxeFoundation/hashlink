@@ -101,7 +101,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
 HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORMAT format ) {
 	dx_driver *drv = static_driver;
 	if( drv->swapchain ) {
-		drv->swapchain->ResizeBuffers(buffer_count, width, height, format, 0);
+		CHKERR(drv->swapchain->ResizeBuffers(buffer_count, width, height, format, 0));
 	} else {
 		DXGI_SWAP_CHAIN_DESC1 desc = {};
 		desc.Width = width;
@@ -112,8 +112,9 @@ HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORM
 		desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		desc.SampleDesc.Count = 1;
 
-		IDXGISwapChain1 *swapchain;
+		IDXGISwapChain1 *swapchain = NULL;
 		drv->factory->CreateSwapChainForHwnd(drv->commandQueue,drv->wnd,&desc,NULL,NULL,&swapchain);
+		if( !swapchain ) CHKERR(E_INVALIDARG);
 		swapchain->QueryInterface(IID_PPV_ARGS(&drv->swapchain));
 	}
 }
@@ -171,7 +172,7 @@ uchar *HL_NAME(get_device_name)() {
 #define _RES _ABSTRACT(dx_resource)
 
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32);
-DEFINE_PRIM(_BOOL, resize, _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, resize, _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, present, _BOOL);
 DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
 DEFINE_PRIM(_VOID, signal, _RES _I64);
@@ -413,6 +414,10 @@ void HL_NAME(command_list_set_graphics_root_signature)( ID3D12GraphicsCommandLis
 	l->SetGraphicsRootSignature(sign);
 }
 
+void HL_NAME(command_list_set_graphics_root32_bit_constants)( ID3D12GraphicsCommandList *l, int index, int numValues, void *data, int destOffset ) {
+	l->SetGraphicsRoot32BitConstants(index, numValues, data, destOffset);
+}
+
 void HL_NAME(command_list_set_pipeline_state)( ID3D12GraphicsCommandList *l, ID3D12PipelineState *pipe ) {
 	l->SetPipelineState(pipe);
 }
@@ -457,6 +462,7 @@ DEFINE_PRIM(_VOID, command_list_clear_depth_stencil_view, _RES _I64 _I32 _F32 _I
 DEFINE_PRIM(_VOID, command_list_draw_instanced, _RES _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, command_list_draw_indexed_instanced, _RES _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, command_list_set_graphics_root_signature, _RES _RES);
+DEFINE_PRIM(_VOID, command_list_set_graphics_root32_bit_constants, _RES _I32 _I32 _BYTES _I32);
 DEFINE_PRIM(_VOID, command_list_set_pipeline_state, _RES _RES);
 DEFINE_PRIM(_VOID, command_list_ia_set_vertex_buffers, _RES _I32 _I32 _STRUCT);
 DEFINE_PRIM(_VOID, command_list_ia_set_index_buffer, _RES _STRUCT);
