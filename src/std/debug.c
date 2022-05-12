@@ -235,6 +235,7 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 		default:
 			return 3;
 		}
+		break;
 	case EXIT_PROCESS_DEBUG_EVENT:
 		return 0;
 	default:
