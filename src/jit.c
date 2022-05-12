@@ -3708,6 +3708,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					value = alloc_fpu(ctx, rb, true);
 					op32(ctx,MOVSD,pmem2(&p,base->id,offset->id,1,0),value);
 					break;
+				case HI64:
+					value = alloc_cpu(ctx, rb, true);
+					op64(ctx,MOV,pmem2(&p,base->id,offset->id,1,0),value);
+					break;
 				default:
 					ASSERT(rb->t->kind);
 					break;
