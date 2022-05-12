@@ -35,7 +35,6 @@ jobs:
             haxe_latest_dist: mac/haxe_latest.tar.gz
 
           - target: win32
-            #runner: windows-2016 # has VS2017 preinstalled which supports PlatformToolset <= v141, WindowsTargetPlatformVersion 8.1
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
@@ -45,7 +44,6 @@ jobs:
             msbuild_WindowsTargetPlatformVersion: 8.1
 
           - target: win64
-            #runner: windows-2016 # has VS2017 preinstalled which supports PlatformToolset <= v141, WindowsTargetPlatformVersion 8.1
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
@@ -58,9 +56,9 @@ jobs:
     - name: "SCM Checkout"
       uses: actions/checkout@v2
 
-    - name: "Install: Visual C++ build tools workload for Visual Studio 2017 Build Tools"
+    - name: "Install: Visual C++ build tools workload for Visual Studio 2019 Build Tools"
       if: startsWith(matrix.target, 'win')
-      run: choco install visualstudio2017buildtools visualstudio2017-workload-vctools
+      run: choco install visualstudio2019buildtools visualstudio2019-workload-vctools
 
     - name: "Install: Windows 8.1 SDK"
       shell: powershell
