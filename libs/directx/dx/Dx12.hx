@@ -32,7 +32,7 @@ abstract Resource(hl.Abstract<"dx_resource">) {
 	}
 }
 
-@:hlNative("dx12","resource_")
+@:hlNative("dx12","resource_") @:forward(release)
 abstract GpuResource(Resource) {
 	@:hlNative("dx12","resource_get_gpu_virtual_address")
 	public function getGpuVirtualAddress() : Int64 { return 0; }
@@ -125,6 +125,7 @@ abstract CommandList(Resource) {
 	public function resourceBarrier( b : ResourceBarrier ) {}
 	public function setPipelineState( state : PipelineState ) {}
 	public function setGraphicsRootSignature( sign : RootSignature ) {}
+	public function setGraphicsRoot32BitConstants( index : Int, numValues : Int, data : hl.Bytes, dstOffset : Int ) {}
 	public function copyBufferRegion( dst : GpuResource, dstOffset : Int64, src : GpuResource, srcOffset : Int64, size : Int64 ) {}
 
 	public function iaSetPrimitiveTopology( top : PrimitiveTopology ) {}
@@ -386,7 +387,7 @@ enum abstract DescriptorRangeType(Int) {
 }
 
 @:struct class RootParameter {
-	var parameterType : RootParameterType;
+	public var parameterType : RootParameterType;
 	var __paddingBeforeUnion : Int;
 }
 
@@ -808,7 +809,7 @@ enum abstract LogicOp(Int) {
 	public var dstBlendAlpha : Blend;
 	public var blendOpAlpha : BlendOp;
 	public var logicOp : LogicOp;
-	public var renderTergetWriteMask : hl.UI8;
+	public var renderTargetWriteMask : hl.UI8;
 	public function new() {
 	}
 }
@@ -1168,8 +1169,7 @@ class Dx12 {
 		return null;
 	}
 
-	public static function resize( width : Int, height : Int, bufferCount : Int, format : DxgiFormat ) : Bool {
-		return false;
+	public static function resize( width : Int, height : Int, bufferCount : Int, format : DxgiFormat ) {
 	}
 
 	public static function signal( fence : Fence, value : Int64 ) {
