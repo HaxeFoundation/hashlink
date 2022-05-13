@@ -36,6 +36,8 @@ abstract Resource(hl.Abstract<"dx_resource">) {
 abstract GpuResource(Resource) {
 	@:hlNative("dx12","resource_get_gpu_virtual_address")
 	public function getGpuVirtualAddress() : Int64 { return 0; }
+	@:hlNative("dx12","get_required_intermediate_size")
+	public function getRequiredIntermediateSize( subRes : Int, resCount : Int ) : Int64 { return 0; }
 	public function map( subResource : Int, range : Range ) : hl.Bytes { return null; }
 	public function unmap( subResource : Int, writtenRange : Range ) {}
 	@:to inline function to() : Resource { return cast this; }
@@ -111,6 +113,47 @@ enum abstract PrimitiveTopology(Int) {
 	}
 }
 
+@:struct class Box {
+	public var left : Int;
+	public var top : Int;
+	public var front : Int;
+	public var right : Int;
+	public var bottom : Int;
+	public var back : Int;
+	public function new() {
+	}
+}
+
+enum abstract TextureCopyType(Int) {
+	var SUBRESOURCE_INDEX = 0;
+	var PLACED_FOOTPRINT = 1;
+}
+
+@:struct class SubresourceFootprint {
+	public var format : DxgiFormat;
+	public var width : Int;
+	public var height : Int;
+	public var depth : Int;
+	public var rowPitch : Int;
+	public function new() {
+	}
+}
+
+@:struct class TextureCopyLocation {
+	public var res : GpuResource;
+	public var type : TextureCopyType;
+	var __unionPadding : Int;
+
+	public var subResourceIndex(get,set) : Int;
+	inline function get_subResourceIndex() : Int return offset.low & 0xFF;
+	inline function set_subResourceIndex(v: Int) { offset = v; return v; }
+
+	public var offset : Int64;
+	@:packed public var footprint(default,null) : SubresourceFootprint;
+	public function new() {
+	}
+}
+
 @:hlNative("dx12","command_list_")
 abstract CommandList(Resource) {
 	public function new(type,alloc,state) {
@@ -124,9 +167,15 @@ abstract CommandList(Resource) {
 	public function reset( alloc : CommandAllocator, state : PipelineState ) {}
 	public function resourceBarrier( b : ResourceBarrier ) {}
 	public function setPipelineState( state : PipelineState ) {}
+	public function setDescriptorHeaps( heaps : hl.NativeArray<DescriptorHeap> ) {}
+	public function copyBufferRegion( dst : GpuResource, dstOffset : Int64, src : GpuResource, srcOffset : Int64, size : Int64 ) {}
+	public function copyTextureRegion( dst : TextureCopyLocation, dstX : Int, dstY : Int, dstZ : Int, src : TextureCopyLocation, srcBox : Box ) {}
+
 	public function setGraphicsRootSignature( sign : RootSignature ) {}
 	public function setGraphicsRoot32BitConstants( index : Int, numValues : Int, data : hl.Bytes, dstOffset : Int ) {}
-	public function copyBufferRegion( dst : GpuResource, dstOffset : Int64, src : GpuResource, srcOffset : Int64, size : Int64 ) {}
+	public function setGraphicsRootConstantBufferView( index : Int, address : Address ) {}
+	public function setGraphicsRootDescriptorTable( index : Int, address : Address ) {}
+	public function setGraphicsRootShaderResourceView( index : Int, address : Address ) {}
 
 	public function iaSetPrimitiveTopology( top : PrimitiveTopology ) {}
 	public function iaSetVertexBuffers( startSlot : Int, numViews : Int, views : VertexBufferView ) {}
@@ -136,6 +185,7 @@ abstract CommandList(Resource) {
 	public function drawIndexedInstanced( indexCountPerInstance : Int, instanceCount : Int, startIndexLocation : Int, baseVertexLocation : Int, startInstanceLocation : Int ) {}
 
 	public function omSetRenderTargets( count : Int, handles : hl.BytesAccess<Address>, flag : Bool32, depthStencils : hl.BytesAccess<Address> ) {}
+	public function omSetStencilRef( value : Int ) {}
 
 	public function rsSetViewports( count : Int, viewports : Viewport ) {}
 	public function rsSetScissorRects( count : Int, rects : Rect ) {}
@@ -194,6 +244,15 @@ enum abstract DescriptorHeapFlags(Int) {
 }
 
 abstract Address(Int64) from Int64 {
+
+	public var value(get,never) : Int64;
+
+	public inline function new( v : Int64 ) {
+		this = v;
+	}
+
+	inline function get_value() return this;
+
 	public inline function offset( delta : Int ) : Address {
 		return cast this + delta;
 	}
@@ -254,7 +313,7 @@ enum abstract ResourceState(Int) {
 	public var PIXEL_SHADER_RESOURCE = 0x80;
 	public var STREAM_OUT = 0x100;
 	public var INDIRECT_ARGUMENT = 0x200;
-	public var COPY_DESC = 0x400;
+	public var COPY_DEST = 0x400;
 	public var COPY_SOURCE = 0x800;
 	public var RESOLVE_DESC = 0x1000;
 	public var RESOLVE_SOURCE = 0x2000;
@@ -263,7 +322,7 @@ enum abstract ResourceState(Int) {
 	public var GENERIC_READ = 0x1 | 0x2 | 0x40  | 0x80  | 0x200  | 0x800;
 	public var ALL_SHADER_RESOURCE = 0x40 | 0x80;
 	public var PRESENT = 0;
-	public var PREDICATIOn = 0x200;
+	public var PREDICATION = 0x200;
 	public var VIDE_DECODE_READ = 0x10000;
 	public var VIDE_DECODE_WRITE = 0x20000;
 	public var VIDE_PROCESS_READ = 0x40000;
@@ -272,7 +331,7 @@ enum abstract ResourceState(Int) {
 	public var VIDE_ENCODE_WRITE = 0x800000;
 }
 
-@:struct class ClearColor {
+@:struct class Color {
 	public var r : Single;
 	public var g : Single;
 	public var b : Single;
@@ -280,6 +339,8 @@ enum abstract ResourceState(Int) {
 	public function new() {
 	}
 }
+
+typedef ClearColor = Color;
 
 @:struct class ResourceBarrier {
 	var type : ResourceBarrierType;
@@ -1082,17 +1143,14 @@ enum ResourceFlag {
 
 @:struct class ClearValue {
 	public var format : DxgiFormat;
-	public var red : Single;
-	public var green : Single;
-	public var blue : Single;
-	public var alpha : Single;
+	@:packed public var color(default,never) : Color;
 	public var depth(get,set) : Float;
 	public var stencil(get,set) : Int;
-	inline function get_depth() return red;
-	inline function set_depth(v) return red = v;
-	function get_stencil() return haxe.io.FPHelper.floatToI32(green);
+	inline function get_depth() return color.r;
+	inline function set_depth(v) return color.r = v;
+	function get_stencil() return haxe.io.FPHelper.floatToI32(color.g);
 	function set_stencil(v) {
-		green = haxe.io.FPHelper.i32ToFloat(v);
+		color.g = haxe.io.FPHelper.i32ToFloat(v);
 		return v;
 	}
 }
@@ -1128,6 +1186,180 @@ enum abstract ResourceStates(Int) {
 	@:op(a|b) function or(r:ResourceStates):ResourceStates;
 }
 
+
+enum abstract SrvDimension(Int) {
+	var UNKNOWN = 0;
+	var BUFFER = 1;
+	var TEXTURE1D = 2;
+	var TEXTURE1DARRAY = 3;
+	var TEXTURE2D = 4;
+	var TEXTURE2DARRAY = 5;
+	var TEXTURE2DMS = 6;
+	var TEXTURE2DMSARRAY = 7;
+	var TEXTURE3D = 8;
+	var TEXTURECUBE = 9;
+	var TEXTURECUBEARRAY = 10;
+	var RAYTRACING_ACCELERATION_STRUCTURE = 11;
+}
+
+enum abstract ShaderComponentValue(Int) {
+	var R = 0;
+	var G = 1;
+	var B = 2;
+	var A = 3;
+	var ZERO = 4;
+	var ONE = 5;
+}
+
+abstract ShaderComponentMapping(Int) {
+	public var red(get,set) : ShaderComponentValue;
+	public var green(get,set) : ShaderComponentValue;
+	public var blue(get,set) : ShaderComponentValue;
+	public var alpha(get,set) : ShaderComponentValue;
+	public function new() {
+		this = 1 << 12;
+	}
+	inline function get_red() : ShaderComponentValue { return cast (this & 7); }
+	inline function get_green() : ShaderComponentValue { return cast ((this >> 3) & 7); }
+	inline function get_blue() : ShaderComponentValue { return cast ((this >> 6) & 7); }
+	inline function get_alpha() : ShaderComponentValue { return cast ((this >> 9) & 7); }
+	inline function set_red(v : ShaderComponentValue) { this = (this & ~(3<<0)) | ((cast v : Int) << 0); return v; }
+	inline function set_green(v : ShaderComponentValue) { this = (this & ~(3<<3)) | ((cast v : Int) << 3); return v; }
+	inline function set_blue(v : ShaderComponentValue) { this = (this & ~(3<<6)) | ((cast v : Int) << 6); return v; }
+	inline function set_alpha(v : ShaderComponentValue) { this = (this & ~(3<<9)) | ((cast v : Int) << 9); return v; }
+
+	public static inline var DEFAULT : ShaderComponentMapping = cast 0x1688;
+}
+
+@:struct class ShaderResourceViewDesc {
+	public var format : DxgiFormat;
+	public var dimension : SrvDimension;
+	public var shader4ComponentMapping : ShaderComponentMapping;
+	var __unionPadding : Int;
+}
+
+enum abstract BufferSRVFlags(Int) {
+	var NONE = 0;
+	var RAW = 1;
+}
+
+@:struct class BufferSRV extends ShaderResourceViewDesc {
+	public var firstElement : Int64;
+	public var numElements : Int;
+	public var structureByteStride : Int;
+	public var flags : BufferSRVFlags;
+	var unused : Int;
+	public function new() {
+		dimension = BUFFER;
+	}
+}
+
+@:struct class Text1DSRV extends ShaderResourceViewDesc {
+	public var mostDetailedMip : Int;
+	public var mipLevels : Int;
+	public var resourceMinLODClamp : Single;
+	var unused1 : Int;
+	var unused2 : Int;
+	var unused3 : Int;
+	public function new() {
+		dimension = TEXTURE1D;
+	}
+}
+
+@:struct class Text1DArraySRV extends ShaderResourceViewDesc {
+	public var mostDetailedMip : Int;
+	public var mipLevels : Int;
+	public var firstArraySlice : Int;
+	public var arraySize : Int;
+	public var resourceMinLODClamp : Single;
+	var unused1 : Int;
+	public function new() {
+		dimension = TEXTURE1DARRAY;
+	}
+}
+
+@:struct class Text2DSRV extends ShaderResourceViewDesc {
+	public var mostDetailedMip : Int;
+	public var mipLevels : Int;
+	public var planeSlice : Int;
+	public var resourceMinLODClamp : Single;
+	var unused1 : Int;
+	var unused2 : Int;
+	public function new() {
+		dimension = TEXTURE2D;
+	}
+}
+
+@:struct class Text2DArraySRV extends ShaderResourceViewDesc {
+	public var mostDetailedMip : Int;
+	public var mipLevels : Int;
+	public var firstArraySlice : Int;
+	public var arraySize : Int;
+	public var planeSlice : Int;
+	public var resourceMinLODClamp : Single;
+	public function new() {
+		dimension = TEXTURE2DARRAY;
+	}
+}
+
+@:struct class Text3DSRV extends ShaderResourceViewDesc {
+	public var mostDetailedMip : Int;
+	public var mipLevels : Int;
+	public var resourceMinLODClamp : Single;
+	var unused1 : Int;
+	var unused2 : Int;
+	var unused3 : Int;
+	public function new() {
+		dimension = TEXTURE3D;
+	}
+}
+
+@:struct class TextCubeSRV extends ShaderResourceViewDesc {
+	public var mostDetailedMip : Int;
+	public var mipLevels : Int;
+	public var resourceMinLODClamp : Single;
+	var unused1 : Int;
+	var unused2 : Int;
+	var unused3 : Int;
+	public function new() {
+		dimension = TEXTURECUBE;
+	}
+}
+
+@:struct class TextCubeArraySRV extends ShaderResourceViewDesc {
+	public var mostDetailedMip : Int;
+	public var mipLevels : Int;
+	public var first2DArrayFace : Int;
+	public var numCubes : Int;
+	public var resourceMinLODClamp : Single;
+	var unused1 : Int;
+	public function new() {
+		dimension = TEXTURECUBEARRAY;
+	}
+}
+
+@:struct class SamplerDesc {
+	public var filter : Filter;
+	public var addressU : AddressMode;
+	public var addressV : AddressMode;
+	public var addressW : AddressMode;
+	public var mipLODBias : Float;
+	public var maxAnisotropy : Int;
+	public var comparisonFunc : ComparisonFunc;
+	@:packed public var borderColor(default,never) : Color;
+	public var minLod : Single;
+	public var maxLod : Single;
+	public function new() {
+	}
+}
+
+@:struct class SubResourceData {
+	public var data : hl.Bytes;
+	public var rowPitch : Int64;
+	public var slicePitch : Int64;
+	public function new() {
+	}
+}
 
 @:hlNative("dx12")
 class Dx12 {
@@ -1165,11 +1397,21 @@ class Dx12 {
 	public static function createDepthStencilView( buffer : Resource, desc : DepthStencilViewDesc, target : Address ) {
 	}
 
+	public static function createShaderResourceView( resource : Resource, desc : ShaderResourceViewDesc, target : Address ) {
+	}
+
+	public static function createSampler( desc : SamplerDesc, target : Address ) {
+	}
+
 	public static function createCommittedResource( heapProperties : HeapProperties, heapFlags : haxe.EnumFlags<HeapFlag>, desc : ResourceDesc, initialState : ResourceStates, clearValue : ClearValue ) : GpuResource {
 		return null;
 	}
 
 	public static function resize( width : Int, height : Int, bufferCount : Int, format : DxgiFormat ) {
+	}
+
+	public static function updateSubResource( commandList : CommandList, dst : GpuResource, src : GpuResource, srcOffset : Int64, first : Int, count : Int, data : SubResourceData ) : Bool {
+		return false;
 	}
 
 	public static function signal( fence : Fence, value : Int64 ) {

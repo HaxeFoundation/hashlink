@@ -179,6 +179,143 @@ DEFINE_PRIM(_VOID, signal, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
 
+/// --- utilities (from d3dx12.h)
+
+struct CD3DX12_TEXTURE_COPY_LOCATION : public D3D12_TEXTURE_COPY_LOCATION
+{
+    CD3DX12_TEXTURE_COPY_LOCATION() = default;
+    explicit CD3DX12_TEXTURE_COPY_LOCATION(const D3D12_TEXTURE_COPY_LOCATION &o) noexcept :
+        D3D12_TEXTURE_COPY_LOCATION(o)
+    {}
+    CD3DX12_TEXTURE_COPY_LOCATION(_In_ ID3D12Resource* pRes) noexcept
+    {
+        pResource = pRes;
+        Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        PlacedFootprint = {};
+    }
+    CD3DX12_TEXTURE_COPY_LOCATION(_In_ ID3D12Resource* pRes, D3D12_PLACED_SUBRESOURCE_FOOTPRINT const& Footprint) noexcept
+    {
+        pResource = pRes;
+        Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        PlacedFootprint = Footprint;
+    }
+    CD3DX12_TEXTURE_COPY_LOCATION(_In_ ID3D12Resource* pRes, UINT Sub) noexcept
+    {
+        pResource = pRes;
+        Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        PlacedFootprint = {};
+        SubresourceIndex = Sub;
+    }
+};
+
+inline void MemcpySubresource(
+    _In_ const D3D12_MEMCPY_DEST* pDest,
+    _In_ const D3D12_SUBRESOURCE_DATA* pSrc,
+    SIZE_T RowSizeInBytes,
+    UINT NumRows,
+    UINT NumSlices) noexcept
+{
+    for (UINT z = 0; z < NumSlices; ++z)
+    {
+        auto pDestSlice = static_cast<BYTE*>(pDest->pData) + pDest->SlicePitch * z;
+        auto pSrcSlice = static_cast<const BYTE*>(pSrc->pData) + pSrc->SlicePitch * LONG_PTR(z);
+        for (UINT y = 0; y < NumRows; ++y)
+        {
+            memcpy(pDestSlice + pDest->RowPitch * y,
+                   pSrcSlice + pSrc->RowPitch * LONG_PTR(y),
+                   RowSizeInBytes);
+        }
+    }
+}
+
+inline UINT64 UpdateSubresources(
+    _In_ ID3D12GraphicsCommandList* pCmdList,
+    _In_ ID3D12Resource* pDestinationResource,
+    _In_ ID3D12Resource* pIntermediate,
+    _In_range_(0,D3D12_REQ_SUBRESOURCES) UINT FirstSubresource,
+    _In_range_(0,D3D12_REQ_SUBRESOURCES-FirstSubresource) UINT NumSubresources,
+    UINT64 RequiredSize,
+    _In_reads_(NumSubresources) const D3D12_PLACED_SUBRESOURCE_FOOTPRINT* pLayouts,
+    _In_reads_(NumSubresources) const UINT* pNumRows,
+    _In_reads_(NumSubresources) const UINT64* pRowSizesInBytes,
+    _In_reads_(NumSubresources) const D3D12_SUBRESOURCE_DATA* pSrcData) noexcept
+{
+    // Minor validation
+    auto IntermediateDesc = pIntermediate->GetDesc();
+    auto DestinationDesc = pDestinationResource->GetDesc();
+    if (IntermediateDesc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER ||
+        IntermediateDesc.Width < RequiredSize + pLayouts[0].Offset ||
+        RequiredSize > SIZE_T(-1) ||
+        (DestinationDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER &&
+            (FirstSubresource != 0 || NumSubresources != 1)))
+    {
+        return 0;
+    }
+
+    BYTE* pData;
+    HRESULT hr = pIntermediate->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+    if (FAILED(hr))
+    {
+        return 0;
+    }
+
+    for (UINT i = 0; i < NumSubresources; ++i)
+    {
+        if (pRowSizesInBytes[i] > SIZE_T(-1)) return 0;
+        D3D12_MEMCPY_DEST DestData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
+        MemcpySubresource(&DestData, &pSrcData[i], static_cast<SIZE_T>(pRowSizesInBytes[i]), pNumRows[i], pLayouts[i].Footprint.Depth);
+    }
+    pIntermediate->Unmap(0, nullptr);
+
+    if (DestinationDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+    {
+        pCmdList->CopyBufferRegion(
+            pDestinationResource, 0, pIntermediate, pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+    }
+    else
+    {
+        for (UINT i = 0; i < NumSubresources; ++i)
+        {
+            CD3DX12_TEXTURE_COPY_LOCATION Dst(pDestinationResource, i + FirstSubresource);
+            CD3DX12_TEXTURE_COPY_LOCATION Src(pIntermediate, pLayouts[i]);
+            pCmdList->CopyTextureRegion(&Dst, 0, 0, 0, &Src, nullptr);
+        }
+    }
+    return RequiredSize;
+}
+
+inline UINT64 UpdateSubresources(
+    _In_ ID3D12GraphicsCommandList* pCmdList,
+    _In_ ID3D12Resource* pDestinationResource,
+    _In_ ID3D12Resource* pIntermediate,
+    UINT64 IntermediateOffset,
+    _In_range_(0,D3D12_REQ_SUBRESOURCES) UINT FirstSubresource,
+    _In_range_(0,D3D12_REQ_SUBRESOURCES-FirstSubresource) UINT NumSubresources,
+    _In_reads_(NumSubresources) const D3D12_SUBRESOURCE_DATA* pSrcData) noexcept
+{
+    UINT64 RequiredSize = 0;
+    auto MemToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * NumSubresources;
+    if (MemToAlloc > SIZE_MAX)
+    {
+       return 0;
+    }
+    void* pMem = HeapAlloc(GetProcessHeap(), 0, static_cast<SIZE_T>(MemToAlloc));
+    if (pMem == nullptr)
+    {
+       return 0;
+    }
+    auto pLayouts = static_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(pMem);
+    auto pRowSizesInBytes = reinterpret_cast<UINT64*>(pLayouts + NumSubresources);
+    auto pNumRows = reinterpret_cast<UINT*>(pRowSizesInBytes + NumSubresources);
+
+    auto Desc = pDestinationResource->GetDesc();
+    static_driver->device->GetCopyableFootprints(&Desc, FirstSubresource, NumSubresources, IntermediateOffset, pLayouts, pNumRows, pRowSizesInBytes, &RequiredSize);
+
+    UINT64 Result = UpdateSubresources(pCmdList, pDestinationResource, pIntermediate, FirstSubresource, NumSubresources, RequiredSize, pLayouts, pNumRows, pRowSizesInBytes, pSrcData);
+    HeapFree(GetProcessHeap(), 0, pMem);
+    return Result;
+}
+
 // ---- RESOURCES
 
 ID3D12Resource *HL_NAME(get_back_buffer)( int index ) {
@@ -201,6 +338,14 @@ void HL_NAME(create_depth_stencil_view)( ID3D12Resource *res, D3D12_DEPTH_STENCI
 	static_driver->device->CreateDepthStencilView(res,desc,descriptor);
 }
 
+void HL_NAME(create_sampler)( D3D12_SAMPLER_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+	static_driver->device->CreateSampler(desc,descriptor);
+}
+
+void HL_NAME(create_shader_resource_view)( ID3D12Resource *res, D3D12_SHADER_RESOURCE_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+	static_driver->device->CreateShaderResourceView(res,desc,descriptor);
+}
+
 int64 HL_NAME(resource_get_gpu_virtual_address)( ID3D12Resource *res ) {
 	return res->GetGPUVirtualAddress();
 }
@@ -219,14 +364,30 @@ void HL_NAME(resource_unmap)( ID3D12Resource *res, int subres, D3D12_RANGE *rang
 	res->Unmap(subres, range);
 }
 
+int64 HL_NAME(get_required_intermediate_size)( ID3D12Resource *res, int first, int count ) {
+    auto desc = res->GetDesc();
+    UINT64 size = 0;
+    static_driver->device->GetCopyableFootprints(&desc, first, count, 0, NULL, NULL, NULL, &size);
+    return size;
+}
+
+bool HL_NAME(update_sub_resource)( ID3D12GraphicsCommandList *cmd, ID3D12Resource *res, ID3D12Resource *tmp, int64 tmpOffs, int first, int count, D3D12_SUBRESOURCE_DATA *data ) {
+	return UpdateSubresources(cmd,res,tmp,(UINT64)tmpOffs,(UINT)first,(UINT)count,data) != 0;
+}
+
 DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_depth_stencil_view, _RES _STRUCT _I64);
+DEFINE_PRIM(_VOID, create_shader_resource_view, _RES _STRUCT _I64);
+DEFINE_PRIM(_VOID, create_sampler, _STRUCT _I64);
 DEFINE_PRIM(_RES, create_committed_resource, _STRUCT _I32 _STRUCT _I32 _STRUCT);
 DEFINE_PRIM(_RES, get_back_buffer, _I32);
 DEFINE_PRIM(_VOID, resource_release, _RES);
 DEFINE_PRIM(_I64, resource_get_gpu_virtual_address, _RES);
 DEFINE_PRIM(_BYTES, resource_map, _RES _I32 _STRUCT);
 DEFINE_PRIM(_VOID, resource_unmap, _RES _I32 _STRUCT);
+DEFINE_PRIM(_I64, get_required_intermediate_size, _RES _I32 _I32);
+DEFINE_PRIM(_BOOL, update_sub_resource, _RES _RES _RES _I64 _I32 _I32 _STRUCT);
+
 
 // ---- SHADERS
 
@@ -438,8 +599,16 @@ void HL_NAME(command_list_copy_buffer_region)( ID3D12GraphicsCommandList *l, ID3
 	l->CopyBufferRegion(dst, dstOffset, src, srcOffset, numBytes);
 }
 
+void HL_NAME(command_list_copy_texture_region)( ID3D12GraphicsCommandList *l, D3D12_TEXTURE_COPY_LOCATION *dst, int dstX, int dstY, int dstZ, D3D12_TEXTURE_COPY_LOCATION *src, D3D12_BOX *srcBox ) {
+	l->CopyTextureRegion(dst, dstX, dstY, dstZ, src, srcBox);
+}
+
 void HL_NAME(command_list_om_set_render_targets)( ID3D12GraphicsCommandList *l, int count, D3D12_CPU_DESCRIPTOR_HANDLE *handles, BOOL flag, D3D12_CPU_DESCRIPTOR_HANDLE *depthStencils ) {
 	l->OMSetRenderTargets(count,handles,flag,depthStencils);
+}
+
+void HL_NAME(command_list_om_set_stencil_ref)( ID3D12GraphicsCommandList *l, int value ) {
+	l->OMSetStencilRef(value);
 }
 
 void HL_NAME(command_list_rs_set_viewports)( ID3D12GraphicsCommandList *l, int count, D3D12_VIEWPORT *viewports ) {
@@ -448,6 +617,22 @@ void HL_NAME(command_list_rs_set_viewports)( ID3D12GraphicsCommandList *l, int c
 
 void HL_NAME(command_list_rs_set_scissor_rects)( ID3D12GraphicsCommandList *l, int count, D3D12_RECT *rects ) {
 	l->RSSetScissorRects(count, rects);
+}
+
+void HL_NAME(command_list_set_descriptor_heaps)( ID3D12GraphicsCommandList *l, varray *heaps ) {
+	l->SetDescriptorHeaps(heaps->size,hl_aptr(heaps,ID3D12DescriptorHeap*));
+}
+
+void HL_NAME(command_list_set_graphics_root_constant_buffer_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS address ) {
+	l->SetGraphicsRootConstantBufferView(index,address);
+}
+
+void HL_NAME(command_list_set_graphics_root_descriptor_table)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_DESCRIPTOR_HANDLE handle ) {
+	l->SetGraphicsRootDescriptorTable(index,handle);
+}
+
+void HL_NAME(command_list_set_graphics_root_shader_resource_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
+	l->SetGraphicsRootShaderResourceView(index,handle);
 }
 
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
@@ -463,11 +648,17 @@ DEFINE_PRIM(_VOID, command_list_draw_instanced, _RES _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, command_list_draw_indexed_instanced, _RES _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, command_list_set_graphics_root_signature, _RES _RES);
 DEFINE_PRIM(_VOID, command_list_set_graphics_root32_bit_constants, _RES _I32 _I32 _BYTES _I32);
+DEFINE_PRIM(_VOID, command_list_set_graphics_root_constant_buffer_view, _RES _I32 _I64);
+DEFINE_PRIM(_VOID, command_list_set_graphics_root_descriptor_table, _RES _I32 _I64);
+DEFINE_PRIM(_VOID, command_list_set_graphics_root_shader_resource_view, _RES _I32 _I64);
+DEFINE_PRIM(_VOID, command_list_set_descriptor_heaps, _RES _ARR);
 DEFINE_PRIM(_VOID, command_list_set_pipeline_state, _RES _RES);
 DEFINE_PRIM(_VOID, command_list_ia_set_vertex_buffers, _RES _I32 _I32 _STRUCT);
 DEFINE_PRIM(_VOID, command_list_ia_set_index_buffer, _RES _STRUCT);
 DEFINE_PRIM(_VOID, command_list_ia_set_primitive_topology, _RES _I32);
 DEFINE_PRIM(_VOID, command_list_copy_buffer_region, _RES _RES _I64 _RES _I64 _I64);
+DEFINE_PRIM(_VOID, command_list_copy_texture_region, _RES _STRUCT _I32 _I32 _I32 _STRUCT _STRUCT);
 DEFINE_PRIM(_VOID, command_list_om_set_render_targets, _RES _I32 _BYTES _I32 _BYTES);
+DEFINE_PRIM(_VOID, command_list_om_set_stencil_ref, _RES _I32);
 DEFINE_PRIM(_VOID, command_list_rs_set_viewports, _RES _I32 _STRUCT);
 DEFINE_PRIM(_VOID, command_list_rs_set_scissor_rects, _RES _I32 _STRUCT);
