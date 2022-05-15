@@ -72,7 +72,7 @@ jobs:
       if: startsWith(matrix.target, 'win')
       uses: microsoft/setup-msbuild@v1.0.3
       with:
-        vs-version: '[15.0,16.0)'
+        vs-version: '[16.0,17.0)'
 
     - name: "Install: Required Dev Packages"
       run: |
