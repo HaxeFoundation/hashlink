@@ -3,6 +3,7 @@ parameters:
   vmImage: ''
   buildSystem: 'cmake' # either 'cmake' or 'vs'
   cmakeGenerator: ''
+  cmakeArchitecture: ''
   cmakeConfig: 'RelWithDebInfo'
 
 jobs:
@@ -10,10 +11,10 @@ jobs:
     pool:
       vmImage: ${{ parameters.vmImage }}
     variables:
-      ${{ if endsWith(parameters.cmakeGenerator, 'Win64') }}:
+      ${{ if eq(parameters.cmakeArchitecture, 'x64') }}:
         MARCH: 64
         FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
-      ${{ if not(endsWith(parameters.cmakeGenerator, 'Win64')) }}:
+      ${{ if eq(parameters.cmakeArchitecture, 'Win32') }}:
         MARCH: 32
         FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
     steps:
@@ -55,7 +56,7 @@ jobs:
           haxelib list
         displayName: Install hashlink haxelib
       - ${{ if eq(parameters.buildSystem, 'cmake') }}:
-        - script: cmake . -G "${{ parameters.cmakeGenerator }}"
+        - script: cmake . -G "${{ parameters.cmakeGenerator }}" -A ${{ parameters.cmakeArchitecture }}
           displayName: CMake
         - script: cmake --build . --config ${{ parameters.cmakeConfig }}
           displayName: Build
