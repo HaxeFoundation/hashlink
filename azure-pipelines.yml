@@ -39,7 +39,6 @@ stages:
           vmImage: 'windows-2019'
           buildSystem: cmake
           cmakeGenerator: 'Visual Studio 16 2019'
-          cmakeArchitecture: 'x64'
 
       - template: other/azure-pipelines/build-windows.yml
         parameters:
@@ -47,7 +46,7 @@ stages:
           vmImage: 'windows-2019'
           buildSystem: cmake
           cmakeGenerator: 'Visual Studio 16 2019'
-          cmakeArchitecture: 'Win32'
+          architecture: 'Win32'
 
       - template: other/azure-pipelines/build-windows.yml
         parameters:
