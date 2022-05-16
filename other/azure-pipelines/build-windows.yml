@@ -18,11 +18,6 @@ jobs:
         MARCH: 32
         FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
     steps:
-      - ${{ if eq(parameters.vmImage, 'windows-2019') }}:
-        - powershell: |
-            Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-            Write-Host "##vso[task.prependpath]C:\ProgramData\chocolatey\bin"
-          displayName: Install Chocolatey
       - powershell: |
           Invoke-WebRequest https://www.libsdl.org/release/SDL2-devel-2.0.5-VC.zip -OutFile SDL.zip
           Expand-Archive SDL.zip -DestinationPath .
