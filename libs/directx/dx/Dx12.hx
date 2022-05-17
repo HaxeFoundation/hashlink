@@ -417,6 +417,13 @@ enum DsvFlags {
 	}
 }
 
+@:struct class ConstantBufferViewDesc {
+	public var bufferLocation : Address;
+	public var sizeInBytes : Int;
+	public function new() {
+	}
+}
+
 enum RootSignatureFlag {
 	ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	DENY_VERTEX_SHADER_ROOT_ACCESS;
@@ -1254,7 +1261,7 @@ enum abstract BufferSRVFlags(Int) {
 	}
 }
 
-@:struct class Text1DSRV extends ShaderResourceViewDesc {
+@:struct class Tex1DSRV extends ShaderResourceViewDesc {
 	public var mostDetailedMip : Int;
 	public var mipLevels : Int;
 	public var resourceMinLODClamp : Single;
@@ -1266,7 +1273,7 @@ enum abstract BufferSRVFlags(Int) {
 	}
 }
 
-@:struct class Text1DArraySRV extends ShaderResourceViewDesc {
+@:struct class Tex1DArraySRV extends ShaderResourceViewDesc {
 	public var mostDetailedMip : Int;
 	public var mipLevels : Int;
 	public var firstArraySlice : Int;
@@ -1278,7 +1285,7 @@ enum abstract BufferSRVFlags(Int) {
 	}
 }
 
-@:struct class Text2DSRV extends ShaderResourceViewDesc {
+@:struct class Tex2DSRV extends ShaderResourceViewDesc {
 	public var mostDetailedMip : Int;
 	public var mipLevels : Int;
 	public var planeSlice : Int;
@@ -1290,7 +1297,7 @@ enum abstract BufferSRVFlags(Int) {
 	}
 }
 
-@:struct class Text2DArraySRV extends ShaderResourceViewDesc {
+@:struct class Tex2DArraySRV extends ShaderResourceViewDesc {
 	public var mostDetailedMip : Int;
 	public var mipLevels : Int;
 	public var firstArraySlice : Int;
@@ -1302,7 +1309,7 @@ enum abstract BufferSRVFlags(Int) {
 	}
 }
 
-@:struct class Text3DSRV extends ShaderResourceViewDesc {
+@:struct class Tex3DSRV extends ShaderResourceViewDesc {
 	public var mostDetailedMip : Int;
 	public var mipLevels : Int;
 	public var resourceMinLODClamp : Single;
@@ -1314,7 +1321,7 @@ enum abstract BufferSRVFlags(Int) {
 	}
 }
 
-@:struct class TextCubeSRV extends ShaderResourceViewDesc {
+@:struct class TexCubeSRV extends ShaderResourceViewDesc {
 	public var mostDetailedMip : Int;
 	public var mipLevels : Int;
 	public var resourceMinLODClamp : Single;
@@ -1326,7 +1333,7 @@ enum abstract BufferSRVFlags(Int) {
 	}
 }
 
-@:struct class TextCubeArraySRV extends ShaderResourceViewDesc {
+@:struct class TexCubeArraySRV extends ShaderResourceViewDesc {
 	public var mostDetailedMip : Int;
 	public var mipLevels : Int;
 	public var first2DArrayFace : Int;
@@ -1343,7 +1350,7 @@ enum abstract BufferSRVFlags(Int) {
 	public var addressU : AddressMode;
 	public var addressV : AddressMode;
 	public var addressW : AddressMode;
-	public var mipLODBias : Float;
+	public var mipLODBias : Single;
 	public var maxAnisotropy : Int;
 	public var comparisonFunc : ComparisonFunc;
 	@:packed public var borderColor(default,never) : Color;
@@ -1395,6 +1402,9 @@ class Dx12 {
 	}
 
 	public static function createDepthStencilView( buffer : Resource, desc : DepthStencilViewDesc, target : Address ) {
+	}
+
+	public static function createConstantBufferView( desc : ConstantBufferViewDesc, target : Address ) {
 	}
 
 	public static function createShaderResourceView( resource : Resource, desc : ShaderResourceViewDesc, target : Address ) {

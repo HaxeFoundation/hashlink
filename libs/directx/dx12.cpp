@@ -338,6 +338,10 @@ void HL_NAME(create_depth_stencil_view)( ID3D12Resource *res, D3D12_DEPTH_STENCI
 	static_driver->device->CreateDepthStencilView(res,desc,descriptor);
 }
 
+void HL_NAME(create_constant_buffer_view)( D3D12_CONSTANT_BUFFER_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+	static_driver->device->CreateConstantBufferView(desc,descriptor);
+}
+
 void HL_NAME(create_sampler)( D3D12_SAMPLER_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateSampler(desc,descriptor);
 }
@@ -378,6 +382,7 @@ bool HL_NAME(update_sub_resource)( ID3D12GraphicsCommandList *cmd, ID3D12Resourc
 DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_depth_stencil_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_shader_resource_view, _RES _STRUCT _I64);
+DEFINE_PRIM(_VOID, create_constant_buffer_view, _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_sampler, _STRUCT _I64);
 DEFINE_PRIM(_RES, create_committed_resource, _STRUCT _I32 _STRUCT _I32 _STRUCT);
 DEFINE_PRIM(_RES, get_back_buffer, _I32);
