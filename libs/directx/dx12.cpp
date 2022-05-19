@@ -358,6 +358,10 @@ void HL_NAME(resource_release)( IUnknown *res ) {
 	res->Release();
 }
 
+void HL_NAME(resource_set_name)( ID3D12Resource *res, vbyte *name ) {
+	res->SetName((LPCWSTR)name);
+}
+
 void *HL_NAME(resource_map)( ID3D12Resource *res, int subres, D3D12_RANGE *range ) {
 	void *data = NULL;
 	DXERR(res->Map(subres, range, &data));
@@ -379,6 +383,10 @@ bool HL_NAME(update_sub_resource)( ID3D12GraphicsCommandList *cmd, ID3D12Resourc
 	return UpdateSubresources(cmd,res,tmp,(UINT64)tmpOffs,(UINT)first,(UINT)count,data) != 0;
 }
 
+void HL_NAME(get_copyable_footprints)( D3D12_RESOURCE_DESC *desc, int first, int count, int64 offset, D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts, int *numRows, int64 *rowSizes, int64 *totalBytes ) {
+    static_driver->device->GetCopyableFootprints(desc, first, count, offset, layouts, (UINT*)numRows, (UINT64*)rowSizes, (UINT64*)totalBytes);
+}
+
 DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_depth_stencil_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_shader_resource_view, _RES _STRUCT _I64);
@@ -387,12 +395,13 @@ DEFINE_PRIM(_VOID, create_sampler, _STRUCT _I64);
 DEFINE_PRIM(_RES, create_committed_resource, _STRUCT _I32 _STRUCT _I32 _STRUCT);
 DEFINE_PRIM(_RES, get_back_buffer, _I32);
 DEFINE_PRIM(_VOID, resource_release, _RES);
+DEFINE_PRIM(_VOID, resource_set_name, _RES _BYTES);
 DEFINE_PRIM(_I64, resource_get_gpu_virtual_address, _RES);
 DEFINE_PRIM(_BYTES, resource_map, _RES _I32 _STRUCT);
 DEFINE_PRIM(_VOID, resource_unmap, _RES _I32 _STRUCT);
 DEFINE_PRIM(_I64, get_required_intermediate_size, _RES _I32 _I32);
 DEFINE_PRIM(_BOOL, update_sub_resource, _RES _RES _RES _I64 _I32 _I32 _STRUCT);
-
+DEFINE_PRIM(_VOID, get_copyable_footprints, _STRUCT _I32 _I32 _I64 _STRUCT _BYTES _BYTES _BYTES);
 
 // ---- SHADERS
 

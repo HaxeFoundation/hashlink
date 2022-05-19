@@ -23,6 +23,10 @@ typedef DriverInitFlags = haxe.EnumFlags<DriverInitFlag>;
 @:hlNative("dx12","resource_")
 abstract Resource(hl.Abstract<"dx_resource">) {
 	public function release() {}
+	public inline function setName( name : String ) {
+		set_name(@:privateAccess name.bytes);
+	}
+	function set_name( name : hl.Bytes ) {}
 }
 
 @:struct class Range {
@@ -32,7 +36,7 @@ abstract Resource(hl.Abstract<"dx_resource">) {
 	}
 }
 
-@:hlNative("dx12","resource_") @:forward(release)
+@:hlNative("dx12","resource_") @:forward(release, setName)
 abstract GpuResource(Resource) {
 	@:hlNative("dx12","resource_get_gpu_virtual_address")
 	public function getGpuVirtualAddress() : Int64 { return 0; }
@@ -139,17 +143,23 @@ enum abstract TextureCopyType(Int) {
 	}
 }
 
+@:struct class PlacedSubresourceFootprint {
+	public var offset : Int64;
+	@:packed public var footprint(default,null) : SubresourceFootprint;
+	public function new() {
+	}
+}
+
 @:struct class TextureCopyLocation {
 	public var res : GpuResource;
 	public var type : TextureCopyType;
 	var __unionPadding : Int;
 
 	public var subResourceIndex(get,set) : Int;
-	inline function get_subResourceIndex() : Int return offset.low & 0xFF;
-	inline function set_subResourceIndex(v: Int) { offset = v; return v; }
+	inline function get_subResourceIndex() : Int return placedFootprint.offset.low & 0xFF;
+	inline function set_subResourceIndex(v: Int) { placedFootprint.offset = v; return v; }
 
-	public var offset : Int64;
-	@:packed public var footprint(default,null) : SubresourceFootprint;
+	@:packed public var placedFootprint(default,null) : PlacedSubresourceFootprint;
 	public function new() {
 	}
 }
@@ -279,7 +289,7 @@ abstract ShaderCompiler(hl.Abstract<"dx_compiler">) {
 }
 
 @:hlNative("dx12","descriptor_heap_")
-abstract DescriptorHeap(Resource) {
+abstract DescriptorHeap(Resource) to Resource {
 	public function new(desc) {
 		this = create(desc);
 	}
@@ -1408,6 +1418,9 @@ class Dx12 {
 	}
 
 	public static function createShaderResourceView( resource : Resource, desc : ShaderResourceViewDesc, target : Address ) {
+	}
+
+	public static function getCopyableFootprints( srcDesc : ResourceDesc, firstSubResource : Int, numSubResources : Int, baseOffset : Int64, layouts : PlacedSubresourceFootprint, numRows : hl.BytesAccess<Int>, rowSizeInBytes : hl.BytesAccess<Int64>, totalBytes : hl.BytesAccess<Int64> ) : Void {
 	}
 
 	public static function createSampler( desc : SamplerDesc, target : Address ) {
