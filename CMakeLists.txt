@@ -292,6 +292,13 @@ if(BUILD_TESTING)
         add_test(NAME uvsample.hl
             COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
         )
+        add_test(NAME version
+            COMMAND hl --version
+        )
+        set_tests_properties(version
+            PROPERTIES
+            PASS_REGULAR_EXPRESSION "${HL_VERSION}"
+        )
     endif()
     add_test(NAME hello
         COMMAND hello
@@ -301,13 +308,6 @@ if(BUILD_TESTING)
     )
     add_test(NAME uvsample
         COMMAND uvsample
-    )
-    add_test(NAME version
-        COMMAND hl --version
-    )
-    set_tests_properties(version
-        PROPERTIES
-        PASS_REGULAR_EXPRESSION "${HL_VERSION}"
     )
 
 endif()
