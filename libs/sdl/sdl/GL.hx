@@ -222,7 +222,7 @@ class GL {
 	}
 
 	@:hlNative("sdl","gl_tex_image2d_multisample")
-	public static function texImage2DMultisample( target : Int, internalFormat : Int, samples : Int, width : Int, height : Int, fixedsamplelocations : Bool ) {
+	public static function texImage2DMultisample( target : Int, samples : Int, internalFormat : Int, width : Int, height : Int, fixedsamplelocations : Bool ) {
 	}
 
 	@:hlNative("sdl","gl_compressed_tex_image2d")
