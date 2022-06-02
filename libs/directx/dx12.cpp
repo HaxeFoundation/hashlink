@@ -43,8 +43,31 @@ void *pContext ) {
 	fflush(stdout);
 }
 
+HL_PRIM varray *HL_NAME(list_devices)() {
+	static int MAX_DEVICES = 64;
+	int index = 0, write = 0;
+	IDXGIAdapter1 *adapter = NULL;
+	IDXGIFactory4 *factory = NULL;
+	varray *arr = hl_alloc_array(&hlt_bytes, MAX_DEVICES);
+	if( static_driver )
+		factory = static_driver->factory;
+	else {
+		CHKERR(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory)));
+	}
+	while( write < MAX_DEVICES && factory->EnumAdapters1(index++,&adapter) != DXGI_ERROR_NOT_FOUND ) {
+		DXGI_ADAPTER_DESC1 desc;
+		adapter->GetDesc1(&desc);
+		if( (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 )
+			hl_aptr(arr,uchar*)[write++] = ustrdup(desc.Description);
+		adapter->Release();
+	}
+	if( !static_driver )
+		factory->Release();
+	return arr;
+}
 
-HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
+
+HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags, uchar *dev_desc ) {
 	UINT dxgiFlags = 0;
 	dx_driver *drv = (dx_driver*)hl_gc_alloc_raw(sizeof(dx_driver));
 	memset(drv,0,sizeof(dx_driver));
@@ -66,7 +89,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags ) {
 	while( drv->factory->EnumAdapters1(index++,&adapter) != DXGI_ERROR_NOT_FOUND ) {
 		DXGI_ADAPTER_DESC1 desc;
 		adapter->GetDesc1(&desc);
-		if( desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ) {
+		if( (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) || (dev_desc && !wcsstr(desc.Description,dev_desc)) ) {
 			adapter->Release();
 			continue;
 		}
@@ -171,7 +194,8 @@ uchar *HL_NAME(get_device_name)() {
 #define _DRIVER _ABSTRACT(dx_driver)
 #define _RES _ABSTRACT(dx_resource)
 
-DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32);
+DEFINE_PRIM(_ARR, list_devices, _NO_ARG);
+DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _BYTES);
 DEFINE_PRIM(_VOID, resize, _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, present, _BOOL);
 DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
