@@ -372,9 +372,21 @@ enum abstract DsvDimension(Int) {
     var TEXTURE2DMSARRAY = 6;
 }
 
+enum abstract RtvDimension(Int) {
+	var UNKNOWN	= 0;
+	var BUFFER = 1;
+    var TEXTURE1D = 2;
+    var TEXTURE1DARRAY = 3;
+    var TEXTURE2D = 4;
+    var TEXTURE2DARRAY = 5;
+    var TEXTURE2DMS = 6;
+    var TEXTURE2DMSARRAY = 7;
+    var TEXTURE3D = 8;
+}
+
 @:struct class RenderTargetViewDesc {
 	public var format : DxgiFormat;
-	public var viewDimension : DsvDimension;
+	public var viewDimension : RtvDimension;
 
 	var int0 : Int;
 	var int1 : Int;
@@ -1381,8 +1393,8 @@ enum abstract BufferSRVFlags(Int) {
 @:hlNative("dx12")
 class Dx12 {
 
-	public static function create( win : Window, flags : DriverInitFlags ) {
-		return dxCreate(@:privateAccess win.win, flags);
+	public static function create( win : Window, flags : DriverInitFlags, ?deviceName : String ) {
+		return dxCreate(@:privateAccess win.win, flags, deviceName == null ? null : @:privateAccess deviceName.bytes);
 	}
 
 	public static function flushMessages() {
@@ -1447,13 +1459,28 @@ class Dx12 {
 		return @:privateAccess String.fromUCS2(dxGetDeviceName());
 	}
 
+	public static function listDevices() {
+		var arr = dxListDevices();
+		var out = [];
+		for( i in 0...arr.length ) {
+			if( arr[i] == null ) break;
+			out.push(@:privateAccess String.fromUCS2(arr[i]));
+		}
+		return out;
+	}
+
+	@:hlNative("dx12", "list_devices")
+	static function dxListDevices() : hl.NativeArray<hl.Bytes> {
+		return null;
+	}
+
 	@:hlNative("dx12", "get_device_name")
 	static function dxGetDeviceName() : hl.Bytes {
 		return null;
 	}
 
 	@:hlNative("dx12", "create")
-	static function dxCreate( win : hl.Abstract<"dx_window">, flags : DriverInitFlags ) : DriverInstance {
+	static function dxCreate( win : hl.Abstract<"dx_window">, flags : DriverInitFlags, deviceName : hl.Bytes ) : DriverInstance {
 		return null;
 	}
 
