@@ -50,6 +50,10 @@ abstract GpuResource(Resource) {
 abstract PipelineState(Resource) {
 }
 
+@:forward(release)
+abstract CommandSignature(Resource) {
+}
+
 @:hlNative("dx12","command_allocator_")
 abstract CommandAllocator(Resource) {
 	public function new(type) {
@@ -193,6 +197,7 @@ abstract CommandList(Resource) {
 
 	public function drawInstanced( vertexCountPerInstance : Int, instanceCount : Int, startVertexLocation : Int, startInstanceLocation : Int ) {}
 	public function drawIndexedInstanced( indexCountPerInstance : Int, instanceCount : Int, startIndexLocation : Int, baseVertexLocation : Int, startInstanceLocation : Int ) {}
+	public function executeIndirect( sign : CommandSignature, maxCommandCount : Int, args : Resource, argsOffset : Int64, count : Resource, countOffset : Int64 ) {}
 
 	public function omSetRenderTargets( count : Int, handles : hl.BytesAccess<Address>, flag : Bool32, depthStencils : hl.BytesAccess<Address> ) {}
 	public function omSetStencilRef( value : Int ) {}
@@ -1390,6 +1395,41 @@ enum abstract BufferSRVFlags(Int) {
 	}
 }
 
+enum abstract IndirectArgumentType(Int) {
+	var DRAW = 0;
+	var DRAW_INDEXED = 1;
+	var DISPATCH = 2;
+	var VERTEX_BUFFER_VIEW = 3;
+	var INDEX_BUFFER_VIEW = 4;
+	var CONSTANT = 5;
+	var CONSTANT_BUFFER_VIEW = 6;
+	var SHADER_RESOURCE_VIEW = 7;
+	var UNORDERED_ACCESS_VIEW = 8;
+	var DISPATCH_RAYS = 9;
+	var DISPATCH_MESH = 10;
+}
+
+@:struct class IndirectArgumentDesc {
+	public var type : IndirectArgumentType;
+	public var rootParameterIndex : Int;
+	public var destOffsetIn32BitValues : Int;
+	public var num32BitValuesToSet : Int;
+	public var slot(get,set) : Int;
+	inline function get_slot() return rootParameterIndex;
+	inline function set_slot(v) return rootParameterIndex = v;
+	public function new() {
+	}
+}
+
+@:struct class CommandSignatureDesc {
+	public var byteStride :Int;
+	public var numArgumentDescs : Int;
+	public var argumentDescs : IndirectArgumentDesc;
+	public var nodeMask : Int;
+	public function new() {
+	}
+}
+
 @:hlNative("dx12")
 class Dx12 {
 
@@ -1439,6 +1479,10 @@ class Dx12 {
 	}
 
 	public static function createCommittedResource( heapProperties : HeapProperties, heapFlags : haxe.EnumFlags<HeapFlag>, desc : ResourceDesc, initialState : ResourceStates, clearValue : ClearValue ) : GpuResource {
+		return null;
+	}
+
+	public static function createCommandSignature( desc : CommandSignatureDesc, root : RootSignature ) : CommandSignature {
 		return null;
 	}
 
