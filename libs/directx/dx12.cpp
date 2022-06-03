@@ -498,12 +498,19 @@ ID3D12PipelineState *HL_NAME(create_graphics_pipeline_state)( D3D12_GRAPHICS_PIP
 	return state;
 }
 
+ID3D12CommandSignature *HL_NAME(create_command_signature)( D3D12_COMMAND_SIGNATURE_DESC *desc, ID3D12RootSignature *rootSign ) {
+	ID3D12CommandSignature *sign = NULL;
+	DXERR(static_driver->device->CreateCommandSignature(desc,rootSign,IID_PPV_ARGS(&sign)));
+	return sign;
+}
+
 #define _COMPILER _ABSTRACT(dx_compiler)
 DEFINE_PRIM(_COMPILER, compiler_create, _NO_ARG);
 DEFINE_PRIM(_BYTES, compiler_compile, _COMPILER _BYTES _BYTES _ARR _REF(_I32));
 DEFINE_PRIM(_BYTES, serialize_root_signature, _STRUCT _I32 _REF(_I32));
 DEFINE_PRIM(_RES, rootsignature_create, _BYTES _I32);
 DEFINE_PRIM(_RES, create_graphics_pipeline_state, _STRUCT);
+DEFINE_PRIM(_RES, create_command_signature, _STRUCT _RES);
 
 // ---- HEAPS
 
@@ -673,6 +680,10 @@ void HL_NAME(command_list_set_graphics_root_shader_resource_view)( ID3D12Graphic
 	l->SetGraphicsRootShaderResourceView(index,handle);
 }
 
+void HL_NAME(command_list_execute_indirect)( ID3D12GraphicsCommandList *l, ID3D12CommandSignature *sign, int maxCommandCount, ID3D12Resource *args, int64 argsOffset, ID3D12Resource *count, int64 countOffset  ) {
+	l->ExecuteIndirect(sign, maxCommandCount, args, argsOffset, count, countOffset);
+}
+
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
 DEFINE_PRIM(_VOID, command_allocator_reset, _RES);
 DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);
@@ -700,3 +711,4 @@ DEFINE_PRIM(_VOID, command_list_om_set_render_targets, _RES _I32 _BYTES _I32 _BY
 DEFINE_PRIM(_VOID, command_list_om_set_stencil_ref, _RES _I32);
 DEFINE_PRIM(_VOID, command_list_rs_set_viewports, _RES _I32 _STRUCT);
 DEFINE_PRIM(_VOID, command_list_rs_set_scissor_rects, _RES _I32 _STRUCT);
+DEFINE_PRIM(_VOID, command_list_execute_indirect, _RES _RES _I32 _RES _I64 _RES _I64);
