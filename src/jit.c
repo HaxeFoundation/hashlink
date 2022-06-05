@@ -2763,6 +2763,42 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 	int size;
 	preg p;
 	preg *tmp;
+	if( v->t->kind == HNULL && v->t->tparam->kind == dst->t->kind ) {
+		int jnull, jend;
+		preg *out;
+		switch( dst->t->kind ) {
+		case HUI8:
+		case HUI16:
+		case HI32:
+		case HBOOL:
+		case HI64:
+			tmp = alloc_cpu(ctx, v, true);
+			op64(ctx, TEST, tmp, tmp);
+			XJump_small(JZero, jnull);
+			op64(ctx, MOV, tmp, pmem(&p,tmp->id,8));
+			XJump_small(JAlways, jend);
+			patch_jump(ctx, jnull);
+			op64(ctx, XOR, tmp, tmp);
+			patch_jump(ctx, jend);
+			store(ctx, dst, tmp, true);
+			return;
+		case HF32:
+		case HF64:
+			tmp = alloc_cpu(ctx, v, true);
+			out = alloc_fpu(ctx, dst, false);
+			op64(ctx, TEST, tmp, tmp);
+			XJump_small(JZero, jnull);
+			op64(ctx, dst->t->kind == HF32 ? MOVSS : MOVSD, out, pmem(&p,tmp->id,8));
+			XJump_small(JAlways, jend);
+			patch_jump(ctx, jnull);
+			op64(ctx, XORPD, out, out);
+			patch_jump(ctx, jend);
+			store(ctx, dst, out, true);
+			return;
+		default:
+			break;
+		}
+	}
 	switch( dst->t->kind ) {
 	case HF32:
 	case HF64:
