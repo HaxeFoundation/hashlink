@@ -1820,7 +1820,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 			out = pa;
 			break;
 		case ID2(RSTACK,RCPU):
-			if( dst == a ) {
+			if( dst == a && OP_FORMS[o].mem_r ) {
 				op64(ctx, o, pa, pb);
 				dst = NULL;
 				out = pa;
