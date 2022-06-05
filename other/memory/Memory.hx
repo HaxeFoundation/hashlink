@@ -289,7 +289,7 @@ class Memory {
 				var ct = new TType(tid, HFun({ args : args, ret : f.ret }), clparam);
 				types.push(ct);
 				var pt = closuresPointers[cid++];
-				if( pt != null )
+				if( !pt.isNull() )
 					pointerType.set(pt, ct);
 			case HObj(o):
 				if( o.tsuper != null )
@@ -323,7 +323,7 @@ class Memory {
 				b.typePtr = readPointer();
 			}
 			b.type = pointerType.get(b.typePtr);
-			b.typePtr = null;
+			b.typePtr = Pointer.NULL;
 			if( b.type != null && b.type.hasPtr && b.page.kind == PNoPtr ) {
 				if( b.type.t.match(HEnum(_)) ) {
 					// most likely one of the constructor without pointer parameter
@@ -748,7 +748,7 @@ class Memory {
 					if(tok.length > 0) args.push(tok);
 					tok = "";
 				}
-				else 
+				else
 					tok += c;
 			}
 		}
