@@ -191,6 +191,12 @@ uchar *HL_NAME(get_device_name)() {
 	return (uchar*)hl_copy_bytes((vbyte*)desc.Description,(int)(ustrlen((uchar*)desc.Description)+1)*2);
 }
 
+int64 HL_NAME(get_timestamp_frequency)() {
+	UINT64 f = 0;
+	CHKERR(static_driver->commandQueue->GetTimestampFrequency(&f))
+	return (int64)f;
+}
+
 #define _DRIVER _ABSTRACT(dx_driver)
 #define _RES _ABSTRACT(dx_resource)
 
@@ -202,6 +208,7 @@ DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
 DEFINE_PRIM(_VOID, signal, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
+DEFINE_PRIM(_I64, get_timestamp_frequency, _NO_ARG);
 
 /// --- utilities (from d3dx12.h)
 
@@ -529,9 +536,16 @@ int64 HL_NAME(descriptor_heap_get_handle)( ID3D12DescriptorHeap *heap, bool gpu 
 	return handle; 
 }
 
+ID3D12QueryHeap *HL_NAME(create_query_heap)( D3D12_QUERY_HEAP_DESC *desc ) {
+	ID3D12QueryHeap *heap = NULL;
+	DXERR(static_driver->device->CreateQueryHeap(desc,IID_PPV_ARGS(&heap)));
+	return heap;
+}
+
 DEFINE_PRIM(_RES, descriptor_heap_create, _STRUCT);
 DEFINE_PRIM(_I32, get_descriptor_handle_increment_size, _I32);
 DEFINE_PRIM(_I64, descriptor_heap_get_handle, _RES _BOOL);
+DEFINE_PRIM(_RES, create_query_heap, _STRUCT);
 
 // ---- SYNCHRO
 
@@ -684,6 +698,22 @@ void HL_NAME(command_list_execute_indirect)( ID3D12GraphicsCommandList *l, ID3D1
 	l->ExecuteIndirect(sign, maxCommandCount, args, argsOffset, count, countOffset);
 }
 
+void HL_NAME(command_list_begin_query)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index ) {
+	l->BeginQuery(heap, type, index);
+}
+
+void HL_NAME(command_list_end_query)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index ) {
+	l->EndQuery(heap, type, index);
+}
+
+void HL_NAME(command_list_resolve_query_data)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index, int count, ID3D12Resource *dest, int64 offset ) {
+	l->ResolveQueryData(heap,type,index,count,dest,offset);
+}
+
+void HL_NAME(command_list_set_predication)( ID3D12GraphicsCommandList *l, ID3D12Resource *res, int64 offset, D3D12_PREDICATION_OP op ) {
+	l->SetPredication(res,offset,op);
+}
+
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
 DEFINE_PRIM(_VOID, command_allocator_reset, _RES);
 DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);
@@ -712,3 +742,7 @@ DEFINE_PRIM(_VOID, command_list_om_set_stencil_ref, _RES _I32);
 DEFINE_PRIM(_VOID, command_list_rs_set_viewports, _RES _I32 _STRUCT);
 DEFINE_PRIM(_VOID, command_list_rs_set_scissor_rects, _RES _I32 _STRUCT);
 DEFINE_PRIM(_VOID, command_list_execute_indirect, _RES _RES _I32 _RES _I64 _RES _I64);
+DEFINE_PRIM(_VOID, command_list_begin_query, _RES _RES _I32 _I32);
+DEFINE_PRIM(_VOID, command_list_end_query, _RES _RES _I32 _I32);
+DEFINE_PRIM(_VOID, command_list_resolve_query_data, _RES _RES _I32 _I32 _I32 _RES _I64);
+DEFINE_PRIM(_VOID, command_list_set_predication, _RES _RES _I64 _I32);
