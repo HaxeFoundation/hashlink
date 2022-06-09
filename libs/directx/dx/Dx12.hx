@@ -205,6 +205,12 @@ abstract CommandList(Resource) {
 	public function rsSetViewports( count : Int, viewports : Viewport ) {}
 	public function rsSetScissorRects( count : Int, rects : Rect ) {}
 
+	public function beginQuery( heap : QueryHeap, type : QueryType, index : Int ) {}
+	public function endQuery( heap : QueryHeap, type : QueryType, index : Int ) {}
+	public function resolveQueryData( heap : QueryHeap, type : QueryType, index : Int, count : Int, dest : Resource, offset : Int64 ) {}
+
+	public function setPredication( res : Resource, offset : Int64, op : PredicationOp ) {}
+
 	static function create( type : CommandListType, alloc : CommandAllocator, state : PipelineState ) : Resource { return null; }
 }
 
@@ -1430,6 +1436,45 @@ enum abstract IndirectArgumentType(Int) {
 	}
 }
 
+enum abstract QueryType(Int) {
+	var OCCLUSION = 0;
+	var BINARY_OCCLUSION = 1;
+	var TIMESTAMP = 2;
+	var PIPELINE_STATISTICS = 3;
+	var SO_STATISTICS_STREAM0 = 4;
+	var SO_STATISTICS_STREAM1 = 5;
+	var SO_STATISTICS_STREAM2 = 6;
+	var SO_STATISTICS_STREAM3 = 7;
+	var VIDEO_DECODE_STATISTICS = 8;
+}
+
+enum abstract QueryHeapType(Int) {
+	var OCCLUSION = 0;
+	var TIMESTAMP = 1;
+	var PIPELINE_STATISTICS = 2;
+	var SO_STATISTICS = 3;
+	var VIDEO_DECODE_STATISTICS = 4;
+	var COPY_QUEUE_TIMESTAMP = 5;
+}
+
+@:struct class QueryHeapDesc {
+	public var type : QueryHeapType;
+	public var count : Int;
+	public var nodeMask : Int;
+	public function new() {
+	}
+}
+
+@:forward(release)
+abstract QueryHeap(Resource) {
+}
+
+enum abstract PredicationOp(Int) {
+	var EQUAL_ZERO = 0;
+	var NOT_EQUAL_ZERO = 1;
+}
+
+
 @:hlNative("dx12")
 class Dx12 {
 
@@ -1472,6 +1517,10 @@ class Dx12 {
 	public static function createShaderResourceView( resource : Resource, desc : ShaderResourceViewDesc, target : Address ) {
 	}
 
+	public static function createQueryHeap( desc : QueryHeapDesc ) : QueryHeap {
+		return null;
+	}
+
 	public static function getCopyableFootprints( srcDesc : ResourceDesc, firstSubResource : Int, numSubResources : Int, baseOffset : Int64, layouts : PlacedSubresourceFootprint, numRows : hl.BytesAccess<Int>, rowSizeInBytes : hl.BytesAccess<Int64>, totalBytes : hl.BytesAccess<Int64> ) : Void {
 	}
 
@@ -1511,6 +1560,11 @@ class Dx12 {
 			out.push(@:privateAccess String.fromUCS2(arr[i]));
 		}
 		return out;
+	}
+
+	@:hlNative("dx12","get_timestamp_frequency")
+	public static function getTimestampFrequency() : Int64 {
+		return 0;
 	}
 
 	@:hlNative("dx12", "list_devices")
