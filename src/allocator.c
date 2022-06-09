@@ -220,22 +220,48 @@ static void flush_free_list( gc_pheader *ph ) {
 		}
 		bid += count;
 	}
-	free_freelist(&old_fl);
 	p->free = new_fl;
 	p->need_flush = false;
 #ifdef __GC_DEBUG
-	if( reuse ) hl_fatal("assert");
-	int bid;
-	gc_freelist *fl = p->free;
+	if( ph->page_id == -1 ) {
+		int k;
+		for(k=0;k<p->free.count;k++) {
+			gc_fl *fl = GET_FL(&p->free,k);
+			printf("(%d-%d)",fl->pos,fl->pos+fl->count-1); 
+		}
+		printf("\n");
+	}
+	if( reuse && reuse->count ) hl_fatal("assert");
 	for(bid=p->first_block;bid<p->max_blocks;bid++) {
-		while( fl && fl->pos + fl->count <= bid ) fl = fl->next;
-		bool is_free = fl && bid >= fl->pos;
+		int k;
+		bool is_free = false;
+		for(k=0;k<p->free.count;k++) {
+			gc_fl *fl = GET_FL(&p->free,k);
+			if( fl->pos < p->first_block || fl->pos + fl->count > p->max_blocks ) hl_fatal("assert");
+			if( bid >= fl->pos && bid < fl->pos + fl->count ) {
+				if( is_free ) hl_fatal("assert");
+				is_free = true;
+			}
+		}
 		bool is_marked = ((ph->bmp[bid>>3] & (1<<(bid&7))) != 0); 
-		if( is_free == is_marked ) hl_fatal("assert");
+		if( is_marked && is_free ) {
+			// check if it was already free before
+			for(k=0;k<old_fl.count;k++) {
+				gc_fl *fl = GET_FL(&old_fl,k);
+				if( bid >= fl->pos && bid < fl->pos+fl->count ) {
+					is_marked = false; // false positive
+					ph->bmp[bid>>3] &= ~(1<<(bid&7));
+					break;
+				}
+			}
+		}
+		if( is_free == is_marked )
+			hl_fatal("assert");
 		if( p->sizes && !is_free )
 			bid += p->sizes[bid]-1;
 	}
 #endif
+	free_freelist(&old_fl);
 }
 
 static void *gc_alloc_fixed( int part, int kind ) {
@@ -272,8 +298,6 @@ static void *gc_alloc_fixed( int part, int kind ) {
 		int i;
 		if( bid < p->first_block || bid >= p->max_blocks )
 			hl_fatal("assert");
-		if( ph->bmp && (ph->bmp[bid>>3]&(1<<(bid&7))) != 0 )
-			hl_fatal("Alloc on marked bit");
 		for(i=0;i<p->block_size;i++)
 			if( ptr[i] != 0xDD )
 				hl_fatal("assert");
