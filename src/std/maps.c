@@ -158,6 +158,29 @@ typedef struct {
 #include "maps.h"
 
 
+// ----- INT64 MAP ---------------------------------
+
+typedef struct {
+	int64 key;
+	int next;
+} hl_hi64_entry;
+
+typedef struct {
+	vdynamic *value;
+} hl_hi64_value;
+
+#define hlt_key		hlt_i64
+#define hl_hi64filter(key) key
+#define hl_hi64hash(h)	(((unsigned int)h) ^ ((unsigned int)(h>>32)))
+#define _MKEY_TYPE	int64
+#define _MNAME(n)	hl_hi64##n
+#define _MMATCH(c)	m->entries[c].key == key
+#define _MKEY(m,c)	m->entries[c].key
+#define	_MSET(c)	m->entries[c].key = key
+#define _MERASE(c)
+
+#include "maps.h"
+
 // ----- BYTES MAP ---------------------------------
 
 typedef struct {
@@ -235,6 +258,17 @@ DEFINE_PRIM( _ARR, hikeys, _IMAP );
 DEFINE_PRIM( _ARR, hivalues, _IMAP );
 DEFINE_PRIM( _VOID, hiclear, _IMAP );
 DEFINE_PRIM( _I32, hisize, _IMAP );
+
+#define _I64MAP _ABSTRACT(hl_int64_map)
+DEFINE_PRIM( _I64MAP, hi64alloc, _NO_ARG );
+DEFINE_PRIM( _VOID, hi64set, _I64MAP _I64 _DYN );
+DEFINE_PRIM( _BOOL, hi64exists, _I64MAP _I64 );
+DEFINE_PRIM( _DYN, hi64get, _I64MAP _I64 );
+DEFINE_PRIM( _BOOL, hi64remove, _I64MAP _I64 );
+DEFINE_PRIM( _ARR, hi64keys, _I64MAP );
+DEFINE_PRIM( _ARR, hi64values, _I64MAP );
+DEFINE_PRIM( _VOID, hi64clear, _I64MAP );
+DEFINE_PRIM( _I32, hi64size, _I64MAP );
 
 #define _BMAP _ABSTRACT(hl_bytes_map)
 DEFINE_PRIM( _BMAP, hballoc, _NO_ARG );
