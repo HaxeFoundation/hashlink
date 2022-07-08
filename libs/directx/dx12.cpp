@@ -452,7 +452,7 @@ dx_compiler *HL_NAME(compiler_create)() {
 vbyte *HL_NAME(compiler_compile)( dx_compiler *comp, uchar *source, uchar *profile, varray *args, int *dataLen ) {
 	IDxcBlobEncoding *blob = NULL;
 	IDxcOperationResult *result = NULL;
-	comp->library->CreateBlobWithEncodingFromPinned(source,(int)ustrlen(source)*2,DXC_CP_UTF16,&blob);
+	comp->library->CreateBlobWithEncodingFromPinned(source,(int)ustrlen(source)*2,1200/*DXC_CP_UTF16*/,&blob);
 	if( blob == NULL )
 		hl_error("Could not create blob");
 	comp->compiler->Compile(blob,L"",L"main",profile,hl_aptr(args,LPCWSTR),args->size,NULL,0,NULL,&result);
