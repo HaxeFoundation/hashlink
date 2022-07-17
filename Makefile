@@ -107,6 +107,7 @@ LIBFLAGS += -L/opt/libjpeg-turbo/lib64
 endif
 
 LIBOPENAL = -lopenal
+LIBOPENGL = -lGL
 RELEASE_NAME = linux
 
 endif
