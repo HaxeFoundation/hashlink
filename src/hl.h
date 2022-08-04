@@ -616,11 +616,13 @@ HL_API hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash )
 HL_API hl_field_lookup *hl_lookup_insert( hl_field_lookup *l, int size, int hash, hl_type *t, int index );
 
 HL_API int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
+HL_API int64 hl_dyn_geti64( vdynamic *d, int hfield );
 HL_API void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
 HL_API float hl_dyn_getf( vdynamic *d, int hfield );
 HL_API double hl_dyn_getd( vdynamic *d, int hfield );
 
 HL_API int hl_dyn_casti( void *data, hl_type *t, hl_type *to );
+HL_API int64 hl_dyn_casti64( void *data, hl_type *t );
 HL_API void *hl_dyn_castp( void *data, hl_type *t, hl_type *to );
 HL_API float hl_dyn_castf( void *data, hl_type *t );
 HL_API double hl_dyn_castd( void *data, hl_type *t );
@@ -631,6 +633,7 @@ HL_API vdynamic *hl_make_dyn( void *data, hl_type *t );
 HL_API void hl_write_dyn( void *data, hl_type *t, vdynamic *v, bool is_tmp );
 
 HL_API void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
+HL_API void hl_dyn_seti64( vdynamic *d, int hfield, int64 value );
 HL_API void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
 HL_API void hl_dyn_setf( vdynamic *d, int hfield, float f );
 HL_API void hl_dyn_setd( vdynamic *d, int hfield, double v );

@@ -862,6 +862,8 @@ HL_PRIM int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 		return *(unsigned short*)addr;
 	case HI32:
 		return *(int*)addr;
+	case HI64:
+		return (int)*(int64*)addr;
 	case HF32:
 		return (int)*(float*)addr;
 	case HF64:
@@ -870,6 +872,34 @@ HL_PRIM int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t ) {
 		return *(bool*)addr;
 	default:
 		return hl_dyn_casti(addr,ft,t);
+	}
+}
+
+HL_PRIM int64 hl_dyn_geti64( vdynamic *d, int hfield ) {
+	hl_type *ft;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
+	void *addr = hl_obj_lookup(d,hfield,&ft);
+	if( !addr ) {
+		d = hl_obj_lookup_extra(d,hfield);
+		return d == NULL ? 0 : hl_dyn_casti64(&d,&hlt_dyn);
+	}
+	switch( ft->kind ) {
+	case HUI8:
+		return *(unsigned char*)addr;
+	case HUI16:
+		return *(unsigned short*)addr;
+	case HI32:
+		return *(int*)addr;
+	case HI64:
+		return *(int64*)addr;
+	case HF32:
+		return (int64)*(float*)addr;
+	case HF64:
+		return (int64)*(double*)addr;
+	case HBOOL:
+		return *(bool*)addr;
+	default:
+		return hl_dyn_casti64(addr,ft);
 	}
 }
 
@@ -977,6 +1007,9 @@ HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 	case HI32:
 		*(int*)addr = value;
 		break;
+	case HI64:
+		*(int64*)addr = value;
+		break;
 	case HBOOL:
 		*(bool*)addr = value != 0;
 		break;
@@ -991,6 +1024,43 @@ HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 			vdynamic tmp;
 			tmp.t = t;
 			tmp.v.i = value;
+			hl_write_dyn(addr,ft,&tmp,true);
+		}
+		break;
+	}
+}
+
+HL_PRIM void hl_dyn_seti64( vdynamic *d, int hfield, int64 value ) {
+	hl_type *ft = NULL;
+	hl_track_call(HL_TRACK_DYNFIELD, on_dynfield(d,hfield));
+	void *addr = hl_obj_lookup_set(d,hfield,&hlt_i64,&ft);
+	switch( ft->kind ) {
+	case HUI8:
+		*(unsigned char*)addr = (unsigned char)value;
+		break;
+	case HUI16:
+		*(unsigned short*)addr = (unsigned short)value;
+		break;
+	case HI32:
+		*(int*)addr = (int)value;
+		break;
+	case HI64:
+		*(int64*)addr = value;
+		break;
+	case HBOOL:
+		*(bool*)addr = value != 0;
+		break;
+	case HF32:
+		*(float*)addr = (float)value;
+		break;
+	case HF64:
+		*(double*)addr = (double)value;
+		break;
+	default:
+		{
+			vdynamic tmp;
+			tmp.t = &hlt_i64;
+			tmp.v.i64 = value;
 			hl_write_dyn(addr,ft,&tmp,true);
 		}
 		break;

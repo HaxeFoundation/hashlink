@@ -858,6 +858,7 @@ static int stack_size( hl_type *t ) {
 	case HF32:
 #	endif
 		return sizeof(int_val);
+	case HI64:
 	default:
 		return hl_type_size(t);
 	}
@@ -1990,6 +1991,7 @@ static void dyn_value_compare( jit_ctx *ctx, preg *a, preg *b, hl_type *t ) {
 			op64(ctx,COMISD,fa,fb);
 		}
 		break;
+	case HI64:
 	default:
 		// ptr comparison
 		op64(ctx,MOV,a,pmem(&p,a->id,HDYN_VALUE));
@@ -2374,6 +2376,9 @@ static void *callback_c2hl( void **f, hl_type *t, void **args, vdynamic *ret ) {
 	case HBOOL:
 		ret->v.i = ((int (*)(void *, void *, void *))call_jit_c2hl)(*f, (void**)&stack + pos, &stack);
 		return &ret->v.i;
+	case HI64:
+		ret->v.i64 = ((int64 (*)(void *, void *, void *))call_jit_c2hl)(*f, (void**)&stack + pos, &stack);
+		return &ret->v.i64;
 	case HF32:
 		ret->v.f = ((float (*)(void *, void *, void *))call_jit_c2hl)(*f, (void**)&stack + pos, &stack);
 		return &ret->v.f;
@@ -2488,6 +2493,8 @@ static void *jit_wrapper_ptr( vclosure_wrapper *c, char *stack_args, void **regs
 	case HI32:
 	case HBOOL:
 		return (void*)(int_val)hl_dyn_casti(&ret,&hlt_dyn,tret);
+	case HI64:
+		return (void*)hl_dyn_casti64(&ret,&hlt_dyn);
 	default:
 		return hl_dyn_castp(&ret,&hlt_dyn,tret);
 	}
@@ -2694,6 +2701,8 @@ static void *get_dyncast( hl_type *t ) {
 		return hl_dyn_castf;
 	case HF64:
 		return hl_dyn_castd;
+	case HI64:
+		return hl_dyn_casti64;
 	case HI32:
 	case HUI16:
 	case HUI8:
@@ -2710,6 +2719,8 @@ static void *get_dynset( hl_type *t ) {
 		return hl_dyn_setf;
 	case HF64:
 		return hl_dyn_setd;
+	case HI64:
+		return hl_dyn_seti64;
 	case HI32:
 	case HUI16:
 	case HUI8:
@@ -2726,6 +2737,8 @@ static void *get_dynget( hl_type *t ) {
 		return hl_dyn_getf;
 	case HF64:
 		return hl_dyn_getd;
+	case HI64:
+		return hl_dyn_geti64;
 	case HI32:
 	case HUI16:
 	case HUI8:
@@ -2802,6 +2815,7 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 	switch( dst->t->kind ) {
 	case HF32:
 	case HF64:
+	case HI64:
 		size = begin_native_call(ctx, 2);
 		set_native_arg(ctx, pconst64(&p,(int_val)v->t));
 		break;
