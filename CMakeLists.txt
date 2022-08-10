@@ -33,6 +33,11 @@ else()
     set(CMAKE_C_STANDARD_REQUIRED ON)
 endif()
 
+set(INTERPRETER_ENABLED TRUE)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+    set(INTERPRETER_ENABLED FALSE)
+endif()
+
 # put output in "bin"
 
 set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/bin)
@@ -136,24 +141,29 @@ set_target_properties(libhl
     COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
 )
 
-add_executable(hl
-    src/code.c
-    src/jit.c
-    src/main.c
-    src/module.c
-    src/debugger.c
-	src/profile.c
-)
+if(INTERPRETER_ENABLED)
+    add_executable(hl
+        src/code.c
+        src/jit.c
+        src/main.c
+        src/module.c
+        src/debugger.c
+        src/profile.c
+    )
 
-if (UNIX AND NOT APPLE)
-    set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+    if (UNIX AND NOT APPLE)
+        set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+    endif()
+
+    target_link_libraries(hl libhl)
 endif()
 
-target_link_libraries(hl libhl)
 
 if(WIN32)
     target_link_libraries(libhl ws2_32 user32)
-    target_link_libraries(hl user32)
+    if(INTERPRETER_ENABLED)
+        target_link_libraries(hl user32)
+    endif()
 else()
     target_link_libraries(libhl m dl pthread)
 endif()
@@ -271,15 +281,25 @@ if(BUILD_TESTING)
     #####################
     # Tests
 
-    add_test(NAME hello.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
-    )
-    add_test(NAME threads.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
-    )
-    add_test(NAME uvsample.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-    )
+
+    if(INTERPRETER_ENABLED)
+        add_test(NAME hello.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+        )
+        add_test(NAME threads.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
+        )
+        add_test(NAME uvsample.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+        )
+        add_test(NAME version
+            COMMAND hl --version
+        )
+        set_tests_properties(version
+            PROPERTIES
+            PASS_REGULAR_EXPRESSION "${HL_VERSION}"
+        )
+    endif()
     add_test(NAME hello
         COMMAND hello
     )
@@ -288,13 +308,6 @@ if(BUILD_TESTING)
     )
     add_test(NAME uvsample
         COMMAND uvsample
-    )
-    add_test(NAME version
-        COMMAND hl --version
-    )
-    set_tests_properties(version
-        PROPERTIES
-        PASS_REGULAR_EXPRESSION "${HL_VERSION}"
     )
 
 endif()
@@ -322,10 +335,15 @@ set(HDLL_DESTINATION
     ${CMAKE_INSTALL_LIBDIR}
 )
 
+
+if(INTERPRETER_ENABLED)
+    set(INSTALL_TARGETS hl libhl)
+else()
+    set(INSTALL_TARGETS libhl)
+endif()
+
 install(
-    TARGETS
-        hl
-        libhl
+    TARGETS ${INSTALL_TARGETS}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
