@@ -30,7 +30,7 @@
     <ProjectGuid>{C6213FBF-BC2B-4235-A827-84A60E848C52}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>libhl</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

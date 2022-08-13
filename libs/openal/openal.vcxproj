@@ -30,7 +30,7 @@
     <ProjectGuid>{EC2DCE5C-267A-4050-8DDE-5BF58FF08E31}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>openal</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

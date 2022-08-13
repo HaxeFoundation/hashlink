@@ -43,7 +43,7 @@
     <ProjectGuid>{540E0E11-B7B1-43F8-B107-0867B2D97F74}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>mysql</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
