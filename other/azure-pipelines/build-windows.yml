@@ -62,7 +62,7 @@ jobs:
         - task: PublishPipelineArtifact@1
           inputs:
             artifactName: ${{ parameters.name }}Binaries
-            targetPath: bin/hashlink-1.13.0-win$(MARCH).zip
+            targetPath: bin/hashlink-1.12.0-win$(MARCH).zip
       - ${{ if eq(parameters.buildSystem, 'vs') }}:
         - task: MSBuild@1
           inputs:
