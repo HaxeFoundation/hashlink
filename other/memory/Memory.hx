@@ -289,7 +289,7 @@ class Memory {
 				var ct = new TType(tid, HFun({ args : args, ret : f.ret }), clparam);
 				types.push(ct);
 				var pt = closuresPointers[cid++];
-				if( pt != null )
+				if( !pt.isNull() )
 					pointerType.set(pt, ct);
 			case HObj(o):
 				if( o.tsuper != null )
@@ -317,13 +317,13 @@ class Memory {
 		for( b in blocks ) {
 			progress++;
 			if( progress % 1000 == 0 )
-				Sys.print((Std.int(progress * 1000 / blocks.length) / 10) + "%  \r");
+				Sys.print((Std.int((progress / blocks.length) * 1000.0) / 10) + "%  \r");
 			if( b.page.memHasPtr() ) {
 				goto(b);
 				b.typePtr = readPointer();
 			}
 			b.type = pointerType.get(b.typePtr);
-			b.typePtr = null;
+			b.typePtr = Pointer.NULL;
 			if( b.type != null && b.type.hasPtr && b.page.kind == PNoPtr ) {
 				if( b.type.t.match(HEnum(_)) ) {
 					// most likely one of the constructor without pointer parameter
@@ -732,6 +732,30 @@ class Memory {
 		Sys.println(msg);
 	}
 
+	static function parseArgs(str: String) {
+		str = StringTools.trim(str);
+		var i = 0;
+		var tok = "";
+		var args = [];
+		var escape = false;
+		while(i != str.length) {
+			var c = str.charAt(i++);
+			if(c == '"') {
+				escape = !escape;
+			}
+			else {
+				if(c == " " && !escape) {
+					if(tok.length > 0) args.push(tok);
+					tok = "";
+				}
+				else
+					tok += c;
+			}
+		}
+		if(tok.length > 0) args.push(tok);
+		return args;
+	}
+
 	static function main() {
 		var m = new Memory();
 
@@ -759,7 +783,7 @@ class Memory {
 		var stdin = Sys.stdin();
 		while( true ) {
 			Sys.print("> ");
-			var args = ~/ +/g.split(StringTools.trim(stdin.readLine()));
+			var args = parseArgs(stdin.readLine());
 			var cmd = args.shift();
 			switch( cmd ) {
 			case "exit", "quit", "q":

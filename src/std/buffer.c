@@ -233,11 +233,11 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 	case HSTRUCT:
 		{
 			hl_type_obj *o = v->t->obj;
-			if( o->rt == NULL || o->rt->toStringFun == NULL ) {
+			if( o->rt == NULL || hl_get_obj_proto(v->t)->toStringFun == NULL ) {
 				if( v->t->kind == HSTRUCT ) hl_buffer_char(b,'@');
 				hl_buffer_str(b,o->name);
 			} else
-				hl_buffer_str(b,o->rt->toStringFun(v));
+				hl_buffer_str(b,o->rt->toStringFun(v->t->kind == HSTRUCT ? (vdynamic*)v->v.ptr : v));
 		}
 		break;
 	case HARRAY:

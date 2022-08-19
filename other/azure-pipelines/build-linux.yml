@@ -1,8 +1,8 @@
 parameters:
   name: 'BuildLinux'
-  vmImage: 'ubuntu-16.04'
+  vmImage: 'ubuntu-18.04'
   container: 'debian:stretch'
-  arch: '' # set it to i386 fof 32-bit build
+  arch: '' # set it to i386 for 32-bit build
   buildSystem: 'cmake' # either 'cmake' or 'make'
   cmakeConfig: 'RelWithDebInfo'
 
@@ -44,6 +44,7 @@ jobs:
               libturbojpeg0-dev \
               libuv1-dev \
               libopenal-dev \
+              libsqlite3-dev \
               neko \
               curl \
               ca-certificates
@@ -67,6 +68,7 @@ jobs:
               libturbojpeg0-dev:i386 \
               libuv1-dev:${{ parameters.arch }} \
               libopenal-dev:${{ parameters.arch }} \
+              libsqlite3-dev:${{ parameters.arch }} \
               neko \
               curl \
               ca-certificates

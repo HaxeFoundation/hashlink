@@ -21,6 +21,10 @@ abstract Pointer(haxe.Int64) {
 	public inline function shift( k : Int ) : haxe.Int64 {
 		return haxe.Int64.shr(this,k);
 	}
+
+	public static var NULL(get,never) : Pointer;
+	inline static function get_NULL() return new Pointer(0);
+
 }
 
 @:enum abstract PageKind(Int) {
@@ -124,6 +128,7 @@ class Block {
 	public function markDepth() {
 		var d = depth + 1;
 		var all = subs;
+		if( all == null ) return;
 		while( all.length > 0 ) {
 			var out = [];
 			for( b in all ) {
@@ -194,7 +199,7 @@ class PointerMap<T> {
 	}
 
 	public function get( p : Pointer ) : T {
-		if( p == null ) return null;
+		if( p.isNull() ) return null;
 		var c = lookup.get(p.value.high);
 		if( c == null ) return null;
 		return c.get(p.value.low);
