@@ -30,7 +30,7 @@
     <ProjectGuid>{43AAD9DB-4708-46B6-AAE8-A5DB95A0B573}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>sqlite</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

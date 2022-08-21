@@ -30,7 +30,7 @@
     <ProjectGuid>{12049F27-EA26-4A33-ADF8-E542C4167C00}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>sdl</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

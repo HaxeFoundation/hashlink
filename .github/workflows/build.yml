@@ -41,7 +41,7 @@ jobs:
             msbuild_Configuration: Release
             msbuild_Platform: Win32
             msbuild_PlatformToolset: v142
-            msbuild_WindowsTargetPlatformVersion: 8.1
+            msbuild_WindowsTargetPlatformVersion: 10.0
 
           - target: win64
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
@@ -50,7 +50,7 @@ jobs:
             msbuild_Configuration: Release
             msbuild_Platform: x64
             msbuild_PlatformToolset: v142
-            msbuild_WindowsTargetPlatformVersion: 8.1
+            msbuild_WindowsTargetPlatformVersion: 10.0
 
     steps:
     - name: "SCM Checkout"
@@ -60,19 +60,11 @@ jobs:
       if: startsWith(matrix.target, 'win')
       run: choco install visualstudio2019buildtools visualstudio2019-workload-vctools
 
-    - name: "Install: Windows 8.1 SDK"
-      shell: powershell
-      if: startsWith(matrix.target, 'win')
-      # https://github.com/actions/virtual-environments/issues/842#issuecomment-643382166
-      run: |
-        Invoke-WebRequest -Method Get -Uri https://go.microsoft.com/fwlink/p/?LinkId=323507 -OutFile sdksetup.exe -UseBasicParsing
-        Start-Process -Wait sdksetup.exe -ArgumentList "/q", "/norestart", "/features", "OptionId.WindowsDesktopSoftwareDevelopmentKit", "OptionId.NetFxSoftwareDevelopmentKit"
-
     - name: Add msbuild to PATH
       if: startsWith(matrix.target, 'win')
       uses: microsoft/setup-msbuild@v1.0.3
       with:
-        vs-version: '[15.0,16.0)'
+        vs-version: '[16.0,17.0)'
 
     - name: "Install: Required Dev Packages"
       run: |

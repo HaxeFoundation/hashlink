@@ -2,6 +2,7 @@ parameters:
   name: 'BuildWindows'
   vmImage: ''
   buildSystem: 'cmake' # either 'cmake' or 'vs'
+  architecture: 'x64' # either 'x64' or 'Win32'
   cmakeGenerator: ''
   cmakeConfig: 'RelWithDebInfo'
 
@@ -10,18 +11,13 @@ jobs:
     pool:
       vmImage: ${{ parameters.vmImage }}
     variables:
-      ${{ if endsWith(parameters.cmakeGenerator, 'Win64') }}:
+      ${{ if eq(parameters.architecture, 'x64') }}:
         MARCH: 64
         FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
-      ${{ if not(endsWith(parameters.cmakeGenerator, 'Win64')) }}:
+      ${{ if eq(parameters.architecture, 'Win32') }}:
         MARCH: 32
         FFMPEG_URL: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
     steps:
-      - ${{ if eq(parameters.vmImage, 'windows2019') }}:
-        - powershell: |
-            Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-            Write-Host "##vso[task.prependpath]C:\ProgramData\chocolatey\bin"
-          displayName: Install Chocolatey
       - powershell: |
           Invoke-WebRequest https://www.libsdl.org/release/SDL2-devel-2.0.5-VC.zip -OutFile SDL.zip
           Expand-Archive SDL.zip -DestinationPath .
@@ -55,7 +51,7 @@ jobs:
           haxelib list
         displayName: Install hashlink haxelib
       - ${{ if eq(parameters.buildSystem, 'cmake') }}:
-        - script: cmake . -G "${{ parameters.cmakeGenerator }}"
+        - script: cmake . -G "${{ parameters.cmakeGenerator }}" -A ${{ parameters.architecture }}
           displayName: CMake
         - script: cmake --build . --config ${{ parameters.cmakeConfig }}
           displayName: Build
@@ -66,7 +62,7 @@ jobs:
         - task: PublishPipelineArtifact@1
           inputs:
             artifactName: ${{ parameters.name }}Binaries
-            targetPath: bin/hashlink-1.13.0-win$(MARCH).zip
+            targetPath: bin/hashlink-1.12.0-win$(MARCH).zip
       - ${{ if eq(parameters.buildSystem, 'vs') }}:
         - task: MSBuild@1
           inputs:

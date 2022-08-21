@@ -176,7 +176,7 @@
     <ProjectGuid>{7DDA1414-6675-45C7-8254-42057901F865}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>jpg</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>fmt</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
