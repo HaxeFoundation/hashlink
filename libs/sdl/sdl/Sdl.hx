@@ -208,6 +208,14 @@ class Sdl {
 		return null;
 	}
 
+	public static function getRelativeMouseMode() : Bool {
+		return false;
+	}
+	
+	public static function warpMouseGlobal( x : Int, y : Int ) : Int {
+		return 0;
+	}
+
 	static function detect_keyboard_layout() : hl.Bytes {
 		return null;
 	}
