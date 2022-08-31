@@ -305,7 +305,7 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 	if( fileName )
 		memcpy(outputFile, fileName, 2048);
 	op.lpstrFile = outputFile;
-	op.nMaxFile = 1024;
+	op.nMaxFile = 2048;
 	op.lpstrInitialDir = hl_dyn_getp(options,hl_hash_utf8("directory"),&hlt_bytes);
 	op.lpstrTitle = hl_dyn_getp(options,hl_hash_utf8("title"),&hlt_bytes);
 	op.Flags |= OFN_NOCHANGEDIR;
