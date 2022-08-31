@@ -281,9 +281,11 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 	wref *win = (wref*)hl_dyn_getp(options,hl_hash_utf8("window"), &hlt_abstract);
 	varray *filters = (varray*)hl_dyn_getp(options,hl_hash_utf8("filters"),&hlt_array);
 	wchar_t *fileName = (wchar_t*)hl_dyn_getp(options,hl_hash_utf8("fileName"),&hlt_bytes);
+	bool multiple = hl_dyn_geti(options,hl_hash_utf8("multiple"),&hlt_bool);
+
 	OPENFILENAME op;
-	wchar_t filterStr[1024];
-	wchar_t outputFile[1024] = {0};
+	wchar_t filterStr[2048];
+	wchar_t outputFile[2048] = {0};
 	ZeroMemory(&op, sizeof(op));
 	op.lStructSize = sizeof(op);
 	op.hwndOwner = win ? win->h : NULL;
@@ -301,12 +303,14 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 		op.nFilterIndex = hl_dyn_geti(options,hl_hash_utf8("filterIndex"),&hlt_i32) + 1; // 1 based
 	}
 	if( fileName )
-		memcpy(outputFile, fileName, (wcslen(fileName)+1) * 2 );
+		memcpy(outputFile, fileName, 2048);
 	op.lpstrFile = outputFile;
 	op.nMaxFile = 1024;
 	op.lpstrInitialDir = hl_dyn_getp(options,hl_hash_utf8("directory"),&hlt_bytes);
 	op.lpstrTitle = hl_dyn_getp(options,hl_hash_utf8("title"),&hlt_bytes);
 	op.Flags |= OFN_NOCHANGEDIR;
+	if( multiple )
+		op.Flags |= OFN_ALLOWMULTISELECT | OFN_EXPLORER;
 	if( forSave ) {
 		op.Flags |= OFN_OVERWRITEPROMPT;
 		if( !GetSaveFileName(&op) )
@@ -316,7 +320,7 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 		if( !GetOpenFileName(&op) )
 			return NULL;
 	}
-	return hl_copy_bytes((vbyte*)outputFile, (int)(wcslen(outputFile)+1)*2);
+	return hl_copy_bytes((vbyte*)outputFile, 2048);
 }
 
 HL_PRIM bool HL_NAME(ui_set_clipboard_text)(char* text) {
