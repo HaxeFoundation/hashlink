@@ -509,8 +509,14 @@ static void hl_module_init_natives( hl_module *m ) {
 		p = tmp;
 		append_type(&p,n->t);
 		*p++ = 0;
-		if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
-			hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
+                for(int i = 0, j = 0; i < strlen(sign)+1; i++) {
+                     if (sign[i] == tmp[j]) {
+                          j++;
+                     } else if (sign[i] != ' ') {
+                          hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
+                          break;
+                     }
+                }
 	}
 }
 
