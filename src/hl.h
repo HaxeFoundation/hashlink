@@ -53,7 +53,9 @@
 
 #if defined(linux) || defined(__linux__)
 #	define HL_LINUX
-#	define _GNU_SOURCE
+#	ifndef _GNU_SOURCE
+#		define _GNU_SOURCE
+#	endif
 #endif
 
 #if defined(HL_IOS) || defined(HL_ANDROID) || defined(HL_TVOS)
