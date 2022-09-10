@@ -304,7 +304,7 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 		op.nFilterIndex = hl_dyn_geti(options,hl_hash_utf8("filterIndex"),&hlt_i32) + 1; // 1 based
 	}
 	if( fileName )
-		memcpy(outputFile, fileName, (wcslen(fileName) + 1) * 2);
+		memcpy(outputFile, fileName, (wcslen(fileName)+1) * 2 );
 	op.lpstrFile = outputFile;
 	op.nMaxFile = 1024;
 	op.lpstrInitialDir = hl_dyn_getp(options,hl_hash_utf8("directory"),&hlt_bytes);
@@ -321,7 +321,7 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 		if( !GetOpenFileName(&op) )
 			return NULL;
 	}
-	return hl_copy_bytes((vbyte*)outputFile, 2048);
+	return hl_copy_bytes((vbyte*)outputFile, sizeof(outputFile));
 }
 
 HL_PRIM bool HL_NAME(ui_set_clipboard_text)(char* text) {
