@@ -457,7 +457,7 @@ static LONG CALLBACK global_handler( PEXCEPTION_POINTERS inf ) {
 
 HL_PRIM vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool *isException ) {
 	hl_trap_ctx trap;
-	vdynamic *exc;
+	vdynamic *ret, *exc;
 	*isException = false;
 	hl_trap(trap, exc, on_exception);
 #	if defined(HL_VCC) && !defined(HL_XBO)
@@ -468,11 +468,12 @@ HL_PRIM vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, boo
 		first = false;
 		AddVectoredExceptionHandler(1,global_handler);
 	}
-	return hl_dyn_call(c,args,nargs);
-#	else
-	return hl_dyn_call(c,args,nargs);
 #	endif
+	ret = hl_dyn_call(c,args,nargs);
+	hl_endtrap(trap);
+	return ret;
 on_exception:
+	hl_endtrap(trap);
 	*isException = true;
 	return exc;
 }
