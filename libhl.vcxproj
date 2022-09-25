@@ -130,6 +130,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/wd4054 /wd4456 /wd4702 /wd4100 /wd4457 /wd4820 /wd5045 /wd4242 /wd4244 /wd4389 /wd4701 /wd4706 /wd4711 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -148,6 +149,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/wd4054 /wd4456 /wd4702 /wd4100 /wd4457 /wd4820 /wd5045 /wd4242 /wd4244 /wd4389 /wd4701 /wd4706 /wd4711 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -169,6 +171,7 @@
       <AdditionalOptions>/wd4054 /wd4456 /wd4702 /wd4100 /wd4457 /wd4820 /wd5045 /wd4242 /wd4244 /wd4389 /wd4701 /wd4706 /wd4711 %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -190,6 +193,7 @@
       <AdditionalOptions>/wd4054 /wd4456 /wd4702 /wd4100 /wd4457 /wd4820 /wd5045 /wd4242 /wd4244 /wd4389 /wd4701 /wd4706 /wd4711 %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -211,6 +215,7 @@
       <AdditionalOptions>/wd4054 /wd4456 /wd4702 /wd4100 /wd4457 /wd4820 /wd5045 /wd4242 /wd4244 /wd4389 /wd4701 /wd4706 /wd4711 %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -232,6 +237,7 @@
       <AdditionalOptions>/wd4054 /wd4456 /wd4702 /wd4100 /wd4457 /wd4820 /wd5045 /wd4242 /wd4244 /wd4389 /wd4701 /wd4706 /wd4711 %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

@@ -142,6 +142,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;UV_EXPORTS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;BUILDING_UV_SHARED</PreprocessorDefinitions>
       <AdditionalOptions>/wd4267 /wd4244 /wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -159,6 +160,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;UV_EXPORTS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;BUILDING_UV_SHARED</PreprocessorDefinitions>
       <AdditionalOptions>/wd4267 /wd4244 /wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -178,6 +180,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;UV_EXPORTS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;BUILDING_UV_SHARED</PreprocessorDefinitions>
       <AdditionalOptions>/wd4267 /wd4244 /wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -200,6 +203,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;UV_EXPORTS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;BUILDING_UV_SHARED</PreprocessorDefinitions>
       <AdditionalOptions>/wd4267 /wd4244 /wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -222,6 +226,7 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;UV_EXPORTS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;BUILDING_UV_SHARED</PreprocessorDefinitions>
       <AdditionalOptions>/wd4267 /wd4244 /wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -242,6 +247,7 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;UV_EXPORTS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;BUILDING_UV_SHARED</PreprocessorDefinitions>
       <AdditionalOptions>/wd4267 /wd4244 /wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
