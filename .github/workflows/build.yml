@@ -56,10 +56,6 @@ jobs:
     - name: "SCM Checkout"
       uses: actions/checkout@v2
 
-    - name: "Install: Visual C++ build tools workload for Visual Studio 2019 Build Tools"
-      if: startsWith(matrix.target, 'win')
-      run: choco install visualstudio2019buildtools visualstudio2019-workload-vctools
-
     - name: Add msbuild to PATH
       if: startsWith(matrix.target, 'win')
       uses: microsoft/setup-msbuild@v1.0.3
