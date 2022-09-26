@@ -292,7 +292,7 @@ jobs:
             ;;
           *)
             dist_folder=hashlink-${short_commit}-${platform_name}
-            make PACKAGE_NAME=$dist_folder release
+            make PACKAGE_NAME=$dist_folder MARCH=${{ matrix.architecture }} release
 
             echo "HASHLINK_DISTRIBUTION=$dist_folder.${{ matrix.archive_ext }}" >> $GITHUB_ENV
             ;;
