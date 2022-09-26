@@ -21,6 +21,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        target: [linux-i386, linux-amd64, darwin, win32, win64]
+        build_system: [default, cmake]
+
         include:
           - target: linux-i386
             runner: ubuntu-18.04
@@ -35,6 +38,7 @@ jobs:
             haxe_latest_dist: mac/haxe_latest.tar.gz
 
           - target: win32
+            build_system: default
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
@@ -43,7 +47,16 @@ jobs:
             msbuild_PlatformToolset: v142
             msbuild_WindowsTargetPlatformVersion: 10.0
 
+          - target: win32
+            build_system: cmake
+            runner: windows-2019
+            haxe_latest_dist: windows64/haxe_latest.zip
+            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
+            cmake_arch: Win32
+            cmake_generator: Visual Studio 16 2019
+
           - target: win64
+            build_system: default
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
@@ -51,6 +64,17 @@ jobs:
             msbuild_Platform: x64
             msbuild_PlatformToolset: v142
             msbuild_WindowsTargetPlatformVersion: 10.0
+
+          - target: win64
+            build_system: cmake
+            runner: windows-2019
+            haxe_latest_dist: windows64/haxe_latest.zip
+            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
+            cmake_arch: x64
+            cmake_generator: Visual Studio 16 2019
+
+    env:
+      CMAKE_CONFIG: RelWithDebInfo
 
     steps:
     - name: "SCM Checkout"
@@ -174,20 +198,35 @@ jobs:
       run: |
         set -eux
 
-        case "${{ matrix.target }}" in
-          linux*)
+        case "${{ matrix.target }},${{ matrix.build_system }}" in
+          linux-i386,cmake)
+            cmake . -DCMAKE_BUILD_TYPE=$CMAKE_CONFIG -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake
+            cmake --build . --config $CMAKE_CONFIG
+            ;;
+
+          win*,cmake)
+            cmake . -G "${{ matrix.cmake_generator }}" -A ${{ matrix.cmake_arch }}
+            cmake --build . --config $CMAKE_CONFIG
+            ;;
+
+          *,cmake)
+            cmake . -DCMAKE_BUILD_TYPE=$CMAKE_CONFIG
+            cmake --build . --config $CMAKE_CONFIG
+            ;;
+
+          linux*,default)
             make
             sudo make install
             sudo ldconfig
             ;;
 
-          darwin*)
+          darwin*,default)
             make
             sudo make codesign_osx
             sudo make install
             ;;
 
-          win*)
+          win*,default)
             MSBuild.exe hl.sln //nologo //m //clp:ErrorsOnly \
               //p:Configuration=${{ matrix.msbuild_Configuration }} \
               //p:Platform=${{ matrix.msbuild_Platform }} \
@@ -198,16 +237,18 @@ jobs:
 
         ls -l .
 
-
     - name: "Test"
       run: |
         set -eux
 
-        case "${{ matrix.target }}" in
-          win32)
+        case "${{ matrix.target }},${{ matrix.build_system }}" in
+          *,cmake)
+            ctest --verbose --build-config $CMAKE_CONFIG
+            ;;
+          win32,default)
             ${{ matrix.msbuild_Configuration }}/hl.exe --version
             ;;
-          win64)
+          win64,default)
             x64/${{ matrix.msbuild_Configuration }}/hl.exe --version
             ;;
           *)
@@ -226,7 +267,27 @@ jobs:
         esac
 
 
+    - name: "Package CMake"
+      if: startsWith(matrix.build_system, 'cmake')
+      run: |
+        set -eux
+        cmake --build . --config $CMAKE_CONFIG --target package
+
+        case "${{ matrix.target }}" in
+          win*)
+            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-${{ matrix.target }}.zip" >> $GITHUB_ENV
+            ;;
+          darwin*)
+            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-Darwin.tar.gz" >> $GITHUB_ENV
+            ;;
+          linux*)
+            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-Linux.tar.gz" >> $GITHUB_ENV
+            ;;
+        esac
+
+
     - name: "Package"
+      if: startsWith(matrix.build_system, 'default')
       run: |
         set -eux
 
