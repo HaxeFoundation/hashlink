@@ -208,6 +208,7 @@ jobs:
             esac
 
             cmake --build . --config ${{ matrix.cmake_configuration }}
+            BUILD_FOLDER=bin
             ;;
 
           vs2019)
@@ -231,11 +232,12 @@ jobs:
             if [[ ${{ matrix.target }} == linux ]]; then
               sudo ldconfig
             fi
+            BUILD_FOLDER=.
             ;;
 
         esac
 
-        ls -l .
+        ls -l $BUILD_FOLDER
 
     - name: "Test"
       run: |
