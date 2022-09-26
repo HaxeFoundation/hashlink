@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         target: [linux-i386, linux-amd64, darwin, win32, win64]
-        build_system: [default, cmake]
+        build_system: [make, cmake, vs2019]
 
         include:
           - target: linux-i386
@@ -38,7 +38,7 @@ jobs:
             haxe_latest_dist: mac/haxe_latest.tar.gz
 
           - target: win32
-            build_system: default
+            build_system: vs2019
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
@@ -56,7 +56,7 @@ jobs:
             cmake_generator: Visual Studio 16 2019
 
           - target: win64
-            build_system: default
+            build_system: vs2019
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
@@ -73,6 +73,22 @@ jobs:
             cmake_arch: x64
             cmake_generator: Visual Studio 16 2019
 
+        exclude:
+          - target: linux-i386
+            build_system: vs2019
+
+          - target: linux-amd64
+            build_system: vs2019
+
+          - target: darwin
+            build_system: vs2019
+
+          - target: win32
+            build_system: make
+
+          - target: win64
+            build_system: make
+
     env:
       CMAKE_CONFIG: RelWithDebInfo
 
@@ -81,7 +97,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Add msbuild to PATH
-      if: startsWith(matrix.target, 'win')
+      if: matrix.build_system == 'vs2019'
       uses: microsoft/setup-msbuild@v1.0.3
       with:
         vs-version: '[16.0,17.0)'
@@ -214,19 +230,19 @@ jobs:
             cmake --build . --config $CMAKE_CONFIG
             ;;
 
-          linux*,default)
+          linux*,make)
             make
             sudo make install
             sudo ldconfig
             ;;
 
-          darwin*,default)
+          darwin*,make)
             make
             sudo make codesign_osx
             sudo make install
             ;;
 
-          win*,default)
+          win*,vs2019)
             MSBuild.exe hl.sln //nologo //m //clp:ErrorsOnly \
               //p:Configuration=${{ matrix.msbuild_Configuration }} \
               //p:Platform=${{ matrix.msbuild_Platform }} \
@@ -245,10 +261,10 @@ jobs:
           *,cmake)
             ctest --verbose --build-config $CMAKE_CONFIG
             ;;
-          win32,default)
+          win32,vs2019)
             ${{ matrix.msbuild_Configuration }}/hl.exe --version
             ;;
-          win64,default)
+          win64,vs2019)
             x64/${{ matrix.msbuild_Configuration }}/hl.exe --version
             ;;
           *)
