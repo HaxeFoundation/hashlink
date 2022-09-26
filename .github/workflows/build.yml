@@ -21,15 +21,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [linux-i386, linux-amd64, darwin, win32, win64]
+        target: [linux, darwin, windows]
+        architecture: [32, 64]
         build_system: [make, cmake, vs2019]
 
         include:
-          - target: linux-i386
-            runner: ubuntu-18.04
-            haxe_latest_dist: linux64/haxe_latest.tar.gz
-
-          - target: linux-amd64
+          - target: linux
             runner: ubuntu-18.04
             haxe_latest_dist: linux64/haxe_latest.tar.gz
 
@@ -37,60 +34,42 @@ jobs:
             runner: macos-10.15
             haxe_latest_dist: mac/haxe_latest.tar.gz
 
-          - target: win32
-            build_system: vs2019
+          - build_system: cmake
+            cmake_configuration: RelWithDebInfo
+
+          - build_system: vs2019
+            msbuild_configuration: Release
+
+          - target: windows
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_latest_dist: windows64/haxe_latest.zip
-            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
-            msbuild_Configuration: Release
-            msbuild_Platform: Win32
-            msbuild_PlatformToolset: v142
-            msbuild_WindowsTargetPlatformVersion: 10.0
 
-          - target: win32
+          - target: windows
             build_system: cmake
-            runner: windows-2019
-            haxe_latest_dist: windows64/haxe_latest.zip
-            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
-            cmake_arch: Win32
             cmake_generator: Visual Studio 16 2019
 
-          - target: win64
-            build_system: vs2019
-            runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
-            haxe_latest_dist: windows64/haxe_latest.zip
-            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
-            msbuild_Configuration: Release
-            msbuild_Platform: x64
-            msbuild_PlatformToolset: v142
-            msbuild_WindowsTargetPlatformVersion: 10.0
+          - target: windows
+            architecture: 32
+            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
+            architecture_string: Win32
 
-          - target: win64
-            build_system: cmake
-            runner: windows-2019
-            haxe_latest_dist: windows64/haxe_latest.zip
+          - target: windows
+            architecture: 64
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
-            cmake_arch: x64
-            cmake_generator: Visual Studio 16 2019
+            architecture_string: x64
 
         exclude:
-          - target: linux-i386
-            build_system: vs2019
-
-          - target: linux-amd64
+          - target: linux
             build_system: vs2019
 
           - target: darwin
             build_system: vs2019
 
-          - target: win32
-            build_system: make
+          - target: darwin
+            architecture: 32
 
-          - target: win64
+          - target: windows
             build_system: make
-
-    env:
-      CMAKE_CONFIG: RelWithDebInfo
 
     steps:
     - name: "SCM Checkout"
@@ -106,8 +85,8 @@ jobs:
       run: |
         set -eux
 
-        case "${{ matrix.target }}" in
-          linux-i386)
+        case "${{ matrix.target }}${{ matrix.architecture }}" in
+          linux32)
             echo "MARCH=32" >> $GITHUB_ENV
             sudo dpkg --add-architecture i386
             sudo apt-get update -y
@@ -126,7 +105,7 @@ jobs:
               libsqlite3-dev:i386
             ;;
 
-          linux-amd64)
+          linux64)
             echo "MARCH=64" >> $GITHUB_ENV
             sudo apt-get update -y
             sudo apt-get install --no-install-recommends -y \
@@ -145,7 +124,7 @@ jobs:
             brew bundle
             ;;
 
-          win*)
+          windows*)
             curl -fsSL --retry 3 --retry-delay 5 -o /tmp/sdl.zip https://www.libsdl.org/release/SDL2-devel-2.0.5-VC.zip
             curl -fsSL --retry 3 --retry-delay 5 -o /tmp/openal.zip https://openal-soft.org/openal-binaries/openal-soft-1.17.2-bin.zip
             curl -fsSL --retry 3 --retry-delay 5 -o /tmp/ffmpeg.zip ${{ matrix.ffmpeg_url }}
@@ -161,15 +140,15 @@ jobs:
         set -eux
 
         case "${{ matrix.target }}" in
-          linux*)
+          linux)
             sudo apt-get install --no-install-recommends -y neko
             ;;
 
-          darwin*)
+          darwin)
             brew install neko
             ;;
 
-          win*)
+          windows)
             choco install --no-progress neko -y
             nekopath=$(find C:/ProgramData/chocolatey/lib/neko -name neko.dll -printf '%h\n')
             echo "NEKOPATH=$nekopath" >> $GITHUB_ENV
@@ -184,7 +163,7 @@ jobs:
 
         download_url="https://build.haxe.org/builds/haxe/${{ matrix.haxe_latest_dist }}"
         echo "Downloading [$download_url]..."
-        if [[ ${{ matrix.target }} == win* ]]; then
+        if [[ ${{ matrix.target }} == windows ]]; then
           curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.zip
           7z x /tmp/haxe.zip -o/tmp
           mv -v /tmp/haxe_* /tmp/haxe
@@ -214,41 +193,46 @@ jobs:
       run: |
         set -eux
 
-        case "${{ matrix.target }},${{ matrix.build_system }}" in
-          linux-i386,cmake)
-            cmake . -DCMAKE_BUILD_TYPE=$CMAKE_CONFIG -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake
-            cmake --build . --config $CMAKE_CONFIG
+        case "${{ matrix.build_system }}" in
+          cmake)
+            case "${{ matrix.target }}${{ matrix.architecture }}" in
+              linux32)
+                cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake ;;
+              windows*)
+                cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+                  -G "${{ matrix.cmake_generator }}" \
+                  -A ${{ matrix.architecture_string }}
+                ;;
+              *)
+                cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
+            esac
+
+            cmake --build . --config ${{ matrix.cmake_configuration }}
             ;;
 
-          win*,cmake)
-            cmake . -G "${{ matrix.cmake_generator }}" -A ${{ matrix.cmake_arch }}
-            cmake --build . --config $CMAKE_CONFIG
-            ;;
-
-          *,cmake)
-            cmake . -DCMAKE_BUILD_TYPE=$CMAKE_CONFIG
-            cmake --build . --config $CMAKE_CONFIG
-            ;;
-
-          linux*,make)
-            make
-            sudo make install
-            sudo ldconfig
-            ;;
-
-          darwin*,make)
-            make
-            sudo make codesign_osx
-            sudo make install
-            ;;
-
-          win*,vs2019)
+          vs2019)
             MSBuild.exe hl.sln //nologo //m //clp:ErrorsOnly \
-              //p:Configuration=${{ matrix.msbuild_Configuration }} \
-              //p:Platform=${{ matrix.msbuild_Platform }} \
-              //p:PlatformToolset=${{ matrix.msbuild_PlatformToolset }} \
-              //p:WindowsTargetPlatformVersion=${{ matrix.msbuild_WindowsTargetPlatformVersion }}
+              //p:Configuration=${{ matrix.msbuild_configuration }} \
+              //p:Platform=${{ matrix.architecture_string }}
+
+            case "${{ matrix.architecture }}" in
+              64) BUILD_FOLDER=x64/${{ matrix.msbuild_configuration }} ;;
+              32) BUILD_FOLDER=${{ matrix.msbuild_configuration }} ;;
+            esac
+            echo "WINDOWS_BUILD_FOLDER=$BUILD_FOLDER" >> $GITHUB_ENV
             ;;
+
+          make)
+            make
+            if [[ ${{ matrix.target }} == darwin ]]; then
+              sudo make codesign_osx
+            fi
+            sudo make install
+            if [[ ${{ matrix.target }} == linux ]]; then
+              sudo ldconfig
+            fi
+            ;;
+
         esac
 
         ls -l .
@@ -257,21 +241,18 @@ jobs:
       run: |
         set -eux
 
-        case "${{ matrix.target }},${{ matrix.build_system }}" in
-          *,cmake)
-            ctest --verbose --build-config $CMAKE_CONFIG
+        case "${{ matrix.build_system }}" in
+          cmake)
+            ctest --verbose --build-config ${{ matrix.cmake_configuration }}
             ;;
-          win32,vs2019)
-            ${{ matrix.msbuild_Configuration }}/hl.exe --version
+          vs2019)
+            ${{ env.WINDOWS_BUILD_FOLDER }}/hl.exe --version
             ;;
-          win64,vs2019)
-            x64/${{ matrix.msbuild_Configuration }}/hl.exe --version
-            ;;
-          *)
+          make)
             ./hl --version
             case ${{ matrix.target }} in
-              linux*)  ldd -v ./hl ;;
-              darwin*) otool -L ./hl ;;
+              linux)  ldd -v ./hl ;;
+              darwin) otool -L ./hl ;;
             esac
 
             haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
@@ -280,6 +261,7 @@ jobs:
             haxe -hl src/_main.c -cp other/tests -main HelloWorld
             make hlc
             ./hlc
+            ;;
         esac
 
 
@@ -287,18 +269,15 @@ jobs:
       if: startsWith(matrix.build_system, 'cmake')
       run: |
         set -eux
-        cmake --build . --config $CMAKE_CONFIG --target package
+        cmake --build . --config ${{ matrix.cmake_configuration }} --target package
 
         case "${{ matrix.target }}" in
-          win*)
-            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-${{ matrix.target }}.zip" >> $GITHUB_ENV
-            ;;
-          darwin*)
-            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-Darwin.tar.gz" >> $GITHUB_ENV
-            ;;
-          linux*)
-            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-Linux.tar.gz" >> $GITHUB_ENV
-            ;;
+          windows)
+            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-win${{ matrix.architecture }}.zip" >> $GITHUB_ENV ;;
+          darwin)
+            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-Darwin.tar.gz" >> $GITHUB_ENV ;;
+          linux)
+            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-Linux.tar.gz" >> $GITHUB_ENV ;;
         esac
 
 
@@ -318,46 +297,38 @@ jobs:
         cp src/hlc_main.c $dist_folder/include
 
         case "${{ matrix.target }}" in
-          linux*)
-            cp hl $dist_folder/
-            cp *.{hdll,so} $dist_folder/
-            ;;
-
-          darwin*)
-            cp hl $dist_folder/
-            cp *.{hdll,dylib} $dist_folder/
-            ;;
-
-          win32)
-            cp ${{ matrix.msbuild_Configuration }}/*.{dll,exe,lib,hdll} $dist_folder/
+          windows)
+            cp ${{ env.WINDOWS_BUILD_FOLDER }}/*.{dll,exe,lib,hdll} $dist_folder/
             cp /c/Windows/System32/msvcr120.dll $dist_folder/
-            cp include/openal/bin/Win32/soft_oal.dll $dist_folder/OpenAL32.dll
-            cp include/sdl/lib/x86/SDL2.dll $dist_folder/
-            ;;
 
-          win64)
-            cp x64/${{ matrix.msbuild_Configuration }}/*.{dll,exe,lib,hdll} $dist_folder/
-            cp /c/Windows/System32/msvcr120.dll $dist_folder/
-            cp include/openal/bin/Win64/soft_oal.dll $dist_folder/OpenAL32.dll
-            cp include/sdl/lib/x64/SDL2.dll $dist_folder/
-            ;;
-        esac
+            if [[ ${{ matrix.architecture }} == 64 ]]; then
+              cp include/openal/bin/Win32/soft_oal.dll $dist_folder/OpenAL32.dll
+              cp include/sdl/lib/x86/SDL2.dll $dist_folder/
+            else
+              cp include/openal/bin/Win64/soft_oal.dll $dist_folder/OpenAL32.dll
+              cp include/sdl/lib/x64/SDL2.dll $dist_folder/
+            fi
 
-        #
-        # Create the tar.gz/zip
-        #
-        case "${{ matrix.target }}" in
-          win*)
             # 7z switches: https://sevenzip.osdn.jp/chm/cmdline/switches/
-            7z a -spf -y -mx9 -bt hashlink-latest-${{ matrix.target }}.zip $dist_folder
-            echo "HASHLINK_DISTRIBUTION=hashlink-latest-${{ matrix.target }}.zip" >> $GITHUB_ENV
+            7z a -spf -y -mx9 -bt hashlink-latest.zip $dist_folder
+            echo "HASHLINK_DISTRIBUTION=hashlink-latest.zip" >> $GITHUB_ENV
             ;;
 
           *)
-            tar cvfz hashlink-latest-${{ matrix.target }}.tar.gz $dist_folder
-            echo "HASHLINK_DISTRIBUTION=hashlink-latest-${{ matrix.target }}.tar.gz" >> $GITHUB_ENV
+            case "${{ matrix.target }}" in
+              linux) LIB_EXT=so ;;
+              darwin) LIB_EXT=dylib ;;
+            esac
+
+            cp hl $dist_folder/
+            cp *.{hdll,$LIB_EXT} $dist_folder/
+
+            tar cvfz hashlink-latest.tar.gz $dist_folder
+            echo "HASHLINK_DISTRIBUTION=hashlink-latest.tar.gz" >> $GITHUB_ENV
+
             ;;
         esac
+
 
     - name: "Share: build artifact"
       uses: actions/upload-artifact@v2
