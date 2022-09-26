@@ -270,67 +270,32 @@ jobs:
         esac
 
 
-    - name: "Package CMake"
-      if: startsWith(matrix.build_system, 'cmake')
+    - name: "Package"
       run: |
         set -eux
-        cmake --build . --config ${{ matrix.cmake_configuration }} --target package
 
-        case "${{ matrix.target }}" in
-          windows)
-            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-win${{ matrix.architecture }}.zip" >> $GITHUB_ENV ;;
-          darwin)
-            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-Darwin.tar.gz" >> $GITHUB_ENV ;;
-          linux)
-            echo "HASHLINK_DISTRIBUTION=bin/hashlink-1.12.0-Linux.tar.gz" >> $GITHUB_ENV ;;
+        case "${{ matrix.target }}${{matrix.architecture}}" in
+          darwin*)   platform_name=darwin ;;
+          windows*)  platform_name=win${{matrix.architecture}} ;;
+          linux32)   platform_name=linux-i386 ;;
+          linux64)   platform_name=linux-amd64 ;;
         esac
 
+        short_commit=$(git rev-parse --short HEAD)
 
-    - name: "Package"
-      if: startsWith(matrix.build_system, 'default')
-      run: |
-        set -eux
+        case "${{ matrix.build_system }}" in
+          cmake)
+            dist_folder=hashlink-${short_commit}-${platform_name}-cmake
+            cmake --build . --config ${{ matrix.cmake_configuration }} --target package \
+              -Dpackage_archive_name=$dist_folder
 
-        dist_folder=hashlink-$(git rev-parse --short $GITHUB_SHA)-${{ matrix.target }}
-
-        #
-        # Collect files for the distribution
-        #
-        mkdir -p $dist_folder/include
-        cp src/hl.h $dist_folder/include
-        cp src/hlc.h $dist_folder/include
-        cp src/hlc_main.c $dist_folder/include
-
-        case "${{ matrix.target }}" in
-          windows)
-            cp ${{ env.WINDOWS_BUILD_FOLDER }}/*.{dll,exe,lib,hdll} $dist_folder/
-            cp /c/Windows/System32/msvcr120.dll $dist_folder/
-
-            if [[ ${{ matrix.architecture }} == 64 ]]; then
-              cp include/openal/bin/Win32/soft_oal.dll $dist_folder/OpenAL32.dll
-              cp include/sdl/lib/x86/SDL2.dll $dist_folder/
-            else
-              cp include/openal/bin/Win64/soft_oal.dll $dist_folder/OpenAL32.dll
-              cp include/sdl/lib/x64/SDL2.dll $dist_folder/
-            fi
-
-            # 7z switches: https://sevenzip.osdn.jp/chm/cmdline/switches/
-            7z a -spf -y -mx9 -bt hashlink-latest.zip $dist_folder
-            echo "HASHLINK_DISTRIBUTION=hashlink-latest.zip" >> $GITHUB_ENV
+            echo "HASHLINK_DISTRIBUTION=bin/$dist_folder.${{ matrix.archive_ext }}" >> $GITHUB_ENV
             ;;
-
           *)
-            case "${{ matrix.target }}" in
-              linux) LIB_EXT=so ;;
-              darwin) LIB_EXT=dylib ;;
-            esac
+            dist_folder=hashlink-${short_commit}-${platform_name}
+            make PACKAGE_NAME=$dist_folder release
 
-            cp hl $dist_folder/
-            cp *.{hdll,$LIB_EXT} $dist_folder/
-
-            tar cvfz hashlink-latest.tar.gz $dist_folder
-            echo "HASHLINK_DISTRIBUTION=hashlink-latest.tar.gz" >> $GITHUB_ENV
-
+            echo "HASHLINK_DISTRIBUTION=$dist_folder.${{ matrix.archive_ext }}" >> $GITHUB_ENV
             ;;
         esac
 

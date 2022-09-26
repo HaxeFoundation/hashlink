@@ -63,9 +63,18 @@ ifeq ($(OS),Windows_NT)
 LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
 RELEASE_NAME=win
+# VS variables are for packaging Visual Studio builds
+VS_RUNTIME_LIBRARY ?= c:/windows/system32/vcruntime140.dll
 
 ifeq ($(MARCH),32)
 CC=i686-pc-cygwin-gcc
+BUILD_DIR = Release
+VS_SDL_LIBRARY ?= include/sdl/lib/x86/SDL2.dll
+VS_OPENAL_LIBRARY ?= include/openal/bin/Win32/soft_oal.dll
+else
+BUILD_DIR = x64/Release
+VS_SDL_LIBRARY ?= include/sdl/lib/x64/SDL2.dll
+VS_OPENAL_LIBRARY ?= include/openal/bin/Win64/soft_oal.dll
 endif
 
 else ifeq ($(UNAME),Darwin)
@@ -184,14 +193,7 @@ sqlite: ${SQLITE} libhl
 mesa:
 	(cd libs/mesa && make)
 
-release: release_version release_$(RELEASE_NAME)
-
-release_version:
-	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))
-	rm -rf hl-$(HL_VER)
-	mkdir hl-$(HL_VER)
-	mkdir hl-$(HL_VER)/include
-	cp src/hl.h src/hlc* hl-$(HL_VER)/include
+release: release_prepare release_$(RELEASE_NAME)
 
 release_haxelib:
 	make HLIB=directx release_haxelib_package
@@ -212,23 +214,27 @@ release_haxelib_package:
 	haxelib submit $(HLIB).zip
 	rm -rf $(HLIB)_release
 
+BUILD_DIR ?= .
+PACKAGE_NAME := hashlink-$(shell $(BUILD_DIR)/hl --version)-$(RELEASE_NAME)
+
+release_prepare:
+	rm -rf $(PACKAGE_NAME)
+	mkdir $(PACKAGE_NAME)
+	mkdir $(PACKAGE_NAME)/include
+	cp src/hl.h src/hlc* $(PACKAGE_NAME)/include
+
 release_win:
-	(cd x64/Release && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
-	cp c:/windows/system32/vcruntime140.dll hl-$(HL_VER)
-	cp `which SDL2.dll` hl-$(HL_VER)
-	cp `which OpenAL32.dll` hl-$(HL_VER)
-	zip -r hl-$(HL_VER).zip hl-$(HL_VER)
-	rm -rf hl-$(HL_VER)
+	cp $(BUILD_DIR)/{hl.exe,libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
+	cp $(VS_RUNTIME_LIBRARY) $(PACKAGE_NAME)
+	cp $(VS_SDL_LIBRARY) $(PACKAGE_NAME)
+	cp $(VS_OPENAL_LIBRARY) $(PACKAGE_NAME)/OpenAL32.dll
+	zip -r $(PACKAGE_NAME).zip $(PACKAGE_NAME)
+	rm -rf $(PACKAGE_NAME)
 
-release_linux:
-	cp hl libhl.so *.hdll hl-$(HL_VER)
-	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
-	rm -rf hl-$(HL_VER)
-
-release_osx:
-	cp hl libhl.dylib *.hdll hl-$(HL_VER)
-	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
-	rm -rf hl-$(HL_VER)
+release_linux release_osx:
+	cp hl libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
+	tar -cvzf $(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
+	rm -rf $(PACKAGE_NAME)
 
 codesign_osx:
 	sudo security delete-identity -c hl-cert || echo
