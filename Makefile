@@ -228,7 +228,8 @@ release_win:
 	cp $(VS_RUNTIME_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_SDL_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_OPENAL_LIBRARY) $(PACKAGE_NAME)/OpenAL32.dll
-	zip -r $(PACKAGE_NAME).zip $(PACKAGE_NAME)
+	# 7z switches: https://sevenzip.osdn.jp/chm/cmdline/switches/
+	7z a -spf -y -mx9 -bt $(PACKAGE_NAME).zip $(PACKAGE_NAME)
 	rm -rf $(PACKAGE_NAME)
 
 release_linux release_osx:
