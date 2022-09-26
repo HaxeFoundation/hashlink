@@ -286,8 +286,7 @@ jobs:
         case "${{ matrix.build_system }}" in
           cmake)
             dist_folder=hashlink-${short_commit}-${platform_name}-cmake
-            cmake --build . --config ${{ matrix.cmake_configuration }} --target package \
-              -Dpackage_archive_name=$dist_folder
+            cpack -D CPACK_PACKAGE_FILE_NAME=$dist_folder -C ${{ matrix.cmake_configuration }}
 
             echo "HASHLINK_DISTRIBUTION=bin/$dist_folder.${{ matrix.archive_ext }}" >> $GITHUB_ENV
             ;;
