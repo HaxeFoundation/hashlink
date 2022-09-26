@@ -221,7 +221,7 @@ release_prepare:
 	rm -rf $(PACKAGE_NAME)
 	mkdir $(PACKAGE_NAME)
 	mkdir $(PACKAGE_NAME)/include
-	cp src/hl.h src/hlc* $(PACKAGE_NAME)/include
+	cp src/hl.h src/hlc.h src/hlc_main.c $(PACKAGE_NAME)/include
 
 release_win:
 	cp $(BUILD_DIR)/{hl.exe,libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
