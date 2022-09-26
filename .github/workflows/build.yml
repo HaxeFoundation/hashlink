@@ -28,11 +28,13 @@ jobs:
         include:
           - target: linux
             runner: ubuntu-18.04
-            haxe_latest_dist: linux64/haxe_latest.tar.gz
+            haxe_nightly_dir: linux64
+            archive_ext: tar.gz
 
           - target: darwin
             runner: macos-10.15
-            haxe_latest_dist: mac/haxe_latest.tar.gz
+            haxe_nightly_dir: mac
+            archive_ext: tar.gz
 
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
@@ -42,7 +44,8 @@ jobs:
 
           - target: windows
             runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
-            haxe_latest_dist: windows64/haxe_latest.zip
+            haxe_nightly_dir: windows64
+            archive_ext: zip
 
           - target: windows
             build_system: cmake
@@ -161,7 +164,7 @@ jobs:
       run: |
         set -eux
 
-        download_url="https://build.haxe.org/builds/haxe/${{ matrix.haxe_latest_dist }}"
+        download_url="https://build.haxe.org/builds/haxe/${{ matrix.haxe_nightly_dir }}/haxe_latest.${{ matrix.archive_ext }}"
         echo "Downloading [$download_url]..."
         if [[ ${{ matrix.target }} == windows ]]; then
           curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.zip
