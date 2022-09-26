@@ -360,10 +360,3 @@ jobs:
           "artifact/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "artifact/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
           "artifact/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"
-
-    - name: "Delete intermediate build artifacts"
-      uses: geekyeggo/delete-artifact@1-glob-support # https://github.com/GeekyEggo/delete-artifact/
-      with:
-        name: "*"
-        useGlob: true
-        failOnError: false
