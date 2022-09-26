@@ -133,7 +133,7 @@ endif
 all: libhl hl libs
 
 install:
-	$(UNAME)==Darwin && make uninstall
+	$(UNAME)==Darwin && ${MAKE} uninstall
 	mkdir -p $(INSTALL_BIN_DIR)
 	cp hl $(INSTALL_BIN_DIR)
 	mkdir -p $(INSTALL_LIB_DIR)
@@ -191,14 +191,14 @@ sqlite: ${SQLITE} libhl
 	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L. -lhl -lsqlite3
 
 mesa:
-	(cd libs/mesa && make)
+	(cd libs/mesa && ${MAKE})
 
 release: release_prepare release_$(RELEASE_NAME)
 
 release_haxelib:
-	make HLIB=directx release_haxelib_package
-	make HLIB=sdl release_haxelib_package
-	make HLIB=openal release_haxelib_package
+	${MAKE} HLIB=directx release_haxelib_package
+	${MAKE} HLIB=sdl release_haxelib_package
+	${MAKE} HLIB=openal release_haxelib_package
 
 ifeq ($(HLIB),directx)
 HLPACK=dx
