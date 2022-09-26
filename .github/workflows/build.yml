@@ -317,7 +317,6 @@ jobs:
     steps:
 
     - name: "SCM Checkout"
-      # only required by "hub release create" to prevent "fatal: Not a git repository"
       uses: actions/checkout@v2
 
     - name: "Get: all build artifacts"
@@ -330,7 +329,7 @@ jobs:
         api_base_url="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
 
         # delete 'latest' github release
-        release_id=$(curl -fsL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/$GITHUB_REPOSITORY/releases | jq -r '.[] | select(.name == "latest") | .id')
+        release_id=$(curl -fsL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/$GITHUB_REPOSITORY/releases | jq -r '.[] | select(.tag_name == "latest") | .id')
         if [[ -n $release_id ]]; then
            echo "Deleting release [$api_base_url/releases/$release_id]..."
            curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -fsSL -X DELETE "$api_base_url/releases/$release_id"
@@ -350,14 +349,17 @@ jobs:
         set -eux
 
         # https://hub.github.com/hub-release.1.html
-        hub release create "latest" \
+
+        short_commit=$(git rev-parse --short HEAD)
+
+        gh release create latest \
           --prerelease \
-          --message "latest" \
-          --attach "artifact/hashlink-latest-darwin.tar.gz" \
-          --attach "artifact/hashlink-latest-linux-amd64.tar.gz" \
-          --attach "artifact/hashlink-latest-win32.zip" \
-          --attach "artifact/hashlink-latest-win64.zip" \
-          --attach "artifact/hashlink-latest-linux-i386.tar.gz"
+          --title "HashLink Nightly Build" \
+          "artifact/hashlink-${short_commit}-darwin.tar.gz#hashlink-latest-darwin.tar.gz" \
+          "artifact/hashlink-${short_commit}-linux-i386.tar.gz#hashlink-latest-linux-i386.tar.gz" \
+          "artifact/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
+          "artifact/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
+          "artifact/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"
 
     - name: "Delete intermediate build artifacts"
       uses: geekyeggo/delete-artifact@1-glob-support # https://github.com/GeekyEggo/delete-artifact/
