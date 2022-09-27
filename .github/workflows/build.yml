@@ -76,7 +76,7 @@ jobs:
 
     steps:
     - name: "SCM Checkout"
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Add msbuild to PATH
       if: matrix.build_system == 'vs2019'
@@ -317,7 +317,7 @@ jobs:
     steps:
 
     - name: "SCM Checkout"
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: "Get: all build artifacts"
       uses: actions/download-artifact@v2
