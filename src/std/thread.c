@@ -67,6 +67,7 @@ struct _hl_condition {
 struct _hl_tls {
 	void (*free)( hl_tls * );
 	DWORD tid;
+	bool gc;
 };
 
 #else
@@ -106,6 +107,7 @@ struct _hl_condition {
 struct _hl_tls {
 	void (*free)( hl_tls * );
 	pthread_key_t key;
+	bool gc;
 };
 
 #endif
@@ -432,6 +434,23 @@ DEFINE_PRIM(_VOID, condition_broadcast, _CONDITION)
 
 // ----------------- THREAD LOCAL
 
+#if defined(HL_THREADS)
+static void **_tls_get( hl_tls *t ) {
+#	ifdef HL_WIN
+	return (void**)TlsGetValue(t->tid);
+#	else
+	return (void**)pthread_getspecific(t->key);
+#	endif
+}
+static void _tls_set( hl_tls *t, void *store ) {
+#	ifdef HL_WIN
+	TlsSetValue(t->tid, store);
+#	else
+	pthread_setspecific(t->key, store);
+#	endif
+}
+#endif
+
 HL_PRIM hl_tls *hl_tls_alloc( bool gc_value ) {
 #	if !defined(HL_THREADS)
 	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
@@ -442,11 +461,13 @@ HL_PRIM hl_tls *hl_tls_alloc( bool gc_value ) {
 	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
 	l->free = hl_tls_free;
 	l->tid = TlsAlloc();
+	l->gc = gc_value;
 	TlsSetValue(l->tid,NULL);
 	return l;
 #	else
 	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
 	l->free = hl_tls_free;
+	l->gc = gc_value;
 	pthread_key_create(&l->key,NULL);
 	return l;
 #	endif
@@ -471,20 +492,36 @@ HL_PRIM void hl_tls_free( hl_tls *l ) {
 HL_PRIM void hl_tls_set( hl_tls *l, void *v ) {
 #	if !defined(HL_THREADS)
 	l->value = v;
-#	elif defined(HL_WIN)
-	TlsSetValue(l->tid,v);
 #	else
-	pthread_setspecific(l->key,v);
+	if( l->gc ) {
+		void **store = _tls_get(l);
+		if( !store) {
+			if( !v )
+				return;
+			store = (void**)malloc(sizeof(void*));
+			hl_add_root(store);
+			_tls_set(l, store);
+		} else {
+			if( !v ) {
+				free(store);
+				hl_remove_root(store);
+				_tls_set(l, NULL);
+				return;
+			}
+		}
+		*store = v;
+	} else
+		_tls_set(l, v);
 #	endif
 }
 
 HL_PRIM void *hl_tls_get( hl_tls *l ) {
 #	if !defined(HL_THREADS)
 	return l->value;
-#	elif defined(HL_WIN)
-	return (void*)TlsGetValue(l->tid);
 #	else
-	return pthread_getspecific(l->key);
+	void **store = _tls_get(l);
+	if( !l->gc ) return store;
+	return store ? *store : NULL;
 #	endif
 }
 
