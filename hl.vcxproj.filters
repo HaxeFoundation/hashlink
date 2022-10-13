@@ -13,4 +13,36 @@
     <ClInclude Include="src\opcodes.h" />
     <ClInclude Include="src\hl.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="StoreLogo.png">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="SmallLogo.png">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="SplashScreen.png">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="GraphicsLogo.png">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="LargeLogo.png">
+      <Filter>Resources</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{85cdbe51-d27e-4417-bd78-85c9fbc4c53b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <MGCCompile Include="MicrosoftGame.Config">
+      <Filter>Resources</Filter>
+    </MGCCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\d4x\tools\build\Output_xbl\hlboot.dat">
+      <Filter>Resources</Filter>
+    </None>
+  </ItemGroup>
 </Project>
