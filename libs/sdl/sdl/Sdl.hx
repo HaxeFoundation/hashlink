@@ -193,12 +193,6 @@ class Sdl {
 		return null;
 	}
 
-
-	@:hlNative("?sdl", "get_desktop_display_mode")
-	static function get_desktop_display_mode(displayId : Int) : Dynamic {
-		return null;
-	}
-
 	@:hlNative("?sdl", "get_displays")
 	static function get_displays() : hl.NativeArray<Dynamic> {
 		return null;
