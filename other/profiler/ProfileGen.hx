@@ -58,6 +58,7 @@ class Thread {
 	public var tid : Int;
 	public var curFrame : Frame;
 	public var frames : Array<Frame>;
+	public var name : String;
 
 	public function new(tid) {
 		this.tid = tid;
@@ -137,6 +138,7 @@ class ProfileGen {
 		var fileMaps : Array<Map<Int,StackElement>> = [];
 		while( true ) {
 			var time = try f.readDouble() catch( e : haxe.io.Eof ) break;
+			if( time == -1 ) break;
 			var tid = f.readInt32();
 			if( tcur == null || tid != tcur.tid ) {
 				tcur = hthreads.get(tid);
@@ -203,16 +205,28 @@ class ProfileGen {
 			}
 		}
 
+		for( t in threads )
+			t.name = "Thread "+t.tid;
+		threads[0].name = "Main";
+
+		var namesCount = try f.readInt32() catch( e : haxe.io.Eof ) 0;
+		for( i in 0...namesCount ) {
+			var tid = f.readInt32();
+			var tname = f.readString(f.readInt32());
+			var t = hthreads.get(tid);
+			t.name = tname;
+		}
+
 		var mainTid = threads[0].tid;
-		var json : Array<Dynamic> = [
+		var json : Array<Dynamic> = [for( t in threads )
 			{
     			pid : 0,
-    			tid : mainTid,
+    			tid : t.tid,
  	 			ts : 0,
 				ph : "M",
 				cat : "__metadata",
 				name : "thread_name",
-				args : { name : "CrBrowserMain" }
+				args : { name : t.name }
 			}
 		];
 

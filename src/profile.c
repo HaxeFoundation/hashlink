@@ -55,6 +55,7 @@ struct _thread_handle {
 	HANDLE h;
 #	endif
 	hl_thread_info *inf;
+	char name[128];
 	thread_handle *next;
 };
 
@@ -76,6 +77,7 @@ static struct {
 	volatile bool stopLoop;
 	volatile bool waitLoop;
 	thread_handle *handles;
+	thread_handle *olds;
 	void **tmpMemory;
 	void *stackOut[MAX_STACK_COUNT];
 	profile_data *record;
@@ -210,6 +212,8 @@ static void read_thread_data( thread_handle *t ) {
 	record_data(&t->tid,sizeof(int));
 	record_data(&eventId,sizeof(int));
 	record_data(data.stackOut,sizeof(void*)*count);
+	if( *t->inf->thread_name && !*t->name )
+		memcpy(t->name, t->inf->thread_name, sizeof(t->name));
 }
 
 static void hl_profile_loop( void *_ ) {
@@ -232,13 +236,40 @@ static void hl_profile_loop( void *_ ) {
 			if( t->flags & HL_THREAD_INVISIBLE ) continue;
 
 			if( !cur || cur->tid != t->thread_id ) {
-				thread_handle *h = malloc(sizeof(thread_handle));
-				h->tid = t->thread_id;
-				h->inf = t;
-				thread_data_init(h);
-				h->next = cur;
-				cur = h;
-				if( prev == NULL ) data.handles = h; else prev->next = h;
+				// have we lost a thread ?
+				thread_handle *h = cur;
+				thread_handle *hprev = prev;
+				while( h ) {
+					if( h->tid == t->thread_id ) {
+						// remove from previous queue
+						if( hprev ) {
+							hprev->next = h->next;
+						} else {
+							data.handles = h->next;
+						}
+						// insert at current position
+						if( prev ) {
+							h->next = prev->next;
+							prev->next = h;
+						} else {
+							h->next = data.handles;
+							data.handles = h;
+						}
+						break;
+					}
+					hprev = h;
+					h = h->next;
+				}
+				if( !h ) {
+					h = malloc(sizeof(thread_handle));
+					memset(h,0,sizeof(thread_handle));
+					h->tid = t->thread_id;
+					h->inf = t;
+					thread_data_init(h);
+					h->next = cur;
+					cur = h;
+					if( prev == NULL ) data.handles = h; else prev->next = h;
+				}
 			}
 			if( (t->flags & HL_THREAD_PROFILER_PAUSED) == 0 )
 				read_thread_data(cur);
@@ -250,7 +281,11 @@ static void hl_profile_loop( void *_ ) {
 			thread_handle *n;
 			thread_data_free(cur);
 			n = cur->next;
-			free(cur);
+			if( *cur->name ) {
+				cur->next = data.olds;
+				data.olds = cur;
+			} else
+				free(cur);
 			cur = n;
 		}
 		next += wait_time;
@@ -300,6 +335,23 @@ static bool read_profile_data( profile_reader *r, void *ptr, int size ) {
 		}
 	}
 	return true;
+}
+
+static int write_names( thread_handle *h, FILE *f ) {
+	int count = 0;
+	while( h ) {
+		if( *h->name ) {
+			if( f ) {
+				int len = (int)strlen(h->name);
+				fwrite(&h->tid,1,4,f);
+				fwrite(&len,1,4,f);
+				fwrite(h->name,1,len,f);
+			} else
+				count++;
+		}
+		h = h->next;
+	}
+	return count;
 }
 
 static void profile_dump() {
@@ -360,6 +412,9 @@ static void profile_dump() {
 			}
 		}
 	}
+	double tend = -1;
+	fwrite(&tend,1,8,f);
+
 	// reset debug_addr flags (allow further dumps)
 	r.r = data.first_record;
 	r.pos = 0;
@@ -382,6 +437,12 @@ static void profile_dump() {
 			read_profile_data(&r,NULL,size);
 		}
 	}
+	// dump threads names
+	int names_count = write_names(data.handles,NULL) + write_names(data.olds,NULL);
+	fwrite(&names_count,1,4,f);
+	write_names(data.handles,f);
+	write_names(data.olds,f);
+	// done
 	fclose(f);
 	printf("%d profile samples saved\n", samples);
 	data.profiling_pause--;
