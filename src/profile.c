@@ -42,16 +42,9 @@
 #define MAX_STACK_COUNT 2048
 
 HL_API double hl_sys_time( void );
-HL_API void *hl_gc_threads_info( void );
 HL_API void hl_setup_profiler( void *, void * );
 int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out, int size );
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr );
-
-typedef struct {
-	int count;
-	bool stopping_world;
-	hl_thread_info **threads;
-} hl_gc_threads;
 
 typedef struct _thread_handle thread_handle;
 typedef struct _profile_data profile_data;
@@ -211,8 +204,8 @@ static void read_thread_data( thread_handle *t ) {
 #endif
 	int eventId = count | 0x80000000;
 	double time = hl_sys_time();
-	struct { int count; bool stop; } *gc = hl_gc_threads_info();
-	if( gc->stop ) eventId |= 0x40000000;
+	hl_threads_info *gc = hl_gc_threads_info();
+	if( gc->stopping_world ) eventId |= 0x40000000;
 	record_data(&time,sizeof(double));
 	record_data(&t->tid,sizeof(int));
 	record_data(&eventId,sizeof(int));
@@ -230,7 +223,7 @@ static void hl_profile_loop( void *_ ) {
 			data.waitLoop = false;
 			continue;
 		}
-		hl_gc_threads *threads = (hl_gc_threads*)hl_gc_threads_info();
+		hl_threads_info *threads = hl_gc_threads_info();
 		int i;
 		thread_handle *prev = NULL;
 		thread_handle *cur = data.handles;
@@ -254,9 +247,11 @@ static void hl_profile_loop( void *_ ) {
 		}
 		if( prev ) prev->next = NULL; else data.handles = NULL;
 		while( cur != NULL ) {
+			thread_handle *n;
 			thread_data_free(cur);
+			n = cur->next;
 			free(cur);
-			cur = cur->next;
+			cur = n;
 		}
 		next += wait_time;
 	}

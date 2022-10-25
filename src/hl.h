@@ -916,7 +916,15 @@ typedef struct {
 	int extra_stack_size;
 } hl_thread_info;
 
+typedef struct {
+	int count;
+	bool stopping_world;
+	hl_thread_info **threads;
+	hl_mutex *global_lock;
+} hl_threads_info;
+
 HL_API hl_thread_info *hl_get_thread();
+HL_API hl_threads_info *hl_gc_threads_info();
 
 #ifdef HL_TRACK_ENABLE
 
