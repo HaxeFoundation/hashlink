@@ -171,7 +171,7 @@ class Sdl {
 		return 0;
 	}
 
-	@:hlNative("?sdl", "get_screen_height_of_display")
+	@:hlNative("?sdl", "get_screen_height_of_window")
 	static function get_screen_height_of_window(win: sdl.Window.WinPtr) : Int {
 		return 0;
 	}
