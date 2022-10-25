@@ -910,6 +910,7 @@ typedef struct {
 	int flags;
 	int exc_stack_count;
 	// extra
+	char thread_name[128];
 	jmp_buf gc_regs;
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
 	void *extra_stack_data[HL_MAX_EXTRA_STACK];

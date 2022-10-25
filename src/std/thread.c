@@ -820,14 +820,16 @@ HL_PRIM int hl_thread_id() {
 typedef struct {
 	void (*callb)( void *);
 	void *param;
+	hl_lock *wait;
 } thread_start;
 
 #ifdef HL_THREADS
 static void gc_thread_entry( thread_start *_s ) {
 	thread_start s = *_s;
 	hl_register_thread(&s);
-	hl_remove_root(&_s->param);
-	free(_s);
+	hl_lock_release(s.wait);
+	s.wait = NULL;
+	_s = NULL;
 	s.callb(s.param);
 	hl_unregister_thread();
 }
@@ -836,10 +838,10 @@ static void gc_thread_entry( thread_start *_s ) {
 HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 #ifdef HL_THREADS
 	if( withGC ) {
-		thread_start *s = (thread_start*)malloc(sizeof(thread_start));
+		thread_start *s = (thread_start*)hl_gc_alloc_raw(sizeof(thread_start));
 		s->callb = callback;
 		s->param = param;
-		hl_add_root(&s->param);
+		s->wait = hl_lock_create();
 		callback = gc_thread_entry;
 		param = s;
 	}
@@ -853,6 +855,8 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 	if( h == NULL )
 		return NULL;
 	CloseHandle(h);
+	if( withGC )
+		hl_lock_wait(((thread_start*)param)->wait, NULL);
 	return (hl_thread*)(int_val)tid;
 #else
 	pthread_t t;
@@ -886,6 +890,73 @@ HL_PRIM hl_thread *hl_thread_create( vclosure *c ) {
 	return hl_thread_start(hl_run_thread,c,true);
 }
 
+#if defined(HL_WIN) && defined(HL_THREADS)
+const DWORD MS_VC_EXCEPTION = 0x406D1388;
+#pragma pack(push,8)
+typedef struct tagTHREADNAME_INFO
+{
+    DWORD dwType; // Must be 0x1000.
+    LPCSTR szName; // Pointer to name (in user addr space).
+    DWORD dwThreadID; // Thread ID (-1=caller thread).
+    DWORD dwFlags; // Reserved for future use, must be zero.
+} THREADNAME_INFO;
+#pragma pack(pop)
+void SetThreadName(DWORD dwThreadID, const char* threadName) {
+    THREADNAME_INFO info;
+    info.dwType = 0x1000;
+    info.szName = threadName;
+    info.dwThreadID = dwThreadID;
+    info.dwFlags = 0;
+#pragma warning(push)
+#pragma warning(disable: 6320 6322)
+    __try{
+        RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER){
+    }
+#pragma warning(pop)
+}
+#endif
+
+HL_PRIM int hl_get_thread_id( hl_thread *t ) {
+#	if !defined(HL_THREADS)
+	return 0;
+#elif defined(HL_WIN)
+	return (DWORD)(int_val)t;
+#elif defined(HL_MAC)
+	uint64_t tid64;
+	pthread_threadid_np((pthread_t)t, &tid64);
+	return (pid_t)tid64;
+#else
+	return -1; // no way to get that on linux :'(
+#endif
+}
+
+HL_PRIM void hl_thread_set_name( hl_thread *t, const char *name ) {
+#if !defined(HL_THREADS)
+	// nothing
+#elif defined(HL_WIN)
+	SetThreadName((DWORD)(int_val)t,name);
+#else
+	pthread_setname_np((pthread_t)t,name);
+#endif
+#ifdef HL_THREADS
+	hl_threads_info *threads = hl_gc_threads_info();
+	hl_thread_info *tinf;
+	int tid = hl_get_thread_id(t);
+	int len = (int)strlen(name);
+	if( len >= 127 ) len = 126;
+	for(int i=0;i<threads->count;i++) {
+		tinf = threads->threads[i];
+		if( tinf->thread_id == tid ) {
+			memcpy(tinf->thread_name, name, len);
+			tinf->thread_name[len + 1] = 0;
+		}
+	}
+#endif
+}
+
 #define _THREAD _ABSTRACT(hl_thread)
 DEFINE_PRIM(_THREAD, thread_current, _NO_ARG);
 DEFINE_PRIM(_THREAD, thread_create, _FUN(_VOID,_NO_ARG));
+DEFINE_PRIM(_VOID, thread_set_name, _THREAD _BYTES);
