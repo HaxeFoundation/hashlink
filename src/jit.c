@@ -3122,7 +3122,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OToSFloat:
 			if( ra == dst ) break;
-			if( ra->t->kind == HI32 ) {
+			if( ra->t->kind == HI32 || ra->t->kind == HUI16 || ra->t->kind == HUI8 ) {
 				preg *r = alloc_cpu(ctx,ra,true);
 				preg *w = alloc_fpu(ctx,dst,false);
 				op32(ctx,dst->t->kind == HF64 ? CVTSI2SD : CVTSI2SS,w,r);
