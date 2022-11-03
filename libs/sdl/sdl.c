@@ -6,8 +6,6 @@
 #if defined(_WIN32) || defined(__ANDROID__) || defined(HL_IOS) || defined(HL_TVOS)
 #	include <SDL.h>
 #	include <SDL_syswm.h>
-#elif defined(HL_MAC)
-#	include <SDL.h>
 #else
 #	include <SDL2/SDL.h>
 #endif
