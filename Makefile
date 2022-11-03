@@ -108,7 +108,7 @@ else
 # Linux
 CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
 LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
-HDLLFLAGS += -Wl,-rpath,$(INSTALL_LIB_DIR)
+HDLLFLAGS += -Wl,-rpath,'$$ORIGIN':$(INSTALL_LIB_DIR)
 
 ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
