@@ -13,6 +13,7 @@ CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 EXTRA_LFLAGS ?=
 LIBFLAGS =
+HDLLFLAGS = -L. -lhl
 HLFLAGS = -ldl
 LIBEXT = so
 LIBTURBOJPEG = -lturbojpeg
@@ -107,6 +108,7 @@ else
 # Linux
 CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
 LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
+HDLLFLAGS += -Wl,-rpath,$(INSTALL_LIB_DIR)
 
 ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
@@ -167,28 +169,28 @@ libs/fmt/%.o: libs/fmt/%.c
 	${CC} ${CFLAGS} -o $@ -c $< ${FMT_INCLUDE}
 
 fmt: ${FMT} libhl
-	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
+	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} ${HDLLFLAGS} -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
 sdl: ${SDL} libhl
-	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENGL)
+	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} ${HDLLFLAGS} -lSDL2 $(LIBOPENGL)
 
 openal: ${OPENAL} libhl
-	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
+	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} ${HDLLFLAGS} $(LIBOPENAL)
 
 ssl: ${SSL} libhl
-	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
+	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} ${HDLLFLAGS} -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
 
 ui: ${UI} libhl
-	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} -L. -lhl
+	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} ${HDLLFLAGS}
 
 uv: ${UV} libhl
-	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
+	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} ${HDLLFLAGS} -luv
 
 mysql: ${MYSQL} libhl
-	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
+	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} ${HDLLFLAGS}
 
 sqlite: ${SQLITE} libhl
-	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L. -lhl -lsqlite3
+	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} ${HDLLFLAGS} -lsqlite3
 
 mesa:
 	(cd libs/mesa && ${MAKE})
