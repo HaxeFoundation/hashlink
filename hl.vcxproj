@@ -392,33 +392,6 @@
     <ClInclude Include="src\hlmodule.h" />
     <ClInclude Include="src\opcodes.h" />
   </ItemGroup>
-  <ItemGroup>
-    <Image Include="GraphicsLogo.png">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
-    <Image Include="LargeLogo.png">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
-    <Image Include="SmallLogo.png">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
-    <Image Include="SplashScreen.png">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
-    <Image Include="StoreLogo.png">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
-  </ItemGroup>
-  <ItemGroup>
-    <MGCCompile Include="MicrosoftGame.Config">
-      <DeploymentContent>true</DeploymentContent>
-    </MGCCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\d4x\tools\build\Output_xbl\hlboot.dat">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
