@@ -160,12 +160,7 @@ static void gc_free_page( gc_pheader *page, int block_count );
 #include "allocator.c"
 #endif
 
-static struct {
-	int count;
-	bool stopping_world;
-	hl_thread_info **threads;
-	hl_mutex *global_lock;
-} gc_threads;
+static hl_threads_info gc_threads;
 
 HL_THREAD_STATIC_VAR hl_thread_info *current_thread;
 
@@ -325,7 +320,7 @@ HL_API void hl_unregister_thread() {
 	hl_mutex_release(gc_threads.global_lock);
 }
 
-HL_API void *hl_gc_threads_info() {
+HL_API hl_threads_info *hl_gc_threads_info() {
 	return &gc_threads;
 }
 

@@ -171,7 +171,7 @@ class Sdl {
 		return 0;
 	}
 
-	@:hlNative("?sdl", "get_screen_height_of_display")
+	@:hlNative("?sdl", "get_screen_height_of_window")
 	static function get_screen_height_of_window(win: sdl.Window.WinPtr) : Int {
 		return 0;
 	}
@@ -190,12 +190,6 @@ class Sdl {
 
 	@:hlNative("?sdl", "get_current_display_mode")
 	static function get_current_display_mode(displayId : Int, registry : Bool) : Dynamic {
-		return null;
-	}
-
-
-	@:hlNative("?sdl", "get_desktop_display_mode")
-	static function get_desktop_display_mode(displayId : Int) : Dynamic {
 		return null;
 	}
 
