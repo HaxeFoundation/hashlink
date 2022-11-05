@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.9.28307.1759
+VisualStudioVersion = 15.0.26228.4
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{$$makeUID(::name::sln)}") = "::name::", "::name::.vcxproj", "{$$makeUID(::name::)}"
 EndProject
