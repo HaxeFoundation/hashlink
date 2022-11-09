@@ -838,6 +838,8 @@ HL_PRIM char* HL_NAME(get_clipboard_text)() {
 
 HL_PRIM varray* HL_NAME(get_displays)() {
 	int n = SDL_GetNumVideoDisplays();
+	if (n == 0)
+		return NULL;
 	varray* arr = hl_alloc_array(&hlt_dynobj, n);
 	for (int i = 0; i < n; i++) {
 		vdynamic *obj = (vdynamic*) hl_alloc_dynobj();
@@ -857,6 +859,8 @@ HL_PRIM varray* HL_NAME(get_displays)() {
 
 HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
 	int n = SDL_GetNumDisplayModes(display_id);
+	if (n == 0)
+		return NULL;
 	varray* arr = hl_alloc_array(&hlt_dynobj, n);
 	for (int i = 0; i < n; i++) {
 		SDL_DisplayMode mode;
