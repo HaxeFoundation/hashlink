@@ -112,7 +112,10 @@ class Sdl {
 	}
 	
 	public static function getDisplayModes(display : Window.DisplayHandle) : Array<ScreenMode> {
-		return [ for(m in get_display_modes(display)) m ];
+		var modes = get_display_modes(display);
+		if(modes == null)
+			return [];
+		return [ for(m in modes) m ];
 	}
 
 	public static function getCurrentDisplayMode(display : Window.DisplayHandle, registry : Bool = false) : ScreenMode {
@@ -120,6 +123,9 @@ class Sdl {
 	}
 
 	public static function getDisplays() : Array<Display> {
+		var displays = get_displays();
+		if(displays == null)
+			return [];
 		var i = 0;
 		return [ for(d in get_displays() ) @:privateAccess { handle: d.handle, name: '${String.fromUTF8(d.name)} (${++i})', left: d.left, top: d.top, right: d.right, bottom: d.bottom } ];
 	}
