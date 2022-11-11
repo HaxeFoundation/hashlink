@@ -208,7 +208,15 @@ sprintf_loop:
 					switch( c ) {
 					case 'd':
 						cfmt[i++] = 0;
-						size = sprintf(tmp,cfmt,va_arg(arglist,int));
+						if( cfmt[i - 3] == 'l') {
+							if( cfmt[i - 4] == 'l' ) {
+								size = sprintf(tmp,cfmt,va_arg(arglist,long long));
+							} else {
+								size = sprintf(tmp,cfmt,va_arg(arglist,long));
+							}
+						} else {
+							size = sprintf(tmp,cfmt,va_arg(arglist,int));
+						}
 						goto sprintf_add;
 					case 'f':
 						cfmt[i++] = 0;
