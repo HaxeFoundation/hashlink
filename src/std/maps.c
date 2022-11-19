@@ -20,6 +20,9 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#ifdef HL_VCC
+#	pragma warning(disable:4034) // sizeof(void) == 0
+#endif
 
 #define H_SIZE_INIT 3
 
@@ -138,7 +141,6 @@ static int hl_freelist_get( hl_free_list *f ) {
 
 typedef struct {
 	int key;
-	int next;
 } hl_hi_entry;
 
 typedef struct {
@@ -162,7 +164,6 @@ typedef struct {
 
 typedef struct {
 	int64 key;
-	int next;
 } hl_hi64_entry;
 
 typedef struct {
@@ -185,7 +186,6 @@ typedef struct {
 
 typedef struct {
 	unsigned int hash;
-	int next;
 } hl_hb_entry;
 
 typedef struct {
@@ -207,9 +207,7 @@ typedef struct {
 
 // ----- OBJECT MAP ---------------------------------
 
-typedef struct {
-	int next;
-} hl_ho_entry;
+typedef void hl_ho_entry;
 
 typedef struct {
 	vdynamic *key;
