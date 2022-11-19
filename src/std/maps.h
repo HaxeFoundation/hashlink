@@ -115,16 +115,12 @@ static void _MNAME(resize)( t_map *m ) {
 		memset(m->values, 0, nentries * sizeof(t_value));
 		hl_freelist_init(&m->lfree);
 		hl_freelist_add_range(&m->lfree,0,m->maxentries);
-		if( old.ncells ) {
-			hl_add_root(&old); // prevent old.cells pointer aliasing
-			for(i=0;i<old.ncells;i++) {
-				int c = old.maxentries < _MLIMIT ? ((char*)old.cells)[i] : ((int*)old.cells)[i];
-				while( c >= 0 ) {
-					_MNAME(set_impl)(m,_MKEY((&old),c),old.values[c].value);
-					c = _MNEXT(&old,c);
-				}
+		for(i=0;i<old.ncells;i++) {
+			int c = old.maxentries < _MLIMIT ? ((char*)old.cells)[i] : ((int*)old.cells)[i];
+			while( c >= 0 ) {
+				_MNAME(set_impl)(m,_MKEY((&old),c),old.values[c].value);
+				c = _MNEXT(&old,c);
 			}
-			hl_remove_root(&old);
 		}
 	}
 }

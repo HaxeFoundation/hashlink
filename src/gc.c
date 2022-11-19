@@ -73,9 +73,7 @@ static int_val gc_hash( void *ptr ) {
 #	define GC_MEMCHK
 #endif
 
-#if defined(HL_NX) || defined(HL_PS)
-#	define GC_INTERIOR_POINTERS
-#endif
+#define GC_INTERIOR_POINTERS
 
 #define out_of_memory(reason)		hl_fatal("Out of Memory (" reason ")")
 
