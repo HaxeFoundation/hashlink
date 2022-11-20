@@ -962,3 +962,162 @@ HL_PRIM void hl_thread_set_name( hl_thread *t, const char *name ) {
 DEFINE_PRIM(_THREAD, thread_current, _NO_ARG);
 DEFINE_PRIM(_THREAD, thread_create, _FUN(_VOID,_NO_ARG));
 DEFINE_PRIM(_VOID, thread_set_name, _THREAD _BYTES);
+
+// ----------------- ATOMICS
+
+// Assumptions made:
+//    Everyone uses GCC, Clang or MSVC
+//    People are not using 8 year old versions of GCC.
+
+#if defined(HL_GCC) || defined(HL_CLANG)
+#define HL_GCC_ATOMICS
+#elif defined(HL_VCC)
+#define HL_VCC_ATOMICS
+#include <intrin.h>
+#else // Nearly everyone uses GCC, Clang or MSVC, right?
+#error                                                                         \
+    "Neither GCC, clang or MSVC is being used. Please contribute the relevant atomic instrinsics for your compiler."
+#endif
+
+HL_PRIM int hl_atomic_add32(int *a, int b) {
+#if defined(HL_GCC_ATOMICS)
+  return __atomic_fetch_add(a, b, __ATOMIC_SEQ_CST);
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedExchangeAdd((LONG volatile *)a, b);
+#endif
+}
+
+HL_PRIM int hl_atomic_sub32(int *a, int b) {
+#if defined(HL_GCC_ATOMICS)
+  return __atomic_fetch_sub(a, b, __ATOMIC_SEQ_CST);
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedExchangeAdd((LONG volatile *)a, -b);
+#endif
+}
+
+HL_PRIM int hl_atomic_and32(int *a, int b) {
+#if defined(HL_GCC_ATOMICS)
+  return __atomic_fetch_and(a, b, __ATOMIC_SEQ_CST);
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedAnd((LONG volatile *)a, b);
+#endif
+}
+
+HL_PRIM int hl_atomic_or32(int *a, int b) {
+#if defined(HL_GCC_ATOMICS)
+  return __atomic_fetch_or(a, b, __ATOMIC_SEQ_CST);
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedOr((LONG volatile *)a, b);
+#endif
+}
+
+HL_PRIM int hl_atomic_xor32(int *a, int b) {
+#if defined(HL_GCC_ATOMICS)
+  return __atomic_fetch_xor(a, b, __ATOMIC_SEQ_CST);
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedXor((LONG volatile *)a, b);
+#endif
+}
+
+HL_PRIM int hl_atomic_compare_exchange32(int *a, int expected,
+                                         int replacement) {
+#if defined(HL_GCC_ATOMICS)
+  int _expected = expected;
+  __atomic_compare_exchange(a, &_expected, &replacement, false,
+                            __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  return _expected;
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedCompareExchange((LONG volatile *)a, replacement, expected);
+#endif
+}
+
+HL_PRIM void *hl_atomic_compare_exchange_ptr(void **a, void *expected,
+                                             void *replacement) {
+#if defined(HL_GCC_ATOMICS)
+  void *_expected = expected;
+  __atomic_compare_exchange(a, &_expected, &replacement, false,
+                            __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  return _expected;
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedCompareExchangePointer((void *volatile *)a, replacement,
+                                            expected);
+#endif
+}
+
+HL_PRIM int hl_atomic_exchange32(int *a, int replacement) {
+#if defined(HL_GCC_ATOMICS)
+  int ret = 0;
+  __atomic_exchange(a, &replacement, &ret, __ATOMIC_SEQ_CST);
+  return ret;
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedExchange((LONG volatile *)a, replacement);
+#endif
+}
+
+HL_PRIM void *hl_atomic_exchange_ptr(void **a, void *replacement) {
+#if defined(HL_GCC_ATOMICS)
+  void *ret = 0;
+  __atomic_exchange(a, &replacement, &ret, __ATOMIC_SEQ_CST);
+  return ret;
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedExchangePointer((void *volatile *)a, replacement);
+#endif
+}
+
+HL_PRIM int hl_atomic_load32(int *a) {
+#if defined(HL_GCC_ATOMICS)
+  int ret = 0;
+  __atomic_load(a, &ret, __ATOMIC_SEQ_CST);
+  return ret;
+#elif defined(HL_VCC_ATOMICS)
+  return _InterlockedXor((LONG volatile *)a, 0);
+#endif
+}
+
+HL_PRIM void *hl_atomic_load_ptr(void **a) {
+#if defined(HL_GCC_ATOMICS)
+  void *ret = 0;
+  __atomic_load(a, &ret, __ATOMIC_SEQ_CST);
+  return ret;
+#elif defined(HL_VCC_ATOMICS)
+#ifdef HL_64
+  return (void *)_InterlockedXor64((__int64 volatile *)a, 0);
+#else
+  return (void *)_InterlockedXor((LONG volatile *)a, 0);
+#endif
+#endif
+}
+
+HL_PRIM int hl_atomic_store32(int *a, int value) {
+#if defined(HL_GCC_ATOMICS)
+  __atomic_store(a, &value, __ATOMIC_SEQ_CST);
+  return value;
+#elif defined(HL_VCC_ATOMICS)
+  _InterlockedExchange((LONG volatile *)a, value);
+  return value;
+#endif
+}
+
+HL_PRIM void *hl_atomic_store_ptr(void **a, void *value) {
+#if defined(HL_GCC_ATOMICS)
+  __atomic_store(a, &value, __ATOMIC_SEQ_CST);
+  return value;
+#elif defined(HL_VCC_ATOMICS)
+  _InterlockedExchangePointer((void *volatile *)a, value);
+  return value;
+#endif
+}
+
+DEFINE_PRIM(_I32, atomic_add32, _REF(_I32) _I32)
+DEFINE_PRIM(_I32, atomic_sub32, _REF(_I32) _I32)
+DEFINE_PRIM(_I32, atomic_and32, _REF(_I32) _I32)
+DEFINE_PRIM(_I32, atomic_or32, _REF(_I32) _I32)
+DEFINE_PRIM(_I32, atomic_xor32, _REF(_I32) _I32)
+DEFINE_PRIM(_I32, atomic_compare_exchange32, _REF(_I32) _I32 _I32)
+DEFINE_PRIM(_DYN, atomic_compare_exchange_ptr, _REF(_DYN) _DYN _DYN)
+DEFINE_PRIM(_I32, atomic_exchange32, _REF(_I32) _I32)
+DEFINE_PRIM(_DYN, atomic_exchange_ptr, _REF(_DYN) _DYN)
+DEFINE_PRIM(_I32, atomic_load32, _REF(_I32))
+DEFINE_PRIM(_DYN, atomic_load_ptr, _REF(_DYN))
+DEFINE_PRIM(_I32, atomic_store32, _REF(_I32) _I32)
+DEFINE_PRIM(_DYN, atomic_store_ptr, _REF(_DYN) _DYN)

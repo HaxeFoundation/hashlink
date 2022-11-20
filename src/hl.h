@@ -211,6 +211,12 @@ typedef unsigned long long uint64;
 #define	HL_API IMPORT
 #endif
 
+#if defined(HL_VCC)
+#define HL_INLINE __inline
+#else
+#define HL_INLINE inline
+#endif
+
 // -------------- UNICODE -----------------------------------
 
 #if defined(HL_WIN) && !defined(HL_LLVM)
