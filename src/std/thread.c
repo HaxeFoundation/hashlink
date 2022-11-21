@@ -958,10 +958,26 @@ HL_PRIM void hl_thread_set_name( hl_thread *t, const char *name ) {
 #endif
 }
 
+HL_PRIM vbyte *hl_thread_get_name( hl_thread *t ) {
+#ifdef HL_THREADS
+	hl_threads_info *threads = hl_gc_threads_info();
+	hl_thread_info *tinf;
+	int tid = hl_get_thread_id(t);
+	for(int i=0;i<threads->count;i++) {
+		tinf = threads->threads[i];
+		if( tinf->thread_id == tid )
+			return *tinf->thread_name ? (vbyte*)tinf->thread_name : NULL;
+	}
+#endif
+	return NULL;
+}
+
+
 #define _THREAD _ABSTRACT(hl_thread)
 DEFINE_PRIM(_THREAD, thread_current, _NO_ARG);
 DEFINE_PRIM(_THREAD, thread_create, _FUN(_VOID,_NO_ARG));
 DEFINE_PRIM(_VOID, thread_set_name, _THREAD _BYTES);
+DEFINE_PRIM(_BYTES, thread_get_name, _THREAD);
 
 // ----------------- ATOMICS
 
