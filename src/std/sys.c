@@ -140,6 +140,7 @@ HL_PRIM vbyte *hl_sys_locale() {
 
 #define PR_WIN_UTF8 1
 #define PR_AUTO_FLUSH 2
+#define PR_FILE 4
 static int print_flags = PR_AUTO_FLUSH;
 
 HL_PRIM int hl_sys_set_flags( int flags ) {
@@ -148,7 +149,7 @@ HL_PRIM int hl_sys_set_flags( int flags ) {
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
-#	ifdef HL_XBO
+#	ifdef HL_XBO || _GAMING_DESKTOP
 	OutputDebugStringW((LPCWSTR)msg);
 #	else	
 #	ifdef HL_WIN_DESKTOP
@@ -159,8 +160,17 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 #	ifdef HL_WIN_DESKTOP
 	if( print_flags & PR_WIN_UTF8 ) _setmode(_fileno(stdout),_O_TEXT);
 #	endif
-
 #	endif
+	if (print_flags & PR_FILE) {
+		static FILE* output = NULL;
+		if (!output) {
+			output = fopen("hloutput.txt", "wb");
+		}
+		if (output) {
+			fprintf(output, "%s", hl_to_utf8((uchar*)msg));
+			fflush(output);
+		}
+	}
 	hl_blocking(false);
 }
 
