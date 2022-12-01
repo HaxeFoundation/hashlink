@@ -49,7 +49,7 @@ HL_PRIM ereg *hl_regexp_new_options( vbyte *str, vbyte *opts ) {
 	size_t error_offset;
 	pcre2_code *p;
 	uchar *o = (uchar*)opts;
-	int options = PCRE2_ALT_BSUX | PCRE2_UCP | PCRE2_UTF;
+	int options = PCRE2_UCP | PCRE2_UTF | PCRE2_ALT_BSUX | PCRE2_ALLOW_EMPTY_CLASS | PCRE2_MATCH_UNSET_BACKREF;
 	while( *o ) {
 		switch( *o++ ) {
 		case 'i':
