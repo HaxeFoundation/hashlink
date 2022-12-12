@@ -148,6 +148,9 @@ HL_PRIM int hl_sys_set_flags( int flags ) {
 }
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
+	char* msg8 = NULL;
+	if (print_flags & PR_FILE)
+		msg8 = hl_to_utf8((uchar*)msg);
 	hl_blocking(true);
 #	ifdef HL_XBO || _GAMING_DESKTOP
 	OutputDebugStringW((LPCWSTR)msg);
@@ -167,7 +170,7 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 			output = fopen("hloutput.txt", "wb");
 		}
 		if (output) {
-			fprintf(output, "%s", hl_to_utf8((uchar*)msg));
+			fprintf(output, "%s", msg8);
 			fflush(output);
 		}
 	}
