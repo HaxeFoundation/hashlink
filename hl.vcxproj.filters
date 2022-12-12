@@ -13,9 +13,4 @@
     <ClInclude Include="src\opcodes.h" />
     <ClInclude Include="src\hl.h" />
   </ItemGroup>
-  <ItemGroup>
-    <Filter Include="Resources">
-      <UniqueIdentifier>{85cdbe51-d27e-4417-bd78-85c9fbc4c53b}</UniqueIdentifier>
-    </Filter>
-  </ItemGroup>
 </Project>

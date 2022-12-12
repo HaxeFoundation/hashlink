@@ -152,7 +152,7 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 	if (print_flags & PR_FILE)
 		msg8 = hl_to_utf8((uchar*)msg);
 	hl_blocking(true);
-#	ifdef HL_XBO || _GAMING_DESKTOP
+#	ifdef HL_XBO
 	OutputDebugStringW((LPCWSTR)msg);
 #	else	
 #	ifdef HL_WIN_DESKTOP
