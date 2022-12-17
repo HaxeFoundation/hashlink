@@ -20,6 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef __x86_64__
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -882,3 +884,6 @@ void* MDBG_API(read_register)( pid_t pid, int thread, int reg, bool is64 ) {
 status_t MDBG_API(write_register)( pid_t pid, int thread, int reg, void *value, bool is64 ) {
     return write_register( get_task(pid), thread, reg, value, is64 ) == KERN_SUCCESS;
 }
+
+#endif
+

@@ -1,6 +1,8 @@
 
 LBITS := $(shell getconf LONG_BIT)
 MARCH ?= $(LBITS)
+ARCH ?= $(shell uname -m)
+
 PREFIX ?= /usr/local
 INSTALL_DIR ?= $(PREFIX)
 INSTALL_BIN_DIR ?= $(PREFIX)/bin
@@ -9,7 +11,7 @@ INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
 LIBS=fmt sdl ssl openal ui uv mysql sqlite
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -std=c11 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 EXTRA_LFLAGS ?=
 LIBFLAGS =
@@ -81,10 +83,25 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(MARCH) -I include -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include \
-	-I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include -I /usr/local/opt/libvorbis/include \
-	-I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
-LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
+
+BPREFIX := $(shell brew --prefix)
+
+BREW_LIBJPEG := $(shell brew --prefix libjpeg)
+BREW_SDL2 := $(shell brew --prefix sdl2)
+BREW_JPEGTURBO := $(shell brew --prefix jpeg-turbo)
+BREW_VORBIS := $(shell brew --prefix libvorbis)
+BREW_OPENAL := $(shell brew --prefix openal-soft)
+BREW_MBEDTLS := $(shell brew --prefix mbedtls@2)
+BREW_LIBPNG := $(shell brew --prefix libpng)
+BREW_LIBOGG := $(shell brew --prefix libogg)
+BREW_LIBUV := $(shell brew --prefix libuv)
+
+CFLAGS += -m$(MARCH) -I include -I $(BREW_LIBJPEG)/include \
+	-I $(BREW_JPEGTURBO)/include -I $(BREW_SDL2)/include -I $(BREW_VORBIS)/include \
+	-I $(BREW_MBEDTLS)/include -I $(BREW_LIBPNG)/include -I $(BREW_LIBOGG)/include \
+	-I $(BREW_LIBUV)/include \
+	-I $(BREW_OPENAL)/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
+LFLAGS += -Wl,-export_dynamic 
 
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
@@ -92,15 +109,22 @@ CFLAGS += -isysroot $(ISYSROOT)
 LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-LIBFLAGS += -L/usr/local/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
+LIBFLAGS += -L$(BREW_LIBJPEG)/lib -L$(BREW_SDL2)/lib -L$(BREW_JPEGTURBO)/lib \
+			-L$(BREW_VORBIS)/lib -L$(BREW_OPENAL)/lib -L$(BREW_MBEDTLS)/lib \
+			-L$(BREW_LIBPNG)/lib -L$(BREW_LIBOGG)/lib -L$(BREW_LIBUV)/lib
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 RELEASE_NAME = osx
 
 # Mac native debug
+ifneq ($(ARCH),arm64)
 HL_DEBUG = include/mdbg/mdbg.o include/mdbg/mach_excServer.o include/mdbg/mach_excUser.o
 LIB += ${HL_DEBUG}
+endif
+
+CFLAGS += -arch $(ARCH)
+LFLAGS += -arch $(ARCH)
 
 else
 
@@ -155,7 +179,7 @@ src/std/regexp.o: src/std/regexp.c
 	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
 
 libhl: ${LIB}
-	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
+	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}
@@ -211,8 +235,8 @@ release_haxelib_package:
 	mkdir $(HLIB)_release
 	(cd libs/$(HLIB) && cp -R $(HLPACK) *.h *.c* haxelib.json ../../$(HLIB)_release | true)
 	zip -r $(HLIB).zip $(HLIB)_release
-	haxelib submit $(HLIB).zip
-	rm -rf $(HLIB)_release
+	#haxelib submit $(HLIB).zip
+	#rm -rf $(HLIB)_release
 
 BUILD_DIR ?= .
 PACKAGE_NAME := hashlink-$(shell $(BUILD_DIR)/hl --version)-$(RELEASE_NAME)
