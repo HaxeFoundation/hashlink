@@ -23,11 +23,9 @@ endif()
 
 # add_subdirectory(mesa)
 
-if(WIN32)
-    option(WITH_OPENAL "Build openal.hdll." ON)
-    if(WITH_OPENAL)
-        add_subdirectory(openal)
-    endif()
+option(WITH_OPENAL "Build openal.hdll." ON)
+if(WITH_OPENAL)
+	add_subdirectory(openal)
 endif()
 
 option(WITH_SDL "Build sdl.hdll." ON)
