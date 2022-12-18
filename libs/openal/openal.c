@@ -1,7 +1,11 @@
 #define HL_NAME(n) openal_##n
 #include <hl.h>
 
-#if defined(__APPLE__) && !defined(openal_soft)
+#if defined(CMAKE_BUILD)
+	#include "al.h"
+	#include "alc.h"
+	#include "alext.h"
+#elif defined(__APPLE__) && !defined(openal_soft)
 	#include <OpenAL/al.h>
 	#include <OpenAL/alc.h>
 #else

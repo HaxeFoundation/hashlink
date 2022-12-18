@@ -21,9 +21,13 @@ if(WIN32)
 
 else()
 	find_package(OpenAL)
+	target_compile_definitions(openal.hdll
+		PRIVATE
+		CMAKE_BUILD
+	)
 	target_include_directories(openal.hdll
 		PRIVATE
-		${OPENAL_INCLUDE_DIRS}
+		${OPENAL_INCLUDE_DIR}
 	)
 endif()
 
