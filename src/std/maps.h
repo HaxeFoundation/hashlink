@@ -8,8 +8,8 @@
 #define t_entry _MNAME(_entry)
 #define t_value _MNAME(_value)
 #define _MLIMIT 128
-#define _MINDEX(m,ckey) ((m)->maxentries < _MLIMIT ? (int)((char*)(m)->cells)[ckey] : ((int*)(m)->cells)[ckey])
-#define _MNEXT(m,ckey) ((m)->maxentries < _MLIMIT ? (int)((char*)(m)->nexts)[ckey] : ((int*)(m)->nexts)[ckey])
+#define _MINDEX(m,ckey) ((m)->maxentries < _MLIMIT ? (int)((signed char*)(m)->cells)[ckey] : ((int*)(m)->cells)[ckey])
+#define _MNEXT(m,ckey) ((m)->maxentries < _MLIMIT ? (int)((signed char*)(m)->nexts)[ckey] : ((int*)(m)->nexts)[ckey])
 
 typedef struct {
 	void *cells;
@@ -68,8 +68,8 @@ static void _MNAME(set_impl)( t_map *m, t_key key, vdynamic *value ) {
 	}
 	_MSET(c);
 	if( m->maxentries < _MLIMIT ) {
-		((char*)m->nexts)[c] = ((char*)m->cells)[ckey];
-		((char*)m->cells)[ckey] = (char)c;
+		((signed char*)m->nexts)[c] = ((signed char*)m->cells)[ckey];
+		((signed char*)m->cells)[ckey] = (signed char)c;
 	} else {
 		((int*)m->nexts)[c] = ((int*)m->cells)[ckey];
 		((int*)m->cells)[ckey] = c;
@@ -108,7 +108,7 @@ static void _MNAME(resize)( t_map *m ) {
 	} else {
 		// expand and remap
 		m->cells = hl_gc_alloc_noptr((ncells + nentries) * ksize);
-		m->nexts = (char*)m->cells + ncells * ksize;
+		m->nexts = (signed char*)m->cells + ncells * ksize;
 		m->ncells = ncells;
 		m->nentries = 0;
 		memset(m->cells,0xFF,ncells * ksize);
@@ -116,7 +116,7 @@ static void _MNAME(resize)( t_map *m ) {
 		hl_freelist_init(&m->lfree);
 		hl_freelist_add_range(&m->lfree,0,m->maxentries);
 		for(i=0;i<old.ncells;i++) {
-			int c = old.maxentries < _MLIMIT ? ((char*)old.cells)[i] : ((int*)old.cells)[i];
+			int c = old.maxentries < _MLIMIT ? ((signed char*)old.cells)[i] : ((int*)old.cells)[i];
 			while( c >= 0 ) {
 				_MNAME(set_impl)(m,_MKEY((&old),c),old.values[c].value);
 				c = _MNEXT(&old,c);
@@ -155,9 +155,9 @@ HL_PRIM bool _MNAME(remove)( t_map *m, t_key key ) {
 			m->values[c].value = NULL;
 			if( m->maxentries < _MLIMIT ) {
 				if( prev >= 0 )
-					((char*)m->nexts)[prev] = ((char*)m->nexts)[c];
+					((signed char*)m->nexts)[prev] = ((signed char*)m->nexts)[c];
 				else
-					((char*)m->cells)[ckey] = ((char*)m->nexts)[c];
+					((signed char*)m->cells)[ckey] = ((signed char*)m->nexts)[c];
 			} else {
 				if( prev >= 0 )
 					((int*)m->nexts)[prev] = ((int*)m->nexts)[c];
