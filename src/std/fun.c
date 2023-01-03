@@ -464,7 +464,7 @@ HL_PRIM vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, boo
 	ULONG size = 32<<10;
 	SetThreadStackGuarantee(&size);
 	static bool first = true;
-	if( first ) {
+	if( first && !hl_detect_debugger() ) {
 		first = false;
 		AddVectoredExceptionHandler(1,global_handler);
 	}

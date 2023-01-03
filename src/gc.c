@@ -240,6 +240,13 @@ static void gc_global_lock( bool lock ) {
 }
 #endif
 
+HL_PRIM void hl_global_lock( bool lock ) {
+	if( lock )
+		hl_mutex_acquire(gc_threads.exclusive_lock);
+	else
+		hl_mutex_release(gc_threads.exclusive_lock);
+}
+
 HL_PRIM void hl_add_root( void *r ) {
 	gc_global_lock(true);
 	if( gc_roots_count == gc_roots_max ) {
@@ -764,8 +771,10 @@ static void hl_gc_init() {
 	gc_stats.mark_bytes = 4; // prevent reading out of bmp
 	memset(&gc_threads,0,sizeof(gc_threads));
 	gc_threads.global_lock = hl_mutex_alloc(false);
+	gc_threads.exclusive_lock = hl_mutex_alloc(false);
 #	ifdef HL_THREADS
 	hl_add_root(&gc_threads.global_lock);
+	hl_add_root(&gc_threads.exclusive_lock);
 #	endif
 }
 

@@ -766,6 +766,7 @@ HL_API void hl_free( hl_alloc *a );
 
 HL_API void hl_global_init( void );
 HL_API void hl_global_free( void );
+HL_API void hl_global_lock( bool lock );
 
 HL_API void *hl_alloc_executable_memory( int size );
 HL_API void hl_free_executable_memory( void *ptr, int size );
@@ -928,6 +929,7 @@ typedef struct {
 	bool stopping_world;
 	hl_thread_info **threads;
 	hl_mutex *global_lock;
+	hl_mutex *exclusive_lock;
 } hl_threads_info;
 
 HL_API hl_thread_info *hl_get_thread();

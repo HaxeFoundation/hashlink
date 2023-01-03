@@ -178,6 +178,13 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	int i, size, start, nlookup, compareHash;
 	if( o->rt ) return o->rt;
 	if( o->super ) p = hl_get_obj_rt(o->super);
+
+	hl_global_lock(true);
+	if( o->rt ) {
+		hl_global_lock(false);
+		return o->rt;
+	}
+
 	t = (hl_runtime_obj*)hl_malloc(alloc,sizeof(hl_runtime_obj));
 	t->t = ot;
 	t->nfields = o->nfields + (p ? p->nfields : 0);
@@ -300,6 +307,8 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 			}
 		}
 	}
+
+	hl_global_lock(false);
 	return t;
 }
 
@@ -317,6 +326,13 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	int nmethods, nbindings;
 	if( ot->vobj_proto ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);
+
+	hl_global_lock(true);
+
+	if( ot->vobj_proto ) {
+		hl_global_lock(false);
+		return t;
+	}
 
 	if( t->nproto ) {
 		void **fptr = (void**)hl_malloc(alloc, sizeof(void*) * t->nproto);
@@ -416,6 +432,8 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	t->castFun = castField ? t->methods[-(castField->field_index+1)] : NULL;
 	t->getFieldFun = getField ? t->methods[-(getField->field_index+1)] : NULL;
 	if( p && !t->getFieldFun ) t->getFieldFun = p->getFieldFun;
+
+	hl_global_lock(false);
 
 	return t;
 }
