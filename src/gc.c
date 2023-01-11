@@ -475,6 +475,8 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	int allocated = 0;
 	if( size == 0 )
 		return NULL;
+	if( size < 0 )
+		hl_error("Invalid allocation size");
 	gc_global_lock(true);
 	gc_check_mark();
 #	ifdef GC_MEMCHK
