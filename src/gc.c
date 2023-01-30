@@ -1030,7 +1030,7 @@ static void gc_free_page_memory( void *ptr, int size ) {
 }
 
 vdynamic *hl_alloc_dynamic( hl_type *t ) {
-	vdynamic *d = (vdynamic*)hl_gc_alloc_gen(t, sizeof(vdynamic), (hl_is_ptr(t) ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
+	vdynamic *d = (vdynamic*)hl_gc_alloc_gen(t, sizeof(vdynamic), (hl_is_ptr(t) ? (t->kind == HSTRUCT ? MEM_KIND_RAW : MEM_KIND_DYNAMIC) : MEM_KIND_NOPTR) | MEM_ZERO);
 	d->t = t;
 	return d;
 }
