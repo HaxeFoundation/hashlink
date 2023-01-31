@@ -692,7 +692,7 @@ static void gc_mark() {
 		hl_thread_info *t = gc_threads.threads[i];
 		cur_mark_stack = mark_stack;
 		gc_mark_stack(t->stack_cur,t->stack_top);
-		gc_mark_stack(&t->gc_regs,(void**)&t->gc_regs + (sizeof(jmp_buf) / sizeof(void*) - 1));
+		gc_mark_stack(&t->gc_regs,(void**)&t->gc_regs + (sizeof(jmp_buf) / (sizeof(void*)) - 1));
 		gc_mark_stack(&t->extra_stack_data,(void**)&t->extra_stack_data + t->extra_stack_size);
 		mark_stack = cur_mark_stack;
 	}
@@ -878,7 +878,9 @@ void hl_free( hl_alloc *a ) {
 		size = (int)(b->p + b->size - ((unsigned char*)b));
 		prev = (int_val)b;
 		free(b);
-		b = n;
+		if (n) {
+			b = n;
+		}
 	}
 	// check if our allocator was not part of the last free block
 	if( (int_val)a < prev || (int_val)a > prev+size )
