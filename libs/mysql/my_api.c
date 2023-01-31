@@ -145,7 +145,7 @@ MYSQL *mysql_real_connect( MYSQL *m, const char *host, const char *user, const c
 			myp_close(m);
 			save_error(m,p);
 			return NULL;
-		}	
+		}
 		m->infos.server_version = strdup(myp_read_string(p));
 		m->infos.thread_id = myp_read_int(p);
 		myp_read(p,scramble_buf,8);
