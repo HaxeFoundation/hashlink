@@ -80,8 +80,8 @@ double utod( const uchar *str, uchar **end ) {
 	}
 	buf[i] = 0;
 	result = strtod(buf,&bend);
-	uchar *new_str = ustrdup(str);
-	*end = new_str + (bend - buf);
+	uchar *copied_str = ustrdup(str);
+	*end = copied_str + (bend - buf);
 	return result;
 }
 
@@ -102,8 +102,8 @@ int utoi( const uchar *str, uchar **end ) {
 	}
 	buf[i] = 0;
 	result = strtol(buf,&bend,10);
-	uchar *strcpy = ustrdup(str);
-	*end = strcpy + (bend - buf);
+	uchar *copied_str = ustrdup(str);
+	*end = copied_str + (bend - buf);
 	return result;
 }
 
