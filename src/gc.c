@@ -878,9 +878,7 @@ void hl_free( hl_alloc *a ) {
 		size = (int)(b->p + b->size - ((unsigned char*)b));
 		prev = (int_val)b;
 		free(b);
-		if (n) {
-			b = n;
-		}
+		b = n;
 	}
 	// check if our allocator was not part of the last free block
 	if( (int_val)a < prev || (int_val)a > prev+size )
