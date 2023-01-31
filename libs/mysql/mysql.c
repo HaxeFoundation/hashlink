@@ -229,9 +229,9 @@ static CONV convert_type( enum enum_field_types t, int flags, unsigned int lengt
 	case FIELD_TYPE_DECIMAL:
 	case FIELD_TYPE_FLOAT:
 	case FIELD_TYPE_DOUBLE:
-	case 246: // 5.0 MYSQL_NEW_DECIMAL
+	case FIELD_TYPE_NEWDECIMAL: // 5.0 MYSQL_NEW_DECIMAL
 		return CONV_FLOAT;
-	case 245: // JSON
+	case FIELD_TYPE_JSON: // JSON
 		return CONV_JSON;
 	case FIELD_TYPE_BLOB:
 	case FIELD_TYPE_TINY_BLOB:
