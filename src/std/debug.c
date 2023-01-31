@@ -346,7 +346,7 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 	void *r = get_reg(reg);
 	if( ((int_val)r) < 0 ) {
 		// peek FP ptr
-		char *addr = (char*)ptrace(PTRACE_PEEKUSER,thread,get_reg(-1),0);
+		vbyte *addr = (vbyte*)ptrace(PTRACE_PEEKUSER,thread,get_reg(-1),0);
 		void *out = NULL;
 		hl_debug_read(pid, addr + (-((int_val)r)-1), (vbyte*)&out, sizeof(void*));
 		return out;
