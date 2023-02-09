@@ -561,6 +561,11 @@ HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
 		return 0;
 #		endif
 	default:
+		{
+			int r = -1;
+			glGetIntegerv(feature, &r);
+			return r;
+		}
 		break;
 	}
 	return -1;
