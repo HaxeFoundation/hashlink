@@ -190,6 +190,10 @@ HL_PRIM bool hl_file_eof( hl_fdesc *f ) {
 	return (bool)feof(f->f);
 }
 
+HL_PRIM int hl_file_error_code() {
+	return errno;
+}
+
 HL_PRIM bool hl_file_flush( hl_fdesc *f ) {
 	int ret;
 	if( !f ) return false;
@@ -266,4 +270,5 @@ DEFINE_PRIM(_FILE, file_stdout, _NO_ARG);
 DEFINE_PRIM(_FILE, file_stderr, _NO_ARG);
 DEFINE_PRIM(_BYTES, file_contents, _BYTES _REF(_I32));
 DEFINE_PRIM(_BOOL, file_is_locked, _BYTES);
+DEFINE_PRIM(_I32, file_error_code, _NO_ARG);
 
