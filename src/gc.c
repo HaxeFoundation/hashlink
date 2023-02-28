@@ -291,6 +291,10 @@ HL_API void hl_register_thread( void *stack_top ) {
 	hl_thread_info *t = (hl_thread_info*)malloc(sizeof(hl_thread_info));
 	memset(t, 0, sizeof(hl_thread_info));
 	t->thread_id = hl_thread_id();
+	#ifdef HL_MAC
+	t->mach_thread_id = mach_thread_self();
+	t->pthread_id = (pthread_t)hl_thread_current();
+	#endif
 	t->stack_top = stack_top;
 	t->flags = HL_TRACK_MASK << HL_TREAD_TRACK_SHIFT;
 	current_thread = t;
