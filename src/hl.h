@@ -922,6 +922,10 @@ typedef struct {
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
 	void *extra_stack_data[HL_MAX_EXTRA_STACK];
 	int extra_stack_size;
+	#ifdef HL_MAC
+	thread_t mach_thread_id;
+	pthread_t pthread_id;
+	#endif
 } hl_thread_info;
 
 typedef struct {
