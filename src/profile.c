@@ -29,6 +29,18 @@
 #include <unistd.h>
 #endif
 
+#if defined(HL_MAC)
+#include <sys/stat.h>
+#include <mach/mach.h>
+#include <mach/mach_vm.h>
+#include <dlfcn.h>
+#include <objc/runtime.h>
+#include <dispatch/dispatch.h>
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#endif
+
 #if defined(__GLIBC__)
 #if __GLIBC_PREREQ(2, 30)
 // tgkill is present

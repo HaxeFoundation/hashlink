@@ -38,6 +38,8 @@
 #endif
 #	define fopen(name,mode) _wfopen(name,mode)
 #	define HL_UFOPEN
+#else
+#include <errno.h>
 #endif
 
 #ifdef HL_WIN_DESKTOP
