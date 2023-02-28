@@ -301,6 +301,7 @@ C_FUNCTION_END
 #	endif
 #elif defined(HL_MAC)
 #include <signal.h>
+#include <mach/mach.h>
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \
 			raise(SIGTRAP);//__builtin_trap();
