@@ -113,6 +113,23 @@ static void sigprof_handler(int sig, siginfo_t *info, void *ucontext)
 	sem_wait(&shared_context.msg3);
 	sem_post(&shared_context.msg4);
 }
+#elif defined(HL_MAC)
+static struct
+{
+	sem_t msg2;
+	sem_t msg3;
+	sem_t msg4;
+	ucontext_t context;
+} shared_context;
+
+static void sigprof_handler(int sig, siginfo_t *info, void *ucontext)
+{
+	ucontext_t *ctx = ucontext;
+	shared_context.context = *ctx;
+	sem_post(&shared_context.msg2);
+	sem_wait(&shared_context.msg3);
+	sem_post(&shared_context.msg4);
+}
 #endif
 
 static void *get_thread_stackptr( thread_handle *t, void **eip ) {
@@ -311,7 +328,7 @@ static void hl_profile_loop( void *_ ) {
 static void profile_event( int code, vbyte *data, int dataLen );
 
 void hl_profile_setup( int sample_count ) {
-#	if defined(HL_THREADS) && (defined(HL_WIN_DESKTOP) || defined(HL_LINUX))
+#	if defined(HL_THREADS) && (defined(HL_WIN_DESKTOP) || defined(HL_LINUX) || defined (HL_MAC))
 	hl_setup_profiler(profile_event,hl_profile_end);
 	if( data.sample_count ) return;
 	if( sample_count < 0 ) {
@@ -324,6 +341,15 @@ void hl_profile_setup( int sample_count ) {
 	sem_init(&shared_context.msg2, 0, 0);
 	sem_init(&shared_context.msg3, 0, 0);
 	sem_init(&shared_context.msg4, 0, 0);
+	struct sigaction action = {0};
+	action.sa_sigaction = sigprof_handler;
+	action.sa_flags = SA_SIGINFO;
+	sigaction(SIGPROF, &action, NULL);
+#	elif defined(HL_MAC)
+	shared_context.context.uc_mcontext = NULL;
+	shared_context.msg2 = dispatch_semaphore_create(0);
+	shared_context.msg3 = dispatch_semaphore_create(0);
+	shared_context.msg4 = dispatch_semaphore_create(0);
 	struct sigaction action = {0};
 	action.sa_sigaction = sigprof_handler;
 	action.sa_flags = SA_SIGINFO;
