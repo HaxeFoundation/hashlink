@@ -196,6 +196,15 @@ static bool pause_thread( thread_handle *t, bool b ) {
 		sem_post(&shared_context.msg3);
 		return sem_wait(&shared_context.msg4) == 0;
 	}
+#elif defined(HL_MAC)
+	if( b ) {
+		pthread_kill( t->inf->pthread_id, SIGPROF);
+		return dispatch_semaphore_wait(shared_context.msg2, DISPATCH_TIME_FOREVER) == 0;
+	} else {
+		dispatch_semaphore_signal(shared_context.msg3);
+		return dispatch_semaphore_wait(shared_context.msg4, DISPATCH_TIME_FOREVER) == 0;
+	}
+	return false;
 #else
 	return false;
 #endif
