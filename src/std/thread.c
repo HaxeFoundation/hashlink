@@ -868,6 +868,8 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 		return NULL;
 	}
 	pthread_attr_destroy(&attr);
+	if( withGC )
+		hl_lock_wait(((thread_start*)param)->wait, NULL);
 	return (hl_thread*)t;
 #endif
 }
