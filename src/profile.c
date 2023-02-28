@@ -116,9 +116,9 @@ static void sigprof_handler(int sig, siginfo_t *info, void *ucontext)
 #elif defined(HL_MAC)
 static struct
 {
-	sem_t msg2;
-	sem_t msg3;
-	sem_t msg4;
+	dispatch_semaphore_t msg2;
+	dispatch_semaphore_t  msg3;
+	dispatch_semaphore_t  msg4;
 	ucontext_t context;
 } shared_context;
 
@@ -126,9 +126,9 @@ static void sigprof_handler(int sig, siginfo_t *info, void *ucontext)
 {
 	ucontext_t *ctx = ucontext;
 	shared_context.context = *ctx;
-	sem_post(&shared_context.msg2);
-	sem_wait(&shared_context.msg3);
-	sem_post(&shared_context.msg4);
+	dispatch_semaphore_signal(shared_context.msg2);
+	dispatch_semaphore_wait(shared_context.msg3, DISPATCH_TIME_FOREVER);
+	dispatch_semaphore_signal(shared_context.msg4);
 }
 #endif
 
