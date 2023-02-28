@@ -230,7 +230,7 @@ static void read_thread_data( thread_handle *t ) {
 		return;
 	}
 
-#ifdef HL_LINUX
+#if defined(HL_LINUX) || defined(HL_MAC)
     int count = hl_module_capture_stack_range(t->inf->stack_top, stack, data.stackOut, MAX_STACK_COUNT);
     pause_thread(t, false);
 #else
