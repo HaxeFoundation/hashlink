@@ -29,6 +29,18 @@
 #include <unistd.h>
 #endif
 
+#if defined(HL_MAC)
+#include <sys/stat.h>
+#include <mach/mach.h>
+#include <mach/mach_vm.h>
+#include <dlfcn.h>
+#include <objc/runtime.h>
+#include <dispatch/dispatch.h>
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#endif
+
 #if defined(__GLIBC__)
 #if __GLIBC_PREREQ(2, 30)
 // tgkill is present
@@ -101,6 +113,23 @@ static void sigprof_handler(int sig, siginfo_t *info, void *ucontext)
 	sem_wait(&shared_context.msg3);
 	sem_post(&shared_context.msg4);
 }
+#elif defined(HL_MAC)
+static struct
+{
+	dispatch_semaphore_t msg2;
+	dispatch_semaphore_t  msg3;
+	dispatch_semaphore_t  msg4;
+	ucontext_t context;
+} shared_context;
+
+static void sigprof_handler(int sig, siginfo_t *info, void *ucontext)
+{
+	ucontext_t *ctx = ucontext;
+	shared_context.context = *ctx;
+	dispatch_semaphore_signal(shared_context.msg2);
+	dispatch_semaphore_wait(shared_context.msg3, DISPATCH_TIME_FOREVER);
+	dispatch_semaphore_signal(shared_context.msg4);
+}
 #endif
 
 static void *get_thread_stackptr( thread_handle *t, void **eip ) {
@@ -122,6 +151,17 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 #	else
 	*eip = (void*)shared_context.context.uc_mcontext.gregs[REG_EIP];
 	return (void*)shared_context.context.uc_mcontext.gregs[REG_ESP];
+#	endif
+#elif defined(HL_MAC)
+#	ifdef HL_64
+	struct __darwin_mcontext64 *mcontext = shared_context.context.uc_mcontext;
+	if (mcontext != NULL) {
+		*eip = (void*)mcontext->__ss.__rip;
+		return (void*)mcontext->__ss.__rsp;
+	}
+	return NULL;
+#	else
+	return NULL;
 #	endif
 #else
 	return NULL;
@@ -156,6 +196,15 @@ static bool pause_thread( thread_handle *t, bool b ) {
 		sem_post(&shared_context.msg3);
 		return sem_wait(&shared_context.msg4) == 0;
 	}
+#elif defined(HL_MAC)
+	if( b ) {
+		pthread_kill( t->inf->pthread_id, SIGPROF);
+		return dispatch_semaphore_wait(shared_context.msg2, DISPATCH_TIME_FOREVER) == 0;
+	} else {
+		dispatch_semaphore_signal(shared_context.msg3);
+		return dispatch_semaphore_wait(shared_context.msg4, DISPATCH_TIME_FOREVER) == 0;
+	}
+	return false;
 #else
 	return false;
 #endif
@@ -190,7 +239,7 @@ static void read_thread_data( thread_handle *t ) {
 		return;
 	}
 
-#ifdef HL_LINUX
+#if defined(HL_LINUX) || defined(HL_MAC)
     int count = hl_module_capture_stack_range(t->inf->stack_top, stack, data.stackOut, MAX_STACK_COUNT);
     pause_thread(t, false);
 #else
@@ -299,7 +348,7 @@ static void hl_profile_loop( void *_ ) {
 static void profile_event( int code, vbyte *data, int dataLen );
 
 void hl_profile_setup( int sample_count ) {
-#	if defined(HL_THREADS) && (defined(HL_WIN_DESKTOP) || defined(HL_LINUX))
+#	if defined(HL_THREADS) && (defined(HL_WIN_DESKTOP) || defined(HL_LINUX) || defined (HL_MAC))
 	hl_setup_profiler(profile_event,hl_profile_end);
 	if( data.sample_count ) return;
 	if( sample_count < 0 ) {
@@ -312,6 +361,15 @@ void hl_profile_setup( int sample_count ) {
 	sem_init(&shared_context.msg2, 0, 0);
 	sem_init(&shared_context.msg3, 0, 0);
 	sem_init(&shared_context.msg4, 0, 0);
+	struct sigaction action = {0};
+	action.sa_sigaction = sigprof_handler;
+	action.sa_flags = SA_SIGINFO;
+	sigaction(SIGPROF, &action, NULL);
+#	elif defined(HL_MAC)
+	shared_context.context.uc_mcontext = NULL;
+	shared_context.msg2 = dispatch_semaphore_create(0);
+	shared_context.msg3 = dispatch_semaphore_create(0);
+	shared_context.msg4 = dispatch_semaphore_create(0);
 	struct sigaction action = {0};
 	action.sa_sigaction = sigprof_handler;
 	action.sa_flags = SA_SIGINFO;

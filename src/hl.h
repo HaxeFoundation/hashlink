@@ -301,6 +301,7 @@ C_FUNCTION_END
 #	endif
 #elif defined(HL_MAC)
 #include <signal.h>
+#include <mach/mach.h>
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \
 			raise(SIGTRAP);//__builtin_trap();
@@ -922,6 +923,10 @@ typedef struct {
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
 	void *extra_stack_data[HL_MAX_EXTRA_STACK];
 	int extra_stack_size;
+	#ifdef HL_MAC
+	thread_t mach_thread_id;
+	pthread_t pthread_id;
+	#endif
 } hl_thread_info;
 
 typedef struct {
