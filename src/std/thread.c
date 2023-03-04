@@ -827,8 +827,8 @@ typedef struct {
 static void gc_thread_entry( thread_start *_s ) {
 	thread_start s = *_s;
 	hl_register_thread(&s);
-	hl_lock_release(s.wait);
-	s.wait = NULL;
+	hl_lock_release(_s->wait);
+	s.wait = _s->wait = NULL;
 	_s = NULL;
 	s.callb(s.param);
 	hl_unregister_thread();
@@ -855,8 +855,10 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 	if( h == NULL )
 		return NULL;
 	CloseHandle(h);
-	if( withGC )
-		hl_lock_wait(((thread_start*)param)->wait, NULL);
+	if( withGC ) {
+		hl_lock *l = ((thread_start*)param)->wait;
+		if( l ) hl_lock_wait(l, NULL);
+	}
 	return (hl_thread*)(int_val)tid;
 #else
 	pthread_t t;
@@ -868,8 +870,10 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 		return NULL;
 	}
 	pthread_attr_destroy(&attr);
-	if( withGC )
-		hl_lock_wait(((thread_start*)param)->wait, NULL);
+	if( withGC ) {
+		hl_lock *l = ((thread_start*)param)->wait;
+		if( l ) hl_lock_wait(l, NULL);
+	}
 	return (hl_thread*)t;
 #endif
 }
