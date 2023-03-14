@@ -428,7 +428,7 @@ HL_PRIM void HL_NAME(set_window_grab)(SDL_Window* window, bool grabbed) {
 }
 
 HL_PRIM bool HL_NAME(get_window_grab)(SDL_Window* window) {
-	SDL_GetWindowGrab(window);
+	return SDL_GetWindowGrab(window);
 }
 
 HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
@@ -831,9 +831,9 @@ HL_PRIM char* HL_NAME(get_clipboard_text)() {
 	char* chr = SDL_GetClipboardText();
 	if (chr == NULL)
 		return NULL;
-	vbyte* bytes = hl_copy_bytes(chr, (int) strlen(chr) + 1);
+	vbyte* bytes = hl_copy_bytes((vbyte*)chr, (int) strlen(chr) + 1);
 	SDL_free(chr);
-	return bytes;
+	return (char*)bytes;
 }
 
 HL_PRIM varray* HL_NAME(get_displays)() {
@@ -851,7 +851,7 @@ HL_PRIM varray* HL_NAME(get_displays)() {
 		hl_dyn_seti(obj, hl_hash_utf8("top"), &hlt_i32, rect.y);
 		hl_dyn_seti(obj, hl_hash_utf8("handle"), &hlt_i32, i);
 		const char *name = SDL_GetDisplayName(i);
-		hl_dyn_setp(obj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes(name, (int) strlen(name)+1));
+		hl_dyn_setp(obj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes((const vbyte*)name, (int) strlen(name)+1));
 		hl_aptr(arr, vdynamic*)[i] = obj;
 	}
 	return arr;

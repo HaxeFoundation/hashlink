@@ -254,7 +254,7 @@ HL_PRIM vbyte *hl_bytes_from_address( int low, int high ) {
 	i64.high = high;
 	return *(vbyte**)&i64;
 #	else
-	return (vbyte*)low;
+	return (vbyte*)(long)low;
 #	endif
 }
 

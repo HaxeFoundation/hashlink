@@ -98,7 +98,7 @@ void psock_close( PSOCK s ) {
 int psock_send( PSOCK s, const char *buf, int size ) {
 	int ret;
 	POSIX_LABEL(send_again);
-	ret = send(s,buf,size,MSG_NOSIGNAL);
+	ret = (int)send(s,buf,size,MSG_NOSIGNAL);
 	if( ret == SOCKET_ERROR ) {
 		HANDLE_EINTR(send_again);
 		return block_error();

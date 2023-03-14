@@ -503,8 +503,8 @@ HL_PRIM void hl_tls_set( hl_tls *l, void *v ) {
 			_tls_set(l, store);
 		} else {
 			if( !v ) {
-				free(store);
 				hl_remove_root(store);
+				free(store);
 				_tls_set(l, NULL);
 				return;
 			}
