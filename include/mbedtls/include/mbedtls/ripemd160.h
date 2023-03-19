@@ -4,7 +4,7 @@
  * \brief RIPE MD-160 message digest
  */
 /*
- *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
+ *  Copyright The Mbed TLS Contributors
  *  SPDX-License-Identifier: Apache-2.0
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -18,14 +18,12 @@
  *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
- *  This file is part of mbed TLS (https://tls.mbed.org)
  */
 #ifndef MBEDTLS_RIPEMD160_H
 #define MBEDTLS_RIPEMD160_H
 
 #if !defined(MBEDTLS_CONFIG_FILE)
-#include "config.h"
+#include "mbedtls/config.h"
 #else
 #include MBEDTLS_CONFIG_FILE
 #endif
@@ -33,31 +31,33 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MBEDTLS_ERR_RIPEMD160_HW_ACCEL_FAILED             -0x0031  /**< RIPEMD160 hardware accelerator failed */
+/* MBEDTLS_ERR_RIPEMD160_HW_ACCEL_FAILED is deprecated and should not be used.
+ */
+/** RIPEMD160 hardware accelerator failed */
+#define MBEDTLS_ERR_RIPEMD160_HW_ACCEL_FAILED             -0x0031
 
-#if ( defined(__ARMCC_VERSION) || defined(_MSC_VER) ) && \
-    !defined(inline) && !defined(__cplusplus)
-#define inline __inline
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 #if !defined(MBEDTLS_RIPEMD160_ALT)
 // Regular implementation
 //
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * \brief          RIPEMD-160 context structure
  */
-typedef struct
+typedef struct mbedtls_ripemd160_context
 {
     uint32_t total[2];          /*!< number of bytes processed  */
     uint32_t state[5];          /*!< intermediate digest state  */
     unsigned char buffer[64];   /*!< data block being processed */
 }
 mbedtls_ripemd160_context;
+
+#else  /* MBEDTLS_RIPEMD160_ALT */
+#include "ripemd160_alt.h"
+#endif /* MBEDTLS_RIPEMD160_ALT */
 
 /**
  * \brief          Initialize RIPEMD-160 context
@@ -74,7 +74,7 @@ void mbedtls_ripemd160_init( mbedtls_ripemd160_context *ctx );
 void mbedtls_ripemd160_free( mbedtls_ripemd160_context *ctx );
 
 /**
- * \brief          Clone (the state of) an RIPEMD-160 context
+ * \brief          Clone (the state of) a RIPEMD-160 context
  *
  * \param dst      The destination context
  * \param src      The context to be cloned
@@ -139,11 +139,8 @@ int mbedtls_internal_ripemd160_process( mbedtls_ripemd160_context *ctx,
  *
  * \param ctx      context to be initialized
  */
-MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160_starts(
-                                            mbedtls_ripemd160_context *ctx )
-{
-    mbedtls_ripemd160_starts_ret( ctx );
-}
+MBEDTLS_DEPRECATED void mbedtls_ripemd160_starts(
+                                            mbedtls_ripemd160_context *ctx );
 
 /**
  * \brief          RIPEMD-160 process buffer
@@ -154,13 +151,10 @@ MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160_starts(
  * \param input    buffer holding the data
  * \param ilen     length of the input data
  */
-MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160_update(
+MBEDTLS_DEPRECATED void mbedtls_ripemd160_update(
                                                 mbedtls_ripemd160_context *ctx,
                                                 const unsigned char *input,
-                                                size_t ilen )
-{
-    mbedtls_ripemd160_update_ret( ctx, input, ilen );
-}
+                                                size_t ilen );
 
 /**
  * \brief          RIPEMD-160 final digest
@@ -170,12 +164,9 @@ MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160_update(
  * \param ctx      RIPEMD-160 context
  * \param output   RIPEMD-160 checksum result
  */
-MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160_finish(
+MBEDTLS_DEPRECATED void mbedtls_ripemd160_finish(
                                                 mbedtls_ripemd160_context *ctx,
-                                                unsigned char output[20] )
-{
-    mbedtls_ripemd160_finish_ret( ctx, output );
-}
+                                                unsigned char output[20] );
 
 /**
  * \brief          RIPEMD-160 process data block (internal use only)
@@ -185,27 +176,12 @@ MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160_finish(
  * \param ctx      RIPEMD-160 context
  * \param data     buffer holding one block of data
  */
-MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160_process(
+MBEDTLS_DEPRECATED void mbedtls_ripemd160_process(
                                             mbedtls_ripemd160_context *ctx,
-                                            const unsigned char data[64] )
-{
-    mbedtls_internal_ripemd160_process( ctx, data );
-}
+                                            const unsigned char data[64] );
 
 #undef MBEDTLS_DEPRECATED
 #endif /* !MBEDTLS_DEPRECATED_REMOVED */
-
-#ifdef __cplusplus
-}
-#endif
-
-#else  /* MBEDTLS_RIPEMD160_ALT */
-#include "ripemd160_alt.h"
-#endif /* MBEDTLS_RIPEMD160_ALT */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * \brief          Output = RIPEMD-160( input buffer )
@@ -235,16 +211,14 @@ int mbedtls_ripemd160_ret( const unsigned char *input,
  * \param ilen     length of the input data
  * \param output   RIPEMD-160 checksum result
  */
-MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160(
-                                                    const unsigned char *input,
-                                                    size_t ilen,
-                                                    unsigned char output[20] )
-{
-    mbedtls_ripemd160_ret( input, ilen, output );
-}
+MBEDTLS_DEPRECATED void mbedtls_ripemd160( const unsigned char *input,
+                                           size_t ilen,
+                                           unsigned char output[20] );
 
 #undef MBEDTLS_DEPRECATED
 #endif /* !MBEDTLS_DEPRECATED_REMOVED */
+
+#if defined(MBEDTLS_SELF_TEST)
 
 /**
  * \brief          Checkup routine
@@ -252,6 +226,8 @@ MBEDTLS_DEPRECATED static inline void mbedtls_ripemd160(
  * \return         0 if successful, or 1 if the test failed
  */
 int mbedtls_ripemd160_self_test( int verbose );
+
+#endif /* MBEDTLS_SELF_TEST */
 
 #ifdef __cplusplus
 }
