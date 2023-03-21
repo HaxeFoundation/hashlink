@@ -101,7 +101,13 @@ if(WIN32)
 
     target_include_directories(ssl.hdll
         PRIVATE
+		.
         ${INCLUDES_BASE_DIR}/mbedtls/include
+    )
+
+    target_compile_definitions(ssl.hdll
+        PRIVATE
+        MBEDTLS_USER_CONFIG_FILE="mbedtls_config.h"
     )
 
     target_link_libraries(ssl.hdll
