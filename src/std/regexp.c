@@ -29,11 +29,10 @@ struct _ereg {
 	void (*finalize)( ereg * );
 	/* The compiled regex code */
 	pcre2_code *regex;
-	/* Number of capture groups */
-	int n_groups;
-
 	/* Pointer to the allocated memory for match data */
 	pcre2_match_data *match_data;
+	/* Number of capture groups */
+	int n_groups;
 	/* Whether the last string was matched successfully */
 	bool matched;
 };
