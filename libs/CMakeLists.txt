@@ -40,11 +40,9 @@ if(WITH_SQLITE)
     add_subdirectory(sqlite)
 endif()
 
-if(WIN32)
-    option(WITH_SSL "Build ssl.hdll." ON)
-    if(WITH_SSL)
+option(WITH_SSL "Build ssl.hdll." ON)
+if(WITH_SSL)
     add_subdirectory(ssl)
-    endif()
 endif()
 
 option(WITH_UI "Build ui.hdll." ON)
