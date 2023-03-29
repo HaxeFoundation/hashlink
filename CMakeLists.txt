@@ -84,12 +84,14 @@ file(GLOB pcre_srcs
     include/pcre/pcre2_valid_utf.c
     include/pcre/pcre2_xclass.c
 )
+
 file(GLOB std_srcs
     src/std/array.c
     src/std/buffer.c
     src/std/bytes.c
     src/std/cast.c
     src/std/date.c
+    src/std/debug.c
     src/std/error.c
     src/std/file.c
     src/std/fun.c
