@@ -95,6 +95,12 @@ target_link_libraries(ssl.hdll
     ${MBEDTLS_LIBRARIES}
 )
 
+if(APPLE)
+	find_library(SECURITY_LIBRARY Security REQUIRED)
+	find_library(COREFOUNDATION_LIBRARY CoreFoundation REQUIRED)
+	target_link_libraries(ssl.hdll ${COREFOUNDATION_LIBRARY} ${SECURITY_LIBRARY})
+endif()
+
 install(
     TARGETS
         ssl.hdll
