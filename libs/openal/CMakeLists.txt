@@ -4,28 +4,32 @@ if(WIN32)
     endif()
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        find_library(OpenAL_LIBRARY OpenAL32 PATHS ${INCLUDES_BASE_DIR}/openal/libs/Win64)
+        find_library(OPENAL_LIBRARY OpenAL32 PATHS ${INCLUDES_BASE_DIR}/openal/libs/Win64)
     else()
-        find_library(OpenAL_LIBRARY OpenAL32 PATHS ${INCLUDES_BASE_DIR}/openal/libs/Win32)
+        find_library(OPENAL_LIBRARY OpenAL32 PATHS ${INCLUDES_BASE_DIR}/openal/libs/Win32)
     endif()
 
-    add_library(openal.hdll SHARED openal.c)
-
-    set_as_hdll(openal)
-
-    target_include_directories(openal.hdll
-        PRIVATE
-        ${INCLUDES_BASE_DIR}/openal/include
-    )
-
-    target_link_libraries(openal.hdll
-        libhl
-        ${OpenAL_LIBRARY}
-    )
-
-    install(
-        TARGETS
-            openal.hdll
-        DESTINATION ${HDLL_DESTINATION}
-    )
+    set(OPENAL_INCLUDE_DIR ${INCLUDES_BASE_DIR}/openal/include)
+else()
+    find_package(OpenAL REQUIRED)
 endif()
+
+add_library(openal.hdll SHARED openal.c)
+
+set_as_hdll(openal)
+
+target_link_libraries(openal.hdll
+    libhl
+    ${OPENAL_LIBRARY}
+)
+
+target_include_directories(openal.hdll
+    PRIVATE
+    ${OPENAL_INCLUDE_DIR}
+)
+
+install(
+    TARGETS
+        openal.hdll
+    DESTINATION ${HDLL_DESTINATION}
+)

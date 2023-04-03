@@ -23,11 +23,9 @@ endif()
 
 # add_subdirectory(mesa)
 
-if(WIN32)
-    option(WITH_OPENAL "Build openal.hdll." ON)
-    if(WITH_OPENAL)
-        add_subdirectory(openal)
-    endif()
+option(WITH_OPENAL "Build openal.hdll." ON)
+if(WITH_OPENAL)
+    add_subdirectory(openal)
 endif()
 
 option(WITH_SDL "Build sdl.hdll." ON)
@@ -40,11 +38,9 @@ if(WITH_SQLITE)
     add_subdirectory(sqlite)
 endif()
 
-if(WIN32)
-    option(WITH_SSL "Build ssl.hdll." ON)
-    if(WITH_SSL)
+option(WITH_SSL "Build ssl.hdll." ON)
+if(WITH_SSL)
     add_subdirectory(ssl)
-    endif()
 endif()
 
 option(WITH_UI "Build ui.hdll." ON)
