@@ -27,7 +27,7 @@ jobs:
 
         include:
           - target: linux
-            runner: ubuntu-18.04
+            runner: ubuntu-20.04
             haxe_nightly_dir: linux64
             archive_ext: tar.gz
 
