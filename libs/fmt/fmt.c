@@ -2,7 +2,7 @@
 #include <png.h>
 #include <hl.h>
 
-#if defined(HL_CONSOLE) && !defined(HL_XBO)
+#if defined(HL_CONSOLE) && !defined(HL_XBO) && !defined(HL_XBS)
 extern bool sys_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags );
 #else
 #	include <turbojpeg.h>
@@ -22,7 +22,7 @@ typedef struct {
 } pixel;
 
 HL_PRIM bool HL_NAME(jpg_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
-#if defined(HL_CONSOLE) && !defined(HL_XBO)
+#if defined(HL_CONSOLE) && !defined(HL_XBO) && !defined(HL_XBS)
 	hl_blocking(true);
 	bool b = sys_jpg_decode(data, dataLen, out, width, height, stride, format, flags);
 	hl_blocking(false);
@@ -628,7 +628,7 @@ static void md5_process( md5_context *ctx, uint8 data[64] ) {
     P( B, C, D, A, 12, 20, 0x8D2A4C8A );
 
 #undef F
-    
+
 #define F(x,y,z) (x ^ y ^ z)
 
     P( A, B, C, D,  5,  4, 0xFFFA3942 );

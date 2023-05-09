@@ -1,6 +1,8 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
 
+#ifndef HL_XBS
+
 #ifdef HL_WIN_DESKTOP
 #include <dxgi.h>
 #include <d3dcommon.h>
@@ -504,3 +506,5 @@ DEFINE_PRIM(_BOOL, set_fullscreen_state, _BOOL);
 DEFINE_PRIM(_BOOL, get_fullscreen_state, _NO_ARG);
 DEFINE_PRIM(_VOID, debug_print, _BYTES);
 DEFINE_PRIM(_VOID, copy_subresource_region, _RESOURCE _I32 _I32 _I32 _I32 _RESOURCE _I32 _DYN);
+
+#endif

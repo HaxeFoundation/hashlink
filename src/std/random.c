@@ -25,9 +25,9 @@
 #if defined(HL_WIN_DESKTOP)
 #	include <windows.h>
 #	include <process.h>
-#elif defined(HL_CONSOLE)
+#elif defined(HL_CONSOLE) && !defined(HL_XBS)
 #	include <posix/posix.h>
-#else
+#elif !defined(HL_XBS)
 #	include <sys/time.h>
 #	include <sys/types.h>
 #	include <unistd.h>
@@ -69,7 +69,11 @@ HL_PRIM void hl_rnd_set_seed( rnd *r, int s ) {
 
 HL_PRIM rnd *hl_rnd_init_system() {
 	rnd *r = hl_rnd_alloc();
+#ifdef HL_XBS
+	int pid = GetCurrentThreadId();
+#else
 	int pid = getpid();
+#endif
 	unsigned int time;
 #ifdef HL_WIN
 	time = GetTickCount();

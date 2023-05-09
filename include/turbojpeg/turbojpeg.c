@@ -42,6 +42,10 @@
 #include "transupp.h"
 #include "./jpegcomp.h"
 
+#if defined(_WIN32)
+#	define putenv _wputenv
+#endif
+
 extern void jpeg_mem_dest_tj(j_compress_ptr, unsigned char **,
 	unsigned long *, boolean);
 extern void jpeg_mem_src_tj(j_decompress_ptr, unsigned char *, unsigned long);

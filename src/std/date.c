@@ -21,7 +21,7 @@
  */
 #include <hl.h>
 
-#ifdef HL_CONSOLE
+#if defined(HL_CONSOLE) && !defined(HL_XBS)
 #	include <posix/posix.h>
 #else
 #	include <time.h>

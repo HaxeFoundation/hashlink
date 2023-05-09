@@ -90,7 +90,7 @@ HL_API bool hl_debug_stop( int pid ) {
 }
 
 HL_API bool hl_debug_breakpoint( int pid ) {
-#	if defined(HL_WIN)
+#	if defined(HL_WIN) && !defined(HL_XBS)
 	return (bool)DebugBreakProcess(OpenPID(pid));
 #	elif defined(HL_MAC)
 	return mdbg_session_pause(pid);
@@ -151,7 +151,7 @@ HL_API bool hl_debug_write( int pid, vbyte *addr, vbyte *buffer, int size ) {
 }
 
 HL_API bool hl_debug_flush( int pid, vbyte *addr, int size ) {
-#	if defined(HL_WIN)
+#	if defined(HL_WIN) && !defined(HL_XBS)
 	return (bool)FlushInstructionCache(OpenPID(pid),addr,size);
 #	elif defined(HL_MAC)
 	return true;
@@ -311,7 +311,7 @@ DefineGetReg(CONTEXT,GetContextReg);
 #endif
 
 HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
-#	if defined(HL_WIN)
+#	if defined(HL_WIN) && !defined(HL_XBS)
 #	ifdef HL_64
 	if( !is64 ) {
 		WOW64_CONTEXT c;
@@ -358,7 +358,7 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 }
 
 HL_API bool hl_debug_write_register( int pid, int thread, int reg, void *value, bool is64 ) {
-#	if defined(HL_WIN)
+#	if defined(HL_WIN) && !defined(HL_XBS)
 #	ifdef HL_64
 	if( !is64 ) {
 		WOW64_CONTEXT c;

@@ -2,5 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="ui_win.c" />
+    <ClCompile Include="ui_stub.c" />
   </ItemGroup>
 </Project>

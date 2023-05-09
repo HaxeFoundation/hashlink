@@ -12,6 +12,7 @@ Debug
 Release
 ReleaseVS2013
 x64
+Gaming.Xbox.Scarlett.x64
 *.stackdump
 *.hdll
 *.so

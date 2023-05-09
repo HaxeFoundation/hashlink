@@ -169,19 +169,19 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 }
 
 static void thread_data_init( thread_handle *t ) {
-#ifdef HL_WIN
+#if defined(HL_WIN) && !defined(HL_XBS)
 	t->h = OpenThread(THREAD_ALL_ACCESS,FALSE, t->tid);
 #endif
 }
 
 static void thread_data_free( thread_handle *t ) {
-#ifdef HL_WIN
+#if defined(HL_WIN) && !defined(HL_XBS)
 	CloseHandle(t->h);
 #endif
 }
 
 static bool pause_thread( thread_handle *t, bool b ) {
-#ifdef HL_WIN
+#if defined(HL_WIN) && !defined(HL_XBS)
 	if( b )
 		return (int)SuspendThread(t->h) >= 0;
 	else {

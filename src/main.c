@@ -133,6 +133,13 @@ static void setup_handler() {
 }
 #endif
 
+#if defined(HL_XBS)
+int wmain(int argc, char *argv[]);
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return wmain(__argc, __argv);
+}
+#endif
+
 #ifdef HL_WIN
 int wmain(int argc, pchar *argv[]) {
 #else
