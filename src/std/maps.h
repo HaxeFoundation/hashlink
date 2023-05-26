@@ -10,6 +10,11 @@
 #define _MLIMIT 128
 #define _MINDEX(m,ckey) ((m)->maxentries < _MLIMIT ? (int)((signed char*)(m)->cells)[ckey] : ((int*)(m)->cells)[ckey])
 #define _MNEXT(m,ckey) ((m)->maxentries < _MLIMIT ? (int)((signed char*)(m)->nexts)[ckey] : ((int*)(m)->nexts)[ckey])
+#ifdef _MNO_EXPORTS
+#define _MSTATIC
+#else
+#define _MSTATIC static
+#endif
 
 typedef struct {
 	void *cells;
@@ -22,13 +27,16 @@ typedef struct {
 	int maxentries;
 } t_map;
 
-HL_PRIM t_map *_MNAME(alloc)() {
+#ifndef _MNO_EXPORTS
+HL_PRIM 
+#endif
+t_map *_MNAME(alloc)() {
 	t_map *m = (t_map*)hl_gc_alloc_raw(sizeof(t_map));
 	memset(m,0,sizeof(t_map));
 	return m;
 }
 
-static vdynamic **_MNAME(find)( t_map *m, t_key key ) {
+_MSTATIC _MVAL_TYPE *_MNAME(find)( t_map *m, t_key key ) {
 	int c, ckey;
 	unsigned int hash;
 
@@ -46,7 +54,7 @@ static vdynamic **_MNAME(find)( t_map *m, t_key key ) {
 
 static void _MNAME(resize)( t_map *m );
 
-static void _MNAME(set_impl)( t_map *m, t_key key, vdynamic *value ) {
+_MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	int c, ckey = 0;
 	unsigned int hash = _MNAME(hash)(key);
 	if( m->values ) {
@@ -125,7 +133,9 @@ static void _MNAME(resize)( t_map *m ) {
 	}
 }
 
-HL_PRIM void _MNAME(set)( t_map *m, t_key key, vdynamic *value ) {
+#ifndef _MNO_EXPORTS
+
+HL_PRIM void _MNAME(set)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	_MNAME(set_impl)(m,_MNAME(filter)(key),value);
 }
 
@@ -211,8 +221,9 @@ HL_PRIM int _MNAME(size)( t_map *m ) {
 }
 
 
+#endif
+
 #undef hlt_key
-#undef hl_hbhash
 #undef _MKEY_TYPE
 #undef _MNAME
 #undef _MMATCH
@@ -222,3 +233,4 @@ HL_PRIM int _MNAME(size)( t_map *m ) {
 #undef _MOLD_KEY
 #undef _MINDEX
 #undef _MNEXT
+#undef _MSTATIC
