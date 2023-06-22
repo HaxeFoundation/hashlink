@@ -156,7 +156,7 @@ HL_PRIM int hl_socket_send( hl_socket *s, vbyte *buf, int pos, int len ) {
 	r = send(s->sock, (char*)buf + pos, len, MSG_NOSIGNAL);
 	if( r == SOCKET_ERROR )
 		return block_error();
-	return len;
+	return r;
 }
 
 
