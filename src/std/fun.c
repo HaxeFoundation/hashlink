@@ -446,6 +446,7 @@ DEFINE_PRIM(_BOOL, is_prim_loaded, _DYN);
 
 #if defined(HL_VCC) && !defined(HL_XBO)
 static LONG CALLBACK global_handler( PEXCEPTION_POINTERS inf ) {
+	if( hl_get_thread() == NULL ) return EXCEPTION_CONTINUE_SEARCH;
 	switch( inf->ExceptionRecord->ExceptionCode ) {
 	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
 	case EXCEPTION_STACK_OVERFLOW: hl_error("Stack overflow");
