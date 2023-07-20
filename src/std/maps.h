@@ -25,7 +25,7 @@ typedef struct {
 	int ncells;
 	int nentries;
 	int maxentries;
-	int minentries;
+	int maxbuckets;
 } t_map;
 
 #ifndef _MNO_EXPORTS
@@ -53,7 +53,7 @@ _MSTATIC _MVAL_TYPE *_MNAME(find)( t_map *m, t_key key ) {
 	return NULL;
 }
 
-static void _MNAME(resize)( t_map *m, bool down );
+static void _MNAME(resize)( t_map *m );
 
 _MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	int c, ckey = 0;
@@ -71,7 +71,7 @@ _MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	}
 	c = hl_freelist_get(&m->lfree);
 	if( c < 0 ) {
-		_MNAME(resize)(m, false);
+		_MNAME(resize)(m);
 		ckey = hash % ((unsigned)m->ncells);
 		c = hl_freelist_get(&m->lfree);
 	}
@@ -87,27 +87,16 @@ _MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	m->nentries++;
 }
 
-static void _MNAME(resize)( t_map *m, bool down ) {
+static void _MNAME(resize)( t_map *m ) {
 	// save
 	t_map old = *m;
-	int i, nentries, ncells;
 
-	if (!down) {
-		if (m->nentries != m->maxentries) hl_error("assert");
+	if( m->nentries != m->maxentries ) hl_error("assert");
 
-		// resize
-		i = 0;
-		nentries = m->maxentries ? ((m->maxentries * 3) + 1) >> 1 : H_SIZE_INIT;
-		ncells = nentries >> 2;
-	}
-	else {
-		if (m->nentries >= m->minentries) hl_error("assert");
-
-		// resize
-		i = 0;
-		nentries = m->minentries > _MLIMIT ? m->minentries : _MLIMIT;
-		ncells = nentries >> 2;
-	}
+	// resize
+	int i = 0;
+	int nentries = m->maxentries ? ((m->maxentries * 3) + 1) >> 1 : H_SIZE_INIT;
+	int ncells = nentries >> 2;
 
 	while( H_PRIMES[i] < ncells ) i++;
 	ncells = H_PRIMES[i];
@@ -116,10 +105,9 @@ static void _MNAME(resize)( t_map *m, bool down ) {
 	m->entries = (t_entry*)hl_gc_alloc_noptr(nentries * sizeof(t_entry));
 	m->values = (t_value*)hl_gc_alloc_raw(nentries * sizeof(t_value));
 	m->maxentries = nentries;
-	int minentries = (nentries * 3) >> 2;
-	m->minentries = minentries > _MLIMIT ? minentries : 0;
+	m->maxbuckets = (nentries >> 7) > 1024 ? (nentries >> 7) : 1024;
 
-	if( old.ncells == ncells && (nentries < _MLIMIT || old.maxentries >= _MLIMIT) && !down ) {
+	if( old.ncells == ncells && (nentries < _MLIMIT || old.maxentries >= _MLIMIT) ) {
 		// simply expand
 		m->nexts = hl_gc_alloc_noptr(nentries * ksize);
 		memcpy(m->entries,old.entries,old.maxentries * sizeof(t_entry));
@@ -143,6 +131,30 @@ static void _MNAME(resize)( t_map *m, bool down ) {
 				_MNAME(set_impl)(m,_MKEY((&old),c),old.values[c].value);
 				c = _MNEXT(&old,c);
 			}
+		}
+	}
+}
+
+static void _MNAME(compact)( t_map *m ) {
+	t_map old = *m;
+	int nentries = old.nentries;
+	int ncells = old.ncells;
+	int ksize = nentries < _MLIMIT ? 1 : sizeof(int);
+	m->entries = (t_entry *)hl_gc_alloc_noptr(nentries * sizeof(t_entry));
+	m->values = (t_value *)hl_gc_alloc_raw(nentries * sizeof(t_value));
+	m->cells = hl_gc_alloc_noptr((ncells + nentries) * ksize);
+	m->nexts = (signed char *)m->cells + ncells * ksize;
+	m->ncells = ncells;
+	m->nentries = 0;
+	memset(m->cells, 0xFF, ncells * ksize);
+	memset(m->values, 0, nentries * sizeof(t_value));
+	hl_freelist_init(&m->lfree);
+	hl_freelist_add_range(&m->lfree, 0, m->maxentries);
+	for (int i = 0; i < old.ncells; i++) {
+		int c = old.maxentries < _MLIMIT ? ((signed char *)old.cells)[i] : ((int *)old.cells)[i];
+		while (c >= 0) {
+			_MNAME(set_impl)(m, _MKEY((&old), c), old.values[c].value);
+			c = _MNEXT(&old, c);
 		}
 	}
 }
@@ -188,8 +200,8 @@ HL_PRIM bool _MNAME(remove)( t_map *m, t_key key ) {
 				else
 					((int*)m->cells)[ckey] = ((int*)m->nexts)[c];
 			}
-			if( m->nentries < m->minentries ) {
-				_MNAME(resize)(m, true);
+			if ((m->lfree.nbuckets) > m->maxbuckets) {
+				_MNAME(compact)(m);
 			}
 			return true;
 		}
