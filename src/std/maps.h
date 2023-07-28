@@ -105,7 +105,7 @@ static void _MNAME(resize)( t_map *m ) {
 	m->entries = (t_entry*)hl_gc_alloc_noptr(nentries * sizeof(t_entry));
 	m->values = (t_value*)hl_gc_alloc_raw(nentries * sizeof(t_value));
 	m->maxentries = nentries;
-	m->maxbuckets = (nentries >> 7) > 1024 ? (nentries >> 7) : 1024;
+	m->maxbuckets = (nentries >> 7) > 16384 ? (nentries >> 7) : 16384;
 
 	if( old.ncells == ncells && (nentries < _MLIMIT || old.maxentries >= _MLIMIT) ) {
 		// simply expand
@@ -137,14 +137,13 @@ static void _MNAME(resize)( t_map *m ) {
 
 static void _MNAME(compact)( t_map *m ) {
 	t_map old = *m;
-	int nentries = old.nentries;
+	int nentries = old.maxentries;
 	int ncells = old.ncells;
 	int ksize = nentries < _MLIMIT ? 1 : sizeof(int);
 	m->entries = (t_entry *)hl_gc_alloc_noptr(nentries * sizeof(t_entry));
 	m->values = (t_value *)hl_gc_alloc_raw(nentries * sizeof(t_value));
 	m->cells = hl_gc_alloc_noptr((ncells + nentries) * ksize);
 	m->nexts = (signed char *)m->cells + ncells * ksize;
-	m->ncells = ncells;
 	m->nentries = 0;
 	memset(m->cells, 0xFF, ncells * ksize);
 	memset(m->values, 0, nentries * sizeof(t_value));
@@ -200,7 +199,7 @@ HL_PRIM bool _MNAME(remove)( t_map *m, t_key key ) {
 				else
 					((int*)m->cells)[ckey] = ((int*)m->nexts)[c];
 			}
-			if ((m->lfree.nbuckets) > m->maxbuckets) {
+			if ((m->lfree.head) > m->maxbuckets) {
 				_MNAME(compact)(m);
 			}
 			return true;
