@@ -136,26 +136,46 @@ static void _MNAME(resize)( t_map *m ) {
 }
 
 static void _MNAME(compact)( t_map *m ) {
-	t_map old = *m;
-	int nentries = old.maxentries;
-	int ncells = old.ncells;
-	int ksize = nentries < _MLIMIT ? 1 : sizeof(int);
-	m->entries = (t_entry *)hl_gc_alloc_noptr(nentries * sizeof(t_entry));
-	m->values = (t_value *)hl_gc_alloc_raw(nentries * sizeof(t_value));
-	m->cells = hl_gc_alloc_noptr((ncells + nentries) * ksize);
-	m->nexts = (signed char *)m->cells + ncells * ksize;
-	m->nentries = 0;
-	memset(m->cells, 0xFF, ncells * ksize);
-	memset(m->values, 0, nentries * sizeof(t_value));
-	hl_freelist_init(&m->lfree);
-	hl_freelist_add_range(&m->lfree, 0, m->maxentries);
-	for (int i = 0; i < old.ncells; i++) {
-		int c = old.maxentries < _MLIMIT ? ((signed char *)old.cells)[i] : ((int *)old.cells)[i];
+	int thresh = m->maxentries - m->nentries;
+	for (int ckey = 0; ckey < m->ncells; ckey++) {
+		int prev = -1;
+		int c = _MINDEX(m, ckey);
 		while (c >= 0) {
-			_MNAME(set_impl)(m, _MKEY((&old), c), old.values[c].value);
-			c = _MNEXT(&old, c);
+			if (c < thresh) {
+				// Get a free index which is the biggest free index as we have at least 1 bucket
+				int c1 = hl_freelist_get(&m->lfree);
+				// Move key/value from c to c1
+				t_key key = _MKEY(m, c);
+				unsigned int hash = _MNAME(hash)(key);
+				_MSET(c1);
+				m->values[c1].value = m->values[c].value;
+				// Erase value at c
+				_MERASE(c);
+				m->values[c].value = NULL;
+				// Move cells/nexts index
+				if (m->maxentries < _MLIMIT) {
+					if (prev >= 0)
+						((signed char *)m->nexts)[prev] = c1;
+					else
+						((signed char *)m->cells)[ckey] = c1;
+					((signed char *)m->nexts)[c1] = ((signed char *)m->nexts)[c];
+				}
+				else {
+					if (prev >= 0)
+						((int *)m->nexts)[prev] = c1;
+					else
+						((int *)m->cells)[ckey] = c1;
+					((int *)m->nexts)[c1] = ((int *)m->nexts)[c];
+				}
+				c = c1;
+			}
+			prev = c;
+			c = _MNEXT(m, c);
 		}
 	}
+	// Reset freelist
+	hl_freelist_init(&m->lfree);
+	hl_freelist_add_range(&m->lfree, 0, thresh);
 }
 
 #ifndef _MNO_EXPORTS
