@@ -235,8 +235,7 @@ class Sdl {
 	}
 }
 
-@:enum
-abstract SDLHint(String) from String to String {
+enum abstract SDLHint(String) from String to String {
 
 	var SDL_HINT_FRAMEBUFFER_ACCELERATION =                 "SDL_FRAMEBUFFER_ACCELERATION";
 	var SDL_HINT_RENDER_DRIVER =                            "SDL_RENDER_DRIVER";

@@ -1,6 +1,6 @@
 package dx;
 
-@:enum abstract Format(Int) {
+enum abstract Format(Int) {
 	var UNKNOWN                     = 0;
 	var R32G32B32A32_TYPELESS       = 1;
 	var R32G32B32A32_FLOAT          = 2;
