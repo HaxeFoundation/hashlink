@@ -15,9 +15,10 @@ typedef struct _gc_freelist {
 
 typedef struct {
 	int block_size;
+	unsigned char size_bits;
+	unsigned char need_flush;
+	short first_block;
 	int max_blocks;
-	int first_block;
-	bool need_flush;
 	// mutable
 	gc_freelist free;
 	unsigned char *sizes;

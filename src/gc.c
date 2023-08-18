@@ -630,6 +630,7 @@ static void gc_flush_mark() {
 			}
 			p = *block++;
 			pos++;
+			if( !p ) continue;
 			page = GC_GET_PAGE(p);
 			if( !page || !INPAGE(p,page) ) continue;
 			int bid = gc_allocator_get_block_id(page,p);
