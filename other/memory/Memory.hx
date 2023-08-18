@@ -774,7 +774,9 @@ class Memory {
 			m.loadMemory(arg);
 		}
 		if( code != null && memory == null ) {
-			memory = new haxe.io.Path(code).dir+"/hlmemory.dump";
+			var dir = new haxe.io.Path(code).dir;
+			if( dir == null ) dir = ".";
+			memory = dir+"/hlmemory.dump";
 			if( sys.FileSystem.exists(memory) ) m.loadMemory(memory);
 		}
 
