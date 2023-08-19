@@ -27,6 +27,14 @@
 #	include <sys/mman.h>
 #endif
 
+#if defined(HL_VCC)
+#define DRAM_PREFETCH(addr) _mm_prefetch(p, 1)
+#elif defined(HL_CLANG) || defined (HL_GCC)
+#define DRAM_PREFETCH(addr) __builtin_prefetch(addr)
+#elif
+#define DRAM_PREFETCH(addr)
+#endif
+
 #define MZERO(ptr,size)		memset(ptr,0,size)
 
 // GC
@@ -636,6 +644,7 @@ static void gc_flush_mark() {
 			int bid = gc_allocator_get_block_id(page,p);
 			if( bid >= 0 && (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
 				page->bmp[bid>>3] |= 1<<(bid&7);
+				if( MEM_HAS_PTR(page->page_kind) ) DRAM_PREFETCH(p);
 				GC_PUSH_GEN(p,page);
 			}
 		}
