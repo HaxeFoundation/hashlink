@@ -13,6 +13,8 @@ typedef struct _gc_freelist {
 	gc_fl *data;
 } gc_freelist;
 
+#define SIZES_PADDING 8
+
 typedef struct {
 	int block_size;
 	unsigned char size_bits;
@@ -22,7 +24,6 @@ typedef struct {
 	// mutable
 	gc_freelist free;
 	unsigned char *sizes;
-	int sizes_ref;
-	int sizes_ref2;
+	char sizes_ref[SIZES_PADDING];
 } gc_allocator_page_data;
 

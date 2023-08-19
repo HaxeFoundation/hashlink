@@ -157,7 +157,7 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	if( p->max_blocks > GC_PAGE_SIZE )
 		hl_fatal("Too many blocks for this page");
 	if( varsize ) {
-		if( p->max_blocks <= 8 )
+		if( p->max_blocks <= SIZES_PADDING )
 			p->sizes = (unsigned char*)&p->sizes_ref;
 		else {
 			p->sizes = ph->base + start_pos;
