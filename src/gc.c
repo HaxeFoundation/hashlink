@@ -82,6 +82,13 @@ static int_val gc_hash( void *ptr ) {
 #endif
 
 #define GC_INTERIOR_POINTERS
+#define GC_PRECISE
+
+#ifndef HL_THREADS
+#	define GC_MARK_THREADS 1
+#else
+#	define GC_MARK_THREADS 4 
+#endif
 
 #define out_of_memory(reason)		hl_fatal("Out of Memory (" reason ")")
 
@@ -552,44 +559,82 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 
 // -------------------------  MARKING ----------------------------------------------------------
 
+typedef struct {
+	void **cur;
+	void **end;
+	int size;
+} gc_mstack;
+
+typedef struct {
+	gc_mstack stack;
+	hl_semaphore *ready;
+	hl_semaphore *done;
+} gc_mthread;
+
 static float gc_mark_threshold = 0.2f;
 static int mark_size = 0;
 static unsigned char *mark_data = NULL;
-static void **cur_mark_stack = NULL;
-static void **mark_stack_end = NULL;
-static int mark_stack_size = 0;
+static gc_mstack global_mark_stack = {0};
+static gc_mthread mark_threads[GC_MARK_THREADS+1] = {0};
+
+#define GC_STACK_BEGIN(st) register void **__current_stack = (st)->cur; gc_mstack *__current_mstack = st;
+#define GC_STACK_END() __current_mstack->cur = __current_stack;
+#define GC_STACK_COUNT(st) ((st)->size - ((st)->end - (st)->cur) - 1)
 
 #define GC_PUSH_GEN(ptr,page) \
 	if( MEM_HAS_PTR((page)->page_kind) ) { \
-		if( mark_stack == mark_stack_end ) mark_stack = hl_gc_mark_grow(mark_stack); \
-		*mark_stack++ = ptr; \
+		if( __current_stack == __current_mstack->end ) { __current_mstack->cur = __current_stack; __current_stack = hl_gc_mark_grow(__current_mstack); } \
+		*__current_stack++ = ptr; \
 	}
 
-HL_PRIM void **hl_gc_mark_grow( void **stack ) {
-	int nsize = mark_stack_size ? (((mark_stack_size * 3) >> 1) & ~1) : 256;
+#ifdef HL_THREADS
+#	define GC_THREADS 1
+#else
+#	define GC_THREADS 0
+#endif
+
+HL_PRIM void **hl_gc_mark_grow( gc_mstack *stack ) {
+	int nsize = stack->size ? (((stack->size * 3) >> 1) & ~1) : 256;
 	void **nstack = (void**)malloc(sizeof(void**) * nsize);
-	void **base_stack = mark_stack_end - mark_stack_size;
-	int avail = (int)(stack - base_stack);
+	void **base_stack = stack->end - stack->size;
+	int avail = (int)(stack->cur - base_stack);
 	if( nstack == NULL ) {
 		out_of_memory("markstack");
 		return NULL;
 	}
 	memcpy(nstack, base_stack, avail * sizeof(void*));
 	free(base_stack);
-	mark_stack_size = nsize;
-	mark_stack_end = nstack + nsize;
-	cur_mark_stack = nstack + avail;
+	stack->size = nsize;
+	stack->end = nstack + nsize;
+	stack->cur = nstack + avail;
 	if( avail == 0 )
-		*cur_mark_stack++ = 0;
-	return cur_mark_stack;
+		*stack->cur++ = 0;
+	return stack->cur;
 }
 
-#define GC_PRECISE
+static bool atomic_bit_set( unsigned char *addr, unsigned char bitmask ) {
+	if( GC_MARK_THREADS <= 1 ) {
+		unsigned char v = *addr;
+		bool b = (v & bitmask) == 0;
+		if( b ) *addr = v | bitmask;
+		return b;
+	}
+#	if defined(HL_VCC)
+	return ((unsigned)InterlockedOr8((char*)addr,(char)bitmask) & bitmask) == 0;
+#	elif defined(HL_CLANG) || defined(HL_GCC)
+	return (__sync_fetch_and_or(addr,bitmask) & bitmask) == 0;
+#	else
+	hl_fatal("Not implemented");
+	return false;
+#	endif
+} 
 
-static void gc_flush_mark() {
-	register void **mark_stack = cur_mark_stack;
+static void gc_flush_mark( gc_mstack *stack ) {
+	GC_STACK_BEGIN(stack);
+	if( !__current_stack ) return;
+	int count = 0;
 	while( true ) {
-		void **block = (void**)*--mark_stack;
+		void **block = (void**)*--__current_stack;
 		gc_pheader *page = GC_GET_PAGE(block);
 		unsigned int *mark_bits = NULL;
 		int pos = 0, nwords;
@@ -598,9 +643,10 @@ static void gc_flush_mark() {
 		ptr += 0; // prevent unreferenced warning
 #		endif
 		if( !block ) {
-			mark_stack++;
+			__current_stack++;
 			break;
 		}
+		count++;
 		int size = gc_allocator_fast_block_size(page, block);
 #		ifdef GC_DEBUG
 		if( size <= 0 ) hl_fatal("assert");
@@ -642,18 +688,20 @@ static void gc_flush_mark() {
 			page = GC_GET_PAGE(p);
 			if( !page || !INPAGE(p,page) ) continue;
 			int bid = gc_allocator_get_block_id(page,p);
-			if( bid >= 0 && (page->bmp[bid>>3] & (1<<(bid&7))) == 0 ) {
-				page->bmp[bid>>3] |= 1<<(bid&7);
+			if( bid >= 0 && atomic_bit_set(&page->bmp[bid>>3],1<<(bid&7)) ) {
 				if( MEM_HAS_PTR(page->page_kind) ) DRAM_PREFETCH(p);
 				GC_PUSH_GEN(p,page);
 			}
 		}
 	}
-	cur_mark_stack = mark_stack;
+	GC_STACK_END();
+	if( gc_flags & GC_PROFILE ) {
+		printf("FLUSH %d\n", count);
+	}
 }
 
 static void gc_mark_stack( void *start, void *end ) {
-	void **mark_stack = cur_mark_stack;
+	GC_STACK_BEGIN(&global_mark_stack);
 	void **stack_head = (void**)start;
 	while( stack_head < (void**)end ) {
 		void *p = *stack_head++;
@@ -669,11 +717,11 @@ static void gc_mark_stack( void *start, void *end ) {
 			GC_PUSH_GEN(p,page);
 		}
 	}
-	cur_mark_stack = mark_stack;
+	GC_STACK_END();
 }
 
 static void gc_mark() {
-	void **mark_stack = cur_mark_stack;
+	GC_STACK_BEGIN(&global_mark_stack);
 	int mark_bytes = gc_stats.mark_bytes;
 	int i;
 	// prepare mark bits
@@ -701,18 +749,42 @@ static void gc_mark() {
 		}
 	}
 
+	GC_STACK_END();
+
 	// scan threads stacks & registers
 	for(i=0;i<gc_threads.count;i++) {
 		hl_thread_info *t = gc_threads.threads[i];
-		cur_mark_stack = mark_stack;
 		gc_mark_stack(t->stack_cur,t->stack_top);
 		gc_mark_stack(&t->gc_regs,(void**)&t->gc_regs + (sizeof(jmp_buf) / sizeof(void*) - 1));
 		gc_mark_stack(&t->extra_stack_data,(void**)&t->extra_stack_data + t->extra_stack_size);
-		mark_stack = cur_mark_stack;
 	}
 
-	cur_mark_stack = mark_stack;
-	if( mark_stack ) gc_flush_mark();
+	gc_mstack *st = &global_mark_stack;
+	if( GC_MARK_THREADS <= 1 )
+		gc_flush_mark(st);
+	else {
+		int count = GC_STACK_COUNT(st) / GC_MARK_THREADS;
+		for(i=0;i<GC_MARK_THREADS-1;i++) {
+			gc_mthread *t = &mark_threads[i];
+			int push = GC_STACK_COUNT(st);
+			if( push > count ) push = count;
+			while( t->stack.size <= push )
+				hl_gc_mark_grow(&t->stack);
+			if( GC_STACK_COUNT(&t->stack) != 0 )
+				hl_fatal("assert");
+			st->cur -= push;
+			memcpy(t->stack.cur, st->cur, push * sizeof(void*));
+			t->stack.cur += push;
+			hl_semaphore_release(t->ready);
+		}
+		gc_flush_mark(st);
+		for(i=0;i<GC_MARK_THREADS-1;i++) {
+			gc_mthread *t = &mark_threads[i];
+			hl_semaphore_acquire(t->done);
+			if( GC_STACK_COUNT(&t->stack) != 0 )
+				hl_fatal("assert");
+		}
+	}
 	gc_allocator_after_mark();
 }
 
@@ -773,6 +845,15 @@ static void gc_check_mark() {
 		gc_major();
 }
 
+static void mark_thread_main( void *param ) {
+	gc_mthread *inf = &mark_threads[(int_val)param];
+	while( true ) {
+		hl_semaphore_acquire(inf->ready);
+		gc_flush_mark(&inf->stack);
+		hl_semaphore_release(inf->done);
+	}
+}
+
 static void hl_gc_init() {
 	int i;
 	for(i=0;i<1<<GC_LEVEL0_BITS;i++)
@@ -791,6 +872,18 @@ static void hl_gc_init() {
 #	ifdef HL_THREADS
 	hl_add_root(&gc_threads.global_lock);
 	hl_add_root(&gc_threads.exclusive_lock);
+	if( GC_MARK_THREADS > 1 ) {
+		for(int i=0;i<GC_MARK_THREADS-1;i++) {
+			gc_mthread *t = &mark_threads[i];
+			hl_add_root(&t->ready);
+			hl_add_root(&t->done);
+			t->ready = hl_semaphore_alloc(1);
+			t->done = hl_semaphore_alloc(1);
+			hl_semaphore_acquire(t->ready);
+			hl_semaphore_acquire(t->done);
+			hl_thread_start(mark_thread_main, (void*)(int_val)i, false);
+		}
+	}
 #	endif
 }
 
@@ -1195,7 +1288,10 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 			private_data += sizeof(void*) * (1<<GC_LEVEL1_BITS);
 
 	fdump_i(private_data);
-	fdump_i(mark_stack_size); // keep separate
+	int msize = global_mark_stack.size;
+	for(i=0;i<GC_MARK_THREADS;i++)
+		msize += mark_threads[i].stack.size;
+	fdump_i(msize); // keep separate
 	fdump_i(page_count);
 	gc_iter_pages(gc_dump_page);
 
