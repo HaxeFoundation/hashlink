@@ -85,9 +85,9 @@ static int_val gc_hash( void *ptr ) {
 #define GC_PRECISE
 
 #ifndef HL_THREADS
-#	define GC_MARK_THREADS 1
+#	define GC_MAX_MARK_THREADS 1
 #else
-#	define GC_MARK_THREADS 4
+#	define GC_MAX_MARK_THREADS 4
 #endif
 
 #define out_of_memory(reason)		hl_fatal("Out of Memory (" reason ")")
@@ -575,7 +575,8 @@ static float gc_mark_threshold = 0.2f;
 static int mark_size = 0;
 static unsigned char *mark_data = NULL;
 static gc_mstack global_mark_stack = {0};
-static gc_mthread mark_threads[GC_MARK_THREADS] = {0};
+static int gc_mark_threads = GC_MAX_MARK_THREADS;
+static gc_mthread mark_threads[GC_MAX_MARK_THREADS] = {0};
 static unsigned char mark_threads_active = 0;
 static hl_semaphore *mark_threads_done;
 
@@ -616,7 +617,7 @@ HL_PRIM void **hl_gc_mark_grow( gc_mstack *stack ) {
 }
 
 static bool atomic_bit_unset( unsigned char *addr, unsigned char bitmask ) {
-	if( GC_MARK_THREADS <= 1 ) {
+	if( GC_MAX_MARK_THREADS <= 1 ) {
 		unsigned char v = *addr;
 		bool b = (v & bitmask) != 0;
 		if( b ) *addr = v & ~bitmask;
@@ -633,7 +634,7 @@ static bool atomic_bit_unset( unsigned char *addr, unsigned char bitmask ) {
 }
 
 static bool atomic_bit_set( unsigned char *addr, unsigned char bitmask ) {
-	if( GC_MARK_THREADS <= 1 ) {
+	if( GC_MAX_MARK_THREADS <= 1 ) {
 		unsigned char v = *addr;
 		bool b = (v & bitmask) == 0;
 		if( b ) *addr = v | bitmask;
@@ -652,11 +653,15 @@ static bool atomic_bit_set( unsigned char *addr, unsigned char bitmask ) {
 static void gc_dispatch_mark( gc_mstack *st ) {
 	int nthreads = 0;
 	int i;
-	for(i=0;i<GC_MARK_THREADS;i++)
+	if( mark_threads_active == (1<<gc_mark_threads) - 1 )
+		return;
+	for(i=0;i<gc_mark_threads;i++)
 		if( (mark_threads_active&(1<<i)) == 0 )
 			nthreads++;
+	if( nthreads == 0 )
+		return;
 	int count = GC_STACK_COUNT(st) / (nthreads + 1);
-	for(i=0;i<GC_MARK_THREADS;i++) {
+	for(i=0;i<gc_mark_threads;i++) {
 		gc_mthread *t = &mark_threads[i];
 		if( !atomic_bit_set(&mark_threads_active,1<<i) )
 			continue;
@@ -693,7 +698,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 			__current_stack++;
 			break;
 		}
-		if( (count++ & (1 << REGULAR_BITS)) != regular_mask && GC_MARK_THREADS > 1 ) {
+		if( (count++ & (1 << REGULAR_BITS)) != regular_mask && GC_MAX_MARK_THREADS > 1 && gc_mark_threads > 1 ) {
 			regular_mask = regular_mask ? 0 : 1 << REGULAR_BITS;
 			GC_STACK_END();
 			gc_dispatch_mark(stack);
@@ -810,7 +815,7 @@ static void gc_mark() {
 	}
 
 	gc_mstack *st = &global_mark_stack;
-	if( GC_MARK_THREADS <= 1 )
+	if( gc_mark_threads <= 1 )
 		gc_flush_mark(st);
 	else {
 		gc_dispatch_mark(st);
@@ -818,7 +823,7 @@ static void gc_mark() {
 		// wait threads to finish
 		while( mark_threads_active )
 			hl_semaphore_acquire(mark_threads_done);
-		for(i=0;i<GC_MARK_THREADS;i++) {
+		for(i=0;i<gc_mark_threads;i++) {
 			gc_mthread *t = &mark_threads[i];
 			if( GC_STACK_COUNT(&t->stack) != 0 )
 				hl_fatal("assert");
@@ -915,8 +920,14 @@ static void hl_gc_init() {
 	hl_add_root(&gc_threads.exclusive_lock);
 	hl_add_root(&mark_threads_done);
 	mark_threads_done = hl_semaphore_alloc(0);
-	if( GC_MARK_THREADS > 1 ) {
-		for(int i=0;i<GC_MARK_THREADS;i++) {
+	char *nthreads = getenv("HL_GC_THREADS");
+	if( nthreads ) {
+		gc_mark_threads = atoi(nthreads);
+		if( gc_mark_threads < 1 ) gc_mark_threads = 1;
+		if( gc_mark_threads > GC_MAX_MARK_THREADS ) gc_mark_threads = GC_MAX_MARK_THREADS;
+	}
+	if( gc_mark_threads > 1 ) {
+		for(int i=0;i<gc_mark_threads;i++) {
 			gc_mthread *t = &mark_threads[i];
 			hl_add_root(&t->ready);
 			t->ready = hl_semaphore_alloc(0);
@@ -1328,7 +1339,7 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 
 	fdump_i(private_data);
 	int msize = global_mark_stack.size;
-	for(i=0;i<GC_MARK_THREADS;i++)
+	for(i=0;i<GC_MAX_MARK_THREADS;i++)
 		msize += mark_threads[i].stack.size;
 	fdump_i(msize); // keep separate
 	fdump_i(page_count);
