@@ -895,8 +895,8 @@ static void mark_thread_main( void *param ) {
 	while( true ) {
 		hl_semaphore_acquire(inf->ready);
 		inf->mark_count += gc_flush_mark(&inf->stack);
-		hl_semaphore_release(mark_threads_done);
-		atomic_bit_unset(&mark_threads_active, 1 << index);
+		while( !atomic_bit_unset(&mark_threads_active, 1 << index) ) {};
+		if( mark_threads_active == 0 ) hl_semaphore_release(mark_threads_done);
 	}
 }
 
