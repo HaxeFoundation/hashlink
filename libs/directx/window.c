@@ -97,7 +97,6 @@ static dx_events *get_events(HWND wnd) {
 }
 
 static void updateClipCursor(HWND wnd) {
-#ifndef HL_XBS
 	if ( disable_capture ) {
 		ClipCursor(NULL);
 		capture_refresh_time = GetTickCount();
@@ -117,11 +116,8 @@ static void updateClipCursor(HWND wnd) {
 		}
 	}
 	capture_refresh_time = GetTickCount();
-#endif
 }
-
 static void checkCaptureFlags( HWND wnd ) {
-#ifndef HL_XBS
 	if ( !(GetAsyncKeyState(VK_LBUTTON) & 0x8000) )
 		disable_capture &= ~LButton;
 	if ( !(GetAsyncKeyState(VK_RBUTTON) & 0x8000) )
@@ -132,11 +128,9 @@ static void checkCaptureFlags( HWND wnd ) {
 		disable_capture &= ~XButton1;
 	if ( !(GetAsyncKeyState(VK_XBUTTON2) & 0x8000) )
 		disable_capture &= ~XButton2;
-#endif
 }
 
 static bool setRelativeMode( HWND wnd, bool enabled ) {
-#ifndef HL_XBS
 	RAWINPUTDEVICE mouse = { 0x01, 0x02, 0, NULL }; /* Mouse: UsagePage = 1, Usage = 2 */
 
 	if ( relative_mouse == enabled ) return true;
@@ -152,9 +146,6 @@ static bool setRelativeMode( HWND wnd, bool enabled ) {
 	updateClipCursor(wnd);
 
 	return RegisterRawInputDevices(&mouse, 1, sizeof(RAWINPUTDEVICE)) || !enabled;
-#else
-	return false;
-#endif
 }
 
 static dx_event *addEvent( HWND wnd, EventType type ) {
@@ -213,13 +204,11 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		{
 			dx_events *evt = get_events(wnd);
 			if( !evt->is_over ) {
-#ifndef HL_XBS
 				TRACKMOUSEEVENT ev;
 				ev.cbSize = sizeof(ev);
 				ev.dwFlags = TME_LEAVE;
 				ev.hwndTrack = wnd;
 				TrackMouseEvent(&ev);
-#endif
 				evt->is_over = true;
 				addState(Enter);
 			}
@@ -231,7 +220,6 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		{
 			dx_events* evt = get_events(wnd);
 			if ( evt->is_focused ) {
-#ifndef HL_XBS
 				// Only handle raw input when window is active
 				HRAWINPUT hRawInput = (HRAWINPUT)lparam;
 				RAWINPUT inp;
@@ -279,7 +267,6 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 						
 					}
 				}
-#endif
 			}
 		}
 		break;
@@ -307,11 +294,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		e->keyRepeat = repeat;
 		// L/R location
 		if( e->keyCode == VK_SHIFT ) {
-#ifndef HL_XBS
 			bool right = MapVirtualKey((lparam >> 16) & 0xFF, MAPVK_VSC_TO_VK_EX) == VK_RSHIFT;
-#else
-			bool right = (((lparam >> 16) & 0xFF) == 0x36) ? true : false;
-#endif
 			e->keyCode |= right ? 512 : 256;
 			e->keyRepeat = false;
 			shift_downs[right?1:0] = e->type == KeyDown;
@@ -325,7 +308,6 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 			return 0;
 		break;
 	case WM_TIMER:
-#ifndef HL_XBS
 		// bugfix for shifts being considered as a single key (one single WM_KEYUP is received when both are down)
 		if( shift_downs[0] && GetKeyState(VK_LSHIFT) >= 0 ) {
 			//printf("LSHIFT RELEASED\n");
@@ -339,7 +321,6 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 			e = addEvent(wnd,KeyUp);
 			e->keyCode = VK_SHIFT | 512;
 		}
-#endif
 
 		if ( ( capture_mouse || relative_mouse ) && get_events(wnd)->is_focused ) {
 			// Refresh the cursor capture every 3s in case some app hijacks it.
@@ -354,6 +335,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 				updateClipCursor(wnd);
 			}
 		}
+
 		break;
 	case WM_CHAR:
 		e = addEvent(wnd,TextInput);
@@ -363,12 +345,9 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_NCACTIVATE:
 		// Allow user to interact with the titlebar without clipping.
 		disable_capture |= SkipUpdate;
-#ifndef HL_XBS
 		ClipCursor(NULL);
-#endif
 		break;
 	case WM_ACTIVATE:
-#ifndef HL_XBS
 		// HIWORD(wparam) = minimized flag
 		if (!(bool)HIWORD(wparam) && LOWORD(wparam) != WA_INACTIVE) {
 
@@ -390,13 +369,10 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		} else {
 			ClipCursor(NULL);
 		}
-#endif
 		break;
 	case WM_NCLBUTTONDOWN:
 		disable_capture |= InTitleClick;
-#ifndef HL_XBS
 		ClipCursor(NULL);
-#endif
 		break;
 	case WM_CAPTURECHANGED:
 		disable_capture &= ~InTitleClick;
@@ -411,9 +387,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_KILLFOCUS:
 		shift_downs[0] = false;
 		shift_downs[1] = false;
-#ifndef HL_XBS
 		if ( capture_mouse || relative_mouse ) ClipCursor(NULL);
-#endif
 		get_events(wnd)->is_focused = false;
 		addState(Blur);
 		break;
@@ -422,7 +396,6 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		break;
 	case WM_GETMINMAXINFO:
 	{
-#ifndef HL_XBS
 		dx_events *buf = get_events(wnd);
 		if( buf ) {
 			long resizable_flags = (WS_MAXIMIZEBOX | WS_THICKFRAME);
@@ -475,7 +448,6 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 				}
 			}
 		}
-#endif
 		break;
 	}
 	case WM_SETCURSOR:
@@ -506,18 +478,10 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 		wc.cbClsExtra    = 0;
 		wc.cbWndExtra    = 0;
 		wc.hInstance     = hinst;
-#ifndef HL_XBS
-		wc.hIcon         = ExtractIcon(hinst, fileName, 0);
-#else
-		wc.hIcon         = NULL;
-#endif
+		wc.hIcon		 = ExtractIcon(hinst, fileName, 0);
 		wc.hIconSm       = wc.hIcon;
 		wc.hCursor       = NULL;
-#ifndef HL_XBS
 		wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-#else
-		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-#endif
 		wc.lpszMenuName  = NULL;
 		wc.lpszClassName = USTR("HL_WIN");
 		wc.cbSize        = sizeof(WNDCLASSEX);
@@ -542,10 +506,8 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 	if( !(windowFlags & Hidden) ) {
 		ShowWindow(win, SW_SHOW);
 	}
-#ifndef HL_XBS
 	SetForegroundWindow(win);
 	SetFocus(win);
-#endif
 	return win;
 }
 
@@ -554,13 +516,10 @@ HL_PRIM dx_window *HL_NAME(win_create)( int width, int height ) {
 }
 
 HL_PRIM void HL_NAME(win_set_title)(dx_window *win, vbyte *title) {
-#ifndef HL_XBS
 	SetWindowText(win,(LPCWSTR)title);
-#endif
 }
 
 HL_PRIM void HL_NAME(win_set_size)(dx_window *win, int width, int height) {
-#ifndef HL_XBS
 	RECT r;
 	GetWindowRect(win,&r);
 	r.left = r.top = 0;
@@ -568,7 +527,6 @@ HL_PRIM void HL_NAME(win_set_size)(dx_window *win, int width, int height) {
 	r.bottom = height;
 	AdjustWindowRectEx(&r,GetWindowLong(win,GWL_STYLE),GetMenu(win) != NULL,GetWindowLong(win,GWL_EXSTYLE));
 	SetWindowPos(win,NULL,0,0,r.right - r.left,r.bottom - r.top,SWP_NOMOVE|SWP_NOOWNERZORDER);
-#endif
 }
 
 HL_PRIM void HL_NAME(win_get_size)(dx_window *win, int *width, int *height) {
@@ -634,15 +592,10 @@ HL_PRIM void HL_NAME(win_get_max_size)(dx_window *win, int *width, int *height) 
 }
 
 HL_PRIM void HL_NAME(win_get_position)(dx_window *win, int *x, int *y) {
-#ifndef HL_XBS
 	RECT r;
 	GetWindowRect(win,&r);
 	if( x ) *x = r.left;
 	if( y ) *y = r.top;
-#else
-	if( x ) *x = 0;
-	if( y ) *y = 0;
-#endif
 }
 
 HL_PRIM void HL_NAME(win_set_position)(dx_window *win, int x, int y) {
@@ -651,7 +604,6 @@ HL_PRIM void HL_NAME(win_set_position)(dx_window *win, int x, int y) {
 
 // initially written with the intent to center on closest monitor; however, SDL centers to primary, so both options are provided
 HL_PRIM void HL_NAME(win_center)(dx_window *win, bool centerPrimary) {
-#ifndef HL_XBS
 	int scnX = 0;
 	int scnY = 0;
 	int scnWidth = -1;
@@ -678,7 +630,6 @@ HL_PRIM void HL_NAME(win_center)(dx_window *win, bool centerPrimary) {
 		HL_NAME(win_get_size)(win, &winWidth, &winHeight);
 		HL_NAME(win_set_position)(win, scnX + ((scnWidth - winWidth) / 2), scnY + ((scnHeight - winHeight) / 2));
 	}
-#endif
 }
 
 HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
@@ -704,10 +655,9 @@ HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
 }
 
 HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
-#ifndef HL_XBS
 	if( fs ) {
 		MONITORINFO mi = { sizeof(mi) };
-		GetMonitorInfo(MonitorFromWindow(win,MONITOR_DEFAULTTOPRIMARY), &mi);
+        GetMonitorInfo(MonitorFromWindow(win,MONITOR_DEFAULTTOPRIMARY), &mi);
 		SetWindowLong(win,GWL_STYLE,WS_POPUP | WS_VISIBLE);
 		SetWindowPos(win,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top,SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	} else {
@@ -715,7 +665,6 @@ HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 		SetWindowLong(win,GWL_STYLE,buf->normal_style);
 		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	}
-#endif
 }
 
 HL_PRIM double HL_NAME(win_get_opacity)(dx_window *win) {
@@ -742,10 +691,8 @@ HL_PRIM bool HL_NAME(win_set_opacity)(dx_window *win, double opacity) {
 			if( !layered )
 				if( SetWindowLong(win, GWL_EXSTYLE, style | WS_EX_LAYERED) == 0 )
 					return false;
-#ifndef HL_XBS
 			if( SetLayeredWindowAttributes(win, 0, (BYTE)((int)(opacity * 255.0)), LWA_ALPHA) == 0 )
 				return false;
-#endif
 		}
 	}
 	return true;
@@ -754,9 +701,7 @@ HL_PRIM bool HL_NAME(win_set_opacity)(dx_window *win, double opacity) {
 HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
 	if (cur_clip_cursor_window == win) {
 		cur_clip_cursor_window = NULL;
-#ifndef HL_XBS
 		ClipCursor(NULL);
-#endif
 	}
 	dx_events *buf = get_events(win);
 	free(buf);
@@ -787,15 +732,10 @@ HL_PRIM void HL_NAME(win_clip_cursor)(dx_window *win, bool enable) {
 }
 
 HL_PRIM bool HL_NAME(set_cursor_pos)( int x, int y ) {
-#ifndef HL_XBS
 	return SetCursorPos(x, y);
-#else
-	return false;
-#endif
 }
 
 HL_PRIM bool HL_NAME(win_set_cursor_pos)( dx_window *wnd, int x, int y) {
-#ifndef HL_XBS
 	if ( wnd ) {
 		POINT pt;
 		pt.x = x;
@@ -803,7 +743,6 @@ HL_PRIM bool HL_NAME(win_set_cursor_pos)( dx_window *wnd, int x, int y) {
 		ClientToScreen(wnd, &pt);
 		return SetCursorPos(pt.x, pt.y);
 	}
-#endif
 	return false;
 }
 
@@ -816,19 +755,11 @@ HL_PRIM bool HL_NAME(win_get_relative_mouse_mode)() {
 }
 
 HL_PRIM int HL_NAME(get_screen_width)() {
-#ifndef HL_XBS
 	return GetSystemMetrics(SM_CXSCREEN);
-#else
-	return 1920;
-#endif
 }
 
 HL_PRIM int HL_NAME(get_screen_height)() {
-#ifndef HL_XBS
 	return GetSystemMetrics(SM_CYSCREEN);
-#else
-	return 1080;
-#endif
 }
 
 typedef struct {
@@ -836,7 +767,6 @@ typedef struct {
 	varray* arr;
 } get_monitors_data;
 
-#ifndef HL_XBS
 BOOL CALLBACK on_get_monitors(HMONITOR monitor, HDC hdc, LPRECT rect, LPARAM param) {
 	get_monitors_data *data = (get_monitors_data*)param;
 	varray* arr = data->arr;
@@ -854,37 +784,17 @@ BOOL CALLBACK on_get_monitors(HMONITOR monitor, HDC hdc, LPRECT rect, LPARAM par
 	hl_aptr(arr, vdynobj*)[data->idx++] = (vdynobj*)dynobj;
 	return TRUE;
 }
-#endif
-
-#ifdef HL_XBS
-#	define XBS_MONITOR_NAME L"Xbox"
-#endif
 
 HL_PRIM varray* HL_NAME(win_get_monitors)() {
-#ifndef HL_XBS
 	get_monitors_data data;
 	data.idx = 0;
 	data.arr = hl_alloc_array(&hlt_dynobj, 64);
 	EnumDisplayMonitors(NULL, NULL, on_get_monitors, (LPARAM)&data);
 	data.arr->size = data.idx;
 	return data.arr;
-#else
-	get_monitors_data data;
-	data.arr = hl_alloc_array(&hlt_dynobj, 1);
-	vdynamic *dynobj = (vdynamic *)hl_alloc_dynobj();
-	hl_dyn_seti(dynobj, hl_hash_utf8("left"), &hlt_i32, 0);
-	hl_dyn_seti(dynobj, hl_hash_utf8("right"), &hlt_i32, HL_NAME(get_screen_width)());
-	hl_dyn_seti(dynobj, hl_hash_utf8("top"), &hlt_i32, 0);
-	hl_dyn_seti(dynobj, hl_hash_utf8("bottom"), &hlt_i32, HL_NAME(get_screen_height)());
-	hl_dyn_setp(dynobj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes((vbyte*)XBS_MONITOR_NAME, (int)(wcslen(XBS_MONITOR_NAME) + 1) * 2));
-	hl_aptr(data.arr, vdynobj *)[0] = (vdynobj *)dynobj;
-	return data.arr;
-#endif
 }
 
-
 HL_PRIM vbyte* HL_NAME(win_get_monitor_from_window)(HWND wnd) {
-#ifndef HL_XBS
 	HMONITOR handle = MonitorFromWindow(wnd, MONITOR_DEFAULTTOPRIMARY);
 
 	MONITORINFOEX info;
@@ -892,13 +802,9 @@ HL_PRIM vbyte* HL_NAME(win_get_monitor_from_window)(HWND wnd) {
 	if (!GetMonitorInfo(handle, (LPMONITORINFO)&info))
 		return NULL;
 	return hl_copy_bytes((vbyte*)info.szDevice, (int)(wcslen(info.szDevice) + 1) * 2);
-#else
-	return hl_copy_bytes((vbyte*)XBS_MONITOR_NAME, (int)(wcslen(XBS_MONITOR_NAME) + 1) * 2);
-#endif
 }
 
 HL_PRIM varray* HL_NAME(win_get_display_settings)(wchar_t* device) {
-#ifndef HL_XBS
 	DEVMODEW ds;
 	ds.dmSize = sizeof(DEVMODEW);
 	int len = 0;
@@ -913,19 +819,9 @@ HL_PRIM varray* HL_NAME(win_get_display_settings)(wchar_t* device) {
 		hl_aptr(arr, vdynobj*)[i] = (vdynobj*) dynobj;
 	}
 	return arr;
-#else
-	varray* arr = hl_alloc_array(&hlt_dynobj, 1);
-	vdynamic *dynobj = (vdynamic *)hl_alloc_dynobj();
-	hl_dyn_seti(dynobj, hl_hash_utf8("width"), &hlt_i32, HL_NAME(get_screen_width)());
-	hl_dyn_seti(dynobj, hl_hash_utf8("height"), &hlt_i32, HL_NAME(get_screen_height)());
-	hl_dyn_seti(dynobj, hl_hash_utf8("framerate"), &hlt_i32, 60);
-	hl_aptr(arr, vdynobj *)[0] = (vdynobj *)dynobj;
-	return arr;
-#endif
 }
 
 HL_PRIM vdynamic* HL_NAME(win_get_current_display_setting)(wchar_t* device, bool registry) {
-#ifndef HL_XBS
 	DEVMODEW ds;
 	ds.dmSize = sizeof(DEVMODEW);
 	EnumDisplaySettingsW(device, registry ? ENUM_REGISTRY_SETTINGS : ENUM_CURRENT_SETTINGS, &ds);
@@ -934,17 +830,9 @@ HL_PRIM vdynamic* HL_NAME(win_get_current_display_setting)(wchar_t* device, bool
 	hl_dyn_seti(dynobj, hl_hash_utf8("height"), &hlt_i32, ds.dmPelsHeight);
 	hl_dyn_seti(dynobj, hl_hash_utf8("framerate"), &hlt_i32, ds.dmDisplayFrequency);
 	return dynobj;
-#else
-	vdynamic* dynobj = (vdynamic*)hl_alloc_dynobj();
-	hl_dyn_seti(dynobj, hl_hash_utf8("width"), &hlt_i32, HL_NAME(get_screen_width)());
-	hl_dyn_seti(dynobj, hl_hash_utf8("height"), &hlt_i32, HL_NAME(get_screen_height)());
-	hl_dyn_seti(dynobj, hl_hash_utf8("framerate"), &hlt_i32, 60);
-	return dynobj;
-#endif
 }
 
 HL_PRIM int HL_NAME(win_change_display_setting)(wchar_t* device, vdynamic* ds) {
-#ifndef HL_XBS
 	bool found = false;
 	DEVMODEW devMode;
 	devMode.dmSize = sizeof(DEVMODEW);
@@ -961,9 +849,6 @@ HL_PRIM int HL_NAME(win_change_display_setting)(wchar_t* device, vdynamic* ds) {
 		}
 	}
 	return ChangeDisplaySettingsExW(device, found ? &devMode : NULL, NULL, found ? CDS_FULLSCREEN : 0, NULL);
-#else
-	return 0;
-#endif
 }
 
 #define TWIN _ABSTRACT(dx_window)
@@ -1004,58 +889,52 @@ HL_PRIM dx_cursor HL_NAME(load_cursor)( int res ) {
 }
 
 HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, int hotX, int hotY ) {
-#ifndef HL_XBS
 	int pad = sizeof(void*) << 3;
-	HICON hicon;
-	HDC hdc = GetDC(NULL);
-	BITMAPV4HEADER bmh;
-	void *pixels;
-	void *maskbits;
-	int maskbitslen;
-	ICONINFO ii;
+    HICON hicon;
+    HDC hdc = GetDC(NULL);
+    BITMAPV4HEADER bmh;
+    void *pixels;
+    void *maskbits;
+    int maskbitslen;
+    ICONINFO ii;
 
-	ZeroMemory(&bmh,sizeof(bmh));
-	bmh.bV4Size = sizeof(bmh);
-	bmh.bV4Width = width;
-	bmh.bV4Height = -height;
-	bmh.bV4Planes = 1;
-	bmh.bV4BitCount = 32;
-	bmh.bV4V4Compression = BI_BITFIELDS;
-	bmh.bV4AlphaMask = 0xFF000000;
-	bmh.bV4RedMask   = 0x00FF0000;
-	bmh.bV4GreenMask = 0x0000FF00;
-	bmh.bV4BlueMask  = 0x000000FF;
+    ZeroMemory(&bmh,sizeof(bmh));
+    bmh.bV4Size = sizeof(bmh);
+    bmh.bV4Width = width;
+    bmh.bV4Height = -height;
+    bmh.bV4Planes = 1;
+    bmh.bV4BitCount = 32;
+    bmh.bV4V4Compression = BI_BITFIELDS;
+    bmh.bV4AlphaMask = 0xFF000000;
+    bmh.bV4RedMask   = 0x00FF0000;
+    bmh.bV4GreenMask = 0x0000FF00;
+    bmh.bV4BlueMask  = 0x000000FF;
 
-	maskbitslen = ((width + (-width)%pad) >> 3) * height;
-	maskbits = malloc(maskbitslen);
+    maskbitslen = ((width + (-width)%pad) >> 3) * height;
+    maskbits = malloc(maskbitslen);
 	if( maskbits == NULL )
 		return NULL;
 	memset(maskbits,0xFF,maskbitslen);
 
 	memset(&ii,0,sizeof(ii));
-	ii.fIcon = FALSE;
-	ii.xHotspot = (DWORD)hotX;
-	ii.yHotspot = (DWORD)hotY;
-	ii.hbmColor = CreateDIBSection(hdc, (BITMAPINFO*)&bmh, DIB_RGB_COLORS, &pixels, NULL, 0);
-	ii.hbmMask = CreateBitmap(width, height, 1, 1, maskbits);
-	ReleaseDC(NULL, hdc);
-	free(maskbits);
+    ii.fIcon = FALSE;
+    ii.xHotspot = (DWORD)hotX;
+    ii.yHotspot = (DWORD)hotY;
+    ii.hbmColor = CreateDIBSection(hdc, (BITMAPINFO*)&bmh, DIB_RGB_COLORS, &pixels, NULL, 0);
+    ii.hbmMask = CreateBitmap(width, height, 1, 1, maskbits);
+    ReleaseDC(NULL, hdc);
+    free(maskbits);
 
-	memcpy(pixels, data, height * width * 4);
-	hicon = CreateIconIndirect(&ii);
+    memcpy(pixels, data, height * width * 4);
+    hicon = CreateIconIndirect(&ii);
 
-	DeleteObject(ii.hbmColor);
-	DeleteObject(ii.hbmMask);
+    DeleteObject(ii.hbmColor);
+    DeleteObject(ii.hbmMask);
 	return hicon;
-#else
-	return NULL;
-#endif
 }
 
 HL_PRIM void HL_NAME(destroy_cursor)( dx_cursor c ) {
-#ifndef HL_XBS
 	DestroyIcon(c);
-#endif
 }
 
 HL_PRIM void HL_NAME(set_cursor)( dx_cursor c ) {
@@ -1082,7 +961,6 @@ DEFINE_PRIM(_VOID, show_cursor, _BOOL);
 DEFINE_PRIM(_BOOL, is_cursor_visible, _NO_ARG);
 
 HL_PRIM vbyte *HL_NAME(detect_keyboard_layout)() {
-#ifndef HL_XBS
 	char q = MapVirtualKey(0x10, MAPVK_VSC_TO_VK);
 	char w = MapVirtualKey(0x11, MAPVK_VSC_TO_VK);
 	char y = MapVirtualKey(0x15, MAPVK_VSC_TO_VK);
@@ -1091,7 +969,6 @@ HL_PRIM vbyte *HL_NAME(detect_keyboard_layout)() {
 	if (q == 'A' && w == 'Z' && y == 'Y') return "azerty";
 	if (q == 'Q' && w == 'W' && y == 'Z') return "qwertz";
 	if (q == 'Q' && w == 'Z' && y == 'Y') return "qzerty";
-#endif
 	return "unknown";
 }
 DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
