@@ -7,9 +7,6 @@
 #define t_map _MNAME(_map)
 #define t_entry _MNAME(_entry)
 #define t_value _MNAME(_value)
-#define _MLIMIT 128
-#define _MINDEX(m,ckey) ((m)->maxentries < _MLIMIT ? (int)((signed char*)(m)->cells)[ckey] : ((int*)(m)->cells)[ckey])
-#define _MNEXT(m,ckey) ((m)->maxentries < _MLIMIT ? (int)((signed char*)(m)->nexts)[ckey] : ((int*)(m)->nexts)[ckey])
 #ifdef _MNO_EXPORTS
 #define _MSTATIC
 #else
@@ -17,15 +14,12 @@
 #endif
 
 typedef struct {
-	void *cells;
-	void *nexts;
 	t_entry *entries;
 	t_value *values;
-	hl_free_list lfree;
-	int ncells;
+	int *psl;
+	int nbuckets;
 	int nentries;
 	int maxentries;
-	int maxbuckets;
 } t_map;
 
 #ifndef _MNO_EXPORTS
@@ -38,17 +32,17 @@ t_map *_MNAME(alloc)() {
 }
 
 _MSTATIC _MVAL_TYPE *_MNAME(find)( t_map *m, t_key key ) {
-	int c, ckey;
+	int c, dc = 0;
 	unsigned int hash;
 
-	if( !m->values ) return NULL;
+	if (m->nbuckets == 0) return NULL;
 	hash = _MNAME(hash)(key);
-	ckey = hash % ((unsigned)m->ncells);
-	c = _MINDEX(m,ckey);
-	while( c >= 0 ) {
-		if( _MMATCH(c) )
+	c = hash % ((unsigned)m->nbuckets);
+	while( m->psl[c] >= 0 && dc <= m->psl[c] ) {
+		if (_MMATCH(c))
 			return &m->values[c].value;
-		c = _MNEXT(m,c);
+		dc++;
+		c = (c + 1) % m->nbuckets;
 	}
 	return NULL;
 }
@@ -56,34 +50,48 @@ _MSTATIC _MVAL_TYPE *_MNAME(find)( t_map *m, t_key key ) {
 static void _MNAME(resize)( t_map *m );
 
 _MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
-	int c, ckey = 0;
+	int c = -1, prev = -1, dc = 0;
 	unsigned int hash = _MNAME(hash)(key);
-	if( m->values ) {
-		ckey = hash % ((unsigned)m->ncells);
-		c = _MINDEX(m,ckey);
-		while( c >= 0 ) {
-			if( _MMATCH(c) ) {
+	if( m->nbuckets > 0 ) {
+		c = hash % ((unsigned)m->nbuckets);
+		while (m->psl[c] >= 0 && dc <= m->psl[c]) {
+			if (_MMATCH(c)) {
 				m->values[c].value = value;
 				return;
 			}
-			c = _MNEXT(m,c);
+			dc++;
+			prev = c;
+			c = (c + 1) % m->nbuckets;
+		}
+		if (prev > 0) {
+			dc--;
+			c = prev;
 		}
 	}
-	c = hl_freelist_get(&m->lfree);
-	if( c < 0 ) {
+	if (m->nentries >= m->maxentries) {
 		_MNAME(resize)(m);
-		ckey = hash % ((unsigned)m->ncells);
-		c = hl_freelist_get(&m->lfree);
+		dc = 0;
+		c = hash % ((unsigned)m->nbuckets);
+	}
+	while (m->psl[c] >= 0) {
+		if (dc > m->psl[c]) {
+			t_key key_tmp = _MKEY(m, c);
+			_MVAL_TYPE value_tmp = m->values[c].value;
+			int dc_tmp = m->psl[c];
+			_MSET(c);
+			m->values[c].value = value;
+			m->psl[c] = dc;
+			key = key_tmp;
+			value = value_tmp;
+			dc = dc_tmp;
+			hash = _MNAME(hash)(key);
+		}
+		dc++;
+		c = (c + 1) % m->nbuckets;
 	}
 	_MSET(c);
-	if( m->maxentries < _MLIMIT ) {
-		((signed char*)m->nexts)[c] = ((signed char*)m->cells)[ckey];
-		((signed char*)m->cells)[ckey] = (signed char)c;
-	} else {
-		((int*)m->nexts)[c] = ((int*)m->cells)[ckey];
-		((int*)m->cells)[ckey] = c;
-	}
 	m->values[c].value = value;
+	m->psl[c] = dc;
 	m->nentries++;
 }
 
@@ -94,88 +102,22 @@ static void _MNAME(resize)( t_map *m ) {
 	if( m->nentries != m->maxentries ) hl_error("assert");
 
 	// resize
-	int i = 0;
-	int nentries = m->maxentries ? ((m->maxentries * 3) + 1) >> 1 : H_SIZE_INIT;
-	int ncells = nentries >> 2;
+	int nbuckets = old.nbuckets ? old.nbuckets << 1 : H_SIZE_INIT;
+	m->entries = (t_entry *)hl_gc_alloc_noptr(nbuckets * sizeof(t_entry));
+	m->values = (t_value *)hl_gc_alloc_raw(nbuckets * sizeof(t_value));
+	m->psl = (int *)hl_gc_alloc_noptr(nbuckets * sizeof(int));
+	m->nbuckets = nbuckets;
+	m->maxentries = nbuckets * 11 >> 4;
 
-	while( H_PRIMES[i] < ncells ) i++;
-	ncells = H_PRIMES[i];
-
-	int ksize = nentries < _MLIMIT ? 1 : sizeof(int);
-	m->entries = (t_entry*)hl_gc_alloc_noptr(nentries * sizeof(t_entry));
-	m->values = (t_value*)hl_gc_alloc_raw(nentries * sizeof(t_value));
-	m->maxentries = nentries;
-	m->maxbuckets = (nentries >> 7) > 16384 ? (nentries >> 7) : 16384;
-
-	if( old.ncells == ncells && (nentries < _MLIMIT || old.maxentries >= _MLIMIT) ) {
-		// simply expand
-		m->nexts = hl_gc_alloc_noptr(nentries * ksize);
-		memcpy(m->entries,old.entries,old.maxentries * sizeof(t_entry));
-		memcpy(m->values,old.values,old.maxentries * sizeof(t_value));
-		memcpy(m->nexts,old.nexts,old.maxentries * ksize);
-		memset(m->values + old.maxentries, 0, (nentries - old.maxentries) * sizeof(t_value));
-		hl_freelist_add_range(&m->lfree,old.maxentries,m->maxentries - old.maxentries);
-	} else {
-		// expand and remap
-		m->cells = hl_gc_alloc_noptr((ncells + nentries) * ksize);
-		m->nexts = (signed char*)m->cells + ncells * ksize;
-		m->ncells = ncells;
-		m->nentries = 0;
-		memset(m->cells,0xFF,ncells * ksize);
-		memset(m->values, 0, nentries * sizeof(t_value));
-		hl_freelist_init(&m->lfree);
-		hl_freelist_add_range(&m->lfree,0,m->maxentries);
-		for(i=0;i<old.ncells;i++) {
-			int c = old.maxentries < _MLIMIT ? ((signed char*)old.cells)[i] : ((int*)old.cells)[i];
-			while( c >= 0 ) {
-				_MNAME(set_impl)(m,_MKEY((&old),c),old.values[c].value);
-				c = _MNEXT(&old,c);
-			}
+	// remap
+	m->nentries = 0;
+	memset(m->values, 0, nbuckets * sizeof(t_value));
+	memset(m->psl, -1, nbuckets * sizeof(int));
+	for (int c = 0; c < old.nbuckets; c++) {
+		if (old.psl[c] >= 0) {
+			_MNAME(set_impl)(m, _MKEY((&old), c), old.values[c].value);
 		}
 	}
-}
-
-static void _MNAME(compact)( t_map *m ) {
-	int thresh = m->maxentries - m->nentries;
-	for (int ckey = 0; ckey < m->ncells; ckey++) {
-		int prev = -1;
-		int c = _MINDEX(m, ckey);
-		while (c >= 0) {
-			if (c < thresh) {
-				// Get a free index which is the biggest free index as we have at least 1 bucket
-				int c1 = hl_freelist_get(&m->lfree);
-				// Move key/value from c to c1
-				t_key key = _MKEY(m, c);
-				unsigned int hash = _MNAME(hash)(key);
-				_MSET(c1);
-				m->values[c1].value = m->values[c].value;
-				// Erase value at c
-				_MERASE(c);
-				m->values[c].value = NULL;
-				// Move cells/nexts index
-				if (m->maxentries < _MLIMIT) {
-					if (prev >= 0)
-						((signed char *)m->nexts)[prev] = c1;
-					else
-						((signed char *)m->cells)[ckey] = c1;
-					((signed char *)m->nexts)[c1] = ((signed char *)m->nexts)[c];
-				}
-				else {
-					if (prev >= 0)
-						((int *)m->nexts)[prev] = c1;
-					else
-						((int *)m->cells)[ckey] = c1;
-					((int *)m->nexts)[c1] = ((int *)m->nexts)[c];
-				}
-				c = c1;
-			}
-			prev = c;
-			c = _MNEXT(m, c);
-		}
-	}
-	// Reset freelist
-	hl_freelist_init(&m->lfree);
-	hl_freelist_add_range(&m->lfree, 0, thresh);
 }
 
 #ifndef _MNO_EXPORTS
@@ -195,66 +137,59 @@ HL_PRIM vdynamic* _MNAME(get)( t_map *m, t_key key ) {
 }
 
 HL_PRIM bool _MNAME(remove)( t_map *m, t_key key ) {
-	int c, prev = -1, ckey;
+	int c, dc = 0;
 	unsigned int hash;
-	if( !m->cells ) return false;
+	if( m->nentries == 0 ) return false;
 	key = _MNAME(filter)(key);
 	hash = _MNAME(hash)(key);
-	ckey = hash % ((unsigned)m->ncells);
-	c = _MINDEX(m,ckey);
-	while( c >= 0 ) {
-		if( _MMATCH(c) ) {
-			hl_freelist_add(&m->lfree,c);
+	c = hash % ((unsigned)m->nbuckets);
+	while (m->psl[c] >= 0 && dc <= m->psl[c]) {
+		if (_MMATCH(c)) {
 			m->nentries--;
 			_MERASE(c);
 			m->values[c].value = NULL;
-			if( m->maxentries < _MLIMIT ) {
-				if( prev >= 0 )
-					((signed char*)m->nexts)[prev] = ((signed char*)m->nexts)[c];
-				else
-					((signed char*)m->cells)[ckey] = ((signed char*)m->nexts)[c];
-			} else {
-				if( prev >= 0 )
-					((int*)m->nexts)[prev] = ((int*)m->nexts)[c];
-				else
-					((int*)m->cells)[ckey] = ((int*)m->nexts)[c];
-			}
-			if ((m->lfree.head) > m->maxbuckets) {
-				_MNAME(compact)(m);
+			m->psl[c] = -1;
+			// Move all following elements
+			int next = (c + 1) % m->nbuckets;
+			while (m->psl[next] > 0) {
+				key = _MKEY(m, next);
+				hash = _MNAME(hash)(key);
+				_MSET(c);
+				_MERASE(next);
+				m->values[c].value = m->values[next].value;
+				m->values[next].value = NULL;
+				m->psl[c] = m->psl[next] - 1;
+				m->psl[next] = -1;
+				c = next;
+				next = (c + 1) % m->nbuckets;
 			}
 			return true;
 		}
-		prev = c;
-		c = _MNEXT(m,c);
+		dc++;
+		c = (c + 1) % m->nbuckets;
 	}
 	return false;
 }
 
 HL_PRIM varray* _MNAME(keys)( t_map *m ) {
-	varray *a = hl_alloc_array(&hlt_key,m->nentries);
-	t_key *keys = hl_aptr(a,t_key);
+	varray *a = hl_alloc_array(&hlt_key, m->nentries);
+	t_key *keys = hl_aptr(a, t_key);
 	int p = 0;
-	int i;
-	for(i=0;i<m->ncells;i++) {
-		int c = _MINDEX(m,i);
-		while( c >= 0 ) {
-			keys[p++] = _MKEY(m,c);
-			c = _MNEXT(m,c);
+	for (int c = 0; c < m->nbuckets; c++) {
+		if (m->psl[c] >= 0) {
+			keys[p++] = _MKEY(m, c);
 		}
 	}
 	return a;
 }
 
 HL_PRIM varray* _MNAME(values)( t_map *m ) {
-	varray *a = hl_alloc_array(&hlt_dyn,m->nentries);
-	vdynamic **values = hl_aptr(a,vdynamic*);
+	varray *a = hl_alloc_array(&hlt_dyn, m->nentries);
+	vdynamic **values = hl_aptr(a, vdynamic*);
 	int p = 0;
-	int i;
-	for(i=0;i<m->ncells;i++) {
-		int c = _MINDEX(m,i);
-		while( c >= 0 ) {
+	for (int c = 0; c < m->nbuckets; c++) {
+		if (m->psl[c] >= 0) {
 			values[p++] = m->values[c].value;
-			c = _MNEXT(m,c);
 		}
 	}
 	return a;
