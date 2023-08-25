@@ -40,7 +40,7 @@ class Stats {
 		var totMem = 0;
 		var max = @:privateAccess mem.maxLines;
 		if( max > 0 && allT.length > max ) {
-			mem.log("<ignore "+(allT.length - max)+" lines - use 'lines 0' to see all>");
+			mem.log("<ignore "+(allT.length - max)+" lines>");
 			allT = allT.slice(allT.length - max);
 		}
 		for( i in allT ) {
@@ -674,6 +674,7 @@ class Memory {
 								if( seq ) {
 									for( k in 0...i ) tl.shift();
 									tag = -1;
+									k += i + 1;
 								}
 								break;
 							}
