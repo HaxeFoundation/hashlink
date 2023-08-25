@@ -1361,6 +1361,7 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	// types
 #	define fdump_t(t)	fdump_i(t.kind); fdump_p(&t);
 	fdump_t(hlt_i32);
+	fdump_t(hlt_i64);
 	fdump_t(hlt_f32);
 	fdump_t(hlt_f64);
 	fdump_t(hlt_dyn);
