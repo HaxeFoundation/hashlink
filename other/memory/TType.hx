@@ -40,13 +40,42 @@ class TType {
 	}
 
 	function tagPtr( pos : Int ) {
-		var p = pos >> 5;
+		var p = pos >> 3;
 		if( ptrTags == null || ptrTags.length <= p ) {
 			var nc = haxe.io.Bytes.alloc(p + 1);
 			if( ptrTags != null ) nc.blit(0, ptrTags, 0, ptrTags.length);
 			ptrTags = nc;
 		}
-		ptrTags.set(p, ptrTags.get(p) | (1 << (pos & 31)));
+		ptrTags.set(p, ptrTags.get(p) | (1 << (pos & 7)));
+	}
+
+	function appendField( m : Memory, pos : Int, name : String, t : HLType ) {
+		switch( t ) {
+		case HPacked({ v : HStruct(p) }):
+			var all = [p];
+			while( p.tsuper != null ) {
+				switch( p.tsuper ) {
+				case HStruct(p2):
+					p = p2;
+					all.unshift(p2);
+				default:
+					throw "assert";
+				}
+			}
+			for( p in all )
+				for( f in p.fields )
+					pos = appendField(m, pos, name+"."+f.name, f.t);
+		case HPacked(_):
+			throw "assert";
+		default:
+			var size = m.typeSize(t);
+			pos = align(pos, size);
+			memFields[pos >> m.ptrBits] = m.getType(t);
+			memFieldsNames[pos >> m.ptrBits] = name;
+			if( t.isPtr() ) tagPtr(pos >> m.ptrBits);
+			pos += size;
+		}
+		return pos;
 	}
 
 	public function buildTypes( m : Memory, tvoid : TType ) {
@@ -68,11 +97,11 @@ class TType {
 		}
 
 		switch( t ) {
-		case HObj(p):
+		case HObj(p), HStruct(p):
 			var protos = [p];
 			while( p.tsuper != null )
 				switch( p.tsuper ) {
-				case HObj(p2):
+				case HObj(p2), HStruct(p2):
 					protos.unshift(p2);
 					p = p2;
 				default:
@@ -81,26 +110,15 @@ class TType {
 			memFields = [];
 			memFieldsNames = [];
 
-			var fcount = 0;
+			var pos = t.match(HStruct(_)) ? 0 : 1 << m.ptrBits; // type
 			for( p in protos )
-				fcount += p.fields.length;
-
-			var pos = 1 << m.ptrBits; // type
-			for( p in protos )
-				for( f in p.fields ) {
-					var size = m.typeSize(f.t);
-					pos = align(pos, size);
-					memFields[pos >> m.ptrBits] = m.getType(f.t);
-					memFieldsNames[pos >> m.ptrBits] = f.name;
-					if( f.t.isPtr() ) tagPtr(pos >> m.ptrBits);
-					pos += size;
-				}
-
+				for( f in p.fields )
+					pos = appendField(m, pos, f.name, f.t);
 			fill(memFields, pos);
 		case HEnum(e):
 			constructs = [];
 			for( c in e.constructs ) {
-				var pos = 4; // index
+				var pos = (1<<m.ptrBits) + 4; // type + index
 				var fields = [];
 				for( t in c.params ) {
 					var size = m.typeSize(t);

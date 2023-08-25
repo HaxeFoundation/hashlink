@@ -94,9 +94,7 @@ class Block {
 	public function new() {
 	}
 
-	function set_type( t : TType ) {
-		if( t != null && t.t == HF64 && page.kind != PNoPtr )
-			throw "!";
+	inline function set_type( t : TType ) {
 		return type = t;
 	}
 
