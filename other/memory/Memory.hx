@@ -38,6 +38,11 @@ class Stats {
 			allT.sort(function(i1, i2) return i1.mem - i2.mem);
 		var totCount = 0;
 		var totMem = 0;
+		var max = @:privateAccess mem.maxLines;
+		if( max > 0 && allT.length > max ) {
+			mem.log("<ignore "+(allT.length - max)+" lines - use 'lines 0' to see all>");
+			allT = allT.slice(allT.length - max);
+		}
 		for( i in allT ) {
 			totCount += i.count;
 			totMem += i.mem;
@@ -101,6 +106,7 @@ class Memory {
 
 	var currentTypeIndex = 0;
 	var resolveCache : Map<String,TType> = new Map();
+	var maxLines : Int = 100;
 
 	function new() {
 	}
@@ -864,6 +870,11 @@ class Memory {
 				case mode:
 					Sys.println("Unknown fields mode " + mode);
 				}
+			case "lines":
+				var v = args.shift();
+				if( v != null )
+					m.maxLines = Std.parseInt(v);
+				Sys.println(m.maxLines == 0 ? "Lines limit disabled" : m.maxLines + " maximum lines displayed");
 			default:
 				Sys.println("Unknown command " + cmd);
 			}
