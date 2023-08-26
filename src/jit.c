@@ -431,6 +431,7 @@ typedef struct {
 #define FLAG_LONGOP	0x80000000
 #define FLAG_16B	0x40000000
 #define FLAG_8B		0x20000000
+#define FLAG_DUAL   0x10000000
 
 #define RM(op,id) ((op) | (((id)+1)<<8))
 #define GET_RM(op)	(((op) >> ((op) < 0 ? 24 : 8)) & 15)
@@ -445,7 +446,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "PUSH", 0x50, RM(0xFF,6), 0x68, 0x6A },
 	{ "ADD", 0x03, 0x01, RM(0x81,0), RM(0x83,0) },
 	{ "SUB", 0x2B, 0x29, RM(0x81,5), RM(0x83,5) },
-	{ "IMUL", LONG_OP(0x0FAF) },
+	{ "IMUL", LONG_OP(0x0FAF), 0, 0x69 | FLAG_DUAL, 0x6B | FLAG_DUAL },
 	{ "DIV", RM(0xF7,6), RM(0xF7,6) },
 	{ "IDIV", RM(0xF7,7), RM(0xF7,7) },
 	{ "CDQ", 0x99 },
@@ -594,12 +595,14 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 			int_val cval = b->holds ? (int_val)b->holds : b->id;
 			// short byte form
 			if( f->r_i8 && IS_SBYTE(cval) ) {
+				if( (f->r_i8&FLAG_DUAL) && a->id > 7 ) r64 |= 4; 
 				OP(f->r_i8);
-				MOD_RM(3,GET_RM(f->r_i8)-1,a->id);
+				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a->id,a->id); else MOD_RM(3,GET_RM(f->r_i8)-1,a->id);
 				B((int)cval);
-			} else if( GET_RM(f->r_const) > 0 ) {
+			} else if( GET_RM(f->r_const) > 0 || (f->r_const&FLAG_DUAL) ) {
+				if( (f->r_i8&FLAG_DUAL) && a->id > 7 ) r64 |= 4; 
 				OP(f->r_const&0xFF);
-				MOD_RM(3,GET_RM(f->r_const)-1,a->id);
+				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a->id,a->id); else MOD_RM(3,GET_RM(f->r_const)-1,a->id);
 				if( mode64 && IS_64 && o == MOV ) W64(cval); else W((int)cval);
 			} else {
 				ERRIF( f->r_const == 0);
@@ -3800,7 +3803,18 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OGetArray:
 			{
 				preg *rdst = IS_FLOAT(dst) ? alloc_fpu(ctx,dst,false) : alloc_cpu(ctx,dst,false);
-				copy(ctx, rdst, pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,hl_type_size(dst->t),sizeof(varray)), dst->size);
+				if( ra->t->kind == HABSTRACT ) {
+					if( dst->t->kind != HOBJ && dst->t->kind != HSTRUCT ) ASSERT(dst->t->kind);
+					hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
+					int osize = rt->size;
+					if( osize & (HL_WSIZE-1) ) osize += HL_WSIZE - (osize & (HL_WSIZE-1));
+					op64(ctx, LEA, rdst, pmem(&p,alloc_cpu(ctx,ra,true)->id,sizeof(struct _hl_carray)));
+					preg *idx = alloc_cpu(ctx, rb, true);
+					op64(ctx, IMUL, idx, pconst(&p,osize));
+					op64(ctx, ADD, rdst, idx);
+					scratch(idx);
+				} else
+					copy(ctx, rdst, pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,hl_type_size(dst->t),sizeof(varray)), dst->size);
 				store(ctx,dst,dst->current,false);
 			}
 			break;
@@ -3812,7 +3826,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OArraySize:
 			{
-				op32(ctx,MOV,alloc_cpu(ctx,dst,false),pmem(&p,alloc_cpu(ctx,ra,true)->id,HL_WSIZE*2));
+				op32(ctx,MOV,alloc_cpu(ctx,dst,false),pmem(&p,alloc_cpu(ctx,ra,true)->id,ra->t->kind == HABSTRACT ? HL_WSIZE + 4 : HL_WSIZE*2));
 				store(ctx,dst,dst->current,false);
 			}
 			break;

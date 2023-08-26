@@ -49,11 +49,7 @@ DEFINE_PRIM(_ARR,alloc_array,_TYPE _I32);
 DEFINE_PRIM(_VOID,array_blit,_ARR _I32 _ARR _I32 _I32);
 DEFINE_PRIM(_TYPE,array_type,_ARR);
 
-typedef struct {
-	hl_type *at;
-	int osize;
-	int size;
-} hl_carray;
+typedef struct _hl_carray hl_carray;
 
 HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	if( at->kind != HOBJ && at->kind != HSTRUCT )
