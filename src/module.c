@@ -472,6 +472,67 @@ static void hl_module_init_indexes( hl_module *m ) {
 	fent->field.name = USTR("init");
 }
 
+#ifdef HL_VTUNE
+#include <jitprofiling.h>
+h_bool hl_module_init_vtune( hl_module *m ) {
+	int i;
+	if( !iJIT_IsProfilingActive() )
+		return false;
+	for(i=0;i<m->code->nfunctions;i++) {
+		hl_function *f = m->code->functions + i;
+		void *faddr = m->functions_ptrs[f->findex];
+
+		iJIT_Method_Load jm = {0};
+		char out[256];
+		jm.method_id = iJIT_GetNewMethodID();
+		if( f->obj ) {
+			jm.class_file_name = hl_to_utf8(f->obj->name);
+			jm.method_name = hl_to_utf8(f->field.name);
+		} else if( f->field.ref ) {
+			jm.class_file_name = hl_to_utf8(f->field.ref->obj->name);
+			jm.method_name = hl_to_utf8(f->field.ref->field.name);
+		} else {
+			sprintf(out,"fun$%d", f->findex);
+			jm.method_name = out;
+		}
+		jm.method_load_address = faddr;
+		jm.method_size = 0;
+		int j;
+		for(j=0;j<m->code->nfunctions;j++) {
+			hl_function *f2 = m->code->functions + j;
+			if( f2 == f ) continue;
+			void *addr = m->functions_ptrs[f2->findex];
+			int_val dif = (char*)addr - (char*)faddr;
+			if( dif <= 0 ) continue;
+			if( jm.method_size == 0 || dif < jm.method_size ) jm.method_size = (int)dif;
+		}
+
+		int file = f->debug[0] & 0x7FFFFFFF;
+		int curline = -1;
+		LineNumberInfo *lines = (LineNumberInfo*)malloc(sizeof(LineNumberInfo)*f->nops);
+		int nlines = 0;
+		hl_debug_infos *dbg = m->jit_debug + i;
+		jm.source_file_name = m->code->debugfiles[file];
+		for(j=0;j<f->nops;j++) {
+			int file2 = f->debug[j<<1] & 0x7FFFFFFF;
+			int line = f->debug[(j<<1)|1];
+			if( file2 != file || line == curline ) continue;
+			lines[nlines].Offset = dbg->large ? ((int*)dbg->offsets)[j] : ((unsigned short*)dbg->offsets)[j];
+			lines[nlines].LineNumber = line - 1;
+			curline = line;
+			nlines++;
+		}
+		if( nlines && jm.method_size ) {
+			jm.line_number_table = lines;
+			jm.line_number_size = nlines;
+		}
+		iJIT_NotifyEvent(iJVM_EVENT_TYPE_METHOD_LOAD_FINISHED,(void*)&jm);
+		free(lines);
+	}
+	return true;
+}
+#endif
+
 static void hl_module_init_natives( hl_module *m ) {
 	char tmp[256];
 	int i;
@@ -619,7 +680,10 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 		hl_constant *c = m->code->constants + i;
 		hl_module_init_constant(m, c);
 	}
-
+	
+#	ifdef HL_VTUNE
+	hl_module_init_vtune(m);
+#	endif
 	hl_module_add(m);
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_gc_set_dump_types(hl_module_types_dump);
