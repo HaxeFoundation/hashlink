@@ -117,6 +117,12 @@ typedef enum {
 	MOV16,
 	CMP16,
 	TEST16,
+	// prefetchs
+	PREFETCHT0,
+	PREFETCHT1,
+	PREFETCHT2,
+	PREFETCHNTA,
+	PREFETCHW,
 	// --
 	_CPU_LAST
 } CpuOp;
@@ -502,6 +508,12 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOV16", OP16(0x8B), OP16(0x89), OP16(0xB8) },
 	{ "CMP16", OP16(0x3B), OP16(0x39) },
 	{ "TEST16", OP16(0x85) },
+	// prefetchs
+	{ "PREFETCHT0", 0, LONG_RM(0x0F18,1) },
+	{ "PREFETCHT1", 0, LONG_RM(0x0F18,2) },
+	{ "PREFETCHT2", 0, LONG_RM(0x0F18,3) },
+	{ "PREFETCHNTA", 0, LONG_RM(0x0F18,0) },
+	{ "PREFETCHW", 0, LONG_RM(0x0F0D,1) },
 };
 
 #ifdef HL_64
@@ -533,7 +545,7 @@ static bool is_reg8( preg *a ) {
 
 static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
-	int r64 = mode64 && (o != PUSH && o != POP && o != CALL && o != PUSH8) ? 8 : 0;
+	int r64 = mode64 && (o != PUSH && o != POP && o != CALL && o != PUSH8 && o < PREFETCHT0) ? 8 : 0;
 	switch( o ) {
 	case CMP8:
 	case TEST8:
@@ -4263,6 +4275,47 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case ONop:
+			break;
+		case OPrefetch:
+			{
+				preg *r = alloc_cpu(ctx, dst, true);
+				if( o->p2 > 0 ) {
+					switch( dst->t->kind ) {
+					case HOBJ:
+					case HSTRUCT:
+						{
+							hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
+							preg *r2 = alloc_reg(ctx, RCPU);
+							op64(ctx, LEA, r2, pmem(&p, r->id, rt->fields_indexes[o->p2-1]));
+							r = r2;
+						}
+						break;
+					default:
+						ASSERT(dst->t->kind);
+						break;
+					}
+				}
+				switch( o->p3 ) {
+				case 0:
+					op64(ctx, PREFETCHT0, pmem(&p,r->id,0), UNUSED);
+					break;
+				case 1:
+					op64(ctx, PREFETCHT1, pmem(&p,r->id,0), UNUSED);
+					break;
+				case 2:
+					op64(ctx, PREFETCHT2, pmem(&p,r->id,0), UNUSED);
+					break;
+				case 3:
+					op64(ctx, PREFETCHNTA, pmem(&p,r->id,0), UNUSED);
+					break;
+				case 4:
+					op64(ctx, PREFETCHW, pmem(&p,r->id,0), UNUSED);
+					break;
+				default:
+					ASSERT(o->p3);
+					break;
+				}
+			}
 			break;
 		default:
 			jit_error(hl_op_name(o->op));
