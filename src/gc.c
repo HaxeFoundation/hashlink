@@ -661,6 +661,8 @@ static void gc_dispatch_mark( gc_mstack *st ) {
 	if( nthreads == 0 )
 		return;
 	int count = GC_STACK_COUNT(st) / (nthreads + 1);
+	if( count == 0 )
+		return;
 	for(i=0;i<gc_mark_threads;i++) {
 		gc_mthread *t = &mark_threads[i];
 		if( !atomic_bit_set(&mark_threads_active,1<<i) )
@@ -825,7 +827,7 @@ static void gc_mark() {
 			hl_semaphore_acquire(mark_threads_done);
 		for(i=0;i<gc_mark_threads;i++) {
 			gc_mthread *t = &mark_threads[i];
-			if( GC_STACK_COUNT(&t->stack) != 0 )
+			if( GC_STACK_COUNT(&t->stack) > 0 )
 				hl_fatal("assert");
 		}
 	}
