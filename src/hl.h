@@ -883,6 +883,7 @@ HL_API void hl_sys_init(void **args, int nargs, void *hlfile);
 HL_API void hl_setup_callbacks(void *sc, void *gw);
 HL_API void hl_setup_callbacks2(void *sc, void *gw, int flags);
 HL_API void hl_setup_reload_check( void *freload, void *param );
+HL_API varray *hl_gc_get_mark_threads(void);
 
 #include <setjmp.h>
 typedef struct _hl_trap_ctx hl_trap_ctx;
