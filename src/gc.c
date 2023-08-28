@@ -650,7 +650,7 @@ static bool atomic_bit_set( unsigned char *addr, unsigned char bitmask ) {
 #	endif
 }
 
-static void gc_dispatch_mark( gc_mstack *st ) {
+static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 	int nthreads = 0;
 	int i;
 	if( mark_threads_active == (1<<gc_mark_threads) - 1 )
@@ -660,7 +660,7 @@ static void gc_dispatch_mark( gc_mstack *st ) {
 			nthreads++;
 	if( nthreads == 0 )
 		return;
-	int count = GC_STACK_COUNT(st) / (nthreads + 1);
+	int count = all ? (GC_STACK_COUNT(st) + nthreads - 1) / nthreads : GC_STACK_COUNT(st) / (nthreads + 1);
 	if( count == 0 )
 		return;
 	for(i=0;i<gc_mark_threads;i++) {
@@ -676,7 +676,15 @@ static void gc_dispatch_mark( gc_mstack *st ) {
 		st->cur -= push;
 		memcpy(t->stack.cur, st->cur, push * sizeof(void*));
 		t->stack.cur += push;
-		hl_semaphore_release(t->ready);
+		if( !all )
+			hl_semaphore_release(t->ready);
+	}
+	if( all ) {
+		if( nthreads != gc_mark_threads ) hl_fatal("assert");
+		for(i=0;i<gc_mark_threads;i++) {
+			gc_mthread *t = &mark_threads[i];
+			hl_semaphore_release(t->ready);
+		}
 	}
 }
 
@@ -703,7 +711,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 		if( (count++ & (1 << REGULAR_BITS)) != regular_mask && GC_MAX_MARK_THREADS > 1 && gc_mark_threads > 1 ) {
 			regular_mask = regular_mask ? 0 : 1 << REGULAR_BITS;
 			GC_STACK_END();
-			gc_dispatch_mark(stack);
+			gc_dispatch_mark(stack,false);
 			GC_STACK_RESUME();
 		}
 		int size = gc_allocator_fast_block_size(page, block);
@@ -820,8 +828,9 @@ static void gc_mark() {
 	if( gc_mark_threads <= 1 )
 		gc_flush_mark(st);
 	else {
-		gc_dispatch_mark(st);
-		gc_flush_mark(st);
+		gc_dispatch_mark(st, true);
+		if( GC_STACK_COUNT(st) > 0 )
+			hl_fatal("assert");
 		// wait threads to finish
 		while( mark_threads_active )
 			hl_semaphore_acquire(mark_threads_done);
