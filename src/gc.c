@@ -903,15 +903,13 @@ static void mark_thread_main( void *param ) {
 	}
 }
 
-HL_API varray *hl_gc_get_mark_threads() {
+int gc_get_mark_threads( hl_thread **tids ) {
 	if (gc_mark_threads <= 1)
-		return hl_alloc_array(&hlt_dyn, 0);
-	varray *a = hl_alloc_array(&hlt_dyn, gc_mark_threads);
-	vdynamic **tids = hl_aptr(a, vdynamic *);
+		return 0;
 	for (int i = 0; i < gc_mark_threads; i++) {
 		tids[i] = mark_threads[i].tid;
 	}
-	return a;
+	return gc_mark_threads;
 }
 
 static void hl_gc_init() {
