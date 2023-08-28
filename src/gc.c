@@ -569,6 +569,7 @@ typedef struct {
 	gc_mstack stack;
 	hl_semaphore *ready;
 	int mark_count;
+	hl_thread *tid;
 } gc_mthread;
 
 static float gc_mark_threshold = 0.2f;
@@ -911,6 +912,15 @@ static void mark_thread_main( void *param ) {
 	}
 }
 
+int gc_get_mark_threads( hl_thread **tids ) {
+	if (gc_mark_threads <= 1)
+		return 0;
+	for (int i = 0; i < gc_mark_threads; i++) {
+		tids[i] = mark_threads[i].tid;
+	}
+	return gc_mark_threads;
+}
+
 static void hl_gc_init() {
 	int i;
 	for(i=0;i<1<<GC_LEVEL0_BITS;i++)
@@ -942,7 +952,7 @@ static void hl_gc_init() {
 			gc_mthread *t = &mark_threads[i];
 			hl_add_root(&t->ready);
 			t->ready = hl_semaphore_alloc(0);
-			hl_thread_start(mark_thread_main, (void*)(int_val)i, false);
+			t->tid = hl_thread_start(mark_thread_main, (void*)(int_val)i, false);
 		}
 	}
 #	endif
