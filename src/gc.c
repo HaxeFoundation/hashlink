@@ -922,12 +922,16 @@ static void hl_gc_init() {
 	hl_add_root(&gc_threads.exclusive_lock);
 	hl_add_root(&mark_threads_done);
 	mark_threads_done = hl_semaphore_alloc(0);
+#	ifndef HL_CONSOLE
 	char *nthreads = getenv("HL_GC_THREADS");
 	if( nthreads ) {
 		gc_mark_threads = atoi(nthreads);
 		if( gc_mark_threads < 1 ) gc_mark_threads = 1;
 		if( gc_mark_threads > GC_MAX_MARK_THREADS ) gc_mark_threads = GC_MAX_MARK_THREADS;
 	}
+#	elif HL_GC_THREADS >= 1 && HL_GC_THREADS <= GC_MAX_MARK_THREADS
+	gc_mark_threads = HL_GC_THREADS;
+#	endif
 	if( gc_mark_threads > 1 ) {
 		for(int i=0;i<gc_mark_threads;i++) {
 			gc_mthread *t = &mark_threads[i];
