@@ -87,7 +87,9 @@ static int_val gc_hash( void *ptr ) {
 #ifndef HL_THREADS
 #	define GC_MAX_MARK_THREADS 1
 #else
+#	ifndef GC_MAX_MARK_THREADS
 #	define GC_MAX_MARK_THREADS 4
+#	endif
 #endif
 
 #define out_of_memory(reason)		hl_fatal("Out of Memory (" reason ")")
