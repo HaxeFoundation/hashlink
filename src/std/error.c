@@ -23,7 +23,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#if defined(HL_CONSOLE) && !defined(HL_XBS)
+#ifdef HL_CONSOLE
 #include <posix/posix.h>
 #endif
 

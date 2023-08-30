@@ -1614,7 +1614,7 @@ static void on_jit_error( const char *msg, int_val line ) {
 	char buf[256];
 	int iline = (int)line;
 	sprintf(buf,"%s (line %d)",msg,iline);
-#if defined(HL_WIN) && !defined(HL_XBS)
+#ifdef HL_WIN_DESKTOP
 	MessageBoxA(NULL,buf,"JIT ERROR",MB_OK);
 #else
 	printf("JIT ERROR : %s\n",buf);
@@ -3955,7 +3955,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					else if( dst->t->kind == HVIRTUAL )
 						f = dst->t->virt->fields + next->p3;
 					if( f == NULL ) ASSERT(dst->t->kind);
-					null_field_access = true;
+ 					null_field_access = true;
 					pad_before_call(ctx, HL_WSIZE);
 					if( f->hashed_name >= 0 && f->hashed_name < 256 )
 						op64(ctx,PUSH8,pconst(&p,f->hashed_name),UNUSED);

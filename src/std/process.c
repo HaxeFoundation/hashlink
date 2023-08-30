@@ -21,7 +21,7 @@
  */
 #include <hl.h>
 
-#if defined(HL_CONSOLE) && !defined(HL_XBS)
+#if defined(HL_CONSOLE)
 #	include <posix/posix.h>
 #elif !defined(HL_WIN)
 #	include <sys/types.h>
@@ -88,11 +88,7 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 	sattr.lpSecurityDescriptor = NULL;
 	memset(&sinf,0,sizeof(sinf));
 	sinf.cb = sizeof(sinf);
-#	ifndef HL_XBS
 	sinf.dwFlags = detached ? 0 : STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
-#	else
-	sinf.dwFlags = 0;
-#	endif
 	sinf.wShowWindow = SW_HIDE;
 	if( !detached ) {
 		CreatePipe(&oread,&sinf.hStdOutput,&sattr,0);

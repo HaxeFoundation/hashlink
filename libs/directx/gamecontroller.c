@@ -1,8 +1,5 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
-
-#ifndef HL_XBS
-
 #include <xinput.h>
 #include <InitGuid.h>
 #define DIRECTINPUT_VERSION 0x0800
@@ -403,5 +400,3 @@ DEFINE_PRIM(_VOID, gctrl_init, _ARR);
 DEFINE_PRIM(_VOID, gctrl_detect, _FUN(_VOID, TGAMECTRL _BYTES));
 DEFINE_PRIM(_VOID, gctrl_update, _OBJ(TGAMECTRL _I32 _STRING _I32 _BYTES _NULL(_F64)));
 DEFINE_PRIM(_VOID, gctrl_set_vibration, TGAMECTRL _F64);
-
-#endif

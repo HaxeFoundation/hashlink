@@ -224,14 +224,12 @@ typedef unsigned long long uint64;
 // -------------- UNICODE -----------------------------------
 
 #if defined(HL_WIN) && !defined(HL_LLVM)
-#if defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)
+#if (defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)) || defined(HL_XBS)
 #	include <Windows.h>
 #elif defined(HL_WIN_DESKTOP) && defined(HL_MINGW)
 #	include<windows.h>
-#elif defined(HL_XBO)
+#else
 #	include <xdk.h>
-#elif defined(HL_XBS)
-#	include <Windows.h>
 #endif
 #	include <wchar.h>
 typedef wchar_t	uchar;

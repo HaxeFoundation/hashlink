@@ -25,7 +25,7 @@
 
 #include <hl.h>
 #include <stdio.h>
-#if defined(HL_CONSOLE) && !defined(HL_XBS)
+#ifdef HL_CONSOLE
 #	include <posix/posix.h>
 #endif
 #ifdef HL_WIN

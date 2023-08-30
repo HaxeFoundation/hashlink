@@ -63,7 +63,7 @@ typedef struct _profile_data profile_data;
 
 struct _thread_handle {
 	int tid;
-#	ifdef HL_WIN_DESKTOP
+#	ifdef HL_WIN
 	HANDLE h;
 #	endif
 	hl_thread_info *inf;
@@ -169,19 +169,19 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 }
 
 static void thread_data_init( thread_handle *t ) {
-#if defined(HL_WIN) && !defined(HL_XBS)
+#ifdef HL_WIN
 	t->h = OpenThread(THREAD_ALL_ACCESS,FALSE, t->tid);
 #endif
 }
 
 static void thread_data_free( thread_handle *t ) {
-#if defined(HL_WIN) && !defined(HL_XBS)
+#ifdef HL_WIN
 	CloseHandle(t->h);
 #endif
 }
 
 static bool pause_thread( thread_handle *t, bool b ) {
-#if defined(HL_WIN) && !defined(HL_XBS)
+#ifdef HL_WIN
 	if( b )
 		return (int)SuspendThread(t->h) >= 0;
 	else {
