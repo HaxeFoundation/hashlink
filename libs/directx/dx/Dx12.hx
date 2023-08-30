@@ -350,6 +350,7 @@ enum abstract ResourceState(Int) {
 	public var VIDE_PROCESS_WRITE = 0x80000;
 	public var VIDE_ENCODE_READ = 0x200000;
 	public var VIDE_ENCODE_WRITE = 0x800000;
+	@:op(a|b) function or(r:ResourceState):ResourceState;
 }
 
 @:struct class Color {
@@ -1195,38 +1196,6 @@ enum ResourceFlag {
 	}
 }
 
-enum abstract ResourceStates(Int) {
-	var COMMON = 0;
-	var VERTEX_AND_CONSTANT_BUFFER = 0x1;
-	var INDEX_BUFFER = 0x2;
-	var RENDER_TARGET = 0x4;
-	var UNORDERED_ACCESS = 0x8;
-	var DEPTH_WRITE = 0x10;
-	var DEPTH_READ = 0x20;
-	var NON_PIXEL_SHADER_RESOURCE = 0x40;
-	var PIXEL_SHADER_RESOURCE = 0x80;
-	var STREAM_OUT = 0x100;
-	var INDIRECT_ARGUMENT = 0x200;
-	var COPY_DEST = 0x400;
-	var COPY_SOURCE = 0x800;
-	var RESOLVE_DEST = 0x1000;
-	var RESOLVE_SOURCE = 0x2000;
-	var RAYTRACING_ACCELERATION_STRUCTURE = 0x400000;
-	var SHADING_RATE_SOURCE = 0x1000000;
-	var GENERIC_READ = ( ( ( ( ( 0x1 | 0x2 )  | 0x40 )  | 0x80 )  | 0x200 )  | 0x800 ) ;
-	var ALL_SHADER_RESOURCE = ( 0x40 | 0x80 ) ;
-	var PRESENT = 0;
-	var PREDICATION = 0x200;
-	var VIDEO_DECODE_READ = 0x10000;
-	var VIDEO_DECODE_WRITE = 0x20000;
-	var VIDEO_PROCESS_READ = 0x40000;
-	var VIDEO_PROCESS_WRITE = 0x80000;
-	var VIDEO_ENCODE_READ = 0x200000;
-	var VIDEO_ENCODE_WRITE = 0x800000;
-	@:op(a|b) function or(r:ResourceStates):ResourceStates;
-}
-
-
 enum abstract SrvDimension(Int) {
 	var UNKNOWN = 0;
 	var BUFFER = 1;
@@ -1527,7 +1496,7 @@ class Dx12 {
 	public static function createSampler( desc : SamplerDesc, target : Address ) {
 	}
 
-	public static function createCommittedResource( heapProperties : HeapProperties, heapFlags : haxe.EnumFlags<HeapFlag>, desc : ResourceDesc, initialState : ResourceStates, clearValue : ClearValue ) : GpuResource {
+	public static function createCommittedResource( heapProperties : HeapProperties, heapFlags : haxe.EnumFlags<HeapFlag>, desc : ResourceDesc, initialState : ResourceState, clearValue : ClearValue ) : GpuResource {
 		return null;
 	}
 
@@ -1546,6 +1515,12 @@ class Dx12 {
 	}
 
 	public static function present( vsync : Bool ) {
+	}
+
+	public static function suspend() {
+	}
+
+	public static function resume() {
 	}
 
 	public static function getDeviceName() {

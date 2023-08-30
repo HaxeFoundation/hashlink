@@ -31,7 +31,7 @@
 
 #if defined(_WIN32)
 #	define HL_WIN
-#	ifndef _DURANGO
+#	if !defined(_DURANGO) && !defined(_GAMING_XBOX)
 #		define HL_WIN_DESKTOP
 #	endif
 #endif
@@ -74,7 +74,11 @@
 #	define HL_XBO
 #endif
 
-#if defined(HL_PS) || defined(HL_NX) || defined(HL_XBO)
+#ifdef _GAMING_XBOX
+#	define HL_XBS
+#endif
+
+#if defined(HL_PS) || defined(HL_NX) || defined(HL_XBO) || defined(HL_XBS)
 #	define HL_CONSOLE
 #endif
 
@@ -220,7 +224,7 @@ typedef unsigned long long uint64;
 // -------------- UNICODE -----------------------------------
 
 #if defined(HL_WIN) && !defined(HL_LLVM)
-#if defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)
+#if (defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)) || defined(HL_XBS)
 #	include <Windows.h>
 #elif defined(HL_WIN_DESKTOP) && defined(HL_MINGW)
 #	include<windows.h>

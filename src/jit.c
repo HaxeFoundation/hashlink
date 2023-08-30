@@ -1629,7 +1629,7 @@ static void on_jit_error( const char *msg, int_val line ) {
 	char buf[256];
 	int iline = (int)line;
 	sprintf(buf,"%s (line %d)",msg,iline);
-#ifdef HL_WIN
+#ifdef HL_WIN_DESKTOP
 	MessageBoxA(NULL,buf,"JIT ERROR",MB_OK);
 #else
 	printf("JIT ERROR : %s\n",buf);

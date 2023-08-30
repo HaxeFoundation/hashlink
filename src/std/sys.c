@@ -148,7 +148,7 @@ HL_PRIM int hl_sys_set_flags( int flags ) {
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
-#	ifdef HL_XBO
+#	if defined(HL_XBO) || defined(HL_XBS)
 	OutputDebugStringW((LPCWSTR)msg);
 #	else	
 #	ifdef HL_WIN_DESKTOP

@@ -63,7 +63,7 @@ typedef struct _profile_data profile_data;
 
 struct _thread_handle {
 	int tid;
-#	ifdef HL_WIN_DESKTOP
+#	ifdef HL_WIN
 	HANDLE h;
 #	endif
 	hl_thread_info *inf;
