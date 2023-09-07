@@ -647,6 +647,7 @@ class GL {
 	public static inline var R32F							= 0x822E;
 	public static inline var UNSIGNED_INT_2_10_10_10_REV	= 0x8368;
 	public static inline var UNSIGNED_INT_10F_11F_11F_REV	= 0x8C3B;
+	public static inline var UNSIGNED_INT_24_8				= 0x84FA;
 
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
@@ -850,6 +851,7 @@ class GL {
 	public static inline var RGB565                         = 0x8D62;
 	public static inline var DEPTH_COMPONENT16              = 0x81A5;
 	public static inline var DEPTH_COMPONENT24              = 0x81A6;
+	public static inline var DEPTH24_STENCIL8              	= 0x88F0;
 	public static inline var STENCIL_INDEX                  = 0x1901;
 	public static inline var STENCIL_INDEX8                 = 0x8D48;
 	public static inline var DEPTH_STENCIL                  = 0x84F9;
