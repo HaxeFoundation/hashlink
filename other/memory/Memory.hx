@@ -86,6 +86,7 @@ class Memory {
 
 	var sortByCount : Bool;
 	var displayFields : FieldsMode = Full;
+	var displayProgress = true;
 
 	var code : format.hl.Data;
 	var pages : Array<Page>;
@@ -335,7 +336,7 @@ class Memory {
 		var missingTypes = 0;
 		for( b in blocks ) {
 			progress++;
-			if( progress % 1000 == 0 )
+			if( displayProgress && progress % 1000 == 0 )
 				Sys.print((Std.int((progress / blocks.length) * 1000.0) / 10) + "%  \r");
 			if( b.page.kind == PDynamic ) {
 				goto(b);
@@ -555,7 +556,7 @@ class Memory {
 
 		for( b in blocks ) {
 			progress++;
-			if( progress % 10000 == 0 )
+			if( displayProgress && progress % 10000 == 0 )
 				Sys.print((Std.int(progress * 1000.0 / blocks.length) / 10) + "%  \r");
 
 			if( !b.page.memHasPtr() )
@@ -652,16 +653,22 @@ class Memory {
 		var lt = resolveType(tstr);
 		if( lt == null ) return;
 
+		inline function isVirtualField(t) { t >>>= 24; return t == 1 || t == 2; }
+
 		var ctx = new Stats(this);
 		for( b in blocks )
 			if( b.type != null && b.type.match(lt) ) {
 				var tl = [];
 				var owner = b.owner;
+				// skip first virtual field
+				if( lt.t != HDynObj && owner != null && owner.type != null && owner.type.t.match(HVirtual(_)) && isVirtualField(owner.makeTID(b,true)) )
+					owner = owner.owner;
+
 				if( owner != null ) {
 					tl.push(owner.makeTID(b,displayFields == Full));
 					var k : Int = up;
 					while( owner.owner != null && k-- > 0 && owner.owner != all ) {
-						var tag = owner.makeTID(owner,displayFields != None);
+						var tag = owner.owner.makeTID(owner,displayFields != None);
 						owner = owner.owner;
 						// remove recursive sequence
 						for( i => tag2 in tl )
@@ -678,6 +685,11 @@ class Memory {
 								}
 								break;
 							}
+						// don't display virtual wrappers
+						if( displayFields != None && owner.type != null && isVirtualField(tag) && owner.type.t.match(HVirtual(_)) ) {
+							tag = -1;
+							k++;
+						}
 						if( tag != -1 )
 							tl.unshift(tag);
 					}
@@ -815,6 +827,10 @@ class Memory {
 				m.loadBytecode(arg);
 				continue;
 			}
+			if( arg == "--args" ) {
+				m.displayProgress = false;
+				break;
+			}
 			memory = arg;
 			m.loadMemory(arg);
 		}
@@ -830,7 +846,7 @@ class Memory {
 		var stdin = Sys.stdin();
 		while( true ) {
 			Sys.print("> ");
-			var args = parseArgs(stdin.readLine());
+			var args = parseArgs(args.length > 0 ? args.shift() : stdin.readLine());
 			var cmd = args.shift();
 			switch( cmd ) {
 			case "exit", "quit", "q":
