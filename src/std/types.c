@@ -838,7 +838,7 @@ static void compact_write_content( mem_context *ctx, vdynamic *d ) {
 			hl_field_lookup *f = obj->lookup + i;
 			int idx = compact_lookup_ref(ctx, hl_is_ptr(f->t) ? (char*)(obj->values + (f->field_index&HL_DYNOBJ_INDEX_MASK)) : (char*)(obj->raw_data + (f->field_index&HL_DYNOBJ_INDEX_MASK)), false);
 			idx = -idx-1;
-			ctx->remap_target[idx] = hl_is_ptr(f->t) ? values_data + sizeof(void*)*f->field_index : raw_data + (f->field_index&HL_DYNOBJ_INDEX_MASK);
+			ctx->remap_target[idx] = hl_is_ptr(f->t) ? values_data + sizeof(void*)*(f->field_index&HL_DYNOBJ_INDEX_MASK) : raw_data + (f->field_index&HL_DYNOBJ_INDEX_MASK);
 		}
 		ctx->todos_pos = save_pos;
 		break;
