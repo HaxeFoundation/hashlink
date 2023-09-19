@@ -320,7 +320,7 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			l.next = stack;
 			f = hl_lookup_find(o->lookup,o->nfields,hl_hash_gen(USTR("__string"),false));
 			if( f && f->t->kind == HFUN && f->t->fun->nargs == 0 && f->t->fun->ret->kind == HBYTES ) {
-				vclosure *v = (vclosure*)o->values[f->field_index];
+				vclosure *v = (vclosure*)o->values[f->field_index&HL_DYNOBJ_INDEX_MASK];
 				if( v ) {
 					hl_buffer_str(b, v->hasValue ? ((uchar*(*)(void*))v->fun)(v->value) : ((uchar*(*)())v->fun)());
 					break;
@@ -331,14 +331,14 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			int *indexes = o->nfields <= 128 ? tmp : (int*)hl_gc_alloc_noptr(sizeof(int) * o->nfields);
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = o->lookup + i;
-				indexes[((unsigned)f->field_index)>>17] = i;
+				indexes[((unsigned)f->field_index)>>HL_DYNOBJ_INDEX_SHIFT] = i;
 			}
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = o->lookup + indexes[i];
 				if( i ) hl_buffer_str_sub(b,USTR(", "),2);
 				hl_buffer_str(b,(uchar*)hl_field_name(f->hashed_name));
 				hl_buffer_str_sub(b,USTR(" : "),3);
-				hl_buffer_addr(b, hl_is_ptr(f->t) ? (void*)(o->values + (f->field_index&0x1FFFF)) : (void*)(o->raw_data + (f->field_index&0x1FFFF)), f->t, &l);
+				hl_buffer_addr(b, hl_is_ptr(f->t) ? (void*)(o->values + (f->field_index&HL_DYNOBJ_INDEX_MASK)) : (void*)(o->raw_data + (f->field_index&HL_DYNOBJ_INDEX_MASK)), f->t, &l);
 			}
 			hl_buffer_char(b, '}');
 		}

@@ -826,7 +826,7 @@ static void compact_write_content( mem_context *ctx, vdynamic *d ) {
 			for(i=0;i<obj->nvalues;i++) {
 				int j;
 				for(j=0;i<obj->nfields;j++) {
-					if( obj->lookup[j].field_index == i && hl_is_ptr(obj->lookup[j].t) ) {
+					if( (obj->lookup[j].field_index&HL_DYNOBJ_INDEX_MASK) == i && hl_is_ptr(obj->lookup[j].t) ) {
 						compact_write_data(ctx, obj->lookup[j].t, obj->values + i);
 						break;
 					}
@@ -836,9 +836,9 @@ static void compact_write_content( mem_context *ctx, vdynamic *d ) {
 		int save_pos = ctx->todos_pos;
 		for(i=0;i<obj->nfields;i++) {
 			hl_field_lookup *f = obj->lookup + i;
-			int idx = compact_lookup_ref(ctx, hl_is_ptr(f->t) ? (char*)(obj->values + f->field_index) : (char*)(obj->raw_data + f->field_index), false);
+			int idx = compact_lookup_ref(ctx, hl_is_ptr(f->t) ? (char*)(obj->values + (f->field_index&HL_DYNOBJ_INDEX_MASK)) : (char*)(obj->raw_data + (f->field_index&HL_DYNOBJ_INDEX_MASK)), false);
 			idx = -idx-1;
-			ctx->remap_target[idx] = hl_is_ptr(f->t) ? values_data + sizeof(void*)*f->field_index : raw_data + f->field_index;
+			ctx->remap_target[idx] = hl_is_ptr(f->t) ? values_data + sizeof(void*)*f->field_index : raw_data + (f->field_index&HL_DYNOBJ_INDEX_MASK);
 		}
 		ctx->todos_pos = save_pos;
 		break;

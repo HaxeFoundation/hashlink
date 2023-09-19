@@ -570,6 +570,9 @@ typedef struct {
 	vvirtual *virtuals;
 } vdynobj;
 
+#define HL_DYNOBJ_INDEX_SHIFT 17
+#define HL_DYNOBJ_INDEX_MASK ((1 << HL_DYNOBJ_INDEX_SHIFT) - 1)
+
 typedef struct _venum {
 	hl_type *t;
 	int index;

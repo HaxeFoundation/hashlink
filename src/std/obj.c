@@ -495,10 +495,8 @@ HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 	}
 }
 
-#define DYNOBJ_INDEX_SHIFT 17
-#define DYNOBJ_INDEX_MASK ((1 << DYNOBJ_INDEX_SHIFT) - 1)
-#define hl_dynobj_field(o,f) (hl_is_ptr((f)->t) ? (void*)((o)->values + ((f)->field_index&DYNOBJ_INDEX_MASK)) : (void*) ((o)->raw_data + ((f)->field_index&DYNOBJ_INDEX_MASK)))
-#define hl_dynobj_order(f) (((unsigned)(f)->field_index) >> DYNOBJ_INDEX_SHIFT)
+#define hl_dynobj_field(o,f) (hl_is_ptr((f)->t) ? (void*)((o)->values + ((f)->field_index&HL_DYNOBJ_INDEX_MASK)) : (void*) ((o)->raw_data + ((f)->field_index&HL_DYNOBJ_INDEX_MASK)))
+#define hl_dynobj_order(f) (((unsigned)(f)->field_index) >> HL_DYNOBJ_INDEX_SHIFT)
 
 vdynamic *hl_virtual_make_value( vvirtual *v ) {
 	vdynobj *o;
@@ -521,8 +519,8 @@ vdynamic *hl_virtual_make_value( vvirtual *v ) {
 			f->field_index = raw_size;
 			raw_size += hl_type_size(f->t);
 		}
-		if( f->field_index > DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj fields");
-		f->field_index |= (i << DYNOBJ_INDEX_SHIFT);
+		if( f->field_index > HL_DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj fields");
+		f->field_index |= (i << HL_DYNOBJ_INDEX_SHIFT);
 	}
 	// copy the data & rebind virtual addresses
 	o->raw_data = hl_gc_alloc_noptr(raw_size);
@@ -687,7 +685,7 @@ static void hl_dynobj_remap_virtuals( vdynobj *o, hl_field_lookup *f, int_val ad
 static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 	int i;
 	unsigned int order = hl_dynobj_order(f);
-	int index = f->field_index & DYNOBJ_INDEX_MASK;
+	int index = f->field_index & HL_DYNOBJ_INDEX_MASK;
 	bool is_ptr = hl_is_ptr(f->t); 
 	// erase data
 	if( is_ptr ) {
@@ -696,7 +694,7 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 		o->values[o->nvalues] = NULL;
 		for(i=0;i<o->nfields;i++) {
 			hl_field_lookup *f = o->lookup + i;
-			if( hl_is_ptr(f->t) && (f->field_index&DYNOBJ_INDEX_MASK) > index )
+			if( hl_is_ptr(f->t) && (f->field_index&HL_DYNOBJ_INDEX_MASK) > index )
 				f->field_index--;
 		}
 	} else {
@@ -730,7 +728,7 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 	for(i=0;i<o->nfields;i++) {
 		hl_field_lookup *f = o->lookup + i;
 		if( hl_dynobj_order(f) > order )
-			f->field_index -= 1 << DYNOBJ_INDEX_SHIFT;
+			f->field_index -= 1 << HL_DYNOBJ_INDEX_SHIFT;
 	}
 }
 
@@ -741,7 +739,7 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 	// expand data
 	if( hl_is_ptr(t) ) {
 		index = o->nvalues;
-		if( index > DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj values");
+		if( index > HL_DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj values");
 		void **nvalues = hl_gc_alloc_raw( (o->nvalues + 1) * sizeof(void*) );
 		memcpy(nvalues,o->values,o->nvalues * sizeof(void*));
 		nvalues[index] = NULL;
@@ -762,7 +760,7 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 		int pad = hl_pad_size(raw_size, t);
 		int size = hl_type_size(t);
 
-		if( raw_size + pad > DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj values");
+		if( raw_size + pad > HL_DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj values");
 
 		char *newData = (char*)hl_gc_alloc_noptr(raw_size + pad + size);
 		if( raw_size == o->raw_size )
@@ -771,11 +769,11 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 			raw_size = 0;
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = o->lookup + i;
-				int index = f->field_index & DYNOBJ_INDEX_MASK;
+				int index = f->field_index & HL_DYNOBJ_INDEX_MASK;
 				if( hl_is_ptr(f->t) ) continue;
 				raw_size += hl_pad_size(raw_size, f->t);
 				memcpy(newData + raw_size, o->raw_data + index, hl_type_size(f->t));
-				f->field_index = raw_size | (hl_dynobj_order(f) << DYNOBJ_INDEX_SHIFT);
+				f->field_index = raw_size | (hl_dynobj_order(f) << HL_DYNOBJ_INDEX_SHIFT);
 				if( index != raw_size )
 					hl_dynobj_remap_virtuals(o, f, 0);
 				raw_size += hl_type_size(f->t);
@@ -796,7 +794,7 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 	hl_field_lookup *f = new_lookup + field_pos;
 	f->t = t;
 	f->hashed_name = hfield;
-	f->field_index = index | (o->nfields << DYNOBJ_INDEX_SHIFT);
+	f->field_index = index | (o->nfields << HL_DYNOBJ_INDEX_SHIFT);
 	memcpy(new_lookup + (field_pos + 1),o->lookup + field_pos, (o->nfields - field_pos) * sizeof(hl_field_lookup));
 	o->nfields++;
 	o->lookup = new_lookup;
