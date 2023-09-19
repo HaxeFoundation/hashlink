@@ -892,6 +892,8 @@ class Memory {
 				if( v != null )
 					m.maxLines = Std.parseInt(v);
 				Sys.println(m.maxLines == 0 ? "Lines limit disabled" : m.maxLines + " maximum lines displayed");
+			case null:
+				Sys.println("");
 			default:
 				Sys.println("Unknown command " + cmd);
 			}
