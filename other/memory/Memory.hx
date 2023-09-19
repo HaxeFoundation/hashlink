@@ -38,6 +38,11 @@ class Stats {
 			allT.sort(function(i1, i2) return i1.mem - i2.mem);
 		var totCount = 0;
 		var totMem = 0;
+		var max = @:privateAccess mem.maxLines;
+		if( max > 0 && allT.length > max ) {
+			mem.log("<ignore "+(allT.length - max)+" lines>");
+			allT = allT.slice(allT.length - max);
+		}
 		for( i in allT ) {
 			totCount += i.count;
 			totMem += i.mem;
@@ -60,6 +65,12 @@ class Stats {
 
 }
 
+enum FieldsMode {
+	Full;
+	Parents;
+	None;
+}
+
 class Memory {
 
 	public var memoryDump : sys.io.FileInput;
@@ -74,7 +85,8 @@ class Memory {
 	var markData : Int;
 
 	var sortByCount : Bool;
-	var displayFields : Bool = true;
+	var displayFields : FieldsMode = Full;
+	var displayProgress = true;
 
 	var code : format.hl.Data;
 	var pages : Array<Page>;
@@ -95,6 +107,7 @@ class Memory {
 
 	var currentTypeIndex = 0;
 	var resolveCache : Map<String,TType> = new Map();
+	var maxLines : Int = 100;
 
 	function new() {
 	}
@@ -105,9 +118,11 @@ class Memory {
 		case HUi8: 1;
 		case HUi16: 2;
 		case HI32, HF32: 4;
-		case HF64: 8;
+		case HI64, HF64: 8;
 		case HBool:
 			return bool32 ? 4 : 1;
+		case HPacked(_), HAt(_):
+			throw "assert";
 		default:
 			return is64 ? 8 : 4;
 		}
@@ -291,13 +306,17 @@ class Memory {
 				var pt = closuresPointers[cid++];
 				if( !pt.isNull() )
 					pointerType.set(pt, ct);
-			case HObj(o):
-				if( o.tsuper != null )
+			case HObj(o), HStruct(o):
+				if( o.tsuper != null ) {
+					var found = false;
 					for( j in 0...types.length )
 						if( types[j].t == o.tsuper ) {
 							types[i].parentClass = types[j];
+							found = true;
 							break;
 						}
+					if( !found ) throw "Missing parent class";
+				}
 			default:
 			}
 		}
@@ -314,21 +333,33 @@ class Memory {
 		var progress = 0;
 		pointerBlock = new PointerMap();
 
+		var missingTypes = 0;
 		for( b in blocks ) {
 			progress++;
-			if( progress % 1000 == 0 )
+			if( displayProgress && progress % 1000 == 0 )
 				Sys.print((Std.int((progress / blocks.length) * 1000.0) / 10) + "%  \r");
-			if( b.page.memHasPtr() ) {
+			if( b.page.kind == PDynamic ) {
 				goto(b);
 				b.typePtr = readPointer();
 			}
 			b.type = pointerType.get(b.typePtr);
+			if( b.page.kind == PDynamic && b.type == null && b.typePtr != Pointer.NULL )
+				missingTypes++; // types that we don't have in our dump
 			b.typePtr = Pointer.NULL;
-			if( b.type != null && b.type.hasPtr && b.page.kind == PNoPtr ) {
-				if( b.type.t.match(HEnum(_)) ) {
-					// most likely one of the constructor without pointer parameter
-				} else
-					b.type = null; // false positive
+			if( b.type != null ) {
+				switch( b.page.kind ) {
+				case PDynamic:
+				case PNoPtr:
+					if( b.type.hasPtr ) {
+						if( b.type.t.match(HEnum(_)) ) {
+							// most likely one of the constructor without pointer parameter
+						} else
+							b.type = null; // false positive
+					}
+				case PRaw, PFinalizer:
+					if( b.type.isDyn )
+						b.type = null; // false positive
+				}
 			}
 			if( b.type != null && !b.type.isDyn )
 				b.type = getTypeNull(b.type);
@@ -336,6 +367,8 @@ class Memory {
 				b.typeKind = KHeader;
 			pointerBlock.set(b.addr, b);
 		}
+
+		//Sys.println(missingTypes+" blocks with unresolved type");
 
 		printStats();
 
@@ -347,22 +380,22 @@ class Memory {
 		types.push(broot.type);
 		broot.depth = 0;
 		broot.addParent(all);
-		var rid = 0;
-		for( g in code.globals ) {
-			if( !g.isPtr() ) continue;
-			var r = roots[rid++];
+
+		for( r in roots ) {
 			var b = pointerBlock.get(r);
 			if( b == null ) continue;
 			b.addParent(broot);
-			if( b.type == null ) {
-				b.type = getType(g);
+			if( b.type == null )
 				b.typeKind = KRoot;
-			}
 		}
 
-		var tvoid = getType(HVoid);
+		var tinvalid = new TType(types.length, HAbstract("invalid"));
+		types.push(tinvalid);
 		for( t in types )
-			t.buildTypes(this, tvoid);
+			t.buildTypes(this, tinvalid);
+
+		var tunknown = new TType(types.length, HAbstract("unknown"));
+		types.push(tunknown);
 
 		tdynObj = getType(HDynObj);
 		tdynObjData = new TType(types.length, HAbstract("dynobjdata"));
@@ -452,11 +485,12 @@ class Memory {
 			if( b.owner == null ) {
 				unRef++;
 				if( unRef < 100 )
-					log("  "+b.addr.toString() + " is not referenced");
+					log("  "+b.addr.toString()+"["+b.size+"] is not referenced");
 				continue;
 			}
 
-			if( b.type != null ) continue;
+			if( b.type != null )
+				continue;
 
 			var o = b.owner;
 			while( o != null && o.type == null )
@@ -470,15 +504,14 @@ class Memory {
 				default:
 				}
 
-			unk++;
-			unkMem += b.size;
+			b.type = tunknown;
 		}
 
 		var falseCount = 0;
 		for( t in types )
 			falseCount += t.falsePositive;
 
-		log("Hierarchy built, "+unk+" unknown ("+MB(unkMem)+"), "+falseCount+" false positives, "+unRef+" unreferenced");
+		log("Hierarchy built, "+falseCount+" false positives, "+unRef+" unreferenced");
 	}
 
 	function printFalsePositives( ?typeStr : String ) {
@@ -523,18 +556,14 @@ class Memory {
 
 		for( b in blocks ) {
 			progress++;
-			if( progress % 10000 == 0 )
+			if( displayProgress && progress % 10000 == 0 )
 				Sys.print((Std.int(progress * 1000.0 / blocks.length) / 10) + "%  \r");
 
 			if( !b.page.memHasPtr() )
 				continue;
 
 			if( b.type != null && !b.type.hasPtr )
-				switch(b.type.t) {
-				case HFun(_):
-				default:
-					log("  Scanning "+b.type+" "+b.addr.toString());
-				}
+				log("  Scanning "+b.type+" "+b.addr.toString());
 
 			goto(b);
 			var fields = null;
@@ -547,20 +576,23 @@ class Memory {
 				ptrTags = b.type.ptrTags;
 				// enum
 				if( b.type.constructs != null ) {
-					start++;
-					fields = b.type.constructs[readInt()];
+					readPointer(); // type
+					var index = readInt();
+					fields = b.type.constructs[index];
 					if( is64 ) readInt(); // skip, not a pointer anyway
+					start += 2;
 				}
 			}
 
 			for( i in start...(b.size >> ptrBits) ) {
 				var r = readPointer();
 
-				//if( ptrTags != null && ((ptrTags.get(i >> 5) >>> (i & 31)) & 1) == 0 ) continue;
-
 				var bs = pointerBlock.get(r);
 				if( bs == null ) continue;
 				var ft = fields != null ? fields[i] : null;
+
+				if( ptrTags != null && ((ptrTags.get(i >> 3) >>> (i & 7)) & 1) == 0 && !b.type.t.match(HVirtual(_)) )
+					continue;
 
 				if( b.type == tdynObj && (i == 1 || i == 2 || i == 3) ) {
 					if( bs.typeKind != KHeader && (bs.typeKind != null || bs.type != null) )
@@ -578,8 +610,8 @@ class Memory {
 				bs.addParent(b,hasFieldNames ? (i+1) : 0);
 
 				if( bs.type == null && ft != null ) {
-					if( ft.t.isDynamic() ) {
-						trace(b.typeKind, b.addr.toString(), b.type.toString(), ft.toString());
+					if( ft.t.match(HDyn | HObj(_)) ) {
+						// we can't infer with a polymorph type
 						continue;
 					}
 					bs.type = ft;
@@ -621,20 +653,45 @@ class Memory {
 		var lt = resolveType(tstr);
 		if( lt == null ) return;
 
+		inline function isVirtualField(t) { t >>>= 24; return t == 1 || t == 2; }
+
 		var ctx = new Stats(this);
 		for( b in blocks )
 			if( b.type != null && b.type.match(lt) ) {
 				var tl = [];
 				var owner = b.owner;
+				// skip first virtual field
+				if( lt.t != HDynObj && owner != null && owner.type != null && owner.type.t.match(HVirtual(_)) && isVirtualField(owner.makeTID(b,true)) )
+					owner = owner.owner;
+
 				if( owner != null ) {
-					var ol = [owner];
-					tl.push(owner.type == null ? 0 : owner.type.tid);
+					tl.push(owner.makeTID(b,displayFields == Full));
 					var k : Int = up;
-					while( owner.owner != null && k-- > 0 && ol.indexOf(owner.owner) < 0 && owner.owner != all ) {
-						var prev = owner;
+					while( owner.owner != null && k-- > 0 && owner.owner != all ) {
+						var tag = owner.owner.makeTID(owner,displayFields != None);
 						owner = owner.owner;
-						ol.push(owner);
-						tl.unshift(owner.makeTID(prev,displayFields));
+						// remove recursive sequence
+						for( i => tag2 in tl )
+							if( tag2 == tag ) {
+								var seq = true;
+								for( n in 0...i ) {
+									if( tl[n] != tl[i+1+n] )
+										seq = false;
+								}
+								if( seq ) {
+									for( k in 0...i ) tl.shift();
+									tag = -1;
+									k += i + 1;
+								}
+								break;
+							}
+						// don't display virtual wrappers
+						if( displayFields != None && owner.type != null && isVirtualField(tag) && owner.type.t.match(HVirtual(_)) ) {
+							tag = -1;
+							k++;
+						}
+						if( tag != -1 )
+							tl.unshift(tag);
 					}
 				}
 				ctx.addPath(tl, b.size);
@@ -770,11 +827,17 @@ class Memory {
 				m.loadBytecode(arg);
 				continue;
 			}
+			if( arg == "--args" ) {
+				m.displayProgress = false;
+				break;
+			}
 			memory = arg;
 			m.loadMemory(arg);
 		}
 		if( code != null && memory == null ) {
-			memory = new haxe.io.Path(code).dir+"/hlmemory.dump";
+			var dir = new haxe.io.Path(code).dir;
+			if( dir == null ) dir = ".";
+			memory = dir+"/hlmemory.dump";
 			if( sys.FileSystem.exists(memory) ) m.loadMemory(memory);
 		}
 
@@ -783,7 +846,7 @@ class Memory {
 		var stdin = Sys.stdin();
 		while( true ) {
 			Sys.print("> ");
-			var args = parseArgs(stdin.readLine());
+			var args = parseArgs(args.length > 0 ? args.shift() : stdin.readLine());
 			var cmd = args.shift();
 			switch( cmd ) {
 			case "exit", "quit", "q":
@@ -815,13 +878,22 @@ class Memory {
 				}
 			case "fields":
 				switch( args.shift() ) {
-				case "true":
-					m.displayFields = true;
-				case "false":
-					m.displayFields = false;
+				case "full":
+					m.displayFields = Full;
+				case "none":
+					m.displayFields = None;
+				case "parents":
+					m.displayFields = Parents;
 				case mode:
 					Sys.println("Unknown fields mode " + mode);
 				}
+			case "lines":
+				var v = args.shift();
+				if( v != null )
+					m.maxLines = Std.parseInt(v);
+				Sys.println(m.maxLines == 0 ? "Lines limit disabled" : m.maxLines + " maximum lines displayed");
+			case null:
+				Sys.println("");
 			default:
 				Sys.println("Unknown command " + cmd);
 			}

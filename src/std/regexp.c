@@ -102,8 +102,8 @@ HL_PRIM int hl_regexp_matched_pos( ereg *e, int m, int *len ) {
 		hl_error("Calling regexp_matched_pos() on an unmatched regexp");
 	if( m < 0 || m >= e->n_groups )
 		hl_error("Matched index %d outside bounds",m);
-	start = matches[m*2];
-	if( len ) *len = matches[m*2+1] - start;
+	start = (int)matches[m*2];
+	if( len ) *len = (int)matches[m*2+1] - start;
 	return start;
 }
 

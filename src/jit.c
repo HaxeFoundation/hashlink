@@ -117,6 +117,12 @@ typedef enum {
 	MOV16,
 	CMP16,
 	TEST16,
+	// prefetchs
+	PREFETCHT0,
+	PREFETCHT1,
+	PREFETCHT2,
+	PREFETCHNTA,
+	PREFETCHW,
 	// --
 	_CPU_LAST
 } CpuOp;
@@ -431,6 +437,7 @@ typedef struct {
 #define FLAG_LONGOP	0x80000000
 #define FLAG_16B	0x40000000
 #define FLAG_8B		0x20000000
+#define FLAG_DUAL   0x10000000
 
 #define RM(op,id) ((op) | (((id)+1)<<8))
 #define GET_RM(op)	(((op) >> ((op) < 0 ? 24 : 8)) & 15)
@@ -445,7 +452,7 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "PUSH", 0x50, RM(0xFF,6), 0x68, 0x6A },
 	{ "ADD", 0x03, 0x01, RM(0x81,0), RM(0x83,0) },
 	{ "SUB", 0x2B, 0x29, RM(0x81,5), RM(0x83,5) },
-	{ "IMUL", LONG_OP(0x0FAF) },
+	{ "IMUL", LONG_OP(0x0FAF), 0, 0x69 | FLAG_DUAL, 0x6B | FLAG_DUAL },
 	{ "DIV", RM(0xF7,6), RM(0xF7,6) },
 	{ "IDIV", RM(0xF7,7), RM(0xF7,7) },
 	{ "CDQ", 0x99 },
@@ -501,6 +508,12 @@ static opform OP_FORMS[_CPU_LAST] = {
 	{ "MOV16", OP16(0x8B), OP16(0x89), OP16(0xB8) },
 	{ "CMP16", OP16(0x3B), OP16(0x39) },
 	{ "TEST16", OP16(0x85) },
+	// prefetchs
+	{ "PREFETCHT0", 0, LONG_RM(0x0F18,1) },
+	{ "PREFETCHT1", 0, LONG_RM(0x0F18,2) },
+	{ "PREFETCHT2", 0, LONG_RM(0x0F18,3) },
+	{ "PREFETCHNTA", 0, LONG_RM(0x0F18,0) },
+	{ "PREFETCHW", 0, LONG_RM(0x0F0D,1) },
 };
 
 #ifdef HL_64
@@ -532,7 +545,7 @@ static bool is_reg8( preg *a ) {
 
 static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 	opform *f = &OP_FORMS[o];
-	int r64 = mode64 && (o != PUSH && o != POP && o != CALL && o != PUSH8) ? 8 : 0;
+	int r64 = mode64 && (o != PUSH && o != POP && o != CALL && o != PUSH8 && o < PREFETCHT0) ? 8 : 0;
 	switch( o ) {
 	case CMP8:
 	case TEST8:
@@ -594,12 +607,14 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 			int_val cval = b->holds ? (int_val)b->holds : b->id;
 			// short byte form
 			if( f->r_i8 && IS_SBYTE(cval) ) {
+				if( (f->r_i8&FLAG_DUAL) && a->id > 7 ) r64 |= 4; 
 				OP(f->r_i8);
-				MOD_RM(3,GET_RM(f->r_i8)-1,a->id);
+				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a->id,a->id); else MOD_RM(3,GET_RM(f->r_i8)-1,a->id);
 				B((int)cval);
-			} else if( GET_RM(f->r_const) > 0 ) {
+			} else if( GET_RM(f->r_const) > 0 || (f->r_const&FLAG_DUAL) ) {
+				if( (f->r_i8&FLAG_DUAL) && a->id > 7 ) r64 |= 4; 
 				OP(f->r_const&0xFF);
-				MOD_RM(3,GET_RM(f->r_const)-1,a->id);
+				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a->id,a->id); else MOD_RM(3,GET_RM(f->r_const)-1,a->id);
 				if( mode64 && IS_64 && o == MOV ) W64(cval); else W((int)cval);
 			} else {
 				ERRIF( f->r_const == 0);
@@ -1614,7 +1629,7 @@ static void on_jit_error( const char *msg, int_val line ) {
 	char buf[256];
 	int iline = (int)line;
 	sprintf(buf,"%s (line %d)",msg,iline);
-#ifdef HL_WIN
+#ifdef HL_WIN_DESKTOP
 	MessageBoxA(NULL,buf,"JIT ERROR",MB_OK);
 #else
 	printf("JIT ERROR : %s\n",buf);
@@ -3800,7 +3815,18 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OGetArray:
 			{
 				preg *rdst = IS_FLOAT(dst) ? alloc_fpu(ctx,dst,false) : alloc_cpu(ctx,dst,false);
-				copy(ctx, rdst, pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,hl_type_size(dst->t),sizeof(varray)), dst->size);
+				if( ra->t->kind == HABSTRACT ) {
+					if( dst->t->kind != HOBJ && dst->t->kind != HSTRUCT ) ASSERT(dst->t->kind);
+					hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
+					int osize = rt->size;
+					if( osize & (HL_WSIZE-1) ) osize += HL_WSIZE - (osize & (HL_WSIZE-1));
+					op64(ctx, LEA, rdst, pmem(&p,alloc_cpu(ctx,ra,true)->id,sizeof(struct _hl_carray)));
+					preg *idx = alloc_cpu(ctx, rb, true);
+					op64(ctx, IMUL, idx, pconst(&p,osize));
+					op64(ctx, ADD, rdst, idx);
+					scratch(idx);
+				} else
+					copy(ctx, rdst, pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,hl_type_size(dst->t),sizeof(varray)), dst->size);
 				store(ctx,dst,dst->current,false);
 			}
 			break;
@@ -3812,7 +3838,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OArraySize:
 			{
-				op32(ctx,MOV,alloc_cpu(ctx,dst,false),pmem(&p,alloc_cpu(ctx,ra,true)->id,HL_WSIZE*2));
+				op32(ctx,MOV,alloc_cpu(ctx,dst,false),pmem(&p,alloc_cpu(ctx,ra,true)->id,ra->t->kind == HABSTRACT ? HL_WSIZE + 4 : HL_WSIZE*2));
 				store(ctx,dst,dst->current,false);
 			}
 			break;
@@ -4249,6 +4275,47 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			}
 			break;
 		case ONop:
+			break;
+		case OPrefetch:
+			{
+				preg *r = alloc_cpu(ctx, dst, true);
+				if( o->p2 > 0 ) {
+					switch( dst->t->kind ) {
+					case HOBJ:
+					case HSTRUCT:
+						{
+							hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
+							preg *r2 = alloc_reg(ctx, RCPU);
+							op64(ctx, LEA, r2, pmem(&p, r->id, rt->fields_indexes[o->p2-1]));
+							r = r2;
+						}
+						break;
+					default:
+						ASSERT(dst->t->kind);
+						break;
+					}
+				}
+				switch( o->p3 ) {
+				case 0:
+					op64(ctx, PREFETCHT0, pmem(&p,r->id,0), UNUSED);
+					break;
+				case 1:
+					op64(ctx, PREFETCHT1, pmem(&p,r->id,0), UNUSED);
+					break;
+				case 2:
+					op64(ctx, PREFETCHT2, pmem(&p,r->id,0), UNUSED);
+					break;
+				case 3:
+					op64(ctx, PREFETCHNTA, pmem(&p,r->id,0), UNUSED);
+					break;
+				case 4:
+					op64(ctx, PREFETCHW, pmem(&p,r->id,0), UNUSED);
+					break;
+				default:
+					ASSERT(o->p3);
+					break;
+				}
+			}
 			break;
 		default:
 			jit_error(hl_op_name(o->op));

@@ -626,7 +626,7 @@ class Driver {
 		return dxCreateTexture2d(desc,data);
 	}
 
-	public static function createDepthStencilView( texture : Resource, format : Format ) : DepthStencilView {
+	public static function createDepthStencilView( texture : Resource, format : Format, readOnly : Bool ) : DepthStencilView {
 		return null;
 	}
 
