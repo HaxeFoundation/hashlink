@@ -18,7 +18,7 @@ typedef DisplaySetting = {
 	framerate : Int
 }
 
-@:enum abstract DisplayMode(Int) {
+enum abstract DisplayMode(Int) {
 	var Windowed = 0;
 	var Fullscreen = 1;
 	var Borderless = 2;

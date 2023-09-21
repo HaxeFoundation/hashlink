@@ -4,7 +4,7 @@ typedef WinPtr = hl.Abstract<"sdl_window">;
 private typedef GLContext = hl.Abstract<"sdl_gl">;
 typedef DisplayHandle = Null<Int>;
 
-@:enum abstract DisplayMode(Int) {
+enum abstract DisplayMode(Int) {
 	var Windowed = 0;
 	var Fullscreen = 1;
 	var Borderless = 2;
