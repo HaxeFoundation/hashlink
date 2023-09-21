@@ -228,9 +228,6 @@ jobs:
 
           make)
             make
-            if [[ ${{ matrix.target }} == darwin ]]; then
-              sudo make codesign_osx
-            fi
             sudo make install
             if [[ ${{ matrix.target }} == linux ]]; then
               sudo ldconfig
