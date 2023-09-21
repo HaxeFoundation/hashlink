@@ -1,6 +1,6 @@
 package dx;
 
-@:enum abstract MapType(Int) {
+enum abstract MapType(Int) {
 	var Read = 1;
 	var Write = 2;
 	var ReadWrite = 3;

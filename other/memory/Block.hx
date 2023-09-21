@@ -27,7 +27,7 @@ abstract Pointer(haxe.Int64) {
 
 }
 
-@:enum abstract PageKind(Int) {
+enum abstract PageKind(Int) {
 	var PDynamic = 0;
 	var PRaw = 1;
 	var PNoPtr = 2;

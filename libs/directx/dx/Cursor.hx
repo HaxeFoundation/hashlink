@@ -2,7 +2,7 @@ package dx;
 
 private typedef CursorPtr = hl.Abstract<"dx_cursor">;
 
-@:enum abstract CursorKind(Int) {
+enum abstract CursorKind(Int) {
 	var Arrow = 32512;
     var IBeam = 32513;
     var Wait = 32514;
