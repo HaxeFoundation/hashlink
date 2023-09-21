@@ -27,12 +27,12 @@ jobs:
 
         include:
           - target: linux
-            runner: ubuntu-18.04
+            runner: ubuntu-20.04
             haxe_nightly_dir: linux64
             archive_ext: tar.gz
 
           - target: darwin
-            runner: macos-10.15
+            runner: macos-11
             haxe_nightly_dir: mac
             archive_ext: tar.gz
 
@@ -68,6 +68,9 @@ jobs:
           - target: darwin
             build_system: vs2019
 
+          - target: linux
+            architecture: 32
+
           - target: darwin
             architecture: 32
 
@@ -76,11 +79,11 @@ jobs:
 
     steps:
     - name: "SCM Checkout"
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Add msbuild to PATH
       if: matrix.build_system == 'vs2019'
-      uses: microsoft/setup-msbuild@v1.0.3
+      uses: microsoft/setup-msbuild@v1
       with:
         vs-version: '[16.0,17.0)'
 
@@ -89,25 +92,6 @@ jobs:
         set -eux
 
         case "${{ matrix.target }}${{ matrix.architecture }}" in
-          linux32)
-            echo "MARCH=32" >> $GITHUB_ENV
-            sudo dpkg --add-architecture i386
-            sudo apt-get update -y
-            sudo apt-get install --no-install-recommends -y \
-              gcc-multilib \
-              libalut-dev:i386 \
-              libmbedtls-dev:i386 \
-              libopenal-dev:i386 \
-              libpng-dev:i386 \
-              libsdl2-dev:i386 \
-              libturbojpeg0-dev:i386 \
-              libuv1-dev:i386 \
-              libvorbis-dev:i386 \
-              libz-dev:i386 \
-              zlib1g-dev:i386 \
-              libsqlite3-dev:i386
-            ;;
-
           linux64)
             echo "MARCH=64" >> $GITHUB_ENV
             sudo apt-get update -y
@@ -199,8 +183,6 @@ jobs:
         case "${{ matrix.build_system }}" in
           cmake)
             case "${{ matrix.target }}${{ matrix.architecture }}" in
-              linux32)
-                cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake ;;
               windows*)
                 cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
                   -G "${{ matrix.cmake_generator }}" \
@@ -228,9 +210,6 @@ jobs:
 
           make)
             make
-            if [[ ${{ matrix.target }} == darwin ]]; then
-              sudo make codesign_osx
-            fi
             sudo make install
             if [[ ${{ matrix.target }} == linux ]]; then
               sudo ldconfig
@@ -277,7 +256,6 @@ jobs:
         case "${{ matrix.target }}${{matrix.architecture}}" in
           darwin*)   platform_name=darwin ;;
           windows*)  platform_name=win${{matrix.architecture}} ;;
-          linux32)   platform_name=linux-i386 ;;
           linux64)   platform_name=linux-amd64 ;;
         esac
 
@@ -300,7 +278,7 @@ jobs:
 
 
     - name: "Share: build artifact"
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         path: ${{ env.HASHLINK_DISTRIBUTION }}
 
@@ -317,10 +295,10 @@ jobs:
     steps:
 
     - name: "SCM Checkout"
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: "Get: all build artifacts"
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
 
     - name: "Delete previous 'latest' release"
       run: |
@@ -356,7 +334,6 @@ jobs:
           --prerelease \
           --title "HashLink Nightly Build" \
           "artifact/hashlink-${short_commit}-darwin.tar.gz#hashlink-latest-darwin.tar.gz" \
-          "artifact/hashlink-${short_commit}-linux-i386.tar.gz#hashlink-latest-linux-i386.tar.gz" \
           "artifact/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "artifact/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
           "artifact/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"
