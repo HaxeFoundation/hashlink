@@ -971,6 +971,22 @@ HL_API hl_track_info hl_track;
 
 #endif
 
+HL_API int hl_atomic_add32(int *a, int b);
+HL_API int hl_atomic_sub32(int *a, int b);
+HL_API int hl_atomic_and32(int *a, int b);
+HL_API int hl_atomic_or32(int *a, int b);
+HL_API int hl_atomic_xor32(int *a, int b);
+HL_API int hl_atomic_compare_exchange32(int *a, int expected,
+                                         int replacement);
+HL_API void *hl_atomic_compare_exchange_ptr(void **a, void *expected,
+                                             void *replacement);
+HL_API int hl_atomic_exchange32(int *a, int replacement);
+HL_API void *hl_atomic_exchange_ptr(void **a, void *replacement);
+HL_API int hl_atomic_load32(int *a);
+HL_API void *hl_atomic_load_ptr(void **a);
+HL_API int hl_atomic_store32(int *a, int value);
+HL_API void *hl_atomic_store_ptr(void **a, void *value);
+
 C_FUNCTION_END
 
 #endif
