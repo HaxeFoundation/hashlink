@@ -238,7 +238,6 @@ int main(int argc, pchar *argv[]) {
 		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ctx.ret));
 		for(i=0;i<a->size;i++)
 			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
-		hl_debug_break();
 		hl_global_free();
 		return 1;
 	}
