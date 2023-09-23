@@ -214,13 +214,8 @@ HL_PRIM HL_NO_OPT void hl_breakpoint() {
 #	pragma optimize( "", on )
 #endif
 
-#ifdef HL_LINUX__
-#include <signal.h>
-static int debugger_present = -1;
-static void _sigtrap_handler(int signum) {
-	debugger_present = 0;
-	signal(SIGTRAP,SIG_DFL);
-}
+#ifdef HL_LINUX
+HL_PRIM int hl_debugger_connected = 0;
 #endif
 
 #ifdef HL_MAC
@@ -230,13 +225,8 @@ static void _sigtrap_handler(int signum) {
 HL_PRIM bool hl_detect_debugger() {
 #	if defined(HL_WIN)
 	return (bool)IsDebuggerPresent();
-#	elif defined(HL_LINUX__)
-	if( debugger_present == -1 ) {
-		debugger_present = 1;
-		signal(SIGTRAP,_sigtrap_handler);
-		raise(SIGTRAP);
-	}
-	return (bool)debugger_present;
+#	elif defined(HL_LINUX)
+	return hl_atomic_load32(&hl_debugger_connected) == 1;
 #	elif defined(HL_MAC)
 	return is_debugger_attached();
 #	else

@@ -39,8 +39,12 @@ HL_API int hl_closure_stack_capture;
 
 static hl_socket *debug_socket = NULL;
 static hl_socket *client_socket = NULL;
-static bool debugger_connected = false;
-static bool debugger_stopped = false;
+#ifdef HL_LINUX
+extern int hl_debugger_connected;
+#else
+static int hl_debugger_connected = 0;
+#endif
+static int debugger_stopped = 0;
 
 #define send hl_send_data
 static void send( void *ptr, int size ) {
@@ -109,10 +113,10 @@ static void hl_debug_loop( hl_module *m ) {
 		// for some reason, this is not working on windows (recv returns 0 ?)
 		hl_socket_recv(s,&cmd,0,1);
 		hl_socket_close(s);
-		debugger_connected = true;
+		hl_atomic_store32(&hl_debugger_connected, 1);
 		client_socket = NULL;
 	} while( loop );
-	debugger_stopped = true;
+	hl_atomic_store32(&debugger_stopped, 1);
 }
 
 h_bool hl_module_debug( hl_module *m, int port, h_bool wait ) {
@@ -133,7 +137,7 @@ h_bool hl_module_debug( hl_module *m, int port, h_bool wait ) {
 		return false;
 	}
 	if( wait ) {
-		while( !debugger_connected )
+		while( hl_atomic_load32(&hl_debugger_connected) == 0)
 			hl_sys_sleep(0.01);
 	}
 #	else
@@ -149,7 +153,7 @@ void hl_module_debug_stop() {
 	if( !debug_socket ) return;
 #	ifdef HL_THREADS
 	hl_socket_close(debug_socket);
-	while( !debugger_stopped )
+	while( hl_atomic_load32(&debugger_stopped) == 0)
 		hl_sys_sleep(0.01);
 	hl_remove_root(&debug_socket);
 	hl_remove_root(&client_socket);
