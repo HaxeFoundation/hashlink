@@ -92,6 +92,8 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_thread_info *t = hl_get_thread();
 	hl_trap_ctx *trap = t->trap_current;
 	bool call_handler = false;
+	if( t->flags & HL_EXC_KILL )
+		hl_fatal("Exception Occured");
 	if( !(t->flags & HL_EXC_RETHROW) )
 		t->exc_stack_count = capture_stack_func(t->exc_stack_trace, HL_EXC_MAX_STACK);
 	t->exc_value = v;
