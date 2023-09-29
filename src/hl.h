@@ -903,6 +903,7 @@ struct _hl_trap_ctx {
 #define HL_EXC_IS_THROW		4
 #define HL_THREAD_INVISIBLE	16
 #define HL_THREAD_PROFILER_PAUSED 32
+#define HL_EXC_KILL			64
 #define HL_TREAD_TRACK_SHIFT 16
 
 #define HL_TRACK_ALLOC		1
