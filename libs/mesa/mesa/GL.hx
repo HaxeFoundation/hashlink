@@ -735,6 +735,8 @@ class GL {
 	public static inline var TEXTURE_WRAP_S                 = 0x2802;
 	public static inline var TEXTURE_WRAP_T                 = 0x2803;
 	public static inline var TEXTURE_LOD_BIAS               = 0x8501;
+	public static inline var TEXTURE_BASE_LEVEL             = 0x813C;
+	public static inline var TEXTURE_MAX_LEVEL              = 0x813D;
 	public static inline var TEXTURE_MAX_ANISOTROPY         = 0x84FE;
 	public static inline var TEXTURE_COMPARE_MODE           = 0x884C;
 	public static inline var TEXTURE_COMPARE_FUNC           = 0x884D;
