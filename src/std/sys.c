@@ -609,7 +609,7 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 }
 
 HL_PRIM double hl_sys_process_memory() {
-#if defined(HL_WIN)
+#if defined(HL_WIN_DESKTOP)
 	PROCESS_MEMORY_COUNTERS inf;
 	GetProcessMemoryInfo(GetCurrentProcess(),&inf,sizeof(inf));
 	return (double)inf.WorkingSetSize;
