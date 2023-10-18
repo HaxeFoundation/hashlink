@@ -441,6 +441,24 @@ static void gc_flush_empty_pages() {
 	}
 }
 
+static int64 gc_allocator_private_memory() {
+	return free_lists_size;
+}
+
+static int gc_free_memory( gc_pheader *ph ) {
+	gc_allocator_page_data *p = &ph->alloc;
+	if( p->need_flush )
+		flush_free_list(ph);
+	gc_freelist *fl = &p->free;
+	int k;
+	int free = 0;
+	for(k=fl->current;k<fl->count;k++) {
+		gc_fl *c = GET_FL(fl,k);
+		free += c->count * p->block_size;
+	}
+	return free;
+}
+
 #ifdef GC_DEBUG
 static void gc_clear_unmarked_mem() {
 	int i;

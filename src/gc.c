@@ -162,6 +162,7 @@ struct _gc_pheader {
 #define GC_DUMP_MEM		2
 #define GC_NO_THREADS	4
 #define GC_FORCE_MAJOR	8
+#define GC_PROFILE_MEM  16
 
 static int gc_flags = 0;
 static gc_pheader *gc_level1_null[1<<GC_LEVEL1_BITS] = {NULL};
@@ -186,6 +187,7 @@ static struct {
 	int64 last_mark_allocs;
 	int64 pages_total_memory;
 	int64 allocation_count;
+	int64 free_memory;
 	int pages_count;
 	int pages_allocated;
 	int pages_blocks;
@@ -846,7 +848,41 @@ static void gc_mark() {
 	gc_allocator_after_mark();
 }
 
+static void count_free_memory( gc_pheader *page, int size ) {
+	gc_stats.free_memory += gc_free_memory(page);
+}
+
 static void gc_major() {
+
+	if( gc_flags & GC_PROFILE_MEM ) {
+		double gc_mem = gc_stats.mark_bytes;
+		int i;
+		gc_mem += gc_allocator_private_memory();
+		gc_mem += global_mark_stack.size * sizeof(void*);
+		for(i=0;i<gc_mark_threads;i++) {
+			gc_mthread *t = &mark_threads[i];
+			gc_mem += t->stack.size * sizeof(void*);
+		}
+		int pages = gc_stats.pages_count;
+		gc_pheader *p = gc_free_pheaders;
+		while( p ) {
+			pages++;
+			p = p->next_page;
+		}
+		gc_mem += sizeof(gc_pheader) * pages;
+		gc_mem += sizeof(void*) * gc_roots_max;
+		gc_mem += (sizeof(void*) + sizeof(hl_thread_info)) * gc_threads.count;
+		for(i=0;i<(1<<GC_LEVEL0_BITS);i++) {
+			void *v = hl_gc_page_map[i];
+			if( v != gc_level1_null )
+				gc_mem += sizeof(void*) * (1<<GC_LEVEL1_BITS);
+		}
+		gc_mem += gc_stats.pages_total_memory;
+		gc_stats.free_memory = 0;
+		gc_iter_pages(count_free_memory);
+		printf("GC-PROFILE-MEM %.2fMB total, %.2f%% free %.2f%% gc\n", gc_mem / (1024.0 * 1024.0), (gc_stats.free_memory * 100.0 / gc_mem), (gc_mem - gc_stats.pages_total_memory) * 100.0 / gc_mem);
+	}
+
 	int time = TIMESTAMP(), dt;
 	gc_stats.last_mark = gc_stats.total_allocated;
 	gc_stats.last_mark_allocs = gc_stats.allocation_count;
@@ -931,6 +967,8 @@ static void hl_gc_init() {
 #	ifndef HL_CONSOLE
 	if( getenv("HL_GC_PROFILE") )
 		gc_flags |= GC_PROFILE;
+	if( getenv("HL_GC_PROFILE_MEM") )
+		gc_flags |= GC_PROFILE_MEM;
 	if( getenv("HL_DUMP_MEMORY") )
 		gc_flags |= GC_DUMP_MEM;
 #	endif
