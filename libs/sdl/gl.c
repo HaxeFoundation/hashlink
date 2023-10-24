@@ -162,6 +162,10 @@ HL_PRIM void HL_NAME(gl_color_mask)( bool r, bool g, bool b, bool a ) {
 	glColorMask(r, g, b, a);
 }
 
+HL_PRIM void HL_NAME(gl_color_maski)( int i, bool r, bool g, bool b, bool a ) {
+	glColorMaski(i, r, g, b, a);
+}
+
 HL_PRIM void HL_NAME(gl_stencil_mask_separate)(int face, int mask) {
 	glStencilMaskSeparate(face, mask);
 }
@@ -664,6 +668,7 @@ DEFINE_PRIM(_VOID,gl_blend_equation_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_depth_mask,_BOOL);
 DEFINE_PRIM(_VOID,gl_depth_func,_I32);
 DEFINE_PRIM(_VOID,gl_color_mask,_BOOL _BOOL _BOOL _BOOL);
+DEFINE_PRIM(_VOID,gl_color_maski,_I32 _BOOL _BOOL _BOOL _BOOL);
 DEFINE_PRIM(_VOID,gl_stencil_mask_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_func_separate,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_op_separate,_I32  _I32 _I32 _I32);
