@@ -174,6 +174,8 @@ class TType {
 		switch( t ) {
 		case HAbstract(p):
 			return p;
+		case HFun(_), HMethod(_):
+			return 'Function(${closure.toString()}: ${t.toString()})';
 		default:
 			return t.toString();
 		}
