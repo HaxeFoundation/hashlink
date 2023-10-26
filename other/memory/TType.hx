@@ -172,8 +172,12 @@ class TType {
 
 	public function toString() {
 		switch( t ) {
+		case HAbstract("roots"):
+			return Memory.withColor("roots", 32);
 		case HAbstract(p):
 			return p;
+		case HFun(_), HMethod(_):
+			return 'Function(${t.toString()})';
 		default:
 			return t.toString();
 		}

@@ -129,6 +129,7 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	// increase size based on previously allocated pages
 	if( block < 256 ) {
 		int num_pages = 0;
+		int count = 1;
 		gc_pheader *ph = gc_pages[pid];
 		while( ph ) {
 			num_pages++;
@@ -136,7 +137,12 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 		}
 		while( num_pages > 8 && (size<<1) / block <= GC_PAGE_SIZE ) {
 			size <<= 1;
+			count <<= 1;
 			num_pages /= 3;
+#			ifdef HL_NX
+			// do not allocate too much large pages with low memory
+			if( count == 4 ) break;
+#			endif
 		}
 	}
 
@@ -439,6 +445,24 @@ static void gc_flush_empty_pages() {
 			ph = next;
 		}
 	}
+}
+
+static int64 gc_allocator_private_memory() {
+	return free_lists_size;
+}
+
+static int gc_free_memory( gc_pheader *ph ) {
+	gc_allocator_page_data *p = &ph->alloc;
+	if( p->need_flush )
+		flush_free_list(ph);
+	gc_freelist *fl = &p->free;
+	int k;
+	int free = 0;
+	for(k=fl->current;k<fl->count;k++) {
+		gc_fl *c = GET_FL(fl,k);
+		free += c->count * p->block_size;
+	}
+	return free;
 }
 
 #ifdef GC_DEBUG

@@ -57,7 +57,7 @@ class Stats {
 				}
 				tpath.push(tstr);
 			}
-			mem.log(i.count + " count, " + Memory.MB(i.mem) + " " + tpath.join(" > "));
+			mem.log(Memory.withColor(i.count + " count, " + Memory.MB(i.mem) + " ", 33) + tpath.join(${Memory.withColor(' > ', 36)}));
 		}
 		if( withSum )
 			mem.log("Total: "+totCount+" count, "+Memory.MB(totMem));
@@ -71,6 +71,12 @@ enum FieldsMode {
 	None;
 }
 
+enum FilterMode {
+	None;
+	Intersect;	// Will display only blocks present in all memories
+	Unique;		// Will display only blocks not present in other memories
+}
+
 class Memory {
 
 	public var memoryDump : sys.io.FileInput;
@@ -80,6 +86,11 @@ class Memory {
 	public var ptrBits : Int;
 
 	public var types : Array<TType>;
+
+	var otherMems : Array<Memory>;
+	var filterMode: FilterMode = None;
+
+	var memFile : String;
 
 	var privateData : Int;
 	var markData : Int;
@@ -95,6 +106,7 @@ class Memory {
 	var typesPointers : Array<Pointer>;
 	var closuresPointers : Array<Pointer>;
 	var blocks : Array<Block>;
+	var filteredBlocks : Array<Block> = [];
 	var baseTypes : Array<{ t : HLType, p : Pointer }>;
 	var all : Block;
 
@@ -164,6 +176,7 @@ class Memory {
 	}
 
 	function loadMemory( arg : String ) {
+		memFile = arg;
 		memoryDump = sys.io.File.read(arg);
 		if( memoryDump.read(3).toString() != "HMD" )
 			throw "Invalid memory dump file";
@@ -243,16 +256,22 @@ class Memory {
 	function printStats() {
 		var pagesSize = 0, reserved = 0;
 		var used = 0, gc = 0;
+		var fUsed = 0;
 		for( p in pages ) {
 			pagesSize += p.size;
 			reserved += p.reserved;
 		}
 		for( b in blocks )
 			used += b.size;
+		for (b in filteredBlocks)
+			fUsed += b.size;
+		log(withColor("--- " + memFile + " ---", 36));
 		log(pages.length + " pages, " + MB(pagesSize) + " memory");
 		log(roots.length + " roots, "+ stacks.length + " stacks");
 		log(code.types.length + " types, " + closuresPointers.length + " closures");
 		log(blocks.length + " live blocks " + MB(used) + " used, " + MB(pagesSize - used - reserved) + " free, "+MB(privateData + markData)+" gc");
+		if (filterMode != None)
+			log(filteredBlocks.length + " blocks in filter " + MB(fUsed) + " used");
 	}
 
 	function getTypeNull( t : TType ) {
@@ -625,7 +644,7 @@ class Memory {
 
 	function printByType() {
 		var ctx = new Stats(this);
-		for( b in blocks )
+		for( b in filteredBlocks )
 			ctx.add(b.type, b.size);
 		ctx.print();
 	}
@@ -656,7 +675,7 @@ class Memory {
 		inline function isVirtualField(t) { t >>>= 24; return t == 1 || t == 2; }
 
 		var ctx = new Stats(this);
-		for( b in blocks )
+		for( b in filteredBlocks )
 			if( b.type != null && b.type.match(lt) ) {
 				var tl = [];
 				var owner = b.owner;
@@ -711,7 +730,7 @@ class Memory {
 		var ctx = new Stats(this);
 		Block.MARK_UID++;
 		var mark = [];
-		for( b in blocks )
+		for( b in filteredBlocks )
 			if( b.type == t )
 				visitRec(b,ctx,[],mark);
 		while( mark.length > 0 ) {
@@ -744,7 +763,7 @@ class Memory {
 		}
 
 		var ctx = new Stats(this);
-		for( b in blocks )
+		for( b in filteredBlocks )
 			if( b.type == lt )
 				for( b in b.getParents() )
 					ctx.addPath([if( b.type == null ) 0 else b.type.tid], 0);
@@ -765,7 +784,7 @@ class Memory {
 
 		var ctx = new Stats(this);
 		var mark = new Map();
-		for( b in blocks )
+		for( b in filteredBlocks )
 			if( b.type == lt ) {
 				function addRec(tl:Array<Int>,b:Block, k:Int) {
 					if( k < 0 ) return;
@@ -775,7 +794,7 @@ class Memory {
 					tl.push(b.type == null ? 0 : b.type.tid);
 					ctx.addPath(tl, b.size);
 					if( b.subs != null ) {
-						k--;
+							k--;
 						for( s in b.subs )
 							addRec(tl.copy(),s.b, k);
 					}
@@ -783,6 +802,43 @@ class Memory {
 				addRec([], b, down);
 			}
 		ctx.print();
+	}
+
+	public function setFilterMode(m: FilterMode) {
+		filterMode = m;
+		switch( m ) {
+		case None:
+			filteredBlocks = blocks.copy();
+		default:
+			filteredBlocks = [];
+			var progress = 0;
+			for( b in blocks ) {
+				progress++;
+				if( displayProgress && progress % 1000 == 0 )
+					Sys.print((Std.int((progress / blocks.length) * 1000.0) / 10) + "%  \r");
+				if( !isBlockIgnored(b, m) )
+					filteredBlocks.push(b);
+			}
+			if( displayProgress )
+				Sys.print("       \r");
+		}
+	}
+	public function isBlockIgnored(b: Block, m: FilterMode) {
+		switch( m ) {
+		case None:
+			return false;
+		case Intersect:
+			for( m in otherMems ) {
+				if( m.pointerBlock.get(b.addr ) == null )
+					return true;
+			}
+		case Unique:
+			for( m in otherMems ) {
+				if( m.pointerBlock.get(b.addr ) != null )
+					return true;
+			}
+		}
+		return false;
 	}
 
 	public function log(msg:String) {
@@ -813,8 +869,11 @@ class Memory {
 		return args;
 	}
 
+	static var useColor = false;
 	static function main() {
 		var m = new Memory();
+		var others: Array<Memory> = [];
+		var filterMode: FilterMode = None;
 
 		//hl.Gc.dumpMemory(); Sys.command("cp memory.hl test.hl");
 
@@ -827,12 +886,22 @@ class Memory {
 				m.loadBytecode(arg);
 				continue;
 			}
+			if( arg == "-c" || arg == "--color" ) {
+				useColor = true;
+				continue;
+			}
 			if( arg == "--args" ) {
 				m.displayProgress = false;
 				break;
 			}
-			memory = arg;
-			m.loadMemory(arg);
+			if (memory == null) {
+				memory = arg;
+				m.loadMemory(arg);
+			} else {
+				var m2 = new Memory();
+				m2.loadMemory(arg);
+				others.push(m2);
+			}
 		}
 		if( code != null && memory == null ) {
 			var dir = new haxe.io.Path(code).dir;
@@ -842,10 +911,16 @@ class Memory {
 		}
 
 		m.check();
+		for (m2 in others) {
+			m2.code = m.code;
+			m2.check();
+		}
+		m.otherMems = [for (i in others) i];
+		m.setFilterMode(filterMode);
 
 		var stdin = Sys.stdin();
 		while( true ) {
-			Sys.print("> ");
+			Sys.print(withColor("> ", 31));
 			var args = parseArgs(args.length > 0 ? args.shift() : stdin.readLine());
 			var cmd = args.shift();
 			switch( cmd ) {
@@ -887,6 +962,25 @@ class Memory {
 				case mode:
 					Sys.println("Unknown fields mode " + mode);
 				}
+			case "filter":
+				switch( args.shift() ) {
+				case "none":
+					filterMode = None;
+				case "intersect":
+					filterMode = Intersect;
+				case "unique":
+					filterMode = Unique;
+				case mode:
+					Sys.println("Unknown filter mode " + mode);
+				}
+				m.setFilterMode(filterMode);
+			case "nextDump":
+				others.push(m);
+				m = others.shift();
+				m.otherMems = [for (i in others) i];
+				m.setFilterMode(filterMode);
+				var ostr = others.length > 0 ? (" (others are " + others.map(m -> m.memFile) + ")") : "";
+				Sys.println("Using dump " + m.memFile + ostr);
 			case "lines":
 				var v = args.shift();
 				if( v != null )
@@ -900,4 +994,11 @@ class Memory {
 		}
 	}
 
+	// A list of ansi colors is available at
+	// https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#8-16-colors
+	public static function withColor(str: String, ansiCol: Int) {
+		if (!useColor)
+			return str;
+		return "\x1B[" + ansiCol + "m" + str + "\x1B[0m";
+	}
 }
