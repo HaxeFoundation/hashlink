@@ -57,7 +57,7 @@ class Stats {
 				}
 				tpath.push(tstr);
 			}
-			mem.log(i.count + " count, " + Memory.MB(i.mem) + " " + tpath.join(" > "));
+			mem.log(Memory.withColor(i.count + " count, " + Memory.MB(i.mem) + " ", 33) + tpath.join(${Memory.withColor(' > ', 36)}));
 		}
 		if( withSum )
 			mem.log("Total: "+totCount+" count, "+Memory.MB(totMem));
@@ -265,7 +265,7 @@ class Memory {
 			used += b.size;
 		for (b in filteredBlocks)
 			fUsed += b.size;
-		log("--- " + memFile + " ---");
+		log(withColor("--- " + memFile + " ---", 36));
 		log(pages.length + " pages, " + MB(pagesSize) + " memory");
 		log(roots.length + " roots, "+ stacks.length + " stacks");
 		log(code.types.length + " types, " + closuresPointers.length + " closures");
@@ -677,7 +677,6 @@ class Memory {
 		var ctx = new Stats(this);
 		for( b in filteredBlocks )
 			if( b.type != null && b.type.match(lt) ) {
-				// TOMORROW here
 				var tl = [];
 				var owner = b.owner;
 				// skip first virtual field
@@ -870,6 +869,7 @@ class Memory {
 		return args;
 	}
 
+	static var useColor = false;
 	static function main() {
 		var m = new Memory();
 		var others: Array<Memory> = [];
@@ -884,6 +884,10 @@ class Memory {
 			if( StringTools.endsWith(arg, ".hl") ) {
 				code = arg;
 				m.loadBytecode(arg);
+				continue;
+			}
+			if( arg == "-c" || arg == "--color" ) {
+				useColor = true;
 				continue;
 			}
 			if( arg == "--args" ) {
@@ -916,7 +920,7 @@ class Memory {
 
 		var stdin = Sys.stdin();
 		while( true ) {
-			Sys.print("> ");
+			Sys.print(withColor("> ", 31));
 			var args = parseArgs(args.length > 0 ? args.shift() : stdin.readLine());
 			var cmd = args.shift();
 			switch( cmd ) {
@@ -990,4 +994,11 @@ class Memory {
 		}
 	}
 
+	// A list of ansi colors is available at
+	// https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#8-16-colors
+	public static function withColor(str: String, ansiCol: Int) {
+		if (!useColor)
+			return str;
+		return "\x1B[" + ansiCol + "m" + str + "\x1B[0m";
+	}
 }
