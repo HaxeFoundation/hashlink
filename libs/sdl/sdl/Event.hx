@@ -21,7 +21,7 @@ package sdl;
 	}
 }
 
-@:enum abstract EventType(Int) {
+enum abstract EventType(Int) {
 	var Quit		= 0;
 	var MouseMove	= 1;
 	var MouseLeave	= 2;
@@ -53,7 +53,7 @@ package sdl;
 	var DropEnd = 403;
 }
 
-@:enum abstract WindowStateChange(Int) {
+enum abstract WindowStateChange(Int) {
 	var Show	= 0;
 	var Hide	= 1;
 	var Expose	= 2;

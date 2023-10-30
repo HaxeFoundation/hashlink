@@ -7,7 +7,7 @@
 #	include <OpenGLES/ES3/gl.h>
 #	define HL_GLES
 #elif defined(HL_MAC)
-#	include <SDL.h>
+#	include <SDL2/SDL.h>
 #	include <OpenGL/gl3.h>
 #	define glBindImageTexture(...) hl_error("Not supported on OSX")
 #	define glDispatchCompute(...) hl_error("Not supported on OSX")
@@ -160,6 +160,10 @@ HL_PRIM void HL_NAME(gl_depth_func)( int f ) {
 
 HL_PRIM void HL_NAME(gl_color_mask)( bool r, bool g, bool b, bool a ) {
 	glColorMask(r, g, b, a);
+}
+
+HL_PRIM void HL_NAME(gl_color_maski)( int i, bool r, bool g, bool b, bool a ) {
+	glColorMaski(i, r, g, b, a);
 }
 
 HL_PRIM void HL_NAME(gl_stencil_mask_separate)(int face, int mask) {
@@ -561,6 +565,11 @@ HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
 		return 0;
 #		endif
 	default:
+		{
+			int r = -1;
+			glGetIntegerv(feature, &r);
+			return r;
+		}
 		break;
 	}
 	return -1;
@@ -659,6 +668,7 @@ DEFINE_PRIM(_VOID,gl_blend_equation_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_depth_mask,_BOOL);
 DEFINE_PRIM(_VOID,gl_depth_func,_I32);
 DEFINE_PRIM(_VOID,gl_color_mask,_BOOL _BOOL _BOOL _BOOL);
+DEFINE_PRIM(_VOID,gl_color_maski,_I32 _BOOL _BOOL _BOOL _BOOL);
 DEFINE_PRIM(_VOID,gl_stencil_mask_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_func_separate,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_op_separate,_I32  _I32 _I32 _I32);

@@ -21,6 +21,8 @@ typedef struct sockaddr uv_sockaddr;
 #define EVT_WRITE	0	// write_t
 #define EVT_CONNECT	0	// connect_t
 
+#define EVT_FS	0
+
 #define EVT_MAX		2
 
 typedef struct {
@@ -221,11 +223,50 @@ HL_PRIM void HL_NAME(tcp_nodelay_wrap)( uv_tcp_t *t, bool enable ) {
 	uv_tcp_nodelay(t,enable?1:0);
 }
 
+#define _FS _HANDLE
+
+static void on_fs_event(uv_fs_event_t* handle, const char* filename, int events, int status) {
+	vdynamic ev;
+	ev.t = &hlt_i32;
+	ev.v.i = events;
+
+	vdynamic* args[1];
+	args[0] = &ev;
+
+	trigger_callb((uv_handle_t*)handle, EVT_FS, args, 1, true);
+}
+
+HL_PRIM uv_fs_event_t* HL_NAME(fs_start_wrap)(uv_loop_t* loop, vclosure* cb, char* path) {
+	uv_fs_event_t* handle = UV_ALLOC(uv_fs_event_t);
+	if (uv_fs_event_init(loop, handle) < 0) {
+		free(handle);
+		return NULL;
+	}
+	init_hl_data((uv_handle_t*) handle);
+	register_callb((uv_handle_t*)handle, cb, EVT_FS);
+
+	if (uv_fs_event_start(handle, on_fs_event, path, 0) < 0) {
+		free_handle(handle);
+		return NULL;
+	}
+	return handle;
+}
+
+HL_PRIM bool HL_NAME(fs_stop_wrap)(uv_fs_event_t* handle) {
+	clear_callb((uv_handle_t*)handle, EVT_FS);
+	return uv_fs_event_stop(handle);
+}
+
 DEFINE_PRIM(_TCP, tcp_init_wrap, _LOOP);
 DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID,_BOOL));
 DEFINE_PRIM(_BOOL, tcp_bind_wrap, _TCP _I32 _I32);
 DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
 DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _TCP _BOOL);
+
+// handle FS
+
+DEFINE_PRIM(_FS, fs_start_wrap, _LOOP _FUN(_VOID, _I32) _BYTES);
+DEFINE_PRIM(_BOOL, fs_stop_wrap, _FS);
 
 // loop
 

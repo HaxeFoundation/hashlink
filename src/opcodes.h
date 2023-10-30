@@ -142,6 +142,7 @@ OP_BEGIN
 	OP(ORefData,2)
 	OP(ORefOffset,3)
 	OP(ONop,0)
+	OP(OPrefetch, 3)
 	// --
 	OP(OLast,0)
 OP_END

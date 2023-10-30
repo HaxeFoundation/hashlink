@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.1)
 
 set(HL_VERSION_MAJOR 1)
-set(HL_VERSION_MINOR 12)
+set(HL_VERSION_MINOR 14)
 set(HL_VERSION_PATCH 0)
 set(HL_VERSION ${HL_VERSION_MAJOR}.${HL_VERSION_MINOR}.${HL_VERSION_PATCH})
 
 cmake_policy(SET CMP0042 NEW)
 
 if(WIN32)
+    set(CMAKE_SYSTEM_VERSION 10.0)
     project(hashlink C CXX) # C++ required for directx
 else()
     project(hashlink C)
@@ -55,14 +56,42 @@ include_directories(
 )
 
 file(GLOB pcre_srcs
-    include/pcre/*.c
+    include/pcre/pcre2_auto_possess.c
+    include/pcre/pcre2_chartables.c
+    include/pcre/pcre2_compile.c
+    include/pcre/pcre2_config.c
+    include/pcre/pcre2_context.c
+    include/pcre/pcre2_convert.c
+    include/pcre/pcre2_dfa_match.c
+    include/pcre/pcre2_error.c
+    include/pcre/pcre2_extuni.c
+    include/pcre/pcre2_find_bracket.c
+    include/pcre/pcre2_jit_compile.c
+    include/pcre/pcre2_maketables.c
+    include/pcre/pcre2_match_data.c
+    include/pcre/pcre2_match.c
+    include/pcre/pcre2_newline.c
+    include/pcre/pcre2_ord2utf.c
+    include/pcre/pcre2_pattern_info.c
+    include/pcre/pcre2_script_run.c
+    include/pcre/pcre2_serialize.c
+    include/pcre/pcre2_string_utils.c
+    include/pcre/pcre2_study.c
+    include/pcre/pcre2_substitute.c
+    include/pcre/pcre2_substring.c
+    include/pcre/pcre2_tables.c
+    include/pcre/pcre2_ucd.c
+    include/pcre/pcre2_valid_utf.c
+    include/pcre/pcre2_xclass.c
 )
+
 file(GLOB std_srcs
     src/std/array.c
     src/std/buffer.c
     src/std/bytes.c
     src/std/cast.c
     src/std/date.c
+    src/std/debug.c
     src/std/error.c
     src/std/file.c
     src/std/fun.c
@@ -133,7 +162,7 @@ set_target_properties(libhl
     PROPERTIES
     VERSION ${HL_VERSION}
     SOVERSION ${HL_VERSION_MAJOR}
-    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16"
 )
 
 add_executable(hl
@@ -142,8 +171,12 @@ add_executable(hl
     src/main.c
     src/module.c
     src/debugger.c
-	src/profile.c
+    src/profile.c
 )
+
+if (UNIX AND NOT APPLE)
+    set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+endif()
 
 target_link_libraries(hl libhl)
 
@@ -274,7 +307,7 @@ if(BUILD_TESTING)
         COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
     )
     add_test(NAME uvsample.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
+        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl 6001
     )
     add_test(NAME hello
         COMMAND hello
@@ -283,7 +316,7 @@ if(BUILD_TESTING)
         COMMAND threads
     )
     add_test(NAME uvsample
-        COMMAND uvsample
+        COMMAND uvsample 6002
     )
     add_test(NAME version
         COMMAND hl --version

@@ -1,2 +1,5 @@
 *.c
+*.h
 *.b
+
+hlc.json

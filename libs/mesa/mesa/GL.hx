@@ -120,6 +120,9 @@ class GL {
 	public static function colorMask( r : Bool, g : Bool, b : Bool, a : Bool ) {
 	}
 
+	public static function colorMaski( i : Int, r : Bool, g : Bool, b : Bool, a : Bool ) {
+	}
+
 	public static function stencilMaskSeparate( face : Int, mask : Int ){
 	}
 
@@ -647,6 +650,7 @@ class GL {
 	public static inline var R32F							= 0x822E;
 	public static inline var UNSIGNED_INT_2_10_10_10_REV	= 0x8368;
 	public static inline var UNSIGNED_INT_10F_11F_11F_REV	= 0x8C3B;
+	public static inline var UNSIGNED_INT_24_8				= 0x84FA;
 
 	/* PixelType */
 	/*      UNSIGNED_BYTE */
@@ -734,6 +738,8 @@ class GL {
 	public static inline var TEXTURE_WRAP_S                 = 0x2802;
 	public static inline var TEXTURE_WRAP_T                 = 0x2803;
 	public static inline var TEXTURE_LOD_BIAS               = 0x8501;
+	public static inline var TEXTURE_BASE_LEVEL             = 0x813C;
+	public static inline var TEXTURE_MAX_LEVEL              = 0x813D;
 	public static inline var TEXTURE_MAX_ANISOTROPY         = 0x84FE;
 	public static inline var TEXTURE_COMPARE_MODE           = 0x884C;
 	public static inline var TEXTURE_COMPARE_FUNC           = 0x884D;
@@ -850,6 +856,7 @@ class GL {
 	public static inline var RGB565                         = 0x8D62;
 	public static inline var DEPTH_COMPONENT16              = 0x81A5;
 	public static inline var DEPTH_COMPONENT24              = 0x81A6;
+	public static inline var DEPTH24_STENCIL8              	= 0x88F0;
 	public static inline var STENCIL_INDEX                  = 0x1901;
 	public static inline var STENCIL_INDEX8                 = 0x8D48;
 	public static inline var DEPTH_STENCIL                  = 0x84F9;

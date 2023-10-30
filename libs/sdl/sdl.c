@@ -6,8 +6,6 @@
 #if defined(_WIN32) || defined(__ANDROID__) || defined(HL_IOS) || defined(HL_TVOS)
 #	include <SDL.h>
 #	include <SDL_syswm.h>
-#elif defined(HL_MAC)
-#	include <SDL.h>
 #else
 #	include <SDL2/SDL.h>
 #endif
@@ -431,6 +429,26 @@ HL_PRIM int HL_NAME(set_relative_mouse_mode)(bool enable) {
 	return SDL_SetRelativeMouseMode(enable);
 }
 
+HL_PRIM bool HL_NAME(get_relative_mouse_mode)() {
+	return SDL_GetRelativeMouseMode();
+}
+
+HL_PRIM int HL_NAME(warp_mouse_global)(int x, int y) {
+	return SDL_WarpMouseGlobal(x, y);
+}
+
+HL_PRIM void HL_NAME(warp_mouse_in_window)(SDL_Window* window, int x, int y) {
+	SDL_WarpMouseInWindow(window, x, y);
+}
+
+HL_PRIM void HL_NAME(set_window_grab)(SDL_Window* window, bool grabbed) {
+	SDL_SetWindowGrab(window, grabbed);
+}
+
+HL_PRIM bool HL_NAME(get_window_grab)(SDL_Window* window) {
+	SDL_GetWindowGrab(window);
+}
+
 HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 	char q = SDL_GetKeyFromScancode(SDL_SCANCODE_Q);
 	char w = SDL_GetKeyFromScancode(SDL_SCANCODE_W);
@@ -443,6 +461,7 @@ HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
 	return "unknown";
 }
 
+#define TWIN _ABSTRACT(sdl_window)
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
 DEFINE_PRIM(_VOID, gl_options, _I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, event_loop, _DYN );
@@ -458,6 +477,11 @@ DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 DEFINE_PRIM(_VOID, text_input, _BOOL);
 DEFINE_PRIM(_I32, set_relative_mouse_mode, _BOOL);
+DEFINE_PRIM(_BOOL, get_relative_mouse_mode, _NO_ARG);
+DEFINE_PRIM(_I32, warp_mouse_global, _I32 _I32);
+DEFINE_PRIM(_VOID, warp_mouse_in_window, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, set_window_grab, TWIN _BOOL);
+DEFINE_PRIM(_BOOL, get_window_grab, TWIN);
 DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 DEFINE_PRIM(_BOOL, hint_value, _BYTES _BYTES);
 
@@ -647,6 +671,7 @@ HL_PRIM void HL_NAME(win_destroy)(SDL_Window *win, SDL_GLContext gl) {
 	SDL_GL_DeleteContext(gl);
 }
 
+#define TGL _ABSTRACT(sdl_gl)
 DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(TGL, win_get_glcontext, TWIN);
@@ -839,6 +864,8 @@ HL_PRIM bool HL_NAME(get_drag_and_drop_enabled)() {
 
 HL_PRIM varray* HL_NAME(get_displays)() {
 	int n = SDL_GetNumVideoDisplays();
+	if (n < 0)
+		return NULL;
 	varray* arr = hl_alloc_array(&hlt_dynobj, n);
 	for (int i = 0; i < n; i++) {
 		vdynamic *obj = (vdynamic*) hl_alloc_dynobj();
@@ -858,6 +885,8 @@ HL_PRIM varray* HL_NAME(get_displays)() {
 
 HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
 	int n = SDL_GetNumDisplayModes(display_id);
+	if (n < 0)
+		return NULL;
 	varray* arr = hl_alloc_array(&hlt_dynobj, n);
 	for (int i = 0; i < n; i++) {
 		SDL_DisplayMode mode;

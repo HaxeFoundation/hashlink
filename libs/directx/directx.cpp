@@ -356,12 +356,13 @@ HL_PRIM dx_pointer *HL_NAME(create_input_layout)( varray *arr, vbyte *bytecode, 
 	return input;
 }
 
-HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_view)( dx_resource *tex, int format ) {
+HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_view)( dx_resource *tex, int format, bool readOnly ) {
 	ID3D11DepthStencilView *view;
 	D3D11_DEPTH_STENCIL_VIEW_DESC  desc;
 	ZeroMemory(&desc, sizeof(desc));
 	desc.Format = (DXGI_FORMAT)format;
 	desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	desc.Flags = readOnly ? D3D11_DSV_READ_ONLY_DEPTH | D3D11_DSV_READ_ONLY_STENCIL : 0;
 	DXERR( driver->device->CreateDepthStencilView(tex,&desc,&view) );
 	return view;
 }
@@ -485,7 +486,7 @@ DEFINE_PRIM(_VOID, ia_set_primitive_topology, _I32);
 DEFINE_PRIM(_VOID, ia_set_input_layout, _POINTER);
 DEFINE_PRIM(_POINTER, create_input_layout, _ARR _BYTES _I32);
 DEFINE_PRIM(_RESOURCE, create_texture_2d, _DYN _BYTES);
-DEFINE_PRIM(_POINTER, create_depth_stencil_view, _RESOURCE _I32);
+DEFINE_PRIM(_POINTER, create_depth_stencil_view, _RESOURCE _I32 _BOOL);
 DEFINE_PRIM(_POINTER, create_depth_stencil_state, _DYN);
 DEFINE_PRIM(_VOID, om_set_depth_stencil_state, _POINTER _I32);
 DEFINE_PRIM(_VOID, clear_depth_stencil_view, _POINTER _NULL(_F64) _NULL(_I32));

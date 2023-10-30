@@ -233,11 +233,11 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 	case HSTRUCT:
 		{
 			hl_type_obj *o = v->t->obj;
-			if( o->rt == NULL || o->rt->toStringFun == NULL ) {
+			if( o->rt == NULL || hl_get_obj_proto(v->t)->toStringFun == NULL ) {
 				if( v->t->kind == HSTRUCT ) hl_buffer_char(b,'@');
 				hl_buffer_str(b,o->name);
 			} else
-				hl_buffer_str(b,o->rt->toStringFun(v));
+				hl_buffer_str(b,o->rt->toStringFun(v->t->kind == HSTRUCT ? (vdynamic*)v->v.ptr : v));
 		}
 		break;
 	case HARRAY:
@@ -320,19 +320,25 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 			l.next = stack;
 			f = hl_lookup_find(o->lookup,o->nfields,hl_hash_gen(USTR("__string"),false));
 			if( f && f->t->kind == HFUN && f->t->fun->nargs == 0 && f->t->fun->ret->kind == HBYTES ) {
-				vclosure *v = (vclosure*)o->values[f->field_index];
+				vclosure *v = (vclosure*)o->values[f->field_index&HL_DYNOBJ_INDEX_MASK];
 				if( v ) {
 					hl_buffer_str(b, v->hasValue ? ((uchar*(*)(void*))v->fun)(v->value) : ((uchar*(*)())v->fun)());
 					break;
 				}
 			}
 			hl_buffer_char(b, '{');
+			int tmp[128];
+			int *indexes = o->nfields <= 128 ? tmp : (int*)hl_gc_alloc_noptr(sizeof(int) * o->nfields);
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = o->lookup + i;
+				indexes[((unsigned)f->field_index)>>HL_DYNOBJ_INDEX_SHIFT] = i;
+			}
+			for(i=0;i<o->nfields;i++) {
+				hl_field_lookup *f = o->lookup + indexes[i];
 				if( i ) hl_buffer_str_sub(b,USTR(", "),2);
 				hl_buffer_str(b,(uchar*)hl_field_name(f->hashed_name));
 				hl_buffer_str_sub(b,USTR(" : "),3);
-				hl_buffer_addr(b, hl_is_ptr(f->t) ? (void*)(o->values + f->field_index) : (void*)(o->raw_data + f->field_index), f->t, &l);
+				hl_buffer_addr(b, hl_is_ptr(f->t) ? (void*)(o->values + (f->field_index&HL_DYNOBJ_INDEX_MASK)) : (void*)(o->raw_data + (f->field_index&HL_DYNOBJ_INDEX_MASK)), f->t, &l);
 			}
 			hl_buffer_char(b, '}');
 		}

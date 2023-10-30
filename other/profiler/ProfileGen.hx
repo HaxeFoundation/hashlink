@@ -20,6 +20,12 @@ class StackElement {
 					desc = desc.substr(0,-15)+"new";
 			}
 		}
+		if( file != null ) {
+			file = file.split("\\").join("/");
+			if( file.charCodeAt(1) == ':'.code )
+				file = file.split("/haxe/std/").pop();
+			file = file.split("/").join(".");
+		}
 		this.desc = desc;
 	}
 }
@@ -58,6 +64,7 @@ class Thread {
 	public var tid : Int;
 	public var curFrame : Frame;
 	public var frames : Array<Frame>;
+	public var name : String;
 
 	public function new(tid) {
 		this.tid = tid;
@@ -101,6 +108,7 @@ class ProfileGen {
 		var file = null;
 		var debug = false;
 		var mintime = 0.0;
+		var keepLines = false;
 
 		while( args.length > 0 ) {
 			var arg = args[0];
@@ -116,6 +124,8 @@ class ProfileGen {
 				outFile = args.shift();
 			case "--min-time-ms":
 				mintime = Std.parseFloat(args.shift()) / 1000.0;
+			case "--keep-lines":
+				keepLines = true;
 			default:
 				throw "Unknown parameter "+arg;
 			}
@@ -134,9 +144,10 @@ class ProfileGen {
 		var hthreads = new Map();
 		var threads = [];
 		var tcur : Thread = null;
-		var fileMaps : Array<Map<Int,StackElement>> = [];
+		var fileMaps : Array<{ byDesc : Map<String,StackElement>, byLine : Map<Int,StackElement> }> = [];
 		while( true ) {
 			var time = try f.readDouble() catch( e : haxe.io.Eof ) break;
+			if( time == -1 ) break;
 			var tid = f.readInt32();
 			if( tcur == null || tid != tcur.tid ) {
 				tcur = hthreads.get(tid);
@@ -156,23 +167,31 @@ class ProfileGen {
 					if( file == -1 )
 						continue;
 					var line = f.readInt32();
-					var elt : StackElement;
+					var elt : StackElement = null;
 					if( file < 0 ) {
 						file &= 0x7FFFFFFF;
-						elt = fileMaps[file].get(line);
+						elt = fileMaps[file].byLine.get(line);
 						if( elt == null ) throw "assert";
 					} else {
 						var len = f.readInt32();
 						var buf = new StringBuf();
 						for( i in 0...len ) buf.addChar(f.readUInt16());
 						var str = buf.toString();
-						elt = new StackElement(str);
-						var m = fileMaps[file];
-						if( m == null ) {
-							m = new Map();
-							fileMaps[file] = m;
+						var maps = fileMaps[file];
+						if( maps == null ) {
+							maps = { byLine : new Map(), byDesc : new Map() };
+							fileMaps[file] = maps;
 						}
-						m.set(line,elt);
+						elt = new StackElement(str);
+						if( !keepLines ) {
+							var ePrev = maps.byDesc.get(elt.desc);
+							if( ePrev != null ) {
+								if( elt.line < ePrev.line ) ePrev.line = elt.line;
+								elt = ePrev;
+							} else
+								maps.byDesc.set(elt.desc, elt);
+						}
+						maps.byLine.set(line,elt);
 					}
 					stack[i] = elt;
 				}
@@ -203,16 +222,28 @@ class ProfileGen {
 			}
 		}
 
+		for( t in threads )
+			t.name = "Thread "+t.tid;
+		threads[0].name = "Main";
+
+		var namesCount = try f.readInt32() catch( e : haxe.io.Eof ) 0;
+		for( i in 0...namesCount ) {
+			var tid = f.readInt32();
+			var tname = f.readString(f.readInt32());
+			var t = hthreads.get(tid);
+			t.name = tname;
+		}
+
 		var mainTid = threads[0].tid;
-		var json : Array<Dynamic> = [
+		var json : Array<Dynamic> = [for( t in threads )
 			{
     			pid : 0,
-    			tid : mainTid,
+    			tid : t.tid,
  	 			ts : 0,
 				ph : "M",
 				cat : "__metadata",
 				name : "thread_name",
-				args : { name : "CrBrowserMain" }
+				args : { name : t.name }
 			}
 		];
 
