@@ -233,6 +233,15 @@ class Sdl {
 	private static function _getClipboardText() : hl.Bytes {
 		return null;
 	}
+	
+	@:hlNative("?sdl", "set_drag_and_drop_enabled")
+	public static function setDragAndDropEnabled( v : Bool ): Void {
+	}
+	
+	@:hlNative("?sdl", "get_drag_and_drop_enabled")
+	public static function getDragAndDropEnabled(): Bool {
+		return false;
+	}
 }
 
 enum abstract SDLHint(String) from String to String {
