@@ -13,7 +13,10 @@ typedef enum {
 	WindowState	= 6,
 	KeyDown		= 7,
 	KeyUp		= 8,
-	TextInput	= 9
+	TextInput	= 9,
+	DropStart = 10,
+	DropFile = 11,
+	DropEnd = 12,
 } EventType;
 
 typedef enum {
@@ -52,6 +55,7 @@ typedef struct {
 	bool keyRepeat;
 	int controller;
 	int value;
+	vbyte* dropFile;
 } dx_event;
 
 typedef struct {
@@ -459,6 +463,45 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 			return TRUE;
 		}
 		break;
+	case WM_DROPFILES:
+	{
+		HDROP drop = (HDROP)wparam;
+		UINT count = DragQueryFileW(drop, 0xFFFFFFFF, NULL, 0);
+
+		POINT dragPoint;
+		if ( !DragQueryPoint(drop, &dragPoint) ) {
+			dragPoint.x = 0L;
+			dragPoint.y = 0L;
+		}
+
+		e = addEvent(wnd, DropStart);
+		e->value = count;
+		e->mouseX = (int)dragPoint.x;
+		e->mouseY = (int)dragPoint.y;
+
+		for ( UINT i = 0; i < count; i++ ) {
+			UINT size = DragQueryFileW(drop, i, NULL, 0);
+			// We have to use hl_add_root, because if GC runs between WM_DROPFILES
+			// and event loop collecting the event - we'll get garbage data, due to buffer being freed.
+			// As a consequence, this event requires checks during fetching of next event
+			// (and window destruction) in order to ensure Haxe side gets proper buffer without memory leaks.
+			vbyte* buffer = hl_alloc_bytes(size * sizeof(WCHAR));
+			if ( DragQueryFileW(drop, i, (LPWSTR)buffer, size) ) {
+				e = addEvent(wnd, DropFile);
+				e->value = size * sizeof(WCHAR);
+				e->dropFile = buffer;
+				e->mouseX = (int)dragPoint.x;
+				e->mouseY = (int)dragPoint.y;
+				hl_add_root(&e->dropFile);
+			}
+		}
+		e = addEvent(wnd, DropEnd);
+		e->value = count;
+		e->mouseX = (int)dragPoint.x;
+		e->mouseY = (int)dragPoint.y;
+		DragFinish(drop);
+		break;
+	}
 	case WM_CLOSE:
 		addEvent(wnd, Quit);
 		return 0;
@@ -704,6 +747,11 @@ HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
 		ClipCursor(NULL);
 	}
 	dx_events *buf = get_events(win);
+	// See WM_DROPFILES comment regarding GC
+	for ( int i = buf->next_event; i < buf->event_count; i++ ) {
+		if ( buf->events[i].type == DropFile )
+			hl_remove_root(&buf->events[i].dropFile);
+	}
 	free(buf);
 	SetWindowLongPtr(win,GWLP_USERDATA,0);
 	DestroyWindow(win);
@@ -722,6 +770,10 @@ HL_PRIM bool HL_NAME(win_get_next_event)( dx_window *win, dx_event *e ) {
 	}
 	save = e->t;
 	memcpy(e,&buf->events[buf->next_event++],sizeof(dx_event));
+	if ( e->type == DropFile ) {
+		// See WM_DROPFILES comment regarding GC
+		hl_remove_root(&buf->events[buf->next_event - 1].dropFile);
+	}
 	e->t = save;
 	return true;
 }
@@ -752,6 +804,10 @@ HL_PRIM bool HL_NAME(win_set_relative_mouse_mode)( dx_window *wnd, bool enabled)
 
 HL_PRIM bool HL_NAME(win_get_relative_mouse_mode)() {
 	return relative_mouse;
+}
+
+HL_PRIM void HL_NAME(win_set_drag_accept_files)( dx_window* wnd, bool enabled ) {
+	DragAcceptFiles(wnd, enabled);
 }
 
 HL_PRIM int HL_NAME(get_screen_width)() {
@@ -875,6 +931,7 @@ DEFINE_PRIM(_BOOL, set_cursor_pos, _I32 _I32);
 DEFINE_PRIM(_BOOL, win_set_cursor_pos, TWIN _I32 _I32);
 DEFINE_PRIM(_BOOL, win_set_relative_mouse_mode, TWIN _BOOL);
 DEFINE_PRIM(_BOOL, win_get_relative_mouse_mode, _NO_ARG);
+DEFINE_PRIM(_VOID, win_set_drag_accept_files, TWIN _BOOL);
 DEFINE_PRIM(_ARR, win_get_display_settings, _BYTES);
 DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES _BOOL);
 DEFINE_PRIM(_I32, win_change_display_setting, _BYTES _DYN);
