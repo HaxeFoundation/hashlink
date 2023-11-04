@@ -480,19 +480,21 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		e->mouseY = (int)dragPoint.y;
 
 		for ( UINT i = 0; i < count; i++ ) {
-			UINT size = DragQueryFileW(drop, i, NULL, 0);
-			// We have to use hl_add_root, because if GC runs between WM_DROPFILES
-			// and event loop collecting the event - we'll get garbage data, due to buffer being freed.
-			// As a consequence, this event requires checks during fetching of next event
+			UINT size = DragQueryFileW(drop, i, NULL, 0) + 1; // + zero terminator
+			// We have to make a temporary unmanaged buffer copy due to async nature of event being
+			// processed and collected by Haxe event loop, and using GC-allocated buffer risks
+			// resulting in garbage data if GC is ran at any point inbetween due to freed buffer.
+			// As a consequence, this event requires checks during fetching of the next event
 			// (and window destruction) in order to ensure Haxe side gets proper buffer without memory leaks.
-			vbyte* buffer = hl_alloc_bytes(size * sizeof(WCHAR));
+			vbyte* buffer = malloc(size * sizeof(WCHAR));
 			if ( DragQueryFileW(drop, i, (LPWSTR)buffer, size) ) {
 				e = addEvent(wnd, DropFile);
 				e->value = size * sizeof(WCHAR);
 				e->dropFile = buffer;
 				e->mouseX = (int)dragPoint.x;
 				e->mouseY = (int)dragPoint.y;
-				hl_add_root(&e->dropFile);
+			} else {
+				free(buffer);
 			}
 		}
 		e = addEvent(wnd, DropEnd);
@@ -749,8 +751,8 @@ HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
 	dx_events *buf = get_events(win);
 	// See WM_DROPFILES comment regarding GC
 	for ( int i = buf->next_event; i < buf->event_count; i++ ) {
-		if ( buf->events[i].type == DropFile )
-			hl_remove_root(&buf->events[i].dropFile);
+		if ( buf->events[i].dropFile != NULL )
+			free(buf->events[i].dropFile);
 	}
 	free(buf);
 	SetWindowLongPtr(win,GWLP_USERDATA,0);
@@ -772,7 +774,10 @@ HL_PRIM bool HL_NAME(win_get_next_event)( dx_window *win, dx_event *e ) {
 	memcpy(e,&buf->events[buf->next_event++],sizeof(dx_event));
 	if ( e->type == DropFile ) {
 		// See WM_DROPFILES comment regarding GC
-		hl_remove_root(&buf->events[buf->next_event - 1].dropFile);
+		vbyte* unmanaged = e->dropFile;
+		e->dropFile = hl_copy_bytes(unmanaged, e->value);
+		free(unmanaged);
+		buf->events[buf->next_event - 1].dropFile = NULL;
 	}
 	e->t = save;
 	return true;
