@@ -14,6 +14,7 @@ package dx;
 	public var keyRepeat : Bool;
 	public var controller : Int;
 	public var value : Int;
+	public var dropFile: hl.Bytes;
 	public function new() {
 	}
 }
@@ -29,6 +30,9 @@ enum abstract EventType(Int) {
 	var KeyDown		= 7;
 	var KeyUp		= 8;
 	var TextInput	= 9;
+	var DropStart = 10;
+	var DropFile = 11;
+	var DropEnd = 12;
 }
 
 enum abstract WindowStateChange(Int) {
