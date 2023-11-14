@@ -50,6 +50,7 @@ class Window {
 	public var displaySetting : DisplaySetting;
 	public var selectedMonitor : MonitorHandle;
 	public var vsync : Bool;
+	public var dragAndDropEnabled(default, set) : Bool;
 
 	public function new( title : String, width : Int, height : Int, x : Int = CW_USEDEFAULT, y : Int = CW_USEDEFAULT, windowFlags : Int = RESIZABLE ) {
 		win = winCreateEx(x, y, width, height, windowFlags);
@@ -243,6 +244,11 @@ class Window {
 		winSetOpacity(win, v);
 		return v;
 	}
+	
+	function set_dragAndDropEnabled(v) {
+		winSetDragAcceptFiles(win, v);
+		return dragAndDropEnabled = v;
+	}
 
 	@:hlNative("?directx", "win_get_display_settings")
 	static function winGetDisplaySettings(monitor : hl.Bytes) : hl.NativeArray<Dynamic> {
@@ -353,6 +359,10 @@ class Window {
 	
 	static function winGetRelativeMouseMode() : Bool { 
 		return false;
+	}
+	
+	@:hlNative("?directx", "win_set_drag_accept_files")
+	static function winSetDragAcceptFiles( win : WinPtr, enable: Bool ) : Void {
 	}
 
 }
