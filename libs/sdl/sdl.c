@@ -275,13 +275,11 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			break;
 		case SDL_CONTROLLERDEVICEADDED:
 			event->type = GControllerAdded;
-			SDL_GameController * controller = SDL_GameControllerOpen(e.cdevice.which);
-            SDL_Joystick* j = SDL_GameControllerGetJoystick(controller);
-			event->controller = SDL_JoystickInstanceID(j);
+			event->controller = e.jdevice.which;
 			break;
 		case SDL_CONTROLLERDEVICEREMOVED:
 			event->type = GControllerRemoved;
-			event->controller = e.cdevice.which;
+			event->controller = e.jdevice.which;
 			break;
 		case SDL_CONTROLLERBUTTONDOWN:
 			event->type = GControllerDown;
