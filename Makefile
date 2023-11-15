@@ -73,6 +73,7 @@ RELEASE_NAME=win
 VS_RUNTIME_LIBRARY ?= c:/windows/system32/vcruntime140.dll
 
 ifeq ($(MARCH),32)
+CFLAGS += -msse2 -mfpmath=sse
 CC=i686-pc-cygwin-gcc
 BUILD_DIR = Release
 VS_SDL_LIBRARY ?= include/sdl/lib/x86/SDL2.dll
@@ -142,7 +143,7 @@ CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
 LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
-CFLAGS += -I /usr/include/i386-linux-gnu
+CFLAGS += -I /usr/include/i386-linux-gnu -msse2 -mfpmath=sse
 LIBFLAGS += -L/opt/libjpeg-turbo/lib
 else
 LIBFLAGS += -L/opt/libjpeg-turbo/lib64
