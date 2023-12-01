@@ -8,8 +8,9 @@ INSTALL_LIB_DIR ?= $(PREFIX)/lib
 INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
 LIBS=fmt sdl ssl openal ui uv mysql sqlite
+ARCH ?= $(shell uname -m)
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -std=c11 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 EXTRA_LFLAGS ?=
 LIBFLAGS =
@@ -72,6 +73,7 @@ RELEASE_NAME=win
 VS_RUNTIME_LIBRARY ?= c:/windows/system32/vcruntime140.dll
 
 ifeq ($(MARCH),32)
+CFLAGS += -msse2 -mfpmath=sse
 CC=i686-pc-cygwin-gcc
 BUILD_DIR = Release
 VS_SDL_LIBRARY ?= include/sdl/lib/x86/SDL2.dll
@@ -86,6 +88,26 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
+
+BPREFIX := $(shell brew --prefix)
+
+BREW_LIBJPEG := $(shell brew --prefix libjpeg-turbo)
+BREW_SDL2 := $(shell brew --prefix sdl2)
+BREW_JPEGTURBO := $(shell brew --prefix jpeg-turbo)
+BREW_VORBIS := $(shell brew --prefix libvorbis)
+BREW_OPENAL := $(shell brew --prefix openal-soft)
+BREW_MBEDTLS := $(shell brew --prefix mbedtls@2)
+BREW_LIBPNG := $(shell brew --prefix libpng)
+BREW_LIBOGG := $(shell brew --prefix libogg)
+BREW_LIBUV := $(shell brew --prefix libuv)
+
+CFLAGS += -m$(MARCH) -I include -I $(BREW_LIBJPEG)/include \
+	-I $(BREW_JPEGTURBO)/include -I $(BREW_SDL2)/include -I $(BREW_VORBIS)/include \
+	-I $(BREW_MBEDTLS)/include -I $(BREW_LIBPNG)/include -I $(BREW_LIBOGG)/include \
+	-I $(BREW_LIBUV)/include \
+	-I $(BREW_OPENAL)/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
+LFLAGS += -Wl,-export_dynamic 
+
 CFLAGS += -m$(MARCH) -I include -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include \
 	-I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include -I /usr/local/opt/libvorbis/include \
 	-I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
@@ -97,15 +119,22 @@ CFLAGS += -isysroot $(ISYSROOT)
 LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-LIBFLAGS += -L/usr/local/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
+LIBFLAGS += -L$(BREW_LIBJPEG)/lib -L$(BREW_SDL2)/lib -L$(BREW_JPEGTURBO)/lib \
+			-L$(BREW_VORBIS)/lib -L$(BREW_OPENAL)/lib -L$(BREW_MBEDTLS)/lib \
+			-L$(BREW_LIBPNG)/lib -L$(BREW_LIBOGG)/lib -L$(BREW_LIBUV)/lib
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 RELEASE_NAME = osx
 
 # Mac native debug
+ifneq ($(ARCH),arm64)
 HL_DEBUG = include/mdbg/mdbg.o include/mdbg/mach_excServer.o include/mdbg/mach_excUser.o
 LIB += ${HL_DEBUG}
+endif
+
+CFLAGS += -arch $(ARCH)
+LFLAGS += -arch $(ARCH)
 
 else
 
@@ -114,7 +143,7 @@ CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
 LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
-CFLAGS += -I /usr/include/i386-linux-gnu
+CFLAGS += -I /usr/include/i386-linux-gnu -msse2 -mfpmath=sse
 LIBFLAGS += -L/opt/libjpeg-turbo/lib
 else
 LIBFLAGS += -L/opt/libjpeg-turbo/lib64
@@ -160,7 +189,7 @@ src/std/regexp.o: src/std/regexp.c
 	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
 
 libhl: ${LIB}
-	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
+	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}

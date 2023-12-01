@@ -225,8 +225,9 @@ static void _sigtrap_handler(int signum) {
 }
 #endif
 
-#ifdef HL_MAC
+#if defined(HL_MAC) && defined(__x86_64__)
 	extern bool is_debugger_attached(void);
+#	define MAC_DEBUG
 #endif
 
 HL_PRIM bool hl_detect_debugger() {
@@ -239,7 +240,7 @@ HL_PRIM bool hl_detect_debugger() {
 		raise(SIGTRAP);
 	}
 	return (bool)debugger_present;
-#	elif defined(HL_MAC)
+#	elif defined(MAC_DEBUG)
 	return is_debugger_attached();
 #	else
 	return false;
