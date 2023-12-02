@@ -3816,24 +3816,36 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			{
 				preg *rdst = IS_FLOAT(dst) ? alloc_fpu(ctx,dst,false) : alloc_cpu(ctx,dst,false);
 				if( ra->t->kind == HABSTRACT ) {
-					if( dst->t->kind != HOBJ && dst->t->kind != HSTRUCT ) ASSERT(dst->t->kind);
-					hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
-					int osize = rt->size;
-					if( osize & (HL_WSIZE-1) ) osize += HL_WSIZE - (osize & (HL_WSIZE-1));
-					op64(ctx, LEA, rdst, pmem(&p,alloc_cpu(ctx,ra,true)->id,sizeof(struct _hl_carray)));
+					int osize;
+					bool isRead = dst->t->kind != HOBJ && dst->t->kind != HSTRUCT;
+					if( isRead )
+						osize = sizeof(void*);
+					else {
+						hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
+						osize = rt->size;
+						if( osize & (HL_WSIZE-1) ) osize += HL_WSIZE - (osize & (HL_WSIZE-1));
+					}
 					preg *idx = alloc_cpu(ctx, rb, true);
 					op64(ctx, IMUL, idx, pconst(&p,osize));
-					op64(ctx, ADD, rdst, idx);
+					op64(ctx, isRead?MOV:LEA, rdst, pmem2(&p,alloc_cpu(ctx,ra, true)->id,idx->id,1,0));
+					store(ctx,dst,dst->current,false);
 					scratch(idx);
-				} else
+				} else {
 					copy(ctx, rdst, pmem2(&p,alloc_cpu(ctx,ra,true)->id,alloc_cpu64(ctx,rb,true)->id,hl_type_size(dst->t),sizeof(varray)), dst->size);
-				store(ctx,dst,dst->current,false);
+					store(ctx,dst,dst->current,false);
+				}
 			}
 			break;
 		case OSetArray:
 			{
 				preg *rrb = IS_FLOAT(rb) ? alloc_fpu(ctx,rb,true) : alloc_cpu(ctx,rb,true);
-				copy(ctx, pmem2(&p,alloc_cpu(ctx,dst,true)->id,alloc_cpu64(ctx,ra,true)->id,hl_type_size(rb->t),sizeof(varray)), rrb, rb->size);
+				if( dst->t->kind == HABSTRACT ) {
+					bool isWrite = dst->t->kind != HOBJ && dst->t->kind != HSTRUCT;
+					// can only write pointers
+					if( !isWrite ) ASSERT(1);
+					copy(ctx, pmem2(&p,alloc_cpu(ctx,dst,true)->id,alloc_cpu64(ctx,ra,true)->id,sizeof(void*),0), rrb, rb->size);
+				} else
+					copy(ctx, pmem2(&p,alloc_cpu(ctx,dst,true)->id,alloc_cpu64(ctx,ra,true)->id,hl_type_size(rb->t),sizeof(varray)), rrb, rb->size);
 			}
 			break;
 		case OArraySize:

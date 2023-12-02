@@ -49,8 +49,6 @@ DEFINE_PRIM(_ARR,alloc_array,_TYPE _I32);
 DEFINE_PRIM(_VOID,array_blit,_ARR _I32 _ARR _I32 _I32);
 DEFINE_PRIM(_TYPE,array_type,_ARR);
 
-typedef struct _hl_carray hl_carray;
-
 HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	if( at->kind != HOBJ && at->kind != HSTRUCT )
 		hl_error("Invalid array type");
@@ -61,26 +59,17 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(at);
 	int osize = rt->size;
 	if( osize & (HL_WSIZE-1) ) osize += HL_WSIZE - (osize & (HL_WSIZE-1));
-	hl_carray *arr;
-	int header = sizeof(hl_carray);
-	if( at->kind == HSTRUCT ) {
-		header += sizeof(vdynamic) * size;
-		arr = (hl_carray*)hl_gc_alloc_gen(at, header + size * osize, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
-		arr->osize = sizeof(vdynamic);
-	} else {
-		arr = (hl_carray*)hl_gc_alloc_gen(at, header + size * osize, (rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
-		arr->osize = osize;
-	}
-	arr->size = size;
-	arr->at = at;
-
+	int offset = 0;
+	if( at->kind == HSTRUCT )
+		offset = sizeof(vdynamic) * size;
+	char *arr = hl_gc_alloc_gen(at, offset + size * osize, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
 	int i,k;
 	for(k=0;k<size;k++) {
-		vobj *o = (vobj*)((char*)arr + header + osize * k);
+		vobj *o = (vobj*)(arr + offset + osize * k);
 		if( at->kind == HOBJ )
 			o->t = at;
 		else {
-			vdynamic *d = (vdynamic*)((char*)(arr + 1) + k * sizeof(vdynamic));
+			vdynamic *d = (vdynamic*)(arr + k * sizeof(vdynamic));
 			d->t = at;
 			d->v.ptr = o;
 		}
@@ -92,16 +81,5 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	return arr;
 }
 
-HL_PRIM int hl_carray_length( hl_carray *arr ) {
-	return arr->size;
-}
-
-HL_PRIM vdynamic *hl_carray_get( hl_carray *arr, int pos ) {
-	if( pos < 0 || pos >= arr->size ) return NULL;
-	return (vdynamic*)((char*)(arr + 1) + pos * arr->osize);
-}
-
 #define _CARRAY _ABSTRACT(hl_carray)
 DEFINE_PRIM(_CARRAY,alloc_carray,_TYPE _I32);
-DEFINE_PRIM(_DYN,carray_get,_CARRAY _I32);
-DEFINE_PRIM(_I32,carray_length,_CARRAY);
