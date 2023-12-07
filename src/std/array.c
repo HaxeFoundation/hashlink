@@ -59,23 +59,17 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(at);
 	int osize = rt->size;
 	if( osize & (HL_WSIZE-1) ) osize += HL_WSIZE - (osize & (HL_WSIZE-1));
-	int offset = 0;
-	if( at->kind == HSTRUCT )
-		offset = sizeof(vdynamic) * size;
-	char *arr = hl_gc_alloc_gen(at, offset + size * osize, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
-	int i,k;
-	for(k=0;k<size;k++) {
-		vobj *o = (vobj*)(arr + offset + osize * k);
-		if( at->kind == HOBJ )
-			o->t = at;
-		else {
-			vdynamic *d = (vdynamic*)(arr + k * sizeof(vdynamic));
-			d->t = at;
-			d->v.ptr = o;
-		}
-		for(i=0;i<rt->nbindings;i++) {
-			hl_runtime_binding *b = rt->bindings + i;
-			*(void**)(((char*)o) + rt->fields_indexes[b->fid]) = b->closure ? hl_alloc_closure_ptr(b->closure,b->ptr,o) : b->ptr;
+	char *arr = hl_gc_alloc_gen(at, size * osize, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
+	if( at->kind == HOBJ || rt->nbindings ) {
+		int i,k;
+		for(k=0;k<size;k++) {
+			char *o = arr + osize * k;
+			if( at->kind == HOBJ )
+				((vobj*)o)->t = at;
+			for(i=0;i<rt->nbindings;i++) {
+				hl_runtime_binding *b = rt->bindings + i;
+				*(void**)(o + rt->fields_indexes[b->fid]) = b->closure ? hl_alloc_closure_ptr(b->closure,b->ptr,o) : b->ptr;
+			}
 		}
 	}
 	return arr;
