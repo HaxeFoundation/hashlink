@@ -192,7 +192,7 @@ abstract CommandList(Resource) {
 	public function setGraphicsRootShaderResourceView( index : Int, address : Address ) {}
 
 	public function iaSetPrimitiveTopology( top : PrimitiveTopology ) {}
-	public function iaSetVertexBuffers( startSlot : Int, numViews : Int, views : VertexBufferView ) {}
+	public function iaSetVertexBuffers( startSlot : Int, numViews : Int, views : VertexBufferView /* hl.CArray */ ) {}
 	public function iaSetIndexBuffer( view : IndexBufferView ) {}
 
 	public function drawInstanced( vertexCountPerInstance : Int, instanceCount : Int, startVertexLocation : Int, startInstanceLocation : Int ) {}
@@ -509,7 +509,7 @@ enum abstract DescriptorRangeType(Int) {
 @:struct class RootParameterDescriptorTable extends RootParameter {
 	public var numDescriptorRanges : Int;
 	public var __padding : Int;
-	public var descriptorRanges : DescriptorRange;
+	public var descriptorRanges : hl.CArray<DescriptorRange>;
 	public var shaderVisibility : ShaderVisibility;
 	public function new() {
 		parameterType = DESCRIPTOR_TABLE;
@@ -633,9 +633,9 @@ enum abstract ShaderVisibility(Int) {
 
 @:struct class RootSignatureDesc {
 	public var numParameters : Int;
-	public var parameters : RootParameter;
+	public var parameters : hl.CArray<RootParameter>;
 	public var numStaticSamplers : Int;
-	public var staticSamplers : StaticSamplerDesc;
+	public var staticSamplers : hl.CArray<StaticSamplerDesc>;
 	public var flags : haxe.EnumFlags<RootSignatureFlag>;
 	public function new() {
 	}
@@ -799,7 +799,7 @@ enum abstract DxgiFormat(Int) {
 }
 
 @:struct class StreamOutputDesc {
-	public var soDeclaration : SoDeclarationEntry;
+	public var soDeclaration : hl.CArray<SoDeclarationEntry>;
 	public var numEntries : Int;
 	public var bufferStrides : hl.Bytes;
 	public var numStrides : Int;
@@ -1024,7 +1024,7 @@ enum abstract InputClassification(Int) {
 }
 
 @:struct class InputLayoutDesc {
-	public var inputElementDescs : InputElementDesc;
+	public var inputElementDescs : hl.CArray<InputElementDesc>;
 	public var numElements : Int;
 	public function new() {
 	}
@@ -1402,7 +1402,7 @@ enum abstract IndirectArgumentType(Int) {
 @:struct class CommandSignatureDesc {
 	public var byteStride :Int;
 	public var numArgumentDescs : Int;
-	public var argumentDescs : IndirectArgumentDesc;
+	public var argumentDescs : hl.CArray<IndirectArgumentDesc>;
 	public var nodeMask : Int;
 	public function new() {
 	}
