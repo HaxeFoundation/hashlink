@@ -289,6 +289,9 @@ abstract ShaderCompiler(hl.Abstract<"dx_compiler">) {
 		var nargs = new hl.NativeArray(args.length);
 		for( i in 0...args.length )
 			nargs[i] = @:privateAccess args[i].bytes;
+		/*
+			Compiling source can trigger a validation error if DXCOMPILER.DLL is missing
+		*/
 		var bytes = do_compile(cast this, @:privateAccess source.bytes, @:privateAccess profile.bytes, nargs, outLen);
 		return @:privateAccess new haxe.io.Bytes(bytes, outLen);
 	}
