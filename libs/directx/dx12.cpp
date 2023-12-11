@@ -546,6 +546,10 @@ void HL_NAME(create_constant_buffer_view)( D3D12_CONSTANT_BUFFER_VIEW_DESC *desc
 	static_driver->device->CreateConstantBufferView(desc,descriptor);
 }
 
+void HL_NAME(create_unordered_access_view)( ID3D12Resource *res, ID3D12Resource *counter, D3D12_UNORDERED_ACCESS_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+	static_driver->device->CreateUnorderedAccessView(res,counter,desc,descriptor);
+}
+
 void HL_NAME(create_sampler)( D3D12_SAMPLER_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateSampler(desc,descriptor);
 }
@@ -604,6 +608,7 @@ DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_depth_stencil_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_shader_resource_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_constant_buffer_view, _STRUCT _I64);
+DEFINE_PRIM(_VOID, create_unordered_access_view, _RES _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_sampler, _STRUCT _I64);
 DEFINE_PRIM(_RES, create_committed_resource, _STRUCT _I32 _STRUCT _I32 _STRUCT);
 DEFINE_PRIM(_RES, get_back_buffer, _I32);
@@ -711,6 +716,13 @@ ID3D12PipelineState *HL_NAME(create_graphics_pipeline_state)( D3D12_GRAPHICS_PIP
 	return state;
 }
 
+ID3D12PipelineState *HL_NAME(create_compute_pipeline_state)( D3D12_COMPUTE_PIPELINE_STATE_DESC *desc ) {
+	ID3D12PipelineState *state = NULL;
+	// if shader is considered invalid, maybe you're missing dxil.dll
+	DXERR(static_driver->device->CreateComputePipelineState(desc,IID_PPV_ARGS(&state)));
+	return state;
+}
+
 ID3D12CommandSignature *HL_NAME(create_command_signature)( D3D12_COMMAND_SIGNATURE_DESC *desc, ID3D12RootSignature *rootSign ) {
 	ID3D12CommandSignature *sign = NULL;
 	DXERR(static_driver->device->CreateCommandSignature(desc,rootSign,IID_PPV_ARGS(&sign)));
@@ -723,6 +735,7 @@ DEFINE_PRIM(_BYTES, compiler_compile, _COMPILER _BYTES _BYTES _ARR _REF(_I32));
 DEFINE_PRIM(_BYTES, serialize_root_signature, _STRUCT _I32 _REF(_I32));
 DEFINE_PRIM(_RES, rootsignature_create, _BYTES _I32);
 DEFINE_PRIM(_RES, create_graphics_pipeline_state, _STRUCT);
+DEFINE_PRIM(_RES, create_compute_pipeline_state, _STRUCT);
 DEFINE_PRIM(_RES, create_command_signature, _STRUCT _RES);
 
 // ---- HEAPS
@@ -900,6 +913,10 @@ void HL_NAME(command_list_set_graphics_root_shader_resource_view)( ID3D12Graphic
 	l->SetGraphicsRootShaderResourceView(index,handle);
 }
 
+void HL_NAME(command_list_set_graphics_root_unordered_access_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
+	l->SetGraphicsRootUnorderedAccessView(index,handle);
+}
+
 void HL_NAME(command_list_execute_indirect)( ID3D12GraphicsCommandList *l, ID3D12CommandSignature *sign, int maxCommandCount, ID3D12Resource *args, int64 argsOffset, ID3D12Resource *count, int64 countOffset  ) {
 	l->ExecuteIndirect(sign, maxCommandCount, args, argsOffset, count, countOffset);
 }
@@ -920,6 +937,34 @@ void HL_NAME(command_list_set_predication)( ID3D12GraphicsCommandList *l, ID3D12
 	l->SetPredication(res,offset,op);
 }
 
+void HL_NAME(command_list_set_compute_root_signature)( ID3D12GraphicsCommandList *l, ID3D12RootSignature *sign ) {
+	l->SetComputeRootSignature(sign);
+}
+
+void HL_NAME(command_list_set_compute_root32_bit_constants)( ID3D12GraphicsCommandList *l, int index, int numValues, void *data, int destOffset ) {
+	l->SetComputeRoot32BitConstants(index, numValues, data, destOffset);
+}
+
+void HL_NAME(command_list_set_compute_root_constant_buffer_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS address ) {
+	l->SetComputeRootConstantBufferView(index,address);
+}
+
+void HL_NAME(command_list_set_compute_root_descriptor_table)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_DESCRIPTOR_HANDLE handle ) {
+	l->SetComputeRootDescriptorTable(index,handle);
+}
+
+void HL_NAME(command_list_set_compute_root_shader_resource_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
+	l->SetComputeRootShaderResourceView(index,handle);
+}
+
+void HL_NAME(command_list_set_compute_root_unordered_access_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
+	l->SetComputeRootUnorderedAccessView(index,handle);
+}
+
+void HL_NAME(command_list_dispatch)( ID3D12GraphicsCommandList *l, int x, int y, int z ) {
+	l->Dispatch(x,y,z);
+}
+
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
 DEFINE_PRIM(_VOID, command_allocator_reset, _RES);
 DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);
@@ -936,6 +981,7 @@ DEFINE_PRIM(_VOID, command_list_set_graphics_root32_bit_constants, _RES _I32 _I3
 DEFINE_PRIM(_VOID, command_list_set_graphics_root_constant_buffer_view, _RES _I32 _I64);
 DEFINE_PRIM(_VOID, command_list_set_graphics_root_descriptor_table, _RES _I32 _I64);
 DEFINE_PRIM(_VOID, command_list_set_graphics_root_shader_resource_view, _RES _I32 _I64);
+DEFINE_PRIM(_VOID, command_list_set_graphics_root_unordered_access_view, _RES _I32 _I64);
 DEFINE_PRIM(_VOID, command_list_set_descriptor_heaps, _RES _ARR);
 DEFINE_PRIM(_VOID, command_list_set_pipeline_state, _RES _RES);
 DEFINE_PRIM(_VOID, command_list_ia_set_vertex_buffers, _RES _I32 _I32 _STRUCT);
@@ -952,3 +998,14 @@ DEFINE_PRIM(_VOID, command_list_begin_query, _RES _RES _I32 _I32);
 DEFINE_PRIM(_VOID, command_list_end_query, _RES _RES _I32 _I32);
 DEFINE_PRIM(_VOID, command_list_resolve_query_data, _RES _RES _I32 _I32 _I32 _RES _I64);
 DEFINE_PRIM(_VOID, command_list_set_predication, _RES _RES _I64 _I32);
+
+DEFINE_PRIM(_VOID, command_list_set_compute_root_signature, _RES _RES);
+DEFINE_PRIM(_VOID, command_list_set_compute_root32_bit_constants, _RES _I32 _I32 _BYTES _I32);
+DEFINE_PRIM(_VOID, command_list_set_compute_root_constant_buffer_view, _RES _I32 _I64);
+DEFINE_PRIM(_VOID, command_list_set_compute_root_descriptor_table, _RES _I32 _I64);
+DEFINE_PRIM(_VOID, command_list_set_compute_root_shader_resource_view, _RES _I32 _I64);
+DEFINE_PRIM(_VOID, command_list_set_compute_root_unordered_access_view, _RES _I32 _I64);
+DEFINE_PRIM(_VOID, command_list_dispatch, _RES _I32 _I32 _I32);
+
+//command_list_clear_unordered_access_view_float,
+//command_list_clear_unordered_access_view_uint,

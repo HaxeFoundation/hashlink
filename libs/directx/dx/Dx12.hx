@@ -190,6 +190,7 @@ abstract CommandList(Resource) {
 	public function setGraphicsRootConstantBufferView( index : Int, address : Address ) {}
 	public function setGraphicsRootDescriptorTable( index : Int, address : Address ) {}
 	public function setGraphicsRootShaderResourceView( index : Int, address : Address ) {}
+	public function setGraphicsRootUnorderedAccessView( index : Int, address : Address ) {}
 
 	public function iaSetPrimitiveTopology( top : PrimitiveTopology ) {}
 	public function iaSetVertexBuffers( startSlot : Int, numViews : Int, views : VertexBufferView /* hl.CArray */ ) {}
@@ -210,6 +211,14 @@ abstract CommandList(Resource) {
 	public function resolveQueryData( heap : QueryHeap, type : QueryType, index : Int, count : Int, dest : Resource, offset : Int64 ) {}
 
 	public function setPredication( res : Resource, offset : Int64, op : PredicationOp ) {}
+
+	public function setComputeRootSignature( sign : RootSignature ) {}
+	public function setComputeRoot32BitConstants( index : Int, numValues : Int, data : hl.Bytes, dstOffset : Int ) {}
+	public function setComputeRootConstantBufferView( index : Int, address : Address ) {}
+	public function setComputeRootDescriptorTable( index : Int, address : Address ) {}
+	public function setComputeRootShaderResourceView( index : Int, address : Address ) {}
+	public function setComputeRootUnorderedAccessView( index : Int, address : Address ) {}
+	public function dispatch( x : Int, y : Int, z : Int ) {}
 
 	static function create( type : CommandListType, alloc : CommandAllocator, state : PipelineState ) : Resource { return null; }
 }
@@ -655,6 +664,12 @@ abstract GraphicsPipelineState(Resource) {
 	}
 }
 
+abstract ComputePipelineState(Resource) {
+	@:to inline function toPS():PipelineState {
+		return cast this;
+	}
+}
+
 abstract Bool32(Int) {
 	@:to inline function toBool() return this != 1;
 	@:from static inline function fromBool(b:Bool) : Bool32 { return cast b?1:0; };
@@ -784,7 +799,7 @@ enum abstract DxgiFormat(Int) {
 
 @:struct class ShaderBytecode {
 	public var shaderBytecode : hl.Bytes;
-	public var bytecodeLength : Int;
+	public var bytecodeLength : hl.I64;
 }
 
 @:struct class SoDeclarationEntry {
@@ -1092,6 +1107,16 @@ enum abstract PipelineStateFlags(Int) {
 	var rtvFormat7 : DxgiFormat;
 	public var dsvFormat : DxgiFormat;
 	@:packed public var sampleDesc(default,null) : DxgiSampleDesc;
+	public var nodeMask : Int;
+	@:packed public var cachedPSO(default,null) : CachedPipelineState;
+	public var flags : PipelineStateFlags;
+	public function new() {
+	}
+}
+
+@:struct class ComputePipelineStateDesc {
+	public var rootSignature : RootSignature;
+	@:packed public var cs(default,null) : ShaderBytecode;
 	public var nodeMask : Int;
 	@:packed public var cachedPSO(default,null) : CachedPipelineState;
 	public var flags : PipelineStateFlags;
@@ -1408,6 +1433,69 @@ enum abstract IndirectArgumentType(Int) {
 	}
 }
 
+enum abstract UAVDimension(Int) {
+	public var UNKNOWN = 0;
+	public var BUFFER = 1;
+	public var TEXTURE1D = 2;
+	public var TEXTURE1DARRAY = 3;
+	public var TEXTURE2D = 4;
+	public var TEXTURE2DARRAY = 5;
+	public var TEXTURE3D = 8;
+}
+
+@:struct class UnorderedAccessViewDesc {
+	public var format : Format;
+	public var viewDimension : UAVDimension;
+}
+
+enum UAVBufferFlags {
+	RAW;
+}
+
+@:struct class UAVBufferViewDesc extends UnorderedAccessViewDesc {
+	public var firstElement : hl.I64;
+	public var numElements : Int;
+	public var structureSizeInBytes : Int;
+	public var counterOffsetInBytes : hl.I64;
+	public var flags : haxe.EnumFlags<UAVBufferFlags>;
+	public function new() {
+		viewDimension = BUFFER;
+	}
+}
+
+@:struct class UAVTextureViewDesc extends UnorderedAccessViewDesc {
+	var int0 : Int;
+	var int1 : Int;
+	var int2 : Int;
+	var int3 : Int;
+	var padding1 : hl.I64;
+	var padding2 : Int;
+	public function new(dim) {
+		viewDimension = dim;
+	}
+	public var mipSlice(get,set) : Int;
+	public var firstArraySlice(get,set) : Int;
+	public var firstWSlice(get,set) : Int;
+	public var arraySize(get,set) : Int;
+	public var planeSlice(get,set) : Int;
+	public var wSlice(get,set) : Int;
+	inline function get_mipSlice() return int0;
+	inline function set_mipSlice(v) return int0 = v;
+
+	inline function get_planeSlice() return switch( viewDimension ) { case TEXTURE2DARRAY: int3; default: int1; }
+	inline function set_planeSlice(v) return switch( viewDimension ) { case TEXTURE2DARRAY: int3 = v; default: int1 = v; }
+
+	inline function get_firstArraySlice() return int1;
+	inline function set_firstArraySlice(v) return int1 = v;
+	inline function get_arraySize() return int2;
+	inline function set_arraySize(v) return int2 = v;
+
+	inline function get_firstWSlice() return int1;
+	inline function set_firstWSlice(v) return int1 = v;
+	inline function get_wSlice() return int2;
+	inline function set_wSlice(v) return int2 = v;
+}
+
 enum abstract QueryType(Int) {
 	var OCCLUSION = 0;
 	var BINARY_OCCLUSION = 1;
@@ -1465,6 +1553,10 @@ class Dx12 {
 		return null;
 	}
 
+	public static function createComputePipelineState( desc : ComputePipelineStateDesc ) : ComputePipelineState {
+		return null;
+	}
+
 	public static function serializeRootSignature( desc : RootSignatureDesc, version : Int, size : hl.Ref<Int> ) : hl.Bytes {
 		return null;
 	}
@@ -1484,6 +1576,9 @@ class Dx12 {
 	}
 
 	public static function createConstantBufferView( desc : ConstantBufferViewDesc, target : Address ) {
+	}
+
+	public static function createUnorderedAccessView( res : Resource, counter : Resource, desc : UnorderedAccessViewDesc, target : Address ) {
 	}
 
 	public static function createShaderResourceView( resource : Resource, desc : ShaderResourceViewDesc, target : Address ) {
