@@ -32,7 +32,7 @@ jobs:
             archive_ext: tar.gz
 
           - target: darwin
-            runner: macos-11
+            runner: macos-12
             haxe_nightly_dir: mac
             archive_ext: tar.gz
 
@@ -107,8 +107,11 @@ jobs:
             ;;
 
           darwin*)
+            brew list --formula | xargs brew uninstall --force --ignore-dependencies
+            brew list --cask | xargs brew uninstall --force --ignore-dependencies
             brew update
             brew bundle
+            brew link mbedtls@2 --force # needed for CMake
             ;;
 
           windows*)
