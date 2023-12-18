@@ -281,7 +281,7 @@ jobs:
 
 
     - name: "Share: build artifact"
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         path: ${{ env.HASHLINK_DISTRIBUTION }}
 
