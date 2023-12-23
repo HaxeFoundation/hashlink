@@ -80,7 +80,7 @@ double utod( const uchar *str, uchar **end ) {
 	}
 	buf[i] = 0;
 	result = strtod(buf,&bend);
-	*end = str + (bend - buf);
+	*end = (uchar*)str + (bend - buf);
 	return result;
 }
 
@@ -101,7 +101,7 @@ int utoi( const uchar *str, uchar **end ) {
 	}
 	buf[i] = 0;
 	result = strtol(buf,&bend,10);
-	*end = str + (bend - buf);
+	*end = (uchar*)str + (bend - buf);
 	return result;
 }
 
