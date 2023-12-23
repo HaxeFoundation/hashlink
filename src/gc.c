@@ -1123,6 +1123,8 @@ retry_jit_alloc:
 #elif defined(HL_WIN)
 	void *ptr = VirtualAlloc(NULL,size,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
 	return ptr;
+#elif defined(HL_OS)
+	return malloc(size);
 #elif defined(HL_CONSOLE)
 	return NULL;
 #else

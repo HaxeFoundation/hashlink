@@ -78,7 +78,7 @@
 #	define HL_XBS
 #endif
 
-#if defined(HL_PS) || defined(HL_NX) || defined(HL_XBO) || defined(HL_XBS)
+#if defined(HL_PS) || defined(HL_NX) || defined(HL_XBO) || defined(HL_XBS) || defined(HL_OS)
 #	define HL_CONSOLE
 #endif
 
