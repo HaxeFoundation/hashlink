@@ -446,7 +446,7 @@ HL_PRIM void HL_NAME(set_window_grab)(SDL_Window* window, bool grabbed) {
 }
 
 HL_PRIM bool HL_NAME(get_window_grab)(SDL_Window* window) {
-	SDL_GetWindowGrab(window);
+	return SDL_GetWindowGrab(window);
 }
 
 HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
