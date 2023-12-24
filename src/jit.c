@@ -2953,7 +2953,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		ctx->currentPos = opCount + 1;
 		jit_buf(ctx);
 #		ifdef JIT_DEBUG
-		{
+		if( opCount == 0 || f->ops[opCount-1].op != OAsm ) {
 			int uid = opCount + (f->findex<<16);
 			op32(ctx, PUSH, pconst(&p,uid), UNUSED);
 			op64(ctx, ADD, PESP, pconst(&p,HL_WSIZE));
@@ -4325,6 +4325,31 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					break;
 				default:
 					ASSERT(o->p3);
+					break;
+				}
+			}
+			break;
+		case OAsm:
+			{
+				switch( o->p1 ) {
+				case 0: // byte output
+					B(o->p2);
+					break;
+				case 1: // scratch cpu reg
+					scratch(REG_AT(o->p2));
+					break;
+				case 2: // read vm reg
+					rb--;
+					copy(ctx, REG_AT(o->p2), &rb->stack, rb->size);
+					scratch(REG_AT(o->p2));
+					break;
+				case 3: // write vm reg
+					rb--;
+					copy(ctx, &rb->stack, REG_AT(o->p2), rb->size);
+					scratch(rb->current);
+					break;
+				default:
+					ASSERT(o->p1);
 					break;
 				}
 			}
