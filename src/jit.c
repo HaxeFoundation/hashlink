@@ -4348,6 +4348,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					copy(ctx, &rb->stack, REG_AT(o->p2), rb->size);
 					scratch(rb->current);
 					break;
+				case 4:
+					if( ctx->totalRegsSize != 0 )
+						hl_fatal("Asm naked function should not have local variables");
+					if( opCount != 0 )
+						hl_fatal("Asm naked function should be on first opcode");
+					ctx->buf.b -= BUF_POS() - ctx->functionPos; // reset to our function start
+					break;
 				default:
 					ASSERT(o->p1);
 					break;
