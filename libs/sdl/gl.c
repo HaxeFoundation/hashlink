@@ -644,6 +644,17 @@ HL_PRIM void HL_NAME(gl_uniform_block_binding)( vdynamic *p, int index, int bind
 	glUniformBlockBinding(p->v.i, index, binding);
 }
 
+// SSBOs
+
+HL_PRIM int HL_NAME(gl_get_program_resource_index)( vdynamic *p, int type, vstring *name ) {
+	char *cname = hl_to_utf8(name->bytes);
+	return (int)glGetProgramResourceIndex(p->v.i, type, cname);
+}
+
+HL_PRIM void HL_NAME(gl_shader_storage_block_binding)( vdynamic *p, int index, int binding ) {
+	glShaderStorageBlockBinding(p->v.i, index, binding);
+}
+
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_clear,_I32);
@@ -757,5 +768,7 @@ DEFINE_PRIM(_F64, gl_query_result, _NULL(_I32));
 
 DEFINE_PRIM(_I32, gl_get_uniform_block_index, _NULL(_I32) _STRING);
 DEFINE_PRIM(_VOID, gl_uniform_block_binding, _NULL(_I32) _I32 _I32);
+DEFINE_PRIM(_I32, gl_get_program_resource_index, _NULL(_I32) _I32 _STRING);
+DEFINE_PRIM(_VOID, gl_shader_storage_block_binding, _NULL(_I32) _I32 _I32);
 
 DEFINE_PRIM(_I32, gl_get_config_parameter, _I32);
