@@ -326,6 +326,14 @@ HL_PRIM void HL_NAME(gl_tex_image3d)( int target, int level, int internalFormat,
 	glTexImage3D(target, level, internalFormat, width, height, depth, border, format, type, image);
 }
 
+HL_PRIM void HL_NAME(gl_tex_storage2d)( int target, int levels, int internalFormat, int width, int height) {
+	glTexStorage2D(target, levels, internalFormat, width, height);
+}
+
+HL_PRIM void HL_NAME(gl_tex_storage3d)( int target, int levels, int internalFormat, int width, int height, int depth) {
+	glTexStorage3D(target, levels, internalFormat, width, height, depth);
+}
+
 HL_PRIM void HL_NAME(gl_tex_image2d_multisample)( int target, int samples, int internalFormat, int width, int height, bool fixedsamplelocations) {
 	glTexImage2DMultisample(target, samples, internalFormat, width, height, fixedsamplelocations);
 }
@@ -706,6 +714,8 @@ DEFINE_PRIM(_VOID,gl_tex_parameteri,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_tex_parameterf,_I32 _I32 _F32);
 DEFINE_PRIM(_VOID,gl_tex_image2d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID,gl_tex_image3d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_tex_storage2d,_I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_tex_storage3d,_I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_tex_image2d_multisample,_I32 _I32 _I32 _I32 _I32 _BOOL);
 DEFINE_PRIM(_VOID,gl_compressed_tex_image2d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID,gl_compressed_tex_image3d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
