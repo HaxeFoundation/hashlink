@@ -363,6 +363,7 @@ enum abstract ResourceState(Int) {
 	public var VIDE_ENCODE_READ = 0x200000;
 	public var VIDE_ENCODE_WRITE = 0x800000;
 	@:op(a|b) function or(r:ResourceState):ResourceState;
+	@:op(a&b) function and(r:ResourceState):ResourceState;
 }
 
 @:struct class Color {
