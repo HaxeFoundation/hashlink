@@ -1445,7 +1445,7 @@ enum abstract UAVDimension(Int) {
 }
 
 @:struct class UnorderedAccessViewDesc {
-	public var format : Format;
+	public var format : DxgiFormat;
 	public var viewDimension : UAVDimension;
 }
 
