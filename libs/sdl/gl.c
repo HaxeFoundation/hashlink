@@ -329,12 +329,16 @@ HL_PRIM void HL_NAME(gl_tex_image3d)( int target, int level, int internalFormat,
 HL_PRIM void HL_NAME(gl_tex_storage2d)( int target, int levels, int internalFormat, int width, int height) {
 #ifndef __APPLE__
 	glTexStorage2D(target, levels, internalFormat, width, height);
+#else
+    hl_error("glTexStorage2d is not supported on Apple platforms");
 #endif
 }
 
 HL_PRIM void HL_NAME(gl_tex_storage3d)( int target, int levels, int internalFormat, int width, int height, int depth) {
 #ifndef __APPLE__
 	glTexStorage3D(target, levels, internalFormat, width, height, depth);
+#else
+	hl_error("glTexStorage3d is not supported on Apple platforms");
 #endif
 }
 
@@ -663,13 +667,15 @@ HL_PRIM int HL_NAME(gl_get_program_resource_index)( vdynamic *p, int type, vstri
 	char *cname = hl_to_utf8(name->bytes);
 	return (int)glGetProgramResourceIndex(p->v.i, type, cname);
 #else
-	return 0;
+	hl_error("glGetProgramResourceIndex is not supported on Apple platforms");
 #endif
 }
 
 HL_PRIM void HL_NAME(gl_shader_storage_block_binding)( vdynamic *p, int index, int binding ) {
 #ifndef __APPLE__
 	glShaderStorageBlockBinding(p->v.i, index, binding);
+#else
+	hl_error("glShaderStorageBlockBinding is not supported on Apple platforms");
 #endif
 }
 
