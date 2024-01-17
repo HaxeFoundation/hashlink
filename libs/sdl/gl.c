@@ -327,11 +327,15 @@ HL_PRIM void HL_NAME(gl_tex_image3d)( int target, int level, int internalFormat,
 }
 
 HL_PRIM void HL_NAME(gl_tex_storage2d)( int target, int levels, int internalFormat, int width, int height) {
+#ifndef __APPLE__
 	glTexStorage2D(target, levels, internalFormat, width, height);
+#endif
 }
 
 HL_PRIM void HL_NAME(gl_tex_storage3d)( int target, int levels, int internalFormat, int width, int height, int depth) {
+#ifndef __APPLE__
 	glTexStorage3D(target, levels, internalFormat, width, height, depth);
+#endif
 }
 
 HL_PRIM void HL_NAME(gl_tex_image2d_multisample)( int target, int samples, int internalFormat, int width, int height, bool fixedsamplelocations) {
@@ -655,12 +659,18 @@ HL_PRIM void HL_NAME(gl_uniform_block_binding)( vdynamic *p, int index, int bind
 // SSBOs
 
 HL_PRIM int HL_NAME(gl_get_program_resource_index)( vdynamic *p, int type, vstring *name ) {
+#ifndef __APPLE__
 	char *cname = hl_to_utf8(name->bytes);
 	return (int)glGetProgramResourceIndex(p->v.i, type, cname);
+#else
+	return 0;
+#endif
 }
 
 HL_PRIM void HL_NAME(gl_shader_storage_block_binding)( vdynamic *p, int index, int binding ) {
+#ifndef __APPLE__
 	glShaderStorageBlockBinding(p->v.i, index, binding);
+#endif
 }
 
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);

@@ -256,10 +256,12 @@ class GL {
 	public static function compressedTexSubImage3D( target : Int, level : Int, xoffset : Int, yoffset : Int, zoffset : Int, width : Int, height : Int, depth : Int, format : Int, type : Int, image : hl.Bytes ) {
 	}
 
+	/** Requires OpenGL 4.2+, therefore not supported on Apple platforms **/
 	@:hlNative("?sdl","gl_tex_storage2d")
 	public static function texStorage2D( target : Int, levels : Int, internalFormat : Int, width : Int, height : Int ) {
 	}
 
+	/** Requires OpenGL 4.2+, therefore not supported on Apple platforms **/
 	@:hlNative("?sdl","gl_tex_storage3d")
 	public static function texStorage3D( target : Int, levels : Int, internalFormat : Int, width : Int, height : Int, depth : Int ) {
 	}
@@ -448,11 +450,13 @@ class GL {
 
 	// ssbos
 
+	/** Requires OpenGL 4.3+, therefore not supported on Apple platforms **/
 	@:hlNative("?sdl","gl_get_program_resource_index")
 	public static function getProgramResourceIndex( p : Program, type : Int, name : String ) : Int {
 		return 0;
 	}
 
+	/** Requires OpenGL 4.3+, therefore not supported on Apple platforms **/
 	@:hlNative("?sdl","gl_shader_storage_block_binding")
 	public static function shaderStorageBlockBinding( p : Program, blockIndex : Int, blockBinding : Int ) : Void {
 	}
