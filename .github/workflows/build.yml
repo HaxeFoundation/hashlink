@@ -248,6 +248,12 @@ jobs:
             haxe -hl src/_main.c -cp other/tests -main HelloWorld
             make hlc
             ./hlc
+
+            # ensure the executable still works when installed globally
+            cp hello.hl /tmp
+            pushd /tmp
+            hl hello.hl
+            popd
             ;;
         esac
 
