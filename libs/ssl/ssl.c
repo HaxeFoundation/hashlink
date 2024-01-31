@@ -693,10 +693,10 @@ HL_PRIM vbyte *HL_NAME(dgst_sign)(vbyte *data, int len, hl_ssl_pkey *key, vbyte 
 	}
 #if MBEDTLS_VERSION_MAJOR >= 3
 	out = hl_gc_alloc_noptr(MBEDTLS_PK_SIGNATURE_MAX_SIZE);
-    if ((r = mbedtls_pk_sign(key->k, mbedtls_md_get_type(md), hash, mbedtls_md_get_size(md), out, MBEDTLS_PK_SIGNATURE_MAX_SIZE, (size ? &ssize : NULL), mbedtls_ctr_drbg_random, &ctr_drbg)) != 0) {
+	if ((r = mbedtls_pk_sign(key->k, mbedtls_md_get_type(md), hash, mbedtls_md_get_size(md), out, MBEDTLS_PK_SIGNATURE_MAX_SIZE, (size ? &ssize : NULL), mbedtls_ctr_drbg_random, &ctr_drbg)) != 0) {
 #else
 	out = hl_gc_alloc_noptr(MBEDTLS_MPI_MAX_SIZE);
-    if ((r = mbedtls_pk_sign(key->k, mbedtls_md_get_type(md), hash, 0, out, (size ? &ssize : NULL), mbedtls_ctr_drbg_random, &ctr_drbg)) != 0){
+	if ((r = mbedtls_pk_sign(key->k, mbedtls_md_get_type(md), hash, 0, out, (size ? &ssize : NULL), mbedtls_ctr_drbg_random, &ctr_drbg)) != 0){
 #endif
 		ssl_error(r);
 		return NULL;
