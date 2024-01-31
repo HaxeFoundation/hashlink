@@ -180,6 +180,7 @@ abstract CommandList(Resource) {
 	public function clearDepthStencilView( rtv : Address, flags : ClearFlags, depth : Single, stencil : Int ) {}
 	public function reset( alloc : CommandAllocator, state : PipelineState ) {}
 	public function resourceBarrier( b : ResourceBarrier ) {}
+	public function resourceBarriers( b : hl.CArray<ResourceBarrier>, barrierCount : Int ) {}
 	public function setPipelineState( state : PipelineState ) {}
 	public function setDescriptorHeaps( heaps : hl.NativeArray<DescriptorHeap> ) {}
 	public function copyBufferRegion( dst : GpuResource, dstOffset : Int64, src : GpuResource, srcOffset : Int64, size : Int64 ) {}

@@ -157,6 +157,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags, uchar *dev_desc ) {
 #if defined(_DEBUG)
 	params.ProcessDebugFlags = D3D12_PROCESS_DEBUG_FLAG_DEBUG_LAYER_ENABLED;
 #endif
+	params.ProcessDebugFlags |= D3D12XBOX_PROCESS_DEBUG_FLAG_ENABLE_COMMON_STATE_PROMOTION;
 	params.GraphicsCommandQueueRingSizeBytes = static_cast<UINT>(D3D12XBOX_DEFAULT_SIZE_BYTES);
 	params.GraphicsScratchMemorySizeBytes = static_cast<UINT>(D3D12XBOX_DEFAULT_SIZE_BYTES);
 	params.ComputeScratchMemorySizeBytes = static_cast<UINT>(D3D12XBOX_DEFAULT_SIZE_BYTES);
@@ -833,6 +834,10 @@ void HL_NAME(command_list_resource_barrier)( ID3D12GraphicsCommandList *l, D3D12
 	l->ResourceBarrier(1,barrier);
 }
 
+void HL_NAME(command_list_resource_barriers)(ID3D12GraphicsCommandList* l, D3D12_RESOURCE_BARRIER* barrier, int barrierCount) {
+	l->ResourceBarrier(barrierCount, barrier);
+}
+
 void HL_NAME(command_list_clear_render_target_view)( ID3D12GraphicsCommandList *l, D3D12_CPU_DESCRIPTOR_HANDLE view, FLOAT *colors ) {
 	l->ClearRenderTargetView(view,colors,0,NULL);
 }
@@ -971,6 +976,7 @@ DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);
 DEFINE_PRIM(_VOID, command_list_close, _RES);
 DEFINE_PRIM(_VOID, command_list_reset, _RES _RES _RES);
 DEFINE_PRIM(_VOID, command_list_resource_barrier, _RES _STRUCT);
+DEFINE_PRIM(_VOID, command_list_resource_barriers, _RES _ABSTRACT(hl_carray) _I32);
 DEFINE_PRIM(_VOID, command_list_execute, _RES);
 DEFINE_PRIM(_VOID, command_list_clear_render_target_view, _RES _I64 _STRUCT);
 DEFINE_PRIM(_VOID, command_list_clear_depth_stencil_view, _RES _I64 _I32 _F32 _I32);
