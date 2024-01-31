@@ -460,7 +460,11 @@ HL_PRIM varray *HL_NAME(cert_get_altnames)(hl_ssl_cert *cert) {
 	varray *a = NULL;
 	vbyte **current = NULL;
 	mbedtls_x509_crt *crt = cert->c;
+#if MBEDTLS_VERSION_MAJOR >= 3
+	if (mbedtls_x509_crt_has_ext_type(crt, MBEDTLS_X509_EXT_SUBJECT_ALT_NAME)) {
+#else
 	if (crt->ext_types & MBEDTLS_X509_EXT_SUBJECT_ALT_NAME) {
+#endif
 		cur = &crt->subject_alt_names;
 		while (cur != NULL) {
 			if (pos == count) {
@@ -593,7 +597,11 @@ HL_PRIM hl_ssl_pkey *HL_NAME(key_from_der)(vbyte *data, int len, bool pub) {
 	if (pub)
 		r = mbedtls_pk_parse_public_key(pk, (const unsigned char*)data, len);
 	else
+#if MBEDTLS_VERSION_MAJOR >= 3
+		r = mbedtls_pk_parse_key(pk, (const unsigned char*)data, len, NULL, 0, mbedtls_ctr_drbg_random, &ctr_drbg);
+#else
 		r = mbedtls_pk_parse_key(pk, (const unsigned char*)data, len, NULL, 0);
+#endif
 	if (r != 0) {
 		mbedtls_pk_free(pk);
 		free(pk);
@@ -618,10 +626,17 @@ HL_PRIM hl_ssl_pkey *HL_NAME(key_from_pem)(vbyte *data, bool pub, vbyte *pass) {
 	buf[len - 1] = '\0';
 	if (pub)
 		r = mbedtls_pk_parse_public_key(pk, buf, len);
+#if MBEDTLS_VERSION_MAJOR >= 3
+	else if (pass == NULL)
+		r = mbedtls_pk_parse_key(pk, buf, len, NULL, 0, mbedtls_ctr_drbg_random, &ctr_drbg);
+	else
+		r = mbedtls_pk_parse_key(pk, buf, len, (const unsigned char*)pass, strlen((char*)pass), mbedtls_ctr_drbg_random, &ctr_drbg);
+#else
 	else if (pass == NULL)
 		r = mbedtls_pk_parse_key(pk, buf, len, NULL, 0);
 	else
 		r = mbedtls_pk_parse_key(pk, buf, len, (const unsigned char*)pass, strlen((char*)pass));
+#endif
 	free(buf);
 	if (r != 0) {
 		mbedtls_pk_free(pk);
@@ -676,9 +691,13 @@ HL_PRIM vbyte *HL_NAME(dgst_sign)(vbyte *data, int len, hl_ssl_pkey *key, vbyte 
 		ssl_error(r);
 		return NULL;
 	}
-
+#if MBEDTLS_VERSION_MAJOR >= 3
+	out = hl_gc_alloc_noptr(MBEDTLS_PK_SIGNATURE_MAX_SIZE);
+	if ((r = mbedtls_pk_sign(key->k, mbedtls_md_get_type(md), hash, mbedtls_md_get_size(md), out, MBEDTLS_PK_SIGNATURE_MAX_SIZE, (size ? &ssize : NULL), mbedtls_ctr_drbg_random, &ctr_drbg)) != 0) {
+#else
 	out = hl_gc_alloc_noptr(MBEDTLS_MPI_MAX_SIZE);
 	if ((r = mbedtls_pk_sign(key->k, mbedtls_md_get_type(md), hash, 0, out, (size ? &ssize : NULL), mbedtls_ctr_drbg_random, &ctr_drbg)) != 0){
+#endif
 		ssl_error(r);
 		return NULL;
 	}
