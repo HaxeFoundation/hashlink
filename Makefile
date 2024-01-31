@@ -18,6 +18,8 @@ HLFLAGS = -ldl
 LIBEXT = so
 LIBTURBOJPEG = -lturbojpeg
 
+LHL_LINK_FLAGS =
+
 PCRE_FLAGS = -I include/pcre -D HAVE_CONFIG_H -D PCRE2_CODE_UNIT_WIDTH=16
 
 PCRE = include/pcre/pcre2_auto_possess.o include/pcre/pcre2_chartables.o include/pcre/pcre2_compile.o \
@@ -136,6 +138,9 @@ endif
 CFLAGS += -arch $(ARCH)
 LFLAGS += -arch $(ARCH)
 
+LFLAGS += -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
+LIBFLAGS += -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
+LHL_LINK_FLAGS += -install_name @rpath/libhl.dylib
 else
 
 # Linux
@@ -189,7 +194,7 @@ src/std/regexp.o: src/std/regexp.c
 	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
 
 libhl: ${LIB}
-	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
+	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} ${LHL_LINK_FLAGS} -shared ${LIB} -lpthread -lm
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}
