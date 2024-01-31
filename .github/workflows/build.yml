@@ -111,7 +111,6 @@ jobs:
             brew list --cask | xargs brew uninstall --force --ignore-dependencies
             brew update
             brew bundle
-            brew link mbedtls@2 --force # needed for CMake
             ;;
 
           windows*)
