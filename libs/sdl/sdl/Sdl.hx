@@ -110,7 +110,7 @@ class Sdl {
 	public static function message( title : String, text : String, error = false ) {
 		@:privateAccess messageBox(title.toUtf8(), text.toUtf8(), error);
 	}
-	
+
 	public static function getDisplayModes(display : Window.DisplayHandle) : Array<ScreenMode> {
 		var modes = get_display_modes(display);
 		if(modes == null)
