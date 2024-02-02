@@ -210,6 +210,10 @@ class GL {
 	public static function bindTexture( t : Int, texture : Texture ) {
 	}
 
+	@:hlNative("?mesa","gl_bind_image_texture")
+	public static function bindImageTexture( unit : Int, texture : Int, level : Int, layered : Bool, layer : Int, access : Int, format : Int ) {
+	}
+
 	public static function texParameteri( t : Int, key : Int, value : Int ) {
 	}
 
@@ -762,6 +766,20 @@ class GL {
 	public static inline var TEXTURE_CUBE_MAP_POSITIVE_Z    = 0x8519;
 	public static inline var TEXTURE_CUBE_MAP_NEGATIVE_Z    = 0x851A;
 	public static inline var MAX_CUBE_MAP_TEXTURE_SIZE      = 0x851C;
+
+	/* Image */
+	public static inline var READ_ONLY                      = 0x88B8;
+	public static inline var WRITE_ONLY                     = 0x88B9;
+	public static inline var READ_WRITE                     = 0x88BA;
+	public static inline var IMAGE_1D                       = 0x904C;
+	public static inline var IMAGE_2D                       = 0x904D;
+	public static inline var IMAGE_3D                       = 0x904E;
+	public static inline var IMAGE_2D_RECT                  = 0x904F;
+	public static inline var IMAGE_CUBE                     = 0x9050;
+	public static inline var IMAGE_BUFFER                   = 0x9051;
+	public static inline var IMAGE_1D_ARRAY                 = 0x9052;
+	public static inline var IMAGE_2D_ARRAY                 = 0x9053;
+	public static inline var IMAGE_CUBE_MAP_ARRAY           = 0x9054;
 
 	/* TextureUnit */
 	public static inline var TEXTURE0                       = 0x84C0;
