@@ -38,6 +38,10 @@ class Sdl {
 		glOptions(major, minor, depth, stencil, flags, samples);
 	}
 
+	public static function setGLVersion( major : Int, minor : Int) {
+		setGLOptions(major, minor);
+	}
+
 	public static function setHint(name:String, value:String) {
 		return @:privateAccess hintValue(name.toUtf8(), value.toUtf8());
 	}
