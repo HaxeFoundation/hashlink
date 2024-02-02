@@ -18,7 +18,7 @@ abstract Surface(SurfacePtr) {
 	}
 
 	@:hlNative("sdl","surface_from")
-	public static function from( pixels : hl.Bytes,  width : Int, height : Int, depth : Int, pitch : Int, rmask : Int, gmask : Int, bmask : Int, amask : Int ) : Surface {
+	public static function from( pixels : hl.Bytes, width : Int, height : Int, depth : Int, pitch : Int, rmask : Int, gmask : Int, bmask : Int, amask : Int ) : Surface {
 		return null;
 	}
 

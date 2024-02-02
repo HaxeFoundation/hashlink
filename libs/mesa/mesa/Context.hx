@@ -13,7 +13,7 @@ abstract Context(hl.Abstract<"mesa_ctx">) {
 	public static var ROW_LENGTH = 0x10;
 	public static var Y_UP = 0x11;
 
-	public static var WIDTH	= 0x20;
+	public static var WIDTH = 0x20;
 	public static var HEIGHT = 0x21;
 	public static var FORMAT = 0x22;
 	public static var TYPE = 0x23;
