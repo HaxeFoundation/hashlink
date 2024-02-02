@@ -16,52 +16,30 @@ typedef ScreenMode = {
 	var framerate : Int;
 };
 
-typedef GLOptions = {
-	final major : Int;
-	final minor : Int;
-	final depth : Int;
-	final stencil : Int;
-	final flags : Int;
-	final samples : Int;
-}
-
 @:hlNative("sdl")
 class Sdl {
 
 	static var initDone = false;
 	static var isWin32 = false;
 
-	public static var glOptions(default,null) : GLOptions = {
-		major : 3,
-		minor : 2,
-		depth : 24,
-		stencil : 8,
-		flags : 1,
-		samples : 1,
-	};
+	public static var requiredGLMajor(default,null) = 3;
+	public static var requiredGLMinor(default,null) = 2;
 
 	public static function init() {
 		if( initDone ) return;
 		initDone = true;
 		if( !initOnce() ) throw "Failed to init SDL";
 		isWin32 = detectWin32();
-		var opt = glOptions;
-		gl_options(opt.major, opt.minor, opt.depth, opt.stencil, opt.flags, opt.samples);
 	}
 
-	public static function setGLOptions(options) {
-		glOptions = options;
+	public static function setGLOptions( major : Int = 3, minor : Int = 2, depth : Int = 24, stencil : Int = 8, flags : Int = 1, samples : Int = 1 ) {
+		requiredGLMajor = major;
+		requiredGLMinor = minor;
+		glOptions(major, minor, depth, stencil, flags, samples);
 	}
 
-	public static function setGLVersion(major, minor) {
-		glOptions = {
-			major : major,
-			minor : minor,
-			depth : glOptions.depth,
-			stencil : glOptions.stencil,
-			flags : glOptions.flags,
-			samples : glOptions.samples
-		};
+	public static function setGLVersion( major : Int, minor : Int) {
+		setGLOptions(major, minor);
 	}
 
 	public static function setHint(name:String, value:String) {
@@ -78,7 +56,7 @@ class Sdl {
 		if( device == null ) device = "Unknown";
 		var flags = new haxe.EnumFlags<hl.UI.DialogFlags>();
 		flags.set(IsError);
-		var msg = 'The application was unable to create an OpenGL context\nfor your $device video card.\nOpenGL ${glOptions.major}.${glOptions.minor}+ is required, please update your driver.';
+		var msg = 'The application was unable to create an OpenGL context\nfor your $device video card.\nOpenGL $requiredGLMajor.$requiredGLMinor+ is required, please update your driver.';
 		hl.UI.dialog("OpenGL Error", msg, flags);
 		Sys.exit( -1);
 	}
@@ -88,7 +66,7 @@ class Sdl {
 	public static inline var GL_COMPATIBILITY_PROFILE = 1 << 2;
 	public static inline var GL_ES                    = 1 << 3;
 
-	static function gl_options( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int, samples : Int ) {}
+	static function glOptions( major : Int, minor : Int, depth : Int, stencil : Int, flags : Int, samples : Int ) {}
 
 	static function initOnce() return false;
 	static function eventLoop( e : Dynamic ) return false;
