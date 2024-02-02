@@ -87,7 +87,7 @@ class Sdl {
 	}
 
 	public static function getScreenWidth(?win : sdl.Window) : Int {
-		return 
+		return
 			if(win == null)
 				get_screen_width();
 			else
@@ -129,7 +129,7 @@ class Sdl {
 		var i = 0;
 		return [ for(d in get_displays() ) @:privateAccess { handle: d.handle, name: '${String.fromUTF8(d.name)} (${++i})', left: d.left, top: d.top, right: d.right, bottom: d.bottom } ];
 	}
-	
+
 	public static function getDevices() {
 		var a = [];
 		var arr = get_devices();
@@ -147,7 +147,7 @@ class Sdl {
 	public static function setRelativeMouseMode( enable : Bool ) : Int {
 		return 0;
 	}
-	
+
 	public static function setClipboardText( text : String ) : Bool {
 		if( text == null )
 			return false;
@@ -211,7 +211,7 @@ class Sdl {
 	public static function getRelativeMouseMode() : Bool {
 		return false;
 	}
-	
+
 	public static function warpMouseGlobal( x : Int, y : Int ) : Int {
 		return 0;
 	}
@@ -233,11 +233,11 @@ class Sdl {
 	private static function _getClipboardText() : hl.Bytes {
 		return null;
 	}
-	
+
 	@:hlNative("?sdl", "set_drag_and_drop_enabled")
 	public static function setDragAndDropEnabled( v : Bool ): Void {
 	}
-	
+
 	@:hlNative("?sdl", "get_drag_and_drop_enabled")
 	public static function getDragAndDropEnabled(): Bool {
 		return false;
