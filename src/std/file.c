@@ -48,6 +48,26 @@
 #	define SET_IS_STD(f,b)
 #endif
 
+#ifndef HL_WIN
+// retry if we were interrupted by a signal (profiler triggered for example)
+static size_t fread_retry( void *buffer, size_t size, size_t count, FILE *f ) {
+	size_t ret;
+	do {
+		ret = fread(buffer,size,count,f);
+	} while( ret == 0 && ferror(f) && errno == EINTR );
+	return ret;
+}
+static size_t fwrite_retry( void *buffer, size_t size, size_t count, FILE *f ) {
+	size_t ret;
+	do {
+		ret = fwrite(buffer,size,count,f);
+	} while( ret == 0 && ferror(f) && errno == EINTR );
+	return ret;
+}
+#define fread fread_retry
+#define fwrite fwrite_retry
+#endif
+
 typedef struct _hl_fdesc hl_fdesc;
 struct _hl_fdesc {
 	void (*finalize)( hl_fdesc * );
