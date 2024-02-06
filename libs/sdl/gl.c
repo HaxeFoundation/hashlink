@@ -122,6 +122,10 @@ HL_PRIM void HL_NAME(gl_polygon_mode)(int face, int mode) {
 	glPolygonMode(face, mode);
 }
 
+HL_PRIM void HL_NAME(gl_polygon_offset)(float factor, float units) {
+	glPolygonOffset(factor, units);
+}
+
 HL_PRIM void HL_NAME(gl_enable)( int feature ) {
 	glEnable(feature);
 }
@@ -693,6 +697,7 @@ DEFINE_PRIM(_VOID,gl_flush,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_pixel_storei,_I32 _I32);
 DEFINE_PRIM(_BYTES,gl_get_string,_I32);
 DEFINE_PRIM(_VOID,gl_polygon_mode,_I32 _I32);
+DEFINE_PRIM(_VOID,gl_polygon_offset,_F32 _F32);
 DEFINE_PRIM(_VOID,gl_enable,_I32);
 DEFINE_PRIM(_VOID,gl_disable,_I32);
 DEFINE_PRIM(_VOID,gl_cull_face,_I32);

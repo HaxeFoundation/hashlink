@@ -90,6 +90,9 @@ class GL {
 	public static function polygonMode( face : Int, mode : Int ) {
 	}
 
+	public static function polygonOffset( factor : hl.F32, units : hl.F32 ) {
+	}
+
 	public static function enable( feature : Int ) {
 	}
 
@@ -876,6 +879,7 @@ class GL {
 	public static inline var DEPTH_COMPONENT16              = 0x81A5;
 	public static inline var DEPTH_COMPONENT24              = 0x81A6;
 	public static inline var DEPTH24_STENCIL8               = 0x88F0;
+	public static inline var DEPTH_COMPONENT32F				= 0x8cac;
 	public static inline var STENCIL_INDEX                  = 0x1901;
 	public static inline var STENCIL_INDEX8                 = 0x8D48;
 	public static inline var DEPTH_STENCIL                  = 0x84F9;
