@@ -797,6 +797,7 @@ enum abstract DxgiFormat(Int) {
 	var P208 = 130;
 	var V208 = 131;
 	var V408 = 132;
+	public inline function toInt() return this;
 }
 
 @:struct class ShaderBytecode {
