@@ -235,8 +235,9 @@ class ProfileGen {
 		}
 
 		var mainTid = threads[0].tid;
-		var json : Array<Dynamic> = [for( t in threads )
-			{
+		var json : Array<Dynamic> = [];
+		for( t in threads ) {
+			json.push({
     			pid : 0,
     			tid : t.tid,
  	 			ts : 0,
@@ -244,8 +245,27 @@ class ProfileGen {
 				cat : "__metadata",
 				name : "thread_name",
 				args : { name : t.name }
-			}
-		];
+			});
+			json.push({
+				args: {
+					data: {
+						frameTreeNodeId: 0,
+						frames: [
+							{
+								processId: 0,
+								url: "http://_"
+							}
+						],
+						persistentIds: true
+					}
+				},
+				cat: "disabled-by-default-devtools.timeline",
+				name: "TracingStartedInBrowser",
+				pid: 0,
+				tid: t.tid,
+				ts: 0
+			});
+		}
 
 		var count = 1;
 		var f0 = threads[0].frames[0];
