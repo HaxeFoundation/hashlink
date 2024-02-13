@@ -7,7 +7,7 @@ private class DInputButton {
 	var num : Int;
 	var mask : Int;
 	var axis : Int;
-	
+
 	public function new( num : Int, mask : Int, axis : Int ){
 		this.num = num;
 		this.mask = mask;
@@ -19,7 +19,7 @@ private class DInputMapping {
 	var guid : Int;
 	var name : hl.Bytes;
 	var button : hl.NativeArray<DInputButton>;
-	
+
 	function new( s : String ){
 		var a = s.split(",");
 		var suid = a.shift();
@@ -28,11 +28,11 @@ private class DInputMapping {
 		guid = (product&0xFF)<<24 | (product&0xFF00)<<8 | (vendor&0xFF)<<8 | (vendor&0xFF00)>>8;
 		name = @:privateAccess a.shift().toUtf8();
 		button = new hl.NativeArray(20);
-		
+
 		for( e in a ){
 			var p = e.split(":");
 			if( p.length != 2 ) continue;
-			
+
 			var btn : DInputButton = switch( p[1].charCodeAt(0) ){
 				case 'b'.code: new DInputButton(Std.parseInt(p[1].substr(1)), 0, -1);
 				case 'h'.code: {
@@ -116,7 +116,7 @@ private class DInputMapping {
 		"03000000172700004431000000000000,XiaoMi Game Controller,a:b0,b:b1,back:b10,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,guide:b20,leftshoulder:b6,leftstick:b13,lefttrigger:b8,leftx:a0,lefty:a1,rightshoulder:b7,rightstick:b14,righttrigger:a7,rightx:a2,righty:a5,start:b11,x:b3,y:b4,",
 		"03000000830500006020000000000000,iBuffalo SNES Controller,a:b1,b:b0,back:b6,dpdown:+a1,dpleft:-a0,dpright:+a0,dpup:-a1,leftshoulder:b4,rightshoulder:b5,start:b7,x:b3,y:b2,",
 	];
-	
+
 	public static function parseDefaults() : hl.NativeArray<DInputMapping> {
 		var a = [for( s in DEFAULTS ) new DInputMapping(s)];
 		var n = new hl.NativeArray(a.length);
@@ -179,10 +179,10 @@ class GameController {
 	public var buttons : haxe.EnumFlags<GameControllerButton>;
 	public var axes : hl.Bytes;
 	var rumbleEnd : Null<Float>;
-	
+
 	function new(){
 	}
-	
+
 	public inline function update(){
 		gctrlUpdate(this);
 		if( rumbleEnd != null && haxe.Timer.stamp() > rumbleEnd ){
@@ -190,7 +190,7 @@ class GameController {
 			rumbleEnd = null;
 		}
 	}
-	
+
 	public inline function rumble( strength : Float, time_s : Float ){
 		gctrlSetVibration(ptr,strength);
 		rumbleEnd = strength <= 0 ? null : haxe.Timer.stamp() + time_s;
@@ -203,7 +203,7 @@ class GameController {
 	public inline function getButtons(){
 		return buttons.toInt();
 	}
-	
+
 	// 
 
 	static var UID = 0;
@@ -213,7 +213,7 @@ class GameController {
 		var mappings = DInputMapping.parseDefaults();
 		gctrlInit( mappings );
 	}
-	
+
 	public static function detect( onDetect : GameController -> Bool -> Void ){
 		gctrlDetect(function(ptr:GameControllerPtr, name:hl.Bytes){
 			if( name != null ){
@@ -236,11 +236,11 @@ class GameController {
 			}
 		});
 	}
-	
+
 	static function gctrlInit( mappings : hl.NativeArray<DInputMapping> ){}
 	static function gctrlDetect( onDetect : GameControllerPtr -> hl.Bytes -> Void ){}
 	static function gctrlUpdate( pad : GameController ){}
 	static function gctrlSetVibration( ptr : GameControllerPtr, strength : Float ){}
 
-	
+
 }

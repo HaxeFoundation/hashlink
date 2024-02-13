@@ -103,19 +103,19 @@ class Window {
 	public function setPosition( x : Int, y : Int ) {
 		winSetPosition(win, x, y);
 	}
-	
+
 	public function setCursorPosition( x : Int, y : Int ) {
 		return winSetCursorPos(win, x, y);
 	}
-	
+
 	public static function setCursorPositionGlobal( x : Int, y : Int ) {
 		return setCursorPos(x, y);
 	}
-	
+
 	public function setRelativeMouseMode( enabled : Bool ) : Bool {
 		return winSetRelativeMouseMode(win, enabled);
 	}
-	
+
 	public function getRelativeMouseMode() : Bool {
 		return winGetRelativeMouseMode();
 	}
@@ -244,7 +244,7 @@ class Window {
 		winSetOpacity(win, v);
 		return v;
 	}
-	
+
 	function set_dragAndDropEnabled(v) {
 		winSetDragAcceptFiles(win, v);
 		return dragAndDropEnabled = v;
@@ -344,23 +344,23 @@ class Window {
 
 	static function winClipCursor( win : WinPtr, enable : Bool ) : Void {
 	}
-	
+
 	static function setCursorPos( x : Int, y : Int ) : Bool {
 		return false;
 	}
-	
+
 	static function winSetCursorPos( win : WinPtr, x : Int, y : Int ) : Bool {
 		return false;
 	}
-	
+
 	static function winSetRelativeMouseMode( win : WinPtr, enable : Bool ) : Bool {
 		return false;
 	}
-	
+
 	static function winGetRelativeMouseMode() : Bool { 
 		return false;
 	}
-	
+
 	@:hlNative("?directx", "win_set_drag_accept_files")
 	static function winSetDragAcceptFiles( win : WinPtr, enable: Bool ) : Void {
 	}
