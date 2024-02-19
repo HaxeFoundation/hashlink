@@ -23,6 +23,10 @@ if(MSVC)
     add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
+if (MINGW)
+    add_compile_options(-municode)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_CURRENT_SOURCE_DIR}/other/cmake
 )
@@ -146,7 +150,7 @@ set_target_properties(libhl
     PUBLIC_HEADER "${public_headers}"
 )
 
-if(WIN32)
+if(WIN32 AND MSVC)
     set_target_properties(libhl
         PROPERTIES
         OUTPUT_NAME libhl
@@ -182,7 +186,7 @@ target_link_libraries(hl libhl)
 
 if(WIN32)
     target_link_libraries(libhl ws2_32 user32)
-    target_link_libraries(hl user32)
+    target_link_libraries(hl user32 shell32)
 else()
     target_link_libraries(libhl m dl pthread)
 endif()
