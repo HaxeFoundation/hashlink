@@ -1445,6 +1445,33 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	gc_global_lock(false);
 }
 
+static int live_obj_count;
+static hl_type *live_obj_t;
+
+static void gc_count_live_block(void *block, int size) {
+	hl_type *t = *(hl_type **)block;
+	if (t == live_obj_t)
+		live_obj_count += 1;
+}
+
+static void gc_count_live_page(gc_pheader *p, int private_data) {
+	gc_iter_live_blocks(p, gc_count_live_block);
+}
+
+static int hl_gc_count_live_objects(hl_type *t) {
+	gc_global_lock(true);
+	gc_stop_world(true);
+	gc_mark();
+
+	live_obj_count = 0;
+	live_obj_t = t;
+	gc_iter_pages(gc_count_live_page);
+
+	gc_stop_world(false);
+	gc_global_lock(false);
+	return live_obj_count;
+}
+
 #ifdef HL_VCC
 #	pragma optimize( "", off )
 #endif
@@ -1460,6 +1487,7 @@ DEFINE_PRIM(_VOID, gc_enable, _BOOL);
 DEFINE_PRIM(_VOID, gc_profile, _BOOL);
 DEFINE_PRIM(_VOID, gc_stats, _REF(_F64) _REF(_F64) _REF(_F64));
 DEFINE_PRIM(_VOID, gc_dump_memory, _BYTES);
+DEFINE_PRIM(_I32, gc_count_live_objects, _TYPE);
 DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
 DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
