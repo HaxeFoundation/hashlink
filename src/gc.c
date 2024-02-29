@@ -1448,17 +1448,17 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 static int live_obj_count;
 static hl_type *live_obj_t;
 
-static void gc_count_live_block(void *block, int size) {
+static void gc_count_live_block( void *block, int size ) {
 	hl_type *t = *(hl_type **)block;
-	if (t == live_obj_t)
+	if( t == live_obj_t )
 		live_obj_count += 1;
 }
 
-static void gc_count_live_page(gc_pheader *p, int private_data) {
+static void gc_count_live_page( gc_pheader *p, int private_data ) {
 	gc_iter_live_blocks(p, gc_count_live_block);
 }
 
-static int hl_gc_count_live_objects(hl_type *t) {
+static int hl_gc_count_live_objects( hl_type *t ) {
 	gc_global_lock(true);
 	gc_stop_world(true);
 	gc_mark();
