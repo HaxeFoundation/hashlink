@@ -1448,7 +1448,7 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 typedef struct {
 	hl_type *t;
 	int count;
-	int page_kind;
+	int page_kinds;
 	varray *arr;
 	int index;
 } gc_live_obj;
@@ -1466,7 +1466,7 @@ static void gc_count_live_block( void *block, int size ) {
 }
 
 static void gc_count_live_page( gc_pheader *p, int private_data ) {
-	if( (1 << p->page_kind) & live_obj.page_kind )
+	if( (1 << p->page_kind) & live_obj.page_kinds )
 		gc_iter_live_blocks(p, gc_count_live_block);
 }
 
@@ -1478,9 +1478,9 @@ static int hl_gc_get_live_objects( hl_type *t, varray *arr ) {
 
 	live_obj.t = t;
 	live_obj.count = 0;
-	live_obj.page_kind = (1 << MEM_KIND_DYNAMIC) + (1 << MEM_KIND_NOPTR);
+	live_obj.page_kinds = (1 << MEM_KIND_DYNAMIC) + (1 << MEM_KIND_NOPTR);
 	if (t->kind == HOBJ) {
-		live_obj.page_kind = hl_get_obj_rt(t)->hasPtr ? 1 << MEM_KIND_DYNAMIC : 1 << MEM_KIND_NOPTR;
+		live_obj.page_kinds = hl_get_obj_rt(t)->hasPtr ? 1 << MEM_KIND_DYNAMIC : 1 << MEM_KIND_NOPTR;
 	}
 	live_obj.arr = arr;
 	live_obj.index = 0;
