@@ -1447,13 +1447,13 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 
 static int live_obj_count;
 static hl_type *live_obj_t;
-static bool live_obj_hasptr;
+static int live_obj_page_kind;
 static varray *live_objs;
 static int live_objs_index;
 
 static void gc_count_live_block( void *block, int size ) {
 	hl_type *t = *(hl_type **)block;
-	if( t != live_obj_t ) return;
+	if( t != live_obj_t || size < sizeof(void*) ) return;
 	live_obj_count += 1;
 	if( live_objs_index < live_objs->size ) {
 		hl_aptr(live_objs, vdynamic*)[live_objs_index] = hl_make_dyn(&block, live_obj_t);
@@ -1462,23 +1462,19 @@ static void gc_count_live_block( void *block, int size ) {
 }
 
 static void gc_count_live_page( gc_pheader *p, int private_data ) {
-	if( live_obj_hasptr ) {
-		if( p->page_kind == MEM_KIND_DYNAMIC )
-			gc_iter_live_blocks(p, gc_count_live_block);
-	} else {
-		if( p->page_kind == MEM_KIND_NOPTR )
-			gc_iter_live_blocks(p, gc_count_live_block);
-	}
+	if( p->page_kind == live_obj_page_kind )
+		gc_iter_live_blocks(p, gc_count_live_block);
 }
 
 static int hl_gc_get_live_objects( hl_type *t, varray *arr ) {
+	if( t->kind != HOBJ ) return -1;
 	gc_global_lock(true);
 	gc_stop_world(true);
 	gc_mark();
 
 	live_obj_count = 0;
 	live_obj_t = t;
-	live_obj_hasptr = (t->kind == HOBJ && t->obj->rt != NULL && t->obj->rt->hasPtr) ? true : false;
+	live_obj_page_kind = hl_get_obj_rt(t)->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR;
 	live_objs = arr;
 	live_objs_index = 0;
 	gc_iter_pages(gc_count_live_page);
