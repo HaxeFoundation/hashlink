@@ -1479,7 +1479,7 @@ static int hl_gc_get_live_objects( hl_type *t, varray *arr ) {
 	live_obj.t = t;
 	live_obj.count = 0;
 	live_obj.page_kinds = (1 << MEM_KIND_DYNAMIC) + (1 << MEM_KIND_NOPTR);
-	if (t->kind == HOBJ) {
+	if( t->kind == HOBJ ) {
 		live_obj.page_kinds = hl_get_obj_rt(t)->hasPtr ? 1 << MEM_KIND_DYNAMIC : 1 << MEM_KIND_NOPTR;
 	}
 	live_obj.arr = arr;
