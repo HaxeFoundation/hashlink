@@ -12,11 +12,20 @@ package sdl;
 	public var keyCode : Int;
 	public var scanCode : Int;
 	public var keyRepeat : Bool;
-	public var controller : Int;
+	public var reference : Int;
 	public var value : Int;
-	public var fingerId : Int;
-	public var joystick : Int;
+	public var __unused : Int;
+	public var windowId : Int;
 	public var dropFile: hl.Bytes;
+
+	// for compile-time backward compatibility
+	public var controller(get,never) : Int;
+	public var joystick(get,never) : Int;
+	public var fingerId(get,never) : Int;
+	inline function get_controller() return reference;
+	inline function get_joystick() return reference;
+	inline function get_fingerId() return reference;
+	
 	public function new() {
 	}
 }

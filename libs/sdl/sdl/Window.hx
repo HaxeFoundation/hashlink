@@ -49,6 +49,7 @@ class Window {
 	var win : WinPtr;
 	var glctx : GLContext;
 	var lastFrame : Float;
+	public var id(get,never) : Int;
 	public var title(default, set) : String;
 	public var vsync(default, set) : Bool;
 	public var width(get, never) : Int;
@@ -256,6 +257,10 @@ class Window {
 		setWindowGrab(win, v);
 		return v;
 	}
+	
+	function get_id() {
+		return winGetId(win);
+	}
 
 	/**
 		Set the current window you will render to (in case of multiple windows)
@@ -329,6 +334,11 @@ class Window {
 
 	@:hlNative("?sdl", "win_display_handle")
 	static function winDisplayHandle( win : WinPtr ) : Int {
+		return 0;
+	}
+
+	@:hlNative("?sdl", "win_get_id")
+	static function winGetId( win : WinPtr ) : Int {
 		return 0;
 	}
 
