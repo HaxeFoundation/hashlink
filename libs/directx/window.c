@@ -505,7 +505,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		break;
 	}
 	case WM_CLOSE:
-		addEvent(wnd, Quit);
+		addState(Close);
 		return 0;
 	}
 	return DefWindowProc(wnd, umsg, wparam, lparam);
@@ -749,14 +749,13 @@ HL_PRIM void HL_NAME(win_destroy)(dx_window *win) {
 		ClipCursor(NULL);
 	}
 	dx_events *buf = get_events(win);
+	DestroyWindow(win);
 	// See WM_DROPFILES comment regarding GC
 	for ( int i = buf->next_event; i < buf->event_count; i++ ) {
 		if ( buf->events[i].dropFile != NULL )
 			free(buf->events[i].dropFile);
 	}
 	free(buf);
-	SetWindowLongPtr(win,GWLP_USERDATA,0);
-	DestroyWindow(win);
 }
 
 HL_PRIM bool HL_NAME(win_get_next_event)( dx_window *win, dx_event *e ) {
