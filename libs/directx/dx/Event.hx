@@ -15,6 +15,7 @@ package dx;
 	public var controller : Int;
 	public var value : Int;
 	public var dropFile: hl.Bytes;
+	public var windowId : Int;
 	public function new() {
 	}
 }

@@ -34,7 +34,9 @@ class Window {
 	public static inline var HIDDEN    = 0x000001;
 	public static inline var RESIZABLE = 0x000002;
 
+	static var _UID = 0;
 	var win : WinPtr;
+	public var id(default,null) : Int;
 	public var title(default, set) : String;
 	public var width(get, never) : Int;
 	public var height(get, never) : Int;
@@ -57,6 +59,7 @@ class Window {
 		this.title = title;
 		windows.push(this);
 		vsync = true;
+		id = ++_UID;
 	}
 
 	function set_title(name:String) {
@@ -357,7 +360,7 @@ class Window {
 		return false;
 	}
 
-	static function winGetRelativeMouseMode() : Bool { 
+	static function winGetRelativeMouseMode() : Bool {
 		return false;
 	}
 
