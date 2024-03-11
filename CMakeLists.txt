@@ -136,6 +136,12 @@ add_library(libhl SHARED
     ${std_srcs}
 )
 
+add_library(libhl-static STATIC
+    ${pcre_srcs}
+    src/gc.c
+    ${std_srcs}
+)
+
 set(public_headers
     src/hl.h
     src/hlc.h
@@ -146,13 +152,26 @@ set_target_properties(libhl
     PUBLIC_HEADER "${public_headers}"
 )
 
+set_target_properties(libhl-static
+    PROPERTIES
+    PUBLIC_HEADER "${public_headers}"
+)
+
 if(WIN32)
     set_target_properties(libhl
         PROPERTIES
         OUTPUT_NAME libhl
     )
+    set_target_properties(libhl-static
+        PROPERTIES
+        OUTPUT_NAME libhl-static
+    )
 else()
     set_target_properties(libhl
+        PROPERTIES
+        OUTPUT_NAME hl
+    )
+    set_target_properties(libhl-static
         PROPERTIES
         OUTPUT_NAME hl
     )
@@ -162,6 +181,11 @@ set_target_properties(libhl
     PROPERTIES
     VERSION ${HL_VERSION}
     SOVERSION ${HL_VERSION_MAJOR}
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16"
+)
+
+set_target_properties(libhl-static
+    PROPERTIES
     COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16"
 )
 
@@ -355,6 +379,7 @@ install(
     TARGETS
         hl
         libhl
+        libhl-static
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
