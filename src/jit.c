@@ -1135,8 +1135,9 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 					op32(ctx,SHR,to,pconst(&p,24));
 					break;
 				}
-			} else if( !is_reg8(from) ) {
-				preg *r = alloc_reg(ctx, RCPU_CALL);				
+			}
+			if( !is_reg8(from) ) {
+				preg *r = alloc_reg(ctx, RCPU_8BITS);
 				op32(ctx, MOV, r, from);
 				RUNLOCK(r);
 				op32(ctx,MOV8,to,r);
