@@ -520,7 +520,11 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	SDL_GetDesktopDisplayMode(0, &displayMode);
 	SDL_Window* win = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | sdlFlags);
 #else
-	SDL_Window* win = SDL_CreateWindow("", x, y, width, height, SDL_WINDOW_OPENGL | sdlFlags);
+	if (sdlFlags & (SDL_WINDOW_METAL | SDL_WINDOW_VULKAN ) == 0) {
+		sdlFlags |= SDL_WINDOW_OPENGL;
+	}
+	
+	SDL_Window* win = SDL_CreateWindow("", x, y, width, height, sdlFlags);
 #endif
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
