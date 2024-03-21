@@ -520,6 +520,9 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	SDL_GetDesktopDisplayMode(0, &displayMode);
 	SDL_Window* win = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | sdlFlags);
 #else
+#	ifdef HL_WIN
+	sdlFlags |= SDL_WINDOW_OPENGL;
+#else
 	if (sdlFlags & (
 #ifdef HL_MAC
 		SDL_WINDOW_METAL | 
@@ -527,7 +530,7 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 		SDL_WINDOW_VULKAN ) == 0) {
 		sdlFlags |= SDL_WINDOW_OPENGL;
 	}
-	
+#endif
 	SDL_Window* win = SDL_CreateWindow("", x, y, width, height, sdlFlags);
 #endif
 #	ifdef HL_WIN
