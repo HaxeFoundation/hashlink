@@ -521,8 +521,10 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	SDL_Window* win = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | sdlFlags);
 #else
 #	ifdef HL_WIN
+	// Required for backwards comapatibility with older versions of hashlink
 	sdlFlags |= SDL_WINDOW_OPENGL;
 #else
+	// Only mac and windows support vulkan.
 	if (sdlFlags & (
 #ifdef HL_MAC
 		SDL_WINDOW_METAL | 
