@@ -21,6 +21,7 @@ include(CTest)
 # force Unicode over Multi-byte
 if(MSVC)
     add_definitions(-DUNICODE -D_UNICODE)
+    add_compile_options(/permissive-)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH
