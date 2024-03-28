@@ -2342,10 +2342,8 @@ static void *callback_c2hl( void **f, hl_type *t, void **args, vdynamic *ret ) {
 				*(int_val*)store = *(int*)v;
 				break;
 			case HF32:
-				{
-					double d = (double)*(float*)v;
-					*(double*)store = d;
-				}
+				*(void**)store = 0;
+				*(float*)store = *(float*)v;
 				break;
 			case HF64:
 				*(double*)store = *(double*)v;
