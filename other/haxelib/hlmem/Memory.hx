@@ -46,7 +46,7 @@ class Stats {
 			totCount += i.count;
 			totMem += i.mem;
 			var tpath = getPathStrings(mem, i.tl);
-			mem.log(Memory.withColor(i.count + " count, " + Memory.MB(i.mem) + " ", 33) + tpath.join(${Memory.withColor(' > ', 36)}));
+			mem.log(Memory.withColor(i.count + " count, " + Memory.MB(i.mem) + " ", 33) + tpath.join(Memory.withColor(' > ', 36)));
 		}
 		if( withSum )
 			mem.log("Total: "+totCount+" count, "+Memory.MB(totMem));
