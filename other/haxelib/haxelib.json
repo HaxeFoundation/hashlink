@@ -4,7 +4,7 @@
 	"license" : "BSD",
 	"contributors" : ["ncannasse"],
 	"description" : "Hashlink support library.",
-	"version" : "0.1.0",
+	"version" : "1.15.0",
 	"main" : "Run",
 	"releasenote" : ""
 }
