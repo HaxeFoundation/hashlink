@@ -1198,7 +1198,7 @@ static void *gc_alloc_page_memory( int size ) {
 			ptr = mmap(base_addr,size+EXTRA_SIZE,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
 			int offset = (int)((int_val)ptr) & (GC_PAGE_SIZE-1);
 			void *aligned = (char*)ptr + (GC_PAGE_SIZE - offset);
-			pextra *inf = (pextra*)(offset > (EXTRA_SIZE>>1) ? ((char*)ptr + EXTRA_SIZE - sizeof(pextra)) : (char*)ptr);
+			pextra *inf = (pextra*)( (char*)ptr + size + EXTRA_SIZE - sizeof(pextra));
 			inf->page_ptr = aligned;
 			inf->base_ptr = ptr;
 			inf->next = extra_pages;
