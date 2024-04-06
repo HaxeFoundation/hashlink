@@ -1135,8 +1135,9 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 					op32(ctx,SHR,to,pconst(&p,24));
 					break;
 				}
-			} else if( !is_reg8(from) ) {
-				preg *r = alloc_reg(ctx, RCPU_CALL);				
+			}
+			if( !is_reg8(from) ) {
+				preg *r = alloc_reg(ctx, RCPU_8BITS);
 				op32(ctx, MOV, r, from);
 				RUNLOCK(r);
 				op32(ctx,MOV8,to,r);
@@ -2341,10 +2342,8 @@ static void *callback_c2hl( void **f, hl_type *t, void **args, vdynamic *ret ) {
 				*(int_val*)store = *(int*)v;
 				break;
 			case HF32:
-				{
-					double d = (double)*(float*)v;
-					*(double*)store = d;
-				}
+				*(void**)store = 0;
+				*(float*)store = *(float*)v;
 				break;
 			case HF64:
 				*(double*)store = *(double*)v;

@@ -219,12 +219,18 @@ HL_PRIM hl_semaphore *hl_semaphore_alloc(int value) {
 HL_PRIM void hl_semaphore_acquire(hl_semaphore *sem) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
+	hl_blocking(true);
 	WaitForSingleObject(sem->sem, INFINITE);
+	hl_blocking(false);
 #	else
 #	ifdef __APPLE__
+	hl_blocking(true);
 	dispatch_semaphore_wait(sem->sem, DISPATCH_TIME_FOREVER);
+	hl_blocking(false);
 #	else
+	hl_blocking(true);
 	sem_wait(&sem->sem);
+	hl_blocking(false);
 #	endif
 #	endif
 }
@@ -233,16 +239,24 @@ HL_PRIM bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
 #	if !defined(HL_THREADS)
 	return true;
 #	elif defined(HL_WIN)
-	return WaitForSingleObject(sem->sem,
+	hl_blocking(true);
+	bool ret = WaitForSingleObject(sem->sem,
 	                           timeout ? (DWORD)((FLOAT)timeout->v.d * 1000.0)
 	                                   : 0) == WAIT_OBJECT_0;
+	hl_blocking(false);
+	return ret;
 #	else
 #	ifdef __APPLE__
-	return dispatch_semaphore_wait(
+	hl_blocking(true);
+	bool ret = dispatch_semaphore_wait(
 	           sem->sem, dispatch_time(DISPATCH_TIME_NOW,
 	                              (int64_t)((timeout ? timeout->v.d : 0) *
 	                                        1000 * 1000 * 1000))) == 0;
+	hl_blocking(false);
+	return ret;
 #	else
+	hl_blocking(true);
+	bool ret;
 	if (timeout) {
 		struct timeval tv;
 		struct timespec t;
@@ -256,11 +270,12 @@ HL_PRIM bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
 		delta -= idelta2 * 1e9;
 		t.tv_sec = tv.tv_sec + idelta + idelta2;
 		t.tv_nsec = (long)delta;
-		return sem_timedwait(&sem->sem, &t) == 0;
+		ret = sem_timedwait(&sem->sem, &t) == 0;
 	} else {
-
-		return sem_trywait(&sem->sem) == 0;
+		ret = sem_trywait(&sem->sem) == 0;
 	}
+	hl_blocking(false);
+	return ret;
 #	endif
 #	endif
 }
@@ -333,9 +348,13 @@ HL_PRIM hl_condition *hl_condition_alloc() {
 HL_PRIM void hl_condition_acquire(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
+	hl_blocking(true);
 	EnterCriticalSection(&cond->cs);
+	hl_blocking(false);
 #	else
+	hl_blocking(true);
 	pthread_mutex_lock(&cond->mutex);
+	hl_blocking(false);
 #	endif
 }
 
@@ -360,9 +379,13 @@ HL_PRIM void hl_condition_release(hl_condition *cond) {
 HL_PRIM void hl_condition_wait(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
+	hl_blocking(true);
 	SleepConditionVariableCS(&cond->cond, &cond->cs, INFINITE);
+	hl_blocking(false);
 #	else
+	hl_blocking(true);
 	pthread_cond_wait(&cond->cond, &cond->mutex);
+	hl_blocking(false);
 #	endif
 }
 
@@ -370,8 +393,10 @@ HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 #	if !defined(HL_THREADS)
 	return true;
 #	elif defined(HL_WIN)
+	hl_blocking(true);
 	SleepConditionVariableCS(&cond->cond, &cond->cs,
 	                         (DWORD)((FLOAT)timeout * 1000.0));
+	hl_blocking(false);
 	return true;
 #	else
 	struct timeval tv;
@@ -386,7 +411,10 @@ HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 	delta -= idelta2 * 1e9;
 	t.tv_sec = tv.tv_sec + idelta + idelta2;
 	t.tv_nsec = (long)delta;
-	return pthread_cond_timedwait(&cond->cond, &cond->mutex, &t) == 0;
+	hl_blocking(true);
+	bool ret = pthread_cond_timedwait(&cond->cond, &cond->mutex, &t) == 0;
+	hl_blocking(false);
+	return ret;
 #	endif
 }
 
