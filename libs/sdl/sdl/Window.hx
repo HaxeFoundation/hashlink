@@ -45,6 +45,7 @@ class Window {
 	public static inline var SDL_WINDOW_TOOLTIP            = 0x00040000;
 	public static inline var SDL_WINDOW_POPUP_MENU         = 0x00080000;
 	public static inline var SDL_WINDOW_VULKAN             = 0x10000000;
+	public static inline var SDL_WINDOW_METAL              = 0x20000000;
 
 	var win : WinPtr;
 	var glctx : GLContext;
