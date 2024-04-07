@@ -220,6 +220,7 @@ class Sdl {
 		return 0;
 	}
 
+	@:hlNative("?sdl", "get_global_mouse_state")
 	public static function getGlobalMouseState( x : hl.Ref<Int>, y : hl.Ref<Int> ) : Int {
 		return 0;
 	}
