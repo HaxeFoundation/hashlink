@@ -147,10 +147,10 @@ typedef enum {
 #define JNotZero	JNeq
 
 #define B(bv)	*ctx->buf.b++ = (unsigned char)(bv)
-#define W(wv)	*ctx->buf.w++ = wv
+#define W(wv)	_jit_buf_w(ctx, wv)
 
 #ifdef HL_64
-#	define W64(wv)	*ctx->buf.w64++ = wv
+#	define W64(wv)	_jit_buf_w64(ctx, wv)
 #else
 #	define W64(wv)	W(wv)
 #endif
@@ -323,12 +323,22 @@ void error_i64() {
 #	endif
 #endif
 
+static inline void _jit_buf_w(jit_ctx* ctx, int wv) {
+	memcpy(ctx->buf.w++, &wv, sizeof(int));
+}
+
+#ifdef HL_64
+static inline void _jit_buf_w64(jit_ctx* ctx, unsigned long long wv) {
+	memcpy(ctx->buf.w64++, &wv, sizeof(unsigned long long));
+}
+#endif
+
 static void _jit_error( jit_ctx *ctx, const char *msg, int line );
 static void on_jit_error( const char *msg, int_val line );
 
 static preg *pmem( preg *r, CpuReg reg, int offset ) {
 	r->kind = RMEM;
-	r->id = 0 | (reg << 4) | (offset << 8);
+	r->id = 0 | ((unsigned)reg << 4) | ((unsigned)offset << 8);
 	return r;
 }
 
@@ -846,7 +856,8 @@ static void patch_jump( jit_ctx *ctx, int p ) {
 		if( d < -128 || d >= 128 ) ASSERT(d);
 		*(char*)(ctx->startBuf + p) = (char)d;
 	} else {
-		*(int*)(ctx->startBuf + p) = BUF_POS() - (p + 4);
+		int patched = BUF_POS() - (p + 4);
+		memcpy(ctx->startBuf + p, &patched, sizeof(int));
 	}
 }
 
@@ -2558,7 +2569,7 @@ static void jit_hl2c( jit_ctx *ctx ) {
 		op64(ctx,MOV,cl,pmem(&p,Ebp,HL_WSIZE*2)); // load arg0
 	op64(ctx,MOV,tmp,pmem(&p,cl->id,0)); // ->t
 	op64(ctx,MOV,tmp,pmem(&p,tmp->id,HL_WSIZE)); // ->fun
-	op64(ctx,MOV,tmp,pmem(&p,tmp->id,(int)(int_val)&ft->ret)); // ->ret
+	op64(ctx,MOV,tmp,pmem(&p,tmp->id,(int)(int_val)offsetof(hl_type_fun, ret))); // ->ret
 	op32(ctx,MOV,tmp,pmem(&p,tmp->id,0)); // -> kind
 
 	op32(ctx,CMP,tmp,pconst(&p,HF64));
@@ -3405,7 +3416,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					preg *pc = REG_AT(CALL_REGS[0]);
 					vreg *sc = R(f->nregs); // scratch register that we temporary rebind					
 					if( o->p3 >= 63 ) jit_error("assert");
-					memcpy(regids + 1, o->extra, o->p3 * sizeof(int));
+
+					if(o->extra) {
+						memcpy(regids + 1, o->extra, o->p3 * sizeof(int));
+					}
+
 					regids[0] = f->nregs;
 					sc->size = HL_WSIZE;
 					sc->t = &hlt_dyn;
@@ -4125,14 +4140,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				if( !tinf ) {
 					call_native(ctx, hl_get_thread, 0);
 					op64(ctx,MOV,treg,PEAX);
-					offset = (int)(int_val)&tinf->trap_current;
+					offset = (int)(int_val)offsetof(hl_thread_info, trap_current);
 				} else {
 					offset = 0;
 					op64(ctx,MOV,treg,pconst64(&p,(int_val)&tinf->trap_current));
 				}
 				op64(ctx,MOV,trap,pmem(&p,treg->id,offset));
 				op64(ctx,SUB,PESP,pconst(&p,trap_size));
-				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&t->prev),trap);
+				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)offsetof(hl_trap_ctx, prev)),trap);
 				op64(ctx,MOV,trap,PESP);
 				op64(ctx,MOV,pmem(&p,treg->id,offset),trap);
 
@@ -4166,7 +4181,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				} else {
 					op64(ctx,MOV,treg,pconst(&p,0));
 				}
-				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&t->tcheck),treg);
+				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)offsetof(hl_trap_ctx, tcheck)),treg);
 
 				size = begin_native_call(ctx, 1);
 				set_native_arg(ctx,trap);
@@ -4176,7 +4191,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,ADD,PESP,pconst(&p,trap_size));
 				if( !tinf ) {
 					call_native(ctx, hl_get_thread, 0);
-					op64(ctx,MOV,PEAX,pmem(&p, Eax, (int)(int_val)&tinf->exc_value));
+					op64(ctx,MOV,PEAX,pmem(&p, Eax, (int)(int_val)offsetof(hl_thread_info, exc_value)));
 				} else {
 					op64(ctx,MOV,PEAX,pconst64(&p,(int_val)&tinf->exc_value));
 					op64(ctx,MOV,PEAX,pmem(&p, Eax, 0));
@@ -4198,7 +4213,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					call_native(ctx, hl_get_thread, 0);
 					addr = PEAX;
 					RLOCK(addr);
-					offset = (int)(int_val)&tinf->trap_current;
+					offset = (int)(int_val)offsetof(hl_thread_info, trap_current);
 				} else {
 					offset = 0;
 					addr = alloc_reg(ctx, RCPU);
@@ -4206,7 +4221,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 				r = alloc_reg(ctx, RCPU);
 				op64(ctx, MOV, r, pmem(&p,addr->id,offset));
-				op64(ctx, MOV, r, pmem(&p,r->id,(int)(int_val)&tmp->prev));
+				op64(ctx, MOV, r, pmem(&p,r->id,(int)(int_val)offsetof(hl_trap_ctx, prev)));
 				op64(ctx, MOV, pmem(&p,addr->id, offset), r);
 #				ifdef HL_WIN
 				// erase eip (prevent false positive)
@@ -4385,7 +4400,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	{
 		jlist *j = ctx->jumps;
 		while( j ) {
-			*(int*)(ctx->startBuf + j->pos) = ctx->opsPos[j->target] - (j->pos + 4);
+			int patched = ctx->opsPos[j->target] - (j->pos + 4);
+			memcpy(ctx->startBuf + j->pos, &patched, sizeof(int));
 			j = j->next;
 		}
 		ctx->jumps = NULL;
@@ -4485,23 +4501,25 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 				fabs = (unsigned char*)code + (int)(int_val)fabs;
 			}
 		}
-		if( (code[c->pos]&~3) == (IS_64?0x48:0xB8) || code[c->pos] == 0x68 ) // MOV : absolute | PUSH
-			*(void**)(code + c->pos + (IS_64?2:1)) = fabs;
-		else {
+		if( (code[c->pos]&~3) == (IS_64?0x48:0xB8) || code[c->pos] == 0x68 ) { // MOV : absolute | PUSH
+			memcpy(code + c->pos + (IS_64?2:1), &fabs, sizeof(void*));
+		} else {
 			int_val delta = (int_val)fabs - (int_val)code - (c->pos + 5);
 			int rpos = (int)delta;
 			if( (int_val)rpos != delta ) {
 				printf("Target code too far too rebase\n");
 				return NULL;
 			}
-			*(int*)(code + c->pos + 1) = rpos;
+
+			memcpy(code + c->pos + 1, &rpos, sizeof(int));
 		}
 		c = c->next;
 	}
 	// patch switchs
 	c = ctx->switchs;
 	while( c ) {
-		*(void**)(code + c->pos) = code + c->pos + (IS_64 ? 14 : 6);
+		void* patched = code + c->pos + (IS_64 ? 14 : 6);
+		memcpy(code + c->pos, &patched, sizeof(void*));
 		c = c->next;
 	}
 	// patch closures

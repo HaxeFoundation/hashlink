@@ -61,8 +61,8 @@
 //		0x0000000YXXX0000
 //		0x0007FY0YXXX0000
 static int_val gc_hash( void *ptr ) {
-	int_val v = (int_val)ptr;
-	return (v ^ ((v >> 33) << 28)) & 0x0000000FFFFFFFFF;
+	uint_val v = (uint_val)ptr;
+	return (int_val)((v ^ ((v >> 33) << 28)) & 0x0000000FFFFFFFFF);
 }
 #endif
 
@@ -271,8 +271,12 @@ HL_PRIM void hl_add_root( void *r ) {
 	if( gc_roots_count == gc_roots_max ) {
 		int nroots = gc_roots_max ? (gc_roots_max << 1) : 16;
 		void ***roots = (void***)malloc(sizeof(void*)*nroots);
-		memcpy(roots,gc_roots,sizeof(void*)*gc_roots_count);
-		free(gc_roots);
+
+		if(gc_roots) {
+			memcpy(roots,gc_roots,sizeof(void*)*gc_roots_count);
+			free(gc_roots);
+		}
+
 		gc_roots = roots;
 		gc_roots_max = nroots;
 	}
@@ -322,7 +326,11 @@ HL_API void hl_register_thread( void *stack_top ) {
 
 	gc_global_lock(true);
 	hl_thread_info **all = (hl_thread_info**)malloc(sizeof(void*) * (gc_threads.count + 1));
-	memcpy(all,gc_threads.threads,sizeof(void*)*gc_threads.count);
+
+	if(gc_threads.threads) {
+		memcpy(all,gc_threads.threads,sizeof(void*)*gc_threads.count);
+	}
+	
 	gc_threads.threads = all;
 	all[gc_threads.count++] = t;
 	gc_global_lock(false);
@@ -605,13 +613,17 @@ static hl_semaphore *mark_threads_done;
 HL_PRIM void **hl_gc_mark_grow( gc_mstack *stack ) {
 	int nsize = stack->size ? (((stack->size * 3) >> 1) & ~1) : 256;
 	void **nstack = (void**)malloc(sizeof(void**) * nsize);
-	void **base_stack = stack->end - stack->size;
+	void **base_stack = stack->end ? stack->end - stack->size : NULL;
 	int avail = (int)(stack->cur - base_stack);
 	if( nstack == NULL ) {
 		out_of_memory("markstack");
 		return NULL;
 	}
-	memcpy(nstack, base_stack, avail * sizeof(void*));
+
+	if(base_stack) {
+		memcpy(nstack, base_stack, avail * sizeof(void*));
+	}
+
 	free(base_stack);
 	stack->size = nsize;
 	stack->end = nstack + nsize;
@@ -707,7 +719,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 		int pos = 0, nwords;
 #		ifdef GC_DEBUG
 		vdynamic *ptr = (vdynamic*)block;
-		ptr += 0; // prevent unreferenced warning
+		(void)ptr; // prevent unreferenced warning
 #		endif
 		if( !block ) {
 			__current_stack++;
@@ -749,7 +761,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 #		endif
 		while( pos < nwords ) {
 			void *p;
-			if( mark_bits && (mark_bits[pos >> 5] & (1 << (pos&31))) == 0 ) {
+			if( mark_bits && (mark_bits[pos >> 5] & (1u << (pos&31))) == 0 ) {
 				pos++;
 				block++;
 				continue;

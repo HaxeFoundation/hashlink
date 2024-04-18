@@ -622,7 +622,11 @@ static void hl_module_init_constant( hl_module *m, hl_constant *c ) {
 static void hl_module_add( hl_module *m ) {
 	hl_module **old_modules = cur_modules;
 	hl_module **new_modules = (hl_module**)malloc(sizeof(void*)*(modules_count + 1));
-	memcpy(new_modules, old_modules, sizeof(void*)*modules_count);
+
+	if(old_modules) { 
+		memcpy(new_modules, old_modules, sizeof(void*)*modules_count);
+	}
+
 	new_modules[modules_count] = m;
 	cur_modules = new_modules;
 	modules_count++;

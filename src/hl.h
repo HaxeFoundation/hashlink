@@ -199,6 +199,7 @@
 #endif
 
 typedef intptr_t int_val;
+typedef uintptr_t uint_val;
 typedef long long int64;
 typedef unsigned long long uint64;
 
