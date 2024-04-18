@@ -2537,7 +2537,6 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	// and pack and pass the args to callback_hl2c
 	preg p;
 	int jfloat1, jfloat2, jexit;
-	hl_type_fun *ft = NULL;
 	int size;
 #	ifdef HL_64
 	preg *cl = REG_AT(CALL_REGS[0]);
@@ -4124,7 +4123,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				int size, jenter, jtrap;
 				int offset = 0;
 				int trap_size = (sizeof(hl_trap_ctx) + 15) & 0xFFF0;
-				hl_trap_ctx *t = NULL;
 #				ifndef HL_THREADS
 				if( tinf == NULL ) tinf = hl_get_thread(); // single thread
 #				endif
@@ -4206,7 +4204,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OEndTrap:
 			{
 				int trap_size = (sizeof(hl_trap_ctx) + 15) & 0xFFF0;
-				hl_trap_ctx *tmp = NULL;
 				preg *addr,*r;
 				int offset;
 				if (!tinf) {
