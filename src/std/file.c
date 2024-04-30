@@ -33,7 +33,7 @@
 #	include <windows.h>
 #	include <io.h>
 #	include <fcntl.h>
-#elif HL_XBO
+#elif defined(HL_XBO)
 #	include<xdk.h>
 #endif
 #	define fopen(name,mode) _wfopen(name,mode)

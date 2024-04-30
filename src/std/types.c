@@ -903,7 +903,7 @@ HL_PRIM vdynamic *hl_mem_compact( vdynamic *d, varray *exclude, int flags, int *
 		object_count++;
 	}
 	vbyte *data = NULL;
-#	ifdef HL_WIN
+#	if defined(HL_WIN) && !defined(HL_XBO)
 	if( flags & 1 )
 		data = (vbyte*)VirtualAlloc(NULL,ctx->buf_pos,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE);
 #	endif
@@ -928,7 +928,7 @@ HL_PRIM vdynamic *hl_mem_compact( vdynamic *d, varray *exclude, int flags, int *
 	free(ctx->offsets);
 	free(ctx->remap_target);
 	free(ctx->todos);
-#	ifdef HL_WIN
+#	if defined(HL_WIN) && !defined(HL_XBO)
 	if( flags & 1 ) {
 		DWORD old = 0;
 		VirtualProtect(data,ctx->buf_pos,PAGE_READONLY,&old);

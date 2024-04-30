@@ -1470,7 +1470,7 @@ static void gc_count_live_page( gc_pheader *p, int private_data ) {
 		gc_iter_live_blocks(p, gc_count_live_block);
 }
 
-static int hl_gc_get_live_objects( hl_type *t, varray *arr ) {
+HL_API int hl_gc_get_live_objects( hl_type *t, varray *arr ) {
 	if( !hl_is_dynamic(t) ) return -1;
 	gc_global_lock(true);
 	gc_stop_world(true);
