@@ -32,6 +32,10 @@ typedef int SOCKET;
 #include "mbedtls/x509_crt.h"
 #include "mbedtls/ssl.h"
 
+#ifdef MBEDTLS_PSA_CRYPTO_C
+#include <psa/crypto.h>
+#endif
+
 #ifdef HL_CONSOLE
 mbedtls_x509_crt *hl_init_cert_chain();
 #endif
@@ -763,6 +767,10 @@ HL_PRIM void HL_NAME(ssl_init)() {
 	mbedtls_entropy_init(&entropy);
 	mbedtls_ctr_drbg_init(&ctr_drbg);
 	mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+
+	#ifdef MBEDTLS_PSA_CRYPTO_C
+	psa_crypto_init();
+	#endif
 }
 
 DEFINE_PRIM(_VOID, ssl_init, _NO_ARG);
