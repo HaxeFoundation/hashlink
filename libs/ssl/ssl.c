@@ -36,7 +36,7 @@ typedef int SOCKET;
 mbedtls_x509_crt *hl_init_cert_chain();
 #endif
 
-#if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS)
+#ifndef MSG_NOSIGNAL
 #	define MSG_NOSIGNAL 0
 #endif
 
