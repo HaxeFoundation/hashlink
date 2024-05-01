@@ -362,39 +362,25 @@ HL_PRIM hl_ssl_cert *HL_NAME(cert_load_defaults)() {
 		CertCloseStore(store, 0);
 	}
 #elif defined(HL_MAC)
-	CFMutableDictionaryRef search;
-	CFArrayRef result;
-	SecKeychainRef keychain;
-	SecCertificateRef item;
-	CFDataRef dat;
+	CFArrayRef certs;
 	// Load keychain
-	if (SecKeychainOpen("/System/Library/Keychains/SystemRootCertificates.keychain", &keychain) != errSecSuccess)
+	if (SecTrustCopyAnchorCertificates(&certs) != errSecSuccess)
 		return NULL;
 
-	// Search for certificates
-	search = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
-	CFDictionarySetValue(search, kSecClass, kSecClassCertificate);
-	CFDictionarySetValue(search, kSecMatchLimit, kSecMatchLimitAll);
-	CFDictionarySetValue(search, kSecReturnRef, kCFBooleanTrue);
-	CFDictionarySetValue(search, kSecMatchSearchList, CFArrayCreate(NULL, (const void **)&keychain, 1, NULL));
-	if (SecItemCopyMatching(search, (CFTypeRef *)&result) == errSecSuccess) {
-		CFIndex n = CFArrayGetCount(result);
-		for (CFIndex i = 0; i < n; i++) {
-			item = (SecCertificateRef)CFArrayGetValueAtIndex(result, i);
-
-			// Get certificate in DER format
-			dat = SecCertificateCopyData(item);
-			if (dat) {
-				if (chain == NULL) {
-					chain = (mbedtls_x509_crt*)malloc(sizeof(mbedtls_x509_crt));
-					mbedtls_x509_crt_init(chain);
-				}
-				mbedtls_x509_crt_parse_der(chain, (unsigned char *)CFDataGetBytePtr(dat), CFDataGetLength(dat));
-				CFRelease(dat);
+	CFIndex count = CFArrayGetCount(certs);
+	for(CFIndex i = 0; i < count; i++) {
+		SecCertificateRef item = (SecCertificateRef)CFArrayGetValueAtIndex(certs, i);
+		CFDataRef data = SecCertificateCopyData(item);
+		if(data) {
+			if (chain == NULL) {
+				chain = (mbedtls_x509_crt*)malloc(sizeof(mbedtls_x509_crt));
+				mbedtls_x509_crt_init(chain);
 			}
+			mbedtls_x509_crt_parse_der(chain, (unsigned char *)CFDataGetBytePtr(data), CFDataGetLength(data));
+			CFRelease(data);
 		}
 	}
-	CFRelease(keychain);
+	CFRelease(certs);
 #elif defined(HL_CONSOLE)
 	chain = hl_init_cert_chain();
 #endif
