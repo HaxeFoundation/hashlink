@@ -256,9 +256,11 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 	// With it, and more we wait, less we miss stop event.
 	usleep(100 * 1000);
 	int ret = waitpid(pid, &status, WNOHANG);
+	if( ret == -1 && errno == ECHILD ) {
+		*thread = pid;
+		return 0;
+	}
 	*thread = ret;
-	if( ret == -1 && errno != EINTR )
-		return 3;
 	if( ret <= 0 )
 		return -1;
 	if( WIFEXITED(status) )
