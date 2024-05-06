@@ -209,7 +209,9 @@ void register_frame_events() {
 	// May return S_OK, S_FALSE
 	HRESULT hr = drv->device->SetFrameIntervalX(dxgiOutput, D3D12XBOX_FRAME_INTERVAL_60_HZ, drv->swapBufferCount - 1u /* Allow n-1 frames of latency */, D3D12XBOX_FRAME_INTERVAL_FLAG_NONE);
 	if (hr < 0) ReportDxError(hr, __LINE__);
-	CHKERR(drv->device->ScheduleFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, 0U, nullptr, D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE));
+	// May return 0x10000000 on XBOXONE
+	hr = drv->device->ScheduleFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, 0U, nullptr, D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE);
+	if (hr < 0) ReportDxError(hr, __LINE__);
 
 	// Prepare first pipeline token
 	drv->pipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
