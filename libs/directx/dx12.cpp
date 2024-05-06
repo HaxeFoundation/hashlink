@@ -17,6 +17,7 @@
 #include <d3d12_x.h>
 #include <d3dx12_x.h>
 #include <dxcapi_x.h>
+#include <vector>
 #endif
 
 #define IID_PPV_ARGS_OLD(ppType) __uuidof(**(ppType)), IID_PPV_ARGS_Helper(ppType)
@@ -170,9 +171,6 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags, uchar *dev_desc ) {
 
 	CHKERR(D3D12XboxCreateDevice(nullptr,&params, IID_PPV_ARGS(&drv->device)))
 	drv->device->SetName(L"HL_DX12_XBS");
-	if (drv->debug) {
-		CHKERR(drv->device->QueryInterface(IID_PPV_ARGS(&drv->debugDevice)));
-	}
 
 	// Prepare for PresentX
 	{
