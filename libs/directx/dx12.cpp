@@ -56,7 +56,7 @@ typedef struct {
 static dx_driver *static_driver = NULL;
 static int CURRENT_NODEMASK = 0;
 
-void dx12_flush_messages();
+HL_PRIM void dx12_flush_messages();
 
 static void ReportDxError( HRESULT err, int line ) {
 	dx12_flush_messages();
@@ -300,7 +300,7 @@ HL_PRIM void HL_NAME(present)( bool vsync ) {
 #endif
 }
 
-int HL_NAME(get_current_back_buffer_index)() {
+HL_PRIM int HL_NAME(get_current_back_buffer_index)() {
 #ifndef HL_XBS
 	return static_driver->swapchain->GetCurrentBackBufferIndex();
 #else
@@ -308,11 +308,11 @@ int HL_NAME(get_current_back_buffer_index)() {
 #endif
 }
 
-void HL_NAME(signal)( ID3D12Fence *fence, int64 value ) {
+HL_PRIM void HL_NAME(signal)( ID3D12Fence *fence, int64 value ) {
 	static_driver->commandQueue->Signal(fence,value);
 }
 
-void HL_NAME(flush_messages)() {
+HL_PRIM void HL_NAME(flush_messages)() {
 #ifndef HL_XBS
 	dx_driver *drv = static_driver;
 	if( !drv->infoQueue ) return;
@@ -333,7 +333,7 @@ void HL_NAME(flush_messages)() {
 #endif
 }
 
-uchar *HL_NAME(get_device_name)() {
+HL_PRIM uchar *HL_NAME(get_device_name)() {
 	DXGI_ADAPTER_DESC desc;
 #ifndef HL_XBS
 	IDXGIAdapter *adapter = NULL;
@@ -352,7 +352,7 @@ uchar *HL_NAME(get_device_name)() {
 	return (uchar*)hl_copy_bytes((vbyte*)desc.Description, (int)(ustrlen((uchar*)desc.Description) + 1) * 2);
 }
 
-int64 HL_NAME(get_timestamp_frequency)() {
+HL_PRIM int64 HL_NAME(get_timestamp_frequency)() {
 	UINT64 f = 0;
 	CHKERR(static_driver->commandQueue->GetTimestampFrequency(&f))
 	return (int64)f;
@@ -515,7 +515,7 @@ inline UINT64 UpdateSubresources(
 
 // ---- RESOURCES
 
-ID3D12Resource *HL_NAME(get_back_buffer)( int index ) {
+HL_PRIM ID3D12Resource *HL_NAME(get_back_buffer)( int index ) {
 	ID3D12Resource *buf = NULL;
 #ifndef HL_XBS
 	static_driver->swapchain->GetBuffer(index, IID_PPV_ARGS(&buf));
@@ -525,7 +525,7 @@ ID3D12Resource *HL_NAME(get_back_buffer)( int index ) {
 	return buf;
 }
 
-ID3D12Resource *HL_NAME(create_committed_resource)( D3D12_HEAP_PROPERTIES *heapProperties, D3D12_HEAP_FLAGS heapFlags, D3D12_RESOURCE_DESC *desc, D3D12_RESOURCE_STATES initialState, D3D12_CLEAR_VALUE *clearValue ) {
+HL_PRIM ID3D12Resource *HL_NAME(create_committed_resource)( D3D12_HEAP_PROPERTIES *heapProperties, D3D12_HEAP_FLAGS heapFlags, D3D12_RESOURCE_DESC *desc, D3D12_RESOURCE_STATES initialState, D3D12_CLEAR_VALUE *clearValue ) {
 	ID3D12Resource *res = NULL;
 #ifdef HL_XBS
 	// In normal dx, INDIRECT_ARGUMENT is included in GENERIC_READ (but we never use it alone) , so we remove it to obtain GENERIC_READ in xbox
@@ -535,53 +535,53 @@ ID3D12Resource *HL_NAME(create_committed_resource)( D3D12_HEAP_PROPERTIES *heapP
 	return res;
 }
 
-void HL_NAME(create_render_target_view)( ID3D12Resource *res, D3D12_RENDER_TARGET_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+HL_PRIM void HL_NAME(create_render_target_view)( ID3D12Resource *res, D3D12_RENDER_TARGET_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateRenderTargetView(res,desc,descriptor);
 }
 
-void HL_NAME(create_depth_stencil_view)( ID3D12Resource *res, D3D12_DEPTH_STENCIL_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+HL_PRIM void HL_NAME(create_depth_stencil_view)( ID3D12Resource *res, D3D12_DEPTH_STENCIL_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateDepthStencilView(res,desc,descriptor);
 }
 
-void HL_NAME(create_constant_buffer_view)( D3D12_CONSTANT_BUFFER_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+HL_PRIM void HL_NAME(create_constant_buffer_view)( D3D12_CONSTANT_BUFFER_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateConstantBufferView(desc,descriptor);
 }
 
-void HL_NAME(create_unordered_access_view)( ID3D12Resource *res, ID3D12Resource *counter, D3D12_UNORDERED_ACCESS_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+HL_PRIM void HL_NAME(create_unordered_access_view)( ID3D12Resource *res, ID3D12Resource *counter, D3D12_UNORDERED_ACCESS_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateUnorderedAccessView(res,counter,desc,descriptor);
 }
 
-void HL_NAME(create_sampler)( D3D12_SAMPLER_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+HL_PRIM void HL_NAME(create_sampler)( D3D12_SAMPLER_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateSampler(desc,descriptor);
 }
 
-void HL_NAME(create_shader_resource_view)( ID3D12Resource *res, D3D12_SHADER_RESOURCE_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
+HL_PRIM void HL_NAME(create_shader_resource_view)( ID3D12Resource *res, D3D12_SHADER_RESOURCE_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateShaderResourceView(res,desc,descriptor);
 }
 
-int64 HL_NAME(resource_get_gpu_virtual_address)( ID3D12Resource *res ) {
+HL_PRIM int64 HL_NAME(resource_get_gpu_virtual_address)( ID3D12Resource *res ) {
 	return res->GetGPUVirtualAddress();
 }
 
-void HL_NAME(resource_release)( IUnknown *res ) {
+HL_PRIM void HL_NAME(resource_release)( IUnknown *res ) {
 	res->Release();
 }
 
-void HL_NAME(resource_set_name)( ID3D12Resource *res, vbyte *name ) {
+HL_PRIM void HL_NAME(resource_set_name)( ID3D12Resource *res, vbyte *name ) {
 	res->SetName((LPCWSTR)name);
 }
 
-void *HL_NAME(resource_map)( ID3D12Resource *res, int subres, D3D12_RANGE *range ) {
+HL_PRIM void *HL_NAME(resource_map)( ID3D12Resource *res, int subres, D3D12_RANGE *range ) {
 	void *data = NULL;
 	DXERR(res->Map(subres, range, &data));
 	return data;
 }
 
-void HL_NAME(resource_unmap)( ID3D12Resource *res, int subres, D3D12_RANGE *range ) {
+HL_PRIM void HL_NAME(resource_unmap)( ID3D12Resource *res, int subres, D3D12_RANGE *range ) {
 	res->Unmap(subres, range);
 }
 
-int64 HL_NAME(get_required_intermediate_size)( ID3D12Resource *res, int first, int count ) {
+HL_PRIM int64 HL_NAME(get_required_intermediate_size)( ID3D12Resource *res, int first, int count ) {
 	auto desc = res->GetDesc();
 	UINT64 size = 0;
 #ifndef HL_XBS
@@ -594,14 +594,14 @@ int64 HL_NAME(get_required_intermediate_size)( ID3D12Resource *res, int first, i
 	return size;
 }
 
-bool HL_NAME(update_sub_resource)( ID3D12GraphicsCommandList *cmd, ID3D12Resource *res, ID3D12Resource *tmp, int64 tmpOffs, int first, int count, D3D12_SUBRESOURCE_DATA *data ) {
+HL_PRIM bool HL_NAME(update_sub_resource)( ID3D12GraphicsCommandList *cmd, ID3D12Resource *res, ID3D12Resource *tmp, int64 tmpOffs, int first, int count, D3D12_SUBRESOURCE_DATA *data ) {
 #ifdef HL_XBS
 	tmpOffs = 0;
 #endif
 	return UpdateSubresources(cmd,res,tmp,(UINT64)tmpOffs,(UINT)first,(UINT)count,data) != 0;
 }
 
-void HL_NAME(get_copyable_footprints)( D3D12_RESOURCE_DESC *desc, int first, int count, int64 offset, D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts, int *numRows, int64 *rowSizes, int64 *totalBytes ) {
+HL_PRIM void HL_NAME(get_copyable_footprints)( D3D12_RESOURCE_DESC *desc, int first, int count, int64 offset, D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts, int *numRows, int64 *rowSizes, int64 *totalBytes ) {
 	static_driver->device->GetCopyableFootprints(desc, first, count, offset, layouts, (UINT*)numRows, (UINT64*)rowSizes, (UINT64*)totalBytes);
 }
 
@@ -634,7 +634,7 @@ typedef struct {
 #endif
 } dx_compiler;
 
-dx_compiler *HL_NAME(compiler_create)() {
+HL_PRIM dx_compiler *HL_NAME(compiler_create)() {
 	dx_compiler *comp = (dx_compiler*)hl_gc_alloc_raw(sizeof(dx_compiler));
 	memset(comp,0,sizeof(dx_compiler));
 #ifndef HL_XBS
@@ -647,7 +647,7 @@ dx_compiler *HL_NAME(compiler_create)() {
 	return comp;
 }
 
-vbyte *HL_NAME(compiler_compile)( dx_compiler *comp, uchar *source, uchar *profile, varray *args, int *dataLen ) {
+HL_PRIM vbyte *HL_NAME(compiler_compile)( dx_compiler *comp, uchar *source, uchar *profile, varray *args, int *dataLen ) {
 	IDxcBlobEncoding *blob = NULL;
 	IDxcOperationResult *result = NULL;
 #ifndef HL_XBS
@@ -689,7 +689,7 @@ vbyte *HL_NAME(compiler_compile)( dx_compiler *comp, uchar *source, uchar *profi
 	return bytes;
 }
 
-vbyte *HL_NAME(serialize_root_signature)( D3D12_ROOT_SIGNATURE_DESC *signature, D3D_ROOT_SIGNATURE_VERSION version, int *dataLen ) {
+HL_PRIM vbyte *HL_NAME(serialize_root_signature)( D3D12_ROOT_SIGNATURE_DESC *signature, D3D_ROOT_SIGNATURE_VERSION version, int *dataLen ) {
 	ID3DBlob *data = NULL;
 	ID3DBlob *error = NULL;
 	HRESULT r = D3D12SerializeRootSignature(signature,version, &data, &error);
@@ -704,27 +704,27 @@ vbyte *HL_NAME(serialize_root_signature)( D3D12_ROOT_SIGNATURE_DESC *signature, 
 	return bytes;
 }
 
-ID3D12RootSignature *HL_NAME(rootsignature_create)( vbyte *bytes, int len ) {
+HL_PRIM ID3D12RootSignature *HL_NAME(rootsignature_create)( vbyte *bytes, int len ) {
 	ID3D12RootSignature *sign = NULL;
 	DXERR(static_driver->device->CreateRootSignature(CURRENT_NODEMASK, bytes, len, IID_PPV_ARGS(&sign)));
 	return sign;
 }
 
-ID3D12PipelineState *HL_NAME(create_graphics_pipeline_state)( D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc ) {
+HL_PRIM ID3D12PipelineState *HL_NAME(create_graphics_pipeline_state)( D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc ) {
 	ID3D12PipelineState *state = NULL;
 	// if shader is considered invalid, maybe you're missing dxil.dll
 	DXERR(static_driver->device->CreateGraphicsPipelineState(desc,IID_PPV_ARGS(&state)));
 	return state;
 }
 
-ID3D12PipelineState *HL_NAME(create_compute_pipeline_state)( D3D12_COMPUTE_PIPELINE_STATE_DESC *desc ) {
+HL_PRIM ID3D12PipelineState *HL_NAME(create_compute_pipeline_state)( D3D12_COMPUTE_PIPELINE_STATE_DESC *desc ) {
 	ID3D12PipelineState *state = NULL;
 	// if shader is considered invalid, maybe you're missing dxil.dll
 	DXERR(static_driver->device->CreateComputePipelineState(desc,IID_PPV_ARGS(&state)));
 	return state;
 }
 
-ID3D12CommandSignature *HL_NAME(create_command_signature)( D3D12_COMMAND_SIGNATURE_DESC *desc, ID3D12RootSignature *rootSign ) {
+HL_PRIM ID3D12CommandSignature *HL_NAME(create_command_signature)( D3D12_COMMAND_SIGNATURE_DESC *desc, ID3D12RootSignature *rootSign ) {
 	ID3D12CommandSignature *sign = NULL;
 	DXERR(static_driver->device->CreateCommandSignature(desc,rootSign,IID_PPV_ARGS(&sign)));
 	return sign;
@@ -741,22 +741,22 @@ DEFINE_PRIM(_RES, create_command_signature, _STRUCT _RES);
 
 // ---- HEAPS
 
-ID3D12DescriptorHeap *HL_NAME(descriptor_heap_create)( D3D12_DESCRIPTOR_HEAP_DESC *desc ) {
+HL_PRIM ID3D12DescriptorHeap *HL_NAME(descriptor_heap_create)( D3D12_DESCRIPTOR_HEAP_DESC *desc ) {
 	ID3D12DescriptorHeap *heap = NULL;
 	DXERR(static_driver->device->CreateDescriptorHeap(desc,IID_PPV_ARGS(&heap)));
 	return heap;
 }
 
-int HL_NAME(get_descriptor_handle_increment_size)( D3D12_DESCRIPTOR_HEAP_TYPE type ) {
+HL_PRIM int HL_NAME(get_descriptor_handle_increment_size)( D3D12_DESCRIPTOR_HEAP_TYPE type ) {
 	return static_driver->device->GetDescriptorHandleIncrementSize(type);
 }
 
-int64 HL_NAME(descriptor_heap_get_handle)( ID3D12DescriptorHeap *heap, bool gpu ) {
+HL_PRIM int64 HL_NAME(descriptor_heap_get_handle)( ID3D12DescriptorHeap *heap, bool gpu ) {
 	UINT64 handle = gpu ? heap->GetGPUDescriptorHandleForHeapStart().ptr : heap->GetCPUDescriptorHandleForHeapStart().ptr;
 	return handle; 
 }
 
-ID3D12QueryHeap *HL_NAME(create_query_heap)( D3D12_QUERY_HEAP_DESC *desc ) {
+HL_PRIM ID3D12QueryHeap *HL_NAME(create_query_heap)( D3D12_QUERY_HEAP_DESC *desc ) {
 	ID3D12QueryHeap *heap = NULL;
 	DXERR(static_driver->device->CreateQueryHeap(desc,IID_PPV_ARGS(&heap)));
 	return heap;
@@ -769,25 +769,25 @@ DEFINE_PRIM(_RES, create_query_heap, _STRUCT);
 
 // ---- SYNCHRO
 
-ID3D12Fence *HL_NAME(fence_create)( int64 value, D3D12_FENCE_FLAGS flags ) {
+HL_PRIM ID3D12Fence *HL_NAME(fence_create)( int64 value, D3D12_FENCE_FLAGS flags ) {
 	ID3D12Fence *f = NULL;
 	DXERR(static_driver->device->CreateFence(value,flags, IID_PPV_ARGS(&f)));
 	return f;
 }
 
-int64 HL_NAME(fence_get_completed_value)( ID3D12Fence *fence ) {
+HL_PRIM int64 HL_NAME(fence_get_completed_value)( ID3D12Fence *fence ) {
 	return (int64)fence->GetCompletedValue();
 }
 
-void HL_NAME(fence_set_event)( ID3D12Fence *fence, int64 value, HANDLE event ) {
+HL_PRIM void HL_NAME(fence_set_event)( ID3D12Fence *fence, int64 value, HANDLE event ) {
 	fence->SetEventOnCompletion(value, event);
 }
 
-HANDLE HL_NAME(waitevent_create)( bool initState ) {
+HL_PRIM HANDLE HL_NAME(waitevent_create)( bool initState ) {
 	return CreateEvent(NULL,FALSE,initState,NULL);
 }
 
-bool HL_NAME(waitevent_wait)( HANDLE event, int time ) {
+HL_PRIM bool HL_NAME(waitevent_wait)( HANDLE event, int time ) {
 	return WaitForSingleObject(event,time) == 0;
 }
 
@@ -801,172 +801,172 @@ DEFINE_PRIM(_BOOL, waitevent_wait, _EVENT _I32);
 
 // ---- COMMANDS
 
-ID3D12CommandAllocator *HL_NAME(command_allocator_create)( D3D12_COMMAND_LIST_TYPE type ) {
+HL_PRIM ID3D12CommandAllocator *HL_NAME(command_allocator_create)( D3D12_COMMAND_LIST_TYPE type ) {
 	ID3D12CommandAllocator *a = NULL;
 	DXERR(static_driver->device->CreateCommandAllocator(type,IID_PPV_ARGS(&a)));
 	return a;
 }
 
-void HL_NAME(command_allocator_reset)( ID3D12CommandAllocator *a ) {
+HL_PRIM void HL_NAME(command_allocator_reset)( ID3D12CommandAllocator *a ) {
 	CHKERR(a->Reset());
 }
 
-ID3D12GraphicsCommandList *HL_NAME(command_list_create)( D3D12_COMMAND_LIST_TYPE type, ID3D12CommandAllocator *alloc, ID3D12PipelineState *initState ) {
+HL_PRIM ID3D12GraphicsCommandList *HL_NAME(command_list_create)( D3D12_COMMAND_LIST_TYPE type, ID3D12CommandAllocator *alloc, ID3D12PipelineState *initState ) {
 	ID3D12GraphicsCommandList *l = NULL;
 	DXERR(static_driver->device->CreateCommandList(CURRENT_NODEMASK,type,alloc,initState,IID_PPV_ARGS(&l)));
 	return l;
 }
 
-void HL_NAME(command_list_close)( ID3D12GraphicsCommandList *l ) {
+HL_PRIM void HL_NAME(command_list_close)( ID3D12GraphicsCommandList *l ) {
 	CHKERR(l->Close());
 }
 
-void HL_NAME(command_list_reset)( ID3D12GraphicsCommandList *l, ID3D12CommandAllocator *alloc, ID3D12PipelineState *state ) {
+HL_PRIM void HL_NAME(command_list_reset)( ID3D12GraphicsCommandList *l, ID3D12CommandAllocator *alloc, ID3D12PipelineState *state ) {
 	CHKERR(l->Reset(alloc,state));
 }
 
-void HL_NAME(command_list_execute)( ID3D12GraphicsCommandList *l ) {
+HL_PRIM void HL_NAME(command_list_execute)( ID3D12GraphicsCommandList *l ) {
 	ID3D12CommandList* const commandLists[] = { l };
 	static_driver->commandQueue->ExecuteCommandLists(1, commandLists);
 }
 
-void HL_NAME(command_list_resource_barrier)( ID3D12GraphicsCommandList *l, D3D12_RESOURCE_BARRIER *barrier ) {
+HL_PRIM void HL_NAME(command_list_resource_barrier)( ID3D12GraphicsCommandList *l, D3D12_RESOURCE_BARRIER *barrier ) {
 	l->ResourceBarrier(1,barrier);
 }
 
-void HL_NAME(command_list_resource_barriers)(ID3D12GraphicsCommandList* l, D3D12_RESOURCE_BARRIER* barrier, int barrierCount) {
+HL_PRIM void HL_NAME(command_list_resource_barriers)(ID3D12GraphicsCommandList* l, D3D12_RESOURCE_BARRIER* barrier, int barrierCount) {
 	l->ResourceBarrier(barrierCount, barrier);
 }
 
-void HL_NAME(command_list_clear_render_target_view)( ID3D12GraphicsCommandList *l, D3D12_CPU_DESCRIPTOR_HANDLE view, FLOAT *colors ) {
+HL_PRIM void HL_NAME(command_list_clear_render_target_view)( ID3D12GraphicsCommandList *l, D3D12_CPU_DESCRIPTOR_HANDLE view, FLOAT *colors ) {
 	l->ClearRenderTargetView(view,colors,0,NULL);
 }
 
-void HL_NAME(command_list_clear_depth_stencil_view)( ID3D12GraphicsCommandList *l, D3D12_CPU_DESCRIPTOR_HANDLE view, D3D12_CLEAR_FLAGS flags, FLOAT depth, int stencil ) {
+HL_PRIM void HL_NAME(command_list_clear_depth_stencil_view)( ID3D12GraphicsCommandList *l, D3D12_CPU_DESCRIPTOR_HANDLE view, D3D12_CLEAR_FLAGS flags, FLOAT depth, int stencil ) {
 	l->ClearDepthStencilView(view,flags,depth,(UINT8)stencil,0,NULL);
 }
 
-void HL_NAME(command_list_draw_instanced)( ID3D12GraphicsCommandList *l, int vertexCountPerInstance, int instanceCount, int startVertexLocation, int startInstanceLocation ) {
+HL_PRIM void HL_NAME(command_list_draw_instanced)( ID3D12GraphicsCommandList *l, int vertexCountPerInstance, int instanceCount, int startVertexLocation, int startInstanceLocation ) {
 	l->DrawInstanced(vertexCountPerInstance, instanceCount, startVertexLocation, startInstanceLocation);
 }
 
-void HL_NAME(command_list_draw_indexed_instanced)( ID3D12GraphicsCommandList *l, int indexCountPerInstance, int instanceCount, int startIndexLocation, int baseVertexLocation, int startInstanceLocation ) {
+HL_PRIM void HL_NAME(command_list_draw_indexed_instanced)( ID3D12GraphicsCommandList *l, int indexCountPerInstance, int instanceCount, int startIndexLocation, int baseVertexLocation, int startInstanceLocation ) {
 	l->DrawIndexedInstanced(indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
 }
 
-void HL_NAME(command_list_set_graphics_root_signature)( ID3D12GraphicsCommandList *l, ID3D12RootSignature *sign ) {
+HL_PRIM void HL_NAME(command_list_set_graphics_root_signature)( ID3D12GraphicsCommandList *l, ID3D12RootSignature *sign ) {
 	l->SetGraphicsRootSignature(sign);
 }
 
-void HL_NAME(command_list_set_graphics_root32_bit_constants)( ID3D12GraphicsCommandList *l, int index, int numValues, void *data, int destOffset ) {
+HL_PRIM void HL_NAME(command_list_set_graphics_root32_bit_constants)( ID3D12GraphicsCommandList *l, int index, int numValues, void *data, int destOffset ) {
 	l->SetGraphicsRoot32BitConstants(index, numValues, data, destOffset);
 }
 
-void HL_NAME(command_list_set_pipeline_state)( ID3D12GraphicsCommandList *l, ID3D12PipelineState *pipe ) {
+HL_PRIM void HL_NAME(command_list_set_pipeline_state)( ID3D12GraphicsCommandList *l, ID3D12PipelineState *pipe ) {
 	l->SetPipelineState(pipe);
 }
 
-void HL_NAME(command_list_ia_set_vertex_buffers)( ID3D12GraphicsCommandList *l, int startSlot, int numViews, D3D12_VERTEX_BUFFER_VIEW *views ) {
+HL_PRIM void HL_NAME(command_list_ia_set_vertex_buffers)( ID3D12GraphicsCommandList *l, int startSlot, int numViews, D3D12_VERTEX_BUFFER_VIEW *views ) {
 	l->IASetVertexBuffers(startSlot, numViews, views);
 }
 
-void HL_NAME(command_list_ia_set_index_buffer)( ID3D12GraphicsCommandList *l, D3D12_INDEX_BUFFER_VIEW *view ) {
+HL_PRIM void HL_NAME(command_list_ia_set_index_buffer)( ID3D12GraphicsCommandList *l, D3D12_INDEX_BUFFER_VIEW *view ) {
 	l->IASetIndexBuffer(view);
 }
 
-void HL_NAME(command_list_ia_set_primitive_topology)( ID3D12GraphicsCommandList *l, D3D12_PRIMITIVE_TOPOLOGY topo ) {
+HL_PRIM void HL_NAME(command_list_ia_set_primitive_topology)( ID3D12GraphicsCommandList *l, D3D12_PRIMITIVE_TOPOLOGY topo ) {
 	l->IASetPrimitiveTopology(topo);
 }
 
-void HL_NAME(command_list_copy_buffer_region)( ID3D12GraphicsCommandList *l, ID3D12Resource *dst, int64 dstOffset, ID3D12Resource *src, int64 srcOffset, int64 numBytes ) {
+HL_PRIM void HL_NAME(command_list_copy_buffer_region)( ID3D12GraphicsCommandList *l, ID3D12Resource *dst, int64 dstOffset, ID3D12Resource *src, int64 srcOffset, int64 numBytes ) {
 	l->CopyBufferRegion(dst, dstOffset, src, srcOffset, numBytes);
 }
 
-void HL_NAME(command_list_copy_texture_region)( ID3D12GraphicsCommandList *l, D3D12_TEXTURE_COPY_LOCATION *dst, int dstX, int dstY, int dstZ, D3D12_TEXTURE_COPY_LOCATION *src, D3D12_BOX *srcBox ) {
+HL_PRIM void HL_NAME(command_list_copy_texture_region)( ID3D12GraphicsCommandList *l, D3D12_TEXTURE_COPY_LOCATION *dst, int dstX, int dstY, int dstZ, D3D12_TEXTURE_COPY_LOCATION *src, D3D12_BOX *srcBox ) {
 	l->CopyTextureRegion(dst, dstX, dstY, dstZ, src, srcBox);
 }
 
-void HL_NAME(command_list_om_set_render_targets)( ID3D12GraphicsCommandList *l, int count, D3D12_CPU_DESCRIPTOR_HANDLE *handles, BOOL flag, D3D12_CPU_DESCRIPTOR_HANDLE *depthStencils ) {
+HL_PRIM void HL_NAME(command_list_om_set_render_targets)( ID3D12GraphicsCommandList *l, int count, D3D12_CPU_DESCRIPTOR_HANDLE *handles, BOOL flag, D3D12_CPU_DESCRIPTOR_HANDLE *depthStencils ) {
 	l->OMSetRenderTargets(count,handles,flag,depthStencils);
 }
 
-void HL_NAME(command_list_om_set_stencil_ref)( ID3D12GraphicsCommandList *l, int value ) {
+HL_PRIM void HL_NAME(command_list_om_set_stencil_ref)( ID3D12GraphicsCommandList *l, int value ) {
 	l->OMSetStencilRef(value);
 }
 
-void HL_NAME(command_list_rs_set_viewports)( ID3D12GraphicsCommandList *l, int count, D3D12_VIEWPORT *viewports ) {
+HL_PRIM void HL_NAME(command_list_rs_set_viewports)( ID3D12GraphicsCommandList *l, int count, D3D12_VIEWPORT *viewports ) {
 	l->RSSetViewports(count, viewports);
 }
 
-void HL_NAME(command_list_rs_set_scissor_rects)( ID3D12GraphicsCommandList *l, int count, D3D12_RECT *rects ) {
+HL_PRIM void HL_NAME(command_list_rs_set_scissor_rects)( ID3D12GraphicsCommandList *l, int count, D3D12_RECT *rects ) {
 	l->RSSetScissorRects(count, rects);
 }
 
-void HL_NAME(command_list_set_descriptor_heaps)( ID3D12GraphicsCommandList *l, varray *heaps ) {
+HL_PRIM void HL_NAME(command_list_set_descriptor_heaps)( ID3D12GraphicsCommandList *l, varray *heaps ) {
 	l->SetDescriptorHeaps(heaps->size,hl_aptr(heaps,ID3D12DescriptorHeap*));
 }
 
-void HL_NAME(command_list_set_graphics_root_constant_buffer_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS address ) {
+HL_PRIM void HL_NAME(command_list_set_graphics_root_constant_buffer_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS address ) {
 	l->SetGraphicsRootConstantBufferView(index,address);
 }
 
-void HL_NAME(command_list_set_graphics_root_descriptor_table)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_DESCRIPTOR_HANDLE handle ) {
+HL_PRIM void HL_NAME(command_list_set_graphics_root_descriptor_table)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_DESCRIPTOR_HANDLE handle ) {
 	l->SetGraphicsRootDescriptorTable(index,handle);
 }
 
-void HL_NAME(command_list_set_graphics_root_shader_resource_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
+HL_PRIM void HL_NAME(command_list_set_graphics_root_shader_resource_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
 	l->SetGraphicsRootShaderResourceView(index,handle);
 }
 
-void HL_NAME(command_list_set_graphics_root_unordered_access_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
+HL_PRIM void HL_NAME(command_list_set_graphics_root_unordered_access_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
 	l->SetGraphicsRootUnorderedAccessView(index,handle);
 }
 
-void HL_NAME(command_list_execute_indirect)( ID3D12GraphicsCommandList *l, ID3D12CommandSignature *sign, int maxCommandCount, ID3D12Resource *args, int64 argsOffset, ID3D12Resource *count, int64 countOffset  ) {
+HL_PRIM void HL_NAME(command_list_execute_indirect)( ID3D12GraphicsCommandList *l, ID3D12CommandSignature *sign, int maxCommandCount, ID3D12Resource *args, int64 argsOffset, ID3D12Resource *count, int64 countOffset  ) {
 	l->ExecuteIndirect(sign, maxCommandCount, args, argsOffset, count, countOffset);
 }
 
-void HL_NAME(command_list_begin_query)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index ) {
+HL_PRIM void HL_NAME(command_list_begin_query)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index ) {
 	l->BeginQuery(heap, type, index);
 }
 
-void HL_NAME(command_list_end_query)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index ) {
+HL_PRIM void HL_NAME(command_list_end_query)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index ) {
 	l->EndQuery(heap, type, index);
 }
 
-void HL_NAME(command_list_resolve_query_data)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index, int count, ID3D12Resource *dest, int64 offset ) {
+HL_PRIM void HL_NAME(command_list_resolve_query_data)( ID3D12GraphicsCommandList *l, ID3D12QueryHeap *heap, D3D12_QUERY_TYPE type, int index, int count, ID3D12Resource *dest, int64 offset ) {
 	l->ResolveQueryData(heap,type,index,count,dest,offset);
 }
 
-void HL_NAME(command_list_set_predication)( ID3D12GraphicsCommandList *l, ID3D12Resource *res, int64 offset, D3D12_PREDICATION_OP op ) {
+HL_PRIM void HL_NAME(command_list_set_predication)( ID3D12GraphicsCommandList *l, ID3D12Resource *res, int64 offset, D3D12_PREDICATION_OP op ) {
 	l->SetPredication(res,offset,op);
 }
 
-void HL_NAME(command_list_set_compute_root_signature)( ID3D12GraphicsCommandList *l, ID3D12RootSignature *sign ) {
+HL_PRIM void HL_NAME(command_list_set_compute_root_signature)( ID3D12GraphicsCommandList *l, ID3D12RootSignature *sign ) {
 	l->SetComputeRootSignature(sign);
 }
 
-void HL_NAME(command_list_set_compute_root32_bit_constants)( ID3D12GraphicsCommandList *l, int index, int numValues, void *data, int destOffset ) {
+HL_PRIM void HL_NAME(command_list_set_compute_root32_bit_constants)( ID3D12GraphicsCommandList *l, int index, int numValues, void *data, int destOffset ) {
 	l->SetComputeRoot32BitConstants(index, numValues, data, destOffset);
 }
 
-void HL_NAME(command_list_set_compute_root_constant_buffer_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS address ) {
+HL_PRIM void HL_NAME(command_list_set_compute_root_constant_buffer_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS address ) {
 	l->SetComputeRootConstantBufferView(index,address);
 }
 
-void HL_NAME(command_list_set_compute_root_descriptor_table)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_DESCRIPTOR_HANDLE handle ) {
+HL_PRIM void HL_NAME(command_list_set_compute_root_descriptor_table)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_DESCRIPTOR_HANDLE handle ) {
 	l->SetComputeRootDescriptorTable(index,handle);
 }
 
-void HL_NAME(command_list_set_compute_root_shader_resource_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
+HL_PRIM void HL_NAME(command_list_set_compute_root_shader_resource_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
 	l->SetComputeRootShaderResourceView(index,handle);
 }
 
-void HL_NAME(command_list_set_compute_root_unordered_access_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
+HL_PRIM void HL_NAME(command_list_set_compute_root_unordered_access_view)( ID3D12GraphicsCommandList *l, int index, D3D12_GPU_VIRTUAL_ADDRESS handle ) {
 	l->SetComputeRootUnorderedAccessView(index,handle);
 }
 
-void HL_NAME(command_list_dispatch)( ID3D12GraphicsCommandList *l, int x, int y, int z ) {
+HL_PRIM void HL_NAME(command_list_dispatch)( ID3D12GraphicsCommandList *l, int x, int y, int z ) {
 	l->Dispatch(x,y,z);
 }
 
