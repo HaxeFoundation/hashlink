@@ -236,8 +236,9 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		start = p->nfields;
 		memcpy(t->fields_indexes, p->fields_indexes, sizeof(int)*p->nfields);
 	}
-	size = p ? p->size : (ot->kind == HSTRUCT ? 0 : HL_WSIZE); // hl_type*
+	size = p ? p->size - p->pad_size : (ot->kind == HSTRUCT ? 0 : HL_WSIZE); // hl_type*
 	nlookup = 0;
+	int largest_field = p ? p->largest_field : size;
 	for(i=0;i<o->nfields;i++) {
 		hl_type *ft = o->fields[i].t;
 		hl_type *pad = ft;
@@ -259,10 +260,28 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 			if( rts->hasPtr ) t->hasPtr = true;
 			continue;
 		}
-		size += hl_type_size(ft);
+		int sz = hl_type_size(ft);
+		size += sz;
+		if( sz > largest_field ) largest_field = sz;
 		if( !t->hasPtr && hl_is_ptr(ft) ) t->hasPtr = true;
 	}
 	t->size = size;
+	t->pad_size = 0;
+	// align size on largest field size to match C, so arr[i].field is always aligned
+	if( largest_field > 0 ) {
+		int pad = size % largest_field;
+		if( pad != 0 ) {
+			t->pad_size = largest_field - pad;
+			t->size += t->pad_size;
+		}
+	}
+	{
+		int sz2 = size;
+		if( sz2 & (HL_WSIZE-1) ) sz2 += HL_WSIZE - (sz2 & (HL_WSIZE-1));
+		if( sz2 != t->size )
+			uprintf(USTR("%s(%d --> %d)\n"), o->name, sz2, t->size);
+	}
+	t->largest_field = largest_field;
 	t->nmethods = p ? p->nmethods : o->nproto;
 	t->methods = NULL;
 	o->rt = t;
