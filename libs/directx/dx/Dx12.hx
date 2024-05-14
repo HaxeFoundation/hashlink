@@ -1044,6 +1044,7 @@ enum abstract InputClassification(Int) {
 @:struct class InputLayoutDesc {
 	public var inputElementDescs : hl.CArray<InputElementDesc>;
 	public var numElements : Int;
+	public var __padding : Int; // largest element
 	public function new() {
 	}
 }
@@ -1094,7 +1095,6 @@ enum abstract PipelineStateFlags(Int) {
 	@:packed public var rasterizerState(default,null) : RasterizerDesc;
 	@:packed public var depthStencilDesc(default,null) : DepthStencilDesc;
 	@:packed public var inputLayout(default,null) : InputLayoutDesc;
-	var __padding : Int; // ?
 	public var ibStripCutValue : IndexBufferStripCutValue;
 	public var primitiveTopologyType : PrimitiveTopologyType;
 	public var numRenderTargets : Int;
