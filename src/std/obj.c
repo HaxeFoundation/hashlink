@@ -275,12 +275,6 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 			t->size += t->pad_size;
 		}
 	}
-	{
-		int sz2 = size;
-		if( sz2 & (HL_WSIZE-1) ) sz2 += HL_WSIZE - (sz2 & (HL_WSIZE-1));
-		if( sz2 != t->size )
-			uprintf(USTR("%s(%d --> %d)\n"), o->name, sz2, t->size);
-	}
 	t->largest_field = largest_field;
 	t->nmethods = p ? p->nmethods : o->nproto;
 	t->methods = NULL;
