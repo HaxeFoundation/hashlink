@@ -241,14 +241,15 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	int largest_field = p ? p->largest_field : size;
 	for(i=0;i<o->nfields;i++) {
 		hl_type *ft = o->fields[i].t;
-		hl_type *pad = ft;
-		while( pad->kind == HPACKED ) {
-			// align on first field
-			pad = pad->tparam;
-			while( pad->obj->super && hl_get_obj_rt(pad->obj->super)->nfields ) pad = pad->obj->super;
-			pad = pad->obj->fields[0].t;
-		}
-		size += hl_pad_struct(size,pad);
+		if( ft->kind == HPACKED ) {
+			// align on packed largest field
+			int large = hl_get_obj_rt(ft->tparam)->largest_field;
+			if( large < HL_WSIZE ) large = HL_WSIZE;
+			int pad = size % large;
+			if( pad != 0 )
+				size += large - size;
+		} else
+			size += hl_pad_struct(size,ft);
 		t->fields_indexes[i+start] = size;
 		if( *o->fields[i].name )
 			hl_lookup_insert(t->lookup,nlookup++,o->fields[i].hashed_name,o->fields[i].t,size);
