@@ -244,10 +244,11 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		if( ft->kind == HPACKED ) {
 			// align on packed largest field
 			int large = hl_get_obj_rt(ft->tparam)->largest_field;
-			if( large < HL_WSIZE ) large = HL_WSIZE;
 			int pad = size % large;
 			if( pad != 0 )
 				size += large - size;
+			if( large > largest_field )
+				largest_field = large;
 		} else
 			size += hl_pad_struct(size,ft);
 		t->fields_indexes[i+start] = size;
