@@ -246,7 +246,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 			int large = hl_get_obj_rt(ft->tparam)->largest_field;
 			int pad = size % large;
 			if( pad != 0 )
-				size += large - size;
+				size += large - pad;
 			if( large > largest_field )
 				largest_field = large;
 		} else
