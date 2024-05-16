@@ -3822,7 +3822,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					else {
 						hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
 						osize = rt->size;
-						if( osize & (HL_WSIZE-1) ) osize += HL_WSIZE - (osize & (HL_WSIZE-1));
 					}
 					preg *idx = alloc_cpu(ctx, rb, true);
 					op64(ctx, IMUL, idx, pconst(&p,osize));

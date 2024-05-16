@@ -533,6 +533,8 @@ struct hl_runtime_obj {
 	int size;
 	int nmethods;
 	int nbindings;
+	unsigned char pad_size;
+	unsigned char largest_field;
 	bool hasPtr;
 	void **methods;
 	int *fields_indexes;
