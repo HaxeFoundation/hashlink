@@ -222,7 +222,7 @@ int main(int argc, pchar *argv[]) {
 	}
 	hl_code_free(ctx.code);
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
-		fprintf(stderr,"Could not start debugger on port %d",debug_port);
+		fprintf(stderr,"Could not start debugger on port %d\n",debug_port);
 		return 4;
 	}
 	cl.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
