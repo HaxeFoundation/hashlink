@@ -117,7 +117,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 	r->finalize = HL_NAME(finalize_result);
 	r->db = NULL;
 
-	if( sqlite3_prepare16_v2(db->db, sql, -1, &r->r, &tl) != SQLITE_OK ) {
+	if( sqlite3_prepare16_v2(db->db, sql, -1, &r->r, (const void**)&tl) != SQLITE_OK ) {
 		HL_NAME(error)(db->db, false);
 	}
 

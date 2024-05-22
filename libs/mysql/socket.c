@@ -19,6 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#define _GNU_SOURCE
 #include "socket.h"
 #include <string.h>
 
@@ -29,7 +30,6 @@
 #	define HANDLE_EINTR(x)
 
 #else
-#	define _GNU_SOURCE
 #	include <sys/types.h>
 #	include <sys/socket.h>
 #	include <sys/time.h>
