@@ -237,6 +237,7 @@ class Window {
 	}
 
 	function set_vsync(v) {
+		if( vsync == v ) return v;
 		setVsync(v);
 		return vsync = v;
 	}
