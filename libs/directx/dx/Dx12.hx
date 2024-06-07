@@ -355,7 +355,7 @@ enum abstract ResourceState(Int) {
 	public var SHADING_RATE_SOURCE = 0x1000000;
 	public var GENERIC_READ = 0x1 | 0x2 | 0x40 | 0x80 | 0x200 | 0x800;
 	public var ALL_SHADER_RESOURCE = 0x40 | 0x80;
-	public var PRESENT = 0;
+	public var PRESENT = #if ( console && !xbogdk ) 0x100000 #else 0 #end;
 	public var PREDICATION = 0x200;
 	public var VIDE_DECODE_READ = 0x10000;
 	public var VIDE_DECODE_WRITE = 0x20000;

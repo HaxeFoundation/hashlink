@@ -584,20 +584,11 @@ HL_PRIM void HL_NAME(resource_unmap)( ID3D12Resource *res, int subres, D3D12_RAN
 HL_PRIM int64 HL_NAME(get_required_intermediate_size)( ID3D12Resource *res, int first, int count ) {
 	auto desc = res->GetDesc();
 	UINT64 size = 0;
-#ifndef HL_XBS
 	static_driver->device->GetCopyableFootprints(&desc, first, count, 0, NULL, NULL, NULL, &size);
-#else
-	D3D12_PLACED_SUBRESOURCE_FOOTPRINT pLayouts;
-	static_driver->device->GetCopyableFootprints(&desc, first + count - 1, 1, 0, &pLayouts, NULL, NULL, &size);
-	size += pLayouts.Offset;
-#endif
 	return size;
 }
 
 HL_PRIM bool HL_NAME(update_sub_resource)( ID3D12GraphicsCommandList *cmd, ID3D12Resource *res, ID3D12Resource *tmp, int64 tmpOffs, int first, int count, D3D12_SUBRESOURCE_DATA *data ) {
-#ifdef HL_XBS
-	tmpOffs = 0;
-#endif
 	return UpdateSubresources(cmd,res,tmp,(UINT64)tmpOffs,(UINT)first,(UINT)count,data) != 0;
 }
 
