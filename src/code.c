@@ -83,7 +83,7 @@ static int hl_read_i32( hl_reader *r ) {
 	b = r->b[r->pos++];
 	c = r->b[r->pos++];
 	d = r->b[r->pos++];
-	return a | (b<<8) | (c<<16) | (d<<24);
+	return (unsigned)a | ((unsigned)b<<8) | ((unsigned)c<<16) | ((unsigned)d<<24);
 }
 
 static int hl_read_index( hl_reader *r ) {
