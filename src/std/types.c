@@ -191,15 +191,21 @@ HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 		return false;
 	switch( t->kind ) {
 	case HVIRTUAL:
-		if( to->virt->nfields < t->virt->nfields ) {
-			int i;
-			for(i=0;i<to->virt->nfields;i++) {
-				hl_obj_field *f1 = t->virt->fields + i;
-				hl_obj_field *f2 = to->virt->fields + i;
-				if( f1->hashed_name != f2->hashed_name || !hl_same_type(f1->t,f2->t) )
-					break;
+		if (to->virt->nfields < t->virt->nfields) {
+			int matches = 0;
+			for (int i = 0; i < to->virt->nfields; i++) {
+				hl_obj_field* f1 = to->virt->fields + i;
+
+				for (int j = i; j < t->virt->nfields; j++) {
+					hl_obj_field* f2 = t->virt->fields + j;
+
+					if (f2->hashed_name == f1->hashed_name && hl_same_type(f2->t, f1->t)) {
+						matches++;
+						break;
+					}
+				}
 			}
-			if( i == to->virt->nfields )
+			if (matches == to->virt->nfields)
 				return true;
 		}
 		break;
