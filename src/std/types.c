@@ -191,7 +191,7 @@ HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 		return false;
 	switch( t->kind ) {
 	case HVIRTUAL:
-		if (to->virt->nfields < t->virt->nfields) {
+		if (to->virt->nfields <= t->virt->nfields) {
 			int matches = 0;
 			for (int i = 0; i < to->virt->nfields; i++) {
 				hl_obj_field* f1 = to->virt->fields + i;
