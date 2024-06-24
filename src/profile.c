@@ -415,7 +415,7 @@ static void profile_dump( vbyte* ptr ) {
 	printf("Writing profiling data...\n");
 	fflush(stdout);
 
-	char* filename = ptr == NULL ? "hlprofile.dump" : hl_to_utf8(ptr);
+	char* filename = ptr == NULL ? "hlprofile.dump" : hl_to_utf8((uchar*)ptr);
 	FILE *f = fopen(filename,"wb");
 	int version = HL_VERSION;
 	fwrite("PROF",1,4,f);
