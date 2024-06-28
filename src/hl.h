@@ -283,7 +283,7 @@ C_FUNCTION_END
 C_FUNCTION_BEGIN
 HL_API void hl_debug_break( void );
 C_FUNCTION_END
-#elif defined(HL_LINUX) && defined(__i386__)
+#elif defined(HL_LINUX)
 #	ifdef HL_64
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \
