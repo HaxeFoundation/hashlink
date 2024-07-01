@@ -177,6 +177,8 @@
 #	define IS_64	1
 #	ifdef HL_VCC
 #		define _PTR_FMT	L"%IX"
+#   elif defined(HL_MINGW)
+#		define _PTR_FMT	L"%lX"
 #	else
 #		define _PTR_FMT	u"%lX"
 #	endif
@@ -227,7 +229,7 @@ typedef unsigned long long uint64;
 #if (defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)) || defined(HL_XBS)
 #	include <Windows.h>
 #elif defined(HL_WIN_DESKTOP) && defined(HL_MINGW)
-#	include<windows.h>
+#	include <windows.h>
 #else
 #	include <xdk.h>
 #endif
