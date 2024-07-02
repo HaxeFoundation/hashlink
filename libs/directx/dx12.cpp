@@ -26,7 +26,7 @@
 #endif
 
 #define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret == E_OUTOFMEMORY ) return NULL; if( __ret != S_OK ) ReportDxError(__ret,__LINE__); }
-#define CHKERR(cmd) { HRESULT __ret = cmd; if( __ret != S_OK ) ReportDxError(__ret,__LINE__); }
+#define CHKERR(cmd) { HRESULT __ret = cmd; if( FAILED(__ret) ) ReportDxError(__ret,__LINE__); }
 
 typedef struct {
 	HWND wnd;
@@ -207,11 +207,9 @@ void register_frame_events() {
 	IDXGIOutput *dxgiOutput;
 	CHKERR(drv->adapter->EnumOutputs(0, &dxgiOutput));
 	// May return S_OK, S_FALSE
-	HRESULT hr = drv->device->SetFrameIntervalX(dxgiOutput, D3D12XBOX_FRAME_INTERVAL_60_HZ, drv->swapBufferCount - 1u /* Allow n-1 frames of latency */, D3D12XBOX_FRAME_INTERVAL_FLAG_NONE);
-	if (hr < 0) ReportDxError(hr, __LINE__);
+	CHKERR(drv->device->SetFrameIntervalX(dxgiOutput, D3D12XBOX_FRAME_INTERVAL_60_HZ, drv->swapBufferCount - 1u /* Allow n-1 frames of latency */, D3D12XBOX_FRAME_INTERVAL_FLAG_NONE));
 	// May return 0x10000000 on XBOXONE
-	hr = drv->device->ScheduleFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, 0U, nullptr, D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE);
-	if (hr < 0) ReportDxError(hr, __LINE__);
+	CHKERR(drv->device->ScheduleFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, 0U, nullptr, D3D12XBOX_SCHEDULE_FRAME_EVENT_FLAG_NONE));
 
 	// Prepare first pipeline token
 	drv->pipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
