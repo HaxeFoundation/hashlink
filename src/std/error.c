@@ -216,13 +216,9 @@ HL_PRIM HL_NO_OPT void hl_breakpoint() {
 #	pragma optimize( "", on )
 #endif
 
-#ifdef HL_LINUX__
-#include <signal.h>
-static int debugger_present = -1;
-static void _sigtrap_handler(int signum) {
-	debugger_present = 0;
-	signal(SIGTRAP,SIG_DFL);
-}
+#ifdef HL_LINUX
+#include <unistd.h>
+#include <fcntl.h>
 #endif
 
 #if defined(HL_MAC) && defined(__x86_64__)
@@ -233,13 +229,26 @@ static void _sigtrap_handler(int signum) {
 HL_PRIM bool hl_detect_debugger() {
 #	if defined(HL_WIN)
 	return (bool)IsDebuggerPresent();
-#	elif defined(HL_LINUX__)
-	if( debugger_present == -1 ) {
-		debugger_present = 1;
-		signal(SIGTRAP,_sigtrap_handler);
-		raise(SIGTRAP);
+#	elif defined(HL_LINUX)
+	static int debugger_present = -1;
+	if(debugger_present < 0) {
+		char buf[2048];
+		char *tracer_pid;
+		ssize_t num_read;
+		debugger_present = 0;
+		int status_fd = open("/proc/self/status", O_RDONLY);
+		if (status_fd == -1)
+			return 0;
+		num_read = read(status_fd, buf, sizeof(buf));
+		close(status_fd);
+		if (num_read > 0) {
+			buf[num_read] = 0;
+			tracer_pid = strstr(buf, "TracerPid:");
+			if (tracer_pid && atoi(tracer_pid + sizeof("TracerPid:") - 1) > 0)
+				debugger_present = 1;
+		}
 	}
-	return (bool)debugger_present;
+	return debugger_present == 1;
 #	elif defined(MAC_DEBUG)
 	return is_debugger_attached();
 #	else
