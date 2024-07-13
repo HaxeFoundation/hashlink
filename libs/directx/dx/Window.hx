@@ -145,6 +145,10 @@ class Window {
 		winResize(win, 2);
 	}
 
+	public function focus() {
+		winSetFocus(win);
+	}
+
 	public function getNextEvent( e : Event ) : Bool {
 		return winGetNextEvent(win, e);
 	}
@@ -320,6 +324,10 @@ class Window {
 	}
 
 	static function winGetPosition( win : WinPtr, x : hl.Ref<Int>, y : hl.Ref<Int> ) {
+	}
+
+	@:hlNative("?directx", "win_set_focus")
+	static function winSetFocus( win: WinPtr ) {
 	}
 
 	static function winGetOpacity( win : WinPtr ) : Float {
