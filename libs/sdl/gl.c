@@ -52,8 +52,12 @@
 #include "GLImports.h"
 #undef GL_IMPORT
 #define GL_IMPORT(fun,t)	fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) return 1
+#ifndef __APPLE__
 #define GL_IMPORT_OPT(fun, t) PFNGL##t##PROC fun = NULL; if ( !fun ) { fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) hl_error("function not resolved"); }
-#else
+#endif
+#endif
+
+#if !defined GL_IMPORT_OPT
 #define GL_IMPORT_OPT(fun, t)
 #define glMultiDrawElementsIndirectCountARB(...) hl_error("function not resolved");
 #endif
