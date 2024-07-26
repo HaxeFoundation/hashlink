@@ -39,6 +39,10 @@ class GL {
 		return 0;
 	}
 
+	public static function hasExtension( name : String ) : Bool {
+		return false;
+	}
+
 	public static function isContextLost() : Bool {
 		return false;
 	}
@@ -403,6 +407,9 @@ class GL {
 	}
 
 	public static function multiDrawElementsIndirect( mode : Int, type : Int, data : hl.Bytes, count : Int, stride : Int ) {
+	}
+
+	public static function multiDrawElementsIndirectCount( mode : Int, type : Int, data : hl.Bytes, drawcount : hl.Bytes, maxdrawcount : Int, stride : Int ) {
 	}
 
 	// queries
@@ -917,6 +924,7 @@ class GL {
 	public static inline var READ_FRAMEBUFFER               = 0x8CA8;
 	public static inline var DRAW_FRAMEBUFFER               = 0x8CA9;
 	public static inline var DRAW_INDIRECT_BUFFER           = 0x8F3F;
+	public static inline var PARAMETER_BUFFER               = 0x80ee;
 
 	public static inline var RGBA4                          = 0x8056;
 	public static inline var RGB5_A1                        = 0x8057;
