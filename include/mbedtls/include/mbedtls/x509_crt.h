@@ -4,8 +4,14 @@
  * \brief X.509 certificate parsing and writing
  */
 /*
- *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
- *  SPDX-License-Identifier: Apache-2.0
+ *  Copyright The Mbed TLS Contributors
+ *  SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+ *
+ *  This file is provided under the Apache License 2.0, or the
+ *  GNU General Public License v2.0 or later.
+ *
+ *  **********
+ *  Apache License 2.0:
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may
  *  not use this file except in compliance with the License.
@@ -19,7 +25,26 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  This file is part of mbed TLS (https://tls.mbed.org)
+ *  **********
+ *
+ *  **********
+ *  GNU General Public License v2.0 or later:
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ *  **********
  */
 #ifndef MBEDTLS_X509_CRT_H
 #define MBEDTLS_X509_CRT_H
@@ -98,7 +123,7 @@ mbedtls_x509_crt;
  * Build flag from an algorithm/curve identifier (pk, md, ecp)
  * Since 0 is always XXX_NONE, ignore it.
  */
-#define MBEDTLS_X509_ID_FLAG( id )   ( 1 << ( id - 1 ) )
+#define MBEDTLS_X509_ID_FLAG( id )   ( 1 << ( ( id ) - 1 ) )
 
 /**
  * Security profile for certificate verification.
@@ -175,19 +200,34 @@ int mbedtls_x509_crt_parse_der( mbedtls_x509_crt *chain, const unsigned char *bu
                         size_t buflen );
 
 /**
- * \brief          Parse one or more certificates and add them
- *                 to the chained list. Parses permissively. If some
- *                 certificates can be parsed, the result is the number
- *                 of failed certificates it encountered. If none complete
- *                 correctly, the first error is returned.
+ * \brief          Parse one DER-encoded or one or more concatenated PEM-encoded
+ *                 certificates and add them to the chained list.
  *
- * \param chain    points to the start of the chain
- * \param buf      buffer holding the certificate data in PEM or DER format
- * \param buflen   size of the buffer
- *                 (including the terminating null byte for PEM data)
+ *                 For CRTs in PEM encoding, the function parses permissively:
+ *                 if at least one certificate can be parsed, the function
+ *                 returns the number of certificates for which parsing failed
+ *                 (hence \c 0 if all certificates were parsed successfully).
+ *                 If no certificate could be parsed, the function returns
+ *                 the first (negative) error encountered during parsing.
  *
- * \return         0 if all certificates parsed successfully, a positive number
- *                 if partly successful or a specific X509 or PEM error code
+ *                 PEM encoded certificates may be interleaved by other data
+ *                 such as human readable descriptions of their content, as
+ *                 long as the certificates are enclosed in the PEM specific
+ *                 '-----{BEGIN/END} CERTIFICATE-----' delimiters.
+ *
+ * \param chain    The chain to which to add the parsed certificates.
+ * \param buf      The buffer holding the certificate data in PEM or DER format.
+ *                 For certificates in PEM encoding, this may be a concatenation
+ *                 of multiple certificates; for DER encoding, the buffer must
+ *                 comprise exactly one certificate.
+ * \param buflen   The size of \p buf, including the terminating \c NULL byte
+ *                 in case of PEM encoded data.
+ *
+ * \return         \c 0 if all certificates were parsed successfully.
+ * \return         The (positive) number of certificates that couldn't
+ *                 be parsed if parsing was partly successful (see above).
+ * \return         A negative X509 or PEM error code otherwise.
+ *
  */
 int mbedtls_x509_crt_parse( mbedtls_x509_crt *chain, const unsigned char *buf, size_t buflen );
 
@@ -287,8 +327,15 @@ int mbedtls_x509_crt_verify_info( char *buf, size_t size, const char *prefix,
  *                 used to sign the certificate, CRL verification is skipped
  *                 silently, that is *without* setting any flag.
  *
+ * \note           The \c trust_ca list can contain two types of certificates:
+ *                 (1) those of trusted root CAs, so that certificates
+ *                 chaining up to those CAs will be trusted, and (2)
+ *                 self-signed end-entity certificates to be trusted (for
+ *                 specific peers you know) - in that case, the self-signed
+ *                 certificate doesn't need to have the CA bit set.
+ *
  * \param crt      a certificate (chain) to be verified
- * \param trust_ca the list of trusted CAs
+ * \param trust_ca the list of trusted CAs (see note above)
  * \param ca_crl   the list of CRLs for trusted CAs (see note above)
  * \param cn       expected Common Name (can be set to
  *                 NULL if the CN must not be verified)

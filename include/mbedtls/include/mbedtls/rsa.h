@@ -9,8 +9,14 @@
  *
  */
 /*
- *  Copyright (C) 2006-2018, Arm Limited (or its affiliates), All Rights Reserved
- *  SPDX-License-Identifier: Apache-2.0
+ *  Copyright The Mbed TLS Contributors
+ *  SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+ *
+ *  This file is provided under the Apache License 2.0, or the
+ *  GNU General Public License v2.0 or later.
+ *
+ *  **********
+ *  Apache License 2.0:
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may
  *  not use this file except in compliance with the License.
@@ -24,7 +30,26 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  This file is part of Mbed TLS (https://tls.mbed.org)
+ *  **********
+ *
+ *  **********
+ *  GNU General Public License v2.0 or later:
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ *  **********
  */
 #ifndef MBEDTLS_RSA_H
 #define MBEDTLS_RSA_H
@@ -93,7 +118,10 @@ extern "C" {
  */
 typedef struct
 {
-    int ver;                    /*!<  Always 0.*/
+    int ver;                    /*!<  Reserved for internal purposes.
+                                 *    Do not set this field in application
+                                 *    code. Its meaning might change without
+                                 *    notice. */
     size_t len;                 /*!<  The size of \p N in Bytes. */
 
     mbedtls_mpi N;                      /*!<  The public modulus. */
@@ -123,6 +151,7 @@ typedef struct
                                      mask generating function used in the
                                      EME-OAEP and EMSA-PSS encodings. */
 #if defined(MBEDTLS_THREADING_C)
+    /* Invariant: the mutex is initialized iff ver != 0. */
     mbedtls_threading_mutex_t mutex;    /*!<  Thread-safety mutex. */
 #endif
 }
@@ -146,13 +175,13 @@ mbedtls_rsa_context;
  * \note           The choice of padding mode is strictly enforced for private key
  *                 operations, since there might be security concerns in
  *                 mixing padding modes. For public key operations it is
- *                 a default value, which can be overriden by calling specific
+ *                 a default value, which can be overridden by calling specific
  *                 \c rsa_rsaes_xxx or \c rsa_rsassa_xxx functions.
  *
  * \note           The hash selected in \p hash_id is always used for OEAP
  *                 encryption. For PSS signatures, it is always used for
- *                 making signatures, but can be overriden for verifying them.
- *                 If set to #MBEDTLS_MD_NONE, it is always overriden.
+ *                 making signatures, but can be overridden for verifying them.
+ *                 If set to #MBEDTLS_MD_NONE, it is always overridden.
  */
 void mbedtls_rsa_init( mbedtls_rsa_context *ctx,
                        int padding,
@@ -518,6 +547,18 @@ int mbedtls_rsa_public( mbedtls_rsa_context *ctx,
  *
  * \note           The input and output buffers must be large
  *                 enough. For example, 128 Bytes if RSA-1024 is used.
+ *
+ * \note           Blinding is used if and only if a PRNG is provided.
+ *
+ * \note           If blinding is used, both the base of exponentation
+ *                 and the exponent are blinded, providing protection
+ *                 against some side-channel attacks.
+ *
+ * \warning        It is deprecated and a security risk to not provide
+ *                 a PRNG here and thereby prevent the use of blinding.
+ *                 Future versions of the library may enforce the presence
+ *                 of a PRNG.
+ *
  */
 int mbedtls_rsa_private( mbedtls_rsa_context *ctx,
                  int (*f_rng)(void *, unsigned char *, size_t),
@@ -807,6 +848,7 @@ int mbedtls_rsa_rsaes_oaep_decrypt( mbedtls_rsa_context *ctx,
  *
  * \note           The \p sig buffer must be as large as the size
  *                 of \p ctx->N. For example, 128 Bytes if RSA-1024 is used.
+ *                 A buffer length of #MBEDTLS_MPI_MAX_SIZE is always safe.
  *
  * \note           For PKCS#1 v2.1 encoding, see comments on
  *                 mbedtls_rsa_rsassa_pss_sign() for details on
@@ -850,6 +892,7 @@ int mbedtls_rsa_pkcs1_sign( mbedtls_rsa_context *ctx,
  *
  * \note           The \p sig buffer must be as large as the size
  *                 of \p ctx->N. For example, 128 Bytes if RSA-1024 is used.
+ *                 A buffer length of #MBEDTLS_MPI_MAX_SIZE is always safe.
  */
 int mbedtls_rsa_rsassa_pkcs1_v15_sign( mbedtls_rsa_context *ctx,
                                int (*f_rng)(void *, unsigned char *, size_t),
@@ -890,6 +933,7 @@ int mbedtls_rsa_rsassa_pkcs1_v15_sign( mbedtls_rsa_context *ctx,
  *
  * \note           The \p sig buffer must be as large as the size
  *                 of \p ctx->N. For example, 128 Bytes if RSA-1024 is used.
+ *                 A buffer length of #MBEDTLS_MPI_MAX_SIZE is always safe.
  *
  * \note           The \p hash_id in the RSA context is the one used for the
  *                 encoding. \p md_alg in the function call is the type of hash

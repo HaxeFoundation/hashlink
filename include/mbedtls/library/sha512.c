@@ -1,8 +1,14 @@
 /*
  *  FIPS-180-2 compliant SHA-384/512 implementation
  *
- *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
- *  SPDX-License-Identifier: Apache-2.0
+ *  Copyright The Mbed TLS Contributors
+ *  SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+ *
+ *  This file is provided under the Apache License 2.0, or the
+ *  GNU General Public License v2.0 or later.
+ *
+ *  **********
+ *  Apache License 2.0:
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may
  *  not use this file except in compliance with the License.
@@ -16,7 +22,26 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  This file is part of mbed TLS (https://tls.mbed.org)
+ *  **********
+ *
+ *  **********
+ *  GNU General Public License v2.0 or later:
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ *  **********
  */
 /*
  *  The SHA-512 Secure Hash Standard was published by NIST in 2002.
@@ -149,6 +174,14 @@ int mbedtls_sha512_starts_ret( mbedtls_sha512_context *ctx, int is384 )
     return( 0 );
 }
 
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha512_starts( mbedtls_sha512_context *ctx,
+                            int is384 )
+{
+    mbedtls_sha512_starts_ret( ctx, is384 );
+}
+#endif
+
 #if !defined(MBEDTLS_SHA512_PROCESS_ALT)
 
 /*
@@ -202,8 +235,11 @@ int mbedtls_internal_sha512_process( mbedtls_sha512_context *ctx,
                                      const unsigned char data[128] )
 {
     int i;
-    uint64_t temp1, temp2, W[80];
-    uint64_t A, B, C, D, E, F, G, H;
+    struct
+    {
+        uint64_t temp1, temp2, W[80];
+        uint64_t A, B, C, D, E, F, G, H;
+    } local;
 
 #define  SHR(x,n) (x >> n)
 #define ROTR(x,n) (SHR(x,n) | (x << (64 - n)))
@@ -217,58 +253,77 @@ int mbedtls_internal_sha512_process( mbedtls_sha512_context *ctx,
 #define F0(x,y,z) ((x & y) | (z & (x | y)))
 #define F1(x,y,z) (z ^ (x & (y ^ z)))
 
-#define P(a,b,c,d,e,f,g,h,x,K)                  \
-{                                               \
-    temp1 = h + S3(e) + F1(e,f,g) + K + x;      \
-    temp2 = S2(a) + F0(a,b,c);                  \
-    d += temp1; h = temp1 + temp2;              \
+#define P(a,b,c,d,e,f,g,h,x,K)                        \
+{                                                     \
+    local.temp1 = h + S3(e) + F1(e,f,g) + K + x;      \
+    local.temp2 = S2(a) + F0(a,b,c);                  \
+    d += local.temp1; h = local.temp1 + local.temp2;  \
 }
 
     for( i = 0; i < 16; i++ )
     {
-        GET_UINT64_BE( W[i], data, i << 3 );
+        GET_UINT64_BE( local.W[i], data, i << 3 );
     }
 
     for( ; i < 80; i++ )
     {
-        W[i] = S1(W[i -  2]) + W[i -  7] +
-               S0(W[i - 15]) + W[i - 16];
+        local.W[i] = S1(local.W[i -  2]) + local.W[i -  7] +
+                     S0(local.W[i - 15]) + local.W[i - 16];
     }
 
-    A = ctx->state[0];
-    B = ctx->state[1];
-    C = ctx->state[2];
-    D = ctx->state[3];
-    E = ctx->state[4];
-    F = ctx->state[5];
-    G = ctx->state[6];
-    H = ctx->state[7];
+    local.A = ctx->state[0];
+    local.B = ctx->state[1];
+    local.C = ctx->state[2];
+    local.D = ctx->state[3];
+    local.E = ctx->state[4];
+    local.F = ctx->state[5];
+    local.G = ctx->state[6];
+    local.H = ctx->state[7];
     i = 0;
 
     do
     {
-        P( A, B, C, D, E, F, G, H, W[i], K[i] ); i++;
-        P( H, A, B, C, D, E, F, G, W[i], K[i] ); i++;
-        P( G, H, A, B, C, D, E, F, W[i], K[i] ); i++;
-        P( F, G, H, A, B, C, D, E, W[i], K[i] ); i++;
-        P( E, F, G, H, A, B, C, D, W[i], K[i] ); i++;
-        P( D, E, F, G, H, A, B, C, W[i], K[i] ); i++;
-        P( C, D, E, F, G, H, A, B, W[i], K[i] ); i++;
-        P( B, C, D, E, F, G, H, A, W[i], K[i] ); i++;
+        P( local.A, local.B, local.C, local.D, local.E,
+           local.F, local.G, local.H, local.W[i], K[i] ); i++;
+        P( local.H, local.A, local.B, local.C, local.D,
+           local.E, local.F, local.G, local.W[i], K[i] ); i++;
+        P( local.G, local.H, local.A, local.B, local.C,
+           local.D, local.E, local.F, local.W[i], K[i] ); i++;
+        P( local.F, local.G, local.H, local.A, local.B,
+           local.C, local.D, local.E, local.W[i], K[i] ); i++;
+        P( local.E, local.F, local.G, local.H, local.A,
+           local.B, local.C, local.D, local.W[i], K[i] ); i++;
+        P( local.D, local.E, local.F, local.G, local.H,
+           local.A, local.B, local.C, local.W[i], K[i] ); i++;
+        P( local.C, local.D, local.E, local.F, local.G,
+           local.H, local.A, local.B, local.W[i], K[i] ); i++;
+        P( local.B, local.C, local.D, local.E, local.F,
+           local.G, local.H, local.A, local.W[i], K[i] ); i++;
     }
     while( i < 80 );
 
-    ctx->state[0] += A;
-    ctx->state[1] += B;
-    ctx->state[2] += C;
-    ctx->state[3] += D;
-    ctx->state[4] += E;
-    ctx->state[5] += F;
-    ctx->state[6] += G;
-    ctx->state[7] += H;
+    ctx->state[0] += local.A;
+    ctx->state[1] += local.B;
+    ctx->state[2] += local.C;
+    ctx->state[3] += local.D;
+    ctx->state[4] += local.E;
+    ctx->state[5] += local.F;
+    ctx->state[6] += local.G;
+    ctx->state[7] += local.H;
+
+    /* Zeroise buffers and variables to clear sensitive data from memory. */
+    mbedtls_zeroize( &local, sizeof( local ) );
 
     return( 0 );
 }
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha512_process( mbedtls_sha512_context *ctx,
+                             const unsigned char data[128] )
+{
+    mbedtls_internal_sha512_process( ctx, data );
+}
+#endif
 #endif /* !MBEDTLS_SHA512_PROCESS_ALT */
 
 /*
@@ -320,17 +375,14 @@ int mbedtls_sha512_update_ret( mbedtls_sha512_context *ctx,
     return( 0 );
 }
 
-static const unsigned char sha512_padding[128] =
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha512_update( mbedtls_sha512_context *ctx,
+                            const unsigned char *input,
+                            size_t ilen )
 {
- 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
+    mbedtls_sha512_update_ret( ctx, input, ilen );
+}
+#endif
 
 /*
  * SHA-512 final digest
@@ -339,26 +391,48 @@ int mbedtls_sha512_finish_ret( mbedtls_sha512_context *ctx,
                                unsigned char output[64] )
 {
     int ret;
-    size_t last, padn;
+    unsigned used;
     uint64_t high, low;
-    unsigned char msglen[16];
 
+    /*
+     * Add padding: 0x80 then 0x00 until 16 bytes remain for the length
+     */
+    used = ctx->total[0] & 0x7F;
+
+    ctx->buffer[used++] = 0x80;
+
+    if( used <= 112 )
+    {
+        /* Enough room for padding + length in current block */
+        memset( ctx->buffer + used, 0, 112 - used );
+    }
+    else
+    {
+        /* We'll need an extra block */
+        memset( ctx->buffer + used, 0, 128 - used );
+
+        if( ( ret = mbedtls_internal_sha512_process( ctx, ctx->buffer ) ) != 0 )
+            return( ret );
+
+        memset( ctx->buffer, 0, 112 );
+    }
+
+    /*
+     * Add message length
+     */
     high = ( ctx->total[0] >> 61 )
          | ( ctx->total[1] <<  3 );
     low  = ( ctx->total[0] <<  3 );
 
-    PUT_UINT64_BE( high, msglen, 0 );
-    PUT_UINT64_BE( low,  msglen, 8 );
+    PUT_UINT64_BE( high, ctx->buffer, 112 );
+    PUT_UINT64_BE( low,  ctx->buffer, 120 );
 
-    last = (size_t)( ctx->total[0] & 0x7F );
-    padn = ( last < 112 ) ? ( 112 - last ) : ( 240 - last );
+    if( ( ret = mbedtls_internal_sha512_process( ctx, ctx->buffer ) ) != 0 )
+        return( ret );
 
-    if( ( ret = mbedtls_sha512_update_ret( ctx, sha512_padding, padn ) ) != 0 )
-            return( ret );
-
-    if( ( ret = mbedtls_sha512_update_ret( ctx, msglen, 16 ) ) != 0 )
-            return( ret );
-
+    /*
+     * Output final state
+     */
     PUT_UINT64_BE( ctx->state[0], output,  0 );
     PUT_UINT64_BE( ctx->state[1], output,  8 );
     PUT_UINT64_BE( ctx->state[2], output, 16 );
@@ -374,6 +448,14 @@ int mbedtls_sha512_finish_ret( mbedtls_sha512_context *ctx,
 
     return( 0 );
 }
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha512_finish( mbedtls_sha512_context *ctx,
+                            unsigned char output[64] )
+{
+    mbedtls_sha512_finish_ret( ctx, output );
+}
+#endif
 
 #endif /* !MBEDTLS_SHA512_ALT */
 
@@ -404,6 +486,16 @@ exit:
 
     return( ret );
 }
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha512( const unsigned char *input,
+                     size_t ilen,
+                     unsigned char output[64],
+                     int is384 )
+{
+    mbedtls_sha512_ret( input, ilen, output, is384 );
+}
+#endif
 
 #if defined(MBEDTLS_SELF_TEST)
 

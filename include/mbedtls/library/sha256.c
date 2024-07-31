@@ -1,8 +1,14 @@
 /*
  *  FIPS-180-2 compliant SHA-256 implementation
  *
- *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
- *  SPDX-License-Identifier: Apache-2.0
+ *  Copyright The Mbed TLS Contributors
+ *  SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+ *
+ *  This file is provided under the Apache License 2.0, or the
+ *  GNU General Public License v2.0 or later.
+ *
+ *  **********
+ *  Apache License 2.0:
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may
  *  not use this file except in compliance with the License.
@@ -16,7 +22,26 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  This file is part of mbed TLS (https://tls.mbed.org)
+ *  **********
+ *
+ *  **********
+ *  GNU General Public License v2.0 or later:
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ *  **********
  */
 /*
  *  The SHA-256 Secure Hash Standard was published by NIST in 2002.
@@ -135,6 +160,14 @@ int mbedtls_sha256_starts_ret( mbedtls_sha256_context *ctx, int is224 )
     return( 0 );
 }
 
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha256_starts( mbedtls_sha256_context *ctx,
+                            int is224 )
+{
+    mbedtls_sha256_starts_ret( ctx, is224 );
+}
+#endif
+
 #if !defined(MBEDTLS_SHA256_PROCESS_ALT)
 static const uint32_t K[] =
 {
@@ -168,76 +201,111 @@ static const uint32_t K[] =
 #define F0(x,y,z) ((x & y) | (z & (x | y)))
 #define F1(x,y,z) (z ^ (x & (y ^ z)))
 
-#define R(t)                                    \
-(                                               \
-    W[t] = S1(W[t -  2]) + W[t -  7] +          \
-           S0(W[t - 15]) + W[t - 16]            \
+#define R(t)                                                        \
+(                                                                   \
+    local.W[t] = S1(local.W[t -  2]) + local.W[t -  7] +            \
+                 S0(local.W[t - 15]) + local.W[t - 16]              \
 )
 
-#define P(a,b,c,d,e,f,g,h,x,K)                  \
-{                                               \
-    temp1 = h + S3(e) + F1(e,f,g) + K + x;      \
-    temp2 = S2(a) + F0(a,b,c);                  \
-    d += temp1; h = temp1 + temp2;              \
+#define P(a,b,c,d,e,f,g,h,x,K)                                      \
+{                                                                   \
+    local.temp1 = h + S3(e) + F1(e,f,g) + K + x;                    \
+    local.temp2 = S2(a) + F0(a,b,c);                                \
+    d += local.temp1; h = local.temp1 + local.temp2;                \
 }
 
 int mbedtls_internal_sha256_process( mbedtls_sha256_context *ctx,
                                 const unsigned char data[64] )
 {
-    uint32_t temp1, temp2, W[64];
-    uint32_t A[8];
+    struct
+    {
+        uint32_t temp1, temp2, W[64];
+        uint32_t A[8];
+    } local;
+
     unsigned int i;
 
     for( i = 0; i < 8; i++ )
-        A[i] = ctx->state[i];
+        local.A[i] = ctx->state[i];
 
 #if defined(MBEDTLS_SHA256_SMALLER)
     for( i = 0; i < 64; i++ )
     {
         if( i < 16 )
-            GET_UINT32_BE( W[i], data, 4 * i );
+            GET_UINT32_BE( local.W[i], data, 4 * i );
         else
             R( i );
 
-        P( A[0], A[1], A[2], A[3], A[4], A[5], A[6], A[7], W[i], K[i] );
+        P( local.A[0], local.A[1], local.A[2], local.A[3], local.A[4],
+           local.A[5], local.A[6], local.A[7], local.W[i], K[i] );
 
-        temp1 = A[7]; A[7] = A[6]; A[6] = A[5]; A[5] = A[4]; A[4] = A[3];
-        A[3] = A[2]; A[2] = A[1]; A[1] = A[0]; A[0] = temp1;
+        local.temp1 = local.A[7]; local.A[7] = local.A[6];
+        local.A[6] = local.A[5]; local.A[5] = local.A[4];
+        local.A[4] = local.A[3]; local.A[3] = local.A[2];
+        local.A[2] = local.A[1]; local.A[1] = local.A[0];
+        local.A[0] = local.temp1;
     }
 #else /* MBEDTLS_SHA256_SMALLER */
     for( i = 0; i < 16; i++ )
-        GET_UINT32_BE( W[i], data, 4 * i );
+        GET_UINT32_BE( local.W[i], data, 4 * i );
 
     for( i = 0; i < 16; i += 8 )
     {
-        P( A[0], A[1], A[2], A[3], A[4], A[5], A[6], A[7], W[i+0], K[i+0] );
-        P( A[7], A[0], A[1], A[2], A[3], A[4], A[5], A[6], W[i+1], K[i+1] );
-        P( A[6], A[7], A[0], A[1], A[2], A[3], A[4], A[5], W[i+2], K[i+2] );
-        P( A[5], A[6], A[7], A[0], A[1], A[2], A[3], A[4], W[i+3], K[i+3] );
-        P( A[4], A[5], A[6], A[7], A[0], A[1], A[2], A[3], W[i+4], K[i+4] );
-        P( A[3], A[4], A[5], A[6], A[7], A[0], A[1], A[2], W[i+5], K[i+5] );
-        P( A[2], A[3], A[4], A[5], A[6], A[7], A[0], A[1], W[i+6], K[i+6] );
-        P( A[1], A[2], A[3], A[4], A[5], A[6], A[7], A[0], W[i+7], K[i+7] );
+        P( local.A[0], local.A[1], local.A[2], local.A[3], local.A[4],
+           local.A[5], local.A[6], local.A[7], local.W[i+0], K[i+0] );
+        P( local.A[7], local.A[0], local.A[1], local.A[2], local.A[3],
+           local.A[4], local.A[5], local.A[6], local.W[i+1], K[i+1] );
+        P( local.A[6], local.A[7], local.A[0], local.A[1], local.A[2],
+           local.A[3], local.A[4], local.A[5], local.W[i+2], K[i+2] );
+        P( local.A[5], local.A[6], local.A[7], local.A[0], local.A[1],
+           local.A[2], local.A[3], local.A[4], local.W[i+3], K[i+3] );
+        P( local.A[4], local.A[5], local.A[6], local.A[7], local.A[0],
+           local.A[1], local.A[2], local.A[3], local.W[i+4], K[i+4] );
+        P( local.A[3], local.A[4], local.A[5], local.A[6], local.A[7],
+           local.A[0], local.A[1], local.A[2], local.W[i+5], K[i+5] );
+        P( local.A[2], local.A[3], local.A[4], local.A[5], local.A[6],
+           local.A[7], local.A[0], local.A[1], local.W[i+6], K[i+6] );
+        P( local.A[1], local.A[2], local.A[3], local.A[4], local.A[5],
+           local.A[6], local.A[7], local.A[0], local.W[i+7], K[i+7] );
     }
 
     for( i = 16; i < 64; i += 8 )
     {
-        P( A[0], A[1], A[2], A[3], A[4], A[5], A[6], A[7], R(i+0), K[i+0] );
-        P( A[7], A[0], A[1], A[2], A[3], A[4], A[5], A[6], R(i+1), K[i+1] );
-        P( A[6], A[7], A[0], A[1], A[2], A[3], A[4], A[5], R(i+2), K[i+2] );
-        P( A[5], A[6], A[7], A[0], A[1], A[2], A[3], A[4], R(i+3), K[i+3] );
-        P( A[4], A[5], A[6], A[7], A[0], A[1], A[2], A[3], R(i+4), K[i+4] );
-        P( A[3], A[4], A[5], A[6], A[7], A[0], A[1], A[2], R(i+5), K[i+5] );
-        P( A[2], A[3], A[4], A[5], A[6], A[7], A[0], A[1], R(i+6), K[i+6] );
-        P( A[1], A[2], A[3], A[4], A[5], A[6], A[7], A[0], R(i+7), K[i+7] );
+        P( local.A[0], local.A[1], local.A[2], local.A[3], local.A[4],
+           local.A[5], local.A[6], local.A[7], R(i+0), K[i+0] );
+        P( local.A[7], local.A[0], local.A[1], local.A[2], local.A[3],
+           local.A[4], local.A[5], local.A[6], R(i+1), K[i+1] );
+        P( local.A[6], local.A[7], local.A[0], local.A[1], local.A[2],
+           local.A[3], local.A[4], local.A[5], R(i+2), K[i+2] );
+        P( local.A[5], local.A[6], local.A[7], local.A[0], local.A[1],
+           local.A[2], local.A[3], local.A[4], R(i+3), K[i+3] );
+        P( local.A[4], local.A[5], local.A[6], local.A[7], local.A[0],
+           local.A[1], local.A[2], local.A[3], R(i+4), K[i+4] );
+        P( local.A[3], local.A[4], local.A[5], local.A[6], local.A[7],
+           local.A[0], local.A[1], local.A[2], R(i+5), K[i+5] );
+        P( local.A[2], local.A[3], local.A[4], local.A[5], local.A[6],
+           local.A[7], local.A[0], local.A[1], R(i+6), K[i+6] );
+        P( local.A[1], local.A[2], local.A[3], local.A[4], local.A[5],
+           local.A[6], local.A[7], local.A[0], R(i+7), K[i+7] );
     }
 #endif /* MBEDTLS_SHA256_SMALLER */
 
     for( i = 0; i < 8; i++ )
-        ctx->state[i] += A[i];
+        ctx->state[i] += local.A[i];
+
+    /* Zeroise buffers and variables to clear sensitive data from memory. */
+    mbedtls_zeroize( &local, sizeof( local ) );
 
     return( 0 );
 }
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha256_process( mbedtls_sha256_context *ctx,
+                             const unsigned char data[64] )
+{
+    mbedtls_internal_sha256_process( ctx, data );
+}
+#endif
 #endif /* !MBEDTLS_SHA256_PROCESS_ALT */
 
 /*
@@ -290,13 +358,14 @@ int mbedtls_sha256_update_ret( mbedtls_sha256_context *ctx,
     return( 0 );
 }
 
-static const unsigned char sha256_padding[64] =
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha256_update( mbedtls_sha256_context *ctx,
+                            const unsigned char *input,
+                            size_t ilen )
 {
- 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
+    mbedtls_sha256_update_ret( ctx, input, ilen );
+}
+#endif
 
 /*
  * SHA-256 final digest
@@ -305,26 +374,48 @@ int mbedtls_sha256_finish_ret( mbedtls_sha256_context *ctx,
                                unsigned char output[32] )
 {
     int ret;
-    uint32_t last, padn;
+    uint32_t used;
     uint32_t high, low;
-    unsigned char msglen[8];
 
+    /*
+     * Add padding: 0x80 then 0x00 until 8 bytes remain for the length
+     */
+    used = ctx->total[0] & 0x3F;
+
+    ctx->buffer[used++] = 0x80;
+
+    if( used <= 56 )
+    {
+        /* Enough room for padding + length in current block */
+        memset( ctx->buffer + used, 0, 56 - used );
+    }
+    else
+    {
+        /* We'll need an extra block */
+        memset( ctx->buffer + used, 0, 64 - used );
+
+        if( ( ret = mbedtls_internal_sha256_process( ctx, ctx->buffer ) ) != 0 )
+            return( ret );
+
+        memset( ctx->buffer, 0, 56 );
+    }
+
+    /*
+     * Add message length
+     */
     high = ( ctx->total[0] >> 29 )
          | ( ctx->total[1] <<  3 );
     low  = ( ctx->total[0] <<  3 );
 
-    PUT_UINT32_BE( high, msglen, 0 );
-    PUT_UINT32_BE( low,  msglen, 4 );
+    PUT_UINT32_BE( high, ctx->buffer, 56 );
+    PUT_UINT32_BE( low,  ctx->buffer, 60 );
 
-    last = ctx->total[0] & 0x3F;
-    padn = ( last < 56 ) ? ( 56 - last ) : ( 120 - last );
-
-    if( ( ret = mbedtls_sha256_update_ret( ctx, sha256_padding, padn ) ) != 0 )
+    if( ( ret = mbedtls_internal_sha256_process( ctx, ctx->buffer ) ) != 0 )
         return( ret );
 
-    if( ( ret = mbedtls_sha256_update_ret( ctx, msglen, 8 ) ) != 0 )
-        return( ret );
-
+    /*
+     * Output final state
+     */
     PUT_UINT32_BE( ctx->state[0], output,  0 );
     PUT_UINT32_BE( ctx->state[1], output,  4 );
     PUT_UINT32_BE( ctx->state[2], output,  8 );
@@ -338,6 +429,14 @@ int mbedtls_sha256_finish_ret( mbedtls_sha256_context *ctx,
 
     return( 0 );
 }
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha256_finish( mbedtls_sha256_context *ctx,
+                            unsigned char output[32] )
+{
+    mbedtls_sha256_finish_ret( ctx, output );
+}
+#endif
 
 #endif /* !MBEDTLS_SHA256_ALT */
 
@@ -368,6 +467,16 @@ exit:
 
     return( ret );
 }
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+void mbedtls_sha256( const unsigned char *input,
+                     size_t ilen,
+                     unsigned char output[32],
+                     int is224 )
+{
+    mbedtls_sha256_ret( input, ilen, output, is224 );
+}
+#endif
 
 #if defined(MBEDTLS_SELF_TEST)
 /*

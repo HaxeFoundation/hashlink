@@ -4,8 +4,14 @@
  * \brief Public Key abstraction layer
  */
 /*
- *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
- *  SPDX-License-Identifier: Apache-2.0
+ *  Copyright The Mbed TLS Contributors
+ *  SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+ *
+ *  This file is provided under the Apache License 2.0, or the
+ *  GNU General Public License v2.0 or later.
+ *
+ *  **********
+ *  Apache License 2.0:
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may
  *  not use this file except in compliance with the License.
@@ -19,7 +25,26 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  This file is part of mbed TLS (https://tls.mbed.org)
+ *  **********
+ *
+ *  **********
+ *  GNU General Public License v2.0 or later:
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ *  **********
  */
 
 #ifndef MBEDTLS_PK_H
@@ -63,7 +88,7 @@
 #define MBEDTLS_ERR_PK_INVALID_ALG         -0x3A80  /**< The algorithm tag or value is invalid. */
 #define MBEDTLS_ERR_PK_UNKNOWN_NAMED_CURVE -0x3A00  /**< Elliptic curve is unsupported (only NIST curves are supported). */
 #define MBEDTLS_ERR_PK_FEATURE_UNAVAILABLE -0x3980  /**< Unavailable feature, e.g. RSA disabled for RSA key. */
-#define MBEDTLS_ERR_PK_SIG_LEN_MISMATCH    -0x3900  /**< The signature is valid but its length is less than expected. */
+#define MBEDTLS_ERR_PK_SIG_LEN_MISMATCH    -0x3900  /**< The buffer contains a valid signature followed by more data. */
 #define MBEDTLS_ERR_PK_HW_ACCEL_FAILED     -0x3880  /**< PK hardware accelerator failed. */
 
 #ifdef __cplusplus
@@ -269,8 +294,8 @@ int mbedtls_pk_can_do( const mbedtls_pk_context *ctx, mbedtls_pk_type_t type );
  * \param sig_len   Signature length
  *
  * \return          0 on success (signature is valid),
- *                  MBEDTLS_ERR_PK_SIG_LEN_MISMATCH if the signature is
- *                  valid but its actual length is less than sig_len,
+ *                  #MBEDTLS_ERR_PK_SIG_LEN_MISMATCH if there is a valid
+ *                  signature in sig but its length is less than \p siglen,
  *                  or a specific error code.
  *
  * \note            For RSA keys, the default padding type is PKCS#1 v1.5.
@@ -300,10 +325,10 @@ int mbedtls_pk_verify( mbedtls_pk_context *ctx, mbedtls_md_type_t md_alg,
  * \param sig_len   Signature length
  *
  * \return          0 on success (signature is valid),
- *                  MBEDTLS_ERR_PK_TYPE_MISMATCH if the PK context can't be
+ *                  #MBEDTLS_ERR_PK_TYPE_MISMATCH if the PK context can't be
  *                  used for this type of signatures,
- *                  MBEDTLS_ERR_PK_SIG_LEN_MISMATCH if the signature is
- *                  valid but its actual length is less than sig_len,
+ *                  #MBEDTLS_ERR_PK_SIG_LEN_MISMATCH if there is a valid
+ *                  signature in sig but its length is less than \p siglen,
  *                  or a specific error code.
  *
  * \note            If hash_len is 0, then the length associated with md_alg
@@ -343,6 +368,10 @@ int mbedtls_pk_verify_ext( mbedtls_pk_type_t type, const void *options,
  *
  * \note            For RSA, md_alg may be MBEDTLS_MD_NONE if hash_len != 0.
  *                  For ECDSA, md_alg may never be MBEDTLS_MD_NONE.
+ *
+ * \note            In order to ensure enough space for the signature, the
+ *                  \p sig buffer size must be of at least
+ *                  `max(MBEDTLS_ECDSA_MAX_LEN, MBEDTLS_MPI_MAX_SIZE)` bytes.
  */
 int mbedtls_pk_sign( mbedtls_pk_context *ctx, mbedtls_md_type_t md_alg,
              const unsigned char *hash, size_t hash_len,
