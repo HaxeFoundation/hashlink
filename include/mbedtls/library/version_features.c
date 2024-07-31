@@ -3,52 +3,9 @@
  *
  *  Copyright The Mbed TLS Contributors
  *  SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
- *
- *  This file is provided under the Apache License 2.0, or the
- *  GNU General Public License v2.0 or later.
- *
- *  **********
- *  Apache License 2.0:
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may
- *  not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *  http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- *  **********
- *
- *  **********
- *  GNU General Public License v2.0 or later:
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- *  **********
  */
 
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "mbedtls/config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
+#include "common.h"
 
 #if defined(MBEDTLS_VERSION_C)
 
@@ -56,14 +13,17 @@
 
 #include <string.h>
 
-static const char *features[] = {
+static const char * const features[] = {
 #if defined(MBEDTLS_VERSION_FEATURES)
-#if defined(MBEDTLS_HAVE_ASM)
+    #if defined(MBEDTLS_HAVE_ASM)
     "MBEDTLS_HAVE_ASM",
 #endif /* MBEDTLS_HAVE_ASM */
 #if defined(MBEDTLS_NO_UDBL_DIVISION)
     "MBEDTLS_NO_UDBL_DIVISION",
 #endif /* MBEDTLS_NO_UDBL_DIVISION */
+#if defined(MBEDTLS_NO_64BIT_MULTIPLICATION)
+    "MBEDTLS_NO_64BIT_MULTIPLICATION",
+#endif /* MBEDTLS_NO_64BIT_MULTIPLICATION */
 #if defined(MBEDTLS_HAVE_SSE2)
     "MBEDTLS_HAVE_SSE2",
 #endif /* MBEDTLS_HAVE_SSE2 */
@@ -94,18 +54,33 @@ static const char *features[] = {
 #if defined(MBEDTLS_PLATFORM_SNPRINTF_ALT)
     "MBEDTLS_PLATFORM_SNPRINTF_ALT",
 #endif /* MBEDTLS_PLATFORM_SNPRINTF_ALT */
+#if defined(MBEDTLS_PLATFORM_VSNPRINTF_ALT)
+    "MBEDTLS_PLATFORM_VSNPRINTF_ALT",
+#endif /* MBEDTLS_PLATFORM_VSNPRINTF_ALT */
 #if defined(MBEDTLS_PLATFORM_NV_SEED_ALT)
     "MBEDTLS_PLATFORM_NV_SEED_ALT",
 #endif /* MBEDTLS_PLATFORM_NV_SEED_ALT */
 #if defined(MBEDTLS_PLATFORM_SETUP_TEARDOWN_ALT)
     "MBEDTLS_PLATFORM_SETUP_TEARDOWN_ALT",
 #endif /* MBEDTLS_PLATFORM_SETUP_TEARDOWN_ALT */
+#if defined(MBEDTLS_PLATFORM_GMTIME_R_ALT)
+    "MBEDTLS_PLATFORM_GMTIME_R_ALT",
+#endif /* MBEDTLS_PLATFORM_GMTIME_R_ALT */
+#if defined(MBEDTLS_PLATFORM_ZEROIZE_ALT)
+    "MBEDTLS_PLATFORM_ZEROIZE_ALT",
+#endif /* MBEDTLS_PLATFORM_ZEROIZE_ALT */
 #if defined(MBEDTLS_DEPRECATED_WARNING)
     "MBEDTLS_DEPRECATED_WARNING",
 #endif /* MBEDTLS_DEPRECATED_WARNING */
 #if defined(MBEDTLS_DEPRECATED_REMOVED)
     "MBEDTLS_DEPRECATED_REMOVED",
 #endif /* MBEDTLS_DEPRECATED_REMOVED */
+#if defined(MBEDTLS_CHECK_PARAMS)
+    "MBEDTLS_CHECK_PARAMS",
+#endif /* MBEDTLS_CHECK_PARAMS */
+#if defined(MBEDTLS_CHECK_PARAMS_ASSERT)
+    "MBEDTLS_CHECK_PARAMS_ASSERT",
+#endif /* MBEDTLS_CHECK_PARAMS_ASSERT */
 #if defined(MBEDTLS_TIMING_ALT)
     "MBEDTLS_TIMING_ALT",
 #endif /* MBEDTLS_TIMING_ALT */
@@ -115,6 +90,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_ARC4_ALT)
     "MBEDTLS_ARC4_ALT",
 #endif /* MBEDTLS_ARC4_ALT */
+#if defined(MBEDTLS_ARIA_ALT)
+    "MBEDTLS_ARIA_ALT",
+#endif /* MBEDTLS_ARIA_ALT */
 #if defined(MBEDTLS_BLOWFISH_ALT)
     "MBEDTLS_BLOWFISH_ALT",
 #endif /* MBEDTLS_BLOWFISH_ALT */
@@ -124,6 +102,12 @@ static const char *features[] = {
 #if defined(MBEDTLS_CCM_ALT)
     "MBEDTLS_CCM_ALT",
 #endif /* MBEDTLS_CCM_ALT */
+#if defined(MBEDTLS_CHACHA20_ALT)
+    "MBEDTLS_CHACHA20_ALT",
+#endif /* MBEDTLS_CHACHA20_ALT */
+#if defined(MBEDTLS_CHACHAPOLY_ALT)
+    "MBEDTLS_CHACHAPOLY_ALT",
+#endif /* MBEDTLS_CHACHAPOLY_ALT */
 #if defined(MBEDTLS_CMAC_ALT)
     "MBEDTLS_CMAC_ALT",
 #endif /* MBEDTLS_CMAC_ALT */
@@ -139,6 +123,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_GCM_ALT)
     "MBEDTLS_GCM_ALT",
 #endif /* MBEDTLS_GCM_ALT */
+#if defined(MBEDTLS_NIST_KW_ALT)
+    "MBEDTLS_NIST_KW_ALT",
+#endif /* MBEDTLS_NIST_KW_ALT */
 #if defined(MBEDTLS_MD2_ALT)
     "MBEDTLS_MD2_ALT",
 #endif /* MBEDTLS_MD2_ALT */
@@ -148,6 +135,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_MD5_ALT)
     "MBEDTLS_MD5_ALT",
 #endif /* MBEDTLS_MD5_ALT */
+#if defined(MBEDTLS_POLY1305_ALT)
+    "MBEDTLS_POLY1305_ALT",
+#endif /* MBEDTLS_POLY1305_ALT */
 #if defined(MBEDTLS_RIPEMD160_ALT)
     "MBEDTLS_RIPEMD160_ALT",
 #endif /* MBEDTLS_RIPEMD160_ALT */
@@ -229,6 +219,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_ECP_INTERNAL_ALT)
     "MBEDTLS_ECP_INTERNAL_ALT",
 #endif /* MBEDTLS_ECP_INTERNAL_ALT */
+#if defined(MBEDTLS_ECP_NO_FALLBACK)
+    "MBEDTLS_ECP_NO_FALLBACK",
+#endif /* MBEDTLS_ECP_NO_FALLBACK */
 #if defined(MBEDTLS_ECP_RANDOMIZE_JAC_ALT)
     "MBEDTLS_ECP_RANDOMIZE_JAC_ALT",
 #endif /* MBEDTLS_ECP_RANDOMIZE_JAC_ALT */
@@ -253,12 +246,6 @@ static const char *features[] = {
 #if defined(MBEDTLS_ECP_NORMALIZE_MXZ_ALT)
     "MBEDTLS_ECP_NORMALIZE_MXZ_ALT",
 #endif /* MBEDTLS_ECP_NORMALIZE_MXZ_ALT */
-#if defined(MBEDTLS_TEST_CONSTANT_FLOW_MEMSAN)
-    "MBEDTLS_TEST_CONSTANT_FLOW_MEMSAN",
-#endif /* MBEDTLS_TEST_CONSTANT_FLOW_MEMSAN */
-#if defined(MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND)
-    "MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND",
-#endif /* MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND */
 #if defined(MBEDTLS_TEST_NULL_ENTROPY)
     "MBEDTLS_TEST_NULL_ENTROPY",
 #endif /* MBEDTLS_TEST_NULL_ENTROPY */
@@ -268,9 +255,15 @@ static const char *features[] = {
 #if defined(MBEDTLS_AES_ROM_TABLES)
     "MBEDTLS_AES_ROM_TABLES",
 #endif /* MBEDTLS_AES_ROM_TABLES */
+#if defined(MBEDTLS_AES_FEWER_TABLES)
+    "MBEDTLS_AES_FEWER_TABLES",
+#endif /* MBEDTLS_AES_FEWER_TABLES */
 #if defined(MBEDTLS_CAMELLIA_SMALL_MEMORY)
     "MBEDTLS_CAMELLIA_SMALL_MEMORY",
 #endif /* MBEDTLS_CAMELLIA_SMALL_MEMORY */
+#if defined(MBEDTLS_CHECK_RETURN_WARNING)
+    "MBEDTLS_CHECK_RETURN_WARNING",
+#endif /* MBEDTLS_CHECK_RETURN_WARNING */
 #if defined(MBEDTLS_CIPHER_MODE_CBC)
     "MBEDTLS_CIPHER_MODE_CBC",
 #endif /* MBEDTLS_CIPHER_MODE_CBC */
@@ -280,6 +273,12 @@ static const char *features[] = {
 #if defined(MBEDTLS_CIPHER_MODE_CTR)
     "MBEDTLS_CIPHER_MODE_CTR",
 #endif /* MBEDTLS_CIPHER_MODE_CTR */
+#if defined(MBEDTLS_CIPHER_MODE_OFB)
+    "MBEDTLS_CIPHER_MODE_OFB",
+#endif /* MBEDTLS_CIPHER_MODE_OFB */
+#if defined(MBEDTLS_CIPHER_MODE_XTS)
+    "MBEDTLS_CIPHER_MODE_XTS",
+#endif /* MBEDTLS_CIPHER_MODE_XTS */
 #if defined(MBEDTLS_CIPHER_NULL_CIPHER)
     "MBEDTLS_CIPHER_NULL_CIPHER",
 #endif /* MBEDTLS_CIPHER_NULL_CIPHER */
@@ -295,6 +294,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_CIPHER_PADDING_ZEROS)
     "MBEDTLS_CIPHER_PADDING_ZEROS",
 #endif /* MBEDTLS_CIPHER_PADDING_ZEROS */
+#if defined(MBEDTLS_CTR_DRBG_USE_128_BIT_KEY)
+    "MBEDTLS_CTR_DRBG_USE_128_BIT_KEY",
+#endif /* MBEDTLS_CTR_DRBG_USE_128_BIT_KEY */
 #if defined(MBEDTLS_ENABLE_WEAK_CIPHERSUITES)
     "MBEDTLS_ENABLE_WEAK_CIPHERSUITES",
 #endif /* MBEDTLS_ENABLE_WEAK_CIPHERSUITES */
@@ -304,6 +306,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_REMOVE_3DES_CIPHERSUITES)
     "MBEDTLS_REMOVE_3DES_CIPHERSUITES",
 #endif /* MBEDTLS_REMOVE_3DES_CIPHERSUITES */
+#if defined(MBEDTLS_ECDH_VARIANT_EVEREST_ENABLED)
+    "MBEDTLS_ECDH_VARIANT_EVEREST_ENABLED",
+#endif /* MBEDTLS_ECDH_VARIANT_EVEREST_ENABLED */
 #if defined(MBEDTLS_ECP_DP_SECP192R1_ENABLED)
     "MBEDTLS_ECP_DP_SECP192R1_ENABLED",
 #endif /* MBEDTLS_ECP_DP_SECP192R1_ENABLED */
@@ -340,12 +345,21 @@ static const char *features[] = {
 #if defined(MBEDTLS_ECP_DP_CURVE25519_ENABLED)
     "MBEDTLS_ECP_DP_CURVE25519_ENABLED",
 #endif /* MBEDTLS_ECP_DP_CURVE25519_ENABLED */
+#if defined(MBEDTLS_ECP_DP_CURVE448_ENABLED)
+    "MBEDTLS_ECP_DP_CURVE448_ENABLED",
+#endif /* MBEDTLS_ECP_DP_CURVE448_ENABLED */
 #if defined(MBEDTLS_ECP_NIST_OPTIM)
     "MBEDTLS_ECP_NIST_OPTIM",
 #endif /* MBEDTLS_ECP_NIST_OPTIM */
 #if defined(MBEDTLS_ECP_NO_INTERNAL_RNG)
     "MBEDTLS_ECP_NO_INTERNAL_RNG",
 #endif /* MBEDTLS_ECP_NO_INTERNAL_RNG */
+#if defined(MBEDTLS_ECP_RESTARTABLE)
+    "MBEDTLS_ECP_RESTARTABLE",
+#endif /* MBEDTLS_ECP_RESTARTABLE */
+#if defined(MBEDTLS_ECDH_LEGACY_CONTEXT)
+    "MBEDTLS_ECDH_LEGACY_CONTEXT",
+#endif /* MBEDTLS_ECDH_LEGACY_CONTEXT */
 #if defined(MBEDTLS_ECDSA_DETERMINISTIC)
     "MBEDTLS_ECDSA_DETERMINISTIC",
 #endif /* MBEDTLS_ECDSA_DETERMINISTIC */
@@ -406,6 +420,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_ENTROPY_NV_SEED)
     "MBEDTLS_ENTROPY_NV_SEED",
 #endif /* MBEDTLS_ENTROPY_NV_SEED */
+#if defined(MBEDTLS_PSA_CRYPTO_KEY_ID_ENCODES_OWNER)
+    "MBEDTLS_PSA_CRYPTO_KEY_ID_ENCODES_OWNER",
+#endif /* MBEDTLS_PSA_CRYPTO_KEY_ID_ENCODES_OWNER */
 #if defined(MBEDTLS_MEMORY_DEBUG)
     "MBEDTLS_MEMORY_DEBUG",
 #endif /* MBEDTLS_MEMORY_DEBUG */
@@ -421,6 +438,27 @@ static const char *features[] = {
 #if defined(MBEDTLS_PKCS1_V21)
     "MBEDTLS_PKCS1_V21",
 #endif /* MBEDTLS_PKCS1_V21 */
+#if defined(MBEDTLS_PSA_CRYPTO_BUILTIN_KEYS)
+    "MBEDTLS_PSA_CRYPTO_BUILTIN_KEYS",
+#endif /* MBEDTLS_PSA_CRYPTO_BUILTIN_KEYS */
+#if defined(MBEDTLS_PSA_CRYPTO_CLIENT)
+    "MBEDTLS_PSA_CRYPTO_CLIENT",
+#endif /* MBEDTLS_PSA_CRYPTO_CLIENT */
+#if defined(MBEDTLS_PSA_CRYPTO_DRIVERS)
+    "MBEDTLS_PSA_CRYPTO_DRIVERS",
+#endif /* MBEDTLS_PSA_CRYPTO_DRIVERS */
+#if defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
+    "MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG",
+#endif /* MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG */
+#if defined(MBEDTLS_PSA_CRYPTO_SPM)
+    "MBEDTLS_PSA_CRYPTO_SPM",
+#endif /* MBEDTLS_PSA_CRYPTO_SPM */
+#if defined(MBEDTLS_PSA_INJECT_ENTROPY)
+    "MBEDTLS_PSA_INJECT_ENTROPY",
+#endif /* MBEDTLS_PSA_INJECT_ENTROPY */
+#if defined(MBEDTLS_PSA_ASSUME_EXCLUSIVE_BUFFERS)
+    "MBEDTLS_PSA_ASSUME_EXCLUSIVE_BUFFERS",
+#endif /* MBEDTLS_PSA_ASSUME_EXCLUSIVE_BUFFERS */
 #if defined(MBEDTLS_RSA_NO_CRT)
     "MBEDTLS_RSA_NO_CRT",
 #endif /* MBEDTLS_RSA_NO_CRT */
@@ -430,9 +468,27 @@ static const char *features[] = {
 #if defined(MBEDTLS_SHA256_SMALLER)
     "MBEDTLS_SHA256_SMALLER",
 #endif /* MBEDTLS_SHA256_SMALLER */
+#if defined(MBEDTLS_SHA512_SMALLER)
+    "MBEDTLS_SHA512_SMALLER",
+#endif /* MBEDTLS_SHA512_SMALLER */
+#if defined(MBEDTLS_SHA512_NO_SHA384)
+    "MBEDTLS_SHA512_NO_SHA384",
+#endif /* MBEDTLS_SHA512_NO_SHA384 */
 #if defined(MBEDTLS_SSL_ALL_ALERT_MESSAGES)
     "MBEDTLS_SSL_ALL_ALERT_MESSAGES",
 #endif /* MBEDTLS_SSL_ALL_ALERT_MESSAGES */
+#if defined(MBEDTLS_SSL_RECORD_CHECKING)
+    "MBEDTLS_SSL_RECORD_CHECKING",
+#endif /* MBEDTLS_SSL_RECORD_CHECKING */
+#if defined(MBEDTLS_SSL_DTLS_CONNECTION_ID)
+    "MBEDTLS_SSL_DTLS_CONNECTION_ID",
+#endif /* MBEDTLS_SSL_DTLS_CONNECTION_ID */
+#if defined(MBEDTLS_SSL_ASYNC_PRIVATE)
+    "MBEDTLS_SSL_ASYNC_PRIVATE",
+#endif /* MBEDTLS_SSL_ASYNC_PRIVATE */
+#if defined(MBEDTLS_SSL_CONTEXT_SERIALIZATION)
+    "MBEDTLS_SSL_CONTEXT_SERIALIZATION",
+#endif /* MBEDTLS_SSL_CONTEXT_SERIALIZATION */
 #if defined(MBEDTLS_SSL_DEBUG_ALL)
     "MBEDTLS_SSL_DEBUG_ALL",
 #endif /* MBEDTLS_SSL_DEBUG_ALL */
@@ -445,6 +501,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_SSL_FALLBACK_SCSV)
     "MBEDTLS_SSL_FALLBACK_SCSV",
 #endif /* MBEDTLS_SSL_FALLBACK_SCSV */
+#if defined(MBEDTLS_SSL_KEEP_PEER_CERTIFICATE)
+    "MBEDTLS_SSL_KEEP_PEER_CERTIFICATE",
+#endif /* MBEDTLS_SSL_KEEP_PEER_CERTIFICATE */
 #if defined(MBEDTLS_SSL_HW_RECORD_ACCEL)
     "MBEDTLS_SSL_HW_RECORD_ACCEL",
 #endif /* MBEDTLS_SSL_HW_RECORD_ACCEL */
@@ -475,6 +534,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_SSL_PROTO_TLS1_2)
     "MBEDTLS_SSL_PROTO_TLS1_2",
 #endif /* MBEDTLS_SSL_PROTO_TLS1_2 */
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3_EXPERIMENTAL)
+    "MBEDTLS_SSL_PROTO_TLS1_3_EXPERIMENTAL",
+#endif /* MBEDTLS_SSL_PROTO_TLS1_3_EXPERIMENTAL */
 #if defined(MBEDTLS_SSL_PROTO_DTLS)
     "MBEDTLS_SSL_PROTO_DTLS",
 #endif /* MBEDTLS_SSL_PROTO_DTLS */
@@ -487,6 +549,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_SSL_DTLS_HELLO_VERIFY)
     "MBEDTLS_SSL_DTLS_HELLO_VERIFY",
 #endif /* MBEDTLS_SSL_DTLS_HELLO_VERIFY */
+#if defined(MBEDTLS_SSL_DTLS_SRTP)
+    "MBEDTLS_SSL_DTLS_SRTP",
+#endif /* MBEDTLS_SSL_DTLS_SRTP */
 #if defined(MBEDTLS_SSL_DTLS_CLIENT_PORT_REUSE)
     "MBEDTLS_SSL_DTLS_CLIENT_PORT_REUSE",
 #endif /* MBEDTLS_SSL_DTLS_CLIENT_PORT_REUSE */
@@ -508,6 +573,18 @@ static const char *features[] = {
 #if defined(MBEDTLS_SSL_TRUNCATED_HMAC_COMPAT)
     "MBEDTLS_SSL_TRUNCATED_HMAC_COMPAT",
 #endif /* MBEDTLS_SSL_TRUNCATED_HMAC_COMPAT */
+#if defined(MBEDTLS_SSL_VARIABLE_BUFFER_LENGTH)
+    "MBEDTLS_SSL_VARIABLE_BUFFER_LENGTH",
+#endif /* MBEDTLS_SSL_VARIABLE_BUFFER_LENGTH */
+#if defined(MBEDTLS_TLS_DEFAULT_ALLOW_SHA1_IN_KEY_EXCHANGE)
+    "MBEDTLS_TLS_DEFAULT_ALLOW_SHA1_IN_KEY_EXCHANGE",
+#endif /* MBEDTLS_TLS_DEFAULT_ALLOW_SHA1_IN_KEY_EXCHANGE */
+#if defined(MBEDTLS_TEST_CONSTANT_FLOW_MEMSAN)
+    "MBEDTLS_TEST_CONSTANT_FLOW_MEMSAN",
+#endif /* MBEDTLS_TEST_CONSTANT_FLOW_MEMSAN */
+#if defined(MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND)
+    "MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND",
+#endif /* MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND */
 #if defined(MBEDTLS_TEST_HOOKS)
     "MBEDTLS_TEST_HOOKS",
 #endif /* MBEDTLS_TEST_HOOKS */
@@ -517,6 +594,12 @@ static const char *features[] = {
 #if defined(MBEDTLS_THREADING_PTHREAD)
     "MBEDTLS_THREADING_PTHREAD",
 #endif /* MBEDTLS_THREADING_PTHREAD */
+#if defined(MBEDTLS_USE_PSA_CRYPTO)
+    "MBEDTLS_USE_PSA_CRYPTO",
+#endif /* MBEDTLS_USE_PSA_CRYPTO */
+#if defined(MBEDTLS_PSA_CRYPTO_CONFIG)
+    "MBEDTLS_PSA_CRYPTO_CONFIG",
+#endif /* MBEDTLS_PSA_CRYPTO_CONFIG */
 #if defined(MBEDTLS_VERSION_FEATURES)
     "MBEDTLS_VERSION_FEATURES",
 #endif /* MBEDTLS_VERSION_FEATURES */
@@ -526,6 +609,9 @@ static const char *features[] = {
 #if defined(MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION)
     "MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION",
 #endif /* MBEDTLS_X509_ALLOW_UNSUPPORTED_CRITICAL_EXTENSION */
+#if defined(MBEDTLS_X509_TRUSTED_CERTIFICATE_CALLBACK)
+    "MBEDTLS_X509_TRUSTED_CERTIFICATE_CALLBACK",
+#endif /* MBEDTLS_X509_TRUSTED_CERTIFICATE_CALLBACK */
 #if defined(MBEDTLS_X509_CHECK_KEY_USAGE)
     "MBEDTLS_X509_CHECK_KEY_USAGE",
 #endif /* MBEDTLS_X509_CHECK_KEY_USAGE */
@@ -565,12 +651,21 @@ static const char *features[] = {
 #if defined(MBEDTLS_CAMELLIA_C)
     "MBEDTLS_CAMELLIA_C",
 #endif /* MBEDTLS_CAMELLIA_C */
+#if defined(MBEDTLS_ARIA_C)
+    "MBEDTLS_ARIA_C",
+#endif /* MBEDTLS_ARIA_C */
 #if defined(MBEDTLS_CCM_C)
     "MBEDTLS_CCM_C",
 #endif /* MBEDTLS_CCM_C */
 #if defined(MBEDTLS_CERTS_C)
     "MBEDTLS_CERTS_C",
 #endif /* MBEDTLS_CERTS_C */
+#if defined(MBEDTLS_CHACHA20_C)
+    "MBEDTLS_CHACHA20_C",
+#endif /* MBEDTLS_CHACHA20_C */
+#if defined(MBEDTLS_CHACHAPOLY_C)
+    "MBEDTLS_CHACHAPOLY_C",
+#endif /* MBEDTLS_CHACHAPOLY_C */
 #if defined(MBEDTLS_CIPHER_C)
     "MBEDTLS_CIPHER_C",
 #endif /* MBEDTLS_CIPHER_C */
@@ -613,9 +708,15 @@ static const char *features[] = {
 #if defined(MBEDTLS_HAVEGE_C)
     "MBEDTLS_HAVEGE_C",
 #endif /* MBEDTLS_HAVEGE_C */
+#if defined(MBEDTLS_HKDF_C)
+    "MBEDTLS_HKDF_C",
+#endif /* MBEDTLS_HKDF_C */
 #if defined(MBEDTLS_HMAC_DRBG_C)
     "MBEDTLS_HMAC_DRBG_C",
 #endif /* MBEDTLS_HMAC_DRBG_C */
+#if defined(MBEDTLS_NIST_KW_C)
+    "MBEDTLS_NIST_KW_C",
+#endif /* MBEDTLS_NIST_KW_C */
 #if defined(MBEDTLS_MD_C)
     "MBEDTLS_MD_C",
 #endif /* MBEDTLS_MD_C */
@@ -667,6 +768,21 @@ static const char *features[] = {
 #if defined(MBEDTLS_PLATFORM_C)
     "MBEDTLS_PLATFORM_C",
 #endif /* MBEDTLS_PLATFORM_C */
+#if defined(MBEDTLS_POLY1305_C)
+    "MBEDTLS_POLY1305_C",
+#endif /* MBEDTLS_POLY1305_C */
+#if defined(MBEDTLS_PSA_CRYPTO_C)
+    "MBEDTLS_PSA_CRYPTO_C",
+#endif /* MBEDTLS_PSA_CRYPTO_C */
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
+    "MBEDTLS_PSA_CRYPTO_SE_C",
+#endif /* MBEDTLS_PSA_CRYPTO_SE_C */
+#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
+    "MBEDTLS_PSA_CRYPTO_STORAGE_C",
+#endif /* MBEDTLS_PSA_CRYPTO_STORAGE_C */
+#if defined(MBEDTLS_PSA_ITS_FILE_C)
+    "MBEDTLS_PSA_ITS_FILE_C",
+#endif /* MBEDTLS_PSA_ITS_FILE_C */
 #if defined(MBEDTLS_RIPEMD160_C)
     "MBEDTLS_RIPEMD160_C",
 #endif /* MBEDTLS_RIPEMD160_C */
@@ -737,23 +853,25 @@ static const char *features[] = {
     NULL
 };
 
-int mbedtls_version_check_feature( const char *feature )
+int mbedtls_version_check_feature(const char *feature)
 {
-    const char **idx = features;
+    const char * const *idx = features;
 
-    if( *idx == NULL )
-        return( -2 );
+    if (*idx == NULL) {
+        return -2;
+    }
 
-    if( feature == NULL )
-        return( -1 );
+    if (feature == NULL) {
+        return -1;
+    }
 
-    while( *idx != NULL )
-    {
-        if( !strcmp( *idx, feature ) )
-            return( 0 );
+    while (*idx != NULL) {
+        if (!strcmp(*idx, feature)) {
+            return 0;
+        }
         idx++;
     }
-    return( -1 );
+    return -1;
 }
 
 #endif /* MBEDTLS_VERSION_C */
