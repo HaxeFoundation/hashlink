@@ -1793,7 +1793,7 @@
  *
  * Uncomment this macro to enable the support for TLS 1.3.
  */
-#define MBEDTLS_SSL_PROTO_TLS1_3
+//#define MBEDTLS_SSL_PROTO_TLS1_3
 
 /**
  * \def MBEDTLS_SSL_TLS1_3_COMPATIBILITY_MODE
