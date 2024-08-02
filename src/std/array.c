@@ -45,9 +45,14 @@ HL_PRIM hl_type *hl_array_type( varray *a ) {
 	return a->at;
 }
 
+HL_PRIM vbyte *hl_array_bytes( varray *a ) {
+	return hl_aptr(a,vbyte);
+}
+
 DEFINE_PRIM(_ARR,alloc_array,_TYPE _I32);
 DEFINE_PRIM(_VOID,array_blit,_ARR _I32 _ARR _I32 _I32);
 DEFINE_PRIM(_TYPE,array_type,_ARR);
+DEFINE_PRIM(_BYTES,array_bytes,_ARR);
 
 HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	if( at->kind != HOBJ && at->kind != HSTRUCT )
