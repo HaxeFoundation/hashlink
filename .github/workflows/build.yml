@@ -77,6 +77,10 @@ jobs:
           - target: windows
             build_system: make
 
+          - target: windows
+            architecture: 32
+            build_system: cmake
+
     steps:
     - name: "SCM Checkout"
       uses: actions/checkout@v4
