@@ -3631,6 +3631,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					int paramsSize;
 					int jhasfield, jend;
 					bool need_dyn;
+					bool obj_in_args = false;
 					vreg *obj = R(o->extra[0]);
 					preg *v = alloc_cpu_call(ctx,obj);
 					preg *r = alloc_reg(ctx,RCPU_CALL);
@@ -3655,7 +3656,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						vreg *a = R(o->extra[i+1]);
 						if( hl_is_ptr(a->t) ) {
 							op64(ctx,MOV,pmem(&p,r->id,i*HL_WSIZE),alloc_cpu(ctx,a,true));
-							if( a->current != v ) RUNLOCK(a->current);
+							if( a->current != v ) {
+								RUNLOCK(a->current);
+							} else
+								obj_in_args = true;
 						} else {
 							preg *r2 = alloc_reg(ctx,RCPU);
 							op64(ctx,LEA,r2,&a->stack);
@@ -3692,15 +3696,30 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					patch_jump(ctx,jhasfield);
 					restore_regs(ctx);
 
-					/*
-						o = o->value hack
-					*/
-					if( v->holds ) v->holds->current = NULL;
-					obj->current = v;
-					v->holds = obj;
-					op64(ctx,MOV,v,pmem(&p,v->id,HL_WSIZE));
+					if( !obj_in_args ) {
+						// o = o->value hack
+						if( v->holds ) v->holds->current = NULL;
+						obj->current = v;
+						v->holds = obj;
+						op64(ctx,MOV,v,pmem(&p,v->id,HL_WSIZE));
+						size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,0);
+					} else {
+						// keep o->value in R(f->nregs)
+						int regids[64];
+						preg *pc = alloc_reg(ctx,RCPU_CALL);
+						vreg *sc = R(f->nregs); // scratch register that we temporary rebind					
+						if( o->p3 >= 63 ) jit_error("assert");
+						memcpy(regids, o->extra, o->p3 * sizeof(int));
+						regids[0] = f->nregs;
+						sc->size = HL_WSIZE;
+						sc->t = &hlt_dyn;
+						op64(ctx, MOV, pc, pmem(&p,v->id,HL_WSIZE));
+						scratch(pc);
+						sc->current = pc;
+						pc->holds = sc;
+						size = prepare_call_args(ctx,o->p3,regids,ctx->vregs,0);
+					}
 
-					size = prepare_call_args(ctx,o->p3,o->extra,ctx->vregs,0);
 					op_call(ctx,r,size);
 					discard_regs(ctx, false);
 					store_result(ctx, dst);
