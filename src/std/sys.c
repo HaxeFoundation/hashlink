@@ -182,6 +182,20 @@ HL_PRIM void hl_sys_exit( int code ) {
 	exit(code);
 }
 
+static void *f_vtune_init = NULL;
+static void *g_vtune_module = NULL;
+HL_PRIM void hl_setup_vtune( void *vtune_init, void *m ) {
+	f_vtune_init = vtune_init;
+	g_vtune_module = m;
+}
+
+HL_PRIM void hl_sys_vtune_init() {
+	if( f_vtune_init ) {
+		getchar();
+		((void(*)(void*))f_vtune_init)(g_vtune_module);
+	}
+}
+
 #ifdef HL_DEBUG_REPRO
 static double CURT = 0;
 #endif
@@ -730,5 +744,6 @@ DEFINE_PRIM(_ARR, sys_args, _NO_ARG);
 DEFINE_PRIM(_I32, sys_getpid, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_check_reload, _BYTES);
 DEFINE_PRIM(_VOID, sys_profile_event, _I32 _BYTES _I32);
+DEFINE_PRIM(_VOID, sys_vtune_init, _NO_ARG);
 DEFINE_PRIM(_I32, sys_set_flags, _I32);
 DEFINE_PRIM(_BOOL, sys_has_debugger, _NO_ARG);

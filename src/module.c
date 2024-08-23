@@ -629,7 +629,8 @@ static void hl_module_add( hl_module *m ) {
 	free(old_modules);
 }
 
-int hl_module_init( hl_module *m, h_bool hot_reload ) {
+void hl_setup_vtune( void *vtune_init, void *m );
+int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later ) {
 	int i;
 	jit_ctx *ctx;
 	// expand globals
@@ -682,7 +683,11 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	}
 
 #	ifdef HL_VTUNE
-	hl_module_init_vtune(m);
+	if( !vtune_later ) {
+		hl_module_init_vtune(m);
+	} else {
+		hl_setup_vtune(hl_module_init_vtune, m);
+	}
 #	endif
 	hl_module_add(m);
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);

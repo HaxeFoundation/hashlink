@@ -145,6 +145,7 @@ int main(int argc, pchar *argv[]) {
 	bool debug_wait = false;
 	bool hot_reload = false;
 	int profile_count = -1;
+	bool vtune_later = false;
 	main_context ctx;
 	bool isExc = false;
 	int first_boot_arg = -1;
@@ -176,6 +177,12 @@ int main(int argc, pchar *argv[]) {
 			profile_count = ptoi(*argv++);
 			continue;
 		}
+#ifdef HL_VTUNE
+		if( pcompare(arg,PSTR("--vtune-later")) == 0 ) {
+			vtune_later = true;
+			continue;
+		}
+#endif
 		if( *arg == '-' || *arg == '+' ) {
 			if( first_boot_arg < 0 ) first_boot_arg = argc + 1;
 			// skip value
@@ -214,7 +221,7 @@ int main(int argc, pchar *argv[]) {
 	ctx.m = hl_module_alloc(ctx.code);
 	if( ctx.m == NULL )
 		return 2;
-	if( !hl_module_init(ctx.m,hot_reload) )
+	if( !hl_module_init(ctx.m,hot_reload,vtune_later) )
 		return 3;
 	if( hot_reload ) {
 		ctx.file_time = pfiletime(ctx.file);
