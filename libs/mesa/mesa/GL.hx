@@ -425,6 +425,19 @@ class GL {
 	public static function uniformBlockBinding( p : Program, blockIndex : Int, blockBinding : Int ) : Void {
 	}
 
+	// ssbos
+
+	/** Requires OpenGL 4.3+, therefore not supported on Apple platforms **/
+	@:hlNative("?mesa","gl_get_program_resource_index")
+	public static function getProgramResourceIndex( p : Program, type : Int, name : String ) : Int {
+		return 0;
+	}
+
+	/** Requires OpenGL 4.3+, therefore not supported on Apple platforms **/
+	@:hlNative("?mesa","gl_shader_storage_block_binding")
+	public static function shaderStorageBlockBinding( p : Program, blockIndex : Int, blockBinding : Int ) : Void {
+	}
+
 	// ----- CONSTANTS -----
 
 	/* ClearBufferMask */
@@ -501,6 +514,8 @@ class GL {
 	public static inline var SHADER_STORAGE_BUFFER          = 0x90D2;
 	public static inline var UNIFORM_BUFFER                 = 0x8A11;
 	public static inline var QUERY_BUFFER                   = 0x9192;
+
+	public static inline var SHADER_STORAGE_BLOCK           = 0x92E6;
 
 	public static inline var STREAM_DRAW                    = 0x88E0;
 	public static inline var STATIC_DRAW                    = 0x88E4;
