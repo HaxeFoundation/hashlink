@@ -1,3 +1,5 @@
+# Auto-generated from hashlink's Makefile template; do not edit
+
 CFLAGS=-O3 -std=c11 -DHL_MAKE -I$$makePath(::relDir::)
 LDLIBS=-lhl -lm -luv::foreach libraries:: -l:::name::.hdll::end::
 
