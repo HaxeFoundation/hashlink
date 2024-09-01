@@ -11,7 +11,7 @@ EXE_SUFFIX=.exe
 endif
 
 SRC_FILES=::foreach cfiles:: \
-	::relDir::::path::::end::
+	::path::::end::
 
 OBJ_FILES=$(patsubst %.c,%.o,$(SRC_FILES))
 
@@ -22,9 +22,12 @@ DEP_FILES=$(patsubst %.c,%.d,$(SRC_FILES))
 
 -include $(DEP_FILES)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+%.o:
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -MMD -MP -c ::relDir::$*.c -o $@
 
 clean:
 	find . \( -name '*.o' -o -name '*.d' \) -delete
 	rm ::name::$(EXE_SUFFIX)
+
+.SUFFIXES:
