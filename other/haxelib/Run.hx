@@ -88,7 +88,7 @@ class Build {
 		for( f in config.files )
 			if( StringTools.endsWith(f,".c") ) {
 				var h = f.substr(0,-2) + ".h";
-				if( sys.FileSystem.exists(targetDir+h) )
+				if( sys.FileSystem.exists(sourcesDir+h) )
 					allFiles.push(h);
 			}
 		allFiles.sort(Reflect.compare);
