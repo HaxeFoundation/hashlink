@@ -1,6 +1,6 @@
 <xml>
 	<files id="::name::">
-		<compilerflag value="-std=c11" />
+		<compilerflag value="-std=c11" unless="MSVC_VER" />
 		<compilerflag value="-DHL_MAKE" />
 		<compilerflag value="-I$$makePath(::relDir::)" />
 ::foreach hfiles::
