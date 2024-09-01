@@ -75,7 +75,7 @@ class Build {
 			else
 				relDir = sourcesAbs.substr(targetAbs.length+1);
 			relDir = relDir.split("\\").join("/");
-			if( relDir != "" )
+			if( !(relDir == "" || StringTools.endsWith(relDir, "/")) )
 				relDir += "/";
 		}
 		if( !sys.FileSystem.exists(srcDir) ) {
