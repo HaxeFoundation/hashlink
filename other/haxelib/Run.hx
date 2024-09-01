@@ -153,7 +153,7 @@ class Build {
 						return sha1.substr(0,8)+"-"+sha1.substr(8,4)+"-"+sha1.substr(12,4)+"-"+sha1.substr(16,4)+"-"+sha1.substr(20,12);
 					},
 					makePath : function(_,dir:String) {
-						return dir == "" ? "./" : (StringTools.endsWith(dir,"/") || StringTools.endsWith(dir,"\\")) ? dir : dir + "/";
+						return dir == "" ? "." : (StringTools.endsWith(dir,"/") || StringTools.endsWith(dir,"\\")) ? dir : dir + "/";
 					},
 					upper : function(_,s:String) {
 						return s.charAt(0).toUpperCase() + s.substr(1);
