@@ -1,14 +1,21 @@
 CFLAGS=-O3 -std=c11 -DHL_MAKE -I$$makePath(::relDir::)
-LDFLAGS=-lhl -lm -luv::foreach libraries:: -l:::name::.hdll::end::
+LDLIBS=-lhl -lm -luv::foreach libraries:: -l:::name::.hdll::end::
 
 SRC_FILES=::foreach cfiles:: \
 	::relDir::::path::::end::
 
-HEADER_FILES=::foreach hfiles:: \
-	::relDir::::path::::end::
+OBJ_FILES=$(patsubst %.c,%.o,$(SRC_FILES))
 
-::name::: $(SRC_FILES) $(HEADER_FILES)
-	$(CC) $(CFLAGS) $(SRC_FILES) -o ::name:: $(LDFLAGS)
+DEP_FILES=$(patsubst %.c,%.d,$(SRC_FILES))
+
+::name::: $(OBJ_FILES)
+	$(CC) $(OBJ_FILES) -o $@ $(LDFLAGS) $(LDLIBS)
+
+-include $(DEP_FILES)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 clean:
+	find . \( -name '*.o' -o -name '*.d' \) -delete
 	rm ::name::
