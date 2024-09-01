@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
 
 #if defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	return wmain(__argc, __argv);
+	return wmain(__argc, __wargv);
 }
 #elif defined(HL_XBS)
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
