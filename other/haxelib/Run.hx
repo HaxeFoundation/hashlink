@@ -36,7 +36,7 @@ class Build {
 			case "make":
 				Sys.command("make", ["-C", targetDir]);
 			case "hxcpp":
-				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"]);
+				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []));
 			case null:
 				log('Code generated in $output');
 				log('Set hlgen.makefile for automatic native compilation');
