@@ -128,16 +128,6 @@ static int throw_handler( int code ) {
 }
 #endif
 
-#if defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	return wmain(__argc, __argv);
-}
-#elif defined(HL_XBS)
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	return main(__argc, __argv);
-}
-#endif
-
 #ifdef HL_WIN_DESKTOP
 int wmain(int argc, uchar *argv[]) {
 #else
@@ -171,3 +161,13 @@ int main(int argc, char *argv[]) {
 	sys_global_exit();
 	return (int)isExc;
 }
+
+#if defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return wmain(__argc, __argv);
+}
+#elif defined(HL_XBS)
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return main(__argc, __argv);
+}
+#endif
