@@ -138,51 +138,10 @@ jobs:
             ;;
         esac
 
-
-    - name: "Install: Neko"
-      run: |
-        set -eux
-
-        case "${{ matrix.target }}" in
-          linux)
-            sudo apt-get install --no-install-recommends -y neko
-            ;;
-
-          darwin)
-            brew install neko
-            ;;
-
-          windows)
-            choco install --no-progress neko -y
-            nekopath=$(find C:/ProgramData/chocolatey/lib/neko -name neko.dll -printf '%h\n')
-            echo "NEKOPATH=$nekopath" >> $GITHUB_ENV
-            ;;
-        esac
-        neko || true # print neko version
-
-
-    - name: "Install: Haxe latest"
-      run: |
-        set -eux
-
-        download_url="https://build.haxe.org/builds/haxe/${{ matrix.haxe_nightly_dir }}/haxe_latest.${{ matrix.archive_ext }}"
-        echo "Downloading [$download_url]..."
-        if [[ ${{ matrix.target }} == windows ]]; then
-          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.zip
-          7z x /tmp/haxe.zip -o/tmp
-          mv -v /tmp/haxe_* /tmp/haxe
-          cygpath -w '/tmp/haxe/' >> $GITHUB_PATH
-          echo "HAXE_STD_PATH=$(cygpath -w '/tmp/haxe/std')" >> $GITHUB_ENV
-        else
-          mkdir /tmp/haxe
-          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.tar.gz
-          tar xzvf /tmp/haxe.tar.gz -C /tmp/haxe --strip-components=1
-          echo "/tmp/haxe/" >> $GITHUB_PATH
-          echo "HAXE_STD_PATH=/tmp/haxe/std" >> $GITHUB_ENV
-        fi
-
-        /tmp/haxe/haxe --version
-
+    - name: Install haxe
+      uses: krdlab/setup-haxe@f0a0baa8ccdb1fe4fc316c8f30eb3ca77aa4ea4e
+      with:
+        haxe-version: latest
 
     - name: "Configure: Haxelib"
       run: |
