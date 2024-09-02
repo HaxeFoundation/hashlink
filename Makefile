@@ -261,7 +261,7 @@ release_haxelib_package:
 	rm -rf $(HLIB)_release
 
 BUILD_DIR ?= .
-PACKAGE_NAME := hashlink-$(shell $(BUILD_DIR)/hl --version)-$(RELEASE_NAME)
+PACKAGE_NAME = $(eval PACKAGE_NAME := hashlink-$(shell $(BUILD_DIR)/hl --version)-$(RELEASE_NAME))$(PACKAGE_NAME)
 
 release_prepare:
 	rm -rf $(PACKAGE_NAME)
