@@ -169,12 +169,19 @@ ifdef DEBUG
 CFLAGS += -g
 endif
 
-all: libhl hl libs
+all: libhl libs
+ifeq ($(ARCH),arm64)
+	$(warning HashLink vm is not supported on arm64, skipping)
+else
+all: hl
+endif
 
 install:
 	$(UNAME)==Darwin && ${MAKE} uninstall
+ifneq ($(ARCH),arm64)
 	mkdir -p $(INSTALL_BIN_DIR)
 	cp hl $(INSTALL_BIN_DIR)
+endif
 	mkdir -p $(INSTALL_LIB_DIR)
 	cp *.hdll $(INSTALL_LIB_DIR)
 	cp libhl.${LIBEXT} $(INSTALL_LIB_DIR)
