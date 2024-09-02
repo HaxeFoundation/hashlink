@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         target: [linux, darwin, windows]
-        architecture: [32, 64]
+        architecture: [32, 64, arm64]
         build_system: [make, cmake, vs2019]
 
         include:
@@ -32,9 +32,16 @@ jobs:
             archive_ext: tar.gz
 
           - target: darwin
-            runner: macos-12
             haxe_nightly_dir: mac
             archive_ext: tar.gz
+
+          - target: darwin
+            architecture: 64
+            runner: macos-12
+
+          - target: darwin
+            architecture: arm64
+            runner: macos-14
 
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
@@ -73,6 +80,12 @@ jobs:
 
           - target: darwin
             architecture: 32
+
+          - target: linux
+            architecture: arm64
+
+          - target: windows
+            architecture: arm64
 
           - target: windows
             build_system: make
@@ -237,24 +250,26 @@ jobs:
             ${{ env.WINDOWS_BUILD_FOLDER }}/hl.exe --version
             ;;
           make)
-            ./hl --version
-            case ${{ matrix.target }} in
-              linux)  ldd -v ./hl ;;
-              darwin) otool -L ./hl ;;
-            esac
+            if [[ ${{ matrix.architecture }} != arm64 ]]; then
+              ./hl --version
+              case ${{ matrix.target }} in
+                linux)  ldd -v ./hl ;;
+                darwin) otool -L ./hl ;;
+              esac
 
-            haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
-            ./hl hello.hl
+              haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
+              ./hl hello.hl
+
+              # ensure the executable still works when installed globally
+              cp hello.hl /tmp
+              pushd /tmp
+              hl hello.hl
+              popd
+            fi
 
             haxe -hl src/_main.c -cp other/tests -main HelloWorld
             make hlc
             ./hlc
-
-            # ensure the executable still works when installed globally
-            cp hello.hl /tmp
-            pushd /tmp
-            hl hello.hl
-            popd
             ;;
         esac
 
@@ -264,7 +279,8 @@ jobs:
         set -eux
 
         case "${{ matrix.target }}${{matrix.architecture}}" in
-          darwin*)   platform_name=darwin ;;
+          darwinarm64)   platform_name=darwin-arm64 ;;
+          darwin64)   platform_name=darwin ;;
           windows*)  platform_name=win${{matrix.architecture}} ;;
           linux64)   platform_name=linux-amd64 ;;
         esac
@@ -332,6 +348,7 @@ jobs:
           --prerelease \
           --title "HashLink Nightly Build" \
           "darwin-make-64/hashlink-${short_commit}-darwin.tar.gz#hashlink-latest-darwin.tar.gz" \
+          "darwin-make-arm64/hashlink-${short_commit}-darwin-arm64.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
           "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
           "windows-vs2019-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"

@@ -279,7 +279,11 @@ release_win:
 	rm -rf $(PACKAGE_NAME)
 
 release_linux release_osx:
+ifeq ($(ARCH),arm64)
+	cp libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
+else
 	cp hl libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
+endif
 	tar -cvzf $(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
 	rm -rf $(PACKAGE_NAME)
 
