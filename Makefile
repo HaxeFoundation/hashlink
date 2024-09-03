@@ -235,20 +235,25 @@ mesa:
 release: release_prepare release_$(RELEASE_NAME)
 
 release_haxelib:
+	${MAKE} HLIB=hashlink release_haxelib_package
 	${MAKE} HLIB=directx release_haxelib_package
 	${MAKE} HLIB=sdl release_haxelib_package
 	${MAKE} HLIB=openal release_haxelib_package
 
+HLPACK=$(HLIB)
+HLDIR=libs/$(HLIB)
+
 ifeq ($(HLIB),directx)
 HLPACK=dx
-else
-HLPACK=$(HLIB)
+else ifeq ($(HLIB),hashlink)
+HLDIR=other/haxelib
+HLPACK=templates
 endif
 
 release_haxelib_package:
 	rm -rf $(HLIB)_release
 	mkdir $(HLIB)_release
-	(cd libs/$(HLIB) && cp -R $(HLPACK) *.h *.c* haxelib.json ../../$(HLIB)_release | true)
+	(cd $(HLDIR) && cp -R $(HLPACK) *.h *.c* *.hx haxelib.json $(CURDIR)/$(HLIB)_release | true)
 	zip -r $(HLIB).zip $(HLIB)_release
 	haxelib submit $(HLIB).zip
 	rm -rf $(HLIB)_release
