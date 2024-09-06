@@ -586,7 +586,7 @@ HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect)( int mode, int type, vbyte
 
 HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect_count)(int mode, int type, vbyte* data, vbyte* drawcount, int maxdrawcount, int stride) {
 	GL_IMPORT_OPT(glMultiDrawElementsIndirectCountARB, MULTIDRAWELEMENTSINDIRECTCOUNTARB)
-	glMultiDrawElementsIndirectCountARB(mode, type, data, drawcount, maxdrawcount, stride);
+	glMultiDrawElementsIndirectCountARB(mode, type, data, (GLintptr)drawcount, maxdrawcount, stride);
 }
 
 HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
