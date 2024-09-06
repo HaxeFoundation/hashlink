@@ -360,6 +360,10 @@ install(
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+install(
+    FILES src/hlc_main.c
+    TYPE INCLUDE
+)
 
 # uninstall target
 # https://gitlab.kitware.com/cmake/community/wikis/FAQ#can-i-do-make-uninstall-with-cmake
