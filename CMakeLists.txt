@@ -28,6 +28,7 @@ option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT
 # force Unicode over Multi-byte
 if(MSVC)
     add_definitions(-DUNICODE -D_UNICODE)
+    add_compile_options(/permissive-)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH
