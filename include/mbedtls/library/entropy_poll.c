@@ -39,9 +39,12 @@
 #if defined(_WIN32) && !defined(EFIX64) && !defined(EFI32)
 
 #include <windows.h>
-#pragma comment(lib, "bcrypt.lib")
 #include <bcrypt.h>
 #include <intsafe.h>
+
+#if defined(_MSC_VER)
+#pragma comment(lib, "bcrypt.lib")
+#endif
 
 int mbedtls_platform_entropy_poll(void *data, unsigned char *output, size_t len,
                                   size_t *olen)
