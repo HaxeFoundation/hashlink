@@ -3,9 +3,13 @@
 CFLAGS=-O3 -std=c11 -DHL_MAKE -I$$makePath(::relDir::)
 LDLIBS=-lhl -lm -luv::foreach libraries:: -l:::name::.hdll::end::
 
-ifeq ($(OS),Windows_NT)
+ifdef HASHLINK
 CFLAGS+=-I$(HASHLINK)/include -I$(HASHLINK)/src
-LDFLAGS=-L$(HASHLINK) -L$(HASHLINK)/lib -municode
+LDFLAGS+=-L$(HASHLINK)/lib -L$(HASHLINK)
+endif
+
+ifeq ($(OS),Windows_NT)
+LDFLAGS+=-municode
 LDLIBS+=C:/Windows/System32/dbghelp.dll
 EXE_SUFFIX=.exe
 endif
