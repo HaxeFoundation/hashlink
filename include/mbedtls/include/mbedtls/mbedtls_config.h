@@ -1183,9 +1183,7 @@
  *
  * Enable functions that use the filesystem.
  */
-#ifndef __ORBIS__
-#	define MBEDTLS_FS_IO
-#endif
+#define MBEDTLS_FS_IO
 
 /**
  * \def MBEDTLS_NO_DEFAULT_ENTROPY_SOURCES
@@ -1811,7 +1809,7 @@
  *
  * Uncomment this macro to enable the support for TLS 1.3.
  */
-//#define MBEDTLS_SSL_PROTO_TLS1_3
+#define MBEDTLS_SSL_PROTO_TLS1_3
 
 /**
  * \def MBEDTLS_SSL_TLS1_3_COMPATIBILITY_MODE
@@ -2099,9 +2097,7 @@
  *
  * Uncomment this to allow your own alternate threading implementation.
  */
-#ifdef _WIN32
-#define MBEDTLS_THREADING_ALT
-#endif
+//#define MBEDTLS_THREADING_ALT
 
 /**
  * \def MBEDTLS_THREADING_PTHREAD
@@ -2112,9 +2108,7 @@
  *
  * Uncomment this to enable pthread mutexes.
  */
-#ifndef _WIN32
-#define MBEDTLS_THREADING_PTHREAD
-#endif
+//#define MBEDTLS_THREADING_PTHREAD
 
 /**
  * \def MBEDTLS_USE_PSA_CRYPTO
@@ -3009,7 +3003,7 @@
  *
  * This module provides networking routines.
  */
-//#define MBEDTLS_NET_C
+#define MBEDTLS_NET_C
 
 /**
  * \def MBEDTLS_OID_C
@@ -3633,7 +3627,7 @@
  *
  * Enable this layer to allow use of mutexes within Mbed TLS
  */
-#define MBEDTLS_THREADING_C
+//#define MBEDTLS_THREADING_C
 
 /**
  * \def MBEDTLS_TIMING_C
@@ -3657,9 +3651,7 @@
  *
  * Module:  library/timing.c
  */
-#ifndef __ORBIS__
-#	define MBEDTLS_TIMING_C
-#endif
+#define MBEDTLS_TIMING_C
 
 /**
  * \def MBEDTLS_VERSION_C

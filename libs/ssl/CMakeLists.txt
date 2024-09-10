@@ -1,5 +1,5 @@
 if (WIN32)
-    set(MBEDTLS_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/mbedtls/include)
+    set(MBEDTLS_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/mbedtls/include .)
     set(MBEDTLS_LIBRARIES crypt32)
 
     add_library(ssl.hdll SHARED
@@ -112,6 +112,11 @@ if (WIN32)
         ${INCLUDES_BASE_DIR}/mbedtls/library/x509write_crt.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/x509write_csr.c
         ssl.c
+    )
+
+    target_compile_definitions(ssl.hdll
+        PRIVATE
+        MBEDTLS_USER_CONFIG_FILE="mbedtls_user_config.h"
     )
 else()
     find_package(MbedTLS REQUIRED)
