@@ -239,9 +239,9 @@ MAKE_STDIO(stdin);
 MAKE_STDIO(stdout);
 MAKE_STDIO(stderr);
 
-HL_PRIM vbyte *hl_file_contents( vbyte *name, int *size ) {
+HL_PRIM vbyte *hl_file_contents( vbyte *name, int *pos, int *size ) {
 	int len;
-	int p = 0;
+	int p = pos;
 	vbyte *content;
 #	ifdef HL_UFOPEN
 	FILE *f = fopen((uchar*)name,USTR("rb"));
