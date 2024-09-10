@@ -10,10 +10,7 @@ function(set_as_hdll target)
 endfunction()
 
 if(WIN32)
-    option(WITH_DIRECTX "Build directx.hdll." ON)
-    if(WITH_DIRECTX)
-        add_subdirectory(directx)
-    endif()
+    add_subdirectory(directx)
 endif()
 
 option(WITH_FMT "Build fmt.hdll." ON)
