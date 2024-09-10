@@ -52,6 +52,14 @@
 #include "GLImports.h"
 #undef GL_IMPORT
 #define GL_IMPORT(fun,t)	fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) return 1
+#ifndef __APPLE__
+#define GL_IMPORT_OPT(fun, t) PFNGL##t##PROC fun = NULL; if ( !fun ) { fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) hl_error("function not resolved"); }
+#endif
+#endif
+
+#if !defined GL_IMPORT_OPT
+#define GL_IMPORT_OPT(fun, t)
+#define glMultiDrawElementsIndirectCountARB(...) hl_error("function not resolved");
 #endif
 
 static int GLLoadAPI() {
@@ -122,6 +130,10 @@ HL_PRIM void HL_NAME(gl_polygon_mode)(int face, int mode) {
 	glPolygonMode(face, mode);
 }
 
+HL_PRIM void HL_NAME(gl_polygon_offset)(float factor, float units) {
+	glPolygonOffset(factor, units);
+}
+
 HL_PRIM void HL_NAME(gl_enable)( int feature ) {
 	glEnable(feature);
 }
@@ -160,6 +172,10 @@ HL_PRIM void HL_NAME(gl_depth_func)( int f ) {
 
 HL_PRIM void HL_NAME(gl_color_mask)( bool r, bool g, bool b, bool a ) {
 	glColorMask(r, g, b, a);
+}
+
+HL_PRIM void HL_NAME(gl_color_maski)( int i, bool r, bool g, bool b, bool a ) {
+	glColorMaski(i, r, g, b, a);
 }
 
 HL_PRIM void HL_NAME(gl_stencil_mask_separate)(int face, int mask) {
@@ -320,6 +336,22 @@ HL_PRIM void HL_NAME(gl_tex_image2d)( int target, int level, int internalFormat,
 
 HL_PRIM void HL_NAME(gl_tex_image3d)( int target, int level, int internalFormat, int width, int height, int depth, int border, int format, int type, vbyte *image ) {
 	glTexImage3D(target, level, internalFormat, width, height, depth, border, format, type, image);
+}
+
+HL_PRIM void HL_NAME(gl_tex_storage2d)( int target, int levels, int internalFormat, int width, int height) {
+#ifndef __APPLE__
+	glTexStorage2D(target, levels, internalFormat, width, height);
+#else
+    hl_error("glTexStorage2d is not supported on Apple platforms");
+#endif
+}
+
+HL_PRIM void HL_NAME(gl_tex_storage3d)( int target, int levels, int internalFormat, int width, int height, int depth) {
+#ifndef __APPLE__
+	glTexStorage3D(target, levels, internalFormat, width, height, depth);
+#else
+	hl_error("glTexStorage3d is not supported on Apple platforms");
+#endif
 }
 
 HL_PRIM void HL_NAME(gl_tex_image2d_multisample)( int target, int samples, int internalFormat, int width, int height, bool fixedsamplelocations) {
@@ -552,6 +584,11 @@ HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect)( int mode, int type, vbyte
 #	endif
 }
 
+HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect_count)(int mode, int type, vbyte* data, vbyte* drawcount, int maxdrawcount, int stride) {
+	GL_IMPORT_OPT(glMultiDrawElementsIndirectCountARB, MULTIDRAWELEMENTSINDIRECTCOUNTARB)
+	glMultiDrawElementsIndirectCountARB(mode, type, data, (GLintptr)drawcount, maxdrawcount, stride);
+}
+
 HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
 	switch( feature ) {
 	case 0:
@@ -569,6 +606,19 @@ HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
 		break;
 	}
 	return -1;
+}
+
+HL_PRIM bool HL_NAME(gl_has_extension)(vstring *name) {
+	const char* cname = hl_to_utf8(name->bytes);
+	GLint numExtensions = 0;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &numExtensions);
+	for (int i = 0; i < numExtensions; i++) {
+		const char* ext = (const char*)glGetStringi(GL_EXTENSIONS, i);
+		if (ext && strcmp(cname, ext) == 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 // queries
@@ -640,6 +690,25 @@ HL_PRIM void HL_NAME(gl_uniform_block_binding)( vdynamic *p, int index, int bind
 	glUniformBlockBinding(p->v.i, index, binding);
 }
 
+// SSBOs
+
+HL_PRIM int HL_NAME(gl_get_program_resource_index)( vdynamic *p, int type, vstring *name ) {
+#ifndef __APPLE__
+	char *cname = hl_to_utf8(name->bytes);
+	return (int)glGetProgramResourceIndex(p->v.i, type, cname);
+#else
+	hl_error("glGetProgramResourceIndex is not supported on Apple platforms");
+#endif
+}
+
+HL_PRIM void HL_NAME(gl_shader_storage_block_binding)( vdynamic *p, int index, int binding ) {
+#ifndef __APPLE__
+	glShaderStorageBlockBinding(p->v.i, index, binding);
+#else
+	hl_error("glShaderStorageBlockBinding is not supported on Apple platforms");
+#endif
+}
+
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_clear,_I32);
@@ -654,6 +723,7 @@ DEFINE_PRIM(_VOID,gl_flush,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_pixel_storei,_I32 _I32);
 DEFINE_PRIM(_BYTES,gl_get_string,_I32);
 DEFINE_PRIM(_VOID,gl_polygon_mode,_I32 _I32);
+DEFINE_PRIM(_VOID,gl_polygon_offset,_F32 _F32);
 DEFINE_PRIM(_VOID,gl_enable,_I32);
 DEFINE_PRIM(_VOID,gl_disable,_I32);
 DEFINE_PRIM(_VOID,gl_cull_face,_I32);
@@ -664,6 +734,7 @@ DEFINE_PRIM(_VOID,gl_blend_equation_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_depth_mask,_BOOL);
 DEFINE_PRIM(_VOID,gl_depth_func,_I32);
 DEFINE_PRIM(_VOID,gl_color_mask,_BOOL _BOOL _BOOL _BOOL);
+DEFINE_PRIM(_VOID,gl_color_maski,_I32 _BOOL _BOOL _BOOL _BOOL);
 DEFINE_PRIM(_VOID,gl_stencil_mask_separate,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_func_separate,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_stencil_op_separate,_I32  _I32 _I32 _I32);
@@ -690,6 +761,8 @@ DEFINE_PRIM(_VOID,gl_tex_parameteri,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_tex_parameterf,_I32 _I32 _F32);
 DEFINE_PRIM(_VOID,gl_tex_image2d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID,gl_tex_image3d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
+DEFINE_PRIM(_VOID,gl_tex_storage2d,_I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_tex_storage3d,_I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_tex_image2d_multisample,_I32 _I32 _I32 _I32 _I32 _BOOL);
 DEFINE_PRIM(_VOID,gl_compressed_tex_image2d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID,gl_compressed_tex_image3d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
@@ -737,6 +810,7 @@ DEFINE_PRIM(_VOID,gl_draw_elements_instanced,_I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_arrays,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_arrays_instanced,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_multi_draw_elements_indirect, _I32 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,gl_multi_draw_elements_indirect_count, _I32 _I32 _BYTES _BYTES _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_vertex_array,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_vertex_array,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_delete_vertex_array,_NULL(_I32));
@@ -752,5 +826,8 @@ DEFINE_PRIM(_F64, gl_query_result, _NULL(_I32));
 
 DEFINE_PRIM(_I32, gl_get_uniform_block_index, _NULL(_I32) _STRING);
 DEFINE_PRIM(_VOID, gl_uniform_block_binding, _NULL(_I32) _I32 _I32);
+DEFINE_PRIM(_I32, gl_get_program_resource_index, _NULL(_I32) _I32 _STRING);
+DEFINE_PRIM(_VOID, gl_shader_storage_block_binding, _NULL(_I32) _I32 _I32);
 
 DEFINE_PRIM(_I32, gl_get_config_parameter, _I32);
+DEFINE_PRIM(_BOOL, gl_has_extension, _STRING);

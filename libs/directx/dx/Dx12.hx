@@ -180,6 +180,7 @@ abstract CommandList(Resource) {
 	public function clearDepthStencilView( rtv : Address, flags : ClearFlags, depth : Single, stencil : Int ) {}
 	public function reset( alloc : CommandAllocator, state : PipelineState ) {}
 	public function resourceBarrier( b : ResourceBarrier ) {}
+	public function resourceBarriers( b : hl.CArray<ResourceBarrier>, barrierCount : Int ) {}
 	public function setPipelineState( state : PipelineState ) {}
 	public function setDescriptorHeaps( heaps : hl.NativeArray<DescriptorHeap> ) {}
 	public function copyBufferRegion( dst : GpuResource, dstOffset : Int64, src : GpuResource, srcOffset : Int64, size : Int64 ) {}
@@ -190,9 +191,10 @@ abstract CommandList(Resource) {
 	public function setGraphicsRootConstantBufferView( index : Int, address : Address ) {}
 	public function setGraphicsRootDescriptorTable( index : Int, address : Address ) {}
 	public function setGraphicsRootShaderResourceView( index : Int, address : Address ) {}
+	public function setGraphicsRootUnorderedAccessView( index : Int, address : Address ) {}
 
 	public function iaSetPrimitiveTopology( top : PrimitiveTopology ) {}
-	public function iaSetVertexBuffers( startSlot : Int, numViews : Int, views : VertexBufferView ) {}
+	public function iaSetVertexBuffers( startSlot : Int, numViews : Int, views : VertexBufferView /* hl.CArray */ ) {}
 	public function iaSetIndexBuffer( view : IndexBufferView ) {}
 
 	public function drawInstanced( vertexCountPerInstance : Int, instanceCount : Int, startVertexLocation : Int, startInstanceLocation : Int ) {}
@@ -210,6 +212,14 @@ abstract CommandList(Resource) {
 	public function resolveQueryData( heap : QueryHeap, type : QueryType, index : Int, count : Int, dest : Resource, offset : Int64 ) {}
 
 	public function setPredication( res : Resource, offset : Int64, op : PredicationOp ) {}
+
+	public function setComputeRootSignature( sign : RootSignature ) {}
+	public function setComputeRoot32BitConstants( index : Int, numValues : Int, data : hl.Bytes, dstOffset : Int ) {}
+	public function setComputeRootConstantBufferView( index : Int, address : Address ) {}
+	public function setComputeRootDescriptorTable( index : Int, address : Address ) {}
+	public function setComputeRootShaderResourceView( index : Int, address : Address ) {}
+	public function setComputeRootUnorderedAccessView( index : Int, address : Address ) {}
+	public function dispatch( x : Int, y : Int, z : Int ) {}
 
 	static function create( type : CommandListType, alloc : CommandAllocator, state : PipelineState ) : Resource { return null; }
 }
@@ -289,6 +299,9 @@ abstract ShaderCompiler(hl.Abstract<"dx_compiler">) {
 		var nargs = new hl.NativeArray(args.length);
 		for( i in 0...args.length )
 			nargs[i] = @:privateAccess args[i].bytes;
+		/*
+			Compiling source can trigger a validation error if DXCOMPILER.DLL is missing
+		*/
 		var bytes = do_compile(cast this, @:privateAccess source.bytes, @:privateAccess profile.bytes, nargs, outLen);
 		return @:privateAccess new haxe.io.Bytes(bytes, outLen);
 	}
@@ -340,9 +353,9 @@ enum abstract ResourceState(Int) {
 	public var RESOLVE_SOURCE = 0x2000;
 	public var RAYTRACING_ACCELERATION_STRUCTURE = 0x400000;
 	public var SHADING_RATE_SOURCE = 0x1000000;
-	public var GENERIC_READ = 0x1 | 0x2 | 0x40  | 0x80  | 0x200  | 0x800;
+	public var GENERIC_READ = 0x1 | 0x2 | 0x40 | 0x80 | 0x200 | 0x800;
 	public var ALL_SHADER_RESOURCE = 0x40 | 0x80;
-	public var PRESENT = 0;
+	public var PRESENT = #if ( console && !xbogdk ) 0x100000 #else 0 #end;
 	public var PREDICATION = 0x200;
 	public var VIDE_DECODE_READ = 0x10000;
 	public var VIDE_DECODE_WRITE = 0x20000;
@@ -350,6 +363,8 @@ enum abstract ResourceState(Int) {
 	public var VIDE_PROCESS_WRITE = 0x80000;
 	public var VIDE_ENCODE_READ = 0x200000;
 	public var VIDE_ENCODE_WRITE = 0x800000;
+	@:op(a|b) function or(r:ResourceState):ResourceState;
+	@:op(a&b) function and(r:ResourceState):ResourceState;
 }
 
 @:struct class Color {
@@ -375,24 +390,24 @@ typedef ClearColor = Color;
 
 enum abstract DsvDimension(Int) {
 	var UNKNOWN	= 0;
-    var TEXTURE1D = 1;
-    var TEXTURE1DARRAY = 2;
-    var TEXTURE2D = 3;
-    var TEXTURE2DARRAY = 4;
-    var TEXTURE2DMS = 5;
-    var TEXTURE2DMSARRAY = 6;
+	var TEXTURE1D = 1;
+	var TEXTURE1DARRAY = 2;
+	var TEXTURE2D = 3;
+	var TEXTURE2DARRAY = 4;
+	var TEXTURE2DMS = 5;
+	var TEXTURE2DMSARRAY = 6;
 }
 
 enum abstract RtvDimension(Int) {
 	var UNKNOWN	= 0;
 	var BUFFER = 1;
-    var TEXTURE1D = 2;
-    var TEXTURE1DARRAY = 3;
-    var TEXTURE2D = 4;
-    var TEXTURE2DARRAY = 5;
-    var TEXTURE2DMS = 6;
-    var TEXTURE2DMSARRAY = 7;
-    var TEXTURE3D = 8;
+	var TEXTURE1D = 2;
+	var TEXTURE1DARRAY = 3;
+	var TEXTURE2D = 4;
+	var TEXTURE2DARRAY = 5;
+	var TEXTURE2DMS = 6;
+	var TEXTURE2DMSARRAY = 7;
+	var TEXTURE3D = 8;
 }
 
 @:struct class RenderTargetViewDesc {
@@ -505,7 +520,7 @@ enum abstract DescriptorRangeType(Int) {
 @:struct class RootParameterDescriptorTable extends RootParameter {
 	public var numDescriptorRanges : Int;
 	public var __padding : Int;
-	public var descriptorRanges : DescriptorRange;
+	public var descriptorRanges : hl.CArray<DescriptorRange>;
 	public var shaderVisibility : ShaderVisibility;
 	public function new() {
 		parameterType = DESCRIPTOR_TABLE;
@@ -629,9 +644,9 @@ enum abstract ShaderVisibility(Int) {
 
 @:struct class RootSignatureDesc {
 	public var numParameters : Int;
-	public var parameters : RootParameter;
+	public var parameters : hl.CArray<RootParameter>;
 	public var numStaticSamplers : Int;
-	public var staticSamplers : StaticSamplerDesc;
+	public var staticSamplers : hl.CArray<StaticSamplerDesc>;
 	public var flags : haxe.EnumFlags<RootSignatureFlag>;
 	public function new() {
 	}
@@ -646,6 +661,12 @@ abstract RootSignature(Resource) {
 }
 
 abstract GraphicsPipelineState(Resource) {
+	@:to inline function toPS():PipelineState {
+		return cast this;
+	}
+}
+
+abstract ComputePipelineState(Resource) {
 	@:to inline function toPS():PipelineState {
 		return cast this;
 	}
@@ -776,11 +797,12 @@ enum abstract DxgiFormat(Int) {
 	var P208 = 130;
 	var V208 = 131;
 	var V408 = 132;
+	public inline function toInt() return this;
 }
 
 @:struct class ShaderBytecode {
 	public var shaderBytecode : hl.Bytes;
-	public var bytecodeLength : Int;
+	public var bytecodeLength : hl.I64;
 }
 
 @:struct class SoDeclarationEntry {
@@ -795,7 +817,7 @@ enum abstract DxgiFormat(Int) {
 }
 
 @:struct class StreamOutputDesc {
-	public var soDeclaration : SoDeclarationEntry;
+	public var soDeclaration : hl.CArray<SoDeclarationEntry>;
 	public var numEntries : Int;
 	public var bufferStrides : hl.Bytes;
 	public var numStrides : Int;
@@ -1020,8 +1042,9 @@ enum abstract InputClassification(Int) {
 }
 
 @:struct class InputLayoutDesc {
-	public var inputElementDescs : InputElementDesc;
+	public var inputElementDescs : hl.CArray<InputElementDesc>;
 	public var numElements : Int;
+	public var __padding : Int; // largest element
 	public function new() {
 	}
 }
@@ -1072,8 +1095,7 @@ enum abstract PipelineStateFlags(Int) {
 	@:packed public var rasterizerState(default,null) : RasterizerDesc;
 	@:packed public var depthStencilDesc(default,null) : DepthStencilDesc;
 	@:packed public var inputLayout(default,null) : InputLayoutDesc;
-	var __padding : Int; // ?
-  	public var ibStripCutValue : IndexBufferStripCutValue;
+	public var ibStripCutValue : IndexBufferStripCutValue;
 	public var primitiveTopologyType : PrimitiveTopologyType;
 	public var numRenderTargets : Int;
 	public var rtvFormats(get,never) : GraphicsRTVFormats;
@@ -1088,6 +1110,16 @@ enum abstract PipelineStateFlags(Int) {
 	var rtvFormat7 : DxgiFormat;
 	public var dsvFormat : DxgiFormat;
 	@:packed public var sampleDesc(default,null) : DxgiSampleDesc;
+	public var nodeMask : Int;
+	@:packed public var cachedPSO(default,null) : CachedPipelineState;
+	public var flags : PipelineStateFlags;
+	public function new() {
+	}
+}
+
+@:struct class ComputePipelineStateDesc {
+	public var rootSignature : RootSignature;
+	@:packed public var cs(default,null) : ShaderBytecode;
 	public var nodeMask : Int;
 	@:packed public var cachedPSO(default,null) : CachedPipelineState;
 	public var flags : PipelineStateFlags;
@@ -1194,38 +1226,6 @@ enum ResourceFlag {
 		return v;
 	}
 }
-
-enum abstract ResourceStates(Int) {
-	var COMMON = 0;
-	var VERTEX_AND_CONSTANT_BUFFER = 0x1;
-	var INDEX_BUFFER = 0x2;
-	var RENDER_TARGET = 0x4;
-	var UNORDERED_ACCESS = 0x8;
-	var DEPTH_WRITE = 0x10;
-	var DEPTH_READ = 0x20;
-	var NON_PIXEL_SHADER_RESOURCE = 0x40;
-	var PIXEL_SHADER_RESOURCE = 0x80;
-	var STREAM_OUT = 0x100;
-	var INDIRECT_ARGUMENT = 0x200;
-	var COPY_DEST = 0x400;
-	var COPY_SOURCE = 0x800;
-	var RESOLVE_DEST = 0x1000;
-	var RESOLVE_SOURCE = 0x2000;
-	var RAYTRACING_ACCELERATION_STRUCTURE = 0x400000;
-	var SHADING_RATE_SOURCE = 0x1000000;
-	var GENERIC_READ = ( ( ( ( ( 0x1 | 0x2 )  | 0x40 )  | 0x80 )  | 0x200 )  | 0x800 ) ;
-	var ALL_SHADER_RESOURCE = ( 0x40 | 0x80 ) ;
-	var PRESENT = 0;
-	var PREDICATION = 0x200;
-	var VIDEO_DECODE_READ = 0x10000;
-	var VIDEO_DECODE_WRITE = 0x20000;
-	var VIDEO_PROCESS_READ = 0x40000;
-	var VIDEO_PROCESS_WRITE = 0x80000;
-	var VIDEO_ENCODE_READ = 0x200000;
-	var VIDEO_ENCODE_WRITE = 0x800000;
-	@:op(a|b) function or(r:ResourceStates):ResourceStates;
-}
-
 
 enum abstract SrvDimension(Int) {
 	var UNKNOWN = 0;
@@ -1430,10 +1430,73 @@ enum abstract IndirectArgumentType(Int) {
 @:struct class CommandSignatureDesc {
 	public var byteStride :Int;
 	public var numArgumentDescs : Int;
-	public var argumentDescs : IndirectArgumentDesc;
+	public var argumentDescs : hl.CArray<IndirectArgumentDesc>;
 	public var nodeMask : Int;
 	public function new() {
 	}
+}
+
+enum abstract UAVDimension(Int) {
+	public var UNKNOWN = 0;
+	public var BUFFER = 1;
+	public var TEXTURE1D = 2;
+	public var TEXTURE1DARRAY = 3;
+	public var TEXTURE2D = 4;
+	public var TEXTURE2DARRAY = 5;
+	public var TEXTURE3D = 8;
+}
+
+@:struct class UnorderedAccessViewDesc {
+	public var format : DxgiFormat;
+	public var viewDimension : UAVDimension;
+}
+
+enum UAVBufferFlags {
+	RAW;
+}
+
+@:struct class UAVBufferViewDesc extends UnorderedAccessViewDesc {
+	public var firstElement : hl.I64;
+	public var numElements : Int;
+	public var structureSizeInBytes : Int;
+	public var counterOffsetInBytes : hl.I64;
+	public var flags : haxe.EnumFlags<UAVBufferFlags>;
+	public function new() {
+		viewDimension = BUFFER;
+	}
+}
+
+@:struct class UAVTextureViewDesc extends UnorderedAccessViewDesc {
+	var int0 : Int;
+	var int1 : Int;
+	var int2 : Int;
+	var int3 : Int;
+	var padding1 : hl.I64;
+	var padding2 : Int;
+	public function new(dim) {
+		viewDimension = dim;
+	}
+	public var mipSlice(get,set) : Int;
+	public var firstArraySlice(get,set) : Int;
+	public var firstWSlice(get,set) : Int;
+	public var arraySize(get,set) : Int;
+	public var planeSlice(get,set) : Int;
+	public var wSlice(get,set) : Int;
+	inline function get_mipSlice() return int0;
+	inline function set_mipSlice(v) return int0 = v;
+
+	inline function get_planeSlice() return switch( viewDimension ) { case TEXTURE2DARRAY: int3; default: int1; }
+	inline function set_planeSlice(v) return switch( viewDimension ) { case TEXTURE2DARRAY: int3 = v; default: int1 = v; }
+
+	inline function get_firstArraySlice() return int1;
+	inline function set_firstArraySlice(v) return int1 = v;
+	inline function get_arraySize() return int2;
+	inline function set_arraySize(v) return int2 = v;
+
+	inline function get_firstWSlice() return int1;
+	inline function set_firstWSlice(v) return int1 = v;
+	inline function get_wSlice() return int2;
+	inline function set_wSlice(v) return int2 = v;
 }
 
 enum abstract QueryType(Int) {
@@ -1493,6 +1556,10 @@ class Dx12 {
 		return null;
 	}
 
+	public static function createComputePipelineState( desc : ComputePipelineStateDesc ) : ComputePipelineState {
+		return null;
+	}
+
 	public static function serializeRootSignature( desc : RootSignatureDesc, version : Int, size : hl.Ref<Int> ) : hl.Bytes {
 		return null;
 	}
@@ -1514,6 +1581,9 @@ class Dx12 {
 	public static function createConstantBufferView( desc : ConstantBufferViewDesc, target : Address ) {
 	}
 
+	public static function createUnorderedAccessView( res : Resource, counter : Resource, desc : UnorderedAccessViewDesc, target : Address ) {
+	}
+
 	public static function createShaderResourceView( resource : Resource, desc : ShaderResourceViewDesc, target : Address ) {
 	}
 
@@ -1527,7 +1597,7 @@ class Dx12 {
 	public static function createSampler( desc : SamplerDesc, target : Address ) {
 	}
 
-	public static function createCommittedResource( heapProperties : HeapProperties, heapFlags : haxe.EnumFlags<HeapFlag>, desc : ResourceDesc, initialState : ResourceStates, clearValue : ClearValue ) : GpuResource {
+	public static function createCommittedResource( heapProperties : HeapProperties, heapFlags : haxe.EnumFlags<HeapFlag>, desc : ResourceDesc, initialState : ResourceState, clearValue : ClearValue ) : GpuResource {
 		return null;
 	}
 
@@ -1546,6 +1616,12 @@ class Dx12 {
 	}
 
 	public static function present( vsync : Bool ) {
+	}
+
+	public static function suspend() {
+	}
+
+	public static function resume() {
 	}
 
 	public static function getDeviceName() {

@@ -27,11 +27,11 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x010D00
+#define HL_VERSION	0x010E00
 
 #if defined(_WIN32)
 #	define HL_WIN
-#	ifndef _DURANGO
+#	if !defined(_DURANGO) && !defined(_GAMING_XBOX)
 #		define HL_WIN_DESKTOP
 #	endif
 #endif
@@ -74,7 +74,11 @@
 #	define HL_XBO
 #endif
 
-#if defined(HL_PS) || defined(HL_NX) || defined(HL_XBO)
+#ifdef _GAMING_XBOX
+#	define HL_XBS
+#endif
+
+#if defined(HL_PS) || defined(HL_NX) || defined(HL_XBO) || defined(HL_XBS) || defined(HL_OS)
 #	define HL_CONSOLE
 #endif
 
@@ -220,7 +224,7 @@ typedef unsigned long long uint64;
 // -------------- UNICODE -----------------------------------
 
 #if defined(HL_WIN) && !defined(HL_LLVM)
-#if defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)
+#if (defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)) || defined(HL_XBS)
 #	include <Windows.h>
 #elif defined(HL_WIN_DESKTOP) && defined(HL_MINGW)
 #	include<windows.h>
@@ -240,10 +244,6 @@ HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list argli
 #	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
 #	define utostr(out,size,str) wcstombs(out,str,size)
-#elif defined(HL_MAC)
-typedef uint16_t uchar;
-#	undef USTR
-#	define USTR(str)	u##str
 #else
 #	include <stdarg.h>
 #if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_MAC)
@@ -283,7 +283,7 @@ C_FUNCTION_END
 C_FUNCTION_BEGIN
 HL_API void hl_debug_break( void );
 C_FUNCTION_END
-#elif defined(HL_LINUX) && defined(__i386__)
+#elif defined(HL_LINUX)
 #	ifdef HL_64
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \
@@ -533,6 +533,8 @@ struct hl_runtime_obj {
 	int size;
 	int nmethods;
 	int nbindings;
+	unsigned char pad_size;
+	unsigned char largest_field;
 	bool hasPtr;
 	void **methods;
 	int *fields_indexes;
@@ -559,6 +561,9 @@ typedef struct {
 	int nvalues;
 	vvirtual *virtuals;
 } vdynobj;
+
+#define HL_DYNOBJ_INDEX_SHIFT 17
+#define HL_DYNOBJ_INDEX_MASK ((1 << HL_DYNOBJ_INDEX_SHIFT) - 1)
 
 typedef struct _venum {
 	hl_type *t;
@@ -894,6 +899,7 @@ struct _hl_trap_ctx {
 #define HL_EXC_IS_THROW		4
 #define HL_THREAD_INVISIBLE	16
 #define HL_THREAD_PROFILER_PAUSED 32
+#define HL_EXC_KILL			64
 #define HL_TREAD_TRACK_SHIFT 16
 
 #define HL_TRACK_ALLOC		1

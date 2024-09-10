@@ -38,6 +38,10 @@ class Sdl {
 		glOptions(major, minor, depth, stencil, flags, samples);
 	}
 
+	public static function setGLVersion( major : Int, minor : Int) {
+		setGLOptions(major, minor);
+	}
+
 	public static function setHint(name:String, value:String) {
 		return @:privateAccess hintValue(name.toUtf8(), value.toUtf8());
 	}
@@ -87,7 +91,7 @@ class Sdl {
 	}
 
 	public static function getScreenWidth(?win : sdl.Window) : Int {
-		return 
+		return
 			if(win == null)
 				get_screen_width();
 			else
@@ -110,7 +114,7 @@ class Sdl {
 	public static function message( title : String, text : String, error = false ) {
 		@:privateAccess messageBox(title.toUtf8(), text.toUtf8(), error);
 	}
-	
+
 	public static function getDisplayModes(display : Window.DisplayHandle) : Array<ScreenMode> {
 		var modes = get_display_modes(display);
 		if(modes == null)
@@ -129,7 +133,7 @@ class Sdl {
 		var i = 0;
 		return [ for(d in get_displays() ) @:privateAccess { handle: d.handle, name: '${String.fromUTF8(d.name)} (${++i})', left: d.left, top: d.top, right: d.right, bottom: d.bottom } ];
 	}
-	
+
 	public static function getDevices() {
 		var a = [];
 		var arr = get_devices();
@@ -147,7 +151,7 @@ class Sdl {
 	public static function setRelativeMouseMode( enable : Bool ) : Int {
 		return 0;
 	}
-	
+
 	public static function setClipboardText( text : String ) : Bool {
 		if( text == null )
 			return false;
@@ -211,8 +215,13 @@ class Sdl {
 	public static function getRelativeMouseMode() : Bool {
 		return false;
 	}
-	
+
 	public static function warpMouseGlobal( x : Int, y : Int ) : Int {
+		return 0;
+	}
+
+	@:hlNative("?sdl", "get_global_mouse_state")
+	public static function getGlobalMouseState( x : hl.Ref<Int>, y : hl.Ref<Int> ) : Int {
 		return 0;
 	}
 
@@ -233,10 +242,18 @@ class Sdl {
 	private static function _getClipboardText() : hl.Bytes {
 		return null;
 	}
+
+	@:hlNative("?sdl", "set_drag_and_drop_enabled")
+	public static function setDragAndDropEnabled( v : Bool ): Void {
+	}
+
+	@:hlNative("?sdl", "get_drag_and_drop_enabled")
+	public static function getDragAndDropEnabled(): Bool {
+		return false;
+	}
 }
 
-@:enum
-abstract SDLHint(String) from String to String {
+enum abstract SDLHint(String) from String to String {
 
 	var SDL_HINT_FRAMEBUFFER_ACCELERATION =                 "SDL_FRAMEBUFFER_ACCELERATION";
 	var SDL_HINT_RENDER_DRIVER =                            "SDL_RENDER_DRIVER";

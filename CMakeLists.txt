@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 
 set(HL_VERSION_MAJOR 1)
-set(HL_VERSION_MINOR 13)
+set(HL_VERSION_MINOR 14)
 set(HL_VERSION_PATCH 0)
 set(HL_VERSION ${HL_VERSION_MAJOR}.${HL_VERSION_MINOR}.${HL_VERSION_PATCH})
 
@@ -17,6 +17,13 @@ endif()
 include(GNUInstallDirs)
 include(FindPkgConfig)
 include(CTest)
+
+set(WITH_VM_DEFAULT ON)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+    set(WITH_VM_DEFAULT OFF)
+endif()
+
+option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
 
 # force Unicode over Multi-byte
 if(MSVC)
@@ -56,14 +63,42 @@ include_directories(
 )
 
 file(GLOB pcre_srcs
-    include/pcre/*.c
+    include/pcre/pcre2_auto_possess.c
+    include/pcre/pcre2_chartables.c
+    include/pcre/pcre2_compile.c
+    include/pcre/pcre2_config.c
+    include/pcre/pcre2_context.c
+    include/pcre/pcre2_convert.c
+    include/pcre/pcre2_dfa_match.c
+    include/pcre/pcre2_error.c
+    include/pcre/pcre2_extuni.c
+    include/pcre/pcre2_find_bracket.c
+    include/pcre/pcre2_jit_compile.c
+    include/pcre/pcre2_maketables.c
+    include/pcre/pcre2_match_data.c
+    include/pcre/pcre2_match.c
+    include/pcre/pcre2_newline.c
+    include/pcre/pcre2_ord2utf.c
+    include/pcre/pcre2_pattern_info.c
+    include/pcre/pcre2_script_run.c
+    include/pcre/pcre2_serialize.c
+    include/pcre/pcre2_string_utils.c
+    include/pcre/pcre2_study.c
+    include/pcre/pcre2_substitute.c
+    include/pcre/pcre2_substring.c
+    include/pcre/pcre2_tables.c
+    include/pcre/pcre2_ucd.c
+    include/pcre/pcre2_valid_utf.c
+    include/pcre/pcre2_xclass.c
 )
+
 file(GLOB std_srcs
     src/std/array.c
     src/std/buffer.c
     src/std/bytes.c
     src/std/cast.c
     src/std/date.c
+    src/std/debug.c
     src/std/error.c
     src/std/file.c
     src/std/fun.c
@@ -134,27 +169,32 @@ set_target_properties(libhl
     PROPERTIES
     VERSION ${HL_VERSION}
     SOVERSION ${HL_VERSION_MAJOR}
-    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16"
 )
 
-add_executable(hl
-    src/code.c
-    src/jit.c
-    src/main.c
-    src/module.c
-    src/debugger.c
-    src/profile.c
-)
+if (WITH_VM)
+    add_executable(hl
+        src/code.c
+        src/jit.c
+        src/main.c
+        src/module.c
+        src/debugger.c
+        src/profile.c
+    )
 
-if (UNIX AND NOT APPLE)
-    set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+    if (UNIX AND NOT APPLE)
+        set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+    endif()
+
+    target_link_libraries(hl libhl)
+
+    if (WIN32)
+        target_link_libraries(hl user32)
+    endif()
 endif()
-
-target_link_libraries(hl libhl)
 
 if(WIN32)
     target_link_libraries(libhl ws2_32 user32)
-    target_link_libraries(hl user32)
 else()
     target_link_libraries(libhl m dl pthread)
 endif()
@@ -271,16 +311,26 @@ if(BUILD_TESTING)
 
     #####################
     # Tests
+    if (WITH_VM)
+        add_test(NAME version
+            COMMAND hl --version
+        )
+        set_tests_properties(version
+            PROPERTIES
+            PASS_REGULAR_EXPRESSION "${HL_VERSION}"
+        )
 
-    add_test(NAME hello.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
-    )
-    add_test(NAME threads.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
-    )
-    add_test(NAME uvsample.hl
-        COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
-    )
+        add_test(NAME hello.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
+        )
+        add_test(NAME threads.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
+        )
+        add_test(NAME uvsample.hl
+            COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl 6001
+        )
+    endif()
+
     add_test(NAME hello
         COMMAND hello
     )
@@ -288,16 +338,8 @@ if(BUILD_TESTING)
         COMMAND threads
     )
     add_test(NAME uvsample
-        COMMAND uvsample
+        COMMAND uvsample 6002
     )
-    add_test(NAME version
-        COMMAND hl --version
-    )
-    set_tests_properties(version
-        PROPERTIES
-        PASS_REGULAR_EXPRESSION "${HL_VERSION}"
-    )
-
 endif()
 
 #####################
@@ -319,18 +361,35 @@ endif()
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
+if(MSVC)
+    if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+        set (CMAKE_INSTALL_PREFIX "C:/HaxeToolkit/hashlink" CACHE PATH "default install path" FORCE)
+    endif()
+
+    set(CMAKE_INSTALL_BINDIR .)
+    set(CMAKE_INSTALL_LIBDIR .)
+endif()
+
 set(HDLL_DESTINATION
     ${CMAKE_INSTALL_LIBDIR}
 )
 
+set(INSTALL_TARGETS libhl)
+if (WITH_VM)
+    list(APPEND INSTALL_TARGETS hl)
+endif()
+
 install(
     TARGETS
-        hl
-        libhl
+        ${INSTALL_TARGETS}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(
+    FILES src/hlc_main.c
+    TYPE INCLUDE
 )
 
 # uninstall target

@@ -39,6 +39,7 @@
 #	include <conio.h>
 #	include <fcntl.h>
 #	include <io.h>
+#	include <psapi.h>
 #	define getenv _wgetenv
 #	define putenv _wputenv
 #	define getcwd(buf,size) (void*)(int_val)GetCurrentDirectoryW(size,buf)
@@ -148,7 +149,7 @@ HL_PRIM int hl_sys_set_flags( int flags ) {
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
-#	ifdef HL_XBO
+#	if defined(HL_XBO) || defined(HL_XBS)
 	OutputDebugStringW((LPCWSTR)msg);
 #	else	
 #	ifdef HL_WIN_DESKTOP
@@ -179,6 +180,20 @@ HL_PRIM void hl_sys_profile_event( int code, vbyte *data, int dataLen ) {
 HL_PRIM void hl_sys_exit( int code ) {
 	if( f_before_exit ) ((void(*)())f_before_exit)();
 	exit(code);
+}
+
+static void *f_vtune_init = NULL;
+static void *g_vtune_module = NULL;
+HL_PRIM void hl_setup_vtune( void *vtune_init, void *m ) {
+	f_vtune_init = vtune_init;
+	g_vtune_module = m;
+}
+
+HL_PRIM void hl_sys_vtune_init() {
+	if( f_vtune_init ) {
+		getchar();
+		((void(*)(void*))f_vtune_init)(g_vtune_module);
+	}
 }
 
 #ifdef HL_DEBUG_REPRO
@@ -607,6 +622,18 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 #endif
 }
 
+HL_PRIM double hl_sys_process_memory() {
+#if defined(HL_WIN_DESKTOP)
+	PROCESS_MEMORY_COUNTERS inf;
+	GetProcessMemoryInfo(GetCurrentProcess(),&inf,sizeof(inf));
+	return (double)inf.WorkingSetSize;
+#elif defined(HL_CONSOLE)
+	return sys_process_memory();
+#else
+	return 0.;
+#endif
+}
+
 HL_PRIM int hl_sys_get_char( bool b ) {
 #	if defined(HL_WIN_DESKTOP)
 	return b?getche():getch();
@@ -711,10 +738,12 @@ DEFINE_PRIM(_F64, sys_thread_cpu_time, _NO_ARG);
 DEFINE_PRIM(_ARR, sys_read_dir, _BYTES);
 DEFINE_PRIM(_BYTES, sys_full_path, _BYTES);
 DEFINE_PRIM(_BYTES, sys_exe_path, _NO_ARG);
+DEFINE_PRIM(_F64, sys_process_memory, _NO_ARG);
 DEFINE_PRIM(_I32, sys_get_char, _BOOL);
 DEFINE_PRIM(_ARR, sys_args, _NO_ARG);
 DEFINE_PRIM(_I32, sys_getpid, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_check_reload, _BYTES);
 DEFINE_PRIM(_VOID, sys_profile_event, _I32 _BYTES _I32);
+DEFINE_PRIM(_VOID, sys_vtune_init, _NO_ARG);
 DEFINE_PRIM(_I32, sys_set_flags, _I32);
 DEFINE_PRIM(_BOOL, sys_has_debugger, _NO_ARG);

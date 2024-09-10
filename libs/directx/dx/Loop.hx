@@ -4,8 +4,10 @@ class Loop {
 
 	static function eventLoop( e : Event ) {
 		for( w in @:privateAccess Window.windows )
-			if( w.getNextEvent(e) )
+			if( w.getNextEvent(e) ) {
+				e.windowId = w.id;
 				return true;
+			}
 		return false;
 	}
 

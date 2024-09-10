@@ -237,6 +237,10 @@ HL_PRIM int hl_bytes_subtract( vbyte *a, vbyte *b ) {
 	return (int)(a - b);
 }
 
+HL_PRIM int_val hl_bytes_address64( vbyte *a ) {
+	return (int_val)a;
+}
+
 HL_PRIM int hl_bytes_address( vbyte *a, int *high ) {
 #	ifdef HL_64
 	*high = (int)(((uint64)a)>>32);
@@ -256,6 +260,10 @@ HL_PRIM vbyte *hl_bytes_from_address( int low, int high ) {
 #	else
 	return (vbyte*)low;
 #	endif
+}
+
+HL_PRIM vbyte *hl_bytes_from_address64( int_val v ) {
+	return (vbyte*)v;
 }
 
 HL_PRIM int hl_string_compare( vbyte *a, vbyte *b, int len ) {
@@ -278,3 +286,5 @@ DEFINE_PRIM(_BYTES,bytes_offset, _BYTES _I32);
 DEFINE_PRIM(_I32,bytes_subtract, _BYTES _BYTES);
 DEFINE_PRIM(_I32,bytes_address, _BYTES _REF(_I32));
 DEFINE_PRIM(_BYTES,bytes_from_address, _I32 _I32);
+DEFINE_PRIM(_I64,bytes_address64, _BYTES);
+DEFINE_PRIM(_BYTES,bytes_from_address64, _I64);

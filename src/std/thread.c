@@ -219,12 +219,18 @@ HL_PRIM hl_semaphore *hl_semaphore_alloc(int value) {
 HL_PRIM void hl_semaphore_acquire(hl_semaphore *sem) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
+	hl_blocking(true);
 	WaitForSingleObject(sem->sem, INFINITE);
+	hl_blocking(false);
 #	else
 #	ifdef __APPLE__
+	hl_blocking(true);
 	dispatch_semaphore_wait(sem->sem, DISPATCH_TIME_FOREVER);
+	hl_blocking(false);
 #	else
+	hl_blocking(true);
 	sem_wait(&sem->sem);
+	hl_blocking(false);
 #	endif
 #	endif
 }
@@ -233,16 +239,24 @@ HL_PRIM bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
 #	if !defined(HL_THREADS)
 	return true;
 #	elif defined(HL_WIN)
-	return WaitForSingleObject(sem->sem,
+	hl_blocking(true);
+	bool ret = WaitForSingleObject(sem->sem,
 	                           timeout ? (DWORD)((FLOAT)timeout->v.d * 1000.0)
 	                                   : 0) == WAIT_OBJECT_0;
+	hl_blocking(false);
+	return ret;
 #	else
 #	ifdef __APPLE__
-	return dispatch_semaphore_wait(
+	hl_blocking(true);
+	bool ret = dispatch_semaphore_wait(
 	           sem->sem, dispatch_time(DISPATCH_TIME_NOW,
 	                              (int64_t)((timeout ? timeout->v.d : 0) *
 	                                        1000 * 1000 * 1000))) == 0;
+	hl_blocking(false);
+	return ret;
 #	else
+	hl_blocking(true);
+	bool ret;
 	if (timeout) {
 		struct timeval tv;
 		struct timespec t;
@@ -256,11 +270,12 @@ HL_PRIM bool hl_semaphore_try_acquire(hl_semaphore *sem, vdynamic *timeout) {
 		delta -= idelta2 * 1e9;
 		t.tv_sec = tv.tv_sec + idelta + idelta2;
 		t.tv_nsec = (long)delta;
-		return sem_timedwait(&sem->sem, &t) == 0;
+		ret = sem_timedwait(&sem->sem, &t) == 0;
 	} else {
-
-		return sem_trywait(&sem->sem) == 0;
+		ret = sem_trywait(&sem->sem) == 0;
 	}
+	hl_blocking(false);
+	return ret;
 #	endif
 #	endif
 }
@@ -333,9 +348,13 @@ HL_PRIM hl_condition *hl_condition_alloc() {
 HL_PRIM void hl_condition_acquire(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
+	hl_blocking(true);
 	EnterCriticalSection(&cond->cs);
+	hl_blocking(false);
 #	else
+	hl_blocking(true);
 	pthread_mutex_lock(&cond->mutex);
+	hl_blocking(false);
 #	endif
 }
 
@@ -360,9 +379,13 @@ HL_PRIM void hl_condition_release(hl_condition *cond) {
 HL_PRIM void hl_condition_wait(hl_condition *cond) {
 #	if !defined(HL_THREADS)
 #	elif defined(HL_WIN)
+	hl_blocking(true);
 	SleepConditionVariableCS(&cond->cond, &cond->cs, INFINITE);
+	hl_blocking(false);
 #	else
+	hl_blocking(true);
 	pthread_cond_wait(&cond->cond, &cond->mutex);
+	hl_blocking(false);
 #	endif
 }
 
@@ -370,8 +393,10 @@ HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 #	if !defined(HL_THREADS)
 	return true;
 #	elif defined(HL_WIN)
+	hl_blocking(true);
 	SleepConditionVariableCS(&cond->cond, &cond->cs,
 	                         (DWORD)((FLOAT)timeout * 1000.0));
+	hl_blocking(false);
 	return true;
 #	else
 	struct timeval tv;
@@ -386,7 +411,10 @@ HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 	delta -= idelta2 * 1e9;
 	t.tv_sec = tv.tv_sec + idelta + idelta2;
 	t.tv_nsec = (long)delta;
-	return pthread_cond_timedwait(&cond->cond, &cond->mutex, &t) == 0;
+	hl_blocking(true);
+	bool ret = pthread_cond_timedwait(&cond->cond, &cond->mutex, &t) == 0;
+	hl_blocking(false);
+	return ret;
 #	endif
 }
 
@@ -812,7 +840,6 @@ HL_PRIM int hl_thread_id() {
 #elif defined(SYS_gettid) && !defined(HL_TVOS)
 	return syscall(SYS_gettid);
 #else
-	hl_error("hl_thread_id() not available for this platform");
 	return -1;
 #endif
 }
@@ -1005,7 +1032,7 @@ HL_PRIM int hl_atomic_add32(int *a, int b) {
 #if defined(HL_GCC_ATOMICS)
   return __atomic_fetch_add(a, b, __ATOMIC_SEQ_CST);
 #elif defined(HL_VCC_ATOMICS)
-  return _InterlockedExchangeAdd((LONG volatile *)a, b);
+  return _InterlockedExchangeAdd((long volatile *)a, b);
 #endif
 }
 
@@ -1013,7 +1040,7 @@ HL_PRIM int hl_atomic_sub32(int *a, int b) {
 #if defined(HL_GCC_ATOMICS)
   return __atomic_fetch_sub(a, b, __ATOMIC_SEQ_CST);
 #elif defined(HL_VCC_ATOMICS)
-  return _InterlockedExchangeAdd((LONG volatile *)a, -b);
+  return _InterlockedExchangeAdd((long volatile *)a, -b);
 #endif
 }
 
@@ -1021,7 +1048,7 @@ HL_PRIM int hl_atomic_and32(int *a, int b) {
 #if defined(HL_GCC_ATOMICS)
   return __atomic_fetch_and(a, b, __ATOMIC_SEQ_CST);
 #elif defined(HL_VCC_ATOMICS)
-  return _InterlockedAnd((LONG volatile *)a, b);
+  return _InterlockedAnd((long volatile *)a, b);
 #endif
 }
 
@@ -1029,7 +1056,7 @@ HL_PRIM int hl_atomic_or32(int *a, int b) {
 #if defined(HL_GCC_ATOMICS)
   return __atomic_fetch_or(a, b, __ATOMIC_SEQ_CST);
 #elif defined(HL_VCC_ATOMICS)
-  return _InterlockedOr((LONG volatile *)a, b);
+  return _InterlockedOr((long volatile *)a, b);
 #endif
 }
 
@@ -1037,7 +1064,7 @@ HL_PRIM int hl_atomic_xor32(int *a, int b) {
 #if defined(HL_GCC_ATOMICS)
   return __atomic_fetch_xor(a, b, __ATOMIC_SEQ_CST);
 #elif defined(HL_VCC_ATOMICS)
-  return _InterlockedXor((LONG volatile *)a, b);
+  return _InterlockedXor((long volatile *)a, b);
 #endif
 }
 
@@ -1049,7 +1076,7 @@ HL_PRIM int hl_atomic_compare_exchange32(int *a, int expected,
                             __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
   return _expected;
 #elif defined(HL_VCC_ATOMICS)
-  return _InterlockedCompareExchange((LONG volatile *)a, replacement, expected);
+  return _InterlockedCompareExchange((long volatile *)a, replacement, expected);
 #endif
 }
 
@@ -1072,7 +1099,7 @@ HL_PRIM int hl_atomic_exchange32(int *a, int replacement) {
   __atomic_exchange(a, &replacement, &ret, __ATOMIC_SEQ_CST);
   return ret;
 #elif defined(HL_VCC_ATOMICS)
-  return _InterlockedExchange((LONG volatile *)a, replacement);
+  return _InterlockedExchange((long volatile *)a, replacement);
 #endif
 }
 
@@ -1092,7 +1119,7 @@ HL_PRIM int hl_atomic_load32(int *a) {
   __atomic_load(a, &ret, __ATOMIC_SEQ_CST);
   return ret;
 #elif defined(HL_VCC_ATOMICS)
-  return _InterlockedXor((LONG volatile *)a, 0);
+  return _InterlockedXor((long volatile *)a, 0);
 #endif
 }
 
@@ -1105,7 +1132,7 @@ HL_PRIM void *hl_atomic_load_ptr(void **a) {
 #ifdef HL_64
   return (void *)_InterlockedXor64((__int64 volatile *)a, 0);
 #else
-  return (void *)_InterlockedXor((LONG volatile *)a, 0);
+  return (void *)_InterlockedXor((long volatile *)a, 0);
 #endif
 #endif
 }
@@ -1115,7 +1142,7 @@ HL_PRIM int hl_atomic_store32(int *a, int value) {
   __atomic_store(a, &value, __ATOMIC_SEQ_CST);
   return value;
 #elif defined(HL_VCC_ATOMICS)
-  _InterlockedExchange((LONG volatile *)a, value);
+  _InterlockedExchange((long volatile *)a, value);
   return value;
 #endif
 }

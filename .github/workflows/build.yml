@@ -22,19 +22,26 @@ jobs:
       fail-fast: false
       matrix:
         target: [linux, darwin, windows]
-        architecture: [32, 64]
+        architecture: [32, 64, arm64]
         build_system: [make, cmake, vs2019]
 
         include:
           - target: linux
-            runner: ubuntu-18.04
+            runner: ubuntu-20.04
             haxe_nightly_dir: linux64
             archive_ext: tar.gz
 
           - target: darwin
-            runner: macos-10.15
             haxe_nightly_dir: mac
             archive_ext: tar.gz
+
+          - target: darwin
+            architecture: 64
+            runner: macos-12
+
+          - target: darwin
+            architecture: arm64
+            runner: macos-14
 
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
@@ -68,19 +75,32 @@ jobs:
           - target: darwin
             build_system: vs2019
 
+          - target: linux
+            architecture: 32
+
           - target: darwin
             architecture: 32
+
+          - target: linux
+            architecture: arm64
+
+          - target: windows
+            architecture: arm64
 
           - target: windows
             build_system: make
 
+          - target: windows
+            architecture: 32
+            build_system: cmake
+
     steps:
     - name: "SCM Checkout"
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Add msbuild to PATH
       if: matrix.build_system == 'vs2019'
-      uses: microsoft/setup-msbuild@v1.0.3
+      uses: microsoft/setup-msbuild@v2
       with:
         vs-version: '[16.0,17.0)'
 
@@ -89,25 +109,6 @@ jobs:
         set -eux
 
         case "${{ matrix.target }}${{ matrix.architecture }}" in
-          linux32)
-            echo "MARCH=32" >> $GITHUB_ENV
-            sudo dpkg --add-architecture i386
-            sudo apt-get update -y
-            sudo apt-get install --no-install-recommends -y \
-              gcc-multilib \
-              libalut-dev:i386 \
-              libmbedtls-dev:i386 \
-              libopenal-dev:i386 \
-              libpng-dev:i386 \
-              libsdl2-dev:i386 \
-              libturbojpeg0-dev:i386 \
-              libuv1-dev:i386 \
-              libvorbis-dev:i386 \
-              libz-dev:i386 \
-              zlib1g-dev:i386 \
-              libsqlite3-dev:i386
-            ;;
-
           linux64)
             echo "MARCH=64" >> $GITHUB_ENV
             sudo apt-get update -y
@@ -128,8 +129,8 @@ jobs:
             ;;
 
           windows*)
-            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/sdl.zip https://www.libsdl.org/release/SDL2-devel-2.0.5-VC.zip
-            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/openal.zip https://openal-soft.org/openal-binaries/openal-soft-1.17.2-bin.zip
+            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/sdl.zip https://www.libsdl.org/release/SDL2-devel-2.30.2-VC.zip
+            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/openal.zip https://github.com/kcat/openal-soft/releases/download/1.23.1/openal-soft-1.23.1-bin.zip
             curl -fsSL --retry 3 --retry-delay 5 -o /tmp/ffmpeg.zip ${{ matrix.ffmpeg_url }}
             7z x /tmp/sdl.zip    -oinclude; mv include/SDL2*   include/sdl
             7z x /tmp/openal.zip -oinclude; mv include/openal* include/openal
@@ -137,51 +138,10 @@ jobs:
             ;;
         esac
 
-
-    - name: "Install: Neko"
-      run: |
-        set -eux
-
-        case "${{ matrix.target }}" in
-          linux)
-            sudo apt-get install --no-install-recommends -y neko
-            ;;
-
-          darwin)
-            brew install neko
-            ;;
-
-          windows)
-            choco install --no-progress neko -y
-            nekopath=$(find C:/ProgramData/chocolatey/lib/neko -name neko.dll -printf '%h\n')
-            echo "NEKOPATH=$nekopath" >> $GITHUB_ENV
-            ;;
-        esac
-        neko || true # print neko version
-
-
-    - name: "Install: Haxe latest"
-      run: |
-        set -eux
-
-        download_url="https://build.haxe.org/builds/haxe/${{ matrix.haxe_nightly_dir }}/haxe_latest.${{ matrix.archive_ext }}"
-        echo "Downloading [$download_url]..."
-        if [[ ${{ matrix.target }} == windows ]]; then
-          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.zip
-          7z x /tmp/haxe.zip -o/tmp
-          mv -v /tmp/haxe_* /tmp/haxe
-          cygpath -w '/tmp/haxe/' >> $GITHUB_PATH
-          echo "HAXE_STD_PATH=$(cygpath -w '/tmp/haxe/std')" >> $GITHUB_ENV
-        else
-          mkdir /tmp/haxe
-          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.tar.gz
-          tar xzvf /tmp/haxe.tar.gz -C /tmp/haxe --strip-components=1
-          echo "/tmp/haxe/" >> $GITHUB_PATH
-          echo "HAXE_STD_PATH=/tmp/haxe/std" >> $GITHUB_ENV
-        fi
-
-        /tmp/haxe/haxe --version
-
+    - name: Install haxe
+      uses: krdlab/setup-haxe@f0a0baa8ccdb1fe4fc316c8f30eb3ca77aa4ea4e
+      with:
+        haxe-version: latest
 
     - name: "Configure: Haxelib"
       run: |
@@ -199,8 +159,6 @@ jobs:
         case "${{ matrix.build_system }}" in
           cmake)
             case "${{ matrix.target }}${{ matrix.architecture }}" in
-              linux32)
-                cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake ;;
               windows*)
                 cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
                   -G "${{ matrix.cmake_generator }}" \
@@ -228,9 +186,6 @@ jobs:
 
           make)
             make
-            if [[ ${{ matrix.target }} == darwin ]]; then
-              sudo make codesign_osx
-            fi
             sudo make install
             if [[ ${{ matrix.target }} == linux ]]; then
               sudo ldconfig
@@ -254,14 +209,22 @@ jobs:
             ${{ env.WINDOWS_BUILD_FOLDER }}/hl.exe --version
             ;;
           make)
-            ./hl --version
-            case ${{ matrix.target }} in
-              linux)  ldd -v ./hl ;;
-              darwin) otool -L ./hl ;;
-            esac
+            if [[ ${{ matrix.architecture }} != arm64 ]]; then
+              ./hl --version
+              case ${{ matrix.target }} in
+                linux)  ldd -v ./hl ;;
+                darwin) otool -L ./hl ;;
+              esac
 
-            haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
-            ./hl hello.hl
+              haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
+              ./hl hello.hl
+
+              # ensure the executable still works when installed globally
+              cp hello.hl /tmp
+              pushd /tmp
+              hl hello.hl
+              popd
+            fi
 
             haxe -hl src/_main.c -cp other/tests -main HelloWorld
             make hlc
@@ -275,9 +238,9 @@ jobs:
         set -eux
 
         case "${{ matrix.target }}${{matrix.architecture}}" in
-          darwin*)   platform_name=darwin ;;
+          darwinarm64)   platform_name=darwin-arm64 ;;
+          darwin64)   platform_name=darwin ;;
           windows*)  platform_name=win${{matrix.architecture}} ;;
-          linux32)   platform_name=linux-i386 ;;
           linux64)   platform_name=linux-amd64 ;;
         esac
 
@@ -300,8 +263,9 @@ jobs:
 
 
     - name: "Share: build artifact"
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
+        name: ${{ matrix.target }}-${{ matrix.build_system }}-${{ matrix.architecture }}
         path: ${{ env.HASHLINK_DISTRIBUTION }}
 
 
@@ -317,30 +281,17 @@ jobs:
     steps:
 
     - name: "SCM Checkout"
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: "Get: all build artifacts"
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4
 
     - name: "Delete previous 'latest' release"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -eu
-
-        api_base_url="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
-
-        # delete 'latest' github release
-        release_id=$(curl -fsL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/$GITHUB_REPOSITORY/releases | jq -r '.[] | select(.tag_name == "latest") | .id')
-        if [[ -n $release_id ]]; then
-           echo "Deleting release [$api_base_url/releases/$release_id]..."
-           curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -fsSL -X DELETE "$api_base_url/releases/$release_id"
-        fi
-
-        # delete 'latest' git tag
-        tag_url="$api_base_url/git/refs/tags/latest"
-        if curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -fsLo /dev/null --head "$tag_url"; then
-           echo "Deleting tag [$tag_url]..."
-           curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -fsSL -X DELETE "$tag_url"
-        fi
+        gh release delete latest --cleanup-tag --yes || true
 
     - name: "Create 'latest' Release"
       env:
@@ -355,8 +306,8 @@ jobs:
         gh release create latest \
           --prerelease \
           --title "HashLink Nightly Build" \
-          "artifact/hashlink-${short_commit}-darwin.tar.gz#hashlink-latest-darwin.tar.gz" \
-          "artifact/hashlink-${short_commit}-linux-i386.tar.gz#hashlink-latest-linux-i386.tar.gz" \
-          "artifact/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
-          "artifact/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
-          "artifact/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"
+          "darwin-make-64/hashlink-${short_commit}-darwin.tar.gz#hashlink-latest-darwin.tar.gz" \
+          "darwin-make-arm64/hashlink-${short_commit}-darwin-arm64.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
+          "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
+          "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
+          "windows-vs2019-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"

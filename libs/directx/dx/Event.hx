@@ -14,35 +14,40 @@ package dx;
 	public var keyRepeat : Bool;
 	public var controller : Int;
 	public var value : Int;
+	public var dropFile: hl.Bytes;
+	public var windowId : Int;
 	public function new() {
 	}
 }
 
-@:enum abstract EventType(Int) {
-	var Quit		= 0;
-	var MouseMove	= 1;
-	var MouseLeave	= 2;
-	var MouseDown	= 3;
-	var MouseUp		= 4;
-	var MouseWheel	= 5;
-	var WindowState	= 6;
-	var KeyDown		= 7;
-	var KeyUp		= 8;
-	var TextInput	= 9;
+enum abstract EventType(Int) {
+	var Quit        = 0;
+	var MouseMove   = 1;
+	var MouseLeave  = 2;
+	var MouseDown   = 3;
+	var MouseUp     = 4;
+	var MouseWheel  = 5;
+	var WindowState = 6;
+	var KeyDown     = 7;
+	var KeyUp       = 8;
+	var TextInput   = 9;
+	var DropStart   = 10;
+	var DropFile    = 11;
+	var DropEnd     = 12;
 }
 
-@:enum abstract WindowStateChange(Int) {
-	var Show	= 0;
-	var Hide	= 1;
-	var Expose	= 2;
-	var Move	= 3;
-	var Resize	= 4;
-	var Minimize= 5;
-	var Maximize= 6;
-	var Restore	= 7;
-	var Enter	= 8;
-	var Leave	= 9;
-	var Focus	= 10;
-	var Blur	= 11;
-	var Close 	= 12;
+enum abstract WindowStateChange(Int) {
+	var Show     = 0;
+	var Hide     = 1;
+	var Expose   = 2;
+	var Move     = 3;
+	var Resize   = 4;
+	var Minimize = 5;
+	var Maximize = 6;
+	var Restore  = 7;
+	var Enter    = 8;
+	var Leave    = 9;
+	var Focus    = 10;
+	var Blur     = 11;
+	var Close    = 12;
 }

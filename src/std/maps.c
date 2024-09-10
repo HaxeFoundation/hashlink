@@ -137,6 +137,8 @@ static int hl_freelist_get( hl_free_list *f ) {
 	return p;
 }
 
+#define _MVAL_TYPE vdynamic*
+
 // ----- INT MAP ---------------------------------
 
 typedef struct {
@@ -245,6 +247,32 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 #define _MERASE(c)  m->values[c].key = NULL
 
 #include "maps.h"
+
+// ----- LOOKUP MAP ---------------------------------
+
+#undef _MVAL_TYPE
+#define _MVAL_TYPE int
+
+typedef struct {
+	void *key;
+} hl_mlookup__entry;
+
+typedef struct {
+	int value;
+} hl_mlookup__value;
+
+#define hl_mlookup_hash(h) ((unsigned int)(int_val)(h))
+#define _MKEY_TYPE	void*
+#define _MNAME(n)	hl_mlookup_##n
+#define _MMATCH(c)	m->entries[c].key == key
+#define _MKEY(m,c)	m->entries[c].key
+#define	_MSET(c)	m->entries[c].key = key
+#define _MERASE(c)
+#define _MNO_EXPORTS
+
+#include "maps.h"
+
+/// ----------------------------------------------
 
 #define _IMAP _ABSTRACT(hl_int_map)
 DEFINE_PRIM( _IMAP, hialloc, _NO_ARG );

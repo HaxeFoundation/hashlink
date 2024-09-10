@@ -2,8 +2,8 @@ package sdl;
 
 private typedef CursorPtr = hl.Abstract<"sdl_cursor">;
 
-@:enum abstract CursorKind(Int) {
-	var Arrow = 0;
+enum abstract CursorKind(Int) {
+    var Arrow = 0;
     var IBeam = 1;
     var Wait = 2;
     var CrossHair = 3;

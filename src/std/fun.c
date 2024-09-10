@@ -338,7 +338,7 @@ HL_PRIM void *hl_dyn_call_obj( vdynamic *o, hl_type *ft, int hfield, void **args
 			hl_field_lookup *l = hl_lookup_find(d->lookup,d->nfields, hfield);
 			if( l != NULL && l->t->kind != HFUN )
 				hl_error("Field %s is of type %s and cannot be called", hl_field_name(hfield), hl_type_str(l->t));
-			vclosure *tmp = (vclosure*)d->values[l->field_index];
+			vclosure *tmp = (vclosure*)d->values[l->field_index&HL_DYNOBJ_INDEX_MASK];
 			if( tmp ) {
 				vclosure_wrapper w;
 				w.cl.t = ft;
@@ -446,6 +446,7 @@ DEFINE_PRIM(_BOOL, is_prim_loaded, _DYN);
 
 #if defined(HL_VCC) && !defined(HL_XBO)
 static LONG CALLBACK global_handler( PEXCEPTION_POINTERS inf ) {
+	if( hl_get_thread() == NULL ) return EXCEPTION_CONTINUE_SEARCH;
 	switch( inf->ExceptionRecord->ExceptionCode ) {
 	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
 	case EXCEPTION_STACK_OVERFLOW: hl_error("Stack overflow");

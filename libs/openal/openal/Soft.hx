@@ -355,7 +355,7 @@ extern class Soft {
 	// ------------------------------------------------------------------------
 
 	public static inline var FORMAT_BFORMAT2D_8                    = 0x20021;
-	public static inline var FORMAT_BFORMAT2D_16                   = 0x20022;	
+	public static inline var FORMAT_BFORMAT2D_16                   = 0x20022;
 	public static inline var FORMAT_BFORMAT2D_FLOAT32              = 0x20023;
 	public static inline var FORMAT_BFORMAT3D_8                    = 0x20031;
 	public static inline var FORMAT_BFORMAT3D_16                   = 0x20032;

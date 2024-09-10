@@ -236,18 +236,21 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 		start = p->nfields;
 		memcpy(t->fields_indexes, p->fields_indexes, sizeof(int)*p->nfields);
 	}
-	size = p ? p->size : (ot->kind == HSTRUCT ? 0 : HL_WSIZE); // hl_type*
+	size = p ? p->size - p->pad_size : (ot->kind == HSTRUCT ? 0 : HL_WSIZE); // hl_type*
 	nlookup = 0;
+	int largest_field = p ? p->largest_field : size;
 	for(i=0;i<o->nfields;i++) {
 		hl_type *ft = o->fields[i].t;
-		hl_type *pad = ft;
-		while( pad->kind == HPACKED ) {
-			// align on first field
-			pad = pad->tparam;
-			while( pad->obj->super && hl_get_obj_rt(pad->obj->super)->nfields ) pad = pad->obj->super;
-			pad = pad->obj->fields[0].t;
-		}
-		size += hl_pad_struct(size,pad);
+		if( ft->kind == HPACKED ) {
+			// align on packed largest field
+			int large = hl_get_obj_rt(ft->tparam)->largest_field;
+			int pad = size % large;
+			if( pad != 0 )
+				size += large - pad;
+			if( large > largest_field )
+				largest_field = large;
+		} else
+			size += hl_pad_struct(size,ft);
 		t->fields_indexes[i+start] = size;
 		if( *o->fields[i].name )
 			hl_lookup_insert(t->lookup,nlookup++,o->fields[i].hashed_name,o->fields[i].t,size);
@@ -259,10 +262,22 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 			if( rts->hasPtr ) t->hasPtr = true;
 			continue;
 		}
-		size += hl_type_size(ft);
+		int sz = hl_type_size(ft);
+		size += sz;
+		if( sz > largest_field ) largest_field = sz;
 		if( !t->hasPtr && hl_is_ptr(ft) ) t->hasPtr = true;
 	}
 	t->size = size;
+	t->pad_size = 0;
+	// align size on largest field size to match C, so arr[i].field is always aligned
+	if( largest_field > 0 ) {
+		int pad = size % largest_field;
+		if( pad != 0 ) {
+			t->pad_size = largest_field - pad;
+			t->size += t->pad_size;
+		}
+	}
+	t->largest_field = largest_field;
 	t->nmethods = p ? p->nmethods : o->nproto;
 	t->methods = NULL;
 	o->rt = t;
@@ -495,7 +510,8 @@ HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx ) {
 	}
 }
 
-#define hl_dynobj_field(o,f) (hl_is_ptr((f)->t) ? (void*)((o)->values + (f)->field_index) : (void*) ((o)->raw_data + (f)->field_index))
+#define hl_dynobj_field(o,f) (hl_is_ptr((f)->t) ? (void*)((o)->values + ((f)->field_index&HL_DYNOBJ_INDEX_MASK)) : (void*) ((o)->raw_data + ((f)->field_index&HL_DYNOBJ_INDEX_MASK)))
+#define hl_dynobj_order(f) (((unsigned)(f)->field_index) >> HL_DYNOBJ_INDEX_SHIFT)
 
 vdynamic *hl_virtual_make_value( vvirtual *v ) {
 	vdynobj *o;
@@ -518,6 +534,8 @@ vdynamic *hl_virtual_make_value( vvirtual *v ) {
 			f->field_index = raw_size;
 			raw_size += hl_type_size(f->t);
 		}
+		if( f->field_index > HL_DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj fields");
+		f->field_index |= (i << HL_DYNOBJ_INDEX_SHIFT);
 	}
 	// copy the data & rebind virtual addresses
 	o->raw_data = hl_gc_alloc_noptr(raw_size);
@@ -681,7 +699,8 @@ static void hl_dynobj_remap_virtuals( vdynobj *o, hl_field_lookup *f, int_val ad
 
 static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 	int i;
-	int index = f->field_index;
+	unsigned int order = hl_dynobj_order(f);
+	int index = f->field_index & HL_DYNOBJ_INDEX_MASK;
 	bool is_ptr = hl_is_ptr(f->t); 
 	// erase data
 	if( is_ptr ) {
@@ -690,7 +709,7 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 		o->values[o->nvalues] = NULL;
 		for(i=0;i<o->nfields;i++) {
 			hl_field_lookup *f = o->lookup + i;
-			if( hl_is_ptr(f->t) && f->field_index > index )
+			if( hl_is_ptr(f->t) && (f->field_index&HL_DYNOBJ_INDEX_MASK) > index )
 				f->field_index--;
 		}
 	} else {
@@ -720,6 +739,12 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 	int field = (int)(f - o->lookup);
 	memmove(o->lookup + field, o->lookup + field + 1, (o->nfields - (field + 1)) * sizeof(hl_field_lookup));
 	o->nfields--;
+	// remap order indexes
+	for(i=0;i<o->nfields;i++) {
+		hl_field_lookup *f = o->lookup + i;
+		if( hl_dynobj_order(f) > order )
+			f->field_index -= 1 << HL_DYNOBJ_INDEX_SHIFT;
+	}
 }
 
 static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t ) {
@@ -728,9 +753,10 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 
 	// expand data
 	if( hl_is_ptr(t) ) {
+		index = o->nvalues;
+		if( index > HL_DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj values");
 		void **nvalues = hl_gc_alloc_raw( (o->nvalues + 1) * sizeof(void*) );
 		memcpy(nvalues,o->values,o->nvalues * sizeof(void*));
-		index = o->nvalues;
 		nvalues[index] = NULL;
 		address_offset = (char*)nvalues - (char*)o->values;
 		o->values = nvalues;
@@ -748,6 +774,9 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 			raw_size = o->raw_size;
 		int pad = hl_pad_size(raw_size, t);
 		int size = hl_type_size(t);
+
+		if( raw_size + pad > HL_DYNOBJ_INDEX_MASK ) hl_error("Too many dynobj values");
+
 		char *newData = (char*)hl_gc_alloc_noptr(raw_size + pad + size);
 		if( raw_size == o->raw_size )
 			memcpy(newData,o->raw_data,o->raw_size);
@@ -755,11 +784,11 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 			raw_size = 0;
 			for(i=0;i<o->nfields;i++) {
 				hl_field_lookup *f = o->lookup + i;
-				int index = f->field_index;
+				int index = f->field_index & HL_DYNOBJ_INDEX_MASK;
 				if( hl_is_ptr(f->t) ) continue;
 				raw_size += hl_pad_size(raw_size, f->t);
 				memcpy(newData + raw_size, o->raw_data + index, hl_type_size(f->t));
-				f->field_index = raw_size;
+				f->field_index = raw_size | (hl_dynobj_order(f) << HL_DYNOBJ_INDEX_SHIFT);
 				if( index != raw_size )
 					hl_dynobj_remap_virtuals(o, f, 0);
 				raw_size += hl_type_size(f->t);
@@ -780,7 +809,7 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 	hl_field_lookup *f = new_lookup + field_pos;
 	f->t = t;
 	f->hashed_name = hfield;
-	f->field_index = index;
+	f->field_index = index | (o->nfields << HL_DYNOBJ_INDEX_SHIFT);
 	memcpy(new_lookup + (field_pos + 1),o->lookup + field_pos, (o->nfields - field_pos) * sizeof(hl_field_lookup));
 	o->nfields++;
 	o->lookup = new_lookup;
@@ -1221,8 +1250,10 @@ HL_PRIM varray *hl_obj_fields( vdynamic *obj ) {
 			vdynobj *o = (vdynobj*)obj;
 			int i;
 			a = hl_alloc_array(&hlt_bytes,o->nfields);
-			for(i=0;i<o->nfields;i++)
-				hl_aptr(a,vbyte*)[i] = (vbyte*)hl_field_name((o->lookup + i)->hashed_name);
+			for(i=0;i<o->nfields;i++) {
+				hl_field_lookup *f = o->lookup + i;
+				hl_aptr(a,vbyte*)[hl_dynobj_order(f)] = (vbyte*)hl_field_name(f->hashed_name);
+			}
 		}
 		break;
 	case HOBJ:

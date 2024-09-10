@@ -192,7 +192,7 @@ int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out
 							code_size -= s;
 							if( module_addr < (void*)code || module_addr >= (void*)(code + code_size) ) continue;
 						}
-						if( out )							
+						if( out )
 							out[count++] = module_addr;
 						else
 							count++;
@@ -324,7 +324,7 @@ static void append_fields( char **p, hl_type *t ) {
 #define DISABLED_LIB_PTR ((void*)(int_val)2)
 
 static void *resolve_library( const char *lib, bool is_opt ) {
-	char tmp[256];	
+	char tmp[256];
 	void *h;
 
 #	ifndef HL_CONSOLE
@@ -346,7 +346,7 @@ static void *resolve_library( const char *lib, bool is_opt ) {
 
 	if( strcmp(lib,"std") == 0 ) {
 #	ifdef HL_WIN
-#		ifdef HL_64						
+#		ifdef HL_64
 		h = dlopen("libhl64.dll",RTLD_LAZY);
 		if( h == NULL ) h = dlopen("libhl.dll",RTLD_LAZY);
 #		else
@@ -358,7 +358,7 @@ static void *resolve_library( const char *lib, bool is_opt ) {
 		return RTLD_DEFAULT;
 #	endif
 	}
-	
+
 	strcpy(tmp,lib);
 
 #	ifdef HL_64
@@ -366,7 +366,7 @@ static void *resolve_library( const char *lib, bool is_opt ) {
 	h = dlopen(tmp,RTLD_LAZY);
 	if( h != NULL ) return h;
 #	endif
-	
+
 	strcpy(tmp+strlen(lib),".hdll");
 	h = dlopen(tmp,RTLD_LAZY);
 	if( h == NULL && !is_opt )
@@ -438,7 +438,7 @@ static void hl_module_init_indexes( hl_module *m ) {
 	for(i=0;i<m->code->nfunctions;i++) {
 		int k;
 		hl_function *f = m->code->functions + i;
-		hl_function *real_f = f;		
+		hl_function *real_f = f;
 		while( real_f && !real_f->obj ) real_f = real_f->field.ref;
 		if( real_f == NULL ) continue;
 		for(k=0;k<f->nops;k++) {
@@ -471,6 +471,67 @@ static void hl_module_init_indexes( hl_module *m ) {
 	fent->obj = &obj_entry;
 	fent->field.name = USTR("init");
 }
+
+#ifdef HL_VTUNE
+#include <jitprofiling.h>
+h_bool hl_module_init_vtune( hl_module *m ) {
+	int i;
+	if( !iJIT_IsProfilingActive() )
+		return false;
+	for(i=0;i<m->code->nfunctions;i++) {
+		hl_function *f = m->code->functions + i;
+		void *faddr = m->functions_ptrs[f->findex];
+
+		iJIT_Method_Load jm = {0};
+		char out[256];
+		jm.method_id = iJIT_GetNewMethodID();
+		if( f->obj ) {
+			jm.class_file_name = hl_to_utf8(f->obj->name);
+			jm.method_name = hl_to_utf8(f->field.name);
+		} else if( f->field.ref ) {
+			jm.class_file_name = hl_to_utf8(f->field.ref->obj->name);
+			jm.method_name = hl_to_utf8(f->field.ref->field.name);
+		} else {
+			sprintf(out,"fun$%d", f->findex);
+			jm.method_name = out;
+		}
+		jm.method_load_address = faddr;
+		jm.method_size = 0;
+		int j;
+		for(j=0;j<m->code->nfunctions;j++) {
+			hl_function *f2 = m->code->functions + j;
+			if( f2 == f ) continue;
+			void *addr = m->functions_ptrs[f2->findex];
+			int_val dif = (char*)addr - (char*)faddr;
+			if( dif <= 0 ) continue;
+			if( jm.method_size == 0 || dif < jm.method_size ) jm.method_size = (int)dif;
+		}
+
+		int file = f->debug[0] & 0x7FFFFFFF;
+		int curline = -1;
+		LineNumberInfo *lines = (LineNumberInfo*)malloc(sizeof(LineNumberInfo)*f->nops);
+		int nlines = 0;
+		hl_debug_infos *dbg = m->jit_debug + i;
+		jm.source_file_name = m->code->debugfiles[file];
+		for(j=0;j<f->nops;j++) {
+			int file2 = f->debug[j<<1] & 0x7FFFFFFF;
+			int line = f->debug[(j<<1)|1];
+			if( file2 != file || line == curline ) continue;
+			lines[nlines].Offset = dbg->large ? ((int*)dbg->offsets)[j] : ((unsigned short*)dbg->offsets)[j];
+			lines[nlines].LineNumber = line - 1;
+			curline = line;
+			nlines++;
+		}
+		if( nlines && jm.method_size ) {
+			jm.line_number_table = lines;
+			jm.line_number_size = nlines;
+		}
+		iJIT_NotifyEvent(iJVM_EVENT_TYPE_METHOD_LOAD_FINISHED,(void*)&jm);
+		free(lines);
+	}
+	return true;
+}
+#endif
 
 static void hl_module_init_natives( hl_module *m ) {
 	char tmp[256];
@@ -509,7 +570,7 @@ static void hl_module_init_natives( hl_module *m ) {
 		p = tmp;
 		append_type(&p,n->t);
 		*p++ = 0;
-		if( memcmp(sign,tmp,strlen(sign)+1) != 0 )
+		if( sign && memcmp(sign,tmp,strlen(sign)+1) != 0 )
 			hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
 	}
 }
@@ -568,7 +629,8 @@ static void hl_module_add( hl_module *m ) {
 	free(old_modules);
 }
 
-int hl_module_init( hl_module *m, h_bool hot_reload ) {
+void hl_setup_vtune( void *vtune_init, void *m );
+int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later ) {
 	int i;
 	jit_ctx *ctx;
 	// expand globals
@@ -620,6 +682,13 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 		hl_module_init_constant(m, c);
 	}
 
+#	ifdef HL_VTUNE
+	if( !vtune_later ) {
+		hl_module_init_vtune(m);
+	} else {
+		hl_setup_vtune(hl_module_init_vtune, m);
+	}
+#	endif
 	hl_module_add(m);
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
 	hl_gc_set_dump_types(hl_module_types_dump);
@@ -657,7 +726,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	}
 	memset(m2->globals_data+m1->globals_size,0,gsize - m1->globals_size);
 	m2->globals_size = gsize;
-	
+
 	hl_module_init_natives(m2);
 	hl_module_init_indexes(m2);
 	hl_jit_reset(ctx, m2);
@@ -802,7 +871,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		fflush(stdout);
 		return false;
 	}
-	
+
 	for(i=0;i<m2->code->nfunctions;i++) {
 		hl_function *f2 = m2->code->functions + i;
 		if( m2->hash->functions_hashes[i] < -1 ) continue;

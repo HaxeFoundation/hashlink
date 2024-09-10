@@ -37,11 +37,11 @@ class UVSample {
 		*/
 
 		var host = new sys.net.Host("localhost");
-		var port = 6001;
+		var port = Std.parseInt(Sys.args()[0]);
 
 		var totR = 0, totW = 0, totRB = 0;
 
-		log("Starting server");
+		log('Starting server on port ${port}');
 		tcp.bind(host, port);
 		tcp.listen(5, function() {
 

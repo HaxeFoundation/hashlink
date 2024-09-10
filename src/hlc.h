@@ -50,6 +50,7 @@
 #undef __SIGN
 #undef far
 #undef FAR
+#undef GENERIC_READ
 
 // disable some warnings triggered by HLC code generator
 

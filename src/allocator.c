@@ -129,6 +129,7 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	// increase size based on previously allocated pages
 	if( block < 256 ) {
 		int num_pages = 0;
+		int count = 1;
 		gc_pheader *ph = gc_pages[pid];
 		while( ph ) {
 			num_pages++;
@@ -136,7 +137,12 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 		}
 		while( num_pages > 8 && (size<<1) / block <= GC_PAGE_SIZE ) {
 			size <<= 1;
+			count <<= 1;
 			num_pages /= 3;
+#			ifdef HL_NX
+			// do not allocate too much large pages with low memory
+			if( count == 4 ) break;
+#			endif
 		}
 	}
 
@@ -147,12 +153,17 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	gc_allocator_page_data *p = &ph->alloc;
 
 	p->block_size = block;
+	p->size_bits = 0;
+	while( block < (1<<p->size_bits) )
+		p->size_bits++;
+	if( block != (1<<p->size_bits) )
+		p->size_bits = 0;
 	p->max_blocks = max_blocks;
 	p->sizes = NULL;
 	if( p->max_blocks > GC_PAGE_SIZE )
 		hl_fatal("Too many blocks for this page");
 	if( varsize ) {
-		if( p->max_blocks <= 8 )
+		if( p->max_blocks <= SIZES_PADDING )
 			p->sizes = (unsigned char*)&p->sizes_ref;
 		else {
 			p->sizes = ph->base + start_pos;
@@ -436,6 +447,24 @@ static void gc_flush_empty_pages() {
 	}
 }
 
+static int64 gc_allocator_private_memory() {
+	return free_lists_size;
+}
+
+static int gc_free_memory( gc_pheader *ph ) {
+	gc_allocator_page_data *p = &ph->alloc;
+	if( p->need_flush )
+		flush_free_list(ph);
+	gc_freelist *fl = &p->free;
+	int k;
+	int free = 0;
+	for(k=fl->current;k<fl->count;k++) {
+		gc_fl *c = GET_FL(fl,k);
+		free += c->count * p->block_size;
+	}
+	return free;
+}
+
 #ifdef GC_DEBUG
 static void gc_clear_unmarked_mem() {
 	int i;
@@ -521,10 +550,18 @@ static void gc_allocator_init() {
 
 static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 	int offset = (int)((unsigned char*)block - page->base);
-	if( offset%page->alloc.block_size != 0 )
+	int bid;
+	if( page->alloc.size_bits ) {
+		bid = offset >> page->alloc.size_bits;
+		if( bid << page->alloc.size_bits != offset )
+			return -1;
+	} else {
+		bid = offset / page->alloc.block_size;
+		if( bid * page->alloc.block_size != offset )
+			return -1;
+	}
+	if( page->alloc.sizes && page->alloc.sizes[bid] == 0 )
 		return -1;
-	int bid = offset / page->alloc.block_size;
-	if( page->alloc.sizes && page->alloc.sizes[bid] == 0 ) return -1;
 	return bid;
 }
 

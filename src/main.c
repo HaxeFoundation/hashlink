@@ -145,6 +145,7 @@ int main(int argc, pchar *argv[]) {
 	bool debug_wait = false;
 	bool hot_reload = false;
 	int profile_count = -1;
+	bool vtune_later = false;
 	main_context ctx;
 	bool isExc = false;
 	int first_boot_arg = -1;
@@ -176,6 +177,12 @@ int main(int argc, pchar *argv[]) {
 			profile_count = ptoi(*argv++);
 			continue;
 		}
+#ifdef HL_VTUNE
+		if( pcompare(arg,PSTR("--vtune-later")) == 0 ) {
+			vtune_later = true;
+			continue;
+		}
+#endif
 		if( *arg == '-' || *arg == '+' ) {
 			if( first_boot_arg < 0 ) first_boot_arg = argc + 1;
 			// skip value
@@ -193,7 +200,7 @@ int main(int argc, pchar *argv[]) {
 		file = PSTR("hlboot.dat");
 		fchk = pfopen(file,"rb");
 		if( fchk == NULL ) {
-			printf("HL/JIT %d.%d.%d (c)2015-2022 Haxe Foundation\n  Usage : hl [--debug <port>] [--debug-wait] <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
+			printf("HL/JIT %d.%d.%d (c)2015-2023 Haxe Foundation\n  Usage : hl [--debug <port>] [--debug-wait] <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
 			return 1;
 		}
 		fclose(fchk);
@@ -214,7 +221,7 @@ int main(int argc, pchar *argv[]) {
 	ctx.m = hl_module_alloc(ctx.code);
 	if( ctx.m == NULL )
 		return 2;
-	if( !hl_module_init(ctx.m,hot_reload) )
+	if( !hl_module_init(ctx.m,hot_reload,vtune_later) )
 		return 3;
 	if( hot_reload ) {
 		ctx.file_time = pfiletime(ctx.file);
@@ -222,7 +229,7 @@ int main(int argc, pchar *argv[]) {
 	}
 	hl_code_free(ctx.code);
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
-		fprintf(stderr,"Could not start debugger on port %d",debug_port);
+		fprintf(stderr,"Could not start debugger on port %d\n",debug_port);
 		return 4;
 	}
 	cl.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
