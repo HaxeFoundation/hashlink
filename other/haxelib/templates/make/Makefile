@@ -10,7 +10,7 @@ endif
 
 ifeq ($(OS),Windows_NT)
 LDFLAGS+=-municode
-LDLIBS+=C:/Windows/System32/dbghelp.dll
+LDLIBS+=-ldbghelp
 EXE_SUFFIX=.exe
 endif
 
