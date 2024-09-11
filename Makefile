@@ -247,13 +247,13 @@ ifeq ($(HLIB),directx)
 HLPACK=dx
 else ifeq ($(HLIB),hashlink)
 HLDIR=other/haxelib
-HLPACK=templates
+HLPACK=templates hlmem memory.hxml Run.hx
 endif
 
 release_haxelib_package:
 	rm -rf $(HLIB)_release
 	mkdir $(HLIB)_release
-	(cd $(HLDIR) && cp -R $(HLPACK) *.h *.c* *.hx haxelib.json $(CURDIR)/$(HLIB)_release | true)
+	(cd $(HLDIR) && cp -R $(HLPACK) *.h *.c* haxelib.json $(CURDIR)/$(HLIB)_release | true)
 	zip -r $(HLIB).zip $(HLIB)_release
 	haxelib submit $(HLIB).zip
 	rm -rf $(HLIB)_release
