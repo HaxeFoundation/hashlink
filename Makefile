@@ -240,20 +240,22 @@ release_haxelib:
 	${MAKE} HLIB=sdl release_haxelib_package
 	${MAKE} HLIB=openal release_haxelib_package
 
-HLPACK=$(HLIB)
-HLDIR=libs/$(HLIB)
-
-ifeq ($(HLIB),directx)
-HLPACK=dx
-else ifeq ($(HLIB),hashlink)
+ifeq ($(HLIB),hashlink)
 HLDIR=other/haxelib
 HLPACK=templates hlmem memory.hxml Run.hx
+else
+HLDIR=libs/$(HLIB)
+ifeq ($(HLIB),directx)
+HLPACK=dx *.h *.c *.cpp
+else
+HLPACK=$(HLIB) *.h *.c
+endif
 endif
 
 release_haxelib_package:
 	rm -rf $(HLIB)_release
 	mkdir $(HLIB)_release
-	(cd $(HLDIR) && cp -R $(HLPACK) *.h *.c* haxelib.json $(CURDIR)/$(HLIB)_release | true)
+	(cd $(HLDIR) && cp -R $(HLPACK) haxelib.json $(CURDIR)/$(HLIB)_release | true)
 	zip -r $(HLIB).zip $(HLIB)_release
 	haxelib submit $(HLIB).zip
 	rm -rf $(HLIB)_release
