@@ -1,7 +1,8 @@
 # Auto-generated from hashlink's Makefile template; do not edit
 
 UNAME := $(shell uname)
-CFLAGS=-O3 -std=c11 -DHL_MAKE -I$$makePath(::relDir::)
+CFLAGS = -O3 -std=c11
+CPPFLAGS = -DHL_MAKE -I$$makePath(::relDir::)
 ifeq ($(UNAME),Darwin)
 LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: /usr/local/lib/::name::.hdll::end::
 else
@@ -9,7 +10,7 @@ LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: -l:::name:
 endif
 
 ifdef HASHLINK
-CFLAGS+=-I$(HASHLINK)/include -I$(HASHLINK)/src
+CPPFLAGS += -I$(HASHLINK)/include -I$(HASHLINK)/src
 LDFLAGS+=-L$(HASHLINK)/lib -L$(HASHLINK)
 endif
 
@@ -33,7 +34,7 @@ DEP_FILES=$(patsubst %.c,%.d,$(SRC_FILES))
 
 %.o:
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -MMD -MP -c ::relDir::$*.c -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c ::relDir::$*.c -o $@
 
 clean:
 	find . \( -name '*.o' -o -name '*.d' \) -delete
