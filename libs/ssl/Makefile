@@ -3,7 +3,12 @@ CFLAGS = -Wall -O3 -std=c11 -m64 -fPIC -pthread -fno-omit-frame-pointer
 CFLAGS += -fvisibility=hidden -I. -I${INCLUDES_BASE_DIR}/mbedtls/include -I ../../src
 LFLAGS = -L../.. -lhl
 
-SRC = \
+UNAME := $(shell uname)
+ifeq ($(UNAME),Darwin)
+CFLAGS += -framework Security -framework CoreFoundation
+endif
+
+SSL = \
 	${INCLUDES_BASE_DIR}/mbedtls/library/aes.o \
 	${INCLUDES_BASE_DIR}/mbedtls/library/aesce.o \
 	${INCLUDES_BASE_DIR}/mbedtls/library/aesni.o \
@@ -116,11 +121,11 @@ SRC = \
 
 all: ssl.hdll
 
-ssl.hdll: ${SRC}
+ssl.hdll: ${SSL}
 	${CC} ${CFLAGS} -shared -o $@ $^ ${LFLAGS}
 
 %.o: %.c
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean:
-	rm -f ${SRC} *.hdll
+	rm -f ${SSL} *.hdll
