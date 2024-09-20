@@ -221,8 +221,14 @@ sdl: ${SDL} libhl
 openal: ${OPENAL} libhl
 	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
 
+ifdef SSL_STATIC
+ssl: libhl
+	${MAKE} -C "libs/ssl"
+	mv libs/ssl/ssl.hdll .
+else
 ssl: ${SSL} libhl
 	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
+endif
 
 ui: ${UI} libhl
 	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} -L. -lhl
@@ -310,6 +316,9 @@ codesign_osx:
 
 clean_o:
 	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HL_DEBUG}
+ifdef SSL_STATIC
+	make -C "libs/ssl" clean
+endif
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
