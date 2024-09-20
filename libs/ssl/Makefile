@@ -1,5 +1,6 @@
 INCLUDES_BASE_DIR = ../../include
-CFLAGS = -fPIC -O3 -I. -I${INCLUDES_BASE_DIR}/mbedtls/include -I ../../src
+CFLAGS = -Wall -O3 -std=c11 -m64 -fPIC -pthread -fno-omit-frame-pointer
+CFLAGS += -fvisibility=hidden -I. -I${INCLUDES_BASE_DIR}/mbedtls/include -I ../../src
 LFLAGS = -L../.. -lhl
 
 SRC = \
@@ -116,7 +117,7 @@ SRC = \
 all: ssl.hdll
 
 ssl.hdll: ${SRC}
-	${CC} ${CFLAGS} -shared -o $@ $< ${LFLAGS}
+	${CC} ${CFLAGS} -shared -o $@ $^ ${LFLAGS}
 
 %.o: %.c
 	${CC} ${CFLAGS} -o $@ -c $<
