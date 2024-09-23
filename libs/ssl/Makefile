@@ -1,6 +1,7 @@
 INCLUDES_BASE_DIR = ../../include
 CFLAGS = -Wall -O3 -std=c11 -m64 -fPIC -pthread -fno-omit-frame-pointer
 CFLAGS += -fvisibility=hidden -I. -I${INCLUDES_BASE_DIR}/mbedtls/include -I ../../src
+CFLAGS += -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
 LFLAGS = -L../.. -lhl
 
 UNAME := $(shell uname)
