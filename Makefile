@@ -51,6 +51,52 @@ OPENAL = libs/openal/openal.o
 
 SSL = libs/ssl/ssl.o
 
+ifdef SSL_STATIC
+SSL += include/mbedtls/library/aes.o include/mbedtls/library/aesce.o include/mbedtls/library/aesni.o \
+	include/mbedtls/library/aria.o include/mbedtls/library/asn1parse.o include/mbedtls/library/asn1write.o \
+	include/mbedtls/library/base64.o include/mbedtls/library/bignum.o include/mbedtls/library/bignum_core.o \
+	include/mbedtls/library/bignum_mod.o include/mbedtls/library/bignum_mod_raw.o \
+	include/mbedtls/library/block_cipher.o include/mbedtls/library/camellia.o include/mbedtls/library/ccm.o \
+	include/mbedtls/library/chacha20.o include/mbedtls/library/chachapoly.o include/mbedtls/library/cipher.o \
+	include/mbedtls/library/cipher_wrap.o include/mbedtls/library/cmac.o include/mbedtls/library/constant_time.o \
+	include/mbedtls/library/ctr_drbg.o include/mbedtls/library/debug.o include/mbedtls/library/des.o \
+	include/mbedtls/library/dhm.o include/mbedtls/library/ecdh.o include/mbedtls/library/ecdsa.o \
+	include/mbedtls/library/ecjpake.o include/mbedtls/library/ecp.o include/mbedtls/library/ecp_curves.o \
+	include/mbedtls/library/ecp_curves_new.o include/mbedtls/library/entropy.o include/mbedtls/library/entropy_poll.o \
+	include/mbedtls/library/error.o include/mbedtls/library/gcm.o include/mbedtls/library/hkdf.o \
+	include/mbedtls/library/hmac_drbg.o include/mbedtls/library/lmots.o include/mbedtls/library/lms.o \
+	include/mbedtls/library/md.o include/mbedtls/library/md5.o include/mbedtls/library/memory_buffer_alloc.o \
+	include/mbedtls/library/mps_reader.o include/mbedtls/library/mps_trace.o include/mbedtls/library/net_sockets.o \
+	include/mbedtls/library/nist_kw.o include/mbedtls/library/oid.o include/mbedtls/library/padlock.o \
+	include/mbedtls/library/pem.o include/mbedtls/library/pk.o include/mbedtls/library/pk_ecc.o \
+	include/mbedtls/library/pk_wrap.o include/mbedtls/library/pkcs12.o include/mbedtls/library/pkcs5.o \
+	include/mbedtls/library/pkcs7.o include/mbedtls/library/pkparse.o include/mbedtls/library/pkwrite.o \
+	include/mbedtls/library/platform.o include/mbedtls/library/platform_util.o include/mbedtls/library/poly1305.o \
+	include/mbedtls/library/psa_crypto.o include/mbedtls/library/psa_crypto_aead.o include/mbedtls/library/psa_crypto_cipher.o \
+	include/mbedtls/library/psa_crypto_client.o include/mbedtls/library/psa_crypto_driver_wrappers_no_static.o \
+	include/mbedtls/library/psa_crypto_ecp.o include/mbedtls/library/psa_crypto_ffdh.o \
+	include/mbedtls/library/psa_crypto_hash.o include/mbedtls/library/psa_crypto_mac.o \
+	include/mbedtls/library/psa_crypto_pake.o include/mbedtls/library/psa_crypto_rsa.o \
+	include/mbedtls/library/psa_crypto_se.o include/mbedtls/library/psa_crypto_slot_management.o \
+	include/mbedtls/library/psa_crypto_storage.o include/mbedtls/library/psa_its_file.o \
+	include/mbedtls/library/psa_util.o include/mbedtls/library/ripemd160.o include/mbedtls/library/rsa.o \
+	include/mbedtls/library/rsa_alt_helpers.o include/mbedtls/library/sha1.o include/mbedtls/library/sha256.o \
+	include/mbedtls/library/sha3.o include/mbedtls/library/sha512.o include/mbedtls/library/ssl_cache.o \
+	include/mbedtls/library/ssl_ciphersuites.o include/mbedtls/library/ssl_client.o include/mbedtls/library/ssl_cookie.o \
+	include/mbedtls/library/ssl_debug_helpers_generated.o include/mbedtls/library/ssl_msg.o \
+	include/mbedtls/library/ssl_ticket.o include/mbedtls/library/ssl_tls.o include/mbedtls/library/ssl_tls12_client.o \
+	include/mbedtls/library/ssl_tls12_server.o include/mbedtls/library/ssl_tls13_client.o \
+	include/mbedtls/library/ssl_tls13_generic.o include/mbedtls/library/ssl_tls13_keys.o \
+	include/mbedtls/library/ssl_tls13_server.o include/mbedtls/library/threading.o include/mbedtls/library/timing.o \
+	include/mbedtls/library/version.o include/mbedtls/library/version_features.o include/mbedtls/library/x509.o \
+	include/mbedtls/library/x509_create.o include/mbedtls/library/x509_crl.o include/mbedtls/library/x509_crt.o \
+	include/mbedtls/library/x509_csr.o include/mbedtls/library/x509write.o include/mbedtls/library/x509write_crt.o \
+	include/mbedtls/library/x509write_csr.o
+SSL_CFLAGS = -fvisibility=hidden -I libs/ssl -I include/mbedtls/include -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
+else
+SSL_LDLIBS = -lmbedtls -lmbedx509 -lmbedcrypto
+endif
+
 UV = libs/uv/uv.o
 
 UI = libs/ui/ui_stub.o
@@ -108,7 +154,7 @@ CFLAGS += -m$(MARCH) -I include -I $(BREW_LIBJPEG)/include \
 	-I $(BREW_MBEDTLS)/include -I $(BREW_LIBPNG)/include -I $(BREW_LIBOGG)/include \
 	-I $(BREW_LIBUV)/include \
 	-I $(BREW_OPENAL)/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
-LFLAGS += -Wl,-export_dynamic 
+LFLAGS += -Wl,-export_dynamic
 
 CFLAGS += -m$(MARCH) -I include -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include \
 	-I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include -I /usr/local/opt/libvorbis/include \
@@ -221,8 +267,16 @@ sdl: ${SDL} libhl
 openal: ${OPENAL} libhl
 	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
 
+./include/mbedtls/%.o: ./include/mbedtls/%.c
+	${CC} ${CFLAGS} -o $@ -c $< ${SSL_CFLAGS}
+
+# force rebuild ssl.o in case we mix SSL_STATIC with normal build
+.PHONY: libs/ssl/ssl.o
+libs/ssl/ssl.o: libs/ssl/ssl.c
+	${CC} ${CFLAGS} -o $@ -c $< ${SSL_CFLAGS}
+
 ssl: ${SSL} libhl
-	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl -lmbedtls -lmbedx509 -lmbedcrypto $(LIBSSL)
+	${CC} ${CFLAGS} ${SSL_CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl ${SSL_LDLIBS} $(LIBSSL)
 
 ui: ${UI} libhl
 	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} -L. -lhl
