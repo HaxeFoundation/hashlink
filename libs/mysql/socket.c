@@ -117,24 +117,29 @@ int psock_recv( PSOCK s, char *buf, int size ) {
 	return ret;
 }
 
-PHOST phost_resolve( const char *host ) {
-	PHOST ip = inet_addr(host);
-	if( ip == INADDR_NONE ) {
-		struct hostent *h;
-#	if defined(OS_WINDOWS) || defined(OS_MAC) || defined(OS_CYGWIN)
-		h = gethostbyname(host);
-#	else
-		struct hostent hbase;
-		char buf[1024];
-		int errcode;
-		gethostbyname_r(host,&hbase,buf,1024,&h,&errcode);
-#	endif
-		if( h == NULL )
-			return UNRESOLVED_HOST;
-		ip = *((unsigned int*)h->h_addr_list[0]);
-	}
-	return ip;
+PHOST phost_resolve(const char *host) {
+    struct addrinfo hints, *res;
+    PHOST ip = INADDR_NONE;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    int status = getaddrinfo(host, NULL, &hints, &res);
+    if (status != 0) {
+        return UNRESOLVED_HOST;
+    }
+
+    if (res != NULL) {
+        struct sockaddr_in *ipv4 = (struct sockaddr_in *)res->ai_addr;
+        ip = ipv4->sin_addr.s_addr;
+    }
+
+    freeaddrinfo(res);
+
+    return ip;
 }
+
 
 SERR psock_connect( PSOCK s, PHOST host, int port ) {
 	struct sockaddr_in addr;
