@@ -98,11 +98,18 @@ jobs:
     - name: "SCM Checkout"
       uses: actions/checkout@v4
 
-    - name: Add msbuild to PATH
+    - name: "Add msbuild to PATH"
       if: matrix.build_system == 'vs2019'
       uses: microsoft/setup-msbuild@v2
       with:
         vs-version: '[16.0,17.0)'
+
+    - name: "Mac homebrew workaround"
+      if: matrix.target == 'darwin'
+      run: |
+        # see https://github.com/Homebrew/homebrew-core/issues/165793#issuecomment-1989441193
+        # see https://github.com/Homebrew/brew/blob/master/.github/workflows/tests.yml
+        brew unlink python && brew link --overwrite python
 
     - name: "Install: Required Dev Packages"
       run: |
