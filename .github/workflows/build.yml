@@ -98,11 +98,20 @@ jobs:
     - name: "SCM Checkout"
       uses: actions/checkout@v4
 
-    - name: Add msbuild to PATH
+    - name: "Add msbuild to PATH"
       if: matrix.build_system == 'vs2019'
       uses: microsoft/setup-msbuild@v2
       with:
         vs-version: '[16.0,17.0)'
+
+    - name: "Mac homebrew workaround" # see https://github.com/actions/setup-python/issues/577
+      if: matrix.target == 'darwin'
+      run: |
+        rm /usr/local/bin/2to3
+        rm /usr/local/bin/idle3
+        rm /usr/local/bin/pydoc3
+        rm /usr/local/bin/python3
+        rm /usr/local/bin/python3-config
 
     - name: "Install: Required Dev Packages"
       run: |
