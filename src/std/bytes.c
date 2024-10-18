@@ -32,7 +32,9 @@ HL_PRIM vbyte *hl_copy_bytes( const vbyte *ptr, int size ) {
 }
 
 HL_PRIM void hl_bytes_blit( char *dst, int dpos, char *src, int spos, int len ) {
-	memmove(dst + dpos,src+spos,len);
+	if(dst && src) {
+		memmove(dst + dpos,src + spos,len);
+	}
 }
 
 HL_PRIM int hl_bytes_compare( vbyte *a, int apos, vbyte *b, int bpos, int len ) {
@@ -143,7 +145,9 @@ HL_PRIM int hl_bytes_rfind( vbyte *where, int len, vbyte *which, int wlen ) {
 }
 
 HL_PRIM void hl_bytes_fill( vbyte *bytes, int pos, int len, int value ) {
-	memset(bytes+pos,value,len);
+	if(bytes) {
+		memset(bytes+pos,value,len);
+	}
 }
 
 
