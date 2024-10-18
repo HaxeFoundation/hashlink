@@ -56,15 +56,22 @@ HL_PRIM bool HL_NAME(png_decode)( vbyte *data, int dataLen, vbyte *out, int widt
 	case 1:
 		img.format = PNG_FORMAT_BGR;
 		break;
+	case 6:
+		img.format = PNG_FORMAT_GRAY;
+		break;
+	case 2:
 	case 7:
 		img.format = PNG_FORMAT_RGBA;
 		break;
+	case 3:
 	case 8:
 		img.format = PNG_FORMAT_BGRA;
 		break;
+	case 4:
 	case 9:
 		img.format = PNG_FORMAT_ABGR;
 		break;
+	case 5:
 	case 10:
 		img.format = PNG_FORMAT_ARGB;
 		break;
