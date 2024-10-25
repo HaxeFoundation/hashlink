@@ -67,7 +67,10 @@ class Build {
 			if( !sys.FileSystem.exists(srcDir) )
 				throw "Failed to find make template '"+tpl+"'";
 		}
-		
+		if( StringTools.contains(sys.FileSystem.absolutePath(targetDir), sys.FileSystem.absolutePath(srcDir)) ) {
+			throw "Template "+tpl+" contains "+targetDir+", can cause recursive generation";
+		}
+
 		var allFiles = config.files.copy();
 		for( f in config.files )
 			if( StringTools.endsWith(f,".c") ) {
