@@ -99,6 +99,8 @@
       <ConformanceMode>true</ConformanceMode>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -117,6 +119,8 @@
       <ConformanceMode>true</ConformanceMode>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -135,6 +139,8 @@
       <ConformanceMode>true</ConformanceMode>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -153,6 +159,8 @@
       <ConformanceMode>true</ConformanceMode>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -162,7 +170,10 @@
       <AdditionalDependencies>libhl.lib::foreach libraries::;::name::.lib::end::</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>::foreach cfiles::
+  <ItemGroup>
+    <ClCompile Include="stdafx.c">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>::foreach cfiles::
     <ClCompile Include="::relDir::::path::" />::end::
   </ItemGroup>
   <ItemGroup>::foreach hfiles::
