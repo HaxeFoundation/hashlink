@@ -99,6 +99,9 @@
       <SDLCheck>true</SDLCheck>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -116,6 +119,9 @@
       <SDLCheck>true</SDLCheck>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -135,6 +141,9 @@
       <SDLCheck>true</SDLCheck>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -156,6 +165,9 @@
       <SDLCheck>true</SDLCheck>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -165,7 +177,10 @@
       <AdditionalDependencies>libhl.lib::foreach libraries::;::name::.lib::end::</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>::foreach cfiles::
+  <ItemGroup>
+    <ClCompile Include="stdafx.c">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>::foreach cfiles::
     <ClCompile Include="::relDir::::path::" />::end::
   </ItemGroup>
   <ItemGroup>::foreach hfiles::
