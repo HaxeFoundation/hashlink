@@ -118,7 +118,7 @@ HL_PRIM void hl_null_access() {
 }
 
 HL_PRIM void hl_throw_buffer( hl_buffer *b ) {
-	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);	
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
 	d->v.ptr = hl_buffer_content(b,NULL);
 	hl_throw(d);
 }

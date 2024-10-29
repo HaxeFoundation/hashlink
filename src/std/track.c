@@ -237,10 +237,10 @@ HL_PRIM int hl_track_entry( int id, hl_type **t, int *count, int *info, varray *
 			count_before += cur->bcount;
 			cur++;
 		}
-		b = cur->buckets + (id - count_before);		
+		b = cur->buckets + (id - count_before);
 		prev_id++;
 	} else {
-		int i;		
+		int i;
 		count_before = 0;
 		for(i=0;i<_KLAST;i++) {
 			bucket_list *data = &all_data[i];
@@ -251,7 +251,7 @@ HL_PRIM int hl_track_entry( int id, hl_type **t, int *count, int *info, varray *
 		prev_id = id;
 		cur = &all_data[i];
 		b = cur->buckets;
-	}	
+	}
 	*t = b->t;
 	*count = b->hit_count;
 	*info = b->info;
@@ -276,7 +276,7 @@ HL_PRIM void hl_track_set_bits( int flags, bool thread ) {
 #	ifdef HL_TRACK_ENABLE
 	if( thread ) {
 		hl_thread_info *t = hl_get_thread();
-		if( t ) t->flags = (t->flags & ~(HL_TRACK_MASK<<HL_TREAD_TRACK_SHIFT)) | ((flags & HL_TRACK_MASK) << HL_TREAD_TRACK_SHIFT);	
+		if( t ) t->flags = (t->flags & ~(HL_TRACK_MASK<<HL_TREAD_TRACK_SHIFT)) | ((flags & HL_TRACK_MASK) << HL_TREAD_TRACK_SHIFT);
 	} else {
 		hl_track.flags = (hl_track.flags & ~HL_TRACK_MASK) | (flags & HL_TRACK_MASK);
 	}

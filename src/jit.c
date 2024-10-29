@@ -316,7 +316,7 @@ struct jit_ctx {
 #	ifdef HL_DEBUG
 #		define error_i64() jit_error("i64-32")
 #	else
-void error_i64() { 
+void error_i64() {
 	printf("The module you are loading is using 64 bit ints that are not supported by the HL32.\nPlease run using HL64 or compile with -D hl-legacy32");
 	jit_exit();
 }
@@ -607,12 +607,12 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 			int_val cval = b->holds ? (int_val)b->holds : b->id;
 			// short byte form
 			if( f->r_i8 && IS_SBYTE(cval) ) {
-				if( (f->r_i8&FLAG_DUAL) && a->id > 7 ) r64 |= 4; 
+				if( (f->r_i8&FLAG_DUAL) && a->id > 7 ) r64 |= 4;
 				OP(f->r_i8);
 				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a->id,a->id); else MOD_RM(3,GET_RM(f->r_i8)-1,a->id);
 				B((int)cval);
 			} else if( GET_RM(f->r_const) > 0 || (f->r_const&FLAG_DUAL) ) {
-				if( (f->r_i8&FLAG_DUAL) && a->id > 7 ) r64 |= 4; 
+				if( (f->r_i8&FLAG_DUAL) && a->id > 7 ) r64 |= 4;
 				OP(f->r_const&0xFF);
 				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a->id,a->id); else MOD_RM(3,GET_RM(f->r_const)-1,a->id);
 				if( mode64 && IS_64 && o == MOV ) W64(cval); else W((int)cval);
@@ -1073,7 +1073,7 @@ static preg *fetch32( jit_ctx *ctx, vreg *r ) {
 	return fetch(r);
 }
 
-// make sure higher bits are zeroes 
+// make sure higher bits are zeroes
 static preg *alloc_cpu64( jit_ctx *ctx, vreg *r, bool andLoad ) {
 #	ifndef HL_64
 	return alloc_cpu(ctx,r,andLoad);
@@ -2417,7 +2417,7 @@ static void jit_c2hl( jit_ctx *ctx ) {
 	op64(ctx,MOV,PEBP,PESP);
 
 #	ifdef HL_64
-	
+
 	fptr = REG_AT(R10);
 	stack = PEAX;
 	stend = REG_AT(R11);
@@ -2554,7 +2554,7 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	//		case HF32: case HF64: return jit_wrapper_d(arg0,&args);
 	//		default: return jit_wrapper_ptr(arg0,&args);
 	//		}
-	if( !IS_64 ) 
+	if( !IS_64 )
 		op64(ctx,MOV,cl,pmem(&p,Ebp,HL_WSIZE*2)); // load arg0
 	op64(ctx,MOV,tmp,pmem(&p,cl->id,0)); // ->t
 	op64(ctx,MOV,tmp,pmem(&p,tmp->id,HL_WSIZE)); // ->fun
@@ -2566,7 +2566,7 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	op32(ctx,CMP,tmp,pconst(&p,HF32));
 	XJump_small(JEq,jfloat2);
 
-	// 64 bits : ESP + EIP (+WIN64PAD) 
+	// 64 bits : ESP + EIP (+WIN64PAD)
 	// 32 bits : ESP + EIP + PARAM0
 	int args_pos = IS_64 ? ((IS_WINCALL64 ? 32 : 0) + HL_WSIZE * 2) : (HL_WSIZE*3);
 
@@ -2897,7 +2897,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		vreg *r = R(i);
 		int creg = select_call_reg(&cregs,r->t,i);
 		if( creg < 0 || IS_WINCALL64 ) {
-			// use existing stack storage 
+			// use existing stack storage
 			r->stackPos = argsSize + HL_WSIZE * 2;
 			argsSize += stack_size(r->t);
 		} else {
@@ -3050,7 +3050,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					preg *pb = alloc_cpu(ctx,ra,true);
 					op64(ctx,XOR,pa,pa);
 					op64(ctx,SUB,pa,pb);
-					store(ctx,dst,pa,true);					
+					store(ctx,dst,pa,true);
 #					else
 					error_i64();
 #					endif
@@ -3313,7 +3313,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				ctx->calls = j;
 
 				set_native_arg(ctx,pconst64(&p,RESERVE_ADDRESS));
-				set_native_arg(ctx,pconst64(&p,(int_val)m->code->functions[m->functions_indexes[o->p2]].type));				
+				set_native_arg(ctx,pconst64(&p,(int_val)m->code->functions[m->functions_indexes[o->p2]].type));
 				call_native(ctx,hl_alloc_closure_ptr,size);
 				store(ctx,dst,PEAX,true);
 			}
@@ -3403,7 +3403,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				{
 					int regids[64];
 					preg *pc = REG_AT(CALL_REGS[0]);
-					vreg *sc = R(f->nregs); // scratch register that we temporary rebind					
+					vreg *sc = R(f->nregs); // scratch register that we temporary rebind
 					if( o->p3 >= 63 ) jit_error("assert");
 					memcpy(regids + 1, o->extra, o->p3 * sizeof(int));
 					regids[0] = f->nregs;
@@ -3442,7 +3442,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					error_i64();
 					break;
 				}
-#				endif 
+#				endif
 				switch( ra->t->kind ) {
 				case HOBJ:
 				case HSTRUCT:
@@ -3707,7 +3707,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						// keep o->value in R(f->nregs)
 						int regids[64];
 						preg *pc = alloc_reg(ctx,RCPU_CALL);
-						vreg *sc = R(f->nregs); // scratch register that we temporary rebind					
+						vreg *sc = R(f->nregs); // scratch register that we temporary rebind
 						if( o->p3 >= 63 ) jit_error("assert");
 						memcpy(regids, o->extra, o->p3 * sizeof(int));
 						regids[0] = f->nregs;

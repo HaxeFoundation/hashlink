@@ -239,7 +239,7 @@ static void flush_free_list( gc_pheader *ph ) {
 		int k;
 		for(k=0;k<p->free.count;k++) {
 			gc_fl *fl = GET_FL(&p->free,k);
-			printf("(%d-%d)",fl->pos,fl->pos+fl->count-1); 
+			printf("(%d-%d)",fl->pos,fl->pos+fl->count-1);
 		}
 		printf("\n");
 	}
@@ -255,7 +255,7 @@ static void flush_free_list( gc_pheader *ph ) {
 				is_free = true;
 			}
 		}
-		bool is_marked = ((ph->bmp[bid>>3] & (1<<(bid&7))) != 0); 
+		bool is_marked = ((ph->bmp[bid>>3] & (1<<(bid&7))) != 0);
 		if( is_marked && is_free ) {
 			// check if it was already free before
 			for(k=0;k<old_fl.count;k++) {
@@ -601,7 +601,7 @@ static void gc_get_stats( int *page_count, int *private_data ) {
 	}
 	*page_count = count;
 	*private_data = 0; // no malloc
-} 
+}
 
 static void gc_iter_pages( gc_page_iterator iter ) {
 	int i;

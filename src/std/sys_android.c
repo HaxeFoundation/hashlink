@@ -114,7 +114,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved)
 	if (!hl_java_method_id_get_context) {
 		__android_log_print(ANDROID_LOG_ERROR, HL_JNI_LOG_TAG, "Error cannot get getContext() method on specified Activity class (not an Activity ?)");
 	}
-	
+
 	return JNI_VERSION_1_4;
 }
 
@@ -227,7 +227,7 @@ static const char* hl_sys_android_get_internal_storage_path(void)
 	return hl_android_internal_files_path;
 }
 
-const char *hl_sys_special( const char *key ) { 
+const char *hl_sys_special( const char *key ) {
 	if (strcmp(key, "android_external_storage_path")==0)
 		return hl_sys_android_get_external_storage_path();
 	else if (strcmp(key, "android_internal_storage_path")==0)
