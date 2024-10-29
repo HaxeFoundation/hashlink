@@ -476,7 +476,7 @@ static void hl_module_init_indexes( hl_module *m ) {
 #include <jitprofiling.h>
 h_bool hl_module_init_vtune( hl_module *m ) {
 	int i;
-	if( !iJIT_IsProfilingActive() )
+	if( !iJIT_IsProfilingActive() || m->jit_debug == NULL )
 		return false;
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
