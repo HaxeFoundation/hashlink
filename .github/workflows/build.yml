@@ -37,7 +37,7 @@ jobs:
 
           - target: darwin
             architecture: 64
-            runner: macos-12
+            runner: macos-13
 
           - target: darwin
             architecture: arm64
