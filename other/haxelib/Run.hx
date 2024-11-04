@@ -1,15 +1,124 @@
+import sys.io.File;
+import haxe.io.Path;
+
+class NinjaGenerator {
+	var buf:StringBuf;
+
+	public function new() {
+		buf = new StringBuf();
+	}
+
+	function comment(value:String, empty_line = false) {
+		buf.add('# $comment \n');
+		if (empty_line) buf.add('\n');
+	}
+
+	function bind(name:String, value:String) {
+		buf.add('$name = $value\n\n');
+	}
+
+	function rule(name:String, args:Map<String, String>) {
+		buf.add('rule $name\n');
+		for (key => value in args) {
+			buf.add('  $key = $value\n');
+		}
+		buf.add('\n');
+	}
+
+	function build(out:Array<String>, rule:String, input:Array<String>, ?args:Map<String, String>) {
+		args ??= [];
+		buf.add('build ${out.join(' ')}: $rule ${input.join(' ')}\n');
+		for (key => value in args) {
+			buf.add('  $key = $value\n');
+		}
+		buf.add('\n');
+	}
+
+	function save(path:String) {
+		var str = this.buf.toString();
+		File.saveContent(path, str);
+	}
+
+	public static function gen(config: HlcConfig, output: String) {
+		var gen = new NinjaGenerator();
+		gen.comment('Automatically generated file, do not edit', true);
+		gen.bind('ninja_required_version', '1.2');
+
+		var compiler_flavor: CCFlavor = switch Sys.systemName() {
+			case "Windows": MSVC;
+			case _: GCC;
+		}
+
+		switch compiler_flavor {
+			case GCC: 
+				gen.bind('cflags', '-DHL_MAKE -Wall -I.');
+				final libflags = config.libs.map((lib) -> switch lib {
+					case "std": "-lhl";
+					case var lib: '-l:$lib.hdll';
+				}).join(' ');
+				gen.bind('ldflags', '-lm $libflags');
+				gen.rule('cc', [
+					"command" => "cc -MD -MF $out.d $cflags -c $in -o $out",
+					"deps" => "gcc",
+					"depfile" => "$out.d",
+				]);
+				gen.rule('ld', [
+					"command" => "cc $ldflags $in -o $out"
+				]);
+			case MSVC:
+				gen.bind('cflags', '/DHL_MAKE /I.');
+				gen.bind('ldflags', 'libhl.lib');
+				gen.rule('cc', [
+					"command" => "cl.exe /showIncludes $cflags /c $in ",
+					"deps" => "msvc",
+				]);
+				gen.rule('ld', [
+					"command" => "link.exe /OUT$out $ldflags @$out.rsp",
+					"rspfile" => "$out.rsp",
+					"rspfile_content" => "$in"
+				]);
+		}
+
+		final objects = [];
+
+		for (file in config.files) {
+			final out_path = haxe.io.Path.withExtension(file, 'o');
+			objects.push(out_path);
+			gen.build([out_path.toString()], "cc", [file], []);
+		}
+
+		final exe_path = Path.withExtension(Path.withoutDirectory(output), switch compiler_flavor {
+			case MSVC: "exe";
+			case GCC: null;
+		});
+		gen.build([exe_path], 'ld', objects, []);
+
+		gen.save(Path.join([Path.directory(output), 'build.ninja']));
+	}
+}
+
+enum abstract CCFlavor(String) {
+	var MSVC = "msvc";
+	/**
+	*	GCC, Clang, etc 
+	**/
+	var GCC = "gcc";
+}
+
+typedef HlcConfig = {
+	var version:Int;
+	var libs:Array<String>;
+	var defines:haxe.DynamicAccess<String>;
+	var files:Array<String>;
+};
+
 class Build {
 
 	var output : String;
 	var name : String;
 	var targetDir : String;
 	var dataPath : String;
-	var config : {
-		var version : Int;
-		var libs : Array<String>;
-		var defines : haxe.DynamicAccess<String>;
-		var files : Array<String>;
-	};
+	var config : HlcConfig;
 
 	public function new(dataPath,output,config) {
 		this.output = output;
@@ -22,10 +131,14 @@ class Build {
 
 	public function run() {
 		var tpl = config.defines.get("hlgen.makefile");
-		if( tpl != null )
+		if( tpl != null && tpl != "ninja"){
 			generateTemplates(tpl);
-		if( config.defines.get("hlgen.silent") == null )
-			Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
+			if( config.defines.get("hlgen.silent") == null )
+				Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
+		} else {
+			NinjaGenerator.gen(config, output);
+			Sys.command('ninja', ['-C', Path.directory(output)]);
+		}
 	}
 	
 	function isAscii( bytes : haxe.io.Bytes ) {
