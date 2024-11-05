@@ -1,5 +1,6 @@
 import sys.io.File;
 import haxe.io.Path;
+using StringTools;
 
 class NinjaGenerator {
 	var buf:StringBuf;
@@ -9,7 +10,7 @@ class NinjaGenerator {
 	}
 
 	function comment(value:String, empty_line = false) {
-		buf.add('# $comment \n');
+		buf.add('# $value \n');
 		if (empty_line) buf.add('\n');
 	}
 
@@ -51,7 +52,7 @@ class NinjaGenerator {
 
 		switch compiler_flavor {
 			case GCC: 
-				gen.bind('cflags', '-DHL_MAKE -Wall -I.');
+				gen.bind('cflags', '-std=c11 -DHL_MAKE -Wall -I.');
 				final libflags = config.libs.map((lib) -> switch lib {
 					case "std": "-lhl";
 					case var lib: '-l:$lib.hdll';
@@ -66,14 +67,15 @@ class NinjaGenerator {
 					"command" => "cc $ldflags $in -o $out"
 				]);
 			case MSVC:
-				gen.bind('cflags', '/DHL_MAKE /I.');
-				gen.bind('ldflags', 'libhl.lib');
+				gen.bind('hashlink', Sys.getEnv('HASHLINK'));
+				gen.bind('cflags', "/DHL_MAKE /std:c11 /I. /I$hashlink\\include");
+				gen.bind('ldflags', "/LIBPATH:$hashlink libhl.lib");
 				gen.rule('cc', [
-					"command" => "cl.exe /showIncludes $cflags /c $in ",
+					"command" => "cl.exe /nologo /showIncludes $cflags /c $in /Fo$out",
 					"deps" => "msvc",
 				]);
 				gen.rule('ld', [
-					"command" => "link.exe /OUT$out $ldflags @$out.rsp",
+					"command" => "link.exe /nologo /OUT:$out $ldflags @$out.rsp",
 					"rspfile" => "$out.rsp",
 					"rspfile_content" => "$in"
 				]);
@@ -94,6 +96,37 @@ class NinjaGenerator {
 		gen.build([exe_path], 'ld', objects, []);
 
 		gen.save(Path.join([Path.directory(output), 'build.ninja']));
+	}
+
+	public static function run(dir:String) {
+		switch Sys.systemName() {
+			case "Windows":
+				var devcmd = findVsDevCmdScript();
+				Sys.command("cmd.exe", ["/C", devcmd, "-arch=x64", '&&', 'ninja', '-C', dir]);
+			case _:
+				Sys.command("ninja", ["-C", dir]);
+		}
+	}
+
+	// private static function writeBat(vsdevcmd:String, out_dir:String)
+
+	private static function findVsDevCmdScript(): Null<String> {
+		var proc = new sys.io.Process('C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe', [
+			"-latest",
+			"-products", "*",
+			"-requires",
+			"Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+			"-property",
+			"installationPath"
+		]);
+		proc.stdin.close();
+		var stdout = proc.stdout.readAll();
+		if (proc.exitCode(true) == 0) {
+			var instPath = stdout.toString().trim();
+			return '$instPath\\Common7\\Tools\\vsdevcmd.bat';
+		} else {
+			return null;
+		}
 	}
 }
 
@@ -137,7 +170,7 @@ class Build {
 				Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
 		} else {
 			NinjaGenerator.gen(config, output);
-			Sys.command('ninja', ['-C', Path.directory(output)]);
+			NinjaGenerator.run(Path.directory(output));
 		}
 	}
 	
