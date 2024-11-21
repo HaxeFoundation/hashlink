@@ -27,7 +27,7 @@ class NinjaGenerator {
 	}
 
 	function build(out:Array<String>, rule:String, input:Array<String>, ?args:Map<String, String>) {
-		args ??= [];
+		if(args == null) args = [];
 		buf.add('build ${out.join(' ')}: $rule ${input.join(' ')}\n');
 		for (key => value in args) {
 			buf.add('  $key = $value\n');
@@ -70,7 +70,7 @@ class NinjaGenerator {
 					"depfile" => "$out.d",
 				]);
 				gen.rule('ld', [
-					"command" => "cc $ldflags $in -o $out"
+					"command" => "cc $in -o $out $ldflags"
 				]);
 			case MSVC:
 				gen.bind('hashlink', Sys.getEnv('HASHLINK'));
