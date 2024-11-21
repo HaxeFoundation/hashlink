@@ -51,13 +51,19 @@ class NinjaGenerator {
 		}
 
 		switch compiler_flavor {
-			case GCC: 
-				gen.bind('cflags', '-std=c11 -DHL_MAKE -Wall -I.');
+			case GCC:
+				var opt_flag = config.defines.exists("debug") ? "-g" : '-O2';
+				var rpath = switch Sys.systemName() {
+					case "Mac": "-rpath @executable_path";
+					case _: "-Wl,-rpath,$$ORIGIN";
+				};
+				gen.bind('cflags', '$opt_flag -std=c11 -DHL_MAKE -Wall -I. -pthread');
 				final libflags = config.libs.map((lib) -> switch lib {
 					case "std": "-lhl";
+					case "uv": '-l:$lib.hdll -luv';
 					case var lib: '-l:$lib.hdll';
 				}).join(' ');
-				gen.bind('ldflags', '-lm $libflags');
+				gen.bind('ldflags', '-pthread -lm $libflags $rpath');
 				gen.rule('cc', [
 					"command" => "cc -MD -MF $out.d $cflags -c $in -o $out",
 					"deps" => "gcc",
