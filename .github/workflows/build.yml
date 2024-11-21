@@ -127,7 +127,8 @@ jobs:
               libturbojpeg-dev \
               libuv1-dev \
               libvorbis-dev \
-              libsqlite3-dev
+              libsqlite3-dev \
+              ninja-build
             ;;
 
           darwin*)
