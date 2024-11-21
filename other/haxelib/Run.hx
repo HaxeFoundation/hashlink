@@ -63,7 +63,7 @@ class NinjaGenerator {
 					case "uv": '-l:$lib.hdll -luv';
 					case var lib: '-l:$lib.hdll';
 				}).join(' ');
-				gen.bind('ldflags', '-pthread -lm $libflags $rpath');
+				gen.bind('ldflags', '-pthread -lm -L/usr/local/lib $libflags $rpath');
 				gen.rule('cc', [
 					"command" => "cc -MD -MF $out.d $cflags -c $in -o $out",
 					"deps" => "gcc",
