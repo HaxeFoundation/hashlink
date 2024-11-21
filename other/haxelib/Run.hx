@@ -55,7 +55,7 @@ class NinjaGenerator {
 				var opt_flag = config.defines.exists("debug") ? "-g" : '-O2';
 				var rpath = switch Sys.systemName() {
 					case "Mac": "-rpath @executable_path -rpath /usr/local/lib";
-					case _: "-Wl,-rpath,$$ORIGIN,/usr/local/lib";
+					case _: "-Wl,-rpath,$$ORIGIN:/usr/local/lib";
 				};
 				gen.bind('cflags', '$opt_flag -std=c11 -DHL_MAKE -Wall -I. -pthread');
 				final libflags = config.libs.map((lib) -> switch lib {
