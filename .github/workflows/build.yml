@@ -155,7 +155,7 @@ jobs:
         set -eux
 
         haxelib setup ~/haxelib
-        haxelib install hashlink
+        haxelib dev hashlink other/haxelib
         haxelib list
 
 
@@ -233,9 +233,8 @@ jobs:
               popd
             fi
 
-            haxe -hl src/_main.c -cp other/tests -main HelloWorld
-            make hlc
-            ./hlc
+            haxe -hl out/main.c -cp other/tests -main HelloWorld
+            out/main
             ;;
         esac
 
