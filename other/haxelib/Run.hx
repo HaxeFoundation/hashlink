@@ -114,8 +114,6 @@ class NinjaGenerator {
 		}
 	}
 
-	// private static function writeBat(vsdevcmd:String, out_dir:String)
-
 	private static function findVsDevCmdScript(): Null<String> {
 		var proc = new sys.io.Process('C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe', [
 			"-latest",
@@ -169,14 +167,14 @@ class Build {
 	}
 
 	public function run() {
-		var tpl = config.defines.get("hlgen.makefile");
-		if( tpl != null && tpl != "ninja"){
-			generateTemplates(tpl);
-			if( config.defines.get("hlgen.silent") == null )
-				Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
-		} else {
-			NinjaGenerator.gen(config, output);
-			NinjaGenerator.run(Path.directory(output));
+		switch config.defines.get("hlgen.makefile") {
+			case "ninja":
+				NinjaGenerator.gen(config, output);
+				NinjaGenerator.run(Path.directory(output));
+			case var tpl:
+				generateTemplates(tpl);
+				if( config.defines.get("hlgen.silent") == null )
+					Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
 		}
 	}
 	

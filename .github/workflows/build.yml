@@ -234,7 +234,7 @@ jobs:
               popd
             fi
 
-            haxe -hl out/main.c -cp other/tests -main HelloWorld
+            haxe -hl out/main.c -cp other/tests -main HelloWorld -D hlgen.makefile=ninja
             out/main
             ;;
         esac
