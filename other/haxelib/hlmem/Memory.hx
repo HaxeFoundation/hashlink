@@ -53,8 +53,10 @@ class Stats {
 	}
 
 	public static function getTypeString(mem : Memory, id : Int){
-		var t = mem.types[id & 0xFFFFFF];
+		var tid = id & 0xFFFFFF;
+		var t = mem.types[tid];
 		var tstr = t.toString();
+		tstr += Memory.withColor("#" + tid, 35);
 		var fid = id >>> 24;
 		if( fid > 0 ) {
 			var f = t.memFieldsNames[fid-1];
@@ -767,7 +769,16 @@ class Memory {
 	function locate( tstr : String, up = 0 ) {
 		var ctx = new Stats(this);
 
-		var lt = resolveType(tstr);
+		var lt = null;
+		if (StringTools.startsWith(tstr, "#")) {
+			var id = Std.parseInt(tstr.substr(1, tstr.length));
+			if (id != null && id >= 0) {
+				lt = types[id];
+			}
+		} else {
+			lt = resolveType(tstr);
+		}
+
 		if( lt == null ) return ctx;
 
 		inline function isVirtualField(t) { t >>>= 24; return t == 1 || t == 2; }
