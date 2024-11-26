@@ -28,6 +28,12 @@
 #define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret == E_OUTOFMEMORY ) return NULL; if( __ret != S_OK ) ReportDxError(__ret,__LINE__); }
 #define CHKERR(cmd) { HRESULT __ret = cmd; if( FAILED(__ret) ) ReportDxError(__ret,__LINE__); }
 
+static int gs_constants[] = {
+	D3D12_TEXTURE_DATA_PITCH_ALIGNMENT,
+	D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT,
+	D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+};
+
 typedef struct {
 	HWND wnd;
 	ID3D12CommandQueue *commandQueue;
@@ -1004,3 +1010,9 @@ DEFINE_PRIM(_VOID, command_list_dispatch, _RES _I32 _I32 _I32);
 
 //command_list_clear_unordered_access_view_float,
 //command_list_clear_unordered_access_view_uint,
+
+HL_PRIM int HL_NAME(get_constant)(int index) {
+	return gs_constants[index];
+}
+
+DEFINE_PRIM(_I32, get_constant, _I32);
