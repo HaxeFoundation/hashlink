@@ -940,12 +940,14 @@ class Memory {
 			return false;
 		case Intersect:
 			for( m in otherMems ) {
-				if( m.pointerBlock.get(b.addr ) == null )
+				var b2 = m.pointerBlock.get(b.addr);
+				if( b2 == null || b2.typePtr != b.typePtr || b2.size != b.size)
 					return true;
 			}
 		case Unique:
 			for( m in otherMems ) {
-				if( m.pointerBlock.get(b.addr ) != null )
+				var b2 = m.pointerBlock.get(b.addr);
+				if( b2 != null && b2.typePtr == b.typePtr && b2.size == b.size )
 					return true;
 			}
 		}
