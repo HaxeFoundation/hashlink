@@ -241,7 +241,15 @@ static void read_thread_data( thread_handle *t ) {
 #else
 	int size = (int)((unsigned char*)t->inf->stack_top - (unsigned char*)stack);
 	if( size > MAX_STACK_SIZE-32 ) size = MAX_STACK_SIZE-32;
-	memcpy(data.tmpMemory + 2,stack,size);
+#ifdef HL_WIN_DESKTOP
+	// it seems we rarely can't make a first read on the thread stack, let's ignore errors and wait.
+	__try {
+#endif
+		memcpy(data.tmpMemory + 2,stack,size);
+#ifdef HL_WIN_DESKTOP
+	} __except(EXCEPTION_EXECUTE_HANDLER) {
+	}
+#endif
 	pause_thread(t, false);
 	data.tmpMemory[0] = eip;
 	data.tmpMemory[1] = stack;
