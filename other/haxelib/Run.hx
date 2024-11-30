@@ -60,8 +60,8 @@ class NinjaGenerator {
 				gen.bind('cflags', '$opt_flag -std=c11 -DHL_MAKE -Wall -I. -pthread');
 				final libflags = config.libs.map((lib) -> switch lib {
 					case "std": "-lhl";
-					case "uv": '-l:$lib.hdll -luv';
-					case var lib: '-l:$lib.hdll';
+					case "uv": '/usr/local/lib/$lib.hdll -luv';
+					case var lib: '/usr/local/lib/$lib.hdll';
 				}).join(' ');
 				gen.bind('ldflags', '-pthread -lm -L/usr/local/lib $libflags $rpath');
 				gen.rule('cc', [
