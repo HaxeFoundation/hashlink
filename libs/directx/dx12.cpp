@@ -73,7 +73,7 @@ static void ReportDxError( HRESULT err, int line ) {
 	hl_error("DXERROR %X line %d",(DWORD)err,line);
 }
 
-static void OnDebugMessage( 
+static void OnDebugMessage(
 D3D12_MESSAGE_CATEGORY Category,
 D3D12_MESSAGE_SEVERITY Severity,
 D3D12_MESSAGE_ID ID,
@@ -260,6 +260,7 @@ HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORM
 		drv->factory->CreateSwapChainForHwnd(drv->commandQueue,drv->wnd,&desc,NULL,NULL,&swapchain);
 		if( !swapchain ) CHKERR(E_INVALIDARG);
 		swapchain->QueryInterface(IID_PPV_ARGS(&drv->swapchain));
+		drv->factory->MakeWindowAssociation(drv->wnd, DXGI_MWA_NO_ALT_ENTER);
 	}
 #else
 	if (drv->swapBuffers) {
@@ -752,7 +753,7 @@ HL_PRIM int HL_NAME(get_descriptor_handle_increment_size)( D3D12_DESCRIPTOR_HEAP
 
 HL_PRIM int64 HL_NAME(descriptor_heap_get_handle)( ID3D12DescriptorHeap *heap, bool gpu ) {
 	UINT64 handle = gpu ? heap->GetGPUDescriptorHandleForHeapStart().ptr : heap->GetCPUDescriptorHandleForHeapStart().ptr;
-	return handle; 
+	return handle;
 }
 
 HL_PRIM ID3D12QueryHeap *HL_NAME(create_query_heap)( D3D12_QUERY_HEAP_DESC *desc ) {
