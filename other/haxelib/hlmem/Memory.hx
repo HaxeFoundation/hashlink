@@ -982,7 +982,7 @@ class Memory {
 		return args;
 	}
 
-	static var useColor = false;
+	static var useColor = true;
 	static function main() {
 		var m = new Memory();
 		var others: Array<Memory> = [];
@@ -999,8 +999,10 @@ class Memory {
 				m.loadBytecode(arg);
 				continue;
 			}
-			if( arg == "-c" || arg == "--color" ) {
-				useColor = true;
+			if( arg == "-c" || arg == "--color" )
+				continue;
+			if( arg == "--no-color" ) {
+				useColor = false;
 				continue;
 			}
 			if( arg == "--args" ) {
