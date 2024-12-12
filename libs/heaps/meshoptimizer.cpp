@@ -1,4 +1,4 @@
-#define HL_NAME(n) fmt_##n
+#define HL_NAME(n) heaps_##n
 #include <meshoptimizer.h>
 #include <hl.h>
 
