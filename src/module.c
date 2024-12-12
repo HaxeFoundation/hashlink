@@ -896,12 +896,16 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	hl_module_add(m2);
 
 	// call entry point (will only update types)
-	if( m2->functions_ptrs[c->entrypoint] ) {
-		vclosure cl;
-		cl.t = c->functions[m2->functions_indexes[c->entrypoint]].type;
-		cl.fun = m2->functions_ptrs[c->entrypoint];
-		cl.hasValue = 0;
-		hl_dyn_call(&cl,NULL,0);
+	for(i=modules_count-1;i>=0;i--) {
+		hl_module *m = cur_modules[i];
+		if( m->functions_ptrs[m->code->entrypoint] ) {
+			vclosure cl;
+			cl.t = m->code->functions[m->functions_indexes[m->code->entrypoint]].type;
+			cl.fun = m->functions_ptrs[m->code->entrypoint];
+			cl.hasValue = 0;
+			hl_dyn_call(&cl,NULL,0);
+			break;
+		}
 	}
 
 	return true;
