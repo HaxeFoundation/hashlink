@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="meshoptimizer.cpp" />
+    <ClCompile Include="mikkt.c" />
+    <ClCompile Include="vhacd.cpp" />
+    <ClCompile Include="..\..\include\meshoptimizer\simplifier.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\spatialorder.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\stripifier.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\vcacheanalyzer.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\vcacheoptimizer.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\vertexcodec.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\vertexfilter.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\vfetchanalyzer.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\vfetchoptimizer.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\allocator.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\clusterizer.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\indexcodec.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\indexgenerator.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\overdrawanalyzer.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\overdrawoptimizer.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\meshoptimizer\quantization.cpp">
+      <Filter>meshoptimizer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\mikktspace\mikktspace.c">
+      <Filter>mikktspace</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="meshoptimizer">
+      <UniqueIdentifier>{cef6075e-999d-435f-b631-cfc5cf831a54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="mikktspace">
+      <UniqueIdentifier>{02495596-877c-4750-a483-7b43a0a93b2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vhacd">
+      <UniqueIdentifier>{94aab7ac-c480-46da-8009-37900d21775b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\meshoptimizer\meshoptimizer.h">
+      <Filter>meshoptimizer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\mikktspace\mikktspace.h">
+      <Filter>mikktspace</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\vhacd\VHACD.h">
+      <Filter>vhacd</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

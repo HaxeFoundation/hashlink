@@ -7,7 +7,7 @@ INSTALL_BIN_DIR ?= $(PREFIX)/bin
 INSTALL_LIB_DIR ?= $(PREFIX)/lib
 INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
-LIBS=fmt sdl ssl openal ui uv mysql sqlite
+LIBS=fmt sdl ssl openal ui uv mysql sqlite heaps
 ARCH ?= $(shell uname -m)
 
 CFLAGS = -Wall -O3 -I src -std=c11 -D LIBHL_EXPORTS
@@ -104,6 +104,18 @@ UI = libs/ui/ui_stub.o
 MYSQL = libs/mysql/socket.o libs/mysql/sha1.o libs/mysql/my_proto.o libs/mysql/my_api.o libs/mysql/mysql.o
 
 SQLITE = libs/sqlite/sqlite.o
+
+HEAPS = libs/heaps/mikkt.o libs/heaps/meshoptimizer.o libs/heaps/vhacd.o
+HEAPS += include/mikktspace/mikktspace.o
+HEAPS += include/meshoptimizer/allocator.o include/meshoptimizer/overdrawoptimizer.o \
+	include/meshoptimizer/vcacheoptimizer.o include/meshoptimizer/clusterizer.o \
+	include/meshoptimizer/quantization.o include/meshoptimizer/vertexcodec.o \
+	include/meshoptimizer/indexcodec.o include/meshoptimizer/simplifier.o \
+	include/meshoptimizer/vertexfilter.o include/meshoptimizer/indexgenerator.o \
+	include/meshoptimizer/spatialorder.o include/meshoptimizer/vfetchanalyzer.o \
+	include/meshoptimizer/stripifier.o include/meshoptimizer/vfetchoptimizer.o \
+	include/meshoptimizer/overdrawanalyzer.o include/meshoptimizer/vcacheanalyzer.o
+HEAPS_CFLAGS = -fvisibility=hidden -I include/mikktspace -I include/meshoptimizer -I include/vhacd
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -290,6 +302,23 @@ mysql: ${MYSQL} libhl
 sqlite: ${SQLITE} libhl
 	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L. -lhl -lsqlite3
 
+CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
+
+./include/mikktspace/%.o: ./include/mikktspace/%.c
+	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
+
+./include/meshoptimizer/%.o: ./include/meshoptimizer/%.cpp
+	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
+
+./libs/heaps/%.o: ./libs/heaps/%.c
+	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
+
+./libs/heaps/%.o: ./libs/heaps/%.cpp
+	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
+
+heaps: ${HEAPS} libhl
+	${CXX} ${CFLAGS} ${HEAPS_CFLAGS} -shared -o heaps.hdll ${HEAPS} ${LIBFLAGS} -L. -lhl
+
 mesa:
 	(cd libs/mesa && ${MAKE})
 
@@ -363,7 +392,7 @@ codesign_osx:
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HL_DEBUG}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
