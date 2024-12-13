@@ -302,17 +302,19 @@ mysql: ${MYSQL} libhl
 sqlite: ${SQLITE} libhl
 	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L. -lhl -lsqlite3
 
+CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
+
 ./include/mikktspace/%.o: ./include/mikktspace/%.c
 	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
 
 ./include/meshoptimizer/%.o: ./include/meshoptimizer/%.cpp
-	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
+	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
 
 ./libs/heaps/%.o: ./libs/heaps/%.c
 	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
 
 ./libs/heaps/%.o: ./libs/heaps/%.cpp
-	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
+	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
 
 heaps: ${HEAPS} libhl
 	${CC} ${CFLAGS} ${HEAPS_CFLAGS} -shared -o heaps.hdll ${HEAPS} ${LIBFLAGS} -L. -lhl
