@@ -115,7 +115,7 @@ HEAPS += include/meshoptimizer/allocator.o include/meshoptimizer/overdrawoptimiz
 	include/meshoptimizer/spatialorder.o include/meshoptimizer/vfetchanalyzer.o \
 	include/meshoptimizer/stripifier.o include/meshoptimizer/vfetchoptimizer.o \
 	include/meshoptimizer/overdrawanalyzer.o include/meshoptimizer/vcacheanalyzer.o
-HEAPS_CFLAGS = -I include/mikktspace -I include/meshoptimizer -I include/vhacd
+HEAPS_CFLAGS = -fvisibility=hidden -I include/mikktspace -I include/meshoptimizer -I include/vhacd
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
