@@ -56,3 +56,8 @@ if(WIN32)
         add_subdirectory(video)
     endif()
 endif()
+
+option(WITH_HEAPS "Build heaps.hdll." ON)
+if(WITH_HEAPS)
+    add_subdirectory(heaps)
+endif()
