@@ -317,7 +317,7 @@ CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
 
 heaps: ${HEAPS} libhl
-	${CC} ${CFLAGS} ${HEAPS_CFLAGS} -shared -o heaps.hdll ${HEAPS} ${LIBFLAGS} -L. -lhl
+	${CXX} ${CFLAGS} ${HEAPS_CFLAGS} -shared -o heaps.hdll ${HEAPS} ${LIBFLAGS} -L. -lhl
 
 mesa:
 	(cd libs/mesa && ${MAKE})
