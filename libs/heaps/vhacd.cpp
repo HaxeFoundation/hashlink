@@ -4,7 +4,10 @@
 #include <VHACD.h>
 #include <hl.h>
 
-typedef VHACD::IVHACD vhacd;
+typedef struct {
+	VHACD::IVHACD* pInstance;
+	std::vector<VHACD::IVHACD::ConvexHull> convexHulls;
+} vhacd;
 
 struct convex_hull {
 	vbyte* points;
@@ -25,21 +28,22 @@ struct convex_hull {
 };
 
 HL_PRIM vhacd* HL_NAME(create_vhacd)() {
-    return VHACD::CreateVHACD();
+	return new vhacd{ VHACD::CreateVHACD() };
 }
 
-HL_PRIM bool HL_NAME(vhacd_compute)(vhacd* pVhacd, float* pPoints, uint32_t countPoints, uint32_t* pTriangles, uint32_t countTriangle, VHACD::IVHACD::Parameters* pParameters ) {
-    return pVhacd->Compute(pPoints, countPoints, pTriangles, countTriangle, *pParameters);
+HL_PRIM bool HL_NAME(vhacd_compute)(vhacd* pVhacd, float* pPoints, uint32_t countPoints, uint32_t* pTriangles, uint32_t countTriangle, VHACD::IVHACD::Parameters* pParameters) {
+	return pVhacd->pInstance->Compute(pPoints, countPoints, pTriangles, countTriangle, *pParameters);
 }
 
 HL_PRIM int HL_NAME(vhacd_get_n_convex_hulls)(vhacd* pVhacd) {
-	return pVhacd->GetNConvexHulls();
+	return pVhacd->pInstance->GetNConvexHulls();
 }
 
-HL_PRIM bool HL_NAME(vhacd_get_convex_hull)(vhacd* pVhacd, int index, convex_hull* pConvexHull ) {
-	VHACD::IVHACD::ConvexHull convexHull;
-	if ( !pVhacd->GetConvexHull(index, convexHull) )
-	   return false;
+HL_PRIM bool HL_NAME(vhacd_get_convex_hull)(vhacd* pVhacd, int index, convex_hull* pConvexHull) {
+	pVhacd->convexHulls.emplace_back();
+	VHACD::IVHACD::ConvexHull& convexHull = pVhacd->convexHulls.back();
+	if (!pVhacd->pInstance->GetConvexHull(index, convexHull))
+		return false;
 
 	pConvexHull->points = (vbyte*)convexHull.m_points.data();
 	pConvexHull->pointCount = (int)convexHull.m_points.size();
@@ -57,21 +61,16 @@ HL_PRIM bool HL_NAME(vhacd_get_convex_hull)(vhacd* pVhacd, int index, convex_hul
 	pConvexHull->boundsMaxY = convexHull.mBmax[1];
 	pConvexHull->boundsMaxZ = convexHull.mBmax[2];
 
-	// To avoid freeing convex hull memory
-	std::vector<VHACD::Vertex> fakePoints{};
-	convexHull.m_points = fakePoints;
-	std::vector<VHACD::Triangle> fakeTriangles{};
-	convexHull.m_triangles = fakeTriangles;
-
 	return true;
 }
 
 HL_PRIM void HL_NAME(vhacd_clean)(vhacd* pVhacd) {
-    pVhacd->Clean();
+	pVhacd->pInstance->Clean();
 }
 
 HL_PRIM void HL_NAME(vhacd_release)(vhacd* pVhacd) {
-	pVhacd->Release();
+	pVhacd->pInstance->Release();
+	delete pVhacd;
 }
 
 #define _VHACD _ABSTRACT(vhacd)
