@@ -149,29 +149,12 @@ else ifeq ($(UNAME),Darwin)
 # Mac
 LIBEXT=dylib
 
-BPREFIX := $(shell brew --prefix)
+BREW_PREFIX := $(shell brew --prefix)
+# prefixes for keg-only packages
+BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
 
-BREW_LIBJPEG := $(shell brew --prefix libjpeg-turbo)
-BREW_SDL2 := $(shell brew --prefix sdl2)
-BREW_JPEGTURBO := $(shell brew --prefix jpeg-turbo)
-BREW_VORBIS := $(shell brew --prefix libvorbis)
-BREW_OPENAL := $(shell brew --prefix openal-soft)
-BREW_MBEDTLS := $(shell brew --prefix mbedtls)
-BREW_LIBPNG := $(shell brew --prefix libpng)
-BREW_LIBOGG := $(shell brew --prefix libogg)
-BREW_LIBUV := $(shell brew --prefix libuv)
-
-CFLAGS += -m$(MARCH) -I include -I $(BREW_LIBJPEG)/include \
-	-I $(BREW_JPEGTURBO)/include -I $(BREW_SDL2)/include -I $(BREW_VORBIS)/include \
-	-I $(BREW_MBEDTLS)/include -I $(BREW_LIBPNG)/include -I $(BREW_LIBOGG)/include \
-	-I $(BREW_LIBUV)/include \
-	-I $(BREW_OPENAL)/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -Dopenal_soft -DGL_SILENCE_DEPRECATION
 LFLAGS += -Wl,-export_dynamic
-
-CFLAGS += -m$(MARCH) -I include -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include \
-	-I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include -I /usr/local/opt/libvorbis/include \
-	-I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
-LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
 
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
@@ -179,9 +162,7 @@ CFLAGS += -isysroot $(ISYSROOT)
 LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-LIBFLAGS += -L$(BREW_LIBJPEG)/lib -L$(BREW_SDL2)/lib -L$(BREW_JPEGTURBO)/lib \
-			-L$(BREW_VORBIS)/lib -L$(BREW_OPENAL)/lib -L$(BREW_MBEDTLS)/lib \
-			-L$(BREW_LIBPNG)/lib -L$(BREW_LIBOGG)/lib -L$(BREW_LIBUV)/lib
+LIBFLAGS += -L$(BREW_PREFIX)/lib -L$(BREW_OPENAL_PREFIX)/lib
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
