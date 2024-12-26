@@ -3760,6 +3760,11 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OGetMem:
 			{
+				#ifndef HL_64
+				if (dst->t->kind == HI64) {
+					error_i64();
+				}
+				#endif
 				preg *base = alloc_cpu(ctx, ra, true);
 				preg *offset = alloc_cpu64(ctx, rb, true);
 				store(ctx, dst, pmem2(&p,base->id,offset->id,1,0), false);
