@@ -34,11 +34,14 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 static hl_module **cur_modules = NULL;
 static int modules_count = 0;
 
-static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos ) {
+EXPORT bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos ) {
+	if ((addr < m->jit_code) || (addr > ((char*)m->jit_code + m->codesize)))
+		return false;
 	int code_pos = ((int)(int_val)((unsigned char*)addr - (unsigned char*)m->jit_code));
 	int min, max;
 	hl_debug_infos *dbg;
 	hl_function *fdebug;
+
 	if( m->jit_debug == NULL )
 		return false;
 	// lookup function from code pos
@@ -116,7 +119,7 @@ static int module_capture_stack( void **stack, int size ) {
 	int count = 0;
 	if( modules_count == 1 ) {
 		hl_module *m = cur_modules[0];
-		unsigned char *code = m->jit_code;
+		unsigned char *code = (unsigned char*) m->jit_code;
 		int code_size = m->codesize;
 		if( m->jit_debug ) {
 			int s = m->jit_debug[0].start;
@@ -141,11 +144,11 @@ static int module_capture_stack( void **stack, int size ) {
 				int i;
 				for(i=0;i<modules_count;i++) {
 					hl_module *m = cur_modules[i];
-					unsigned char *code = m->jit_code;
+					unsigned char *code = (unsigned char*) m->jit_code;
 					int code_size = m->codesize;
 					if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
 						if( count == size ) {
-							stack_ptr = stack_top;
+							stack_ptr = (void**)stack_top;
 							break;
 						}
 						if( m->jit_debug ) {
@@ -191,7 +194,7 @@ static void hl_module_types_dump( void (*fdump)( void *, int) ) {
 	}
 }
 
-hl_module *hl_module_alloc( hl_code *c ) {
+EXPORT hl_module *hl_module_alloc( hl_code *c ) {
 	int i;
 	int gsize = 0;
 	hl_module *m = (hl_module*)malloc(sizeof(hl_module));
@@ -276,7 +279,7 @@ static void *resolve_library( const char *lib ) {
 	void *h;
 
 #	ifndef HL_CONSOLE
-	static char *DISABLED_LIBS = NULL;
+	static const char *DISABLED_LIBS = NULL;
 	if( !DISABLED_LIBS ) {
 		DISABLED_LIBS = getenv("HL_DISABLED_LIBS");
 		if( !DISABLED_LIBS ) DISABLED_LIBS = "";
@@ -466,7 +469,7 @@ static void hl_module_init_natives( hl_module *m ) {
 	}
 }
 
-int hl_module_init( hl_module *m, h_bool hot_reload ) {
+EXPORT int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
 	// RESET globals
@@ -564,7 +567,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	return 1;
 }
 
-h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
+EXPORT h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	int i1,i2;
 	bool has_changes = false;
 	jit_ctx *ctx = m1->jit_ctx;
@@ -662,7 +665,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	return true;
 }
 
-void hl_module_free( hl_module *m ) {
+EXPORT void hl_module_free( hl_module *m ) {
 	hl_free(&m->ctx.alloc);
 	hl_free_executable_memory(m->code, m->codesize);
 	free(m->functions_indexes);

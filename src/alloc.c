@@ -55,6 +55,8 @@ static inline unsigned int TRAILING_ZEROES( unsigned int x ) {
 #define GC_PAGE_BITS	16
 #define GC_PAGE_SIZE	(1 << GC_PAGE_BITS)
 
+#define GC_BLOCK_OFFSET 8
+
 #ifndef HL_64
 #	define gc_hash(ptr)			((unsigned int)(ptr))
 #	define GC_LEVEL0_BITS		8
@@ -563,7 +565,8 @@ resume:
 					if( avail > p->free_blocks ) p->free_blocks = avail;
 					avail = 0;
 					next += bits - 1;
-					if( p->sizes[next] == 0 ) hl_fatal("assert");
+					if( p->sizes[next] == 0 ) 
+						hl_fatal("assert");
 					next += p->sizes[next];
 					if( next + nblocks > p->max_blocks ) {
 						p->next_block = next;
@@ -643,6 +646,8 @@ alloc_var:
 }
 
 static void *gc_alloc_gen( int size, int flags, int *allocated ) {
+	size += GC_BLOCK_OFFSET;
+
 	int m = size & (GC_ALIGN - 1);
 	int p;
 	gc_stats.allocation_count++;
@@ -653,8 +658,8 @@ static void *gc_alloc_gen( int size, int flags, int *allocated ) {
 		return NULL;
 	}
 	if( size <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & MEM_ALIGN_DOUBLE) == 0 && flags != MEM_KIND_FINALIZER ) {
-		*allocated = size;
-		return gc_alloc_fixed( (size >> GC_ALIGN_BITS) - 1, flags & PAGE_KIND_MASK);
+		*allocated = size - GC_BLOCK_OFFSET;
+		return (vbyte*)gc_alloc_fixed( (size >> GC_ALIGN_BITS) - 1, flags & PAGE_KIND_MASK) + GC_BLOCK_OFFSET;
 	}
 	for(p=GC_FIXED_PARTS;p<GC_PARTITIONS;p++) {
 		int block = GC_SIZES[p];
@@ -663,8 +668,8 @@ static void *gc_alloc_gen( int size, int flags, int *allocated ) {
 		if( m ) query += block - m;
 		if( query < block * 255 ) {
 			void *ptr = gc_alloc_var(p, query, flags & PAGE_KIND_MASK);
-			*allocated = query;
-			return ptr;
+			*allocated = query - GC_BLOCK_OFFSET;
+			return (vbyte*)ptr + GC_BLOCK_OFFSET;
 		}
 	}
 	gc_global_lock(false);
@@ -680,11 +685,12 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	int allocated = 0;
 	gc_global_lock(true);
 	gc_check_mark();
+
 #	ifdef GC_MEMCHK
 	size += HL_WSIZE;
 #	endif
 	if( gc_flags & GC_PROFILE ) time = TIMESTAMP();
-	ptr = gc_alloc_gen(size, flags, &allocated);
+	ptr = (vbyte*)gc_alloc_gen(size, flags, &allocated);
 	if( gc_flags & GC_PROFILE ) gc_stats.alloc_time += TIMESTAMP() - time;
 #	ifdef GC_DEBUG
 	memset(ptr,0xCD,allocated);
@@ -697,6 +703,7 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	memset((char*)ptr+(allocated - HL_WSIZE),0xEE,HL_WSIZE);
 #	endif
 	gc_global_lock(false);
+
 	hl_track_call(HL_TRACK_ALLOC, on_alloc(t,size,flags,ptr));
 	return ptr;
 }
@@ -764,7 +771,7 @@ static void gc_flush_mark() {
 		nwords = size / HL_WSIZE;
 #		ifdef GC_PRECISE
 		if( page->page_kind == MEM_KIND_DYNAMIC ) {
-			hl_type *t = *(hl_type**)block;
+			hl_type* t = *(hl_type**)((char*)block + GC_BLOCK_OFFSET);
 #			ifdef GC_DEBUG
 #				ifdef HL_64
 				if( (int_val)t == 0xDDDDDDDDDDDDDDDD ) continue;
@@ -792,7 +799,7 @@ static void gc_flush_mark() {
 				block++;
 				continue;
 			}
-			p = *block++;
+			p = (vbyte*)*block++ - GC_BLOCK_OFFSET/*Reserve Space*/;
 			pos++;
 			page = GC_GET_PAGE(p);
 			if( !page || !INPAGE(p,page) || ((((unsigned char*)p - (unsigned char*)page))%page->block_size) != 0 ) continue;
@@ -871,7 +878,7 @@ static void gc_mark_stack( void *start, void *end ) {
 	void **mark_stack = cur_mark_stack;
 	void **stack_head = (void**)start;
 	while( stack_head < (void**)end ) {
-		void *p = *stack_head++;
+		void *p = (vbyte*)*stack_head++ -GC_BLOCK_OFFSET/*Reserve Space*/;
 		gc_pheader *page = GC_GET_PAGE(p);
 		int bid;
 		if( !page || !INPAGE(p,page) || (((unsigned char*)p - (unsigned char*)page)%page->block_size) != 0 ) continue;
@@ -918,7 +925,7 @@ static void gc_mark() {
 	}
 	// push roots
 	for(i=0;i<gc_roots_count;i++) {
-		void *p = *gc_roots[i];
+		void *p = (vbyte*)*gc_roots[i] - GC_BLOCK_OFFSET/*Reserve Space*/;
 		gc_pheader *page;
 		int bid;
 		if( !p ) continue;
@@ -995,6 +1002,7 @@ HL_API void hl_gc_major() {
 }
 
 HL_API bool hl_is_gc_ptr( void *ptr ) {
+	(vbyte*)ptr -= GC_BLOCK_OFFSET/*Reserve Space*/;
 	gc_pheader *page = GC_GET_PAGE(ptr);
 	int bid;
 	if( !page || !INPAGE(ptr,page) ) return false;
@@ -1264,7 +1272,6 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 	int i;
 	hl_runtime_obj *rt = t->obj->rt;
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(t);
-	size = rt->size;
 	if( size & (HL_WSIZE-1) ) size += HL_WSIZE - (size & (HL_WSIZE-1));
 	if( t->kind == HSTRUCT ) {
 		o = (vobj*)hl_gc_alloc_gen(t, size, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);

@@ -105,7 +105,7 @@ static void hl_debug_loop( hl_module *m ) {
 	} while( loop );
 }
 
-bool hl_module_debug( hl_module *m, int port, bool wait ) {
+EXPORT bool hl_module_debug( hl_module *m, int port, bool wait ) {
 	hl_socket *s;
 	hl_socket_init();
 	s = hl_socket_new(false);

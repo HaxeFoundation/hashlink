@@ -405,7 +405,6 @@ static int throw_handler( int code ) {
 	switch( code ) {
 	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
 	case EXCEPTION_STACK_OVERFLOW: hl_error("Stack overflow");
-	default: hl_error("Unknown runtime error");
 	}
 	return EXCEPTION_CONTINUE_SEARCH;
 }
@@ -416,13 +415,14 @@ HL_PRIM vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, boo
 	vdynamic *exc;
 	*isException = false;
 	hl_trap(trap, exc, on_exception);
-#	if defined(HL_VCC) && !defined(HL_XBO)
-	__try {
-		return hl_dyn_call(c,args,nargs);
-	} __except( throw_handler(GetExceptionCode()) ) {}
-#	else
+	//.NET runtime will hold the exception
+//#	if defined(HL_VCC) && !defined(HL_XBO)
+//	__try {
+//		return hl_dyn_call(c,args,nargs);
+//	} __except( throw_handler(GetExceptionCode()) ) {}
+//#	else
 	return hl_dyn_call(c,args,nargs);
-#	endif
+//#	endif
 on_exception:
 	*isException = true;
 	return exc;

@@ -2190,7 +2190,7 @@ static void op_jump( jit_ctx *ctx, vreg *a, vreg *b, hl_opcode *op, int targetPo
 	register_jump(ctx,do_jump(ctx,op->op, IS_FLOAT(a)),targetPos);
 }
 
-jit_ctx *hl_jit_alloc() {
+EXPORT jit_ctx *hl_jit_alloc() {
 	int i;
 	jit_ctx *ctx = (jit_ctx*)malloc(sizeof(jit_ctx));
 	if( ctx == NULL ) return NULL;
@@ -2210,7 +2210,7 @@ jit_ctx *hl_jit_alloc() {
 	return ctx;
 }
 
-void hl_jit_free( jit_ctx *ctx, h_bool can_reset ) {
+EXPORT void hl_jit_free( jit_ctx *ctx, h_bool can_reset ) {
 	free(ctx->vregs);
 	free(ctx->opsPos);
 	free(ctx->startBuf);
@@ -2236,16 +2236,19 @@ static void jit_nops( jit_ctx *ctx ) {
 
 #define MAX_ARGS 16
 
-static void *call_jit_c2hl = NULL;
-static void *call_jit_hl2c = NULL;
+EXPORT void *call_jit_c2hl = NULL;
+EXPORT void *call_jit_hl2c = NULL;
 
-static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
+EXPORT void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	/*
 		prepare stack and regs according to prepare_call_args, but by reading runtime type information
 		from the function type. The stack and regs will be setup by the trampoline function.
 	*/
 	unsigned char stack[MAX_ARGS * 8];
 	call_regs cregs = {0};
+	if (ret == NULL) {
+		ret = ret;
+	}
 	if( t->fun->nargs > MAX_ARGS )
 		hl_error("Too many arguments for dynamic call");
 	int i, size = 0, pad = 0, pos = 0;
@@ -2334,6 +2337,7 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		}
 	}
 	pos >>= IS_64 ? 3 : 2;
+	//printf("Test: %p %d", &stack, pos);
 	switch( t->fun->ret->kind ) {
 	case HUI8:
 	case HUI16:
@@ -2627,7 +2631,7 @@ static void hl_jit_init_module( jit_ctx *ctx, hl_module *m ) {
 	}
 }
 
-void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
+EXPORT void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	hl_jit_init_module(ctx,m);
 	ctx->c2hl = jit_build(ctx, jit_c2hl);
 	ctx->hl2c = jit_build(ctx, jit_hl2c);
@@ -2638,7 +2642,7 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	ctx->static_functions[1] = (void*)(int_val)jit_build(ctx,jit_assert);
 }
 
-void hl_jit_reset( jit_ctx *ctx, hl_module *m ) {
+EXPORT void hl_jit_reset( jit_ctx *ctx, hl_module *m ) {
 	ctx->debug = NULL;
 	hl_jit_init_module(ctx,m);
 }
@@ -2741,7 +2745,7 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 	store_result(ctx, dst);
 }
 
-int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
+EXPORT int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i, size = 0, opCount;
 	int codePos = BUF_POS();
 	int nargs = f->type->fun->nargs;
@@ -4121,7 +4125,7 @@ static void *get_wrapper( hl_type *t ) {
 	return call_jit_hl2c;
 }
 
-void hl_jit_patch_method( void *old_fun, void **new_fun_table ) {
+EXPORT void hl_jit_patch_method( void *old_fun, void **new_fun_table ) {
 	// mov eax, addr
 	// jmp [eax]
 	unsigned char *b = (unsigned char*)old_fun;
@@ -4148,7 +4152,7 @@ void hl_jit_patch_method( void *old_fun, void **new_fun_table ) {
 	*b++ = 0x20;
 }
 
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
+EXPORT void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
 	jlist *c;
 	int size = BUF_POS();
 	unsigned char *code;

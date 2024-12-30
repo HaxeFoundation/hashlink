@@ -627,6 +627,11 @@ HL_PRIM bool hl_sys_check_reload() {
 	return reload_fun && ((bool(*)(void*))reload_fun)(reload_param);
 }
 
+HL_PRIM int hl_modcore_native_was_here() {
+	return 114514;
+}
+
+
 #ifndef HL_MOBILE
 const char *hl_sys_special( const char *key ) {
 	 hl_error("Unknown sys_special key");

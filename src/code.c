@@ -130,7 +130,7 @@ static const char *hl_read_string( hl_reader *r ) {
 	return r->code->strings[i];
 }
 
-const uchar *hl_get_ustring( hl_code *code, int index ) {
+EXPORT const uchar *hl_get_ustring( hl_code *code, int index ) {
 	uchar *str = code->ustrings[index];
 	if( str == NULL ) {
 		int size = hl_utf8_length((vbyte*)code->strings[index],0);
@@ -349,7 +349,7 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 #define EXIT(msg) { ERROR(msg); CHK_ERROR(); }
 #define ALLOC(v,ptr,count) v = (ptr *)hl_zalloc(&c->alloc,count*sizeof(ptr))
 
-const char *hl_op_name( int op ) {
+EXPORT const char *hl_op_name( int op ) {
 	if( op < 0 || op >= OLast )
 		return "UnknownOp";
 	return hl_op_names[op];
@@ -421,7 +421,7 @@ static int *hl_read_debug_infos( hl_reader *r, int nops ) {
 	return debug;
 }
 
-hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
+EXPORT hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	hl_reader _r = { data, size, 0, 0, NULL };	
 	hl_reader *r = &_r;
 	hl_code *c;
@@ -609,7 +609,7 @@ static const unsigned int crc32_table[] =
 #define HSTR(s) { const char *_c = s; while( *_c ) H(*_c++); }
 #define HUSTR(s) { const uchar *_c = s; while( *_c ) H(*_c++); }
 
-int hl_code_hash_type( hl_type *t ) {
+EXPORT int hl_code_hash_type( hl_type *t ) {
 	int hash = -1;
 	int i;
 	switch( t->kind ) {
@@ -627,7 +627,7 @@ int hl_code_hash_type( hl_type *t ) {
 	return hash;
 }
 
-int hl_code_hash_native( hl_native *n ) {
+EXPORT int hl_code_hash_native( hl_native *n ) {
 	int hash = -1;
 	HSTR(n->lib);
 	HSTR(n->name);
@@ -635,7 +635,7 @@ int hl_code_hash_native( hl_native *n ) {
 	return hash;
 }
 
-int hl_code_hash_fun_sign( hl_function *f ) {
+EXPORT int hl_code_hash_fun_sign( hl_function *f ) {
 	int hash = -1;
 	H32(hl_code_hash_type(f->type));
 	if( f->obj ) {
@@ -649,7 +649,7 @@ int hl_code_hash_fun_sign( hl_function *f ) {
 	return hash;
 }
 
-int hl_code_hash_fun( hl_code *c, hl_function *f, int *functions_indexes, int *functions_signs ) {
+EXPORT int hl_code_hash_fun( hl_code *c, hl_function *f, int *functions_indexes, int *functions_signs ) {
 	int hash = -1;
 	int i, k;
 	for(i=0;i<f->nregs;i++)

@@ -705,7 +705,7 @@ static hl_field_lookup *hl_dynobj_add_field( vdynobj *o, int hfield, hl_type *t 
 
 // -------------------- DYNAMIC GET ------------------------------------
 
-static void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t ) {
+HL_PRIM void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t ) {
 	switch( d->t->kind ) {
 	case HDYNOBJ:
 		{
@@ -751,7 +751,7 @@ static void *hl_obj_lookup( vdynamic *d, int hfield, hl_type **t ) {
 }
 
 // fetch method or dynamic field (getField)
-static vdynamic *hl_obj_lookup_extra( vdynamic *d, int hfield ) {
+HL_PRIM vdynamic *hl_obj_lookup_extra( vdynamic *d, int hfield ) {
 	switch( d->t->kind ) {
 	case HOBJ:
 	case HSTRUCT:

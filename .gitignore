@@ -53,3 +53,6 @@ node_modules
 /*.tgz
 args.txt
 /other/benchs/hlc
+
+.vs/
+out/

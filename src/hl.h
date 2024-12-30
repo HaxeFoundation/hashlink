@@ -22,10 +22,10 @@
 #ifndef HL_H
 #define HL_H
 
-/**
-	Detailed documentation can be found here:
-	https://github.com/HaxeFoundation/hashlink/wiki/
-**/
+ /**
+	 Detailed documentation can be found here:
+	 https://github.com/HaxeFoundation/hashlink/wiki/
+ **/
 
 #define HL_VERSION	0x010A00
 
@@ -185,7 +185,7 @@
 #	ifndef true
 #		define true 1
 #		define false 0
-		typedef unsigned char bool;
+typedef unsigned char bool;
 #	endif
 #endif
 
@@ -223,7 +223,7 @@ typedef wchar_t	uchar;
 #	define uprintf		wprintf
 #	define ustrlen		wcslen
 #	define ustrdup		_wcsdup
-HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
+HL_API int uvszprintf(uchar* out, int out_size, const uchar* fmt, va_list arglist);
 #	define utod(s,end)	wcstod(s,end)
 #	define utoi(s,end)	wcstol(s,end,10)
 #	define ucmp(a,b)	wcscmp(a,b)
@@ -249,25 +249,26 @@ typedef char16_t uchar;
 
 #ifndef HL_NATIVE_UCHAR_FUN
 C_FUNCTION_BEGIN
-HL_API int ustrlen( const uchar *str );
-HL_API uchar *ustrdup( const uchar *str );
-HL_API double utod( const uchar *str, uchar **end );
-HL_API int utoi( const uchar *str, uchar **end );
-HL_API int ucmp( const uchar *a, const uchar *b );
-HL_API int utostr( char *out, int out_size, const uchar *str );
-HL_API int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
-HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
-HL_API void uprintf( const uchar *fmt, const uchar *str );
+HL_API int ustrlen(const uchar* str);
+HL_API uchar* ustrdup(const uchar* str);
+HL_API double utod(const uchar* str, uchar** end);
+HL_API int utoi(const uchar* str, uchar** end);
+HL_API int ucmp(const uchar* a, const uchar* b);
+HL_API int utostr(char* out, int out_size, const uchar* str);
+HL_API int usprintf(uchar* out, int out_size, const uchar* fmt, ...);
+HL_API int uvszprintf(uchar* out, int out_size, const uchar* fmt, va_list arglist);
+HL_API void uprintf(const uchar* fmt, const uchar* str);
 C_FUNCTION_END
 #endif
 
+#ifdef ENABLE_HL_DEBUG_BREAK
 #if defined(HL_VCC)
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
 #elif defined(HL_PS) && defined(_DEBUG)
 #	define hl_debug_break()	__debugbreak()
 #elif defined(HL_NX)
 C_FUNCTION_BEGIN
-HL_API void hl_debug_break( void );
+HL_API void hl_debug_break(void);
 C_FUNCTION_END
 #elif defined(HL_LINUX) && defined(__i386__)
 #	ifdef HL_64
@@ -288,6 +289,9 @@ C_FUNCTION_END
 #else
 #	define hl_debug_break()
 #endif
+#else
+#define hl_debug_break()
+#endif
 
 #ifdef HL_VCC
 #	define HL_NO_RETURN(f) __declspec(noreturn) f
@@ -300,71 +304,71 @@ C_FUNCTION_END
 // ---- TYPES -------------------------------------------
 
 typedef enum {
-	HVOID	= 0,
-	HUI8	= 1,
-	HUI16	= 2,
-	HI32	= 3,
-	HI64	= 4,
-	HF32	= 5,
-	HF64	= 6,
-	HBOOL	= 7,
-	HBYTES	= 8,
-	HDYN	= 9,
-	HFUN	= 10,
-	HOBJ	= 11,
-	HARRAY	= 12,
-	HTYPE	= 13,
-	HREF	= 14,
-	HVIRTUAL= 15,
+	HVOID = 0,
+	HUI8 = 1,
+	HUI16 = 2,
+	HI32 = 3,
+	HI64 = 4,
+	HF32 = 5,
+	HF64 = 6,
+	HBOOL = 7,
+	HBYTES = 8,
+	HDYN = 9,
+	HFUN = 10,
+	HOBJ = 11,
+	HARRAY = 12,
+	HTYPE = 13,
+	HREF = 14,
+	HVIRTUAL = 15,
 	HDYNOBJ = 16,
-	HABSTRACT=17,
-	HENUM	= 18,
-	HNULL	= 19,
+	HABSTRACT = 17,
+	HENUM = 18,
+	HNULL = 19,
 	HMETHOD = 20,
-	HSTRUCT	= 21,
+	HSTRUCT = 21,
 	// ---------
-	HLAST	= 22,
+	HLAST = 22,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
 typedef struct hl_type hl_type;
 typedef struct hl_runtime_obj hl_runtime_obj;
 typedef struct hl_alloc_block hl_alloc_block;
-typedef struct { hl_alloc_block *cur; } hl_alloc;
+typedef struct { hl_alloc_block* cur; } hl_alloc;
 typedef struct _hl_field_lookup hl_field_lookup;
 
 typedef struct {
 	hl_alloc alloc;
-	void **functions_ptrs;
-	hl_type **functions_types;
+	void** functions_ptrs;
+	hl_type** functions_types;
 } hl_module_context;
 
 typedef struct {
-	hl_type **args;
-	hl_type *ret;
+	hl_type** args;
+	hl_type* ret;
 	int nargs;
 	// storage for closure
-	hl_type *parent;
+	hl_type* parent;
 	struct {
 		hl_type_kind kind;
-		void *p;
+		void* p;
 	} closure_type;
 	struct {
-		hl_type **args;
-		hl_type *ret;
+		hl_type** args;
+		hl_type* ret;
 		int nargs;
-		hl_type *parent;
+		hl_type* parent;
 	} closure;
 } hl_type_fun;
 
 typedef struct {
-	const uchar *name;
-	hl_type *t;
+	const uchar* name;
+	hl_type* t;
 	int hashed_name;
 } hl_obj_field;
 
 typedef struct {
-	const uchar *name;
+	const uchar* name;
 	int findex;
 	int pindex;
 	int hashed_name;
@@ -374,72 +378,72 @@ typedef struct {
 	int nfields;
 	int nproto;
 	int nbindings;
-	const uchar *name;
-	hl_type *super;
-	hl_obj_field *fields;
-	hl_obj_proto *proto;
-	int *bindings;
-	void **global_value;
-	hl_module_context *m;
-	hl_runtime_obj *rt;
+	const uchar* name;
+	hl_type* super;
+	hl_obj_field* fields;
+	hl_obj_proto* proto;
+	int* bindings;
+	void** global_value;
+	hl_module_context* m;
+	hl_runtime_obj* rt;
 } hl_type_obj;
 
 typedef struct {
-	hl_obj_field *fields;
+	hl_obj_field* fields;
 	int nfields;
 	// runtime
 	int dataSize;
-	int *indexes;
-	hl_field_lookup *lookup;
+	int* indexes;
+	hl_field_lookup* lookup;
 } hl_type_virtual;
 
 typedef struct {
-	const uchar *name;
+	const uchar* name;
 	int nparams;
-	hl_type **params;
+	hl_type** params;
 	int size;
 	bool hasptr;
-	int *offsets;
+	int* offsets;
 } hl_enum_construct;
 
 typedef struct {
-	const uchar *name;
+	const uchar* name;
 	int nconstructs;
-	hl_enum_construct *constructs;
-	void **global_value;
+	hl_enum_construct* constructs;
+	void** global_value;
 } hl_type_enum;
 
 struct hl_type {
 	hl_type_kind kind;
 	union {
-		const uchar *abs_name;
-		hl_type_fun *fun;
-		hl_type_obj *obj;
-		hl_type_enum *tenum;
-		hl_type_virtual *virt;
-		hl_type	*tparam;
+		const uchar* abs_name;
+		hl_type_fun* fun;
+		hl_type_obj* obj;
+		hl_type_enum* tenum;
+		hl_type_virtual* virt;
+		hl_type* tparam;
 	};
-	void **vobj_proto;
-	unsigned int *mark_bits;
+	void** vobj_proto;
+	unsigned int* mark_bits;
 };
 
 C_FUNCTION_BEGIN
 
-HL_API int hl_type_size( hl_type *t );
+HL_API int hl_type_size(hl_type* t);
 #define hl_pad_size(size,t)	((t)->kind == HVOID ? 0 : ((-(size)) & (hl_type_size(t) - 1)))
-HL_API int hl_pad_struct( int size, hl_type *t );
+HL_API int hl_pad_struct(int size, hl_type* t);
 
-HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
-HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
-HL_API void hl_flush_proto( hl_type *ot );
-HL_API void hl_init_enum( hl_type *et, hl_module_context *m );
+HL_API hl_runtime_obj* hl_get_obj_rt(hl_type* ot);
+HL_API hl_runtime_obj* hl_get_obj_proto(hl_type* ot);
+HL_API void hl_flush_proto(hl_type* ot);
+HL_API void hl_init_enum(hl_type* et, hl_module_context* m);
 
 /* -------------------- VALUES ------------------------------ */
 
 typedef unsigned char vbyte;
 
 typedef struct {
-	hl_type *t;
+	hl_type* t;
 #	ifndef HL_64
 	int __pad; // force align on 16 bytes for double
 #	endif
@@ -450,62 +454,62 @@ typedef struct {
 		int i;
 		float f;
 		double d;
-		vbyte *bytes;
-		void *ptr;
+		vbyte* bytes;
+		void* ptr;
 		int64 i64;
 	} v;
 } vdynamic;
 
 typedef struct {
-	hl_type *t;
+	hl_type* t;
 	/* fields data */
 } vobj;
 
 typedef struct _vvirtual vvirtual;
 struct _vvirtual {
-	hl_type *t;
-	vdynamic *value;
-	vvirtual *next;
+	hl_type* t;
+	vdynamic* value;
+	vvirtual* next;
 };
 
 #define hl_vfields(v) ((void**)(((vvirtual*)(v))+1))
 
 typedef struct {
-	hl_type *t;
-	hl_type *at;
+	hl_type* t;
+	hl_type* at;
 	int size;
 	int __pad; // force align on 16 bytes for double
 } varray;
 
 typedef struct _vclosure {
-	hl_type *t;
-	void *fun;
+	hl_type* t;
+	void* fun;
 	int hasValue;
 #	ifdef HL_64
 	int __pad;
 #	endif
-	void *value;
+	void* value;
 } vclosure;
 
 typedef struct {
 	vclosure cl;
-	vclosure *wrappedFun;
+	vclosure* wrappedFun;
 } vclosure_wrapper;
 
 struct _hl_field_lookup {
-	hl_type *t;
+	hl_type* t;
 	int hashed_name;
 	int field_index; // negative or zero : index in methods
 };
 
 typedef struct {
-	void *ptr;
-	hl_type *closure;
+	void* ptr;
+	hl_type* closure;
 	int fid;
 } hl_runtime_binding;
 
 struct hl_runtime_obj {
-	hl_type *t;
+	hl_type* t;
 	// absolute
 	int nfields;
 	int nproto;
@@ -513,32 +517,32 @@ struct hl_runtime_obj {
 	int nmethods;
 	int nbindings;
 	bool hasPtr;
-	void **methods;
-	int *fields_indexes;
-	hl_runtime_binding *bindings;
-	hl_runtime_obj *parent;
-	const uchar *(*toStringFun)( vdynamic *obj );
-	int (*compareFun)( vdynamic *a, vdynamic *b );
-	vdynamic *(*castFun)( vdynamic *obj, hl_type *t );
-	vdynamic *(*getFieldFun)( vdynamic *obj, int hfield );
+	void** methods;
+	int* fields_indexes;
+	hl_runtime_binding* bindings;
+	hl_runtime_obj* parent;
+	const uchar* (*toStringFun)(vdynamic* obj);
+	int (*compareFun)(vdynamic* a, vdynamic* b);
+	vdynamic* (*castFun)(vdynamic* obj, hl_type* t);
+	vdynamic* (*getFieldFun)(vdynamic* obj, int hfield);
 	// relative
 	int nlookup;
-	hl_field_lookup *lookup;
+	hl_field_lookup* lookup;
 };
 
 typedef struct {
-	hl_type *t;
-	hl_field_lookup *lookup;
-	char *raw_data;
-	void **values;
+	hl_type* t;
+	hl_field_lookup* lookup;
+	char* raw_data;
+	void** values;
 	int nfields;
 	int raw_size;
 	int nvalues;
-	vvirtual *virtuals;
+	vvirtual* virtuals;
 } vdynobj;
 
 typedef struct _venum {
-	hl_type *t;
+	hl_type* t;
 	int index;
 } venum;
 
@@ -554,71 +558,71 @@ HL_API hl_type hlt_dynobj;
 HL_API hl_type hlt_bool;
 HL_API hl_type hlt_abstract;
 
-HL_API double hl_nan( void );
-HL_API bool hl_is_dynamic( hl_type *t );
+HL_API double hl_nan(void);
+HL_API bool hl_is_dynamic(hl_type* t);
 #define hl_is_ptr(t)	((t)->kind >= HBYTES)
-HL_API bool hl_same_type( hl_type *a, hl_type *b );
-HL_API bool hl_safe_cast( hl_type *t, hl_type *to );
+HL_API bool hl_same_type(hl_type* a, hl_type* b);
+HL_API bool hl_safe_cast(hl_type* t, hl_type* to);
 
 #define hl_aptr(a,t)	((t*)(((varray*)(a))+1))
 
-HL_API varray *hl_alloc_array( hl_type *t, int size );
-HL_API vdynamic *hl_alloc_dynamic( hl_type *t );
-HL_API vdynamic *hl_alloc_dynbool( bool b );
-HL_API vdynamic *hl_alloc_obj( hl_type *t );
-HL_API venum *hl_alloc_enum( hl_type *t, int index );
-HL_API vvirtual *hl_alloc_virtual( hl_type *t );
-HL_API vdynobj *hl_alloc_dynobj( void );
-HL_API vbyte *hl_alloc_bytes( int size );
-HL_API vbyte *hl_copy_bytes( const vbyte *byte, int size );
-HL_API int hl_utf8_length( const vbyte *s, int pos );
-HL_API int hl_from_utf8( uchar *out, int outLen, const char *str );
-HL_API char *hl_to_utf8( const uchar *bytes );
-HL_API uchar *hl_to_utf16( const char *str );
-HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
-HL_API hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid );
+HL_API varray* hl_alloc_array(hl_type* t, int size);
+HL_API vdynamic* hl_alloc_dynamic(hl_type* t);
+HL_API vdynamic* hl_alloc_dynbool(bool b);
+HL_API vdynamic* hl_alloc_obj(hl_type* t);
+HL_API venum* hl_alloc_enum(hl_type* t, int index);
+HL_API vvirtual* hl_alloc_virtual(hl_type* t);
+HL_API vdynobj* hl_alloc_dynobj(void);
+HL_API vbyte* hl_alloc_bytes(int size);
+HL_API vbyte* hl_copy_bytes(const vbyte* byte, int size);
+HL_API int hl_utf8_length(const vbyte* s, int pos);
+HL_API int hl_from_utf8(uchar* out, int outLen, const char* str);
+HL_API char* hl_to_utf8(const uchar* bytes);
+HL_API uchar* hl_to_utf16(const char* str);
+HL_API vdynamic* hl_virtual_make_value(vvirtual* v);
+HL_API hl_obj_field* hl_obj_field_fetch(hl_type* t, int fid);
 
-HL_API int hl_hash( vbyte *name );
-HL_API int hl_hash_utf8( const char *str ); // no cache
-HL_API int hl_hash_gen( const uchar *name, bool cache_name );
-HL_API vbyte *hl_field_name( int hash );
+HL_API int hl_hash(vbyte* name);
+HL_API int hl_hash_utf8(const char* str); // no cache
+HL_API int hl_hash_gen(const uchar* name, bool cache_name);
+HL_API vbyte* hl_field_name(int hash);
 
 #define hl_error(msg, ...) hl_throw(hl_alloc_strbytes(USTR(msg), ## __VA_ARGS__))
 
-HL_API vdynamic *hl_alloc_strbytes( const uchar *msg, ... );
-HL_API void hl_assert( void );
-HL_API HL_NO_RETURN( void hl_throw( vdynamic *v ) );
-HL_API HL_NO_RETURN( void hl_rethrow( vdynamic *v ) );
-HL_API void hl_setup_longjump( void *j );
-HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
-HL_API void hl_dump_stack( void );
-HL_API varray *hl_exception_stack( void );
-HL_API bool hl_detect_debugger( void );
+HL_API vdynamic* hl_alloc_strbytes(const uchar* msg, ...);
+HL_API void hl_assert(void);
+HL_API HL_NO_RETURN(void hl_throw(vdynamic* v));
+HL_API HL_NO_RETURN(void hl_rethrow(vdynamic* v));
+HL_API void hl_setup_longjump(void* j);
+HL_API void hl_setup_exception(void* resolve_symbol, void* capture_stack);
+HL_API void hl_dump_stack(void);
+HL_API varray* hl_exception_stack(void);
+HL_API bool hl_detect_debugger(void);
 
-HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
-HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
-HL_API hl_field_lookup *hl_lookup_find( hl_field_lookup *l, int size, int hash );
-HL_API hl_field_lookup *hl_lookup_insert( hl_field_lookup *l, int size, int hash, hl_type *t, int index );
+HL_API vvirtual* hl_to_virtual(hl_type* vt, vdynamic* obj);
+HL_API void hl_init_virtual(hl_type* vt, hl_module_context* ctx);
+HL_API hl_field_lookup* hl_lookup_find(hl_field_lookup* l, int size, int hash);
+HL_API hl_field_lookup* hl_lookup_insert(hl_field_lookup* l, int size, int hash, hl_type* t, int index);
 
-HL_API int hl_dyn_geti( vdynamic *d, int hfield, hl_type *t );
-HL_API void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t );
-HL_API float hl_dyn_getf( vdynamic *d, int hfield );
-HL_API double hl_dyn_getd( vdynamic *d, int hfield );
+HL_API int hl_dyn_geti(vdynamic* d, int hfield, hl_type* t);
+HL_API void* hl_dyn_getp(vdynamic* d, int hfield, hl_type* t);
+HL_API float hl_dyn_getf(vdynamic* d, int hfield);
+HL_API double hl_dyn_getd(vdynamic* d, int hfield);
 
-HL_API int hl_dyn_casti( void *data, hl_type *t, hl_type *to );
-HL_API void *hl_dyn_castp( void *data, hl_type *t, hl_type *to );
-HL_API float hl_dyn_castf( void *data, hl_type *t );
-HL_API double hl_dyn_castd( void *data, hl_type *t );
+HL_API int hl_dyn_casti(void* data, hl_type* t, hl_type* to);
+HL_API void* hl_dyn_castp(void* data, hl_type* t, hl_type* to);
+HL_API float hl_dyn_castf(void* data, hl_type* t);
+HL_API double hl_dyn_castd(void* data, hl_type* t);
 
 #define hl_invalid_comparison 0xAABBCCDD
-HL_API int hl_dyn_compare( vdynamic *a, vdynamic *b );
-HL_API vdynamic *hl_make_dyn( void *data, hl_type *t );
-HL_API void hl_write_dyn( void *data, hl_type *t, vdynamic *v, bool is_tmp );
+HL_API int hl_dyn_compare(vdynamic* a, vdynamic* b);
+HL_API vdynamic* hl_make_dyn(void* data, hl_type* t);
+HL_API void hl_write_dyn(void* data, hl_type* t, vdynamic* v, bool is_tmp);
 
-HL_API void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value );
-HL_API void hl_dyn_setp( vdynamic *d, int hfield, hl_type *t, void *ptr );
-HL_API void hl_dyn_setf( vdynamic *d, int hfield, float f );
-HL_API void hl_dyn_setd( vdynamic *d, int hfield, double v );
+HL_API void hl_dyn_seti(vdynamic* d, int hfield, hl_type* t, int value);
+HL_API void hl_dyn_setp(vdynamic* d, int hfield, hl_type* t, void* ptr);
+HL_API void hl_dyn_setf(vdynamic* d, int hfield, float f);
+HL_API void hl_dyn_setd(vdynamic* d, int hfield, double v);
 
 typedef enum {
 	OpAdd,
@@ -634,15 +638,15 @@ typedef enum {
 	OpXor,
 	OpLast
 } DynOp;
-HL_API vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b );
+HL_API vdynamic* hl_dyn_op(int op, vdynamic* a, vdynamic* b);
 
-HL_API vclosure *hl_alloc_closure_void( hl_type *t, void *fvalue );
-HL_API vclosure *hl_alloc_closure_ptr( hl_type *fullt, void *fvalue, void *ptr );
-HL_API vclosure *hl_make_fun_wrapper( vclosure *c, hl_type *to );
-HL_API void *hl_wrapper_call( void *value, void **args, vdynamic *ret );
-HL_API void *hl_dyn_call_obj( vdynamic *obj, hl_type *ft, int hfield, void **args, vdynamic *ret );
-HL_API vdynamic *hl_dyn_call( vclosure *c, vdynamic **args, int nargs );
-HL_API vdynamic *hl_dyn_call_safe( vclosure *c, vdynamic **args, int nargs, bool *isException );
+HL_API vclosure* hl_alloc_closure_void(hl_type* t, void* fvalue);
+HL_API vclosure* hl_alloc_closure_ptr(hl_type* fullt, void* fvalue, void* ptr);
+HL_API vclosure* hl_make_fun_wrapper(vclosure* c, hl_type* to);
+HL_API void* hl_wrapper_call(void* value, void** args, vdynamic* ret);
+HL_API void* hl_dyn_call_obj(vdynamic* obj, hl_type* ft, int hfield, void** args, vdynamic* ret);
+HL_API vdynamic* hl_dyn_call(vclosure* c, vdynamic** args, int nargs);
+HL_API vdynamic* hl_dyn_call_safe(vclosure* c, vdynamic** args, int nargs, bool* isException);
 
 /*
 	These macros should be only used when the closure `cl` has been type checked beforehand
@@ -668,22 +672,22 @@ typedef struct _hl_thread hl_thread;
 typedef struct _hl_mutex hl_mutex;
 typedef struct _hl_tls hl_tls;
 
-HL_API hl_thread *hl_thread_start( void *callback, void *param, bool withGC );
-HL_API hl_thread *hl_thread_current( void );
+HL_API hl_thread* hl_thread_start(void* callback, void* param, bool withGC);
+HL_API hl_thread* hl_thread_current(void);
 HL_API void hl_thread_yield(void);
-HL_API void hl_register_thread( void *stack_top );
-HL_API void hl_unregister_thread( void );
+HL_API void hl_register_thread(void* stack_top);
+HL_API void hl_unregister_thread(void);
 
-HL_API hl_mutex *hl_mutex_alloc( bool gc_thread );
-HL_API void hl_mutex_acquire( hl_mutex *l );
-HL_API bool hl_mutex_try_acquire( hl_mutex *l );
-HL_API void hl_mutex_release( hl_mutex *l );
-HL_API void hl_mutex_free( hl_mutex *l );
+HL_API hl_mutex* hl_mutex_alloc(bool gc_thread);
+HL_API void hl_mutex_acquire(hl_mutex* l);
+HL_API bool hl_mutex_try_acquire(hl_mutex* l);
+HL_API void hl_mutex_release(hl_mutex* l);
+HL_API void hl_mutex_free(hl_mutex* l);
 
-HL_API hl_tls *hl_tls_alloc( bool gc_value );
-HL_API void hl_tls_set( hl_tls *l, void *value );
-HL_API void *hl_tls_get( hl_tls *l );
-HL_API void hl_tls_free( hl_tls *l );
+HL_API hl_tls* hl_tls_alloc(bool gc_value);
+HL_API void hl_tls_set(hl_tls* l, void* value);
+HL_API void* hl_tls_get(hl_tls* l);
+HL_API void hl_tls_free(hl_tls* l);
 
 // ----------------------- ALLOC --------------------------------------------------
 
@@ -695,49 +699,49 @@ HL_API void hl_tls_free( hl_tls *l );
 #define MEM_ALIGN_DOUBLE	128
 #define MEM_ZERO			256
 
-HL_API void *hl_gc_alloc_gen( hl_type *t, int size, int flags );
-HL_API void hl_add_root( void *ptr );
-HL_API void hl_remove_root( void *ptr );
-HL_API void hl_gc_major( void );
-HL_API bool hl_is_gc_ptr( void *ptr );
+HL_API void* hl_gc_alloc_gen(hl_type* t, int size, int flags);
+HL_API void hl_add_root(void* ptr);
+HL_API void hl_remove_root(void* ptr);
+HL_API void hl_gc_major(void);
+HL_API bool hl_is_gc_ptr(void* ptr);
 
-HL_API void hl_blocking( bool b );
-HL_API bool hl_is_blocking( void );
+HL_API void hl_blocking(bool b);
+HL_API bool hl_is_blocking(void);
 
-typedef void (*hl_types_dump)( void (*)( void *, int) );
-HL_API void hl_gc_set_dump_types( hl_types_dump tdump );
+typedef void (*hl_types_dump)(void (*)(void*, int));
+HL_API void hl_gc_set_dump_types(hl_types_dump tdump);
 
 #define hl_gc_alloc_noptr(size)		hl_gc_alloc_gen(&hlt_bytes,size,MEM_KIND_NOPTR)
 #define hl_gc_alloc(t,size)			hl_gc_alloc_gen(t,size,MEM_KIND_DYNAMIC)
 #define hl_gc_alloc_raw(size)		hl_gc_alloc_gen(&hlt_abstract,size,MEM_KIND_RAW)
 #define hl_gc_alloc_finalizer(size) hl_gc_alloc_gen(&hlt_abstract,size,MEM_KIND_FINALIZER)
 
-HL_API void hl_alloc_init( hl_alloc *a );
-HL_API void *hl_malloc( hl_alloc *a, int size );
-HL_API void *hl_zalloc( hl_alloc *a, int size );
-HL_API void hl_free( hl_alloc *a );
+HL_API void hl_alloc_init(hl_alloc* a);
+HL_API void* hl_malloc(hl_alloc* a, int size);
+HL_API void* hl_zalloc(hl_alloc* a, int size);
+HL_API void hl_free(hl_alloc* a);
 
-HL_API void hl_global_init( void );
-HL_API void hl_global_free( void );
+HL_API void hl_global_init(void);
+HL_API void hl_global_free(void);
 
-HL_API void *hl_alloc_executable_memory( int size );
-HL_API void hl_free_executable_memory( void *ptr, int size );
+HL_API void* hl_alloc_executable_memory(int size);
+HL_API void hl_free_executable_memory(void* ptr, int size);
 
 // ----------------------- BUFFER --------------------------------------------------
 
 typedef struct hl_buffer hl_buffer;
 
-HL_API hl_buffer *hl_alloc_buffer( void );
-HL_API void hl_buffer_val( hl_buffer *b, vdynamic *v );
-HL_API void hl_buffer_char( hl_buffer *b, uchar c );
-HL_API void hl_buffer_str( hl_buffer *b, const uchar *str );
-HL_API void hl_buffer_cstr( hl_buffer *b, const char *str );
-HL_API void hl_buffer_str_sub( hl_buffer *b, const uchar *str, int len );
-HL_API int hl_buffer_length( hl_buffer *b );
-HL_API uchar *hl_buffer_content( hl_buffer *b, int *len );
-HL_API uchar *hl_to_string( vdynamic *v );
-HL_API const uchar *hl_type_str( hl_type *t );
-HL_API void hl_throw_buffer( hl_buffer *b );
+HL_API hl_buffer* hl_alloc_buffer(void);
+HL_API void hl_buffer_val(hl_buffer* b, vdynamic* v);
+HL_API void hl_buffer_char(hl_buffer* b, uchar c);
+HL_API void hl_buffer_str(hl_buffer* b, const uchar* str);
+HL_API void hl_buffer_cstr(hl_buffer* b, const char* str);
+HL_API void hl_buffer_str_sub(hl_buffer* b, const uchar* str, int len);
+HL_API int hl_buffer_length(hl_buffer* b);
+HL_API uchar* hl_buffer_content(hl_buffer* b, int* len);
+HL_API uchar* hl_to_string(vdynamic* v);
+HL_API const uchar* hl_type_str(hl_type* t);
+HL_API void hl_throw_buffer(hl_buffer* b);
 
 // ----------------------- FFI ------------------------------------------------------
 
@@ -769,8 +773,8 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #define _STRING						_OBJ(_BYTES _I32)
 
 typedef struct {
-	hl_type *t;
-	uchar *bytes;
+	hl_type* t;
+	uchar* bytes;
 	int length;
 } vstring;
 
@@ -821,18 +825,18 @@ typedef struct {
 #define hl_fatal2(msg,p0,p1)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1)
 #define hl_fatal3(msg,p0,p1,p2)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1,p2)
 #define hl_fatal4(msg,p0,p1,p2,p3)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1,p2,p3)
-HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
-HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
-HL_API void hl_sys_init(void **args, int nargs, void *hlfile);
-HL_API void hl_setup_callbacks(void *sc, void *gw);
-HL_API void hl_setup_reload_check( void *freload, void *param );
+HL_API void* hl_fatal_error(const char* msg, const char* file, int line);
+HL_API void hl_fatal_fmt(const char* file, int line, const char* fmt, ...);
+HL_API void hl_sys_init(void** args, int nargs, void* hlfile);
+HL_API void hl_setup_callbacks(void* sc, void* gw);
+HL_API void hl_setup_reload_check(void* freload, void* param);
 
 #include <setjmp.h>
 typedef struct _hl_trap_ctx hl_trap_ctx;
 struct _hl_trap_ctx {
 	jmp_buf buf;
-	hl_trap_ctx *prev;
-	vdynamic *tcheck;
+	hl_trap_ctx* prev;
+	vdynamic* tcheck;
 };
 #define hl_trap(ctx,r,label) { hl_thread_info *__tinf = hl_get_thread(); ctx.tcheck = NULL; ctx.prev = __tinf->trap_current; __tinf->trap_current = &ctx; if( setjmp(ctx.buf) ) { r = __tinf->exc_value; goto label; } }
 #define hl_endtrap(ctx)	hl_get_thread()->trap_current = ctx.prev
@@ -854,30 +858,30 @@ typedef struct {
 	int thread_id;
 	// gc vars
 	volatile int gc_blocking;
-	void *stack_top;
-	void *stack_cur;
+	void* stack_top;
+	void* stack_cur;
 	// exception handling
-	hl_trap_ctx *trap_current;
-	hl_trap_ctx *trap_uncaught;
-	vclosure *exc_handler;
-	vdynamic *exc_value;
+	hl_trap_ctx* trap_current;
+	hl_trap_ctx* trap_uncaught;
+	vclosure* exc_handler;
+	vdynamic* exc_value;
 	int flags;
 	int exc_stack_count;
 	// extra
 	jmp_buf gc_regs;
-	void *exc_stack_trace[HL_EXC_MAX_STACK];
+	void* exc_stack_trace[HL_EXC_MAX_STACK];
 } hl_thread_info;
 
-HL_API hl_thread_info *hl_get_thread();
+HL_API hl_thread_info* hl_get_thread();
 
 #ifdef HL_TRACK_ENABLE
 
 typedef struct {
 	int flags;
-	void (*on_alloc)(hl_type *,int,int,void*);
-	void (*on_cast)(hl_type *, hl_type*);
-	void (*on_dynfield)( vdynamic *, int );
-	void (*on_dyncall)( vdynamic *, int );
+	void (*on_alloc)(hl_type*, int, int, void*);
+	void (*on_cast)(hl_type*, hl_type*);
+	void (*on_dynfield)(vdynamic*, int);
+	void (*on_dyncall)(vdynamic*, int);
 } hl_track_info;
 
 #define hl_is_tracking(flag) ((hl_track.flags&(flag)) && (hl_get_thread()->flags & (flag<<HL_TREAD_TRACK_SHIFT)))
