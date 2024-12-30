@@ -46,6 +46,7 @@ class Build {
 			tpl = "vs2015";
 		var srcDir = tpl;
 		var targetDir = config.defines.get("hlgen.makefilepath");
+		var jumboBuild = config.defines.get("hlgen.nojumbo") == null;
 		var relDir = "";
 		if( targetDir == null )
 			targetDir = this.targetDir;
@@ -133,6 +134,7 @@ class Build {
 					directories : directories,
 					cfiles : [for( f in files ) if( StringTools.endsWith(f.path,".c") ) f],
 					hfiles : [for( f in files ) if( StringTools.endsWith(f.path,".h") ) f],
+					jumboBuild : jumboBuild,
 				},{
 					makeUID : function(_,s:String) {
 						var sha1 = haxe.crypto.Sha1.encode(s);
