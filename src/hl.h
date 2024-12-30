@@ -124,7 +124,7 @@
 #endif
 
 #ifdef _DEBUG
-#	define HL_DEBUG
+//#	define HL_DEBUG
 #endif
 
 #ifndef HL_CONSOLE

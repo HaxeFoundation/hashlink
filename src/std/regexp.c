@@ -21,7 +21,7 @@
  */
 #include <hl.h>
 #define PCRE_STATIC
-#include <pcre/pcre.h>
+#include <pcre.h>
 
 typedef struct _ereg ereg;
 
