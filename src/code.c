@@ -39,6 +39,8 @@ typedef struct {
 	hl_code *code;
 } hl_reader;
 
+#define CODE_LOG(format, ...) LOG_INFO(LOG_S_CODE, format, __VA_ARGS__)
+
 #undef ERROR
 #define READ() hl_read_b(r)
 #define INDEX() hl_read_index(r)
@@ -438,7 +440,7 @@ EXPORT hl_code *hl_code_read( const unsigned char *data, int size, char **error_
 	r->code = c;
 	c->version = READ();
 	if( c->version <= 1 || c->version > max_version ) {
-		printf("Found version %d while HL %d.%d supports up to %d\n",c->version,HL_VERSION>>16,(HL_VERSION>>8)&0xFF,max_version);
+		CODE_LOG("Found version %d while HL %d.%d supports up to %d\n",c->version,HL_VERSION>>16,(HL_VERSION>>8)&0xFF,max_version);
 		EXIT("Unsupported bytecode version");
 	}
 	flags = UINDEX();

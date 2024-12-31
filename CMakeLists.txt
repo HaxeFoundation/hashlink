@@ -55,6 +55,7 @@ file(GLOB srcs
     src/gc.c
     src/jit.c
     src/module.c
+    src/logging.c
     src/std/*.c
 )
 
@@ -63,7 +64,7 @@ list(REMOVE_ITEM srcs "src/allocator.c")
 add_library(libhl SHARED
     ${pcre_srcs}
     ${srcs}
-)
+ "src/event.c")
 
 set(public_headers
     src/hl.h

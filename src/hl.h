@@ -826,6 +826,43 @@ typedef struct {
 #	define HL_NO_OPT
 #endif
 
+// -------------- LOGGING ----------------------------------
+
+
+
+#define LOG_LEVEL_VERBOSE 0
+#define LOG_LEVEL_DEBUG 1
+#define LOG_LEVEL_INFO 2
+#define LOG_LEVEL_WARNING 3
+#define LOG_LEVEL_ERROR 4
+#define LOG_LEVEL_FATAL 5
+
+#define LOG_DEBUG(source, format, ...) hl_log_printf(source, LOG_LEVEL_DEBUG, format, __VA_ARGS__)
+#define LOG_INFO(source, format, ...) hl_log_printf(source, LOG_LEVEL_INFO, format, __VA_ARGS__)
+#define LOG_WARN(source, format, ...) hl_log_printf(source, LOG_LEVEL_WARNING, format, __VA_ARGS__)
+#define LOG_ERR(source, format, ...) hl_log_printf(source, LOG_LEVEL_ERROR, format, __VA_ARGS__)
+#define LOG_FATAL(source, format, ...) hl_log_printf(source, LOG_LEVEL_FATAL, format, __VA_ARGS__)
+
+#define LOG_S_GC ((char*)0x01)
+#define LOG_S_CODE ((char*)0x02)
+#define LOG_S_JIT ((char*)0x03)
+
+typedef void (*hl_log_handler)(const char* source, int level, const char* format, va_list args);
+
+HL_API void hl_log_printf(const char* source, int level, const char* format, ...);
+HL_API void hl_log_set_handler(hl_log_handler handler);
+
+// -------------- EVENT ------------------------------------
+
+#define HL_EV_BEGORE_GC 1
+#define HL_EV_AFTER_GC 2
+
+typedef void (*hl_event_handler)(int eventId, void* data);
+
+HL_API void hl_event(int eventId, void* data);
+HL_API void hl_event_set_handler(hl_event_handler handler);
+
+
 // -------------- EXTRA ------------------------------------
 
 #define hl_fatal(msg)			hl_fatal_error(msg,__FILE__,__LINE__)
@@ -881,6 +918,8 @@ typedef struct {
 } hl_thread_info;
 
 HL_API hl_thread_info* hl_get_thread();
+
+
 
 #ifdef HL_TRACK_ENABLE
 

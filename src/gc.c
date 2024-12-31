@@ -101,6 +101,8 @@ typedef void (*gc_page_iterator)(gc_pheader*, int);
 // block-ptr + size
 typedef void (*gc_block_iterator)(void*, int);
 
+#define GC_LOG(format, ...) LOG_DEBUG(LOG_S_GC, format, __VA_ARGS__)
+
 //#define GC_EXTERN_API
 
 #ifdef GC_EXTERN_API
@@ -212,7 +214,7 @@ static struct {
 } last_profile;
 
 #ifdef HL_WIN
-#	define TIMESTAMP() ((int)GetTickCount())
+#	define TIMESTAMP() ((int)GetTickCount64())
 #else
 #	define TIMESTAMP() 0
 #endif
@@ -442,9 +444,9 @@ static gc_pheader* gc_alloc_page(int size, int kind, int block_count) {
 	void* ptr = gc_will_collide(p->base, size);
 	if (ptr) {
 #		ifdef HL_VCC
-		printf("GC Page HASH collide %IX %IX\n", (int_val)GC_GET_PAGE(ptr), (int_val)ptr);
+		GC_LOG("GC Page HASH collide %IX %IX\n", (int_val)GC_GET_PAGE(ptr), (int_val)ptr);
 #		else
-		printf("GC Page HASH collide %lX %lX\n", (int_val)GC_GET_PAGE(ptr), (int_val)ptr);
+		GC_LOG("GC Page HASH collide %lX %lX\n", (int_val)GC_GET_PAGE(ptr), (int_val)ptr);
 #		endif
 		return gc_alloc_page(size, kind, block_count);
 	}
@@ -538,11 +540,11 @@ void* hl_gc_alloc_gen(hl_type* t, int size, int flags) {
 			int i;
 			for (i = 0; i < MAX_WORDS; i++)
 				if (SIZE_CATEGORIES[i])
-					printf("%d=%.1f ", i * sizeof(void*), (SIZE_CATEGORIES[i] * 100.) / gc_stats.allocation_count);
+					GC_LOG("%d=%.1f ", i * sizeof(void*), (SIZE_CATEGORIES[i] * 100.) / gc_stats.allocation_count);
 			for (i = 0; i < 33; i++)
 				if (LARGE_BLOCKS[i])
-					printf("%d=%.2f ", 1 << i, (LARGE_BLOCKS[i] * 100.) / gc_stats.allocation_count);
-			printf("%d\n", gc_stats.allocation_count);
+					GC_LOG("%d=%.2f ", 1 << i, (LARGE_BLOCKS[i] * 100.) / gc_stats.allocation_count);
+			GC_LOG("%d\n", gc_stats.allocation_count);
 		}
 #		endif
 		ptr = gc_allocator_alloc(&allocated, flags & PAGE_KIND_MASK);
@@ -891,9 +893,9 @@ static void gc_major() {
 		gc_mem += gc_stats.pages_total_memory;
 		gc_stats.free_memory = 0;
 		gc_iter_pages(count_free_memory);
-		printf("GC-PROFILE-MEM %.2fMB total, %.2f%% free %.2f%% gc\n", gc_mem / (1024.0 * 1024.0), (gc_stats.free_memory * 100.0 / gc_mem), (gc_mem - gc_stats.pages_total_memory) * 100.0 / gc_mem);
+		GC_LOG("GC-PROFILE-MEM %.2fMB total, %.2f%% free %.2f%% gc\n", gc_mem / (1024.0 * 1024.0), (gc_stats.free_memory * 100.0 / gc_mem), (gc_mem - gc_stats.pages_total_memory) * 100.0 / gc_mem);
 	}
-
+	hl_event(HL_EV_BEGORE_GC, NULL);
 	int time = TIMESTAMP(), dt;
 	gc_stats.last_mark = gc_stats.total_allocated;
 	gc_stats.last_mark_allocs = gc_stats.allocation_count;
@@ -903,8 +905,9 @@ static void gc_major() {
 	dt = TIMESTAMP() - time;
 	gc_stats.mark_count++;
 	gc_stats.mark_time += dt;
+	hl_event(HL_EV_AFTER_GC, NULL);
 	if (gc_flags & GC_PROFILE) {
-		printf("GC-PROFILE %d\n\tmark-time %.3g\n\talloc-time %.3g\n\ttotal-mark-time %.3g\n\ttotal-alloc-time %.3g\n\tallocated %d (%dKB)\n",
+		GC_LOG("GC-PROFILE %d\n\tmark-time %.3g\n\talloc-time %.3g\n\ttotal-mark-time %.3g\n\ttotal-alloc-time %.3g\n\tallocated %d (%dKB)\n",
 			gc_stats.mark_count,
 			dt / 1000.,
 			(gc_stats.alloc_time - last_profile.alloc_time) / 1000.,
