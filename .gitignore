@@ -56,3 +56,4 @@ args.txt
 
 .vs/
 out/
+vcpkg_installed/

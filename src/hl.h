@@ -668,9 +668,11 @@ HL_API vdynamic* hl_dyn_call_safe(vclosure* c, vdynamic** args, int nargs, bool*
 struct _hl_thread;
 struct _hl_mutex;
 struct _hl_tls;
+struct _hl_semaphore;
 typedef struct _hl_thread hl_thread;
 typedef struct _hl_mutex hl_mutex;
 typedef struct _hl_tls hl_tls;
+typedef struct _hl_semaphore hl_semaphore;
 
 HL_API hl_thread* hl_thread_start(void* callback, void* param, bool withGC);
 HL_API hl_thread* hl_thread_current(void);
@@ -688,6 +690,12 @@ HL_API hl_tls* hl_tls_alloc(bool gc_value);
 HL_API void hl_tls_set(hl_tls* l, void* value);
 HL_API void* hl_tls_get(hl_tls* l);
 HL_API void hl_tls_free(hl_tls* l);
+
+HL_API hl_semaphore* hl_semaphore_alloc(int value);
+HL_API void hl_semaphore_acquire(hl_semaphore* sem);
+HL_API bool hl_semaphore_try_acquire(hl_semaphore* sem, vdynamic* timeout);
+HL_API void hl_semaphore_release(hl_semaphore* sem);
+HL_API void hl_semaphore_free(hl_semaphore* sem);
 
 // ----------------------- ALLOC --------------------------------------------------
 

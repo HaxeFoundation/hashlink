@@ -21,7 +21,13 @@
  */
 #include <hl.h>
 
+typedef struct _hl_semaphore hl_semaphore;
+
 #if !defined(HL_THREADS)
+
+struct _hl_semaphore {
+	void (*free)(hl_semaphore*);
+};
 
 struct _hl_mutex {
 	void (*free)( hl_mutex * );
@@ -34,6 +40,11 @@ struct _hl_tls {
 };
 
 #elif defined(HL_WIN)
+
+struct _hl_semaphore {
+	void (*free)(hl_semaphore*);
+	HANDLE sem;
+};
 
 struct _hl_mutex {
 	void (*free)( hl_mutex * );
@@ -56,6 +67,15 @@ struct _hl_mutex {
 	void (*free)( hl_mutex * );
 	pthread_mutex_t lock;
 	bool is_gc;
+};
+
+struct _hl_semaphore {
+	void (*free)(hl_semaphore*);
+#	ifdef __APPLE__
+	dispatch_semaphore_t sem;
+#	else
+	sem_t sem;
+#endif
 };
 
 struct _hl_tls {
@@ -143,6 +163,133 @@ DEFINE_PRIM(_VOID, mutex_acquire, _MUTEX);
 DEFINE_PRIM(_BOOL, mutex_try_acquire, _MUTEX);
 DEFINE_PRIM(_VOID, mutex_release, _MUTEX);
 DEFINE_PRIM(_VOID, mutex_free, _MUTEX);
+
+// ------------------ SEMAPHORE
+
+HL_PRIM hl_semaphore* hl_semaphore_alloc(int value) {
+#	if !defined(HL_THREADS)
+	static struct _hl_semaphore null_semaphore = { 0 };
+	return (hl_semaphore*)&null_semaphore;
+#	elif defined(HL_WIN)
+	hl_semaphore* sem =
+		(hl_semaphore*)hl_gc_alloc_finalizer(sizeof(hl_semaphore));
+	sem->free = hl_semaphore_free;
+	sem->sem = CreateSemaphoreW(NULL, value, 0x7FFFFFFF, NULL);
+	return sem;
+#	else
+	hl_semaphore* sem =
+		(hl_semaphore*)hl_gc_alloc_finalizer(sizeof(hl_semaphore));
+	sem->free = hl_semaphore_free;
+#	ifdef __APPLE__
+	sem->sem = dispatch_semaphore_create(value);
+#	else
+	sem_init(&sem->sem, false, value);
+#	endif
+	return sem;
+#	endif
+}
+
+HL_PRIM void hl_semaphore_acquire(hl_semaphore* sem) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	hl_blocking(true);
+	WaitForSingleObject(sem->sem, INFINITE);
+	hl_blocking(false);
+#	else
+#	ifdef __APPLE__
+	hl_blocking(true);
+	dispatch_semaphore_wait(sem->sem, DISPATCH_TIME_FOREVER);
+	hl_blocking(false);
+#	else
+	hl_blocking(true);
+	sem_wait(&sem->sem);
+	hl_blocking(false);
+#	endif
+#	endif
+}
+
+HL_PRIM bool hl_semaphore_try_acquire(hl_semaphore* sem, vdynamic* timeout) {
+#	if !defined(HL_THREADS)
+	return true;
+#	elif defined(HL_WIN)
+	hl_blocking(true);
+	bool ret = WaitForSingleObject(sem->sem,
+		timeout ? (DWORD)((FLOAT)timeout->v.d * 1000.0)
+		: 0) == WAIT_OBJECT_0;
+	hl_blocking(false);
+	return ret;
+#	else
+#	ifdef __APPLE__
+	hl_blocking(true);
+	bool ret = dispatch_semaphore_wait(
+		sem->sem, dispatch_time(DISPATCH_TIME_NOW,
+			(int64_t)((timeout ? timeout->v.d : 0) *
+				1000 * 1000 * 1000))) == 0;
+	hl_blocking(false);
+	return ret;
+#	else
+	hl_blocking(true);
+	bool ret;
+	if (timeout) {
+		struct timeval tv;
+		struct timespec t;
+		double delta = timeout->v.d;
+		int idelta = (int)delta, idelta2;
+		delta -= idelta;
+		delta *= 1.0e9;
+		gettimeofday(&tv, NULL);
+		delta += tv.tv_usec * 1000.0;
+		idelta2 = (int)(delta / 1e9);
+		delta -= idelta2 * 1e9;
+		t.tv_sec = tv.tv_sec + idelta + idelta2;
+		t.tv_nsec = (long)delta;
+		ret = sem_timedwait(&sem->sem, &t) == 0;
+	}
+	else {
+		ret = sem_trywait(&sem->sem) == 0;
+	}
+	hl_blocking(false);
+	return ret;
+#	endif
+#	endif
+}
+
+HL_PRIM void hl_semaphore_release(hl_semaphore* sem) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	ReleaseSemaphore(sem->sem, 1, NULL);
+#	else
+#	ifdef __APPLE__
+	dispatch_semaphore_signal(sem->sem);
+#	else
+	sem_post(&sem->sem);
+#	endif
+#	endif
+}
+
+HL_PRIM void hl_semaphore_free(hl_semaphore* sem) {
+#	if !defined(HL_THREADS)
+#	elif defined(HL_WIN)
+	if (sem->free) {
+		CloseHandle(sem->sem);
+		sem->free = NULL;
+	}
+#	else
+	if (sem->free) {
+#ifndef __APPLE__
+		sem_destroy(&sem->sem);
+#endif
+		sem->free = NULL;
+	}
+#	endif
+}
+
+#define _SEMAPHORE _ABSTRACT(hl_semaphore)
+DEFINE_PRIM(_SEMAPHORE, semaphore_alloc, _I32);
+DEFINE_PRIM(_VOID, semaphore_acquire, _SEMAPHORE);
+DEFINE_PRIM(_BOOL, semaphore_try_acquire, _SEMAPHORE _NULL(_F64));
+DEFINE_PRIM(_VOID, semaphore_release, _SEMAPHORE);
+DEFINE_PRIM(_VOID, semaphore_free, _SEMAPHORE);
 
 // ----------------- THREAD LOCAL
 

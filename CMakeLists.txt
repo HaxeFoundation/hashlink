@@ -50,9 +50,15 @@ file(GLOB pcre_srcs
 )
 
 file(GLOB srcs
-    src/*.c
+    src/code.c
+    src/debugger.c
+    src/gc.c
+    src/jit.c
+    src/module.c
     src/std/*.c
 )
+
+list(REMOVE_ITEM srcs "src/allocator.c")
 
 add_library(libhl SHARED
     ${pcre_srcs}
