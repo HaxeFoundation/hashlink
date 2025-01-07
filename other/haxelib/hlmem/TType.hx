@@ -175,7 +175,7 @@ class TType {
 	public function toString() {
 		switch( t ) {
 		case HAbstract("roots"):
-			return Memory.withColor("roots", 32);
+			return Analyzer.withColor("roots", Green);
 		case HAbstract(p):
 			return p;
 		case HFun(_), HMethod(_):
