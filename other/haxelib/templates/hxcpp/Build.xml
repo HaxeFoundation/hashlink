@@ -1,0 +1,39 @@
+<xml>
+	<files id="::name::">
+		<compilerflag value="-std=c11" unless="MSVC_VER" />
+		<compilerflag value="-DHL_MAKE" />
+		<compilerflag value="-I$$makePath(::relDir::)" />
+		<compilerflag value="-I${HASHLINK}/src" if="HASHLINK" />
+		<compilerflag value="-I${HASHLINK}/include" if="HASHLINK" />
+::foreach hfiles::
+		<depend name="::relDir::::path::" />::end::
+::foreach cfiles::
+		<file name="::relDir::::path::" />::end::
+	</files>
+
+	<set name="ARCH_DIR" value="/x64" if="HXCPP_M64" />
+
+	<target id="default" output="::name::" tool="linker" toolid="exe">
+		<files id="::name::" />
+
+		<libpath name="${HASHLINK}" if="HASHLINK" />
+		<libpath name="${HASHLINK}/lib" if="HASHLINK" />
+
+		<section unless="windows">
+			<lib name="-lhl" />
+			<lib name="-lm" />
+			<lib name="-luv" />
+::foreach libraries::
+			<lib name="-l:::name::.hdll" />::end::
+		</section>
+
+		<section if="windows">
+			<libpath name="${HASHLINK}${ARCH_DIR}/Debug" if="debug HASHLINK" />
+			<libpath name="${HASHLINK}${ARCH_DIR}/Release" if="HASHLINK" unless="debug" />
+
+			<lib name="libhl.lib" />
+::foreach libraries::
+			<lib name="::name::.lib" />::end::
+		</section>
+	</target>
+</xml>

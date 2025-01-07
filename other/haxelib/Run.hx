@@ -2,6 +2,7 @@ class Build {
 
 	var output : String;
 	var name : String;
+	var sourcesDir : String;
 	var targetDir : String;
 	var dataPath : String;
 	var config : {
@@ -17,17 +18,34 @@ class Build {
 		this.dataPath = dataPath;
 		var path = new haxe.io.Path(output);
 		this.name = path.file;
-		this.targetDir = path.dir+"/";
+		this.sourcesDir = path.dir+"/";
+		this.targetDir = this.sourcesDir;
 	}
+
+	function log(message:String) {
+		if( config.defines.get("hlgen.silent") == null )
+			Sys.println(message);
+	}
+
 
 	public function run() {
 		var tpl = config.defines.get("hlgen.makefile");
 		if( tpl != null )
 			generateTemplates(tpl);
-		if( config.defines.get("hlgen.silent") == null )
-			Sys.println("Code generated in "+output+" automatic native compilation not yet implemented");
+		switch tpl {
+			case "make":
+				Sys.command("make", ["-C", targetDir]);
+			case "hxcpp":
+				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []));
+			case null:
+				log('Code generated in $output');
+				log('Set hlgen.makefile for automatic native compilation');
+			case unimplemented:
+				log('Code generated in $output');
+				log('Automatic native compilation not yet implemented for $unimplemented');
+		}
 	}
-	
+
 	function isAscii( bytes : haxe.io.Bytes ) {
 		// BOM CHECK
 		if( bytes.length > 3 && bytes.get(0) == 0xEF && bytes.get(1) == 0xBB && bytes.get(2) == 0xBF )
@@ -45,21 +63,19 @@ class Build {
 		if( tpl == null || tpl == "1" )
 			tpl = "vs2015";
 		var srcDir = tpl;
-		var targetDir = config.defines.get("hlgen.makefilepath");
 		var relDir = "";
-		if( targetDir == null )
-			targetDir = this.targetDir;
-		else {
+		if( config.defines["hlgen.makefilepath"] != null ) {
+			targetDir = config.defines.get("hlgen.makefilepath");
 			if( !StringTools.endsWith(targetDir,"/") && !StringTools.endsWith(targetDir,"\\") )
 				targetDir += "/";
+			var sourcesAbs = sys.FileSystem.absolutePath(sourcesDir);
 			var targetAbs = sys.FileSystem.absolutePath(targetDir);
-			var currentAbs = sys.FileSystem.absolutePath(this.targetDir);
-			if( !StringTools.startsWith(currentAbs, targetAbs+"/") )
-				relDir = currentAbs+"/"; // absolute
-			else 
-				relDir = currentAbs.substr(targetAbs.length+1);
+			if( !StringTools.startsWith(sourcesAbs, targetAbs+"/") )
+				relDir = sourcesAbs+"/"; // absolute
+			else
+				relDir = sourcesAbs.substr(targetAbs.length+1);
 			relDir = relDir.split("\\").join("/");
-			if( relDir != "" )
+			if( !(relDir == "" || StringTools.endsWith(relDir, "/")) )
 				relDir += "/";
 		}
 		if( !sys.FileSystem.exists(srcDir) ) {
@@ -75,7 +91,7 @@ class Build {
 		for( f in config.files )
 			if( StringTools.endsWith(f,".c") ) {
 				var h = f.substr(0,-2) + ".h";
-				if( sys.FileSystem.exists(targetDir+h) )
+				if( sys.FileSystem.exists(sourcesDir+h) )
 					allFiles.push(h);
 			}
 		allFiles.sort(Reflect.compare);
@@ -140,7 +156,7 @@ class Build {
 						return sha1.substr(0,8)+"-"+sha1.substr(8,4)+"-"+sha1.substr(12,4)+"-"+sha1.substr(16,4)+"-"+sha1.substr(20,12);
 					},
 					makePath : function(_,dir:String) {
-						return dir == "" ? "./" : (StringTools.endsWith(dir,"/") || StringTools.endsWith(dir,"\\")) ? dir : dir + "/";
+						return dir == "" ? "." : (StringTools.endsWith(dir,"/") || StringTools.endsWith(dir,"\\")) ? dir : dir + "/";
 					},
 					upper : function(_,s:String) {
 						return s.charAt(0).toUpperCase() + s.substr(1);
