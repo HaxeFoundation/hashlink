@@ -1718,15 +1718,20 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 			{
 				preg *out = bop == OSMod || bop == OUMod ? REG_AT(Edx) : PEAX;
 				preg *r;
-				int jz, jend;
+				preg p;
+				int jz, jz1 = 0, jend;
 				if( pa->kind == RCPU && pa->id == Eax ) RLOCK(pa);
 				r = alloc_cpu(ctx,b,true);
 				// integer div 0 => 0
 				op(ctx,TEST,r,r,is64);
-				XJump_small(JNotZero,jz);
-				op(ctx,XOR,out,out,is64);
-				XJump_small(JAlways,jend);
-				patch_jump(ctx,jz);
+				XJump_small(JZero, jz);
+				// Prevent MIN/-1 overflow exception
+				// OSMod: r = (b == 0 || b == -1) ? 0 : a % b
+				// OSDiv: r = (b == 0 || b == -1) ? a * b : a / b
+				if( bop == OSMod || bop == OSDiv ) {
+					op(ctx, CMP, r, pconst(&p,-1), is64);
+					XJump_small(JEq, jz1);
+				}
 				pa = fetch(a);
 				if( pa->kind != RCPU || pa->id != Eax ) {
 					scratch(PEAX);
@@ -1740,6 +1745,15 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 				else
 					op(ctx, CDQ, UNUSED, UNUSED, is64); // sign-extend Eax into Eax:Edx
 				op(ctx, bop == OUDiv || bop == OUMod ? DIV : IDIV, fetch(b), UNUSED, is64);
+				XJump_small(JAlways, jend);
+				patch_jump(ctx, jz);
+				patch_jump(ctx, jz1);
+				if( bop != OSDiv ) {
+					op(ctx, XOR, out, out, is64);
+				} else {
+					load(ctx, out, a);
+					op(ctx, IMUL, out, r, is64);
+				}
 				patch_jump(ctx, jend);
 				if( dst ) store(ctx, dst, out, true);
 				return out;
