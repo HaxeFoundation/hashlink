@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 
 set(HL_VERSION_MAJOR 1)
 set(HL_VERSION_MINOR 10)
