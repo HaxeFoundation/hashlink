@@ -857,6 +857,8 @@ HL_API void hl_log_set_handler(hl_log_handler handler);
 #define HL_EV_BEGORE_GC 1
 #define HL_EV_AFTER_GC 2
 
+#define HL_EV_VM_READY 3
+
 typedef void (*hl_event_handler)(int eventId, void* data);
 
 HL_API void hl_event(int eventId, void* data);

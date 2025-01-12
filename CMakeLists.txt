@@ -73,24 +73,11 @@ set(public_headers
 
 set_target_properties(libhl
     PROPERTIES
-    PUBLIC_HEADER "${public_headers}"
-)
-
-set_target_properties(libhl
-        PROPERTIES
-        OUTPUT_NAME libhl
-)
-
-set_target_properties(libhl
-    PROPERTIES
-    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
-)
-
-set_target_properties(libhl
-    PROPERTIES
     VERSION ${HL_VERSION}
     SOVERSION ${HL_VERSION_MAJOR}
-    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS"
+    OUTPUT_NAME libhl
+    PUBLIC_HEADER "${public_headers}"
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;ENABLE_HL_DEBUG_BREAK"
 )
 
 
