@@ -14,71 +14,46 @@ class FileReader {
 
 	#if js
 	// js read file in once for better performance
-	var memBytes : haxe.io.Bytes;
-	var memPos : Int;
+	var memInput : haxe.io.BytesInput;
 	#else
 	var memInput : sys.io.FileInput;
 	#end
 
 	public inline function new(file : String) {
 		#if js
-		memBytes = sys.io.File.getBytes(file);
-		memPos = 0;
+		memInput = new haxe.io.BytesInput(sys.io.File.getBytes(file));
 		#else
 		memInput = sys.io.File.read(file);
 		#end
 	}
 
 	public inline function close() {
-		#if js
-		memBytes = null;
-		memPos = 0;
-		#else
 		if( memInput != null )
 			memInput.close();
 		memInput = null;
-		#end
 	}
 
 	public inline function readString(length : Int) : String {
-		#if js
-		var str = memBytes.getString(memPos, 3);
-		memPos += 3;
-		#else
-		var str = memInput.read(3).toString();
-		#end
-		return str;
+		return memInput.readString(length);
 	}
 
 	public inline function readByte() : Int  {
-		#if js
-		var b = memBytes.get(memPos);
-		memPos += 1;
-		#else
-		var b = memInput.readByte();
-		#end
-		return b;
+		return memInput.readByte();
 	}
 
 	public inline function readInt32() : Int {
-		#if js
-		var i = memBytes.getInt32(memPos);
-		memPos += 4;
-		#else
-		var i = memInput.readInt32();
-		#end
-		return i;
+		return memInput.readInt32();
 	}
 
-	public inline function readPointer( is64 : Bool ) : Block.Pointer {
+	public inline function readPointer( is64 : Bool ) : haxe.Int64 {
 		var low = readInt32();
 		var high = is64 ? readInt32() : 0;
-		return cast haxe.Int64.make(high,low);
+		return haxe.Int64.make(high,low);
 	}
 
 	public inline function tell() : Float {
 		#if js
-		return memPos;
+		return memInput.position;
 		#else
 		return tell2(@:privateAccess memInput.__f);
 		#end
@@ -96,11 +71,11 @@ class FileReader {
 		var dpos = Std.int(pos);
 		switch( mode ) {
 		case SeekBegin:
-			memPos = dpos;
+			memInput.position = dpos;
 		case SeekCur:
-			memPos += dpos;
+			memInput.position += dpos;
 		case SeekEnd:
-			memPos = memBytes.length + dpos;
+			memInput.position = memInput.length + dpos;
 		}
 		#else
 		if( !seek2(@:privateAccess memInput.__f, pos, mode.getIndex()) )

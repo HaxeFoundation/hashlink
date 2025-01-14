@@ -118,7 +118,7 @@ class Memory {
 	}
 
 	inline function readPointer() : Pointer {
-		return memFileReader.readPointer(is64);
+		return cast memFileReader.readPointer(is64);
 	}
 
 	function goto( b : Block ) {
