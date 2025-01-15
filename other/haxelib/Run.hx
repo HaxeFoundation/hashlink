@@ -46,6 +46,7 @@ class Build {
 			tpl = "vs2015";
 		var srcDir = tpl;
 		var targetDir = config.defines.get("hlgen.makefilepath");
+		var jumboBuild = config.defines.get("hlgen.makefile.jumbo");
 		var relDir = "";
 		if( targetDir == null )
 			targetDir = this.targetDir;
@@ -125,7 +126,7 @@ class Build {
 				}
 				var content = sys.io.File.getContent(srcPath);
 				var tpl = new haxe.Template(content);
-				content = tpl.execute({
+				var context = {
 					name : this.name,
 					libraries : [for( l in config.libs ) if( l != "std" ) { name : l }],
 					files : files,
@@ -133,7 +134,9 @@ class Build {
 					directories : directories,
 					cfiles : [for( f in files ) if( StringTools.endsWith(f.path,".c") ) f],
 					hfiles : [for( f in files ) if( StringTools.endsWith(f.path,".h") ) f],
-				},{
+					jumboBuild : jumboBuild,
+				};
+				var macros = {
 					makeUID : function(_,s:String) {
 						var sha1 = haxe.crypto.Sha1.encode(s);
 						sha1 = sha1.toUpperCase();
@@ -147,7 +150,12 @@ class Build {
 					},
 					winPath : function(_,s:String) return s.split("/").join("\\"),
 					getEnv : function(_,s:String) return Sys.getEnv(s),
-				});
+					setDefaultJumboBuild: function(_, b:String) {
+						context.jumboBuild ??= b;
+						return "";
+					}
+				};
+				content = tpl.execute(context, macros);
 				var prevContent = try sys.io.File.getContent(targetPath) catch( e : Dynamic ) null;
 				if( prevContent != content )
 					sys.io.File.saveContent(targetPath, content);
