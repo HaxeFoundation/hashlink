@@ -100,7 +100,7 @@ class Memory {
 	public function getTypeString( id : Int, withTstr : Bool, withId : Bool, withField : Bool ) : String {
 		var tid = id & 0xFFFFFF;
 		var t = types[tid];
-		var tstr = withTstr ? t.toString() : "";
+		var tstr = withTstr ? "" + t.toString() : "";
 		if( withId )
 			tstr += Analyzer.withColor("#" + tid, Magenta);
 		var fid = id >>> 24;
@@ -603,7 +603,7 @@ class Memory {
 	public function getFalsePositives( ?typeStr : String ) : FalsePositiveStats {
 		var ctx = new FalsePositiveStats();
 		for( t in types )
-			if( t.falsePositive > 0 && (typeStr == null || t.toString().indexOf(typeStr) >= 0) ) {
+			if( t.falsePositive > 0 && (typeStr == null || ("" + t.toString()).indexOf(typeStr) >= 0) ) {
 				ctx.add(t);
 			}
 		ctx.sort();
