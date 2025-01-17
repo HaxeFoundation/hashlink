@@ -326,6 +326,10 @@ release_haxelib:
 ifeq ($(HLIB),hashlink)
 HLDIR=other/haxelib
 HLPACK=templates hlmem memory.hxml Run.hx
+
+haxelib_prepackage:
+	cp src/main.c ${HLDIR}/templates/hlboot.c
+
 else
 HLDIR=libs/$(HLIB)
 ifeq ($(HLIB),directx)
@@ -333,9 +337,10 @@ HLPACK=dx *.h *.c *.cpp
 else
 HLPACK=$(HLIB) *.h *.c
 endif
+haxelib_prepackage:
 endif
 
-release_haxelib_package:
+release_haxelib_package: haxelib_prepackage
 	rm -rf $(HLIB)_release
 	mkdir $(HLIB)_release
 	(cd $(HLDIR) && cp -R $(HLPACK) haxelib.json $(CURDIR)/$(HLIB)_release | true)

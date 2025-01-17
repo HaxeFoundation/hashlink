@@ -19,16 +19,23 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include <hl.h>
-#include <hlmodule.h>
 
+// #define HL_BOOT
+
+#include <hl.h>
+#ifdef HL_BOOT
+#include <hl/hlmodule.h>
+#else
+#include <hlmodule.h>
+#endif
+
+#ifndef HL_BOOT
 #define HL_DEBUGGER
 #define HL_PROFILER
 #define HL_HOT_RELOAD
 
 #ifdef HL_WIN
 #	include <locale.h>
-typedef uchar pchar;
 #define pprintf(str,file)	uprintf(USTR(str),file)
 #define pfopen(file,ext) _wfopen(file,USTR(ext))
 #define pcompare wcscmp
@@ -36,12 +43,18 @@ typedef uchar pchar;
 #define PSTR(x) USTR(x)
 #else
 #	include <sys/stat.h>
-typedef char pchar;
 #define pprintf printf
 #define pfopen fopen
 #define pcompare strcmp
 #define ptoi atoi
 #define PSTR(x) x
+#endif
+#endif
+
+#ifdef HL_WIN
+typedef uchar pchar;
+#else
+typedef char pchar;
 #endif
 
 typedef struct {
@@ -54,6 +67,12 @@ typedef struct {
 	vdynamic *ret;
 } main_context;
 
+#ifdef HL_BOOT
+const unsigned char program[] = {
+	::program::
+};
+int program_size = ::programSize::;
+#else
 static int pfiletime( pchar *file )	{
 #ifdef HL_WIN
 	struct _stat32 st;
@@ -93,6 +112,7 @@ static hl_code *load_code( const pchar *file, char **error_msg, bool print_error
 	free(fdata);
 	return code;
 }
+#endif
 
 #ifdef HL_HOT_RELOAD
 static bool check_reload( main_context *m ) {
@@ -159,11 +179,14 @@ int main(int argc, pchar *argv[]) {
 	bool hot_reload = false;
 	bool vtune_later = false;
 	main_context ctx;
+#ifndef HL_BOOT
 	int first_boot_arg = -1;
+#endif
 	bool isExc = false;
 	argv++;
 	argc--;
 
+#ifndef HL_BOOT
 	while( argc ) {
 		pchar *arg = *argv++;
 		argc--;
@@ -242,10 +265,15 @@ int main(int argc, pchar *argv[]) {
 			argc = first_boot_arg;
 		}
 	}
+#endif
 	hl_global_init();
 	hl_sys_init((void**)argv,argc,file);
 	hl_register_thread(&ctx);
+#ifdef HL_BOOT
+	ctx.code = hl_code_read(program, program_size, &error_msg);
+#else
 	ctx.code = load_code(file, &error_msg, true);
+#endif
 	if( ctx.code == NULL ) {
 		if( error_msg ) printf("%s\n", error_msg);
 		return 1;
