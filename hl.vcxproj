@@ -267,8 +267,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\hl.h" />
-    <ClInclude Include="src\hlmodule.h" />
-    <ClInclude Include="src\opcodes.h" />
+    <ClInclude Include="src\hl\hlmodule.h" />
+    <ClInclude Include="src\hl\opcodes.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

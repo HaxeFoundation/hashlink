@@ -19,17 +19,17 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "hlmodule.h"
+#include "hl/hlmodule.h"
 
 #define OP(_,n) n,
 #define OP_BEGIN static int hl_op_nargs[] = {
 #define OP_END };
-#include "opcodes.h"
+#include "hl/opcodes.h"
 
 #define OP(n,_) #n,
 #define OP_BEGIN static const char *hl_op_names[] = {
 #define OP_END };
-#include "opcodes.h"
+#include "hl/opcodes.h"
 
 typedef struct {
 	const unsigned char *b;
@@ -1099,4 +1099,3 @@ void hl_code_hash_free( hl_code_hash *h ) {
 	free(h->types_hashes);
 	free(h);
 }
-

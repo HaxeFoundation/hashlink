@@ -9,8 +9,8 @@
     <ClCompile Include="src\profile.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\hlmodule.h" />
-    <ClInclude Include="src\opcodes.h" />
+    <ClInclude Include="src\hl\hlmodule.h" />
+    <ClInclude Include="src\hl\opcodes.h" />
     <ClInclude Include="src\hl.h" />
   </ItemGroup>
 </Project>
