@@ -39,7 +39,9 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+LIBHLJIT = src/code.o src/jit.o src/module.o src/debugger.o src/profile.o
+
+HL = src/main.o
 
 FMT_INCLUDE = -I include/mikktspace -I include/minimp3
 
@@ -212,7 +214,7 @@ all: libhl libs
 ifeq ($(ARCH),arm64)
 	$(warning HashLink vm is not supported on arm64, skipping)
 else
-all: hl
+all: libhljit.a hl
 endif
 
 install:
@@ -224,12 +226,19 @@ endif
 	mkdir -p $(INSTALL_LIB_DIR)
 	cp *.hdll $(INSTALL_LIB_DIR)
 	cp libhl.${LIBEXT} $(INSTALL_LIB_DIR)
+ifneq ($(ARCH),arm64)
+	cp libhljit.a $(INSTALL_LIB_DIR)
+endif
 	mkdir -p $(INSTALL_INCLUDE_DIR)
 	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
+ifneq ($(ARCH),arm64)
+	mkdir -p $(INSTALL_INCLUDE_DIR)/hl
+	cp src/hlmodule.h src/opcodes.h $(INSTALL_INCLUDE_DIR)/hl
+endif
 
 uninstall:
 	rm -f $(INSTALL_BIN_DIR)/hl $(INSTALL_LIB_DIR)/libhl.${LIBEXT} $(INSTALL_LIB_DIR)/*.hdll
-	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
+	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c $(INSTALL_INCLUDE_DIR)/hl/hlmodule.h $(INSTALL_INCLUDE_DIR)/hl/opcodes.h
 
 libs: $(LIBS)
 
@@ -245,8 +254,11 @@ libhl: ${LIB}
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}
 
-hl: ${HL} libhl
-	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
+libhljit.a: ${LIBHLJIT}
+	${AR} rcs $@ $^
+
+hl: ${HL} libhljit.a libhl
+	${CC} ${CFLAGS} -o $@ ${HL} libhljit.a ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
 
 libs/fmt/%.o: libs/fmt/%.c
 	${CC} ${CFLAGS} -o $@ -c $< ${FMT_INCLUDE}
@@ -339,6 +351,10 @@ release_prepare:
 	mkdir $(PACKAGE_NAME)
 	mkdir $(PACKAGE_NAME)/include
 	cp src/hl.h src/hlc.h src/hlc_main.c $(PACKAGE_NAME)/include
+ifneq ($(ARCH),arm64)
+	mkdir $(PACKAGE_NAME)/include/hl
+	cp src/hlmodule.h src/opcodes.h $(PACKAGE_NAME)/include/hl
+endif
 
 release_win:
 	cp $(BUILD_DIR)/{hl.exe,libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
@@ -376,6 +392,6 @@ clean_o:
 	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
 
 clean: clean_o
-	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
+	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll *.a
 
 .PHONY: libhl hl hlc fmt sdl libs release

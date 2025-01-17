@@ -173,20 +173,28 @@ set_target_properties(libhl
 )
 
 if (WITH_VM)
-    add_executable(hl
+    add_library(libhljit STATIC
         src/code.c
         src/jit.c
-        src/main.c
         src/module.c
         src/debugger.c
         src/profile.c
+    )
+
+    set_target_properties(libhljit
+        PROPERTIES
+        PUBLIC_HEADER "src/hlmodule.h;src/opcodes.h"
+    )
+
+    add_executable(hl
+        src/main.c
     )
 
     if (UNIX AND NOT APPLE)
         set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
     endif()
 
-    target_link_libraries(hl libhl)
+    target_link_libraries(hl libhl libhljit)
 
     if (WIN32)
         target_link_libraries(hl user32)
@@ -387,6 +395,14 @@ install(
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+if (WITH_VM)
+    install(
+        TARGETS libhljit
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hl
+    )
+endif()
+
 install(
     FILES src/hlc_main.c
     TYPE INCLUDE
