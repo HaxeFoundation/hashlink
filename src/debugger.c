@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
-#include <hlmodule.h>
+#include <hl/hlmodule.h>
 
 struct _hl_socket;
 typedef struct _hl_socket hl_socket;

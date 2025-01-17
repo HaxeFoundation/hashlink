@@ -183,7 +183,7 @@ if (WITH_VM)
 
     set_target_properties(libhljit
         PROPERTIES
-        PUBLIC_HEADER "src/hlmodule.h;src/opcodes.h"
+        PUBLIC_HEADER "src/hl/hlmodule.h;src/hl/opcodes.h"
     )
 
     add_executable(hl

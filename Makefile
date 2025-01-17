@@ -233,7 +233,7 @@ endif
 	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
 ifneq ($(ARCH),arm64)
 	mkdir -p $(INSTALL_INCLUDE_DIR)/hl
-	cp src/hlmodule.h src/opcodes.h $(INSTALL_INCLUDE_DIR)/hl
+	cp src/hl/hlmodule.h src/hl/opcodes.h $(INSTALL_INCLUDE_DIR)/hl
 endif
 
 uninstall:
@@ -358,7 +358,7 @@ release_prepare:
 	cp src/hl.h src/hlc.h src/hlc_main.c $(PACKAGE_NAME)/include
 ifneq ($(ARCH),arm64)
 	mkdir $(PACKAGE_NAME)/include/hl
-	cp src/hlmodule.h src/opcodes.h $(PACKAGE_NAME)/include/hl
+	cp src/hl/hlmodule.h src/hl/opcodes.h $(PACKAGE_NAME)/include/hl
 endif
 
 release_win:

@@ -23,11 +23,7 @@
 // #define HL_BOOT
 
 #include <hl.h>
-#ifdef HL_BOOT
 #include <hl/hlmodule.h>
-#else
-#include <hlmodule.h>
-#endif
 
 #ifndef HL_BOOT
 #define HL_DEBUGGER
