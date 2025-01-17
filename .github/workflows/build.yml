@@ -156,7 +156,7 @@ jobs:
         set -eux
 
         haxelib setup ~/haxelib
-        haxelib install hashlink
+        haxelib dev hashlink other/haxelib
         haxelib list
 
 
