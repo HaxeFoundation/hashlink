@@ -218,7 +218,22 @@ int main(int argc, pchar *argv[]) {
 		file = PSTR("hlboot.dat");
 		fchk = pfopen(file,"rb");
 		if( fchk == NULL ) {
-			printf("HL/JIT %d.%d.%d (c)2015-2023 Haxe Foundation\n  Usage : hl [--debug <port>] [--debug-wait] <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
+			const char* options = "[--version]"
+#ifdef HL_DEBUGGER
+				" [--debug <port>] [--debug-wait]"
+#endif
+#ifdef HL_HOT_RELOAD
+				" [--hot-reload]"
+#endif
+#ifdef HL_PROFILER
+				" [--profile <count>]"
+#endif
+#ifdef HL_VTUNE
+				" [--vtune-later]"
+#endif
+		;
+
+			printf("HL/JIT %d.%d.%d (c)2015-2025 Haxe Foundation\n  Usage : hl %s <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF,options);
 			return 1;
 		}
 		fclose(fchk);
