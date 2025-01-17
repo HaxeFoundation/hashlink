@@ -214,6 +214,11 @@ if(BUILD_TESTING)
         haxe
     )
 
+    find_program(
+        HAXELIB
+        haxelib
+    )
+
     #####################
     # hello.hl
 
@@ -318,6 +323,27 @@ if(BUILD_TESTING)
     )
 
     #####################
+    # hello.c (hashlink boot)
+    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot/hello.c
+        COMMAND ${HAXE_COMPILER}
+                -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot/hello.hl
+                -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+        COMMAND ${HAXELIB} run hashlink boot ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot/hello.hl
+    )
+    if (WITH_VM)
+        add_executable(hello_boot
+            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot/hello.c
+        )
+        set_target_properties(hello_boot
+            PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot
+        )
+        target_link_libraries(hello_boot
+            libhl libhljit
+        )
+    endif()
+
+    #####################
     # Tests
     if (WITH_VM)
         add_test(NAME version
@@ -336,6 +362,9 @@ if(BUILD_TESTING)
         )
         add_test(NAME uvsample.hl
             COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl 6001
+        )
+        add_test(NAME hello_boot
+            COMMAND hello_boot
         )
     endif()
 
