@@ -840,7 +840,7 @@ HL_PRIM void *hl_dyn_getp( vdynamic *d, int hfield, hl_type *t ) {
 
 // -------------------- DYNAMIC SET ------------------------------------
 
-static void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **ft ) {
+HL_PRIM void *hl_obj_lookup_set( vdynamic *d, int hfield, hl_type *t, hl_type **ft ) {
 	switch( d->t->kind ) {
 	case HDYNOBJ:
 		{
