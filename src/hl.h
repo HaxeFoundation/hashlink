@@ -343,8 +343,9 @@ typedef enum {
 	HMETHOD = 20,
 	HSTRUCT	= 21,
 	HPACKED = 22,
+	HGUID	= 23,
 	// ---------
-	HLAST	= 23,
+	HLAST	= 24,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
@@ -603,6 +604,7 @@ HL_API int hl_utf8_length( const vbyte *s, int pos );
 HL_API int hl_from_utf8( uchar *out, int outLen, const char *str );
 HL_API char *hl_to_utf8( const uchar *bytes );
 HL_API uchar *hl_to_utf16( const char *str );
+HL_API uchar *hl_guid_str( int64 guid, uchar buf[14] );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
 HL_API hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid );
 
@@ -796,7 +798,7 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 // ----------------------- FFI ------------------------------------------------------
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsilfdbBDPOATR??X?N?S"
+#define TYPE_STR	"vcsilfdbBDPOATR??X?N?S?g"
 
 #undef  _VOID
 #define _NO_ARG
@@ -819,6 +821,7 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #undef _NULL
 #define _NULL(t)					"N" t
 #define _STRUCT						"S"
+#define _GUID						"g"
 
 #undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)
@@ -941,6 +944,7 @@ typedef struct {
 	hl_thread_info **threads;
 	hl_mutex *global_lock;
 	hl_mutex *exclusive_lock;
+	void *guid_map;
 } hl_threads_info;
 
 HL_API hl_thread_info *hl_get_thread();

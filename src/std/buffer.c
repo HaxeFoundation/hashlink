@@ -162,6 +162,9 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 	case HBYTES:
 		hl_buffer_str(b,*(uchar**)data);
 		break;
+	case HGUID:
+		hl_buffer_str(b,hl_guid_str(*(int64*)data,buf));
+		break;
 	case HTYPE:
 	case HREF:
 	case HABSTRACT:
@@ -379,6 +382,9 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		break;
 	case HNULL:
 		hl_buffer_str_sub(b, USTR("_null_"), 6);
+		break;
+	case HGUID:
+		hl_buffer_str(b,hl_guid_str(v->v.i64,buf));
 		break;
 	default:
 		hl_buffer_str_sub(b, buf, usprintf(buf, 32, _PTR_FMT USTR("H"),(int_val)v));
