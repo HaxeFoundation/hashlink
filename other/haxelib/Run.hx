@@ -166,6 +166,52 @@ class Build {
 
 }
 
+class Boot {
+	static function findMainFile(haxelibPath:String) {
+		return sys.FileSystem.exists('$haxelibPath/../../src/main.c') ? '$haxelibPath/../../src/main.c' :
+			sys.FileSystem.exists('${Sys.getEnv("HASHLINK")}/src/main.c') ? '${Sys.getEnv("HASHLINK")}/src/main.c' :
+			sys.FileSystem.exists('$haxelibPath/templates/hlboot.c') ? '$haxelibPath/templates/hlboot.c' :
+			throw "Cannot find template main.c file. Try setting the HASHLINK environment variable";
+	}
+
+	public static function boot(module:String, haxelibPath:String) {
+		final cFile = StringTools.replace(sys.io.File.getContent(findMainFile(haxelibPath)), "// #define HL_BOOT", "#define HL_BOOT");
+
+		final inputFile = sys.io.File.read(module, true);
+		final outputFile = sys.io.File.write(StringTools.replace(module, ".hl", ".c"));
+
+		final splitFile = cFile.split("::");
+
+		var programSize:Null<Int> = null;
+		for (part in splitFile) {
+			if (part == "program") {
+				programSize = 0;
+				var foundEnd = false;
+				while (!foundEnd) {
+					final byte = try {
+						inputFile.readByte();
+					} catch (e) {
+						foundEnd = true;
+						continue;
+					};
+
+					outputFile.writeString('$byte,');
+					programSize++;
+				}
+			} else if (part == "programSize") {
+				if (programSize == null)
+					throw "Program size unknown";
+				outputFile.writeString('$programSize');
+			} else {
+				outputFile.writeString(part);
+			}
+		}
+
+		inputFile.close();
+		outputFile.close();
+	}
+}
+
 class Run {
 	static function main() {
 		var args = Sys.args();
@@ -185,6 +231,8 @@ class Run {
 			var output = args.shift();
 			if( StringTools.endsWith(output,".c") ) return;			
 			Sys.command("hl "+output);
+		case "boot":
+			Boot.boot(args[0], haxelibPath);
 		case cmd:
 			Sys.println("Unknown command "+cmd);
 			Sys.exit(1);

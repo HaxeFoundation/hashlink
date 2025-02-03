@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
-#include <hlmodule.h>
+#include <hl/hlmodule.h>
 
 #ifdef HL_WIN
 #	include <windows.h>

@@ -173,20 +173,28 @@ set_target_properties(libhl
 )
 
 if (WITH_VM)
-    add_executable(hl
+    add_library(libhljit STATIC
         src/code.c
         src/jit.c
-        src/main.c
         src/module.c
         src/debugger.c
         src/profile.c
+    )
+
+    set_target_properties(libhljit
+        PROPERTIES
+        PUBLIC_HEADER "src/hl/hlmodule.h;src/hl/opcodes.h"
+    )
+
+    add_executable(hl
+        src/main.c
     )
 
     if (UNIX AND NOT APPLE)
         set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
     endif()
 
-    target_link_libraries(hl libhl)
+    target_link_libraries(hl libhl libhljit)
 
     if (WIN32)
         target_link_libraries(hl user32)
@@ -204,6 +212,11 @@ if(BUILD_TESTING)
     find_program(
         HAXE_COMPILER
         haxe
+    )
+
+    find_program(
+        HAXELIB
+        haxelib
     )
 
     #####################
@@ -310,6 +323,27 @@ if(BUILD_TESTING)
     )
 
     #####################
+    # hello.c (hashlink boot)
+    add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot/hello.c
+        COMMAND ${HAXE_COMPILER}
+                -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot/hello.hl
+                -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
+        COMMAND ${HAXELIB} run hashlink boot ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot/hello.hl
+    )
+    if (WITH_VM)
+        add_executable(hello_boot
+            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot/hello.c
+        )
+        set_target_properties(hello_boot
+            PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello_boot
+        )
+        target_link_libraries(hello_boot
+            libhl libhljit
+        )
+    endif()
+
+    #####################
     # Tests
     if (WITH_VM)
         add_test(NAME version
@@ -328,6 +362,9 @@ if(BUILD_TESTING)
         )
         add_test(NAME uvsample.hl
             COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl 6001
+        )
+        add_test(NAME hello_boot
+            COMMAND hello_boot
         )
     endif()
 
@@ -387,6 +424,14 @@ install(
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+if (WITH_VM)
+    install(
+        TARGETS libhljit
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hl
+    )
+endif()
+
 install(
     FILES src/hlc_main.c
     TYPE INCLUDE

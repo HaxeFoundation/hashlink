@@ -19,12 +19,19 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
+// #define HL_BOOT
+
 #include <hl.h>
-#include <hlmodule.h>
+#include <hl/hlmodule.h>
+
+#ifndef HL_BOOT
+#define HL_DEBUGGER
+#define HL_PROFILER
+#define HL_HOT_RELOAD
 
 #ifdef HL_WIN
 #	include <locale.h>
-typedef uchar pchar;
 #define pprintf(str,file)	uprintf(USTR(str),file)
 #define pfopen(file,ext) _wfopen(file,USTR(ext))
 #define pcompare wcscmp
@@ -32,22 +39,36 @@ typedef uchar pchar;
 #define PSTR(x) USTR(x)
 #else
 #	include <sys/stat.h>
-typedef char pchar;
 #define pprintf printf
 #define pfopen fopen
 #define pcompare strcmp
 #define ptoi atoi
 #define PSTR(x) x
 #endif
+#endif
+
+#ifdef HL_WIN
+typedef uchar pchar;
+#else
+typedef char pchar;
+#endif
 
 typedef struct {
+#ifdef HL_HOT_RELOAD
 	pchar *file;
+	int file_time;
+#endif
 	hl_code *code;
 	hl_module *m;
 	vdynamic *ret;
-	int file_time;
 } main_context;
 
+#ifdef HL_BOOT
+const unsigned char program[] = {
+	::program::
+};
+int program_size = ::programSize::;
+#else
 static int pfiletime( pchar *file )	{
 #ifdef HL_WIN
 	struct _stat32 st;
@@ -87,7 +108,9 @@ static hl_code *load_code( const pchar *file, char **error_msg, bool print_error
 	free(fdata);
 	return code;
 }
+#endif
 
+#ifdef HL_HOT_RELOAD
 static bool check_reload( main_context *m ) {
 	int time = pfiletime(m->file);
 	bool changed;
@@ -102,6 +125,7 @@ static bool check_reload( main_context *m ) {
 	hl_code_free(code);
 	return changed;
 }
+#endif
 
 #ifdef HL_VCC
 // this allows some runtime detection to switch to high performance mode
@@ -141,20 +165,28 @@ int main(int argc, pchar *argv[]) {
 	static vclosure cl;
 	pchar *file = NULL;
 	char *error_msg = NULL;
+#ifdef HL_DEBUGGER
 	int debug_port = -1;
 	bool debug_wait = false;
-	bool hot_reload = false;
+#endif
+#ifdef HL_PROFILER
 	int profile_count = -1;
+#endif
+	bool hot_reload = false;
 	bool vtune_later = false;
 	main_context ctx;
-	bool isExc = false;
+#ifndef HL_BOOT
 	int first_boot_arg = -1;
+#endif
+	bool isExc = false;
 	argv++;
 	argc--;
 
+#ifndef HL_BOOT
 	while( argc ) {
 		pchar *arg = *argv++;
 		argc--;
+#ifdef HL_DEBUGGER
 		if( pcompare(arg,PSTR("--debug")) == 0 ) {
 			if( argc-- == 0 ) break;
 			debug_port = ptoi(*argv++);
@@ -164,19 +196,24 @@ int main(int argc, pchar *argv[]) {
 			debug_wait = true;
 			continue;
 		}
+#endif
 		if( pcompare(arg,PSTR("--version")) == 0 ) {
 			printf("%d.%d.%d",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
 			return 0;
 		}
+#ifdef HL_HOT_RELOAD
 		if( pcompare(arg,PSTR("--hot-reload")) == 0 ) {
 			hot_reload = true;
 			continue;
 		}
+#endif
+#ifdef HL_PROFILER
 		if( pcompare(arg,PSTR("--profile")) == 0 ) {
 			if( argc-- == 0 ) break;
 			profile_count = ptoi(*argv++);
 			continue;
 		}
+#endif
 #ifdef HL_VTUNE
 		if( pcompare(arg,PSTR("--vtune-later")) == 0 ) {
 			vtune_later = true;
@@ -200,7 +237,22 @@ int main(int argc, pchar *argv[]) {
 		file = PSTR("hlboot.dat");
 		fchk = pfopen(file,"rb");
 		if( fchk == NULL ) {
-			printf("HL/JIT %d.%d.%d (c)2015-2023 Haxe Foundation\n  Usage : hl [--debug <port>] [--debug-wait] <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
+			const char* options = "[--version]"
+#ifdef HL_DEBUGGER
+				" [--debug <port>] [--debug-wait]"
+#endif
+#ifdef HL_HOT_RELOAD
+				" [--hot-reload]"
+#endif
+#ifdef HL_PROFILER
+				" [--profile <count>]"
+#endif
+#ifdef HL_VTUNE
+				" [--vtune-later]"
+#endif
+		;
+
+			printf("HL/JIT %d.%d.%d (c)2015-2025 Haxe Foundation\n  Usage : hl %s <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF,options);
 			return 1;
 		}
 		fclose(fchk);
@@ -209,11 +261,15 @@ int main(int argc, pchar *argv[]) {
 			argc = first_boot_arg;
 		}
 	}
+#endif
 	hl_global_init();
 	hl_sys_init((void**)argv,argc,file);
 	hl_register_thread(&ctx);
-	ctx.file = file;
+#ifdef HL_BOOT
+	ctx.code = hl_code_read(program, program_size, &error_msg);
+#else
 	ctx.code = load_code(file, &error_msg, true);
+#endif
 	if( ctx.code == NULL ) {
 		if( error_msg ) printf("%s\n", error_msg);
 		return 1;
@@ -223,29 +279,40 @@ int main(int argc, pchar *argv[]) {
 		return 2;
 	if( !hl_module_init(ctx.m,hot_reload,vtune_later) )
 		return 3;
+#ifdef HL_HOT_RELOAD
+	ctx.file = file;
 	if( hot_reload ) {
 		ctx.file_time = pfiletime(ctx.file);
 		hl_setup_reload_check(check_reload,&ctx);
 	}
+#endif
 	hl_code_free(ctx.code);
+#ifdef HL_DEBUGGER
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
 		fprintf(stderr,"Could not start debugger on port %d\n",debug_port);
 		return 4;
 	}
+#endif
 	cl.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
 	cl.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
 	cl.hasValue = 0;
 	setup_handler();
+#ifdef HL_PROFILER
 	hl_profile_setup(profile_count);
+#endif
 	ctx.ret = hl_dyn_call_safe(&cl,NULL,0,&isExc);
+#ifdef HL_PROFILER
 	hl_profile_end();
+#endif
 	if( isExc ) {
 		varray *a = hl_exception_stack();
 		int i;
 		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ctx.ret));
 		for(i=0;i<a->size;i++)
 			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
+#ifdef HL_DEBUGGER
 		hl_debug_break();
+#endif
 		hl_global_free();
 		return 1;
 	}
@@ -256,4 +323,3 @@ int main(int argc, pchar *argv[]) {
 	hl_global_free();
 	return 0;
 }
-
