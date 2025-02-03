@@ -699,6 +699,10 @@ HL_PRIM void HL_NAME(win_resize)(dx_window *win, int mode) {
 	}
 }
 
+HL_PRIM void HL_NAME(win_set_focus)(dx_window* win) {
+	SetFocus(win);
+}
+
 HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 	if( fs ) {
 		MONITORINFO mi = { sizeof(mi) };
@@ -916,6 +920,7 @@ DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_fullscreen, TWIN _BOOL);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
+DEFINE_PRIM(_VOID, win_set_focus, TWIN);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_min_size, TWIN _I32 _I32);
