@@ -580,15 +580,16 @@ HL_PRIM varray *hl_enum_parameters( venum *e ) {
 
 static void *hl_guid_map = NULL;
 extern void *hl_hi64alloc();
-extern void hl_hi64set( void *map, int64 guid, vbyte *name );
-extern vbyte *hl_hi64get( void *map, int64 guid );
+extern void hl_hi64set( void *map, int64 guid, vdynamic *name );
+extern vdynamic *hl_hi64get( void *map, int64 guid );
 extern void hl_hi64remove( void *map, int64 guid );
 
 HL_PRIM uchar *hl_guid_str( int64 guid, uchar buf[14] ) {
 	static char CHARS[] = "#&0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 	int i;
 	int pos = 0;
-	uchar *name = hl_guid_map ? (uchar*)hl_hi64get(hl_guid_map,guid) : NULL;
+	vdynamic *data = hl_guid_map ? hl_hi64get(hl_guid_map,guid) : NULL;
+	uchar *name = data ? (uchar*)(data->v.bytes) : NULL;
 	if( name != NULL )
 		return name;
 	if( guid == 0 )
@@ -609,7 +610,7 @@ HL_PRIM void hl_register_guid_name( int64 guid, vbyte *name ) {
 		hl_add_root(&hl_guid_map);
 	}
 	if( name )
-		hl_hi64set(hl_guid_map, guid, name);
+		hl_hi64set(hl_guid_map, guid, hl_make_dyn(&name, &hlt_bytes));
 	else
 		hl_hi64remove(hl_guid_map, guid);
 }
