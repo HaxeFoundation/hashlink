@@ -50,7 +50,11 @@
 #undef __SIGN
 #undef far
 #undef FAR
+#undef near
+#undef NEAR
 #undef GENERIC_READ
+#undef INT_MAX
+#undef INT_MIN
 
 // disable some warnings triggered by HLC code generator
 
