@@ -1879,7 +1879,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RFPU,RFPU):
 			op64(ctx,o,pa,pb);
-			if( o == COMISD && bop != OJSGt ) {
+			if( (o == COMISD || o == COMISS) && bop != OJSGt ) {
 				int jnotnan;
 				XJump_small(JNParity,jnotnan);
 				switch( bop ) {
