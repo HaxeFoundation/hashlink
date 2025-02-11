@@ -94,4 +94,28 @@ extern void hl_entry_point();
 #define HL__ENUM_CONSTRUCT__	hl_type *t; int index;
 #define HL__ENUM_INDEX__(v)		((venum*)(v))->index
 
+#if defined(HL_VCC)
+#define __hl_prefetch_m0(addr) _mm_prefetch((char*)addr, _MM_HINT_T0)
+#define __hl_prefetch_m1(addr) _mm_prefetch((char*)addr, _MM_HINT_T1)
+#define __hl_prefetch_m2(addr) _mm_prefetch((char*)addr, _MM_HINT_T2)
+#define __hl_prefetch_m3(addr) _mm_prefetch((char*)addr, _MM_HINT_NTA)
+#ifdef _MM_HINT_ET1
+#define __hl_prefetch_m4(addr) _mm_prefetch((char*)addr, _MM_HINT_ET1)
+#else
+#define __hl_prefetch_m4(addr) _m_prefetchw((char*)addr)
+#endif
+#elif defined(HL_CLANG) || defined (HL_GCC)
+#define __hl_prefetch_m0(addr) __builtin_prefetch((void*)addr, 0, 3)
+#define __hl_prefetch_m1(addr) __builtin_prefetch((void*)addr, 0, 2)
+#define __hl_prefetch_m2(addr) __builtin_prefetch((void*)addr, 0, 1)
+#define __hl_prefetch_m3(addr) __builtin_prefetch((void*)addr, 0, 0)
+#define __hl_prefetch_m4(addr) __builtin_prefetch((void*)addr, 1)
+#elif
+#define __hl_prefetch_m0(addr)
+#define __hl_prefetch_m1(addr)
+#define __hl_prefetch_m2(addr)
+#define __hl_prefetch_m3(addr)
+#define __hl_prefetch_m4(addr)
+#endif
+
 #endif
