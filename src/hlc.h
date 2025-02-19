@@ -39,6 +39,7 @@
 #undef stdout
 #undef stderr
 #undef DELETE
+#undef ERROR
 #undef NO_ERROR
 #undef EOF
 #undef STRICT
@@ -55,6 +56,22 @@
 #undef GENERIC_READ
 #undef INT_MAX
 #undef INT_MIN
+#undef BIG_ENDIAN
+#undef LITTLE_ENDIAN
+#undef ALTERNATE
+#undef DIFFERENCE
+#undef IN
+#undef OUT
+#undef DOUBLE_CLICK
+#undef WAIT_FAILED
+#undef OPTIONAL
+#undef OVERFLOW
+#undef UNDERFLOW
+#undef DOMAIN
+#undef TRANSPARENT
+#undef CopyFile
+#undef COLOR_HIGHLIGHT
+#undef __valid
 
 // disable some warnings triggered by HLC code generator
 
