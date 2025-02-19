@@ -60,11 +60,8 @@
 #undef LITTLE_ENDIAN
 #undef ALTERNATE
 #undef DIFFERENCE
-#undef IN
-#undef OUT
 #undef DOUBLE_CLICK
 #undef WAIT_FAILED
-#undef OPTIONAL
 #undef OVERFLOW
 #undef UNDERFLOW
 #undef DOMAIN
