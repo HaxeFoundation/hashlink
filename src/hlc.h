@@ -35,6 +35,9 @@
 
 // undefine some commonly used names that can clash with class/var name
 #undef CONST
+#undef IN
+#undef OUT
+#undef OPTIONAL
 #undef stdin
 #undef stdout
 #undef stderr
