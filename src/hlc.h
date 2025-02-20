@@ -35,10 +35,14 @@
 
 // undefine some commonly used names that can clash with class/var name
 #undef CONST
+#undef IN
+#undef OUT
+#undef OPTIONAL
 #undef stdin
 #undef stdout
 #undef stderr
 #undef DELETE
+#undef ERROR
 #undef NO_ERROR
 #undef EOF
 #undef STRICT
@@ -55,6 +59,19 @@
 #undef GENERIC_READ
 #undef INT_MAX
 #undef INT_MIN
+#undef BIG_ENDIAN
+#undef LITTLE_ENDIAN
+#undef ALTERNATE
+#undef DIFFERENCE
+#undef DOUBLE_CLICK
+#undef WAIT_FAILED
+#undef OVERFLOW
+#undef UNDERFLOW
+#undef DOMAIN
+#undef TRANSPARENT
+#undef CopyFile
+#undef COLOR_HIGHLIGHT
+#undef __valid
 
 // disable some warnings triggered by HLC code generator
 
