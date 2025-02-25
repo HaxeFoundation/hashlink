@@ -74,6 +74,8 @@ HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 			v->v.ptr = p;
 			return v;
 		}
+	case HVOID:
+		return NULL;
 	default:
 		return *(vdynamic**)data;
 	}
