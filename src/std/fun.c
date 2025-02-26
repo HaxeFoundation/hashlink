@@ -149,6 +149,9 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 	if( args->size > HL_MAX_ARGS )
 		hl_error("Too many arguments");
 	if( cl->hasValue ) {
+		if( cl->hasValue == 2 ) {
+			cl = ((vclosure_wrapper*)cl)->wrappedFun;
+		}
 		if( cl->fun == fun_var_args ) {
 			cl = (vclosure*)cl->value;
 			return cl->hasValue ? ((vdynamic* (*)(vdynamic*, varray*))cl->fun)(cl->value, args) : ((vdynamic* (*)(varray*))cl->fun)(args);
@@ -228,7 +231,7 @@ HL_PRIM vdynamic *hl_dyn_call( vclosure *c, vdynamic **args, int nargs ) {
 	tmp.a.t = &hlt_array;
 	tmp.a.at = &hlt_dyn;
 	tmp.a.size = nargs;
-	if( c->hasValue && c->t->fun->nargs >= 0 ) {
+	if( c->hasValue && c->t->fun->nargs >= 0 && c->t->fun->parent != NULL ) {
 		ctmp.t = c->t->fun->parent;
 		ctmp.hasValue = 0;
 		ctmp.fun = c->fun;
