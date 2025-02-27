@@ -703,6 +703,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 	while( true ) {
 		void **block = (void**)*--__current_stack;
 		gc_pheader *page = GC_GET_PAGE(block);
+		if( !page || !INPAGE(block,page) ) continue;
 		unsigned int *mark_bits = NULL;
 		int pos = 0, nwords;
 #		ifdef GC_DEBUG
