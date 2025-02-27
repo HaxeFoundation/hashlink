@@ -703,7 +703,6 @@ static int gc_flush_mark( gc_mstack *stack ) {
 	while( true ) {
 		void **block = (void**)*--__current_stack;
 		gc_pheader *page = GC_GET_PAGE(block);
-		if( !page || !INPAGE(block,page) ) continue;
 		unsigned int *mark_bits = NULL;
 		int pos = 0, nwords;
 #		ifdef GC_DEBUG
@@ -714,6 +713,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 			__current_stack++;
 			break;
 		}
+		if( !page || !INPAGE(block,page) ) continue;
 		if( (count++ & (1 << REGULAR_BITS)) != regular_mask && GC_MAX_MARK_THREADS > 1 && gc_mark_threads > 1 ) {
 			regular_mask = regular_mask ? 0 : 1 << REGULAR_BITS;
 			GC_STACK_END();
