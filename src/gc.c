@@ -713,6 +713,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 			__current_stack++;
 			break;
 		}
+		if( !page || !INPAGE(block,page) ) continue;
 		if( (count++ & (1 << REGULAR_BITS)) != regular_mask && GC_MAX_MARK_THREADS > 1 && gc_mark_threads > 1 ) {
 			regular_mask = regular_mask ? 0 : 1 << REGULAR_BITS;
 			GC_STACK_END();
@@ -734,6 +735,9 @@ static int gc_flush_mark( gc_mstack *stack ) {
 				if( (int_val)t == 0xDDDDDDDD ) continue;
 #				endif
 #			endif
+			if( !t || t->kind < 0 || t->kind >= HLAST ) {
+				continue;
+			}
 			if( t && t->mark_bits && t->kind != HFUN ) {
 				mark_bits = t->mark_bits;
 				if( t->kind == HENUM ) {
@@ -749,20 +753,24 @@ static int gc_flush_mark( gc_mstack *stack ) {
 #		endif
 		while( pos < nwords ) {
 			void *p;
+			gc_pheader *pagep;
 			if( mark_bits && (mark_bits[pos >> 5] & (1 << (pos&31))) == 0 ) {
 				pos++;
 				block++;
 				continue;
 			}
+			if( !INPAGE(block,page) ) {
+				break;
+			}
 			p = *block++;
 			pos++;
 			if( !p ) continue;
-			page = GC_GET_PAGE(p);
-			if( !page || !INPAGE(p,page) ) continue;
-			int bid = gc_allocator_get_block_id(page,p);
-			if( bid >= 0 && atomic_bit_set(&page->bmp[bid>>3],1<<(bid&7)) ) {
-				if( MEM_HAS_PTR(page->page_kind) ) DRAM_PREFETCH(p);
-				GC_PUSH_GEN(p,page);
+			pagep = GC_GET_PAGE(p);
+			if( !pagep || !INPAGE(p,pagep) ) continue;
+			int bid = gc_allocator_get_block_id(pagep,p);
+			if( bid >= 0 && atomic_bit_set(&pagep->bmp[bid>>3],1<<(bid&7)) ) {
+				if( MEM_HAS_PTR(pagep->page_kind) ) DRAM_PREFETCH(p);
+				GC_PUSH_GEN(p,pagep);
 			}
 		}
 	}
