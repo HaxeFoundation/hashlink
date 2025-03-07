@@ -3262,7 +3262,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				case HF64:
 				case HF32:
 #					ifdef HL_64
-					op64(ctx,dst->t->kind == HF32 ? MOVSS : MOVSD,alloc_fpu(ctx,dst,false),pcodeaddr(&p,o->p2 * 8 + (dst->t->kind == HF32 ? 4 : 0)));
+					op64(ctx,dst->t->kind == HF32 ? CVTSD2SS : MOVSD,alloc_fpu(ctx,dst,false),pcodeaddr(&p,o->p2 * 8));
 #					else
 					op64(ctx,dst->t->kind == HF32 ? MOVSS : MOVSD,alloc_fpu(ctx,dst,false),paddr(&p,m->code->floats + o->p2));
 #					endif
@@ -3512,6 +3512,23 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					{
 						hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
 						preg *rr = alloc_cpu(ctx, dst, true);
+						if( rb->t->kind == HSTRUCT ) {
+							hl_type *ft = hl_obj_field_fetch(dst->t,o->p2)->t;
+							if( ft->kind == HPACKED ) {
+								hl_runtime_obj *frt = hl_get_obj_rt(ft->tparam);
+								preg *prb = alloc_cpu(ctx, rb, true);
+								preg *tmp = alloc_reg(ctx, RCPU_CALL);
+								int offset = 0;
+								while( offset < frt->size ) {
+									int remain = frt->size - offset;
+									int copy_size = remain >= HL_WSIZE ? HL_WSIZE : (remain >= 4 ? 4 : (remain >= 2 ? 2 : 1));
+									copy(ctx, tmp, pmem(&p, (CpuReg)prb->id, offset), copy_size);
+									copy(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]+offset), tmp, copy_size);
+									offset += copy_size;
+								}
+								break;
+							}
+						}
 						copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p2]), rb);
 					}
 					break;
@@ -3601,6 +3618,23 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				vreg *r = R(0);
 				hl_runtime_obj *rt = hl_get_obj_rt(r->t);
 				preg *rr = alloc_cpu(ctx, r, true);
+				if( ra->t->kind == HSTRUCT ) {
+					hl_type *ft = hl_obj_field_fetch(r->t,o->p1)->t;
+					if( ft->kind == HPACKED ) {
+						hl_runtime_obj *frt = hl_get_obj_rt(ft->tparam);
+						preg *pra = alloc_cpu(ctx, ra, true);
+						preg *tmp = alloc_reg(ctx, RCPU_CALL);
+						int offset = 0;
+						while( offset < frt->size ) {
+							int remain = frt->size - offset;
+							int copy_size = remain >= HL_WSIZE ? HL_WSIZE : (remain >= 4 ? 4 : (remain >= 2 ? 2 : 1));
+							copy(ctx, tmp, pmem(&p, (CpuReg)pra->id, offset), copy_size);
+							copy(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p1]+offset), tmp, copy_size);
+							offset += copy_size;
+						}
+						break;
+					}
+				}
 				copy_from(ctx, pmem(&p, (CpuReg)rr->id, rt->fields_indexes[o->p1]), ra);
 			}
 			break;
