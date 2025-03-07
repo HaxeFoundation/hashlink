@@ -736,7 +736,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 #			endif
 			if( !t ) {
 				if( page->alloc.sizes != NULL && size != 0 ) {
-					hl_fatal("[GC] t = null, alloc.sizes != null, size = %d", size);
+					hl_fatal2("[GC] t = null, alloc.sizes != null, block 0x%p, size = %d", block, size);
 				}
 				continue;
 			}
