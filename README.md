@@ -45,6 +45,20 @@ To install hashlink binaries on your system you can then call:
 
 `make install`
 
+**On Arch Linux:**
+
+Make and install it using the [Arch User Repository](https://aur.archlinux.org/packages/hashlink) (AUR):
+
+```
+git clone https://aur.archlinux.org/hashlink.git
+cd hashlink
+makepkg -sri
+```
+
+Or using an AUR helper such as [yay](https://aur.archlinux.org/packages/yay-bin):
+
+`yay -S hashlink`
+
 ## Building on Windows
 
 Open `hl.sln` using Visual Studio C++ and compile.
