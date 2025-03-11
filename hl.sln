@@ -3,18 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31729.503
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sdl", "libs\sdl\sdl.vcxproj", "{12049F27-EA26-4A33-ADF8-E542C4167C00}"
-	ProjectSection(ProjectDependencies) = postProject
-		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libhl", "libhl.vcxproj", "{C6213FBF-BC2B-4235-A827-84A60E848C52}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fmt", "libs\fmt\fmt.vcxproj", "{7DDA1414-6675-45C7-8254-42057901F865}"
-	ProjectSection(ProjectDependencies) = postProject
-		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hl", "hl.vcxproj", "{BBF750D2-6DD2-4A41-AC3A-07C070B94FA1}"
 	ProjectSection(ProjectDependencies) = postProject
 		{76E4DB00-8114-4B96-BA76-39D800F8D5EE} = {76E4DB00-8114-4B96-BA76-39D800F8D5EE}
@@ -31,6 +19,20 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hl", "hl.vcxproj", "{BBF750
 		{E3F735ED-9701-46BE-A86C-C61D3CE0D525} = {E3F735ED-9701-46BE-A86C-C61D3CE0D525}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libhl", "libhl.vcxproj", "{C6213FBF-BC2B-4235-A827-84A60E848C52}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "libs", "libs", "{0EC4330B-6B61-45F8-B297-CA7097AFFD98}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sdl", "libs\sdl\sdl.vcxproj", "{12049F27-EA26-4A33-ADF8-E542C4167C00}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fmt", "libs\fmt\fmt.vcxproj", "{7DDA1414-6675-45C7-8254-42057901F865}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
+	EndProjectSection
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ui", "libs\ui\ui.vcxproj", "{6534D221-34DF-404A-AFCD-6DEC9BBC9798}"
 	ProjectSection(ProjectDependencies) = postProject
 		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
@@ -40,8 +42,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sqlite", "libs\sqlite\sqlit
 	ProjectSection(ProjectDependencies) = postProject
 		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
 	EndProjectSection
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "libs", "libs", "{0EC4330B-6B61-45F8-B297-CA7097AFFD98}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssl", "libs\ssl\ssl.vcxproj", "{F4D939D6-88D6-4FF2-874A-7BECF75A01C2}"
 	ProjectSection(ProjectDependencies) = postProject
