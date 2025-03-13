@@ -542,6 +542,7 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 		SDL_HideWindow(win);
 		SDL_ShowWindow(win);
 	}
+	SDL_RaiseWindow(win); // better first focus lost behavior
 #	endif
 	return win;
 }
