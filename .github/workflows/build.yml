@@ -240,6 +240,12 @@ jobs:
             ;;
         esac
 
+    - name: "Test haxelib build"
+      run: |
+        cd other/haxelib
+        haxe memory.hxml
+        haxe profiler.hxml
+        cd ../..
 
     - name: "Package"
       run: |
