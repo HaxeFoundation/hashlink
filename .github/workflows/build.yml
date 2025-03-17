@@ -242,6 +242,7 @@ jobs:
 
     - name: "Test haxelib build"
       run: |
+        haxelib git format https://github.com/HaxeFoundation/format
         cd other/haxelib
         haxe memory.hxml
         haxe profiler.hxml
