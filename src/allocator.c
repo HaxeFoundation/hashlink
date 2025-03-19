@@ -560,8 +560,14 @@ static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 		if( bid * page->alloc.block_size != offset )
 			return -1;
 	}
-	if( page->alloc.sizes && page->alloc.sizes[bid] == 0 )
+	if( bid >= page->alloc.max_blocks )
 		return -1;
+	if( page->alloc.sizes ) {
+		if( bid < page->alloc.first_block )
+			return -1;
+		if( page->alloc.sizes[bid] == 0 )
+			return -1;
+	}
 	return bid;
 }
 
@@ -569,12 +575,18 @@ static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 static int gc_allocator_get_block_interior( gc_pheader *page, void **block ) {
 	int offset = (int)((unsigned char*)*block - page->base);
 	int bid = offset / page->alloc.block_size;
+	if( bid >= page->alloc.max_blocks )
+		return -1;
 	if( page->alloc.sizes ) {
 		if( bid < page->alloc.first_block ) return -1;
+		int start = bid;
 		while( page->alloc.sizes[bid] == 0 ) {
 			if( bid == page->alloc.first_block ) return -1;
 			bid--;
 		}
+		int size = page->alloc.sizes[bid];
+		if( (start - bid) >= size )
+			return -1;
 	}
 	*block = page->base + bid * page->alloc.block_size;
 	return bid;

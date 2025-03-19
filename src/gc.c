@@ -734,7 +734,9 @@ static int gc_flush_mark( gc_mstack *stack ) {
 				if( (int_val)t == 0xDDDDDDDD ) continue;
 #				endif
 #			endif
-			if( t && t->mark_bits && t->kind != HFUN ) {
+			if( !t )
+				continue; // skip not allocated block
+			if( t->mark_bits && t->kind != HFUN ) {
 				mark_bits = t->mark_bits;
 				if( t->kind == HENUM ) {
 					mark_bits += ((venum*)block)->index;
