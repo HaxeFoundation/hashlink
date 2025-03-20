@@ -193,27 +193,30 @@ HL_PRIM int hl_socket_recv_char( hl_socket *s ) {
 	return (unsigned char)cc;
 }
 
-HL_PRIM int hl_host_resolve( vbyte *host ) {
-	unsigned int ip;
+HL_PRIM int hl_host_resolve(vbyte *host) {
+	struct addrinfo hints, *res;
+	unsigned int ip = INADDR_NONE;
+
 	hl_blocking(true);
-	ip = inet_addr((char*)host);
-	if( ip == INADDR_NONE ) {
-		struct hostent *h;
-#	if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS) || defined (HL_CYGWIN) || defined(HL_CONSOLE)
-		h = gethostbyname((char*)host);
-#	else
-		struct hostent hbase;
-		char buf[1024];
-		int errcode;
-		gethostbyname_r((char*)host,&hbase,buf,1024,&h,&errcode);
-#	endif
-		if( h == NULL ) {
-			hl_blocking(false);
-			return -1;
-		}
-		ip = *((unsigned int*)h->h_addr_list[0]);
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	int status = getaddrinfo((char*)host, NULL, &hints, &res);
+	if (status != 0) {
+		hl_blocking(false);
+		return -1;
 	}
+
+	if (res != NULL) {
+		struct sockaddr_in *ipv4 = (struct sockaddr_in *)res->ai_addr;
+		ip = ipv4->sin_addr.s_addr;
+	}
+
+	freeaddrinfo(res);
 	hl_blocking(false);
+
 	return ip;
 }
 
