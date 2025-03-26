@@ -283,28 +283,40 @@ C_FUNCTION_END
 C_FUNCTION_BEGIN
 HL_API void hl_debug_break( void );
 C_FUNCTION_END
-#elif defined(HL_LINUX)
-#	ifdef HL_64
-#	define hl_debug_break() \
-		if( hl_detect_debugger() ) \
-			__asm__("0: int3;" \
-			    ".pushsection embed-breakpoints;" \
-			    ".quad 0b;" \
-			    ".popsection")
-#	else
-#	define hl_debug_break() \
-		if( hl_detect_debugger() ) \
-			__asm__("0: int3;" \
-			    ".pushsection embed-breakpoints;" \
-			    ".long 0b;" \
-			    ".popsection")
+#elif !defined(HL_CONSOLE)
+
+// use __builtin_debugtrap when available
+// fall back to breakpoint instructions for certain architectures
+// else raise SIGTRAP
+#	ifdef __has_builtin
+#	if __has_builtin(__builtin_debugtrap)
+#	define USE_BUILTIN_DEBUG_TRAP 1
 #	endif
-#elif defined(HL_MAC)
-#include <signal.h>
-#include <mach/mach.h>
+#	endif
+
+#	ifdef USE_BUILTIN_DEBUG_TRAP
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \
-			raise(SIGTRAP);//__builtin_trap();
+			__builtin_debugtrap()
+#	elif defined(__x86_64__) || defined(__i386__)
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			__asm__("int3;")
+#	elif defined(__aarch64__)
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			__asm__("brk #0xf000;")
+#	elif defined(__riscv)
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			__asm__("ebreak;")
+#	else
+#	include <signal.h>
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			raise(SIGTRAP)
+#	endif
+#undef USE_BUILTIN_DEBUG_TRAP
 #else
 #	define hl_debug_break()
 #endif
@@ -912,6 +924,11 @@ struct _hl_trap_ctx {
 #define HL_TRACK_MASK		(HL_TRACK_ALLOC | HL_TRACK_CAST | HL_TRACK_DYNFIELD | HL_TRACK_DYNCALL)
 
 #define HL_MAX_EXTRA_STACK 64
+
+#ifdef HL_MAC
+#include <mach/mach.h>
+#include <signal.h>
+#endif
 
 typedef struct {
 	int thread_id;
