@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.13)
 
 set(HL_VERSION_MAJOR 1)
 set(HL_VERSION_MINOR 15)
@@ -34,12 +34,8 @@ list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_CURRENT_SOURCE_DIR}/other/cmake
 )
 
-if(CMAKE_VERSION VERSION_LESS "3.1")
-    set(CMAKE_C_FLAGS "-std=c11 ${CMAKE_C_FLAGS}")
-else()
-    set(CMAKE_C_STANDARD 11)
-    set(CMAKE_C_STANDARD_REQUIRED ON)
-endif()
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # put output in "bin"
 
