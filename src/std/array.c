@@ -78,5 +78,13 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	return arr;
 }
 
+HL_PRIM void hl_carray_blit( void *dst, hl_type *at, int dpos, void *src, int spos, int len ) {
+	hl_runtime_obj *rt = at->obj->rt;
+	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(at);
+	int size = rt->size;
+	memmove( (vbyte*)dst + dpos * size, (vbyte*)src + spos * size, len * size);
+}
+
 #define _CARRAY _ABSTRACT(hl_carray)
 DEFINE_PRIM(_CARRAY,alloc_carray,_TYPE _I32);
+DEFINE_PRIM(_VOID,carray_blit,_CARRAY _TYPE _I32 _CARRAY _I32 _I32);
