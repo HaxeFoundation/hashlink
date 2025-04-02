@@ -79,6 +79,10 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 }
 
 HL_PRIM void hl_carray_blit( void *dst, hl_type *at, int dpos, void *src, int spos, int len ) {
+	if( at->kind != HOBJ && at->kind != HSTRUCT )
+		hl_error("Invalid array type");
+	if( dpos < 0 || spos < 0 || len < 0 )
+		hl_error("Invalid array size or length");
 	hl_runtime_obj *rt = at->obj->rt;
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(at);
 	int size = rt->size;
