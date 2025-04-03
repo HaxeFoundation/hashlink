@@ -3909,20 +3909,24 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		case OSetArray:
 			{
 				if( dst->t->kind == HABSTRACT ) {
-					bool isWrite = dst->t->kind != HOBJ && dst->t->kind != HSTRUCT;
-					// can only write pointers
-					if( !isWrite ) ASSERT(1);
-					hl_runtime_obj *rt = hl_get_obj_rt(rb->t);
+					int osize;
+					bool isWrite = rb->t->kind != HOBJ && rb->t->kind != HSTRUCT;
+					if( isWrite ) {
+						osize = sizeof(void*);
+					} else {
+						hl_runtime_obj *rt = hl_get_obj_rt(rb->t);
+						osize = rt->size;
+					}
 					preg *pdst = alloc_cpu(ctx,dst,true);
 					preg *pra = alloc_cpu64(ctx,ra,true);
-					preg *prb = alloc_cpu(ctx,rb,true);
-					op64(ctx, IMUL, pra, pconst(&p,rt->size));
+					op64(ctx, IMUL, pra, pconst(&p,osize));
 					op64(ctx, ADD, pdst, pra);
 					scratch(pra);
+					preg *prb = alloc_cpu(ctx,rb,true);
 					preg *tmp = alloc_reg(ctx, RCPU_CALL);
 					int offset = 0;
-					while( offset < rt->size ) {
-						int remain = rt->size - offset;
+					while( offset < osize ) {
+						int remain = osize - offset;
 						int copy_size = remain >= HL_WSIZE ? HL_WSIZE : (remain >= 4 ? 4 : (remain >= 2 ? 2 : 1));
 						copy(ctx, tmp, pmem(&p, prb->id, offset), copy_size);
 						copy(ctx, pmem(&p, pdst->id, offset), tmp, copy_size);
