@@ -114,6 +114,14 @@ static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 
 static int hlc_capture_stack( void **stack, int size ) {
 	int count = 0;
+#	if defined(HL_WIN_DESKTOP) || defined(HL_LINUX) || defined(HL_MAC)
+	// force return total count when output stack is null
+	static void* tmpstack[HL_EXC_MAX_STACK];
+	if( stack == NULL ) {
+		stack = tmpstack;
+		size = HL_EXC_MAX_STACK;
+	}
+#	endif
 #	ifdef HL_WIN_DESKTOP
 	count = CaptureStackBackTrace(2, size, stack, NULL) - 8; // 8 startup
 #	elif defined(HL_LINUX)
