@@ -87,7 +87,7 @@ HL_PRIM void hl_buffer_str_sub( hl_buffer *b, const uchar *s, int len ) {
 }
 
 HL_PRIM void hl_buffer_str( hl_buffer *b, const uchar *s ) {
-	if( s ) hl_buffer_str_sub(b,s,(int)ustrlen(s)); else hl_buffer_str_sub(b,USTR("NULL"),4);
+	if( s ) hl_buffer_str_sub(b,s,(int)ustrlen(s)); else hl_buffer_str_sub(b,USTR("null"),4);
 }
 
 HL_PRIM void hl_buffer_cstr( hl_buffer *b, const char *s ) {
@@ -97,7 +97,7 @@ HL_PRIM void hl_buffer_cstr( hl_buffer *b, const char *s ) {
 		hl_from_utf8(out,len,s);
 		hl_buffer_str_sub(b,out,len);
 		free(out);
-	} else hl_buffer_str_sub(b,USTR("NULL"),4);
+	} else hl_buffer_str_sub(b,USTR("null"),4);
 }
 
 HL_PRIM void hl_buffer_char( hl_buffer *b, uchar c ) {
