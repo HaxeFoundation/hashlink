@@ -1,3 +1,170 @@
+import sys.io.File;
+import haxe.io.Path;
+using StringTools;
+
+class NinjaGenerator {
+	var buf:StringBuf;
+
+	public function new() {
+		buf = new StringBuf();
+	}
+
+	function comment(value:String, empty_line = false) {
+		buf.add('# $value \n');
+		if (empty_line) buf.add('\n');
+	}
+
+	function bind(name:String, value:String) {
+		buf.add('$name = $value\n\n');
+	}
+
+	function rule(name:String, args:Map<String, String>) {
+		buf.add('rule $name\n');
+		for (key => value in args) {
+			buf.add('  $key = $value\n');
+		}
+		buf.add('\n');
+	}
+
+	function build(out:Array<String>, rule:String, input:Array<String>, ?args:Map<String, String>) {
+		if(args == null) args = [];
+		buf.add('build ${out.join(' ')}: $rule ${input.join(' ')}\n');
+		for (key => value in args) {
+			buf.add('  $key = $value\n');
+		}
+		buf.add('\n');
+	}
+
+	function save(path:String) {
+		var str = this.buf.toString();
+		File.saveContent(path, str);
+	}
+
+	public static function gen(config: HlcConfig, output: String) {
+		var gen = new NinjaGenerator();
+		gen.comment('Automatically generated file, do not edit', true);
+		gen.bind('ninja_required_version', '1.2');
+
+		var compiler_flavor: CCFlavor = switch Sys.systemName() {
+			case "Windows": MSVC;
+			case _: GCC;
+		}
+
+		switch compiler_flavor {
+			case GCC:
+				var prefix = "/usr/local";
+				if (Sys.systemName() == "Mac") {
+					var proc = new sys.io.Process("brew", ["--prefix", "hashlink"]);
+					proc.stdin.close();
+					if (proc.exitCode(true) == 0) {
+						var path = proc.stdout.readAll().toString().trim();
+						if (sys.FileSystem.exists(path)) {
+							prefix = path;
+						}
+					}
+				}
+				var opt_flag = config.defines.exists("debug") ? "-g" : '-O2';
+				var rpath = switch Sys.systemName() {
+					case "Mac": '-rpath @executable_path -rpath $prefix/lib';
+					case _: '-Wl,-rpath,$$ORIGIN:$prefix/lib';
+				};
+				gen.bind('cflags', '$opt_flag -std=c11 -DHL_MAKE -Wall -I. -pthread');
+				final libflags = config.libs.map((lib) -> switch lib {
+					case "std": "-lhl";
+					case "uv": '$prefix/lib/$lib.hdll -luv';
+					case var lib: '$prefix/lib/$lib.hdll';
+				}).join(' ');
+				gen.bind('ldflags', '-pthread -lm -L$prefix/lib $libflags $rpath');
+				gen.rule('cc', [
+					"command" => "cc -MD -MF $out.d $cflags -c $in -o $out",
+					"deps" => "gcc",
+					"depfile" => "$out.d",
+				]);
+				gen.rule('ld', [
+					"command" => "cc $in -o $out $ldflags"
+				]);
+			case MSVC:
+				gen.bind('hashlink', Sys.getEnv('HASHLINK'));
+				gen.bind('cflags', "/DHL_MAKE /std:c11 /I. /I$hashlink\\include");
+				final libflags = config.libs.map((lib) -> switch lib {
+					case "std": "libhl.lib";
+					case var lib: '$lib.lib';
+				});
+				gen.bind('ldflags', "/LIBPATH:$hashlink " + libflags);
+				gen.rule('cc', [
+					"command" => "cl.exe /nologo /showIncludes $cflags /c $in /Fo$out",
+					"deps" => "msvc",
+				]);
+				gen.rule('ld', [
+					"command" => "link.exe /nologo /OUT:$out $ldflags @$out.rsp",
+					"rspfile" => "$out.rsp",
+					"rspfile_content" => "$in"
+				]);
+		}
+
+		final objects = [];
+
+		for (file in config.files) {
+			final out_path = haxe.io.Path.withExtension(file, 'o');
+			objects.push(out_path);
+			gen.build([out_path.toString()], "cc", [file], []);
+		}
+
+		final exe_path = Path.withExtension(Path.withoutDirectory(output), switch compiler_flavor {
+			case MSVC: "exe";
+			case GCC: null;
+		});
+		gen.build([exe_path], 'ld', objects, []);
+
+		gen.save(Path.join([Path.directory(output), 'build.ninja']));
+	}
+
+	public static function run(dir:String) {
+		switch Sys.systemName() {
+			case "Windows":
+				var devcmd = findVsDevCmdScript();
+				var devcmd = haxe.SysTools.quoteWinArg(devcmd, true);
+				Sys.command('$devcmd && ninja -C $dir');
+			case _:
+				Sys.command("ninja", ["-C", dir]);
+		}
+	}
+
+	private static function findVsDevCmdScript(): Null<String> {
+		var proc = new sys.io.Process('C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe', [
+			"-latest",
+			"-products", "*",
+			"-requires",
+			"Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+			"-property",
+			"installationPath"
+		]);
+		proc.stdin.close();
+		var stdout = proc.stdout.readAll();
+		if (proc.exitCode(true) == 0) {
+			var instPath = stdout.toString().trim();
+			return '$instPath\\VC\\Auxiliary\\Build\\vcvars64.bat';
+		} else {
+			return null;
+		}
+	}
+}
+
+enum abstract CCFlavor(String) {
+	var MSVC = "msvc";
+	/**
+	*	GCC, Clang, etc 
+	**/
+	var GCC = "gcc";
+}
+
+typedef HlcConfig = {
+	var version:Int;
+	var libs:Array<String>;
+	var defines:haxe.DynamicAccess<String>;
+	var files:Array<String>;
+};
+
 class Build {
 
 	var output : String;
@@ -5,12 +172,7 @@ class Build {
 	var sourcesDir : String;
 	var targetDir : String;
 	var dataPath : String;
-	var config : {
-		var version : Int;
-		var libs : Array<String>;
-		var defines : haxe.DynamicAccess<String>;
-		var files : Array<String>;
-	};
+	var config : HlcConfig;
 
 	public function new(dataPath,output,config) {
 		this.output = output;
@@ -30,8 +192,13 @@ class Build {
 
 	public function run() {
 		var tpl = config.defines.get("hlgen.makefile");
-		if( tpl != null )
-			generateTemplates(tpl);
+		switch tpl {
+			case "ninja":
+				NinjaGenerator.gen(config, output);
+			case var tpl:
+				if( tpl != null )
+					generateTemplates(tpl);
+		}
 		log('Code generated in $output');
 		switch tpl {
 			case "make":
@@ -40,6 +207,8 @@ class Build {
 				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []));
 			case "vs2019", "vs2022":
 				Sys.command("make", ["-C", targetDir]);
+			case "ninja":
+				NinjaGenerator.run(Path.directory(output));
 			case null:
 				var suggestion = (Sys.systemName() == "Windows") ? "vs2019" : "make";
 				log('Set -D hlgen.makefile=${suggestion} for automatic native compilation');
