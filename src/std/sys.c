@@ -608,17 +608,16 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 #elif defined(HL_CONSOLE)
 	return sys_exe_path();
 #else
-	const pchar *p = getenv("_");
-	if( p != NULL )
-		return (vbyte*)pstrdup(p,-1);
-	{
-		pchar path[PATH_MAX];
-		int length = readlink("/proc/self/exe", path, sizeof(path));
-		if( length < 0 )
-			return NULL;
-		path[length] = '\0';
-		return (vbyte*)pstrdup(path,-1);
+	pchar path[PATH_MAX];
+	int length = readlink("/proc/self/exe", path, sizeof(path));
+	if( length < 0 ) {
+		const pchar *p = getenv("_");
+		if( p != NULL )
+			return (vbyte*)pstrdup(p,-1);
+		return NULL;
 	}
+	path[length] = '\0';
+	return (vbyte*)pstrdup(path,-1);
 #endif
 }
 
