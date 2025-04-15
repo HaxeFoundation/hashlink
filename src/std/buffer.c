@@ -181,6 +181,16 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 		else
 			hl_buffer_str_sub(b,USTR("false"),5);
 		break;
+	case HSTRUCT:
+		{
+			hl_type_obj *o = t->obj;
+			if( o->rt == NULL || hl_get_obj_proto(t)->toStringFun == NULL ) {
+				hl_buffer_char(b,'@');
+				hl_buffer_str(b,o->name);
+			} else
+				hl_buffer_str(b,o->rt->toStringFun(*(vdynamic**)data));
+		}
+		break;
 	default:
 		hl_buffer_rec(b, *(vdynamic**)data, stack);
 		break;
