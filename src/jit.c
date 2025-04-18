@@ -4077,19 +4077,35 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 
 				hl_opcode *next = f->ops + opCount + 1;
 				bool null_field_access = false;
-				if( next->op == OField && next->p2 == o->p1 ) {
+				int hashed_name = 0;
+				// skip const and operation between nullcheck and access
+				while( (next < f->ops + f->nops - 1) && (next->op >= OInt && next->op <= ODecr) ) {
+					next++;
+				}
+				if( (next->op == OField && next->p2 == o->p1) || (next->op == OSetField && next->p1 == o->p1) ) {
+					int fid = next->op == OField ? next->p3 : next->p2;
 					hl_obj_field *f = NULL;
 					if( dst->t->kind == HOBJ || dst->t->kind == HSTRUCT )
-						f = hl_obj_field_fetch(dst->t, next->p3);
+						f = hl_obj_field_fetch(dst->t, fid);
 					else if( dst->t->kind == HVIRTUAL )
-						f = dst->t->virt->fields + next->p3;
+						f = dst->t->virt->fields + fid;
 					if( f == NULL ) ASSERT(dst->t->kind);
- 					null_field_access = true;
+					null_field_access = true;
+					hashed_name = f->hashed_name;
+				} else if( (next->op >= OCall1 && next->op <= OCallN) && next->p3 == o->p1 ) {
+					int fid = next->p2 < 0 ? -1 : ctx->m->functions_indexes[next->p2];
+					hl_function *cf = ctx->m->code->functions + fid;
+					vbyte *name = fun_field_name(cf);
+					null_field_access = true;
+					hashed_name = hl_hash_gen(name, true);
+				}
+
+				if( null_field_access ) {
 					pad_before_call(ctx, HL_WSIZE);
-					if( f->hashed_name >= 0 && f->hashed_name < 256 )
-						op64(ctx,PUSH8,pconst(&p,f->hashed_name),UNUSED);
+					if( hashed_name >= 0 && hashed_name < 256 )
+						op64(ctx,PUSH8,pconst(&p,hashed_name),UNUSED);
 					else
-						op32(ctx,PUSH,pconst(&p,f->hashed_name),UNUSED);
+						op32(ctx,PUSH,pconst(&p,hashed_name),UNUSED);
 				} else {
 					pad_before_call(ctx, 0);
 				}
