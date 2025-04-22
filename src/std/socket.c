@@ -41,7 +41,9 @@
 #	include <hl.h>
 #	include <posix/posix.h>
 #else
+#	ifndef _GNU_SOURCE
 #	define _GNU_SOURCE
+#	endif
 #	include <string.h>
 #	include <sys/types.h>
 #	include <sys/socket.h>
