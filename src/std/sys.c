@@ -122,6 +122,8 @@ HL_PRIM vbyte *hl_sys_string() {
 	return (vbyte*)USTR("GNU/kFreeBSD");
 #elif defined(HL_LINUX)
 	return (vbyte*)USTR("Linux");
+#elif defined(HL_EMSCRIPTEN)
+	return (vbyte*)USTR("Emscripten");
 #else
 #error Unknown system string
 #endif

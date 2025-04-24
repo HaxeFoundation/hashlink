@@ -27,6 +27,10 @@
 #	include <sys/mman.h>
 #endif
 
+#if defined(HL_EMSCRIPTEN)
+#	include <emscripten/heap.h>
+#endif
+
 #if defined(HL_VCC)
 #define DRAM_PREFETCH(addr) _mm_prefetch(p, 1)
 #elif defined(HL_CLANG) || defined (HL_GCC)
@@ -1181,6 +1185,8 @@ static void *gc_alloc_page_memory( int size ) {
 	return ptr;
 #elif defined(HL_CONSOLE)
 	return sys_alloc_align(size, GC_PAGE_SIZE);
+#elif defined(HL_EMSCRIPTEN)
+	return emscripten_builtin_memalign(GC_PAGE_SIZE, size);
 #else
 	static int recursions = 0;
 	int i = 0;
@@ -1233,6 +1239,8 @@ static void gc_free_page_memory( void *ptr, int size ) {
 	VirtualFree(ptr, 0, MEM_RELEASE);
 #elif defined(HL_CONSOLE)
 	sys_free_align(ptr,size);
+#elif defined(HL_EMSCRIPTEN)
+	emscripten_builtin_free(ptr);
 #else
 	pextra *e = extra_pages, *prev = NULL;
 	while( e ) {

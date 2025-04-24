@@ -58,6 +58,13 @@
 #	endif
 #endif
 
+#if defined(__EMSCRIPTEN__)
+#	define HL_EMSCRIPTEN
+#	ifndef _GNU_SOURCE
+#		define _GNU_SOURCE
+#	endif
+#endif
+
 #if defined(HL_IOS) || defined(HL_ANDROID) || defined(HL_TVOS)
 #	define HL_MOBILE
 #endif
@@ -86,7 +93,7 @@
 #	define HL_BSD
 #endif
 
-#if defined(_64BITS) || defined(__x86_64__) || defined(_M_X64) || defined(__LP64__)
+#if defined(_64BITS) || defined(__x86_64__) || defined(_M_X64) || defined(__LP64__) || defined(__wasm64__)
 #	define HL_64
 #endif
 
