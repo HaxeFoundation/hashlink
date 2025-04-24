@@ -286,7 +286,7 @@ HL_PRIM void hl_remove_root( void *v ) {
 	for(i=gc_roots_count-1;i>=0;i--)
 		if( gc_roots[i] == (void**)v ) {
 			gc_roots_count--;
-			memmove(gc_roots + i, gc_roots + (i+1), (gc_roots_count - i) * sizeof(void*));
+			gc_roots[i] = gc_roots[gc_roots_count];
 			break;
 		}
 	gc_global_lock(false);
