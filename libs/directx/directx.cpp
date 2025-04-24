@@ -358,7 +358,7 @@ HL_PRIM dx_pointer *HL_NAME(create_input_layout)( varray *arr, vbyte *bytecode, 
 
 HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_view)( dx_resource *tex, int format, bool readOnly ) {
 	ID3D11DepthStencilView *view;
-	D3D11_DEPTH_STENCIL_VIEW_DESC  desc;
+	D3D11_DEPTH_STENCIL_VIEW_DESC desc;
 	ZeroMemory(&desc, sizeof(desc));
 	desc.Format = (DXGI_FORMAT)format;
 	desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
@@ -373,7 +373,7 @@ HL_PRIM dx_pointer *HL_NAME(create_depth_stencil_state)( dx_struct<D3D11_DEPTH_S
 	return state;
 }
 
-HL_PRIM void HL_NAME(om_set_depth_stencil_state)( dx_pointer *s, int ref )  {
+HL_PRIM void HL_NAME(om_set_depth_stencil_state)( dx_pointer *s, int ref ) {
 	driver->context->OMSetDepthStencilState((ID3D11DepthStencilState*)s,ref);
 }
 

@@ -502,12 +502,12 @@ inline UINT64 UpdateSubresources(
 	auto MemToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * NumSubresources;
 	if (MemToAlloc > SIZE_MAX)
 	{
-	   return 0;
+		return 0;
 	}
 	void* pMem = HeapAlloc(GetProcessHeap(), 0, static_cast<SIZE_T>(MemToAlloc));
 	if (pMem == nullptr)
 	{
-	   return 0;
+		return 0;
 	}
 	auto pLayouts = static_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(pMem);
 	auto pRowSizesInBytes = reinterpret_cast<UINT64*>(pLayouts + NumSubresources);
@@ -923,7 +923,7 @@ HL_PRIM void HL_NAME(command_list_set_graphics_root_unordered_access_view)( ID3D
 	l->SetGraphicsRootUnorderedAccessView(index,handle);
 }
 
-HL_PRIM void HL_NAME(command_list_execute_indirect)( ID3D12GraphicsCommandList *l, ID3D12CommandSignature *sign, int maxCommandCount, ID3D12Resource *args, int64 argsOffset, ID3D12Resource *count, int64 countOffset  ) {
+HL_PRIM void HL_NAME(command_list_execute_indirect)( ID3D12GraphicsCommandList *l, ID3D12CommandSignature *sign, int maxCommandCount, ID3D12Resource *args, int64 argsOffset, ID3D12Resource *count, int64 countOffset ) {
 	l->ExecuteIndirect(sign, maxCommandCount, args, argsOffset, count, countOffset);
 }
 
