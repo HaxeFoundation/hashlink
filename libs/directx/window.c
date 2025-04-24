@@ -83,7 +83,8 @@ typedef enum {
 	RButton = 8,
 	MButton = 16,
 	XButton1 = 32,
-	XButton2 = 64
+	XButton2 = 64,
+	NotForeground = 128
 } mouse_capture_flags;
 static int disable_capture = 0;
 static bool capture_mouse = false;
@@ -396,6 +397,12 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		addState(Blur);
 		break;
 	case WM_WINDOWPOSCHANGED:
+		HWND wndFg = GetForegroundWindow();
+		if( wndFg != wnd ) {
+			disable_capture |= NotForeground;
+		} else {
+			disable_capture &= ~NotForeground;
+		}
 		updateClipCursor(wnd);
 		break;
 	case WM_GETMINMAXINFO:
