@@ -133,15 +133,15 @@ static void setup_handler() {
 }
 #endif
 
-bool maybe_print_custom_stack(vdynamic* ret) {
+bool maybe_print_custom_stack( vdynamic* ret ) {
 	hl_type* exct = ret->t;
-	while (exct->kind == HOBJ) {
-		if (exct->obj->super == NULL) {
-			if (ucmp(exct->obj->name, USTR("haxe.Exception")) == 0) {
+	while( exct->kind == HOBJ ) {
+		if( exct->obj->super == NULL ) {
+			if( ucmp(exct->obj->name, USTR("haxe.Exception")) == 0 ) {
 				hl_field_lookup* f = hl_lookup_find(exct->obj->rt->lookup, exct->obj->rt->nlookup, hl_hash_gen(USTR("_hx_customStack"), true));
-				if (f == NULL || f->field_index < 0) break;
+				if( f == NULL || f->field_index < 0 ) break;
 				vdynamic* customStack = *(vdynamic**)((char*)(ret) + f->field_index);
-				if (customStack != NULL) {
+				if( customStack != NULL ) {
 					uprintf(USTR("%s\n"), hl_to_string(customStack));
 					return true;
 				}
@@ -261,10 +261,10 @@ int main(int argc, pchar *argv[]) {
 	hl_profile_end();
 	if( isExc ) {
 		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ctx.ret));
-		if (!maybe_print_custom_stack(ctx.ret)) {
+		if( !maybe_print_custom_stack(ctx.ret) ) {
 			varray* a = hl_exception_stack();
 			int i;
-			for (i = 0; i < a->size; i++)
+			for( i = 0; i < a->size; i++ )
 				uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar*)[i]);
 		}
 		hl_debug_break();
