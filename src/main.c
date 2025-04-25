@@ -142,7 +142,7 @@ bool maybe_print_custom_stack(vdynamic* ret) {
 				if (f == NULL || f->field_index < 0) break;
 				vdynamic* customStack = *(vdynamic**)((char*)(ret) + f->field_index);
 				if (customStack != NULL) {
-					uprintf(USTR("%s"), hl_to_string(customStack));
+					uprintf(USTR("%s\n"), hl_to_string(customStack));
 					return true;
 				}
 			}
