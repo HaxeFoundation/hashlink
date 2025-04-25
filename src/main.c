@@ -138,11 +138,11 @@ bool maybe_print_custom_stack( vdynamic* ret ) {
 	while( exct->kind == HOBJ ) {
 		if( exct->obj->super == NULL ) {
 			if( ucmp(exct->obj->name, USTR("haxe.Exception")) == 0 ) {
-				hl_field_lookup* f = hl_lookup_find(exct->obj->rt->lookup, exct->obj->rt->nlookup, hl_hash_gen(USTR("_hx_customStack"), true));
+				hl_field_lookup* f = hl_lookup_find(exct->obj->rt->lookup, exct->obj->rt->nlookup, hl_hash_gen(USTR("__customStack"), true));
 				if( f == NULL || f->field_index < 0 ) break;
 				vdynamic* customStack = *(vdynamic**)((char*)(ret) + f->field_index);
 				if( customStack != NULL ) {
-					uprintf(USTR("%s\n"), hl_to_string(customStack));
+					uprintf(USTR("Custom stack:%s\n"), hl_to_string(customStack));
 					return true;
 				}
 			}
