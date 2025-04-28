@@ -397,6 +397,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		addState(Blur);
 		break;
 	case WM_WINDOWPOSCHANGED:
+	{
 		HWND wndFg = GetForegroundWindow();
 		if( wndFg != wnd ) {
 			disable_capture |= NotForeground;
@@ -405,6 +406,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		}
 		updateClipCursor(wnd);
 		break;
+	}
 	case WM_GETMINMAXINFO:
 	{
 		dx_events *buf = get_events(wnd);
