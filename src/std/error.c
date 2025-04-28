@@ -142,14 +142,14 @@ HL_PRIM void hl_dump_stack() {
 	fflush(stdout);
 }
 
-HL_PRIM bool hl_maybe_print_custom_stack( vdynamic* ret ) {
-	hl_type* exct = ret->t;
-	while( exct->kind == HOBJ ) {
-		if( exct->obj->super == NULL ) {
-			if( ucmp(exct->obj->name, USTR("haxe.Exception")) == 0 ) {
-				hl_field_lookup* f = hl_lookup_find(exct->obj->rt->lookup, exct->obj->rt->nlookup, hl_hash_gen(USTR("__customStack"), true));
+HL_PRIM bool hl_maybe_print_custom_stack( vdynamic *exc ) {
+	hl_type *ot = exc->t;
+	while( ot->kind == HOBJ ) {
+		if( ot->obj->super == NULL ) {
+			if( ucmp(ot->obj->name, USTR("haxe.Exception")) == 0 ) {
+				hl_field_lookup *f = hl_lookup_find(ot->obj->rt->lookup, ot->obj->rt->nlookup, hl_hash_gen(USTR("__customStack"), true));
 				if( f == NULL || f->field_index < 0 ) break;
-				vdynamic* customStack = *(vdynamic**)((char*)(ret) + f->field_index);
+				vdynamic *customStack = *(vdynamic**)((char*)(exc) + f->field_index);
 				if( customStack != NULL ) {
 					uprintf(USTR("%s\n"), hl_to_string(customStack));
 					return true;
@@ -157,7 +157,7 @@ HL_PRIM bool hl_maybe_print_custom_stack( vdynamic* ret ) {
 			}
 			break;
 		}
-		exct = exct->obj->super;
+		ot = ot->obj->super;
 	}
 	return false;
 }
