@@ -240,11 +240,13 @@ int main(int argc, pchar *argv[]) {
 	ctx.ret = hl_dyn_call_safe(&cl,NULL,0,&isExc);
 	hl_profile_end();
 	if( isExc ) {
-		varray *a = hl_exception_stack();
-		int i;
 		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ctx.ret));
-		for(i=0;i<a->size;i++)
-			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
+		if( !hl_maybe_print_custom_stack(ctx.ret) ) {
+			varray *a = hl_exception_stack();
+			int i;
+			for( i = 0; i < a->size; i++ )
+				uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar*)[i]);
+		}
 		hl_debug_break();
 		hl_global_free();
 		return 1;

@@ -142,6 +142,26 @@ HL_PRIM void hl_dump_stack() {
 	fflush(stdout);
 }
 
+HL_PRIM bool hl_maybe_print_custom_stack( vdynamic *exc ) {
+	hl_type *ot = exc->t;
+	while( ot->kind == HOBJ ) {
+		if( ot->obj->super == NULL ) {
+			if( ucmp(ot->obj->name, USTR("haxe.Exception")) == 0 ) {
+				hl_field_lookup *f = hl_lookup_find(ot->obj->rt->lookup, ot->obj->rt->nlookup, hl_hash_gen(USTR("__customStack"), true));
+				if( f == NULL || f->field_index < 0 ) break;
+				vdynamic *customStack = *(vdynamic**)((char*)(exc) + f->field_index);
+				if( customStack != NULL ) {
+					uprintf(USTR("%s\n"), hl_to_string(customStack));
+					return true;
+				}
+			}
+			break;
+		}
+		ot = ot->obj->super;
+	}
+	return false;
+}
+
 HL_PRIM varray *hl_exception_stack() {
 	hl_thread_info *t = hl_get_thread();
 	varray *a = hl_alloc_array(&hlt_bytes, t->exc_stack_count);
