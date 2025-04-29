@@ -32,16 +32,17 @@ class Build {
 		var tpl = config.defines.get("hlgen.makefile");
 		if( tpl != null )
 			generateTemplates(tpl);
+		log('Code generated in $output');
 		switch tpl {
 			case "make":
 				Sys.command("make", ["-C", targetDir]);
 			case "hxcpp":
 				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []));
+			case "vs2019", "vs2022":
+				Sys.command("make", ["-C", targetDir]);
 			case null:
-				log('Code generated in $output');
 				log('Set hlgen.makefile for automatic native compilation');
 			case unimplemented:
-				log('Code generated in $output');
 				log('Automatic native compilation not yet implemented for $unimplemented');
 		}
 	}
@@ -54,7 +55,7 @@ class Build {
 		var len = bytes.length;
 		while( i < len ) {
 			var c = bytes.get(i++);
-			if( c == 0 || c >= 0x80 ) return false;			
+			if( c == 0 || c >= 0x80 ) return false;
 		}
 		return true;
 	}
@@ -114,7 +115,7 @@ class Build {
 
 		var directories = [for( k in directories.keys() ) { path : k }];
 		directories.sort(function(a,b) return Reflect.compare(a.path,b.path));
-		
+
 		function genRec( path : String ) {
 			var dir = srcDir + "/" + path;
 			for( f in sys.FileSystem.readDirectory(dir) ) {
@@ -188,7 +189,7 @@ class Run {
 		var originalPath = args.pop();
 		var haxelibPath = Sys.getCwd()+"/";
 		Sys.setCwd(originalPath);
-		
+
 		switch( args.shift() ) {
 		case "build":
 			var output = args.shift();
@@ -199,7 +200,7 @@ class Run {
 			new Build(haxelibPath,output,config).run();
 		case "run":
 			var output = args.shift();
-			if( StringTools.endsWith(output,".c") ) return;			
+			if( StringTools.endsWith(output,".c") ) return;
 			Sys.command("hl "+output);
 		case cmd:
 			Sys.println("Unknown command "+cmd);
