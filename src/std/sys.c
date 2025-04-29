@@ -122,6 +122,8 @@ HL_PRIM vbyte *hl_sys_string() {
 	return (vbyte*)USTR("GNU/kFreeBSD");
 #elif defined(HL_LINUX)
 	return (vbyte*)USTR("Linux");
+#elif defined(HL_EMSCRIPTEN)
+	return (vbyte*)USTR("Emscripten");
 #else
 #error Unknown system string
 #endif
@@ -151,7 +153,7 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
 #	if defined(HL_XBO) || defined(HL_XBS)
 	OutputDebugStringW((LPCWSTR)msg);
-#	else	
+#	else
 #	ifdef HL_WIN_DESKTOP
 	if( print_flags & PR_WIN_UTF8 ) _setmode(_fileno(stdout),_O_U8TEXT);
 #	endif
@@ -608,17 +610,16 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 #elif defined(HL_CONSOLE)
 	return sys_exe_path();
 #else
-	const pchar *p = getenv("_");
-	if( p != NULL )
-		return (vbyte*)pstrdup(p,-1);
-	{
-		pchar path[PATH_MAX];
-		int length = readlink("/proc/self/exe", path, sizeof(path));
-		if( length < 0 )
-			return NULL;
-		path[length] = '\0';
-		return (vbyte*)pstrdup(path,-1);
+	pchar path[PATH_MAX];
+	int length = readlink("/proc/self/exe", path, sizeof(path));
+	if( length < 0 ) {
+		const pchar *p = getenv("_");
+		if( p != NULL )
+			return (vbyte*)pstrdup(p,-1);
+		return NULL;
 	}
+	path[length] = '\0';
+	return (vbyte*)pstrdup(path,-1);
 #endif
 }
 

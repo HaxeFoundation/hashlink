@@ -29,6 +29,15 @@
 # ifndef CONST
 #	define CONST
 # endif
+# ifndef IN
+#	define IN
+# endif
+# ifndef OUT
+#	define OUT
+# endif
+# ifndef OPTIONAL
+#	define OPTIONAL
+# endif
 #	pragma warning(disable:4091)
 #if !defined(HL_MINGW)
 #	include <DbgHelp.h>
@@ -37,6 +46,9 @@
 #endif
 #	pragma comment(lib, "Dbghelp.lib")
 #	undef CONST
+#	undef IN
+#	undef OUT
+#	undef OPTIONAL
 #endif
 
 #ifdef HL_CONSOLE
@@ -102,6 +114,14 @@ static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 
 static int hlc_capture_stack( void **stack, int size ) {
 	int count = 0;
+#	if defined(HL_WIN_DESKTOP) || defined(HL_LINUX) || defined(HL_MAC)
+	// force return total count when output stack is null
+	static void* tmpstack[HL_EXC_MAX_STACK];
+	if( stack == NULL ) {
+		stack = tmpstack;
+		size = HL_EXC_MAX_STACK;
+	}
+#	endif
 #	ifdef HL_WIN_DESKTOP
 	count = CaptureStackBackTrace(2, size, stack, NULL) - 8; // 8 startup
 #	elif defined(HL_LINUX)
@@ -128,16 +148,6 @@ static int throw_handler( int code ) {
 }
 #endif
 
-#if defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	return wmain(__argc, __argv);
-}
-#elif defined(HL_XBS)
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	return main(__argc, __argv);
-}
-#endif
-
 #ifdef HL_WIN_DESKTOP
 int wmain(int argc, uchar *argv[]) {
 #else
@@ -161,13 +171,25 @@ int main(int argc, char *argv[]) {
 	cl.fun = hl_entry_point;
 	ret = hl_dyn_call_safe(&cl, NULL, 0, &isExc);
 	if( isExc ) {
-		varray *a = hl_exception_stack();
-		int i;
 		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ret));
-		for (i = 0; i<a->size; i++)
-			uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar*)[i]);
+		if( !hl_maybe_print_custom_stack(ret) ) {
+			varray *a = hl_exception_stack();
+			int i;
+			for( i = 0; i < a->size; i++ )
+				uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar*)[i]);
+		}
 	}
 	hl_global_free();
 	sys_global_exit();
 	return (int)isExc;
 }
+
+#if defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return wmain(__argc, __wargv);
+}
+#elif defined(HL_XBS)
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return main(__argc, __argv);
+}
+#endif

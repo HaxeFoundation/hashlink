@@ -87,7 +87,7 @@ HL_PRIM void hl_buffer_str_sub( hl_buffer *b, const uchar *s, int len ) {
 }
 
 HL_PRIM void hl_buffer_str( hl_buffer *b, const uchar *s ) {
-	if( s ) hl_buffer_str_sub(b,s,(int)ustrlen(s)); else hl_buffer_str_sub(b,USTR("NULL"),4);
+	if( s ) hl_buffer_str_sub(b,s,(int)ustrlen(s)); else hl_buffer_str_sub(b,USTR("null"),4);
 }
 
 HL_PRIM void hl_buffer_cstr( hl_buffer *b, const char *s ) {
@@ -97,7 +97,7 @@ HL_PRIM void hl_buffer_cstr( hl_buffer *b, const char *s ) {
 		hl_from_utf8(out,len,s);
 		hl_buffer_str_sub(b,out,len);
 		free(out);
-	} else hl_buffer_str_sub(b,USTR("NULL"),4);
+	} else hl_buffer_str_sub(b,USTR("null"),4);
 }
 
 HL_PRIM void hl_buffer_char( hl_buffer *b, uchar c ) {
@@ -162,6 +162,9 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 	case HBYTES:
 		hl_buffer_str(b,*(uchar**)data);
 		break;
+	case HGUID:
+		hl_buffer_str(b,hl_guid_str(*(int64*)data,buf));
+		break;
 	case HTYPE:
 	case HREF:
 	case HABSTRACT:
@@ -177,6 +180,16 @@ static void hl_buffer_addr( hl_buffer *b, void *data, hl_type *t, vlist *stack )
 			hl_buffer_str_sub(b,USTR("true"),4);
 		else
 			hl_buffer_str_sub(b,USTR("false"),5);
+		break;
+	case HSTRUCT:
+		{
+			hl_type_obj *o = t->obj;
+			if( o->rt == NULL || hl_get_obj_proto(t)->toStringFun == NULL ) {
+				hl_buffer_char(b,'@');
+				hl_buffer_str(b,o->name);
+			} else
+				hl_buffer_str(b,o->rt->toStringFun(*(vdynamic**)data));
+		}
 		break;
 	default:
 		hl_buffer_rec(b, *(vdynamic**)data, stack);
@@ -379,6 +392,9 @@ static void hl_buffer_rec( hl_buffer *b, vdynamic *v, vlist *stack ) {
 		break;
 	case HNULL:
 		hl_buffer_str_sub(b, USTR("_null_"), 6);
+		break;
+	case HGUID:
+		hl_buffer_str(b,hl_guid_str(v->v.i64,buf));
 		break;
 	default:
 		hl_buffer_str_sub(b, buf, usprintf(buf, 32, _PTR_FMT USTR("H"),(int_val)v));

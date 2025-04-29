@@ -22,19 +22,26 @@ jobs:
       fail-fast: false
       matrix:
         target: [linux, darwin, windows]
-        architecture: [32, 64]
+        architecture: [32, 64, arm64]
         build_system: [make, cmake, vs2019]
 
         include:
           - target: linux
-            runner: ubuntu-20.04
+            runner: ubuntu-22.04
             haxe_nightly_dir: linux64
             archive_ext: tar.gz
 
           - target: darwin
-            runner: macos-12
             haxe_nightly_dir: mac
             archive_ext: tar.gz
+
+          - target: darwin
+            architecture: 64
+            runner: macos-13
+
+          - target: darwin
+            architecture: arm64
+            runner: macos-14
 
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
@@ -74,6 +81,12 @@ jobs:
           - target: darwin
             architecture: 32
 
+          - target: linux
+            architecture: arm64
+
+          - target: windows
+            architecture: arm64
+
           - target: windows
             build_system: make
 
@@ -85,11 +98,19 @@ jobs:
     - name: "SCM Checkout"
       uses: actions/checkout@v4
 
-    - name: Add msbuild to PATH
+    - name: "Add msbuild to PATH"
       if: matrix.build_system == 'vs2019'
       uses: microsoft/setup-msbuild@v2
       with:
         vs-version: '[16.0,17.0)'
+
+    - name: "Mac homebrew workaround"
+      if: matrix.target == 'darwin'
+      run: |
+        # see https://github.com/Homebrew/homebrew-core/issues/165793#issuecomment-1989441193
+        # see https://github.com/Homebrew/brew/blob/master/.github/workflows/tests.yml
+        brew unlink python && brew link --overwrite python
+        brew unlink python@3.12 && brew link --overwrite python@3.12
 
     - name: "Install: Required Dev Packages"
       run: |
@@ -125,51 +146,10 @@ jobs:
             ;;
         esac
 
-
-    - name: "Install: Neko"
-      run: |
-        set -eux
-
-        case "${{ matrix.target }}" in
-          linux)
-            sudo apt-get install --no-install-recommends -y neko
-            ;;
-
-          darwin)
-            brew install neko
-            ;;
-
-          windows)
-            choco install --no-progress neko -y
-            nekopath=$(find C:/ProgramData/chocolatey/lib/neko -name neko.dll -printf '%h\n')
-            echo "NEKOPATH=$nekopath" >> $GITHUB_ENV
-            ;;
-        esac
-        neko || true # print neko version
-
-
-    - name: "Install: Haxe latest"
-      run: |
-        set -eux
-
-        download_url="https://build.haxe.org/builds/haxe/${{ matrix.haxe_nightly_dir }}/haxe_latest.${{ matrix.archive_ext }}"
-        echo "Downloading [$download_url]..."
-        if [[ ${{ matrix.target }} == windows ]]; then
-          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.zip
-          7z x /tmp/haxe.zip -o/tmp
-          mv -v /tmp/haxe_* /tmp/haxe
-          cygpath -w '/tmp/haxe/' >> $GITHUB_PATH
-          echo "HAXE_STD_PATH=$(cygpath -w '/tmp/haxe/std')" >> $GITHUB_ENV
-        else
-          mkdir /tmp/haxe
-          curl -fsSL --retry 3 --retry-delay 5 "$download_url" -o /tmp/haxe.tar.gz
-          tar xzvf /tmp/haxe.tar.gz -C /tmp/haxe --strip-components=1
-          echo "/tmp/haxe/" >> $GITHUB_PATH
-          echo "HAXE_STD_PATH=/tmp/haxe/std" >> $GITHUB_ENV
-        fi
-
-        /tmp/haxe/haxe --version
-
+    - name: Install haxe
+      uses: krdlab/setup-haxe@f0a0baa8ccdb1fe4fc316c8f30eb3ca77aa4ea4e
+      with:
+        haxe-version: latest
 
     - name: "Configure: Haxelib"
       run: |
@@ -237,34 +217,44 @@ jobs:
             ${{ env.WINDOWS_BUILD_FOLDER }}/hl.exe --version
             ;;
           make)
-            ./hl --version
-            case ${{ matrix.target }} in
-              linux)  ldd -v ./hl ;;
-              darwin) otool -L ./hl ;;
-            esac
+            if [[ ${{ matrix.architecture }} != arm64 ]]; then
+              ./hl --version
+              case ${{ matrix.target }} in
+                linux)  ldd -v ./hl ;;
+                darwin) otool -L ./hl ;;
+              esac
 
-            haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
-            ./hl hello.hl
+              haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
+              ./hl hello.hl
+
+              # ensure the executable still works when installed globally
+              cp hello.hl /tmp
+              pushd /tmp
+              hl hello.hl
+              popd
+            fi
 
             haxe -hl src/_main.c -cp other/tests -main HelloWorld
             make hlc
             ./hlc
-
-            # ensure the executable still works when installed globally
-            cp hello.hl /tmp
-            pushd /tmp
-            hl hello.hl
-            popd
             ;;
         esac
 
+    - name: "Test haxelib build"
+      run: |
+        haxelib git format https://github.com/HaxeFoundation/format
+        cd other/haxelib
+        haxe memory.hxml
+        haxe profiler.hxml
+        cd ../..
 
     - name: "Package"
       run: |
         set -eux
 
         case "${{ matrix.target }}${{matrix.architecture}}" in
-          darwin*)   platform_name=darwin ;;
+          darwinarm64)   platform_name=darwin-arm64 ;;
+          darwin64)   platform_name=darwin ;;
           windows*)  platform_name=win${{matrix.architecture}} ;;
           linux64)   platform_name=linux-amd64 ;;
         esac
@@ -332,6 +322,7 @@ jobs:
           --prerelease \
           --title "HashLink Nightly Build" \
           "darwin-make-64/hashlink-${short_commit}-darwin.tar.gz#hashlink-latest-darwin.tar.gz" \
+          "darwin-make-arm64/hashlink-${short_commit}-darwin-arm64.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
           "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
           "windows-vs2019-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"

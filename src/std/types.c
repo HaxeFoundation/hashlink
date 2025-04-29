@@ -37,7 +37,7 @@ static const uchar *TSTR[] = {
 	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("i64"), USTR("f32"), USTR("f64"),
 	USTR("bool"), USTR("bytes"), USTR("dynamic"), NULL, NULL,
 	USTR("array"), USTR("type"), NULL, NULL, USTR("dynobj"),
-	NULL, NULL, NULL, NULL, NULL, NULL
+	NULL, NULL, NULL, NULL, NULL, NULL, USTR("guid")
 };
 
 static int T_SIZES[] = {
@@ -64,6 +64,7 @@ static int T_SIZES[] = {
 	HL_WSIZE, // METHOD
 	HL_WSIZE, // STRUCT
 	0, // PACKED
+	8, // GUID
 };
 
 HL_PRIM int hl_type_size( hl_type *t ) {
@@ -86,6 +87,7 @@ HL_PRIM int hl_pad_struct( int size, hl_type *t ) {
 		GET_ALIGN(unsigned int);
 		break;
 	case HI64:
+	case HGUID:
 		GET_ALIGN(int64);
 		break;
 	case HF32:
@@ -122,6 +124,7 @@ HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 	case HDYN:
 	case HARRAY:
 	case HDYNOBJ:
+	case HGUID:
 		return true;
 	case HREF:
 	case HNULL:
@@ -178,6 +181,7 @@ HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 		false, // HMETHOD
 		false, // HSTRUCT
 		false, // HPACKED
+		false, // HGUID
 	};
 	return T_IS_DYNAMIC[t->kind];
 }
@@ -574,6 +578,44 @@ HL_PRIM varray *hl_enum_parameters( venum *e ) {
 	return a;
 }
 
+static void *hl_guid_map = NULL;
+extern void *hl_hi64alloc();
+extern void hl_hi64set( void *map, int64 guid, vdynamic *name );
+extern vdynamic *hl_hi64get( void *map, int64 guid );
+extern void hl_hi64remove( void *map, int64 guid );
+
+HL_PRIM uchar *hl_guid_str( int64 guid, uchar buf[14] ) {
+	static char CHARS[] = "#&0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+	int i;
+	int pos = 0;
+	vdynamic *data = hl_guid_map ? hl_hi64get(hl_guid_map,guid) : NULL;
+	uchar *name = data ? (uchar*)(data->v.bytes) : NULL;
+	if( name != NULL )
+		return name;
+	if( guid == 0 )
+		return USTR("0");
+	for(i=0;i<11;i++) {
+		if( i == 4 || i == 8 )
+			buf[pos++] = '-';
+		buf[pos++] = CHARS[(guid >> (60 - i*6))&63];
+	}
+	buf[pos++] = 0;
+	return buf;
+}
+
+HL_PRIM void hl_register_guid_name( int64 guid, vbyte *name ) {
+	if( hl_guid_map == NULL ) {
+		hl_guid_map = hl_hi64alloc();
+		hl_gc_threads_info()->guid_map = hl_guid_map;
+		hl_add_root(&hl_guid_map);
+	}
+	if( name )
+		hl_hi64set(hl_guid_map, guid, hl_make_dyn(&name, &hlt_bytes));
+	else
+		hl_hi64remove(hl_guid_map, guid);
+}
+
+
 DEFINE_PRIM(_BYTES, type_str, _TYPE);
 DEFINE_PRIM(_BYTES, type_name, _TYPE);
 DEFINE_PRIM(_I32, type_args_count, _TYPE);
@@ -586,6 +628,7 @@ DEFINE_PRIM(_BOOL, type_enum_eq, _DYN _DYN);
 DEFINE_PRIM(_DYN, alloc_enum_dyn, _TYPE _I32 _ARR _I32);
 DEFINE_PRIM(_ARR, enum_parameters, _DYN);
 DEFINE_PRIM(_BOOL, type_set_global, _TYPE _DYN);
+DEFINE_PRIM(_VOID, register_guid_name, _I64 _BYTES);
 
 typedef void hl_mlookup_map;
 extern hl_mlookup_map *hl_mlookup_alloc();

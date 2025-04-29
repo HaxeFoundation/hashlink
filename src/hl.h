@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x010E00
+#define HL_VERSION	0x010F00
 
 #if defined(_WIN32)
 #	define HL_WIN
@@ -53,6 +53,13 @@
 
 #if defined(linux) || defined(__linux__)
 #	define HL_LINUX
+#	ifndef _GNU_SOURCE
+#		define _GNU_SOURCE
+#	endif
+#endif
+
+#if defined(__EMSCRIPTEN__)
+#	define HL_EMSCRIPTEN
 #	ifndef _GNU_SOURCE
 #		define _GNU_SOURCE
 #	endif
@@ -86,7 +93,7 @@
 #	define HL_BSD
 #endif
 
-#if defined(_64BITS) || defined(__x86_64__) || defined(_M_X64) || defined(__LP64__)
+#if defined(_64BITS) || defined(__x86_64__) || defined(_M_X64) || defined(__LP64__) || defined(__wasm64__)
 #	define HL_64
 #endif
 
@@ -283,28 +290,40 @@ C_FUNCTION_END
 C_FUNCTION_BEGIN
 HL_API void hl_debug_break( void );
 C_FUNCTION_END
-#elif defined(HL_LINUX)
-#	ifdef HL_64
-#	define hl_debug_break() \
-		if( hl_detect_debugger() ) \
-			__asm__("0: int3;" \
-			    ".pushsection embed-breakpoints;" \
-			    ".quad 0b;" \
-			    ".popsection")
-#	else
-#	define hl_debug_break() \
-		if( hl_detect_debugger() ) \
-			__asm__("0: int3;" \
-			    ".pushsection embed-breakpoints;" \
-			    ".long 0b;" \
-			    ".popsection")
+#elif !defined(HL_CONSOLE)
+
+// use __builtin_debugtrap when available
+// fall back to breakpoint instructions for certain architectures
+// else raise SIGTRAP
+#	ifdef __has_builtin
+#	if __has_builtin(__builtin_debugtrap)
+#	define USE_BUILTIN_DEBUG_TRAP 1
 #	endif
-#elif defined(HL_MAC)
-#include <signal.h>
-#include <mach/mach.h>
+#	endif
+
+#	ifdef USE_BUILTIN_DEBUG_TRAP
 #	define hl_debug_break() \
 		if( hl_detect_debugger() ) \
-			raise(SIGTRAP);//__builtin_trap();
+			__builtin_debugtrap()
+#	elif defined(__x86_64__) || defined(__i386__)
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			__asm__("int3;")
+#	elif defined(__aarch64__)
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			__asm__("brk #0xf000;")
+#	elif defined(__riscv)
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			__asm__("ebreak;")
+#	else
+#	include <signal.h>
+#	define hl_debug_break() \
+		if( hl_detect_debugger() ) \
+			raise(SIGTRAP)
+#	endif
+#undef USE_BUILTIN_DEBUG_TRAP
 #else
 #	define hl_debug_break()
 #endif
@@ -343,8 +362,9 @@ typedef enum {
 	HMETHOD = 20,
 	HSTRUCT	= 21,
 	HPACKED = 22,
+	HGUID	= 23,
 	// ---------
-	HLAST	= 23,
+	HLAST	= 24,
 	_H_FORCE_INT = 0x7FFFFFFF
 } hl_type_kind;
 
@@ -603,6 +623,7 @@ HL_API int hl_utf8_length( const vbyte *s, int pos );
 HL_API int hl_from_utf8( uchar *out, int outLen, const char *str );
 HL_API char *hl_to_utf8( const uchar *bytes );
 HL_API uchar *hl_to_utf16( const char *str );
+HL_API uchar *hl_guid_str( int64 guid, uchar buf[14] );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
 HL_API hl_obj_field *hl_obj_field_fetch( hl_type *t, int fid );
 
@@ -621,6 +642,7 @@ HL_API HL_NO_RETURN( void hl_null_access( void ) );
 HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
 HL_API void hl_dump_stack( void );
+HL_API bool hl_maybe_print_custom_stack( vdynamic *exc );
 HL_API varray *hl_exception_stack( void );
 HL_API bool hl_detect_debugger( void );
 
@@ -796,7 +818,7 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 // ----------------------- FFI ------------------------------------------------------
 
 // match GNU C++ mangling
-#define TYPE_STR	"vcsilfdbBDPOATR??X?N?S"
+#define TYPE_STR	"vcsilfdbBDPOATR??X?N?S?g"
 
 #undef  _VOID
 #define _NO_ARG
@@ -819,6 +841,7 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #undef _NULL
 #define _NULL(t)					"N" t
 #define _STRUCT						"S"
+#define _GUID						"g"
 
 #undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)
@@ -910,6 +933,11 @@ struct _hl_trap_ctx {
 
 #define HL_MAX_EXTRA_STACK 64
 
+#ifdef HL_MAC
+#include <mach/mach.h>
+#include <signal.h>
+#endif
+
 typedef struct {
 	int thread_id;
 	// gc vars
@@ -941,6 +969,7 @@ typedef struct {
 	hl_thread_info **threads;
 	hl_mutex *global_lock;
 	hl_mutex *exclusive_lock;
+	void *guid_map;
 } hl_threads_info;
 
 HL_API hl_thread_info *hl_get_thread();

@@ -118,7 +118,7 @@ HL_PRIM void hl_null_access() {
 }
 
 HL_PRIM void hl_throw_buffer( hl_buffer *b ) {
-	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);	
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
 	d->v.ptr = hl_buffer_content(b,NULL);
 	hl_throw(d);
 }
@@ -140,6 +140,26 @@ HL_PRIM void hl_dump_stack() {
 		uprintf(USTR("%s\n"),str);
 	}
 	fflush(stdout);
+}
+
+HL_PRIM bool hl_maybe_print_custom_stack( vdynamic *exc ) {
+	hl_type *ot = exc->t;
+	while( ot->kind == HOBJ ) {
+		if( ot->obj->super == NULL ) {
+			if( ucmp(ot->obj->name, USTR("haxe.Exception")) == 0 ) {
+				hl_field_lookup *f = hl_lookup_find(ot->obj->rt->lookup, ot->obj->rt->nlookup, hl_hash_gen(USTR("__customStack"), true));
+				if( f == NULL || f->field_index < 0 ) break;
+				vdynamic *customStack = *(vdynamic**)((char*)(exc) + f->field_index);
+				if( customStack != NULL ) {
+					uprintf(USTR("%s\n"), hl_to_string(customStack));
+					return true;
+				}
+			}
+			break;
+		}
+		ot = ot->obj->super;
+	}
+	return false;
 }
 
 HL_PRIM varray *hl_exception_stack() {

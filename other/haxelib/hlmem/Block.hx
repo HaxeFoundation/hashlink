@@ -24,6 +24,16 @@ abstract Pointer(haxe.Int64) {
 		return haxe.Int64.shr(this,k);
 	}
 
+	@:op(A == B)
+	public static function eq( a : Pointer, b : Pointer ) : Bool {
+		return a.value == b.value;
+	}
+
+	@:op(A != B)
+	public static function neq( a : Pointer, b : Pointer ) : Bool {
+		return a.value != b.value;
+	}
+
 	public static var NULL(get,never) : Pointer;
 	inline static function get_NULL() return new Pointer(0);
 
@@ -41,7 +51,7 @@ class Page {
 	public var kind : PageKind;
 	public var size : Int;
 	public var reserved : Int;
-	public var dataPosition : Int = -1;
+	public var dataPosition : Float;
 
 	public function new() {
 	}
@@ -108,7 +118,7 @@ class Block {
 			parents.push(b);
 		}
 		if( b.subs == null ) b.subs = [];
-		b.subs.push(new BlockSub(this,fid));
+		b.subs.push(new BlockSub(this, fid));
 	}
 
 	public function makeTID( prev : Block, withField : Bool ) {
@@ -161,7 +171,7 @@ class Block {
 		owner = parents[0];
 	}
 
-	function removeParent( p : Block ) {
+	public function removeParent( p : Block ) {
 		if( parents != null ) {
 			parents.remove(p);
 			if( parents.length == 0 ) parents = null;

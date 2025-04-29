@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+﻿$$setDefaultJumboBuild(true)<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -95,9 +95,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;HL_MAKE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <ObjectFileName>$(IntDir)\%(RelativeDir)\%(Filename).obj</ObjectFileName>
+      <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -112,9 +116,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;HL_MAKE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <ObjectFileName>$(IntDir)\%(RelativeDir)\%(Filename).obj</ObjectFileName>
+      <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -129,9 +137,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;HL_MAKE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <ObjectFileName>$(IntDir)\%(RelativeDir)\%(Filename).obj</ObjectFileName>
+      <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -146,9 +158,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;HL_MAKE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <ObjectFileName>$(IntDir)\%(RelativeDir)\%(Filename).obj</ObjectFileName>
+      <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -158,12 +174,20 @@
       <AdditionalDependencies>libhl.lib::foreach libraries::;::name::.lib::end::</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>::foreach cfiles::
-    <ClCompile Include="::relDir::::path::" />::end::
-  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="stdafx.c">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>::if (jumboBuild == "true")::
+    <ClCompile Include="::relDir::::name::.c" />
+    <!--::end::::foreach cfiles::
+    <ClCompile Include="::relDir::::path::" />::end::::if (jumboBuild == "true")::
+    -->::end::
+  </ItemGroup>::if (jumboBuild == "true")::
+  <!--::end::
   <ItemGroup>::foreach hfiles::
     <ClInclude Include="::relDir::::path::" />::end::
-  </ItemGroup>
+  </ItemGroup>::if (jumboBuild == "true")::
+  -->::end::
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

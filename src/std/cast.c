@@ -31,6 +31,8 @@ static void invalid_cast( hl_type *from, hl_type *to ) {
 HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	vdynamic *v;
 	switch( t->kind ) {
+	case HVOID:
+		return NULL;
 	case HUI8:
 		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
 		v->t = t;

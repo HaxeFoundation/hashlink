@@ -247,7 +247,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -259,13 +259,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2013|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

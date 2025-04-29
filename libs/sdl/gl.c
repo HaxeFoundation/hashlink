@@ -512,6 +512,10 @@ HL_PRIM void HL_NAME(gl_buffer_sub_data)( int target, int offset, vbyte *data, i
 	glBufferSubData(target, offset, srcLength, data + srcOffset);
 }
 
+HL_PRIM void HL_NAME(gl_get_buffer_sub_data)( int target, int offset, vbyte *data, int srcOffset, int srcLength ) {
+	glGetBufferSubData(target, srcOffset, srcLength, data + offset);
+}
+
 HL_PRIM void HL_NAME(gl_enable_vertex_attrib_array)( int attrib ) {
 	glEnableVertexAttribArray(attrib);
 }
@@ -586,7 +590,7 @@ HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect)( int mode, int type, vbyte
 
 HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect_count)(int mode, int type, vbyte* data, vbyte* drawcount, int maxdrawcount, int stride) {
 	GL_IMPORT_OPT(glMultiDrawElementsIndirectCountARB, MULTIDRAWELEMENTSINDIRECTCOUNTARB)
-	glMultiDrawElementsIndirectCountARB(mode, type, data, drawcount, maxdrawcount, stride);
+	glMultiDrawElementsIndirectCountARB(mode, type, data, (GLintptr)drawcount, maxdrawcount, stride);
 }
 
 HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
@@ -794,6 +798,7 @@ DEFINE_PRIM(_VOID,gl_bind_buffer_base,_I32 _I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_buffer_data_size,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_buffer_data,_I32 _I32 _BYTES _I32);
 DEFINE_PRIM(_VOID,gl_buffer_sub_data,_I32 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,gl_get_buffer_sub_data,_I32 _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_enable_vertex_attrib_array,_I32);
 DEFINE_PRIM(_VOID,gl_disable_vertex_attrib_array,_I32);
 DEFINE_PRIM(_VOID,gl_vertex_attrib_pointer,_I32 _I32 _I32 _BOOL _I32 _I32);

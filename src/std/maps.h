@@ -28,7 +28,7 @@ typedef struct {
 } t_map;
 
 #ifndef _MNO_EXPORTS
-HL_PRIM 
+HL_PRIM
 #endif
 t_map *_MNAME(alloc)() {
 	t_map *m = (t_map*)hl_gc_alloc_raw(sizeof(t_map));

@@ -239,7 +239,7 @@ static void flush_free_list( gc_pheader *ph ) {
 		int k;
 		for(k=0;k<p->free.count;k++) {
 			gc_fl *fl = GET_FL(&p->free,k);
-			printf("(%d-%d)",fl->pos,fl->pos+fl->count-1); 
+			printf("(%d-%d)",fl->pos,fl->pos+fl->count-1);
 		}
 		printf("\n");
 	}
@@ -255,7 +255,7 @@ static void flush_free_list( gc_pheader *ph ) {
 				is_free = true;
 			}
 		}
-		bool is_marked = ((ph->bmp[bid>>3] & (1<<(bid&7))) != 0); 
+		bool is_marked = ((ph->bmp[bid>>3] & (1<<(bid&7))) != 0);
 		if( is_marked && is_free ) {
 			// check if it was already free before
 			for(k=0;k<old_fl.count;k++) {
@@ -560,8 +560,14 @@ static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 		if( bid * page->alloc.block_size != offset )
 			return -1;
 	}
-	if( page->alloc.sizes && page->alloc.sizes[bid] == 0 )
+	if( bid >= page->alloc.max_blocks )
 		return -1;
+	if( page->alloc.sizes ) {
+		if( bid < page->alloc.first_block )
+			return -1;
+		if( page->alloc.sizes[bid] == 0 )
+			return -1;
+	}
 	return bid;
 }
 
@@ -569,12 +575,18 @@ static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 static int gc_allocator_get_block_interior( gc_pheader *page, void **block ) {
 	int offset = (int)((unsigned char*)*block - page->base);
 	int bid = offset / page->alloc.block_size;
+	if( bid >= page->alloc.max_blocks )
+		return -1;
 	if( page->alloc.sizes ) {
 		if( bid < page->alloc.first_block ) return -1;
+		int start = bid;
 		while( page->alloc.sizes[bid] == 0 ) {
 			if( bid == page->alloc.first_block ) return -1;
 			bid--;
 		}
+		int size = page->alloc.sizes[bid];
+		if( (start - bid) >= size )
+			return -1;
 	}
 	*block = page->base + bid * page->alloc.block_size;
 	return bid;
@@ -601,7 +613,7 @@ static void gc_get_stats( int *page_count, int *private_data ) {
 	}
 	*page_count = count;
 	*private_data = 0; // no malloc
-} 
+}
 
 static void gc_iter_pages( gc_page_iterator iter ) {
 	int i;

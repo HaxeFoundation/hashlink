@@ -8,6 +8,13 @@ enum DriverInitFlag {
 	DEBUG;
 }
 
+enum abstract Constant(Int) to Int {
+	public var TEXTURE_DATA_PITCH_ALIGNMENT;
+	public var TEXTURE_DATA_PLACEMENT_ALIGNMENT;
+	public var DESCRIPTOR_RANGE_OFFSET_APPEND;
+	public var RESOURCE_BARRIER_ALL_SUBRESOURCES;
+}
+
 enum abstract CommandListType(Int) {
 	public var DIRECT = 0;
 	public var BUNDLE = 1;
@@ -1624,6 +1631,10 @@ class Dx12 {
 	public static function resume() {
 	}
 
+	public static function getConstant( index : Int ) : Int {
+		return 0;
+	}
+
 	public static function getDeviceName() {
 		return @:privateAccess String.fromUCS2(dxGetDeviceName());
 	}
@@ -1657,5 +1668,4 @@ class Dx12 {
 	static function dxCreate( win : hl.Abstract<"dx_window">, flags : DriverInitFlags, deviceName : hl.Bytes ) : DriverInstance {
 		return null;
 	}
-
 }

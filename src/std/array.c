@@ -37,8 +37,8 @@ HL_PRIM varray *hl_alloc_array( hl_type *at, int size ) {
 }
 
 HL_PRIM void hl_array_blit( varray *dst, int dpos, varray *src, int spos, int len ) {
-	int size = hl_type_size(dst->at); 
-	memmove( hl_aptr(dst,vbyte) + dpos * size, hl_aptr(src,vbyte) + spos * size, len * size); 
+	int size = hl_type_size(dst->at);
+	memmove( hl_aptr(dst,vbyte) + dpos * size, hl_aptr(src,vbyte) + spos * size, len * size);
 }
 
 HL_PRIM hl_type *hl_array_type( varray *a ) {
@@ -78,5 +78,17 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	return arr;
 }
 
+HL_PRIM void hl_carray_blit( void *dst, hl_type *at, int dpos, void *src, int spos, int len ) {
+	if( at->kind != HOBJ && at->kind != HSTRUCT )
+		hl_error("Invalid array type");
+	if( dpos < 0 || spos < 0 || len < 0 )
+		hl_error("Invalid array pos or length");
+	hl_runtime_obj *rt = at->obj->rt;
+	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(at);
+	int size = rt->size;
+	memmove( (vbyte*)dst + dpos * size, (vbyte*)src + spos * size, len * size);
+}
+
 #define _CARRAY _ABSTRACT(hl_carray)
 DEFINE_PRIM(_CARRAY,alloc_carray,_TYPE _I32);
+DEFINE_PRIM(_VOID,carray_blit,_CARRAY _TYPE _I32 _CARRAY _I32 _I32);

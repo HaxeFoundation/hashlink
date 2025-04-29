@@ -701,7 +701,7 @@ static void hl_dynobj_delete_field( vdynobj *o, hl_field_lookup *f ) {
 	int i;
 	unsigned int order = hl_dynobj_order(f);
 	int index = f->field_index & HL_DYNOBJ_INDEX_MASK;
-	bool is_ptr = hl_is_ptr(f->t); 
+	bool is_ptr = hl_is_ptr(f->t);
 	// erase data
 	if( is_ptr ) {
 		memmove(o->values + index, o->values + index + 1, (o->nvalues - (index + 1)) * sizeof(void*));
