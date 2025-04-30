@@ -1,7 +1,12 @@
 # Auto-generated from hashlink's Makefile template; do not edit
 
+UNAME := $(shell uname)
 CFLAGS=-O3 -std=c11 -DHL_MAKE -I$$makePath(::relDir::)
+ifeq ($(UNAME),Darwin)
+LDLIBS=-lhl -lm -luv::foreach libraries:: /usr/local/lib/::name::.hdll::end::
+else
 LDLIBS=-lhl -lm -luv::foreach libraries:: -l:::name::.hdll::end::
+endif
 
 ifdef HASHLINK
 CFLAGS+=-I$(HASHLINK)/include -I$(HASHLINK)/src
