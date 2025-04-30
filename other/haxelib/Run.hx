@@ -41,7 +41,8 @@ class Build {
 			case "vs2019", "vs2022":
 				Sys.command("make", ["-C", targetDir]);
 			case null:
-				log('Set hlgen.makefile for automatic native compilation');
+				var suggestion = (Sys.systemName() == "Windows") ? "vs2019" : "make";
+				log('Set -D hlgen.makefile=${suggestion} for automatic native compilation');
 			case unimplemented:
 				log('Automatic native compilation not yet implemented for $unimplemented');
 		}
