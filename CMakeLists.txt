@@ -202,11 +202,18 @@ if(BUILD_TESTING)
         haxe
     )
 
+    if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "Win32")
+        SET(HAXE_FLAGS -D hl-legacy32)
+    else()
+        SET(HAXE_FLAGS )
+    endif()
+
     #####################
     # hello.hl
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
         COMMAND ${HAXE_COMPILER}
+            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
             -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
     )
@@ -219,6 +226,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
         COMMAND ${HAXE_COMPILER}
+            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
             -cp ${CMAKE_SOURCE_DIR}/other/tests -main Threads
     )
@@ -231,6 +239,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
         COMMAND ${HAXE_COMPILER}
+            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
             -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
     )
@@ -243,6 +252,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello/hello.c
         COMMAND ${HAXE_COMPILER}
+            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello/hello.c
             -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
     )
@@ -265,6 +275,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads/threads.c
         COMMAND ${HAXE_COMPILER}
+            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads/threads.c
             -cp ${CMAKE_SOURCE_DIR}/other/tests -main Threads
     )
@@ -287,6 +298,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
         COMMAND ${HAXE_COMPILER}
+            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
             -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
     )
