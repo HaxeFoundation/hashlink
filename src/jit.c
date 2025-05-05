@@ -4095,7 +4095,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				} else if( (next->op >= OCall1 && next->op <= OCallN) && next->p3 == o->p1 ) {
 					int fid = next->p2 < 0 ? -1 : ctx->m->functions_indexes[next->p2];
 					hl_function *cf = ctx->m->code->functions + fid;
-					vbyte *name = fun_field_name(cf);
+					const uchar *name = fun_field_name(cf);
 					null_field_access = true;
 					hashed_name = hl_hash_gen(name, true);
 				}
