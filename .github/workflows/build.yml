@@ -124,7 +124,8 @@ jobs:
               libturbojpeg-dev \
               libuv1-dev \
               libvorbis-dev \
-              libsqlite3-dev
+              libsqlite3-dev \
+              ninja-build
             ;;
 
           darwin*)
@@ -152,7 +153,7 @@ jobs:
         set -eux
 
         haxelib setup ~/haxelib
-        haxelib install hashlink
+        haxelib dev hashlink other/haxelib
         haxelib list
 
 
@@ -233,6 +234,11 @@ jobs:
             haxe -hl src/_main.c -cp other/tests -main HelloWorld
             make hlc
             ./hlc
+            haxe -hl out/helloworld/main.c -cp other/tests -main HelloWorld -D hlgen.makefile=ninja
+            out/helloworld/main
+    
+            haxe -hl out/fmtsample/main.c -cp other/fmtsample -main FmtSample -D hlgen.makefile=ninja
+            out/fmtsample/main
             ;;
         esac
 
