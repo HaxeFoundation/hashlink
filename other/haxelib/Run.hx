@@ -39,7 +39,26 @@ class Build {
 			case "hxcpp":
 				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []));
 			case "vs2019", "vs2022":
-				Sys.command("make", ["-C", targetDir]);
+				var vswhereProc = new sys.io.Process("C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe", ["-requires", "Microsoft.Component.MSBuild", "-find", "MSBuild",
+					"-version", tpl == "vs2019" ? "[16.0,17.0]" : "[17.0,18.0]"
+				]);
+				if( vswhereProc.exitCode() == 0 ) {
+					var msbuildPath = StringTools.trim(vswhereProc.stdout.readLine().toString());
+					if( msbuildPath.length > 0 ) {
+						var prevCwd = Sys.getCwd();
+						var msbuild = '$msbuildPath\\Current\\Bin\\MSBuild.exe';
+						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", "-property:Configuration=Release", "-property:Platform=x64"];
+						log('"$msbuild"' + " " + msbuildArgs.join(" "));
+						Sys.setCwd(targetDir);
+						Sys.command(msbuild, msbuildArgs);
+						Sys.setCwd(prevCwd);
+					} else {
+						log('Failed to find a valid MSbuild installation for template $tpl.');
+					}
+				} else {
+					log("vswhere error: " + vswhereProc.stderr.readAll().toString());
+				}
+				vswhereProc.close();
 			case null:
 				var suggestion = (Sys.systemName() == "Windows") ? "vs2019" : "make";
 				log('Set -D hlgen.makefile=${suggestion} for automatic native compilation');
