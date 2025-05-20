@@ -2935,6 +2935,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	ctx->totalRegsSize = size;
 	jit_buf(ctx);
 	ctx->functionPos = BUF_POS();
+	// make sure currentPos is > 0 before any reg allocations happen
+	// otherwise `alloc_reg` thinks that all registers are locked
+	ctx->currentPos = 1;
 	op_enter(ctx);
 #	ifdef HL_64
 	{
