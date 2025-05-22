@@ -180,6 +180,10 @@ class Window {
 		setPosition(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 	}
 
+	public function raise() {
+		winRaise( win );
+	}
+
 	public function warpMouse( x : Int, y : Int ) {
 		warpMouseInWindow(win, x, y);
 	}
@@ -367,6 +371,10 @@ class Window {
 
 	static function winGetOpacity( win : WinPtr ) : Float {
 		return 0.0;
+	}
+
+	@:hlNative("?sdl", "win_raise")
+	static function winRaise( win : WinPtr ) {
 	}
 
 	static function winSetOpacity( win : WinPtr, opacity : Float ) : Bool {
