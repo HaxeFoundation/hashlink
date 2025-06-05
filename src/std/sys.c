@@ -243,7 +243,7 @@ HL_PRIM int64 hl_sys_timestamp_ms() {
 	return time.QuadPart * 1000LL / qpcFrequency.QuadPart;
 #else
 	struct timespec ts;
-	if (clock_gettime(CLOCK_MONOTONIC, &tv)) {
+	if (clock_gettime(CLOCK_MONOTONIC, &ts)) {
 		return 0;
 	}
 
