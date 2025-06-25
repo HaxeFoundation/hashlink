@@ -985,6 +985,7 @@ class GL {
 	/* Queries */
 	public static inline var SAMPLES_PASSED                 = 0x8914;
 	public static inline var TIMESTAMP                      = 0x8E28;
+	public static inline var TIME_ELAPSED                   = 0x88BF;
 
 	/* Barriers */
 	public static inline var VERTEX_ATTRIB_ARRAY_BARRIER_BIT = 0x00000001;
