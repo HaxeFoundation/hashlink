@@ -34,6 +34,7 @@ enum abstract EventType(Int) {
 	var DropStart   = 10;
 	var DropFile    = 11;
 	var DropEnd     = 12;
+	var KeyMapChanged = 13;
 }
 
 enum abstract WindowStateChange(Int) {

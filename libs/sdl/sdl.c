@@ -61,6 +61,7 @@ typedef enum {
 	DropFile,
 	DropText,
 	DropEnd,
+	KeyMapChanged = 500,
 } event_type;
 
 typedef enum {
@@ -373,6 +374,9 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->type = DropEnd;
 			event->window = e.drop.windowID;
 			break;
+		case SDL_KEYMAPCHANGED:
+			event->type = KeyMapChanged;
+			break;
 		default:
 			//printf("Unknown event type 0x%X\\n", e.type);
 			continue;
@@ -523,7 +527,7 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	// force window to match device resolution on mobile
 	if ((sdlFlags & (
 #ifdef HL_MAC
-		SDL_WINDOW_METAL | 
+		SDL_WINDOW_METAL |
 #endif
 		SDL_WINDOW_VULKAN )) == 0) {
 		sdlFlags |= SDL_WINDOW_OPENGL;
