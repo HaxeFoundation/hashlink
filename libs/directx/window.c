@@ -17,6 +17,7 @@ typedef enum {
 	DropStart = 10,
 	DropFile = 11,
 	DropEnd = 12,
+	KeyMapChanged = 13,
 } EventType;
 
 typedef enum {
@@ -513,6 +514,9 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		DragFinish(drop);
 		break;
 	}
+	case WM_INPUTLANGCHANGE:
+		e = addEvent(wnd,KeyMapChanged);
+		break;
 	case WM_CLOSE:
 		addState(Close);
 		return 0;

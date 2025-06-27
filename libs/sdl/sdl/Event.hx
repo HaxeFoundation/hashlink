@@ -25,7 +25,7 @@ package sdl;
 	inline function get_controller() return reference;
 	inline function get_joystick() return reference;
 	inline function get_fingerId() return reference;
-	
+
 	public function new() {
 	}
 }
@@ -60,6 +60,7 @@ enum abstract EventType(Int) {
 	var DropFile = 401;
 	var DropText = 402;
 	var DropEnd = 403;
+	var KeyMapChanged = 500;
 }
 
 enum abstract WindowStateChange(Int) {
