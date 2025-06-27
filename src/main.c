@@ -114,7 +114,9 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 static void handle_signal( int signum ) {
 	signal(signum, SIG_DFL);
 	printf("SIGNAL %d\n",signum);
-	hl_dump_stack();
+	if( hl_get_thread() != NULL ) {
+		hl_dump_stack();
+	}
 	fflush(stdout);
 	raise(signum);
 }
