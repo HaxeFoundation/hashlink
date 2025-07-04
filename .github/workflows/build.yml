@@ -50,13 +50,13 @@ jobs:
             msbuild_configuration: Release
 
           - target: windows
-            runner: windows-2019 # has VS2019 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
+            runner: windows-2022 # has VS 2022 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
             haxe_nightly_dir: windows64
             archive_ext: zip
 
           - target: windows
             build_system: cmake
-            cmake_generator: Visual Studio 16 2019
+            cmake_generator: Visual Studio 17 2022
 
           - target: windows
             architecture: 32
@@ -97,8 +97,6 @@ jobs:
     - name: "Add msbuild to PATH"
       if: matrix.build_system == 'vs2019'
       uses: microsoft/setup-msbuild@v2
-      with:
-        vs-version: '[16.0,17.0)'
 
     - name: "Mac homebrew workaround"
       if: matrix.target == 'darwin'
