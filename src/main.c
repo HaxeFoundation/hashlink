@@ -167,7 +167,7 @@ int main(int argc, pchar *argv[]) {
 			continue;
 		}
 		if( pcompare(arg,PSTR("--version")) == 0 ) {
-			printf("%d.%d.%d",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
+			printf("%d.%d.%d\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
 			return 0;
 		}
 		if( pcompare(arg,PSTR("--hot-reload")) == 0 ) {
