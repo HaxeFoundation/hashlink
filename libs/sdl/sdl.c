@@ -203,14 +203,14 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->window = e.button.windowID;
 			event->button = e.button.button;
 			event->mouseX = e.button.x;
-			event->mouseY = e.motion.y;
+			event->mouseY = e.button.y;
 			break;
 		case SDL_MOUSEBUTTONUP:
 			event->type = MouseUp;
 			event->window = e.button.windowID;
 			event->button = e.button.button;
 			event->mouseX = e.button.x;
-			event->mouseY = e.motion.y;
+			event->mouseY = e.button.y;
 			break;
 		case SDL_FINGERDOWN:
 			event->type = TouchDown;
