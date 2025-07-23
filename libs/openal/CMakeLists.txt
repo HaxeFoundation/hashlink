@@ -14,7 +14,7 @@ else()
     find_package(OpenAL REQUIRED)
 endif()
 
-add_library(openal.hdll SHARED openal.c)
+add_library(openal.hdll openal.c)
 
 set_as_hdll(openal)
 

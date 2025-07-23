@@ -14,7 +14,7 @@ if(WIN32)
         find_library(TurboJPEG_LIBRARIES simd PATHS ${INCLUDES_BASE_DIR}/turbojpeg/x86)
     endif()
 
-    add_library(fmt.hdll SHARED
+    add_library(fmt.hdll
         ${INCLUDES_BASE_DIR}/png/png.c
         ${INCLUDES_BASE_DIR}/png/pngerror.c
         ${INCLUDES_BASE_DIR}/png/pngget.c
@@ -134,7 +134,7 @@ else()
         pkg_check_modules(OGGVORBIS REQUIRED vorbis vorbisenc vorbisfile)
     endif()
 
-    add_library(fmt.hdll SHARED
+    add_library(fmt.hdll
         fmt.c
         sha1.c
         dxt.c

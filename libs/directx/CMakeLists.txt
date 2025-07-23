@@ -3,7 +3,7 @@ option(WITH_DIRECTX "Build directx.hdll." ON)
 if(WITH_DIRECTX)
     find_package(DirectX)
 
-    add_library(directx.hdll SHARED
+    add_library(directx.hdll
         directx.cpp
         gamecontroller.c
         window.c
@@ -30,7 +30,7 @@ endif()
 option(WITH_DX12 "Build dx12.hdll." ON)
 
 if(WITH_DX12)
-    add_library(dx12.hdll SHARED
+    add_library(dx12.hdll
         dx12.cpp
     )
 

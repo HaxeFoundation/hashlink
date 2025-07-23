@@ -1,4 +1,4 @@
-add_library(uv.hdll SHARED
+add_library(uv.hdll
     uv.c
 )
 

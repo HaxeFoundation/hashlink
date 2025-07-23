@@ -1,4 +1,4 @@
-add_library(ui.hdll SHARED ui_stub.c)
+add_library(ui.hdll ui_stub.c)
 
 if(WIN32)
     set_target_properties(ui.hdll PROPERTIES SOURCES ui_win.c)

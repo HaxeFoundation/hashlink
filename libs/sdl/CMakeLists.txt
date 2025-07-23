@@ -3,7 +3,7 @@ if(WIN32)
 endif()
 find_package(SDL2 REQUIRED)
 
-add_library(sdl.hdll SHARED
+add_library(sdl.hdll
     sdl.c
     gl.c
 )

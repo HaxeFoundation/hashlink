@@ -2,7 +2,7 @@ if (WIN32)
     set(MBEDTLS_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/mbedtls/include .)
     set(MBEDTLS_LIBRARIES crypt32)
 
-    add_library(ssl.hdll SHARED
+    add_library(ssl.hdll
         ${INCLUDES_BASE_DIR}/mbedtls/library/aes.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/aesce.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/aesni.c
@@ -121,7 +121,7 @@ if (WIN32)
 else()
     find_package(MbedTLS REQUIRED)
 
-    add_library(ssl.hdll SHARED
+    add_library(ssl.hdll
         ssl.c
     )
 endif()
