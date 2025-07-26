@@ -15,6 +15,10 @@ function(set_as_hdll target)
     )
 endfunction()
 
+if (ANDROID)
+    include(ExternalProject)
+endif()
+
 if(WIN32)
     add_subdirectory(directx)
 endif()
