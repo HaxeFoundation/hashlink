@@ -42,6 +42,8 @@
 #	define glFramebufferTexture(...) ES_NOT_SUPPORTED
 #	define glDispatchCompute(...) ES_NOT_SUPPORTED
 #	define glMemoryBarrier(...) ES_NOT_SUPPORTED
+#	define glGetBufferSubData(...) ES_NOT_SUPPORTED
+#	define glShaderStorageBlockBinding(...) ES_NOT_SUPPORTED
 #	define glPolygonMode(face,mode) if( mode != 0x1B02 ) ES_NOT_SUPPORTED
 #	define glGetQueryObjectiv glGetQueryObjectuiv
 #	define glClearDepth glClearDepthf
