@@ -24,7 +24,7 @@
 #	define HL_GLES
 #elif defined(HL_ANDROID)
 #	include <SDL.h>
-#	include <GLES3/gl3.h>
+#	include <GLES3/gl32.h>
 #	include <GLES3/gl3ext.h>
 #	define HL_GLES
 #else
