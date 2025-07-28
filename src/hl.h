@@ -643,6 +643,7 @@ HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
 HL_API void hl_dump_stack( void );
 HL_API bool hl_maybe_print_custom_stack( vdynamic *exc );
+HL_API void hl_print_uncaught_exception( vdynamic *exc );
 HL_API varray *hl_exception_stack( void );
 HL_API bool hl_detect_debugger( void );
 

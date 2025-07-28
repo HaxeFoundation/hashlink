@@ -175,13 +175,7 @@ int main(int argc, char *argv[]) {
 	cl.fun = hl_entry_point;
 	ret = hl_dyn_call_safe(&cl, NULL, 0, &isExc);
 	if( isExc ) {
-		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ret));
-		if( !hl_maybe_print_custom_stack(ret) ) {
-			varray *a = hl_exception_stack();
-			int i;
-			for( i = 0; i < a->size; i++ )
-				uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar*)[i]);
-		}
+		hl_print_uncaught_exception(ret);
 	}
 	hl_global_free();
 	sys_global_exit();
