@@ -5,7 +5,7 @@ set(HEAPS_INCLUDE_DIRS
     .
 )
 
-add_library(heaps.hdll SHARED
+add_library(heaps.hdll
     ${INCLUDES_BASE_DIR}/mikktspace/mikktspace.c
     ${INCLUDES_BASE_DIR}/meshoptimizer/allocator.cpp
     ${INCLUDES_BASE_DIR}/meshoptimizer/overdrawoptimizer.cpp

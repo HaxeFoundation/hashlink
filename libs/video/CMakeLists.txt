@@ -9,7 +9,7 @@ if(WIN32)
     find_library(FFMPEG_LIBRARY_swscale swscale PATHS ${INCLUDES_BASE_DIR}/ffmpeg/lib)
     set(FFMPEG_LIBRARIES ${FFMPEG_LIBRARY_avcodec} ${FFMPEG_LIBRARY_avformat} ${FFMPEG_LIBRARY_avutil} ${FFMPEG_LIBRARY_swscale})
 
-    add_library(video.hdll SHARED video.c)
+    add_library(video.hdll video.c)
 
     set_as_hdll(video)
 

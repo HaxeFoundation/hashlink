@@ -1,8 +1,12 @@
+add_library(ssl.hdll
+    ssl.c
+)
+
 if (WIN32)
     set(MBEDTLS_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/mbedtls/include .)
     set(MBEDTLS_LIBRARIES crypt32)
 
-    add_library(ssl.hdll SHARED
+    target_sources(ssl.hdll PRIVATE
         ${INCLUDES_BASE_DIR}/mbedtls/library/aes.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/aesce.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/aesni.c
@@ -111,19 +115,37 @@ if (WIN32)
         ${INCLUDES_BASE_DIR}/mbedtls/library/x509write.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/x509write_crt.c
         ${INCLUDES_BASE_DIR}/mbedtls/library/x509write_csr.c
-        ssl.c
     )
 
     target_compile_definitions(ssl.hdll
         PRIVATE
         MBEDTLS_USER_CONFIG_FILE="mbedtls_user_config.h"
     )
+elseif(ANDROID)
+	ExternalProject_Add(mbedtls-project
+        URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.4/mbedtls-3.6.4.tar.bz2
+        URL_HASH SHA256=ec35b18a6c593cf98c3e30db8b98ff93e8940a8c4e690e66b41dfc011d678110
+        CMAKE_ARGS
+            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DANDROID_PLATFORM=${ANDROID_PLATFORM}
+            -DANDROID_ABI=${CMAKE_ANDROID_ARCH_ABI}
+            -DBUILD_SHARED_LIBS=OFF
+        # INSTALL_BYPRODUCTS in CMake 3.26+
+        BUILD_BYPRODUCTS <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libmbedtls.a
+        DOWNLOAD_EXTRACT_TIMESTAMP true
+    )
+    ExternalProject_Get_Property(mbedtls-project INSTALL_DIR)
+
+    add_library(mbedtls STATIC IMPORTED)
+    set_target_properties(mbedtls PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libmbedtls.a)
+
+    set(MBEDTLS_INCLUDE_DIRS ${INSTALL_DIR}/include)
+    set(MBEDTLS_LIBRARIES mbedtls)
+
+    add_dependencies(mbedtls mbedtls-project)
 else()
     find_package(MbedTLS REQUIRED)
-
-    add_library(ssl.hdll SHARED
-        ssl.c
-    )
 endif()
 
 set_as_hdll(ssl)

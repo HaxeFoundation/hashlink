@@ -24,7 +24,7 @@
 #	define HL_GLES
 #elif defined(HL_ANDROID)
 #	include <SDL.h>
-#	include <GLES3/gl3.h>
+#	include <GLES3/gl32.h>
 #	include <GLES3/gl3ext.h>
 #	define HL_GLES
 #else
@@ -42,6 +42,8 @@
 #	define glFramebufferTexture(...) ES_NOT_SUPPORTED
 #	define glDispatchCompute(...) ES_NOT_SUPPORTED
 #	define glMemoryBarrier(...) ES_NOT_SUPPORTED
+#	define glGetBufferSubData(...) ES_NOT_SUPPORTED
+#	define glShaderStorageBlockBinding(...) ES_NOT_SUPPORTED
 #	define glPolygonMode(face,mode) if( mode != 0x1B02 ) ES_NOT_SUPPORTED
 #	define glGetQueryObjectiv glGetQueryObjectuiv
 #	define glClearDepth glClearDepthf

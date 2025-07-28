@@ -1,13 +1,23 @@
 set(INCLUDES_BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
+if (BUILD_SHARED_LIBS)
+    set(HDLL_SUFFIX .hdll)
+else()
+    set(HDLL_SUFFIX .hdll${CMAKE_STATIC_LIBRARY_SUFFIX})
+endif()
+
 function(set_as_hdll target)
     set_target_properties(${target}.hdll
         PROPERTIES
         PREFIX ""
         OUTPUT_NAME ${target}
-        SUFFIX .hdll
+        SUFFIX ${HDLL_SUFFIX}
     )
 endfunction()
+
+if (ANDROID)
+    include(ExternalProject)
+endif()
 
 if(WIN32)
     add_subdirectory(directx)
