@@ -162,6 +162,16 @@ HL_PRIM bool hl_maybe_print_custom_stack( vdynamic *exc ) {
 	return false;
 }
 
+HL_PRIM void hl_print_uncaught_exception(vdynamic *exc) {
+	uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
+	if (!hl_maybe_print_custom_stack(exc)) {
+		varray *a = hl_exception_stack();
+		for (int i = 0; i < a->size; i++)
+			uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar *)[i]);
+	}
+	fflush(stdout);
+}
+
 HL_PRIM varray *hl_exception_stack() {
 	hl_thread_info *t = hl_get_thread();
 	varray *a = hl_alloc_array(&hlt_bytes, t->exc_stack_count);
