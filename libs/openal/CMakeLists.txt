@@ -21,22 +21,19 @@ elseif(ANDROID)
             -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
             -DANDROID_PLATFORM=${ANDROID_PLATFORM}
             -DANDROID_ABI=${CMAKE_ANDROID_ARCH_ABI}
-            -DLIBTYPE=STATIC
         # INSTALL_BYPRODUCTS in CMake 3.26+
-        BUILD_BYPRODUCTS <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libopenal.a
+        BUILD_BYPRODUCTS <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libopenal.so
         DOWNLOAD_EXTRACT_TIMESTAMP true
     )
     ExternalProject_Get_Property(openal-soft INSTALL_DIR)
 
     add_library(openal SHARED IMPORTED)
-    set_target_properties(openal PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libopenal.a)
+    set_target_properties(openal PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libopenal.so)
 
     set(OPENAL_INCLUDE_DIR ${INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR})
     set(OPENAL_LIBRARY openal)
 
     add_dependencies(openal openal-soft)
-
-    target_compile_definitions(openal.hdll PRIVATE OPENAL_STATIC)
 else()
     find_package(OpenAL REQUIRED)
 endif()
