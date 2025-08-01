@@ -141,7 +141,7 @@ jobs:
         esac
 
     - name: Install haxe
-      uses: krdlab/setup-haxe@f0a0baa8ccdb1fe4fc316c8f30eb3ca77aa4ea4e
+      uses: krdlab/setup-haxe@44ee8fe4aa9274beff932b6dda5fbaa94670e966
       with:
         haxe-version: latest
 
