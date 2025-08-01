@@ -124,7 +124,7 @@ if (WIN32)
 elseif(ANDROID)
 	ExternalProject_Add(mbedtls-project
         URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.4/mbedtls-3.6.4.tar.bz2
-        URL_HASH SHA256=ec35b18a6c593cf98c3e30db8b98ff93e8940a8c4e690e66b41dfc011d678110
+        URL_HASH SHA256=6a7ed66b4aca38836f0eff8d8fba72992bf0c7326337608ef01de469fd8368bd
         CMAKE_ARGS
             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
             -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
