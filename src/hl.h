@@ -283,7 +283,7 @@ HL_API void uprintf( const uchar *fmt, const uchar *str );
 C_FUNCTION_END
 
 #if defined(HL_VCC)
-#	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
+#	define hl_debug_break()	if( hl_detect_debugger() ) __debugbreak()
 #elif defined(HL_PS) && defined(_DEBUG)
 #	define hl_debug_break()	__debugbreak()
 #elif defined(HL_NX)
