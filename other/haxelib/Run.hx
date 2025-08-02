@@ -28,12 +28,16 @@ class Build {
 	}
 
 
-	public function run() {
+	public function generate() {
 		var tpl = config.defines.get("hlgen.makefile");
 		if( tpl != null )
 			generateTemplates(tpl);
 		log('Code generated in $output');
-		switch tpl {
+	}
+
+	public function compile() {
+		var tpl = config.defines.get("hlgen.makefile");
+		return switch tpl {
 			case "make":
 				Sys.command("make", ["-C", targetDir]);
 			case "hxcpp":
@@ -42,6 +46,7 @@ class Build {
 				var vswhereProc = new sys.io.Process("C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe", ["-requires", "Microsoft.Component.MSBuild", "-find", "MSBuild",
 					"-version", tpl == "vs2019" ? "[16.0,17.0]" : "[17.0,18.0]"
 				]);
+				var code = 0;
 				if( vswhereProc.exitCode() == 0 ) {
 					var msbuildPath = StringTools.trim(try vswhereProc.stdout.readLine().toString() catch (e:haxe.io.Eof) "");
 					if( msbuildPath.length > 0 ) {
@@ -50,21 +55,26 @@ class Build {
 						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", "-property:Configuration=Release", "-property:Platform=x64"];
 						log('"$msbuild"' + " " + msbuildArgs.join(" "));
 						Sys.setCwd(targetDir);
-						Sys.command(msbuild, msbuildArgs);
+						code = Sys.command(msbuild, msbuildArgs);
 						Sys.setCwd(prevCwd);
 					} else {
 						log('Failed to find a valid MSbuild installation for template $tpl.');
+						code = 1;
 					}
 				} else {
 					log("vswhere error: " + vswhereProc.stderr.readAll().toString());
+					code = vswhereProc.exitCode();
 				}
 				vswhereProc.close();
+				code;
 			case null:
 				var suggestion = (Sys.systemName() == "Windows") ? "vs2019" : "make";
 				log('Set -D hlgen.makefile=${suggestion} for automatic native compilation');
+				0;
 			case unimplemented:
 				log('Automatic native compilation not yet implemented for $unimplemented');
-		}
+				0;
+		};
 	}
 
 	function isAscii( bytes : haxe.io.Bytes ) {
@@ -217,7 +227,9 @@ class Run {
 			path.file = "hlc";
 			path.ext = "json";
 			var config = haxe.Json.parse(sys.io.File.getContent(path.toString()));
-			new Build(haxelibPath,output,config).run();
+			final build = new Build(haxelibPath,output,config);
+			build.generate();
+			Sys.exit(build.compile());
 		case "run":
 			var output = args.shift();
 			if( StringTools.endsWith(output,".c") ) return;
