@@ -1,6 +1,5 @@
 #define HL_NAME(n) ssl_##n
 
-#define _WINSOCKAPI_
 #include <hl.h>
 #ifdef HL_WIN
 #undef _GUID
