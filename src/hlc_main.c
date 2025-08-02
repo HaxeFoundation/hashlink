@@ -26,19 +26,10 @@
 #endif
 
 #ifdef HL_WIN_DESKTOP
-# ifndef CONST
-#	define CONST
-# endif
-# ifndef IN
-#	define IN
-# endif
-# ifndef OUT
-#	define OUT
-# endif
-# ifndef OPTIONAL
-#	define OPTIONAL
-# endif
 #	pragma warning(disable:4091)
+# undef _GUID
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
 #if !defined(HL_MINGW)
 #	include <DbgHelp.h>
 #else

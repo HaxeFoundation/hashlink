@@ -231,13 +231,6 @@ typedef unsigned long long uint64;
 // -------------- UNICODE -----------------------------------
 
 #if defined(HL_WIN) && !defined(HL_LLVM)
-#if (defined(HL_WIN_DESKTOP) && !defined(HL_MINGW)) || defined(HL_XBS)
-#	include <Windows.h>
-#elif defined(HL_WIN_DESKTOP) && defined(HL_MINGW)
-#	include<windows.h>
-#else
-#	include <xdk.h>
-#endif
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
@@ -283,7 +276,7 @@ HL_API void uprintf( const uchar *fmt, const uchar *str );
 C_FUNCTION_END
 
 #if defined(HL_VCC)
-#	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
+#	define hl_debug_break()	if( hl_detect_debugger() ) __debugbreak()
 #elif defined(HL_PS) && defined(_DEBUG)
 #	define hl_debug_break()	__debugbreak()
 #elif defined(HL_NX)

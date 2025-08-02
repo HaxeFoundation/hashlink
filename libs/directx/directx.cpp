@@ -1,5 +1,6 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
+#undef _GUID
 
 #ifdef HL_WIN_DESKTOP
 #include <dxgi.h>

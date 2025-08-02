@@ -1,6 +1,8 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
 
+#include "hlsystem.h"
+
 #define MAX_EVENTS 1024
 
 typedef enum {

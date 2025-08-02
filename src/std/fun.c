@@ -21,6 +21,8 @@
  */
 #include <hl.h>
 
+#include "hlsystem.h"
+
 HL_PRIM int hl_closure_stack_capture = 0;
 
 static void fun_var_args() {

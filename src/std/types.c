@@ -21,6 +21,8 @@
  */
 #include <hl.h>
 
+#include "hlsystem.h"
+
 HL_PRIM hl_type hlt_array = { HARRAY };
 HL_PRIM hl_type hlt_bytes = { HBYTES };
 HL_PRIM hl_type hlt_dynobj = { HDYNOBJ };
