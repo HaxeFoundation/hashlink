@@ -27,6 +27,8 @@
 #include <posix/posix.h>
 #endif
 
+#include "hlsystem.h"
+
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	hl_blocking(true);
 #	ifdef HL_WIN_DESKTOP

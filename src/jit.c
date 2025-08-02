@@ -24,6 +24,7 @@
 #endif
 #include <math.h>
 #include <hlmodule.h>
+#include "hlsystem.h"
 
 #ifdef __arm__
 #	error "JIT does not support ARM processors, only x86 and x86-64 are supported, please use HashLink/C native compilation instead"

@@ -33,6 +33,8 @@
 #   define MAC_DEBUG
 #endif
 
+#include "hlsystem.h"
+
 #if defined(HL_WIN)
 static HANDLE last_process = NULL, last_thread = NULL;
 static int last_pid = -1;

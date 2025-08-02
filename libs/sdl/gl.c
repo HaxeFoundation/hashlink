@@ -1,6 +1,8 @@
 #define HL_NAME(n) sdl_##n
 #include <hl.h>
 
+#include "hlsystem.h"
+
 #if defined(HL_IOS) || defined (HL_TVOS)
 #	include <SDL.h>
 #	include <SDL_syswm.h>

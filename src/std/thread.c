@@ -22,6 +22,8 @@
 
 #include <hl.h>
 
+#include "hlsystem.h"
+
 typedef struct _hl_semaphore hl_semaphore;
 typedef struct _hl_condition hl_condition;
 
