@@ -25,7 +25,6 @@
 #pragma warning(disable:4548)
 
 #	include <string.h>
-#	define _WINSOCKAPI_
 #	include <hl.h>
 #	undef _GUID
 #	include <winsock2.h>
