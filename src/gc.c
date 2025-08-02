@@ -21,6 +21,7 @@
  */
 #include "hl.h"
 #ifdef HL_WIN
+#	undef _GUID
 #	include <windows.h>
 #else
 #	include <sys/types.h>

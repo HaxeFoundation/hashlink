@@ -24,17 +24,16 @@
 #endif
 
 #include <hl.h>
+#include "hlsystem.h"
+
 #include <stdio.h>
 #ifdef HL_CONSOLE
 #	include <posix/posix.h>
 #endif
 #ifdef HL_WIN
 #ifdef HL_WIN_DESKTOP
-#	include <windows.h>
 #	include <io.h>
 #	include <fcntl.h>
-#elif defined(HL_XBO)
-#	include<xdk.h>
 #endif
 #	define fopen(name,mode) _wfopen(name,mode)
 #	define HL_UFOPEN

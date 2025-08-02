@@ -34,6 +34,7 @@
 #include <sys/stat.h>
 
 #if defined(HL_WIN)
+#	undef _GUID
 #	include <windows.h>
 #	include <direct.h>
 #	include <conio.h>

@@ -20,6 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#include "hlsystem.h"
+
 #include <stdarg.h>
 #include <string.h>
 
