@@ -28,6 +28,7 @@
 #ifdef HL_WIN_DESKTOP
 #	pragma warning(disable:4091)
 # undef _GUID
+# define WIN32_LEAN_AND_MEAN
 # include <windows.h>
 #if !defined(HL_MINGW)
 #	include <DbgHelp.h>
