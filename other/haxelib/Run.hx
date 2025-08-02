@@ -43,7 +43,7 @@ class Build {
 					"-version", tpl == "vs2019" ? "[16.0,17.0]" : "[17.0,18.0]"
 				]);
 				if( vswhereProc.exitCode() == 0 ) {
-					var msbuildPath = StringTools.trim(vswhereProc.stdout.readLine().toString());
+					var msbuildPath = StringTools.trim(try vswhereProc.stdout.readLine().toString() catch (e:haxe.io.Eof) "");
 					if( msbuildPath.length > 0 ) {
 						var prevCwd = Sys.getCwd();
 						var msbuild = '$msbuildPath\\Current\\Bin\\MSBuild.exe';
