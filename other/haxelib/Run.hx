@@ -62,7 +62,7 @@ class Build {
 						code = 1;
 					}
 				} else {
-					log("vswhere error: " + vswhereProc.stderr.readAll().toString());
+					log("vswhere error: " + vswhereProc.stdout.readAll().toString() + vswhereProc.stderr.readAll().toString());
 					code = vswhereProc.exitCode();
 				}
 				vswhereProc.close();
