@@ -24,6 +24,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
 endif()
 
 option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
+option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
 # force Unicode over Multi-byte
 if(MSVC)
@@ -133,7 +134,7 @@ if(IOS_PLATFORM)
     )
 endif()
 
-add_library(libhl SHARED
+add_library(libhl
     ${pcre_srcs}
     src/gc.c
     ${std_srcs}
@@ -192,7 +193,13 @@ endif()
 if(WIN32)
     target_link_libraries(libhl ws2_32 user32)
 else()
-    target_link_libraries(libhl m dl pthread)
+    target_link_libraries(libhl m dl)
+
+    if(ANDROID)
+        target_link_libraries(libhl log)
+    else()
+        target_link_libraries(libhl pthread)
+    endif()
 endif()
 
 if(BUILD_TESTING)

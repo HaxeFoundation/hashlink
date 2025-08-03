@@ -278,6 +278,23 @@ jobs:
         path: ${{ env.HASHLINK_DISTRIBUTION }}
 
 
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: "SCM Checkout"
+      uses: actions/checkout@v4
+
+    - name: "Build: Hashlink"
+      run: |
+        set -ex
+        mkdir build
+        cd build
+        cmake .. -G Ninja --toolchain $ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+          -DANDROID_PLATFORM=24 -DANDROID_ABI=arm64-v8a -DBUILD_SHARED_LIBS=OFF \
+          -DBUILD_TESTING=OFF -DWITH_VM=OFF
+        cmake --build .
+
   ###########################################################
   publish-latest-release:
   ###########################################################

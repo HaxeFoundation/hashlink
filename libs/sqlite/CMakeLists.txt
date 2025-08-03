@@ -1,4 +1,4 @@
-add_library(sqlite.hdll SHARED
+add_library(sqlite.hdll
     sqlite.c
     ${INCLUDES_BASE_DIR}/sqlite/src/sqlite3.c
 )
