@@ -9,10 +9,8 @@ add_library(fmt.hdll
     ${MIKKTSPACE_INCLUDE_DIR}/mikktspace.c
 )
 
-if (WIN32 OR ANDROID)
+if (WIN32)
     set(PNG_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/png)
-    set(VORBIS_INCLUDE_DIR ${INCLUDES_BASE_DIR}/vorbis)
-
     target_sources(fmt.hdll PRIVATE
         ${INCLUDES_BASE_DIR}/png/png.c
         ${INCLUDES_BASE_DIR}/png/pngerror.c
@@ -28,7 +26,13 @@ if (WIN32 OR ANDROID)
         ${INCLUDES_BASE_DIR}/png/pngwio.c
         ${INCLUDES_BASE_DIR}/png/pngwrite.c
         ${INCLUDES_BASE_DIR}/png/pngwtran.c
-        ${INCLUDES_BASE_DIR}/png/pngwutil.c
+        ${INCLUDES_BASE_DIR}/png/pngwutil.c)
+endif()
+
+if (WIN32 OR ANDROID)
+    set(VORBIS_INCLUDE_DIR ${INCLUDES_BASE_DIR}/vorbis)
+
+    target_sources(fmt.hdll PRIVATE
         ${INCLUDES_BASE_DIR}/vorbis/bitrate.c
         ${INCLUDES_BASE_DIR}/vorbis/bitwise.c
         ${INCLUDES_BASE_DIR}/vorbis/block.c
@@ -52,11 +56,6 @@ if (WIN32 OR ANDROID)
         ${INCLUDES_BASE_DIR}/vorbis/vorbisfile.c
         ${INCLUDES_BASE_DIR}/vorbis/window.c
     )
-
-    if (ANDROID)
-        # TODO: enable
-        target_compile_definitions(fmt.hdll PRIVATE PNG_ARM_NEON_OPT=0)
-    endif()
 endif()
 
 if(WIN32)
@@ -160,6 +159,31 @@ elseif(ANDROID)
     set(TurboJPEG_LIBRARIES turbojpeg)
 
     add_dependencies(turbojpeg turbojpeg-project)
+
+    ExternalProject_Add(libpng
+        URL https://github.com/pnggroup/libpng/archive/refs/tags/v1.6.50.tar.gz
+        URL_HASH SHA256=71158e53cfdf2877bc99bcab33641d78df3f48e6e0daad030afe9cb8c031aa46
+        CMAKE_ARGS
+            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DANDROID_PLATFORM=${ANDROID_PLATFORM}
+            -DANDROID_ABI=${CMAKE_ANDROID_ARCH_ABI}
+            -DPNG_SHARED=OFF
+            -DPNG_TESTS=OFF
+            -DPNG_TOOLS=OFF
+        # INSTALL_BYPRODUCTS in CMake 3.26+
+        BUILD_BYPRODUCTS <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libpng.a
+        DOWNLOAD_EXTRACT_TIMESTAMP true
+    )
+    ExternalProject_Get_Property(libpng INSTALL_DIR)
+
+    add_library(png STATIC IMPORTED)
+    set_target_properties(png PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libpng.a)
+
+    set(PNG_INCLUDE_DIRS ${INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR})
+    set(PNG_LIBRARIES png)
+
+    add_dependencies(png libpng)
 else()
     find_package(ZLIB REQUIRED)
     find_package(PNG REQUIRED)
@@ -193,11 +217,6 @@ target_link_libraries(fmt.hdll
     ${PNG_LIBRARIES}
     ${TurboJPEG_LIBRARIES}
     ${OGGVORBIS_LIBRARIES}
-)
-
-target_compile_definitions(fmt.hdll
-    PRIVATE
-    ${PNG_DEFINITIONS}
 )
 
 install(
