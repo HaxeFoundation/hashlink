@@ -27,6 +27,12 @@ if(BUILD_SHARED_LIBS)
     # ensure third-party static libs are built with PIC
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
+if(ANDROID)
+    set(_DOWNLOAD_DEPENDENCIES ON)
+else()
+    set(_DOWNLOAD_DEPENDENCIES OFF)
+endif()
+option(DOWNLOAD_DEPENDENCIES "Download & build third-party dependencies" ${_DOWNLOAD_DEPENDENCIES})
 
 # force Unicode over Multi-byte
 if(MSVC)
@@ -138,8 +144,11 @@ add_library(libhl
 
 target_include_directories(libhl
     PUBLIC src
-    PRIVATE include/pcre
+    PRIVATE include include/pcre
 )
+
+# C11 / C++11 are required for features such as unicode strings
+target_compile_features(libhl PUBLIC cxx_std_11 c_std_11)
 
 set(public_headers
     src/hl.h
@@ -181,7 +190,9 @@ if (WITH_VM)
     )
 
     if (UNIX AND NOT APPLE)
-        set_target_properties(hl PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+        set_target_properties(hl PROPERTIES
+            INSTALL_RPATH "$ORIGIN;$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        )
     endif()
 
     target_link_libraries(hl libhl)

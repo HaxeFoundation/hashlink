@@ -3,7 +3,7 @@ add_library(sdl.hdll
     gl.c
 )
 
-if (ANDROID)
+if ((NOT WIN32) AND DOWNLOAD_DEPENDENCIES)
     FetchContent_Declare(
         SDL2
         URL https://github.com/libsdl-org/SDL/releases/download/release-2.32.8/SDL2-2.32.8.tar.gz

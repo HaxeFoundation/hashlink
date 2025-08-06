@@ -121,36 +121,20 @@ if (WIN32)
         PRIVATE
         MBEDTLS_USER_CONFIG_FILE="mbedtls_user_config.h"
     )
-elseif(ANDROID)
-	ExternalProject_Add(mbedtls-project
+elseif(DOWNLOAD_DEPENDENCIES)
+	FetchContent_Declare(mbedtls-project
         URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.4/mbedtls-3.6.4.tar.bz2
         URL_HASH SHA256=ec35b18a6c593cf98c3e30db8b98ff93e8940a8c4e690e66b41dfc011d678110
-        CMAKE_ARGS
-            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-            -DANDROID_PLATFORM=${ANDROID_PLATFORM}
-            -DANDROID_ABI=${CMAKE_ANDROID_ARCH_ABI}
-            -DBUILD_SHARED_LIBS=OFF
-        # INSTALL_BYPRODUCTS in CMake 3.26+
-        BUILD_BYPRODUCTS
-            <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libmbedtls.a
-            <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libmbedcrypto.a
-            <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libmbedx509.a
         DOWNLOAD_EXTRACT_TIMESTAMP true
+        EXCLUDE_FROM_ALL
     )
-    ExternalProject_Get_Property(mbedtls-project INSTALL_DIR)
-
-    add_library(mbedtls STATIC IMPORTED)
-    set_target_properties(mbedtls PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libmbedtls.a)
-    add_library(mbedcrypto STATIC IMPORTED)
-    set_target_properties(mbedcrypto PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libmbedcrypto.a)
-    add_library(mbedx509 STATIC IMPORTED)
-    set_target_properties(mbedx509 PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libmbedx509.a)
-
-    set(MBEDTLS_INCLUDE_DIRS ${INSTALL_DIR}/include)
-    set(MBEDTLS_LIBRARIES mbedtls mbedcrypto mbedx509)
-
-    add_dependencies(mbedtls mbedtls-project)
+    set(_OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    set(ENABLE_PROGRAMS OFF CACHE INTERNAL "")
+    set(ENABLE_TESTING OFF CACHE INTERNAL "")
+    FetchContent_MakeAvailable(mbedtls-project)
+    set(BUILD_SHARED_LIBS ${_OLD_BUILD_SHARED_LIBS})
+    set(MBEDTLS_LIBRARIES MbedTLS::mbedtls MbedTLS::mbedx509 MbedTLS::mbedcrypto)
 else()
     find_package(MbedTLS REQUIRED)
 endif()

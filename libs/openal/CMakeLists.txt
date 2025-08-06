@@ -14,8 +14,10 @@ if(WIN32)
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         find_library(OPENAL_LIBRARY OpenAL32 PATHS ${INCLUDES_BASE_DIR}/openal/libs/Win64)
+        install(FILES ${INCLUDES_BASE_DIR}/openal/bin/Win64/soft_oal.dll TYPE BIN RENAME OpenAL32.dll)
     else()
         find_library(OPENAL_LIBRARY OpenAL32 PATHS ${INCLUDES_BASE_DIR}/openal/libs/Win32)
+        install(FILES ${INCLUDES_BASE_DIR}/openal/bin/Win32/soft_oal.dll TYPE BIN RENAME OpenAL32.dll)
     endif()
 
     set(OPENAL_INCLUDE_DIR ${INCLUDES_BASE_DIR}/openal/include)
@@ -24,8 +26,7 @@ if(WIN32)
         IMPORTED_IMPLIB ${OPENAL_LIBRARY}
         INTERFACE_INCLUDE_DIRECTORIES ${OPENAL_INCLUDE_DIR}
     )
-    install(IMPORTED_RUNTIME_ARTIFACTS OpenAL::OpenAL)
-elseif(ANDROID)
+elseif(DOWNLOAD_DEPENDENCIES)
 	FetchContent_Declare(openal-soft
         URL https://github.com/kcat/openal-soft/archive/refs/tags/1.24.3.tar.gz
         URL_HASH SHA256=7e1fecdeb45e7f78722b776c5cf30bd33934b961d7fd2a11e0494e064cc631ce
