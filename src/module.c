@@ -23,6 +23,7 @@
 #include <hlmodule.h>
 
 #ifdef HL_WIN
+#	undef _GUID
 #	include <windows.h>
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #	define dlopen(l,p)		(void*)( (l) ? LoadLibraryA(l) : (HMODULE)&__ImageBase)

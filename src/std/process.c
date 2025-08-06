@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#include "hlsystem.h"
 
 #if defined(HL_CONSOLE)
 #	include <posix/posix.h>
