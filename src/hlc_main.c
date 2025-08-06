@@ -40,6 +40,26 @@
 #	undef IN
 #	undef OUT
 #	undef OPTIONAL
+#	undef DELETE
+#	undef ERROR
+#	undef NO_ERROR
+#	undef STRICT
+#	undef TRUE
+#	undef FALSE
+#	undef CW_USEDEFAULT
+#	undef far
+#	undef FAR
+#	undef near
+#	undef NEAR
+#	undef GENERIC_READ
+#	undef ALTERNATE
+#	undef DIFFERENCE
+#	undef DOUBLE_CLICK
+#	undef WAIT_FAILED
+#	undef TRANSPARENT
+#	undef CopyFile
+#	undef COLOR_HIGHLIGHT
+#	undef __valid
 #endif
 
 #ifdef HL_CONSOLE
