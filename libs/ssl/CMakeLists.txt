@@ -132,16 +132,23 @@ elseif(ANDROID)
             -DANDROID_ABI=${CMAKE_ANDROID_ARCH_ABI}
             -DBUILD_SHARED_LIBS=OFF
         # INSTALL_BYPRODUCTS in CMake 3.26+
-        BUILD_BYPRODUCTS <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libmbedtls.a
+        BUILD_BYPRODUCTS
+            <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libmbedtls.a
+            <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libmbedcrypto.a
+            <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libmbedx509.a
         DOWNLOAD_EXTRACT_TIMESTAMP true
     )
     ExternalProject_Get_Property(mbedtls-project INSTALL_DIR)
 
     add_library(mbedtls STATIC IMPORTED)
     set_target_properties(mbedtls PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libmbedtls.a)
+    add_library(mbedcrypto STATIC IMPORTED)
+    set_target_properties(mbedcrypto PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libmbedcrypto.a)
+    add_library(mbedx509 STATIC IMPORTED)
+    set_target_properties(mbedx509 PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libmbedx509.a)
 
     set(MBEDTLS_INCLUDE_DIRS ${INSTALL_DIR}/include)
-    set(MBEDTLS_LIBRARIES mbedtls)
+    set(MBEDTLS_LIBRARIES mbedtls mbedcrypto mbedx509)
 
     add_dependencies(mbedtls mbedtls-project)
 else()
