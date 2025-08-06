@@ -283,4 +283,30 @@ DEFINE_PRIM(_I32, run, _LOOP _I32);
 DEFINE_PRIM(_I32, loop_alive, _LOOP);
 DEFINE_PRIM(_VOID, stop, _LOOP);
 
+HL_PRIM uv_loop_t* HL_NAME(default_loop_wrap)() {
+	return uv_default_loop();
+}
+
+HL_PRIM int HL_NAME(loop_close_wrap)(uv_loop_t* loop) {
+	return uv_loop_close(loop);
+}
+
+HL_PRIM int HL_NAME(run_wrap)(uv_loop_t* loop, int mode) {
+	return uv_run(loop, (uv_run_mode)mode);
+}
+
+HL_PRIM int HL_NAME(loop_alive_wrap)(uv_loop_t* loop) {
+	return uv_loop_alive(loop);
+}
+
+HL_PRIM void HL_NAME(stop_wrap)(uv_loop_t* loop) {
+	uv_stop(loop);
+}
+
+DEFINE_PRIM(_LOOP, default_loop_wrap, _NO_ARG);
+DEFINE_PRIM(_I32, loop_close_wrap, _LOOP);
+DEFINE_PRIM(_I32, run_wrap, _LOOP _I32);
+DEFINE_PRIM(_I32, loop_alive_wrap, _LOOP);
+DEFINE_PRIM(_VOID, stop_wrap, _LOOP);
+
 DEFINE_PRIM(_BYTES, strerror, _I32);
