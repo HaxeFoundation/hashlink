@@ -325,6 +325,31 @@ if(BUILD_TESTING)
     )
 
     #####################
+    # header_macro_clashes.c
+
+    set(HEADER_MACRO_CLASH_SRCS
+        ${CMAKE_SOURCE_DIR}/other/tests/header_macro_clashes/header_macro_clashes.c
+        ${CMAKE_SOURCE_DIR}/other/tests/header_macro_clashes/variables.c
+    )
+
+    add_executable(header_macro_clashes ${HEADER_MACRO_CLASH_SRCS})
+    set_target_properties(header_macro_clashes
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/
+    )
+    target_link_libraries(header_macro_clashes
+        libhl
+    )
+
+    # also test without hlc_main.c
+    add_executable(header_macro_clashes_no_main ${HEADER_MACRO_CLASH_SRCS})
+    set_target_properties(header_macro_clashes_no_main
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/
+        COMPILE_DEFINITIONS "WITHOUT_HLC_MAIN=0"
+    )
+
+    #####################
     # Tests
     if (WITH_VM)
         add_test(NAME version
