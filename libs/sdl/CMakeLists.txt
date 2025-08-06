@@ -18,16 +18,15 @@ if (ANDROID)
     )
     ExternalProject_Get_Property(sdl2-project INSTALL_DIR)
 
-    add_library(sdl2 SHARED IMPORTED)
-    set_target_properties(sdl2 PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libSDL2.so)
+    add_library(SDL2::SDL2 SHARED IMPORTED)
+    set_target_properties(SDL2::SDL2 PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libSDL2.so)
 
-    set(SDL2_INCLUDE_DIR ${INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR}/SDL2)
-    set(SDL2_LIBRARY sdl2)
+    set(SDL2_INCLUDE_DIRS ${INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR}/SDL2)
 
-    add_dependencies(sdl2 sdl2-project)
+    add_dependencies(SDL2::SDL2 sdl2-project)
 else()
     if(WIN32)
-        set(SDL2_PATH ${INCLUDES_BASE_DIR}/sdl)
+        set(SDL2_DIR ${INCLUDES_BASE_DIR}/sdl/cmake)
     endif()
 
     find_package(SDL2 REQUIRED)
@@ -36,12 +35,12 @@ endif()
 set_as_hdll(sdl)
 target_include_directories(sdl.hdll
     PRIVATE
-    ${SDL2_INCLUDE_DIR}
+    ${SDL2_INCLUDE_DIRS}
     ${INCLUDES_BASE_DIR}/gl
 )
 target_link_libraries(sdl.hdll
     libhl
-    ${SDL2_LIBRARY}
+    SDL2::SDL2
 )
 
 if(WIN32)
