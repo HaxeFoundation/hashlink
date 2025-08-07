@@ -34,14 +34,10 @@
 #ifdef HLC_BOOT
 
 // undefine some commonly used names that can clash with class/var name
-#undef CONST
 #undef stdin
 #undef stdout
 #undef stderr
 #undef EOF
-#undef HIDDEN
-#undef RESIZABLE
-#undef __SIGN
 #undef INT_MAX
 #undef INT_MIN
 #undef BIG_ENDIAN
