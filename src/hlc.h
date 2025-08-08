@@ -38,6 +38,9 @@
 #undef stdout
 #undef stderr
 #undef EOF
+#undef TRUE
+#undef FALSE
+#undef __SIGN
 #undef INT_MAX
 #undef INT_MIN
 #undef BIG_ENDIAN
