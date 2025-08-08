@@ -123,12 +123,14 @@ GL_IMPORT(glColorMaski, COLORMASKI);
 GL_IMPORT(glTexStorage2D, TEXSTORAGE2D);
 GL_IMPORT(glTexStorage3D, TEXSTORAGE3D);
 
+GL_IMPORT(glDebugMessageCallback, DEBUGMESSAGECALLBACK);
+GL_IMPORT(glDebugMessageControl, DEBUGMESSAGECONTROL);
+
 #if !defined(HL_MESA)
 GL_IMPORT(glGetQueryObjectui64v, GETQUERYOBJECTUI64V);
 GL_IMPORT(glQueryCounter, QUERYCOUNTER);
 #endif
 
-#endif
 #if defined(_WIN32) || defined(HL_NX)
 GL_IMPORT(glBlendEquation, BLENDEQUATION);
 GL_IMPORT(glActiveTexture, ACTIVETEXTURE);
@@ -142,4 +144,6 @@ GL_IMPORT(glCompressedTexSubImage3D, COMPRESSEDTEXSUBIMAGE3D);
 
 #if defined(HL_NX)
 GL_IMPORT(glClearDepthf, CLEARDEPTHF);
+#endif
+
 #endif

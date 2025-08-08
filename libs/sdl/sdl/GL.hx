@@ -34,6 +34,11 @@ class GL {
 		return false;
 	}
 
+	@:hlNative("?sdl","gl_set_debug")
+	public static function setDebug( enable : Bool ) : Bool {
+		return false;
+	}
+
 	// non standard
 	public static function getConfigParameter( v : Int ) : Int {
 		return 0;
