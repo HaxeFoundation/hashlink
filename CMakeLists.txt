@@ -325,6 +325,20 @@ if(BUILD_TESTING)
     )
 
     #####################
+    # header_macro_clashes.c
+
+    add_executable(header_macro_clashes
+        ${CMAKE_SOURCE_DIR}/other/tests/header_macro_clashes/header_macro_clashes.c
+    )
+    set_target_properties(header_macro_clashes
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/
+    )
+    target_link_libraries(header_macro_clashes
+        libhl
+    )
+
+    #####################
     # Tests
     if (WITH_VM)
         add_test(NAME version
