@@ -87,7 +87,6 @@ HL_PRIM bool HL_NAME(gl_init)() {
 HL_PRIM bool HL_NAME(gl_set_debug)( bool enable ) {
 #ifdef GL_VERSION_4_3
 	if( enable ) {
-		// During init, enable debug output
 		glEnable(GL_DEBUG_OUTPUT);
 		glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_PERFORMANCE, GL_DONT_CARE, 0, NULL, GL_FALSE);
 		glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_OTHER, GL_DONT_CARE, 0, NULL, GL_FALSE);
