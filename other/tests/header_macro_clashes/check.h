@@ -112,3 +112,6 @@
 #ifdef __valid
 #error "__valid is defined"
 #endif
+#ifdef SOCKET_ERROR
+#error "SOCKET_ERROR is defined"
+#endif
