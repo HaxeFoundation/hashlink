@@ -69,11 +69,13 @@ static int GLLoadAPI() {
 	return 0;
 }
 
-static void debug_message_callback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam ) {
+#ifdef GL_VERSION_4_3
+static void APIENTRY debug_message_callback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam ) {
 	fprintf(stderr, "GL %s: type = 0x%x, severity = 0x%x, message = %s\n",
 		( type == GL_DEBUG_TYPE_ERROR ? "** ERROR **" : "DEBUG" ),
 		type, severity, message);
 }
+#endif
 
 #define ZIDX(val) ((val)?(val)->v.i:0)
 
