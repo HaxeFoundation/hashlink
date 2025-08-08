@@ -69,11 +69,34 @@ static int GLLoadAPI() {
 	return 0;
 }
 
+static void debug_message_callback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam ) {
+	fprintf(stderr, "GL %s: type = 0x%x, severity = 0x%x, message = %s\n",
+		( type == GL_DEBUG_TYPE_ERROR ? "** ERROR **" : "DEBUG" ),
+		type, severity, message);
+}
+
 #define ZIDX(val) ((val)?(val)->v.i:0)
 
 // globals
 HL_PRIM bool HL_NAME(gl_init)() {
 	return GLLoadAPI() == 0;
+}
+
+HL_PRIM bool HL_NAME(gl_set_debug)( bool enable ) {
+#ifdef GL_VERSION_4_3
+	if( enable ) {
+		// During init, enable debug output
+		glEnable(GL_DEBUG_OUTPUT);
+		glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_PERFORMANCE, GL_DONT_CARE, 0, NULL, GL_FALSE);
+		glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_OTHER, GL_DONT_CARE, 0, NULL, GL_FALSE);
+		glDebugMessageCallback(debug_message_callback, 0);
+	} else {
+		glDisable(GL_DEBUG_OUTPUT);
+	}
+	return true;
+#else
+	return false;
+#endif
 }
 
 HL_PRIM bool HL_NAME(gl_is_context_lost)() {
@@ -716,6 +739,7 @@ HL_PRIM void HL_NAME(gl_shader_storage_block_binding)( vdynamic *p, int index, i
 }
 
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
+DEFINE_PRIM(_BOOL,gl_set_debug,_BOOL);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_clear,_I32);
 DEFINE_PRIM(_I32,gl_get_error,_NO_ARG);
