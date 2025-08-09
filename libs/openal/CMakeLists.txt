@@ -19,36 +19,33 @@ if(WIN32)
     endif()
 
     set(OPENAL_INCLUDE_DIR ${INCLUDES_BASE_DIR}/openal/include)
+    add_library(OpenAL::OpenAL SHARED IMPORTED)
+    set_target_properties(OpenAL::OpenAL PROPERTIES
+        IMPORTED_IMPLIB ${OPENAL_LIBRARY}
+        INTERFACE_INCLUDE_DIRECTORIES ${OPENAL_INCLUDE_DIR}
+    )
+    install(IMPORTED_RUNTIME_ARTIFACTS OpenAL::OpenAL)
 elseif(ANDROID)
-    if (WITH_STATIC_OPENAL)
-        set(OPENAL_LIBTYPE STATIC)
-        set(OPENAL_LIBSUFFIX ${CMAKE_STATIC_LIBRARY_SUFFIX})
-    else()
-        set(OPENAL_LIBTYPE SHARED)
-        set(OPENAL_LIBSUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
-    endif()
-	ExternalProject_Add(openal-soft
+	FetchContent_Declare(openal-soft
         URL https://github.com/kcat/openal-soft/archive/refs/tags/1.24.3.tar.gz
         URL_HASH SHA256=7e1fecdeb45e7f78722b776c5cf30bd33934b961d7fd2a11e0494e064cc631ce
-        CMAKE_ARGS
-            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-            -DANDROID_PLATFORM=${ANDROID_PLATFORM}
-            -DANDROID_ABI=${CMAKE_ANDROID_ARCH_ABI}
-            -DLIBTYPE=${OPENAL_LIBTYPE}
-        # INSTALL_BYPRODUCTS in CMake 3.26+
-        BUILD_BYPRODUCTS <INSTALL_DIR>/${CMAKE_INSTALL_LIBDIR}/libopenal${OPENAL_LIBSUFFIX}
         DOWNLOAD_EXTRACT_TIMESTAMP true
+        EXCLUDE_FROM_ALL
     )
-    ExternalProject_Get_Property(openal-soft INSTALL_DIR)
 
-    add_library(openal SHARED IMPORTED)
-    set_target_properties(openal PROPERTIES IMPORTED_LOCATION ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libopenal${OPENAL_LIBSUFFIX})
+    set(ALSOFT_EXAMPLES OFF CACHE INTERNAL "")
+    set(ALSOFT_UTILS OFF CACHE INTERNAL "")
+    if (WITH_STATIC_OPENAL)
+        set(LIBTYPE STATIC)
+    endif()
 
-    set(OPENAL_INCLUDE_DIR ${INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR})
-    set(OPENAL_LIBRARY openal)
-
-    add_dependencies(openal openal-soft)
+    FetchContent_MakeAvailable(openal-soft)
+    install(
+    TARGETS
+        OpenAL
+    LIBRARY
+    RUNTIME
+)
 else()
     find_package(OpenAL REQUIRED)
 endif()
@@ -57,12 +54,7 @@ set_as_hdll(openal)
 
 target_link_libraries(openal.hdll
     libhl
-    ${OPENAL_LIBRARY}
-)
-
-target_include_directories(openal.hdll
-    PRIVATE
-    ${OPENAL_INCLUDE_DIR}
+    OpenAL::OpenAL
 )
 
 install(

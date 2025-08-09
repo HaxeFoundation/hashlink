@@ -17,6 +17,7 @@ endfunction()
 
 if (ANDROID)
     include(ExternalProject)
+    include(FetchContent)
 endif()
 
 if(WIN32)

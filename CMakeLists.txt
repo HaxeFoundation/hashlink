@@ -9,10 +9,8 @@ cmake_policy(SET CMP0042 NEW)
 
 if(WIN32)
     set(CMAKE_SYSTEM_VERSION 10.0)
-    project(hashlink C CXX) # C++ required for directx
-else()
-    project(hashlink C)
 endif()
+project(hashlink)
 
 include(GNUInstallDirs)
 include(FindPkgConfig)
@@ -25,6 +23,10 @@ endif()
 
 option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
+if(BUILD_SHARED_LIBS)
+    # ensure third-party static libs are built with PIC
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # force Unicode over Multi-byte
 if(MSVC)
@@ -52,12 +54,6 @@ foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
     set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
     set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${OUTPUT_DIR} )
 endforeach()
-
-include_directories(
-    src
-    include
-    include/pcre
-)
 
 file(GLOB pcre_srcs
     include/pcre/pcre2_auto_possess.c
@@ -138,6 +134,11 @@ add_library(libhl
     ${pcre_srcs}
     src/gc.c
     ${std_srcs}
+)
+
+target_include_directories(libhl
+    PUBLIC src
+    PRIVATE include/pcre
 )
 
 set(public_headers
