@@ -21,6 +21,7 @@
  */
 #include <hl.h>
 #include <hlmodule.h>
+#include "hlsystem.h"
 
 #ifdef HL_WIN
 #	include <locale.h>

@@ -1,6 +1,8 @@
 #define HL_NAME(n) sdl_##n
 
 #include <hl.h>
+#include "hlsystem.h"
+
 #include <locale.h>
 
 #if defined(_WIN32) || defined(__ANDROID__) || defined(HL_IOS) || defined(HL_TVOS)

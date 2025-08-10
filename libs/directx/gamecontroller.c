@@ -1,5 +1,7 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
+#include "hlsystem.h"
+
 #include <xinput.h>
 #include <InitGuid.h>
 #define DIRECTINPUT_VERSION 0x0800

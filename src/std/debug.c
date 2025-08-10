@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#include "hlsystem.h"
 #if defined(HL_LINUX) && (defined(__i386__) || defined(__x86_64__))
 #	include <sys/ptrace.h>
 #	include <sys/wait.h>

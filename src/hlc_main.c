@@ -26,19 +26,10 @@
 #endif
 
 #ifdef HL_WIN_DESKTOP
-# ifndef CONST
-#	define CONST
-# endif
-# ifndef IN
-#	define IN
-# endif
-# ifndef OUT
-#	define OUT
-# endif
-# ifndef OPTIONAL
-#	define OPTIONAL
-# endif
 #	pragma warning(disable:4091)
+# undef _GUID
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
 #if !defined(HL_MINGW)
 #	include <DbgHelp.h>
 #else
@@ -49,6 +40,26 @@
 #	undef IN
 #	undef OUT
 #	undef OPTIONAL
+#	undef DELETE
+#	undef ERROR
+#	undef NO_ERROR
+#	undef STRICT
+#	undef TRUE
+#	undef FALSE
+#	undef CW_USEDEFAULT
+#	undef far
+#	undef FAR
+#	undef near
+#	undef NEAR
+#	undef GENERIC_READ
+#	undef ALTERNATE
+#	undef DIFFERENCE
+#	undef DOUBLE_CLICK
+#	undef WAIT_FAILED
+#	undef TRANSPARENT
+#	undef CopyFile
+#	undef COLOR_HIGHLIGHT
+#	undef __valid
 #endif
 
 #ifdef HL_CONSOLE
