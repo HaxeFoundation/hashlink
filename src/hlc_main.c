@@ -148,21 +148,6 @@ static int hlc_capture_stack( void **stack, int size ) {
 	return count;
 }
 
-#if defined( HL_VCC )
-static int throw_handler( int code ) {
-	#if !defined(HL_XBO)
-	switch( code ) {
-	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
-	case EXCEPTION_STACK_OVERFLOW: hl_error("Stack overflow");
-	default: hl_error("Unknown runtime error");
-	}
-	return EXCEPTION_CONTINUE_SEARCH;
-	#else
-	return 0;
-	#endif
-}
-#endif
-
 #ifdef HL_WIN_DESKTOP
 int wmain(int argc, uchar *argv[]) {
 #else
