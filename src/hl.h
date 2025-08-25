@@ -249,7 +249,7 @@ HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list argli
 #if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_MAC)
 #include <stddef.h>
 #include <stdint.h>
-#if !defined(__cplusplus) || __cplusplus < 201103L
+#if !defined(__cplusplus) || (__cplusplus < 201103L && !defined(_LIBCPP_VERSION))
 typedef uint16_t char16_t;
 typedef uint32_t char32_t;
 #endif
