@@ -25,11 +25,13 @@
 #   include <SDL_main.h>
 #endif
 
-#ifdef HL_WIN_DESKTOP
+#if defined(HL_WIN_DESKTOP) || defined(HL_XBS)
 #	pragma warning(disable:4091)
-# undef _GUID
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>
+#	undef _GUID
+#ifndef WIN32_LEAN_AND_MEAN
+#	define WIN32_LEAN_AND_MEAN
+#endif
+#	include <windows.h>
 #if !defined(HL_MINGW)
 #	include <DbgHelp.h>
 #else
@@ -148,22 +150,7 @@ static int hlc_capture_stack( void **stack, int size ) {
 	return count;
 }
 
-#if defined( HL_VCC )
-static int throw_handler( int code ) {
-	#if !defined(HL_XBO)
-	switch( code ) {
-	case EXCEPTION_ACCESS_VIOLATION: hl_error("Access violation");
-	case EXCEPTION_STACK_OVERFLOW: hl_error("Stack overflow");
-	default: hl_error("Unknown runtime error");
-	}
-	return EXCEPTION_CONTINUE_SEARCH;
-	#else
-	return 0;
-	#endif
-}
-#endif
-
-#ifdef HL_WIN_DESKTOP
+#if defined(HL_WIN_DESKTOP) || defined(HL_XBS)
 int wmain(int argc, uchar *argv[]) {
 #else
 int main(int argc, char *argv[]) {
@@ -193,12 +180,8 @@ int main(int argc, char *argv[]) {
 	return (int)isExc;
 }
 
-#if defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+#if (defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)) || defined(HL_XBS)
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLine, int nCmdShow) {
 	return wmain(__argc, __wargv);
-}
-#elif defined(HL_XBS)
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	return main(__argc, __argv);
 }
 #endif
