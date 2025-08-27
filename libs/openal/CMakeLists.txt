@@ -25,7 +25,7 @@ elseif(ANDROID)
         set(OPENAL_LIBSUFFIX ${CMAKE_STATIC_LIBRARY_SUFFIX})
     else()
         set(OPENAL_LIBTYPE SHARED)
-        set(OPENAL_LIBSUFFIX ${CMAKE_SHARED_LIBARY_SUFFIX})
+        set(OPENAL_LIBSUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
     endif()
 	ExternalProject_Add(openal-soft
         URL https://github.com/kcat/openal-soft/archive/refs/tags/1.24.3.tar.gz
