@@ -591,7 +591,7 @@ DEFINE_PRIM(_VOID, al_get_bufferiv, _I32 _I32 _BYTES);
 #define CHECK_EXT(fun) if(fun == NULL) hl_error("Unsupported extension function")
 
 // ----------------------------------------------------------------------------
-#ifdef EXT_thread_local_context
+#ifdef ALC_EXT_thread_local_context
 // ----------------------------------------------------------------------------
 
 HL_PRIM bool HL_NAME(alc_set_thread_context)(ALCcontext *context) {
@@ -651,7 +651,7 @@ DEFINE_PRIM(_VOID, alc_device_resume_soft, TDEVICE);
 #endif
 
 // ----------------------------------------------------------------------------
-#ifdef SOFT_HRTF
+#ifdef ALC_SOFT_HRTF
 // ----------------------------------------------------------------------------
 
 HL_PRIM vbyte* HL_NAME(alc_get_stringi_soft)(ALCdevice *device, int param, int index) {
