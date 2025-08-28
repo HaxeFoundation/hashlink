@@ -669,6 +669,19 @@ DEFINE_PRIM(_BOOL,  alc_reset_device_soft, TDEVICE _BYTES);
 #endif
 
 // ----------------------------------------------------------------------------
+#ifdef ALC_SOFT_reopen_device
+// ----------------------------------------------------------------------------
+
+HL_PRIM bool HL_NAME(alc_reopen_device_soft)(ALCdevice *device, vbyte *deviceName, vbyte *attribs) {
+	CHECK_EXT(alcReopenDeviceSOFT);
+	return alcReopenDeviceSOFT(device, deviceName, attribs);
+}
+
+
+DEFINE_PRIM(_BOOL,  alc_reopen_device_soft, TDEVICE _BYTES _BYTES);
+#endif
+
+// ----------------------------------------------------------------------------
 #ifdef AL_EXT_STATIC_BUFFER
 // ----------------------------------------------------------------------------
 

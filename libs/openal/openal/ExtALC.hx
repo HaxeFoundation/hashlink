@@ -85,4 +85,11 @@ extern class ExtALC {
 
 	public static function getStringiSoft  (device : Device, param : Int, index : Int) : hl.Bytes;
 	public static function resetDeviceSoft (device : Device, attribs : hl.Bytes) : Bool;
+
+	// ----------------------------------------------------------------------------
+	// ALC_SOFT_reopen_device
+	// ----------------------------------------------------------------------------
+
+	public static inline var SOFT_reopen_device = "ALC_SOFT_reopen_device";
+	public static function reopenDeviceSoft (device : Device, deviceName : hl.Bytes, attribs : hl.Bytes) : Bool;
 }
