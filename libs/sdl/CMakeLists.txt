@@ -40,6 +40,9 @@ target_link_libraries(sdl.hdll
     libhl
     SDL2::SDL2
 )
+if(APPLE)
+    target_compile_definitions(sdl.hdll PRIVATE GL_SILENCE_DEPRECATION)
+endif()
 
 if(WIN32)
     target_link_libraries(sdl.hdll
