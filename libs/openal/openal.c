@@ -132,14 +132,14 @@ DEFINE_PRIM(_VOID,    alc_destroy_context,      TCONTEXT);
 DEFINE_PRIM(TCONTEXT, alc_get_current_context,  _NO_ARG);
 DEFINE_PRIM(TDEVICE,  alc_get_contexts_device,  TCONTEXT);
 
-DEFINE_PRIM(TDEVICE,  alc_open_device,  _BYTES); 
+DEFINE_PRIM(TDEVICE,  alc_open_device,  _BYTES);
 DEFINE_PRIM(_BOOL,    alc_close_device, TDEVICE);
 
 DEFINE_PRIM(_I32,     alc_get_error, TDEVICE);
 
 DEFINE_PRIM(_VOID,    alc_load_extensions,      TDEVICE);
 DEFINE_PRIM(_BOOL,    alc_is_extension_present, TDEVICE _BYTES);
-DEFINE_PRIM(_I32,     alc_get_enum_value,       TDEVICE _BYTES); 
+DEFINE_PRIM(_I32,     alc_get_enum_value,       TDEVICE _BYTES);
 
 DEFINE_PRIM(_BYTES,   alc_get_string,   TDEVICE _I32);
 DEFINE_PRIM(_VOID,    alc_get_integerv, TDEVICE _I32 _I32 _BYTES);
@@ -669,6 +669,18 @@ DEFINE_PRIM(_BOOL,  alc_reset_device_soft, TDEVICE _BYTES);
 #endif
 
 // ----------------------------------------------------------------------------
+#ifdef ALC_SOFT_device_clock
+// ----------------------------------------------------------------------------
+
+HL_PRIM void HL_NAME(alc_get_integer64v_soft)(ALCdevice *device, int param, int index, vbyte *values) {
+	CHECK_EXT(alcGetInteger64vSOFT);
+	alcGetInteger64vSOFT(device, param, index, (char*) values);
+}
+
+DEFINE_PRIM(_VOID, alc_get_integer64v_soft,  TDEVICE _I32 _I32 _BYTES);
+#endif
+
+// ----------------------------------------------------------------------------
 #ifdef ALC_SOFT_reopen_device
 // ----------------------------------------------------------------------------
 
@@ -711,7 +723,7 @@ DEFINE_PRIM(_VOID, al_buffer_sub_data_soft, _I32 _I32 _BYTES _I32 _I32);
 
 HL_PRIM void HL_NAME(al_request_foldback_start)(int mode, int count, int length, vbyte *mem, vclosure *callback) {
 	CHECK_EXT(alRequestFoldbackStart);
-	if (callback->hasValue) if( callback->hasValue ) hl_error("Cannot set foldback on closure callback");
+	if( callback->hasValue ) hl_error("Cannot set foldback on closure callback");
 	alRequestFoldbackStart(mode, count, length, (ALfloat*)mem, (LPALFOLDBACKCALLBACK)callback->fun);
 }
 
@@ -800,12 +812,12 @@ HL_PRIM void HL_NAME(al_sourcei64_soft)(unsigned source, int param, int valueHi,
 	alSourcei64SOFT(source, param, I64_COMBINE(valueHi, valueLo));
 }
 
-HL_PRIM void HL_NAME(al_source3i64_soft)(unsigned source, int param, 
+HL_PRIM void HL_NAME(al_source3i64_soft)(unsigned source, int param,
 		int value1Hi, int value1Lo, int value2Hi, int value2Lo, int value3Hi, int value3Lo) {
 	CHECK_EXT(alSource3i64SOFT);
-	alSource3i64SOFT(source, param, 
-		I64_COMBINE(value1Hi, value1Lo), 
-		I64_COMBINE(value2Hi, value2Lo), 
+	alSource3i64SOFT(source, param,
+		I64_COMBINE(value1Hi, value1Lo),
+		I64_COMBINE(value2Hi, value2Lo),
 		I64_COMBINE(value3Hi, value3Lo));
 }
 
@@ -822,7 +834,7 @@ HL_PRIM void HL_NAME(al_get_sourcei64_soft)(unsigned source, int param, int *val
 	*valueLo = I64_LO(value);
 }
 
-HL_PRIM void HL_NAME(al_get_source3i64_soft)(unsigned source, int param, 
+HL_PRIM void HL_NAME(al_get_source3i64_soft)(unsigned source, int param,
 		int *value1Hi, int *value1Lo, int *value2Hi, int *value2Lo, int *value3Hi, int *value3Lo) {
 	ALint64SOFT value1, value2, value3;
 	CHECK_EXT(alGetSource3i64SOFT);
@@ -873,6 +885,98 @@ HL_PRIM void HL_NAME(al_process_updates_soft)() {
 
 DEFINE_PRIM(_VOID, al_defer_updates_soft,   _NO_ARG);
 DEFINE_PRIM(_VOID, al_process_updates_soft, _NO_ARG);
+#endif
+
+// ----------------------------------------------------------------------------
+#ifdef AL_SOFT_source_resampler
+// ----------------------------------------------------------------------------
+
+HL_PRIM vbyte* HL_NAME(al_get_stringi_soft)(int param, int index) {
+	CHECK_EXT(alGetStringiSOFT);
+	return (vbyte*)alGetStringiSOFT(param, index);
+}
+
+DEFINE_PRIM(_BYTES, al_get_stringi_soft, _I32 _I32);
+#endif
+
+// ----------------------------------------------------------------------------
+#ifdef AL_SOFT_events
+// ----------------------------------------------------------------------------
+
+HL_PRIM void HL_NAME(al_event_control_soft)(int count, int *types, bool enable) {
+	CHECK_EXT(alEventControlSOFT);
+	alEventControlSOFT(count, types, enable);
+}
+
+HL_PRIM void HL_NAME(al_event_callback_soft)(vclosure *callback, void *userParam) {
+	CHECK_EXT(alEventCallbackSOFT);
+	if( callback->hasValue ) hl_error("Cannot set closure callback");
+	alEventCallbackSOFT((ALEVENTPROCSOFT)callback->fun, userParam);
+}
+
+HL_PRIM vbyte* HL_NAME(al_get_pointer_soft)(int param) {
+	CHECK_EXT(alGetPointerSOFT);
+	return (vbyte*)alGetPointerSOFT(param);
+}
+
+HL_PRIM void HL_NAME(al_get_pointerv_soft)(int param, void **values) {
+	CHECK_EXT(alGetPointervSOFT);
+	alGetPointervSOFT(param, values);
+}
+
+DEFINE_PRIM(_VOID, al_event_control_soft, _I32 _REF(_I32) _BOOL);
+DEFINE_PRIM(_VOID, al_event_callback_soft, _FUN(_VOID, _I32 _I32 _I32 _I32 _BYTES _DYN) _DYN);
+DEFINE_PRIM(_DYN, al_get_pointer_soft, _I32);
+DEFINE_PRIM(_VOID, al_get_pointerv_soft, _I32 _REF(_DYN));
+#endif
+
+// ----------------------------------------------------------------------------
+#ifdef AL_SOFT_callback_buffer
+// ----------------------------------------------------------------------------
+
+HL_PRIM void HL_NAME(al_buffer_callback_soft)(int buffer, int format, int freq, vclosure *callback, void *userptr) {
+	CHECK_EXT(alBufferCallbackSOFT);
+	if( callback->hasValue ) hl_error("Cannot set closure callback");
+	alBufferCallbackSOFT(buffer, format, freq, (ALBUFFERCALLBACKTYPESOFT)callback->fun, userptr);
+}
+
+HL_PRIM void HL_NAME(al_get_buffer_ptr_soft)(int buffer, int param, void **ptr) {
+	CHECK_EXT(alGetBufferPtrSOFT);
+	alGetBufferPtrSOFT(buffer, param, ptr);
+}
+
+HL_PRIM void HL_NAME(al_get_buffer3_ptr_soft)(int buffer, int param, void **ptr0, void **ptr1, void **ptr2) {
+	CHECK_EXT(alGetBuffer3PtrSOFT);
+	alGetBuffer3PtrSOFT(buffer, param, ptr0, ptr1, ptr2);
+}
+
+HL_PRIM void HL_NAME(al_get_buffer_ptrv_soft)(int buffer, int param, void **ptr) {
+	CHECK_EXT(alGetBufferPtrvSOFT);
+	alGetBufferPtrvSOFT(buffer, param, ptr);
+}
+
+DEFINE_PRIM(_VOID, al_buffer_callback_soft, _I32 _I32 _I32 _FUN(_I32, _DYN _BYTES _I32) _DYN);
+DEFINE_PRIM(_VOID, al_get_buffer_ptr_soft, _I32 _I32 _REF(_DYN));
+DEFINE_PRIM(_VOID, al_get_buffer3_ptr_soft, _I32 _I32 _REF(_DYN) _REF(_DYN) _REF(_DYN));
+DEFINE_PRIM(_VOID, al_get_buffer_ptrv_soft, _I32 _I32 _REF(_DYN));
+#endif
+
+// ----------------------------------------------------------------------------
+#ifdef AL_SOFT_source_start_delay
+// ----------------------------------------------------------------------------
+
+HL_PRIM void HL_NAME(al_source_play_at_time_soft)(int source, int start_time_hi, int start_time_lo) {
+	CHECK_EXT(alSourcePlayAtTimeSOFT);
+	alSourcePlayAtTimeSOFT(source, I64_COMBINE(start_time_hi, start_time_lo));
+}
+
+HL_PRIM void HL_NAME(al_source_play_at_timev_soft)(int n, vbyte *sources, int start_time_hi, int start_time_lo) {
+	CHECK_EXT(alSourcePlayAtTimevSOFT);
+	alSourcePlayAtTimevSOFT(n, (ALuint*)sources, I64_COMBINE(start_time_hi, start_time_lo));
+}
+
+DEFINE_PRIM(_VOID, al_source_play_at_time_soft, _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, al_source_play_at_timev_soft, _I32 _BYTES _I32 _I32);
 #endif
 
 // ----------------------------------------------------------------------------

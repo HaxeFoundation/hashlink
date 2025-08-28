@@ -11,7 +11,7 @@ extern class ExtAL {
 	public static inline var FORMAT_IMA_ADPCM_STEREO16_EXT         = 0x10001;
 
 	// ------------------------------------------------------------------------
-	// AL_LOKI_IMA_ADPCM_format
+	// AL_LOKI_WAVE_format
 	// ------------------------------------------------------------------------
 
 	public static inline var FORMAT_WAVE_EXT                       = 0x10002;
@@ -284,4 +284,122 @@ extern class ExtAL {
 
 	public static inline var FORMAT_BFORMAT2D_MULAW                = 0x10031;
 	public static inline var FORMAT_BFORMAT3D_MULAW                = 0x10032;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_gain_clamp_ex
+	// ------------------------------------------------------------------------
+
+	public static inline var GAIN_LIMIT_SOFT                       = 0x200E;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_source_resampler
+	// ------------------------------------------------------------------------
+
+	public static inline var NUM_RESAMPLERS_SOFT                   = 0x1210;
+	public static inline var DEFAULT_RESAMPLER_SOFT                = 0x1211;
+	public static inline var SOURCE_RESAMPLER_SOFT                 = 0x1212;
+	public static inline var RESAMPLER_NAME_SOFT                   = 0x1213;
+
+	public static function getStringiSoft  (param : Int, index : Int) : hl.Bytes;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_source_spatialize
+	// ------------------------------------------------------------------------
+
+	public static inline var SOURCE_SPATIALIZE_SOFT                   = 0x1214;
+	public static inline var AUTO_SOFT                             = 0x0002;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_direct_channels_remix
+	// ------------------------------------------------------------------------
+
+	public static inline var DROP_UNMATCHED_SOFT                   = 0x0001;
+	public static inline var REMIX_UNMATCHED_SOFT                  = 0x0002;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_bformat_ex
+	// ------------------------------------------------------------------------
+
+	public static inline var AMBISONIC_LAYOUT_SOFT                 = 0x1997;
+	public static inline var AMBISONIC_SCALING_SOFT                = 0x1998;
+
+	// Ambisonic layouts
+	public static inline var FUMA_SOFT                             = 0x0000;
+	public static inline var ACN_SOFT                              = 0x0001;
+
+	// Ambisonic scalings (normalization)
+	public static inline var SN3D_SOFT                             = 0x0001;
+	public static inline var N3D_SOFT                              = 0x0002;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_effect_target
+	// ------------------------------------------------------------------------
+
+	public static inline var EFFECTSLOT_TARGET_SOFT                = 0x199C;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_events
+	// ------------------------------------------------------------------------
+
+	public static inline var EVENT_CALLBACK_FUNCTION_SOFT          = 0x19A2;
+	public static inline var EVENT_CALLBACK_USER_PARAM_SOFT        = 0x19A3;
+	public static inline var EVENT_TYPE_BUFFER_COMPLETED_SOFT      = 0x19A4;
+	public static inline var EVENT_TYPE_SOURCE_STATE_CHANGED_SOFT  = 0x19A5;
+	public static inline var EVENT_TYPE_DISCONNECTED_SOFT          = 0x19A6;
+
+	public static function eventControlSoft(count : Int, types : hl.Ref<Int>, enable : Bool) : Void;
+	public static function eventCallbackSoft(callback : (Int,Int,Int,Int,hl.Bytes,Dynamic)->Void, userParam : Dynamic) : Void;
+	public static function getPointerSoft(param : Int) : Dynamic;
+	public static function getPointervSoft(param : Int, values : hl.Ref<Dynamic>) : Void;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_callback_buffer
+	// ------------------------------------------------------------------------
+
+	public static inline var BUFFER_CALLBACK_FUNCTION_SOFT         = 0x19A0;
+	public static inline var BUFFER_CALLBACK_USER_PARAM_SOFT       = 0x19A1;
+
+	public static function bufferCallbackSoft(buffer : Int, format : Int, freq : Int, callback : (Dynamic,hl.Bytes,Int)->Int, userptr : Dynamic) : Void;
+	public static function getBufferPtrSoft(buffer : Int, param : Int, ptr : hl.Ref<Dynamic>) : Void;
+	public static function getBuffer3PtrSoft(buffer : Int, param : Int, ptr0 : hl.Ref<Dynamic>, ptr1 : hl.Ref<Dynamic>, ptr2 : hl.Ref<Dynamic>) : Void;
+	public static function getBufferPtrvSoft(buffer : Int, param : Int, ptr : hl.Ref<Dynamic>) : Void;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_UHJ
+	// ------------------------------------------------------------------------
+
+	public static inline var FORMAT_UHJ2CHN8_SOFT                  = 0x19A2;
+	public static inline var FORMAT_UHJ2CHN16_SOFT                 = 0x19A3;
+	public static inline var FORMAT_UHJ2CHN_FLOAT32_SOFT           = 0x19A4;
+	public static inline var FORMAT_UHJ3CHN8_SOFT                  = 0x19A5;
+	public static inline var FORMAT_UHJ3CHN16_SOFT                 = 0x19A6;
+	public static inline var FORMAT_UHJ3CHN_FLOAT32_SOFT           = 0x19A7;
+	public static inline var FORMAT_UHJ4CHN8_SOFT                  = 0x19A8;
+	public static inline var FORMAT_UHJ4CHN16_SOFT                 = 0x19A9;
+	public static inline var FORMAT_UHJ4CHN_FLOAT32_SOFT           = 0x19AA;
+	public static inline var STEREO_MODE_SOFT                      = 0x19B0;
+	public static inline var NORMAL_SOFT                           = 0x0000;
+	public static inline var SUPER_STEREO_SOFT                     = 0x0001;
+	public static inline var SUPER_STEREO_WIDTH_SOFT               = 0x19B1;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_UHJ_ex
+	// ------------------------------------------------------------------------
+
+	public static inline var FORMAT_UHJ2CHN_MULAW_SOFT             = 0x19B3;
+	public static inline var FORMAT_UHJ2CHN_ALAW_SOFT              = 0x19B4;
+	public static inline var FORMAT_UHJ2CHN_IMA4_SOFT              = 0x19B5;
+	public static inline var FORMAT_UHJ2CHN_MSADPCM_SOFT           = 0x19B6;
+	public static inline var FORMAT_UHJ3CHN_MULAW_SOFT             = 0x19B7;
+	public static inline var FORMAT_UHJ3CHN_ALAW_SOFT              = 0x19B8;
+	public static inline var FORMAT_UHJ4CHN_MULAW_SOFT             = 0x19B9;
+	public static inline var FORMAT_UHJ4CHN_ALAW_SOFT              = 0x19BA;
+
+	// ------------------------------------------------------------------------
+	// AL_SOFT_source_start_delay
+	// ------------------------------------------------------------------------
+
+	public static function sourcePlayAtTimeSoft(source : Int, startTimeHi : Int, startTimeLo : Int) : Void;
+	public static function sourcePlayAtTimevSoft(n : Int, sources : hl.Bytes, startTimeHi : Int, startTimeLo : Int) : Void;
+
 }

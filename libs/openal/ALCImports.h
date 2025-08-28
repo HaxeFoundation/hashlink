@@ -19,6 +19,10 @@ ALC_IMPORT(alcGetStringiSOFT, LPALCGETSTRINGISOFT);
 ALC_IMPORT(alcResetDeviceSOFT, LPALCRESETDEVICESOFT);
 #endif
 
+#ifdef ALC_SOFT_device_clock
+ALC_IMPORT(alcGetInteger64vSOFT, LPALCGETINTEGER64VSOFT);
+#endif
+
 #ifdef ALC_SOFT_reopen_device
 ALC_IMPORT(alcReopenDeviceSOFT, LPALCREOPENDEVICESOFT);
 #endif
