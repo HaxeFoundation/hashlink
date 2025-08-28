@@ -243,7 +243,6 @@ HL_PRIM void HL_NAME(al_load_extensions)() {
 #endif
 }
 
-
 HL_PRIM bool HL_NAME(al_is_extension_present)(vbyte *extname) {
 	return alIsExtensionPresent((char*)extname) == AL_TRUE;
 }
@@ -689,7 +688,6 @@ HL_PRIM bool HL_NAME(alc_reopen_device_soft)(ALCdevice *device, vbyte *deviceNam
 	return alcReopenDeviceSOFT(device, deviceName, (ALCint*)attribs);
 }
 
-
 DEFINE_PRIM(_BOOL,  alc_reopen_device_soft, TDEVICE _BYTES _BYTES);
 #endif
 
@@ -735,7 +733,6 @@ HL_PRIM void HL_NAME(al_request_foldback_stop)() {
 DEFINE_PRIM(_VOID, al_request_foldback_start, _I32 _I32 _I32 _BYTES _FUN(_VOID, _I32 _I32));
 DEFINE_PRIM(_VOID, al_request_foldback_stop,  _NO_ARG);
 #endif
-
 
 // ----------------------------------------------------------------------------
 #ifdef AL_SOFT_buffer_samples
