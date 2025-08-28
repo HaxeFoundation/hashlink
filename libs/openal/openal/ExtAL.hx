@@ -401,5 +401,4 @@ extern class ExtAL {
 
 	public static function sourcePlayAtTimeSoft(source : Int, startTimeHi : Int, startTimeLo : Int) : Void;
 	public static function sourcePlayAtTimevSoft(n : Int, sources : hl.Bytes, startTimeHi : Int, startTimeLo : Int) : Void;
-
 }
