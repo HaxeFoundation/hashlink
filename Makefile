@@ -105,7 +105,7 @@ MYSQL = libs/mysql/socket.o libs/mysql/sha1.o libs/mysql/my_proto.o libs/mysql/m
 
 SQLITE = libs/sqlite/sqlite.o
 
-HEAPS = libs/heaps/mikkt.o libs/heaps/meshoptimizer.o libs/heaps/vhacd.o
+HEAPS = libs/heaps/mikkt.o libs/heaps/meshoptimizer.o libs/heaps/vhacd.o libs/heaps/renderdoc.o
 HEAPS += include/mikktspace/mikktspace.o
 HEAPS += include/meshoptimizer/allocator.o include/meshoptimizer/overdrawoptimizer.o \
 	include/meshoptimizer/vcacheoptimizer.o include/meshoptimizer/clusterizer.o \
@@ -115,7 +115,7 @@ HEAPS += include/meshoptimizer/allocator.o include/meshoptimizer/overdrawoptimiz
 	include/meshoptimizer/spatialorder.o include/meshoptimizer/vfetchanalyzer.o \
 	include/meshoptimizer/stripifier.o include/meshoptimizer/vfetchoptimizer.o \
 	include/meshoptimizer/overdrawanalyzer.o include/meshoptimizer/vcacheanalyzer.o
-HEAPS_CFLAGS = -fvisibility=hidden -I include/mikktspace -I include/meshoptimizer -I include/vhacd
+HEAPS_CFLAGS = -fvisibility=hidden -I include/mikktspace -I include/meshoptimizer -I include/vhacd -I include/renderdoc
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
