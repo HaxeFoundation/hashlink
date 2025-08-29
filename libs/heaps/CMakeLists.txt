@@ -2,6 +2,7 @@ set(HEAPS_INCLUDE_DIRS
     ${INCLUDES_BASE_DIR}/mikktspace
     ${INCLUDES_BASE_DIR}/meshoptimizer
     ${INCLUDES_BASE_DIR}/vhacd
+    ${INCLUDES_BASE_DIR}/renderdoc
     .
 )
 
@@ -26,6 +27,7 @@ add_library(heaps.hdll
     mikkt.c
     meshoptimizer.cpp
     vhacd.cpp
+    renderdoc.c
 )
 
 set_as_hdll(heaps)
