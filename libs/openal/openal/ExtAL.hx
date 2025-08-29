@@ -300,13 +300,13 @@ extern class ExtAL {
 	public static inline var SOURCE_RESAMPLER_SOFT                 = 0x1212;
 	public static inline var RESAMPLER_NAME_SOFT                   = 0x1213;
 
-	public static function getStringiSoft  (param : Int, index : Int) : hl.Bytes;
+	public static function getStringiSoft(param : Int, index : Int) : hl.Bytes;
 
 	// ------------------------------------------------------------------------
 	// AL_SOFT_source_spatialize
 	// ------------------------------------------------------------------------
 
-	public static inline var SOURCE_SPATIALIZE_SOFT                   = 0x1214;
+	public static inline var SOURCE_SPATIALIZE_SOFT                = 0x1214;
 	public static inline var AUTO_SOFT                             = 0x0002;
 
 	// ------------------------------------------------------------------------

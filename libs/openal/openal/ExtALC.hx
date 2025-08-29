@@ -126,7 +126,7 @@ extern class ExtALC {
 	// ----------------------------------------------------------------------------
 
 	public static inline var SOFT_reopen_device = "ALC_SOFT_reopen_device";
-	public static function reopenDeviceSoft (device : Device, deviceName : hl.Bytes, attribs : hl.Bytes) : Bool;
+	public static function reopenDeviceSoft(device : Device, deviceName : hl.Bytes, attribs : hl.Bytes) : Bool;
 
 	// ------------------------------------------------------------------------
 	// ALC_SOFT_output_mode
