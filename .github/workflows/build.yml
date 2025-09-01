@@ -372,8 +372,8 @@ jobs:
         gh release create latest \
           --prerelease \
           --title "HashLink Nightly Build" \
-          "darwin-cmake-64/hashlink-${short_commit}-darwin.tar.gz#hashlink-latest-darwin.tar.gz" \
-          "darwin-cmake-arm64/hashlink-${short_commit}-darwin-arm64.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
+          "darwin-cmake-64/hashlink-${short_commit}-darwin-cmake.tar.gz#hashlink-latest-darwin.tar.gz" \
+          "darwin-cmake-arm64/hashlink-${short_commit}-darwin-arm64-cmake.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
           "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
           "windows-vs2019-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"
