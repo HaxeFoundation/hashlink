@@ -60,11 +60,7 @@
 #	define TARGET_LITTLE_ENDIAN
 #endif
 
-#ifndef true
-#	define true 1
-#	define false 0
-	typedef int bool;
-#endif
+#include <stdbool.h>
 
 #endif
 /* ************************************************************************ */

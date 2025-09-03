@@ -66,7 +66,7 @@ HL_PRIM int HL_NAME(rdoc_get_num_captures)() {
 HL_PRIM bool HL_NAME(rdoc_get_capture)(int index, vbyte *filename, int *pathlength, int64 *timestamp) {
 	if( rdoc_api == NULL )
 		return false;
-	int ret = rdoc_api->GetCapture(index, (char*)filename, pathlength, timestamp);
+	int ret = rdoc_api->GetCapture(index, (char*)filename, (uint32_t*)pathlength, (uint64_t*)timestamp);
 	return ret == 1 ? true : false;
 }
 
