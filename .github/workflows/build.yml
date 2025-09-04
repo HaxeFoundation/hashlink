@@ -23,7 +23,7 @@ jobs:
       matrix:
         target: [linux, darwin, windows]
         architecture: [32, 64, arm64]
-        build_system: [make, cmake, vs2019, makegcc]
+        build_system: [make, cmake, vs2019, makegcc14]
 
         include:
           - target: linux
@@ -95,10 +95,10 @@ jobs:
             build_system: make
 
           - target: darwin
-            build_system: makegcc
+            build_system: makegcc14
 
           - target: windows
-            build_system: makegcc
+            build_system: makegcc14
 
     steps:
     - name: "SCM Checkout"
@@ -153,14 +153,13 @@ jobs:
         esac
 
     - name: "Install: GCC 14"
-      if: matrix.build_system == 'makegcc'
+      if: matrix.build_system == 'makegcc14'
       run: |
           sudo add-apt-repository universe
           sudo apt update
           sudo apt install -y gcc-14 g++-14
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 --slave /usr/bin/g++ g++ /usr/bin/g++-14
           gcc --version
-          export CC=gcc
 
     - name: Install haxe
       uses: krdlab/setup-haxe@f0a0baa8ccdb1fe4fc316c8f30eb3ca77aa4ea4e
