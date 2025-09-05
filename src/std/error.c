@@ -79,9 +79,20 @@ HL_PRIM void hl_set_error_handler( vclosure *d ) {
 	t->exc_handler = d;
 }
 
+#ifdef HL_DEBUG
+static bool hl_is_debug_mode = true;
+#else
+static bool hl_is_debug_mode = false;
+#endif
+
+HL_PRIM void hl_set_debug_mode( bool b ) {
+	hl_is_debug_mode = b;
+}
+
 static bool break_on_trap( hl_thread_info *t, hl_trap_ctx *trap, vdynamic *v ) {
 	bool unwrapped = false;
 	vdynamic *vvalue = NULL;
+	if( !hl_is_debug_mode ) return false;
 	while( true ) {
 		if( trap == NULL || trap == t->trap_uncaught || t->trap_current == NULL || trap->prev == NULL ) return true;
 		if( !trap->tcheck || !v ) return false;
@@ -114,11 +125,11 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	t->trap_current = trap->prev;
 	call_handler = trap == t->trap_uncaught || t->trap_current == NULL;
 	if( (t->flags&HL_EXC_CATCH_ALL) || break_on_trap(t,trap,v) ) {
-		if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
 		t->flags |= HL_EXC_IS_THROW;
 		hl_debug_break();
 		t->flags &= ~HL_EXC_IS_THROW;
 	}
+	if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
 	t->flags &= ~HL_EXC_RETHROW;
 	if( t->exc_handler && call_handler ) hl_dyn_call_safe(t->exc_handler,&v,1,&call_handler);
 	if( throw_jump == NULL ) throw_jump = longjmp;

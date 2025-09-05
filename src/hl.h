@@ -639,6 +639,7 @@ HL_API bool hl_maybe_print_custom_stack( vdynamic *exc );
 HL_API void hl_print_uncaught_exception( vdynamic *exc );
 HL_API varray *hl_exception_stack( void );
 HL_API bool hl_detect_debugger( void );
+HL_API void hl_set_debug_mode( bool b );
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
