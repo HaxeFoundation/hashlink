@@ -23,11 +23,11 @@ jobs:
       matrix:
         target: [linux, darwin, windows]
         architecture: [32, 64, arm64]
-        build_system: [make, cmake, vs2019]
+        build_system: [make, cmake, vs2019, makegcc14]
 
         include:
           - target: linux
-            runner: ubuntu-22.04
+            runner: ubuntu-latest
             haxe_nightly_dir: linux64
             archive_ext: tar.gz
 
@@ -94,6 +94,12 @@ jobs:
             architecture: 64
             build_system: make
 
+          - target: darwin
+            build_system: makegcc14
+
+          - target: windows
+            build_system: makegcc14
+
     steps:
     - name: "SCM Checkout"
       uses: actions/checkout@v5
@@ -146,6 +152,15 @@ jobs:
             ;;
         esac
 
+    - name: "Install: GCC 14"
+      if: matrix.build_system == 'makegcc14'
+      run: |
+          sudo add-apt-repository universe
+          sudo apt update
+          sudo apt install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 --slave /usr/bin/g++ g++ /usr/bin/g++-14
+          gcc --version
+
     - name: Install haxe
       uses: krdlab/setup-haxe@f0a0baa8ccdb1fe4fc316c8f30eb3ca77aa4ea4e
       with:
@@ -186,7 +201,7 @@ jobs:
                   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
                   -DFLAT_INSTALL_TREE=ON
                 ;;
-              *)
+              linux64)
                 cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
             esac
 
@@ -206,7 +221,7 @@ jobs:
             echo "WINDOWS_BUILD_FOLDER=$BUILD_FOLDER" >> $GITHUB_ENV
             ;;
 
-          make)
+          make*)
             make
             sudo make install
             if [[ ${{ matrix.target }} == linux ]]; then
@@ -240,7 +255,7 @@ jobs:
           vs2019)
             ${{ env.WINDOWS_BUILD_FOLDER }}/hl.exe --version
             ;;
-          make)
+          make*)
             if [[ ${{ matrix.architecture }} != arm64 ]]; then
               ./hl --version
               case ${{ matrix.target }} in
