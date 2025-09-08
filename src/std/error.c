@@ -167,7 +167,7 @@ HL_PRIM void hl_dump_stack() {
 	fflush(stdout);
 }
 
-HL_PRIM bool hl_maybe_print_custom_stack( vdynamic *exc ) {
+static bool maybe_print_custom_stack( vdynamic *exc ) {
 	hl_type *ot = exc->t;
 	while( ot->kind == HOBJ ) {
 		if( ot->obj->super == NULL ) {
@@ -189,7 +189,7 @@ HL_PRIM bool hl_maybe_print_custom_stack( vdynamic *exc ) {
 
 HL_PRIM void hl_print_uncaught_exception(vdynamic *exc) {
 	uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
-	if (!hl_maybe_print_custom_stack(exc)) {
+	if (!maybe_print_custom_stack(exc)) {
 		varray *a = hl_exception_stack();
 		for (int i = 0; i < a->size; i++)
 			uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar *)[i]);
