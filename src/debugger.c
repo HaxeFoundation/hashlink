@@ -142,6 +142,7 @@ h_bool hl_module_debug( hl_module *m, int port, h_bool wait ) {
 	hl_socket_close(debug_socket);
 	debug_socket = NULL;
 #	endif
+	hl_set_debug_mode(true);
 	return true;
 }
 
