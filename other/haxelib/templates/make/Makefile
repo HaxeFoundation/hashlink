@@ -3,9 +3,9 @@
 UNAME := $(shell uname)
 CFLAGS=-O3 -std=c11 -DHL_MAKE -I$$makePath(::relDir::)
 ifeq ($(UNAME),Darwin)
-LDLIBS=-lhl -lm -luv::foreach libraries:: /usr/local/lib/::name::.hdll::end::
+LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: /usr/local/lib/::name::.hdll::end::
 else
-LDLIBS=-lhl -lm -luv::foreach libraries:: -l:::name::.hdll::end::
+LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: -l:::name::.hdll::end::
 endif
 
 ifdef HASHLINK
