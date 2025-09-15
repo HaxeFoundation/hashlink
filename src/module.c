@@ -23,6 +23,7 @@
 #include <hlmodule.h>
 
 #ifdef HL_WIN
+#	undef _GUID
 #	include <windows.h>
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #	define dlopen(l,p)		(void*)( (l) ? LoadLibraryA(l) : (HMODULE)&__ImageBase)
@@ -476,7 +477,7 @@ static void hl_module_init_indexes( hl_module *m ) {
 #include <jitprofiling.h>
 h_bool hl_module_init_vtune( hl_module *m ) {
 	int i;
-	if( !iJIT_IsProfilingActive() )
+	if( !iJIT_IsProfilingActive() || m->jit_debug == NULL )
 		return false;
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
@@ -629,7 +630,8 @@ static void hl_module_add( hl_module *m ) {
 	free(old_modules);
 }
 
-int hl_module_init( hl_module *m, h_bool hot_reload ) {
+void hl_setup_vtune( void *vtune_init, void *m );
+int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later ) {
 	int i;
 	jit_ctx *ctx;
 	// expand globals
@@ -682,7 +684,11 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	}
 
 #	ifdef HL_VTUNE
-	hl_module_init_vtune(m);
+	if( !vtune_later ) {
+		hl_module_init_vtune(m);
+	} else {
+		hl_setup_vtune(hl_module_init_vtune, m);
+	}
 #	endif
 	hl_module_add(m);
 	hl_setup_exception(module_resolve_symbol, module_capture_stack);
@@ -891,12 +897,16 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	hl_module_add(m2);
 
 	// call entry point (will only update types)
-	if( m2->functions_ptrs[c->entrypoint] ) {
-		vclosure cl;
-		cl.t = c->functions[m2->functions_indexes[c->entrypoint]].type;
-		cl.fun = m2->functions_ptrs[c->entrypoint];
-		cl.hasValue = 0;
-		hl_dyn_call(&cl,NULL,0);
+	for(i=modules_count-1;i>=0;i--) {
+		hl_module *m = cur_modules[i];
+		if( m->functions_ptrs[m->code->entrypoint] ) {
+			vclosure cl;
+			cl.t = m->code->functions[m->functions_indexes[m->code->entrypoint]].type;
+			cl.fun = m->functions_ptrs[m->code->entrypoint];
+			cl.hasValue = 0;
+			hl_dyn_call(&cl,NULL,0);
+			break;
+		}
 	}
 
 	return true;

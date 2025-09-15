@@ -144,7 +144,7 @@ const char* hl_op_name( int op );
 
 typedef unsigned char h_bool;
 hl_module *hl_module_alloc( hl_code *code );
-int hl_module_init( hl_module *m, h_bool hot_reload );
+int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later );
 h_bool hl_module_patch( hl_module *m, hl_code *code );
 void hl_module_free( hl_module *m );
 h_bool hl_module_debug( hl_module *m, int port, h_bool wait );

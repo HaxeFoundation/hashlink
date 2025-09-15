@@ -21,6 +21,7 @@
  */
 
 #include <hl.h>
+#include "hlsystem.h"
 
 typedef struct _hl_semaphore hl_semaphore;
 typedef struct _hl_condition hl_condition;
@@ -907,16 +908,10 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 
 static void hl_run_thread( vclosure *c ) {
 	bool isExc;
-	varray *a;
-	int i;
 	vdynamic *exc = hl_dyn_call_safe(c,NULL,0,&isExc);
 	if( !isExc )
 		return;
-	a = hl_exception_stack();
-	uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
-	for(i=0;i<a->size;i++)
-		uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
-	fflush(stdout);
+	hl_print_uncaught_exception(exc);
 }
 
 HL_PRIM hl_thread *hl_thread_create( vclosure *c ) {
@@ -970,7 +965,7 @@ HL_PRIM void hl_thread_set_name( hl_thread *t, const char *name ) {
 	// nothing
 #elif defined(HL_WIN)
 	SetThreadName((DWORD)(int_val)t,name);
-#elif defined(HL_MAC)
+#elif defined(HL_MAC) || defined(HL_IOS)
 	// pthread_setname_np only possible for current thread
 #else
 	pthread_setname_np((pthread_t)t,name);

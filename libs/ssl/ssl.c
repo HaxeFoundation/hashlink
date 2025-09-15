@@ -1,8 +1,8 @@
 #define HL_NAME(n) ssl_##n
 
-#define _WINSOCKAPI_
 #include <hl.h>
 #ifdef HL_WIN
+#undef _GUID
 #include <winsock2.h>
 #include <wincrypt.h>
 #else
@@ -32,11 +32,15 @@ typedef int SOCKET;
 #include "mbedtls/x509_crt.h"
 #include "mbedtls/ssl.h"
 
+#ifdef MBEDTLS_PSA_CRYPTO_C
+#include <psa/crypto.h>
+#endif
+
 #ifdef HL_CONSOLE
 mbedtls_x509_crt *hl_init_cert_chain();
 #endif
 
-#if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS)
+#ifndef MSG_NOSIGNAL
 #	define MSG_NOSIGNAL 0
 #endif
 
@@ -362,39 +366,25 @@ HL_PRIM hl_ssl_cert *HL_NAME(cert_load_defaults)() {
 		CertCloseStore(store, 0);
 	}
 #elif defined(HL_MAC)
-	CFMutableDictionaryRef search;
-	CFArrayRef result;
-	SecKeychainRef keychain;
-	SecCertificateRef item;
-	CFDataRef dat;
+	CFArrayRef certs;
 	// Load keychain
-	if (SecKeychainOpen("/System/Library/Keychains/SystemRootCertificates.keychain", &keychain) != errSecSuccess)
+	if (SecTrustCopyAnchorCertificates(&certs) != errSecSuccess)
 		return NULL;
 
-	// Search for certificates
-	search = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
-	CFDictionarySetValue(search, kSecClass, kSecClassCertificate);
-	CFDictionarySetValue(search, kSecMatchLimit, kSecMatchLimitAll);
-	CFDictionarySetValue(search, kSecReturnRef, kCFBooleanTrue);
-	CFDictionarySetValue(search, kSecMatchSearchList, CFArrayCreate(NULL, (const void **)&keychain, 1, NULL));
-	if (SecItemCopyMatching(search, (CFTypeRef *)&result) == errSecSuccess) {
-		CFIndex n = CFArrayGetCount(result);
-		for (CFIndex i = 0; i < n; i++) {
-			item = (SecCertificateRef)CFArrayGetValueAtIndex(result, i);
-
-			// Get certificate in DER format
-			dat = SecCertificateCopyData(item);
-			if (dat) {
-				if (chain == NULL) {
-					chain = (mbedtls_x509_crt*)malloc(sizeof(mbedtls_x509_crt));
-					mbedtls_x509_crt_init(chain);
-				}
-				mbedtls_x509_crt_parse_der(chain, (unsigned char *)CFDataGetBytePtr(dat), CFDataGetLength(dat));
-				CFRelease(dat);
+	CFIndex count = CFArrayGetCount(certs);
+	for(CFIndex i = 0; i < count; i++) {
+		SecCertificateRef item = (SecCertificateRef)CFArrayGetValueAtIndex(certs, i);
+		CFDataRef data = SecCertificateCopyData(item);
+		if(data) {
+			if (chain == NULL) {
+				chain = (mbedtls_x509_crt*)malloc(sizeof(mbedtls_x509_crt));
+				mbedtls_x509_crt_init(chain);
 			}
+			mbedtls_x509_crt_parse_der(chain, (unsigned char *)CFDataGetBytePtr(data), CFDataGetLength(data));
+			CFRelease(data);
 		}
 	}
-	CFRelease(keychain);
+	CFRelease(certs);
 #elif defined(HL_CONSOLE)
 	chain = hl_init_cert_chain();
 #endif
@@ -777,6 +767,10 @@ HL_PRIM void HL_NAME(ssl_init)() {
 	mbedtls_entropy_init(&entropy);
 	mbedtls_ctr_drbg_init(&ctr_drbg);
 	mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+
+	#ifdef MBEDTLS_PSA_CRYPTO_C
+	psa_crypto_init();
+	#endif
 }
 
 DEFINE_PRIM(_VOID, ssl_init, _NO_ARG);

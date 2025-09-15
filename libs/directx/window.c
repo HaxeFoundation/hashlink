@@ -1,5 +1,6 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
+#include "hlsystem.h"
 
 #define MAX_EVENTS 1024
 
@@ -17,6 +18,7 @@ typedef enum {
 	DropStart = 10,
 	DropFile = 11,
 	DropEnd = 12,
+	KeyMapChanged = 13,
 } EventType;
 
 typedef enum {
@@ -83,7 +85,8 @@ typedef enum {
 	RButton = 8,
 	MButton = 16,
 	XButton1 = 32,
-	XButton2 = 64
+	XButton2 = 64,
+	NotForeground = 128
 } mouse_capture_flags;
 static int disable_capture = 0;
 static bool capture_mouse = false;
@@ -138,14 +141,14 @@ static bool setRelativeMode( HWND wnd, bool enabled ) {
 	RAWINPUTDEVICE mouse = { 0x01, 0x02, 0, NULL }; /* Mouse: UsagePage = 1, Usage = 2 */
 
 	if ( relative_mouse == enabled ) return true;
-	
+
 	if ( !enabled ) {
 		mouse.dwFlags |= RIDEV_REMOVE;
 		if ( show_cursor ) SetCursor(cur_cursor);
 	} else {
 		SetCursor(NULL);
 	}
-	
+
 	relative_mouse = enabled;
 	updateClipCursor(wnd);
 
@@ -203,8 +206,8 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_SYSCOMMAND:
 		if( wparam == SC_KEYMENU && (lparam>>16) <= 0 )
 			return 0;
-		break;	
-	case WM_MOUSEMOVE: 
+		break;
+	case WM_MOUSEMOVE:
 		{
 			dx_events *evt = get_events(wnd);
 			if( !evt->is_over ) {
@@ -229,11 +232,11 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 				RAWINPUT inp;
 				UINT size = sizeof(inp);
 				GetRawInputData(hRawInput, RID_INPUT, &inp, &size, sizeof(RAWINPUTHEADER));
-				
+
 				// Ignore pseudo-movement from touch events.
 				if ( inp.header.dwType == RIM_TYPEMOUSE ) {
 					RAWMOUSE* mouse = &inp.data.mouse;
-					
+
 					if ( (mouse->usFlags & 0x01) == MOUSE_MOVE_RELATIVE ) {
 						if ( mouse->lLastX != 0 || mouse->lLastY != 0 ) {
 							e = addEvent(wnd, MouseMove);
@@ -243,12 +246,12 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 							e->mouseXRel = mouse->lLastX;
 							e->mouseYRel = mouse->lLastY;
 						}
-						
+
 					} else if ( mouse->lLastX || mouse->lLastY ) {
 						// Absolute movement - simulate relative movement
-						
+
 						static POINT lastMousePos;
-						
+
 						bool virtual_desktop = mouse->usFlags & MOUSE_VIRTUAL_DESKTOP;
 						int w = GetSystemMetrics(virtual_desktop ? SM_CXVIRTUALSCREEN : SM_CXSCREEN);
 						int h = GetSystemMetrics(virtual_desktop ? SM_CYVIRTUALSCREEN : SM_CYSCREEN);
@@ -268,7 +271,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 							lastMousePos.x = x;
 							lastMousePos.y = y;
 						}
-						
+
 					}
 				}
 			}
@@ -291,7 +294,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 			}
 		}
 		bool repeat = (umsg == WM_KEYDOWN || umsg == WM_SYSKEYDOWN) && (lparam & 0x40000000) != 0;
-		// see 
+		// see
 		e = addEvent(wnd,(umsg == WM_KEYUP || umsg == WM_SYSKEYUP) ? KeyUp : KeyDown);
 		e->keyCode = (int)wparam;
 		e->scanCode = (lparam >> 16) & 0xFF;
@@ -318,7 +321,7 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 			shift_downs[0] = false;
 			e = addEvent(wnd,KeyUp);
 			e->keyCode = VK_SHIFT | 256;
-		}			
+		}
 		if( shift_downs[1] && GetKeyState(VK_RSHIFT) >= 0 ) {
 			//printf("RSHIFT RELEASED\n");
 			shift_downs[1] = false;
@@ -396,8 +399,16 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		addState(Blur);
 		break;
 	case WM_WINDOWPOSCHANGED:
+	{
+		HWND wndFg = GetForegroundWindow();
+		if( wndFg != wnd ) {
+			disable_capture |= NotForeground;
+		} else {
+			disable_capture &= ~NotForeground;
+		}
 		updateClipCursor(wnd);
 		break;
+	}
 	case WM_GETMINMAXINFO:
 	{
 		dx_events *buf = get_events(wnd);
@@ -504,6 +515,9 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		DragFinish(drop);
 		break;
 	}
+	case WM_INPUTLANGCHANGE:
+		e = addEvent(wnd,KeyMapChanged);
+		break;
 	case WM_CLOSE:
 		addState(Close);
 		return 0;
@@ -523,7 +537,7 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 		wc.cbClsExtra    = 0;
 		wc.cbWndExtra    = 0;
 		wc.hInstance     = hinst;
-		wc.hIcon		 = ExtractIcon(hinst, fileName, 0);
+		wc.hIcon         = ExtractIcon(hinst, fileName, 0);
 		wc.hIconSm       = wc.hIcon;
 		wc.hCursor       = NULL;
 		wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
@@ -706,7 +720,7 @@ HL_PRIM void HL_NAME(win_set_focus)(dx_window* win) {
 HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
 	if( fs ) {
 		MONITORINFO mi = { sizeof(mi) };
-        GetMonitorInfo(MonitorFromWindow(win,MONITOR_DEFAULTTOPRIMARY), &mi);
+		GetMonitorInfo(MonitorFromWindow(win,MONITOR_DEFAULTTOPRIMARY), &mi);
 		SetWindowLong(win,GWL_STYLE,WS_POPUP | WS_VISIBLE);
 		SetWindowPos(win,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top,SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	} else {
@@ -956,46 +970,46 @@ HL_PRIM dx_cursor HL_NAME(load_cursor)( int res ) {
 
 HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, int hotX, int hotY ) {
 	int pad = sizeof(void*) << 3;
-    HICON hicon;
-    HDC hdc = GetDC(NULL);
-    BITMAPV4HEADER bmh;
-    void *pixels;
-    void *maskbits;
-    int maskbitslen;
-    ICONINFO ii;
+	HICON hicon;
+	HDC hdc = GetDC(NULL);
+	BITMAPV4HEADER bmh;
+	void *pixels;
+	void *maskbits;
+	int maskbitslen;
+	ICONINFO ii;
 
-    ZeroMemory(&bmh,sizeof(bmh));
-    bmh.bV4Size = sizeof(bmh);
-    bmh.bV4Width = width;
-    bmh.bV4Height = -height;
-    bmh.bV4Planes = 1;
-    bmh.bV4BitCount = 32;
-    bmh.bV4V4Compression = BI_BITFIELDS;
-    bmh.bV4AlphaMask = 0xFF000000;
-    bmh.bV4RedMask   = 0x00FF0000;
-    bmh.bV4GreenMask = 0x0000FF00;
-    bmh.bV4BlueMask  = 0x000000FF;
+	ZeroMemory(&bmh,sizeof(bmh));
+	bmh.bV4Size = sizeof(bmh);
+	bmh.bV4Width = width;
+	bmh.bV4Height = -height;
+	bmh.bV4Planes = 1;
+	bmh.bV4BitCount = 32;
+	bmh.bV4V4Compression = BI_BITFIELDS;
+	bmh.bV4AlphaMask = 0xFF000000;
+	bmh.bV4RedMask   = 0x00FF0000;
+	bmh.bV4GreenMask = 0x0000FF00;
+	bmh.bV4BlueMask  = 0x000000FF;
 
-    maskbitslen = ((width + (-width)%pad) >> 3) * height;
-    maskbits = malloc(maskbitslen);
+	maskbitslen = ((width + (-width)%pad) >> 3) * height;
+	maskbits = malloc(maskbitslen);
 	if( maskbits == NULL )
 		return NULL;
 	memset(maskbits,0xFF,maskbitslen);
 
 	memset(&ii,0,sizeof(ii));
-    ii.fIcon = FALSE;
-    ii.xHotspot = (DWORD)hotX;
-    ii.yHotspot = (DWORD)hotY;
-    ii.hbmColor = CreateDIBSection(hdc, (BITMAPINFO*)&bmh, DIB_RGB_COLORS, &pixels, NULL, 0);
-    ii.hbmMask = CreateBitmap(width, height, 1, 1, maskbits);
-    ReleaseDC(NULL, hdc);
-    free(maskbits);
+	ii.fIcon = FALSE;
+	ii.xHotspot = (DWORD)hotX;
+	ii.yHotspot = (DWORD)hotY;
+	ii.hbmColor = CreateDIBSection(hdc, (BITMAPINFO*)&bmh, DIB_RGB_COLORS, &pixels, NULL, 0);
+	ii.hbmMask = CreateBitmap(width, height, 1, 1, maskbits);
+	ReleaseDC(NULL, hdc);
+	free(maskbits);
 
-    memcpy(pixels, data, height * width * 4);
-    hicon = CreateIconIndirect(&ii);
+	memcpy(pixels, data, height * width * 4);
+	hicon = CreateIconIndirect(&ii);
 
-    DeleteObject(ii.hbmColor);
-    DeleteObject(ii.hbmMask);
+	DeleteObject(ii.hbmColor);
+	DeleteObject(ii.hbmMask);
 	return hicon;
 }
 

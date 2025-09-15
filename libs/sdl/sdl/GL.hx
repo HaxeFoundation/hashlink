@@ -34,9 +34,18 @@ class GL {
 		return false;
 	}
 
+	@:hlNative("?sdl","gl_set_debug")
+	public static function setDebug( enable : Bool ) : Bool {
+		return false;
+	}
+
 	// non standard
 	public static function getConfigParameter( v : Int ) : Int {
 		return 0;
+	}
+
+	public static function hasExtension( name : String ) : Bool {
+		return false;
 	}
 
 	public static function isContextLost() : Bool {
@@ -351,6 +360,10 @@ class GL {
 	public static function bufferSubData( target : Int, offset : Int, data : hl.Bytes, srcOffset : Int, srcLength : Int ) {
 	}
 
+	@:hlNative("?sdl","gl_get_buffer_sub_data")
+	public static function getBufferSubData( target : Int, offset : Int, data : hl.Bytes, srcOffset : Int, srcLength : Int ) {
+	}
+
 	public static function enableVertexAttribArray( attrib : Int ) {
 	}
 
@@ -403,6 +416,9 @@ class GL {
 	}
 
 	public static function multiDrawElementsIndirect( mode : Int, type : Int, data : hl.Bytes, count : Int, stride : Int ) {
+	}
+
+	public static function multiDrawElementsIndirectCount( mode : Int, type : Int, data : hl.Bytes, drawcount : hl.Bytes, maxdrawcount : Int, stride : Int ) {
 	}
 
 	// queries
@@ -917,6 +933,7 @@ class GL {
 	public static inline var READ_FRAMEBUFFER               = 0x8CA8;
 	public static inline var DRAW_FRAMEBUFFER               = 0x8CA9;
 	public static inline var DRAW_INDIRECT_BUFFER           = 0x8F3F;
+	public static inline var PARAMETER_BUFFER               = 0x80ee;
 
 	public static inline var RGBA4                          = 0x8056;
 	public static inline var RGB5_A1                        = 0x8057;
@@ -973,6 +990,7 @@ class GL {
 	/* Queries */
 	public static inline var SAMPLES_PASSED                 = 0x8914;
 	public static inline var TIMESTAMP                      = 0x8E28;
+	public static inline var TIME_ELAPSED                   = 0x88BF;
 
 	/* Barriers */
 	public static inline var VERTEX_ATTRIB_ARRAY_BARRIER_BIT = 0x00000001;

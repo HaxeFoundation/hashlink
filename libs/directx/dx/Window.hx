@@ -376,4 +376,13 @@ class Window {
 	static function winSetDragAcceptFiles( win : WinPtr, enable: Bool ) : Void {
 	}
 
+	public static function detectKeyboardLayout() @:privateAccess {
+		return String.fromUTF8( dxDetectKeyboardLayout() );
+	}
+
+	@:hlNative("directx", "detect_keyboard_layout")
+	static function dxDetectKeyboardLayout() : hl.Bytes {
+		return null;
+	}
+
 }

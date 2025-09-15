@@ -1,5 +1,7 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
+#include "hlsystem.h"
+
 #include <xinput.h>
 #include <InitGuid.h>
 #define DIRECTINPUT_VERSION 0x0800
@@ -185,7 +187,7 @@ static BOOL CALLBACK gctrl_dinput_deviceCb(const DIDEVICEINSTANCE *instance, voi
 
 	result = IDirectInput8_CreateDevice(gctrl_dinput, &instance->guidInstance, &di_device, NULL);
 	if( FAILED(result) ) return DIENUM_CONTINUE;
-	
+
 	device = (dx_gctrl_device*)malloc(sizeof(dx_gctrl_device));
 	ZeroMemory(device, sizeof(dx_gctrl_device));
 
@@ -256,7 +258,7 @@ static void gctrl_dinput_update(dx_gctrl_data *data) {
 	}
 	if( result != DI_OK )
 		return;
-	
+
 	data->buttons = 0;
 	for( int i = 0; i < mapping->button->size; i++ ) {
 		dinput_mapping_btn *bmap = hl_aptr(mapping->button, dinput_mapping_btn*)[i];
@@ -272,9 +274,9 @@ static void gctrl_dinput_update(dx_gctrl_data *data) {
 		}
 
 		switch (i) {
-			case 0: 
+			case 0:
 			case 2:
-				((double*)data->axes)[i] = (double)(val / 65535.) * 2 - 1.; 
+				((double*)data->axes)[i] = (double)(val / 65535.) * 2 - 1.;
 				break;
 			case 1:
 			case 3:
@@ -284,14 +286,14 @@ static void gctrl_dinput_update(dx_gctrl_data *data) {
 			case 5:
 				((double*)data->axes)[i] = bmap->axis < 0 ? (val > 0 ? 1 : 0) : (double)(val / 65535.);
 				break;
-			default: 
+			default:
 				data->buttons |= (val > 0 ? 1 : 0) << (i - 6);
 				break;
 		}
 	}
 }
 
-// 
+//
 
 void gctrl_detect_thread(void *p) {
 	while (true) {

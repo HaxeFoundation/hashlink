@@ -14,14 +14,14 @@ Here's the dependencies that you install in order to compile all the libraries:
 
 * fmt: libpng-dev libturbojpeg-dev libvorbis-dev
 * openal: libopenal-dev
-* sdl: libsdl2-dev
+* sdl: libsdl2-dev libglu1-mesa-dev
 * ssl: libmbedtls-dev
 * uv: libuv1-dev
 * sqlite: libsqlite3-dev
 
 To install all dependencies on the latest **Ubuntu**, for example:
 
-`sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev libsqlite3-dev`
+`sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libglu1-mesa-dev libmbedtls-dev libuv1-dev libsqlite3-dev`
 
 For 16.04, see [this note](https://github.com/HaxeFoundation/hashlink/issues/147).
 
@@ -50,6 +50,11 @@ To install hashlink binaries on your system you can then call:
 Open `hl.sln` using Visual Studio C++ and compile.
 
 To build all of HashLink libraries it is required to download several additional distributions, read each library README file (in hashlink/libs/xxx/README.md) for additional information.
+
+In short you'll probably need:
+
+- [SDL2-devel](https://github.com/libsdl-org/SDL/releases/download/release-2.30.12/SDL2-devel-2.30.12-VC.zip), extract to `<hashlink>/include/sdl`
+- [openal-soft](https://github.com/kcat/openal-soft/releases/download/1.23.1/openal-soft-1.23.1-bin.zip), extract to `<hashlink>/include/openal`
 
 ## Debugging
 

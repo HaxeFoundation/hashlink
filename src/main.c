@@ -21,6 +21,7 @@
  */
 #include <hl.h>
 #include <hlmodule.h>
+#include "hlsystem.h"
 
 #ifdef HL_WIN
 #	include <locale.h>
@@ -114,7 +115,9 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 static void handle_signal( int signum ) {
 	signal(signum, SIG_DFL);
 	printf("SIGNAL %d\n",signum);
-	hl_dump_stack();
+	if( hl_get_thread() != NULL ) {
+		hl_dump_stack();
+	}
 	fflush(stdout);
 	raise(signum);
 }
@@ -145,6 +148,7 @@ int main(int argc, pchar *argv[]) {
 	bool debug_wait = false;
 	bool hot_reload = false;
 	int profile_count = -1;
+	bool vtune_later = false;
 	main_context ctx;
 	bool isExc = false;
 	int first_boot_arg = -1;
@@ -176,6 +180,12 @@ int main(int argc, pchar *argv[]) {
 			profile_count = ptoi(*argv++);
 			continue;
 		}
+#ifdef HL_VTUNE
+		if( pcompare(arg,PSTR("--vtune-later")) == 0 ) {
+			vtune_later = true;
+			continue;
+		}
+#endif
 		if( *arg == '-' || *arg == '+' ) {
 			if( first_boot_arg < 0 ) first_boot_arg = argc + 1;
 			// skip value
@@ -193,7 +203,7 @@ int main(int argc, pchar *argv[]) {
 		file = PSTR("hlboot.dat");
 		fchk = pfopen(file,"rb");
 		if( fchk == NULL ) {
-			printf("HL/JIT %d.%d.%d (c)2015-2023 Haxe Foundation\n  Usage : hl [--debug <port>] [--debug-wait] <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
+			printf("HL/JIT %d.%d.%d (c)2015-2025 Haxe Foundation\n  Usage : hl [--debug <port>] [--debug-wait] <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
 			return 1;
 		}
 		fclose(fchk);
@@ -214,7 +224,7 @@ int main(int argc, pchar *argv[]) {
 	ctx.m = hl_module_alloc(ctx.code);
 	if( ctx.m == NULL )
 		return 2;
-	if( !hl_module_init(ctx.m,hot_reload) )
+	if( !hl_module_init(ctx.m,hot_reload,vtune_later) )
 		return 3;
 	if( hot_reload ) {
 		ctx.file_time = pfiletime(ctx.file);
@@ -233,18 +243,14 @@ int main(int argc, pchar *argv[]) {
 	ctx.ret = hl_dyn_call_safe(&cl,NULL,0,&isExc);
 	hl_profile_end();
 	if( isExc ) {
-		varray *a = hl_exception_stack();
-		int i;
-		uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(ctx.ret));
-		for(i=0;i<a->size;i++)
-			uprintf(USTR("Called from %s\n"), hl_aptr(a,uchar*)[i]);
+		hl_print_uncaught_exception(ctx.ret);
 		hl_debug_break();
 		hl_global_free();
 		return 1;
 	}
 	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
-	// do not call hl_unregister_thread() or hl_global_free will display error 
+	// do not call hl_unregister_thread() or hl_global_free will display error
 	// on global_lock if there are threads that are still running (such as debugger)
 	hl_global_free();
 	return 0;

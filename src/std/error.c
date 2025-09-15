@@ -20,6 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#include "hlsystem.h"
+
 #include <stdarg.h>
 #include <string.h>
 
@@ -77,12 +79,35 @@ HL_PRIM void hl_set_error_handler( vclosure *d ) {
 	t->exc_handler = d;
 }
 
+#ifdef HL_DEBUG
+static bool hl_is_debug_mode = true;
+#else
+static bool hl_is_debug_mode = false;
+#endif
+
+HL_PRIM void hl_set_debug_mode( bool b ) {
+	hl_is_debug_mode = b;
+}
+
 static bool break_on_trap( hl_thread_info *t, hl_trap_ctx *trap, vdynamic *v ) {
+	bool unwrapped = false;
+	vdynamic *vvalue = NULL;
+	if( !hl_is_debug_mode ) return false;
 	while( true ) {
 		if( trap == NULL || trap == t->trap_uncaught || t->trap_current == NULL || trap->prev == NULL ) return true;
 		if( !trap->tcheck || !v ) return false;
+		if( !unwrapped ) {
+			unwrapped = true;
+			hl_type *vt = v->t;
+			if( vt->kind == HOBJ && ucmp(vt->obj->name, USTR("haxe.ValueException")) == 0 ) {
+				hl_field_lookup *f = hl_lookup_find(vt->obj->rt->lookup, vt->obj->rt->nlookup, hl_hash_gen(USTR("value"), true));
+				if( f != NULL && f->field_index >= 0 )
+					vvalue = *(vdynamic**)((char*)(v) + f->field_index);
+			}
+		}
 		hl_type *ot = ((hl_type**)trap->tcheck)[1]; // it's an obj with first field is a hl_type
 		if( !ot || hl_safe_cast(v->t,ot) ) return false;
+		if( vvalue != NULL && hl_safe_cast(vvalue->t,ot) ) return false;
 		trap = trap->prev;
 	}
 	return false;
@@ -100,11 +125,11 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	t->trap_current = trap->prev;
 	call_handler = trap == t->trap_uncaught || t->trap_current == NULL;
 	if( (t->flags&HL_EXC_CATCH_ALL) || break_on_trap(t,trap,v) ) {
-		if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
 		t->flags |= HL_EXC_IS_THROW;
 		hl_debug_break();
 		t->flags &= ~HL_EXC_IS_THROW;
 	}
+	if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
 	t->flags &= ~HL_EXC_RETHROW;
 	if( t->exc_handler && call_handler ) hl_dyn_call_safe(t->exc_handler,&v,1,&call_handler);
 	if( throw_jump == NULL ) throw_jump = longjmp;
@@ -118,7 +143,7 @@ HL_PRIM void hl_null_access() {
 }
 
 HL_PRIM void hl_throw_buffer( hl_buffer *b ) {
-	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);	
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
 	d->v.ptr = hl_buffer_content(b,NULL);
 	hl_throw(d);
 }
@@ -138,6 +163,36 @@ HL_PRIM void hl_dump_stack() {
 			str = sym;
 		}
 		uprintf(USTR("%s\n"),str);
+	}
+	fflush(stdout);
+}
+
+static bool maybe_print_custom_stack( vdynamic *exc ) {
+	hl_type *ot = exc->t;
+	while( ot->kind == HOBJ ) {
+		if( ot->obj->super == NULL ) {
+			if( ucmp(ot->obj->name, USTR("haxe.Exception")) == 0 ) {
+				hl_field_lookup *f = hl_lookup_find(ot->obj->rt->lookup, ot->obj->rt->nlookup, hl_hash_gen(USTR("__customStack"), true));
+				if( f == NULL || f->field_index < 0 ) break;
+				vdynamic *customStack = *(vdynamic**)((char*)(exc) + f->field_index);
+				if( customStack != NULL ) {
+					uprintf(USTR("%s\n"), hl_to_string(customStack));
+					return true;
+				}
+			}
+			break;
+		}
+		ot = ot->obj->super;
+	}
+	return false;
+}
+
+HL_PRIM void hl_print_uncaught_exception(vdynamic *exc) {
+	uprintf(USTR("Uncaught exception: %s\n"), hl_to_string(exc));
+	if (!maybe_print_custom_stack(exc)) {
+		varray *a = hl_exception_stack();
+		for (int i = 0; i < a->size; i++)
+			uprintf(USTR("Called from %s\n"), hl_aptr(a, uchar *)[i]);
 	}
 	fflush(stdout);
 }

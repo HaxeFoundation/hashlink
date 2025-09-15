@@ -1,5 +1,6 @@
 #define HL_NAME(n) sdl_##n
 #include <hl.h>
+#include "hlsystem.h"
 
 #if defined(HL_IOS) || defined (HL_TVOS)
 #	include <SDL.h>
@@ -7,14 +8,14 @@
 #	include <OpenGLES/ES3/gl.h>
 #	define HL_GLES
 #elif defined(HL_MAC)
-#	include <SDL2/SDL.h>
+#	include <SDL.h>
 #	include <OpenGL/gl3.h>
 #	define glBindImageTexture(...) hl_error("Not supported on OSX")
 #	define glDispatchCompute(...) hl_error("Not supported on OSX")
 #	define glMemoryBarrier(...) hl_error("Not supported on OSX")
 #elif defined(_WIN32)
 #	include <SDL.h>
-#	include <GL/GLU.h>
+#	include <GL/GL.h>
 #	include <glext.h>
 #elif defined(HL_CONSOLE)
 #	include <graphic/glapi.h>
@@ -24,13 +25,12 @@
 #	define HL_GLES
 #elif defined(HL_ANDROID)
 #	include <SDL.h>
-#	include <GLES3/gl3.h>
+#	include <GLES3/gl32.h>
 #	include <GLES3/gl3ext.h>
 #	define HL_GLES
 #else
-#	include <SDL2/SDL.h>
-#	include <GL/glu.h>
-#	include <GL/glext.h>
+#	include <SDL.h>
+#	include <GL/glcorearb.h>
 #endif
 
 #ifdef HL_GLES
@@ -42,6 +42,8 @@
 #	define glFramebufferTexture(...) ES_NOT_SUPPORTED
 #	define glDispatchCompute(...) ES_NOT_SUPPORTED
 #	define glMemoryBarrier(...) ES_NOT_SUPPORTED
+#	define glGetBufferSubData(...) ES_NOT_SUPPORTED
+#	define glShaderStorageBlockBinding(...) ES_NOT_SUPPORTED
 #	define glPolygonMode(face,mode) if( mode != 0x1B02 ) ES_NOT_SUPPORTED
 #	define glGetQueryObjectiv glGetQueryObjectuiv
 #	define glClearDepth glClearDepthf
@@ -52,6 +54,14 @@
 #include "GLImports.h"
 #undef GL_IMPORT
 #define GL_IMPORT(fun,t)	fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) return 1
+#ifndef __APPLE__
+#define GL_IMPORT_OPT(fun, t) PFNGL##t##PROC fun = NULL; if ( !fun ) { fun = (PFNGL##t##PROC)SDL_GL_GetProcAddress(#fun); if( fun == NULL ) hl_error("function not resolved"); }
+#endif
+#endif
+
+#if !defined GL_IMPORT_OPT
+#define GL_IMPORT_OPT(fun, t)
+#define glMultiDrawElementsIndirectCountARB(...) hl_error("function not resolved");
 #endif
 
 static int GLLoadAPI() {
@@ -59,11 +69,35 @@ static int GLLoadAPI() {
 	return 0;
 }
 
+#ifdef GL_VERSION_4_3
+static void APIENTRY debug_message_callback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam ) {
+	fprintf(stderr, "GL %s: type = 0x%x, severity = 0x%x, message = %s\n",
+		( type == GL_DEBUG_TYPE_ERROR ? "** ERROR **" : "DEBUG" ),
+		type, severity, message);
+}
+#endif
+
 #define ZIDX(val) ((val)?(val)->v.i:0)
 
 // globals
 HL_PRIM bool HL_NAME(gl_init)() {
 	return GLLoadAPI() == 0;
+}
+
+HL_PRIM bool HL_NAME(gl_set_debug)( bool enable ) {
+#ifdef GL_VERSION_4_3
+	if( enable ) {
+		glEnable(GL_DEBUG_OUTPUT);
+		glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_PERFORMANCE, GL_DONT_CARE, 0, NULL, GL_FALSE);
+		glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_OTHER, GL_DONT_CARE, 0, NULL, GL_FALSE);
+		glDebugMessageCallback(debug_message_callback, 0);
+	} else {
+		glDisable(GL_DEBUG_OUTPUT);
+	}
+	return true;
+#else
+	return false;
+#endif
 }
 
 HL_PRIM bool HL_NAME(gl_is_context_lost)() {
@@ -504,6 +538,10 @@ HL_PRIM void HL_NAME(gl_buffer_sub_data)( int target, int offset, vbyte *data, i
 	glBufferSubData(target, offset, srcLength, data + srcOffset);
 }
 
+HL_PRIM void HL_NAME(gl_get_buffer_sub_data)( int target, int offset, vbyte *data, int srcOffset, int srcLength ) {
+	glGetBufferSubData(target, srcOffset, srcLength, data + offset);
+}
+
 HL_PRIM void HL_NAME(gl_enable_vertex_attrib_array)( int attrib ) {
 	glEnableVertexAttribArray(attrib);
 }
@@ -576,6 +614,11 @@ HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect)( int mode, int type, vbyte
 #	endif
 }
 
+HL_PRIM void HL_NAME(gl_multi_draw_elements_indirect_count)(int mode, int type, vbyte* data, vbyte* drawcount, int maxdrawcount, int stride) {
+	GL_IMPORT_OPT(glMultiDrawElementsIndirectCountARB, MULTIDRAWELEMENTSINDIRECTCOUNTARB)
+	glMultiDrawElementsIndirectCountARB(mode, type, data, (GLintptr)drawcount, maxdrawcount, stride);
+}
+
 HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
 	switch( feature ) {
 	case 0:
@@ -593,6 +636,19 @@ HL_PRIM int HL_NAME(gl_get_config_parameter)( int feature ) {
 		break;
 	}
 	return -1;
+}
+
+HL_PRIM bool HL_NAME(gl_has_extension)(vstring *name) {
+	const char* cname = hl_to_utf8(name->bytes);
+	GLint numExtensions = 0;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &numExtensions);
+	for (int i = 0; i < numExtensions; i++) {
+		const char* ext = (const char*)glGetStringi(GL_EXTENSIONS, i);
+		if (ext && strcmp(cname, ext) == 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 // queries
@@ -684,6 +740,7 @@ HL_PRIM void HL_NAME(gl_shader_storage_block_binding)( vdynamic *p, int index, i
 }
 
 DEFINE_PRIM(_BOOL,gl_init,_NO_ARG);
+DEFINE_PRIM(_BOOL,gl_set_debug,_BOOL);
 DEFINE_PRIM(_BOOL,gl_is_context_lost,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_clear,_I32);
 DEFINE_PRIM(_I32,gl_get_error,_NO_ARG);
@@ -768,6 +825,7 @@ DEFINE_PRIM(_VOID,gl_bind_buffer_base,_I32 _I32 _NULL(_I32));
 DEFINE_PRIM(_VOID,gl_buffer_data_size,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_buffer_data,_I32 _I32 _BYTES _I32);
 DEFINE_PRIM(_VOID,gl_buffer_sub_data,_I32 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,gl_get_buffer_sub_data,_I32 _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_enable_vertex_attrib_array,_I32);
 DEFINE_PRIM(_VOID,gl_disable_vertex_attrib_array,_I32);
 DEFINE_PRIM(_VOID,gl_vertex_attrib_pointer,_I32 _I32 _I32 _BOOL _I32 _I32);
@@ -784,6 +842,7 @@ DEFINE_PRIM(_VOID,gl_draw_elements_instanced,_I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_arrays,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_draw_arrays_instanced,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_multi_draw_elements_indirect, _I32 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,gl_multi_draw_elements_indirect_count, _I32 _I32 _BYTES _BYTES _I32 _I32);
 DEFINE_PRIM(_NULL(_I32),gl_create_vertex_array,_NO_ARG);
 DEFINE_PRIM(_VOID,gl_bind_vertex_array,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_delete_vertex_array,_NULL(_I32));
@@ -803,3 +862,4 @@ DEFINE_PRIM(_I32, gl_get_program_resource_index, _NULL(_I32) _I32 _STRING);
 DEFINE_PRIM(_VOID, gl_shader_storage_block_binding, _NULL(_I32) _I32 _I32);
 
 DEFINE_PRIM(_I32, gl_get_config_parameter, _I32);
+DEFINE_PRIM(_BOOL, gl_has_extension, _STRING);

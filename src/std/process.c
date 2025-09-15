@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#include "hlsystem.h"
 
 #if defined(HL_CONSOLE)
 #	include <posix/posix.h>
@@ -61,7 +62,9 @@ static void process_finalize( vprocess *p ) {
 #	ifdef HL_WIN
 	CloseHandle(p->eread);
 	CloseHandle(p->oread);
-	CloseHandle(p->iwrite);
+	if (p->iwrite != NULL) {
+		CloseHandle(p->iwrite);
+	}
 	CloseHandle(p->pinf.hProcess);
 	CloseHandle(p->pinf.hThread);
 #	else
@@ -235,6 +238,7 @@ HL_PRIM bool hl_process_stdin_close( vprocess *p ) {
 #	ifdef HL_WIN
 	if( !CloseHandle(p->iwrite) )
 		return false;
+	p->iwrite = NULL;
 #	else
 	if( close(p->iwrite) )
 		return false;

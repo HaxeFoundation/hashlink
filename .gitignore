@@ -21,6 +21,7 @@ x64
 *.a
 *.opendb
 *.VC.db
+.cache
 .vs
 /hl
 /include/sdl

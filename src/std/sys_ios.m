@@ -54,7 +54,7 @@ static int ios_get_retina_scale_factor()
 	return [[UIScreen mainScreen] scale];
 }
 
-const char *hl_sys_special( const char *key ) { 
+const char *hl_sys_special( const char *key ) {
 	if (strcmp(key, "ios_resource_path")==0)
 		return ios_get_resource_path();
 	else if (strcmp(key, "ios_document_path")==0)

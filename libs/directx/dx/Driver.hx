@@ -749,10 +749,12 @@ class Driver {
 	static function dxDebugPrint( str : hl.Bytes ) {
 	}
 
+	@:deprecated("dx.Driver.detectKeyboardLayout is deprecated. Use dx.Window.detectKeyboardLayout instead.")
 	public static function detectKeyboardLayout() @:privateAccess {
 		return String.fromUTF8( dxDetectKeyboardLayout() );
 	}
 
+	@:deprecated("dx.Driver.dxDetectKeyboardLayout is deprecated. Use dx.Window.dxDetectKeyboardLayout instead.")
 	@:hlNative("directx", "detect_keyboard_layout")
 	static function dxDetectKeyboardLayout() : hl.Bytes {
 		return null;

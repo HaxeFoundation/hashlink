@@ -325,6 +325,10 @@ class GL {
 	public static function bufferSubData( target : Int, offset : Int, data : hl.Bytes, srcOffset : Int, srcLength : Int ) {
 	}
 
+	@:hlNative("?mesa","gl_get_buffer_sub_data")
+	public static function getBufferSubData( target : Int, offset : Int, data : hl.Bytes, srcOffset : Int, srcLength : Int ) {
+	}
+
 	public static function enableVertexAttribArray( attrib : Int ) {
 	}
 
@@ -425,6 +429,19 @@ class GL {
 	public static function uniformBlockBinding( p : Program, blockIndex : Int, blockBinding : Int ) : Void {
 	}
 
+	// ssbos
+
+	/** Requires OpenGL 4.3+, therefore not supported on Apple platforms **/
+	@:hlNative("?mesa","gl_get_program_resource_index")
+	public static function getProgramResourceIndex( p : Program, type : Int, name : String ) : Int {
+		return 0;
+	}
+
+	/** Requires OpenGL 4.3+, therefore not supported on Apple platforms **/
+	@:hlNative("?mesa","gl_shader_storage_block_binding")
+	public static function shaderStorageBlockBinding( p : Program, blockIndex : Int, blockBinding : Int ) : Void {
+	}
+
 	// ----- CONSTANTS -----
 
 	/* ClearBufferMask */
@@ -501,6 +518,8 @@ class GL {
 	public static inline var SHADER_STORAGE_BUFFER          = 0x90D2;
 	public static inline var UNIFORM_BUFFER                 = 0x8A11;
 	public static inline var QUERY_BUFFER                   = 0x9192;
+
+	public static inline var SHADER_STORAGE_BLOCK           = 0x92E6;
 
 	public static inline var STREAM_DRAW                    = 0x88E0;
 	public static inline var STATIC_DRAW                    = 0x88E4;
@@ -928,6 +947,7 @@ class GL {
 	/* Queries */
 	public static inline var SAMPLES_PASSED                 = 0x8914;
 	public static inline var TIMESTAMP                      = 0x8E28;
+	public static inline var TIME_ELAPSED                   = 0x88BF;
 
 	/* Barriers */
 	public static inline var VERTEX_ATTRIB_ARRAY_BARRIER_BIT = 0x00000001;
