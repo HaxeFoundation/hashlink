@@ -90,18 +90,18 @@ class Sdl {
 	public static function delay(time:Int) {
 	}
 
-	public static function getScreenWidth(?win : sdl.Window) : Int {
+	public static function getScreenWidth(?win : sdl.Window, index: Int = 0) : Int {
 		return
 			if(win == null)
-				get_screen_width();
+				get_screen_width( index );
 			else
 				get_screen_width_of_window(@:privateAccess win.win);
 	}
 
-	public static function getScreenHeight(?win : sdl.Window) : Int {
+	public static function getScreenHeight(?win : sdl.Window, index: Int = 0) : Int {
 		return
 			if(win == null)
-				get_screen_height();
+				get_screen_height( index );
 			else
 				get_screen_height_of_window(@:privateAccess win.win);
 	}
@@ -148,10 +148,6 @@ class Sdl {
 		return a;
 	}
 
-	public static function setRelativeMouseMode( enable : Bool ) : Int {
-		return 0;
-	}
-
 	public static function setClipboardText( text : String ) : Bool {
 		if( text == null )
 			return false;
@@ -166,13 +162,22 @@ class Sdl {
 			return @:privateAccess String.fromUTF8(t);
 	}
 
+
+	public static function getError() : String {
+		var t = _getError();
+		if( t == null )
+			return null;
+		else
+			return @:privateAccess String.fromUTF8(t);
+	}
+
 	@:hlNative("?sdl", "get_screen_width")
-	static function get_screen_width() : Int {
+	static function get_screen_width( index: Int ) : Int {
 		return 0;
 	}
 
 	@:hlNative("?sdl", "get_screen_height")
-	static function get_screen_height() : Int {
+	static function get_screen_height( index: Int ) : Int {
 		return 0;
 	}
 
@@ -212,16 +217,12 @@ class Sdl {
 		return null;
 	}
 
-	public static function getRelativeMouseMode() : Bool {
-		return false;
-	}
-
 	public static function warpMouseGlobal( x : Int, y : Int ) : Int {
 		return 0;
 	}
 
 	@:hlNative("?sdl", "get_global_mouse_state")
-	public static function getGlobalMouseState( x : hl.Ref<Int>, y : hl.Ref<Int> ) : Int {
+	public static function getGlobalMouseState( x : hl.Ref<Single>, y : hl.Ref<Single> ) : Int {
 		return 0;
 	}
 
@@ -250,6 +251,11 @@ class Sdl {
 	@:hlNative("?sdl", "get_drag_and_drop_enabled")
 	public static function getDragAndDropEnabled(): Bool {
 		return false;
+	}
+
+	@:hlNative("?sdl", "get_error")
+	private static function _getError() : hl.Bytes {
+		return null;
 	}
 }
 
