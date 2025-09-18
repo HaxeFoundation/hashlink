@@ -128,7 +128,6 @@ jobs:
               libmbedtls-dev \
               libopenal-dev \
               libpng-dev \
-              libsdl3-dev \
               libturbojpeg-dev \
               libuv1-dev \
               libvorbis-dev \
@@ -202,7 +201,9 @@ jobs:
                   -DFLAT_INSTALL_TREE=ON
                 ;;
               linux64)
-                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+                  -DDOWNLOAD_DEPENDENCIES=ON \
+                ;;
             esac
 
             cmake --build build --config ${{ matrix.cmake_configuration }}
