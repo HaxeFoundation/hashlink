@@ -116,13 +116,6 @@ jobs:
         brew unlink python && brew link --overwrite python
         brew unlink python@3.12 && brew link --overwrite python@3.12
 
-    - name: "Setup SDL3"
-      if: runner.os == 'Linux'
-      uses: libsdl-org/setup-sdl@main
-      with:
-        version: 3-latest
-        install-linux-dependencies: true
-
     - name: "Install: Required Dev Packages"
       run: |
         set -eux
@@ -237,7 +230,8 @@ jobs:
                   -DFLAT_INSTALL_TREE=ON
                 ;;
               linux64)
-                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }}
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+                  -DDOWNLOAD_DEPENDENCIES=ON \
                 ;;
             esac
 
