@@ -542,8 +542,6 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	}
 
 #ifdef	HL_MOBILE
-	SDL_DisplayMode displayMode;
-	SDL_GetDesktopDisplayMode(0, &displayMode);
 	SDL_Window* win = SDL_CreateWindow("", width, height,
 					   SDL_WINDOW_BORDERLESS | sdlFlags);
 #else
