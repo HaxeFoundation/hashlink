@@ -136,11 +136,11 @@ ifeq ($(MARCH),32)
 CFLAGS += -msse2 -mfpmath=sse
 CC=i686-pc-cygwin-gcc
 BUILD_DIR = Release
-VS_SDL_LIBRARY ?= include/sdl/lib/x86/SDL2.dll
+VS_SDL_LIBRARY ?= include/sdl/lib/x86/SDL3.dll
 VS_OPENAL_LIBRARY ?= include/openal/bin/Win32/soft_oal.dll
 else
 BUILD_DIR = x64/Release
-VS_SDL_LIBRARY ?= include/sdl/lib/x64/SDL2.dll
+VS_SDL_LIBRARY ?= include/sdl/lib/x64/SDL3.dll
 VS_OPENAL_LIBRARY ?= include/openal/bin/Win64/soft_oal.dll
 endif
 
@@ -152,9 +152,9 @@ LIBEXT=dylib
 BREW_PREFIX := $(shell brew --prefix)
 # prefixes for keg-only packages
 BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
-BREW_SDL_PREFIX := $(shell brew --prefix sdl2)
+BREW_SDL_PREFIX := $(shell brew --prefix sdl3)
 
-CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -I $(BREW_SDL_PREFIX)/include/SDL2 -Dopenal_soft -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -I $(BREW_SDL_PREFIX)/include/SDL3 -Dopenal_soft -DGL_SILENCE_DEPRECATION
 LFLAGS += -Wl,-export_dynamic
 
 ifdef OSX_SDK
@@ -163,7 +163,7 @@ CFLAGS += -isysroot $(ISYSROOT)
 LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-SDL_LINK_FLAGS = -L$(BREW_SDL_PREFIX)/lib -lSDL2
+SDL_LINK_FLAGS = -L$(BREW_SDL_PREFIX)/lib -lSDL3
 LIBFLAGS += -L$(BREW_PREFIX)/lib -L$(BREW_OPENAL_PREFIX)/lib
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
@@ -185,7 +185,7 @@ LHL_LINK_FLAGS += -install_name @rpath/libhl.dylib
 else
 
 # Linux
-CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
+CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl3)
 LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
@@ -195,7 +195,7 @@ else
 LIBFLAGS += -L/opt/libjpeg-turbo/lib64
 endif
 
-SDL_LINK_FLAGS = $(shell pkg-config --libs sdl2)
+SDL_LINK_FLAGS = $(shell pkg-config --libs sdl3)
 LIBOPENAL = -lopenal
 LIBOPENGL = -lGL
 RELEASE_NAME = linux
