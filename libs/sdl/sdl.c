@@ -7,10 +7,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gamepad.h>
 
-#if defined(HL_WIN) || defined(HL_IOS) || defined(HL_TVOS)
-#	include <SDL_syswm.h>
-#endif
-
 #if defined (HL_IOS) || defined(HL_TVOS)
 #	include <OpenGLES/ES3/gl.h>
 #	include <OpenGLES/ES3/glext.h>
