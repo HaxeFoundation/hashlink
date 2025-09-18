@@ -132,7 +132,6 @@ jobs:
               libuv1-dev \
               libvorbis-dev \
               libsqlite3-dev
-            ;;
 
             # ref https://github.com/libsdl-org/SDL/blob/main/docs/README-linux.md#build-dependencies
             sudo apt-get install --no-install-recommends -y \
