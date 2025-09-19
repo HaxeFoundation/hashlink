@@ -835,7 +835,7 @@ DEFINE_PRIM(_I32, haptic_rumble_play, THAPTIC _F64 _I32);
 
 HL_PRIM int HL_NAME(joy_count)() {
 	int count;
-	SDL_Joystick *sticks = SDL_GetJoysticks(&count);
+	SDL_JoystickID *sticks = SDL_GetJoysticks(&count);
 	SDL_free(sticks);
 
 	return count;
