@@ -202,6 +202,18 @@ jobs:
         haxelib install hashlink
         haxelib list
 
+    - name: "Build and install SDL3"
+      if: runner.os == 'Linux'
+      run: |
+        wget https://github.com/libsdl-org/SDL/releases/download/release-3.2.22/SDL3-3.2.22.tar.gz
+        tar -xzvf SDL3-3.2.22.tar.gz 
+        cd SDL3-3.2.22/
+        mkdir build
+        cd build
+        cmake ..
+        make
+        sudo make --install
+
 
     - name: "Build: HashLink"
       run: |
@@ -230,8 +242,7 @@ jobs:
                   -DFLAT_INSTALL_TREE=ON
                 ;;
               linux64)
-                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
-                  -DDOWNLOAD_DEPENDENCIES=ON \
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }}
                 ;;
             esac
 

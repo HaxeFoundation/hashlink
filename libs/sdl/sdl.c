@@ -406,6 +406,7 @@ HL_PRIM int HL_NAME(get_screen_width)( int index ) {
 		index = 0;
 
 	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[index]);
+	SDL_Free( displays );
 	return e->w;
 }
 
@@ -416,6 +417,7 @@ HL_PRIM int HL_NAME(get_screen_height)( int index ) {
 		index = 0;
 
 	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[index]);
+	SDL_Free( displays );
 	return e->h;
 }
 
@@ -761,17 +763,22 @@ DEFINE_PRIM(_I32, win_get_id, TWIN);
 
 HL_PRIM int HL_NAME(gctrl_count)() {
 	int count;
-	SDL_GetJoysticks(&count);
+	SDL_JoystickID *sticks = SDL_GetJoysticks(&count);
+	SDL_Free(sticks);
 	return count;
 }
 
 HL_PRIM SDL_Gamepad *HL_NAME(gctrl_open)(int idx) {
 	int count;
 	SDL_JoystickID *sticks = SDL_GetJoysticks(&count);
-	if( idx >= count || !SDL_IsGamepad(sticks[idx]) )
-		return NULL;
 
-	return SDL_OpenGamepad(sticks[idx]);
+	SDL_GamePad *pad = NULL;
+
+	if( idx >= 0 && idx < count && SDL_IsGamepad(sticks[idx]) )
+		pad = SDL_OpenGamepad( sticks[idx] );
+
+	SDL_Free(sticks);
+	return pad;
 }
 
 HL_PRIM void HL_NAME(gctrl_close)(SDL_Gamepad *controller) {
@@ -828,7 +835,9 @@ DEFINE_PRIM(_I32, haptic_rumble_play, THAPTIC _F64 _I32);
 
 HL_PRIM int HL_NAME(joy_count)() {
 	int count;
-	SDL_GetJoysticks(&count);
+	SDL_Joystick *sticks = SDL_GetJoysticks(&count);
+	SDL_Free(sticks);
+
 	return count;
 }
 
@@ -938,23 +947,26 @@ HL_PRIM bool HL_NAME(get_drag_and_drop_enabled)() {
 HL_PRIM varray* HL_NAME(get_displays)() {
 	int n;
 	SDL_DisplayID *displays = SDL_GetDisplays(&n);
-	if (n <= 0)
-		return NULL;
-	varray* arr = hl_alloc_array(&hlt_dynobj, n);
-	for (int i = 0; i < n; i++) {
-		vdynamic *obj = (vdynamic*) hl_alloc_dynobj();
-		SDL_Rect rect;
-		SDL_DisplayID display = displays[i];
-		SDL_GetDisplayBounds(display, &rect);
-		hl_dyn_seti(obj, hl_hash_utf8("right"), &hlt_i32, rect.x+rect.w);
-		hl_dyn_seti(obj, hl_hash_utf8("bottom"), &hlt_i32, rect.y+rect.h);
-		hl_dyn_seti(obj, hl_hash_utf8("left"), &hlt_i32, rect.x);
-		hl_dyn_seti(obj, hl_hash_utf8("top"), &hlt_i32, rect.y);
-		hl_dyn_seti(obj, hl_hash_utf8("handle"), &hlt_i32, i);
-		const char *name = SDL_GetDisplayName(display);
-		hl_dyn_setp(obj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes(name, (int) strlen(name)+1));
-		hl_aptr(arr, vdynamic*)[i] = obj;
+	if (n > 0)
+	{
+		varray* arr = hl_alloc_array(&hlt_dynobj, n);
+		for (int i = 0; i < n; i++) {
+			vdynamic *obj = (vdynamic*) hl_alloc_dynobj();
+			SDL_Rect rect;
+			SDL_DisplayID display = displays[i];
+			SDL_GetDisplayBounds(display, &rect);
+			hl_dyn_seti(obj, hl_hash_utf8("right"), &hlt_i32, rect.x+rect.w);
+			hl_dyn_seti(obj, hl_hash_utf8("bottom"), &hlt_i32, rect.y+rect.h);
+			hl_dyn_seti(obj, hl_hash_utf8("left"), &hlt_i32, rect.x);
+			hl_dyn_seti(obj, hl_hash_utf8("top"), &hlt_i32, rect.y);
+			hl_dyn_seti(obj, hl_hash_utf8("handle"), &hlt_i32, i);
+			const char *name = SDL_GetDisplayName(display);
+			hl_dyn_setp(obj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes(name, (int) strlen(name)+1));
+			hl_aptr(arr, vdynamic*)[i] = obj;
+		}
 	}
+	SDL_Free( displays );
+
 	return arr;
 }
 
@@ -975,6 +987,8 @@ HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
 		hl_dyn_seti(obj, hl_hash_utf8("framerate"), &hlt_i32, mode->refresh_rate);
 		hl_aptr(arr, vdynamic*)[i] = obj;
 	}
+
+	SDL_Free(modes);
 	return arr;
 }
 
