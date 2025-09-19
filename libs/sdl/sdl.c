@@ -406,7 +406,7 @@ HL_PRIM int HL_NAME(get_screen_width)( int index ) {
 		index = 0;
 
 	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[index]);
-	SDL_Free( displays );
+	SDL_free( displays );
 	return e->w;
 }
 
@@ -417,7 +417,7 @@ HL_PRIM int HL_NAME(get_screen_height)( int index ) {
 		index = 0;
 
 	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[index]);
-	SDL_Free( displays );
+	SDL_free( displays );
 	return e->h;
 }
 
@@ -764,7 +764,7 @@ DEFINE_PRIM(_I32, win_get_id, TWIN);
 HL_PRIM int HL_NAME(gctrl_count)() {
 	int count;
 	SDL_JoystickID *sticks = SDL_GetJoysticks(&count);
-	SDL_Free(sticks);
+	SDL_free(sticks);
 	return count;
 }
 
@@ -777,7 +777,7 @@ HL_PRIM SDL_Gamepad *HL_NAME(gctrl_open)(int idx) {
 	if( idx >= 0 && idx < count && SDL_IsGamepad(sticks[idx]) )
 		pad = SDL_OpenGamepad( sticks[idx] );
 
-	SDL_Free(sticks);
+	SDL_free(sticks);
 	return pad;
 }
 
@@ -836,7 +836,7 @@ DEFINE_PRIM(_I32, haptic_rumble_play, THAPTIC _F64 _I32);
 HL_PRIM int HL_NAME(joy_count)() {
 	int count;
 	SDL_Joystick *sticks = SDL_GetJoysticks(&count);
-	SDL_Free(sticks);
+	SDL_free(sticks);
 
 	return count;
 }
@@ -948,7 +948,7 @@ HL_PRIM varray* HL_NAME(get_displays)() {
 	int n;
 	SDL_DisplayID *displays = SDL_GetDisplays(&n);
 	varray* arr = hl_alloc_array(&hlt_dynobj, n);
-	
+
 	for (int i = 0; i < n; i++) {
 		vdynamic *obj = (vdynamic*) hl_alloc_dynobj();
 		SDL_Rect rect;
@@ -964,7 +964,7 @@ HL_PRIM varray* HL_NAME(get_displays)() {
 		hl_aptr(arr, vdynamic*)[i] = obj;
 	}
 
-	SDL_Free( displays );
+	SDL_free( displays );
 
 	return arr;
 }
@@ -987,19 +987,18 @@ HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
 		hl_aptr(arr, vdynamic*)[i] = obj;
 	}
 
-	SDL_Free(modes);
+	SDL_free(modes);
 	return arr;
 }
 
 HL_PRIM vdynobj* HL_NAME(get_current_display_mode)(int display_id, bool registry) {
 	const SDL_DisplayMode *mode;
-	int r;
 	if(registry)
 		mode = SDL_GetDesktopDisplayMode(display_id);
 	else
 		mode = SDL_GetCurrentDisplayMode(display_id);
 	if (mode == NULL) {
-		printf("can't find mode for %d : %d\n", display_id, r);
+		printf("can't find mode for %d\n", display_id);
 		return NULL;
 	}
 	vdynamic* obj = (vdynamic*)hl_alloc_dynobj();
