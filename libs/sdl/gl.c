@@ -4,7 +4,6 @@
 
 #if defined(HL_IOS) || defined (HL_TVOS)
 #	include <SDL3/SDL.h>
-#	include <SDL_syswm.h>
 #	include <OpenGLES/ES3/gl.h>
 #	define HL_GLES
 #elif defined(HL_MAC)
