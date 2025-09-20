@@ -154,8 +154,13 @@ HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, 
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, samples);
 	}
 }
+static hint_window_grab_keyboard = false;
 
 HL_PRIM bool HL_NAME(hint_value)( vbyte* name, vbyte* value) {
+	if( strcmp( name, "SDL_GRAB_KEYBOARD" ) == 0 )
+		hint_window_grab_keyboard = value != 0;
+
+
 	return SDL_SetHint((char*)name, (char*)value) == true;
 }
 
@@ -511,15 +516,17 @@ HL_PRIM void HL_NAME(warp_mouse_in_window)(SDL_Window* window, int x, int y) {
 	SDL_WarpMouseInWindow(window, x, y);
 }
 
-// SDl2 compat: Grab both
+// SDl2 compat: Check emulated `SDL_HINT_GRAB_KEYBOARD` hint
 HL_PRIM void HL_NAME(set_window_grab)(SDL_Window* window, bool grabbed) {
-	SDL_SetWindowKeyboardGrab(window, grabbed);
+	if( hint_window_grab_keyboard )
+		SDL_SetWindowKeyboardGrab(window, grabbed);
+		
 	SDL_SetWindowMouseGrab(window, grabbed);
 }
 
-// SDL2 compat: We only need to check for keyboard grab since we grab both
+// SDL2 compat: We only need to check for mouse grab since that's always obtained.
 HL_PRIM bool HL_NAME(get_window_grab)(SDL_Window* window) {
-	return SDL_GetWindowKeyboardGrab(window);
+	return SDL_GetWindowMouseGrab(window);
 }
 
 // sdl2 compat:
