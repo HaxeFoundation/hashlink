@@ -768,17 +768,8 @@ HL_PRIM int HL_NAME(gctrl_count)() {
 	return count;
 }
 
-HL_PRIM SDL_Gamepad *HL_NAME(gctrl_open)(int idx) {
-	int count;
-	SDL_JoystickID *sticks = SDL_GetJoysticks(&count);
-
-	SDL_Gamepad *pad = NULL;
-
-	if( idx >= 0 && idx < count && SDL_IsGamepad(sticks[idx]) )
-		pad = SDL_OpenGamepad( sticks[idx] );
-
-	SDL_free(sticks);
-	return pad;
+HL_PRIM SDL_Gamepad *HL_NAME(gctrl_open)(SDL_JoystickID id) {
+	return SDL_OpenGamepad(id);
 }
 
 HL_PRIM void HL_NAME(gctrl_close)(SDL_Gamepad *controller) {
