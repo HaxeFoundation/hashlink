@@ -154,7 +154,7 @@ HL_PRIM void HL_NAME(gl_options)( int major, int minor, int depth, int stencil, 
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, samples);
 	}
 }
-static hint_window_grab_keyboard = false;
+static bool hint_window_grab_keyboard = false;
 
 HL_PRIM bool HL_NAME(hint_value)( vbyte* name, vbyte* value) {
 	if( strcmp( (char*)name, "SDL_GRAB_KEYBOARD" ) == 0 )
