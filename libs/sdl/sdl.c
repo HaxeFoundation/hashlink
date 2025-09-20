@@ -458,8 +458,8 @@ HL_PRIM void HL_NAME(text_input)( bool enable ) {
 	SDL_Window **windows;
 
     /* First, enable text events */
-    (void)SDL_EventState(SDL_EVENT_TEXT_INPUT, 1);
-    (void)SDL_EventState(SDL_EVENT_TEXT_EDITING, 1);
+    SDL_SetEventEnabled(SDL_EVENT_TEXT_INPUT, true );
+    SDL_SetEventEnabled(SDL_EVENT_TEXT_EDITING, true);
 
     windows = SDL_GetWindows(NULL);
     if (windows) {
