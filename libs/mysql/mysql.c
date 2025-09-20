@@ -47,7 +47,8 @@ typedef enum {
 	CONV_DATE,
 	CONV_DATETIME,
 	CONV_JSON,
-	CONV_BOOL
+	CONV_BOOL,
+	CONV_I64
 } CONV;
 
 typedef struct {
@@ -115,6 +116,12 @@ HL_PRIM vdynamic *HL_NAME(result_next)( result *r ) {
 		switch( r->fields_convs[i] ) {
 		case CONV_INT:
 			hl_dyn_seti(obj, r->fields_ids[i], &hlt_i32, atoi(row[i]));
+			break;
+		case CONV_I64:
+			{
+			    char *endptr;
+				hl_dyn_seti64(obj, r->fields_ids[i], strtoll(row[i],&endptr,10));
+			}
 			break;
 		case CONV_STRING:
 			arg.t = &hlt_bytes;
@@ -226,6 +233,7 @@ static CONV convert_type( enum enum_field_types t, int flags, unsigned int lengt
 	case FIELD_TYPE_INT24:
 		return CONV_INT;
 	case FIELD_TYPE_LONGLONG:
+		return CONV_I64;
 	case FIELD_TYPE_DECIMAL:
 	case FIELD_TYPE_FLOAT:
 	case FIELD_TYPE_DOUBLE:
