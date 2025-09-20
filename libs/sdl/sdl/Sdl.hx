@@ -90,18 +90,18 @@ class Sdl {
 	public static function delay(time:Int) {
 	}
 
-	public static function getScreenWidth(?win : sdl.Window, index: Int = 0) : Int {
+	public static function getScreenWidth(?win : sdl.Window) : Int {
 		return
 			if(win == null)
-				get_screen_width( index );
+				get_screen_width();
 			else
 				get_screen_width_of_window(@:privateAccess win.win);
 	}
 
-	public static function getScreenHeight(?win : sdl.Window, index: Int = 0) : Int {
+	public static function getScreenHeight(?win : sdl.Window) : Int {
 		return
 			if(win == null)
-				get_screen_height( index );
+				get_screen_height();
 			else
 				get_screen_height_of_window(@:privateAccess win.win);
 	}
@@ -148,6 +148,10 @@ class Sdl {
 		return a;
 	}
 
+	public static function setRelativeMouseMode( enable : Bool ) : Int {
+		return 0;
+	}
+
 	public static function setClipboardText( text : String ) : Bool {
 		if( text == null )
 			return false;
@@ -172,12 +176,12 @@ class Sdl {
 	}
 
 	@:hlNative("?sdl", "get_screen_width")
-	static function get_screen_width( index: Int ) : Int {
+	static function get_screen_width() : Int {
 		return 0;
 	}
 
 	@:hlNative("?sdl", "get_screen_height")
-	static function get_screen_height( index: Int ) : Int {
+	static function get_screen_height() : Int {
 		return 0;
 	}
 
@@ -217,12 +221,16 @@ class Sdl {
 		return null;
 	}
 
+	public static function getRelativeMouseMode() : Bool {
+		return false;
+	}
+
 	public static function warpMouseGlobal( x : Int, y : Int ) : Int {
 		return 0;
 	}
 
 	@:hlNative("?sdl", "get_global_mouse_state")
-	public static function getGlobalMouseState( x : hl.Ref<Single>, y : hl.Ref<Single> ) : Int {
+	public static function getGlobalMouseState( x : hl.Ref<Int>, y : hl.Ref<Int> ) : Int {
 		return 0;
 	}
 

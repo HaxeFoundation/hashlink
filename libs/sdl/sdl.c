@@ -399,24 +399,21 @@ HL_PRIM void HL_NAME(delay)( int time ) {
 	hl_blocking(false);
 }
 
-HL_PRIM int HL_NAME(get_screen_width)( int index ) {
+// SDL2 compat: Assume display 0.
+HL_PRIM int HL_NAME(get_screen_width)() {
 	int count;
 	SDL_DisplayID *displays = SDL_GetDisplays( &count );
-	if ( index < 0 || index > count )
-		index = 0;
-
-	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[index]);
+	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[0]);
 	SDL_free( displays );
 	return e->w;
 }
 
-HL_PRIM int HL_NAME(get_screen_height)( int index ) {
+// SDL2 compat: Assume display 0.
+HL_PRIM int HL_NAME(get_screen_height)() {
 	int count;
 	SDL_DisplayID *displays = SDL_GetDisplays( &count );
-	if ( index < 0 || index > count )
-		index = 0;
 
-	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[index]);
+	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[0]);
 	SDL_free( displays );
 	return e->h;
 }
@@ -455,19 +452,55 @@ HL_PRIM bool HL_NAME(detect_win32)() {
 #	endif
 }
 
-HL_PRIM void HL_NAME(text_input)( SDL_Window* window, bool enable ) {
-	if( enable )
-		SDL_StartTextInput(window);
-	else
-		SDL_StopTextInput(window);
+// sdl2 compat: start input for all windows
+HL_PRIM void HL_NAME(text_input)( bool enable ) {
+
+	SDL_Window **windows;
+
+    /* First, enable text events */
+    (void)SDL_EventState(SDL_EVENT_TEXT_INPUT, 1);
+    (void)SDL_EventState(SDL_EVENT_TEXT_EDITING, 1);
+
+    windows = SDL_GetWindows(NULL);
+    if (windows) {
+        int i;
+        for (i = 0; windows[i]; ++i) {
+			if( enable )
+            	SDL_StartTextInput(windows[i]);
+			else 
+				SDL_StopTextInput(windows[i]);
+
+        }
+        SDL_free(windows);
+    }
 }
 
-HL_PRIM bool HL_NAME(set_relative_mouse_mode)(SDL_Window* window, bool enable) {
-	return SDL_SetWindowRelativeMouseMode(window, enable);
+
+// sdl2 compat: We need to internally store relative mouse mode state
+static bool relative_mouse_mode = false;
+
+HL_PRIM int HL_NAME(set_relative_mouse_mode)( bool enable) {
+	int retval = 0;
+    SDL_Window **windows = SDL_GetWindows(NULL);
+    if (windows) {
+        int i;
+
+        for (i = 0; windows[i]; ++i) {
+            if (!SDL_SetWindowRelativeMouseMode(windows[i], enable)) {
+                retval = -1;
+            }
+        }
+
+        SDL_free(windows);
+    }
+    if (retval == 0) {
+        relative_mouse_mode = enable;
+    }
+    return retval;
 }
 
-HL_PRIM bool HL_NAME(get_relative_mouse_mode)(SDL_Window* window) {
-	return SDL_GetWindowRelativeMouseMode(window);
+HL_PRIM bool HL_NAME(get_relative_mouse_mode)() {
+	return relative_mouse_mode;
 }
 
 HL_PRIM int HL_NAME(warp_mouse_global)(int x, int y) {
@@ -478,19 +511,24 @@ HL_PRIM void HL_NAME(warp_mouse_in_window)(SDL_Window* window, int x, int y) {
 	SDL_WarpMouseInWindow(window, x, y);
 }
 
+// SDl2 compat: Grab both
 HL_PRIM void HL_NAME(set_window_grab)(SDL_Window* window, bool grabbed) {
-	// Grab both.
 	SDL_SetWindowKeyboardGrab(window, grabbed);
 	SDL_SetWindowMouseGrab(window, grabbed);
 }
 
+// SDL2 compat: We only need to check for keyboard grab since we grab both
 HL_PRIM bool HL_NAME(get_window_grab)(SDL_Window* window) {
-	// @todo: SDL3 separates keyboard and mouse grab here. Do we care?
 	return SDL_GetWindowKeyboardGrab(window);
 }
 
-HL_PRIM int HL_NAME(get_global_mouse_state)(float* x, float* y) {
-	return SDL_GetGlobalMouseState(x, y);
+// sdl2 compat:
+HL_PRIM int HL_NAME(get_global_mouse_state)(int* x, int* y) {
+	float fx, fy;
+	int retval = SDL_GetGlobalMouseState(&fx, &fy);
+	*x = (int)fx;
+	*y = (int)fy;
+	return retval;
 }
 
 HL_PRIM const char *HL_NAME(detect_keyboard_layout)() {
@@ -512,22 +550,22 @@ DEFINE_PRIM(_BOOL, event_loop, _DYN );
 DEFINE_PRIM(_I32, event_poll, _STRUCT );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
-DEFINE_PRIM(_I32, get_screen_width, _I32);
-DEFINE_PRIM(_I32, get_screen_height, _I32);
+DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
+DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_width_of_window, TWIN);
 DEFINE_PRIM(_I32, get_screen_height_of_window, TWIN);
 DEFINE_PRIM(_I32, get_framerate, TWIN);
 DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
-DEFINE_PRIM(_VOID, text_input, TWIN _BOOL);
-DEFINE_PRIM(_BOOL, set_relative_mouse_mode, TWIN _BOOL);
-DEFINE_PRIM(_BOOL, get_relative_mouse_mode, TWIN _NO_ARG);
+DEFINE_PRIM(_VOID, text_input, _BOOL);
+DEFINE_PRIM(_I32, set_relative_mouse_mode, _BOOL);
+DEFINE_PRIM(_BOOL, get_relative_mouse_mode, _NO_ARG);
 DEFINE_PRIM(_I32, warp_mouse_global, _I32 _I32);
 DEFINE_PRIM(_VOID, warp_mouse_in_window, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, set_window_grab, TWIN _BOOL);
 DEFINE_PRIM(_BOOL, get_window_grab, TWIN);
-DEFINE_PRIM(_I32, get_global_mouse_state, _REF(_F32) _REF(_F32));
+DEFINE_PRIM(_I32, get_global_mouse_state, _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_BYTES, detect_keyboard_layout, _NO_ARG);
 DEFINE_PRIM(_BOOL, hint_value, _BYTES _BYTES);
 
@@ -647,8 +685,8 @@ HL_PRIM void HL_NAME(win_set_title)(SDL_Window *win, vbyte *title) {
 	SDL_SetWindowTitle(win, (char*)title);
 }
 
-HL_PRIM bool HL_NAME(win_set_position)(SDL_Window *win, int x, int y) {
-	return SDL_SetWindowPosition(win, x, y);
+HL_PRIM void HL_NAME(win_set_position)(SDL_Window *win, int x, int y) {
+	SDL_SetWindowPosition(win, x, y);
 }
 
 HL_PRIM void HL_NAME(win_get_position)(SDL_Window *win, int *x, int *y) {
@@ -680,7 +718,7 @@ HL_PRIM void HL_NAME(win_get_max_size)(SDL_Window *win, int *width, int *height)
 }
 
 HL_PRIM double HL_NAME(win_get_opacity)(SDL_Window *win) {
-	return SDL_GetWindowOpacity(win );
+	return SDL_GetWindowOpacity(win);
 }
 
 HL_PRIM bool HL_NAME(win_set_opacity)(SDL_Window *win, double opacity) {
@@ -744,7 +782,7 @@ DEFINE_PRIM(_BOOL, win_set_display_mode, TWIN _I32 _I32 _I32);
 DEFINE_PRIM(_I32, win_display_handle, TWIN);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
-DEFINE_PRIM(_BOOL, win_set_position, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_min_size, TWIN _I32 _I32);

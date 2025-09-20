@@ -27,6 +27,7 @@ class Window {
 	public static inline var SDL_WINDOW_FULLSCREEN         = 0x00000001;
 	public static inline var SDL_WINDOW_OPENGL             = 0x00000002;
 	public static inline var SDL_WINDOW_OCCLUDED           = 0x00000004;
+	public static inline var SDL_WINDOW_SHOWN              = 0x00000004; // SDL2 compat
 	public static inline var SDL_WINDOW_HIDDEN             = 0x00000008;
 	public static inline var SDL_WINDOW_BORDERLESS         = 0x00000010;
 	public static inline var SDL_WINDOW_RESIZABLE          = 0x00000020;
@@ -172,7 +173,7 @@ class Window {
 	}
 
 	public function setPosition( x : Int, y : Int ) {
-		return winSetPosition(win, x, y);
+		winSetPosition(win, x, y);
 	}
 
 	public function center() {
@@ -300,15 +301,6 @@ class Window {
 		winResize(win, 2);
 	}
 
-
-	public function getRelativeMouseMode() : Bool {
-		return winGetRelativeMouseMode( win );
-	}
-
-	public function setRelativeMouseMode( enabled: Bool ) : Bool {
-		return winSetRelativeMouseMode( win, enabled );
-	}
-
 	static function winCreateEx( x : Int, y : Int, width : Int, height : Int, sdlFlags : Int ) : WinPtr {
 		return null;
 	}
@@ -320,8 +312,7 @@ class Window {
 	static function winSetTitle( win : WinPtr, title : hl.Bytes ) {
 	}
 
-	static function winSetPosition( win : WinPtr, width : Int, height : Int ): Bool {
-		return false;
+	static function winSetPosition( win : WinPtr, width : Int, height : Int ): Void {
 	}
 
 	static function winGetPosition( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
@@ -400,14 +391,4 @@ class Window {
 	
 	static function warpMouseInWindow( win : WinPtr, x : Int, y : Int ) : Void {
 	}
-
-	@:hlNative("?sdl", "get_relative_mouse_mode")
-	static function winGetRelativeMouseMode( win : WinPtr ) : Bool {
-		return false;
-	}
-	@:hlNative("?sdl", "set_relative_mouse_mode")
-	static function winSetRelativeMouseMode( win : WinPtr, enabled: Bool ) : Bool {
-		return false;
-	}
-
 }
