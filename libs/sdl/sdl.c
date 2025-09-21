@@ -305,11 +305,11 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			break;
 		case SDL_EVENT_GAMEPAD_ADDED:
 			event->type = GControllerAdded;
-			event->reference = e.jdevice.which;
+			event->reference = e.gdevice.which;
 			break;
 		case SDL_EVENT_GAMEPAD_REMOVED:
 			event->type = GControllerRemoved;
-			event->reference = e.jdevice.which;
+			event->reference = e.gdevice.which;
 			break;
 		case SDL_EVENT_GAMEPAD_BUTTON_DOWN :
 			event->type = GControllerDown;
