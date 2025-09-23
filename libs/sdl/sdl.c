@@ -922,12 +922,12 @@ DEFINE_PRIM(_BYTES, joy_get_name, TJOY);
 
 
 // SDL3 Joystick API
-HL_PRIM varray *HL_NAME(get_joysticks)(SDL_Joystick *joystick) {
+HL_PRIM varray *HL_NAME(get_joysticks)() {
 	SDL_JoystickID *sticks;
 	int count;
 	sticks = SDL_GetJoysticks( &count );
 	varray *result = hl_alloc_array(&hlt_i32, count);
-	int *idx = hl_aptr(result,SDL_Joystick);
+	SDL_JoystickID *idx = hl_aptr(result,SDL_JoystickID);
 	while( *sticks )
 	{
 		*idx++ = *sticks++; 
