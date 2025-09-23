@@ -265,6 +265,14 @@ class Sdl {
 	private static function _getError() : hl.Bytes {
 		return null;
 	}
+
+
+	//
+	// SDL3 Joystick API 
+	//
+	public static function getJoysticks() : hl.NativeArray<Int> {
+		return null;
+	}
 }
 
 enum abstract SDLHint(String) from String to String {

@@ -920,6 +920,23 @@ DEFINE_PRIM(_BOOL, joy_get_button, TJOY _I32);
 DEFINE_PRIM(_I32, joy_get_id, TJOY);
 DEFINE_PRIM(_BYTES, joy_get_name, TJOY);
 
+
+// SDL3 Joystick API
+HL_PRIM varray *HL_NAME(get_joysticks)(SDL_Joystick *joystick) {
+	SDL_JoystickID *sticks;
+	int count;
+	sticks = SDL_GetJoysticks( &count );
+	varray *result = hl_alloc_array(&hlt_i32, count);
+	int *idx = hl_aptr(result,SDL_Joystick);
+	while( *sticks )
+	{
+		*idx++ = *sticks++; 
+	}
+	return result;
+}
+
+DEFINE_PRIM(_ARR, get_joysticks, _NO_ARG );
+
 // surface
 
 
