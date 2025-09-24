@@ -63,6 +63,7 @@ jobs:
 
           - target: windows
             architecture: 64
+            runner: windows-2025
             build_system: cmake-mingw
 
           - target: windows
