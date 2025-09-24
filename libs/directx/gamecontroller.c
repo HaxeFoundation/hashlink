@@ -3,7 +3,7 @@
 #include "hlsystem.h"
 
 #include <xinput.h>
-#include <InitGuid.h>
+#include <initguid.h>
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #include <dbt.h>

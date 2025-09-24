@@ -15,7 +15,7 @@
 #	define glMemoryBarrier(...) hl_error("Not supported on OSX")
 #elif defined(_WIN32)
 #	include <SDL.h>
-#	include <GL/GL.h>
+#	include <GL/gl.h>
 #	include <glext.h>
 #elif defined(HL_CONSOLE)
 #	include <graphic/glapi.h>
