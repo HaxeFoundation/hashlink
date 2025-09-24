@@ -23,7 +23,7 @@ jobs:
       matrix:
         target: [linux, darwin, windows]
         architecture: [32, 64, arm64]
-        build_system: [make, cmake, vs2019, makegcc14]
+        build_system: [make, cmake, cmake-mingw, vs2019, makegcc14]
 
         include:
           - target: linux
@@ -46,6 +46,9 @@ jobs:
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
 
+          - build_system: cmake-mingw
+            cmake_configuration: RelWithDebInfo
+
           - build_system: vs2019
             msbuild_configuration: Release
 
@@ -57,6 +60,10 @@ jobs:
           - target: windows
             build_system: cmake
             cmake_generator: Visual Studio 17 2022
+
+          - target: windows
+            architecture: 64
+            build_system: cmake-mingw
 
           - target: windows
             architecture: 32
@@ -99,6 +106,16 @@ jobs:
 
           - target: windows
             build_system: makegcc14
+
+          - target: windows
+            architecture: 32
+            build_system: cmake-mingw
+
+          - target: darwin
+            build_system: cmake-mingw
+
+          - target: linux
+            build_system: cmake-mingw
 
     steps:
     - name: "SCM Checkout"
@@ -209,6 +226,17 @@ jobs:
             BUILD_FOLDER=build/bin
             ;;
 
+          cmake-mingw)
+            # TODO: Set up environment to build other libs
+            cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+              -G "MinGW Makefiles" \
+              -DWITH_FMT=OFF -DWITH_VIDEO=OFF -DWITH_OPENAL=OFF -DWITH_SDL=OFF -DWITH_DIRECTX=OFF -DWITH_DX12=OFF -DWITH_UI=OFF \
+              ${{ matrix.cmake_flags }}
+
+            cmake --build build --config ${{ matrix.cmake_configuration }}
+            BUILD_FOLDER=build/bin
+            ;;
+
           vs2019)
             MSBuild.exe hl.sln //nologo //m //clp:ErrorsOnly \
               //p:Configuration=${{ matrix.msbuild_configuration }} \
@@ -239,7 +267,7 @@ jobs:
         set -eux
 
         case "${{ matrix.build_system }}" in
-          cmake)
+          cmake*)
             case "${{matrix.target}}" in
               linux)
                 cmake --install build --prefix /tmp/hashlink
@@ -248,6 +276,9 @@ jobs:
               darwin)
                 cmake --install build --prefix /tmp/hashlink
                 if [ -f /tmp/hashlink/hl ]; then /tmp/hashlink/hl --version; fi
+                ;;
+              windows)
+                export PATH=$(pwd)/build/bin:$PATH
                 ;;
             esac
             cd build && ctest --verbose --build-config ${{ matrix.cmake_configuration }}
@@ -301,8 +332,8 @@ jobs:
         short_commit=$(git rev-parse --short HEAD)
 
         case "${{ matrix.build_system }}" in
-          cmake)
-            dist_folder=hashlink-${short_commit}-${platform_name}-cmake
+          cmake*)
+            dist_folder=hashlink-${short_commit}-${platform_name}-${{ matrix.build_system }}
             cd build && cpack -D CPACK_PACKAGE_FILE_NAME=$dist_folder -C ${{ matrix.cmake_configuration }}
 
             echo "HASHLINK_DISTRIBUTION=build/bin/$dist_folder.${{ matrix.archive_ext }}" >> $GITHUB_ENV
