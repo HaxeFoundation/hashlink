@@ -26,16 +26,18 @@ if ((NOT WIN32) AND DOWNLOAD_DEPENDENCIES)
 else()
     if(WIN32)
         set(SDL2_DIR ${INCLUDES_BASE_DIR}/sdl/cmake)
+        if(NOT MINGW)
+            target_include_directories(sdl.hdll
+                PRIVATE
+                ${INCLUDES_BASE_DIR}/gl
+            )
+        endif()
     endif()
 
     find_package(SDL2 REQUIRED)
 endif()
 
 set_as_hdll(sdl)
-target_include_directories(sdl.hdll
-    PRIVATE
-    ${INCLUDES_BASE_DIR}/gl
-)
 target_link_libraries(sdl.hdll
     libhl
     SDL2::SDL2

@@ -16,7 +16,7 @@
 #elif defined(_WIN32)
 #	include <SDL.h>
 #	include <GL/gl.h>
-#	include <glext.h>
+#	include <GL/glext.h>
 #elif defined(HL_CONSOLE)
 #	include <graphic/glapi.h>
 #elif defined(HL_MESA)
