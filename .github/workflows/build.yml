@@ -231,7 +231,7 @@ jobs:
             # TODO: Set up environment to build other libs
             cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
               -G "MinGW Makefiles" \
-              -DWITH_FMT=OFF -DWITH_VIDEO=OFF -DWITH_OPENAL=OFF -DWITH_SDL=OFF -DWITH_DIRECTX=OFF -DWITH_DX12=OFF -DWITH_UI=OFF \
+              -DWITH_FMT=OFF -DWITH_VIDEO=OFF -DWITH_OPENAL=OFF -DWITH_SDL=OFF -DWITH_DIRECTX=OFF -DWITH_DX12=OFF \
               ${{ matrix.cmake_flags }}
 
             cmake --build build --config ${{ matrix.cmake_configuration }}
