@@ -919,6 +919,14 @@ HL_PRIM hl_thread *hl_thread_create( vclosure *c ) {
 }
 
 #if defined(HL_WIN) && defined(HL_THREADS)
+#ifdef HL_MINGW
+static void SetThreadName(DWORD dwThreadID, const char* threadName) {
+	SetThreadDescription(
+		OpenThread(THREAD_SET_LIMITED_INFORMATION, FALSE, dwThreadID),
+		hl_to_utf16(threadName)
+	);
+}
+#else
 const DWORD MS_VC_EXCEPTION = 0x406D1388;
 #pragma pack(push,8)
 typedef struct tagTHREADNAME_INFO
@@ -944,6 +952,7 @@ void SetThreadName(DWORD dwThreadID, const char* threadName) {
     }
 #pragma warning(pop)
 }
+#endif
 #endif
 
 HL_PRIM int hl_get_thread_id( hl_thread *t ) {
