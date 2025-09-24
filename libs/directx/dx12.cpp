@@ -344,7 +344,7 @@ HL_PRIM void HL_NAME(flush_messages)() {
 #endif
 }
 
-HL_PRIM uchar *HL_NAME(get_device_name)() {
+HL_PRIM const uchar *HL_NAME(get_device_name)() {
 	DXGI_ADAPTER_DESC desc;
 #ifndef HL_XBS
 	IDXGIAdapter *adapter = NULL;
@@ -696,7 +696,7 @@ HL_PRIM vbyte *HL_NAME(serialize_root_signature)( D3D12_ROOT_SIGNATURE_DESC *sig
 	ID3DBlob *error = NULL;
 	HRESULT r = D3D12SerializeRootSignature(signature,version, &data, &error);
 	if( !SUCCEEDED(r) ) {
-		uchar *c = error ? hl_to_utf16((char*)error->GetBufferPointer()) : USTR("Invalid argument");
+		const uchar *c = error ? hl_to_utf16((char*)error->GetBufferPointer()) : USTR("Invalid argument");
 		if( error ) error->Release();
 		hl_error("%s",c);
 	}
