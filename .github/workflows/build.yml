@@ -161,7 +161,12 @@ jobs:
             ;;
 
           windows*)
-            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/sdl.zip https://www.libsdl.org/release/SDL2-devel-2.30.2-VC.zip
+            if [[ ${{ matrix.build_system }} == cmake-mingw ]]; then
+              SDL_SUFFIX=mingw
+            else
+              SDL_SUFFIX=VC
+            fi
+            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/sdl.zip https://www.libsdl.org/release/SDL2-devel-2.30.2-${SDL_SUFFIX}.zip
             curl -fsSL --retry 3 --retry-delay 5 -o /tmp/openal.zip https://github.com/kcat/openal-soft/releases/download/1.23.1/openal-soft-1.23.1-bin.zip
             curl -fsSL --retry 3 --retry-delay 5 -o /tmp/ffmpeg.zip ${{ matrix.ffmpeg_url }}
             7z x /tmp/sdl.zip    -oinclude; mv include/SDL2*   include/sdl
@@ -228,11 +233,8 @@ jobs:
             ;;
 
           cmake-mingw)
-            # TODO: Set up environment to build other libs
-            cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
-              -G "MinGW Makefiles" \
-              -DWITH_FMT=OFF -DWITH_VIDEO=OFF -DWITH_OPENAL=OFF -DWITH_SDL=OFF -DWITH_DIRECTX=OFF -DWITH_DX12=OFF \
-              ${{ matrix.cmake_flags }}
+            cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+              -DWITH_VIDEO=OFF -DWITH_DX12=OFF
 
             cmake --build build --config ${{ matrix.cmake_configuration }}
             BUILD_FOLDER=build/bin
