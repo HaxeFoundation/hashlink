@@ -49,6 +49,11 @@ if(MSVC)
     add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
+if (MINGW)
+    add_compile_options(-municode)
+    add_link_options(-municode)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_CURRENT_SOURCE_DIR}/other/cmake
 )
@@ -170,7 +175,7 @@ set_target_properties(libhl
     PUBLIC_HEADER "${public_headers}"
 )
 
-if(WIN32)
+if(MSVC)
     set_target_properties(libhl
         PROPERTIES
         OUTPUT_NAME libhl
@@ -240,6 +245,12 @@ if(BUILD_TESTING)
         SET(HAXE_FLAGS )
     endif()
 
+    if(MINGW)
+        set(HLC_LIBRARIES dbghelp)
+    else()
+        set(HLC_LIBRARIES)
+    endif()
+
     #####################
     # hello.hl
 
@@ -300,6 +311,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(hello
         libhl
+        ${HLC_LIBRARIES}
     )
 
     #####################
@@ -323,6 +335,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(threads
         libhl
+        ${HLC_LIBRARIES}
     )
 
     #####################
@@ -347,6 +360,7 @@ if(BUILD_TESTING)
     target_link_libraries(uvsample
         libhl
         uv.hdll
+        ${HLC_LIBRARIES}
     )
 
     #####################
@@ -361,6 +375,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(header_macro_clashes
         libhl
+        ${HLC_LIBRARIES}
     )
 
     #####################

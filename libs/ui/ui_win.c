@@ -226,12 +226,16 @@ static void sentinel_loop( vsentinel *s ) {
 				GetThreadContext(h,&regs);
 				// simulate a call
 #				ifdef HL_64
-				*--(int_val*)regs.Rsp = regs.Rip;
-				*--(int_val*)regs.Rsp = regs.Rsp;
+				int_val* rsp = (int_val*)regs.Rsp;
+				*--rsp = (int_val)regs.Rip;
+				*--rsp = (int_val)rsp;
+				regs.Rsp = (int_val)rsp;
 				regs.Rip = (int_val)s->callback;
 #				else
-				*--(int_val*)regs.Esp = regs.Eip;
-				*--(int_val*)regs.Esp = regs.Esp;
+				int_val* esp = (int_val*)regs.Esp;
+				*--esp = (int_val)regs.Eip;
+				*--esp = (int_val)esp;
+				regs.Esp = (int_val)esp;
 				regs.Eip = (int_val)s->callback;
 #				endif
 				// resume

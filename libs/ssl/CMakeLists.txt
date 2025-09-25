@@ -4,7 +4,7 @@ add_library(ssl.hdll
 
 if (WIN32)
     set(MBEDTLS_INCLUDE_DIRS ${INCLUDES_BASE_DIR}/mbedtls/include .)
-    set(MBEDTLS_LIBRARIES crypt32)
+    set(MBEDTLS_LIBRARIES crypt32 bcrypt)
 
     target_sources(ssl.hdll PRIVATE
         ${INCLUDES_BASE_DIR}/mbedtls/library/aes.c

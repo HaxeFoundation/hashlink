@@ -14,6 +14,7 @@ CFLAGS = -Wall -O3 -I src -std=c11 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 EXTRA_LFLAGS ?=
 LIBFLAGS =
+LIBHL_LDLIBS = -lm -lpthread
 HLFLAGS = -ldl
 LIBEXT = so
 LIBTURBOJPEG = -lturbojpeg
@@ -123,7 +124,7 @@ BOOT = src/_main.o
 
 UNAME := $(shell uname)
 
-# Cygwin
+# Cygwin / mingw
 ifeq ($(OS),Windows_NT)
 
 LIBFLAGS += -Wl,--export-all-symbols
@@ -142,6 +143,16 @@ else
 BUILD_DIR = x64/Release
 VS_SDL_LIBRARY ?= include/sdl/lib/x64/SDL2.dll
 VS_OPENAL_LIBRARY ?= include/openal/bin/Win64/soft_oal.dll
+endif
+
+ifneq (, $(findstring MINGW64, $(UNAME)))
+LIBHL_LDLIBS += -lws2_32 -lwsock32
+SSL_LDLIBS += -lcrypt32 -lbcrypt -lws2_32
+MYSQL_LDLIBS += -lws2_32 -lwsock32
+HLC_LDLIBS = -ldbghelp
+CFLAGS += -municode
+LIBFLAGS += -municode
+HLFLAGS =
 endif
 
 else ifeq ($(UNAME),Darwin)
@@ -243,10 +254,10 @@ src/std/regexp.o: src/std/regexp.c
 	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
 
 libhl: ${LIB}
-	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} ${LHL_LINK_FLAGS} -shared ${LIB} -lpthread -lm
+	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} ${LHL_LINK_FLAGS} -shared $^ ${LIBHL_LDLIBS}
 
 hlc: ${BOOT}
-	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}
+	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS} ${HLC_LDLIBS}
 
 hl: ${HL} libhl
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
@@ -281,7 +292,7 @@ uv: ${UV} libhl
 	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
 
 mysql: ${MYSQL} libhl
-	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
+	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl ${MYSQL_LDLIBS}
 
 sqlite: ${SQLITE} libhl
 	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L. -lhl -lsqlite3
