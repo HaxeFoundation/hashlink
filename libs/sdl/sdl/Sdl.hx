@@ -166,6 +166,15 @@ class Sdl {
 			return @:privateAccess String.fromUTF8(t);
 	}
 
+
+	public static function getError() : String {
+		var t = _getError();
+		if( t == null )
+			return null;
+		else
+			return @:privateAccess String.fromUTF8(t);
+	}
+
 	@:hlNative("?sdl", "get_screen_width")
 	static function get_screen_width() : Int {
 		return 0;
@@ -251,6 +260,19 @@ class Sdl {
 	public static function getDragAndDropEnabled(): Bool {
 		return false;
 	}
+
+	@:hlNative("?sdl", "get_error")
+	private static function _getError() : hl.Bytes {
+		return null;
+	}
+
+
+	//
+	// SDL3 Joystick API 
+	//
+	public static function getJoysticks() : hl.NativeArray<Int> {
+		return null;
+	}
 }
 
 enum abstract SDLHint(String) from String to String {
@@ -269,7 +291,7 @@ enum abstract SDLHint(String) from String to String {
 	var SDL_HINT_VIDEO_X11_NET_WM_PING =                    "SDL_VIDEO_X11_NET_WM_PING";
 	var SDL_HINT_WINDOW_FRAME_USABLE_WHILE_CURSOR_HIDDEN =  "SDL_WINDOW_FRAME_USABLE_WHILE_CURSOR_HIDDEN";
 	var SDL_HINT_WINDOWS_ENABLE_MESSAGELOOP =               "SDL_WINDOWS_ENABLE_MESSAGELOOP";
-	var SDL_HINT_GRAB_KEYBOARD =                            "SDL_GRAB_KEYBOARD";
+	var SDL_HINT_GRAB_KEYBOARD =                            "SDL_GRAB_KEYBOARD"; // SDL2 compat
 	var SDL_HINT_MOUSE_RELATIVE_MODE_WARP =                 "SDL_MOUSE_RELATIVE_MODE_WARP";
 	var SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS =             "SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS";
 	var SDL_HINT_IDLE_TIMER_DISABLED =                      "SDL_IOS_IDLE_TIMER_DISABLED";
