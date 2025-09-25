@@ -234,7 +234,7 @@ jobs:
 
           cmake-mingw)
             cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
-              -DWITH_VIDEO=OFF -DWITH_DX12=OFF
+              -DWITH_DX12=OFF
 
             cmake --build build --config ${{ matrix.cmake_configuration }}
             BUILD_FOLDER=build/bin
