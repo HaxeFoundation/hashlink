@@ -236,7 +236,7 @@ jobs:
             cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
               -DWITH_DX12=OFF
 
-            cmake --build build --config ${{ matrix.cmake_configuration }}
+            cmake --build build --config ${{ matrix.cmake_configuration }} --parallel
             BUILD_FOLDER=build/bin
             ;;
 
