@@ -4,13 +4,10 @@
 #include "hlsystem.h"
 
 #include <locale.h>
+#include <SDL.h>
 
-#if defined(_WIN32) || defined(__ANDROID__) || defined(HL_IOS) || defined(HL_TVOS)
-#	include <SDL.h>
-#	include <SDL_vulkan.h>
+#if defined(HL_WIN) || defined(HL_IOS) || defined(HL_TVOS)
 #	include <SDL_syswm.h>
-#else
-#	include <SDL2/SDL.h>
 #endif
 
 #if defined (HL_IOS) || defined(HL_TVOS)
@@ -696,6 +693,10 @@ HL_PRIM void HL_NAME(win_resize)(SDL_Window *win, int mode) {
 	}
 }
 
+HL_PRIM void HL_NAME(win_raise)(SDL_Window *win) {
+	SDL_RaiseWindow(win);
+}
+
 
 HL_PRIM void HL_NAME(win_swap_window)(SDL_Window *win) {
 #if defined(HL_IOS) || defined(HL_TVOS)
@@ -730,6 +731,7 @@ DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _I32);
 DEFINE_PRIM(_BOOL, win_set_display_mode, TWIN _I32 _I32 _I32);
 DEFINE_PRIM(_I32, win_display_handle, TWIN);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
+DEFINE_PRIM(_VOID, win_raise, TWIN);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));

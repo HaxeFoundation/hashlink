@@ -23,11 +23,11 @@ jobs:
       matrix:
         target: [linux, darwin, windows]
         architecture: [32, 64, arm64]
-        build_system: [make, cmake, vs2019]
+        build_system: [make, cmake, vs2019, makegcc14]
 
         include:
           - target: linux
-            runner: ubuntu-22.04
+            runner: ubuntu-latest
             haxe_nightly_dir: linux64
             archive_ext: tar.gz
 
@@ -37,11 +37,11 @@ jobs:
 
           - target: darwin
             architecture: 64
-            runner: macos-13
+            runner: macos-latest
 
           - target: darwin
             architecture: arm64
-            runner: macos-14
+            runner: macos-latest
 
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
@@ -90,6 +90,16 @@ jobs:
           - target: windows
             build_system: make
 
+          - target: darwin
+            architecture: 64
+            build_system: make
+
+          - target: darwin
+            build_system: makegcc14
+
+          - target: windows
+            build_system: makegcc14
+
     steps:
     - name: "SCM Checkout"
       uses: actions/checkout@v5
@@ -126,8 +136,10 @@ jobs:
             ;;
 
           darwin*)
-            brew update
-            brew bundle
+            if [ "${{matrix.build_system}}" != "cmake" ]; then
+              brew update
+              brew bundle
+            fi
             ;;
 
           windows*)
@@ -139,6 +151,15 @@ jobs:
             7z x /tmp/ffmpeg.zip -oinclude; mv include/ffmpeg* include/ffmpeg
             ;;
         esac
+
+    - name: "Install: GCC 14"
+      if: matrix.build_system == 'makegcc14'
+      run: |
+          sudo add-apt-repository universe
+          sudo apt update
+          sudo apt install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 --slave /usr/bin/g++ g++ /usr/bin/g++-14
+          gcc --version
 
     - name: Install haxe
       uses: krdlab/setup-haxe@f0a0baa8ccdb1fe4fc316c8f30eb3ca77aa4ea4e
@@ -162,16 +183,30 @@ jobs:
           cmake)
             case "${{ matrix.target }}${{ matrix.architecture }}" in
               windows*)
-                cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
                   -G "${{ matrix.cmake_generator }}" \
                   -A ${{ matrix.architecture_string }}
                 ;;
-              *)
-                cmake . -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
+              darwin64)
+                cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+                  -DDOWNLOAD_DEPENDENCIES=ON \
+                  -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+                  -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 \
+                  -DFLAT_INSTALL_TREE=ON
+                ;;
+              darwinarm64)
+                cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+                  -DDOWNLOAD_DEPENDENCIES=ON \
+                  -DCMAKE_OSX_ARCHITECTURES=arm64 \
+                  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+                  -DFLAT_INSTALL_TREE=ON
+                ;;
+              linux64)
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
             esac
 
-            cmake --build . --config ${{ matrix.cmake_configuration }}
-            BUILD_FOLDER=bin
+            cmake --build build --config ${{ matrix.cmake_configuration }}
+            BUILD_FOLDER=build/bin
             ;;
 
           vs2019)
@@ -186,7 +221,7 @@ jobs:
             echo "WINDOWS_BUILD_FOLDER=$BUILD_FOLDER" >> $GITHUB_ENV
             ;;
 
-          make)
+          make*)
             make
             sudo make install
             if [[ ${{ matrix.target }} == linux ]]; then
@@ -205,12 +240,22 @@ jobs:
 
         case "${{ matrix.build_system }}" in
           cmake)
-            ctest --verbose --build-config ${{ matrix.cmake_configuration }}
+            case "${{matrix.target}}" in
+              linux)
+                cmake --install build --prefix /tmp/hashlink
+                /tmp/hashlink/bin/hl --version
+                ;;
+              darwin)
+                cmake --install build --prefix /tmp/hashlink
+                if [ -f /tmp/hashlink/hl ]; then /tmp/hashlink/hl --version; fi
+                ;;
+            esac
+            cd build && ctest --verbose --build-config ${{ matrix.cmake_configuration }}
             ;;
           vs2019)
             ${{ env.WINDOWS_BUILD_FOLDER }}/hl.exe --version
             ;;
-          make)
+          make*)
             if [[ ${{ matrix.architecture }} != arm64 ]]; then
               ./hl --version
               case ${{ matrix.target }} in
@@ -258,9 +303,9 @@ jobs:
         case "${{ matrix.build_system }}" in
           cmake)
             dist_folder=hashlink-${short_commit}-${platform_name}-cmake
-            cpack -D CPACK_PACKAGE_FILE_NAME=$dist_folder -C ${{ matrix.cmake_configuration }}
+            cd build && cpack -D CPACK_PACKAGE_FILE_NAME=$dist_folder -C ${{ matrix.cmake_configuration }}
 
-            echo "HASHLINK_DISTRIBUTION=bin/$dist_folder.${{ matrix.archive_ext }}" >> $GITHUB_ENV
+            echo "HASHLINK_DISTRIBUTION=build/bin/$dist_folder.${{ matrix.archive_ext }}" >> $GITHUB_ENV
             ;;
           *)
             dist_folder=hashlink-${short_commit}-${platform_name}
@@ -301,11 +346,9 @@ jobs:
     - name: "Build: Hashlink"
       run: |
         set -ex
-        mkdir build
-        cd build
-        cmake .. -G Ninja --toolchain $ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+        cmake -B build -G Ninja --toolchain $ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
           -DANDROID_PLATFORM=24 -DANDROID_ABI=arm64-v8a -DBUILD_SHARED_LIBS=OFF -DWITH_VM=OFF
-        cmake --build .
+        cmake --build build
 
   ###########################################################
   publish-latest-release:
@@ -344,8 +387,8 @@ jobs:
         gh release create latest \
           --prerelease \
           --title "HashLink Nightly Build" \
-          "darwin-make-64/hashlink-${short_commit}-darwin.tar.gz#hashlink-latest-darwin.tar.gz" \
-          "darwin-make-arm64/hashlink-${short_commit}-darwin-arm64.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
+          "darwin-cmake-64/hashlink-${short_commit}-darwin-cmake.tar.gz#hashlink-latest-darwin.tar.gz" \
+          "darwin-cmake-arm64/hashlink-${short_commit}-darwin-arm64-cmake.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
           "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
           "windows-vs2019-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip"

@@ -8,7 +8,7 @@
 #	include <OpenGLES/ES3/gl.h>
 #	define HL_GLES
 #elif defined(HL_MAC)
-#	include <SDL2/SDL.h>
+#	include <SDL.h>
 #	include <OpenGL/gl3.h>
 #	define glBindImageTexture(...) hl_error("Not supported on OSX")
 #	define glDispatchCompute(...) hl_error("Not supported on OSX")
@@ -29,7 +29,7 @@
 #	include <GLES3/gl3ext.h>
 #	define HL_GLES
 #else
-#	include <SDL2/SDL.h>
+#	include <SDL.h>
 #	include <GL/glcorearb.h>
 #endif
 

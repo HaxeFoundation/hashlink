@@ -55,6 +55,7 @@
     <ClCompile Include="..\..\include\mikktspace\mikktspace.c">
       <Filter>mikktspace</Filter>
     </ClCompile>
+    <ClCompile Include="renderdoc.c" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="meshoptimizer">
@@ -66,6 +67,9 @@
     <Filter Include="vhacd">
       <UniqueIdentifier>{94aab7ac-c480-46da-8009-37900d21775b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="renderdoc">
+      <UniqueIdentifier>{d6d800a7-7e8c-46bb-bf92-bf770710615d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\meshoptimizer\meshoptimizer.h">
@@ -76,6 +80,9 @@
     </ClInclude>
     <ClInclude Include="..\..\include\vhacd\VHACD.h">
       <Filter>vhacd</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\renderdoc\renderdoc_app.h">
+      <Filter>renderdoc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

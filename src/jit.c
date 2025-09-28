@@ -4249,6 +4249,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op64(ctx,MOV,pmem(&p,treg->id,offset),trap);
 
 				/*
+					trap E,@catch
+					catch g
+					catch g2
+					...
+					@:catch
+
+					// Before haxe 5
 					This is a bit hackshish : we want to detect the type of exception filtered by the catch so we check the following
 					sequence of HL opcodes:
 
@@ -4260,13 +4267,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 
 					??? is expected to be hl.BaseType.check
 				*/
+				hl_opcode *cat = f->ops + opCount + 1;
 				hl_opcode *next = f->ops + opCount + 1 + o->p2;
 				hl_opcode *next2 = f->ops + opCount + 2 + o->p2;
-				if( next->op == OGetGlobal && next2->op == OCall2 && next2->p3 == next->p1 && dst->stack.id == (int)(int_val)next2->extra ) {
-					hl_type *gt = m->code->globals[next->p2];
+				if( cat->op == OCatch || (next->op == OGetGlobal && next2->op == OCall2 && next2->p3 == next->p1 && dst->stack.id == (int)(int_val)next2->extra) ) {
+					int gindex = cat->op == OCatch ? cat->p1 : next->p2;
+					hl_type *gt = m->code->globals[gindex];
 					while( gt->kind == HOBJ && gt->obj->super ) gt = gt->obj->super;
 					if( gt->kind == HOBJ && gt->obj->nfields && gt->obj->fields[0].t->kind == HTYPE ) {
-						void *addr = m->globals_data + m->globals_indexes[next->p2];
+						void *addr = m->globals_data + m->globals_indexes[gindex];
 #						ifdef HL_64
 						op64(ctx,MOV,treg,pconst64(&p,(int_val)addr));
 						op64(ctx,MOV,treg,pmem(&p,treg->id,0));
@@ -4471,6 +4480,9 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 					break;
 				}
 			}
+			break;
+		case OCatch:
+			// Only used by OTrap typing
 			break;
 		default:
 			jit_error(hl_op_name(o->op));

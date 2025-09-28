@@ -43,11 +43,13 @@
     <ClCompile Include="meshoptimizer.cpp" />
     <ClCompile Include="mikkt.c" />
     <ClCompile Include="vhacd.cpp" />
+    <ClCompile Include="renderdoc.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\meshoptimizer\meshoptimizer.h" />
     <ClInclude Include="..\..\include\mikktspace\mikktspace.h" />
     <ClInclude Include="..\..\include\vhacd\VHACD.h" />
+    <ClInclude Include="..\..\include\renderdoc\renderdoc_app.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -107,23 +109,23 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetExt>.hdll</TargetExt>
     <LibraryPath>../../x64/$(Configuration);$(LibraryPath)</LibraryPath>
-    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../src;$(IncludePath)</IncludePath>
+    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../include/renderdoc;../../src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetExt>.hdll</TargetExt>
     <LibraryPath>../../x64/$(Configuration);$(LibraryPath)</LibraryPath>
-    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../src;$(IncludePath)</IncludePath>
+    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../include/renderdoc;../../src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../src;$(IncludePath)</IncludePath>
+    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../include/renderdoc;../../src;$(IncludePath)</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../src;$(IncludePath)</IncludePath>
+    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../include/renderdoc;../../src;$(IncludePath)</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2013|Win32'">
-    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../src;$(IncludePath)</IncludePath>
+    <IncludePath>../../include/meshoptimizer;../../include/mikktspace;../../include/vhacd;../../include/renderdoc;../../src;$(IncludePath)</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
