@@ -29,7 +29,7 @@
 #define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret == E_OUTOFMEMORY ) return NULL; if( __ret != S_OK ) ReportDxError(__ret,__LINE__); }
 #define CHKERR(cmd) { HRESULT __ret = cmd; if( FAILED(__ret) ) ReportDxError(__ret,__LINE__); }
 
-static int gs_constants[] = {
+static unsigned int gs_constants[] = {
 #ifdef _GAMING_XBOX_XBOXONE
 	D3D12XBOX_TEXTURE_DATA_PITCH_ALIGNMENT,
 #else
