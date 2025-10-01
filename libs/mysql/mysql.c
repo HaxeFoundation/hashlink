@@ -27,7 +27,7 @@
 #include "mysql.h"
 #include <string.h>
 
-HL_PRIM void error( MYSQL *m, const char *msg ) {
+static void error( MYSQL *m, const char *msg ) {
 	hl_buffer *b = hl_alloc_buffer();
 	hl_buffer_cstr(b,msg);
 	hl_buffer_cstr(b," ");
