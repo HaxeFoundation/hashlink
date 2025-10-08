@@ -306,6 +306,7 @@
     <ClInclude Include="include\pcre\pcre2_intmodedep.h" />
     <ClInclude Include="include\pcre\pcre2_ucp.h" />
     <ClInclude Include="src\hl.h" />
+    <ClInclude Include="src\hl_ffi.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

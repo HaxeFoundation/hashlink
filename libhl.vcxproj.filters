@@ -175,5 +175,6 @@
     <ClInclude Include="include\pcre\pcre2_ucp.h">
       <Filter>pcre</Filter>
     </ClInclude>
+    <ClInclude Include="src\hl_ffi.h" />
   </ItemGroup>
 </Project>
