@@ -368,7 +368,7 @@ void hl_profile_setup( int sample_count ) {
 	sem_init(&shared_context.msg4, 0, 0);
 	struct sigaction action = {0};
 	action.sa_sigaction = sigprof_handler;
-	action.sa_flags = SA_SIGINFO;
+	action.sa_flags = SA_SIGINFO | SA_RESTART;
 	sigaction(SIGPROF, &action, NULL);
 #	elif defined(HL_MAC)
 	shared_context.context.uc_mcontext = NULL;
@@ -377,7 +377,7 @@ void hl_profile_setup( int sample_count ) {
 	shared_context.msg4 = dispatch_semaphore_create(0);
 	struct sigaction action = {0};
 	action.sa_sigaction = sigprof_handler;
-	action.sa_flags = SA_SIGINFO;
+	action.sa_flags = SA_SIGINFO | SA_RESTART;
 	sigaction(SIGPROF, &action, NULL);
 #	endif
 	hl_thread_start(hl_profile_loop,NULL,false);
