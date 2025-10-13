@@ -1396,6 +1396,12 @@ HL_API void hl_gc_dump_memory( const char *filename ) {
 	gc_stop_world(true);
 	gc_mark();
 	fdump = fopen(filename,"wb");
+	if( fdump == NULL ) {
+		gc_stop_world(false);
+		gc_global_lock(false);
+		hl_error("Failed to open file");
+		return;
+	}
 
 	// header
 	fdump_d("HMD1",4);

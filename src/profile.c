@@ -426,6 +426,12 @@ static void profile_dump( vbyte* ptr ) {
 
 	char* filename = ptr == NULL ? "hlprofile.dump" : hl_to_utf8((uchar*)ptr);
 	FILE *f = fopen(filename,"wb");
+	if( f == NULL ) {
+		data.profiling_pause--;
+		printf("Failed to open file %s, 0 profile samples saved\n", filename);
+		hl_error("Failed to open file");
+		return;
+	}
 	int version = HL_VERSION;
 	fwrite("PROF",1,4,f);
 	fwrite(&version,1,4,f);
@@ -508,7 +514,7 @@ static void profile_dump( vbyte* ptr ) {
 	write_names(data.olds,f);
 	// done
 	fclose(f);
-	printf("%d profile samples saved\n", samples);
+	printf("%d profile samples saved to %s\n", samples, filename);
 	data.profiling_pause--;
 }
 
