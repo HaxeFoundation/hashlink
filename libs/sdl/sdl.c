@@ -642,6 +642,10 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	}
 	SDL_RaiseWindow(win); // better first focus lost behavior
 #	endif
+
+	// SDL2 compat
+	SDL_StartTextInput(win);
+
 	return win;
 }
 
