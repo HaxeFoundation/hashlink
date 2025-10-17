@@ -280,7 +280,7 @@ static void hl_profile_loop( void *_ ) {
 		if( t < next || data.profiling_pause ) {
 			if( !(t < next) ) next = t;
 			data.waitLoop = false;
-			if( data.profiling_pause ) hl_sys_sleep(0.1);
+			if( data.profiling_pause ) hl_sys_sleep(0.001);
 			continue;
 		}
 		hl_threads_info *threads = hl_gc_threads_info();
