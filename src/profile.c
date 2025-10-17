@@ -55,6 +55,7 @@
 #define MAX_STACK_COUNT 2048
 
 HL_API double hl_sys_time( void );
+HL_API void	hl_sys_sleep( double time );
 HL_API void hl_setup_profiler( void *, void * );
 int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out, int size );
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr );
@@ -279,6 +280,7 @@ static void hl_profile_loop( void *_ ) {
 		if( t < next || data.profiling_pause ) {
 			if( !(t < next) ) next = t;
 			data.waitLoop = false;
+			if( data.profiling_pause ) hl_sys_sleep(0.1);
 			continue;
 		}
 		hl_threads_info *threads = hl_gc_threads_info();
