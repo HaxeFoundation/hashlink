@@ -4591,7 +4591,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 		hl_setup_longjump(code + ctx->longjump);
 #		endif
 		int i;
-		for(i=0;i<sizeof(ctx->static_functions)/sizeof(void*);i++)
+		for(i=0;i<(int)(sizeof(ctx->static_functions)/sizeof(void*));i++)
 			ctx->static_functions[i] = (void*)(code + (int)(int_val)ctx->static_functions[i]);
 	}
 	// patch calls
