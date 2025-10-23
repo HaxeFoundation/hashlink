@@ -41,7 +41,6 @@ elseif(DOWNLOAD_DEPENDENCIES)
 	FetchContent_Declare(libuv-project
         URL https://github.com/libuv/libuv/archive/refs/tags/v1.51.0.tar.gz
         URL_HASH SHA256=27e55cf7083913bfb6826ca78cde9de7647cded648d35f24163f2d31bb9f51cd
-        DOWNLOAD_EXTRACT_TIMESTAMP true
         EXCLUDE_FROM_ALL
     )
     set(_OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
