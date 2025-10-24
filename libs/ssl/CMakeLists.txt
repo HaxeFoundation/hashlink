@@ -125,7 +125,6 @@ elseif(DOWNLOAD_DEPENDENCIES)
 	FetchContent_Declare(mbedtls-project
         URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.4/mbedtls-3.6.4.tar.bz2
         URL_HASH SHA256=ec35b18a6c593cf98c3e30db8b98ff93e8940a8c4e690e66b41dfc011d678110
-        DOWNLOAD_EXTRACT_TIMESTAMP true
         EXCLUDE_FROM_ALL
     )
     set(_OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
