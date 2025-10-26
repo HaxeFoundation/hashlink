@@ -161,6 +161,9 @@ static int ms_gcd( int m, int n ) {
 #define TSORT double
 #define TID(t)	t##_f64
 #include "sort.h"
+#define TSORT int64
+#define TID(t)	t##_i64
+#include "sort.h"
 
 HL_PRIM void hl_bsort_i32( vbyte *bytes, int pos, int len, vclosure *cmp ) {
 	m_sort_i32 m;
@@ -174,6 +177,13 @@ HL_PRIM void hl_bsort_f64( vbyte *bytes, int pos, int len, vclosure *cmp ) {
 	m.arr = (double*)(bytes + pos);
 	m.c = cmp;
 	merge_sort_rec_f64(&m,0,len);
+}
+
+HL_PRIM void hl_bsort_i64(vbyte* bytes, int pos, int len, vclosure* cmp) {
+	m_sort_f64 m;
+	m.arr = (int64*)(bytes + pos);
+	m.c = cmp;
+	merge_sort_rec_i64(&m, 0, len);
 }
 
 static inline bool is_space_char(uchar c) {
@@ -282,6 +292,7 @@ DEFINE_PRIM(_F64, parse_float,_BYTES _I32 _I32);
 DEFINE_PRIM(_NULL(_I32), parse_int, _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,bsort_i32,_BYTES _I32 _I32 _FUN(_I32,_I32 _I32));
 DEFINE_PRIM(_VOID,bsort_f64,_BYTES _I32 _I32 _FUN(_I32,_F64 _F64));
+DEFINE_PRIM(_VOID, bsort_i64, _BYTES _I32 _I32 _FUN(_I32, _I64 _I64));
 DEFINE_PRIM(_BYTES,bytes_offset, _BYTES _I32);
 DEFINE_PRIM(_I32,bytes_subtract, _BYTES _BYTES);
 DEFINE_PRIM(_I32,bytes_address, _BYTES _REF(_I32));
