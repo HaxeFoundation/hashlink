@@ -180,7 +180,7 @@ HL_PRIM void hl_bsort_f64( vbyte *bytes, int pos, int len, vclosure *cmp ) {
 }
 
 HL_PRIM void hl_bsort_i64(vbyte* bytes, int pos, int len, vclosure* cmp) {
-	m_sort_f64 m;
+	m_sort_i64 m;
 	m.arr = (int64*)(bytes + pos);
 	m.c = cmp;
 	merge_sort_rec_i64(&m, 0, len);
