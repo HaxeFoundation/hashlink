@@ -172,6 +172,16 @@ HL_PRIM void hl_sys_vtune_init() {
 	if( hl_setup.vtune_init ) hl_setup.vtune_init();
 }
 
+HL_PRIM bool hl_sys_load_plugin( vbyte *file ) {
+	return hl_setup.load_plugin && hl_setup.load_plugin((pchar*)file);
+}
+
+HL_PRIM vdynamic *hl_sys_resolve_type( hl_type *t, hl_type *gt ) {
+	if( hl_setup.resolve_type == NULL )
+		return NULL;
+	return hl_setup.resolve_type(t,gt);
+}
+
 #ifdef HL_DEBUG_REPRO
 static double CURT = 0;
 #endif
@@ -722,3 +732,5 @@ DEFINE_PRIM(_VOID, sys_profile_event, _I32 _BYTES _I32);
 DEFINE_PRIM(_VOID, sys_vtune_init, _NO_ARG);
 DEFINE_PRIM(_I32, sys_set_flags, _I32);
 DEFINE_PRIM(_BOOL, sys_has_debugger, _NO_ARG);
+DEFINE_PRIM(_BOOL, sys_load_plugin, _BYTES);
+DEFINE_PRIM(_DYN, sys_resolve_type, _TYPE _TYPE);

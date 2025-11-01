@@ -89,9 +89,10 @@ static hl_code *load_code( const pchar *file, char **error_msg, bool print_error
 	return code;
 }
 
-static main_context* reload_ctx = NULL;
+static main_context* main_ctx = NULL;
+
 static bool check_reload( vbyte *alt_file ) {
-	main_context* m = reload_ctx;
+	main_context* m = main_ctx;
 	pchar* file = alt_file ? (pchar*)alt_file : m->file;
 	int time = pfiletime(file);
 	bool changed;
@@ -105,6 +106,61 @@ static bool check_reload( vbyte *alt_file ) {
 	m->file_time = time;
 	hl_code_free(code);
 	return changed;
+}
+
+static bool load_plugin( pchar *file ) {
+	char *error_msg = NULL;
+	hl_code *code = load_code(file, &error_msg, false);
+	if( code == NULL )
+		return false;
+	int i;
+	for(i=0;i<code->ntypes;i++) {
+		hl_type *t1 = code->types + i;
+		if( t1->kind != HOBJ ) continue;
+		hl_type *t2 = hl_module_resolve_type(main_ctx->m, t1);
+		// ensure that cast will work between types !
+		if( t2 ) t1->obj->name = t2->obj->name;
+	}
+	hl_module *m = hl_module_alloc(code);
+	if( m == NULL )
+		return false;
+	if( !hl_module_init(m,false) )
+		return false;
+	hl_code_free(code);
+	vclosure cl;
+	cl.t = m->code->functions[m->functions_indexes[m->code->entrypoint]].type;
+	cl.fun = m->functions_ptrs[m->code->entrypoint];
+	cl.hasValue = 0;
+ 	hl_dyn_call(&cl,NULL,0);
+	return true;
+}
+
+static vdynamic *resolve_type( hl_type *t, hl_type *gt ) {
+	hl_type *t2 = hl_module_resolve_type(main_ctx->m, t);
+	if( t2 == NULL || t2->kind != HOBJ )
+		return NULL;
+	hl_module_context *m = t->obj->m;
+	hl_module_context *m2 = t2->obj->m;
+	vdynamic *g = (vdynamic*)*t2->obj->global_value;
+	hl_type *gt2 = g->t;
+	// patch bindings (constructor, etc.)
+	int i;
+	for(i=0;i<gt->obj->nbindings;i++) {
+		int mid1 = gt->obj->bindings[(i<<1)|1];
+		int mid2 = gt2->obj->bindings[(i<<1)|1];
+		void *fun1 = m->functions_ptrs[mid1];
+		void **fun2 = &m2->functions_ptrs[mid2];
+		hl_jit_patch_method(fun1,fun2);
+	}
+	// patch methods
+	for(i=0;i<t->obj->nproto;i++) {
+		int mid1 = t->obj->proto[i].findex;
+		int mid2 = t2->obj->proto[i].findex;
+		void *fun1 = m->functions_ptrs[mid1];
+		void **fun2 = &m2->functions_ptrs[mid2];
+		hl_jit_patch_method(fun1,fun2);
+	}
+	return g;
 }
 
 #ifdef HL_VCC
@@ -214,6 +270,7 @@ int main(int argc, pchar *argv[]) {
 	hl_setup.sys_nargs = argc;
 	hl_sys_init();
 	hl_register_thread(&ctx);
+	main_ctx = &ctx;
 	ctx.file = file;
 	ctx.code = load_code(file, &error_msg, true);
 	if( ctx.code == NULL ) {
@@ -227,9 +284,10 @@ int main(int argc, pchar *argv[]) {
 		return 3;
 	if( hot_reload ) {
 		ctx.file_time = pfiletime(ctx.file);
-		reload_ctx = &ctx;
 		hl_setup.reload_check = check_reload;
 	}
+	hl_setup.load_plugin = load_plugin;
+	hl_setup.resolve_type = resolve_type;
 	hl_code_free(ctx.code);
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
 		fprintf(stderr,"Could not start debugger on port %d\n",debug_port);

@@ -701,6 +701,18 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	return 1;
 }
 
+hl_type *hl_module_resolve_type( hl_module *m, hl_type *t ) {
+	int i;
+	if( t->kind != HOBJ )
+		return NULL;
+	for(i=0;i<m->code->ntypes;i++) {
+		hl_type *t2 = m->code->types + i;
+		if( t2->kind == HOBJ && ucmp(t->obj->name,t2->obj->name) == 0 )
+			return t2;
+	}
+	return NULL;
+}
+
 h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	int i,i1,i2;
 	bool has_changes = false;

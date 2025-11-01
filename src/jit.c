@@ -308,6 +308,7 @@ struct jit_ctx {
 	int hl2c;
 	int longjump;
 	void *static_functions[8];
+	bool static_function_offset;
 };
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
@@ -4407,6 +4408,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OAssert:
 			{
+				pad_before_call(ctx, 0);
 				jlist *j = (jlist*)hl_malloc(&ctx->galloc,sizeof(jlist));
 				j->pos = BUF_POS();
 				j->target = -2;
@@ -4599,7 +4601,10 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 #		ifdef JIT_CUSTOM_LONGJUMP
 		hl_setup.throw_jump = (void(*)(jmp_buf, int))(code + ctx->longjump);
 #		endif
+	}
+	if( !ctx->static_function_offset ) {
 		int i;
+		ctx->static_function_offset = true;
 		for(i=0;i<(int)(sizeof(ctx->static_functions)/sizeof(void*));i++)
 			ctx->static_functions[i] = (void*)(code + (int)(int_val)ctx->static_functions[i]);
 	}
