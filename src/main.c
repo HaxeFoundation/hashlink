@@ -117,7 +117,7 @@ static bool load_plugin( pchar *file ) {
 	for(i=0;i<code->ntypes;i++) {
 		hl_type *t1 = code->types + i;
 		if( t1->kind != HOBJ ) continue;
-		hl_type *t2 = hl_module_resolve_type(main_ctx->m, t1);
+		hl_type *t2 = hl_module_resolve_type(main_ctx->m, t1, false);
 		// ensure that cast will work between types !
 		if( t2 ) t1->obj->name = t2->obj->name;
 	}
@@ -136,13 +136,12 @@ static bool load_plugin( pchar *file ) {
 }
 
 static vdynamic *resolve_type( hl_type *t, hl_type *gt ) {
-	hl_type *t2 = hl_module_resolve_type(main_ctx->m, t);
+	hl_type *t2 = hl_module_resolve_type(main_ctx->m, t, true);
 	if( t2 == NULL || t2->kind != HOBJ )
 		return NULL;
 	hl_module_context *m = t->obj->m;
 	hl_module_context *m2 = t2->obj->m;
-	vdynamic *g = (vdynamic*)*t2->obj->global_value;
-	hl_type *gt2 = g->t;
+	hl_type *gt2 = hl_module_resolve_type(main_ctx->m, gt, true);
 	// patch bindings (constructor, etc.)
 	int i;
 	for(i=0;i<gt->obj->nbindings;i++) {
@@ -160,7 +159,7 @@ static vdynamic *resolve_type( hl_type *t, hl_type *gt ) {
 		void **fun2 = &m2->functions_ptrs[mid2];
 		hl_jit_patch_method(fun1,fun2);
 	}
-	return g;
+	return (vdynamic*)*t2->obj->global_value;
 }
 
 #ifdef HL_VCC
