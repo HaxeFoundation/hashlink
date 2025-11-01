@@ -89,13 +89,16 @@ static hl_code *load_code( const pchar *file, char **error_msg, bool print_error
 	return code;
 }
 
-static bool check_reload( main_context *m ) {
-	int time = pfiletime(m->file);
+static main_context* reload_ctx = NULL;
+static bool check_reload( vbyte *alt_file ) {
+	main_context* m = reload_ctx;
+	pchar* file = alt_file ? (pchar*)alt_file : m->file;
+	int time = pfiletime(file);
 	bool changed;
 	if( time == m->file_time )
 		return false;
 	char *error_msg = NULL;
-	hl_code *code = load_code(m->file, &error_msg, false);
+	hl_code *code = load_code(file, &error_msg, false);
 	if( code == NULL )
 		return false;
 	changed = hl_module_patch(m->m, code);
@@ -213,7 +216,10 @@ int main(int argc, pchar *argv[]) {
 		}
 	}
 	hl_global_init();
-	hl_sys_init((void**)argv,argc,file);
+	hl_setup.file_path = file;
+	hl_setup.sys_args = (pchar**)argv;
+	hl_setup.sys_nargs = argc;
+	hl_sys_init();
 	hl_register_thread(&ctx);
 	ctx.file = file;
 	ctx.code = load_code(file, &error_msg, true);
@@ -228,7 +234,8 @@ int main(int argc, pchar *argv[]) {
 		return 3;
 	if( hot_reload ) {
 		ctx.file_time = pfiletime(ctx.file);
-		hl_setup_reload_check(check_reload,&ctx);
+		reload_ctx = &ctx;
+		hl_setup.reload_check = check_reload;
 	}
 	hl_code_free(ctx.code);
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {

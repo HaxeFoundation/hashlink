@@ -62,20 +62,9 @@ typedef struct _stat32 pstat;
 #	include <sys/times.h>
 #	include <sys/wait.h>
 #	include <locale.h>
-#	define HL_UTF8PATH
 typedef struct stat pstat;
 #endif
 
-#endif
-
-#ifdef HL_UTF8PATH
-typedef char pchar;
-#define pstrchr strchr
-#define pstrlen	strlen
-#else
-typedef uchar pchar;
-#define pstrchr wcschr
-#define pstrlen	ustrlen
 #endif
 
 #ifdef HL_MAC
@@ -87,6 +76,8 @@ typedef uchar pchar;
 #ifndef CLK_TCK
 #	define CLK_TCK	100
 #endif
+
+HL_PRIM hl_setup_t hl_setup = { 0 };
 
 static pchar *pstrdup( const pchar *s, int len ) {
 	pchar *ret;
@@ -674,53 +665,33 @@ HL_PRIM int hl_sys_get_char( bool b ) {
 #	endif
 }
 
-static pchar **sys_args;
-static int sys_nargs;
-
 HL_PRIM varray *hl_sys_args() {
-	varray *a = hl_alloc_array(&hlt_bytes,sys_nargs);
+	varray *a = hl_alloc_array(&hlt_bytes,hl_setup.sys_nargs);
 	int i;
-	for(i=0;i<sys_nargs;i++)
-		hl_aptr(a,pchar*)[i] = sys_args[i];
+	for(i=0;i<hl_setup.sys_nargs;i++)
+		hl_aptr(a,pchar*)[i] = hl_setup.sys_args[i];
 	return a;
 }
 
-static void *hl_file = NULL;
-
-HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
+HL_PRIM void hl_sys_init() {
 #ifdef HL_WIN
 	QueryPerformanceFrequency(&qpcFrequency);
 #endif
-	sys_args = (pchar**)args;
-	sys_nargs = nargs;
-	hl_file = hlfile;
 #	ifdef HL_WIN_DESKTOP
 	setlocale(LC_CTYPE, ""); // printf to current locale
 #	endif
 }
 
 HL_PRIM vbyte *hl_sys_hl_file() {
-	return (vbyte*)hl_file;
-}
-
-static void *reload_fun = NULL;
-static void *reload_param = NULL;
-HL_PRIM void hl_setup_reload_check( void *freload, void *param ) {
-	reload_fun = freload;
-	reload_param = param;
+	return (vbyte*)hl_setup.file_path;
 }
 
 HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
-	if( debug_alt_file && reload_param ) {
-		*((vbyte**)reload_param) = debug_alt_file;
-	}
-	return reload_fun && ((bool(*)(void*))reload_fun)(reload_param);
+	return hl_setup.reload_check != NULL && hl_setup.reload_check(debug_alt_file);
 }
 
-extern int hl_closure_stack_capture;
-
 HL_PRIM bool hl_sys_has_debugger() {
-	return hl_closure_stack_capture != 0;
+	return hl_setup.is_debugger_attached;
 }
 
 #ifndef HL_MOBILE

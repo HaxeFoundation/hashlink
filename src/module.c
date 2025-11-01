@@ -691,7 +691,8 @@ int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later ) {
 	}
 #	endif
 	hl_module_add(m);
-	hl_setup_exception(module_resolve_symbol, module_capture_stack);
+	hl_setup.resolve_symbol = module_resolve_symbol;
+	hl_setup.capture_stack = module_capture_stack;
 	hl_gc_set_dump_types(hl_module_types_dump);
 	hl_jit_free(ctx, hot_reload);
 	if( hot_reload ) {

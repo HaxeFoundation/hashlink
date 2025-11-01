@@ -163,9 +163,13 @@ int main(int argc, char *argv[]) {
 	sys_global_init();
 	hl_global_init();
 	hl_register_thread(&ret);
-	hl_setup_exception(hlc_resolve_symbol,hlc_capture_stack);
-	hl_setup_callbacks(hlc_static_call, hlc_get_wrapper);
-	hl_sys_init((void**)(argv + 1),argc - 1,NULL);
+	hl_setup.resolve_symbol = hlc_resolve_symbol;
+	hl_setup.capture_stack = hlc_capture_stack;
+	hl_setup.static_call = hlc_static_call;
+	hl_setup.get_wrapper = hlc_get_wrapper;
+	hl_setup.sys_args = (pchar**)(argv + 1);
+	hl_setup.sys_nargs = argc - 1;
+	hl_sys_init();
 	tf.ret = &hlt_void;
 	clt.kind = HFUN;
 	clt.fun = &tf;

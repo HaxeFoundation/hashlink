@@ -595,6 +595,39 @@ HL_API hl_type hlt_dynobj;
 HL_API hl_type hlt_bool;
 HL_API hl_type hlt_abstract;
 
+
+
+#ifdef HL_WIN
+typedef uchar pchar;
+#define pstrchr wcschr
+#define pstrlen	ustrlen
+#else
+typedef char pchar;
+#define pstrchr strchr
+#define pstrlen	strlen
+#define HL_UTF8PATH
+#endif
+
+
+typedef struct {
+	pchar* file_path;
+	pchar** sys_args;
+	int sys_nargs;
+	void (*throw_jump)(jmp_buf, int);
+	uchar* (*resolve_symbol)(void* addr, uchar* out, int* outSize);
+	int (*capture_stack)(void** stack, int size);
+	bool (*reload_check)(vbyte* alt_file);
+	void* (*static_call)(void* fun, hl_type* t, void** args, vdynamic* out);
+	void* (*get_wrapper)(hl_type* t);
+	bool static_call_ref;
+	int closure_stack_capture;
+	bool is_debugger_enabled;
+	bool is_debugger_attached;
+} hl_setup_t;
+
+HL_API hl_setup_t hl_setup;
+HL_API void hl_sys_init();
+
 HL_API double hl_nan( void );
 HL_API bool hl_is_dynamic( hl_type *t );
 #define hl_is_ptr(t)	((t)->kind >= HBYTES)
@@ -632,13 +665,10 @@ HL_API void hl_assert( void );
 HL_API HL_NO_RETURN( void hl_throw( vdynamic *v ) );
 HL_API HL_NO_RETURN( void hl_rethrow( vdynamic *v ) );
 HL_API HL_NO_RETURN( void hl_null_access( void ) );
-HL_API void hl_setup_longjump( void *j );
-HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
 HL_API void hl_dump_stack( void );
 HL_API void hl_print_uncaught_exception( vdynamic *exc );
 HL_API varray *hl_exception_stack( void );
 HL_API bool hl_detect_debugger( void );
-HL_API void hl_set_debug_mode( bool b );
 
 HL_API vvirtual *hl_to_virtual( hl_type *vt, vdynamic *obj );
 HL_API void hl_init_virtual( hl_type *vt, hl_module_context *ctx );
@@ -895,10 +925,6 @@ typedef struct {
 #define hl_fatal4(msg,p0,p1,p2,p3)	hl_fatal_fmt(__FILE__,__LINE__,msg,p0,p1,p2,p3)
 HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
 HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
-HL_API void hl_sys_init(void **args, int nargs, void *hlfile);
-HL_API void hl_setup_callbacks(void *sc, void *gw);
-HL_API void hl_setup_callbacks2(void *sc, void *gw, int flags);
-HL_API void hl_setup_reload_check( void *freload, void *param );
 
 #include <setjmp.h>
 typedef struct _hl_trap_ctx hl_trap_ctx;

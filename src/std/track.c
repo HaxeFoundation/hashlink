@@ -59,8 +59,6 @@ typedef struct {
 static bucket_list all_data[_KLAST] = {{0}};
 static hl_mutex *track_lock = NULL;
 
-int hl_internal_capture_stack( void **stack, int size );
-
 static bucket *bucket_find_insert( bucket_list *data, unsigned int hash, void **stack, int count ) {
 	int min = 0, mid;
 	int max = data->bcount;
@@ -142,7 +140,7 @@ static bucket *fetch_bucket( bucket_kind kind ) {
 	bucket_list *data = &all_data[kind];
 	bucket *b;
 	if( track_lock == NULL ) init_lock();
-	count = hl_internal_capture_stack(tinf->exc_stack_trace,track_depth);
+	count = hl_setup.capture_stack(tinf->exc_stack_trace,track_depth);
 	if( count > max_depth ) max_depth = count;
 	hash = -count;
 	for(i=0;i<count;i++)

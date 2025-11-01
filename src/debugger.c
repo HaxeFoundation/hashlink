@@ -35,8 +35,6 @@ HL_API int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len );
 HL_API void hl_sys_sleep( double t );
 HL_API int hl_sys_getpid();
 
-HL_API int hl_closure_stack_capture;
-
 static hl_socket *debug_socket = NULL;
 static hl_socket *client_socket = NULL;
 static bool debugger_connected = false;
@@ -103,7 +101,8 @@ static void hl_debug_loop( hl_module *m ) {
 			send(d->offsets,(d->large ? sizeof(int) : sizeof(unsigned short)) * (f->nops + 1));
 		}
 
-		hl_closure_stack_capture = 8;
+		hl_setup.closure_stack_capture = 8;
+		hl_setup.is_debugger_attached = true;
 
 		// wait answer
 		// for some reason, this is not working on windows (recv returns 0 ?)
@@ -142,7 +141,7 @@ h_bool hl_module_debug( hl_module *m, int port, h_bool wait ) {
 	hl_socket_close(debug_socket);
 	debug_socket = NULL;
 #	endif
-	hl_set_debug_mode(true);
+	hl_setup.is_debugger_enabled = true;
 	return true;
 }
 
