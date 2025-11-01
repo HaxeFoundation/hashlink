@@ -608,6 +608,8 @@ typedef char pchar;
 #define HL_UTF8PATH
 #endif
 
+#include <setjmp.h>
+
 typedef struct {
 	pchar* file_path;
 	pchar** sys_args;
@@ -928,7 +930,6 @@ typedef struct {
 HL_API void *hl_fatal_error( const char *msg, const char *file, int line );
 HL_API void hl_fatal_fmt( const char *file, int line, const char *fmt, ...);
 
-#include <setjmp.h>
 typedef struct _hl_trap_ctx hl_trap_ctx;
 struct _hl_trap_ctx {
 	jmp_buf buf;
