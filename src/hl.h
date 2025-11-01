@@ -597,7 +597,7 @@ HL_API hl_type hlt_abstract;
 
 
 
-#ifdef HL_WIN
+#if defined(HL_WIN)
 typedef uchar pchar;
 #define pstrchr wcschr
 #define pstrlen	ustrlen
@@ -607,7 +607,6 @@ typedef char pchar;
 #define pstrlen	strlen
 #define HL_UTF8PATH
 #endif
-
 
 typedef struct {
 	pchar* file_path;
@@ -619,6 +618,9 @@ typedef struct {
 	bool (*reload_check)(vbyte* alt_file);
 	void* (*static_call)(void* fun, hl_type* t, void** args, vdynamic* out);
 	void* (*get_wrapper)(hl_type* t);
+	void (*profile_event)(int code, vbyte *data, int len);
+	void (*before_exit)();
+	void (*vtune_init)();
 	bool static_call_ref;
 	int closure_stack_capture;
 	bool is_debugger_enabled;

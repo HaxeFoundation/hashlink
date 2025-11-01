@@ -356,7 +356,8 @@ static void profile_event( int code, vbyte *data, int dataLen );
 
 void hl_profile_setup( int sample_count ) {
 #	if defined(HL_THREADS) && (defined(HL_WIN_DESKTOP) || defined(HL_LINUX) || defined (HL_MAC))
-	hl_setup_profiler(profile_event,hl_profile_end);
+	hl_setup.profile_event = profile_event;
+	hl_setup.before_exit = hl_profile_end;
 	if( data.sample_count ) return;
 	if( sample_count < 0 ) {
 		// was not started with --profile : pause until we get start event

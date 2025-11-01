@@ -159,35 +159,17 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(false);
 }
 
-
-static void *f_before_exit = NULL;
-static void *f_profile_event = NULL;
-HL_PRIM void hl_setup_profiler( void *profile_event, void *before_exit ) {
-	f_before_exit = before_exit;
-	f_profile_event = profile_event;
-}
-
 HL_PRIM void hl_sys_profile_event( int code, vbyte *data, int dataLen ) {
-	if( f_profile_event ) ((void(*)(int,vbyte*,int))f_profile_event)(code,data,dataLen);
+	if( hl_setup.profile_event ) hl_setup.profile_event(code, data, dataLen);
 }
 
 HL_PRIM void hl_sys_exit( int code ) {
-	if( f_before_exit ) ((void(*)())f_before_exit)();
+	if( hl_setup.before_exit ) hl_setup.before_exit();
 	exit(code);
 }
 
-static void *f_vtune_init = NULL;
-static void *g_vtune_module = NULL;
-HL_PRIM void hl_setup_vtune( void *vtune_init, void *m ) {
-	f_vtune_init = vtune_init;
-	g_vtune_module = m;
-}
-
 HL_PRIM void hl_sys_vtune_init() {
-	if( f_vtune_init ) {
-		getchar();
-		((void(*)(void*))f_vtune_init)(g_vtune_module);
-	}
+	if( hl_setup.vtune_init ) hl_setup.vtune_init();
 }
 
 #ifdef HL_DEBUG_REPRO

@@ -532,6 +532,11 @@ h_bool hl_module_init_vtune( hl_module *m ) {
 	}
 	return true;
 }
+static void modules_init_vtune() {
+	int i;
+	for(i=0;i<modules_count;i++)
+		hl_module_init_vtune(cur_modules[i]);
+}
 #endif
 
 static void hl_module_init_natives( hl_module *m ) {
@@ -630,8 +635,7 @@ static void hl_module_add( hl_module *m ) {
 	free(old_modules);
 }
 
-void hl_setup_vtune( void *vtune_init, void *m );
-int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later ) {
+int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
 	// expand globals
@@ -682,18 +686,13 @@ int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later ) {
 		hl_constant *c = m->code->constants + i;
 		hl_module_init_constant(m, c);
 	}
-
-#	ifdef HL_VTUNE
-	if( !vtune_later ) {
-		hl_module_init_vtune(m);
-	} else {
-		hl_setup_vtune(hl_module_init_vtune, m);
-	}
-#	endif
 	hl_module_add(m);
 	hl_setup.resolve_symbol = module_resolve_symbol;
 	hl_setup.capture_stack = module_capture_stack;
 	hl_gc_set_dump_types(hl_module_types_dump);
+#	ifdef HL_VTUNE
+	hl_setup.vtune_init = modules_init_vtune;
+#	endif
 	hl_jit_free(ctx, hot_reload);
 	if( hot_reload ) {
 		hl_code_hash_finalize(m->hash);
