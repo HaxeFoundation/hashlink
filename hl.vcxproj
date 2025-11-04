@@ -280,6 +280,7 @@
   <ItemGroup>
     <ClInclude Include="src\hl.h" />
     <ClInclude Include="src\hlmodule.h" />
+    <ClInclude Include="src\hlsystem.h" />
     <ClInclude Include="src\opcodes.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

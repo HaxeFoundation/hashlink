@@ -56,7 +56,6 @@
 
 HL_API double hl_sys_time( void );
 HL_API void	hl_sys_sleep( double time );
-HL_API void hl_setup_profiler( void *, void * );
 int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out, int size );
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr );
 
