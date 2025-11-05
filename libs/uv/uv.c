@@ -270,6 +270,13 @@ DEFINE_PRIM(_BOOL, fs_stop_wrap, _FS);
 
 // loop
 
+uv_loop_t *HL_NAME(create_loop)() {
+	uv_loop_t *l = (uv_loop_t*)hl_gc_alloc_noptr(sizeof(uv_loop_t));
+	uv_loop_init(l);
+	return l;
+}
+
+DEFINE_PRIM(_LOOP, create_loop, _NO_ARG);
 DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
 DEFINE_PRIM(_I32, loop_close, _LOOP);
 DEFINE_PRIM(_I32, run, _LOOP _I32);
