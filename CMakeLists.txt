@@ -225,7 +225,7 @@ if (WITH_VM)
 endif()
 
 if(WIN32)
-    target_link_libraries(libhl ws2_32 user32)
+    target_link_libraries(libhl ws2_32 user32 winmm)
 else()
     target_link_libraries(libhl m dl)
 
