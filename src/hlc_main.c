@@ -32,11 +32,7 @@
 #	define WIN32_LEAN_AND_MEAN
 #endif
 #	include <windows.h>
-#if !defined(HL_MINGW)
-#	include <DbgHelp.h>
-#else
 #	include <dbghelp.h>
-#endif
 #	pragma comment(lib, "Dbghelp.lib")
 #	undef CONST
 #	undef IN
