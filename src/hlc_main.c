@@ -68,14 +68,6 @@ extern void sys_global_exit();
 #define sys_global_exit()
 #endif
 
-
-#ifdef HL_VCC
-#	include <crtdbg.h>
-#else
-#	define _CrtSetDbgFlag(x)
-#	define _CrtCheckMemory()
-#endif
-
 #if defined(HL_LINUX) && (!defined(HL_ANDROID) || __ANDROID_MIN_SDK_VERSION__ >= 33)
 #define HL_LINUX_BACKTRACE
 #endif
