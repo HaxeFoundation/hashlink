@@ -159,6 +159,7 @@ HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {
 			p = &tmp[i].i;
 			break;
 		case HI64:
+		case HGUID:
 			tmp[i].i64 = hl_dyn_casti64(vargs + i, &hlt_dyn);
 			p = &tmp[i].i64;
 			break;
@@ -266,6 +267,7 @@ HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 				v = &tmp[i].i;
 				break;
 			case HI64:
+			case HGUID:
 				tmp[i].i64 = hl_dyn_casti64(v,t);
 				v = &tmp[i].i64;
 				break;
@@ -297,6 +299,7 @@ HL_PRIM void *hl_wrapper_call( void *_c, void **args, vdynamic *ret ) {
 		ret->v.i = hl_dyn_casti(aret,w->t->fun->ret,tfun->ret);
 		break;
 	case HI64:
+	case HGUID:
 		ret->v.i64 = hl_dyn_casti64(aret,w->t->fun->ret);
 		break;
 	case HF32:
