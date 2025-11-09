@@ -32,11 +32,7 @@
 #	define WIN32_LEAN_AND_MEAN
 #endif
 #	include <windows.h>
-#if !defined(HL_MINGW)
-#	include <DbgHelp.h>
-#else
 #	include <dbghelp.h>
-#endif
 #	pragma comment(lib, "Dbghelp.lib")
 #	undef CONST
 #	undef IN
@@ -70,14 +66,6 @@ extern void sys_global_exit();
 #else
 #define sys_global_init()
 #define sys_global_exit()
-#endif
-
-
-#ifdef HL_VCC
-#	include <crtdbg.h>
-#else
-#	define _CrtSetDbgFlag(x)
-#	define _CrtCheckMemory()
 #endif
 
 #if defined(HL_LINUX) && (!defined(HL_ANDROID) || __ANDROID_MIN_SDK_VERSION__ >= 33)
@@ -131,7 +119,7 @@ static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 
 static int hlc_capture_stack( void **stack, int size ) {
 	int count = 0;
-#	if defined(HL_WIN_DESKTOP) || defined(HL_LINUX) || defined(HL_MAC)
+#	if defined(HL_WIN_DESKTOP) || defined(HL_LINUX_BACKTRACE) || defined(HL_MAC)
 	// force return total count when output stack is null
 	static void* tmpstack[HL_EXC_MAX_STACK];
 	if( stack == NULL ) {
