@@ -28,6 +28,30 @@ static void invalid_cast( hl_type *from, hl_type *to ) {
 	hl_error("Can't cast %s to %s",hl_type_str(from),hl_type_str(to));
 }
 
+
+static vdynamic static_ints[256];
+static bool static_ints_init = false;
+
+static vdynamic *hl_dyni32( int v ) {
+	char b = (char)v;
+	if( b == v ) {
+		if( !static_ints_init ) {
+			int i;
+			for(i=-128;i<128;i++) {
+				static_ints[i&0xFF].t = &hlt_i32;
+				static_ints[i&0xFF].v.i = i;
+			}
+			static_ints_init = true;
+		}
+		return &static_ints[v&0xFF];
+	}
+	vdynamic *d = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
+	d->t = &hlt_i32;
+	d->v.i = v;
+	return d;
+
+}
+
 HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 	vdynamic *v;
 	switch( t->kind ) {
@@ -44,10 +68,7 @@ HL_PRIM vdynamic *hl_make_dyn( void *data, hl_type *t ) {
 		v->v.i = *(unsigned short*)data;
 		return v;
 	case HI32:
-		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
-		v->t = t;
-		v->v.i = *(int*)data;
-		return v;
+		return hl_dyni32(*(int*)data);
 	case HI64:
 	case HGUID:
 		v = (vdynamic*)hl_gc_alloc_noptr(sizeof(vdynamic));
@@ -526,12 +547,6 @@ HL_PRIM bool hl_type_safe_cast( hl_type *a, hl_type *b ) {
 static vdynamic *hl_dynf64( double v ) {
 	vdynamic *d = hl_alloc_dynamic(&hlt_f64);
 	d->v.d = v;
-	return d;
-}
-
-static vdynamic *hl_dyni32( int v ) {
-	vdynamic *d = hl_alloc_dynamic(&hlt_i32);
-	d->v.i = v;
 	return d;
 }
 
