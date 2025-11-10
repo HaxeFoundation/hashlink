@@ -270,7 +270,7 @@ DEFINE_PRIM(_BOOL, fs_stop_wrap, _FS);
 
 // loop
 
-uv_loop_t *HL_NAME(create_loop)() {
+HL_PRIM uv_loop_t *HL_NAME(create_loop)() {
 	uv_loop_t *l = (uv_loop_t*)hl_gc_alloc_noptr(sizeof(uv_loop_t));
 	uv_loop_init(l);
 	return l;
