@@ -574,9 +574,13 @@ HL_PRIM vdynamic *hl_dyn_op( int op, vdynamic *a, vdynamic *b ) {
 	return NULL;
 }
 
+HL_PRIM int64 hl_value_address( vdynamic *v ) {
+	return (int64)(int_val)(v && !hl_is_dynamic(v->t) ? v->v.ptr : v);
+}
+
 DEFINE_PRIM(_I32, dyn_compare, _DYN _DYN);
 DEFINE_PRIM(_DYN, value_cast, _DYN _TYPE);
 DEFINE_PRIM(_BOOL, type_safe_cast, _TYPE _TYPE);
 DEFINE_PRIM(_DYN, dyn_op, _I32 _DYN _DYN);
 DEFINE_PRIM(_I32, ptr_compare, _DYN _DYN);
-
+DEFINE_PRIM(_I64, value_address, _DYN);

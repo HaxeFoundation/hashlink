@@ -620,6 +620,15 @@ HL_PRIM void hl_register_guid_name( int64 guid, vbyte *name ) {
 		hl_hi64remove(hl_guid_map, guid);
 }
 
+HL_PRIM int hl_type_data_size( hl_type *t ) {
+	switch( t->kind ) {
+	case HSTRUCT:
+	case HOBJ:
+		return hl_get_obj_rt(t)->size;
+	default:
+		return -1;
+	}
+}
 
 DEFINE_PRIM(_BYTES, type_str, _TYPE);
 DEFINE_PRIM(_BYTES, type_name, _TYPE);
@@ -634,6 +643,7 @@ DEFINE_PRIM(_DYN, alloc_enum_dyn, _TYPE _I32 _ARR _I32);
 DEFINE_PRIM(_ARR, enum_parameters, _DYN);
 DEFINE_PRIM(_BOOL, type_set_global, _TYPE _DYN);
 DEFINE_PRIM(_VOID, register_guid_name, _I64 _BYTES);
+DEFINE_PRIM(_I32, type_data_size, _TYPE);
 
 typedef void hl_mlookup_map;
 extern hl_mlookup_map *hl_mlookup_alloc();
