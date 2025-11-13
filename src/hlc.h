@@ -25,12 +25,6 @@
 #include <math.h>
 #include <hl.h>
 
-#ifdef HL_64
-#	define PAD_64_VAL	,0
-#else
-#	define PAD_64_VAL
-#endif
-
 #ifdef HLC_BOOT
 
 // undefine some commonly used names that can clash with class/var name
