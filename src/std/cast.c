@@ -241,6 +241,10 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	case TK2(HARRAY,HDYN):
 	// NO(HSTRUCT,HDYN)
 		return *(void**)data;
+	case TK2(HABSTRACT,HABSTRACT):
+		if ( ucmp(t->abs_name, to->abs_name) != 0 )
+			break;
+		return *(void**)data;
 	}
 	if( to->kind == HDYN )
 		return hl_make_dyn(data,t);
