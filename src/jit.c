@@ -1719,17 +1719,17 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 		case OUMod:
 			{
 				preg *out = bop == OSMod || bop == OUMod ? REG_AT(Edx) : PEAX;
-				preg *r;
+				preg *r = pb;
 				preg p;
 				int jz, jz1 = 0, jend;
 				if( pa->kind == RCPU && pa->id == Eax ) RLOCK(pa);
 				// ensure b in CPU reg and not in Eax/Edx (for UI8/UI16)
-				if( pb->kind != RCPU || pb->id != Ecx ) {
+				if( pb->kind != RCPU || (pb->id == Eax || pb->id == Edx) ) {
 					scratch(REG_AT(Ecx));
 					scratch(pb);
 					load(ctx,REG_AT(Ecx),b);
+					r = REG_AT(Ecx);
 				}
-				r = REG_AT(Ecx);
 				// integer div 0 => 0
 				op(ctx,TEST,r,r,is64);
 				XJump_small(JZero, jz);
