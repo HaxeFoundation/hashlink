@@ -273,7 +273,7 @@ static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 static preg _unused = { RUNUSED, 0, 0, NULL };
 static preg *UNUSED = &_unused;
 
-struct jit_ctx {
+struct _jit_ctx {
 	union {
 		unsigned char *b;
 		unsigned int *w;
