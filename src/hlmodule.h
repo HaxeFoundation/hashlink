@@ -103,7 +103,7 @@ typedef struct {
 	bool large;
 } hl_debug_infos;
 
-typedef struct jit_ctx jit_ctx;
+typedef struct _jit_ctx jit_ctx;
 
 
 typedef struct {
