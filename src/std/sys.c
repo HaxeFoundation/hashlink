@@ -306,9 +306,13 @@ HL_PRIM varray *hl_sys_env() {
 HL_PRIM void hl_sys_sleep( double f ) {
 	hl_blocking(true);
 #if defined(HL_WIN)
+	#if !defined(HL_CONSOLE)
 	timeBeginPeriod(1);
+	#endif
 	Sleep((DWORD)(f * 1000));
+	#if !defined(HL_CONSOLE)
 	timeEndPeriod(1);
+	#endif
 #else
 	struct timespec t;
 	t.tv_sec = (int)f;
