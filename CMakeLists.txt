@@ -20,9 +20,7 @@ include(FindPkgConfig)
 include(CTest)
 
 set(WITH_VM_DEFAULT ON)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
-    set(WITH_VM_DEFAULT OFF)
-endif()
+# VM now supports x86, x86-64, and AArch64 architectures
 
 option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
 option(WITH_LLVM_AOT "Whether to build the hl2llvm AOT compiler" OFF)
@@ -200,9 +198,23 @@ set_target_properties(libhl
 )
 
 if (WITH_VM)
+    # Select JIT backend based on architecture
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(JIT_SOURCES
+            src/jit_aarch64.c
+            src/jit_aarch64_emit.c
+            src/jit_shared.c
+        )
+    else()
+        set(JIT_SOURCES
+            src/jit_x86.c
+            src/jit_shared.c
+        )
+    endif()
+
     add_executable(hl
         src/code.c
-        src/jit.c
+        ${JIT_SOURCES}
         src/main.c
         src/module.c
         src/debugger.c
@@ -480,6 +492,79 @@ if(BUILD_TESTING)
         add_test(NAME uvsample.hl
             COMMAND hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl 6001
         )
+
+        #####################
+        # Minimal JIT Tests
+        # These test individual opcodes without pulling in the Haxe stdlib
+
+        # Common sources for all minimal JIT tests
+        set(MINIMAL_JIT_SOURCES
+            src/code.c
+            ${JIT_SOURCES}
+            src/module.c
+            src/debugger.c
+            src/profile.c
+        )
+
+        # Macro to add a minimal JIT test
+        macro(add_minimal_jit_test name)
+            add_executable(${name}
+                ${CMAKE_SOURCE_DIR}/other/tests/minimal/${name}.c
+                ${MINIMAL_JIT_SOURCES}
+            )
+            target_include_directories(${name}
+                PRIVATE ${CMAKE_SOURCE_DIR}/other/tests/minimal
+            )
+            target_link_libraries(${name}
+                libhl
+            )
+            set_target_properties(${name}
+                PROPERTIES
+                RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/minimal
+            )
+            add_test(NAME ${name} COMMAND ${name})
+        endmacro()
+
+        # Add all minimal JIT tests
+        add_minimal_jit_test(test_int_ops)
+        add_minimal_jit_test(test_float_ops)
+        add_minimal_jit_test(test_bool_ops)
+        add_minimal_jit_test(test_control_flow)
+        add_minimal_jit_test(test_i64_ops)
+        add_minimal_jit_test(test_calls)
+        add_minimal_jit_test(test_strings)
+        add_minimal_jit_test(test_globals)
+        add_minimal_jit_test(test_natives)
+        add_minimal_jit_test(test_closures)
+        add_minimal_jit_test(test_objects)
+        add_minimal_jit_test(test_dynamic)
+        add_minimal_jit_test(test_callbacks)
+        add_minimal_jit_test(test_native_field)
+        add_minimal_jit_test(test_binop_inplace)
+        add_minimal_jit_test(test_enum)
+        add_minimal_jit_test(test_instance_closure)
+        add_minimal_jit_test(test_memory_ops)
+        add_minimal_jit_test(test_array_ops)
+        add_minimal_jit_test(test_ref_ops)
+        add_minimal_jit_test(test_unsigned_ops)
+        add_minimal_jit_test(test_switch)
+        add_minimal_jit_test(test_jumps_unsigned)
+        add_minimal_jit_test(test_type_ops)
+        add_minimal_jit_test(test_exceptions)
+        add_minimal_jit_test(test_methods)
+        add_minimal_jit_test(test_virtual_fields)
+
+        # Bytecode dump utility (needs code.c for hl_code_read)
+        add_executable(hldump
+            ${CMAKE_SOURCE_DIR}/other/tests/minimal/hldump.c
+            ${CMAKE_SOURCE_DIR}/src/code.c
+        )
+        target_link_libraries(hldump libhl)
+        set_target_properties(hldump
+            PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/minimal
+        )
+
     endif()
 
     add_test(NAME hello

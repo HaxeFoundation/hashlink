@@ -196,7 +196,8 @@ static int stack_size_c2hl(hl_type *t) {
  * Callback for dynamic function calls (C -> HL direction).
  * Called by hl_dyn_call/hl_call_method to invoke AOT functions dynamically.
  */
-static void *aot_callback_c2hl(void **f, hl_type *t, void **args, vdynamic *ret) {
+static void *aot_callback_c2hl(void *_f, hl_type *t, void **args, vdynamic *ret) {
+    void **f = (void**)_f;
     unsigned char stack[MAX_ARGS * 16];
     int nextCpu = 0, nextFpu = 0;
     int mappedRegs[MAX_ARGS];
@@ -307,11 +308,11 @@ static void *aot_callback_c2hl(void **f, hl_type *t, void **args, vdynamic *ret)
 }
 
 /*
- * Get wrapper function for a given function index.
+ * Get wrapper function for a given type.
  * For AOT, we return NULL since we don't support HL->C wrapping yet.
  */
-static void *aot_get_wrapper(int findex) {
-    (void)findex;
+static void *aot_get_wrapper(hl_type *t) {
+    (void)t;
     return NULL;
 }
 
@@ -376,8 +377,7 @@ int aot_init_module_data(const unsigned char *data, int size) {
         fprintf(stderr, "Failed to allocate module\n");
         return 0;
     }
-    /* hl_module_init(module, hot_reload, vtune_later) */
-    if (!hl_module_init(m, 0, 0)) {
+    if (!hl_module_init(m, 0)) {
         fprintf(stderr, "Failed to initialize module\n");
         return 0;
     }
@@ -419,9 +419,12 @@ int aot_init_module_data(const unsigned char *data, int size) {
      * dynamically. We provide our AOT-compatible callback that uses a trampoline
      * to call AOT functions with the correct calling convention.
      *
-     * The flags=1 tells the runtime to use cl->fun directly (not &cl->fun).
+     * static_call_ref=true tells the runtime to pass &cl->fun (address of function pointer).
+     * Our callback_c2hl then dereferences it with *f to get the actual function pointer.
      */
-    hl_setup_callbacks2(aot_callback_c2hl, aot_get_wrapper, 1);
+    hl_setup.get_wrapper = aot_get_wrapper;
+    hl_setup.static_call = aot_callback_c2hl;
+    hl_setup.static_call_ref = true;
 
     return 1;
 }

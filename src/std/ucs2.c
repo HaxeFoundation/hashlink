@@ -115,6 +115,18 @@ int ucmp( const uchar *a, const uchar *b ) {
 	}
 }
 
+/**
+ * Compare two String objects by value.
+ * Returns: 0 if equal, non-zero if different
+ * Handles NULL: NULL == NULL, NULL != non-NULL
+ */
+HL_PRIM int hl_str_cmp( vstring *a, vstring *b ) {
+	if( a == b ) return 0;  // Same pointer or both NULL
+	if( !a || !b ) return 1;  // One NULL, one not
+	if( a->length != b->length ) return 1;  // Different lengths
+	return ucmp(a->bytes, b->bytes);  // Compare bytes
+}
+
 int usprintf( uchar *out, int out_size, const uchar *fmt, ... ) {
 	va_list args;
 	int ret;

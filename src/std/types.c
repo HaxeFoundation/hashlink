@@ -420,7 +420,11 @@ HL_PRIM void hl_init_enum( hl_type *et, hl_module_context *m ) {
 }
 
 HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
-	if( t->kind != HENUM ) return NULL;
+	if (t->kind != HENUM) {
+		printf("[DEBUG type_enum_fields] ERROR: called with non-enum type! t=%p kind=%d\n", (void*)t, t->kind);
+		fflush(stdout);
+		return NULL;
+	}
 	varray *a = hl_alloc_array(&hlt_bytes,t->tenum->nconstructs);
 	int i;
 	for( i=0; i<t->tenum->nconstructs;i++)
@@ -429,6 +433,11 @@ HL_PRIM varray* hl_type_enum_fields( hl_type *t ) {
 }
 
 HL_PRIM varray* hl_type_enum_values( hl_type *t ) {
+	if (t->kind != HENUM) {
+		printf("[DEBUG type_enum_values] ERROR: called with non-enum type! t=%p kind=%d\n", (void*)t, t->kind);
+		fflush(stdout);
+		return NULL;  // Return NULL instead of crashing
+	}
 	varray *a = hl_alloc_array(&hlt_dyn,t->tenum->nconstructs);
 	int i;
 	for( i=0; i<t->tenum->nconstructs;i++) {

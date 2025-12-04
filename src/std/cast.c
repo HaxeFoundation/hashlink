@@ -33,7 +33,7 @@ static vdynamic static_ints[256];
 static bool static_ints_init = false;
 
 static vdynamic *hl_dyni32( int v ) {
-	char b = (char)v;
+	signed char b = (signed char)v;
 	if( b == v ) {
 		if( !static_ints_init ) {
 			int i;

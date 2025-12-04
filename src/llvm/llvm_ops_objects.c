@@ -168,7 +168,14 @@ void llvm_emit_objects(llvm_ctx *ctx, hl_function *f, hl_opcode *op, int op_idx)
             }
             LLVMValueRef type_ptr = type_idx >= 0 ? llvm_get_type_ptr(ctx, type_idx)
                 : LLVMConstNull(ctx->ptr_type);
-            LLVMValueRef args[] = { obj_ptr, hash_val, type_ptr, val };
+            /* Extend smaller integer types to i32 for hl_dyn_seti */
+            LLVMValueRef val_i32 = val;
+            if (src_type->kind == HUI8 || src_type->kind == HBOOL) {
+                val_i32 = LLVMBuildZExt(ctx->builder, val, ctx->i32_type, "ext_i32");
+            } else if (src_type->kind == HUI16) {
+                val_i32 = LLVMBuildZExt(ctx->builder, val, ctx->i32_type, "ext_i32");
+            }
+            LLVMValueRef args[] = { obj_ptr, hash_val, type_ptr, val_i32 };
             LLVMBuildCall2(ctx->builder, LLVMGlobalGetValueType(ctx->rt_dyn_seti),
                 ctx->rt_dyn_seti, args, 4, "");
             break;
