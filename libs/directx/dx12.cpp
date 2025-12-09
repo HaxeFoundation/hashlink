@@ -607,6 +607,10 @@ HL_PRIM void HL_NAME(get_copyable_footprints)( D3D12_RESOURCE_DESC *desc, int fi
 	static_driver->device->GetCopyableFootprints(desc, first, count, offset, layouts, (UINT*)numRows, (UINT64*)rowSizes, (UINT64*)totalBytes);
 }
 
+HL_PRIM void HL_NAME(copy_descriptors_simple)(int numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE dstCpuAddress, D3D12_CPU_DESCRIPTOR_HANDLE srcCpuAddress, D3D12_DESCRIPTOR_HEAP_TYPE heapType) {
+	static_driver->device->CopyDescriptorsSimple(numDescriptors, dstCpuAddress, srcCpuAddress, heapType);
+}
+
 DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_depth_stencil_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_shader_resource_view, _RES _STRUCT _I64);
@@ -623,6 +627,7 @@ DEFINE_PRIM(_VOID, resource_unmap, _RES _I32 _STRUCT);
 DEFINE_PRIM(_I64, get_required_intermediate_size, _RES _I32 _I32);
 DEFINE_PRIM(_BOOL, update_sub_resource, _RES _RES _RES _I64 _I32 _I32 _STRUCT);
 DEFINE_PRIM(_VOID, get_copyable_footprints, _STRUCT _I32 _I32 _I64 _STRUCT _BYTES _BYTES _BYTES);
+DEFINE_PRIM(_VOID, copy_descriptors_simple, _I32 _I64 _I64 _I32);
 
 // ---- SHADERS
 

@@ -1636,6 +1636,10 @@ class Dx12 {
 		return 0;
 	}
 
+	@:hlNative("?dx12","copy_descriptors_simple")
+	public static function copyDescriptorsSimple( numDescriptors : Int, dstCpuAddress : Address, srcCpuAddress : Address, heapType : DescriptorHeapType ) {
+	}
+
 	public static function getDeviceName() {
 		return @:privateAccess String.fromUCS2(dxGetDeviceName());
 	}
