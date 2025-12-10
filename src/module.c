@@ -702,7 +702,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 }
 
 static bool check_same_type( hl_type *t1, hl_type *t2 ) {
-	if( hl_same_type(t1,t2) || hl_safe_cast(t1,t2) )
+	if( hl_safe_cast(t1,t2) )
 		return true;
 	if( t1->kind != t2->kind )
 		return false;
