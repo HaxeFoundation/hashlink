@@ -187,6 +187,36 @@ HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 	return T_IS_DYNAMIC[t->kind];
 }
 
+HL_PRIM bool hl_is_ptr( hl_type *t ) {
+	static bool T_IS_PTR[] = {
+		false, // HVOID,
+		false, // HI8
+		false, // HI16
+		false, // HI32
+		false, // HI64
+		false, // HF32
+		false, // HF64
+		false, // HBOOL
+		true, // HBYTES
+		true, // HDYN
+		true, // HFUN
+		true, // HOBJ
+		true, // HARRAY
+		true, // HTYPE
+		true, // HREF
+		true, // HVIRTUAL
+		true, // HDYNOBJ
+		true, // HABSTRACT
+		true, // HENUM
+		true, // HNULL
+		true, // HMETHOD
+		true, // HSTRUCT
+		true, // HPACKED
+		false, // HGUID
+	};
+	return T_IS_PTR[t->kind];
+}
+
 HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 	if( t == to )
 		return true;
