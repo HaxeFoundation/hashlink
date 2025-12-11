@@ -3231,7 +3231,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				op32(ctx, CVTSS2SI, w, r);
 				op32(ctx, LDMXCSR, pmem(&p, Esp, -4), UNUSED);
 				store(ctx, dst, w, true);
-			} else if( dst->t->kind == HI64 && ra->t->kind == HI32 ) {
+			} else if( (dst->t->kind == HI64 || dst->t->kind == HGUID) && ra->t->kind == HI32 ) {
 				if( ra->current != PEAX ) {
 					op32(ctx, MOV, PEAX, fetch(ra));
 					scratch(PEAX);
