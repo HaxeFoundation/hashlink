@@ -266,10 +266,6 @@ HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 		break;
 	case HPACKED:
 		return hl_safe_cast(t->tparam, to);
-	case HGUID:
-		return to->kind == HI64;
-	case HI64:
-		return to->kind == HGUID;
 	default:
 		break;
 	}
