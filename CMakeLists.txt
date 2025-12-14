@@ -25,6 +25,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64" AND (NOT CMAKE_OSX_ARCHITECTURES
 endif()
 
 option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
+option(WITH_LLVM_AOT "Whether to build the hl2llvm AOT compiler" OFF)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 if(BUILD_SHARED_LIBS)
     # ensure third-party static libs are built with PIC
@@ -236,6 +237,83 @@ else()
     endif()
 endif()
 
+#####################
+# LLVM AOT Compiler (hl2llvm)
+if(WITH_LLVM_AOT)
+    find_package(LLVM REQUIRED CONFIG)
+    message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+    message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+
+    # LLVM definitions and includes
+    add_definitions(${LLVM_DEFINITIONS})
+
+    # Source files for hl2llvm
+    set(HL2LLVM_SOURCES
+        src/llvm/hl2llvm_main.c
+        src/llvm/llvm_codegen.c
+        src/llvm/llvm_types.c
+        src/llvm/llvm_runtime.c
+        src/llvm/llvm_ops_constants.c
+        src/llvm/llvm_ops_arith.c
+        src/llvm/llvm_ops_control.c
+        src/llvm/llvm_ops_memory.c
+        src/llvm/llvm_ops_calls.c
+        src/llvm/llvm_ops_closures.c
+        src/llvm/llvm_ops_types.c
+        src/llvm/llvm_ops_objects.c
+        src/llvm/llvm_ops_enums.c
+        src/llvm/llvm_ops_refs.c
+        src/llvm/llvm_ops_exceptions.c
+        src/llvm/llvm_ops_misc.c
+        src/code.c
+    )
+
+    add_executable(hl2llvm ${HL2LLVM_SOURCES})
+
+    # AOT runtime library (provides module loading for AOT binaries)
+    add_library(aot_runtime STATIC
+        src/llvm/aot_runtime.c
+        src/module.c
+        src/code.c
+    )
+    target_include_directories(aot_runtime PRIVATE src)
+    target_link_libraries(aot_runtime libhl)
+
+    # Make hl2llvm depend on aot_runtime so both are built together
+    add_dependencies(hl2llvm aot_runtime)
+
+    target_include_directories(hl2llvm
+        PRIVATE
+            src
+            ${LLVM_INCLUDE_DIRS}
+    )
+
+    # Get LLVM libraries
+    llvm_map_components_to_libnames(LLVM_LIBS
+        core
+        analysis
+        bitwriter
+        target
+        ${LLVM_TARGETS_TO_BUILD}
+    )
+
+    target_link_libraries(hl2llvm
+        libhl
+        ${LLVM_LIBS}
+    )
+
+    if(APPLE)
+        set_target_properties(hl2llvm PROPERTIES
+            INSTALL_RPATH "@executable_path;@executable_path/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    elseif(UNIX)
+        set_target_properties(hl2llvm PROPERTIES
+            INSTALL_RPATH "$ORIGIN;$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    endif()
+
+endif()
+
 if(BUILD_TESTING)
 
     find_program(
@@ -441,6 +519,9 @@ set(HDLL_DESTINATION
 set(INSTALL_TARGETS libhl)
 if (WITH_VM)
     list(APPEND INSTALL_TARGETS hl)
+endif()
+if (WITH_LLVM_AOT)
+    list(APPEND INSTALL_TARGETS hl2llvm)
 endif()
 
 install(
