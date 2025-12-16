@@ -398,7 +398,7 @@ jobs:
       uses: actions/checkout@v6
 
     - name: "Get: all build artifacts"
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
 
     - name: "Delete previous 'latest' release"
       env:
