@@ -6618,6 +6618,8 @@ void *hl_jit_code(jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **de
 	int code_size = BUF_POS();
 	unsigned char *code;
 	jlist *j;
+    unsigned int *insn_ptr;
+    unsigned int insn;
 
 	// Round up code size to page boundary for memory allocation
 	int alloc_size = (code_size + 4095) & ~4095;
@@ -6682,8 +6684,8 @@ void *hl_jit_code(jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **de
 
 	do_patch:
 		// Check what kind of patching we need to do
-		unsigned int *insn_ptr = (unsigned int*)(code + j->pos);
-		unsigned int insn = *insn_ptr;
+		insn_ptr = (unsigned int*)(code + j->pos);
+		insn = *insn_ptr;
 
 		if ((insn & 0xFC000000) == 0x94000000) {
 			// BL instruction - patch with relative offset
