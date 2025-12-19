@@ -431,8 +431,20 @@ static void spill_regs(jit_ctx *ctx) {
 	// They survive function calls, so their values remain valid after BLR.
 	// This is the key optimization - values in callee-saved don't need spilling.
 
-	// Spill and discard FPU scratch registers (V0-V7) - these get clobbered by calls
+	// Spill and discard FPU scratch registers (V0-V7, V16-V31) - these get clobbered by calls
+	// V8-V15 are callee-saved and survive calls
 	for (i = 0; i < 8; i++) {
+		preg *r = &ctx->pregs[RCPU_COUNT + i];
+		if (r->holds) {
+			if (r->holds->dirty) {
+				free_reg(ctx, r);  // Dirty: store to stack, then clear binding
+			} else {
+				discard(ctx, r);   // Clean: just clear binding (value already on stack)
+			}
+		}
+	}
+	// Also spill V16-V31 (caller-saved temporary FPU registers)
+	for (i = 16; i < 32; i++) {
 		preg *r = &ctx->pregs[RCPU_COUNT + i];
 		if (r->holds) {
 			if (r->holds->dirty) {
@@ -2059,8 +2071,9 @@ static void discard_regs(jit_ctx *ctx) {
 			r->holds = NULL;
 		}
 	}
-	// Handle FPU scratch registers (V0-V7)
-	for (i = 0; i < 8; i++) {
+	// Handle ALL FPU registers (V0-V31) at merge points
+	// At labels, control flow may come from different paths with different allocations
+	for (i = 0; i < RFPU_COUNT; i++) {
 		preg *r = &ctx->pregs[RCPU_COUNT + i];
 		if (r->holds) {
 			r->holds->dirty = 0;
