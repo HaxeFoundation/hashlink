@@ -153,6 +153,16 @@ void on_jit_error(const char *msg, int_val line) {
 	jit_exit();
 }
 
+static void jit_null_fail(int fhash) {
+	vbyte *field = hl_field_name(fhash);
+	hl_buffer *b = hl_alloc_buffer();
+	hl_buffer_str(b, USTR("Null access ."));
+	hl_buffer_str(b, (uchar*)field);
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
+	d->v.ptr = hl_buffer_content(b, NULL);
+	hl_throw(d);
+}
+
 #define JIT_ASSERT(cond) do { if (!(cond)) { \
 	printf("JIT ASSERTION FAILED: %s (jit_aarch64.c:%d)\n", #cond, __LINE__); \
 	jit_exit(); \
@@ -2150,7 +2160,8 @@ static void op_get_mem(jit_ctx *ctx, vreg *dst, vreg *base, int offset, int size
 			load_immediate(ctx, offset, RTMP, false);  // Use RTMP for address computation
 			encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, base_r, RTMP);
 			// LDR dst_r, [RTMP]
-			encode_ldr_str_imm(ctx, (size == 8) ? 0x03 : 0x02, 0, 0x01, 0, RTMP, dst_r);
+			int size_bits = (size == 1) ? 0x00 : (size == 2) ? 0x01 : (size == 4) ? 0x02 : 0x03;
+			encode_ldr_str_imm(ctx, size_bits, 0, 0x01, 0, RTMP, dst_r);
 		}
 
 		// Always store to stack - it's the source of truth for later loads
@@ -2235,7 +2246,8 @@ static void op_set_mem(jit_ctx *ctx, vreg *base, int offset, vreg *value, int si
 				encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP2, 0, base_r, RTMP);
 			}
 			// STR value_r, [RTMP]
-			encode_ldr_str_imm(ctx, (size == 8) ? 0x03 : 0x02, 0, 0x00, 0, RTMP, value_r);
+			int size_bits = (size == 1) ? 0x00 : (size == 2) ? 0x01 : (size == 4) ? 0x02 : 0x03;
+			encode_ldr_str_imm(ctx, size_bits, 0, 0x00, 0, RTMP, value_r);
 		}
 	}
 
@@ -3218,7 +3230,7 @@ static void op_safe_cast(jit_ctx *ctx, vreg *dst, vreg *obj, hl_type *target_typ
  * Null coalescing: dst = (a != null) ? a : b
  * OCoalesce/ONullCheck
  */
-static void op_null_check(jit_ctx *ctx, vreg *dst) {
+static void op_null_check(jit_ctx *ctx, vreg *dst, int hashed_name) {
 	// Check if dst is null and call hl_null_access if so
 	preg *dst_reg = fetch(ctx, dst);
 
@@ -3234,13 +3246,15 @@ static void op_null_check(jit_ctx *ctx, vreg *dst) {
 	int bne_pos = BUF_POS();
 	encode_branch_cond(ctx, 0, COND_NE);  // B.NE (will patch offset)
 
-	// Null path: call hl_null_access(field, hashed_name)
-	// For simplicity, pass 0 for both (basic null access error)
+	// Null path: call hl_null_access or jit_null_fail
 	// NOTE: Do NOT call spill_regs() here! hl_null_access never returns (it throws),
 	// and spill_regs() would corrupt compile-time register bindings for the non-null path.
-	load_immediate(ctx, 0, X0, true);  // field = NULL
-	load_immediate(ctx, 0, X1, true);  // hashed_name = 0
-	load_immediate(ctx, (int64_t)hl_null_access, RTMP, true);
+	if (hashed_name) {
+		load_immediate(ctx, hashed_name, X0, true);
+		load_immediate(ctx, (int64_t)jit_null_fail, RTMP, true);
+	} else {
+		load_immediate(ctx, (int64_t)hl_null_access, RTMP, true);
+	}
 	EMIT32(ctx, 0xD63F0000 | (RTMP << 5));  // BLR RTMP
 	// hl_null_access doesn't return (it throws), but we don't emit anything after
 
@@ -4224,8 +4238,26 @@ void hl_jit_free(jit_ctx *ctx, h_bool can_reset) {
 		free(ctx->vregs);
 	if (ctx->opsPos)
 		free(ctx->opsPos);
+	if (ctx->debug)
+		free(ctx->debug);
 
-	free(ctx);
+	// Clear pointers to prevent use-after-free if ctx is reused
+	ctx->startBuf = NULL;
+	ctx->vregs = NULL;
+	ctx->opsPos = NULL;
+	ctx->debug = NULL;
+	ctx->maxRegs = 0;
+	ctx->maxOps = 0;
+	ctx->bufSize = 0;
+	ctx->buf.b = NULL;
+	ctx->calls = NULL;
+	// closure_list is managed by GC (they are allocated in falloc/galloc)
+
+	hl_free(&ctx->falloc);
+	hl_free(&ctx->galloc);
+
+	if (!can_reset)
+		free(ctx);
 }
 
 void hl_jit_reset(jit_ctx *ctx, hl_module *m) {
@@ -4313,14 +4345,15 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 	ctx->allocOffset = 0;
 
 	// Allocate virtual register array if needed
-	// Always reallocate to ensure clean state (no stale data from previous functions)
-	free(ctx->vregs);
-	ctx->vregs = (vreg*)calloc(f->nregs + 1, sizeof(vreg));
-	if (ctx->vregs == NULL) {
-		ctx->maxRegs = 0;
-		return -1;
+	if (f->nregs > ctx->maxRegs) {
+		free(ctx->vregs);
+		ctx->vregs = (vreg*)calloc(f->nregs + 1, sizeof(vreg));
+		if (ctx->vregs == NULL) {
+			ctx->maxRegs = 0;
+			return -1;
+		}
+		ctx->maxRegs = f->nregs;
 	}
-	ctx->maxRegs = f->nregs;
 
 	// Allocate opcode position array if needed
 	if (f->nops > ctx->maxOps) {
@@ -4385,9 +4418,9 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 			(*arg_count)++;
 		} else {
 			// Argument is on stack (caller's frame)
-			// +80 for saved callee-saved (64 bytes) + FP/LR (16 bytes)
+			// +96 for saved callee-saved (64 bytes) + RTMP/RTMP2 (16 bytes) + FP/LR (16 bytes)
 			// Each stack arg occupies 8 bytes (matching caller's prepare_call_args)
-			r->stackPos = argsSize + 80;
+			r->stackPos = argsSize + 96;
 			argsSize += 8;
 		}
 	}
@@ -4414,8 +4447,11 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 	memset(ctx->ldp_positions, 0, sizeof(ctx->ldp_positions));
 
 	// Function prologue - offset-based for selective NOP patching (Phase 2)
-	// Reserve space for callee-saved (64 bytes) + FP/LR (16 bytes) = 80 bytes
-	encode_add_sub_imm(ctx, 1, 1, 0, 0, 80, SP_REG, SP_REG);  // SUB SP, SP, #80
+	// Reserve space for callee-saved (64 bytes) + RTMP/RTMP2 (16 bytes) + FP/LR (16 bytes) = 96 bytes
+	encode_add_sub_imm(ctx, 1, 1, 0, 0, 96, SP_REG, SP_REG);  // SUB SP, SP, #96
+
+	// Save RTMP/RTMP2 (X27, X28) - NOT NOPpable as they are used internally by JIT
+	stp_offset(ctx, RTMP, RTMP2, SP_REG, 80); // STP X27, X28, [SP, #80]
 
 	// Save callee-saved at fixed offsets (NOPpable) - positions recorded for backpatching
 	ctx->stp_positions[0] = BUF_POS();
@@ -5045,12 +5081,16 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 					// Load arguments from stack
 					ldr_stack(ctx, X0, dst->stackPos, dst->size);  // obj
 					load_immediate(ctx, (int64_t)dst->t->virt->fields[o->p2].hashed_name, X1, true);
-					if (!IS_FLOAT(rb) && rb->t->kind != HI64)
-						load_immediate(ctx, (int64_t)rb->t, X2, true);
+					
 					if (IS_FLOAT(rb)) {
 						ldr_stack_fp(ctx, V0, rb->stackPos, rb->size);
+					} else if (rb->t->kind == HI64) {
+						// hl_dyn_seti64(obj, field, value) - value in X2
+						ldr_stack(ctx, X2, rb->stackPos, rb->size);
 					} else {
-						ldr_stack(ctx, X3, rb->stackPos, rb->size);  // value
+						// hl_dyn_setp/i(obj, field, type, value) - type in X2, value in X3
+						load_immediate(ctx, (int64_t)rb->t, X2, true);
+						ldr_stack(ctx, X3, rb->stackPos, rb->size);
 					}
 					load_immediate(ctx, (int64_t)get_dynset(rb->t), RTMP, true);
 					EMIT32(ctx,(0xD63F0000) | (RTMP << 5));
@@ -5125,7 +5165,34 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 			break;
 
 		case ONullCheck:
-			op_null_check(ctx, dst);
+			{
+				int hashed_name = 0;
+				// Look ahead to find the field access
+				hl_opcode *next = f->ops + opCount + 1;
+				// Skip const and basic operations
+				while( (next < f->ops + f->nops - 1) && (next->op >= OInt && next->op <= ODecr) ) {
+					next++;
+				}
+				if( (next->op == OField && next->p2 == o->p1) || (next->op == OSetField && next->p1 == o->p1) ) {
+					int fid = next->op == OField ? next->p3 : next->p2;
+					hl_obj_field *field = NULL;
+					if( dst->t->kind == HOBJ || dst->t->kind == HSTRUCT ) {
+						field = hl_obj_field_fetch(dst->t, fid);
+					} else if( dst->t->kind == HVIRTUAL ) {
+						field = dst->t->virt->fields + fid;
+					}
+					if( field ) hashed_name = field->hashed_name;
+				} else if( (next->op >= OCall1 && next->op <= OCallN) && next->p3 == o->p1 ) {
+					// Method call
+					int fid = next->p2 < 0 ? -1 : ctx->m->functions_indexes[next->p2];
+					if( fid >= 0 && fid < ctx->m->code->nfunctions ) {
+						hl_function *cf = ctx->m->code->functions + fid;
+						const uchar *name = fun_field_name(cf);
+						if( name ) hashed_name = hl_hash_gen(name, true);
+					}
+				}
+				op_null_check(ctx, dst, hashed_name);
+			}
 			break;
 
 		// Object allocation
@@ -6081,18 +6148,25 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 	case OAssert:
 		// Call the assertion helper (static_functions[1])
 		{
+			// Emit indirect call sequence:
+			//   LDR X17, [PC, #12]
+			//   BLR X17
+			//   B #12
+			//   .quad address (patched later)
+
+			EMIT32(ctx, 0x58000071);  // LDR X17, #12
+			EMIT32(ctx, 0xD63F0220);  // BLR X17
+
+			// Register literal position for patching
 			jlist *j = (jlist*)hl_malloc(&ctx->galloc, sizeof(jlist));
-			j->pos = BUF_POS();
+			j->pos = BUF_POS() + 4;   // Position of the 8-byte literal (after B instruction)
 			j->target = -2;  // Special marker for assert function
 			j->next = ctx->calls;
 			ctx->calls = j;
 
-			// Load address placeholder and call
-			// Will be patched to static_functions[1] in hl_jit_code
-			EMIT32(ctx, 0);  // Placeholder for address (low)
-			EMIT32(ctx, 0);  // Placeholder for address (high)
-			// For now, emit a BL that will be patched
-			EMIT32(ctx, 0x94000000);  // BL (will be patched)
+			EMIT32(ctx, 0x14000003);  // B #12 (skip 3 instructions = 12 bytes)
+			EMIT32(ctx, 0);           // Low 32 bits placeholder
+			EMIT32(ctx, 0);           // High 32 bits placeholder
 		}
 		break;
 
@@ -6300,7 +6374,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 					}
 				} else {
 					ldr_stack(ctx, RTMP, field_val->stackPos, field_val->size);
-					int size_code = (field_val->size == 8) ? 0x03 : (field_val->size == 4) ? 0x02 : 0x00;
+					int size_code = (field_val->size == 8) ? 0x03 : (field_val->size == 4) ? 0x02 : (field_val->size == 2) ? 0x01 : 0x00;
 					if (field_offset < 4096 && (field_offset % field_val->size) == 0) {
 						encode_ldr_str_imm(ctx, size_code, 0, 0x00, field_offset / field_val->size, X0, RTMP);
 					} else {
@@ -6506,8 +6580,11 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 	ctx->ldp_positions[0] = BUF_POS();
 	ldp_offset(ctx, X25, X26, SP_REG, 64);  // LDP X25, X26, [SP, #64]
 
+	// Restore RTMP/RTMP2 (X27, X28)
+	ldp_offset(ctx, RTMP, RTMP2, SP_REG, 80); // LDP X27, X28, [SP, #80]
+
 	// Deallocate callee-saved frame
-	encode_add_sub_imm(ctx, 1, 0, 0, 0, 80, SP_REG, SP_REG);  // ADD SP, SP, #80
+	encode_add_sub_imm(ctx, 1, 0, 0, 0, 96, SP_REG, SP_REG);  // ADD SP, SP, #96
 
 	// RET  ; Return (BR X30)
 	encode_branch_reg(ctx, 0x02, LR);
