@@ -6112,7 +6112,8 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 					// Load global address
 					void *addr = m->globals_data + m->globals_indexes[gindex];
 					load_immediate(ctx, (int64_t)addr, RTMP, true);
-					
+					encode_ldr_str_imm(ctx, 0x03, 0, 0x01, 0, RTMP, RTMP);
+
 					// STR RTMP, [SP, #offset_tcheck]
 					// We use X10 (which holds SP) from previous step
 					if (offset_tcheck < 4096) {
