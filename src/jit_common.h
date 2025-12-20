@@ -23,6 +23,7 @@
 #define JIT_COMMON_H
 
 #include <hlmodule.h>
+#include <stdbool.h>
 
 /*
  * Portable JIT definitions shared between x86 and AArch64 backends
