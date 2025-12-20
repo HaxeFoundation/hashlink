@@ -2157,8 +2157,8 @@ static void op_get_mem(jit_ctx *ctx, vreg *dst, vreg *base, int offset, int size
 			encode_ldr_str_imm(ctx, size_bits, 0, 0x01, imm12, base_r, dst_r);
 		} else {
 			// Offset too large - compute effective address in RTMP, then load into dst_r
-			load_immediate(ctx, offset, RTMP, false);  // Use RTMP for address computation
-			encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, base_r, RTMP);
+			load_immediate(ctx, offset, RTMP2, false);
+			encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP2, 0, base_r, RTMP);
 			// LDR dst_r, [RTMP]
 			int size_bits = (size == 1) ? 0x00 : (size == 2) ? 0x01 : (size == 4) ? 0x02 : 0x03;
 			encode_ldr_str_imm(ctx, size_bits, 0, 0x01, 0, RTMP, dst_r);
