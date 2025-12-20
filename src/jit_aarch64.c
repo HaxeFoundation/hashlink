@@ -92,7 +92,8 @@ static const Arm64Reg RCPU_SCRATCH_REGS[] = {
 	X16, X17
 };
 
-// All FP registers are caller-saved in AAPCS64
+// FP register count for allocation pool (V0-V7, V16-V31 are caller-saved; V8-V15 are
+// callee-saved per AAPCS64 but we don't save them, so we avoid allocating them)
 #define RFPU_SCRATCH_COUNT 32
 
 // Callee-saved registers: X19-X28
