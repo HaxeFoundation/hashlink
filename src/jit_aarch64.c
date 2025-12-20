@@ -109,7 +109,9 @@ static const Arm64Reg RCPU_CALLEE_ALLOC[] = {
 	X19, X20, X21, X22, X23, X24, X25, X26
 };
 
-// FP callee-saved: V8-V15 (only lower 64 bits)
+// FP callee-saved: V8-V15 (only lower 64 bits per AAPCS64)
+// NOTE: We intentionally do NOT allocate these registers because our prologue
+// doesn't save them. This array is kept for documentation and is_callee_saved_fpu().
 #define RFPU_CALLEE_SAVED_COUNT 8
 static const Arm64FpReg RFPU_CALLEE_SAVED[] = {
 	V8, V9, V10, V11, V12, V13, V14, V15
@@ -296,31 +298,33 @@ static preg *alloc_cpu(jit_ctx *ctx, preg_kind k) {
 
 /**
  * Allocate a floating-point register
+ *
+ * IMPORTANT: We only use caller-saved FP registers (V0-V7, V16-V31).
+ * V8-V15 are callee-saved per AAPCS64, and since our prologue/epilogue
+ * doesn't save/restore them, we must not allocate them.
+ *
+ * This gives us 24 FP registers which is sufficient for most code.
+ * If all are in use, we evict (spill to stack) the least recently used.
  */
 static preg *alloc_fpu(jit_ctx *ctx) {
 	preg *p;
 	int i;
 
-	// First pass: find a free register
-	// Prefer caller-saved registers (V0-V7, V16-V31)
+	// First pass: find a free caller-saved register (V0-V7, V16-V31)
 	// Lock check: p->lock >= ctx->currentPos means locked at current operation
 	for (i = 0; i < RFPU_COUNT; i++) {
 		if (i >= 8 && i < 16)
-			continue;  // Skip callee-saved V8-V15 for now
+			continue;  // NEVER use callee-saved V8-V15 - they aren't saved in prologue
 		p = PVFPR(i);
 		if (p->holds == NULL && p->lock < ctx->currentPos)
 			return p;
 	}
 
-	// Second pass: try callee-saved if needed
-	for (i = 8; i < 16; i++) {
-		p = PVFPR(i);
-		if (p->holds == NULL && p->lock < ctx->currentPos)
-			return p;
-	}
-
-	// Third pass: evict an unlocked register
+	// Second pass: evict an unlocked caller-saved register
+	// Only iterate over V0-V7 and V16-V31, skip V8-V15
 	for (i = 0; i < RFPU_COUNT; i++) {
+		if (i >= 8 && i < 16)
+			continue;  // NEVER use callee-saved V8-V15
 		p = PVFPR(i);
 		if (p->lock < ctx->currentPos) {
 			free_reg(ctx, p);  // Spill to stack before reusing
@@ -442,7 +446,8 @@ static void spill_regs(jit_ctx *ctx) {
 	// This is the key optimization - values in callee-saved don't need spilling.
 
 	// Spill and discard FPU scratch registers (V0-V7, V16-V31) - these get clobbered by calls
-	// V8-V15 are callee-saved and survive calls
+	// NOTE: V8-V15 are callee-saved per AAPCS64, but we intentionally never allocate them
+	// (see alloc_fpu) since our prologue doesn't save them. No need to handle them here.
 	for (i = 0; i < 8; i++) {
 		preg *r = &ctx->pregs[RCPU_COUNT + i];
 		if (r->holds) {

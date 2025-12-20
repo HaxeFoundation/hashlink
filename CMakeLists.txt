@@ -199,7 +199,8 @@ set_target_properties(libhl
 
 if (WITH_VM)
     # Select JIT backend based on architecture
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    # Note: macOS uses "arm64" while Linux uses "aarch64"
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
         set(JIT_SOURCES
             src/jit_aarch64.c
             src/jit_aarch64_emit.c
@@ -553,6 +554,7 @@ if(BUILD_TESTING)
         add_minimal_jit_test(test_exceptions)
         add_minimal_jit_test(test_methods)
         add_minimal_jit_test(test_virtual_fields)
+        add_minimal_jit_test(test_fp_pressure)
 
         # Bytecode dump utility (needs code.c for hl_code_read)
         add_executable(hldump
