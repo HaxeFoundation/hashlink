@@ -2299,11 +2299,19 @@ static void op_get_mem_reg(jit_ctx *ctx, vreg *dst, vreg *base, vreg *offset, in
 	if (IS_FLOAT(dst)) {
 		// Float load: use FPU register and V=1
 		Arm64FpReg dst_fp = (dst_reg->kind == RFPU) ? (Arm64FpReg)dst_reg->id : V16;
+		if (dst_fp == V16) {
+			preg *pv16 = PVFPR(16);
+			if (pv16->holds != NULL) free_reg(ctx, pv16);
+		}
 		encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, dst_fp);  // V=1 for FP
 		str_stack_fp(ctx, dst_fp, dst->stackPos, dst->size);
 	} else {
 		// Integer load
 		Arm64Reg dst_r = (dst_reg->kind == RCPU) ? (Arm64Reg)dst_reg->id : X9;
+		if (dst_r == X9) {
+			preg *px9 = &ctx->pregs[X9];
+			if (px9->holds != NULL) free_reg(ctx, px9);
+		}
 		encode_ldr_str_imm(ctx, size_bits, 0, 0x01, 0, RTMP, dst_r);
 		// For byte/halfword loads, the result is zero-extended automatically by LDRB/LDRH
 		str_stack(ctx, dst_r, dst->stackPos, dst->size);
@@ -2337,13 +2345,28 @@ static void op_set_mem_reg(jit_ctx *ctx, vreg *base, vreg *offset, vreg *value, 
 	if (IS_FLOAT(value)) {
 		value_fp = (value_reg->kind == RFPU) ? (Arm64FpReg)value_reg->id : V16;
 		if (value_reg->kind != RFPU) {
+			// Ensure V16 is free before using it
+			if (value_fp == V16) {
+				preg *pv16 = PVFPR(16);
+				if (pv16->holds != NULL) free_reg(ctx, pv16);
+			}
 			ldr_stack_fp(ctx, value_fp, value->stackPos, value->size);
 		}
 	} else {
 		value_r = (value_reg->kind == RCPU) ? (Arm64Reg)value_reg->id : X9;
 		if (value_reg->kind == RCONST) {
+			// Ensure X9 is free if we are using it
+			if (value_r == X9) {
+				preg *px9 = &ctx->pregs[X9];
+				if (px9->holds != NULL) free_reg(ctx, px9);
+			}
 			load_immediate(ctx, value_reg->id, value_r, value->size == 8);
 		} else if (value_reg->kind != RCPU) {
+			// Ensure X9 is free if we are using it
+			if (value_r == X9) {
+				preg *px9 = &ctx->pregs[X9];
+				if (px9->holds != NULL) free_reg(ctx, px9);
+			}
 			ldr_stack(ctx, value_r, value->stackPos, value->size);
 		}
 	}
@@ -2565,6 +2588,10 @@ static void op_get_array(jit_ctx *ctx, vreg *dst, vreg *array, vreg *index) {
 	}
 
 	Arm64Reg dst_r = (dst_reg->kind == RCPU) ? (Arm64Reg)dst_reg->id : X9;
+	if (dst_r == X9) {
+		preg *px9 = &ctx->pregs[X9];
+		if (px9->holds != NULL) free_reg(ctx, px9);
+	}
 
 	// Step 3: Calculate element address
 	// For varray: array + sizeof(varray) + index * elem_size
@@ -2674,20 +2701,33 @@ static void op_set_array(jit_ctx *ctx, vreg *array, vreg *index, vreg *value) {
 	// For struct copy, value is a pointer to the source struct
 	// For floats, use FP register; for integers, use CPU register
 	Arm64Reg value_r = X9;
-	Arm64FpReg value_fp = V0;
+	Arm64FpReg value_fp = V16;
 	bool is_float_value = IS_FLOAT(value);
 
 	if (is_float_value) {
 		if (value_reg->kind == RFPU) {
 			value_fp = (Arm64FpReg)value_reg->id;
 		} else {
+			// Ensure V16 is free before using it
+			preg *pv16 = PVFPR(16);
+			if (pv16->holds != NULL) free_reg(ctx, pv16);
 			ldr_stack_fp(ctx, value_fp, value->stackPos, value->size);
 		}
 	} else {
 		value_r = (value_reg->kind == RCPU) ? (Arm64Reg)value_reg->id : X9;
 		if (value_reg->kind == RCONST) {
+			// Ensure X9 is free if we are using it
+			if (value_r == X9) {
+				preg *px9 = &ctx->pregs[X9];
+				if (px9->holds != NULL) free_reg(ctx, px9);
+			}
 			load_immediate(ctx, value_reg->id, value_r, value->size == 8);
 		} else if (value_reg->kind != RCPU) {
+			// Ensure X9 is free if we are using it
+			if (value_r == X9) {
+				preg *px9 = &ctx->pregs[X9];
+				if (px9->holds != NULL) free_reg(ctx, px9);
+			}
 			ldr_stack(ctx, value_r, value->stackPos, value->size);
 		}
 	}
@@ -2980,6 +3020,10 @@ static void op_compare(jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op op) {
 	}
 
 	Arm64Reg dst_r = (dst_reg->kind == RCPU) ? (Arm64Reg)dst_reg->id : X9;
+	if (dst_r == X9) {
+		preg *px9 = &ctx->pregs[X9];
+		if (px9->holds != NULL) free_reg(ctx, px9);
+	}
 
 	bool is_float = IS_FLOAT(a);
 
@@ -2987,6 +3031,15 @@ static void op_compare(jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op op) {
 		// Floating-point comparison
 		Arm64FpReg fa_r = (a_reg->kind == RFPU) ? (Arm64FpReg)a_reg->id : V16;
 		Arm64FpReg fb_r = (b_reg->kind == RFPU) ? (Arm64FpReg)b_reg->id : V17;
+
+		if (fa_r == V16) {
+			preg *pv16 = PVFPR(16);
+			if (pv16->holds != NULL) free_reg(ctx, pv16);
+		}
+		if (fb_r == V17) {
+			preg *pv17 = PVFPR(17);
+			if (pv17->holds != NULL) free_reg(ctx, pv17);
+		}
 
 		if (a_reg->kind != RFPU) {
 			// Load from stack to FP register
@@ -4555,24 +4608,11 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 		for (i = nargs; i < f->nregs; i++) {
 			vreg *r = R(i);
 			if (r->size > 0 && r->stackPos < 0) {
-				// Use str_stack with XZR as source
-				if (r->size == 8) {
-					load_immediate(ctx, r->stackPos, RTMP, true);
-					encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, RFP, RTMP);
-					encode_ldr_str_imm(ctx, 0x03, 0, 0x00, 0, RTMP, XZR);
-				} else if (r->size == 4) {
-					load_immediate(ctx, r->stackPos, RTMP, true);
-					encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, RFP, RTMP);
-					encode_ldr_str_imm(ctx, 0x02, 0, 0x00, 0, RTMP, XZR);
-				} else if (r->size == 2) {
-					load_immediate(ctx, r->stackPos, RTMP, true);
-					encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, RFP, RTMP);
-					encode_ldr_str_imm(ctx, 0x01, 0, 0x00, 0, RTMP, XZR);
-				} else if (r->size == 1) {
-					load_immediate(ctx, r->stackPos, RTMP, true);
-					encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, RFP, RTMP);
-					encode_ldr_str_imm(ctx, 0x00, 0, 0x00, 0, RTMP, XZR);
+				// Use str_stack with XZR as source - efficient and handles all offsets
+				if (r->size != 1 && r->size != 2 && r->size != 4 && r->size != 8) {
+					JIT_ASSERT(0);
 				}
+				str_stack(ctx, XZR, r->stackPos, r->size);
 			}
 		}
 	}
@@ -6360,6 +6400,8 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 				} else {
 					if (val_r == RTMP2) {
 						// Need to use a different temp
+						preg *px9 = &ctx->pregs[X9];
+						if (px9->holds != NULL) free_reg(ctx, px9);
 						ldr_stack(ctx, X9, rb->stackPos, rb->size);
 						val_r = X9;
 					}
@@ -6474,6 +6516,10 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 				// ADD dst, ptr, offset
 				encode_add_sub_reg(ctx, 1, 0, 0, 0, off_r, 0, ptr_r, RTMP2);
 			} else {
+				// Ensure X9 is free
+				preg *px9 = &ctx->pregs[X9];
+				if (px9->holds != NULL) free_reg(ctx, px9);
+
 				// Multiply offset by element size, then add
 				load_immediate(ctx, elem_size, X9, true);
 				encode_madd_msub(ctx, 1, 0, X9, ptr_r, off_r, RTMP2);  // RTMP2 = ptr + off * elem_size
