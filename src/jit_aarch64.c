@@ -6647,6 +6647,9 @@ void *hl_jit_code(jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **de
 		return NULL;
 	}
 
+	// Make JIT memory writable (Apple Silicon W^X)
+	hl_jit_write_protect(false);
+
 	// Copy generated code to executable memory (with jumps already patched)
 	memcpy(code, ctx->startBuf, code_size);
 
@@ -6771,6 +6774,10 @@ void *hl_jit_code(jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **de
 		write_jit_debug_file(ctx, m, code, code_size);
 	}
 
+	// Flush instruction cache and make executable (Apple Silicon W^X)
+	hl_jit_flush_cache(code, code_size);
+	hl_jit_write_protect(true);
+
 	// Set return values
 	if (codesize)
 		*codesize = code_size;
@@ -6797,6 +6804,9 @@ void hl_jit_patch_method(void *old_fun, void **new_fun_table) {
 	unsigned int *insn = (unsigned int *)old_fun;
 	unsigned long long addr = (unsigned long long)(int_val)new_fun_table;
 
+	// Make JIT memory writable (Apple Silicon W^X)
+	hl_jit_write_protect(false);
+
 	// MOVZ X16, #imm16 (bits 0-15)
 	*insn++ = 0xD2800000 | (16) | (((addr >> 0) & 0xFFFF) << 5);
 
@@ -6815,8 +6825,7 @@ void hl_jit_patch_method(void *old_fun, void **new_fun_table) {
 	// BR X16 - branch to function
 	*insn++ = 0xD61F0200;  // BR X16
 
-	// Flush instruction cache for the patched code
-#if defined(__GNUC__) || defined(__clang__)
-	__builtin___clear_cache((char*)old_fun, (char*)insn);
-#endif
+	// Flush instruction cache and make executable (Apple Silicon W^X)
+	hl_jit_flush_cache(old_fun, 24);
+	hl_jit_write_protect(true);
 }
