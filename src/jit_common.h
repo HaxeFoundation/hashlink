@@ -120,6 +120,7 @@ struct _jit_ctx {
 	int stp_positions[4];             // Positions of 4 STP instructions for backpatching
 	int ldp_positions[4];             // Positions of 4 LDP instructions for backpatching
 #endif
+	bool freed;                       // Double-free protection flag
 };
 
 // Portable macros

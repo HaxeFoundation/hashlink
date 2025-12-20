@@ -4229,38 +4229,57 @@ jit_ctx *hl_jit_alloc() {
 }
 
 void hl_jit_free(jit_ctx *ctx, h_bool can_reset) {
-	if (ctx == NULL)
+	if (ctx == NULL || ctx->freed)
 		return;
 
-	if (ctx->startBuf)
-		free(ctx->startBuf);
-	if (ctx->vregs)
-		free(ctx->vregs);
-	if (ctx->opsPos)
-		free(ctx->opsPos);
-	if (ctx->debug)
-		free(ctx->debug);
+	// Mark as freed immediately to prevent double-free
+	ctx->freed = true;
 
-	// Clear pointers to prevent use-after-free if ctx is reused
-	ctx->startBuf = NULL;
-	ctx->vregs = NULL;
-	ctx->opsPos = NULL;
-	ctx->debug = NULL;
+	// Free and NULL each pointer atomically to prevent use-after-free window
+	if (ctx->startBuf) {
+		void *tmp = ctx->startBuf;
+		ctx->startBuf = NULL;
+		free(tmp);
+	}
+	if (ctx->vregs) {
+		void *tmp = ctx->vregs;
+		ctx->vregs = NULL;
+		free(tmp);
+	}
+	if (ctx->opsPos) {
+		void *tmp = ctx->opsPos;
+		ctx->opsPos = NULL;
+		free(tmp);
+	}
+	if (ctx->debug) {
+		void *tmp = ctx->debug;
+		ctx->debug = NULL;
+		free(tmp);
+	}
+
+	// Clear remaining fields
+	ctx->buf.b = NULL;
+	ctx->bufSize = 0;
 	ctx->maxRegs = 0;
 	ctx->maxOps = 0;
-	ctx->bufSize = 0;
-	ctx->buf.b = NULL;
 	ctx->calls = NULL;
-	// closure_list is managed by GC (they are allocated in falloc/galloc)
+	// closure_list is managed by GC (allocated in falloc/galloc)
 
+	// Free allocators before freeing ctx
 	hl_free(&ctx->falloc);
 	hl_free(&ctx->galloc);
 
-	if (!can_reset)
+	if (!can_reset) {
+#ifdef GC_DEBUG
+		// Poison memory to catch use-after-free in debug builds
+		memset(ctx, 0xDD, sizeof(jit_ctx));
+#endif
 		free(ctx);
+	}
 }
 
 void hl_jit_reset(jit_ctx *ctx, hl_module *m) {
+	ctx->freed = false;  // Allow reuse after reset
 	ctx->debug = NULL;
 	hl_jit_init_module(ctx, m);
 }
