@@ -5959,32 +5959,55 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 			break;
 
 		case OSwitch:
-			// Switch statement - simplified linear search approach
+			// Switch statement - optimized using branch table
 			{
-				// Spill all registers before any conditional jumps.
-				// Jump targets will have discard_regs() via OLabel.
 				spill_regs(ctx);
+				preg *r = fetch(ctx, dst);
+				Arm64Reg r_val = (Arm64Reg)r->id;
 
-				// Fetch the switch value (this creates a new binding after spill)
-				preg *r_val = fetch(ctx, dst);
+				// Ensure value is in a CPU register (not stack)
+				if (r->kind != RCPU) {
+					ldr_stack(ctx, RTMP2, dst->stackPos, dst->size);
+					r_val = RTMP2;
+				}
 
-				// For each case, compare and branch
+				// CMP r_val, #count
+				if (o->p2 < 4096) {
+					encode_add_sub_imm(ctx, (dst->size == 8) ? 1 : 0, 1, 1, 0, o->p2, r_val, XZR);
+				} else {
+					load_immediate(ctx, o->p2, RTMP, false); // Use RTMP here since r_val might be RTMP2
+					encode_add_sub_reg(ctx, (dst->size == 8) ? 1 : 0, 1, 1, 0, RTMP, 0, r_val, XZR);
+				}
+
+				// B.HS default (index >= count)
+				int jdefault = BUF_POS();
+				encode_branch_cond(ctx, 0, COND_HS);
+
+				// Compute target address: target = table_start + (index * 4)
+				// ADR RTMP, table_start (PC + 12 bytes)
+				// Offset 12: immhi=3, immlo=0
+				encode_adr(ctx, 0, 3, RTMP);
+
+				// ADD RTMP, RTMP, r_val, LSL #2 (or UXTW #2 for 32-bit index)
+				// sf=1 (64-bit result), op=0 (ADD), S=0, Rm=r_val, option=3(64)/2(32), imm3=2, Rn=RTMP, Rd=RTMP
+				int option = (dst->size == 8) ? 3 : 2; // 3=UXTX(64), 2=UXTW(32)
+				encode_add_sub_ext(ctx, 1, 0, 0, r_val, option, 2, RTMP, RTMP);
+
+				// BR RTMP
+				// 0xD61F0000 | (Rn << 5)
+				EMIT32(ctx, 0xD61F0000 | (RTMP << 5));
+
+				// table_start:
+				// Emit jumps
 				for (int i = 0; i < o->p2; i++) {
-					// CMP value, #i
-					if (i < 256) {
-						// SUBS XZR, Xn, #i
-						encode_add_sub_imm(ctx, (dst->size == 8) ? 1 : 0, 1, 1, 0, i, (Arm64Reg)r_val->id, XZR);
-					} else {
-						load_immediate(ctx, i, RTMP, false);
-						encode_add_sub_reg(ctx, (dst->size == 8) ? 1 : 0, 1, 1, 0, RTMP, 0, (Arm64Reg)r_val->id, XZR);
-					}
-		
-					// B.EQ to target
 					int jump_pos = BUF_POS();
-					encode_branch_cond(ctx, 0, COND_EQ);
+					// Emit B 0 (unconditional branch, to be patched)
+					EMIT32(ctx, 0x14000000);
 					register_jump(ctx, jump_pos, (opCount + 1) + o->extra[i]);
 				}
-				// If no match, fall through (default case is next instruction)
+
+				// Patch jdefault to here (fallthrough)
+				patch_jump(ctx, jdefault, BUF_POS());
 			}
 			break;
 
@@ -6069,13 +6092,48 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 				encode_ldr_str_reg(ctx, 0x03, 0, 0x00, RTMP, 0x03, 0, X0, X10);
 			}
 
-			// Step 4: Set tcheck = NULL (simplified - not doing type filtering yet)
-			// STR XZR, [SP, #offset_tcheck]
-			if (offset_tcheck < 4096) {
-				encode_ldr_str_imm(ctx, 0x03, 0, 0x00, offset_tcheck / 8, X10, XZR);
-			} else {
-				load_immediate(ctx, offset_tcheck, RTMP, true);
-				encode_ldr_str_reg(ctx, 0x03, 0, 0x00, RTMP, 0x03, 0, X10, XZR);
+			// Step 4: Set tcheck (type filtering)
+			hl_opcode *cat = f->ops + opCount + 1;
+			hl_opcode *next = f->ops + opCount + 1 + o->p2;
+			hl_opcode *next2 = f->ops + opCount + 2 + o->p2;
+			int gindex = -1;
+
+			if (cat->op == OCatch) {
+				gindex = cat->p1;
+			} else if (next->op == OGetGlobal && next2->op == OCall2 && next2->p3 == next->p1 && dst->stack.id == (int)(int_val)next2->extra) {
+				gindex = next->p2;
+			}
+
+			bool has_type_check = false;
+			if (gindex >= 0) {
+				hl_type *gt = m->code->globals[gindex];
+				while (gt->kind == HOBJ && gt->obj->super) gt = gt->obj->super;
+				if (gt->kind == HOBJ && gt->obj->nfields && gt->obj->fields[0].t->kind == HTYPE) {
+					// Load global address
+					void *addr = m->globals_data + m->globals_indexes[gindex];
+					load_immediate(ctx, (int64_t)addr, RTMP, true);
+					
+					// STR RTMP, [SP, #offset_tcheck]
+					// We use X10 (which holds SP) from previous step
+					if (offset_tcheck < 4096) {
+						encode_ldr_str_imm(ctx, 0x03, 0, 0x00, offset_tcheck / 8, X10, RTMP);
+					} else {
+						// Use RTMP2 for offset since RTMP holds the value
+						load_immediate(ctx, offset_tcheck, RTMP2, true);
+						encode_ldr_str_reg(ctx, 0x03, 0, 0x00, RTMP2, 0x03, 0, X10, RTMP);
+					}
+					has_type_check = true;
+				}
+			}
+
+			if (!has_type_check) {
+				// STR XZR, [SP, #offset_tcheck]
+				if (offset_tcheck < 4096) {
+					encode_ldr_str_imm(ctx, 0x03, 0, 0x00, offset_tcheck / 8, X10, XZR);
+				} else {
+					load_immediate(ctx, offset_tcheck, RTMP, true);
+					encode_ldr_str_reg(ctx, 0x03, 0, 0x00, RTMP, 0x03, 0, X10, XZR);
+				}
 			}
 
 			// Step 5: Call setjmp(trap_ctx)
