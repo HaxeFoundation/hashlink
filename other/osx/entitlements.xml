@@ -2,10 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Required for Hot-Reloading on Apple Silicon (W^X memory protection) -->
+    <!-- Required for JIT compilation on Apple Silicon (W^X memory protection) -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
+    <!-- Required for debugger to attach to process (task_for_pid) -->
     <key>com.apple.security.get-task-allow</key>
+    <true/>
+    <!-- Allows executable memory without MAP_JIT flag -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- Allows loading libraries not signed by Apple or same team (e.g., debugger modules) -->
+    <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
 </dict>
 </plist>
