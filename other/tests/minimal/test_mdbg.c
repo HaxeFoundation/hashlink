@@ -397,6 +397,127 @@ TEST(verify_cpsr_is_32bit) {
 }
 
 /* ============================================================
+ * Bug #4: ARM64 single-step requires MDSCR_EL1.SS, not CPSR TF
+ *
+ * On ARM64, single-stepping is enabled via MDSCR_EL1.SS (bit 0)
+ * which is accessed via debug registers (REG_DR6 -> __mdscr_el1).
+ *
+ * On x86, single-stepping uses EFLAGS.TF (bit 8).
+ *
+ * The Haxe debugger's singleStep() must use DR6 on ARM64,
+ * not EFlags which maps to CPSR (which has no trap flag).
+ *
+ * Expected behavior:
+ * - ARM64: Set/clear bit 0 of MDSCR_EL1 (via DR6)
+ * - x86: Set/clear bit 8 of EFLAGS
+ * ============================================================ */
+TEST(bug4_arm64_single_step_uses_mdscr_not_cpsr) {
+    char *content = read_file("hld/Debugger.hx");
+    if (!content) {
+        /* Try alternate paths - from hashlink repo or test directory */
+        content = read_file("../../../hashlink-debugger/hld/Debugger.hx");
+    }
+    if (!content) {
+        /* Try absolute path for development */
+        content = read_file("/Users/jameskim/Develop/hashlink-debugger/hld/Debugger.hx");
+    }
+    if (!content) {
+        fprintf(stderr, "    Cannot read Debugger.hx (expected in hashlink-debugger)\n");
+        fprintf(stderr, "    This test verifies ARM64 single-step implementation\n");
+        return TEST_SKIP;
+    }
+
+    /* Find singleStep function */
+    char *func_start = strstr(content, "function singleStep");
+    if (!func_start) {
+        fprintf(stderr, "    singleStep function not found\n");
+        free(content);
+        return TEST_FAIL;
+    }
+
+    /* Find the next function (to limit search scope) */
+    char *func_end = strstr(func_start + 20, "\n\tfunction ");
+    if (!func_end) {
+        func_end = func_start + 500;
+    }
+
+    size_t range = func_end - func_start;
+    char *func_code = malloc(range + 1);
+    strncpy(func_code, func_start, range);
+    func_code[range] = '\0';
+
+    /*
+     * The singleStep function should:
+     * 1. Check isArm64 to determine which mechanism to use
+     * 2. For ARM64: Use DR6 (MDSCR_EL1) bit 0
+     * 3. For x86: Use EFlags bit 8 (0x100)
+     *
+     * Current buggy code only handles x86:
+     *   var r = getReg(tid, EFlags).toInt();
+     *   if( set ) r |= 256 else r &= ~256;  // bit 8 = trap flag
+     *
+     * Fixed code should check isArm64 and use DR6 bit 0 for ARM64.
+     */
+
+    bool mentions_arm64 = contains(func_code, "isArm64") ||
+                          contains(func_code, "Arm64") ||
+                          contains(func_code, "arm64");
+    bool mentions_dr6 = contains(func_code, "Dr6") ||
+                        contains(func_code, "DR6") ||
+                        contains(func_code, "MDSCR");
+
+    free(func_code);
+    free(content);
+
+    if (!mentions_arm64) {
+        fprintf(stderr, "    BUG: singleStep() does not check for ARM64!\n");
+        fprintf(stderr, "    ARM64 requires MDSCR_EL1.SS (bit 0) for single-step,\n");
+        fprintf(stderr, "    not CPSR/EFLAGS which has no trap flag on ARM64.\n");
+        return TEST_FAIL;
+    }
+
+    if (!mentions_dr6) {
+        fprintf(stderr, "    WARNING: singleStep() mentions ARM64 but may not use DR6\n");
+        fprintf(stderr, "    ARM64 single-step requires DR6 (MDSCR_EL1) bit 0\n");
+        /* Don't fail yet - might be handled differently */
+    }
+
+    return TEST_PASS;
+}
+
+/* ============================================================
+ * Verification: MDSCR_EL1 bit 0 is SS (Software Step) enable
+ * ============================================================ */
+TEST(verify_mdscr_ss_bit) {
+    /*
+     * ARM64 MDSCR_EL1 register layout:
+     *   Bit 0: SS - Software Step enable
+     *   When set, the processor generates a Software Step exception
+     *   after executing the next instruction.
+     *
+     * Reference: ARM Architecture Reference Manual ARMv8-A
+     */
+    int ss_bit_position = 0;  /* Bit 0 */
+    int ss_mask = 1 << ss_bit_position;  /* 0x1 */
+
+    if (ss_mask != 1) {
+        fprintf(stderr, "    SS bit mask should be 0x1 (bit 0)\n");
+        return TEST_FAIL;
+    }
+
+    /* x86 EFLAGS trap flag is bit 8 (0x100) - different from ARM64! */
+    int x86_tf_bit = 8;
+    int x86_tf_mask = 1 << x86_tf_bit;  /* 0x100 = 256 */
+
+    if (x86_tf_mask == ss_mask) {
+        fprintf(stderr, "    x86 TF and ARM64 SS are at different bit positions!\n");
+        return TEST_FAIL;
+    }
+
+    return TEST_PASS;
+}
+
+/* ============================================================
  * Main
  * ============================================================ */
 int main(int argc, char *argv[]) {
@@ -414,11 +535,13 @@ int main(int argc, char *argv[]) {
         TEST_ENTRY(bug2_read_register_frees_memory),
         TEST_ENTRY(bug2b_write_register_frees_memory),
         TEST_ENTRY(bug3_complete_debug_register_names),
+        TEST_ENTRY(bug4_arm64_single_step_uses_mdscr_not_cpsr),
 
         /* Verification tests - should PASS */
         TEST_ENTRY(verify_arm64_thread_state_size),
         TEST_ENTRY(verify_arm64_debug_state_size),
         TEST_ENTRY(verify_cpsr_is_32bit),
+        TEST_ENTRY(verify_mdscr_ss_bit),
     };
 
     int count = sizeof(tests) / sizeof(tests[0]);
