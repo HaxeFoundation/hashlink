@@ -145,7 +145,10 @@ static bool is_block_error() {
 }
 
 static int net_read(void *fd, unsigned char *buf, size_t len) {
-	int r = recv((SOCKET)(int_val)fd, (char *)buf, (int)len, MSG_NOSIGNAL);
+	int r;
+	hl_blocking(true);
+	r = recv((SOCKET)(int_val)fd, (char *)buf, (int)len, MSG_NOSIGNAL);
+	hl_blocking(false);
 	if( r == SOCKET_ERROR && is_block_error() )
 		return MBEDTLS_ERR_SSL_WANT_READ;
 	return r;
