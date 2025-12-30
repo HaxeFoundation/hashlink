@@ -288,13 +288,17 @@ static void hl_profile_loop( void *_ ) {
 	double wait_time = 1. / data.sample_count;
 	double next = hl_sys_time();
 	data.tmpMemory = malloc(MAX_STACK_SIZE);
+	data.waitLoop = false;
 	while( !data.stopLoop ) {
 		double t = hl_sys_time();
 		hl_condition_acquire(data.waitCond);
 		if( t < next || data.profiling_pause ) {
 			if( !(t < next) ) next = t;
-			data.waitLoop = false;
-			if( data.profiling_pause ) hl_condition_timed_wait(data.waitCond, 0.001);
+			if( data.profiling_pause ) {
+				data.waitLoop = true;
+				hl_condition_wait(data.waitCond);
+				data.waitLoop = false;
+			}
 			hl_condition_release(data.waitCond);
 			continue;
 		}
@@ -562,8 +566,7 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		break;
 	case -3:
 		profile_pause();
-		data.waitLoop = true;
-		while( data.waitLoop ) {}
+		while( !data.waitLoop ) {}
 		profile_data *d = data.first_record;
 		while( d ) {
 			profile_data *n = d->next;
@@ -597,8 +600,7 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		if( code < 0 ) return;
 		if( data.profiling_pause || (code != 0 && (hl_get_thread()->flags & HL_THREAD_PROFILER_PAUSED)) ) return;
 		profile_pause();
-		data.waitLoop = true;
-		while( data.waitLoop ) {}
+		while( !data.waitLoop ) {}
 		double time = hl_sys_time();
 		record_data(&time,sizeof(double));
 		record_data(&hl_get_thread()->thread_id,sizeof(int));
