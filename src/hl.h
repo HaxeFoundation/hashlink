@@ -847,7 +847,9 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 
 // ----------------------- FFI ------------------------------------------------------
 
+#ifndef HL_DISABLE_LEGACY_FFI
 #include <hl_ffi.h>
+#endif
 
 // -------------- EXTRA ------------------------------------
 
