@@ -11,6 +11,7 @@ package sdl;
 	public var state : WindowStateChange;
 	public var keyCode : Int;
 	public var scanCode : Int;
+	public var modifier : Int;
 	public var keyRepeat : Bool;
 	public var reference : Int;
 	public var value : Int;
