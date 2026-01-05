@@ -848,7 +848,90 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 // ----------------------- FFI ------------------------------------------------------
 
 #ifndef HL_DISABLE_LEGACY_FFI
-#include <hl_ffi.h>
+
+// match GNU C++ mangling
+#define TYPE_STR	"vcsilfdbBDPOATR??X?N?S?g"
+
+#undef  _VOID
+#define _NO_ARG
+#define _VOID						"v"
+#define	_I8							"c"
+#define _I16						"s"
+#define _I32						"i"
+#define _I64						"l"
+#define _F32						"f"
+#define _F64						"d"
+#define _BOOL						"b"
+#define _BYTES						"B"
+#define _DYN						"D"
+#define _FUN(t, args)				"P" args "_" t
+#define _OBJ(fields)				"O" fields "_"
+#define _ARR						"A"
+#define _TYPE						"T"
+#define _REF(t)						"R" t
+#define _ABSTRACT(name)				"X" #name "_"
+#undef _NULL
+#define _NULL(t)					"N" t
+#define _STRUCT						"S"
+#define _GUID						"g"
+
+#undef _STRING
+#define _STRING						_OBJ(_BYTES _I32)
+
+#define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
+#define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
+
+#endif // HL_DISABLE_LEGACY_FFI
+
+#if !defined(HL_NAME)
+#	define HL_NAME(p)					p
+#	ifdef LIBHL_EXPORTS
+#		define HL_PRIM				EXPORT
+#		ifndef HL_DISABLE_LEGACY_FFI
+#			undef DEFINE_PRIM
+#			define DEFINE_PRIM(t,name,args)						_DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
+#			define DEFINE_PRIM_WITH_NAME						_DEFINE_PRIM_WITH_NAME
+#		endif
+#	else
+#		define HL_PRIM
+#		ifndef HL_DISABLE_LEGACY_FFI
+#			define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#		endif
+#	endif
+#elif defined(LIBHL_STATIC)
+#	ifdef __cplusplus
+#		define	HL_PRIM				extern "C"
+#	else
+#		define	HL_PRIM
+#	endif
+#	ifndef HL_DISABLE_LEGACY_FFI
+#		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#	endif
+#else
+#	ifdef __cplusplus
+#		define	HL_PRIM				extern "C" EXPORT
+#	else
+#		define	HL_PRIM				EXPORT
+#	endif
+#	ifndef HL_DISABLE_LEGACY_FFI
+#		define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
+#	endif
+#endif
+
+typedef struct {
+	hl_type *t;
+	uchar *bytes;
+	int length;
+} vstring;
+
+#if defined(HL_GCC) && !defined(HL_CONSOLE)
+#	ifdef HL_CLANG
+#		define HL_NO_OPT	__attribute__ ((optnone))
+#	else
+#		define HL_NO_OPT	__attribute__((optimize("-O0")))
+#	endif
+#else
+#	define HL_NO_OPT
 #endif
 
 // -------------- EXTRA ------------------------------------
