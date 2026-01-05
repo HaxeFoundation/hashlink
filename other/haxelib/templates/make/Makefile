@@ -1,7 +1,7 @@
 # Auto-generated from hashlink's Makefile template; do not edit
 
 UNAME := $(shell uname)
-CFLAGS=-O3 -std=c11 -DHL_MAKE -DHL_DISABLE_LEGACY_FFI -I$$makePath(::relDir::)
+CFLAGS=-O3 -std=c11 -DHL_MAKE -I$$makePath(::relDir::)
 ifeq ($(UNAME),Darwin)
 LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: /usr/local/lib/::name::.hdll::end::
 else

@@ -97,7 +97,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::HL_DISABLE_LEGACY_FFI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -118,7 +118,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::HL_DISABLE_LEGACY_FFI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -141,7 +141,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::HL_DISABLE_LEGACY_FFI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -166,7 +166,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::HL_DISABLE_LEGACY_FFI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;::if (jumboBuild != "true")::HL_MAKE;::end::%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ObjectFileName>$(IntDir)\%(RelativeDir)</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
