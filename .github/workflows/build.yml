@@ -192,7 +192,7 @@ jobs:
     - name: Install haxe
       uses: krdlab/setup-haxe@v2
       with:
-        haxe-version: latest
+        haxe-version: 2026-01-05_development_3aed86e
 
     - name: "Configure: Haxelib"
       run: |
@@ -372,7 +372,7 @@ jobs:
     - name: Install haxe
       uses: krdlab/setup-haxe@v2
       with:
-        haxe-version: latest
+        haxe-version: 2026-01-05_development_3aed86e
 
     - name: "Configure: Haxelib"
       run: |
