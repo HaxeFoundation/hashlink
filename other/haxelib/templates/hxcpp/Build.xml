@@ -2,6 +2,7 @@
 	<files id="::name::">
 		<compilerflag value="-std=c11" unless="MSVC_VER" />
 		<compilerflag value="-DHL_MAKE" />
+		<compilerflag value="-DHL_DISABLE_LEGACY_FFI" />
 		<compilerflag value="-I$$makePath(::relDir::)" />
 		<compilerflag value="-I${HASHLINK}/src" if="HASHLINK" />
 		<compilerflag value="-I${HASHLINK}/include" if="HASHLINK" />
