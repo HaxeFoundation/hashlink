@@ -96,8 +96,10 @@ class Window {
 
 			var shaderVersion = 120;
 			if (isOpenGLES) {
-				if( reg.match(v) )
-					shaderVersion = Std.int(Math.min( 100, Math.round( Std.parseFloat(reg.matched(0)) * 100 ) ));
+				shaderVersion = 100; // GLES 2.0 default
+				if( reg.match(v) ) {
+					shaderVersion = Math.round( Std.parseFloat(reg.matched(0)) * 100 );
+				}
 			}
 			else {
 				shaderVersion = 130;
@@ -109,12 +111,17 @@ class Window {
 			}
 
 			var vertex = GL.createShader(GL.VERTEX_SHADER);
-			GL.shaderSource(vertex, ["#version " + shaderVersion, "void main() { gl_Position = vec4(1.0); }"].join("\n"));
+			if (isOpenGLES)
+				GL.shaderSource(vertex, ["#version " + shaderVersion + " es", "void main() { gl_Position = vec4(1.0); }"].join("\n"));
+			else
+				GL.shaderSource(vertex, ["#version " + shaderVersion, "void main() { gl_Position = vec4(1.0); }"].join("\n"));
 			GL.compileShader(vertex);
 			if( GL.getShaderParameter(vertex, GL.COMPILE_STATUS) != 1 ) throw "Failed to compile VS ("+GL.getShaderInfoLog(vertex)+")";
 
 			var fragment = GL.createShader(GL.FRAGMENT_SHADER);
-			if (isOpenGLES)
+			if (isOpenGLES && shaderVersion >= 300)
+				GL.shaderSource(fragment, ["#version " + shaderVersion + " es", "precision mediump float;", "out vec4 color; void main() { color = vec4(1.0); }"].join("\n"));
+			else if (isOpenGLES)
 				GL.shaderSource(fragment, ["#version " + shaderVersion, "lowp vec4 color; void main() { color = vec4(1.0); }"].join("\n"));
 			else
 				GL.shaderSource(fragment, ["#version " + shaderVersion, "out vec4 color; void main() { color = vec4(1.0); }"].join("\n"));

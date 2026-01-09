@@ -118,7 +118,9 @@ GL_IMPORT(glGetProgramResourceIndex, GETPROGRAMRESOURCEINDEX);
 GL_IMPORT(glShaderStorageBlockBinding, SHADERSTORAGEBLOCKBINDING);
 
 GL_IMPORT(glMultiDrawElementsIndirect, MULTIDRAWELEMENTSINDIRECT);
+#if !defined(HL_GLES31)
 GL_IMPORT(glColorMaski, COLORMASKI);
+#endif
 
 GL_IMPORT(glTexStorage2D, TEXSTORAGE2D);
 GL_IMPORT(glTexStorage3D, TEXSTORAGE3D);
@@ -126,7 +128,7 @@ GL_IMPORT(glTexStorage3D, TEXSTORAGE3D);
 GL_IMPORT(glDebugMessageCallback, DEBUGMESSAGECALLBACK);
 GL_IMPORT(glDebugMessageControl, DEBUGMESSAGECONTROL);
 
-#if !defined(HL_MESA)
+#if !defined(HL_MESA) && !defined(HL_GLES31)
 GL_IMPORT(glGetQueryObjectui64v, GETQUERYOBJECTUI64V);
 GL_IMPORT(glQueryCounter, QUERYCOUNTER);
 #endif

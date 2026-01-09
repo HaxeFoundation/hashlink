@@ -701,6 +701,7 @@ class GL {
 	public static inline var LUMINANCE_ALPHA                = 0x190A;
 
 	public static inline var BGRA                           = 0x80E1;
+	public static inline var RGB8                           = 0x8051;
 	public static inline var RGBA8                          = 0x8058;
 	public static inline var RGB10_A2                       = 0x8059;
 

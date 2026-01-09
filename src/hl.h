@@ -93,8 +93,12 @@
 #	define HL_BSD
 #endif
 
-#if defined(_64BITS) || defined(__x86_64__) || defined(_M_X64) || defined(__LP64__) || defined(__wasm64__)
+#if defined(_64BITS) || defined(__x86_64__) || defined(_M_X64) || defined(__LP64__) || defined(__wasm64__) || defined(__aarch64__)
 #	define HL_64
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+#	define HL_ARM64
 #endif
 
 #if defined(__GNUC__)
@@ -828,6 +832,8 @@ HL_API void hl_global_lock( bool lock );
 
 HL_API void *hl_alloc_executable_memory( int size );
 HL_API void hl_free_executable_memory( void *ptr, int size );
+HL_API void hl_jit_write_protect( bool executable );
+HL_API void hl_jit_flush_cache( void *ptr, int size );
 
 // ----------------------- BUFFER --------------------------------------------------
 
@@ -881,6 +887,8 @@ typedef struct {
 	uchar *bytes;
 	int length;
 } vstring;
+
+HL_API int hl_str_cmp( vstring *a, vstring *b );
 
 #define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
