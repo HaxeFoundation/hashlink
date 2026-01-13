@@ -339,6 +339,7 @@ const char *myp_charset_name( int charset ) {
 	case 83:
 	case 223:
 	case 254:
+	case 255:
 		return "utf8";
 	case 45:
 	case 46:
