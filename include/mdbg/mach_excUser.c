@@ -5,7 +5,7 @@
  * OPTIONS: 
  */
 
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__aarch64__)
 
 #define	__MIG_check__Reply__mach_exc_subsystem__ 1
 

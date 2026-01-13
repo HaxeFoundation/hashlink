@@ -56,7 +56,22 @@ if(ANDROID)
     target_link_libraries(sdl.hdll GLESv3)
 endif()
 
-if((APPLE OR UNIX) AND NOT ANDROID)
+# ARM Linux with OpenGL ES 3.1 (e.g., Asahi, Raspberry Pi)
+option(USE_GLES31 "Use OpenGL ES 3.1 instead of Desktop OpenGL" OFF)
+
+if(USE_GLES31 AND UNIX AND NOT ANDROID AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GLES REQUIRED glesv2)
+    target_include_directories(sdl.hdll
+        PRIVATE
+        ${GLES_INCLUDE_DIRS}
+    )
+    target_link_libraries(sdl.hdll
+        libhl
+        ${GLES_LIBRARIES}
+    )
+    target_compile_definitions(sdl.hdll PRIVATE HL_GLES31=1)
+elseif((APPLE OR UNIX) AND NOT ANDROID)
     find_package(OpenGL REQUIRED)
     target_include_directories(sdl.hdll
         PRIVATE
