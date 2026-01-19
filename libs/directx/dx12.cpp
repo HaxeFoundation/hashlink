@@ -40,6 +40,12 @@ static unsigned int gs_constants[] = {
 	D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 };
 
+enum DriverInitFlag {
+	DEBUG                    = 0 << 0,
+	GPU_BASED_VALIDATION     = 0 << 1, 
+	BREAK_ON_ERROR           = 0 << 2,
+};
+
 typedef struct {
 	HWND wnd;
 	ID3D12CommandQueue *commandQueue;
@@ -117,20 +123,20 @@ HL_PRIM varray *HL_NAME(list_devices)() {
 }
 
 
-HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags, uchar *dev_desc ) {
+HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *dev_desc ) {
 	UINT dxgiFlags = 0;
 	dx_driver *drv = (dx_driver*)hl_gc_alloc_raw(sizeof(dx_driver));
 	memset(drv, 0, sizeof(dx_driver));
 	drv->wnd = window;
 
-	if( flags & 1 ) {
+	if( flags & DEBUG ) {
 		ID3D12Debug *debugController;
 		D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
 		debugController->EnableDebugLayer();
 #ifndef HL_XBS
 		debugController->QueryInterface(&drv->debug);
 		drv->debug->EnableDebugLayer();
-		drv->debug->SetEnableGPUBasedValidation(true);
+		drv->debug->SetEnableGPUBasedValidation(flags & GPU_BASED_VALIDATION);
 		dxgiFlags |= DXGI_CREATE_FACTORY_DEBUG;
 #else
 		debugController->QueryInterface(IID_PPV_ARGS(&drv->debug));
@@ -162,6 +168,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags, uchar *dev_desc ) {
 	if( drv->debug ) {
 		CHKERR(drv->device->QueryInterface(IID_PPV_ARGS(&drv->debugDevice)));
 		CHKERR(drv->device->QueryInterface(IID_PPV_ARGS(&drv->infoQueue)));
+		drv->infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, flags & BREAK_ON_ERROR);
 		drv->infoQueue->ClearStoredMessages();
 	}
 #else
@@ -611,6 +618,10 @@ HL_PRIM void HL_NAME(copy_descriptors_simple)(int numDescriptors, D3D12_CPU_DESC
 	static_driver->device->CopyDescriptorsSimple(numDescriptors, dstCpuAddress, srcCpuAddress, heapType);
 }
 
+HL_PRIM void HL_NAME(check_feature_support)(D3D12_FEATURE feature, void* data, int dataSize) {
+	static_driver->device->CheckFeatureSupport(feature, &data, dataSize);
+}
+
 DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_depth_stencil_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_shader_resource_view, _RES _STRUCT _I64);
@@ -628,6 +639,7 @@ DEFINE_PRIM(_I64, get_required_intermediate_size, _RES _I32 _I32);
 DEFINE_PRIM(_BOOL, update_sub_resource, _RES _RES _RES _I64 _I32 _I32 _STRUCT);
 DEFINE_PRIM(_VOID, get_copyable_footprints, _STRUCT _I32 _I32 _I64 _STRUCT _BYTES _BYTES _BYTES);
 DEFINE_PRIM(_VOID, copy_descriptors_simple, _I32 _I64 _I64 _I32);
+DEFINE_PRIM(_VOID, check_feature_support, _I32 _BYTES _I32);
 
 // ---- SHADERS
 
