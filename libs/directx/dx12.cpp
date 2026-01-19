@@ -41,9 +41,9 @@ static unsigned int gs_constants[] = {
 };
 
 enum DriverInitFlag {
-	DEBUG                    = 0 << 0,
-	GPU_BASED_VALIDATION     = 0 << 1, 
-	BREAK_ON_ERROR           = 0 << 2,
+	DEBUG                    = 1 << 0,
+	GPU_BASED_VALIDATION     = 1 << 1,
+	BREAK_ON_ERROR           = 1 << 2,
 };
 
 typedef struct {
