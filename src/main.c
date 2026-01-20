@@ -41,9 +41,9 @@ typedef char pchar;
 #define PSTR(x) x
 #endif
 
-#if defined(HL_WIN_DESKTOP) && defined(HL_DX12_AGILITY)
-__declspec(dllexport) extern const UINT D3D12SDKVersion = 618;
-__declspec(dllexport) extern const char* D3D12SDKPath = HL_DX12_AGILITY;
+#if defined(HL_WIN_DESKTOP) && defined(HL_DX12_AGILITY_VERSION)
+__declspec(dllexport) extern const UINT D3D12SDKVersion = HL_DX12_AGILITY_VERSION;
+__declspec(dllexport) extern const char* D3D12SDKPath = u8"./D3D12/";
 #endif
 
 typedef struct {
