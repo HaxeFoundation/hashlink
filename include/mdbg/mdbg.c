@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef __x86_64__
+#ifdef __aarch64__
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,7 +32,6 @@
 #include <errno.h>
 #include <assert.h>
 #include <sys/types.h>
-#include <sys/user.h>
 #include <sys/ptrace.h>
 #include <sys/event.h>
 #include <sys/sysctl.h>
@@ -60,7 +59,18 @@
 #define     STATUS_STACKOVERFLOW     5
 #define     STATUS_WATCHBREAK        0x100
 
-#define     SINGLESTEP_TRAP          0x00000100
+/*
+ * ARM64 EXC_BREAKPOINT exception codes (from mach/arm/exception.h):
+ *   1 = EXC_ARM_BREAKPOINT - BRK instruction executed
+ *   2 = Software single-step completed (Empirical value for macOS ARM64)
+ *   3 = Hardware breakpoint hit (Empirical value for macOS ARM64)
+ *
+ * Note: EXC_ARM_SINGLE_STEP and EXC_ARM_HW_BREAKPOINT are not defined
+ * in the official macOS SDK but are observed during debugging sessions.
+ */
+#define     EXC_ARM_BREAKPOINT       1
+#define     EXC_ARM_SINGLE_STEP      2
+#define     EXC_ARM_HW_BREAKPOINT    3
 
 #define     MAX_EXCEPTION_PORTS      16
 
@@ -71,12 +81,12 @@ static struct debug_session *find_session(mach_port_t task);
 static mach_port_t get_task(pid_t pid);
 static mach_port_t get_thread(mach_port_t mach_task, uint thread_num);
 static uint64_t get_thread_id(thread_t thread);
-static x86_thread_state64_t* get_thread_state(mach_port_t mach_thread);
-static kern_return_t set_thread_state(thread_t mach_thread, x86_thread_state64_t *break_state);
-static x86_debug_state64_t* get_debug_state(thread_t mach_thread);
-static kern_return_t set_debug_state(thread_t mach_thread, x86_debug_state64_t *break_state);
+static arm_thread_state64_t* get_thread_state(mach_port_t mach_thread);
+static kern_return_t set_thread_state(thread_t mach_thread, arm_thread_state64_t *break_state);
+static arm_debug_state64_t* get_debug_state(thread_t mach_thread);
+static kern_return_t set_debug_state(thread_t mach_thread, arm_debug_state64_t *break_state);
 
-static void* task_exception_server (mach_port_t exception_port);
+static void* task_exception_server_thread(void* arg);
 
 
 #pragma mark Structs
@@ -210,34 +220,32 @@ static char* exception_to_string(exception_type_t exc) {
 
 static char* get_register_name(int reg) {
     switch(reg) {
-        case REG_RAX: return "Rax";
-        case REG_RBX: return "Rbx";
-        case REG_RCX: return "Rcx";
-        case REG_RDX: return "Rdx";
-        case REG_RDI: return "Rdi";
-        case REG_RSI: return "Rsi";
-        case REG_RBP: return "Rbp";
-        case REG_RSP: return "Rsp";
-        case REG_R8:  return "R8";
-        case REG_R9:  return "R9";
-        case REG_R10: return "R10";
-        case REG_R11: return "R11";
-        case REG_R12: return "R12";
-        case REG_R13: return "R13";
-        case REG_R14: return "R14";
-        case REG_R15: return "R15";
-        case REG_RIP: return "Rip";
-        case REG_RFLAGS: return "Rflags";
-
-        case REG_DR0: return "Dr0";
-        case REG_DR1: return "Dr1";
-        case REG_DR2: return "Dr2";
-        case REG_DR3: return "Dr3";
-        case REG_DR4: return "Dr4";
-        case REG_DR5: return "Dr5";
-        case REG_DR6: return "Dr6";
-        case REG_DR7: return "Dr7";
-
+        case REG_RAX: return "X0";
+        case REG_RBX: return "X19";
+        case REG_RCX: return "X1";
+        case REG_RDX: return "X2";
+        case REG_RDI: return "X0";
+        case REG_RSI: return "X1";
+        case REG_RBP: return "FP";
+        case REG_RSP: return "SP";
+        case REG_R8:  return "X8";
+        case REG_R9:  return "X9";
+        case REG_R10: return "X10";
+        case REG_R11: return "X11";
+        case REG_R12: return "X12";
+        case REG_R13: return "X13";
+        case REG_R14: return "X14";
+        case REG_R15: return "X15";
+        case REG_RIP: return "PC";
+        case REG_RFLAGS: return "CPSR";
+        case REG_DR0: return "BVR0";
+        case REG_DR1: return "BVR1";
+        case REG_DR2: return "BVR2";
+        case REG_DR3: return "BVR3";
+        case REG_DR4: return "BCR0";
+        case REG_DR5: return "BCR1";
+        case REG_DR6: return "MDSCR";
+        case REG_DR7: return "BCR3";
         default: return "invalid register";
     }
 }
@@ -246,7 +254,7 @@ static char* get_register_name(int reg) {
 #pragma mark Debug helpers
 
 // From: https://developer.apple.com/library/archive/qa/qa1361/_index.html
-// Returns true if the current process is being debugged (either 
+// Returns true if the current process is being debugged (either
 // running under the debugger or has a debugger attached post facto).
 bool is_debugger_attached(void) {
     int                 junk;
@@ -349,87 +357,146 @@ static debug_session *find_session_by_pid(pid_t pid) {
 
 #pragma mark Registers
 
+/*
+ * ARM64 register mapping for HashLink debugger compatibility.
+ *
+ * The debugger protocol uses x86 register indices via get_reg() in debug.c:
+ *   REG_RSP (8) -> SP
+ *   REG_RBP (7) -> FP (X29)
+ *   REG_RIP (17) -> PC
+ *   REG_RFLAGS (18) -> CPSR (note: 32-bit, but we return as 64-bit)
+ *   REG_RAX (1) -> X0
+ *
+ * ARM64 thread state structure (non-opaque):
+ *   __x[29]  - General purpose registers X0-X28
+ *   __fp     - Frame pointer X29
+ *   __lr     - Link register X30
+ *   __sp     - Stack pointer
+ *   __pc     - Program counter
+ *   __cpsr   - Current program status register (32-bit!)
+ */
 
-__uint64_t *get_reg( x86_thread_state64_t *regs, int r ) {
-    switch( r ) {
-        case REG_RAX: return &regs->__rax;
-        case REG_RBX: return &regs->__rbx;
-        case REG_RCX: return &regs->__rcx;
-        case REG_RDX: return &regs->__rdx;
-        case REG_RDI: return &regs->__rdi;
-        case REG_RSI: return &regs->__rsi;
-        case REG_RBP: return &regs->__rbp;
-        case REG_RSP: return &regs->__rsp;
-        case REG_R8:  return &regs->__r8;
-        case REG_R9:  return &regs->__r9;
-        case REG_R10: return &regs->__r10;
-        case REG_R11: return &regs->__r11;
-        case REG_R12: return &regs->__r12;
-        case REG_R13: return &regs->__r13;
-        case REG_R14: return &regs->__r14;
-        case REG_R15: return &regs->__r15;
-        case REG_RIP: return &regs->__rip;
-        case REG_RFLAGS: return &regs->__rflags;
+/* Static storage for CPSR as 64-bit (since __cpsr is 32-bit) */
+static __uint64_t cpsr_as_64;
+
+__uint64_t *get_reg(arm_thread_state64_t *regs, int r) {
+    switch(r) {
+        case REG_RAX: return &regs->__x[0];   /* Return value / first arg */
+        case REG_RBX: return &regs->__x[19];  /* Callee-saved */
+        case REG_RCX: return &regs->__x[1];   /* Second arg */
+        case REG_RDX: return &regs->__x[2];   /* Third arg */
+        case REG_RDI: return &regs->__x[0];   /* First arg (same as RAX in ARM64 ABI) */
+        case REG_RSI: return &regs->__x[1];   /* Second arg (same as RCX) */
+        case REG_RBP: return &regs->__fp;     /* Frame pointer X29 */
+        case REG_RSP: return &regs->__sp;     /* Stack pointer */
+        case REG_R8:  return &regs->__x[8];
+        case REG_R9:  return &regs->__x[9];
+        case REG_R10: return &regs->__x[10];
+        case REG_R11: return &regs->__x[11];
+        case REG_R12: return &regs->__x[12];
+        case REG_R13: return &regs->__x[13];
+        case REG_R14: return &regs->__x[14];
+        case REG_R15: return &regs->__x[15];
+        case REG_RIP: return &regs->__pc;     /* Program counter */
+        case REG_RFLAGS:
+            /* CPSR is 32-bit, convert to 64-bit for API compatibility */
+            cpsr_as_64 = regs->__cpsr;
+            return &cpsr_as_64;
     }
     return NULL;
 }
 
-__uint64_t *get_debug_reg( x86_debug_state64_t *regs, int r ) {
-    switch( r ) {
-        case REG_DR0: return &regs->__dr0;
-        case REG_DR1: return &regs->__dr1;
-        case REG_DR2: return &regs->__dr2;
-        case REG_DR3: return &regs->__dr3;
-        case REG_DR4: return &regs->__dr4;
-        case REG_DR5: return &regs->__dr5;
-        case REG_DR6: return &regs->__dr6;
-        case REG_DR7: return &regs->__dr7;
+/*
+ * ARM64 debug registers mapping.
+ *
+ * ARM64 debug state structure:
+ *   __bvr[16]   - Breakpoint Value Registers
+ *   __bcr[16]   - Breakpoint Control Registers
+ *   __wvr[16]   - Watchpoint Value Registers
+ *   __wcr[16]   - Watchpoint Control Registers
+ *   __mdscr_el1 - Monitor Debug System Control Register (bit 0 = SS)
+ *
+ * x86 DR6 is debug status, DR7 is debug control.
+ * On ARM64, we map these to the debug state registers.
+ */
+__uint64_t *get_debug_reg(arm_debug_state64_t *regs, int r) {
+    switch(r) {
+        case REG_DR0: return &regs->__bvr[0];  /* Breakpoint Value Register 0 */
+        case REG_DR1: return &regs->__bvr[1];
+        case REG_DR2: return &regs->__bvr[2];
+        case REG_DR3: return &regs->__bvr[3];
+        case REG_DR4: return &regs->__bcr[0];  /* Breakpoint Control Register 0 */
+        case REG_DR5: return &regs->__bcr[1];
+        case REG_DR6: return &regs->__mdscr_el1; /* Debug status/control */
+        case REG_DR7: return &regs->__bcr[3];    /* Debug control */
     }
     return NULL;
 }
 
-__uint64_t read_register(mach_port_t task, int thread, int reg, bool is64 ) {
+__uint64_t read_register(mach_port_t task, int thread, int reg, bool is64) {
     __uint64_t *rdata;
     mach_port_t mach_thread = get_thread(task, thread);
 
     if(reg >= REG_DR0) {
-        x86_debug_state64_t *regs = get_debug_state(mach_thread);
-        rdata = get_debug_reg(regs, reg - 4);
+        arm_debug_state64_t *regs = get_debug_state(mach_thread);
+        rdata = get_debug_reg(regs, reg);
+        if(rdata == NULL) {
+            if(regs) free(regs);
+            return 0;
+        }
+        __uint64_t val = *rdata;
+        free(regs);
+        return val;
     } else {
-        x86_thread_state64_t *regs = get_thread_state(mach_thread);
+        arm_thread_state64_t *regs = get_thread_state(mach_thread);
         rdata = get_reg(regs, reg);
+        if(rdata == NULL) {
+            if(regs) free(regs);
+            return 0;
+        }
+        __uint64_t val = *rdata;
+        free(regs);
+        return val;
     }
-
-    DEBUG_PRINT_VERBOSE("register %s is: 0x%08x\n", get_register_name(reg), *rdata);
-
-    return *rdata;
 }
 
-static kern_return_t write_register(mach_port_t task, int thread, int reg, void *value, bool is64 ) {
+static kern_return_t write_register(mach_port_t task, int thread, int reg, void *value, bool is64) {
     DEBUG_PRINT_VERBOSE("write register %i (%s) on thread %i", reg, get_register_name(reg), thread);
 
     __uint64_t *rdata;
     mach_port_t mach_thread = get_thread(task, thread);
+    kern_return_t kret = KERN_SUCCESS;
 
     if(reg >= REG_DR0) {
-        x86_debug_state64_t *regs = get_debug_state(mach_thread);
-        rdata = get_debug_reg(regs, reg - 4);
-        DEBUG_PRINT_VERBOSE("register flag for %s was: 0x%08x\n",get_register_name(reg), *rdata);
+        arm_debug_state64_t *regs = get_debug_state(mach_thread);
+        rdata = get_debug_reg(regs, reg);
+        if(rdata == NULL) {
+            if(regs) free(regs);
+            return KERN_INVALID_ARGUMENT;
+        }
 
+        DEBUG_PRINT_VERBOSE("register flag for %s was: 0x%08llx\n", get_register_name(reg), *rdata);
         *rdata = (__uint64_t)value;
-        set_debug_state(mach_thread, regs);
+        kret = set_debug_state(mach_thread, regs);
+        free(regs);
     } else {
-        x86_thread_state64_t *regs = get_thread_state(mach_thread);
+        arm_thread_state64_t *regs = get_thread_state(mach_thread);
         rdata = get_reg(regs, reg);
-        DEBUG_PRINT_VERBOSE("register flag for %s was: 0x%08x\n",get_register_name(reg), *rdata);
+        if(rdata == NULL) {
+            if(regs) free(regs);
+            return KERN_INVALID_ARGUMENT;
+        }
 
+        DEBUG_PRINT_VERBOSE("register flag for %s was: 0x%08llx\n", get_register_name(reg), *rdata);
         *rdata = (__uint64_t)value;
-        set_thread_state(mach_thread, regs);
+        if( reg == REG_RFLAGS ) regs->__cpsr = (unsigned int)(*rdata);
+        kret = set_thread_state(mach_thread, regs);
+        free(regs);
     }
 
-    DEBUG_PRINT_VERBOSE("register flag for %s now is: 0x%08x\n",get_register_name(reg), *rdata);
+    DEBUG_PRINT_VERBOSE("register flag for %s now is: 0x%08llx\n", get_register_name(reg), value);
 
-    return KERN_SUCCESS;
+    return kret;
 }
 
 
@@ -438,35 +505,67 @@ static kern_return_t write_register(mach_port_t task, int thread, int reg, void 
 
 static kern_return_t read_memory(mach_port_t task, mach_vm_address_t addr, mach_vm_address_t dest, int size) {
     mach_vm_size_t nread;
-	kern_return_t kret = mach_vm_read_overwrite(task, addr, size, dest, &nread);
-	
-    EXIT_ON_MACH_ERROR(kret,"Error: probably reading from invalid address!");
+    kern_return_t kret = mach_vm_read_overwrite(task, addr, size, dest, &nread);
 
-    DEBUG_PRINT_VERBOSE("read %i bytes from %p", nread, addr);
-    #if MDBG_DEBUG && MDBG_LOG_LEVEL > 1
-    log_buffer(dest, size);
+    if(kret != KERN_SUCCESS) {
+        DEBUG_PRINT("Error reading memory at %p: %s", (void*)addr, mach_error_string(kret));
+        return kret;
+    }
+
+    DEBUG_PRINT_VERBOSE("read %llu bytes from %p", nread, (void*)addr);
+#if MDBG_DEBUG && MDBG_LOG_LEVEL > 1
+    log_buffer((unsigned char*)dest, size);
     printf("\n\n");
-    #endif
+#endif
 
     return kret;
 }
 
 static kern_return_t write_memory(mach_port_t task, mach_vm_address_t addr, mach_vm_address_t src, int size) {
-    kern_return_t kret = mach_vm_protect(task, addr, size, 0, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE);
-    EXIT_ON_MACH_ERROR(kret,"Fatal error: failed to acquire write permission!");
+    kern_return_t kret;
+
+    /*
+     * Cross-process memory patching on ARM64 requires W^X compliance.
+     * mach_vm_protect cannot set WRITE+EXECUTE together regardless of JIT entitlements.
+     * Strategy: try direct write first, then toggle RW->write->RX for code pages.
+     */
+
+    /* First try direct write without changing protection */
+    kret = mach_vm_write(task, addr, src, size);
+    if(kret == KERN_SUCCESS) {
+        DEBUG_PRINT_VERBOSE("wrote %i bytes to %p (direct)", size, (void*)addr);
+        return KERN_SUCCESS;
+    }
+
+    DEBUG_PRINT("Direct write failed, trying with protection change...");
+
+    /* Remove execute, add write (W^X compliant) */
+    kret = mach_vm_protect(task, addr, size, 0, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
+    if(kret != KERN_SUCCESS) {
+        DEBUG_PRINT("Failed to set write permission at %p: %s", (void*)addr, mach_error_string(kret));
+        return kret;
+    }
 
     kret = mach_vm_write(task, addr, src, size);
-    EXIT_ON_MACH_ERROR(kret,"Fatal error: failed to write to traced process memory!");
+    if(kret != KERN_SUCCESS) {
+        DEBUG_PRINT("Failed to write to process memory at %p: %s", (void*)addr, mach_error_string(kret));
+        /* Try to restore original protection */
+        mach_vm_protect(task, addr, size, 0, VM_PROT_READ | VM_PROT_EXECUTE);
+        return kret;
+    }
 
+    /* Restore execute permission */
     kret = mach_vm_protect(task, addr, size, 0, VM_PROT_READ | VM_PROT_EXECUTE);
-    EXIT_ON_MACH_ERROR(kret,"Fatal error: failed to reset write permission!");
+    if(kret != KERN_SUCCESS) {
+        DEBUG_PRINT("Failed to restore execute permission at %p: %s", (void*)addr, mach_error_string(kret));
+    }
 
-    DEBUG_PRINT_VERBOSE("wrote %i bytes to %p",size, addr);
-    #if MDBG_DEBUG && MDBG_LOG_LEVEL
-        log_buffer(src, size);
-        printf("\n\n");
-    #endif
-    return kret;
+    DEBUG_PRINT_VERBOSE("wrote %i bytes to %p", size, (void*)addr);
+#if MDBG_DEBUG && MDBG_LOG_LEVEL
+    log_buffer((unsigned char*)src, size);
+    printf("\n\n");
+#endif
+    return KERN_SUCCESS;
 }
 
 
@@ -486,79 +585,75 @@ static mach_port_t get_thread(mach_port_t mach_task, uint thread_id) {
     kern_return_t kret = task_threads(mach_task, &threadList, &threadCount);
     if (kret != KERN_SUCCESS) {
         DEBUG_PRINT("get_thread() failed with message %s!\n", mach_error_string(kret));
-        exit(0);
+        return 0;
     }
-    for(int i=0;i<threadCount;i++) {
+    for(int i=0; i<threadCount; i++) {
         if(get_thread_id(threadList[i]) == thread_id) {
             return threadList[i];
         }
     }
-    exit(0); // TODO: catch better
+    DEBUG_PRINT("Thread %u not found!", thread_id);
+    return 0;
 }
 
 static thread_identifier_info_data_t* get_thread_info(thread_t thread) {
 
-  thread_identifier_info_data_t *tident = safe_malloc(sizeof(thread_identifier_info_data_t));
-  mach_msg_type_number_t tident_count = THREAD_IDENTIFIER_INFO_COUNT;
-  kern_return_t kret = thread_info (thread, THREAD_IDENTIFIER_INFO, (thread_info_t)tident, &tident_count);
+    thread_identifier_info_data_t *tident = safe_malloc(sizeof(thread_identifier_info_data_t));
+    mach_msg_type_number_t tident_count = THREAD_IDENTIFIER_INFO_COUNT;
+    kern_return_t kret = thread_info(thread, THREAD_IDENTIFIER_INFO, (thread_info_t)tident, &tident_count);
 
-  EXIT_ON_MACH_ERROR(kret, "failed to get thread info");
+    EXIT_ON_MACH_ERROR(kret, "failed to get thread info");
 
-  return tident;
+    return tident;
 }
 
 static uint64_t get_thread_id(thread_t thread) {
     thread_identifier_info_data_t *tinfo = get_thread_info(thread);
-    return tinfo->thread_id;
+    uint64_t tid = tinfo->thread_id;
+    free(tinfo);
+    return tid;
 }
 
-static x86_thread_state64_t* get_thread_state(thread_t mach_thread) {
+static arm_thread_state64_t* get_thread_state(thread_t mach_thread) {
+    arm_thread_state64_t* state;
+    mach_msg_type_number_t stateCount = ARM_THREAD_STATE64_COUNT;
 
-    x86_thread_state64_t* state;
-    mach_msg_type_number_t stateCount = x86_THREAD_STATE64_COUNT;
-
-    state = safe_malloc(sizeof(x86_thread_state64_t));
-    kern_return_t kret = thread_get_state( mach_thread, x86_THREAD_STATE64, (thread_state_t)state, &stateCount);
+    state = safe_malloc(sizeof(arm_thread_state64_t));
+    kern_return_t kret = thread_get_state(mach_thread, ARM_THREAD_STATE64, (thread_state_t)state, &stateCount);
     if (kret != KERN_SUCCESS) {
-        DEBUG_PRINT("Error failed with message %s!\n", mach_error_string(kret));
-        exit(0);
+        DEBUG_PRINT("get_thread_state failed with message %s!\n", mach_error_string(kret));
+        free(state);
+        return NULL;
     }
     return state;
 }
 
-static kern_return_t set_thread_state(thread_t mach_thread, x86_thread_state64_t *break_state) {
-
-    kern_return_t kret = thread_set_state(mach_thread, x86_THREAD_STATE64, (thread_state_t)break_state, x86_THREAD_STATE64_COUNT);
+static kern_return_t set_thread_state(thread_t mach_thread, arm_thread_state64_t *break_state) {
+    kern_return_t kret = thread_set_state(mach_thread, ARM_THREAD_STATE64, (thread_state_t)break_state, ARM_THREAD_STATE64_COUNT);
     if (kret != KERN_SUCCESS) {
-        DEBUG_PRINT("Error failed with message %s!\n", mach_error_string(kret));
-        exit(0);
+        DEBUG_PRINT("set_thread_state failed with message %s!\n", mach_error_string(kret));
     }
     return kret;
 }
 
+static arm_debug_state64_t* get_debug_state(thread_t mach_thread) {
+    arm_debug_state64_t* state;
+    mach_msg_type_number_t stateCount = ARM_DEBUG_STATE64_COUNT;
 
-// Debug register state
-
-static x86_debug_state64_t* get_debug_state(thread_t mach_thread) {
-
-    x86_debug_state64_t* state;
-    mach_msg_type_number_t stateCount = x86_DEBUG_STATE64_COUNT;
-
-    state = safe_malloc(sizeof(x86_debug_state64_t));
-    kern_return_t kret = thread_get_state( mach_thread, x86_DEBUG_STATE64, (thread_state_t)state, &stateCount);
+    state = safe_malloc(sizeof(arm_debug_state64_t));
+    kern_return_t kret = thread_get_state(mach_thread, ARM_DEBUG_STATE64, (thread_state_t)state, &stateCount);
     if (kret != KERN_SUCCESS) {
-        DEBUG_PRINT("Error failed with message %s!\n", mach_error_string(kret));
-        exit(0);
+        DEBUG_PRINT("get_debug_state failed with message %s!\n", mach_error_string(kret));
+        free(state);
+        return NULL;
     }
     return state;
 }
 
-static kern_return_t set_debug_state(thread_t mach_thread, x86_debug_state64_t *break_state) {
-
-    kern_return_t kret = thread_set_state(mach_thread, x86_DEBUG_STATE64, (thread_state_t)break_state, x86_DEBUG_STATE64_COUNT);
+static kern_return_t set_debug_state(thread_t mach_thread, arm_debug_state64_t *break_state) {
+    kern_return_t kret = thread_set_state(mach_thread, ARM_DEBUG_STATE64, (thread_state_t)break_state, ARM_DEBUG_STATE64_COUNT);
     if (kret != KERN_SUCCESS) {
-        DEBUG_PRINT("Error failed with message %s!\n", mach_error_string(kret));
-        exit(0);
+        DEBUG_PRINT("set_debug_state failed with message %s!\n", mach_error_string(kret));
     }
     return kret;
 }
@@ -567,7 +662,7 @@ static kern_return_t set_debug_state(thread_t mach_thread, x86_debug_state64_t *
 #pragma mark Exception ports
 
 static kern_return_t save_exception_ports(task_t task, exception_ports_info *info) {
-    info->count = (sizeof (info->ports) / sizeof (info->ports[0]));
+    info->count = (sizeof(info->ports) / sizeof(info->ports[0]));
 
     return task_get_exception_ports(task, EXC_MASK_ALL, info->masks, &info->count, info->ports, info->behaviors, info->flavors);
 }
@@ -595,7 +690,7 @@ static mach_port_t get_task(pid_t pid) {
     mach_port_t task;
     kern_return_t kret = task_for_pid(mach_task_self(), pid, &task);
 
-    EXIT_ON_MACH_ERROR(kret,"Fatal error: failed to get task for pid %i",pid);
+    EXIT_ON_MACH_ERROR(kret,"Fatal error: failed to get task for pid %i", pid);
 
     return task;
 }
@@ -603,7 +698,7 @@ static mach_port_t get_task(pid_t pid) {
 static kern_return_t attach_to_task(mach_port_t task, pid_t pid) {
 
     if(find_session(task) != NULL) {
-        DEBUG_PRINT("Warning already attached to task (%i). Not attaching again!",task);
+        DEBUG_PRINT("Warning already attached to task (%i). Not attaching again!", task);
         return KERN_SUCCESS;
     }
     debug_session *sess = create_debug_session(task, pid);
@@ -620,12 +715,12 @@ static kern_return_t attach_to_task(mach_port_t task, pid_t pid) {
     // store current exception ports
     save_exception_ports(task, (exception_ports_info*)sess->old_exception_ports);
 
-    kret = task_set_exception_ports(task, EXC_MASK_ALL, sess->exception_port, EXCEPTION_STATE_IDENTITY|MACH_EXCEPTION_CODES, x86_THREAD_STATE64);
+    kret = task_set_exception_ports(task, EXC_MASK_ALL, sess->exception_port, EXCEPTION_STATE_IDENTITY|MACH_EXCEPTION_CODES, ARM_THREAD_STATE64);
     RETURN_ON_MACH_ERROR(kret,"task_set_exception_ports failed");
 
     // launch mach exception port thread //
-    err = pthread_create(&sess->exception_handler_thread, NULL, (void *(*)(void*))task_exception_server, (void *(*)(void*))(unsigned long long)sess->exception_port);
-    EXIT_ON_MACH_ERROR(err,"can't create *task_exception_server* thread :[%s]",strerror(err));
+    err = pthread_create(&sess->exception_handler_thread, NULL, task_exception_server_thread, (void*)(uintptr_t)sess->exception_port);
+    EXIT_ON_MACH_ERROR(err,"can't create *task_exception_server* thread :[%s]", strerror(err));
 
     DEBUG_PRINT("successfully created mach exception port thread %d\n", 0);
 
@@ -639,7 +734,7 @@ static kern_return_t attach_to_pid(pid_t pid) {
 }
 
 static kern_return_t detach_from_pid(pid_t pid) {
-    debug_session *sess = find_session_by_pid( pid );
+    debug_session *sess = find_session_by_pid(pid);
 
     if(sess != NULL) {
         DEBUG_PRINT("cleaning up debug session...");
@@ -661,12 +756,12 @@ static kern_return_t detach_from_pid(pid_t pid) {
 
 extern kern_return_t catch_mach_exception_raise /* stub – will not be called */
 (
-	mach_port_t exception_port,
-	mach_port_t thread,
-	mach_port_t task,
-	exception_type_t exception,
-	mach_exception_data_t code,
-	mach_msg_type_number_t codeCnt
+    mach_port_t exception_port,
+    mach_port_t thread,
+    mach_port_t task,
+    exception_type_t exception,
+    mach_exception_data_t code,
+    mach_msg_type_number_t codeCnt
 ) {
     DEBUG_PRINT("this handler should not be called");  
     return MACH_RCV_INVALID_TYPE;
@@ -674,48 +769,57 @@ extern kern_return_t catch_mach_exception_raise /* stub – will not be called *
 
 extern kern_return_t catch_mach_exception_raise_state /* stub – will not be called */
 (
-	mach_port_t exception_port,
-	exception_type_t exception,
-	const mach_exception_data_t code,
-	mach_msg_type_number_t codeCnt,
-	int *flavor,
-	const thread_state_t old_state,
-	mach_msg_type_number_t old_stateCnt,
-	thread_state_t new_state,
-	mach_msg_type_number_t *new_stateCnt
+    mach_port_t exception_port,
+    exception_type_t exception,
+    const mach_exception_data_t code,
+    mach_msg_type_number_t codeCnt,
+    int *flavor,
+    const thread_state_t old_state,
+    mach_msg_type_number_t old_stateCnt,
+    thread_state_t new_state,
+    mach_msg_type_number_t *new_stateCnt
 ) {
     DEBUG_PRINT("this handler should not be called");                           
     return MACH_RCV_INVALID_TYPE;
 }
 
 extern kern_return_t catch_mach_exception_raise_state_identity(
-	mach_port_t             exception_port,
-	mach_port_t             thread,
-	mach_port_t             task,
-	exception_type_t        exception,
-	exception_data_t        code,
-	mach_msg_type_number_t  codeCnt,
-	int *                   flavor,
-	thread_state_t          old_state,
-	mach_msg_type_number_t  old_stateCnt,
-	thread_state_t          new_state,
-	mach_msg_type_number_t *new_stateCnt
+    mach_port_t             exception_port,
+    mach_port_t             thread,
+    mach_port_t             task,
+    exception_type_t        exception,
+    exception_data_t        code,
+    mach_msg_type_number_t  codeCnt,
+    int *                   flavor,
+    thread_state_t          old_state,
+    mach_msg_type_number_t  old_stateCnt,
+    thread_state_t          new_state,
+    mach_msg_type_number_t *new_stateCnt
 ) {
+    DEBUG_PRINT(">>> ENTER catch_mach_exception_raise_state_identity");
+    DEBUG_PRINT("exception=%d, codeCnt=%d, flavor=%d, old_stateCnt=%d",
+                exception, codeCnt, flavor ? *flavor : -1, old_stateCnt);
 
-    x86_thread_state64_t *state = (x86_thread_state64_t *) old_state;
-    x86_thread_state64_t *newState = (x86_thread_state64_t *) new_state;
+    arm_thread_state64_t *state = (arm_thread_state64_t *)old_state;
+    arm_thread_state64_t *newState = (arm_thread_state64_t *)new_state;
+
+    DEBUG_PRINT("state=%p, newState=%p", (void*)state, (void*)newState);
 
     debug_session *sess = find_session(task);
-    sess->current_thread = get_thread_id(thread); /* set system-wide thread id */
+    if(sess == NULL) {
+        DEBUG_PRINT("No session found for task!");
+        return KERN_FAILURE;
+    }
 
-    DEBUG_PRINT("exception occured on thread (%i): %s",sess->current_thread, exception_to_string(exception));
-    DEBUG_PRINT("stack address: 0x%02lx", state->__rip);
+    sess->current_thread = get_thread_id(thread);
 
+    DEBUG_PRINT("exception occurred on thread (%llu): %s", sess->current_thread, exception_to_string(exception));
+    DEBUG_PRINT("PC address: 0x%016llx", state->__pc);
 
     if (exception == EXC_SOFTWARE && code[0] == EXC_SOFT_SIGNAL) { // handling UNIX soft signal
         int subcode = code[2];
 
-        DEBUG_PRINT("EXC_SOFTWARE signal: %s",get_signal_name(code[2]));
+        DEBUG_PRINT("EXC_SOFTWARE signal: %s", get_signal_name(code[2]));
 
         if (subcode == SIGSTOP || subcode == SIGTRAP) {
              // clear signal to prevent default OS handling //
@@ -737,35 +841,44 @@ extern kern_return_t catch_mach_exception_raise_state_identity(
         }*/
     }
     else if(exception == EXC_BREAKPOINT) {
+        DEBUG_PRINT("*** EXC_BREAKPOINT caught! PC=0x%016llx, code[0]=%d ***", state->__pc, codeCnt > 0 ? code[0] : -1);
         task_suspend(sess->task);
 
-        // check if single step mode
-        if(state->__rflags & SINGLESTEP_TRAP) {
-            state->__rflags &= ~SINGLESTEP_TRAP; // clear single-step
+        /* ARM64 EXC_BREAKPOINT codes:
+         *   EXC_ARM_BREAKPOINT (1) - BRK instruction
+         *   EXC_ARM_SINGLE_STEP (2) - Software single-step
+         *   EXC_ARM_HW_BREAKPOINT (3) - Hardware breakpoint
+         */
+        if(codeCnt > 0 && code[0] == EXC_ARM_SINGLE_STEP) {
             sess->process_status = STATUS_SINGLESTEP;
             DEBUG_PRINT("SINGLE STEP");
         } else {
             sess->process_status = STATUS_BREAKPOINT;
+            DEBUG_PRINT("BREAKPOINT HIT (code=%d)", codeCnt > 0 ? code[0] : -1);
         }
 
         // move past breakpoint by setting old to new thread state
         *newState = *state;
         *new_stateCnt = old_stateCnt;
-        *flavor = x86_THREAD_STATE64;
+        *flavor = ARM_THREAD_STATE64;
 
         semaphore_signal(sess->wait_sem);
 
         return KERN_SUCCESS;
     }
     else if(exception == EXC_BAD_INSTRUCTION) {
-         task_suspend(sess->task);
-         sess->process_status = STATUS_BREAKPOINT;
+        task_suspend(sess->task);
+        sess->process_status = STATUS_BREAKPOINT;
 
-         return KERN_SUCCESS;
+        semaphore_signal(sess->wait_sem);
+
+        return KERN_SUCCESS;
     }
     else if(exception == EXC_BAD_ACCESS) {
         task_suspend(sess->task);
         sess->process_status = STATUS_ERROR;
+
+        semaphore_signal(sess->wait_sem);
 
         return KERN_SUCCESS;
     }
@@ -776,7 +889,8 @@ extern kern_return_t catch_mach_exception_raise_state_identity(
     return KERN_FAILURE;
 }
 
-static void* task_exception_server (mach_port_t exception_port) {
+static void* task_exception_server_thread(void* arg) {
+    mach_port_t exception_port = (mach_port_t)(uintptr_t)arg;
     mach_msg_return_t rt;
     mach_msg_header_t *msg;
     mach_msg_header_t *reply;
@@ -788,13 +902,13 @@ static void* task_exception_server (mach_port_t exception_port) {
 
     int i = 0;
     while (1) {
-        DEBUG_PRINT("waiting for next exception (%i)...",i);
+        DEBUG_PRINT("waiting for next exception (%i)...", i);
         i++;
 
         rt = mach_msg(msg, MACH_RCV_MSG, 0, sizeof(union __RequestUnion__mach_exc_subsystem), exception_port, 0, MACH_PORT_NULL);
 
-        if (rt!= MACH_MSG_SUCCESS) {
-            DEBUG_PRINT("MACH_RCV_MSG stopped, exit from task_exception_server thread :%d\n", 1);
+        if (rt != MACH_MSG_SUCCESS) {
+            DEBUG_PRINT("MACH_RCV_MSG stopped, exit from task_exception_server thread: %d\n", rt);
             return "MACH_RCV_MSG_FAILURE";
         }
         /*
@@ -810,7 +924,7 @@ static void* task_exception_server (mach_port_t exception_port) {
         // Send the now-initialized reply
         rt = mach_msg(reply, MACH_SEND_MSG, reply->msgh_size, 0, MACH_PORT_NULL, 0, MACH_PORT_NULL);
 
-        if (rt!= MACH_MSG_SUCCESS) {
+        if (rt != MACH_MSG_SUCCESS) {
             return "MACH_SEND_MSG_FAILURE";
         }
     }
@@ -819,7 +933,7 @@ static void* task_exception_server (mach_port_t exception_port) {
 static void wait_for_exception(debug_session *sess, int timeout /*in millis*/) {
     DEBUG_PRINT("waiting for next exception...");
 
-    kern_return_t kret = semaphore_timedwait(sess->wait_sem, (struct mach_timespec){0,timeout * 1000000});
+    kern_return_t kret = semaphore_timedwait(sess->wait_sem, (struct mach_timespec){0, timeout * 1000000});
     if(kret == KERN_OPERATION_TIMED_OUT) {
         sess->process_status = STATUS_TIMEOUT;
         DEBUG_PRINT("wait timed out!");
@@ -831,20 +945,20 @@ static void wait_for_exception(debug_session *sess, int timeout /*in millis*/) {
 #pragma mark Debug API
 
 
-status_t MDBG_API(session_attach)( pid_t pid ) {
+status_t MDBG_API(session_attach)(pid_t pid) {
     return attach_to_pid(pid) == KERN_SUCCESS;
 }
 
-status_t MDBG_API(session_detach)( pid_t pid ) {
+status_t MDBG_API(session_detach)(pid_t pid) {
     return detach_from_pid(pid) == KERN_SUCCESS;
 }
 
-status_t MDBG_API(session_pause)( pid_t pid ) {
+status_t MDBG_API(session_pause)(pid_t pid) {
     return kill(pid, SIGTRAP) == 0;
 }
 
-int MDBG_API(session_wait)( pid_t pid, int *thread, int timeout ) {
-    debug_session *sess = find_session_by_pid( pid );
+int MDBG_API(session_wait)(pid_t pid, int *thread, int timeout) {
+    debug_session *sess = find_session_by_pid(pid);
     if(sess != NULL) {
         wait_for_exception(sess, timeout);
         *thread = sess->current_thread;
@@ -854,8 +968,8 @@ int MDBG_API(session_wait)( pid_t pid, int *thread, int timeout ) {
     return 4;
 }
 
-status_t MDBG_API(session_resume)( pid_t pid ) {
-    debug_session *sess = find_session_by_pid( pid );
+status_t MDBG_API(session_resume)(pid_t pid) {
+    debug_session *sess = find_session_by_pid(pid);
     if(sess != NULL) {
         sess->process_status = STATUS_HANDLED;
         task_resume(sess->task);
@@ -865,24 +979,24 @@ status_t MDBG_API(session_resume)( pid_t pid ) {
     return false;
 }
 
-debug_session *MDBG_API(session_get)( pid_t pid ) {
-    return find_session_by_pid( pid );
+debug_session *MDBG_API(session_get)(pid_t pid) {
+    return find_session_by_pid(pid);
 }
 
-status_t MDBG_API(read_memory)( pid_t pid, unsigned char* addr, unsigned char* dest, int size ) {
-    return read_memory( get_task(pid), (mach_vm_address_t)addr, (mach_vm_address_t)dest, size ) == KERN_SUCCESS;
+status_t MDBG_API(read_memory)(pid_t pid, unsigned char* addr, unsigned char* dest, int size) {
+    return read_memory(get_task(pid), (mach_vm_address_t)addr, (mach_vm_address_t)dest, size) == KERN_SUCCESS;
 }
 
-status_t MDBG_API(write_memory)( pid_t pid, unsigned char* addr, unsigned char* src, int size ) {
-    return write_memory( get_task(pid), (mach_vm_address_t)addr, (mach_vm_address_t)src, size ) == KERN_SUCCESS;
+status_t MDBG_API(write_memory)(pid_t pid, unsigned char* addr, unsigned char* src, int size) {
+    return write_memory(get_task(pid), (mach_vm_address_t)addr, (mach_vm_address_t)src, size) == KERN_SUCCESS;
 }
 
-void* MDBG_API(read_register)( pid_t pid, int thread, int reg, bool is64 ) {
-    return (void*)read_register( get_task(pid), thread, reg, is64 );
+void* MDBG_API(read_register)(pid_t pid, int thread, int reg, bool is64) {
+    return (void*)read_register(get_task(pid), thread, reg, is64);
 }
 
-status_t MDBG_API(write_register)( pid_t pid, int thread, int reg, void *value, bool is64 ) {
-    return write_register( get_task(pid), thread, reg, value, is64 ) == KERN_SUCCESS;
+status_t MDBG_API(write_register)(pid_t pid, int thread, int reg, void *value, bool is64) {
+    return write_register(get_task(pid), thread, reg, value, is64) == KERN_SUCCESS;
 }
 
 #endif

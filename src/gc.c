@@ -26,6 +26,10 @@
 #else
 #	include <sys/types.h>
 #	include <sys/mman.h>
+#	if defined(__APPLE__) && defined(__aarch64__)
+#		include <pthread.h>
+#		include <libkern/OSCacheControl.h>
+#	endif
 #endif
 
 #if defined(HL_EMSCRIPTEN)
@@ -1134,9 +1138,15 @@ retry_jit_alloc:
 	return malloc(size);
 #elif defined(HL_CONSOLE)
 	return NULL;
+#elif defined(__APPLE__) && defined(__aarch64__)
+	// Apple Silicon requires MAP_JIT for W^X
+	void *p = mmap(NULL, size, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_ANONYMOUS|MAP_JIT, -1, 0);
+	if (p == MAP_FAILED) return NULL;
+	return p;
 #else
 	void *p;
 	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,(MAP_PRIVATE|MAP_ANONYMOUS),-1,0);
+	if (p == MAP_FAILED) return NULL;
 	return p;
 #endif
 }
@@ -1146,6 +1156,18 @@ HL_PRIM void hl_free_executable_memory( void *c, int size ) {
 	VirtualFree(c,0,MEM_RELEASE);
 #elif !defined(HL_CONSOLE)
 	munmap(c, size);
+#endif
+}
+
+HL_PRIM void hl_jit_write_protect( bool executable ) {
+#if defined(__APPLE__) && defined(__aarch64__)
+	pthread_jit_write_protect_np(executable ? 1 : 0);
+#endif
+}
+
+HL_PRIM void hl_jit_flush_cache( void *ptr, int size ) {
+#if defined(__APPLE__) && defined(__aarch64__)
+	sys_icache_invalidate(ptr, size);
 #endif
 }
 

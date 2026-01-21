@@ -28,6 +28,12 @@
 #	include <GLES3/gl32.h>
 #	include <GLES3/gl3ext.h>
 #	define HL_GLES
+#elif defined(HL_GLES31)
+// ARM Linux with OpenGL ES 3.1 (e.g., Asahi, Raspberry Pi)
+#	include <SDL.h>
+#	include <GLES3/gl31.h>
+#	include <GLES2/gl2ext.h>
+#	define HL_GLES
 #else
 #	include <SDL.h>
 #	include <GL/glcorearb.h>
@@ -35,18 +41,40 @@
 
 #ifdef HL_GLES
 #	define GL_IMPORT(fun, t)
-#	define ES_NOT_SUPPORTED hl_error("Not supported by GLES3")
+#	define ES_NOT_SUPPORTED hl_error("Not supported by GLES")
+// Tier 1: Not available in any GLES version
 #	define glBindFragDataLocation(...) ES_NOT_SUPPORTED
-#	define glBindImageTexture(...) ES_NOT_SUPPORTED
-#	define glTexImage2DMultisample(...) ES_NOT_SUPPORTED
-#	define glFramebufferTexture(...) ES_NOT_SUPPORTED
-#	define glDispatchCompute(...) ES_NOT_SUPPORTED
-#	define glMemoryBarrier(...) ES_NOT_SUPPORTED
 #	define glGetBufferSubData(...) ES_NOT_SUPPORTED
-#	define glShaderStorageBlockBinding(...) ES_NOT_SUPPORTED
 #	define glPolygonMode(face,mode) if( mode != 0x1B02 ) ES_NOT_SUPPORTED
 #	define glGetQueryObjectiv glGetQueryObjectuiv
 #	define glClearDepth glClearDepthf
+#endif
+
+// Tier 2: Available in GLES 3.1+ but not in GLES 3.0
+#if defined(HL_GLES) && !defined(HL_GLES31)
+#	define glDispatchCompute(...) ES_NOT_SUPPORTED
+#	define glMemoryBarrier(...) ES_NOT_SUPPORTED
+#	define glBindImageTexture(...) ES_NOT_SUPPORTED
+#	define glGetProgramResourceIndex(...) ES_NOT_SUPPORTED
+#endif
+
+// Not in any GLES version (use layout qualifiers in shaders instead)
+#if defined(HL_GLES)
+#	define glTexImage2DMultisample(...) ES_NOT_SUPPORTED
+#	define glShaderStorageBlockBinding(...) ES_NOT_SUPPORTED
+#endif
+
+// glFramebufferTexture is GLES 3.2 only - map to layer variant for 3.1
+#if defined(HL_GLES31)
+#	define glFramebufferTexture(target, attachment, texture, level) \
+		glFramebufferTextureLayer(target, attachment, texture, level, 0)
+#elif defined(HL_GLES)
+#	define glFramebufferTexture(...) ES_NOT_SUPPORTED
+#endif
+
+// glColorMaski is GLES 3.2 only
+#if defined(HL_GLES31)
+#	define glColorMaski(...) ES_NOT_SUPPORTED
 #endif
 
 #if !defined(HL_CONSOLE) && !defined(GL_IMPORT)
@@ -679,14 +707,14 @@ HL_PRIM bool HL_NAME(gl_query_result_available)( vdynamic *q ) {
 
 HL_PRIM double HL_NAME(gl_query_result)( vdynamic *q ) {
 	GLuint64 v = -1;
-#	if !defined(HL_MESA) && !defined(HL_MOBILE)
+#	if !defined(HL_MESA) && !defined(HL_MOBILE) && !defined(HL_GLES31)
 	glGetQueryObjectui64v(q->v.i, GL_QUERY_RESULT, &v);
 #	endif
 	return (double)v;
 }
 
 HL_PRIM void HL_NAME(gl_query_counter)( vdynamic *q, int target ) {
-#	if !defined(HL_MESA) && !defined(HL_MOBILE)
+#	if !defined(HL_MESA) && !defined(HL_MOBILE) && !defined(HL_GLES31)
 	glQueryCounter(q->v.i, target);
 #	endif
 }
