@@ -117,6 +117,10 @@
 #	define HL_CLANG
 #endif
 
+#if defined(_MSC_VER) && defined(__clang__)
+#	define HL_CLANG_CL
+#endif
+
 #if defined(_MSC_VER) && !defined(HL_LLVM)
 #	define HL_VCC
 #	pragma warning(disable:4996) // remove deprecated C API usage warnings
@@ -136,7 +140,7 @@
 #	endif
 #endif
 
-#if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CYGWIN)
+#if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CYGWIN) || defined(HL_CLANG_CL)
 #	define HL_WIN_CALL
 #endif
 
@@ -167,7 +171,7 @@
 #	include <stdint.h>
 #endif
 
-#if defined(HL_VCC) || defined(HL_MINGW)
+#if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CLANG_CL)
 #	define EXPORT __declspec( dllexport )
 #	define IMPORT __declspec( dllimport )
 #else
