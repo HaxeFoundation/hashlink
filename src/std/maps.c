@@ -228,7 +228,6 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 		case HTYPE:
 		case HABSTRACT:
 		case HREF:
-		case HENUM:
 			key = (vdynamic*)key->v.ptr;
 			break;
 		default:
