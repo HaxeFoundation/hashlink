@@ -1045,6 +1045,19 @@ HL_API void hl_blocking( bool b ) {
 	}
 }
 
+HL_API void hl_gc_safepoint() {
+	hl_thread_info *t = current_thread;
+	if( !t )
+		return; // allow hl_gc_safepoint in non-GC threads
+	if( t->gc_blocking == 0 && gc_threads.stopping_world ) {
+#		ifdef HL_THREADS
+		gc_save_context(t,&t);
+#		endif
+		gc_global_lock(true);
+		gc_global_lock(false);
+	}
+}
+
 void hl_cache_free();
 void hl_cache_init();
 
@@ -1525,4 +1538,5 @@ DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
 DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
 DEFINE_PRIM(_VOID, blocking, _BOOL);
+DEFINE_PRIM(_VOID, gc_safepoint, _NO_ARG);
 DEFINE_PRIM(_VOID, set_thread_flags, _I32 _I32);
