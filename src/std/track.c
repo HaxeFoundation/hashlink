@@ -128,7 +128,7 @@ static void init_lock() {
 	hl_thread_info *tinf = hl_get_thread();
 	int flags = tinf->flags;
 	tinf->flags &= ~(HL_TRACK_ALLOC<<HL_TREAD_TRACK_SHIFT);
-	track_lock = hl_mutex_alloc(true);
+	track_lock = hl_mutex_alloc(false);
 	hl_add_root(&track_lock);
 	tinf->flags = flags;
 }
