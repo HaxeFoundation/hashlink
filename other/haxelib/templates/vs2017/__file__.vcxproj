@@ -103,7 +103,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
-      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723;4756</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -124,7 +124,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
-      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723;4756</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,7 +147,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
-      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723;4756</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -172,7 +172,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
-      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4703;4100;4101;4102;4204;4221;4244;4700;4701;4702;4703;4715;4716;4723;4756</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

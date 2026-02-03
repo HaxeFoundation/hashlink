@@ -60,6 +60,7 @@
 #	pragma warning(disable:4715) // control paths must return a value
 #	pragma warning(disable:4716) // must return a value (ends with throw)
 #	pragma warning(disable:4723) // potential divide by 0
+#	pragma warning(disable:4756) // overflow in constant arithmetic
 #else
 #	pragma GCC diagnostic ignored "-Wunused-variable"
 #	pragma GCC diagnostic ignored "-Wunused-function"
