@@ -7,13 +7,13 @@ abstract class Result {
 @:structInit
 class MemStats extends Result {
 	public var memFile : String;
-	public var free : Int;
-	public var used : Int;
-	public var filterUsed : Int;
-	public var totalAllocated : Int;
+	public var free : Float;
+	public var used : Float;
+	public var filterUsed : Float;
+	public var totalAllocated : Float;
 	public var gc : Int;
 	public var pagesCount : Int;
-	public var pagesSize : Int;
+	public var pagesSize : Float;
 	public var rootsCount : Int;
 	public var stackCount : Int;
 	public var typesCount : Int;
