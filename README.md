@@ -12,7 +12,7 @@
 HashLink is distributed with some graphics libraries allowing to develop various applications, you can manually disable the libraries you want to compile in Makefile.
 Here's the dependencies that you install in order to compile all the libraries:
 
-* fmt: libpng-dev libturbojpeg-dev libvorbis-dev
+* fmt: libpng-dev libturbojpeg-dev libvorbis-dev libopus-dev
 * openal: libopenal-dev
 * sdl: libsdl2-dev libglu1-mesa-dev
 * ssl: libmbedtls-dev
