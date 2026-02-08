@@ -97,6 +97,447 @@
     <ClCompile Include="..\..\include\turbojpeg\jutils.c" />
     <ClCompile Include="..\..\include\turbojpeg\transupp.c" />
     <ClCompile Include="..\..\include\turbojpeg\turbojpeg.c" />
+    <ClCompile Include="..\..\include\opusfile\info.c">
+      <ObjectFileName>$(IntDir)opusfile\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opusfile\internal.c">
+      <ObjectFileName>$(IntDir)opusfile\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opusfile\opusfile.c">
+      <ObjectFileName>$(IntDir)opusfile\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opusfile\stream.c">
+      <ObjectFileName>$(IntDir)opusfile\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\opus.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\opus_decoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\opus_encoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\extensions.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\opus_multistream.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\opus_multistream_encoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\opus_multistream_decoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\repacketizer.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\opus_projection_encoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\opus_projection_decoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\mapping_matrix.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\analysis.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\mlp.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\src\mlp_data.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;../../include/opus-src/silk;../../include/opus-src/silk/float;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\bands.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\celt.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\celt_encoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\celt_decoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\cwrs.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\entcode.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\entdec.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\entenc.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\kiss_fft.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\laplace.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\mathops.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\mdct.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\modes.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\pitch.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\celt_lpc.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\quant_bands.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\rate.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\celt\vq.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)opus_celt\</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\CNG.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\code_signs.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\init_decoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\decode_core.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\decode_frame.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\decode_parameters.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\decode_indices.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\decode_pulses.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\decoder_set_fs.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\dec_API.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\enc_API.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\encode_indices.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\encode_pulses.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\gain_quant.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\interpolate.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\LP_variable_cutoff.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NLSF_decode.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NSQ.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NSQ_del_dec.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\PLC.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\shell_coder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\tables_gain.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\tables_LTP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\tables_NLSF_CB_NB_MB.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\tables_NLSF_CB_WB.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\tables_other.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\tables_pitch_lag.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\tables_pulses_per_block.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\VAD.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\control_audio_bandwidth.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\quant_LTP_gains.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\VQ_WMat_EC.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\HP_variable_cutoff.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NLSF_encode.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NLSF_VQ.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NLSF_unpack.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NLSF_del_dec_quant.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\process_NLSFs.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\stereo_LR_to_MS.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\stereo_MS_to_LR.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\check_control_input.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\control_SNR.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\init_encoder.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\control_codec.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\A2NLSF.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\ana_filt_bank_1.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\biquad_alt.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\bwexpander_32.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\bwexpander.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\debug.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\decode_pitch.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\inner_prod_aligned.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\lin2log.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\log2lin.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\LPC_analysis_filter.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\LPC_inv_pred_gain.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\table_LSF_cos.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NLSF2A.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NLSF_stabilize.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\NLSF_VQ_weights_laroia.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\pitch_est_tables.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\resampler.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\resampler_down2_3.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\resampler_down2.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\resampler_private_AR2.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\resampler_private_down_FIR.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\resampler_private_IIR_FIR.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\resampler_private_up2_HQ.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\resampler_rom.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\sigm_Q15.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\sort.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\sum_sqr_shift.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\stereo_decode_pred.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\stereo_encode_pred.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\stereo_find_predictor.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\stereo_quant_pred.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\LPC_fit.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk;../../include/opus-src/silk/float;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\apply_sine_window_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\corrMatrix_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\encode_frame_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\find_LPC_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\find_LTP_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\find_pitch_lags_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\find_pred_coefs_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\LPC_analysis_filter_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\LTP_analysis_filter_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\LTP_scale_ctrl_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\noise_shape_analysis_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\process_gains_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\regularize_correlations_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\residual_energy_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\warped_autocorrelation_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\wrappers_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\autocorrelation_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\burg_modified_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\bwexpander_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\energy_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\inner_product_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\k2a_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\LPC_inv_pred_gain_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\pitch_analysis_core_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\scale_copy_vector_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\scale_vector_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\schur_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\..\include\opus-src\silk\float\sort_FLP.c">
+      <AdditionalIncludeDirectories>../../include/opus-src/silk/float;../../include/opus-src/silk;../../include/opus-src/celt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="..\..\include\vorbis\bitrate.c" />
     <ClCompile Include="..\..\include\vorbis\bitwise.c" />
     <ClCompile Include="..\..\include\vorbis\block.c" />
@@ -141,6 +582,13 @@
     <ClInclude Include="..\..\include\png\pnglibconf.h" />
     <ClInclude Include="..\..\include\png\pngpriv.h" />
     <ClInclude Include="..\..\include\png\pngstruct.h" />
+    <ClInclude Include="..\..\include\opusfile\internal.h" />
+    <ClInclude Include="..\..\include\opusfile\opusfile.h" />
+    <ClInclude Include="..\..\include\opus-src\include\opus_defines.h" />
+    <ClInclude Include="..\..\include\opus-src\include\opus_multistream.h" />
+    <ClInclude Include="..\..\include\opus-src\include\opus_projection.h" />
+    <ClInclude Include="..\..\include\opus-src\include\opus_types.h" />
+    <ClInclude Include="..\..\include\opus-src\include\opus.h" />
     <ClInclude Include="..\..\include\vorbis\backends.h" />
     <ClInclude Include="..\..\include\vorbis\bitrate.h" />
     <ClInclude Include="..\..\include\vorbis\codebook.h" />
@@ -247,37 +695,37 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/opus-src/include;../../include/opusfile;../../include/opus-src;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/opus-src/include;../../include/opusfile;../../include/opus-src;../../include/mikktspace;../../include/minimp3</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;../../x64/$(Configuration);../../include/turbojpeg/x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/opus-src/include;../../include/opusfile;../../include/opus-src;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2013|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/opus-src/include;../../include/opusfile;../../include/opus-src;../../include/mikktspace;../../include/minimp3;../../include/meshoptimizer</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;../../$(Configuration);../../include/turbojpeg/x86</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/opus-src/include;../../include/opusfile;../../include/opus-src;../../include/mikktspace;../../include/minimp3</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;../../x64/$(Configuration);../../include/turbojpeg/x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2013|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/mikktspace;../../include/minimp3</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../src;../../include/turbojpeg;../../include/zlib;../../include/png;../../include/vorbis;../../include/opus-src/include;../../include/opusfile;../../include/opus-src;../../include/mikktspace;../../include/minimp3</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;../../x64/$(Configuration);../../include/turbojpeg/x64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -286,7 +734,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;%(PreprocessorDefinitions); _CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;OPUS_BUILD;USE_ALLOCA;HAVE_LRINTF;HAVE_CONFIG_H;OP_HAVE_LRINTF;%(PreprocessorDefinitions); _CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <AdditionalOptions>/wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
@@ -305,7 +753,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;%(PreprocessorDefinitions); _CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;OPUS_BUILD;USE_ALLOCA;HAVE_LRINTF;HAVE_CONFIG_H;OP_HAVE_LRINTF;%(PreprocessorDefinitions); _CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <AdditionalOptions>/wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
@@ -324,7 +772,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;OPUS_BUILD;USE_ALLOCA;HAVE_LRINTF;HAVE_CONFIG_H;OP_HAVE_LRINTF;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <AdditionalOptions>/wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
@@ -347,7 +795,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;OPUS_BUILD;USE_ALLOCA;HAVE_LRINTF;HAVE_CONFIG_H;OP_HAVE_LRINTF;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <AdditionalOptions>/wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
@@ -370,7 +818,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;%(PreprocessorDefinitions); _CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;OPUS_BUILD;USE_ALLOCA;HAVE_LRINTF;HAVE_CONFIG_H;OP_HAVE_LRINTF;%(PreprocessorDefinitions); _CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <AdditionalOptions>/wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
@@ -391,7 +839,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;%(PreprocessorDefinitions); _CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;JPG_EXPORTS;OPUS_BUILD;USE_ALLOCA;HAVE_LRINTF;HAVE_CONFIG_H;OP_HAVE_LRINTF;%(PreprocessorDefinitions); _CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <AdditionalOptions>/wd4996 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
