@@ -149,6 +149,7 @@ jobs:
               libturbojpeg-dev \
               libuv1-dev \
               libvorbis-dev \
+              libopusfile-dev \
               libsqlite3-dev
             ;;
 

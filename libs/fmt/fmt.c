@@ -10,6 +10,7 @@ extern bool sys_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int
 
 #include <zlib.h>
 #include <vorbis/vorbisfile.h>
+#include "opusfile.h"
 
 #define MINIMP3_IMPLEMENTATION
 #define MINIMP3_FLOAT_OUTPUT
@@ -434,6 +435,137 @@ DEFINE_PRIM(_I32, ogg_tell, _OGG);
 DEFINE_PRIM(_BOOL, ogg_seek, _OGG _I32);
 DEFINE_PRIM(_I32, ogg_read, _OGG _BYTES _I32 _I32);
 
+/* ----------------------------------------------- SOUND : OPUS ------------------------------------------------ */
+
+typedef struct _fmt_opus fmt_opus;
+struct _fmt_opus {
+	void (*finalize)( fmt_opus * );
+	OggOpusFile *f;
+	char *bytes;
+	int pos;
+	int size;
+};
+
+static void opus_finalize( fmt_opus *o ) {
+	op_free(o->f);
+}
+
+static int opus_memread( void *stream, unsigned char *ptr, int nbytes ) {
+	fmt_opus *o = (fmt_opus*)stream;
+	int len = nbytes;
+	if( o->pos + len > o->size )
+		len = o->size - o->pos;
+	if( len <= 0 ) return 0;
+	memcpy(ptr, o->bytes + o->pos, len);
+	o->pos += len;
+	return len;
+}
+
+static int opus_memseek( void *stream, opus_int64 _offset, int whence ) {
+	fmt_opus *o = (fmt_opus*)stream;
+	int offset = (int)_offset;
+	switch( whence ) {
+	case SEEK_SET:
+		if( offset < 0 || offset > o->size ) return -1;
+		o->pos = offset;
+		break;
+	case SEEK_CUR:
+		if( o->pos + offset < 0 || o->pos + offset > o->size ) return -1;
+		o->pos += offset;
+		break;
+	case SEEK_END:
+		if( o->size + offset < 0 || o->size + offset > o->size ) return -1;
+		o->pos = o->size + offset;
+		break;
+	}
+	return 0;
+}
+
+static opus_int64 opus_memtell( void *stream ) {
+	fmt_opus *o = (fmt_opus*)stream;
+	return o->pos;
+}
+
+static OpusFileCallbacks OPUS_CALLBACKS_MEMORY = {
+	opus_memread,
+	opus_memseek,
+	opus_memtell,
+	NULL
+};
+
+HL_PRIM fmt_opus *HL_NAME(opus_open)( char *bytes, int size ) {
+	int error = 0;
+	fmt_opus *o = (fmt_opus*)hl_gc_alloc_finalizer(sizeof(fmt_opus));
+	o->finalize = NULL;
+	o->bytes = bytes;
+	o->size = size;
+	o->pos = 0;
+	o->f = op_open_callbacks(o, &OPUS_CALLBACKS_MEMORY, NULL, 0, &error);
+	if( error != 0 || o->f == NULL )
+		return NULL;
+	o->finalize = opus_finalize;
+	return o;
+}
+
+HL_PRIM void HL_NAME(opus_info)( fmt_opus *o, int *bitrate, int *freq, int *samples, int *channels ) {
+	const OpusHead *head = op_head(o->f, -1);
+	*bitrate = op_bitrate(o->f, -1);
+	*freq = 48000; // Opus always decodes to 48kHz
+	*channels = head->channel_count;
+	*samples = (int)op_pcm_total(o->f, -1);
+}
+
+HL_PRIM int HL_NAME(opus_tell)( fmt_opus *o ) {
+	return (int)op_pcm_tell(o->f);
+}
+
+HL_PRIM bool HL_NAME(opus_seek)( fmt_opus *o, int sample ) {
+	return op_pcm_seek(o->f, sample) == 0;
+}
+
+HL_PRIM int HL_NAME(opus_read)( fmt_opus *o, char *output, int size, int format ) {
+	int ret = 0;
+	int total = 0;
+	const OpusHead *head = op_head(o->f, -1);
+	int ch = head->channel_count;
+	hl_blocking(true);
+	if( format == 2 ) {
+		// I16 output
+		int samples_requested = size / (2 * ch);
+		while( samples_requested > 0 ) {
+			ret = op_read(o->f, (opus_int16*)output, samples_requested * ch, NULL);
+			if( ret < 0 ) { total = -1; break; }
+			if( ret == 0 ) break;
+			int bytes_read = ret * ch * 2;
+			total += bytes_read;
+			output += bytes_read;
+			samples_requested -= ret;
+		}
+	} else {
+		// F32 output
+		int samples_requested = size / (4 * ch);
+		while( samples_requested > 0 ) {
+			ret = op_read_float(o->f, (float*)output, samples_requested * ch, NULL);
+			if( ret < 0 ) { total = -1; break; }
+			if( ret == 0 ) break;
+			int bytes_read = ret * ch * 4;
+			total += bytes_read;
+			output += bytes_read;
+			samples_requested -= ret;
+		}
+	}
+	hl_blocking(false);
+	return total;
+}
+
+#define _OPUS _ABSTRACT(fmt_opus)
+
+DEFINE_PRIM(_OPUS, opus_open, _BYTES _I32);
+DEFINE_PRIM(_VOID, opus_info, _OPUS _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_I32, opus_tell, _OPUS);
+DEFINE_PRIM(_BOOL, opus_seek, _OPUS _I32);
+DEFINE_PRIM(_I32, opus_read, _OPUS _BYTES _I32 _I32);
+
 /* ----------------------------------------------- SOUND : MP3 ------------------------------------------------ */
 
 typedef struct _fmt_mp3 fmt_mp3;
@@ -631,7 +763,7 @@ static void md5_process( md5_context *ctx, uint8 data[64] ) {
     P( B, C, D, A, 12, 20, 0x8D2A4C8A );
 
 #undef F
-    
+
 #define F(x,y,z) (x ^ y ^ z)
 
     P( A, B, C, D,  5,  4, 0xFFFA3942 );
