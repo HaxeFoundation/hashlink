@@ -280,6 +280,10 @@ HL_PRIM int hl_string_compare( vbyte *a, vbyte *b, int len ) {
 	return memcmp(a,b,len * sizeof(uchar));
 }
 
+HL_PRIM int hl_bytes_get_memsize( vbyte *ptr ) {
+	return hl_gc_get_memsize(ptr);
+}
+
 DEFINE_PRIM(_BYTES,alloc_bytes,_I32);
 DEFINE_PRIM(_VOID,bytes_blit,_BYTES _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_I32,bytes_compare,_BYTES _I32 _BYTES _I32 _I32);
@@ -299,3 +303,4 @@ DEFINE_PRIM(_I32,bytes_address, _BYTES _REF(_I32));
 DEFINE_PRIM(_BYTES,bytes_from_address, _I32 _I32);
 DEFINE_PRIM(_I64,bytes_address64, _BYTES);
 DEFINE_PRIM(_BYTES,bytes_from_address64, _I64);
+DEFINE_PRIM(_I32, bytes_get_memsize, _BYTES);

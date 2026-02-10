@@ -1540,4 +1540,3 @@ DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
 DEFINE_PRIM(_VOID, blocking, _BOOL);
 DEFINE_PRIM(_VOID, gc_safepoint, _NO_ARG);
 DEFINE_PRIM(_VOID, set_thread_flags, _I32 _I32);
-DEFINE_PRIM(_I32, gc_get_memsize, _BYTES);
