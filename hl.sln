@@ -79,6 +79,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "heaps", "libs\heaps\heaps.v
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dx12debug", "libs\directx\dx12debug.vcxproj", "{65866777-C94B-473F-8962-295F9DEAADA3}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C6213FBF-BC2B-4235-A827-84A60E848C52} = {C6213FBF-BC2B-4235-A827-84A60E848C52}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -301,19 +304,15 @@ Global
 		{E3F735ED-9701-46BE-A86C-C61D3CE0D525}.ReleaseVS2013|x64.ActiveCfg = ReleaseVS2013|Win32
 		{E3F735ED-9701-46BE-A86C-C61D3CE0D525}.ReleaseVS2013|x64.Build.0 = ReleaseVS2013|Win32
 		{65866777-C94B-473F-8962-295F9DEAADA3}.Debug|Win32.ActiveCfg = Debug|Win32
-		{65866777-C94B-473F-8962-295F9DEAADA3}.Debug|Win32.Build.0 = Debug|Win32
 		{65866777-C94B-473F-8962-295F9DEAADA3}.Debug|x64.ActiveCfg = Debug|x64
 		{65866777-C94B-473F-8962-295F9DEAADA3}.Debug|x64.Build.0 = Debug|x64
 		{65866777-C94B-473F-8962-295F9DEAADA3}.Release|Win32.ActiveCfg = Release|Win32
-		{65866777-C94B-473F-8962-295F9DEAADA3}.Release|Win32.Build.0 = Release|Win32
 		{65866777-C94B-473F-8962-295F9DEAADA3}.Release|x64.ActiveCfg = Release|x64
 		{65866777-C94B-473F-8962-295F9DEAADA3}.Release|x64.Build.0 = Release|x64
 		{65866777-C94B-473F-8962-295F9DEAADA3}.ReleaseDX12Agility|Win32.ActiveCfg = Release|Win32
-		{65866777-C94B-473F-8962-295F9DEAADA3}.ReleaseDX12Agility|Win32.Build.0 = Release|Win32
 		{65866777-C94B-473F-8962-295F9DEAADA3}.ReleaseDX12Agility|x64.ActiveCfg = Release|x64
 		{65866777-C94B-473F-8962-295F9DEAADA3}.ReleaseDX12Agility|x64.Build.0 = Release|x64
 		{65866777-C94B-473F-8962-295F9DEAADA3}.ReleaseVS2013|Win32.ActiveCfg = Release|Win32
-		{65866777-C94B-473F-8962-295F9DEAADA3}.ReleaseVS2013|Win32.Build.0 = Release|Win32
 		{65866777-C94B-473F-8962-295F9DEAADA3}.ReleaseVS2013|x64.ActiveCfg = Release|x64
 		{65866777-C94B-473F-8962-295F9DEAADA3}.ReleaseVS2013|x64.Build.0 = Release|x64
 	EndGlobalSection
