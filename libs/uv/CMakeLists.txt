@@ -43,7 +43,7 @@ if(WIN32)
             ${INCLUDES_BASE_DIR}/libuv/src/win/winsock.c
     )
 elseif(DOWNLOAD_DEPENDENCIES)
-	FetchContent_Declare(libuv-project
+    FetchContent_Declare(libuv-project
         URL https://github.com/libuv/libuv/archive/refs/tags/v1.51.0.tar.gz
         URL_HASH SHA256=27e55cf7083913bfb6826ca78cde9de7647cded648d35f24163f2d31bb9f51cd
         EXCLUDE_FROM_ALL
@@ -67,12 +67,13 @@ if(WIN32)
     target_include_directories(uv.hdll
         PRIVATE
         ${INCLUDES_BASE_DIR}/libuv/include
-		${INCLUDES_BASE_DIR}/libuv/src
+        ${INCLUDES_BASE_DIR}/libuv/src
     )
     target_link_libraries(uv.hdll
         psapi
         iphlpapi
         userenv
+        dbghelp
     )
     target_compile_definitions(uv.hdll
         PRIVATE
