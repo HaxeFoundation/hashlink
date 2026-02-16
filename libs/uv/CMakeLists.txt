@@ -67,6 +67,7 @@ if(WIN32)
     target_include_directories(uv.hdll
         PRIVATE
         ${INCLUDES_BASE_DIR}/libuv/include
+		${INCLUDES_BASE_DIR}/libuv/src
     )
     target_link_libraries(uv.hdll
         psapi
