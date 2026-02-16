@@ -117,7 +117,7 @@
 #	define HL_CLANG
 #endif
 
-#if defined(_MSC_VER) && !defined(HL_LLVM)
+#if defined(_MSC_VER)
 #	define HL_VCC
 #	pragma warning(disable:4996) // remove deprecated C API usage warnings
 #	pragma warning(disable:4055) // void* - to - function cast
@@ -163,9 +163,7 @@
 #endif
 
 #include <stddef.h>
-#ifndef HL_VCC
-#	include <stdint.h>
-#endif
+#include <stdint.h>
 
 #if defined(HL_VCC) || defined(HL_MINGW)
 #	define EXPORT __declspec( dllexport )
@@ -230,7 +228,7 @@ typedef unsigned long long uint64;
 
 // -------------- UNICODE -----------------------------------
 
-#if defined(HL_WIN) && !defined(HL_LLVM)
+#if defined(HL_WIN)
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
