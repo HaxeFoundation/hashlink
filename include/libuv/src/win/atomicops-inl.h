@@ -26,7 +26,7 @@
 
 
 /* Atomic set operation on char */
-#ifdef _MSC_VER /* MSVC */
+#if defined(_MSC_VER) && !defined(__clang__)/* MSVC */
 
 /* _InterlockedOr8 is supported by MSVC on x32 and x64. It is  slightly less */
 /* efficient than InterlockedExchange, but InterlockedExchange8 does not */
