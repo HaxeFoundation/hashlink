@@ -59,15 +59,15 @@ uv_handle_type uv_guess_handle(uv_file file) {
 
 
 int uv_is_active(const uv_handle_t* handle) {
-  return (handle->flags & UV__HANDLE_ACTIVE) &&
-        !(handle->flags & UV__HANDLE_CLOSING);
+  return (handle->flags & UV_HANDLE_ACTIVE) &&
+        !(handle->flags & UV_HANDLE_CLOSING);
 }
 
 
 void uv_close(uv_handle_t* handle, uv_close_cb cb) {
   uv_loop_t* loop = handle->loop;
 
-  if (handle->flags & UV__HANDLE_CLOSING) {
+  if (handle->flags & UV_HANDLE_CLOSING) {
     assert(0);
     return;
   }
@@ -77,69 +77,68 @@ void uv_close(uv_handle_t* handle, uv_close_cb cb) {
   /* Handle-specific close actions */
   switch (handle->type) {
     case UV_TCP:
-      uv_tcp_close(loop, (uv_tcp_t*)handle);
+      uv__tcp_close(loop, (uv_tcp_t*)handle);
       return;
 
     case UV_NAMED_PIPE:
-      uv_pipe_close(loop, (uv_pipe_t*) handle);
+      uv__pipe_close(loop, (uv_pipe_t*) handle);
       return;
 
     case UV_TTY:
-      uv_tty_close((uv_tty_t*) handle);
+      uv__tty_close((uv_tty_t*) handle);
       return;
 
     case UV_UDP:
-      uv_udp_close(loop, (uv_udp_t*) handle);
+      uv__udp_close(loop, (uv_udp_t*) handle);
       return;
 
     case UV_POLL:
-      uv_poll_close(loop, (uv_poll_t*) handle);
+      uv__poll_close(loop, (uv_poll_t*) handle);
       return;
 
     case UV_TIMER:
       uv_timer_stop((uv_timer_t*)handle);
       uv__handle_closing(handle);
-      uv_want_endgame(loop, handle);
+      uv__want_endgame(loop, handle);
       return;
 
     case UV_PREPARE:
       uv_prepare_stop((uv_prepare_t*)handle);
       uv__handle_closing(handle);
-      uv_want_endgame(loop, handle);
+      uv__want_endgame(loop, handle);
       return;
 
     case UV_CHECK:
       uv_check_stop((uv_check_t*)handle);
       uv__handle_closing(handle);
-      uv_want_endgame(loop, handle);
+      uv__want_endgame(loop, handle);
       return;
 
     case UV_IDLE:
       uv_idle_stop((uv_idle_t*)handle);
       uv__handle_closing(handle);
-      uv_want_endgame(loop, handle);
+      uv__want_endgame(loop, handle);
       return;
 
     case UV_ASYNC:
-      uv_async_close(loop, (uv_async_t*) handle);
+      uv__async_close(loop, (uv_async_t*) handle);
       return;
 
     case UV_SIGNAL:
-      uv_signal_close(loop, (uv_signal_t*) handle);
+      uv__signal_close(loop, (uv_signal_t*) handle);
       return;
 
     case UV_PROCESS:
-      uv_process_close(loop, (uv_process_t*) handle);
+      uv__process_close(loop, (uv_process_t*) handle);
       return;
 
     case UV_FS_EVENT:
-      uv_fs_event_close(loop, (uv_fs_event_t*) handle);
+      uv__fs_event_close(loop, (uv_fs_event_t*) handle);
       return;
 
     case UV_FS_POLL:
       uv__fs_poll_close((uv_fs_poll_t*) handle);
       uv__handle_closing(handle);
-      uv_want_endgame(loop, handle);
       return;
 
     default:
@@ -150,5 +149,14 @@ void uv_close(uv_handle_t* handle, uv_close_cb cb) {
 
 
 int uv_is_closing(const uv_handle_t* handle) {
-  return !!(handle->flags & (UV__HANDLE_CLOSING | UV_HANDLE_CLOSED));
+  return !!(handle->flags & (UV_HANDLE_CLOSING | UV_HANDLE_CLOSED));
+}
+
+
+uv_os_fd_t uv_get_osfhandle(int fd) {
+  return uv__get_osfhandle(fd);
+}
+
+int uv_open_osfhandle(uv_os_fd_t os_fd) {
+  return _open_osfhandle((intptr_t) os_fd, 0);
 }

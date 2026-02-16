@@ -1,4 +1,4 @@
-/* Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+/* Copyright libuv project contributors. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -19,36 +19,21 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef UV_WIN_STREAM_INL_H_
-#define UV_WIN_STREAM_INL_H_
+#ifndef UV_STRSCPY_H_
+#define UV_STRSCPY_H_
 
-#include <assert.h>
-
+/* Include uv.h for its definitions of size_t and ssize_t.
+ * size_t can be obtained directly from <stddef.h> but ssize_t requires
+ * some hoop jumping on Windows that I didn't want to duplicate here.
+ */
 #include "uv.h"
-#include "internal.h"
-#include "handle-inl.h"
-#include "req-inl.h"
 
+/* Copies up to |n-1| bytes from |s| to |d| and always zero-terminates
+ * the result, except when |n==0|. Returns the number of bytes copied
+ * or UV_E2BIG if |d| is too small.
+ *
+ * See https://www.kernel.org/doc/htmldocs/kernel-api/API-strscpy.html
+ */
+ssize_t uv__strscpy(char* d, const char* s, size_t n);
 
-INLINE static void uv__stream_init(uv_loop_t* loop,
-                                   uv_stream_t* handle,
-                                   uv_handle_type type) {
-  uv__handle_init(loop, (uv_handle_t*) handle, type);
-  handle->write_queue_size = 0;
-  handle->activecnt = 0;
-  handle->stream.conn.shutdown_req = NULL;
-  handle->stream.conn.write_reqs_pending = 0;
-
-  UV_REQ_INIT(&handle->read_req, UV_READ);
-  handle->read_req.event_handle = NULL;
-  handle->read_req.wait_handle = INVALID_HANDLE_VALUE;
-  handle->read_req.data = handle;
-}
-
-
-INLINE static void uv__connection_init(uv_stream_t* handle) {
-  handle->flags |= UV_HANDLE_CONNECTION;
-}
-
-
-#endif /* UV_WIN_STREAM_INL_H_ */
+#endif  /* UV_STRSCPY_H_ */

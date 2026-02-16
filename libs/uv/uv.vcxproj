@@ -259,12 +259,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\include\libuv\src\fs-poll.c" />
+    <ClCompile Include="..\..\include\libuv\src\idna.c" />
     <ClCompile Include="..\..\include\libuv\src\inet.c" />
+    <ClCompile Include="..\..\include\libuv\src\random.c" />
+    <ClCompile Include="..\..\include\libuv\src\strscpy.c" />
+    <ClCompile Include="..\..\include\libuv\src\strtok.c" />
+    <ClCompile Include="..\..\include\libuv\src\thread-common.c" />
     <ClCompile Include="..\..\include\libuv\src\threadpool.c" />
+    <ClCompile Include="..\..\include\libuv\src\timer.c" />
     <ClCompile Include="..\..\include\libuv\src\uv-common.c" />
+    <ClCompile Include="..\..\include\libuv\src\uv-data-getter-setters.c" />
     <ClCompile Include="..\..\include\libuv\src\version.c" />
     <ClCompile Include="..\..\include\libuv\src\win\async.c" />
     <ClCompile Include="..\..\include\libuv\src\win\core.c" />
+    <ClCompile Include="..\..\include\libuv\src\win\detect-wakeup.c" />
     <ClCompile Include="..\..\include\libuv\src\win\dl.c" />
     <ClCompile Include="..\..\include\libuv\src\win\error.c" />
     <ClCompile Include="..\..\include\libuv\src\win\fs-event.c" />
@@ -277,13 +285,10 @@
     <ClCompile Include="..\..\include\libuv\src\win\poll.c" />
     <ClCompile Include="..\..\include\libuv\src\win\process-stdio.c" />
     <ClCompile Include="..\..\include\libuv\src\win\process.c" />
-    <ClCompile Include="..\..\include\libuv\src\win\req.c" />
     <ClCompile Include="..\..\include\libuv\src\win\signal.c" />
-    <ClCompile Include="..\..\include\libuv\src\win\snprintf.c" />
     <ClCompile Include="..\..\include\libuv\src\win\stream.c" />
     <ClCompile Include="..\..\include\libuv\src\win\tcp.c" />
     <ClCompile Include="..\..\include\libuv\src\win\thread.c" />
-    <ClCompile Include="..\..\include\libuv\src\win\timer.c" />
     <ClCompile Include="..\..\include\libuv\src\win\tty.c" />
     <ClCompile Include="..\..\include\libuv\src\win\udp.c" />
     <ClCompile Include="..\..\include\libuv\src\win\util.c" />
@@ -295,7 +300,6 @@
     <ClInclude Include="..\..\include\libuv\src\heap-inl.h" />
     <ClInclude Include="..\..\include\libuv\src\queue.h" />
     <ClInclude Include="..\..\include\libuv\src\uv-common.h" />
-    <ClInclude Include="..\..\include\libuv\src\win\atomicops-inl.h" />
     <ClInclude Include="..\..\include\libuv\src\win\handle-inl.h" />
     <ClInclude Include="..\..\include\libuv\src\win\internal.h" />
     <ClInclude Include="..\..\include\libuv\src\win\req-inl.h" />

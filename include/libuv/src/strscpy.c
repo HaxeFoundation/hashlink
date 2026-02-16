@@ -1,4 +1,4 @@
-/* Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+/* Copyright libuv project contributors. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -19,25 +19,20 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef UV_VERSION_H
-#define UV_VERSION_H
+#include "strscpy.h"
+#include <limits.h>  /* SSIZE_MAX */
 
- /*
- * Versions with the same major number are ABI stable. API is allowed to
- * evolve between minor releases, but only in a backwards compatible way.
- * Make sure you update the -soname directives in configure.ac
- * and uv.gyp whenever you bump UV_VERSION_MAJOR or UV_VERSION_MINOR (but
- * not UV_VERSION_PATCH.)
- */
+ssize_t uv__strscpy(char* d, const char* s, size_t n) {
+  size_t i;
 
-#define UV_VERSION_MAJOR 1
-#define UV_VERSION_MINOR 9
-#define UV_VERSION_PATCH 1
-#define UV_VERSION_IS_RELEASE 1
-#define UV_VERSION_SUFFIX ""
+  for (i = 0; i < n; i++)
+    if ('\0' == (d[i] = s[i]))
+      return i > SSIZE_MAX ? UV_E2BIG : (ssize_t) i;
 
-#define UV_VERSION_HEX  ((UV_VERSION_MAJOR << 16) | \
-                         (UV_VERSION_MINOR <<  8) | \
-                         (UV_VERSION_PATCH))
+  if (i == 0)
+    return 0;
 
-#endif /* UV_VERSION_H */
+  d[--i] = '\0';
+
+  return UV_E2BIG;
+}
