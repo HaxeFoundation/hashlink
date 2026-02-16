@@ -216,9 +216,9 @@ abstract CommandList(Resource) {
 	public function rsSetViewports( count : Int, viewports : Viewport ) {}
 	public function rsSetScissorRects( count : Int, rects : Rect ) {}
 
-	@:hlNative("?dx12Debug","command_list_pix_begin_event")
+	@:hlNative("?dx12debug","command_list_pix_begin_event")
 	public function pixBeginEvent( color : haxe.Int64, formatString : hl.Bytes ) {}
-	@:hlNative("?dx12Debug","command_list_pix_end_event")
+	@:hlNative("?dx12debug","command_list_pix_end_event")
 	public function pixEndEvent() {}
 
 	public function beginQuery( heap : QueryHeap, type : QueryType, index : Int ) {}

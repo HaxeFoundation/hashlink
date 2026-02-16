@@ -1,4 +1,4 @@
-#define HL_NAME(n) dx12_##n
+#define HL_NAME(n) dx12debug_##n
 #include <hl.h>
 #undef _GUID
 
