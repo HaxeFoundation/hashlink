@@ -186,7 +186,7 @@
 #ifdef HL_64
 #	define HL_WSIZE 8
 #	define IS_64	1
-#	if defined(HL_VCC) || defined(HL_MINGW)
+#	if defined(HL_VCC) || defined(HL_MINGW) || defined(HL_CLANG_CL)
 #		define _PTR_FMT	L"%IX"
 #	else
 #		define _PTR_FMT	u"%lX"
@@ -234,7 +234,7 @@ typedef unsigned long long uint64;
 
 // -------------- UNICODE -----------------------------------
 
-#if defined(HL_WIN) && !defined(HL_LLVM)
+#if defined(HL_VCC) || defined(HL_CLANG_CL)
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
