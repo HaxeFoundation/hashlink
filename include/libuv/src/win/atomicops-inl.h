@@ -34,7 +34,7 @@
 /* target to be aligned. */
 #pragma intrinsic(_InterlockedOr8)
 
-static char __declspec(inline) uv__atomic_exchange_set(char volatile* target) {
+static inline char uv__atomic_exchange_set(char volatile* target) {
   return _InterlockedOr8(target, 1);
 }
 
