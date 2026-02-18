@@ -37,6 +37,7 @@
 #undef __SIGN
 #undef INT_MAX
 #undef INT_MIN
+#undef INT16_MAX
 #undef BIG_ENDIAN
 #undef LITTLE_ENDIAN
 #undef OVERFLOW
