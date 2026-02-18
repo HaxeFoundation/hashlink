@@ -23,7 +23,7 @@ jobs:
       matrix:
         target: [linux, darwin, windows]
         architecture: [32, 64, arm64]
-        build_system: [make, cmake, cmake-mingw, vs2019, makegcc14]
+        build_system: [make, cmake, cmake-mingw, cmake-clang-cl, vs2019, makegcc14]
 
         include:
           - target: linux
@@ -49,6 +49,9 @@ jobs:
           - build_system: cmake-mingw
             cmake_configuration: RelWithDebInfo
 
+          - build_system: cmake-clang-cl
+            cmake_configuration: RelWithDebInfo
+
           - build_system: vs2019
             msbuild_configuration: Release
 
@@ -65,6 +68,10 @@ jobs:
             architecture: 64
             runner: windows-2025
             build_system: cmake-mingw
+
+          - target: windows
+            build_system: cmake-clang-cl
+            cmake_generator: Visual Studio 17 2022
 
           - target: windows
             architecture: 32
@@ -117,6 +124,12 @@ jobs:
 
           - target: linux
             build_system: cmake-mingw
+
+          - target: darwin
+            build_system: cmake-clang-cl
+
+          - target: linux
+            build_system: cmake-clang-cl
 
     steps:
     - name: "SCM Checkout"
@@ -242,6 +255,14 @@ jobs:
               -DWITH_DX12=OFF
 
             cmake --build build --config ${{ matrix.cmake_configuration }} --parallel
+            BUILD_FOLDER=build/bin
+            ;;
+          cmake-clang-cl)
+            cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+              -G "${{ matrix.cmake_generator }}" \
+              -A ${{ matrix.architecture_string }} \
+              -T ClangCL
+            cmake --build build --config ${{ matrix.cmake_configuration }}
             BUILD_FOLDER=build/bin
             ;;
 
