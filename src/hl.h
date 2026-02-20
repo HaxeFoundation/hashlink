@@ -845,6 +845,8 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 
 // ----------------------- FFI ------------------------------------------------------
 
+#ifndef HL_DISABLE_LEGACY_FFI
+
 // match GNU C++ mangling
 #define TYPE_STR	"vcsilfdbBDPOATR??X?N?S?g"
 
@@ -874,25 +876,25 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)
 
-typedef struct {
-	hl_type *t;
-	uchar *bytes;
-	int length;
-} vstring;
-
 #define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
+
+#endif // HL_DISABLE_LEGACY_FFI
 
 #if !defined(HL_NAME)
 #	define HL_NAME(p)					p
 #	ifdef LIBHL_EXPORTS
 #		define HL_PRIM				EXPORT
-#		undef DEFINE_PRIM
-#		define DEFINE_PRIM(t,name,args)						_DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
-#		define DEFINE_PRIM_WITH_NAME						_DEFINE_PRIM_WITH_NAME
+#		ifndef HL_DISABLE_LEGACY_FFI
+#			undef DEFINE_PRIM
+#			define DEFINE_PRIM(t,name,args)						_DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
+#			define DEFINE_PRIM_WITH_NAME						_DEFINE_PRIM_WITH_NAME
+#		endif
 #	else
 #		define HL_PRIM
-#		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#		ifndef HL_DISABLE_LEGACY_FFI
+#			define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#		endif
 #	endif
 #elif defined(LIBHL_STATIC)
 #	ifdef __cplusplus
@@ -900,15 +902,25 @@ typedef struct {
 #	else
 #		define	HL_PRIM
 #	endif
-#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#	ifndef HL_DISABLE_LEGACY_FFI
+#		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#	endif
 #else
 #	ifdef __cplusplus
 #		define	HL_PRIM				extern "C" EXPORT
 #	else
 #		define	HL_PRIM				EXPORT
 #	endif
-#	define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
+#	ifndef HL_DISABLE_LEGACY_FFI
+#		define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
+#	endif
 #endif
+
+typedef struct {
+	hl_type *t;
+	uchar *bytes;
+	int length;
+} vstring;
 
 #if defined(HL_GCC) && !defined(HL_CONSOLE)
 #	ifdef HL_CLANG
