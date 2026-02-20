@@ -26,6 +26,11 @@
 typedef struct _hl_semaphore hl_semaphore;
 typedef struct _hl_condition hl_condition;
 
+#ifdef __OpenBSD__
+#include <pthread_np.h>
+#define pthread_setname_np(a,b) pthread_set_name_np(a,b)
+#endif
+
 #if !defined(HL_THREADS)
 
 struct _hl_mutex {
@@ -840,6 +845,8 @@ HL_PRIM int hl_thread_id() {
 	return (pid_t)tid64;
 #elif defined(SYS_gettid) && !defined(HL_TVOS)
 	return syscall(SYS_gettid);
+#elif defined(__OpenBSD__)
+	return getthrid();
 #else
 	return -1;
 #endif
