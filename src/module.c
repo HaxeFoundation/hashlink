@@ -701,11 +701,13 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	return 1;
 }
 
-static bool check_same_type( hl_type *t1, hl_type *t2 ) {
-	if( hl_safe_cast(t1,t2) )
-		return true;
+static bool check_same_type( hl_type *t1, hl_type *t2, int depth ) {
 	if( t1->kind != t2->kind )
 		return false;
+	if( depth > 10 ) // we have loop enough, we're probably comparing the same recursive thing
+		return true;
+	if( hl_safe_cast(t1,t2) )
+		return true;
 	int i;
 	switch( t1->kind ) {
 	case HOBJ:
@@ -716,16 +718,16 @@ static bool check_same_type( hl_type *t1, hl_type *t2 ) {
 		if( t1->fun->nargs != t2->fun->nargs )
 			return false;
 		for(i=0;i<t1->fun->nargs;i++)
-			if( !check_same_type(t1->fun->args[i],t2->fun->args[i]) )
+			if( !check_same_type(t1->fun->args[i], t2->fun->args[i], depth + 1) )
 				return false;
-		return check_same_type(t1->fun->ret, t2->fun->ret);
+		return check_same_type(t1->fun->ret, t2->fun->ret, depth + 1);
 	case HVIRTUAL:
 		if( t1->virt->nfields != t2->virt->nfields )
 			return false;
 		for(i=0;i<t1->virt->nfields;i++) {
 			hl_obj_field *f1 = t1->virt->fields + i;
 			hl_obj_field *f2 = t2->virt->fields + i;
-			if( f1->hashed_name != f2->hashed_name || !check_same_type(f1->t, f2->t) )
+			if( f1->hashed_name != f2->hashed_name || !check_same_type(f1->t, f2->t, depth + 1) )
 				return false;
 		}
 		return true;
@@ -747,7 +749,7 @@ static int check_same_obj( hl_type_obj *o1, hl_type_obj *o2 ) {
 		if( o1->proto[i].hashed_name != o2->proto[i].hashed_name )
 			return -1;
 	for(i=0;i<o1->nfields;i++)
-		if( o1->fields[i].hashed_name != o2->fields[i].hashed_name || !check_same_type(o1->fields[i].t,o2->fields[i].t) )
+		if( o1->fields[i].hashed_name != o2->fields[i].hashed_name || !check_same_type(o1->fields[i].t,o2->fields[i].t, 0) )
 			return -1;
 	for(i=0;i<o1->nproto;i++)
 		if( o1->proto[i].pindex != o2->proto[i].pindex )
