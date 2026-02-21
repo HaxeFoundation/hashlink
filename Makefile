@@ -10,7 +10,8 @@ INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 LIBS=fmt sdl ssl openal ui uv mysql sqlite heaps
 ARCH ?= $(shell uname -m)
 
-CFLAGS = -Wall -O3 -I src -std=c11 -D LIBHL_EXPORTS -fvisibility=hidden
+CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden
+CPPFLAGS = -I src -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
 EXTRA_LFLAGS ?=
 LIBFLAGS =
@@ -21,11 +22,11 @@ LIBTURBOJPEG = -lturbojpeg
 
 LHL_LINK_FLAGS =
 
-PCRE_FLAGS = -D PCRE2_CODE_UNIT_WIDTH=16
+PCRE_CPPFLAGS = -D PCRE2_CODE_UNIT_WIDTH=16
 ifdef WITH_SYSTEM_PCRE2
 LHL_LINK_FLAGS += -lpcre2-16
 else
-PCRE_FLAGS += -I include/pcre -D HAVE_CONFIG_H -D PCRE2_STATIC
+PCRE_CPPFLAGS += -I include/pcre -D HAVE_CONFIG_H -D PCRE2_STATIC
 PCRE = include/pcre/pcre2_auto_possess.o include/pcre/pcre2_chartables.o include/pcre/pcre2_compile.o \
 	include/pcre/pcre2_config.o include/pcre/pcre2_context.o include/pcre/pcre2_convert.o \
 	include/pcre/pcre2_dfa_match.o include/pcre/pcre2_error.o include/pcre/pcre2_extuni.o \
@@ -46,7 +47,7 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 
 HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
 
-FMT_INCLUDE = -I include/mikktspace -I include/minimp3
+FMT_CPPFLAGS = -I include/mikktspace -I include/minimp3
 
 FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o libs/fmt/dxt.o
 
@@ -97,7 +98,7 @@ SSL += include/mbedtls/library/aes.o include/mbedtls/library/aesce.o include/mbe
 	include/mbedtls/library/x509_create.o include/mbedtls/library/x509_crl.o include/mbedtls/library/x509_crt.o \
 	include/mbedtls/library/x509_csr.o include/mbedtls/library/x509write.o include/mbedtls/library/x509write_crt.o \
 	include/mbedtls/library/x509write_csr.o
-SSL_CFLAGS = -I libs/ssl -I include/mbedtls/include -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
+SSL_CPPFLAGS = -I libs/ssl -I include/mbedtls/include -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
 else
 SSL_LDLIBS = -lmbedtls -lmbedx509 -lmbedcrypto
 endif
@@ -120,7 +121,7 @@ HEAPS += include/meshoptimizer/allocator.o include/meshoptimizer/overdrawoptimiz
 	include/meshoptimizer/spatialorder.o include/meshoptimizer/vfetchanalyzer.o \
 	include/meshoptimizer/stripifier.o include/meshoptimizer/vfetchoptimizer.o \
 	include/meshoptimizer/overdrawanalyzer.o include/meshoptimizer/vcacheanalyzer.o
-HEAPS_CFLAGS = -I include/mikktspace -I include/meshoptimizer -I include/vhacd -I include/renderdoc
+HEAPS_CPPFLAGS = -I include/mikktspace -I include/meshoptimizer -I include/vhacd -I include/renderdoc
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -170,7 +171,11 @@ BREW_PREFIX := $(shell brew --prefix)
 BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
 BREW_SDL_PREFIX := $(shell brew --prefix sdl2)
 
-CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -I $(BREW_SDL_PREFIX)/include/SDL2 -Dopenal_soft -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH)
+CPPFLAGS += -I include -I $(BREW_PREFIX)/include
+
+SDL_CPPFLAGS = -I $(BREW_SDL_PREFIX)/include/SDL2 -DGL_SILENCE_DEPRECATION
+OPENAL_CPPFLAGS = -I $(BREW_OPENAL_PREFIX)/include -Dopenal_soft
 
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
@@ -200,16 +205,18 @@ LHL_LINK_FLAGS += -install_name @rpath/libhl.dylib
 else
 
 # Linux
-CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
+CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
 LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
-CFLAGS += -I /usr/include/i386-linux-gnu -msse2 -mfpmath=sse
+CFLAGS += -msse2 -mfpmath=sse
+CPPFLAGS += -I /usr/include/i386-linux-gnu
 LIBFLAGS += -L/opt/libjpeg-turbo/lib
 else
 LIBFLAGS += -L/opt/libjpeg-turbo/lib64
 endif
 
+SDL_CPPFLAGS = $(shell pkg-config --cflags sdl2)
 SDL_LINK_FLAGS = $(shell pkg-config --libs sdl2)
 LIBOPENAL = -lopenal
 LIBOPENGL = -lGL
@@ -251,11 +258,7 @@ uninstall:
 
 libs: $(LIBS)
 
-./include/pcre/%.o: include/pcre/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
-
-src/std/regexp.o: src/std/regexp.c
-	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
+src/std/regexp.o $(PCRE): CPPFLAGS += $(PCRE_CPPFLAGS)
 
 libhl: ${LIB}
 	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} ${LHL_LINK_FLAGS} -shared $^ ${LIBHL_LDLIBS}
@@ -266,28 +269,25 @@ hlc: ${BOOT}
 hl: ${HL} libhl
 	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
 
-libs/fmt/%.o: libs/fmt/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${FMT_INCLUDE}
-
+$(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
 fmt: ${FMT} libhl
 	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
 
+$(SDL): CPPFLAGS += $(SDL_CPPFLAGS)
 sdl: ${SDL} libhl
 	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl $(SDL_LINK_FLAGS) $(LIBOPENGL)
 
+$(OPENAL): CPPFLAGS += $(OPENAL_CPPFLAGS)
 openal: ${OPENAL} libhl
 	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
 
-./include/mbedtls/%.o: ./include/mbedtls/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${SSL_CFLAGS}
-
+$(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 # force rebuild ssl.o in case we mix SSL_STATIC with normal build
 .PHONY: libs/ssl/ssl.o
 libs/ssl/ssl.o: libs/ssl/ssl.c
-	${CC} ${CFLAGS} -o $@ -c $< ${SSL_CFLAGS}
-
+	${CC} ${CFLAGS} $(CPPFLAGS) -o $@ -c $<
 ssl: ${SSL} libhl
-	${CC} ${CFLAGS} ${SSL_CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl ${SSL_LDLIBS} $(LIBSSL)
+	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl ${SSL_LDLIBS} $(LIBSSL)
 
 ui: ${UI} libhl
 	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} -L. -lhl
@@ -303,20 +303,9 @@ sqlite: ${SQLITE} libhl
 
 CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 
-./include/mikktspace/%.o: ./include/mikktspace/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
-
-./include/meshoptimizer/%.o: ./include/meshoptimizer/%.cpp
-	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
-
-./libs/heaps/%.o: ./libs/heaps/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
-
-./libs/heaps/%.o: ./libs/heaps/%.cpp
-	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
-
+$(HEAPS): CPPFLAGS += $(HEAPS_CPPFLAGS)
 heaps: ${HEAPS} libhl
-	${CXX} ${CFLAGS} ${HEAPS_CFLAGS} -shared -o heaps.hdll ${HEAPS} ${LIBFLAGS} -L. -lhl
+	${CXX} ${CFLAGS} -shared -o heaps.hdll ${HEAPS} ${LIBFLAGS} -L. -lhl
 
 mesa:
 	(cd libs/mesa && ${MAKE})
@@ -386,10 +375,7 @@ codesign_osx:
 	codesign --entitlements other/osx/entitlements.xml -fs hl-cert hl
 	rm key.pem cert.cer openssl.cnf
 
-.SUFFIXES : .c .o
-
-.c.o :
-	${CC} ${CFLAGS} -o $@ -c $<
+.SUFFIXES : .cpp .c .o
 
 clean_o:
 	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
