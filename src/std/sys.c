@@ -173,7 +173,7 @@ HL_PRIM void hl_sys_vtune_init() {
 }
 
 HL_PRIM bool hl_sys_load_plugin( vbyte *file ) {
-#	ifdef HL_UTF8_PATH
+#	ifdef HL_UTF8PATH
 	file = (vbyte*)hl_to_utf8((uchar*)file);
 #	endif
 	return hl_setup.load_plugin && hl_setup.load_plugin((pchar*)file);
