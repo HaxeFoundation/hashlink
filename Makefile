@@ -11,7 +11,7 @@ LIBS=fmt sdl ssl openal ui uv mysql sqlite heaps
 ARCH ?= $(shell uname -m)
 
 CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden
-CPPFLAGS = -I src -D LIBHL_EXPORTS
+CPPFLAGS = -I src
 LFLAGS = -L. -lhl
 EXTRA_LFLAGS ?=
 LIBFLAGS =
@@ -259,7 +259,7 @@ uninstall:
 libs: $(LIBS)
 
 src/std/regexp.o $(PCRE): CPPFLAGS += $(PCRE_CPPFLAGS)
-
+$(LIB): CPPFLAGS += -D LIBHL_EXPORTS
 libhl: ${LIB}
 	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} ${LHL_LINK_FLAGS} -shared $^ ${LIBHL_LDLIBS}
 
