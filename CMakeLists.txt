@@ -163,7 +163,6 @@ add_library(libhl
 
 target_include_directories(libhl
     PUBLIC src
-    PRIVATE include
 )
 
 # C11 / C++11 are required for features such as unicode strings
@@ -204,6 +203,10 @@ else()
     target_sources(libhl PRIVATE ${pcre_srcs})
     target_include_directories(libhl PRIVATE include/pcre)
     target_compile_definitions(libhl PRIVATE HAVE_CONFIG_H PCRE2_STATIC)
+endif()
+
+if(APPLE)
+    target_include_directories(libhl PRIVATE include)
 endif()
 
 if(WIN32)
