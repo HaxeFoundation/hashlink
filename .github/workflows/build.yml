@@ -37,7 +37,7 @@ jobs:
 
           - target: darwin
             architecture: 64
-            runner: macos-latest
+            runner: macos-15-intel
 
           - target: darwin
             architecture: arm64
@@ -103,10 +103,6 @@ jobs:
             architecture: arm64
 
           - target: windows
-            build_system: make
-
-          - target: darwin
-            architecture: 64
             build_system: make
 
           - target: darwin
