@@ -7,7 +7,7 @@ INSTALL_BIN_DIR ?= $(PREFIX)/bin
 INSTALL_LIB_DIR ?= $(PREFIX)/lib
 INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
-LIBS=fmt sdl ssl openal ui uv mysql sqlite heaps
+LIBS = $(addsuffix .hdll,fmt sdl ssl openal ui uv mysql sqlite heaps)
 ARCH ?= $(shell uname -m)
 
 CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden
@@ -276,42 +276,42 @@ $(HL): $(HL_OBJ) $(LIBHL)
 
 $(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
 
-fmt: $(FMT) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -lpng $(LIBTURBOJPEG) -lz -lvorbisfile -o $@.hdll
+fmt.hdll: $(FMT) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -lpng $(LIBTURBOJPEG) -lz -lvorbisfile -o $@
 
 $(SDL): CPPFLAGS += $(SDL_CPPFLAGS)
-sdl: $(SDL) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) $(SDL_LINK_FLAGS) -shared $^ $(LIBOPENGL) -o $@.hdll
+sdl.hdll: $(SDL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $(SDL_LINK_FLAGS) $^ $(LIBOPENGL) -o $@
 
 $(OPENAL): CPPFLAGS += $(OPENAL_CPPFLAGS)
-openal: $(OPENAL) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) $^ -shared $(LIBOPENAL) -o $@.hdll
+openal.hdll: $(OPENAL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(LIBOPENAL) -o $@
 
 $(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 # force rebuild ssl.o in case we mix SSL_STATIC with normal build
 .PHONY: libs/ssl/ssl.o
 libs/ssl/ssl.o: libs/ssl/ssl.c
 	${CC} ${CFLAGS} $(CPPFLAGS) -o $@ -c $<
-ssl: $(SSL) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(SSL_LDLIBS) $(LIBSSL) -o $@.hdll
+ssl.hdll: $(SSL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(SSL_LDLIBS) $(LIBSSL) -o $@
 
-ui: $(UI) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -o $@.hdll
+ui.hdll: $(UI) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -o $@
 
-uv: $(UV) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -luv -o $@.hdll
+uv.hdll: $(UV) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -luv -o $@
 
-mysql: $(MYSQL) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(MYSQL_LDLIBS) -o $@.hdll
+mysql.hdll: $(MYSQL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(MYSQL_LDLIBS) -o $@
 
-sqlite: $(SQLITE) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -lsqlite3 -o $@.hdll
+sqlite.hdll: $(SQLITE) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -lsqlite3 -o $@
 
 CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 
 $(HEAPS): CPPFLAGS += $(HEAPS_CPPFLAGS)
-heaps: $(HEAPS) $(LIBHL)
-	$(CXX) $(CXXFLAGS) $(LIBFLAGS) -shared $^ -o $@.hdll
+heaps.hdll: $(HEAPS) $(LIBHL)
+	$(CXX) $(CXXFLAGS) $(LIBFLAGS) -shared $^ -o $@
 
 mesa:
 	(cd libs/mesa && ${MAKE})
@@ -389,4 +389,4 @@ clean_o:
 clean: clean_o
 	rm -f $(HL) $(HLC) $(LIBHL) *.hdll
 
-.PHONY: fmt sdl libs release
+.PHONY: libs release
