@@ -45,7 +45,7 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+HL_OBJ = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
 
 FMT_CPPFLAGS = -I include/mikktspace -I include/minimp3
 
@@ -132,6 +132,7 @@ UNAME := $(shell uname)
 # Cygwin / mingw
 ifeq ($(OS),Windows_NT)
 
+EXE_SUFFIX = .exe
 LIBEXT = dll
 RELEASE_NAME=win
 # VS variables are for packaging Visual Studio builds
@@ -234,19 +235,21 @@ CFLAGS += -g
 endif
 
 LIBHL = libhl.$(LIBEXT)
+HL = hl$(EXE_SUFFIX)
+HLC = hlc$(EXE_SUFFIX)
 
 all: $(LIBHL) libs
 ifeq ($(ARCH),arm64)
 	$(warning HashLink vm is not supported on arm64, skipping)
 else
-all: hl
+all: $(HL)
 endif
 
 install:
 	$(UNAME)==Darwin && ${MAKE} uninstall
 ifneq ($(ARCH),arm64)
 	mkdir -p $(INSTALL_BIN_DIR)
-	cp hl $(INSTALL_BIN_DIR)
+	cp $(HL) $(INSTALL_BIN_DIR)
 endif
 	mkdir -p $(INSTALL_LIB_DIR)
 	cp *.hdll $(INSTALL_LIB_DIR)
@@ -255,7 +258,7 @@ endif
 	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
 
 uninstall:
-	rm -f $(INSTALL_BIN_DIR)/hl $(INSTALL_LIB_DIR)/$(LIBHL) $(INSTALL_LIB_DIR)/*.hdll
+	rm -f $(INSTALL_BIN_DIR)/$(HL) $(INSTALL_LIB_DIR)/$(LIBHL) $(INSTALL_LIB_DIR)/*.hdll
 	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
 
 libs: $(LIBS)
@@ -265,10 +268,10 @@ $(LIB): CPPFLAGS += -D LIBHL_EXPORTS
 $(LIBHL): $(LIB)
 	$(CC) $(CFLAGS) $(LIBFLAGS) $(LHL_LINK_FLAGS) -shared $^ $(LIBHL_LDLIBS) -o $@
 
-hlc: $(BOOT) $(LIBHL)
+$(HLC): $(BOOT) $(LIBHL)
 	$(CC) $(CFLAGS) $(LFLAGS) $(EXTRA_LFLAGS) $^ $(HLC_LDLIBS) -o $@
 
-hl: $(HL) $(LIBHL)
+$(HL): $(HL_OBJ) $(LIBHL)
 	$(CC) $(CFLAGS) $(LFLAGS) $(EXTRA_LFLAGS) $(HLFLAGS) $^ -o $@
 
 $(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
@@ -342,7 +345,7 @@ release_haxelib_package:
 	rm -rf $(HLIB)_release
 
 BUILD_DIR ?= .
-PACKAGE_NAME = $(eval PACKAGE_NAME := hashlink-$(shell $(BUILD_DIR)/hl --version)-$(RELEASE_NAME))$(PACKAGE_NAME)
+PACKAGE_NAME = $(eval PACKAGE_NAME := hashlink-$(shell $(BUILD_DIR)/$(HL) --version)-$(RELEASE_NAME))$(PACKAGE_NAME)
 
 release_prepare:
 	rm -rf $(PACKAGE_NAME)
@@ -351,7 +354,7 @@ release_prepare:
 	cp src/hl.h src/hlc.h src/hlc_main.c $(PACKAGE_NAME)/include
 
 release_win:
-	cp $(BUILD_DIR)/{hl.exe,libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
+	cp $(BUILD_DIR)/{$(HL),libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
 	cp $(VS_RUNTIME_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_SDL_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_OPENAL_LIBRARY) $(PACKAGE_NAME)/OpenAL32.dll
@@ -364,7 +367,7 @@ release_linux release_osx:
 ifeq ($(ARCH),arm64)
 	cp $(LIBHL) *.hdll $(PACKAGE_NAME)
 else
-	cp hl $(LIBHL) *.hdll $(PACKAGE_NAME)
+	cp $(HL) $(LIBHL) *.hdll $(PACKAGE_NAME)
 endif
 	tar -cvzf $(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
 	rm -rf $(PACKAGE_NAME)
@@ -375,15 +378,15 @@ codesign_osx:
 	openssl req -x509 -newkey rsa:4096 -keyout key.pem -nodes -days 365 -subj '/CN=hl-cert' -outform der -out cert.cer -extensions v3_req -config openssl.cnf
 	sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain cert.cer
 	sudo security import key.pem -k /Library/Keychains/System.keychain -A
-	codesign --entitlements other/osx/entitlements.xml -fs hl-cert hl
+	codesign --entitlements other/osx/entitlements.xml -fs hl-cert $(HL)
 	rm key.pem cert.cer openssl.cnf
 
 .SUFFIXES : .cpp .c .o
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL_OBJ} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
 
 clean: clean_o
-	rm -f hl hl.exe $(LIBHL) *.hdll
+	rm -f $(HL) $(HLC) $(LIBHL) *.hdll
 
-.PHONY: hl hlc fmt sdl libs release
+.PHONY: fmt sdl libs release
