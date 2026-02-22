@@ -18,7 +18,6 @@ LIBFLAGS =
 LIBHL_LDLIBS = -lm -lpthread
 HLFLAGS = -ldl
 LIBEXT = so
-LIBTURBOJPEG = -lturbojpeg
 
 LHL_LINK_FLAGS =
 
@@ -100,7 +99,7 @@ SSL += include/mbedtls/library/aes.o include/mbedtls/library/aesce.o include/mbe
 	include/mbedtls/library/x509write_csr.o
 SSL_CPPFLAGS = -I libs/ssl -I include/mbedtls/include -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
 else
-SSL_LDLIBS = -lmbedtls -lmbedx509 -lmbedcrypto
+ssl_LDLIBS = -lmbedtls -lmbedx509 -lmbedcrypto
 endif
 
 UV = libs/uv/uv.o
@@ -154,11 +153,10 @@ endif
 
 ifneq (, $(findstring MINGW64, $(UNAME)))
 LIBHL_LDLIBS += -lws2_32 -lwsock32
-SSL_LDLIBS += -lcrypt32 -lbcrypt -lws2_32
-MYSQL_LDLIBS += -lws2_32 -lwsock32
+ssl_LDLIBS += -lcrypt32 -lbcrypt -lws2_32
+mysql_LDLIBS += -lws2_32 -lwsock32
 HLC_LDLIBS = -ldbghelp
 CFLAGS += -municode
-LIBFLAGS += -municode
 HLFLAGS =
 endif
 
@@ -184,11 +182,12 @@ CFLAGS += -isysroot $(ISYSROOT)
 LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-SDL_LINK_FLAGS = -L$(BREW_SDL_PREFIX)/lib -lSDL2
-LIBFLAGS += -L$(BREW_PREFIX)/lib -L$(BREW_OPENAL_PREFIX)/lib
-LIBOPENGL = -framework OpenGL
-LIBOPENAL = -lopenal
-LIBSSL = -framework Security -framework CoreFoundation
+LIBFLAGS += -L$(BREW_PREFIX)/lib
+sdl_LDFLAGS = -L$(BREW_SDL_PREFIX)/lib
+sdl_LDLIBS = -lSDL2 -framework OpenGL
+openal_LDFLAGS = -L$(BREW_OPENAL_PREFIX)/lib
+openal_LDLIBS = -lopenal
+ssl_LDLIBS += -framework Security -framework CoreFoundation
 RELEASE_NAME = osx
 
 # Mac native debug
@@ -218,9 +217,9 @@ LIBFLAGS += -L/opt/libjpeg-turbo/lib64
 endif
 
 SDL_CPPFLAGS = $(shell pkg-config --cflags sdl2)
-SDL_LINK_FLAGS = $(shell pkg-config --libs sdl2)
-LIBOPENAL = -lopenal
-LIBOPENGL = -lGL
+sdl_LDFLAGS = $(shell pkg-config --libs-only-L --libs-only-other sdl2)
+sdl_LDLIBS = $(shell pkg-config --libs-only-l sdl2) -lGL
+openal_LDLIBS = -lopenal
 RELEASE_NAME = linux
 
 endif
@@ -274,18 +273,19 @@ $(HLC): $(BOOT) $(LIBHL)
 $(HL): $(HL_OBJ) $(LIBHL)
 	$(CC) $(CFLAGS) $(LFLAGS) $(EXTRA_LFLAGS) $(HLFLAGS) $^ -o $@
 
-$(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
+%.hdll: HDLL_LINK = $(LINK.c)
+%.hdll:
+	$(HDLL_LINK) $(LIBFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
 
+$(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
+fmt_LDLIBS = -lpng -lturbojpeg -lvorbisfile -lz
 fmt.hdll: $(FMT) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -lpng $(LIBTURBOJPEG) -lz -lvorbisfile -o $@
 
 $(SDL): CPPFLAGS += $(SDL_CPPFLAGS)
 sdl.hdll: $(SDL) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $(SDL_LINK_FLAGS) $^ $(LIBOPENGL) -o $@
 
 $(OPENAL): CPPFLAGS += $(OPENAL_CPPFLAGS)
 openal.hdll: $(OPENAL) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(LIBOPENAL) -o $@
 
 $(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 # force rebuild ssl.o in case we mix SSL_STATIC with normal build
@@ -293,25 +293,22 @@ $(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 libs/ssl/ssl.o: libs/ssl/ssl.c
 	${CC} ${CFLAGS} $(CPPFLAGS) -o $@ -c $<
 ssl.hdll: $(SSL) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(SSL_LDLIBS) $(LIBSSL) -o $@
 
 ui.hdll: $(UI) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -o $@
 
+uv_LDLIBS = -luv
 uv.hdll: $(UV) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -luv -o $@
 
 mysql.hdll: $(MYSQL) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(MYSQL_LDLIBS) -o $@
 
+sqlite_LDLIBS = -lsqlite3
 sqlite.hdll: $(SQLITE) $(LIBHL)
-	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -lsqlite3 -o $@
 
 CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 
 $(HEAPS): CPPFLAGS += $(HEAPS_CPPFLAGS)
+heaps.hdll: HDLL_LINK = $(LINK.cc)
 heaps.hdll: $(HEAPS) $(LIBHL)
-	$(CXX) $(CXXFLAGS) $(LIBFLAGS) -shared $^ -o $@
 
 mesa:
 	(cd libs/mesa && ${MAKE})
