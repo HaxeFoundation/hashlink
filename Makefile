@@ -12,18 +12,15 @@ ARCH ?= $(shell uname -m)
 
 CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden
 CPPFLAGS = -I src
-LFLAGS =
-EXTRA_LFLAGS ?=
-LIBFLAGS =
+LIBHL_LDFLAGS =
 LIBHL_LDLIBS = -lm -lpthread
-HLFLAGS = -ldl
+USE_LIBHL_LDFLAGS =
+hl_LDLIBS = -ldl -lm
 LIBEXT = so
-
-LHL_LINK_FLAGS =
 
 PCRE_CPPFLAGS = -D PCRE2_CODE_UNIT_WIDTH=16
 ifdef WITH_SYSTEM_PCRE2
-LHL_LINK_FLAGS += -lpcre2-16
+LIBHL_LDLIBS += -lpcre2-16
 else
 PCRE_CPPFLAGS += -I include/pcre -D HAVE_CONFIG_H -D PCRE2_STATIC
 PCRE = include/pcre/pcre2_auto_possess.o include/pcre/pcre2_chartables.o include/pcre/pcre2_compile.o \
@@ -152,12 +149,12 @@ VS_DX_LIBRARY ?= include/dx/bin/x64/dxcompiler.dll include/dx/bin/x64/dxil.dll
 endif
 
 ifneq (, $(findstring MINGW64, $(UNAME)))
+CFLAGS += -municode
 LIBHL_LDLIBS += -lws2_32 -lwsock32
+hl_LDLIBS = -lm
+hlc_LDLIBS = -ldbghelp
 ssl_LDLIBS += -lcrypt32 -lbcrypt -lws2_32
 mysql_LDLIBS += -lws2_32 -lwsock32
-HLC_LDLIBS = -ldbghelp
-CFLAGS += -municode
-HLFLAGS =
 endif
 
 else ifeq ($(UNAME),Darwin)
@@ -179,10 +176,9 @@ OPENAL_CPPFLAGS = -I $(BREW_OPENAL_PREFIX)/include -Dopenal_soft
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
 CFLAGS += -isysroot $(ISYSROOT)
-LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-LIBFLAGS += -L$(BREW_PREFIX)/lib
+LDFLAGS += -L$(BREW_PREFIX)/lib
 sdl_LDFLAGS = -L$(BREW_SDL_PREFIX)/lib
 sdl_LDLIBS = -lSDL2 -framework OpenGL
 openal_LDFLAGS = -L$(BREW_OPENAL_PREFIX)/lib
@@ -197,16 +193,15 @@ LIB += ${HL_DEBUG}
 endif
 
 CFLAGS += -arch $(ARCH)
-LFLAGS += -arch $(ARCH)
 
-LFLAGS += -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
-LIBFLAGS += -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
-LHL_LINK_FLAGS += -install_name @rpath/libhl.dylib
+LIBHL_LDFLAGS += -install_name @rpath/libhl.dylib
+USE_LIBHL_LDFLAGS = -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
 else
 
 # Linux
 CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
-LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--no-undefined
+LDFLAGS += -Wl,--no-undefined
+USE_LIBHL_LDFLAGS = -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR)
 
 ifeq ($(MARCH),32)
 CFLAGS += -msse2 -mfpmath=sse
@@ -265,20 +260,19 @@ libs: $(LIBS)
 src/std/regexp.o $(PCRE): CPPFLAGS += $(PCRE_CPPFLAGS)
 $(LIB): CPPFLAGS += -D LIBHL_EXPORTS
 $(LIBHL): $(LIB)
-	$(CC) $(CFLAGS) $(LIBFLAGS) $(LHL_LINK_FLAGS) -shared $^ $(LIBHL_LDLIBS) -o $@
-
-$(HLC): $(BOOT) $(LIBHL)
-	$(CC) $(CFLAGS) $(LFLAGS) $(EXTRA_LFLAGS) $^ $(HLC_LDLIBS) -o $@
+	$(LINK.c) $(LIBHL_LDFLAGS) -shared $^ $(LIBHL_LDLIBS) -o $@
 
 $(HL): $(HL_OBJ) $(LIBHL)
-	$(CC) $(CFLAGS) $(LFLAGS) $(EXTRA_LFLAGS) $(HLFLAGS) $^ -o $@
+$(HLC): $(BOOT) $(LIBHL)
+$(HL) $(HLC):
+	$(LINK.c) $(USE_LIBHL_LDFLAGS) $^ $($@_LDLIBS) -o $@
 
 %.hdll: HDLL_LINK = $(LINK.c)
 %.hdll:
-	$(HDLL_LINK) $(LIBFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
+	$(HDLL_LINK) $(USE_LIBHL_LDFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
 
 $(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
-fmt_LDLIBS = -lpng -lturbojpeg -lvorbisfile -lz
+fmt_LDLIBS = -lpng -lturbojpeg -lvorbisfile -lz -lm
 fmt.hdll: $(FMT) $(LIBHL)
 
 $(SDL): CPPFLAGS += $(SDL_CPPFLAGS)
@@ -291,7 +285,7 @@ $(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 # force rebuild ssl.o in case we mix SSL_STATIC with normal build
 .PHONY: libs/ssl/ssl.o
 libs/ssl/ssl.o: libs/ssl/ssl.c
-	${CC} ${CFLAGS} $(CPPFLAGS) -o $@ -c $<
+	$(COMPILE.c) -o $@ -c $<
 ssl.hdll: $(SSL) $(LIBHL)
 
 ui.hdll: $(UI) $(LIBHL)
