@@ -30,10 +30,12 @@ jobs:
             archive_ext: tar.gz
 
           - target: linux
+            architecture: 64
             runner: ubuntu-latest
             haxe_nightly_dir: linux64
 
           - target: linux
+            architecture: arm64
             runner: ubuntu-24.04-arm
             haxe_nightly_dir: linux-arm64
 
@@ -201,7 +203,7 @@ jobs:
           gcc --version
 
     - name: Install haxe
-      uses: krdlab/setup-haxe@v2
+      uses: tobil4sk/setup-haxe@9d1527c4bb9d1d449d196a0822118692ceeac457
       with:
         haxe-version: latest
 
