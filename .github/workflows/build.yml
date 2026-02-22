@@ -27,9 +27,15 @@ jobs:
 
         include:
           - target: linux
+            archive_ext: tar.gz
+
+          - target: linux
             runner: ubuntu-latest
             haxe_nightly_dir: linux64
-            archive_ext: tar.gz
+
+          - target: linux
+            runner: ubuntu-24.04-arm
+            haxe_nightly_dir: linux-arm64
 
           - target: darwin
             haxe_nightly_dir: mac
@@ -96,9 +102,6 @@ jobs:
           - target: darwin
             architecture: 32
 
-          - target: linux
-            architecture: arm64
-
           - target: windows
             architecture: arm64
 
@@ -146,9 +149,8 @@ jobs:
       run: |
         set -eux
 
-        case "${{ matrix.target }}${{ matrix.architecture }}" in
-          linux64)
-            echo "MARCH=64" >> $GITHUB_ENV
+        case "${{ matrix.target }}" in
+          linux)
             sudo apt-get update -y
             sudo apt-get install --no-install-recommends -y \
               libmbedtls-dev \
@@ -161,14 +163,14 @@ jobs:
               libsqlite3-dev
             ;;
 
-          darwin*)
+          darwin)
             if [ "${{matrix.build_system}}" != "cmake" ]; then
               brew update
               brew bundle
             fi
             ;;
 
-          windows*)
+          windows)
             if [[ ${{ matrix.build_system }} == cmake-mingw ]]; then
               SDL_SUFFIX=mingw
             else
@@ -238,7 +240,7 @@ jobs:
                   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
                   -DFLAT_INSTALL_TREE=ON
                 ;;
-              linux64)
+              linux*)
                 cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
             esac
 
@@ -352,6 +354,7 @@ jobs:
           darwin64)   platform_name=darwin ;;
           windows*)  platform_name=win${{matrix.architecture}} ;;
           linux64)   platform_name=linux-amd64 ;;
+          linuxarm64)   platform_name=linux-arm64 ;;
         esac
 
         short_commit=$(git rev-parse --short HEAD)
@@ -446,6 +449,7 @@ jobs:
           "darwin-cmake-64/hashlink-${short_commit}-darwin-cmake.tar.gz#hashlink-latest-darwin.tar.gz" \
           "darwin-cmake-arm64/hashlink-${short_commit}-darwin-arm64-cmake.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
           "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
+          "linux-make-arm64/hashlink-${short_commit}-linux-arm64.tar.gz#hashlink-latest-linux-arm64.tar.gz" \
           "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
           "windows-vs2019-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip" \
           "windows-cmake-mingw-64/hashlink-${short_commit}-win64-cmake-mingw.zip#hashlink-latest-win64-mingw.zip"
