@@ -211,9 +211,9 @@ LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--no-undefined
 ifeq ($(MARCH),32)
 CFLAGS += -msse2 -mfpmath=sse
 CPPFLAGS += -I /usr/include/i386-linux-gnu
-LIBFLAGS += -L/opt/libjpeg-turbo/lib
+fmt_LDFLAGS = -L/opt/libjpeg-turbo/lib
 else
-LIBFLAGS += -L/opt/libjpeg-turbo/lib64
+fmt_LDFLAGS = -L/opt/libjpeg-turbo/lib64
 endif
 
 SDL_CPPFLAGS = $(shell pkg-config --cflags sdl2)
