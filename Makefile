@@ -12,7 +12,7 @@ ARCH ?= $(shell uname -m)
 
 CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden
 CPPFLAGS = -I src
-LFLAGS = -L. -lhl
+LFLAGS =
 EXTRA_LFLAGS ?=
 LIBFLAGS =
 LIBHL_LDLIBS = -lm -lpthread
@@ -233,7 +233,9 @@ ifdef DEBUG
 CFLAGS += -g
 endif
 
-all: libhl libs
+LIBHL = libhl.$(LIBEXT)
+
+all: $(LIBHL) libs
 ifeq ($(ARCH),arm64)
 	$(warning HashLink vm is not supported on arm64, skipping)
 else
@@ -248,64 +250,65 @@ ifneq ($(ARCH),arm64)
 endif
 	mkdir -p $(INSTALL_LIB_DIR)
 	cp *.hdll $(INSTALL_LIB_DIR)
-	cp libhl.${LIBEXT} $(INSTALL_LIB_DIR)
+	cp $(LIBHL) $(INSTALL_LIB_DIR)
 	mkdir -p $(INSTALL_INCLUDE_DIR)
 	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
 
 uninstall:
-	rm -f $(INSTALL_BIN_DIR)/hl $(INSTALL_LIB_DIR)/libhl.${LIBEXT} $(INSTALL_LIB_DIR)/*.hdll
+	rm -f $(INSTALL_BIN_DIR)/hl $(INSTALL_LIB_DIR)/$(LIBHL) $(INSTALL_LIB_DIR)/*.hdll
 	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
 
 libs: $(LIBS)
 
 src/std/regexp.o $(PCRE): CPPFLAGS += $(PCRE_CPPFLAGS)
 $(LIB): CPPFLAGS += -D LIBHL_EXPORTS
-libhl: ${LIB}
-	${CC} ${CFLAGS} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} ${LHL_LINK_FLAGS} -shared $^ ${LIBHL_LDLIBS}
+$(LIBHL): $(LIB)
+	$(CC) $(CFLAGS) $(LIBFLAGS) $(LHL_LINK_FLAGS) -shared $^ $(LIBHL_LDLIBS) -o $@
 
-hlc: ${BOOT}
-	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS} ${HLC_LDLIBS}
+hlc: $(BOOT) $(LIBHL)
+	$(CC) $(CFLAGS) $(LFLAGS) $(EXTRA_LFLAGS) $^ $(HLC_LDLIBS) -o $@
 
-hl: ${HL} libhl
-	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
+hl: $(HL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LFLAGS) $(EXTRA_LFLAGS) $(HLFLAGS) $^ -o $@
 
 $(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
-fmt: ${FMT} libhl
-	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
+
+fmt: $(FMT) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -lpng $(LIBTURBOJPEG) -lz -lvorbisfile -o $@.hdll
 
 $(SDL): CPPFLAGS += $(SDL_CPPFLAGS)
-sdl: ${SDL} libhl
-	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl $(SDL_LINK_FLAGS) $(LIBOPENGL)
+sdl: $(SDL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) $(SDL_LINK_FLAGS) -shared $^ $(LIBOPENGL) -o $@.hdll
 
 $(OPENAL): CPPFLAGS += $(OPENAL_CPPFLAGS)
-openal: ${OPENAL} libhl
-	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
+openal: $(OPENAL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) $^ -shared $(LIBOPENAL) -o $@.hdll
 
 $(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 # force rebuild ssl.o in case we mix SSL_STATIC with normal build
 .PHONY: libs/ssl/ssl.o
 libs/ssl/ssl.o: libs/ssl/ssl.c
 	${CC} ${CFLAGS} $(CPPFLAGS) -o $@ -c $<
-ssl: ${SSL} libhl
-	${CC} ${CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl ${SSL_LDLIBS} $(LIBSSL)
+ssl: $(SSL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(SSL_LDLIBS) $(LIBSSL) -o $@.hdll
 
-ui: ${UI} libhl
-	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} -L. -lhl
+ui: $(UI) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -o $@.hdll
 
-uv: ${UV} libhl
-	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
+uv: $(UV) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -luv -o $@.hdll
 
-mysql: ${MYSQL} libhl
-	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl ${MYSQL_LDLIBS}
+mysql: $(MYSQL) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ $(MYSQL_LDLIBS) -o $@.hdll
 
-sqlite: ${SQLITE} libhl
-	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L. -lhl -lsqlite3
+sqlite: $(SQLITE) $(LIBHL)
+	$(CC) $(CFLAGS) $(LIBFLAGS) -shared $^ -lsqlite3 -o $@.hdll
 
 CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 
 $(HEAPS): CPPFLAGS += $(HEAPS_CPPFLAGS)
-heaps: ${HEAPS} libhl
-	${CXX} ${CFLAGS} -shared -o heaps.hdll ${HEAPS} ${LIBFLAGS} -L. -lhl
+heaps: $(HEAPS) $(LIBHL)
+	$(CXX) $(CXXFLAGS) $(LIBFLAGS) -shared $^ -o $@.hdll
 
 mesa:
 	(cd libs/mesa && ${MAKE})
@@ -359,9 +362,9 @@ release_win:
 
 release_linux release_osx:
 ifeq ($(ARCH),arm64)
-	cp libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
+	cp $(LIBHL) *.hdll $(PACKAGE_NAME)
 else
-	cp hl libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
+	cp hl $(LIBHL) *.hdll $(PACKAGE_NAME)
 endif
 	tar -cvzf $(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
 	rm -rf $(PACKAGE_NAME)
@@ -381,6 +384,6 @@ clean_o:
 	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
 
 clean: clean_o
-	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
+	rm -f hl hl.exe $(LIBHL) *.hdll
 
-.PHONY: libhl hl hlc fmt sdl libs release
+.PHONY: hl hlc fmt sdl libs release
