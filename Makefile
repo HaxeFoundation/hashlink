@@ -127,7 +127,6 @@ UNAME := $(shell uname)
 # Cygwin / mingw
 ifeq ($(OS),Windows_NT)
 
-LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
 RELEASE_NAME=win
 # VS variables are for packaging Visual Studio builds
@@ -168,7 +167,6 @@ BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
 BREW_SDL_PREFIX := $(shell brew --prefix sdl2)
 
 CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -I $(BREW_SDL_PREFIX)/include/SDL2 -Dopenal_soft -DGL_SILENCE_DEPRECATION
-LFLAGS += -Wl,-export_dynamic
 
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
@@ -199,7 +197,7 @@ else
 
 # Linux
 CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
-LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
+LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu -msse2 -mfpmath=sse
