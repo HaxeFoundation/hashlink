@@ -36,6 +36,7 @@ else()
     set(_DOWNLOAD_DEPENDENCIES OFF)
 endif()
 option(DOWNLOAD_DEPENDENCIES "Download & build third-party dependencies" ${_DOWNLOAD_DEPENDENCIES})
+option(WITH_SYSTEM_PCRE2 "Link libhl against system installation of pcre2" OFF)
 
 if(MSVC)
     if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -156,14 +157,13 @@ if(IOS_PLATFORM)
 endif()
 
 add_library(libhl
-    ${pcre_srcs}
     src/gc.c
     ${std_srcs}
 )
 
 target_include_directories(libhl
     PUBLIC src
-    PRIVATE include include/pcre
+    PRIVATE include
 )
 
 # C11 / C++11 are required for features such as unicode strings
@@ -195,8 +195,28 @@ set_target_properties(libhl
     PROPERTIES
     VERSION ${HL_VERSION}
     SOVERSION ${HL_VERSION_MAJOR}
-    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16"
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;PCRE2_CODE_UNIT_WIDTH=16"
 )
+
+if(WITH_SYSTEM_PCRE2)
+    target_link_libraries(libhl pcre2-16)
+else()
+    target_sources(libhl PRIVATE ${pcre_srcs})
+    target_include_directories(libhl PRIVATE include/pcre)
+    target_compile_definitions(libhl PRIVATE HAVE_CONFIG_H PCRE2_STATIC)
+endif()
+
+if(WIN32)
+    target_link_libraries(libhl ws2_32 user32 winmm)
+else()
+    target_link_libraries(libhl m dl)
+
+    if(ANDROID)
+        target_link_libraries(libhl log)
+    else()
+        target_link_libraries(libhl pthread)
+    endif()
+endif()
 
 if (WITH_VM)
     add_executable(hl
@@ -221,18 +241,6 @@ if (WITH_VM)
 
     if (WIN32)
         target_link_libraries(hl user32)
-    endif()
-endif()
-
-if(WIN32)
-    target_link_libraries(libhl ws2_32 user32 winmm)
-else()
-    target_link_libraries(libhl m dl)
-
-    if(ANDROID)
-        target_link_libraries(libhl log)
-    else()
-        target_link_libraries(libhl pthread)
     endif()
 endif()
 
