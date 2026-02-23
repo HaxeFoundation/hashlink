@@ -198,7 +198,10 @@ LHL_LINK_FLAGS += -install_name @rpath/libhl.dylib
 else
 
 # Linux
-CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
+ifneq ($(ARCH),arm64)
+CFLAGS += -m$(MARCH)
+endif
+CFLAGS += -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
 LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
