@@ -298,16 +298,12 @@ jobs:
         case "${{ matrix.build_system }}" in
           cmake*)
             case "${{matrix.target}}" in
-              linux)
-                cmake --install build --prefix /tmp/hashlink
-                /tmp/hashlink/bin/hl --version
-                ;;
-              darwin)
-                cmake --install build --prefix /tmp/hashlink
-                if [ -f /tmp/hashlink/hl ]; then /tmp/hashlink/hl --version; fi
-                ;;
               windows)
                 export PATH=$(pwd)/build/bin:$PATH
+                ;;
+              *)
+                cmake --install build --prefix /tmp/hashlink
+                if [ -f /tmp/hashlink/hl ]; then /tmp/hashlink/hl --version; fi
                 ;;
             esac
             cd build && ctest --verbose --build-config ${{ matrix.cmake_configuration }}
