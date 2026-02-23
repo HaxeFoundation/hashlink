@@ -197,6 +197,10 @@ LIBFLAGS += -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
 LHL_LINK_FLAGS += -install_name @rpath/libhl.dylib
 else
 
+ifeq ($(ARCH),aarch64)
+ARCH = arm64
+endif
+
 # Linux
 ifneq ($(ARCH),arm64)
 CFLAGS += -m$(MARCH)
