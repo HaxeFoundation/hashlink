@@ -333,7 +333,8 @@ jobs:
                 darwin) otool -L ./hl ;;
               esac
 
-              haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
+              haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp \
+                ${{ matrix.architecture == 32 && '-D hl-legacy32' || '' }}
               ./hl hello.hl
 
               # ensure the executable still works when installed globally
