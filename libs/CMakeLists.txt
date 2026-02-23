@@ -13,6 +13,9 @@ function(set_as_hdll target)
         OUTPUT_NAME ${target}
         SUFFIX ${HDLL_SUFFIX}
     )
+    if (NOT MSVC AND NOT APPLE)
+        target_link_options(${target}.hdll PRIVATE "-Wl,--no-undefined")
+    endif()
 endfunction()
 
 if (DOWNLOAD_DEPENDENCIES)
