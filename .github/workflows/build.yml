@@ -73,7 +73,6 @@ jobs:
             cmake_generator: Visual Studio 17 2022
 
           - target: windows
-            architecture: 64
             runner: windows-2025
             build_system: cmake-mingw
 
@@ -115,10 +114,6 @@ jobs:
 
           - target: windows
             build_system: makegcc14
-
-          - target: windows
-            architecture: 32
-            build_system: cmake-mingw
 
           - target: darwin
             build_system: cmake-mingw
@@ -173,6 +168,10 @@ jobs:
             ;;
 
           windows)
+            if [[ ${{ matrix.build_system }}${{ matrix.architecture }} == cmake-mingw32 ]]; then
+              echo "C:\mingw32\bin" >> $GITHUB_PATH
+            fi
+
             if [[ ${{ matrix.build_system }} == cmake-mingw ]]; then
               SDL_SUFFIX=mingw
             else
