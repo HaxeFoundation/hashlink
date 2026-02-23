@@ -21,8 +21,11 @@ LIBTURBOJPEG = -lturbojpeg
 
 LHL_LINK_FLAGS =
 
-PCRE_FLAGS = -I include/pcre -D HAVE_CONFIG_H -D PCRE2_CODE_UNIT_WIDTH=16
-
+PCRE_FLAGS = -D PCRE2_CODE_UNIT_WIDTH=16
+ifdef WITH_SYSTEM_PCRE2
+LHL_LINK_FLAGS += -lpcre2-16
+else
+PCRE_FLAGS += -I include/pcre -D HAVE_CONFIG_H -D PCRE2_STATIC
 PCRE = include/pcre/pcre2_auto_possess.o include/pcre/pcre2_chartables.o include/pcre/pcre2_compile.o \
 	include/pcre/pcre2_config.o include/pcre/pcre2_context.o include/pcre/pcre2_convert.o \
 	include/pcre/pcre2_dfa_match.o include/pcre/pcre2_error.o include/pcre/pcre2_extuni.o \
@@ -32,6 +35,7 @@ PCRE = include/pcre/pcre2_auto_possess.o include/pcre/pcre2_chartables.o include
 	include/pcre/pcre2_serialize.o include/pcre/pcre2_string_utils.o include/pcre/pcre2_study.o \
 	include/pcre/pcre2_substitute.o include/pcre/pcre2_substring.o include/pcre/pcre2_tables.o \
 	include/pcre/pcre2_ucd.o include/pcre/pcre2_valid_utf.o include/pcre/pcre2_xclass.o
+endif
 
 RUNTIME = src/gc.o
 
