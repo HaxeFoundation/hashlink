@@ -243,16 +243,12 @@ if(BUILD_TESTING)
         haxe
     )
 
-    if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "Win32")
+    if(CMAKE_SIZEOF_VOID_P EQUAL 4)
         SET(HAXE_FLAGS -D hl-legacy32)
-    else()
-        SET(HAXE_FLAGS )
     endif()
 
     if(MINGW)
         set(HLC_LIBRARIES dbghelp)
-    else()
-        set(HLC_LIBRARIES)
     endif()
 
     #####################
