@@ -30,7 +30,6 @@ jobs:
             archive_ext: tar.gz
 
           - target: linux
-            architecture: 64
             runner: ubuntu-latest
             haxe_nightly_dir: linux64
 
@@ -97,9 +96,6 @@ jobs:
           - target: darwin
             build_system: vs2019
 
-          - target: linux
-            architecture: 32
-
           - target: darwin
             architecture: 32
 
@@ -144,20 +140,28 @@ jobs:
 
     - name: "Install: Required Dev Packages"
       run: |
-        set -eux
+        set -ex
 
         case "${{ matrix.target }}" in
           linux)
+            if [ ${{matrix.architecture}} == 32 ]; then
+              echo "MARCH=32" >> $GITHUB_ENV
+              sudo dpkg --add-architecture i386
+              SUFFIX=":i386"
+              EXTRA_APT_PKGS="gcc-multilib g++-multilib"
+            fi
+
             sudo apt-get update -y
             sudo apt-get install --no-install-recommends -y \
-              libmbedtls-dev \
-              libopenal-dev \
-              libpng-dev \
-              libsdl2-dev \
-              libturbojpeg-dev \
-              libuv1-dev \
-              libvorbis-dev \
-              libsqlite3-dev
+              libmbedtls-dev${SUFFIX} \
+              libopenal-dev${SUFFIX} \
+              libpng-dev${SUFFIX} \
+              libsdl2-dev${SUFFIX} \
+              libturbojpeg-dev${SUFFIX} \
+              libuv1-dev${SUFFIX} \
+              libvorbis-dev${SUFFIX} \
+              libsqlite3-dev${SUFFIX} \
+              ${EXTRA_APT_PKGS}
             ;;
 
           darwin)
@@ -199,6 +203,9 @@ jobs:
           sudo apt update
           sudo apt install -y gcc-14 g++-14
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 --slave /usr/bin/g++ g++ /usr/bin/g++-14
+          if [[ ${{ matrix.architecture }} == 32 ]]; then
+            sudo apt install -y gcc-14-multilib g++-14-multilib
+          fi
           gcc --version
 
     - name: Install haxe
@@ -241,6 +248,8 @@ jobs:
                   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
                   -DFLAT_INSTALL_TREE=ON
                 ;;
+              linux32)
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake ;;
               linux*)
                 cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
             esac
@@ -350,6 +359,7 @@ jobs:
           darwinarm64)   platform_name=darwin-arm64 ;;
           darwin64)   platform_name=darwin ;;
           windows*)  platform_name=win${{matrix.architecture}} ;;
+          linux32)   platform_name=linux-i386 ;;
           linux64)   platform_name=linux-amd64 ;;
           linuxarm64)   platform_name=linux-arm64 ;;
         esac
@@ -445,6 +455,7 @@ jobs:
           --title "HashLink Nightly Build" \
           "darwin-cmake-64/hashlink-${short_commit}-darwin-cmake.tar.gz#hashlink-latest-darwin.tar.gz" \
           "darwin-cmake-arm64/hashlink-${short_commit}-darwin-arm64-cmake.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
+          "linux-make-32/hashlink-${short_commit}-linux-i386.tar.gz#hashlink-latest-linux-i386.tar.gz" \
           "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "linux-make-arm64/hashlink-${short_commit}-linux-arm64.tar.gz#hashlink-latest-linux-arm64.tar.gz" \
           "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
