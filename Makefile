@@ -10,7 +10,7 @@ INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 LIBS=fmt sdl ssl openal ui uv mysql sqlite heaps
 ARCH ?= $(shell uname -m)
 
-CFLAGS = -Wall -O3 -I src -std=c11 -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -std=c11 -D LIBHL_EXPORTS -fvisibility=hidden
 LFLAGS = -L. -lhl
 EXTRA_LFLAGS ?=
 LIBFLAGS =
@@ -93,7 +93,7 @@ SSL += include/mbedtls/library/aes.o include/mbedtls/library/aesce.o include/mbe
 	include/mbedtls/library/x509_create.o include/mbedtls/library/x509_crl.o include/mbedtls/library/x509_crt.o \
 	include/mbedtls/library/x509_csr.o include/mbedtls/library/x509write.o include/mbedtls/library/x509write_crt.o \
 	include/mbedtls/library/x509write_csr.o
-SSL_CFLAGS = -fvisibility=hidden -I libs/ssl -I include/mbedtls/include -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
+SSL_CFLAGS = -I libs/ssl -I include/mbedtls/include -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
 else
 SSL_LDLIBS = -lmbedtls -lmbedx509 -lmbedcrypto
 endif
@@ -116,7 +116,7 @@ HEAPS += include/meshoptimizer/allocator.o include/meshoptimizer/overdrawoptimiz
 	include/meshoptimizer/spatialorder.o include/meshoptimizer/vfetchanalyzer.o \
 	include/meshoptimizer/stripifier.o include/meshoptimizer/vfetchoptimizer.o \
 	include/meshoptimizer/overdrawanalyzer.o include/meshoptimizer/vcacheanalyzer.o
-HEAPS_CFLAGS = -fvisibility=hidden -I include/mikktspace -I include/meshoptimizer -I include/vhacd -I include/renderdoc
+HEAPS_CFLAGS = -I include/mikktspace -I include/meshoptimizer -I include/vhacd -I include/renderdoc
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -127,7 +127,6 @@ UNAME := $(shell uname)
 # Cygwin / mingw
 ifeq ($(OS),Windows_NT)
 
-LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
 RELEASE_NAME=win
 # VS variables are for packaging Visual Studio builds
@@ -168,7 +167,6 @@ BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
 BREW_SDL_PREFIX := $(shell brew --prefix sdl2)
 
 CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -I $(BREW_SDL_PREFIX)/include/SDL2 -Dopenal_soft -DGL_SILENCE_DEPRECATION
-LFLAGS += -Wl,-export_dynamic
 
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
@@ -199,7 +197,7 @@ else
 
 # Linux
 CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
-LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
+LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu -msse2 -mfpmath=sse
