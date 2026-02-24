@@ -8,7 +8,6 @@ if ((NOT WIN32) AND DOWNLOAD_DEPENDENCIES)
         SDL3
         URL https://github.com/libsdl-org/SDL/releases/download/release-3.2.22/SDL3-3.2.22.tar.gz
         URL_HASH SHA256=f29d00cbcee273c0a54f3f32f86bf5c595e8823a96b1d92a145aac40571ebfcc
-        DOWNLOAD_EXTRACT_TIMESTAMP true
         EXCLUDE_FROM_ALL
     )
     set(SDL_TEST OFF CACHE INTERNAL "")
@@ -26,16 +25,18 @@ if ((NOT WIN32) AND DOWNLOAD_DEPENDENCIES)
 else()
     if(WIN32)
         set(SDL3_DIR ${INCLUDES_BASE_DIR}/sdl/cmake)
+        if(NOT MINGW)
+            target_include_directories(sdl.hdll
+                PRIVATE
+                ${INCLUDES_BASE_DIR}/gl
+            )
+        endif()
     endif()
 
     find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3)
 endif()
 
 set_as_hdll(sdl)
-target_include_directories(sdl.hdll
-    PRIVATE
-    ${INCLUDES_BASE_DIR}/gl
-)
 target_link_libraries(sdl.hdll
     libhl
     SDL3::SDL3

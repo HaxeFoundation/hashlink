@@ -532,6 +532,11 @@ h_bool hl_module_init_vtune( hl_module *m ) {
 	}
 	return true;
 }
+static void modules_init_vtune() {
+	int i;
+	for(i=0;i<modules_count;i++)
+		hl_module_init_vtune(cur_modules[i]);
+}
 #endif
 
 static void hl_module_init_natives( hl_module *m ) {
@@ -630,8 +635,7 @@ static void hl_module_add( hl_module *m ) {
 	free(old_modules);
 }
 
-void hl_setup_vtune( void *vtune_init, void *m );
-int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later ) {
+int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
 	// expand globals
@@ -682,23 +686,95 @@ int hl_module_init( hl_module *m, h_bool hot_reload, h_bool vtune_later ) {
 		hl_constant *c = m->code->constants + i;
 		hl_module_init_constant(m, c);
 	}
-
-#	ifdef HL_VTUNE
-	if( !vtune_later ) {
-		hl_module_init_vtune(m);
-	} else {
-		hl_setup_vtune(hl_module_init_vtune, m);
-	}
-#	endif
 	hl_module_add(m);
-	hl_setup_exception(module_resolve_symbol, module_capture_stack);
+	hl_setup.resolve_symbol = module_resolve_symbol;
+	hl_setup.capture_stack = module_capture_stack;
 	hl_gc_set_dump_types(hl_module_types_dump);
+#	ifdef HL_VTUNE
+	hl_setup.vtune_init = modules_init_vtune;
+#	endif
 	hl_jit_free(ctx, hot_reload);
 	if( hot_reload ) {
 		hl_code_hash_finalize(m->hash);
 		m->jit_ctx = ctx;
 	}
 	return 1;
+}
+
+static bool check_same_type( hl_type *t1, hl_type *t2 ) {
+	if( hl_safe_cast(t1,t2) )
+		return true;
+	if( t1->kind != t2->kind )
+		return false;
+	int i;
+	switch( t1->kind ) {
+	case HOBJ:
+	case HSTRUCT:
+		return ucmp(t1->obj->name,t2->obj->name) == 0;
+	case HFUN:
+	case HMETHOD:
+		if( t1->fun->nargs != t2->fun->nargs )
+			return false;
+		for(i=0;i<t1->fun->nargs;i++)
+			if( !check_same_type(t1->fun->args[i],t2->fun->args[i]) )
+				return false;
+		return check_same_type(t1->fun->ret, t2->fun->ret);
+	case HVIRTUAL:
+		if( t1->virt->nfields != t2->virt->nfields )
+			return false;
+		for(i=0;i<t1->virt->nfields;i++) {
+			hl_obj_field *f1 = t1->virt->fields + i;
+			hl_obj_field *f2 = t2->virt->fields + i;
+			if( f1->hashed_name != f2->hashed_name || !check_same_type(f1->t, f2->t) )
+				return false;
+		}
+		return true;
+	case HABSTRACT:
+		return ucmp(t1->abs_name, t2->abs_name) == 0;
+	case HENUM:
+		return ucmp(t1->tenum->name, t2->tenum->name) == 0;
+	default:
+		break;
+	}
+	return false;
+}
+
+static int check_same_obj( hl_type_obj *o1, hl_type_obj *o2 ) {
+	if( o1->nproto != o2->nproto || o1->nfields != o2->nfields || o1->nbindings != o2->nbindings )
+		return -1;
+	int i;
+	for(i=0;i<o1->nproto;i++)
+		if( o1->proto[i].hashed_name != o2->proto[i].hashed_name )
+			return -1;
+	for(i=0;i<o1->nfields;i++)
+		if( o1->fields[i].hashed_name != o2->fields[i].hashed_name || !check_same_type(o1->fields[i].t,o2->fields[i].t) )
+			return -1;
+	for(i=0;i<o1->nproto;i++)
+		if( o1->proto[i].pindex != o2->proto[i].pindex )
+			return -2;
+	return 0;
+}
+
+hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err ) {
+	int i;
+	if( t->kind != HOBJ )
+		return NULL;
+	for(i=0;i<m->code->ntypes;i++) {
+		hl_type *t2 = m->code->types + i;
+		if( t2->kind == HOBJ && ucmp(t->obj->name,t2->obj->name) == 0 ) {
+			int r = check_same_obj(t->obj,t2->obj);
+			if( r == 0 )
+				return t2;
+			if( err ) {
+				if( r == -2 )
+					hl_error("Class '%s' has different prototype than loader (missing @:virtual)",t->obj->name);
+				else
+					hl_error("Class '%s' has different definition than loader",t->obj->name);
+			}
+			return NULL;
+		}
+	}
+	return NULL;
 }
 
 h_bool hl_module_patch( hl_module *m1, hl_code *c ) {

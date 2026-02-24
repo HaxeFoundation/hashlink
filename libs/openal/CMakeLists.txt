@@ -30,7 +30,6 @@ elseif(DOWNLOAD_DEPENDENCIES)
 	FetchContent_Declare(openal-soft
         URL https://github.com/kcat/openal-soft/archive/refs/tags/1.24.3.tar.gz
         URL_HASH SHA256=7e1fecdeb45e7f78722b776c5cf30bd33934b961d7fd2a11e0494e064cc631ce
-        DOWNLOAD_EXTRACT_TIMESTAMP true
         EXCLUDE_FROM_ALL
     )
 

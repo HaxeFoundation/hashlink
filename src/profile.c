@@ -55,7 +55,6 @@
 #define MAX_STACK_COUNT 2048
 
 HL_API double hl_sys_time( void );
-HL_API void hl_setup_profiler( void *, void * );
 int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out, int size );
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr );
 
@@ -95,6 +94,7 @@ static struct {
 	void *stackOut[MAX_STACK_COUNT];
 	profile_data *record;
 	profile_data *first_record;
+	hl_condition *waitCond;
 } data = {0};
 
 #ifdef HL_LINUX
@@ -242,12 +242,12 @@ static void read_thread_data( thread_handle *t ) {
 #else
 	int size = (int)((unsigned char*)t->inf->stack_top - (unsigned char*)stack);
 	if( size > MAX_STACK_SIZE-32 ) size = MAX_STACK_SIZE-32;
-#ifdef HL_WIN_DESKTOP
+#if defined(HL_WIN_DESKTOP) && defined(HL_VCC)
 	// it seems we rarely can't make a first read on the thread stack, let's ignore errors and wait.
 	__try {
 #endif
 		memcpy(data.tmpMemory + 2,stack,size);
-#ifdef HL_WIN_DESKTOP
+#if defined(HL_WIN_DESKTOP) && defined(HL_VCC)
 	} __except(EXCEPTION_EXECUTE_HANDLER) {
 	}
 #endif
@@ -270,17 +270,39 @@ static void read_thread_data( thread_handle *t ) {
 		memcpy(t->name, t->inf->thread_name, sizeof(t->name));
 }
 
+static void profile_pause() {
+	hl_condition_acquire(data.waitCond);
+	data.profiling_pause++;
+	hl_condition_broadcast(data.waitCond);
+	hl_condition_release(data.waitCond);
+}
+
+static void profile_resume() {
+	hl_condition_acquire(data.waitCond);
+	data.profiling_pause--;
+	hl_condition_broadcast(data.waitCond);
+	hl_condition_release(data.waitCond);
+}
+
 static void hl_profile_loop( void *_ ) {
 	double wait_time = 1. / data.sample_count;
 	double next = hl_sys_time();
 	data.tmpMemory = malloc(MAX_STACK_SIZE);
+	data.waitLoop = false;
 	while( !data.stopLoop ) {
 		double t = hl_sys_time();
+		hl_condition_acquire(data.waitCond);
 		if( t < next || data.profiling_pause ) {
 			if( !(t < next) ) next = t;
-			data.waitLoop = false;
+			if( data.profiling_pause ) {
+				data.waitLoop = true;
+				hl_condition_wait(data.waitCond);
+				data.waitLoop = false;
+			}
+			hl_condition_release(data.waitCond);
 			continue;
 		}
+		hl_condition_release(data.waitCond);
 		hl_threads_info *threads = hl_gc_threads_info();
 		int i;
 		thread_handle *prev = NULL;
@@ -354,11 +376,16 @@ static void profile_event( int code, vbyte *data, int dataLen );
 
 void hl_profile_setup( int sample_count ) {
 #	if defined(HL_THREADS) && (defined(HL_WIN_DESKTOP) || defined(HL_LINUX) || defined (HL_MAC))
-	hl_setup_profiler(profile_event,hl_profile_end);
+	if( data.waitCond == NULL ) {
+		data.waitCond = hl_condition_alloc();
+		hl_add_root(&data.waitCond);
+	}
+	hl_setup.profile_event = profile_event;
+	hl_setup.before_exit = hl_profile_end;
 	if( data.sample_count ) return;
 	if( sample_count < 0 ) {
 		// was not started with --profile : pause until we get start event
-		data.profiling_pause++;
+		profile_pause();
 		return;
 	}
 	data.sample_count = sample_count;
@@ -368,7 +395,7 @@ void hl_profile_setup( int sample_count ) {
 	sem_init(&shared_context.msg4, 0, 0);
 	struct sigaction action = {0};
 	action.sa_sigaction = sigprof_handler;
-	action.sa_flags = SA_SIGINFO;
+	action.sa_flags = SA_SIGINFO | SA_RESTART;
 	sigaction(SIGPROF, &action, NULL);
 #	elif defined(HL_MAC)
 	shared_context.context.uc_mcontext = NULL;
@@ -377,7 +404,7 @@ void hl_profile_setup( int sample_count ) {
 	shared_context.msg4 = dispatch_semaphore_create(0);
 	struct sigaction action = {0};
 	action.sa_sigaction = sigprof_handler;
-	action.sa_flags = SA_SIGINFO;
+	action.sa_flags = SA_SIGINFO | SA_RESTART;
 	sigaction(SIGPROF, &action, NULL);
 #	endif
 	hl_thread_start(hl_profile_loop,NULL,false);
@@ -420,12 +447,18 @@ static int write_names( thread_handle *h, FILE *f ) {
 static void profile_dump( vbyte* ptr ) {
 	if( !data.first_record ) return;
 
-	data.profiling_pause++;
+	profile_pause();
 	printf("Writing profiling data...\n");
 	fflush(stdout);
 
 	char* filename = ptr == NULL ? "hlprofile.dump" : hl_to_utf8((uchar*)ptr);
 	FILE *f = fopen(filename,"wb");
+	if( f == NULL ) {
+		profile_resume();
+		printf("Failed to open file %s, 0 profile samples saved\n", filename);
+		hl_error("Failed to open file");
+		return;
+	}
 	int version = HL_VERSION;
 	fwrite("PROF",1,4,f);
 	fwrite(&version,1,4,f);
@@ -508,14 +541,18 @@ static void profile_dump( vbyte* ptr ) {
 	write_names(data.olds,f);
 	// done
 	fclose(f);
-	printf("%d profile samples saved\n", samples);
-	data.profiling_pause--;
+	printf("%d profile samples saved to %s\n", samples, filename);
+	profile_resume();
 }
 
 void hl_profile_end() {
 	profile_dump(NULL);
 	if( !data.sample_count ) return;
 	data.stopLoop = true;
+	hl_condition_acquire(data.waitCond);
+	data.profiling_pause = 0;
+	hl_condition_broadcast(data.waitCond);
+	hl_condition_release(data.waitCond);
 	while( data.stopLoop ) {};
 }
 
@@ -528,9 +565,8 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		hl_get_thread()->flags &= ~HL_THREAD_PROFILER_PAUSED;
 		break;
 	case -3:
-		data.profiling_pause++;
-		data.waitLoop = true;
-		while( data.waitLoop ) {}
+		profile_pause();
+		while( !data.waitLoop ) {}
 		profile_data *d = data.first_record;
 		while( d ) {
 			profile_data *n = d->next;
@@ -540,13 +576,13 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 		}
 		data.first_record = NULL;
 		data.record = NULL;
-		data.profiling_pause--;
+		profile_resume();
 		break;
 	case -4:
-		data.profiling_pause++;
+		profile_pause();
 		break;
 	case -5:
-		data.profiling_pause--;
+		profile_resume();
 		break;
 	case -6:
 		profile_dump(ptr);
@@ -563,16 +599,15 @@ static void profile_event( int code, vbyte *ptr, int dataLen ) {
 	default:
 		if( code < 0 ) return;
 		if( data.profiling_pause || (code != 0 && (hl_get_thread()->flags & HL_THREAD_PROFILER_PAUSED)) ) return;
-		data.profiling_pause++;
-		data.waitLoop = true;
-		while( data.waitLoop ) {}
+		profile_pause();
+		while( !data.waitLoop ) {}
 		double time = hl_sys_time();
 		record_data(&time,sizeof(double));
 		record_data(&hl_get_thread()->thread_id,sizeof(int));
 		record_data(&code,sizeof(int));
 		record_data(&dataLen,sizeof(int));
 		record_data(ptr,dataLen);
-		data.profiling_pause--;
+		profile_resume();
 		break;
 	}
 }

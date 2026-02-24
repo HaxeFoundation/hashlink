@@ -145,7 +145,6 @@ elseif(DOWNLOAD_DEPENDENCIES)
             -DCMAKE_INSTALL_LIBDIR=lib
         # INSTALL_BYPRODUCTS in CMake 3.26+
         BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libturbojpeg.a
-        DOWNLOAD_EXTRACT_TIMESTAMP true
     )
 
     ExternalProject_Get_Property(turbojpeg-project INSTALL_DIR)
@@ -170,7 +169,6 @@ elseif(DOWNLOAD_DEPENDENCIES)
             -DCMAKE_INSTALL_LIBDIR=lib
         # INSTALL_BYPRODUCTS in CMake 3.26+
         BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libpng.a
-        DOWNLOAD_EXTRACT_TIMESTAMP true
     )
     ExternalProject_Get_Property(libpng INSTALL_DIR)
 
@@ -190,7 +188,6 @@ elseif(DOWNLOAD_DEPENDENCIES)
             -DCMAKE_INSTALL_LIBDIR=lib
         # INSTALL_BYPRODUCTS in CMake 3.26+
         BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libogg.a
-        DOWNLOAD_EXTRACT_TIMESTAMP true
     )
     ExternalProject_Get_Property(libogg INSTALL_DIR)
     set(OGG_INSTALL_DIR ${INSTALL_DIR})
@@ -211,7 +208,6 @@ elseif(DOWNLOAD_DEPENDENCIES)
         BUILD_BYPRODUCTS
             <INSTALL_DIR>/lib/libvorbis.a
             <INSTALL_DIR>/lib/libvorbisfile.a
-        DOWNLOAD_EXTRACT_TIMESTAMP true
     )
     add_dependencies(libvorbis libogg)
     ExternalProject_Get_Property(libvorbis INSTALL_DIR)
@@ -226,7 +222,7 @@ elseif(DOWNLOAD_DEPENDENCIES)
     set_target_properties(vorbisfile PROPERTIES IMPORTED_LOCATION ${VORBIS_INSTALL_DIR}/lib/libvorbisfile.a)
 
     set(VORBIS_INCLUDE_DIR ${VORBIS_INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR} ${OGG_INCLUDE_DIR})
-    set(OGGVORBIS_LIBRARIES vorbis ogg vorbisfile)
+    set(OGGVORBIS_LIBRARIES vorbisfile vorbis ogg)
 
     add_dependencies(vorbisfile libvorbis)
     add_dependencies(vorbis libvorbis)

@@ -29,7 +29,7 @@
 #define DXERR(cmd)	{ HRESULT __ret = cmd; if( __ret == E_OUTOFMEMORY ) return NULL; if( __ret != S_OK ) ReportDxError(__ret,__LINE__); }
 #define CHKERR(cmd) { HRESULT __ret = cmd; if( FAILED(__ret) ) ReportDxError(__ret,__LINE__); }
 
-static int gs_constants[] = {
+static unsigned int gs_constants[] = {
 #ifdef _GAMING_XBOX_XBOXONE
 	D3D12XBOX_TEXTURE_DATA_PITCH_ALIGNMENT,
 #else
@@ -38,6 +38,12 @@ static int gs_constants[] = {
 	D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT,
 	D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND,
 	D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+};
+
+enum DriverInitFlag {
+	DEBUG                    = 1 << 0,
+	GPU_BASED_VALIDATION     = 1 << 1,
+	BREAK_ON_ERROR           = 1 << 2,
 };
 
 typedef struct {
@@ -117,20 +123,20 @@ HL_PRIM varray *HL_NAME(list_devices)() {
 }
 
 
-HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags, uchar *dev_desc ) {
+HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *dev_desc ) {
 	UINT dxgiFlags = 0;
 	dx_driver *drv = (dx_driver*)hl_gc_alloc_raw(sizeof(dx_driver));
 	memset(drv, 0, sizeof(dx_driver));
 	drv->wnd = window;
 
-	if( flags & 1 ) {
+	if( flags & DEBUG ) {
 		ID3D12Debug *debugController;
 		D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
 		debugController->EnableDebugLayer();
 #ifndef HL_XBS
 		debugController->QueryInterface(&drv->debug);
 		drv->debug->EnableDebugLayer();
-		drv->debug->SetEnableGPUBasedValidation(true);
+		drv->debug->SetEnableGPUBasedValidation(flags & GPU_BASED_VALIDATION);
 		dxgiFlags |= DXGI_CREATE_FACTORY_DEBUG;
 #else
 		debugController->QueryInterface(IID_PPV_ARGS(&drv->debug));
@@ -162,6 +168,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int flags, uchar *dev_desc ) {
 	if( drv->debug ) {
 		CHKERR(drv->device->QueryInterface(IID_PPV_ARGS(&drv->debugDevice)));
 		CHKERR(drv->device->QueryInterface(IID_PPV_ARGS(&drv->infoQueue)));
+		drv->infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, flags & BREAK_ON_ERROR);
 		drv->infoQueue->ClearStoredMessages();
 	}
 #else
@@ -344,7 +351,7 @@ HL_PRIM void HL_NAME(flush_messages)() {
 #endif
 }
 
-HL_PRIM uchar *HL_NAME(get_device_name)() {
+HL_PRIM const uchar *HL_NAME(get_device_name)() {
 	DXGI_ADAPTER_DESC desc;
 #ifndef HL_XBS
 	IDXGIAdapter *adapter = NULL;
@@ -607,6 +614,14 @@ HL_PRIM void HL_NAME(get_copyable_footprints)( D3D12_RESOURCE_DESC *desc, int fi
 	static_driver->device->GetCopyableFootprints(desc, first, count, offset, layouts, (UINT*)numRows, (UINT64*)rowSizes, (UINT64*)totalBytes);
 }
 
+HL_PRIM void HL_NAME(copy_descriptors_simple)(int numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE dstCpuAddress, D3D12_CPU_DESCRIPTOR_HANDLE srcCpuAddress, D3D12_DESCRIPTOR_HEAP_TYPE heapType) {
+	static_driver->device->CopyDescriptorsSimple(numDescriptors, dstCpuAddress, srcCpuAddress, heapType);
+}
+
+HL_PRIM void HL_NAME(check_feature_support)(D3D12_FEATURE feature, void* data, int dataSize) {
+	static_driver->device->CheckFeatureSupport(feature, &data, dataSize);
+}
+
 DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_depth_stencil_view, _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_shader_resource_view, _RES _STRUCT _I64);
@@ -623,6 +638,8 @@ DEFINE_PRIM(_VOID, resource_unmap, _RES _I32 _STRUCT);
 DEFINE_PRIM(_I64, get_required_intermediate_size, _RES _I32 _I32);
 DEFINE_PRIM(_BOOL, update_sub_resource, _RES _RES _RES _I64 _I32 _I32 _STRUCT);
 DEFINE_PRIM(_VOID, get_copyable_footprints, _STRUCT _I32 _I32 _I64 _STRUCT _BYTES _BYTES _BYTES);
+DEFINE_PRIM(_VOID, copy_descriptors_simple, _I32 _I64 _I64 _I32);
+DEFINE_PRIM(_VOID, check_feature_support, _I32 _BYTES _I32);
 
 // ---- SHADERS
 
@@ -696,7 +713,7 @@ HL_PRIM vbyte *HL_NAME(serialize_root_signature)( D3D12_ROOT_SIGNATURE_DESC *sig
 	ID3DBlob *error = NULL;
 	HRESULT r = D3D12SerializeRootSignature(signature,version, &data, &error);
 	if( !SUCCEEDED(r) ) {
-		uchar *c = error ? hl_to_utf16((char*)error->GetBufferPointer()) : USTR("Invalid argument");
+		const uchar *c = error ? hl_to_utf16((char*)error->GetBufferPointer()) : USTR("Invalid argument");
 		if( error ) error->Release();
 		hl_error("%s",c);
 	}

@@ -94,7 +94,7 @@ HL_PRIM bool HL_NAME(video_decode_frame)( hl_video *v, vbyte *out, double *time 
 		i.linesize[0] = v->codec->width * 4;
 		i.linesize[1] = v->codec->width * 4;
 		i.linesize[2] = v->codec->width * 4;
-		sws_scale(v->scale, v->frame->data, v->frame->linesize, 0, v->codec->height, i.data, i.linesize);
+		sws_scale(v->scale, (const uint8_t* const*)v->frame->data, v->frame->linesize, 0, v->codec->height, i.data, i.linesize);
 	}
 	if( time )
 		*time = (double)av_frame_get_best_effort_timestamp(v->frame) * av_q2d(v->codec->pkt_timebase);

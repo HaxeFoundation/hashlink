@@ -1,4 +1,4 @@
-/* Copyright the libuv project contributors. All rights reserved.
+/* Copyright libuv project contributors. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -19,24 +19,9 @@
  * IN THE SOFTWARE.
  */
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
+#ifndef UV_STRTOK_H_
+#define UV_STRTOK_H_
 
-#include <stdio.h>
-#include <stdarg.h>
+char* uv__strtok(char* str, const char* sep, char** itr);
 
-/* Emulate snprintf() on MSVC<2015, _snprintf() doesn't zero-terminate the buffer
- * on overflow...
- */
-int snprintf(char* buf, size_t len, const char* fmt, ...) {
-  int n;
-  va_list ap;
-  va_start(ap, fmt);
-
-  n = _vscprintf(fmt, ap);
-  vsnprintf_s(buf, len, _TRUNCATE, fmt, ap);
-
-  va_end(ap);
-  return n;
-}
-
-#endif
+#endif  /* UV_STRTOK_H_ */

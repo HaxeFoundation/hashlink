@@ -62,20 +62,9 @@ typedef struct _stat32 pstat;
 #	include <sys/times.h>
 #	include <sys/wait.h>
 #	include <locale.h>
-#	define HL_UTF8PATH
 typedef struct stat pstat;
 #endif
 
-#endif
-
-#ifdef HL_UTF8PATH
-typedef char pchar;
-#define pstrchr strchr
-#define pstrlen	strlen
-#else
-typedef uchar pchar;
-#define pstrchr wcschr
-#define pstrlen	ustrlen
 #endif
 
 #ifdef HL_MAC
@@ -87,6 +76,8 @@ typedef uchar pchar;
 #ifndef CLK_TCK
 #	define CLK_TCK	100
 #endif
+
+HL_PRIM hl_setup_t hl_setup = { 0 };
 
 static pchar *pstrdup( const pchar *s, int len ) {
 	pchar *ret;
@@ -168,35 +159,30 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(false);
 }
 
-
-static void *f_before_exit = NULL;
-static void *f_profile_event = NULL;
-HL_PRIM void hl_setup_profiler( void *profile_event, void *before_exit ) {
-	f_before_exit = before_exit;
-	f_profile_event = profile_event;
-}
-
 HL_PRIM void hl_sys_profile_event( int code, vbyte *data, int dataLen ) {
-	if( f_profile_event ) ((void(*)(int,vbyte*,int))f_profile_event)(code,data,dataLen);
+	if( hl_setup.profile_event ) hl_setup.profile_event(code, data, dataLen);
 }
 
 HL_PRIM void hl_sys_exit( int code ) {
-	if( f_before_exit ) ((void(*)())f_before_exit)();
+	if( hl_setup.before_exit ) hl_setup.before_exit();
 	exit(code);
 }
 
-static void *f_vtune_init = NULL;
-static void *g_vtune_module = NULL;
-HL_PRIM void hl_setup_vtune( void *vtune_init, void *m ) {
-	f_vtune_init = vtune_init;
-	g_vtune_module = m;
+HL_PRIM void hl_sys_vtune_init() {
+	if( hl_setup.vtune_init ) hl_setup.vtune_init();
 }
 
-HL_PRIM void hl_sys_vtune_init() {
-	if( f_vtune_init ) {
-		getchar();
-		((void(*)(void*))f_vtune_init)(g_vtune_module);
-	}
+HL_PRIM bool hl_sys_load_plugin( vbyte *file ) {
+#	ifdef HL_UTF8PATH
+	file = (vbyte*)hl_to_utf8((uchar*)file);
+#	endif
+	return hl_setup.load_plugin && hl_setup.load_plugin((pchar*)file);
+}
+
+HL_PRIM vdynamic *hl_sys_resolve_type( hl_type *t, hl_type *gt ) {
+	if( hl_setup.resolve_type == NULL )
+		return NULL;
+	return hl_setup.resolve_type(t,gt);
 }
 
 #ifdef HL_DEBUG_REPRO
@@ -320,7 +306,13 @@ HL_PRIM varray *hl_sys_env() {
 HL_PRIM void hl_sys_sleep( double f ) {
 	hl_blocking(true);
 #if defined(HL_WIN)
+	#if !defined(HL_CONSOLE)
+	timeBeginPeriod(1);
+	#endif
 	Sleep((DWORD)(f * 1000));
+	#if !defined(HL_CONSOLE)
+	timeEndPeriod(1);
+	#endif
 #else
 	struct timespec t;
 	t.tv_sec = (int)f;
@@ -674,53 +666,33 @@ HL_PRIM int hl_sys_get_char( bool b ) {
 #	endif
 }
 
-static pchar **sys_args;
-static int sys_nargs;
-
 HL_PRIM varray *hl_sys_args() {
-	varray *a = hl_alloc_array(&hlt_bytes,sys_nargs);
+	varray *a = hl_alloc_array(&hlt_bytes,hl_setup.sys_nargs);
 	int i;
-	for(i=0;i<sys_nargs;i++)
-		hl_aptr(a,pchar*)[i] = sys_args[i];
+	for(i=0;i<hl_setup.sys_nargs;i++)
+		hl_aptr(a,pchar*)[i] = hl_setup.sys_args[i];
 	return a;
 }
 
-static void *hl_file = NULL;
-
-HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
+HL_PRIM void hl_sys_init() {
 #ifdef HL_WIN
 	QueryPerformanceFrequency(&qpcFrequency);
 #endif
-	sys_args = (pchar**)args;
-	sys_nargs = nargs;
-	hl_file = hlfile;
 #	ifdef HL_WIN_DESKTOP
 	setlocale(LC_CTYPE, ""); // printf to current locale
 #	endif
 }
 
 HL_PRIM vbyte *hl_sys_hl_file() {
-	return (vbyte*)hl_file;
-}
-
-static void *reload_fun = NULL;
-static void *reload_param = NULL;
-HL_PRIM void hl_setup_reload_check( void *freload, void *param ) {
-	reload_fun = freload;
-	reload_param = param;
+	return (vbyte*)hl_setup.file_path;
 }
 
 HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
-	if( debug_alt_file && reload_param ) {
-		*((vbyte**)reload_param) = debug_alt_file;
-	}
-	return reload_fun && ((bool(*)(void*))reload_fun)(reload_param);
+	return hl_setup.reload_check != NULL && hl_setup.reload_check(debug_alt_file);
 }
 
-extern int hl_closure_stack_capture;
-
 HL_PRIM bool hl_sys_has_debugger() {
-	return hl_closure_stack_capture != 0;
+	return hl_setup.is_debugger_attached;
 }
 
 #ifndef HL_MOBILE
@@ -769,3 +741,5 @@ DEFINE_PRIM(_VOID, sys_profile_event, _I32 _BYTES _I32);
 DEFINE_PRIM(_VOID, sys_vtune_init, _NO_ARG);
 DEFINE_PRIM(_I32, sys_set_flags, _I32);
 DEFINE_PRIM(_BOOL, sys_has_debugger, _NO_ARG);
+DEFINE_PRIM(_BOOL, sys_load_plugin, _BYTES);
+DEFINE_PRIM(_DYN, sys_resolve_type, _TYPE _TYPE);

@@ -6,7 +6,7 @@
 #include <dxgi.h>
 #include <d3dcommon.h>
 #include <d3d11.h>
-#include <D3Dcompiler.h>
+#include <d3dcompiler.h>
 #else
 #include <xbo_directx.h>
 #endif

@@ -196,6 +196,7 @@ HL_PRIM void HL_NAME(ui_stop_loop)() {
 
 typedef struct {
 	hl_thread *thread;
+	hl_thread_info *main_thread;
 	DWORD original;
 	void *callback;
 	double timeout;
@@ -214,7 +215,7 @@ static void sentinel_loop( vsentinel *s ) {
 		while( true ) {
 			Sleep(time_ms);
 			if( tick != s->ticks || s->pause ) break;
-			if( hl_is_blocking() ) continue;
+			if( s->main_thread->gc_blocking ) continue;
 			k++;
 			if( k == 16 ) {
 				if( hl_detect_debugger() ) {
@@ -226,12 +227,16 @@ static void sentinel_loop( vsentinel *s ) {
 				GetThreadContext(h,&regs);
 				// simulate a call
 #				ifdef HL_64
-				*--(int_val*)regs.Rsp = regs.Rip;
-				*--(int_val*)regs.Rsp = regs.Rsp;
+				int_val* rsp = (int_val*)regs.Rsp;
+				*--rsp = (int_val)regs.Rip;
+				*--rsp = (int_val)rsp;
+				regs.Rsp = (int_val)rsp;
 				regs.Rip = (int_val)s->callback;
 #				else
-				*--(int_val*)regs.Esp = regs.Eip;
-				*--(int_val*)regs.Esp = regs.Esp;
+				int_val* esp = (int_val*)regs.Esp;
+				*--esp = (int_val)regs.Eip;
+				*--esp = (int_val)esp;
+				regs.Esp = (int_val)esp;
 				regs.Eip = (int_val)s->callback;
 #				endif
 				// resume
@@ -253,6 +258,7 @@ HL_PRIM vsentinel *HL_NAME(ui_start_sentinel)( double timeout, vclosure *c ) {
 	s->ticks = 0;
 	s->pause = false;
 	s->original = GetCurrentThreadId();
+	s->main_thread = hl_get_thread();
 	s->callback = c->fun;
 #	ifdef HL_THREADS
 	s->thread = hl_thread_start(sentinel_loop,s,false);

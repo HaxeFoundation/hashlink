@@ -187,6 +187,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			t->obj->proto = (hl_obj_proto*)hl_malloc(&r->code->alloc,sizeof(hl_obj_proto)*nproto);
 			t->obj->bindings = (int*)hl_malloc(&r->code->alloc,sizeof(int)*nbindings*2);
 			t->obj->rt = NULL;
+			t->obj->m = NULL;
 			for(i=0;i<nfields;i++) {
 				hl_obj_field *f = t->obj->fields + i;
 				f->name = hl_read_ustring(r);
@@ -205,9 +206,6 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 				t->obj->bindings[(i<<1)|1] = UINDEX();
 			}
 		}
-		break;
-	case HREF:
-		t->tparam = hl_get_type(r);
 		break;
 	case HVIRTUAL:
 		{
@@ -246,6 +244,7 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			}
 		}
 		break;
+	case HREF:
 	case HNULL:
 	case HPACKED:
 		t->tparam = hl_get_type(r);

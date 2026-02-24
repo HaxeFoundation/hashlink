@@ -6,6 +6,8 @@ typedef DriverInstance = hl.Abstract<"dx_driver">;
 
 enum DriverInitFlag {
 	DEBUG;
+	GPU_BASED_VALIDATION;
+	BREAK_ON_ERROR;
 }
 
 enum abstract Constant(Int) to Int {
@@ -213,6 +215,11 @@ abstract CommandList(Resource) {
 
 	public function rsSetViewports( count : Int, viewports : Viewport ) {}
 	public function rsSetScissorRects( count : Int, rects : Rect ) {}
+
+	@:hlNative("?dx12debug","command_list_pix_begin_event")
+	public function pixBeginEvent( color : haxe.Int64, formatString : hl.Bytes ) {}
+	@:hlNative("?dx12debug","command_list_pix_end_event")
+	public function pixEndEvent() {}
 
 	public function beginQuery( heap : QueryHeap, type : QueryType, index : Int ) {}
 	public function endQuery( heap : QueryHeap, type : QueryType, index : Int ) {}
@@ -1166,9 +1173,10 @@ enum abstract MemoryPool(Int) {
 
 enum HeapFlag {
 	SHARED;
+	__UNUSED;
 	DENY_BUFFERS;
 	ALLOW_DISPLAY;
-	__UNUSED;
+	__UNUSED2;
 	SHARED_CROSS_ADAPTER;
 	DENY_RT_DS_TEXTURES;
 	DENY_NON_RT_DS_TEXTURES;
@@ -1544,6 +1552,71 @@ enum abstract PredicationOp(Int) {
 	var NOT_EQUAL_ZERO = 1;
 }
 
+enum abstract Dx12Feature(Int) {
+	var D3D12_OPTIONS = 0;
+  	var ARCHITECTURE = 1;
+  	var FEATURE_LEVELS = 2;
+  	var FORMAT_SUPPORT = 3;
+  	var MULTISAMPLE_QUALITY_LEVELS = 4;
+  	var FORMAT_INFO = 5;
+  	var GPU_VIRTUAL_ADDRESS_SUPPORT = 6;
+  	var SHADER_MODEL = 7;
+  	var D3D12_OPTIONS1 = 8;
+  	var PROTECTED_RESOURCE_SESSION_SUPPORT = 10;
+  	var ROOT_SIGNATURE = 12;
+  	var ARCHITECTURE1 = 16;
+  	var D3D12_OPTIONS2 = 18;
+  	var SHADER_CACHE = 19;
+  	var COMMAND_QUEUE_PRIORITY = 20;
+  	var D3D12_OPTIONS3 = 21;
+  	var EXISTING_HEAPS = 22;
+  	var D3D12_OPTIONS4 = 23;
+  	var SERIALIZATION = 24;
+  	var CROSS_NODE = 25;
+  	var D3D12_OPTIONS5 = 27;
+  	var DISPLAYABLE;
+  	var D3D12_OPTIONS6 = 30;
+  	var QUERY_META_COMMAND = 31;
+  	var D3D12_OPTIONS7 = 32;
+  	var PROTECTED_RESOURCE_SESSION_TYPE_COUNT = 33;
+  	var PROTECTED_RESOURCE_SESSION_TYPES = 34;
+  	var D3D12_OPTIONS8 = 36;
+  	var D3D12_OPTIONS9 = 37;
+  	var D3D12_OPTIONS10;
+  	var D3D12_OPTIONS11;
+  	var D3D12_OPTIONS12;
+  	var D3D12_OPTIONS13;
+  	var D3D12_OPTIONS14;
+  	var D3D12_OPTIONS15;
+  	var D3D12_OPTIONS16;
+  	var D3D12_OPTIONS17;
+  	var D3D12_OPTIONS18;
+  	var D3D12_OPTIONS19;
+  	var D3D12_OPTIONS20;
+  	var PREDICATION;
+  	var PLACED_RESOURCE_SUPPORT_INFO;
+  	var HARDWARE_COPY;
+  	var D3D12_OPTIONS21;
+  	var APPLICATION_SPECIFIC_DRIVER_STATE;
+  	var BYTECODE_BYPASS_HASH_SUPPORTED;
+  	var SHADER_CACHE_ABI_SUPPORT;
+}
+
+enum abstract ShaderModel(Int) to Int {
+  var SHADER_MODEL_NONE;
+  var SHADER_MODEL_5_1 = 0x51;
+  var SHADER_MODEL_6_0 = 0x60;
+  var SHADER_MODEL_6_1 = 0x61;
+  var SHADER_MODEL_6_2 = 0x62;
+  var SHADER_MODEL_6_3 = 0x63;
+  var SHADER_MODEL_6_4 = 0x64;
+  var SHADER_MODEL_6_5 = 0x65;
+  var SHADER_MODEL_6_6 = 0x66;
+  var SHADER_MODEL_6_7 = 0x67;
+  var SHADER_MODEL_6_8;
+  var SHADER_MODEL_6_9;
+  var HIGHEST_SHADER_MODEL;
+}
 
 @:hlNative("dx12")
 class Dx12 {
@@ -1633,6 +1706,12 @@ class Dx12 {
 
 	public static function getConstant( index : Int ) : Int {
 		return 0;
+	}
+
+	public static function copyDescriptorsSimple( numDescriptors : Int, dstCpuAddress : Address, srcCpuAddress : Address, heapType : DescriptorHeapType ) {
+	}
+
+	public static function checkFeatureSupport( feature : Dx12Feature, data : hl.Bytes, dataSize : Int ) {
 	}
 
 	public static function getDeviceName() {

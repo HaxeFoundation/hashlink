@@ -475,6 +475,9 @@ HL_PRIM bool hl_socket_select( varray *ra, varray *wa, varray *ea, char *tmp, in
 	hl_blocking(true);
 	if( select((int)(max+1),ra?rs:NULL,wa?ws:NULL,ea?es:NULL,tt) == SOCKET_ERROR ) {
 		hl_blocking(false);
+#		ifndef HL_WIN
+		if( errno == EINTR ) return true;
+#		endif
 		return false;
 	}
 	hl_blocking(false);

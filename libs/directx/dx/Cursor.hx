@@ -8,9 +8,13 @@ enum abstract CursorKind(Int) {
 	var Wait = 32514;
 	var CrossHair = 32515;
 	var WaitArrow = 32650;
+    var SizeNWSE = 32642;
+    var SizeNESW = 32643;
+    var SizeWE = 32644;
+    var SizeNS = 32645;
+	var SizeALL = 32646;
 	var No = 32648;
 	var Hand = 32649;
-	var SizeALL = 32646;
 }
 
 abstract Cursor(CursorPtr) {

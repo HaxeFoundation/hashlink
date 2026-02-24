@@ -938,6 +938,7 @@ HL_PRIM int64 hl_dyn_geti64( vdynamic *d, int hfield ) {
 	case HI32:
 		return *(int*)addr;
 	case HI64:
+	case HGUID:
 		return *(int64*)addr;
 	case HF32:
 		return (int64)*(float*)addr;
@@ -1055,6 +1056,7 @@ HL_PRIM void hl_dyn_seti( vdynamic *d, int hfield, hl_type *t, int value ) {
 		*(int*)addr = value;
 		break;
 	case HI64:
+	case HGUID:
 		*(int64*)addr = value;
 		break;
 	case HBOOL:
@@ -1092,6 +1094,7 @@ HL_PRIM void hl_dyn_seti64( vdynamic *d, int hfield, int64 value ) {
 		*(int*)addr = (int)value;
 		break;
 	case HI64:
+	case HGUID:
 		*(int64*)addr = value;
 		break;
 	case HBOOL:

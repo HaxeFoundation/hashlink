@@ -6,6 +6,9 @@ set(HL_VERSION_PATCH 0)
 set(HL_VERSION ${HL_VERSION_MAJOR}.${HL_VERSION_MINOR}.${HL_VERSION_PATCH})
 
 cmake_policy(SET CMP0042 NEW)
+if (${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.24)
+	cmake_policy(VERSION 3.24)
+endif()
 
 if(WIN32)
     set(CMAKE_SYSTEM_VERSION 10.0)
@@ -33,6 +36,7 @@ else()
     set(_DOWNLOAD_DEPENDENCIES OFF)
 endif()
 option(DOWNLOAD_DEPENDENCIES "Download & build third-party dependencies" ${_DOWNLOAD_DEPENDENCIES})
+option(WITH_SYSTEM_PCRE2 "Link libhl against system installation of pcre2" OFF)
 
 if(MSVC)
     if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -47,6 +51,12 @@ endif()
 # force Unicode over Multi-byte
 if(MSVC)
     add_definitions(-DUNICODE -D_UNICODE)
+    add_compile_options(/permissive-)
+endif()
+
+if (MINGW)
+    add_compile_options(-municode)
+    add_link_options(-municode)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH
@@ -55,6 +65,8 @@ list(APPEND CMAKE_MODULE_PATH
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+
+set(CMAKE_C_VISIBILITY_PRESET hidden)
 
 # put output in "bin"
 
@@ -147,14 +159,12 @@ if(IOS_PLATFORM)
 endif()
 
 add_library(libhl
-    ${pcre_srcs}
     src/gc.c
     ${std_srcs}
 )
 
 target_include_directories(libhl
     PUBLIC src
-    PRIVATE include include/pcre
 )
 
 # C11 / C++11 are required for features such as unicode strings
@@ -170,7 +180,7 @@ set_target_properties(libhl
     PUBLIC_HEADER "${public_headers}"
 )
 
-if(WIN32)
+if(MSVC)
     set_target_properties(libhl
         PROPERTIES
         OUTPUT_NAME libhl
@@ -186,8 +196,32 @@ set_target_properties(libhl
     PROPERTIES
     VERSION ${HL_VERSION}
     SOVERSION ${HL_VERSION_MAJOR}
-    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16"
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;PCRE2_CODE_UNIT_WIDTH=16"
 )
+
+if(WITH_SYSTEM_PCRE2)
+    target_link_libraries(libhl pcre2-16)
+else()
+    target_sources(libhl PRIVATE ${pcre_srcs})
+    target_include_directories(libhl PRIVATE include/pcre)
+    target_compile_definitions(libhl PRIVATE HAVE_CONFIG_H PCRE2_STATIC)
+endif()
+
+if(APPLE)
+    target_include_directories(libhl PRIVATE include)
+endif()
+
+if(WIN32)
+    target_link_libraries(libhl ws2_32 user32 winmm)
+else()
+    target_link_libraries(libhl m dl)
+
+    if(ANDROID)
+        target_link_libraries(libhl log)
+    else()
+        target_link_libraries(libhl pthread)
+    endif()
+endif()
 
 if (WITH_VM)
     add_executable(hl
@@ -215,18 +249,6 @@ if (WITH_VM)
     endif()
 endif()
 
-if(WIN32)
-    target_link_libraries(libhl ws2_32 user32)
-else()
-    target_link_libraries(libhl m dl)
-
-    if(ANDROID)
-        target_link_libraries(libhl log)
-    else()
-        target_link_libraries(libhl pthread)
-    endif()
-endif()
-
 if(BUILD_TESTING)
 
     find_program(
@@ -238,6 +260,12 @@ if(BUILD_TESTING)
         SET(HAXE_FLAGS -D hl-legacy32)
     else()
         SET(HAXE_FLAGS )
+    endif()
+
+    if(MINGW)
+        set(HLC_LIBRARIES dbghelp)
+    else()
+        set(HLC_LIBRARIES)
     endif()
 
     #####################
@@ -300,6 +328,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(hello
         libhl
+        ${HLC_LIBRARIES}
     )
 
     #####################
@@ -323,6 +352,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(threads
         libhl
+        ${HLC_LIBRARIES}
     )
 
     #####################
@@ -347,6 +377,7 @@ if(BUILD_TESTING)
     target_link_libraries(uvsample
         libhl
         uv.hdll
+        ${HLC_LIBRARIES}
     )
 
     #####################
@@ -361,6 +392,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(header_macro_clashes
         libhl
+        ${HLC_LIBRARIES}
     )
 
     #####################

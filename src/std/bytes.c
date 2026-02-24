@@ -161,6 +161,9 @@ static int ms_gcd( int m, int n ) {
 #define TSORT double
 #define TID(t)	t##_f64
 #include "sort.h"
+#define TSORT int64
+#define TID(t)	t##_i64
+#include "sort.h"
 
 HL_PRIM void hl_bsort_i32( vbyte *bytes, int pos, int len, vclosure *cmp ) {
 	m_sort_i32 m;
@@ -174,6 +177,13 @@ HL_PRIM void hl_bsort_f64( vbyte *bytes, int pos, int len, vclosure *cmp ) {
 	m.arr = (double*)(bytes + pos);
 	m.c = cmp;
 	merge_sort_rec_f64(&m,0,len);
+}
+
+HL_PRIM void hl_bsort_i64(vbyte* bytes, int pos, int len, vclosure* cmp) {
+	m_sort_i64 m;
+	m.arr = (int64*)(bytes + pos);
+	m.c = cmp;
+	merge_sort_rec_i64(&m, 0, len);
 }
 
 static inline bool is_space_char(uchar c) {
@@ -270,6 +280,10 @@ HL_PRIM int hl_string_compare( vbyte *a, vbyte *b, int len ) {
 	return memcmp(a,b,len * sizeof(uchar));
 }
 
+HL_PRIM int hl_bytes_get_memsize( vbyte *ptr ) {
+	return hl_gc_get_memsize(ptr);
+}
+
 DEFINE_PRIM(_BYTES,alloc_bytes,_I32);
 DEFINE_PRIM(_VOID,bytes_blit,_BYTES _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(_I32,bytes_compare,_BYTES _I32 _BYTES _I32 _I32);
@@ -282,9 +296,11 @@ DEFINE_PRIM(_F64, parse_float,_BYTES _I32 _I32);
 DEFINE_PRIM(_NULL(_I32), parse_int, _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,bsort_i32,_BYTES _I32 _I32 _FUN(_I32,_I32 _I32));
 DEFINE_PRIM(_VOID,bsort_f64,_BYTES _I32 _I32 _FUN(_I32,_F64 _F64));
+DEFINE_PRIM(_VOID, bsort_i64, _BYTES _I32 _I32 _FUN(_I32, _I64 _I64));
 DEFINE_PRIM(_BYTES,bytes_offset, _BYTES _I32);
 DEFINE_PRIM(_I32,bytes_subtract, _BYTES _BYTES);
 DEFINE_PRIM(_I32,bytes_address, _BYTES _REF(_I32));
 DEFINE_PRIM(_BYTES,bytes_from_address, _I32 _I32);
 DEFINE_PRIM(_I64,bytes_address64, _BYTES);
 DEFINE_PRIM(_BYTES,bytes_from_address64, _I64);
+DEFINE_PRIM(_I32, bytes_get_memsize, _BYTES);

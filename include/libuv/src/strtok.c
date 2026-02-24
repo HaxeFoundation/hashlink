@@ -1,4 +1,4 @@
-/* Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+/* Copyright libuv project contributors. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -19,19 +19,34 @@
  * IN THE SOFTWARE.
  */
 
-/*
- * This file is private to libuv. It provides common functionality to both
- * Windows and Unix backends.
- */
+#include <stdlib.h>
+#include "strtok.h"
 
-#ifndef UV_THREADPOOL_H_
-#define UV_THREADPOOL_H_
+char* uv__strtok(char* str, const char* sep, char** itr) {
+  const char* sep_itr;
+  char* tmp;
+  char* start;
 
-struct uv__work {
-  void (*work)(struct uv__work *w);
-  void (*done)(struct uv__work *w, int status);
-  struct uv_loop_s* loop;
-  void* wq[2];
-};
+  if (str == NULL)
+    start = tmp = *itr;
+  else
+    start = tmp = str;
 
-#endif /* UV_THREADPOOL_H_ */
+  if (tmp == NULL)
+    return NULL;
+
+  while (*tmp != '\0') {
+    sep_itr = sep;
+    while (*sep_itr != '\0') {
+      if (*tmp == *sep_itr) {
+        *itr = tmp + 1;
+        *tmp = '\0';
+        return start;
+      }
+      sep_itr++;
+    }
+    tmp++;
+  }
+  *itr = NULL;
+  return start;
+}

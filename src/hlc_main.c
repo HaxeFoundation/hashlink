@@ -32,11 +32,7 @@
 #	define WIN32_LEAN_AND_MEAN
 #endif
 #	include <windows.h>
-#if !defined(HL_MINGW)
-#	include <DbgHelp.h>
-#else
 #	include <dbghelp.h>
-#endif
 #	pragma comment(lib, "Dbghelp.lib")
 #	undef CONST
 #	undef IN
@@ -70,14 +66,6 @@ extern void sys_global_exit();
 #else
 #define sys_global_init()
 #define sys_global_exit()
-#endif
-
-
-#ifdef HL_VCC
-#	include <crtdbg.h>
-#else
-#	define _CrtSetDbgFlag(x)
-#	define _CrtCheckMemory()
 #endif
 
 #if defined(HL_LINUX) && (!defined(HL_ANDROID) || __ANDROID_MIN_SDK_VERSION__ >= 33)
@@ -131,7 +119,7 @@ static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 
 static int hlc_capture_stack( void **stack, int size ) {
 	int count = 0;
-#	if defined(HL_WIN_DESKTOP) || defined(HL_LINUX) || defined(HL_MAC)
+#	if defined(HL_WIN_DESKTOP) || defined(HL_LINUX_BACKTRACE) || defined(HL_MAC)
 	// force return total count when output stack is null
 	static void* tmpstack[HL_EXC_MAX_STACK];
 	if( stack == NULL ) {
@@ -140,11 +128,14 @@ static int hlc_capture_stack( void **stack, int size ) {
 	}
 #	endif
 #	ifdef HL_WIN_DESKTOP
-	count = CaptureStackBackTrace(2, size, stack, NULL) - 8; // 8 startup
+	count = CaptureStackBackTrace(2, size, stack, NULL);
+	if( size == HL_EXC_MAX_STACK ) count -= 8; // 8 startup
 #	elif defined(HL_LINUX_BACKTRACE)
-	count = backtrace(stack, size) - 8;
+	count = backtrace(stack, size);
+	if( size == HL_EXC_MAX_STACK ) count -= 8;
 #	elif defined(HL_MAC)
-	count = backtrace(stack, size) - 6;
+	count = backtrace(stack, size);
+	if( size == HL_EXC_MAX_STACK ) count -= 6;
 #	endif
 	if( count < 0 ) count = 0;
 	return count;
@@ -163,9 +154,13 @@ int main(int argc, char *argv[]) {
 	sys_global_init();
 	hl_global_init();
 	hl_register_thread(&ret);
-	hl_setup_exception(hlc_resolve_symbol,hlc_capture_stack);
-	hl_setup_callbacks(hlc_static_call, hlc_get_wrapper);
-	hl_sys_init((void**)(argv + 1),argc - 1,NULL);
+	hl_setup.resolve_symbol = hlc_resolve_symbol;
+	hl_setup.capture_stack = hlc_capture_stack;
+	hl_setup.static_call = hlc_static_call;
+	hl_setup.get_wrapper = hlc_get_wrapper;
+	hl_setup.sys_args = (pchar**)(argv + 1);
+	hl_setup.sys_nargs = argc - 1;
+	hl_sys_init();
 	tf.ret = &hlt_void;
 	clt.kind = HFUN;
 	clt.fun = &tf;
