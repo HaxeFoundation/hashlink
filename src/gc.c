@@ -308,6 +308,58 @@ HL_PRIM gc_pheader *hl_gc_get_page( void *v ) {
 
 HL_API int hl_thread_id();
 
+HL_PRIM int hl_atomic_add32(int *a, int b);
+
+#ifdef HL_WIN
+static SRWLOCK free_list_mutex = SRWLOCK_INIT;
+static inline void lock_free_list() { AcquireSRWLockExclusive(&free_list_mutex); }
+static inline void unlock_free_list() { ReleaseSRWLockExclusive(&free_list_mutex); }
+#else
+#include <pthread.h>
+static pthread_mutex_t free_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+static inline void lock_free_list() { pthread_mutex_lock(&free_list_mutex); }
+static inline void unlock_free_list() { pthread_mutex_unlock(&free_list_mutex); }
+#endif
+
+static int tls_counter = 0;
+
+struct tls_free_list {
+	int key;
+	struct tls_free_list *next;
+};
+
+static struct tls_free_list * free_list;
+
+int get_tls_slot() {
+	lock_free_list();
+	if (free_list) {
+		struct tls_free_list *l = free_list;
+		int key = l->key;
+		free_list = l->next;
+		free(l);
+		unlock_free_list();
+		return key;
+	}
+	unlock_free_list();
+	return hl_atomic_add32(&tls_counter, 1);
+}
+
+// this function should only run in the finalizer, which is called when all threads
+// are stopped
+void free_tls_slot(int key) {
+	for (int i = 0; i < gc_threads.count; i++) {
+		if (key < gc_threads.threads[i]->tls_arr_size) {
+			gc_threads.threads[i]->tls_arr[key] = NULL;
+		}
+	}
+	struct tls_free_list *l = malloc(sizeof(struct tls_free_list));
+	l->key = key;
+	lock_free_list();
+	l->next = free_list;
+	free_list = l;
+	unlock_free_list();
+}
+
 HL_API void hl_register_thread( void *stack_top ) {
 	if( hl_get_thread() )
 		hl_fatal("Thread already registered");
@@ -324,6 +376,9 @@ HL_API void hl_register_thread( void *stack_top ) {
 	current_thread = t;
 	hl_add_root(&t->exc_value);
 	hl_add_root(&t->exc_handler);
+	hl_add_root(&t->tls_arr);
+	t->tls_arr_size = 0;
+	t->tls_arr = NULL;
 
 	gc_global_lock(true);
 	hl_thread_info **all = (hl_thread_info**)malloc(sizeof(void*) * (gc_threads.count + 1));
@@ -340,6 +395,7 @@ HL_API void hl_unregister_thread() {
 		hl_fatal("Thread not registered");
 	hl_remove_root(&t->exc_value);
 	hl_remove_root(&t->exc_handler);
+	hl_remove_root(&t->tls_arr);
 	gc_global_lock(true);
 	for(i=0;i<gc_threads.count;i++)
 		if( gc_threads.threads[i] == t ) {
