@@ -254,7 +254,7 @@ HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORM
 	dx_driver *drv = static_driver;
 #ifndef HL_XBS
 	if( drv->swapchain ) {
-		CHKERR(drv->swapchain->ResizeBuffers(buffer_count, width, height, format, 0));
+		CHKERR(drv->swapchain->ResizeBuffers(buffer_count, width, height, format, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING));
 	} else {
 		DXGI_SWAP_CHAIN_DESC1 desc = {};
 		desc.Width = width;
@@ -264,6 +264,7 @@ HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORM
 		desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		desc.SampleDesc.Count = 1;
+		desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
 		IDXGISwapChain1 *swapchain = NULL;
 		drv->factory->CreateSwapChainForHwnd(drv->commandQueue,drv->wnd,&desc,NULL,NULL,&swapchain);
@@ -303,7 +304,7 @@ HL_PRIM void HL_NAME(present)( bool vsync ) {
 	dx_driver *drv = static_driver;
 #ifndef HL_XBS
 	UINT syncInterval = vsync ? 1 : 0;
-	UINT presentFlags = 0;
+	UINT presentFlags = syncInterval == 0 ? DXGI_PRESENT_ALLOW_TEARING : 0;
 	CHKERR(drv->swapchain->Present(syncInterval, presentFlags));
 #else
 	D3D12XBOX_PRESENT_PLANE_PARAMETERS planeParameters = {};
