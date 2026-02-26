@@ -22,6 +22,9 @@
 #include <hl.h>
 #include <hlmodule.h>
 
+/* GDB JIT interface cleanup (defined in jit_elf.c) */
+void gdb_jit_unregister(struct jit_code_entry *entry);
+
 #ifdef HL_WIN
 #	undef _GUID
 #	include <windows.h>
@@ -1006,6 +1009,10 @@ void hl_module_free( hl_module *m ) {
 		for(i=0;i<m->code->nfunctions;i++)
 			free(m->jit_debug[i].offsets);
 		free(m->jit_debug);
+	}
+	if( m->gdb_jit_entry ) {
+		gdb_jit_unregister(m->gdb_jit_entry);
+		m->gdb_jit_entry = NULL;
 	}
 	if( m->jit_ctx )
 		hl_jit_free(m->jit_ctx,false);
