@@ -26,26 +26,32 @@ class Window {
 
 	public static inline var SDL_WINDOW_FULLSCREEN         = 0x00000001;
 	public static inline var SDL_WINDOW_OPENGL             = 0x00000002;
-	public static inline var SDL_WINDOW_SHOWN              = 0x00000004;
+	public static inline var SDL_WINDOW_OCCLUDED           = 0x00000004;
 	public static inline var SDL_WINDOW_HIDDEN             = 0x00000008;
 	public static inline var SDL_WINDOW_BORDERLESS         = 0x00000010;
 	public static inline var SDL_WINDOW_RESIZABLE          = 0x00000020;
 	public static inline var SDL_WINDOW_MINIMIZED          = 0x00000040;
 	public static inline var SDL_WINDOW_MAXIMIZED          = 0x00000080;
-	public static inline var SDL_WINDOW_INPUT_GRABBED      = 0x00000100;
+	public static inline var SDL_WINDOW_MOUSE_GRABBED      = 0x00000100;
+
 	public static inline var SDL_WINDOW_INPUT_FOCUS        = 0x00000200;
 	public static inline var SDL_WINDOW_MOUSE_FOCUS        = 0x00000400;
-	public static inline var SDL_WINDOW_FULLSCREEN_DESKTOP = 0x00001001;
 	public static inline var SDL_WINDOW_FOREIGN            = 0x00000800;
+	public static inline var SDL_WINDOW_MODAL              = 0x00001000;
 	public static inline var SDL_WINDOW_ALLOW_HIGHDPI      = 0x00002000;
 	public static inline var SDL_WINDOW_MOUSE_CAPTURE      = 0x00004000;
-	public static inline var SDL_WINDOW_ALWAYS_ON_TOP      = 0x00008000;
-	public static inline var SDL_WINDOW_SKIP_TASKBAR       = 0x00010000;
+	public static inline var SDL_WINDOW_ALWAYS_ON_TOP      = 0x00010000;
 	public static inline var SDL_WINDOW_UTILITY            = 0x00020000;
+
 	public static inline var SDL_WINDOW_TOOLTIP            = 0x00040000;
 	public static inline var SDL_WINDOW_POPUP_MENU         = 0x00080000;
 	public static inline var SDL_WINDOW_VULKAN             = 0x10000000;
 	public static inline var SDL_WINDOW_METAL              = 0x20000000;
+
+	// SDL2 compatibility
+	public static inline var SDL_WINDOW_SHOWN              = 0x00000004; // SDL2 compat
+	public static inline var SDL_WINDOW_INPUT_GRABBED      = 0x00000100; // SDL2 compat
+	public static inline var SDL_WINDOW_SKIP_TASKBAR       = 0x00020000; // SDL2 compat
 
 	var win : WinPtr;
 	var glctx : GLContext;
@@ -68,7 +74,7 @@ class Window {
 	public var opacity(get, set) : Float;
 	public var grab(get, set) : Bool;
 
-	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE ) {
+	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_RESIZABLE ) {
 		while( true ) {
 			win = winCreateEx(x, y, width, height, sdlFlags);
 			if( win == null ) throw "Failed to create window";
@@ -316,7 +322,7 @@ class Window {
 	static function winSetTitle( win : WinPtr, title : hl.Bytes ) {
 	}
 
-	static function winSetPosition( win : WinPtr, width : Int, height : Int ) {
+	static function winSetPosition( win : WinPtr, width : Int, height : Int ): Void {
 	}
 
 	static function winGetPosition( win : WinPtr, width : hl.Ref<Int>, height : hl.Ref<Int> ) {
@@ -399,5 +405,4 @@ class Window {
 	
 	static function warpMouseInWindow( win : WinPtr, x : Int, y : Int ) : Void {
 	}
-
 }

@@ -14,20 +14,20 @@ Here's the dependencies that you install in order to compile all the libraries:
 
 * fmt: libpng-dev libturbojpeg-dev libvorbis-dev
 * openal: libopenal-dev
-* sdl: libsdl2-dev libglu1-mesa-dev
+* sdl: libsdl3-dev libglu1-mesa-dev
 * ssl: libmbedtls-dev
 * uv: libuv1-dev
 * sqlite: libsqlite3-dev
 
 To install all dependencies on the latest **Ubuntu**, for example:
 
-`sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libglu1-mesa-dev libmbedtls-dev libuv1-dev libsqlite3-dev`
+`sudo apt-get install libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl3-dev libglu1-mesa-dev libmbedtls-dev libuv1-dev libsqlite3-dev`
 
 For 16.04, see [this note](https://github.com/HaxeFoundation/hashlink/issues/147).
 
 To install all dependencies on the latest **Fedora**, for example:
 
-`sudo dnf install libpng-devel turbojpeg-devel libvorbis-devel openal-soft-devel SDL2-devel mesa-libGLU-devel mbedtls-devel libuv-devel  sqlite-devel`
+`sudo dnf install libpng-devel turbojpeg-devel libvorbis-devel openal-soft-devel SDL3-devel mesa-libGLU-devel mbedtls-devel libuv-devel  sqlite-devel`
 
 **And on OSX:**
 
@@ -53,7 +53,7 @@ To build all of HashLink libraries it is required to download several additional
 
 In short you'll probably need:
 
-- [SDL2-devel](https://github.com/libsdl-org/SDL/releases/download/release-2.30.12/SDL2-devel-2.30.12-VC.zip), extract to `<hashlink>/include/sdl`
+- [SDL3-devel](https://github.com/libsdl-org/SDL/releases/download/release-3.2.22/SDL3-devel-3.2.22-VC.zip), extract to `<hashlink>/include/sdl`
 - [openal-soft](https://github.com/kcat/openal-soft/releases/download/1.23.1/openal-soft-1.23.1-bin.zip), extract to `<hashlink>/include/openal`
 
 ## Debugging

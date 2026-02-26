@@ -140,12 +140,12 @@ ifeq ($(MARCH),32)
 CFLAGS += -msse2 -mfpmath=sse
 CC=i686-pc-cygwin-gcc
 BUILD_DIR = Release
-VS_SDL_LIBRARY ?= include/sdl/lib/x86/SDL2.dll
+VS_SDL_LIBRARY ?= include/sdl/lib/x86/SDL3.dll
 VS_OPENAL_LIBRARY ?= include/openal/bin/Win32/soft_oal.dll
 VS_DX_LIBRARY ?= include/dx/bin/x86/dxcompiler.dll include/dx/bin/x86/dxil.dll
 else
 BUILD_DIR = x64/Release
-VS_SDL_LIBRARY ?= include/sdl/lib/x64/SDL2.dll
+VS_SDL_LIBRARY ?= include/sdl/lib/x64/SDL3.dll
 VS_OPENAL_LIBRARY ?= include/openal/bin/Win64/soft_oal.dll
 VS_DX_LIBRARY ?= include/dx/bin/x64/dxcompiler.dll include/dx/bin/x64/dxil.dll
 endif
@@ -168,9 +168,9 @@ LIBEXT=dylib
 BREW_PREFIX := $(shell brew --prefix)
 # prefixes for keg-only packages
 BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
-BREW_SDL_PREFIX := $(shell brew --prefix sdl2)
+BREW_SDL_PREFIX := $(shell brew --prefix sdl3)
 
-CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -I $(BREW_SDL_PREFIX)/include/SDL2 -Dopenal_soft -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -Dopenal_soft -DGL_SILENCE_DEPRECATION
 
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
@@ -178,7 +178,7 @@ CFLAGS += -isysroot $(ISYSROOT)
 LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-SDL_LINK_FLAGS = -L$(BREW_SDL_PREFIX)/lib -lSDL2
+SDL_LINK_FLAGS = -L$(BREW_SDL_PREFIX)/lib -lSDL3
 LIBFLAGS += -L$(BREW_PREFIX)/lib -L$(BREW_OPENAL_PREFIX)/lib
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
@@ -200,7 +200,7 @@ LHL_LINK_FLAGS += -install_name @rpath/libhl.dylib
 else
 
 # Linux
-CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
+CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl3)
 LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
@@ -210,7 +210,7 @@ else
 LIBFLAGS += -L/opt/libjpeg-turbo/lib64
 endif
 
-SDL_LINK_FLAGS = $(shell pkg-config --libs sdl2)
+SDL_LINK_FLAGS = $(shell pkg-config --libs sdl3)
 LIBOPENAL = -lopenal
 LIBOPENGL = -lGL
 RELEASE_NAME = linux

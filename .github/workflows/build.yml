@@ -158,11 +158,39 @@ jobs:
               libmbedtls-dev \
               libopenal-dev \
               libpng-dev \
-              libsdl2-dev \
               libturbojpeg-dev \
               libuv1-dev \
               libvorbis-dev \
               libsqlite3-dev
+
+            # ref https://github.com/libsdl-org/SDL/blob/main/docs/README-linux.md#build-dependencies
+            sudo apt-get install --no-install-recommends -y \
+              libasound2-dev \
+              libpulse-dev \
+              libaudio-dev \
+              libjack-dev \
+              libsndio-dev \
+              libx11-dev \
+              libxext-dev \
+              libxrandr-dev \
+              libxcursor-dev \
+              libxfixes-dev \
+              libxi-dev \
+              libxss-dev \
+              libxtst-dev \
+              libxkbcommon-dev \
+              libdrm-dev \
+              libgbm-dev \
+              libgl1-mesa-dev \
+              libgles2-mesa-dev \
+              libegl1-mesa-dev \
+              libdbus-1-dev \
+              libibus-1.0-dev \
+              libudev-dev \
+              libpipewire-0.3-dev \
+              libwayland-dev \
+              libdecor-0-dev \
+              liburing-dev
             ;;
 
           darwin*)
@@ -178,10 +206,10 @@ jobs:
             else
               SDL_SUFFIX=VC
             fi
-            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/sdl.zip https://www.libsdl.org/release/SDL2-devel-2.30.2-${SDL_SUFFIX}.zip
+            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/sdl.zip https://www.libsdl.org/release/SDL3-devel-3.2.22-${SDL_SUFFIX}.zip
             curl -fsSL --retry 3 --retry-delay 5 -o /tmp/openal.zip https://github.com/kcat/openal-soft/releases/download/1.23.1/openal-soft-1.23.1-bin.zip
             curl -fsSL --retry 3 --retry-delay 5 -o /tmp/ffmpeg.zip ${{ matrix.ffmpeg_url }}
-            7z x /tmp/sdl.zip    -oinclude; mv include/SDL2*   include/sdl
+            7z x /tmp/sdl.zip    -oinclude; mv include/SDL3*   include/sdl
             7z x /tmp/openal.zip -oinclude; mv include/openal* include/openal
             7z x /tmp/ffmpeg.zip -oinclude; mv include/ffmpeg* include/ffmpeg
             ;;
@@ -215,6 +243,18 @@ jobs:
         haxelib install hashlink
         haxelib list
 
+    - name: "Build and install SDL3"
+      if: runner.os == 'Linux'
+      run: |
+        wget https://github.com/libsdl-org/SDL/releases/download/release-3.2.22/SDL3-3.2.22.tar.gz
+        tar -xzvf SDL3-3.2.22.tar.gz 
+        cd SDL3-3.2.22/
+        mkdir build
+        cd build
+        cmake ..
+        make
+        sudo make install
+
 
     - name: "Build: HashLink"
       run: |
@@ -243,7 +283,8 @@ jobs:
                   -DFLAT_INSTALL_TREE=ON
                 ;;
               linux64)
-                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }}
+                ;;
             esac
 
             cmake --build build --config ${{ matrix.cmake_configuration }}

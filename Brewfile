@@ -3,7 +3,7 @@
 brew "cmake"
 brew "jpeg-turbo"
 brew "libpng"
-brew "sdl2"
+brew "sdl3"
 brew "libogg"
 brew "libvorbis"
 brew "openal-soft"

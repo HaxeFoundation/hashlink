@@ -13,8 +13,8 @@ class GameController {
 	public var id(get,never) : Int;
 	public var name(get,never) : String;
 
-	public function new( index : Int ){
-		ptr = gctrlOpen( index );
+	public function new( id : Int ){
+		ptr = gctrlOpen( id );
 	}
 
 	public inline function getAxis( axisId : Int ){
