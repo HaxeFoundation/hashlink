@@ -372,7 +372,9 @@ codesign_osx:
 	codesign --entitlements other/osx/entitlements.xml -fs hl-cert $(HL)
 	rm key.pem cert.cer openssl.cnf
 
-.SUFFIXES : .cpp .c .o
+# restrict built in rules to only handle cpp, c and o files
+.SUFFIXES:
+.SUFFIXES: .cpp .c .o
 
 clean_o:
 	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL_OBJ} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
