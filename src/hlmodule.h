@@ -120,6 +120,8 @@ typedef struct {
 #define WIN64_UNWIND_TABLES
 #endif
 
+struct jit_code_entry;  /* Forward declaration for GDB JIT interface */
+
 typedef struct {
 	hl_code *code;
 	int codesize;
@@ -132,6 +134,7 @@ typedef struct {
 	hl_code_hash *hash;
 	hl_debug_infos *jit_debug;
 	jit_ctx *jit_ctx;
+	struct jit_code_entry *gdb_jit_entry;  /* GDB JIT interface registration (or NULL) */
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
 	PRUNTIME_FUNCTION unwind_table;

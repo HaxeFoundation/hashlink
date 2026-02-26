@@ -41,7 +41,16 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL_OBJ = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+# Conditional JIT backend selection based on architecture
+ifeq ($(ARCH),aarch64)
+    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_elf.o src/jit_shared.o
+else ifeq ($(ARCH),arm64)
+    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_elf.o src/jit_shared.o
+else
+    HL_JIT = src/jit_x86.o src/jit_elf.o src/jit_shared.o
+endif
+
+HL_OBJ = src/code.o $(HL_JIT) src/main.o src/module.o src/debugger.o src/profile.o
 
 FMT_CPPFLAGS = -I include/mikktspace -I include/minimp3
 
@@ -239,19 +248,12 @@ LIBHL = libhl.$(LIBEXT)
 HL = hl$(EXE_SUFFIX)
 HLC = hlc$(EXE_SUFFIX)
 
-all: $(LIBHL) libs
-ifeq ($(ARCH),arm64)
-	$(warning HashLink vm is not supported on arm64, skipping)
-else
-all: $(HL)
-endif
+all: $(LIBHL) libs $(HL)
 
 install:
 	$(UNAME)==Darwin && ${MAKE} uninstall
-ifneq ($(ARCH),arm64)
 	mkdir -p $(INSTALL_BIN_DIR)
 	cp $(HL) $(INSTALL_BIN_DIR)
-endif
 	mkdir -p $(INSTALL_LIB_DIR)
 	cp *.hdll $(INSTALL_LIB_DIR)
 	cp $(LIBHL) $(INSTALL_LIB_DIR)
@@ -362,11 +364,7 @@ release_win:
 	rm -rf $(PACKAGE_NAME)
 
 release_linux release_osx:
-ifeq ($(ARCH),arm64)
-	cp $(LIBHL) *.hdll $(PACKAGE_NAME)
-else
 	cp $(HL) $(LIBHL) *.hdll $(PACKAGE_NAME)
-endif
 	tar -cvzf $(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
 	rm -rf $(PACKAGE_NAME)
 

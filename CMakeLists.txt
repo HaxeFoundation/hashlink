@@ -20,9 +20,7 @@ include(FindPkgConfig)
 include(CTest)
 
 set(WITH_VM_DEFAULT ON)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
-    set(WITH_VM_DEFAULT OFF)
-endif()
+# VM now supports x86, x86-64, and AArch64 architectures
 
 option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
@@ -224,9 +222,24 @@ else()
 endif()
 
 if (WITH_VM)
+    # Select JIT backend based on architecture
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(JIT_SOURCES
+            src/jit_aarch64.c
+            src/jit_aarch64_emit.c
+            src/jit_elf.c
+            src/jit_shared.c
+        )
+    else()
+        set(JIT_SOURCES
+            src/jit_x86.c
+            src/jit_shared.c
+        )
+    endif()
+
     add_executable(hl
         src/code.c
-        src/jit.c
+        ${JIT_SOURCES}
         src/main.c
         src/module.c
         src/debugger.c
@@ -246,6 +259,8 @@ if (WITH_VM)
 
     if (WIN32)
         target_link_libraries(hl user32)
+    else()
+        target_link_libraries(hl dl)  # For dlopen/dlsym in jit_elf.c
     endif()
 endif()
 
