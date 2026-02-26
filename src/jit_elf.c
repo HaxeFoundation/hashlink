@@ -15,6 +15,22 @@
 #include "jit_common.h"
 #include "jit_elf.h"
 
+/* The GDB JIT interface requires GCC/Clang extensions (__attribute__, inline asm).
+ * On other compilers (MSVC), provide stubs that do nothing. */
+#if !defined(__GNUC__) && !defined(__clang__)
+
+struct jit_code_entry *gdb_jit_register(jit_ctx *ctx, hl_module *m,
+                                         int code_size, void *code_base) {
+    (void)ctx; (void)m; (void)code_size; (void)code_base;
+    return NULL;
+}
+
+void gdb_jit_unregister(struct jit_code_entry *entry) {
+    (void)entry;
+}
+
+#else /* GCC or Clang */
+
 /* ========== GDB JIT Interface Global Symbols ========== */
 /*
  * These symbols MUST have these exact names and NOT be static.
@@ -392,3 +408,5 @@ void gdb_jit_unregister(struct jit_code_entry *entry) {
     free((void *)entry->symfile_addr);
     free(entry);
 }
+
+#endif /* __GNUC__ || __clang__ */
