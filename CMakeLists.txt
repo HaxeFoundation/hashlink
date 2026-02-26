@@ -222,8 +222,9 @@ else()
 endif()
 
 if (WITH_VM)
-    # Select JIT backend based on architecture
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+    # Select JIT backend based on target architecture
+    # On macOS, CMAKE_OSX_ARCHITECTURES overrides CMAKE_SYSTEM_PROCESSOR for cross-compilation
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
         set(JIT_SOURCES
             src/jit_aarch64.c
             src/jit_aarch64_emit.c
