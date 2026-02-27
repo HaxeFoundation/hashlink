@@ -167,7 +167,7 @@ BREW_PREFIX := $(shell brew --prefix)
 BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
 BREW_SDL_PREFIX := $(shell brew --prefix sdl2)
 
-CFLAGS += -m$(MARCH)
+CFLAGS += -arch $(ARCH)
 CPPFLAGS += -I include -I $(BREW_PREFIX)/include
 
 SDL_CPPFLAGS = -I $(BREW_SDL_PREFIX)/include/SDL2 -DGL_SILENCE_DEPRECATION
@@ -191,8 +191,6 @@ ifneq ($(ARCH),arm64)
 HL_DEBUG = include/mdbg/mdbg.o include/mdbg/mach_excServer.o include/mdbg/mach_excUser.o
 LIB += ${HL_DEBUG}
 endif
-
-CFLAGS += -arch $(ARCH)
 
 LIBHL_LDFLAGS += -install_name @rpath/libhl.dylib
 USE_LIBHL_LDFLAGS = -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
