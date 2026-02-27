@@ -319,8 +319,6 @@ static void restore_regs( jit_ctx *ctx ) {
 	}
 }
 
-// jit_buf() is now in jit_shared.c
-
 static const char *KNAMES[] = { "cpu","fpu","stack","const","addr","mem","unused" };
 #define ERRIF(c)	if( c ) { printf("%s(%s,%s)\n",f?f->name:"???",KNAMES[a->kind], KNAMES[b->kind]); ASSERT(0); }
 

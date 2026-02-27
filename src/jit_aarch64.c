@@ -45,7 +45,6 @@
 #include <sys/mman.h>
 #include "jit_common.h"
 #include "jit_aarch64_emit.h"
-#include "jit_elf.h"
 #include "hlsystem.h"
 
 // Helper for LDR/STR scaled offset from struct field
@@ -101,9 +100,6 @@ static const Arm64Reg RCPU_SCRATCH_REGS[] = {
 // Callee-saved registers: X19-X28
 // X29 (FP) and X30 (LR) are also callee-saved but handled specially
 #define RCPU_CALLEE_SAVED_COUNT 10
-static const Arm64Reg RCPU_CALLEE_SAVED[] = {
-	X19, X20, X21, X22, X23, X24, X25, X26, X27, X28
-};
 
 // Callee-saved registers available for allocation
 // These survive function calls, so we don't need to spill them before BLR
@@ -114,9 +110,6 @@ static const Arm64Reg RCPU_CALLEE_ALLOC[] = {
 
 // FP callee-saved: V8-V15 (only lower 64 bits per AAPCS64)
 #define RFPU_CALLEE_SAVED_COUNT 8
-static const Arm64FpReg RFPU_CALLEE_SAVED[] = {
-	V8, V9, V10, V11, V12, V13, V14, V15
-};
 
 // Frame size for callee-saved registers + FP/LR
 // CPU callee-saved: RCPU_CALLEE_SAVED_COUNT * 8 bytes = 80 bytes
@@ -173,48 +166,6 @@ void on_jit_error(const char *msg, int_val line) {
 // ============================================================================
 
 /**
- * Check if a CPU register is a call (argument) register
- */
-static bool is_call_reg(Arm64Reg r) {
-	for (int i = 0; i < CALL_NREGS; i++) {
-		if (CALL_REGS[i] == r)
-			return true;
-	}
-	return false;
-}
-
-/**
- * Get the index of a register in the call register array
- * Returns -1 if not a call register
- */
-static int call_reg_index(Arm64Reg r) {
-	for (int i = 0; i < CALL_NREGS; i++) {
-		if (CALL_REGS[i] == r)
-			return i;
-	}
-	return -1;
-}
-
-/**
- * Check if a register is callee-saved (must be preserved across calls)
- */
-static bool is_callee_saved_cpu(Arm64Reg r) {
-	for (int i = 0; i < RCPU_CALLEE_SAVED_COUNT; i++) {
-		if (RCPU_CALLEE_SAVED[i] == r)
-			return true;
-	}
-	return r == RFP || r == RLR;
-}
-
-static bool is_callee_saved_fpu(Arm64FpReg r) {
-	for (int i = 0; i < RFPU_CALLEE_SAVED_COUNT; i++) {
-		if (RFPU_CALLEE_SAVED[i] == r)
-			return true;
-	}
-	return false;
-}
-
-/**
  * Check if type is String (HOBJ with bytes:HBYTES + length:HI32)
  * Used for value-based string comparison per Haxe spec.
  */
@@ -223,6 +174,17 @@ static bool is_string_type(hl_type *t) {
 	if (t->obj->nfields != 2) return false;
 	return t->obj->fields[0].t->kind == HBYTES &&
 	       t->obj->fields[1].t->kind == HI32;
+}
+
+/**
+ * Fast string equality comparison (called from JIT-compiled code).
+ * Returns 0 if equal, non-zero if different.
+ */
+static int jit_str_cmp( vstring *a, vstring *b ) {
+	if( a == b ) return 0;
+	if( !a || !b ) return 1;
+	if( a->length != b->length ) return 1;
+	return memcmp(a->bytes, b->bytes, a->length * sizeof(uchar));
 }
 
 // ============================================================================
@@ -265,7 +227,7 @@ static preg *alloc_cpu(jit_ctx *ctx, preg_kind k) {
 	for (i = 0; i < RCPU_CALLEE_ALLOC_COUNT; i++) {
 		p = REG_AT(RCPU_CALLEE_ALLOC[i]);
 		if (p->holds == NULL && p->lock < ctx->currentPos) {
-			ctx->callee_saved_used |= (1 << i);  // Mark register as used for Phase 2 NOP patching
+			ctx->callee_saved_used |= (1 << i);
 			return p;
 		}
 	}
@@ -274,7 +236,7 @@ static preg *alloc_cpu(jit_ctx *ctx, preg_kind k) {
 	for (i = 0; i < RCPU_CALLEE_ALLOC_COUNT; i++) {
 		p = REG_AT(RCPU_CALLEE_ALLOC[i]);
 		if (p->lock < ctx->currentPos) {
-			ctx->callee_saved_used |= (1 << i);  // Mark register as used for Phase 2 NOP patching
+			ctx->callee_saved_used |= (1 << i);
 			free_reg(ctx, p);  // Spill to stack before reusing
 			return p;
 		}
@@ -605,21 +567,21 @@ static void ldr_stack_fp(jit_ctx *ctx, Arm64FpReg dst, int stack_offset, int siz
 
 	// Priority 1: Use LDUR for small signed offsets (-256 to +255)
 	if (stack_offset >= -256 && stack_offset <= 255) {
-		encode_ldur_stur(ctx, size_enc, 1, 0x01, stack_offset, RFP, dst);
+		encode_ldur_stur(ctx, size_enc, 1, 0x01, stack_offset, RFP, (Arm64Reg)dst);
 		return;
 	}
 
 	// Priority 2: Use LDR with scaled unsigned offset for larger positive aligned offsets
 	if (stack_offset >= 0 && (stack_offset % size == 0) && stack_offset < 4096 * size) {
 		int scaled_offset = stack_offset / size;
-		encode_ldr_str_imm(ctx, size_enc, 1, 0x01, scaled_offset, RFP, dst);
+		encode_ldr_str_imm(ctx, size_enc, 1, 0x01, scaled_offset, RFP, (Arm64Reg)dst);
 		return;
 	}
 
 	// Fallback: Compute address in register
 	load_immediate(ctx, stack_offset, RTMP, true);
 	encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, RFP, RTMP);
-	encode_ldr_str_imm(ctx, size_enc, 1, 0x01, 0, RTMP, dst);
+	encode_ldr_str_imm(ctx, size_enc, 1, 0x01, 0, RTMP, (Arm64Reg)dst);
 }
 
 /**
@@ -661,21 +623,21 @@ static void str_stack_fp(jit_ctx *ctx, Arm64FpReg src, int stack_offset, int siz
 
 	// Priority 1: Use STUR for small signed offsets (-256 to +255)
 	if (stack_offset >= -256 && stack_offset <= 255) {
-		encode_ldur_stur(ctx, size_enc, 1, 0x00, stack_offset, RFP, src);
+		encode_ldur_stur(ctx, size_enc, 1, 0x00, stack_offset, RFP, (Arm64Reg)src);
 		return;
 	}
 
 	// Priority 2: Use STR with scaled unsigned offset for larger positive aligned offsets
 	if (stack_offset >= 0 && (stack_offset % size == 0) && stack_offset < 4096 * size) {
 		int scaled_offset = stack_offset / size;
-		encode_ldr_str_imm(ctx, size_enc, 1, 0x00, scaled_offset, RFP, src);
+		encode_ldr_str_imm(ctx, size_enc, 1, 0x00, scaled_offset, RFP, (Arm64Reg)src);
 		return;
 	}
 
 	// Fallback: Compute address in register
 	load_immediate(ctx, stack_offset, RTMP, true);
 	encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, RFP, RTMP);
-	encode_ldr_str_imm(ctx, size_enc, 1, 0x00, 0, RTMP, src);
+	encode_ldr_str_imm(ctx, size_enc, 1, 0x00, 0, RTMP, (Arm64Reg)src);
 }
 
 /**
@@ -822,61 +784,6 @@ static preg *fetch(jit_ctx *ctx, vreg *r) {
 	RLOCK(p);
 
 	return p;
-}
-
-/**
- * Copy data between locations (register, stack, immediate)
- * This is the main data movement workhorse function
- */
-static void copy(jit_ctx *ctx, vreg *dst, preg *dst_p, vreg *src, preg *src_p) {
-	if (src_p->kind == RCONST) {
-		// Load immediate into destination
-		int64_t val = src_p->id;
-
-		if (IS_FLOAT(dst)) {
-			// Load float constant: load bits as integer, then move to FP register
-			preg *d = (dst_p && dst_p->kind == RFPU) ? dst_p : alloc_fpu(ctx);
-
-			if (val == 0) {
-				// FMOV Dd, XZR - zero the FP register
-				EMIT32(ctx, (1 << 31) | (0 << 29) | (0x1E << 24) | (1 << 22) | (1 << 21) | (7 << 16) | (31 << 5) | d->id);
-			} else {
-				// Load bits to GPR, then FMOV to FPR
-				load_immediate(ctx, val, RTMP, true);
-				// FMOV Dd, Xn: sf=1, S=0, type=01, rmode=00, opcode=00111, Rn, Rd
-				EMIT32(ctx, (0x9E670000) | (RTMP << 5) | d->id);
-			}
-
-			if (dst_p == NULL || dst_p != d) {
-				reg_bind(ctx, dst, d);
-			}
-		} else {
-			// Load integer immediate
-			preg *d = (dst_p && dst_p->kind == RCPU) ? dst_p : fetch(ctx, dst);
-			load_immediate(ctx, val, d->id, dst->size == 8);
-			if (dst_p == NULL || dst_p != d) {
-				reg_bind(ctx, dst, d);
-			}
-		}
-	} else if (src_p->kind == RCPU && dst_p && dst_p->kind == RCPU) {
-		// Register to register
-		mov_reg_reg(ctx, dst_p->id, src_p->id, dst->size == 8);
-	} else if (src_p->kind == RFPU && dst_p && dst_p->kind == RFPU) {
-		// FP register to FP register
-		fmov_reg_reg(ctx, dst_p->id, src_p->id, dst->size == 8);
-	} else {
-		// Generic case: fetch src, store to dst
-		preg *s = (src_p && (src_p->kind == RCPU || src_p->kind == RFPU)) ? src_p : fetch(ctx, src);
-		preg *d = (dst_p && (dst_p->kind == RCPU || dst_p->kind == RFPU)) ? dst_p : fetch(ctx, dst);
-
-		if (IS_FLOAT(dst)) {
-			fmov_reg_reg(ctx, d->id, s->id, dst->size == 8);
-		} else {
-			mov_reg_reg(ctx, d->id, s->id, dst->size == 8);
-		}
-
-		reg_bind(ctx, dst, d);
-	}
 }
 
 // ============================================================================
@@ -1878,17 +1785,17 @@ static void op_jump(jit_ctx *ctx, vreg *a, vreg *b, hl_op op, int target_opcode)
 	}
 
 	// Handle String EQUALITY comparison (value-based per Haxe spec)
-	// hl_str_cmp only returns 0 (equal) or 1 (not equal), so it can only be used
+	// jit_str_cmp only returns 0 (equal) or 1 (not equal), so it can only be used
 	// for OJEq/OJNotEq. For ordered comparisons, fall through to compareFun path.
 	if ((op == OJEq || op == OJNotEq) && is_string_type(a->t) && is_string_type(b->t)) {
 		// Spill before call
 		spill_regs(ctx);
 		spill_callee_saved(ctx);
 
-		// Call hl_str_cmp(a, b) - returns 0 if equal, non-zero if not equal
+		// Call jit_str_cmp(a, b) - returns 0 if equal, non-zero if not equal
 		vreg *args[2] = { a, b };
 		int stack_space = prepare_call_args(ctx, NULL, args, 2, true);
-		load_immediate(ctx, (int64_t)hl_str_cmp, RTMP, true);
+		load_immediate(ctx, (int64_t)jit_str_cmp, RTMP, true);
 		EMIT32(ctx, 0xD63F0000 | (RTMP << 5));  // BLR RTMP
 		if (stack_space > 0) {
 			encode_add_sub_imm(ctx, 1, 0, 0, 0, stack_space, SP_REG, SP_REG);
@@ -2177,11 +2084,11 @@ static void op_get_mem(jit_ctx *ctx, vreg *dst, vreg *base, int offset, int size
 
 		if (offset >= 0 && offset < (1 << 12) * size) {
 			int imm12 = offset / size;
-			encode_ldr_str_imm(ctx, size_bits, 1, 0x01, imm12, base_r, dst_r);  // V=1 for FP
+			encode_ldr_str_imm(ctx, size_bits, 1, 0x01, imm12, base_r, (Arm64Reg)dst_r);  // V=1 for FP
 		} else {
 			load_immediate(ctx, offset, RTMP2, false);
 			encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP2, 0, base_r, RTMP);
-			encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, dst_r);  // V=1 for FP
+			encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, (Arm64Reg)dst_r);  // V=1 for FP
 		}
 
 		str_stack_fp(ctx, dst_r, dst->stackPos, dst->size);
@@ -2250,11 +2157,11 @@ static void op_set_mem(jit_ctx *ctx, vreg *base, int offset, vreg *value, int si
 
 		if (offset >= 0 && offset < (1 << 12) * size) {
 			int imm12 = offset / size;
-			encode_ldr_str_imm(ctx, size_bits, 1, 0x00, imm12, base_r, value_r);  // V=1 for FP
+			encode_ldr_str_imm(ctx, size_bits, 1, 0x00, imm12, base_r, (Arm64Reg)value_r);  // V=1 for FP
 		} else {
 			load_immediate(ctx, offset, RTMP2, false);
 			encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP2, 0, base_r, RTMP);
-			encode_ldr_str_imm(ctx, size_bits, 1, 0x00, 0, RTMP, value_r);  // V=1 for FP
+			encode_ldr_str_imm(ctx, size_bits, 1, 0x00, 0, RTMP, (Arm64Reg)value_r);  // V=1 for FP
 		}
 	} else {
 		// Integer/pointer: load value first into CPU register
@@ -2335,7 +2242,7 @@ static void op_get_mem_reg(jit_ctx *ctx, vreg *dst, vreg *base, vreg *offset, in
 	if (IS_FLOAT(dst)) {
 		// Float load: use FPU register and V=1
 		Arm64FpReg dst_fp = (dst_reg->kind == RFPU) ? (Arm64FpReg)dst_reg->id : V16;
-		encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, dst_fp);  // V=1 for FP
+		encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, (Arm64Reg)dst_fp);  // V=1 for FP
 		str_stack_fp(ctx, dst_fp, dst->stackPos, dst->size);
 	} else {
 		// Integer load
@@ -2403,7 +2310,7 @@ static void op_set_mem_reg(jit_ctx *ctx, vreg *base, vreg *offset, vreg *value, 
 
 	// Step 4: Store to [RTMP]
 	if (IS_FLOAT(value)) {
-		encode_ldr_str_imm(ctx, size_bits, 1, 0x00, 0, RTMP, value_fp);  // V=1 for FP
+		encode_ldr_str_imm(ctx, size_bits, 1, 0x00, 0, RTMP, (Arm64Reg)value_fp);  // V=1 for FP
 	} else {
 		encode_ldr_str_imm(ctx, size_bits, 0, 0x00, 0, RTMP, value_r);
 	}
@@ -2649,7 +2556,7 @@ static void op_get_array(jit_ctx *ctx, vreg *dst, vreg *array, vreg *index) {
 			free_reg(ctx, pv0);
 		}
 		int size_bits = (dst->size == 8) ? 0x03 : 0x02;  // F64 or F32
-		encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, V0);  // V=1 for FP
+		encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, (Arm64Reg)V0);  // V=1 for FP
 		str_stack_fp(ctx, V0, dst->stackPos, dst->size);
 		// Clear dst's old binding - value is now on stack, not in a register
 		if (dst->current != NULL) {
@@ -2806,7 +2713,7 @@ static void op_set_array(jit_ctx *ctx, vreg *array, vreg *index, vreg *value) {
 	} else if (is_float_value) {
 		// Float store: STR Vn, [RTMP] with V=1
 		int size_bits = (value->size == 8) ? 0x03 : 0x02;  // F64 or F32
-		encode_ldr_str_imm(ctx, size_bits, 1, 0x00, 0, RTMP, value_fp);  // V=1 for FP
+		encode_ldr_str_imm(ctx, size_bits, 1, 0x00, 0, RTMP, (Arm64Reg)value_fp);  // V=1 for FP
 	} else {
 		// Integer store: STR Xn, [RTMP]
 		int size_bits = (elem_size == 1) ? 0x00 : (elem_size == 2) ? 0x01 : (elem_size == 4) ? 0x02 : 0x03;
@@ -2837,7 +2744,7 @@ static void op_get_global(jit_ctx *ctx, vreg *dst, int global_index) {
 		Arm64FpReg dst_r = (dst_reg->kind == RFPU) ? (Arm64FpReg)dst_reg->id : V16;
 		// LDR Vn, [RTMP2] - floating point load
 		// size: 0x02=32-bit (S), 0x03=64-bit (D)
-		encode_ldr_str_imm(ctx, dst->size == 8 ? 0x03 : 0x02, 1, 0x01, 0, RTMP2, dst_r);
+		encode_ldr_str_imm(ctx, dst->size == 8 ? 0x03 : 0x02, 1, 0x01, 0, RTMP2, (Arm64Reg)dst_r);
 		// Store to stack
 		str_stack_fp(ctx, dst_r, dst->stackPos, dst->size);
 	} else {
@@ -2872,7 +2779,7 @@ static void op_set_global(jit_ctx *ctx, int global_index, vreg *value) {
 			ldr_stack_fp(ctx, value_r, value->stackPos, value->size);
 		}
 		// STR Vn, [RTMP2] - floating point store
-		encode_ldr_str_imm(ctx, value->size == 8 ? 0x03 : 0x02, 1, 0x00, 0, RTMP2, value_r);
+		encode_ldr_str_imm(ctx, value->size == 8 ? 0x03 : 0x02, 1, 0x00, 0, RTMP2, (Arm64Reg)value_r);
 	} else {
 		// Integer/pointer: store from CPU register
 		Arm64Reg value_r = (value_reg->kind == RCPU) ? (Arm64Reg)value_reg->id : RTMP;
@@ -2947,7 +2854,7 @@ static void op_unref(jit_ctx *ctx, vreg *dst, vreg *src) {
 		// Float dereference: LDR Vd, [src_r]
 		preg *dst_reg = alloc_dst(ctx, dst);
 		Arm64FpReg dst_r = (dst_reg->kind == RFPU) ? (Arm64FpReg)dst_reg->id : V16;
-		encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, src_r, dst_r);
+		encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, src_r, (Arm64Reg)dst_r);
 		str_stack_fp(ctx, dst_r, dst->stackPos, dst->size);
 	} else {
 		// Integer dereference: LDR Xd, [src_r]
@@ -2991,100 +2898,6 @@ static void op_setref(jit_ctx *ctx, vreg *dst, vreg *src) {
 // ============================================================================
 // Comparison Operations (result stored, not branching)
 // ============================================================================
-
-/*
- * Equality comparison: dst = (a == b)
- * OEq/ONeq/OLt/OGte/etc: Store comparison result as boolean
- */
-static void op_compare(jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op op) {
-	preg *a_reg = fetch(ctx, a);
-	preg *b_reg = fetch(ctx, b);
-	preg *dst_reg = alloc_dst(ctx, dst);
-
-	Arm64Reg a_r = (a_reg->kind == RCPU) ? (Arm64Reg)a_reg->id : RTMP;
-	if (a_reg->kind == RCONST) {
-		load_immediate(ctx, a_reg->id, a_r, a->size == 8);
-	} else if (a_reg->kind != RCPU) {
-		ldr_stack(ctx, a_r, a->stackPos, a->size);
-	}
-
-	Arm64Reg b_r = (b_reg->kind == RCPU) ? (Arm64Reg)b_reg->id : RTMP2;
-	if (b_reg->kind == RCONST) {
-		load_immediate(ctx, b_reg->id, b_r, b->size == 8);
-	} else if (b_reg->kind != RCPU) {
-		ldr_stack(ctx, b_r, b->stackPos, b->size);
-	}
-
-	Arm64Reg dst_r = (dst_reg->kind == RCPU) ? (Arm64Reg)dst_reg->id : X9;
-
-	bool is_float = IS_FLOAT(a);
-
-	if (is_float) {
-		// Floating-point comparison
-		Arm64FpReg fa_r = (a_reg->kind == RFPU) ? (Arm64FpReg)a_reg->id : V16;
-		Arm64FpReg fb_r = (b_reg->kind == RFPU) ? (Arm64FpReg)b_reg->id : V17;
-
-		if (a_reg->kind != RFPU) {
-			// Load from stack to FP register
-			ldr_stack_fp(ctx, fa_r, a->stackPos, a->size);
-		}
-		if (b_reg->kind != RFPU) {
-			ldr_stack_fp(ctx, fb_r, b->stackPos, b->size);
-		}
-
-		// FCMP fa_r, fb_r
-		int is_double = a->size == 8 ? 1 : 0;
-		encode_fp_compare(ctx, 0, is_double, is_double, fb_r, 0, fa_r);
-	} else {
-		// Integer comparison: CMP a_r, b_r
-		encode_add_sub_reg(ctx, a->size == 8 ? 1 : 0, 1, 1, 0, b_r, 0, a_r, XZR);
-	}
-
-	// Get condition code for this operation
-	ArmCondition cond = hl_cond_to_arm(op, is_float);
-
-	// CSET dst_r, cond  (Set register to 1 if condition true, 0 otherwise)
-	// Encoding: CSINC dst, XZR, XZR, !cond
-	// This sets dst = (cond) ? 1 : 0
-	int inv_cond = cond ^ 1;  // Invert condition
-	// CSINC: sf=0, op=0, S=0, Rm=XZR, cond=inv_cond, o2=1, Rn=XZR, Rd=dst_r
-	EMIT32(ctx,(0 << 31) | (0 << 30) | (0xD4 << 21) | (XZR << 16) | (inv_cond << 12) | (1 << 10) | (XZR << 5) | dst_r);
-
-	// Always store to stack - source of truth for later loads
-	str_stack(ctx, dst_r, dst->stackPos, dst->size);
-
-	discard(ctx, a_reg);
-	discard(ctx, b_reg);
-}
-
-// ============================================================================
-// Type and Object Operations
-// ============================================================================
-
-/*
- * Get object type: dst = obj->type
- * OType: Load type pointer from object
- */
-static void op_type(jit_ctx *ctx, vreg *dst, vreg *obj) {
-	preg *obj_reg = fetch(ctx, obj);
-	preg *dst_reg = alloc_dst(ctx, dst);
-
-	Arm64Reg obj_r = (obj_reg->kind == RCPU) ? (Arm64Reg)obj_reg->id : RTMP;
-	if (obj_reg->kind != RCPU) {
-		ldr_stack(ctx, obj_r, obj->stackPos, obj->size);
-	}
-
-	Arm64Reg dst_r = (dst_reg->kind == RCPU) ? (Arm64Reg)dst_reg->id : RTMP2;
-
-	// Load type pointer from object header (first field at offset 0)
-	// LDR dst_r, [obj_r]
-	encode_ldr_str_imm(ctx, 0x03, 0, 0x01, 0, obj_r, dst_r);
-
-	// Always store to stack - source of truth for later loads
-	str_stack(ctx, dst_r, dst->stackPos, dst->size);
-
-	discard(ctx, obj_reg);
-}
 
 /*
  * OGetThis: Load a field from the "this" object (R(0))
@@ -3201,7 +3014,7 @@ static void op_safe_cast(jit_ctx *ctx, vreg *dst, vreg *obj, hl_type *target_typ
 				encode_branch_cond(ctx, 0, COND_EQ);  // B.EQ null_path
 
 				// Non-null: load float from offset 8
-				encode_ldr_str_imm(ctx, (dst->size == 8) ? 0x03 : 0x02, 1, 0x01, 8 / dst->size, r, V0);
+				encode_ldr_str_imm(ctx, (dst->size == 8) ? 0x03 : 0x02, 1, 0x01, 8 / dst->size, r, (Arm64Reg)V0);
 				jend = BUF_POS();
 				encode_branch_uncond(ctx, 0);  // B end
 
@@ -3583,7 +3396,7 @@ static int prepare_call_args(jit_ctx *ctx, hl_type **arg_types, vreg **args, int
 				ldr_stack_fp(ctx, V16, arg->stackPos, arg->size);
 				encode_ldr_str_imm(ctx, arg->size == 4 ? 0x02 : 0x03, 1, 0x00,
 				                   current_stack_offset / (arg->size == 4 ? 4 : 8),
-				                   SP_REG, V16);
+				                   SP_REG, (Arm64Reg)V16);
 				current_stack_offset += 8;
 			}
 		} else {
@@ -4476,7 +4289,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 	ctx->functionPos = BUF_POS();
 	ctx->currentPos = 1;
 
-	// Initialize Phase 2 callee-saved tracking
+	// Initialize callee-saved register tracking for backpatching
 	ctx->callee_saved_used = 0;
 	ctx->fpu_callee_saved_used = 0;
 	memset(ctx->stp_positions, 0, sizeof(ctx->stp_positions));
@@ -4484,7 +4297,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 	memset(ctx->stp_fpu_positions, 0, sizeof(ctx->stp_fpu_positions));
 	memset(ctx->ldp_fpu_positions, 0, sizeof(ctx->ldp_fpu_positions));
 
-	// Function prologue - offset-based for selective NOP patching (Phase 2)
+	// Function prologue - callee-saved saves are backpatched to NOP if unused
 	// Reserve space for callee-saved registers + FP/LR
 	encode_add_sub_imm(ctx, 1, 1, 0, 0, CALLEE_SAVED_FRAME_SIZE, SP_REG, SP_REG);  // SUB SP, SP, #CALLEE_SAVED_FRAME_SIZE
 
@@ -4835,7 +4648,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 					ldr_stack_fp(ctx, V16, ra->stackPos, ra->size);
 					// STR Vn, [X0, #HDYN_VALUE]
 					encode_ldr_str_imm(ctx, (ra->size == 8) ? 0x03 : 0x02, 1, 0x00,
-					                   HDYN_VALUE / ((ra->size == 8) ? 8 : 4), X0, V16);
+					                   HDYN_VALUE / ((ra->size == 8) ? 8 : 4), X0, (Arm64Reg)V16);
 				} else {
 					// Integer/pointer: load from stack and store to [X0 + HDYN_VALUE]
 					ldr_stack(ctx, X16, ra->stackPos, ra->size);
@@ -5029,7 +4842,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 						// Float: load into FPU register
 						Arm64FpReg dst_r = (r_vfield->kind == RFPU) ? (Arm64FpReg)r_vfield->id : V16;
 						int size_bits = (dst->size == 8) ? 0x03 : 0x02;
-						encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, dst_r);  // V=1 for FP
+						encode_ldr_str_imm(ctx, size_bits, 1, 0x01, 0, RTMP, (Arm64Reg)dst_r);  // V=1 for FP
 						str_stack_fp(ctx, dst_r, dst->stackPos, dst->size);
 					} else {
 						// Integer/pointer: load into CPU register
@@ -5112,7 +4925,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 						if (r_val->kind != RFPU)
 							ldr_stack_fp(ctx, val_r, rb->stackPos, rb->size);
 						int size_bits = (rb->size == 8) ? 0x03 : 0x02;
-						encode_ldr_str_imm(ctx, size_bits, 1, 0x00, 0, RTMP, val_r);  // V=1 for FP store
+						encode_ldr_str_imm(ctx, size_bits, 1, 0x00, 0, RTMP, (Arm64Reg)val_r);  // V=1 for FP store
 					} else {
 						// Integer/pointer: store from CPU register
 						Arm64Reg val_r = (r_val->kind == RCPU) ? r_val->id : RTMP2;
@@ -5361,7 +5174,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 						// X4 was clobbered by call, recompute: ret buffer is at SP + args_size
 						encode_add_sub_imm(ctx, 1, 0, 0, 0, args_size + HDYN_VALUE, SP_REG, X10);
 						if (IS_FLOAT(dst)) {
-							encode_ldr_str_imm(ctx, dst->size == 8 ? 0x03 : 0x02, 1, 0x01, 0, X10, V0);
+							encode_ldr_str_imm(ctx, dst->size == 8 ? 0x03 : 0x02, 1, 0x01, 0, X10, (Arm64Reg)V0);
 							str_stack_fp(ctx, V0, dst->stackPos, dst->size);
 						} else {
 							encode_ldr_str_imm(ctx, dst->size == 8 ? 0x03 : 0x02, 0, 0x01, 0, X10, X0);
@@ -6285,11 +6098,11 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 				}
 				if (field_offset < 4096 && (field_offset % (dst->size)) == 0) {
 					int scale = (dst->size == 8) ? 3 : 2;
-					encode_ldr_str_imm(ctx, scale, 1, 0x01, field_offset >> scale, src, V0);
+					encode_ldr_str_imm(ctx, scale, 1, 0x01, field_offset >> scale, src, (Arm64Reg)V0);
 				} else {
 					load_immediate(ctx, field_offset, RTMP2, true);
 					encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP2, 0, src, RTMP2);
-					encode_ldr_str_imm(ctx, (dst->size == 8) ? 3 : 2, 1, 0x01, 0, RTMP2, V0);
+					encode_ldr_str_imm(ctx, (dst->size == 8) ? 3 : 2, 1, 0x01, 0, RTMP2, (Arm64Reg)V0);
 				}
 				str_stack_fp(ctx, V0, dst->stackPos, dst->size);
 			} else {
@@ -6332,11 +6145,11 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 				}
 				if (field_offset < 4096 && (field_offset % rb->size) == 0) {
 					int scale = (rb->size == 8) ? 3 : 2;
-					encode_ldr_str_imm(ctx, scale, 1, 0x00, field_offset >> scale, enum_r, val_r);
+					encode_ldr_str_imm(ctx, scale, 1, 0x00, field_offset >> scale, enum_r, (Arm64Reg)val_r);
 				} else {
 					load_immediate(ctx, field_offset, RTMP2, true);
 					encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP2, 0, enum_r, RTMP2);
-					encode_ldr_str_imm(ctx, (rb->size == 8) ? 3 : 2, 1, 0x00, 0, RTMP2, val_r);
+					encode_ldr_str_imm(ctx, (rb->size == 8) ? 3 : 2, 1, 0x00, 0, RTMP2, (Arm64Reg)val_r);
 				}
 			} else {
 				Arm64Reg val_r = (r_val->kind == RCPU) ? r_val->id : RTMP2;
@@ -6380,11 +6193,11 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 					ldr_stack_fp(ctx, V0, field_val->stackPos, field_val->size);
 					if (field_offset < 4096 && (field_offset % field_val->size) == 0) {
 						int scale = (field_val->size == 8) ? 3 : 2;
-						encode_ldr_str_imm(ctx, scale, 1, 0x00, field_offset >> scale, X0, V0);
+						encode_ldr_str_imm(ctx, scale, 1, 0x00, field_offset >> scale, X0, (Arm64Reg)V0);
 					} else {
 						load_immediate(ctx, field_offset, RTMP, true);
 						encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, X0, RTMP);
-						encode_ldr_str_imm(ctx, (field_val->size == 8) ? 3 : 2, 1, 0x00, 0, RTMP, V0);
+						encode_ldr_str_imm(ctx, (field_val->size == 8) ? 3 : 2, 1, 0x00, 0, RTMP, (Arm64Reg)V0);
 					}
 				} else {
 					ldr_stack(ctx, RTMP, field_val->stackPos, field_val->size);
@@ -6573,7 +6386,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 	// Record epilogue position BEFORE emitting it (for jumps past last opcode)
 	ctx->opsPos[f->nops] = BUF_POS();
 
-	// Function epilogue - offset-based for selective NOP patching (Phase 2)
+	// Function epilogue - callee-saved restores are backpatched to NOP if unused
 	// MOV SP, X29  ; Restore stack pointer to frame pointer
 	mov_reg_reg(ctx, SP_REG, FP, true);
 
@@ -6627,7 +6440,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 		ctx->jumps = NULL;
 	}
 
-	// Phase 2a: Backpatch unused CPU callee-saved register saves/restores to NOPs
+	// Backpatch unused CPU callee-saved register saves/restores to NOPs
 	// Each STP/LDP handles a pair: [0]=X27,X28  [1]=X25,X26  [2]=X23,X24  [3]=X21,X22  [4]=X19,X20
 	// Bitmap bits: 0,1=X19,X20  2,3=X21,X22  4,5=X23,X24  6,7=X25,X26  8,9=X27,X28
 	{
@@ -6644,7 +6457,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 		}
 	}
 
-	// Phase 2b: Backpatch unused FPU callee-saved register saves/restores to NOPs
+	// Backpatch unused FPU callee-saved register saves/restores to NOPs
 	// Pairs: [0]=V8,V9  [1]=V10,V11  [2]=V12,V13  [3]=V14,V15
 	// Bitmap: bits 0,1=V8,V9  bits 2,3=V10,V11  bits 4,5=V12,V13  bits 6,7=V14,V15
 	{
@@ -6745,9 +6558,6 @@ void *hl_jit_code(jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **de
 	// Round up code size to page boundary for memory allocation
 	int alloc_size = (code_size + 4095) & ~4095;
 
-	// Note: Jump patching is now done at the end of each function in jit_function()
-	// This ensures ctx->opsPos contains the correct positions for each function's jumps
-
 	// Allocate executable memory
 	code = (unsigned char*)hl_alloc_executable_memory(alloc_size);
 	if (code == NULL) {
@@ -6757,11 +6567,6 @@ void *hl_jit_code(jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **de
 
 	// Copy generated code to executable memory (with jumps already patched)
 	memcpy(code, ctx->startBuf, code_size);
-
-	// Register with GDB JIT interface for debugging
-	if (m->code->hasdebug) {
-		m->gdb_jit_entry = gdb_jit_register(ctx, m, code_size, code);
-	}
 
 	// Set up C↔HL trampolines and callbacks
 	if (!call_jit_c2hl) {

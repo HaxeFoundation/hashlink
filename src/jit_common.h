@@ -25,7 +25,7 @@
 #include <hlmodule.h>
 
 /*
- * Portable JIT definitions shared between x86 and AArch64 backends
+ * JIT definitions shared between x86 and AArch64 backends.
  */
 
 // Maximum register count across all architectures
@@ -114,8 +114,8 @@ struct _jit_ctx {
 	int longjump;
 	void *static_functions[8];
 	bool static_function_offset;
-#ifdef HL_64
-	// Phase 2: Callee-saved register optimization (AArch64 only)
+#if defined(__aarch64__) || defined(_M_ARM64)
+	// Callee-saved register backpatching (AArch64 only)
 	unsigned int callee_saved_used;       // Bitmap: bit i = 1 if CPU callee-saved reg i used
 	unsigned int fpu_callee_saved_used;   // Bitmap: bit i = 1 if FPU callee-saved reg i used
 	int stp_positions[5];                 // CPU STP positions (5 pairs: X19-X28)

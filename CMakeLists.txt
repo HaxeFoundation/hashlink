@@ -19,10 +19,7 @@ include(GNUInstallDirs)
 include(FindPkgConfig)
 include(CTest)
 
-set(WITH_VM_DEFAULT ON)
-# VM now supports x86, x86-64, and AArch64 architectures
-
-option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
+option(WITH_VM "Whether to build the Hashlink virtual machine" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 if(BUILD_SHARED_LIBS)
     # ensure third-party static libs are built with PIC
@@ -228,13 +225,11 @@ if (WITH_VM)
         set(JIT_SOURCES
             src/jit_aarch64.c
             src/jit_aarch64_emit.c
-            src/jit_elf.c
             src/jit_shared.c
         )
     else()
         set(JIT_SOURCES
             src/jit_x86.c
-            src/jit_elf.c
             src/jit_shared.c
         )
     endif()
@@ -262,7 +257,7 @@ if (WITH_VM)
     if (WIN32)
         target_link_libraries(hl user32)
     else()
-        target_link_libraries(hl dl)  # For dlopen/dlsym in jit_elf.c
+        target_link_libraries(hl dl)
     endif()
 endif()
 

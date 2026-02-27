@@ -115,8 +115,6 @@ typedef struct {
 	int *functions_indexes;
 } hl_code_hash;
 
-struct jit_code_entry;  /* Forward declaration for GDB JIT interface */
-
 typedef struct {
 	hl_code *code;
 	int codesize;
@@ -129,7 +127,6 @@ typedef struct {
 	hl_code_hash *hash;
 	hl_debug_infos *jit_debug;
 	jit_ctx *jit_ctx;
-	struct jit_code_entry *gdb_jit_entry;  /* GDB JIT interface registration (or NULL) */
 	hl_module_context ctx;
 } hl_module;
 

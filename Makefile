@@ -44,13 +44,10 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-# Conditional JIT backend selection based on architecture
-ifeq ($(ARCH),aarch64)
-    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_elf.o src/jit_shared.o
-else ifeq ($(ARCH),arm64)
-    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_elf.o src/jit_shared.o
+ifneq (,$(filter aarch64 arm64,$(ARCH)))
+    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_shared.o
 else
-    HL_JIT = src/jit_x86.o src/jit_elf.o src/jit_shared.o
+    HL_JIT = src/jit_x86.o src/jit_shared.o
 endif
 
 HL = src/code.o $(HL_JIT) src/main.o src/module.o src/debugger.o src/profile.o
@@ -378,11 +375,7 @@ release_win:
 	rm -rf $(PACKAGE_NAME)
 
 release_linux release_osx:
-ifeq ($(ARCH),arm64)
-	cp libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
-else
 	cp hl libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
-endif
 	tar -cvzf $(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
 	rm -rf $(PACKAGE_NAME)
 
