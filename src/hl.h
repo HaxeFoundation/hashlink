@@ -785,7 +785,6 @@ HL_API void hl_condition_free(hl_condition *cond);
 HL_API hl_tls *hl_tls_alloc( bool gc_value );
 HL_API void hl_tls_set( hl_tls *l, void *value );
 HL_API void *hl_tls_get( hl_tls *l );
-HL_API void hl_tls_free( hl_tls *l );
 
 // ----------------------- ALLOC --------------------------------------------------
 
@@ -984,6 +983,8 @@ typedef struct {
 	thread_t mach_thread_id;
 	pthread_t pthread_id;
 	#endif
+	int tls_arr_size;
+	void **tls_arr;
 } hl_thread_info;
 
 typedef struct {
