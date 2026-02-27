@@ -97,10 +97,6 @@
 #	define HL_64
 #endif
 
-#if defined(__aarch64__) || defined(_M_ARM64)
-#	define HL_ARM64
-#endif
-
 #if defined(__GNUC__)
 #	define HL_GCC
 #endif
@@ -883,8 +879,6 @@ typedef struct {
 	uchar *bytes;
 	int length;
 } vstring;
-
-HL_API int hl_str_cmp( vstring *a, vstring *b );
 
 #define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END

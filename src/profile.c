@@ -157,6 +157,13 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 	*eip = (void*)shared_context.context.uc_mcontext.gregs[REG_EIP];
 	return (void*)shared_context.context.uc_mcontext.gregs[REG_ESP];
 #	endif
+#elif defined(HL_MAC) && defined(__aarch64__)
+	struct __darwin_mcontext64 *mcontext = shared_context.context.uc_mcontext;
+	if (mcontext != NULL) {
+		*eip = (void*)mcontext->__ss.__pc;
+		return (void*)mcontext->__ss.__sp;
+	}
+	return NULL;
 #elif defined(HL_MAC) && defined(__x86_64__)
 	struct __darwin_mcontext64 *mcontext = shared_context.context.uc_mcontext;
 	if (mcontext != NULL) {
