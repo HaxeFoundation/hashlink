@@ -271,14 +271,14 @@ libs: $(LIBS)
 src/std/regexp.o $(PCRE): CPPFLAGS += $(PCRE_CPPFLAGS)
 $(LIB): CPPFLAGS += -D LIBHL_EXPORTS
 $(LIBHL): $(LIB)
-	$(LINK.c) $(LIBHL_LDFLAGS) -shared $^ $(LIBHL_LDLIBS) -o $@
+	$(CC) $(LDFLAGS) $(LIBHL_LDFLAGS) -shared $^ $(LIBHL_LDLIBS) -o $@
 
 $(HL): $(HL_OBJ) $(LIBHL)
 $(HLC): $(BOOT) $(LIBHL)
 $(HL) $(HLC):
-	$(LINK.c) $(USE_LIBHL_LDFLAGS) $^ $($@_LDLIBS) -o $@
+	$(CC) $(LDFLAGS) $(USE_LIBHL_LDFLAGS) $^ $($@_LDLIBS) -o $@
 
-%.hdll: HDLL_LINK = $(LINK.c)
+%.hdll: HDLL_LINK = $(CC) $(LDFLAGS)
 %.hdll:
 	$(HDLL_LINK) $(USE_LIBHL_LDFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
 
@@ -296,7 +296,7 @@ $(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 # force rebuild ssl.o in case we mix SSL_STATIC with normal build
 .PHONY: libs/ssl/ssl.o
 libs/ssl/ssl.o: libs/ssl/ssl.c
-	$(COMPILE.c) -o $@ $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $<
 ssl.hdll: $(SSL) $(LIBHL)
 
 ui.hdll: $(UI) $(LIBHL)
@@ -312,7 +312,7 @@ sqlite.hdll: $(SQLITE) $(LIBHL)
 CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 
 $(HEAPS): CPPFLAGS += $(HEAPS_CPPFLAGS)
-heaps.hdll: HDLL_LINK = $(LINK.cc)
+heaps.hdll: HDLL_LINK = $(CXX) $(LDFLAGS)
 heaps.hdll: $(HEAPS) $(LIBHL)
 
 mesa:
