@@ -47,6 +47,16 @@
 #include "jit_aarch64_emit.h"
 #include "hlsystem.h"
 
+// macOS ARM64 W^X support: MAP_JIT memory requires toggling write protection
+#if defined(__APPLE__) && defined(__aarch64__)
+#include <pthread.h>
+#define JIT_ENABLE_WRITE()  pthread_jit_write_protect_np(false)
+#define JIT_ENABLE_EXEC()   pthread_jit_write_protect_np(true)
+#else
+#define JIT_ENABLE_WRITE()
+#define JIT_ENABLE_EXEC()
+#endif
+
 // Helper for LDR/STR scaled offset from struct field
 #define FIELD_OFFSET_SCALED(type, field) (offsetof(type, field) / 8)
 
@@ -6566,6 +6576,7 @@ void *hl_jit_code(jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **de
 	}
 
 	// Copy generated code to executable memory (with jumps already patched)
+	JIT_ENABLE_WRITE();
 	memcpy(code, ctx->startBuf, code_size);
 
 	// Set up C↔HL trampolines and callbacks
@@ -6683,6 +6694,7 @@ void *hl_jit_code(jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **de
 	// Fallback: manual cache flush (may not be available on all platforms)
 	#warning "Instruction cache flush not implemented for this compiler"
 #endif
+	JIT_ENABLE_EXEC();
 
 	// Write perf map for profiler support (perf, heaptrack, etc.)
 	if (ctx->debug && m->code->hasdebug) {
@@ -6715,6 +6727,8 @@ void hl_jit_patch_method(void *old_fun, void **new_fun_table) {
 	unsigned int *insn = (unsigned int *)old_fun;
 	unsigned long long addr = (unsigned long long)(int_val)new_fun_table;
 
+	JIT_ENABLE_WRITE();
+
 	// MOVZ X16, #imm16 (bits 0-15)
 	*insn++ = 0xD2800000 | (16) | (((addr >> 0) & 0xFFFF) << 5);
 
@@ -6737,4 +6751,5 @@ void hl_jit_patch_method(void *old_fun, void **new_fun_table) {
 #if defined(__GNUC__) || defined(__clang__)
 	__builtin___clear_cache((char*)old_fun, (char*)insn);
 #endif
+	JIT_ENABLE_EXEC();
 }
