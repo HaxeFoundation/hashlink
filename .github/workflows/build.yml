@@ -27,9 +27,16 @@ jobs:
 
         include:
           - target: linux
+            archive_ext: tar.gz
+
+          - target: linux
             runner: ubuntu-latest
             haxe_nightly_dir: linux64
-            archive_ext: tar.gz
+
+          - target: linux
+            architecture: arm64
+            runner: ubuntu-24.04-arm
+            haxe_nightly_dir: linux-arm64
 
           - target: darwin
             haxe_nightly_dir: mac
@@ -37,7 +44,7 @@ jobs:
 
           - target: darwin
             architecture: 64
-            runner: macos-latest
+            runner: macos-15-intel
 
           - target: darwin
             architecture: arm64
@@ -65,7 +72,6 @@ jobs:
             cmake_generator: Visual Studio 17 2022
 
           - target: windows
-            architecture: 64
             runner: windows-2025
             build_system: cmake-mingw
 
@@ -90,14 +96,8 @@ jobs:
           - target: darwin
             build_system: vs2019
 
-          - target: linux
-            architecture: 32
-
           - target: darwin
             architecture: 32
-
-          - target: linux
-            architecture: arm64
 
           - target: windows
             architecture: arm64
@@ -106,18 +106,10 @@ jobs:
             build_system: make
 
           - target: darwin
-            architecture: 64
-            build_system: make
-
-          - target: darwin
             build_system: makegcc14
 
           - target: windows
             build_system: makegcc14
-
-          - target: windows
-            architecture: 32
-            build_system: cmake-mingw
 
           - target: darwin
             build_system: cmake-mingw
@@ -148,31 +140,42 @@ jobs:
 
     - name: "Install: Required Dev Packages"
       run: |
-        set -eux
+        set -ex
 
-        case "${{ matrix.target }}${{ matrix.architecture }}" in
-          linux64)
-            echo "MARCH=64" >> $GITHUB_ENV
+        case "${{ matrix.target }}" in
+          linux)
+            if [ ${{matrix.architecture}} == 32 ]; then
+              echo "MARCH=32" >> $GITHUB_ENV
+              sudo dpkg --add-architecture i386
+              SUFFIX=":i386"
+              EXTRA_APT_PKGS="gcc-multilib g++-multilib"
+            fi
+
             sudo apt-get update -y
             sudo apt-get install --no-install-recommends -y \
-              libmbedtls-dev \
-              libopenal-dev \
-              libpng-dev \
+              libmbedtls-dev${SUFFIX} \
+              libopenal-dev${SUFFIX} \
+              libpng-dev${SUFFIX} \
               libsdl2-dev \
-              libturbojpeg-dev \
-              libuv1-dev \
-              libvorbis-dev \
-              libsqlite3-dev
+              libturbojpeg-dev${SUFFIX} \
+              libuv1-dev${SUFFIX} \
+              libvorbis-dev${SUFFIX} \
+              libsqlite3-dev${SUFFIX} \
+              ${EXTRA_APT_PKGS}
             ;;
 
-          darwin*)
+          darwin)
             if [ "${{matrix.build_system}}" != "cmake" ]; then
               brew update
               brew bundle
             fi
             ;;
 
-          windows*)
+          windows)
+            if [[ ${{ matrix.build_system }}${{ matrix.architecture }} == cmake-mingw32 ]]; then
+              echo "C:\mingw32\bin" >> $GITHUB_PATH
+            fi
+
             if [[ ${{ matrix.build_system }} == cmake-mingw ]]; then
               SDL_SUFFIX=mingw
             else
@@ -200,10 +203,13 @@ jobs:
           sudo apt update
           sudo apt install -y gcc-14 g++-14
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 --slave /usr/bin/g++ g++ /usr/bin/g++-14
+          if [[ ${{ matrix.architecture }} == 32 ]]; then
+            sudo apt install -y gcc-14-multilib g++-14-multilib
+          fi
           gcc --version
 
     - name: Install haxe
-      uses: krdlab/setup-haxe@v2
+      uses: tobil4sk/setup-haxe@9d1527c4bb9d1d449d196a0822118692ceeac457
       with:
         haxe-version: latest
 
@@ -242,7 +248,11 @@ jobs:
                   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
                   -DFLAT_INSTALL_TREE=ON
                 ;;
-              linux64)
+              linux32)
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} -DWITH_SDL=OFF \
+                  -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake
+                ;;
+              linux*)
                 cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} ;;
             esac
 
@@ -279,7 +289,11 @@ jobs:
             ;;
 
           make*)
-            make
+            if [[ ${{ matrix.target }}${{ matrix.architecture }} == linux32 ]]; then
+              make -o sdl # 32 bit sdl cannot be installed
+            else
+              make
+            fi
             sudo make install
             if [[ ${{ matrix.target }} == linux ]]; then
               sudo ldconfig
@@ -298,16 +312,12 @@ jobs:
         case "${{ matrix.build_system }}" in
           cmake*)
             case "${{matrix.target}}" in
-              linux)
-                cmake --install build --prefix /tmp/hashlink
-                /tmp/hashlink/bin/hl --version
-                ;;
-              darwin)
-                cmake --install build --prefix /tmp/hashlink
-                if [ -f /tmp/hashlink/hl ]; then /tmp/hashlink/hl --version; fi
-                ;;
               windows)
                 export PATH=$(pwd)/build/bin:$PATH
+                ;;
+              *)
+                cmake --install build --prefix /tmp/hashlink
+                if [ -f /tmp/hashlink/hl ]; then /tmp/hashlink/hl --version; fi
                 ;;
             esac
             cd build && ctest --verbose --build-config ${{ matrix.cmake_configuration }}
@@ -323,7 +333,8 @@ jobs:
                 darwin) otool -L ./hl ;;
               esac
 
-              haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp
+              haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp \
+                ${{ matrix.architecture == 32 && '-D hl-legacy32' || '' }}
               ./hl hello.hl
 
               # ensure the executable still works when installed globally
@@ -355,7 +366,9 @@ jobs:
           darwinarm64)   platform_name=darwin-arm64 ;;
           darwin64)   platform_name=darwin ;;
           windows*)  platform_name=win${{matrix.architecture}} ;;
+          linux32)   platform_name=linux-i386 ;;
           linux64)   platform_name=linux-amd64 ;;
+          linuxarm64)   platform_name=linux-arm64 ;;
         esac
 
         short_commit=$(git rev-parse --short HEAD)
@@ -449,7 +462,9 @@ jobs:
           --title "HashLink Nightly Build" \
           "darwin-cmake-64/hashlink-${short_commit}-darwin-cmake.tar.gz#hashlink-latest-darwin.tar.gz" \
           "darwin-cmake-arm64/hashlink-${short_commit}-darwin-arm64-cmake.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
+          "linux-make-32/hashlink-${short_commit}-linux-i386.tar.gz#hashlink-latest-linux-i386.tar.gz" \
           "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
+          "linux-make-arm64/hashlink-${short_commit}-linux-arm64.tar.gz#hashlink-latest-linux-arm64.tar.gz" \
           "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
           "windows-vs2019-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip" \
           "windows-cmake-mingw-64/hashlink-${short_commit}-win64-cmake-mingw.zip#hashlink-latest-win64-mingw.zip"

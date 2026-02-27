@@ -198,8 +198,15 @@ LIBHL_LDFLAGS += -install_name @rpath/libhl.dylib
 USE_LIBHL_LDFLAGS = -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
 else
 
+ifeq ($(ARCH),aarch64)
+ARCH = arm64
+endif
+
 # Linux
-CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
+ifneq ($(ARCH),arm64)
+CFLAGS += -m$(MARCH)
+endif
+CFLAGS += -fPIC -pthread -fno-omit-frame-pointer
 LDFLAGS += -Wl,--no-undefined
 USE_LIBHL_LDFLAGS = -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR)
 
