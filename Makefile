@@ -12,6 +12,7 @@ ARCH ?= $(shell uname -m)
 
 CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden
 CPPFLAGS = -I src
+LDFLAGS = -fvisibility=hidden
 LIBHL_LDFLAGS =
 LIBHL_LDLIBS = -lm -lpthread
 USE_LIBHL_LDFLAGS =
@@ -150,6 +151,7 @@ endif
 
 ifneq (, $(findstring MINGW64, $(UNAME)))
 CFLAGS += -municode
+LDFLAGS += -municode
 LIBHL_LDLIBS += -lws2_32 -lwsock32
 hl_LDLIBS = -lm
 hlc_LDLIBS = -ldbghelp
@@ -168,6 +170,7 @@ BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
 BREW_SDL_PREFIX := $(shell brew --prefix sdl2)
 
 CFLAGS += -arch $(ARCH)
+LDFLAGS += -arch $(ARCH)
 CPPFLAGS += -I include -I $(BREW_PREFIX)/include
 
 SDL_CPPFLAGS = -I $(BREW_SDL_PREFIX)/include/SDL2 -DGL_SILENCE_DEPRECATION
@@ -176,6 +179,7 @@ OPENAL_CPPFLAGS = -I $(BREW_OPENAL_PREFIX)/include -Dopenal_soft
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
 CFLAGS += -isysroot $(ISYSROOT)
+LDFLAGS += -isysroot $(ISYSROOT)
 endif
 
 LDFLAGS += -L$(BREW_PREFIX)/lib
@@ -203,9 +207,10 @@ endif
 # Linux
 ifneq ($(ARCH),arm64)
 CFLAGS += -m$(MARCH)
+LDFLAGS += -m$(MARCH)
 endif
 CFLAGS += -fPIC -pthread -fno-omit-frame-pointer
-LDFLAGS += -Wl,--no-undefined
+LDFLAGS += -fPIC -pthread -Wl,--no-undefined
 USE_LIBHL_LDFLAGS = -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR)
 
 ifeq ($(MARCH),32)
@@ -231,6 +236,7 @@ endif
 
 ifdef DEBUG
 CFLAGS += -g
+LDFLAGS += -g
 endif
 
 LIBHL = libhl.$(LIBEXT)
