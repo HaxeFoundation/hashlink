@@ -3349,11 +3349,19 @@ static void op_call_method_obj(jit_ctx *ctx, vreg *dst, vreg *obj, int method_in
 // Function Calls
 // ============================================================================
 
+static inline void align_upwards(int *value, int alignment) {
+	if (*value & (alignment - 1)) {
+		*value = (*value + alignment - 1) & ~(alignment - 1);
+	}
+}
+
 /*
  * Prepare arguments for a function call according to AAPCS64:
  * - First 8 integer/pointer args in X0-X7
  * - First 8 floating-point args in V0-V7
  * - Additional args on stack (16-byte aligned)
+ *   - on Apple platforms arguments only consume their size + any necessary padding
+ *   - on platforms that follow the standard AAPCS arguments consume one or more 8-byte slots
  * - Returns the total stack space needed for overflow args
  */
 static int prepare_call_args(jit_ctx *ctx, hl_type **arg_types, vreg **args, int nargs, bool is_native) {
@@ -3368,7 +3376,12 @@ static int prepare_call_args(jit_ctx *ctx, hl_type **arg_types, vreg **args, int
 
 		if (*reg_count >= CALL_NREGS) {
 			// Arg goes on stack
+			#ifdef __APPLE__
+			align_upwards(&stack_offset, args[i]->size);
+			stack_offset += args[i]->size;
+			#else
 			stack_offset += 8;  // Each stack arg takes 8 bytes (aligned)
+			#endif
 		}
 		(*reg_count)++;
 	}
@@ -3402,12 +3415,19 @@ static int prepare_call_args(jit_ctx *ctx, hl_type **arg_types, vreg **args, int
 				ldr_stack_fp(ctx, dest_reg, arg->stackPos, arg->size);
 				fp_reg_count++;
 			} else {
+#ifdef __APPLE__
+				align_upwards(&current_stack_offset, arg->size);
+#endif
 				// Overflow: load to temp, then store to stack
 				ldr_stack_fp(ctx, V16, arg->stackPos, arg->size);
 				encode_ldr_str_imm(ctx, arg->size == 4 ? 0x02 : 0x03, 1, 0x00,
 				                   current_stack_offset / (arg->size == 4 ? 4 : 8),
 				                   SP_REG, (Arm64Reg)V16);
-				current_stack_offset += 8;
+#ifdef __APPLE__
+				current_stack_offset += arg->size;
+#else
+				current_stack_offset += 8; // Each stack arg takes 8 bytes (aligned)
+#endif
 			}
 		} else {
 			// Integer/pointer argument
@@ -3417,12 +3437,19 @@ static int prepare_call_args(jit_ctx *ctx, hl_type **arg_types, vreg **args, int
 				ldr_stack(ctx, dest_reg, arg->stackPos, arg->size);
 				int_reg_count++;
 			} else {
+#ifdef __APPLE__
+				align_upwards(&current_stack_offset, arg->size);
+#endif
 				// Overflow: load to temp, then store to stack
 				ldr_stack(ctx, RTMP, arg->stackPos, arg->size);
 				encode_ldr_str_imm(ctx, arg->size == 8 ? 0x03 : 0x02, 0, 0x00,
 				                   current_stack_offset / (arg->size == 8 ? 8 : 4),
 				                   SP_REG, RTMP);
-				current_stack_offset += 8;
+#ifdef __APPLE__
+				current_stack_offset += arg->size;
+#else
+				current_stack_offset += 8; // Each stack arg takes 8 bytes (aligned)
+#endif
 			}
 		}
 	}
