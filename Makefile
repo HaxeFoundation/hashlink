@@ -296,7 +296,7 @@ $(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 # force rebuild ssl.o in case we mix SSL_STATIC with normal build
 .PHONY: libs/ssl/ssl.o
 libs/ssl/ssl.o: libs/ssl/ssl.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 ssl.hdll: $(SSL) $(LIBHL)
 
 ui.hdll: $(UI) $(LIBHL)
