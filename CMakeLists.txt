@@ -54,6 +54,10 @@ if (MINGW)
     add_link_options(-municode)
 endif()
 
+if(NOT MSVC)
+    add_compile_options(-fno-omit-frame-pointer)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_CURRENT_SOURCE_DIR}/other/cmake
 )
