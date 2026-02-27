@@ -7,25 +7,23 @@ INSTALL_BIN_DIR ?= $(PREFIX)/bin
 INSTALL_LIB_DIR ?= $(PREFIX)/lib
 INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
-LIBS=fmt sdl ssl openal ui uv mysql sqlite heaps
+LIBS = $(addsuffix .hdll,fmt sdl ssl openal ui uv mysql sqlite heaps)
 ARCH ?= $(shell uname -m)
 
-CFLAGS = -Wall -O3 -I src -std=c11 -D LIBHL_EXPORTS -fvisibility=hidden
-LFLAGS = -L. -lhl
-EXTRA_LFLAGS ?=
-LIBFLAGS =
+CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden
+CPPFLAGS = -I src
+LDFLAGS = -fvisibility=hidden
+LIBHL_LDFLAGS =
 LIBHL_LDLIBS = -lm -lpthread
-HLFLAGS = -ldl
+USE_LIBHL_LDFLAGS =
+hl_LDLIBS = -ldl -lm
 LIBEXT = so
-LIBTURBOJPEG = -lturbojpeg
 
-LHL_LINK_FLAGS =
-
-PCRE_FLAGS = -D PCRE2_CODE_UNIT_WIDTH=16
+PCRE_CPPFLAGS = -D PCRE2_CODE_UNIT_WIDTH=16
 ifdef WITH_SYSTEM_PCRE2
-LHL_LINK_FLAGS += -lpcre2-16
+LIBHL_LDLIBS += -lpcre2-16
 else
-PCRE_FLAGS += -I include/pcre -D HAVE_CONFIG_H -D PCRE2_STATIC
+PCRE_CPPFLAGS += -I include/pcre -D HAVE_CONFIG_H -D PCRE2_STATIC
 PCRE = include/pcre/pcre2_auto_possess.o include/pcre/pcre2_chartables.o include/pcre/pcre2_compile.o \
 	include/pcre/pcre2_config.o include/pcre/pcre2_context.o include/pcre/pcre2_convert.o \
 	include/pcre/pcre2_dfa_match.o include/pcre/pcre2_error.o include/pcre/pcre2_extuni.o \
@@ -44,9 +42,9 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+HL_OBJ = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
 
-FMT_INCLUDE = -I include/mikktspace -I include/minimp3
+FMT_CPPFLAGS = -I include/mikktspace -I include/minimp3
 
 FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o libs/fmt/dxt.o
 
@@ -97,9 +95,9 @@ SSL += include/mbedtls/library/aes.o include/mbedtls/library/aesce.o include/mbe
 	include/mbedtls/library/x509_create.o include/mbedtls/library/x509_crl.o include/mbedtls/library/x509_crt.o \
 	include/mbedtls/library/x509_csr.o include/mbedtls/library/x509write.o include/mbedtls/library/x509write_crt.o \
 	include/mbedtls/library/x509write_csr.o
-SSL_CFLAGS = -I libs/ssl -I include/mbedtls/include -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
+SSL_CPPFLAGS = -I libs/ssl -I include/mbedtls/include -D MBEDTLS_USER_CONFIG_FILE=\"mbedtls_user_config.h\"
 else
-SSL_LDLIBS = -lmbedtls -lmbedx509 -lmbedcrypto
+ssl_LDLIBS = -lmbedtls -lmbedx509 -lmbedcrypto
 endif
 
 UV = libs/uv/uv.o
@@ -120,7 +118,7 @@ HEAPS += include/meshoptimizer/allocator.o include/meshoptimizer/overdrawoptimiz
 	include/meshoptimizer/spatialorder.o include/meshoptimizer/vfetchanalyzer.o \
 	include/meshoptimizer/stripifier.o include/meshoptimizer/vfetchoptimizer.o \
 	include/meshoptimizer/overdrawanalyzer.o include/meshoptimizer/vcacheanalyzer.o
-HEAPS_CFLAGS = -I include/mikktspace -I include/meshoptimizer -I include/vhacd -I include/renderdoc
+HEAPS_CPPFLAGS = -I include/mikktspace -I include/meshoptimizer -I include/vhacd -I include/renderdoc
 
 LIB = ${PCRE} ${RUNTIME} ${STD}
 
@@ -131,6 +129,7 @@ UNAME := $(shell uname)
 # Cygwin / mingw
 ifeq ($(OS),Windows_NT)
 
+EXE_SUFFIX = .exe
 LIBEXT = dll
 RELEASE_NAME=win
 # VS variables are for packaging Visual Studio builds
@@ -151,13 +150,13 @@ VS_DX_LIBRARY ?= include/dx/bin/x64/dxcompiler.dll include/dx/bin/x64/dxil.dll
 endif
 
 ifneq (, $(findstring MINGW64, $(UNAME)))
-LIBHL_LDLIBS += -lws2_32 -lwsock32
-SSL_LDLIBS += -lcrypt32 -lbcrypt -lws2_32
-MYSQL_LDLIBS += -lws2_32 -lwsock32
-HLC_LDLIBS = -ldbghelp
 CFLAGS += -municode
-LIBFLAGS += -municode
-HLFLAGS =
+LDFLAGS += -municode
+LIBHL_LDLIBS += -lws2_32 -lwsock32
+hl_LDLIBS = -lm
+hlc_LDLIBS = -ldbghelp
+ssl_LDLIBS += -lcrypt32 -lbcrypt -lws2_32
+mysql_LDLIBS += -lws2_32 -lwsock32
 endif
 
 else ifeq ($(UNAME),Darwin)
@@ -170,19 +169,25 @@ BREW_PREFIX := $(shell brew --prefix)
 BREW_OPENAL_PREFIX := $(shell brew --prefix openal-soft)
 BREW_SDL_PREFIX := $(shell brew --prefix sdl2)
 
-CFLAGS += -m$(MARCH) -I include -I $(BREW_PREFIX)/include -I $(BREW_OPENAL_PREFIX)/include -I $(BREW_SDL_PREFIX)/include/SDL2 -Dopenal_soft -DGL_SILENCE_DEPRECATION
+CFLAGS += -arch $(ARCH)
+LDFLAGS += -arch $(ARCH)
+CPPFLAGS += -I include -I $(BREW_PREFIX)/include
+
+SDL_CPPFLAGS = -I $(BREW_SDL_PREFIX)/include/SDL2 -DGL_SILENCE_DEPRECATION
+OPENAL_CPPFLAGS = -I $(BREW_OPENAL_PREFIX)/include -Dopenal_soft
 
 ifdef OSX_SDK
 ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
 CFLAGS += -isysroot $(ISYSROOT)
-LFLAGS += -isysroot $(ISYSROOT)
+LDFLAGS += -isysroot $(ISYSROOT)
 endif
 
-SDL_LINK_FLAGS = -L$(BREW_SDL_PREFIX)/lib -lSDL2
-LIBFLAGS += -L$(BREW_PREFIX)/lib -L$(BREW_OPENAL_PREFIX)/lib
-LIBOPENGL = -framework OpenGL
-LIBOPENAL = -lopenal
-LIBSSL = -framework Security -framework CoreFoundation
+LDFLAGS += -L$(BREW_PREFIX)/lib
+sdl_LDFLAGS = -L$(BREW_SDL_PREFIX)/lib
+sdl_LDLIBS = -lSDL2 -framework OpenGL
+openal_LDFLAGS = -L$(BREW_OPENAL_PREFIX)/lib
+openal_LDLIBS = -lopenal
+ssl_LDLIBS += -framework Security -framework CoreFoundation
 RELEASE_NAME = osx
 
 # Mac native debug
@@ -191,12 +196,8 @@ HL_DEBUG = include/mdbg/mdbg.o include/mdbg/mach_excServer.o include/mdbg/mach_e
 LIB += ${HL_DEBUG}
 endif
 
-CFLAGS += -arch $(ARCH)
-LFLAGS += -arch $(ARCH)
-
-LFLAGS += -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
-LIBFLAGS += -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
-LHL_LINK_FLAGS += -install_name @rpath/libhl.dylib
+LIBHL_LDFLAGS += -install_name @rpath/libhl.dylib
+USE_LIBHL_LDFLAGS = -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
 else
 
 ifeq ($(ARCH),aarch64)
@@ -206,20 +207,24 @@ endif
 # Linux
 ifneq ($(ARCH),arm64)
 CFLAGS += -m$(MARCH)
+LDFLAGS += -m$(MARCH)
 endif
-CFLAGS += -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
-LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--no-undefined
+CFLAGS += -fPIC -pthread -fno-omit-frame-pointer
+LDFLAGS += -fPIC -pthread -Wl,--no-undefined
+USE_LIBHL_LDFLAGS = -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR)
 
 ifeq ($(MARCH),32)
-CFLAGS += -I /usr/include/i386-linux-gnu -msse2 -mfpmath=sse
-LIBFLAGS += -L/opt/libjpeg-turbo/lib
+CFLAGS += -msse2 -mfpmath=sse
+CPPFLAGS += -I /usr/include/i386-linux-gnu
+fmt_LDFLAGS = -L/opt/libjpeg-turbo/lib
 else
-LIBFLAGS += -L/opt/libjpeg-turbo/lib64
+fmt_LDFLAGS = -L/opt/libjpeg-turbo/lib64
 endif
 
-SDL_LINK_FLAGS = $(shell pkg-config --libs sdl2)
-LIBOPENAL = -lopenal
-LIBOPENGL = -lGL
+SDL_CPPFLAGS = $(shell pkg-config --cflags sdl2)
+sdl_LDFLAGS = $(shell pkg-config --libs-only-L --libs-only-other sdl2)
+sdl_LDLIBS = $(shell pkg-config --libs-only-l sdl2) -lGL
+openal_LDLIBS = -lopenal
 RELEASE_NAME = linux
 
 endif
@@ -231,99 +236,84 @@ endif
 
 ifdef DEBUG
 CFLAGS += -g
+LDFLAGS += -g
 endif
 
-all: libhl libs
+LIBHL = libhl.$(LIBEXT)
+HL = hl$(EXE_SUFFIX)
+HLC = hlc$(EXE_SUFFIX)
+
+all: $(LIBHL) libs
 ifeq ($(ARCH),arm64)
 	$(warning HashLink vm is not supported on arm64, skipping)
 else
-all: hl
+all: $(HL)
 endif
 
 install:
 	$(UNAME)==Darwin && ${MAKE} uninstall
 ifneq ($(ARCH),arm64)
 	mkdir -p $(INSTALL_BIN_DIR)
-	cp hl $(INSTALL_BIN_DIR)
+	cp $(HL) $(INSTALL_BIN_DIR)
 endif
 	mkdir -p $(INSTALL_LIB_DIR)
 	cp *.hdll $(INSTALL_LIB_DIR)
-	cp libhl.${LIBEXT} $(INSTALL_LIB_DIR)
+	cp $(LIBHL) $(INSTALL_LIB_DIR)
 	mkdir -p $(INSTALL_INCLUDE_DIR)
 	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
 
 uninstall:
-	rm -f $(INSTALL_BIN_DIR)/hl $(INSTALL_LIB_DIR)/libhl.${LIBEXT} $(INSTALL_LIB_DIR)/*.hdll
+	rm -f $(INSTALL_BIN_DIR)/$(HL) $(INSTALL_LIB_DIR)/$(LIBHL) $(INSTALL_LIB_DIR)/*.hdll
 	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
 
 libs: $(LIBS)
 
-./include/pcre/%.o: include/pcre/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
+src/std/regexp.o $(PCRE): CPPFLAGS += $(PCRE_CPPFLAGS)
+$(LIB): CPPFLAGS += -D LIBHL_EXPORTS
+$(LIBHL): $(LIB)
+	$(CC) $(LDFLAGS) $(LIBHL_LDFLAGS) -shared $^ $(LIBHL_LDLIBS) -o $@
 
-src/std/regexp.o: src/std/regexp.c
-	${CC} ${CFLAGS} -o $@ -c $< ${PCRE_FLAGS}
+$(HL): $(HL_OBJ) $(LIBHL)
+$(HLC): $(BOOT) $(LIBHL)
+$(HL) $(HLC):
+	$(CC) $(LDFLAGS) $(USE_LIBHL_LDFLAGS) $^ $($@_LDLIBS) -o $@
 
-libhl: ${LIB}
-	${CC} ${CFLAGS} -o libhl.$(LIBEXT) ${LIBFLAGS} ${LHL_LINK_FLAGS} -shared $^ ${LIBHL_LDLIBS}
+%.hdll: HDLL_LINK = $(CC) $(LDFLAGS)
+%.hdll:
+	$(HDLL_LINK) $(USE_LIBHL_LDFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
 
-hlc: ${BOOT}
-	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS} ${HLC_LDLIBS}
+$(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
+fmt_LDLIBS = -lpng -lturbojpeg -lvorbisfile -lz -lm
+fmt.hdll: $(FMT) $(LIBHL)
 
-hl: ${HL} libhl
-	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
+$(SDL): CPPFLAGS += $(SDL_CPPFLAGS)
+sdl.hdll: $(SDL) $(LIBHL)
 
-libs/fmt/%.o: libs/fmt/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${FMT_INCLUDE}
+$(OPENAL): CPPFLAGS += $(OPENAL_CPPFLAGS)
+openal.hdll: $(OPENAL) $(LIBHL)
 
-fmt: ${FMT} libhl
-	${CC} ${CFLAGS} -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
-
-sdl: ${SDL} libhl
-	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl $(SDL_LINK_FLAGS) $(LIBOPENGL)
-
-openal: ${OPENAL} libhl
-	${CC} ${CFLAGS} -shared -o openal.hdll ${OPENAL} ${LIBFLAGS} -L. -lhl $(LIBOPENAL)
-
-./include/mbedtls/%.o: ./include/mbedtls/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${SSL_CFLAGS}
-
+$(SSL): CPPFLAGS += $(SSL_CPPFLAGS)
 # force rebuild ssl.o in case we mix SSL_STATIC with normal build
 .PHONY: libs/ssl/ssl.o
 libs/ssl/ssl.o: libs/ssl/ssl.c
-	${CC} ${CFLAGS} -o $@ -c $< ${SSL_CFLAGS}
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+ssl.hdll: $(SSL) $(LIBHL)
 
-ssl: ${SSL} libhl
-	${CC} ${CFLAGS} ${SSL_CFLAGS} -shared -o ssl.hdll ${SSL} ${LIBFLAGS} -L. -lhl ${SSL_LDLIBS} $(LIBSSL)
+ui.hdll: $(UI) $(LIBHL)
 
-ui: ${UI} libhl
-	${CC} ${CFLAGS} -shared -o ui.hdll ${UI} ${LIBFLAGS} -L. -lhl
+uv_LDLIBS = -luv
+uv.hdll: $(UV) $(LIBHL)
 
-uv: ${UV} libhl
-	${CC} ${CFLAGS} -shared -o uv.hdll ${UV} ${LIBFLAGS} -L. -lhl -luv
+mysql.hdll: $(MYSQL) $(LIBHL)
 
-mysql: ${MYSQL} libhl
-	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl ${MYSQL_LDLIBS}
-
-sqlite: ${SQLITE} libhl
-	${CC} ${CFLAGS} -shared -o sqlite.hdll ${SQLITE} ${LIBFLAGS} -L. -lhl -lsqlite3
+sqlite_LDLIBS = -lsqlite3
+sqlite.hdll: $(SQLITE) $(LIBHL)
 
 CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 
-./include/mikktspace/%.o: ./include/mikktspace/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
-
-./include/meshoptimizer/%.o: ./include/meshoptimizer/%.cpp
-	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
-
-./libs/heaps/%.o: ./libs/heaps/%.c
-	${CC} ${CFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
-
-./libs/heaps/%.o: ./libs/heaps/%.cpp
-	${CC} ${CXXFLAGS} -o $@ -c $< ${HEAPS_CFLAGS}
-
-heaps: ${HEAPS} libhl
-	${CXX} ${CFLAGS} ${HEAPS_CFLAGS} -shared -o heaps.hdll ${HEAPS} ${LIBFLAGS} -L. -lhl
+$(HEAPS): CPPFLAGS += $(HEAPS_CPPFLAGS)
+heaps.hdll: HDLL_LINK = $(CXX) $(LDFLAGS)
+heaps.hdll: $(HEAPS) $(LIBHL)
 
 mesa:
 	(cd libs/mesa && ${MAKE})
@@ -357,7 +347,7 @@ release_haxelib_package:
 	rm -rf $(HLIB)_release
 
 BUILD_DIR ?= .
-PACKAGE_NAME = $(eval PACKAGE_NAME := hashlink-$(shell $(BUILD_DIR)/hl --version)-$(RELEASE_NAME))$(PACKAGE_NAME)
+PACKAGE_NAME = $(eval PACKAGE_NAME := hashlink-$(shell $(BUILD_DIR)/$(HL) --version)-$(RELEASE_NAME))$(PACKAGE_NAME)
 
 release_prepare:
 	rm -rf $(PACKAGE_NAME)
@@ -366,7 +356,7 @@ release_prepare:
 	cp src/hl.h src/hlc.h src/hlc_main.c $(PACKAGE_NAME)/include
 
 release_win:
-	cp $(BUILD_DIR)/{hl.exe,libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
+	cp $(BUILD_DIR)/{$(HL),libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
 	cp $(VS_RUNTIME_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_SDL_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_OPENAL_LIBRARY) $(PACKAGE_NAME)/OpenAL32.dll
@@ -377,9 +367,9 @@ release_win:
 
 release_linux release_osx:
 ifeq ($(ARCH),arm64)
-	cp libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
+	cp $(LIBHL) *.hdll $(PACKAGE_NAME)
 else
-	cp hl libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
+	cp $(HL) $(LIBHL) *.hdll $(PACKAGE_NAME)
 endif
 	tar -cvzf $(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
 	rm -rf $(PACKAGE_NAME)
@@ -390,18 +380,17 @@ codesign_osx:
 	openssl req -x509 -newkey rsa:4096 -keyout key.pem -nodes -days 365 -subj '/CN=hl-cert' -outform der -out cert.cer -extensions v3_req -config openssl.cnf
 	sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain cert.cer
 	sudo security import key.pem -k /Library/Keychains/System.keychain -A
-	codesign --entitlements other/osx/entitlements.xml -fs hl-cert hl
+	codesign --entitlements other/osx/entitlements.xml -fs hl-cert $(HL)
 	rm key.pem cert.cer openssl.cnf
 
-.SUFFIXES : .c .o
-
-.c.o :
-	${CC} ${CFLAGS} -o $@ -c $<
+# restrict built in rules to only handle cpp, c and o files
+.SUFFIXES:
+.SUFFIXES: .cpp .c .o
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL_OBJ} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
 
 clean: clean_o
-	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll
+	rm -f $(HL) $(HLC) $(LIBHL) *.hdll
 
-.PHONY: libhl hl hlc fmt sdl libs release
+.PHONY: libs release
