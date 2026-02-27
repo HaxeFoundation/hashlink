@@ -1147,6 +1147,10 @@ retry_jit_alloc:
 	return malloc(size);
 #elif defined(HL_CONSOLE)
 	return NULL;
+#elif defined(__APPLE__) && defined(__aarch64__)
+	void *p;
+	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,(MAP_PRIVATE|MAP_ANONYMOUS|MAP_JIT),-1,0);
+	return p;
 #else
 	void *p;
 	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,(MAP_PRIVATE|MAP_ANONYMOUS),-1,0);
