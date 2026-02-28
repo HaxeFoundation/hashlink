@@ -2118,10 +2118,11 @@ static void op_get_mem(jit_ctx *ctx, vreg *dst, vreg *base, int offset, int size
 			encode_ldr_str_imm(ctx, size_bits, 0, 0x01, imm12, base_r, dst_r);
 		} else {
 			// Offset too large - compute effective address in RTMP, then load into dst_r
+			int size_bits = (size == 1) ? 0x00 : (size == 2) ? 0x01 : (size == 4) ? 0x02 : 0x03;
 			load_immediate(ctx, offset, RTMP, false);  // Use RTMP for address computation
 			encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP, 0, base_r, RTMP);
 			// LDR dst_r, [RTMP]
-			encode_ldr_str_imm(ctx, (size == 8) ? 0x03 : 0x02, 0, 0x01, 0, RTMP, dst_r);
+			encode_ldr_str_imm(ctx, size_bits, 0, 0x01, 0, RTMP, dst_r);
 		}
 
 		// Always store to stack - it's the source of truth for later loads
@@ -2206,7 +2207,10 @@ static void op_set_mem(jit_ctx *ctx, vreg *base, int offset, vreg *value, int si
 				encode_add_sub_reg(ctx, 1, 0, 0, 0, RTMP2, 0, base_r, RTMP);
 			}
 			// STR value_r, [RTMP]
-			encode_ldr_str_imm(ctx, (size == 8) ? 0x03 : 0x02, 0, 0x00, 0, RTMP, value_r);
+			{
+				int size_bits = (size == 1) ? 0x00 : (size == 2) ? 0x01 : (size == 4) ? 0x02 : 0x03;
+				encode_ldr_str_imm(ctx, size_bits, 0, 0x00, 0, RTMP, value_r);
+			}
 		}
 	}
 
@@ -4136,14 +4140,22 @@ void hl_jit_free(jit_ctx *ctx, h_bool can_reset) {
 	if (ctx == NULL)
 		return;
 
-	if (ctx->startBuf)
-		free(ctx->startBuf);
-	if (ctx->vregs)
-		free(ctx->vregs);
-	if (ctx->opsPos)
-		free(ctx->opsPos);
-
-	free(ctx);
+	free(ctx->vregs);
+	free(ctx->opsPos);
+	free(ctx->startBuf);
+	ctx->maxRegs = 0;
+	ctx->vregs = NULL;
+	ctx->maxOps = 0;
+	ctx->opsPos = NULL;
+	ctx->startBuf = NULL;
+	ctx->bufSize = 0;
+	ctx->buf.b = NULL;
+	ctx->calls = NULL;
+	ctx->switchs = NULL;
+	ctx->closure_list = NULL;
+	hl_free(&ctx->falloc);
+	hl_free(&ctx->galloc);
+	if (!can_reset) free(ctx);
 }
 
 void hl_jit_reset(jit_ctx *ctx, hl_module *m) {
@@ -5765,7 +5777,7 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 			break;
 
 		case OSwitch:
-			// Switch statement - simplified linear search approach
+			// Switch statement - O(1) branch table dispatch
 			{
 				// Spill all registers before any conditional jumps.
 				// Jump targets will have discard_regs() via OLabel.
@@ -5773,24 +5785,40 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 
 				// Fetch the switch value (this creates a new binding after spill)
 				preg *r_val = fetch(ctx, dst);
+				Arm64Reg val_r = (Arm64Reg)r_val->id;
 
-				// For each case, compare and branch
-				for (int i = 0; i < o->p2; i++) {
-					// CMP value, #i
-					if (i < 256) {
-						// SUBS XZR, Xn, #i
-						encode_add_sub_imm(ctx, (dst->size == 8) ? 1 : 0, 1, 1, 0, i, (Arm64Reg)r_val->id, XZR);
-					} else {
-						load_immediate(ctx, i, RTMP, false);
-						encode_add_sub_reg(ctx, (dst->size == 8) ? 1 : 0, 1, 1, 0, RTMP, 0, (Arm64Reg)r_val->id, XZR);
-					}
-		
-					// B.EQ to target
-					int jump_pos = BUF_POS();
-					encode_branch_cond(ctx, 0, COND_EQ);
-					register_jump(ctx, jump_pos, (opCount + 1) + o->extra[i]);
+				// CMP value, #count (bounds check)
+				if (o->p2 < 4096) {
+					encode_add_sub_imm(ctx, 0, 1, 1, 0, o->p2, val_r, XZR);
+				} else {
+					load_immediate(ctx, o->p2, RTMP, false);
+					encode_add_sub_reg(ctx, 0, 1, 1, 0, RTMP, 0, val_r, XZR);
 				}
-				// If no match, fall through (default case is next instruction)
+
+				// B.HS default (unsigned >= count means out of range)
+				int jdefault = BUF_POS();
+				encode_branch_cond(ctx, 0, COND_HS);
+
+				// ADR RTMP, table_start (3 instructions ahead = +12 bytes)
+				// ADR encodes PC-relative: immhi = imm>>2, immlo = imm&3
+				EMIT32(ctx, 0x10000000 | ((12 & 3) << 29) | ((12 >> 2) << 5) | RTMP);
+
+				// ADD RTMP, RTMP, Wn, UXTW #2 (index * 4 bytes per B instruction)
+				encode_add_sub_ext(ctx, 1, 0, 0, val_r, 2, 2, RTMP, RTMP);
+
+				// BR RTMP
+				EMIT32(ctx, 0xD61F0000 | (RTMP << 5));
+
+				// Branch table: one B instruction per case
+				for (int i = 0; i < o->p2; i++) {
+					int jump_pos = BUF_POS();
+					EMIT32(ctx, 0x14000000);  // B #0 (placeholder, patched by register_jump)
+					register_jump(ctx, jump_pos, (opCount + 1) + o->extra[i]);
+					if ((i & 15) == 0) jit_buf(ctx);
+				}
+
+				// Default: patch B.HS to here
+				patch_jump(ctx, jdefault, BUF_POS());
 			}
 			break;
 
@@ -5875,13 +5903,37 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 				encode_ldr_str_reg(ctx, 0x03, 0, 0x00, RTMP, 0x03, 0, X0, X10);
 			}
 
-			// Step 4: Set tcheck = NULL (simplified - not doing type filtering yet)
-			// STR XZR, [SP, #offset_tcheck]
-			if (offset_tcheck < 4096) {
-				encode_ldr_str_imm(ctx, 0x03, 0, 0x00, offset_tcheck / 8, X10, XZR);
-			} else {
-				load_immediate(ctx, offset_tcheck, RTMP, true);
-				encode_ldr_str_reg(ctx, 0x03, 0, 0x00, RTMP, 0x03, 0, X10, XZR);
+			// Step 4: Set tcheck for exception type filtering
+			// Look ahead at catch handler opcodes to determine the exception type
+			// (same pattern as x86 backend)
+			{
+				hl_opcode *cat = f->ops + opCount + 1;
+				hl_opcode *next = f->ops + opCount + 1 + o->p2;
+				hl_opcode *next2 = f->ops + opCount + 2 + o->p2;
+				Arm64Reg tcheck_val = XZR;  // default: NULL = catch all
+
+				if (cat->op == OCatch ||
+					(next->op == OGetGlobal && next2->op == OCall2 &&
+					 next2->p3 == next->p1 && dst->stack.id == (int)(int_val)next2->extra)) {
+					int gindex = cat->op == OCatch ? cat->p1 : next->p2;
+					hl_type *gt = ctx->m->code->globals[gindex];
+					while (gt->kind == HOBJ && gt->obj->super) gt = gt->obj->super;
+					if (gt->kind == HOBJ && gt->obj->nfields && gt->obj->fields[0].t->kind == HTYPE) {
+						void *addr = ctx->m->globals_data + ctx->m->globals_indexes[gindex];
+						// Load address of the global, then dereference to get the type object
+						load_immediate(ctx, (int64_t)addr, X9, true);
+						encode_ldr_str_imm(ctx, 0x03, 0, 0x01, 0, X9, X9);  // LDR X9, [X9]
+						tcheck_val = X9;
+					}
+				}
+
+				// STR tcheck_val, [SP, #offset_tcheck]
+				if (offset_tcheck < 4096) {
+					encode_ldr_str_imm(ctx, 0x03, 0, 0x00, offset_tcheck / 8, X10, tcheck_val);
+				} else {
+					load_immediate(ctx, offset_tcheck, RTMP, true);
+					encode_ldr_str_reg(ctx, 0x03, 0, 0x00, RTMP, 0x03, 0, X10, tcheck_val);
+				}
 			}
 
 			// Step 5: Call setjmp(trap_ctx)
@@ -6017,20 +6069,21 @@ int hl_jit_function(jit_ctx *ctx, hl_module *m, hl_function *f) {
 		break;
 
 	case OAssert:
-		// Call the assertion helper (static_functions[1])
+		// Call the assertion helper (hl_assert)
+		// Use same LDR+BLR+B+literal pattern as JIT function calls
 		{
+			EMIT32(ctx, 0x58000071);  // LDR X17, #12 (load from literal pool)
+			EMIT32(ctx, 0xD63F0220);  // BLR X17
+
 			jlist *j = (jlist*)hl_malloc(&ctx->galloc, sizeof(jlist));
-			j->pos = BUF_POS();
+			j->pos = BUF_POS() + 4;  // Position of the 8-byte literal (after B)
 			j->target = -2;  // Special marker for assert function
 			j->next = ctx->calls;
 			ctx->calls = j;
 
-			// Load address placeholder and call
-			// Will be patched to static_functions[1] in hl_jit_code
-			EMIT32(ctx, 0);  // Placeholder for address (low)
-			EMIT32(ctx, 0);  // Placeholder for address (high)
-			// For now, emit a BL that will be patched
-			EMIT32(ctx, 0x94000000);  // BL (will be patched)
+			EMIT32(ctx, 0x14000003);  // B #12 (skip over literal)
+			EMIT32(ctx, 0);           // Low 32 bits placeholder
+			EMIT32(ctx, 0);           // High 32 bits placeholder
 		}
 		break;
 
