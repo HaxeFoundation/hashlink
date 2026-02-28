@@ -19,12 +19,7 @@ include(GNUInstallDirs)
 include(FindPkgConfig)
 include(CTest)
 
-set(WITH_VM_DEFAULT ON)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
-    set(WITH_VM_DEFAULT OFF)
-endif()
-
-option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
+option(WITH_VM "Whether to build the Hashlink virtual machine" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 if(BUILD_SHARED_LIBS)
     # ensure third-party static libs are built with PIC
@@ -57,6 +52,10 @@ endif()
 if (MINGW)
     add_compile_options(-municode)
     add_link_options(-municode)
+endif()
+
+if(NOT MSVC)
+    add_compile_options(-fno-omit-frame-pointer)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH
@@ -224,9 +223,24 @@ else()
 endif()
 
 if (WITH_VM)
+    # Select JIT backend based on target architecture
+    # On macOS, CMAKE_OSX_ARCHITECTURES overrides CMAKE_SYSTEM_PROCESSOR for cross-compilation
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+        set(JIT_SOURCES
+            src/jit_aarch64.c
+            src/jit_aarch64_emit.c
+            src/jit_common.c
+        )
+    else()
+        set(JIT_SOURCES
+            src/jit_x86.c
+            src/jit_common.c
+        )
+    endif()
+
     add_executable(hl
         src/code.c
-        src/jit.c
+        ${JIT_SOURCES}
         src/main.c
         src/module.c
         src/debugger.c
@@ -246,6 +260,8 @@ if (WITH_VM)
 
     if (WIN32)
         target_link_libraries(hl user32)
+    else()
+        target_link_libraries(hl dl)
     endif()
 endif()
 

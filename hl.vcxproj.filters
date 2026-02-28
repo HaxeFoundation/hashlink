@@ -4,7 +4,8 @@
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\code.c" />
     <ClCompile Include="src\module.c" />
-    <ClCompile Include="src\jit.c" />
+    <ClCompile Include="src\jit_x86.c" />
+    <ClCompile Include="src\jit_common.c" />
     <ClCompile Include="src\debugger.c" />
     <ClCompile Include="src\profile.c" />
   </ItemGroup>
@@ -13,5 +14,6 @@
     <ClInclude Include="src\opcodes.h" />
     <ClInclude Include="src\hl.h" />
     <ClInclude Include="src\hlsystem.h" />
+    <ClInclude Include="src\jit_common.h" />
   </ItemGroup>
 </Project>

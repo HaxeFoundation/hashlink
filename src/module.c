@@ -207,7 +207,44 @@ int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out
 }
 
 static int module_capture_stack( void **stack, int size ) {
+#if defined(__aarch64__) || defined(_M_ARM64)
+	// On AArch64, walk the frame pointer (X29) chain instead of scanning the stack.
+	// The heuristic scanner produces false positives from callee-saved register spills
+	// (STP X19,X20 etc.) that look like (stack_addr, code_addr) pairs.
+	void *stack_top = hl_get_thread()->stack_top;
+	void **fp = (void **)__builtin_frame_address(0);
+	int count = 0;
+	while( fp && (void *)fp < stack_top ) {
+		void *lr = fp[1];
+		void *next_fp = fp[0];
+		int i;
+		for(i=0;i<modules_count;i++) {
+			hl_module *m = cur_modules[i];
+			unsigned char *code = m->jit_code;
+			int code_size = m->codesize;
+			if( lr >= (void*)code && lr < (void*)(code + code_size) ) {
+				if( m->jit_debug ) {
+					int s = m->jit_debug[0].start;
+					code += s;
+					code_size -= s;
+					if( lr < (void*)code || lr >= (void*)(code + code_size) ) continue;
+				}
+				if( stack ) {
+					if( count == size ) return count;
+					stack[count] = lr;
+				}
+				count++;
+				break;
+			}
+		}
+		if( next_fp == NULL || next_fp <= (void *)fp || next_fp >= stack_top )
+			break;
+		fp = (void **)next_fp;
+	}
+	return count;
+#else
 	return hl_module_capture_stack_range(hl_get_thread()->stack_top, (void**)&stack, stack, size);
+#endif
 }
 
 static void hl_module_types_dump( void (*fdump)( void *, int) ) {

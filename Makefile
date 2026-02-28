@@ -44,7 +44,13 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+ifneq (,$(filter aarch64 arm64,$(ARCH)))
+    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_common.o
+else
+    HL_JIT = src/jit_x86.o src/jit_common.o
+endif
+
+HL = src/code.o $(HL_JIT) src/main.o src/module.o src/debugger.o src/profile.o
 
 FMT_INCLUDE = -I include/mikktspace -I include/minimp3
 
@@ -233,19 +239,12 @@ ifdef DEBUG
 CFLAGS += -g
 endif
 
-all: libhl libs
-ifeq ($(ARCH),arm64)
-	$(warning HashLink vm is not supported on arm64, skipping)
-else
-all: hl
-endif
+all: libhl libs hl
 
 install:
 	$(UNAME)==Darwin && ${MAKE} uninstall
-ifneq ($(ARCH),arm64)
 	mkdir -p $(INSTALL_BIN_DIR)
 	cp hl $(INSTALL_BIN_DIR)
-endif
 	mkdir -p $(INSTALL_LIB_DIR)
 	cp *.hdll $(INSTALL_LIB_DIR)
 	cp libhl.${LIBEXT} $(INSTALL_LIB_DIR)
@@ -376,11 +375,7 @@ release_win:
 	rm -rf $(PACKAGE_NAME)
 
 release_linux release_osx:
-ifeq ($(ARCH),arm64)
-	cp libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
-else
 	cp hl libhl.$(LIBEXT) *.hdll $(PACKAGE_NAME)
-endif
 	tar -cvzf $(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
 	rm -rf $(PACKAGE_NAME)
 

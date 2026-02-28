@@ -19,16 +19,23 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
+/*
+ * x86/x86-64 JIT backend
+ * This file contains the x86-specific implementation of the HashLink JIT compiler.
+ * For AArch64, see jit_aarch64.c
+ */
+
+#if !defined(__x86_64__) && !defined(_M_X64) && !defined(__i386__) && !defined(_M_IX86)
+#  error "This file is for x86/x64 architectures only. Use jit_aarch64.c for ARM64."
+#endif
+
 #ifdef _MSC_VER
 #pragma warning(disable:4820)
 #endif
 #include <math.h>
-#include <hlmodule.h>
+#include "jit_common.h"
 #include "hlsystem.h"
-
-#ifdef __arm__
-#	error "JIT does not support ARM processors, only x86 and x86-64 are supported, please use HashLink/C native compilation instead"
-#endif
 
 #ifdef HL_DEBUG
 #	define JIT_DEBUG
@@ -184,44 +191,7 @@ static const int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
 #	define IS_WINCALL64 0
 #endif
 
-typedef struct jlist jlist;
-struct jlist {
-	int pos;
-	int target;
-	jlist *next;
-};
-
-typedef struct vreg vreg;
-
-typedef enum {
-	RCPU = 0,
-	RFPU = 1,
-	RSTACK = 2,
-	RCONST = 3,
-	RADDR = 4,
-	RMEM = 5,
-	RUNUSED = 6,
-	RCPU_CALL = 1 | 8,
-	RCPU_8BITS = 1 | 16
-} preg_kind;
-
-typedef struct {
-	preg_kind kind;
-	int id;
-	int lock;
-	vreg *holds;
-} preg;
-
-struct vreg {
-	int stackPos;
-	int size;
-	hl_type *t;
-	preg *current;
-	preg stack;
-};
-
-#define REG_AT(i)		(ctx->pregs + (i))
-
+// x86-specific register configuration
 #ifdef HL_64
 #	define RCPU_COUNT	16
 #	define RFPU_COUNT	16
@@ -257,62 +227,12 @@ static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 
 #define REG_COUNT	(RCPU_COUNT + RFPU_COUNT)
 
-#define ID2(a,b)	((a) | ((b)<<8))
-#define R(id)		(ctx->vregs + (id))
-#define ASSERT(i)	{ printf("JIT ERROR %d (jit.c line %d)\n",i,(int)__LINE__); jit_exit(); }
-#define IS_FLOAT(r)	((r)->t->kind == HF64 || (r)->t->kind == HF32)
-#define RLOCK(r)		if( (r)->lock < ctx->currentPos ) (r)->lock = ctx->currentPos
-#define RUNLOCK(r)		if( (r)->lock == ctx->currentPos ) (r)->lock = 0
-
+// x86-specific macros
 #define BREAK()		B(0xCC)
 
 #if defined(HL_64) && defined(HL_VCC)
 #	define JIT_CUSTOM_LONGJUMP
 #endif
-
-static preg _unused = { RUNUSED, 0, 0, NULL };
-static preg *UNUSED = &_unused;
-
-struct _jit_ctx {
-	union {
-		unsigned char *b;
-		unsigned int *w;
-		unsigned long long *w64;
-		int *i;
-		double *d;
-	} buf;
-	vreg *vregs;
-	preg pregs[REG_COUNT];
-	vreg *savedRegs[REG_COUNT];
-	int savedLocks[REG_COUNT];
-	int *opsPos;
-	int maxRegs;
-	int maxOps;
-	int bufSize;
-	int totalRegsSize;
-	int functionPos;
-	int allocOffset;
-	int currentPos;
-	int nativeArgsCount;
-	unsigned char *startBuf;
-	hl_module *m;
-	hl_function *f;
-	jlist *jumps;
-	jlist *calls;
-	jlist *switchs;
-	hl_alloc falloc; // cleared per-function
-	hl_alloc galloc;
-	vclosure *closure_list;
-	hl_debug_infos *debug;
-	int c2hl;
-	int hl2c;
-	int longjump;
-	void *static_functions[8];
-	bool static_function_offset;
-};
-
-#define jit_exit() { hl_debug_break(); exit(-1); }
-#define jit_error(msg)	_jit_error(ctx,msg,__LINE__)
 
 #ifndef HL_64
 #	ifdef HL_DEBUG
@@ -396,31 +316,6 @@ static void restore_regs( jit_ctx *ctx ) {
 		p->holds = r;
 		p->lock = ctx->savedLocks[i];
 		if( r ) r->current = p;
-	}
-}
-
-static void jit_buf( jit_ctx *ctx ) {
-	if( BUF_POS() > ctx->bufSize - MAX_OP_SIZE ) {
-		int nsize = ctx->bufSize * 4 / 3;
-		unsigned char *nbuf;
-		int curpos;
-		if( nsize == 0 ) {
-			int i;
-			for(i=0;i<ctx->m->code->nfunctions;i++)
-				nsize += ctx->m->code->functions[i].nops;
-			nsize *= 4;
-		}
-		if( nsize < ctx->bufSize + MAX_OP_SIZE * 4 ) nsize = ctx->bufSize + MAX_OP_SIZE * 4;
-		curpos = BUF_POS();
-		nbuf = (unsigned char*)malloc(nsize);
-		if( nbuf == NULL ) ASSERT(nsize);
-		if( ctx->startBuf ) {
-			memcpy(nbuf,ctx->startBuf,curpos);
-			free(ctx->startBuf);
-		}
-		ctx->startBuf = nbuf;
-		ctx->buf.b = nbuf + curpos;
-		ctx->bufSize = nsize;
 	}
 }
 
