@@ -42,9 +42,9 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/track.o
 
 ifneq (,$(filter aarch64 arm64,$(ARCH)))
-    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_shared.o
+    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_common.o
 else
-    HL_JIT = src/jit_x86.o src/jit_shared.o
+    HL_JIT = src/jit_x86.o src/jit_common.o
 endif
 
 HL_OBJ = src/code.o $(HL_JIT) src/main.o src/module.o src/debugger.o src/profile.o
