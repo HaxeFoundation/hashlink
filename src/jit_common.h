@@ -155,7 +155,7 @@ extern preg *UNUSED;
 #define ASSERT(i)	{ printf("JIT ERROR %d (jit.c line %d)\n",i,(int)__LINE__); jit_exit(); }
 #endif
 
-// Shared utility functions (implemented in jit_shared.c)
+// Shared utility functions (implemented in jit_common.c)
 void jit_buf(jit_ctx *ctx);
 
 // AArch64: Emit a 32-bit instruction to the code buffer

@@ -45,9 +45,9 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/track.o
 
 ifneq (,$(filter aarch64 arm64,$(ARCH)))
-    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_shared.o
+    HL_JIT = src/jit_aarch64.o src/jit_aarch64_emit.o src/jit_common.o
 else
-    HL_JIT = src/jit_x86.o src/jit_shared.o
+    HL_JIT = src/jit_x86.o src/jit_common.o
 endif
 
 HL = src/code.o $(HL_JIT) src/main.o src/module.o src/debugger.o src/profile.o
@@ -214,7 +214,7 @@ ifneq ($(ARCH),arm64)
 CFLAGS += -m$(MARCH)
 endif
 CFLAGS += -fPIC -pthread -fno-omit-frame-pointer $(shell pkg-config --cflags sdl2)
-LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--export-dynamic -Wl,--no-undefined
+LFLAGS += -lm -Wl,-rpath,.:'$$ORIGIN':$(INSTALL_LIB_DIR) -Wl,--no-undefined
 
 ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu -msse2 -mfpmath=sse

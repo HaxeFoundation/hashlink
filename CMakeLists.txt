@@ -229,12 +229,12 @@ if (WITH_VM)
         set(JIT_SOURCES
             src/jit_aarch64.c
             src/jit_aarch64_emit.c
-            src/jit_shared.c
+            src/jit_common.c
         )
     else()
         set(JIT_SOURCES
             src/jit_x86.c
-            src/jit_shared.c
+            src/jit_common.c
         )
     endif()
 
