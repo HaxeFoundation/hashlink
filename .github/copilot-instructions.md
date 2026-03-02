@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-HashLink is a virtual machine for the [Haxe](https://haxe.org) programming language. It executes `.hl` bytecode files produced by the Haxe compiler. This repository contains:
+HashLink is a virtual machine for the [Haxe](https://haxe.org) programming language. It can either execute `.hl` bytecode produced by the Haxe compiler (using the `hl` binary), or compile Haxe code to C for standalone native execution (HLC mode, requiring all dependent libraries but not the `hl` binary). This repository contains:
 
 - The HashLink VM (`hl` binary) and runtime library (`libhl.so`)
-- Optional native extension libraries (`fmt.hdll`, `sdl.hdll`, `ssl.hdll`, `openal.hdll`, `uv.hdll`, `mysql.hdll`, `sqlite.hdll`, `heaps.hdll`)
-- Source code in `src/` and library implementations in `libs/`
+- Optional native extension libraries (cross-platform: `fmt.hdll`, `sdl.hdll`, `ssl.hdll`, `openal.hdll`, `uv.hdll`, `mysql.hdll`, `sqlite.hdll`, `heaps.hdll`, `ui.hdll`; platform-specific: `mesa.hdll` on Linux game servers, `directx.hdll`/`dx12.hdll`/`dx12debug.hdll` on Windows)
+- Source code of the HashLink core library (hl/libhl) in `src/` and native extension library implementations in `libs/`
 - Test programs in `other/tests/`
 - CMake build support alongside the classic `Makefile`
 
@@ -80,13 +80,18 @@ HashLink is mostly tested as part of the Haxe tests over at https://github.com/H
 - `sys/` - Tests specific to the `std/sys` package
 - `threads/` - Thread-related tests, generally for `std/sys/thread` package
 
+> **Note:** The latest Haxe nightly generally requires git versions of haxelibs rather than the released ones. For example:
+> ```bash
+> haxelib git utest https://github.com/haxe-utest/utest.git
+> ```
+
 ## Key Source Files and Directories
 
 | Path | Description |
 |------|-------------|
-| `src/` | VM core: JIT compiler, GC, module loader, debugger |
+| `src/` | Source code of the HashLink core library (hl/libhl): JIT compiler, GC, module loader, debugger |
 | `src/hl.h` | Main public header for embedding HashLink |
-| `libs/` | Native extension libraries (fmt, sdl, ssl, openal, uv, mysql, sqlite, heaps) |
+| `libs/` | Native extension libraries (fmt, sdl, ssl, openal, uv, mysql, sqlite, heaps, mesa, ui, directx, etc.) |
 | `include/` | Vendored third-party headers (pcre2, mbedtls, sdl, etc.) |
 | `other/tests/` | Haxe test programs |
 | `other/haxelib/` | HashLink haxelib package sources |
