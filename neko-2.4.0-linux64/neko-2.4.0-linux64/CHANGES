@@ -1,0 +1,389 @@
+2024-07-18 : 2.4.0
+	all : deprecated neko (see README)
+	std : fixed put_env when null is passed in (#229 https://github.com/HaxeFoundation/haxe/issues/10395)
+	std : added sys_cpu_arch (#275)
+	std : fixed sys_is64 returning false on 64 bit Windows (#276)
+	std : fixed $int to respect whitespace and signs in hex notation and to ignore trailing text (#258)
+	all : fixed various build issues on macOS Catalina and Big Sur
+	cmake : update all dependencies
+	all : added arm64 binaries for Linux and macOS, and universal binaries for macOS
+	regexp : migrated to pcre2, fixing matches with null characters (#249)
+	regexp : fixed stack overflow with large strings (#262)
+	regexp : added regexp_matched_num function (#257)
+	nekotools : allowed custom 404 handler for server (#278)
+	nekotools : added `nekotools boot -c *.n` option to help output (#273)
+	ui : migrated to gtk3 on Linux (#220)
+	sqlite : fixed early finalizer call (#200)
+	cmake : fixed loading error when installing to /usr/local on Unix (#271)
+	gc : fixed "GetThreadContext failed" error on Windows (#264)
+	std : fixed date_format crash on windows (#279)
+	vm : added more detailed errors for failed stack checks (#284)
+	ssl : migrated to mbedtls 3 (#290)
+	ssl : ignored MBEDTLS_ERR_SSL_WANT_READ and MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET (#291)
+
+2019-10-19 : 2.3.0
+	std : added socket_set_broadcast function (#190)
+	std : fixed sha1_update call (#194)
+	std : fixed 0x7F detection in utf8 functions
+	std : changed date_get_tz to take an argument (a timestamp), and to return minutes instead of seconds (#195)
+	std : added date_utc_format, date_get_utc_day, and date_get_utc_hours - all variants of existing functions,
+			but using gmtime_r instead of localtime_r (#195)
+
+2017-12-19 : 2.2.0
+	nekotools : added `nekotools boot -c *.n`, which generates a C file that contains the input Neko bytecode (#130)
+	nekotools : fixed `nekotools boot` not able to find neko when a value in PATH does not have a trailing slash (#148)
+	cmake : recognize common install location variables by using GNUInstallDirs
+	cmake : fixed various build issues, particularly for FreeBSD (Thanks, ppenzin!), and cygwin
+	cmake : added NekoConfig.cmake to ease building ndll or native program using Neko with CMake
+	cmake : replaces WITH_NDLLS with WITH_* (#157)
+	cmake : does not recompile nekoc/nekoml unless RECOMPILE_NEKOC_NEKOML (#171)
+	all : added NEKO_MODULE_PATH in neko.h that points to the installation path of the ndll files
+	std : bugfix in utf8_compare (https://github.com/HaxeFoundation/haxe/issues/5308)
+	ssl : handle MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY (#150)
+	ssl : allow partial failure on loading certificates (#160)
+	mysql : use eof terminated string when appropriated (#159)
+	jit : disable jit for win64, which never worked
+	all : introduced NEKO_BIG_ENDIAN and NEKO_LITTLE_ENDIAN to replace IS_BIG_ENDIAN, IS_LITTLE_ENDIAN, LITTLE_ENDIAN, BIG_ENDIAN, and BYTE_ORDER
+	all : renamed TAG_BITS to NEKO_TAG_B1ITS
+	all : add NEKO_JIT_DISABLE and NEKO_JIT_DEBUG CMake options
+	all : VS2015 and 2017 compatiblity (#133 #172)
+	sqlite : fixed reading 32-bit int from sqlite (#167)
+
+2016-05-08 : 2.1.0
+	all : switched to use CMake for building (#122)
+	mod_neko/tora : use remote_ip (fixes Apache 2.2 returning 0.0.0.0 in 64 bits ?)
+	std : added buffer_get_length
+	std : added socket_send_to and socket_recv_from for UDP, added socket_set_keepalive
+	all : increased max codesize from 65K opcodes to 1M
+	nekoc : allow break/continue in try/catch
+	std : bugfix in utf8_compare
+	vm : added $sget16/$sget32/$sgetf/$sgetd, $sset16/$sset32/$ssetf/$ssetd, and $itof/$itod/$ftoi/$dtoi
+	vm : bugfix with arrays/strings having length >128MB
+	jit : bugfix on some GCC versions causing invalid array access
+	std : fixed escaping of arguments in process_run
+	all : nekotools boot executable can now be safely striped on Linux (#86)
+	all : nekotools boot now looks for the Neko VM binary in cwd, $loader.path, and PATH in order (#110)
+	std : added epoll support (#67)
+	all : libneko can now be loaded from current directory
+	all : libneko is now versioned
+	vm : comparisons with NaN and Int/Float now always returns false
+	api : added kind_lookup (#6)
+	mod_neko/tora : distribute ndlls compiled against Apache 2.4 (can still manually compile against Apache 2.2)
+	mysql : use MariaDB's LGPL connector/c instead of MySQL's GPL connector/c (can still use MySQL for compilation)
+	all : copyright to Haxe Foundation instead of Nicolas and other license clean up (#102)
+
+2013-02-23 : 2.0.0
+	all : changed license to MIT
+	mod_neko+mod_tora : fixed issue with get_client_ip in 64 bits mode /gcc
+	mysql : added support for timestamp to date conversion
+	std : added merge_sort native implementation
+	std : added mem_local_size
+	regexp : fix in regexp_match, ^ no longer match if pos > 0
+	tools : don't abort server on invalid http request
+	std : fixed sys_command error code (was <<8 on Linux/OSX)
+	nekoc : added -version which adds Loop opcode and ensure correct $array evaluation order
+	vm : support for bytecode version and new Loop/MakeArray2 opcodes
+	mod_neko/tora : only mix POST with GET params if content-type contains 'urlencoded'
+	mysql5 : added charset support check for escape()
+	nekoc : fixed bug with switch tables where max >= 256
+	neko : int32 is now a first class value
+	std : md5 and hashing now takes the int32 value into account
+	neko : max array/string size is now 256MB instead of 512MB
+	std : date_new("YYYY-MM-DD") now uses localtime instead of UTC (same as Y-M-D H:M:S)
+	neko : fixed missing stack for array write in interp mode with invalid index
+	neko : added "-version" to print version and exit
+
+2011-09-10 : 1.8.2
+	vm : use 15 digits (instead of 10) for float display
+	std : allow up to 512MB array/string size in serialize (instead of 1MB)
+	std : bugfix in utf8 (with 4 bytes codes)
+	vm : finalizers bugfix on Windows
+	std : added sys_thread_cpu_time()
+	vm : use VEXTERN for neko_kind_module and neko_id_module
+	std : hide process console in process_run
+	nekoml : added Math core module
+	std : fixed timeout error for sockets on Windows
+	mod_tora : added PROXY_MODE configuration
+	std : fixed timeout error for sockets on Linux
+	vm : fixed $int and $float - return null on invalid strings
+	mysql : added result_get_fields_names
+	gc : prevent issues with AV softs / GoogleDesktop which inject threads
+	vm : use sse2 for fp calculus on gcc (double precision, same as msvc/flash)
+		removed in updated build (some CPU are not compatible)
+	mysql : added support for BINARY(size) type
+	vm : keep stack infos for object/array ops (interp)
+	std : added thread_stack
+	vm : added $fasthash
+	mysql5 : fixed 5.5 protocol change
+	std : fixed sha1 for 64-bits (also fix mysql5 auth)
+	std : added make_sha1
+	mysql : added set_conv_funs for string + bytes wrapping support
+
+2009-07-26 : 1.8.1
+	nekoc : small fix in evaluation of using jump tables for switch on integers
+	regexp : use a recursion limit to prevent stack overflows in pcre
+	mysql5 : completely rewrote mysql client
+	mod_tora : complete rearchitecture with abstract protocol
+	std : added socket_set_fast_send
+	mod_tora : use socket fast send to optimize timing
+	mod_tora : fixed bug when .n file does not exists
+	mod_tora : fix for Apache 2.x - does not set the content-type if declined
+	mod_tora : added port range configuration (for random tora server)
+	std, mod_tora : propagate jit mode to created threads
+	nekoc : optimization for debug infos : precompute file table at compile-time
+	threads : added neko_gc_register_thread (but buggy, so not used)
+	mysql5 : added 5 hours network timeout while waiting for an answer
+	mysql5 : fixed some additional errors handling
+	mysql5 : allow big requests (more than 16MB)
+	vm : optimize object table - one word and one memory block saved per object
+	jit : one more crash fix for the + operation and unexisting overloaded operator
+	nekoml : added Sys.is_directory, Sys.read_directory and Regexp.split
+	nekoml : don't allow empty match
+	vm : create pthreads in detached mode (prevent leak on osx/linux)
+	std : added math_fceil,math_ffloor,math_fround,math_int,process_kill
+	nekoc : forbidden usage of 'var' outside blocks
+
+2008-09-23 : 1.8.0
+	added mod_tora (neko application server)
+	changed mod_neko get_host_name : return the http host instead of the server IP
+	bugfix in nekoml : fixed usage of nekoml.std + added -nostd
+	std : added EINTR handling in send/recv socket operations and fread/fwrite
+	gc : upgraded windows version to 7.1
+	vm : fixed comparison of bool
+	vm : moved threads stuff into threads.c
+	nekoml : fixed lexing engine, allow escape sequences in char groups
+	mysql : link with thread_safe version on linux
+	std : fixed threads issues with host_resolve and host_reverse
+	libs : compile with -pthread on linux/osx to ensure thread safety
+	main : turned ON jit by default for bootable executables
+	std : added set_trusted primitive
+	gc : use alloc_ignore_off_page for large blocks
+	gc : use finalizers with no_order (prevent cycles)
+	mysql : prevent hashing the fields that looks like inner requests
+	vm : optimized global fields cache
+	std : string_split doesn't copy the string anymore if the pattern is not found
+	vm : added neko_vm_dump_stack
+	std : use per-thread locale on POSIX systems
+	std : url_encode does not encode anymore - and . chars
+	std : fixed sleep() for unix (more accurate and deal with signals)
+	std : added module_read_string and module_set_name
+	std : fixed some file descriptor issues with processes and threads
+	jit : fixed crash whith unsupported OO overloading
+	vm : added $getkind and $iskind builtins
+	std : added same_closure for closure comparison
+
+2008-07-28 : 1.7.1
+	nekotools : fixed set_return_code in web server
+	std : display windowed application in process_run
+	mod_neko : allowed to uncache module with set_main(null)
+	mod_neko : use strmcpi for set_header("Content-Type")
+	nekoc : one last fix for big arrays (first element was not compiled)
+	mod_neko : added get_http_method
+	nekoml : minor fixes in lexer
+	nekoml : added -pack and -use, auto build nekoml.std
+	include nekoml as part of standard distribution
+	vm/security : $smake now fills the string with 0
+	std/int32 : fixed need_32_bits macro (negative values)
+	bugfix : >> and >>> were reversed in JIT
+	bugfix : date functions are now MT-safe
+	removed context.h and context.c
+	added lock and tls multithread API to neko.h
+	std : added date_get_tz()
+	mod_neko : added log_message
+	regexp : fix for unmatched optional groups, return null instead of empty string
+	threads : for windows, use critical_section instead of mutex for locks
+	threads : for posix, use a recursive mutex which match windows behavior
+	std : added mutex and deque api (threads)
+
+2008-03-16 : 1.7.0
+	nekoc : allow binary ast format with -p, don't allow inline nxml
+	std : allow int32_new float parameter
+	vm : reduce debug infos memory size by 16
+	vm : fixed $int in case of overflow
+	regexp : upgraded windows ndll to use pcre 7.3 with utf8 support
+	fixed : math_round(0.5) is now 1
+	fixed : date_set_hour and date_set_day crash with invalid dates
+	fixed : bug in vm/callback.c when stack address is >2GB
+	sockets : added support for socket_poll for Windows
+	sockets : added socket_poll_prepare and socket_poll_events
+	thread : added tls_create, tls_set, tls_get
+	vm : threaded interpreter (gcc only)
+	vm : always use COMPACT_TABLE for objects
+	mod_neko : log some errors into apache log
+	neko+vm : added perf statistics hooks (-stats)
+	mod_neko : scriptable configuration and statistics
+	regexp : allow more than 10 matches
+	std : added process_close
+	vm : added $aconcat
+	nekoc : fixed big arrays declarations
+	std : added sys_is64
+
+2007-07-25 : 1.6.0
+	display error message when uncaught exception in neko thread
+	fix bug in long run JIT programs : no C functions callable anymore
+	use a smarter way to prevent C stack overflow
+	nekoc : stack align error message
+	set max-stack-per-function to 128 and default-stack-size to 256
+	jit now check stack overflow on function entry and not on every push
+	mod_neko2 set MOD_NEKO=2 env var (for version detection)
+	mod_neko2 : remove Apache 2.0 error message, use 302 http code for redirect
+	fixed fallback of interp operator overloading
+	fix for 64-bit CPU
+	minor optimization for [0] jit array access
+	gnuk/freebsd support
+	fixed thread messages on Windows (do not use system queue)
+	thread_current returns unique value
+	remove kind_import, kind_export, added kind_share
+	added ui library
+	added libs/std/process api functions
+	new binary ast format (faster than nxml)
+
+2007-01-28 : 1.5.3
+	minor fixes in mod_neko multipart and POST data handling
+	fixed $objremove result (was always true)
+	fixed one-last-bug when using more-than-five-arguments method call return value
+	fixed bug in dev webserver when accessing a directory
+	added xcross support
+	fixed bug with $setresolver in bytecode interpreter
+	changed bootable vm implementation (easier, allow compressed bin)
+	added .mode in sys_stat
+	change in $version format
+
+2006-11-22 : 1.5.2
+	fixed std math_pow float
+	minor thread cleanup
+	added MySQL5.ndll for Windows
+	fields hash cache is now global (instead of per-thread)
+	socket_select retry on EINTR
+	fixed under-second lock timeout for Linux/OSX
+	added socket_poll for Linux/OSX (emulate with select() on Windows)
+	fixed compilation bug when accessing 'this' in arguments and more than 5 args
+	fixed string_split with empty string (was causing infinite loop)
+	fixes in more-than-five-arguments-calls
+	added $varargs
+
+2006-10-29 : 1.5
+	neko web server : get_client_header is now case-insensitive
+	std : new thread and lock api
+	neko : when run from commandline, SEGV on Linux are turned into exceptions
+	+ added mod_neko2 error if used with Apache 2.0.x
+
+2006-10-09 : 1.4.5
+	sqlite : added BOOL handling
+	jit : added mmap support (for execution protection)
+	jit : fixed bug when unsupported operation exception
+	vm : fixed bug in debug infos reading when nfiles > 255
+	vm : fixed bug in interp -> jit call
+	vm : default NEKOPATH is now the same on OSX/Linux
+	vm : optimized debug infos runtime memory size
+	std : added misc.c (float & double bytes manipulations + gc/vm functions)
+	std : fixed buf in sys_read_dir on windows (directory not closed correctly)
+	std : added sys_getch, sys_get_pid
+	std : fixed socket_host (was returning the same as socket_peer)
+	std : improved performances of serialize/unserialize
+	allowed break & continues in try/catch if they don't break outside
+	nekoml : fixed bug in lexer allocating too bug memory when small reads
+	nekotools : bugfixes in server, added static file streaming
+	nekotools : fixed boot for universal binaries
+	mod_neko : minor updates for better memory handling
+	mod_neko : use soft timeout for Apache 1.3
+
+2006-08-02 : 1.4
+	std : added a SO_REUSEADDR before socket_bind (except windows)
+	nekoc/nekovm : allowed more than 127 filenames in debug infos
+	nekotools server : added -rewrite for mod_rewrite'style urls
+	added zlib wrapper
+	mod_neko for apache 2.0
+	added sqlite wrapper
+	std : fixed socket_set_timeout (changed unit from millisec to seconds)
+	std : fixed math_pow (integer overflow) , fixed readdir (missing closedir on Linux)
+	added PPC registers
+	neko.h : added NEKO_* OS/CPU flags
+	added JIT for x86
+	vm : (int mod 0) is now an exception (and not NaN)
+	neko.h : added kind_import and kind_export to share abstracts between libraries
+	std : handle signals in socket send and recv
+	allowed OSX universal build
+	added $setresolver for unknown object field handling
+
+2006-05-11 : 1.3
+	neko : fixed endianness bug needed to boot, exported neko_is_big_endian
+	neko : fixed bug on Linux x86 gcc with object operators (eax get overwritten)
+	neko : fixed bug : error when __string or __compare does not exist
+	neko : allowed runtime printer redirection (+ added std@print_redirect)
+	neko : defined a default NEKOPATH when not specified (less configuration)
+	neko : fixed int32 calculus bug (need_32_bits macro)
+	neko : fixed calls with a lot of arguments (some cases were failing)
+	neko : fixed preservation of 'this' through tailcall, if changed inside the call
+	neko : added unary operator minus parsing
+	neko : fixed error reporting of unclosed parenthesis
+	nekoml : added Net core module for sockets
+	nekoml : when catching Neko errors, wrap them using Neko_error constructor
+	std : supported serialization of C primitives and __serialize/__unserialize overrides
+	added nekotools (merged nekoboot and neko webserver)
+	std : fixed math_round, fixed math docs
+	std : fixed bug in utf8_resize, utf8_get and utf8_iter.
+	regexp : added regexp_new_options for matching options and regexp_replace_fun
+	regexp : fixed invalid matched length when not index 0
+	added some benchmarks in src/benchs
+	neko : fixed $ablit and $sblit (when used with same array/string)
+	neko : fixed multithread win32 support
+	mod_neko : changed Content-Type handling for POST data
+	std : added blocking sockets support
+	std : changed sys_time to sys_cpu_time, added sys_time (local time).
+	std : fixed put_env on Linux (GC issue)
+	cleanup of some stuff needed by experimental JIT
+	std : added memory module
+
+2006-01-09 : 1.2
+	nekoc:
+		added linker : provide linked versions of neko & nekoml compilers
+		added tail calls optimization
+	nekoml:
+		little improved nekoml->neko patterns generator
+	libs:
+		added md5 digest , utf8 api and base_encode/base_decode in std
+		some changes in mod_neko api
+		mysql api now threat tinyint(1) as booleans
+		improved xml parser : support for doctype
+		some fixes for OSX and C++ compilation
+	neko:
+		renamed 'nekovm' to 'neko'
+		experimental jit support
+		object prototypes
+		moved args from builtin ($args) to loader ($loader.args)
+		makeboot can create standalone binaries
+		runtime errors on :
+			- calls with invalid number of arguments
+			- field accesses of not-an-object
+			- binary operations on invalid types
+			- array accesses on not-an-array and not-an-object
+	license change : from GPL to LGPL
+
+2005-11-10 : 1.1
+	vm :
+		ports PPC (big endian) and AMD64
+		added stack conservation check at bytecode loadtime : faster VM runtime
+		some more opcodes for better speed
+		added exception and call stack traces
+		added debug informations for bytecode
+		added dispatch tables (for integer switchs)
+		tuned GC usage
+		reorganized VM apis
+	neko:
+		added labels in the language specification
+		added $goto and $apply
+		added switchs
+		added documentation generator
+	nekoml:
+		added NekoML
+		bootstrapped the language (no more need for ocaml)
+	libs:
+		rewrote and completed standard library
+		added generated documentation
+
+2005-08-17 : 1.0
+	compiler in ocaml
+	virtual machine
+	mod_neko
+	some small libraries
