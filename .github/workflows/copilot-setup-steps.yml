@@ -1,0 +1,46 @@
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install --no-install-recommends -y \
+            libmbedtls-dev \
+            libopenal-dev \
+            libpng-dev \
+            libsdl2-dev \
+            libturbojpeg-dev \
+            libuv1-dev \
+            libvorbis-dev \
+            libsqlite3-dev
+
+      - name: Install Haxe
+        uses: tobil4sk/setup-haxe@9d1527c4bb9d1d449d196a0822118692ceeac457
+        with:
+          haxe-version: latest
+
+      - name: Configure haxelib
+        run: |
+          haxelib setup ~/haxelib
+          haxelib install hashlink
+
+      - name: Build and install HashLink
+        run: |
+          make
+          sudo make install
+          sudo ldconfig
