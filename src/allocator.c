@@ -325,7 +325,8 @@ static void *gc_alloc_fixed( int part, int kind ) {
 	gc_free_pages[pid] = ph;
 #	ifdef HL_THREADS
 	if( (gc_flags & GC_NO_THREADS) == 0 && pid < GC_TLOCAL_PIDS && current_thread ) {
-		// Claim this page for the current thread's lock-free fast path
+		// Claim this page for the current thread's lock-free fast path.
+		// Safe because gc_alloc_fixed is only called while holding the global lock.
 		p->tlocal_owner = current_thread->thread_id;
 		gc_tlocal_pages[pid] = ph;
 		// Advance gc_free_pages past owned pages so other threads get different pages
