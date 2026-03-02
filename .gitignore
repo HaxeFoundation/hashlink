@@ -57,3 +57,5 @@ args.txt
 /other/benchs/hlc
 /haxe_latest
 /neko-2.4.0-linux64
+/hlc
+/src/hlc.json
