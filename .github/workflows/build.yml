@@ -390,7 +390,7 @@ jobs:
 
 
     - name: "Share: build artifact"
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.target }}-${{ matrix.build_system }}-${{ matrix.architecture }}
         path: ${{ env.HASHLINK_DISTRIBUTION }}
