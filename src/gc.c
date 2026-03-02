@@ -177,13 +177,30 @@ static gc_pheader *gc_free_pheaders = NULL;
 static gc_pheader *gc_alloc_page( int size, int kind, int block_count );
 static void gc_free_page( gc_pheader *page, int block_count );
 
+static hl_threads_info gc_threads;
+
+HL_THREAD_STATIC_VAR hl_thread_info *current_thread;
+
+#ifdef HL_THREADS
+// Thread-local page cache for lock-free fixed-size allocation
+// GC_TLOCAL_PIDS must equal GC_FIXED_PARTS << PAGE_KIND_BITS (checked after allocator include)
+#define GC_TLOCAL_PIDS		20
+#define GC_TLOCAL_MERGE		128
+HL_THREAD_STATIC_VAR gc_pheader *gc_tlocal_pages[GC_TLOCAL_PIDS];
+HL_THREAD_STATIC_VAR int gc_tlocal_gen;
+HL_THREAD_STATIC_VAR int gc_tlocal_count;
+HL_THREAD_STATIC_VAR int64 gc_tlocal_bytes;
+HL_THREAD_STATIC_VAR int64 gc_tlocal_req;
+static volatile int gc_gen = 0;
+#endif
+
 #ifndef GC_EXTERN_API
 #include "allocator.c"
 #endif
 
-static hl_threads_info gc_threads;
-
-HL_THREAD_STATIC_VAR hl_thread_info *current_thread;
+#ifdef HL_THREADS
+_Static_assert(GC_TLOCAL_PIDS == (GC_FIXED_PARTS << PAGE_KIND_BITS), "GC_TLOCAL_PIDS mismatch");
+#endif
 
 static struct {
 	int64 total_requested;
@@ -226,7 +243,13 @@ HL_API hl_thread_info *hl_get_thread() {
 
 static void gc_save_context(hl_thread_info *t, void *prev_stack ) {
 	void *stack_cur = &t;
+	// We only need to capture callee-saved registers for GC root scanning.
+	// Use _setjmp to avoid saving the signal mask (which may involve a syscall).
+#	ifdef HL_WIN
 	setjmp(t->gc_regs);
+#	else
+	_setjmp(t->gc_regs);
+#	endif
 	// some compilers (such as clang) might push/pop some callee registers in call
 	// to gc_save_context (or before) which might hold a gc value !
 	// let's capture them immediately in extra per-thread data
@@ -364,7 +387,15 @@ static void gc_stop_world( bool b ) {
 		gc_threads.stopping_world = true;
 		for(i=0;i<gc_threads.count;i++) {
 			hl_thread_info *t = gc_threads.threads[i];
-			while( t->gc_blocking == 0 ) {}; // spinwait
+			while( t->gc_blocking == 0 ) {
+#				if defined(HL_VCC)
+				YieldProcessor();
+#				elif defined(__x86_64__) || defined(__i386__)
+				__asm__ __volatile__("pause");
+#				elif defined(__aarch64__)
+				__asm__ __volatile__("yield");
+#				endif
+			}
 		}
 	} else {
 		// releasing global lock will release all threads
@@ -505,7 +536,96 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 		return NULL;
 	if( size < 0 )
 		hl_error("Invalid allocation size");
+#	ifdef HL_THREADS
+	// Fast path: lock-free allocation from thread-local cached page
+	if( (gc_flags & (GC_NO_THREADS|GC_PROFILE)) == 0 ) {
+		hl_thread_info *tinf = current_thread;
+		if( tinf ) {
+			int sz = size;
+			sz += (-sz) & (GC_ALIGN - 1);
+			if( sz <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & PAGE_KIND_MASK) != MEM_KIND_FINALIZER ) {
+				if( gc_tlocal_gen != gc_gen ) {
+					// GC happened - caches are invalid. tlocal_owner was already cleared
+					// by gc_allocator_before_mark, so just drop our cache pointers.
+					MZERO(gc_tlocal_pages, sizeof(gc_tlocal_pages));
+					gc_tlocal_gen = gc_gen;
+				}
+				int part = (sz >> GC_ALIGN_BITS) - 1;
+				int kind = flags & PAGE_KIND_MASK;
+				int pid = (part << PAGE_KIND_BITS) | kind;
+				gc_pheader *ph = gc_tlocal_pages[pid];
+				if( ph ) {
+					gc_allocator_page_data *p = &ph->alloc;
+					gc_freelist *fl = &p->free;
+					if( fl->current < fl->count ) {
+						gc_fl *c = GET_FL(fl, fl->current);
+						int bid = c->pos++;
+						c->count--;
+						if( !c->count ) fl->current++;
+						ptr = ph->base + bid * p->block_size;
+						allocated = GC_SIZES[part];
+#						ifdef GC_DEBUG
+						memset(ptr,0xCD,allocated);
+#						endif
+						if( flags & MEM_ZERO )
+							MZERO(ptr,allocated);
+						else if( MEM_HAS_PTR(flags) && allocated != size )
+							MZERO((char*)ptr+size,allocated-size);
+#						ifdef GC_MEMCHK
+						memset((char*)ptr+(allocated - HL_WSIZE),0xEE,HL_WSIZE);
+#						endif
+						// Accumulate stats locally
+						gc_tlocal_count++;
+						gc_tlocal_bytes += allocated;
+						gc_tlocal_req += size;
+						// Safepoint: cooperate with GC if world is stopping
+						if( gc_threads.stopping_world ) {
+							gc_save_context(tinf, &t);
+							tinf->gc_blocking++;
+							hl_mutex_acquire(gc_threads.global_lock);
+							gc_stats.allocation_count += gc_tlocal_count;
+							gc_stats.total_allocated += gc_tlocal_bytes;
+							gc_stats.total_requested += gc_tlocal_req;
+							gc_tlocal_count = 0;
+							gc_tlocal_bytes = 0;
+							gc_tlocal_req = 0;
+							tinf->gc_blocking--;
+							hl_mutex_release(gc_threads.global_lock);
+						} else if( gc_tlocal_count >= GC_TLOCAL_MERGE ) {
+							// Periodically merge stats and check GC
+							gc_global_lock(true);
+							gc_stats.allocation_count += gc_tlocal_count;
+							gc_stats.total_allocated += gc_tlocal_bytes;
+							gc_stats.total_requested += gc_tlocal_req;
+							gc_tlocal_count = 0;
+							gc_tlocal_bytes = 0;
+							gc_tlocal_req = 0;
+							gc_check_mark();
+							gc_global_lock(false);
+						}
+						hl_track_call(HL_TRACK_ALLOC, on_alloc(t,size,flags,ptr));
+						return ptr;
+					}
+					// Page exhausted - release ownership
+					p->tlocal_owner = 0;
+					gc_tlocal_pages[pid] = NULL;
+				}
+			}
+		}
+	}
+#	endif
 	gc_global_lock(true);
+	// Merge any pending thread-local stats
+#	ifdef HL_THREADS
+	if( gc_tlocal_count ) {
+		gc_stats.allocation_count += gc_tlocal_count;
+		gc_stats.total_allocated += gc_tlocal_bytes;
+		gc_stats.total_requested += gc_tlocal_req;
+		gc_tlocal_count = 0;
+		gc_tlocal_bytes = 0;
+		gc_tlocal_req = 0;
+	}
+#	endif
 	gc_check_mark();
 #	ifdef GC_MEMCHK
 	size += HL_WSIZE;
@@ -895,6 +1015,9 @@ static void gc_major() {
 	gc_stats.last_mark_allocs = gc_stats.allocation_count;
 	gc_stop_world(true);
 	gc_mark();
+#	ifdef HL_THREADS
+	gc_gen++;
+#	endif
 	gc_stop_world(false);
 	dt = TIMESTAMP() - time;
 	gc_stats.mark_count++;

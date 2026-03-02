@@ -283,6 +283,13 @@ static void *gc_alloc_fixed( int part, int kind ) {
 	int bid = -1;
 	while( ph ) {
 		p = &ph->alloc;
+#		ifdef HL_THREADS
+		// Skip pages owned by another thread for fast-path allocation
+		if( p->tlocal_owner && p->tlocal_owner != (current_thread ? current_thread->thread_id : 0) ) {
+			ph = ph->next_page;
+			continue;
+		}
+#		endif
 		if( p->need_flush )
 			flush_free_list(ph);
 		gc_freelist *fl = &p->free;
@@ -316,6 +323,28 @@ static void *gc_alloc_fixed( int part, int kind ) {
 	}
 #	endif
 	gc_free_pages[pid] = ph;
+#	ifdef HL_THREADS
+	if( (gc_flags & GC_NO_THREADS) == 0 && pid < GC_TLOCAL_PIDS && current_thread ) {
+		// Claim this page for the current thread's lock-free fast path
+		p->tlocal_owner = current_thread->thread_id;
+		gc_tlocal_pages[pid] = ph;
+		// Advance gc_free_pages past owned pages so other threads get different pages
+		gc_pheader *next = ph->next_page;
+		while( next ) {
+			gc_allocator_page_data *np = &next->alloc;
+			if( np->tlocal_owner ) {
+				next = next->next_page;
+				continue;
+			}
+			if( np->need_flush )
+				flush_free_list(next);
+			if( np->free.current < np->free.count )
+				break;
+			next = next->next_page;
+		}
+		gc_free_pages[pid] = next;
+	}
+#	endif
 	return ptr;
 }
 
@@ -532,6 +561,9 @@ static void gc_allocator_before_mark( unsigned char *mark_cur ) {
 		while( p ) {
 			p->bmp = mark_cur;
 			p->alloc.need_flush = true;
+#			ifdef HL_THREADS
+			p->alloc.tlocal_owner = 0;
+#			endif
 			mark_cur += (p->alloc.max_blocks + 7) >> 3;
 			p = p->next_page;
 		}
