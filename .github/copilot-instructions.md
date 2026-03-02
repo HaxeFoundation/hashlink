@@ -73,6 +73,13 @@ make hlc
 ./hlc
 ```
 
+HashLink is mostly tested as part of the Haxe tests over at https://github.com/HaxeFoundation/haxe/tree/development/tests. There are several test suites:
+
+- `unit/` - General Unit tests
+- `misc/hl` - Tests expected to produce failures/warnings or assert specific stdout/stderr output
+- `sys/` - Tests specific to the `std/sys` package
+- `threads/` - Thread-related tests, generally for `std/sys/thread` package
+
 ## Key Source Files and Directories
 
 | Path | Description |
