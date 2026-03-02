@@ -1524,7 +1524,7 @@ static void op_call( jit_ctx *ctx, preg *r, int size ) {
 }
 
 static void call_native( jit_ctx *ctx, void *nativeFun, int size ) {
-	bool isExc = nativeFun == hl_assert || nativeFun == hl_throw || nativeFun == on_jit_error;
+	bool isExc = nativeFun == hl_assert || nativeFun == hl_throw || nativeFun == hl_rethrow || nativeFun == on_jit_error;
 	preg p;
 	// native function, already resolved
 	op64(ctx,MOV,PEAX,pconst64(&p,(int_val)nativeFun));
@@ -3810,13 +3810,27 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case ORethrow:
 			{
+#			if defined(HL_64) && !defined(HL_WIN_CALL)
+				// Push EBP so the stack scanner can locate this throw site as a (EBP, return_addr) pair.
+				// The extraSize=HL_WSIZE adjusts the alignment calculation for the extra PUSH.
+				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,HL_WSIZE);
+				op64(ctx,PUSH,PEBP,UNUSED);
+#			else
 				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,0);
+#			endif
 				call_native(ctx,hl_rethrow,size);
 			}
 			break;
 		case OThrow:
 			{
+#			if defined(HL_64) && !defined(HL_WIN_CALL)
+				// Push EBP so the stack scanner can locate this throw site as a (EBP, return_addr) pair.
+				// The extraSize=HL_WSIZE adjusts the alignment calculation for the extra PUSH.
+				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,HL_WSIZE);
+				op64(ctx,PUSH,PEBP,UNUSED);
+#			else
 				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,0);
+#			endif
 				call_native(ctx,hl_throw,size);
 			}
 			break;
@@ -4339,6 +4353,22 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				jtrap = do_jump(ctx,OJAlways,false);
 				register_jump(ctx,jtrap,(opCount + 1) + o->p2);
 				patch_jump(ctx,jenter);
+				// Clear the PC stored by setjmp to prevent the stack scanner from recording
+				// a spurious entry for the 'try' line when an exception is thrown inside this block.
+				// At this point PEAX=0 (setjmp returned 0) and ESP points to the hl_trap_ctx/jmp_buf.
+#				ifdef HL_WIN
+				{
+					_JUMP_BUFFER *b = NULL;
+#					ifdef HL_64
+					op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&(b->Rip)),PEAX);
+#					else
+					op64(ctx,MOV,pmem(&p,Esp,(int)&(b->Eip)),PEAX);
+#					endif
+				}
+#				elif defined(HL_MAC)
+				// On macOS x86-64, RIP is stored at offset 56 (7*8) in the jmp_buf
+				op64(ctx,MOV,pmem(&p,Esp,56),PEAX);
+#				endif
 			}
 			break;
 		case OEndTrap:
