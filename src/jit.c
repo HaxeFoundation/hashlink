@@ -4353,22 +4353,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				jtrap = do_jump(ctx,OJAlways,false);
 				register_jump(ctx,jtrap,(opCount + 1) + o->p2);
 				patch_jump(ctx,jenter);
-				// Clear the PC stored by setjmp to prevent the stack scanner from recording
-				// a spurious entry for the 'try' line when an exception is thrown inside this block.
-				// At this point PEAX=0 (setjmp returned 0) and ESP points to the hl_trap_ctx/jmp_buf.
-#				ifdef HL_WIN
-				{
-					_JUMP_BUFFER *b = NULL;
-#					ifdef HL_64
-					op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&(b->Rip)),PEAX);
-#					else
-					op64(ctx,MOV,pmem(&p,Esp,(int)&(b->Eip)),PEAX);
-#					endif
-				}
-#				elif defined(HL_MAC)
-				// On macOS x86-64, RIP is stored at offset 56 (7*8) in the jmp_buf
-				op64(ctx,MOV,pmem(&p,Esp,56),PEAX);
-#				endif
 			}
 			break;
 		case OEndTrap:
