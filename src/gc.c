@@ -177,6 +177,7 @@ static gc_pheader *gc_free_pheaders = NULL;
 static gc_pheader *gc_alloc_page( int size, int kind, int block_count );
 static void gc_free_page( gc_pheader *page, int block_count );
 
+// gc_threads and current_thread must be declared before allocator.c since it references them
 static hl_threads_info gc_threads;
 
 HL_THREAD_STATIC_VAR hl_thread_info *current_thread;
@@ -191,6 +192,8 @@ HL_THREAD_STATIC_VAR int gc_tlocal_gen;
 HL_THREAD_STATIC_VAR int gc_tlocal_count;
 HL_THREAD_STATIC_VAR int64 gc_tlocal_bytes;
 HL_THREAD_STATIC_VAR int64 gc_tlocal_req;
+// gc_gen is only incremented inside gc_major with the world stopped (all threads blocked),
+// so atomic operations are not needed. volatile ensures reads see the latest value.
 static volatile int gc_gen = 0;
 #endif
 
@@ -199,7 +202,7 @@ static volatile int gc_gen = 0;
 #endif
 
 #ifdef HL_THREADS
-_Static_assert(GC_TLOCAL_PIDS == (GC_FIXED_PARTS << PAGE_KIND_BITS), "GC_TLOCAL_PIDS mismatch");
+_Static_assert(GC_TLOCAL_PIDS == (GC_FIXED_PARTS << PAGE_KIND_BITS), "GC_TLOCAL_PIDS must equal (GC_FIXED_PARTS << PAGE_KIND_BITS) to properly index thread-local page cache");
 #endif
 
 static struct {
@@ -543,6 +546,7 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 		if( tinf ) {
 			int sz = size;
 			sz += (-sz) & (GC_ALIGN - 1);
+			// Finalizers need special handling incompatible with lock-free allocation
 			if( sz <= GC_SIZES[GC_FIXED_PARTS-1] && (flags & PAGE_KIND_MASK) != MEM_KIND_FINALIZER ) {
 				if( gc_tlocal_gen != gc_gen ) {
 					// GC happened - caches are invalid. tlocal_owner was already cleared
