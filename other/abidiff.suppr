@@ -5,11 +5,11 @@
 
 # pcre2 was accidentally exported by libhl.so
 [suppress_function]
-  symbol_name_regexp = ^_?pcre2_
+  symbol_name_regexp = ^_?pcre(2|16)_
   drop = yes
 
 [suppress_variable]
-  symbol_name_regexp = ^_?pcre2_
+  symbol_name_regexp = ^_?pcre(2|16)_
   drop = yes
 
 # accidentally exported, but never part of hl.h
