@@ -3810,7 +3810,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case ORethrow:
 			{
-#			if defined(HL_64) && !defined(HL_WIN_CALL)
+#			if !defined(HL_WIN) || !defined(HL_64)
 				// Push EBP so the stack scanner can locate this throw site as a (EBP, return_addr) pair.
 				// The extraSize=HL_WSIZE adjusts the alignment calculation for the extra PUSH.
 				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,HL_WSIZE);
@@ -3823,7 +3823,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case OThrow:
 			{
-#			if defined(HL_64) && !defined(HL_WIN_CALL)
+#			if !defined(HL_WIN) || !defined(HL_64)
 				// Push EBP so the stack scanner can locate this throw site as a (EBP, return_addr) pair.
 				// The extraSize=HL_WSIZE adjusts the alignment calculation for the extra PUSH.
 				int size = prepare_call_args(ctx,1,&o->p1,ctx->vregs,HL_WSIZE);
