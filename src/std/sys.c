@@ -159,6 +159,11 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(false);
 }
 
+HL_PRIM void hl_setup_profiler( void *profile_event, void *before_exit ) {
+	hl_setup.before_exit = before_exit;
+	hl_setup.profile_event = profile_event;
+}
+
 HL_PRIM void hl_sys_profile_event( int code, vbyte *data, int dataLen ) {
 	if( hl_setup.profile_event ) hl_setup.profile_event(code, data, dataLen);
 }
@@ -166,6 +171,18 @@ HL_PRIM void hl_sys_profile_event( int code, vbyte *data, int dataLen ) {
 HL_PRIM void hl_sys_exit( int code ) {
 	if( hl_setup.before_exit ) hl_setup.before_exit();
 	exit(code);
+}
+
+static void *f_vtune_init = NULL;
+static void *g_vtune_module = NULL;
+static void setup_vtune_wrapper() {
+	((void(*)(void*))f_vtune_init)(g_vtune_module);
+}
+
+HL_PRIM void hl_setup_vtune( void *vtune_init, void *m ) {
+	f_vtune_init = vtune_init;
+	g_vtune_module = m;
+	hl_setup.vtune_init = setup_vtune_wrapper;
 }
 
 HL_PRIM void hl_sys_vtune_init() {
@@ -674,10 +691,16 @@ HL_PRIM varray *hl_sys_args() {
 	return a;
 }
 
-HL_PRIM void hl_sys_init() {
+HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 #ifdef HL_WIN
 	QueryPerformanceFrequency(&qpcFrequency);
 #endif
+	if (hlfile)
+		hl_setup.file_path = (pchar*)hlfile;
+	if (args)
+		hl_setup.sys_args = (pchar**)args;
+	if (nargs)
+		hl_setup.sys_nargs = nargs;
 #	ifdef HL_WIN_DESKTOP
 	setlocale(LC_CTYPE, ""); // printf to current locale
 #	endif
@@ -685,6 +708,18 @@ HL_PRIM void hl_sys_init() {
 
 HL_PRIM vbyte *hl_sys_hl_file() {
 	return (vbyte*)hl_setup.file_path;
+}
+
+static void *compat_reload_fun = NULL;
+static void *compat_reload_param = NULL;
+static bool reload_wrapper() {
+	return ((bool(*)(void*))compat_reload_fun)(compat_reload_param);
+}
+
+HL_PRIM void hl_setup_reload_check( void *freload, void *param ) {
+	compat_reload_fun = freload;
+	compat_reload_param = param;
+	hl_setup.reload_check = reload_wrapper;
 }
 
 HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
