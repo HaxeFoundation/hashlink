@@ -290,7 +290,7 @@ jobs:
 
           make*)
             if [[ ${{ matrix.target }}${{ matrix.architecture }} == linux32 ]]; then
-              make -o sdl # 32 bit sdl cannot be installed
+              make -o sdl.hdll # 32 bit sdl cannot be installed
             else
               make
             fi
