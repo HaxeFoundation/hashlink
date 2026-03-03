@@ -1,3 +1,8 @@
+[suppress_type]
+  type_kind = enum
+  name = hl_type_kind
+  changed_enumerators = HLAST
+
 # pcre2 was accidentally exported by libhl.so
 [suppress_function]
   symbol_name_regexp = ^_?pcre2_
