@@ -11,3 +11,8 @@
 [suppress_function]
   symbol_name_regexp = hl_(cache_init|internal_capture_stack|mlookup_alloc|mlookup_find|mlookup_set_impl)
   drop = yes
+
+# exported explicitly, but never part of hl.h
+[suppress_variable]
+  symbol_name_regexp = hl_closure_stack_capture
+  drop = yes
