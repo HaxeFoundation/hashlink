@@ -731,7 +731,7 @@ HL_PRIM bool hl_sys_has_debugger() {
 }
 
 #ifndef HL_MOBILE
-const char *hl_sys_special( const char *key ) {
+HL_PRIM const char *hl_sys_special( const char *key ) {
 	 hl_error("Unknown sys_special key");
 	 return NULL;
 }
