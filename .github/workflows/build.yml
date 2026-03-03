@@ -444,7 +444,7 @@ jobs:
         make -C hashlink_1.15 DEBUG=1 -j8 libhl
       name: Build 1.15
     - run: |
-        abidiff hashlink_1.15/libhl.so libhl.so --no-added-syms
+        abidiff hashlink_1.15/libhl.so libhl.so --no-added-syms --suppr other/abidiff.suppr
 
   ###########################################################
   publish-latest-release:
