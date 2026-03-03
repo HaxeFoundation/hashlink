@@ -4340,6 +4340,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 #endif
 				op64(ctx,TEST,PEAX,PEAX);
 				XJump_small(JZero,jenter);
+#				ifdef HL_WIN
+				// setjmp returned non-zero after longjmp (exception path):
+				// clear saved PC in jmp_buf before popping trap to avoid a false JIT frame.
+				op64(ctx,XOR,PEAX,PEAX);
+				{
+					_JUMP_BUFFER *b = NULL;
+#					ifdef HL_64
+					op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&(b->Rip)),PEAX);
+#					else
+					op64(ctx,MOV,pmem(&p,Esp,(int)&(b->Eip)),PEAX);
+#					endif
+				}
+#				endif
 				op64(ctx,ADD,PESP,pconst(&p,trap_size));
 				if( !tinf ) {
 					call_native(ctx, hl_get_thread, 0);
