@@ -516,7 +516,11 @@ jobs:
         repository: HaxeFoundation/haxe
         path: haxe
     - name: Test
-      run: haxe --run RunCi hl ${{ matrix.test-flags }}
+      run: |
+        if [[ "${{ matrix.os }}" == "darwin" ]]; then
+          echo "" > sys/compile-fs.hxml
+        fi
+        haxe --run RunCi hl ${{ matrix.test-flags }}
       working-directory: haxe/tests
 
   ###########################################################
