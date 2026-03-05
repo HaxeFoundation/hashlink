@@ -474,6 +474,18 @@ jobs:
             matrix.architecture == 'x86_64' && '64' ||
             matrix.architecture == 'x86_32' && '32'
           }}
+
+    - name: Install apt packages
+      if: matrix.os == 'linux'
+      run: |
+        sudo apt-get update -qqy
+        sudo apt-get install -qqy libpng16-16t64 libjpeg-turbo8 libturbojpeg zlib1g libogg0 libvorbis0a libvorbisfile3 libvorbisenc2 libsqlite3-0
+
+    - name: Install brew packages
+      if: matrix.os == 'darwin'
+      run: |
+        brew install libpng jpeg-turbo libvorbis sqlite
+
     - name: Install binary (Linux/Mac)
       if: matrix.os != 'windows'
       run: |
