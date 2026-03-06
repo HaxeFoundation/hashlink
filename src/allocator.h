@@ -25,5 +25,8 @@ typedef struct {
 	gc_freelist free;
 	unsigned char *sizes;
 	char sizes_ref[SIZES_PADDING];
+#	ifdef HL_THREADS
+	int tlocal_owner; // thread_id of the thread that owns this page for fast-path allocation, 0 = unowned
+#	endif
 } gc_allocator_page_data;
 
