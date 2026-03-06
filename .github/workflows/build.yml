@@ -423,12 +423,111 @@ jobs:
           -DANDROID_PLATFORM=24 -DANDROID_ABI=arm64-v8a -DBUILD_SHARED_LIBS=OFF -DWITH_VM=OFF
         cmake --build build
 
+  haxe-test-suite:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [darwin, linux, windows]
+        architecture: [x86_32, x86_64, arm64]
+        include:
+        - architecture: arm64
+          test-flags: --skip-hl-jit # not yet supported
+
+        - architecture: x86_32
+          test-flags: --skip-hl-jit # not stable
+
+        - os: linux
+          runner: ubuntu-latest
+
+        - os: linux
+          architecture: arm64
+          runner: ubuntu-24.04-arm
+
+        - os: darwin
+          architecture: x86_64
+          runner: macos-15-intel
+
+        - os: darwin
+          architecture: arm64
+          runner: macos-latest
+
+        - os: windows
+          runner: windows-latest
+
+        exclude:
+        - os: darwin
+          architecture: x86_32
+
+        - os: windows
+          architecture: arm64
+
+    runs-on: ${{ matrix.runner }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Download binary
+      uses: actions/download-artifact@v4
+      with:
+        name: |
+          ${{ matrix.os }}-${{ matrix.os == 'windows' && 'vs2019' || 'make' }}-${{
+            matrix.architecture == 'arm64' && 'arm64' ||
+            matrix.architecture == 'x86_64' && '64' ||
+            matrix.architecture == 'x86_32' && '32'
+          }}
+
+    - name: Install apt packages
+      if: matrix.os == 'linux'
+      run: |
+        sudo apt-get update -qqy
+        sudo apt-get install -qqy libpng16-16t64 libjpeg-turbo8 libturbojpeg zlib1g libogg0 libvorbis0a libvorbisfile3 libvorbisenc2 libsqlite3-0
+
+    - name: Install brew packages
+      if: matrix.os == 'darwin'
+      run: |
+        brew install libpng jpeg-turbo libvorbis sqlite
+
+    - name: Install binary (Linux/Mac)
+      if: matrix.os != 'windows'
+      run: |
+        tar -xvzf hashlink-*.tar.gz
+        cd $(echo hashlink-*/)
+        sudo mkdir -p /usr/local/{bin,lib}
+        if [[ "${{ matrix.architecture }}" == "arm64" ]]; then
+          echo "echo Jit is not supported on arm64" > /usr/local/bin/hl
+          chmod +x /usr/local/bin/hl
+        else
+          sudo cp hl /usr/local/bin/
+        fi
+        sudo cp libhl.* *.hdll /usr/local/lib/
+
+    - name: Install binary (Windows)
+      if: matrix.os == 'windows'
+      run: |
+        unzip hashlink-*.zip
+        echo $(pwd)/hashlink-*/ >> $GITHUB_PATH
+
+    - name: Check binary
+      run: hl --version
+    - uses: tobil4sk/setup-haxe@9d1527c4bb9d1d449d196a0822118692ceeac457
+      with:
+        haxe-version: latest
+    - uses: actions/checkout@v4
+      with:
+        repository: HaxeFoundation/haxe
+        path: haxe
+    - name: Test
+      run: |
+        if [[ "${{ matrix.os }}" == "darwin" ]]; then
+          echo "" > sys/compile-fs.hxml
+        fi
+        haxe --run RunCi hl ${{ matrix.test-flags }}
+      working-directory: haxe/tests
+
   ###########################################################
   publish-latest-release:
   ###########################################################
     runs-on: ubuntu-latest
-    needs:
-      - build
+    needs: [build, haxe-test-suite]
     if: github.ref == 'refs/heads/master'
     concurrency: publish-latest-release # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idconcurrency
 
