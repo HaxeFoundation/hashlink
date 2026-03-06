@@ -92,16 +92,17 @@
 static const Arm64Reg CALL_REGS[] = { X0, X1, X2, X3, X4, X5, X6, X7 };
 static const Arm64FpReg FP_CALL_REGS[] = { V0, V1, V2, V3, V4, V5, V6, V7 };
 
-// Caller-saved (scratch) registers: X0-X17 (avoid X18)
-// Note: We use X0-X17 as scratch, but X0-X7 are also argument registers
-#define RCPU_SCRATCH_COUNT 18
+// Caller-saved (scratch) registers available for vreg allocation: X0-X15
+// X16 (IP0) and X17 (IP1) are reserved as RTMP/RTMP2 for multi-instruction
+// sequences and opcode debug markers — they must NOT be in this pool.
+// X18 is the platform register (reserved on some OSes).
+#define RCPU_SCRATCH_COUNT 16
 
 // vdynamic structure: type (8 bytes) + value (8 bytes)
 #define HDYN_VALUE 8
 static const Arm64Reg RCPU_SCRATCH_REGS[] = {
 	X0, X1, X2, X3, X4, X5, X6, X7,
-	X8, X9, X10, X11, X12, X13, X14, X15,
-	X16, X17
+	X8, X9, X10, X11, X12, X13, X14, X15
 };
 
 // All FP registers are caller-saved in AAPCS64
