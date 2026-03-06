@@ -207,7 +207,50 @@ int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out
 }
 
 static int module_capture_stack( void **stack, int size ) {
+#ifdef WIN64_UNWIND_TABLES
+	CONTEXT context;
+	RtlCaptureContext(&context);
+	int count = 0;
+	while(true) {
+		DWORD64 base;
+		DWORD64 ip = context.Rip;
+		PRUNTIME_FUNCTION fn_entry = RtlLookupFunctionEntry(ip, &base, NULL);
+		if (!fn_entry) {
+			break;
+		}
+		void *module_addr = (void*)ip;
+		for(int i=0;i<modules_count;i++) {
+			hl_module *m = cur_modules[i];
+			unsigned char *code = m->jit_code;
+			int code_size = m->codesize;
+			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
+				if( stack && count == size ) {
+					break;
+				}
+
+				if( stack )
+					stack[count++] = module_addr;
+				else
+					count++;
+				break;
+			}
+		}
+
+		if (stack && count == size) {
+			break;
+		}
+
+		void* handler_data;
+		ULONG64 establisher_frame;
+		RtlVirtualUnwind(0, base, ip, fn_entry, &context, &handler_data, &establisher_frame, NULL);
+		if (context.Rip == 0) {
+			break;
+		}
+	}
+	return count;
+#else
 	return hl_module_capture_stack_range(hl_get_thread()->stack_top, (void**)&stack, stack, size);
+#endif
 }
 
 static void hl_module_types_dump( void (*fdump)( void *, int) ) {
@@ -995,6 +1038,10 @@ void hl_module_free( hl_module *m ) {
 	}
 	hl_free(&m->ctx.alloc);
 	hl_free_executable_memory(m->code, m->codesize);
+#ifdef WIN64_UNWIND_TABLES
+	RtlDeleteFunctionTable(m->unwind_table);
+	free(m->unwind_table);
+#endif
 	if( m->hash ) hl_code_hash_free(m->hash);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
