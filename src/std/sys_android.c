@@ -227,7 +227,7 @@ static const char* hl_sys_android_get_internal_storage_path(void)
 	return hl_android_internal_files_path;
 }
 
-const char *hl_sys_special( const char *key ) {
+HL_PRIM const char *hl_sys_special( const char *key ) {
 	if (strcmp(key, "android_external_storage_path")==0)
 		return hl_sys_android_get_external_storage_path();
 	else if (strcmp(key, "android_internal_storage_path")==0)

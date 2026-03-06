@@ -1,0 +1,27 @@
+[suppress_type]
+  type_kind = enum
+  name = hl_type_kind
+  changed_enumerators = HLAST
+
+# pcre2 was accidentally exported by libhl.so
+[suppress_function]
+  symbol_name_regexp = ^_?pcre(2|16)_
+  drop = yes
+
+[suppress_variable]
+  symbol_name_regexp = ^_?pcre(2|16)_
+  drop = yes
+
+# accidentally exported, but never part of hl.h
+[suppress_function]
+  symbol_name_regexp = hl_(cache_init|internal_capture_stack|mlookup_alloc|mlookup_find|mlookup_set_impl)
+  drop = yes
+
+[suppress_function]
+  symbol_name_regexp = gc_get_mark_threads
+  drop = yes
+
+# exported explicitly, but never part of hl.h
+[suppress_variable]
+  symbol_name_regexp = hl_closure_stack_capture
+  drop = yes
