@@ -266,10 +266,6 @@ static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 
 #define BREAK()		B(0xCC)
 
-#if defined(HL_64) && defined(HL_VCC)
-#	define JIT_CUSTOM_LONGJUMP
-#endif
-
 static preg _unused = { RUNUSED, 0, 0, NULL };
 static preg *UNUSED = &_unused;
 
@@ -306,10 +302,53 @@ struct _jit_ctx {
 	hl_debug_infos *debug;
 	int c2hl;
 	int hl2c;
-	int longjump;
 	void *static_functions[8];
 	bool static_function_offset;
+#ifdef WIN64_UNWIND_TABLES
+	int unwind_offset;
+	int nunwind;
+	PRUNTIME_FUNCTION unwind_table;
+#endif
 };
+
+#ifdef WIN64_UNWIND_TABLES
+
+typedef enum _UNWIND_OP_CODES
+{
+	UWOP_PUSH_NONVOL = 0, /* info == register number */
+	UWOP_ALLOC_LARGE,	  /* no info, alloc size in next 2 slots */
+	UWOP_ALLOC_SMALL,	  /* info == size of allocation / 8 - 1 */
+	UWOP_SET_FPREG,		  /* no info, FP = RSP + UNWIND_INFO.FPRegOffset*16 */
+	UWOP_SAVE_NONVOL,	  /* info == register number, offset in next slot */
+	UWOP_SAVE_NONVOL_FAR, /* info == register number, offset in next 2 slots */
+	UWOP_SAVE_XMM128 = 8, /* info == XMM reg number, offset in next slot */
+	UWOP_SAVE_XMM128_FAR, /* info == XMM reg number, offset in next 2 slots */
+	UWOP_PUSH_MACHFRAME	  /* info == 0: no error-code, 1: error-code */
+} UNWIND_CODE_OPS;
+
+void write_uwcode(jit_ctx *ctx, unsigned char offset, UNWIND_CODE_OPS code, unsigned char info)
+{
+	B(offset);
+	B((code) | (info) << 4);
+}
+
+void write_unwind_data(jit_ctx *ctx)
+{
+	// All generated functions use a frame pointer, so the same unwind info can be used for all of them
+	unsigned char version = 1;
+	unsigned char flags = 0;
+	unsigned char CountOfCodes = 2;
+	unsigned char SizeOfProlog = 4;
+	unsigned char FrameRegister = 5; // RBP
+	unsigned char FrameOffset = 0;
+	B((version) | (flags) << 3);
+	B(SizeOfProlog);
+	B(CountOfCodes);
+	B((FrameRegister) | (FrameOffset) << 4);
+	write_uwcode(ctx, 4, UWOP_SET_FPREG, 0);
+	write_uwcode(ctx, 1, UWOP_PUSH_NONVOL, 5);
+}
+#endif
 
 #define jit_exit() { hl_debug_break(); exit(-1); }
 #define jit_error(msg)	_jit_error(ctx,msg,__LINE__)
@@ -2623,38 +2662,6 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	op64(ctx,RET,UNUSED,UNUSED);
 }
 
-#ifdef JIT_CUSTOM_LONGJUMP
-// Win64 debug CRT performs a Rtl stack check in debug mode, preventing from
-// using longjump. This in an alternate implementation that follows the native
-// setjump storage.
-//
-// Another more reliable way of handling this would be to use RtlAddFunctionTable
-// but this would require complex creation of unwind info
-static void jit_longjump( jit_ctx *ctx ) {
-	preg *buf = REG_AT(CALL_REGS[0]);
-	preg *ret = REG_AT(CALL_REGS[1]);
-	preg p;
-	int i;
-	op64(ctx,MOV,PEAX,ret); // return value
-	op64(ctx,MOV,REG_AT(Edx),pmem(&p,buf->id,0x0));
-	op64(ctx,MOV,REG_AT(Ebx),pmem(&p,buf->id,0x8));
-	op64(ctx,MOV,REG_AT(Esp),pmem(&p,buf->id,0x10));
-	op64(ctx,MOV,REG_AT(Ebp),pmem(&p,buf->id,0x18));
-	op64(ctx,MOV,REG_AT(Esi),pmem(&p,buf->id,0x20));
-	op64(ctx,MOV,REG_AT(Edi),pmem(&p,buf->id,0x28));
-	op64(ctx,MOV,REG_AT(R12),pmem(&p,buf->id,0x30));
-	op64(ctx,MOV,REG_AT(R13),pmem(&p,buf->id,0x38));
-	op64(ctx,MOV,REG_AT(R14),pmem(&p,buf->id,0x40));
-	op64(ctx,MOV,REG_AT(R15),pmem(&p,buf->id,0x48));
-	op64(ctx,LDMXCSR,pmem(&p,buf->id,0x58), UNUSED);
-	op64(ctx,FLDCW,pmem(&p,buf->id,0x5C), UNUSED);
-	for(i=0;i<10;i++)
-		op64(ctx,MOVSD,REG_AT(XMM(i+6)),pmem(&p,buf->id,0x60 + i * 16));
-	op64(ctx,PUSH,pmem(&p,buf->id,0x50),UNUSED);
-	op64(ctx,RET,UNUSED,UNUSED);
-}
-#endif
-
 static void jit_fail( uchar *msg ) {
 	if( msg == NULL ) {
 		hl_debug_break();
@@ -2705,7 +2712,14 @@ static int jit_build( jit_ctx *ctx, void (*fbuild)( jit_ctx *) ) {
 	jit_nops(ctx);
 	pos = BUF_POS();
 	fbuild(ctx);
+	int endPos = BUF_POS();
 	jit_nops(ctx);
+#ifdef WIN64_UNWIND_TABLES
+	int fid = ctx->nunwind++;
+	ctx->unwind_table[fid].BeginAddress = pos;
+	ctx->unwind_table[fid].EndAddress = endPos;
+	ctx->unwind_table[fid].UnwindData = ctx->unwind_offset;
+#endif
 	return pos;
 }
 
@@ -2720,15 +2734,20 @@ static void hl_jit_init_module( jit_ctx *ctx, hl_module *m ) {
 		jit_buf(ctx);
 		*ctx->buf.d++ = m->code->floats[i];
 	}
+#ifdef WIN64_UNWIND_TABLES
+	jit_buf(ctx);
+	ctx->unwind_offset = BUF_POS();
+	write_unwind_data(ctx);
+
+	ctx->unwind_table = malloc(sizeof(RUNTIME_FUNCTION) * (m->code->nfunctions + 10));
+	memset(ctx->unwind_table, 0, sizeof(RUNTIME_FUNCTION) * (m->code->nfunctions + 10));
+#endif
 }
 
 void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	hl_jit_init_module(ctx,m);
 	ctx->c2hl = jit_build(ctx, jit_c2hl);
 	ctx->hl2c = jit_build(ctx, jit_hl2c);
-#	ifdef JIT_CUSTOM_LONGJUMP
-	ctx->longjump = jit_build(ctx, jit_longjump);
-#	endif
 	ctx->static_functions[0] = (void*)(int_val)jit_build(ctx,jit_null_access);
 	ctx->static_functions[1] = (void*)(int_val)jit_build(ctx,jit_assert);
 	ctx->static_functions[2] = (void*)(int_val)jit_build(ctx,jit_null_field_access);
@@ -4317,7 +4336,14 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				}
 				op64(ctx,MOV,pmem(&p,Esp,(int)(int_val)&t->tcheck),treg);
 
+				// On Win64 setjmp actually takes two arguments
+				// the jump buffer and the frame pointer (or the stack pointer if there is no FP)
+#if defined(HL_WIN) && defined(HL_64)
+				size = begin_native_call(ctx, 2);
+				set_native_arg(ctx, REG_AT(Ebp));
+#else
 				size = begin_native_call(ctx, 1);
+#endif
 				set_native_arg(ctx,trap);
 #ifdef HL_MINGW
 				call_native(ctx,_setjmp,size);
@@ -4547,6 +4573,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		}
 		ctx->jumps = NULL;
 	}
+	int codeEndPos = BUF_POS();
 	// add nops padding
 	jit_nops(ctx);
 	// clear regs
@@ -4562,6 +4589,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		ctx->debug[fid].offsets = debug32 ? (void*)debug32 : (void*)debug16;
 		ctx->debug[fid].large = debug32 != NULL;
 	}
+	// unwind info
+#ifdef WIN64_UNWIND_TABLES
+	int uw_idx = ctx->nunwind++;
+	ctx->unwind_table[uw_idx].BeginAddress = codePos;
+	ctx->unwind_table[uw_idx].EndAddress = codeEndPos;
+	ctx->unwind_table[uw_idx].UnwindData = ctx->unwind_offset;
+#endif
 	// reset tmp allocator
 	hl_free(&ctx->falloc);
 	return codePos;
@@ -4618,10 +4652,11 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 		hl_setup.get_wrapper = get_wrapper;
 		hl_setup.static_call = callback_c2hl;
 		hl_setup.static_call_ref = true;
-#		ifdef JIT_CUSTOM_LONGJUMP
-		hl_setup.throw_jump = (void(*)(jmp_buf, int))(code + ctx->longjump);
-#		endif
 	}
+#ifdef WIN64_UNWIND_TABLES
+	m->unwind_table = ctx->unwind_table;
+	RtlAddFunctionTable(m->unwind_table, ctx->nunwind, (DWORD64)code);
+#endif
 	if( !ctx->static_function_offset ) {
 		int i;
 		ctx->static_function_offset = true;
