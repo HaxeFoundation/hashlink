@@ -499,7 +499,7 @@ jobs:
         cd $(echo hashlink-*/)
         sudo mkdir -p /usr/local/{bin,lib,include}
         if [[ "${{ matrix.architecture }}" == "arm64" ]]; then
-          echo "echo Jit is not supported on arm64" > /usr/local/bin/hl
+          printf "#!/bin/sh\necho Jit is not supported on arm64\n" > /usr/local/bin/hl
           chmod +x /usr/local/bin/hl
         else
           sudo cp hl /usr/local/bin/
