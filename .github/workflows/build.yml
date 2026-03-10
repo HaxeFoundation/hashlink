@@ -484,7 +484,7 @@ jobs:
     - name: Install brew packages
       if: matrix.os == 'darwin'
       run: |
-        brew install libpng jpeg-turbo libvorbis sqlite
+        brew install libpng jpeg-turbo libvorbis sqlite mbedtls
 
     - name: Install msbuild
       uses: microsoft/setup-msbuild@v2
