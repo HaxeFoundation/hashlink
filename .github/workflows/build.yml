@@ -511,6 +511,10 @@ jobs:
     - uses: tobil4sk/setup-haxe@9d1527c4bb9d1d449d196a0822118692ceeac457
       with:
         haxe-version: latest
+
+    - name: Setup haxelib
+      run: haxelib dev hashlink ./other/haxelib
+
     - uses: actions/checkout@v4
       with:
         repository: HaxeFoundation/haxe
