@@ -511,7 +511,7 @@ jobs:
       if: matrix.os == 'windows'
       run: |
         unzip hashlink-*.zip
-        echo $(pwd)/hashlink-*/ >> $GITHUB_PATH
+        echo $(cygpath -w $(pwd)/hashlink-*/) >> $GITHUB_PATH
 
     - name: Check binary
       run: hl --version
