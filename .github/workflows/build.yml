@@ -486,6 +486,12 @@ jobs:
       run: |
         brew install libpng jpeg-turbo libvorbis sqlite
 
+    - name: Install msbuild
+      uses: microsoft/setup-msbuild@v2
+      if: matrix.os == 'windows'
+      with:
+        msbuild-architecture: ${{ matrix.architecture == 'x86_64' && 'x64' || 'x86' }}
+
     - name: Install binary (Linux/Mac)
       if: matrix.os != 'windows'
       run: |
