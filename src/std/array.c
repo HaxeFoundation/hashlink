@@ -54,10 +54,12 @@ DEFINE_PRIM(_VOID,array_blit,_ARR _I32 _ARR _I32 _I32);
 DEFINE_PRIM(_TYPE,array_type,_ARR);
 DEFINE_PRIM(_BYTES,array_bytes,_ARR);
 
+#ifndef HL_DISABLE_COMPAT
 typedef struct {
 	size_t size;
 	hl_type* type;
 } hl_carray_header;
+#endif
 
 HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	if( at->kind != HOBJ && at->kind != HSTRUCT )
@@ -67,10 +69,14 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 
 	hl_runtime_obj *rt = at->obj->rt;
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(at);
+#ifdef HL_DISABLE_COMPAT
+	char *arr = hl_gc_alloc_gen(at, size * rt->size, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
+#else
 	void *ptr = hl_gc_alloc_gen(at, sizeof(hl_carray_header) + size * rt->size, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
 	((hl_carray_header*)ptr)->size = size;
 	((hl_carray_header*)ptr)->type = at;
 	char *arr = (char*)ptr + sizeof(hl_carray_header);
+#endif
 	if( at->kind == HOBJ || rt->nbindings ) {
 		int i,k;
 		for(k=0;k<size;k++) {
@@ -101,6 +107,7 @@ HL_PRIM void hl_carray_blit( void *dst, hl_type *at, int dpos, void *src, int sp
 DEFINE_PRIM(_CARRAY,alloc_carray,_TYPE _I32);
 DEFINE_PRIM(_VOID,carray_blit,_CARRAY _TYPE _I32 _CARRAY _I32 _I32);
 
+#ifndef HL_DISABLE_COMPAT
 // For backwards compatibility with HL 1.13
 
 HL_PRIM int hl_carray_length( void *arr ) {
@@ -129,3 +136,4 @@ HL_PRIM vdynamic *hl_carray_get( void *arr, int pos ) {
 
 DEFINE_PRIM(_DYN,carray_get,_CARRAY _I32);
 DEFINE_PRIM(_I32,carray_length,_CARRAY);
+#endif
