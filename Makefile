@@ -194,6 +194,7 @@ endif
 
 LIBHL_LDFLAGS += -install_name @rpath/libhl.dylib
 USE_LIBHL_LDFLAGS = -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
+HDLL_LDFLAGS += -install_name @rpath/$@
 else
 
 ifeq ($(ARCH),aarch64)
@@ -276,7 +277,7 @@ $(HL) $(HLC):
 
 %.hdll: HDLL_LINK = $(CC) $(LDFLAGS)
 %.hdll:
-	$(HDLL_LINK) $(USE_LIBHL_LDFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
+	$(HDLL_LINK) $(USE_LIBHL_LDFLAGS) $(HDLL_LDFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
 
 $(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
 fmt_LDLIBS = -lpng -lturbojpeg -lvorbisfile -lz -lm
