@@ -491,7 +491,7 @@ jobs:
       run: |
         tar -xvzf hashlink-*.tar.gz
         cd $(echo hashlink-*/)
-        sudo mkdir -p /usr/local/{bin,lib}
+        sudo mkdir -p /usr/local/{bin,lib,include}
         if [[ "${{ matrix.architecture }}" == "arm64" ]]; then
           echo "echo Jit is not supported on arm64" > /usr/local/bin/hl
           chmod +x /usr/local/bin/hl
@@ -499,6 +499,7 @@ jobs:
           sudo cp hl /usr/local/bin/
         fi
         sudo cp libhl.* *.hdll /usr/local/lib/
+        sudo cp include/* /usr/local/include/
 
     - name: Install binary (Windows)
       if: matrix.os == 'windows'
