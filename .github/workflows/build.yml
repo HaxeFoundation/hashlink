@@ -478,8 +478,16 @@ jobs:
     - name: Install apt packages
       if: matrix.os == 'linux'
       run: |
+        if [ ${{matrix.architecture}} == x86_32 ]; then
+          sudo dpkg --add-architecture i386
+          SUFFIX=":i386"
+          EXTRA_APT_PKGS="gcc-multilib"
+          printf '#!/bin/sh\n/usr/bin/gcc -m32 "$@"\n' > /usr/local/bin/gcc
+          chmod +x /usr/local/bin/gcc
+        fi
         sudo apt-get update -qqy
-        sudo apt-get install -qqy libpng16-16t64 libjpeg-turbo8 libturbojpeg zlib1g libogg0 libvorbis0a libvorbisfile3 libvorbisenc2 libsqlite3-0
+        sudo apt-get install -qqy libpng16-16t64${SUFFIX} libjpeg-turbo8${SUFFIX} libturbojpeg${SUFFIX} zlib1g${SUFFIX} libogg0${SUFFIX} libvorbis0a${SUFFIX} \
+          libvorbisfile3${SUFFIX} libvorbisenc2${SUFFIX} libsqlite3-0${SUFFIX} ${EXTRA_APT_PKGS}
 
     - name: Install brew packages
       if: matrix.os == 'darwin'
