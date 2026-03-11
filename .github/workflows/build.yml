@@ -492,6 +492,10 @@ jobs:
       with:
         msbuild-architecture: ${{ matrix.architecture == 'x86_64' && 'x64' || 'x86' }}
 
+    - name: Setup mingw
+      if: matrix.os == 'windows' && matrix.architecture == 'x86_32'
+      run: echo "C:\mingw32\bin" >> $GITHUB_PATH
+
     - name: Install binary (Linux/Mac)
       if: matrix.os != 'windows'
       run: |
