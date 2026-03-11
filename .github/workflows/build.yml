@@ -435,7 +435,7 @@ jobs:
           test-flags: --skip-hl-jit # not yet supported
 
         - architecture: x86_32
-          test-flags: --skip-hl-jit # not stable
+          test-flags: --skip-hl-jit --msbuild-platform x86 # not stable
 
         - os: linux
           runner: ubuntu-latest
