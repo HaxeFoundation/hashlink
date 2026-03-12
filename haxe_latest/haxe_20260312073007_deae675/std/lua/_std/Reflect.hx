@@ -1,0 +1,163 @@
+/*
+ * Copyright (C)2005-2019 Haxe Foundation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+import lua.Boot;
+import lua.Lua;
+import lua.TableTools;
+
+@:coreApi class Reflect {
+	public inline static function hasField(o:Dynamic, field:String):Bool {
+		return if (inline isFunction(o)) {
+			false;
+		} else if (Lua.type(o) == "string" && (untyped String.prototype[field] != null || field == "length")) {
+			true;
+		} else untyped o.__fields__ != null ? o.__fields__[field] != null : o[field] != null;
+	}
+
+	public static function field(o:Dynamic, field:String):Dynamic untyped {
+		if (Lua.type(o) == "string") {
+			if (field == "length") {
+				return cast(o : String).length;
+			} else
+				return untyped String.prototype[field];
+		} else {
+			return try o[field] catch (e:Dynamic) null;
+		}
+	}
+
+	public inline static function setField(o:Dynamic, field:String, value:Dynamic):Void untyped {
+		o[field] = value;
+	}
+
+	public static function getProperty(o:Dynamic, field:String):Dynamic {
+		return if (o == null) {
+			untyped __define_feature__("Reflect.getProperty", null);
+		} else if (o.__properties__ != null && Reflect.field(o, "get_" + field) != null) {
+			callMethod(o, Reflect.field(o, "get_" + field), []);
+		} else {
+			Reflect.field(o, field);
+		}
+	}
+
+	public static function setProperty(o:Dynamic, field:String, value:Dynamic):Void untyped {
+		if (o.__properties__ != null && o.__properties__["set_" + field]) {
+			var tmp:String = o.__properties__["set_" + field];
+			callMethod(o, Reflect.field(o, tmp), [value]);
+		} else {
+			o[field] = __define_feature__("Reflect.setProperty", value);
+		}
+	}
+
+	public static function callMethod(o:Dynamic, func:haxe.Constraints.Function, args:Array<Dynamic>):Dynamic {
+		if (args == null || args.length == 0) {
+			return func(o);
+		} else {
+			var self_arg = false;
+			if (o != null && o.__name__ == null) {
+				self_arg = true;
+			}
+			return if (self_arg) {
+				func(o, lua.TableTools.unpack(cast args, 0, args.length - 1));
+			} else {
+				func(lua.TableTools.unpack(cast args, 0, args.length - 1));
+			}
+		}
+	}
+
+	public static function fields(o:Dynamic):Array<String> {
+		if (lua.Lua.type(o) == "string") {
+			return Reflect.fields(untyped String.prototype);
+		} else {
+			return untyped _hx_field_arr(o);
+		}
+	}
+
+	public static function isFunction(f:Dynamic):Bool {
+		return Lua.type(f) == "function" && !(Boot.isClass(f) || Boot.isEnum(f));
+	}
+
+	public static function compare<T>(a:T, b:T):Int {
+		if (a == b)
+			return 0
+		else if (a == null)
+			return -1
+		else if (b == null)
+			return 1
+		else if (haxe.Int64.isInt64(a) && haxe.Int64.isInt64(b))
+			return haxe.Int64.compare(cast a, cast b);
+		else
+			return (cast a) > (cast b) ? 1 : -1;
+	}
+
+	public static function compareMethods(f1:Dynamic, f2:Dynamic):Bool {
+		return f1 == f2;
+	}
+
+	public static function isObject(v:Dynamic):Bool untyped {
+		if (v == null)
+			return false;
+		var t = lua.Lua.type(v);
+		return (t == "string" || (t == "table" && v.__enum__ == null))
+			|| (t == "function" && (lua.Boot.isClass(v) || lua.Boot.isEnum(v)) != null);
+	}
+
+	public static function isEnumValue(v:Dynamic):Bool {
+		return v != null && Std.isOfType(v, lua.Table) && v.__enum__ != null;
+	}
+
+	public static function deleteField(o:Dynamic, field:String):Bool untyped {
+		if (!hasField(o, field))
+			return false;
+		o[field] = null;
+		o.__fields__[field] = null;
+		return true;
+	}
+
+	public static function copy<T>(o:Null<T>):Null<T> {
+		if (o == null)
+			return null;
+		var o2:Dynamic = {};
+		for (f in Reflect.fields(o))
+			Reflect.setField(o2, f, Reflect.field(o, f));
+		return o2;
+	}
+
+	public static function makeVarArgs<T>(f:Array<Dynamic>->T):Dynamic {
+		/*
+			- Convert var arg to table
+			- Set indexing from zero
+			- Extract real table length
+			- Recreate as dynamic array
+			- Return function called with this array
+		 */
+		return lua.Syntax.code("function(...)
+			local a = {...}
+			local b = {}
+			local l = 0
+			for k, v in pairs(a) do
+				b[k-1] = v
+				l = math.max(k,l)
+			end
+			return {0}(_hx_tab_array(b, l))
+		end", f);
+	}
+}
