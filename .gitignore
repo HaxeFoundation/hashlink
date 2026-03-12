@@ -55,3 +55,5 @@ node_modules
 /*.tgz
 args.txt
 /other/benchs/hlc
+/haxe_latest/
+/neko-*/
