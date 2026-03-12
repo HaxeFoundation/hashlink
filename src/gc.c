@@ -239,9 +239,10 @@ static void gc_save_context(hl_thread_info *t, void *prev_stack ) {
 	uintptr_t aligned_prev_stack = ((uintptr_t)prev_stack) & ~(sizeof(void*) - 1);
 	prev_stack = (void*)aligned_prev_stack;
 	int size = (int)((char*)prev_stack - (char*)stack_cur) / sizeof(void*);
+	if( size < 0 ) size = 0;
 	if( size > HL_MAX_EXTRA_STACK ) hl_fatal("GC_SAVE_CONTEXT");
 	t->extra_stack_size = size;
-	memcpy(t->extra_stack_data, prev_stack, size*sizeof(void*));
+	memcpy(t->extra_stack_data, stack_cur, size*sizeof(void*));
 }
 
 #ifndef HL_THREADS
