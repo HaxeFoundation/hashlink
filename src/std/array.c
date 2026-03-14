@@ -60,6 +60,7 @@ typedef struct {
 	hl_type* type;
 } hl_carray_footer;
 #endif
+#define HL_CARRAY_GET_FOOTER(arr) ((hl_carray_footer*)((char*)(arr) + hl_gc_get_memsize((arr)) - sizeof(hl_carray_footer)))
 
 HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	if( at->kind != HOBJ && at->kind != HSTRUCT )
@@ -73,7 +74,7 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	char *arr = hl_gc_alloc_gen(at, size * rt->size, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
 #else
 	char *arr = hl_gc_alloc_gen(at, size * rt->size + sizeof(hl_carray_footer), (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
-	hl_carray_footer *footer = (hl_carray_footer*)(arr + size * rt->size);
+	hl_carray_footer *footer = HL_CARRAY_GET_FOOTER(arr);
 	footer->size = size;
 	footer->type = at;
 #endif
@@ -109,7 +110,6 @@ DEFINE_PRIM(_VOID,carray_blit,_CARRAY _TYPE _I32 _CARRAY _I32 _I32);
 
 #ifndef HL_DISABLE_COMPAT
 // For backwards compatibility with HL 1.13
-#define HL_CARRAY_GET_FOOTER(arr) ((hl_carray_footer*)((char*)(arr) + hl_gc_get_memsize((arr)) - sizeof(hl_carray_footer)))
 
 HL_PRIM int hl_carray_length( void *arr ) {
 	if (!hl_is_gc_ptr(arr)) {
