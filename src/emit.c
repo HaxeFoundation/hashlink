@@ -295,7 +295,7 @@ static ereg emit_gen( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode ) {
 }
 
 static ereg emit_gen_size( emit_ctx *ctx, emit_op op, int size_offs ) {
-	return emit_gen_ext(ctx,op,ENULL,ENULL,0,size_offs);
+	return emit_gen_ext(ctx,op,ENULL,ENULL,op==ALLOC_STACK ? M_PTR : 0,size_offs);
 }
 
 static int emit_jump( emit_ctx *ctx, bool cond ) {
@@ -477,7 +477,9 @@ static void emit_store_size( emit_ctx *ctx, ereg dst, int dst_offset, ereg src, 
 }
 
 static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
-	return emit_gen(ctx, PHI, v1, v2, 0);
+	int mode = ctx->instrs[v1.index].mode;
+	if( mode != ctx->instrs[v2.index].mode ) emit_assert();
+	return emit_gen(ctx, PHI, v1, v2, mode);
 }
 
 static ereg emit_conv( emit_ctx *ctx, ereg v, emit_mode mode, bool _unsigned ) {
@@ -1613,6 +1615,7 @@ typedef struct { const char *name; void *ptr; } named_ptr;
 static void hl_dump_ptr_name( emit_ctx *ctx, void *ptr ) {
 #	define N(v)	ptr_names[i].name = #v; ptr_names[i].ptr = v; i++
 #	define N2(n,v)	ptr_names[i].name = n; ptr_names[i].ptr = v; i++
+#	define DYN(p) N2("dyn_get" #p, hl_dyn_get##p); N2("dyn_set" #p, hl_dyn_set##p); N2("dyn_cast" #p, hl_dyn_cast##p)
 	static named_ptr ptr_names[256] = { NULL };
 	int i = 0;
 	if( !ptr_names[0].ptr ) {
@@ -1629,11 +1632,11 @@ static void hl_dump_ptr_name( emit_ctx *ctx, void *ptr ) {
 		N(hl_rethrow);
 		N(hl_to_virtual);
 		N(hl_alloc_enum);
-		N(hl_dyn_castf);
-		N(hl_dyn_castd);
-		N(hl_dyn_casti64);
-		N(hl_dyn_casti);
-		N(hl_dyn_castp);
+		DYN(f);
+		DYN(d);
+		DYN(i64);
+		DYN(i);
+		DYN(p);
 		N2("null_field",hl_stub_null_field_access);
 		N2("null_access",hl_stub_null_access);
 		N(hl_get_thread);
@@ -1746,6 +1749,8 @@ void hl_emit_dump( emit_ctx *ctx ) {
 					printf(" [@%X] = @%X", e->a.index, e->b.index);
 				else
 					printf(" @%X[%d] = @%X", e->a.index, offs, e->b.index);
+				if( e->mode == 0 || e->mode != ctx->instrs[e->b.index].mode )
+					printf(" ???");
 			}
 			break;
 		default:
