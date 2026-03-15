@@ -22,7 +22,9 @@
 #include <hlmodule.h>
 
 typedef enum {
-	LOAD,
+	LOAD_ADDR,
+	LOAD_IMM,
+	LOAD_ARG,
 	STORE,
 	LEA,
 	TEST,
@@ -33,40 +35,77 @@ typedef enum {
 	BINOP,
 	UNOP,
 	CONV,
+	CONV_UNSIGNED,
 	RET,
+	CALL_PTR,
+	CALL_REG,
+	CALL_FUN,
+	PHY,
 	ALLOC_STACK,
 	FREE_STACK,
 	ALLOC_GLOBAL_STACK,
 	NATIVE_REG,
 	PREFETCH,
+	DEBUG_BREAK,
 } emit_op;
+
+static const char *op_names[] = {
+	"load-addr",
+	"load-imm",
+	"load-arg",
+	"store",
+	"lea",
+	"test",
+	"cmp",
+	"jcond",
+	"jump",
+	"jump-table",
+	"binop",
+	"unop",
+	"conv",
+	"conv-unsigned",
+	"ret",
+	"call-ptr",
+	"call-reg",
+	"call-fun",
+	"phy",
+	"alloc-stack",
+	"free-stack",
+	"alloc-global-stack",
+	"native-reg",
+	"prefetch",
+	"debug-break",
+};
 
 typedef enum {
 	REG_RBP,
 } native_reg;
 
 typedef enum {
+	NONE,
 	I8,
 	I16,
 	I32,
 	I64,
 	F32,
-	F64
+	F64,
+	PTR,
 } emit_mode;
 
-typedef struct {
-	int id;
-	hl_type *t;
-} vreg;
 
 typedef struct {
 	int index;
 } ereg;
 
 typedef struct {
+	int id;
+	hl_type *t;
+	ereg current;
+} vreg;
+
+typedef struct {
 	emit_op op;
 	emit_mode mode;
-	short offset_param;
 	union {
 		struct {
 			ereg a;
@@ -79,7 +118,7 @@ typedef struct {
 #define MAX_TMP_ARGS	32
 #define MAX_TRAPS		32
 
-typedef struct {
+struct _emit_ctx {
 	hl_module *mod;
 	hl_function *fun;
 	einstr *instrs;
@@ -100,7 +139,7 @@ typedef struct {
 	int max_jumps;
 
 	void *closure_list; // TODO : patch with good addresses
-} emit_ctx; 
+}; 
 
 #define R(i)	(ctx->vregs + (i))
 
@@ -113,10 +152,10 @@ typedef struct {
 #define LOAD_CONST_PTR(v) LOAD_CONST(v,&hlt_bytes)
 #define LOAD_MEM(v, offs, t) emit_load_mem(ctx, v, offs, t)
 #define LOAD_MEM_PTR(v, offs) LOAD_MEM(v, offs, &hlt_bytes)
-#define STORE_MEM(to, offs, v) emit_gen(ctx, STORE, to, v, offs)
+#define STORE_MEM(to, offs, v) emit_store_mem(ctx, to, offs, v)
 #define LOAD_OBJ_METHOD(obj,id) LOAD_MEM_PTR(LOAD_MEM_PTR(LOAD_MEM_PTR((obj),0),HL_WSIZE*2),HL_WSIZE*(id))
 #define OFFSET(base,index,mult,offset) emit_gen(ctx, LEA, base, index, (mult) | ((offset) << 8))
-
+#define BREAK() emit_gen(ctx, DEBUG_BREAK, ENULL, ENULL, 0)
 #define CUR_REG() __current_reg(ctx)
 
 #define HDYN_VALUE 8
@@ -137,28 +176,59 @@ static void hl_stub_null_field_access() { emit_assert(); }
 static void hl_stub_null_access() { emit_assert(); }
 static void hl_stub_assert() { emit_assert(); }
 
+static emit_mode hl_type_mode( hl_type *t ) {
+	if( t->kind < HBOOL )
+		return (emit_mode)t->kind;
+	if( t->kind == HBOOL )
+		return sizeof(bool) == 1 ? I8 : I32;
+	if( t->kind == HGUID )
+		return I64;
+	return PTR;
+}
+
+void hl_jit_patch_method( void*fun, void**newt ) {
+	emit_assert();
+}
+
 static ereg __current_reg( emit_ctx *ctx ) {
 	ereg r = {ctx->emit_pos-1};
 	return r;
 }
 
-static einstr *emit_instr( emit_ctx *ctx ) {
+static ereg *get_tmp_args( emit_ctx *ctx, int count ) {
+	if( count > MAX_TMP_ARGS ) emit_error("Too many arguments");
+	return ctx->tmp_args;
+}
+
+static einstr *emit_instr( emit_ctx *ctx, emit_op op ) {
 	if( ctx->emit_pos == ctx->max_instrs ) {
+		int pos = ctx->emit_pos;
 		int next_size = ctx->max_instrs ? (ctx->max_instrs * 3) >> 1 : 256;
 		einstr *instrs = (einstr*)malloc(sizeof(einstr) * next_size);
 		if( instrs == NULL ) emit_error("Out of memory");
-		memcpy(instrs, ctx->instrs, ctx->emit_pos * sizeof(einstr));
+		memcpy(instrs, ctx->instrs, pos * sizeof(einstr));
+		memset(instrs + pos, 0, (next_size - pos) * sizeof(einstr));
 		free(ctx->instrs);
 		ctx->instrs = instrs;
 		ctx->max_instrs = next_size;
 	}
-	return ctx->instrs + ctx->emit_pos++;
+	einstr *e = ctx->instrs + ctx->emit_pos++;
+	e->op = op;
+	return e;
+}
+
+static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
+	einstr *e = emit_instr(ctx, STORE);
+	e->mode = (ctx->instrs[from.index].mode) | (offs << 8);
+	e->args.a = to;
+	e->args.b = from;
+}
+
+static void store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
 }
 
 static ereg emit_gen( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode ) {
-	einstr *e = emit_instr(ctx);
-	if( (short)mode != mode ) emit_assert();
-	e->op = op;
+	einstr *e = emit_instr(ctx, op);
 	e->mode = mode;
 	e->args.a = a;
 	e->args.b = b;
@@ -172,7 +242,7 @@ static int emit_jump( emit_ctx *ctx, bool cond ) {
 }
 
 static void patch_jump( emit_ctx *ctx, int jpos ) {
-	ctx->instrs[jpos].value = ctx->emit_pos; 
+	ctx->instrs[jpos].mode = ctx->emit_pos - (jpos + 1); 
 }
 
 static void register_jump( emit_ctx *ctx, int jpos, int offs ) {
@@ -190,43 +260,74 @@ static void register_jump( emit_ctx *ctx, int jpos, int offs ) {
 }
 
 static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
-	return ENULL;
+	//if( r->current.index < 0 ) emit_assert();
+	return r->current;
 }
 
 static ereg emit_load_const( emit_ctx *ctx, uint64 value, hl_type *size_t ) {
-	return ENULL;
+	einstr *e = emit_instr(ctx, LOAD_IMM);
+	e->mode = hl_type_mode(size_t);
+	e->value = value;
+	return CUR_REG();
 }
 
 static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t ) {
-	return ENULL;
+	einstr *e = emit_instr(ctx, LOAD_ADDR);
+	e->mode = hl_type_mode(size_t);
+	e->args.a = v;
+	e->args.b.index = offset;
+	return CUR_REG();
 }
 
 static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 	if( to->t->kind == HVOID ) return;
+	to->current = v;
 }
 
 static ereg emit_binop( emit_ctx *ctx, hl_op op, ereg a, ereg b ) {
-	return ENULL;
+	return emit_gen(ctx, BINOP, a, b, op);
 }
 
 static ereg emit_unop( emit_ctx *ctx, hl_op op, ereg v ) {
-	return ENULL;
+	return emit_gen(ctx, UNOP, v, ENULL, op);
 }
 
 static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int nargs, hl_type *ret ) {
-	return ENULL;
+	einstr *e = emit_instr(ctx, CALL_PTR);
+	e->mode = hl_type_mode(ret);
+	e->value = (int64)native_ptr;
+	store_args(ctx, e, args, nargs);
+	return CUR_REG();
 }
 
 static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_type *ret ) {
-	return ENULL;
+	einstr *e = emit_instr(ctx, CALL_REG);
+	e->mode = hl_type_mode(ret);
+	e->args.a = f;
+	store_args(ctx, e, args, nargs);
+	return CUR_REG();
 }
 
 static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t ) {
-	return ENULL;
+	BREAK();
+	return v;
 }
 
-static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int *args ) {
-	emit_error("TODO");
+static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int *args_regs ) {
+	hl_module *m = ctx->mod;
+	int fid = m->functions_indexes[findex];
+	bool isNative = fid >= m->code->nfunctions;
+	ereg *args = get_tmp_args(ctx, count);
+	for(int i=0;i<count;i++)
+		args[i] = LOAD(R(args_regs[i]));
+	if( isNative )
+		STORE(dst, emit_native_call(ctx, m->functions_ptrs[findex], args, count, dst->t));
+	else {
+		einstr *e = emit_instr(ctx, CALL_FUN);
+		e->mode = findex;
+		store_args(ctx, e, args, count);
+		STORE(dst, CUR_REG());
+	}
 }
 
 static vclosure *alloc_static_closure( emit_ctx *ctx, int fid ) {
@@ -296,17 +397,12 @@ static void emit_store_size( emit_ctx *ctx, ereg dst, int dst_offset, ereg src, 
 	}
 }
 
-static ereg *get_tmp_args( emit_ctx *ctx, int count ) {
-	if( count > MAX_TMP_ARGS ) emit_error("Too many arguments");
-	return ctx->tmp_args;
-}
-
 static ereg emit_phy( emit_ctx *ctx, ereg v1, ereg v2 ) {
-	return ENULL;
+	return emit_gen(ctx, PHY, v1, v2, 0);
 }
 
-static ereg emit_conv( emit_ctx *ctx, ereg v, hl_op op ) {
-	return ENULL;
+static ereg emit_conv( emit_ctx *ctx, ereg v, emit_mode mode, bool _unsigned ) {
+	return emit_gen(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, ENULL, mode);
 }
 
 static bool dyn_need_type( hl_type *t ) {
@@ -462,7 +558,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OToSFloat:
 	case OToInt:
 	case OToUFloat:
-		STORE(dst, emit_conv(ctx,LOAD(ra),o->op));
+		STORE(dst, emit_conv(ctx,LOAD(ra),hl_type_mode(dst->t), o->op == OToUFloat));
 		break;
 	case ORet:
 		emit_gen(ctx, RET, LOAD(dst), ENULL, 0);
@@ -505,7 +601,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg args[3];
 			args[0] = LOAD_CONST_PTR(m->code->functions[m->functions_indexes[o->p2]].type);
-			// WRITE (emit_pos + op_count) to process later and replace address !
+			// TODO : WRITE (emit_pos + op_count) to process later and replace address !
 			args[1] = LOAD_CONST_PTR(0);
 			args[2] = LOAD(rb);
 			STORE(dst, emit_native_call(ctx,hl_alloc_closure_ptr,args,3,dst->t));
@@ -643,9 +739,9 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			case HVIRTUAL:
 				// code for : if( hl_vfields(o)[f] ) *hl_vfields(o)[f] = v; else hl_dyn_set(o,hash(field),vt,v)
 				{
-					ereg obj = LOAD(ra);
+					ereg obj = LOAD(dst);
 					ereg val = LOAD(rb);
-					ereg field = LOAD_MEM_PTR(obj,sizeof(vvirtual)+HL_WSIZE*o->p3);
+					ereg field = LOAD_MEM_PTR(obj,sizeof(vvirtual)+HL_WSIZE*o->p2);
 					emit_gen(ctx, TEST, field, ENULL, OJNull);
 					int jidx = emit_jump(ctx, true);
 					STORE_MEM(field, 0, val);
@@ -654,7 +750,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					bool need_type = dyn_need_type(dst->t);
 					ereg args[4];
 					args[0] = obj;
-					args[1] = LOAD_CONST(ra->t->virt->fields[o->p3].hashed_name,&hlt_i32);
+					args[1] = LOAD_CONST(dst->t->virt->fields[o->p2].hashed_name,&hlt_i32);
 					if( need_type ) {
 						args[2] = LOAD_CONST_PTR(rb->t);
 						args[3] = val;
@@ -742,7 +838,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					emit_gen(ctx, TEST, field, ENULL, OJNull);
 					int jidx = emit_jump(ctx, true);
 
-					int nargs = o->p3 + 1;
+					int nargs = o->p3;
 					ereg *args = get_tmp_args(ctx, nargs);
 					int i;
 					args[0] = LOAD_MEM_PTR(obj,HL_WSIZE);
@@ -753,8 +849,9 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					int jend = emit_jump(ctx, false);
 					patch_jump(ctx, jidx);
 
-					ereg eargs = emit_gen(ctx, ALLOC_STACK, ENULL, ENULL, o->p3);
-					for(i=0;i<o->p3;i++)
+					nargs = o->p3 - 1;
+					ereg eargs = emit_gen(ctx, ALLOC_STACK, ENULL, ENULL, nargs);
+					for(i=0;i<nargs;i++)
 						STORE_MEM(eargs,i*HL_WSIZE,LOAD(R(o->extra[i+1])));
 					bool need_dyn = !hl_is_ptr(dst->t) && dst->t->kind != HVOID;
 					int dyn_size = sizeof(vdynamic)/HL_WSIZE;
@@ -796,7 +893,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg offs = OFFSET(LOAD(ra),LOAD(rb),1,0);
 			ereg val = LOAD_MEM(offs, 0, dst->t);
-			if( o->op != OGetMem ) val = emit_conv(ctx, val, o->op);
+			if( o->op != OGetMem ) val = emit_conv(ctx, val, I32, false);
 			STORE(dst, val);
 		}
 		break;
@@ -806,7 +903,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg offs = OFFSET(LOAD(dst), LOAD(ra),1,0);
 			ereg val = LOAD(rb);
-			if( o->op != OSetMem ) val = emit_conv(ctx, val, o->op);
+			if( o->op != OSetMem ) val = emit_conv(ctx, val, I32, false);
 			STORE_MEM(offs, 0, val);
 		}
 		break;
@@ -933,7 +1030,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case OSetEnumField:
 		{
-			hl_enum_construct *c = &ra->t->tenum->constructs[0];
+			hl_enum_construct *c = &dst->t->tenum->constructs[0];
 			STORE_MEM(LOAD(dst), c->offsets[o->p2], LOAD(rb));
 		}
 		break;
@@ -1082,7 +1179,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OEndTrap:
 		{
 			if( ctx->trap_count == 0 ) emit_assert();
-			ereg st = ctx->traps[--ctx->trap_count];
+			ereg st = ctx->traps[ctx->trap_count - 1];
 
 			ereg thread, current_addr;
 			static hl_thread_info *tinf = NULL;
@@ -1167,10 +1264,12 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	}
 }
 
-bool emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
+int hl_emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int i;
 	ctx->mod = m;
 	ctx->fun = f;
+	ctx->emit_pos = 0;
+	ctx->trap_count = 0;
 
 	if( f->nregs > ctx->max_regs ) {
 		free(ctx->vregs);
@@ -1185,11 +1284,16 @@ bool emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
+		r->current = ENULL;
 	}
 
-	if( f->nops > ctx->pos_map_size ) {
+	for(i=0;i<f->type->fun->nargs;i++) {
+		STORE(R(i), emit_gen(ctx, LOAD_ARG, ENULL, ENULL, hl_type_mode(f->type->fun->args[i])));
+	}
+
+	if( f->nops >= ctx->pos_map_size ) {
 		free(ctx->pos_map);
-		ctx->pos_map = (int*)malloc(sizeof(int) * f->nops);
+		ctx->pos_map = (int*)malloc(sizeof(int) * (f->nops+1));
 		if( ctx->pos_map == NULL )
 			return false;
 		ctx->pos_map_size = f->nops;
@@ -1200,6 +1304,18 @@ bool emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
 		ctx->pos_map[op_pos] = ctx->emit_pos;
 		emit_opcode(ctx,f->ops + op_pos);
 	}
+
+	// patch jumps
+	i = 0;
+	while( i < ctx->jump_count ) {
+		int pos = ctx->jump_regs[i++];
+		einstr *e = ctx->instrs + pos;
+		int target = ctx->jump_regs[i++];
+		e->mode = ctx->pos_map[target] - (pos + 1);
+	}
+	ctx->jump_count = 0;
+
+	ctx->pos_map[f->nops] = -1;
 	return true;
 }
 
@@ -1210,7 +1326,153 @@ emit_ctx *hl_emit_alloc() {
 	return ctx;
 }
 
-void hl_emit_free( emit_ctx *ctx ) {
+void hl_emit_free( emit_ctx *ctx, h_bool can_reset ) {
 	free(ctx->vregs);
+	free(ctx->instrs);
+	free(ctx->pos_map);
+	free(ctx->jump_regs);
 	free(ctx);
+}
+
+void hl_emit_init( emit_ctx *ctx, hl_module *m ) {
+}
+
+void hl_emit_reset( emit_ctx *ctx, hl_module *m ) {
+}
+
+void *hl_emit_code( emit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
+	printf("TODO:emit_code\n");
+	exit(0);
+	return NULL;
+}
+
+static void hl_dump_arg( emit_ctx *ctx, int fmt, int val, char sep ) {
+	if( fmt == 0 ) return;
+	printf("%c", sep);
+	switch( fmt ) {
+	case 1:
+	case 2:
+		printf("R%d", val);
+		if( val < 0 || val >= ctx->fun->nregs ) printf("?");
+		break;
+	case 3:
+		printf("%d", val);
+		break;
+	case 4:
+		printf("[%d]", val);
+		break;
+	case 5:
+	case 6:
+		printf("@%X", val + ctx->op_pos + 1);
+		break;
+	default:
+		printf("?#%d", fmt);
+		break;
+	}
+}
+
+#define OP(_,_a,_b,_c) ((_a) | (((_b)&0xFF) << 8) | (((_c)&0xFF) << 16)),
+#define OP_BEGIN static int hl_op_fmt[] = {
+#define OP_END };
+#undef R
+#include "opcodes.h"
+
+static void hl_dump_op( emit_ctx *ctx, hl_opcode *op ) {
+	printf("%s", hl_op_name(op->op) + 1);
+	int fmt = hl_op_fmt[op->op];
+	hl_dump_arg(ctx, fmt & 0xFF, op->p1, ' ');
+	if( ((fmt >> 8) & 0xFF) == 5 ) {
+		int count = (fmt >> 16) & 0xFF;
+		printf(" [");
+		if( count == 4 ) {
+			printf("%d", op->p2);
+			printf(",%d", op->p3);
+			printf(",%d", (int)(int_val)op->extra);
+		} else {
+			if( count == 0xFF ) count = op->p3;
+			for(int i=0;i<count;i++) {
+				if( i != 0 ) printf(",");
+				printf("%d", op->extra[i]);
+			}
+		}
+		printf("]");
+	} else {
+		hl_dump_arg(ctx, (fmt >> 8) & 0xFF, op->p2,',');
+		hl_dump_arg(ctx, fmt >> 16, op->p3,',');
+	}
+}
+
+static const char *emit_mode_str( emit_mode mode ) {
+	switch( mode ) {
+	case NONE: return "-void";
+	case I8: return "-i8";
+	case I16: return "-i16";
+	case I32: return "-i32";
+	case I64: return "-i64";
+	case F32: return "-f32";
+	case F64: return "-f64";
+	case PTR: return "";
+	default:
+		static char buf[50];
+		sprintf(buf,"?%d",mode);
+		return buf;
+	}
+}
+
+void hl_emit_dump( emit_ctx *ctx ) {
+	int i;
+	int cur_op = 0;
+	hl_function *f = ctx->fun;
+	int nargs = f->type->fun->nargs;
+	printf("function %X(", f->findex);
+	for(i=0;i<nargs;i++) {
+		if( i > 0 ) printf(",");
+		uprintf(USTR("R%d"), i);
+	}
+	printf(")\n");
+	for(i=0;i<f->nregs;i++)
+		uprintf(USTR("\tR%d : %s\n"),i, hl_type_str(f->regs[i]));
+	for(i=0;i<ctx->emit_pos;i++) {
+		while( ctx->pos_map[cur_op] == i ) {
+			printf("@%X ", cur_op);
+			ctx->op_pos = cur_op;
+			hl_dump_op(ctx, f->ops + cur_op);
+			printf("\n");
+			cur_op++;
+		}
+		einstr *e = ctx->instrs + i;
+		printf("\t\t@%X %s", i, op_names[e->op]);
+		switch( e->op ) {
+		case LOAD_ADDR:
+		case LOAD_IMM:
+		case LOAD_ARG:
+			printf("%s", emit_mode_str(e->mode));
+			break;
+		default:
+			break;
+		}
+		switch( e->op ) {
+		case JUMP:
+		case JCOND:
+			printf(" @%X", i + 1 + e->mode);
+			break;
+		case STORE:
+			{
+				int offs = e->mode >> 8;
+				printf("%s", emit_mode_str(e->mode&0xFF));
+				if( offs == 0 )
+					printf(" [@%X] := @%X", e->args.a.index, e->args.b.index);
+				else
+					printf(" @%X[%d] := @%X", e->args.a.index, offs, e->args.b.index);
+			}
+			break;
+		default:
+			if( e->args.a.index >= 0 ) printf(" @%X", e->args.a.index);
+			if( e->args.b.index >= 0 ) printf(", @%X", e->args.b.index);
+			break;
+		}
+		printf("\n");
+	}
+	printf("\n\n");
+	fflush(stdout);
 }
