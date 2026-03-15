@@ -354,6 +354,7 @@ release_prepare:
 
 release_win:
 	cp $(BUILD_DIR)/{$(HL),libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
+	rm  $(PACKAGE_NAME)/hl.lib # avoid confusion between hl.lib and libhl.lib
 	cp $(VS_RUNTIME_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_SDL_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_OPENAL_LIBRARY) $(PACKAGE_NAME)/OpenAL32.dll
