@@ -717,7 +717,6 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 			hl_emit_free(ctx, false);
 			return 0;
 		}
-		hl_emit_dump(ctx);
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
 	}
 	m->jit_code = hl_emit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
