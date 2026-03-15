@@ -39,9 +39,17 @@ class Build {
 		var tpl = config.defines.get("hlgen.makefile");
 		return switch tpl {
 			case "make":
-				Sys.command("make", ["-C", targetDir]);
+				var platformArgs = switch config.defines.get("hlgen.build.architecture") {
+					case 'x86_32': ["EXTRA_CFLAGS=-m32", "EXTRA_LDFLAGS=-m32"];
+					case _: [];
+				};
+				Sys.command("make", ["-C", targetDir].concat(platformArgs));
 			case "hxcpp":
-				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []));
+				var platformArgs = switch config.defines.get("hlgen.build.architecture") {
+					case 'x86_32': ["HXCPP_M32"];
+					case _: [];
+				};
+				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []).concat(platformArgs));
 			case "vs2019", "vs2022":
 				var vswhereProc = new sys.io.Process("C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe", ["-requires", "Microsoft.Component.MSBuild", "-find", "MSBuild",
 					"-version", tpl == "vs2019" ? "[16.0,17.0]" : "[17.0,18.0]"
@@ -52,7 +60,11 @@ class Build {
 					if( msbuildPath.length > 0 ) {
 						var prevCwd = Sys.getCwd();
 						var msbuild = '$msbuildPath\\Current\\Bin\\MSBuild.exe';
-						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", "-property:Configuration=Release", "-property:Platform=x64"];
+						var platform = switch config.defines.get("hlgen.build.architecture") {
+							case 'x86_32': 'x86';
+							case _: 'x64';
+						};
+						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", "-property:Configuration=Release", '-property:Platform=$platform'];
 						log('"$msbuild"' + " " + msbuildArgs.join(" "));
 						Sys.setCwd(targetDir);
 						code = Sys.command(msbuild, msbuildArgs);
