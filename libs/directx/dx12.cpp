@@ -331,6 +331,10 @@ HL_PRIM void HL_NAME(signal)( ID3D12Fence *fence, int64 value ) {
 	static_driver->commandQueue->Signal(fence,value);
 }
 
+HL_PRIM void HL_NAME(wait)( ID3D12Fence* fence, int64 value ) {
+	static_driver->commandQueue->Wait(fence,value);
+}
+
 HL_PRIM void HL_NAME(flush_messages)() {
 #ifndef HL_XBS
 	dx_driver *drv = static_driver;
@@ -388,6 +392,7 @@ DEFINE_PRIM(_VOID, suspend, _NO_ARG);
 DEFINE_PRIM(_VOID, resume, _NO_ARG);
 DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
 DEFINE_PRIM(_VOID, signal, _RES _I64);
+DEFINE_PRIM(_VOID, wait, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
 DEFINE_PRIM(_I64, get_timestamp_frequency, _NO_ARG);
@@ -821,6 +826,35 @@ DEFINE_PRIM(_BOOL, waitevent_wait, _EVENT _I32);
 
 // ---- COMMANDS
 
+HL_PRIM ID3D12CommandQueue* HL_NAME(command_queue_create)( D3D12_COMMAND_LIST_TYPE type ) {
+	D3D12_COMMAND_QUEUE_DESC desc = {};
+	desc.Type = type;
+	desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+	desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	desc.NodeMask = CURRENT_NODEMASK;
+	ID3D12CommandQueue* q = NULL;
+	CHKERR(static_driver->device->CreateCommandQueue(&desc, IID_PPV_ARGS(&q)));
+	return q;
+}
+
+HL_PRIM void HL_NAME(command_queue_execute_command_list)(ID3D12CommandQueue* q, ID3D12GraphicsCommandList* l) {
+	ID3D12CommandList* const commandLists[] = { l };
+	q->ExecuteCommandLists(1, commandLists);
+}
+
+HL_PRIM void HL_NAME(command_queue_execute_command_lists)(ID3D12CommandQueue* q, ID3D12GraphicsCommandList* l, int count) {
+	ID3D12CommandList** commandLists{ (ID3D12CommandList**)(l) };
+	q->ExecuteCommandLists(count, commandLists);
+}
+
+HL_PRIM void HL_NAME(command_queue_signal)(ID3D12CommandQueue* q, ID3D12Fence* fence, int64 value) {
+	q->Signal(fence, value);
+}
+
+HL_PRIM void HL_NAME(command_queue_wait)(ID3D12CommandQueue* q, ID3D12Fence* fence, int64 value) {
+	q->Wait(fence, value);
+}
+
 HL_PRIM ID3D12CommandAllocator *HL_NAME(command_allocator_create)( D3D12_COMMAND_LIST_TYPE type ) {
 	ID3D12CommandAllocator *a = NULL;
 	DXERR(static_driver->device->CreateCommandAllocator(type,IID_PPV_ARGS(&a)));
@@ -990,6 +1024,12 @@ HL_PRIM void HL_NAME(command_list_dispatch)( ID3D12GraphicsCommandList *l, int x
 	l->Dispatch(x,y,z);
 }
 
+
+DEFINE_PRIM(_RES, command_queue_create, _I32);
+DEFINE_PRIM(_VOID, command_queue_execute_command_list, _RES _RES);
+DEFINE_PRIM(_VOID, command_queue_execute_command_lists, _RES _ABSTRACT(hl_carray) _I32);
+DEFINE_PRIM(_VOID, command_queue_signal, _RES _RES _I64);
+DEFINE_PRIM(_VOID, command_queue_wait, _RES _RES _I64);
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
 DEFINE_PRIM(_VOID, command_allocator_reset, _RES);
 DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);

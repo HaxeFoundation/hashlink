@@ -63,6 +63,18 @@ abstract PipelineState(Resource) {
 abstract CommandSignature(Resource) {
 }
 
+@:hlNative("dx12","command_queue_")
+abstract CommandQueue(Resource) {
+	public function new(type) {
+		this = create(type);
+	}
+	public function executeCommandList( commandList : CommandList ) {}
+	public function executeCommandLists( commandLists : hl.CArray<CommandList>, count : Int ) {}
+	public function signal( fence : Fence, value : Int64 ) {}
+	public function wait( fence : Fence, value : Int64 ) {}
+	static function create( type : CommandListType ) : Resource { return null; }
+}
+
 @:hlNative("dx12","command_allocator_")
 abstract CommandAllocator(Resource) {
 	public function new(type) {
@@ -1693,6 +1705,9 @@ class Dx12 {
 	}
 
 	public static function signal( fence : Fence, value : Int64 ) {
+	}
+
+	public static function wait( fence : Fence, value : Int64 ) {
 	}
 
 	public static function present( vsync : Bool ) {

@@ -21,12 +21,12 @@
  */
 #include "hlmodule.h"
 
-#define OP(_,n) n,
+#define OP(_,_a,_b,_c) (_b == AR ? _c : (_c == X ? (_b == X ? (_a == X ? 0 : 1) : 2) : 3)),
 #define OP_BEGIN static int hl_op_nargs[] = {
 #define OP_END };
 #include "opcodes.h"
 
-#define OP(n,_) #n,
+#define OP(n,_a,_b,_c) #n,
 #define OP_BEGIN static const char *hl_op_names[] = {
 #define OP_END };
 #include "opcodes.h"
