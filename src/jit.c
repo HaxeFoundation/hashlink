@@ -201,6 +201,7 @@ typedef enum {
 	RADDR = 4,
 	RMEM = 5,
 	RUNUSED = 6,
+	RUNBIND = 7,
 	RCPU_CALL = 1 | 8,
 	RCPU_8BITS = 1 | 16
 } preg_kind;
@@ -221,6 +222,7 @@ struct vreg {
 };
 
 #define REG_AT(i)		(ctx->pregs + (i))
+#define XMM(i)			((i) + RCPU_COUNT)
 
 #ifdef HL_64
 #	define RCPU_COUNT	16
@@ -230,6 +232,8 @@ struct vreg {
 #		define RCPU_SCRATCH_COUNT	7
 #		define RFPU_SCRATCH_COUNT	6
 static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, R8, R9, R10, R11 };
+static const int RCPU_FREE_REGS[] = { Ebx, Esi, Edi, R12, R13, R14, R15, -1 };
+static const int RFPU_FREE_REGS[] = { XMM(6), XMM(7), XMM(8), XMM(9), XMM(10), XMM(11), XMM(12), XMM(13), XMM(14), XMM(15), -1 };
 static const CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
 #	else
 #		define CALL_NREGS			6 // TODO : XMM6+XMM7 are FPU reg parameters
@@ -237,6 +241,8 @@ static const CpuReg CALL_REGS[] = { Ecx, Edx, R8, R9 };
 #		define RFPU_SCRATCH_COUNT	16
 static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx, Esi, Edi, R8, R9, R10, R11 };
 static const CpuReg CALL_REGS[] = { Edi, Esi, Edx, Ecx, R8, R9 };
+static const int RCPU_FREE_REGS[] = { Ebx, R12, R13, R14, R15, -1 };
+static const int RFPU_FREE_REGS[] = { -1 };
 #	endif
 #else
 #	define CALL_NREGS	0
@@ -245,9 +251,10 @@ static const CpuReg CALL_REGS[] = { Edi, Esi, Edx, Ecx, R8, R9 };
 #	define RCPU_SCRATCH_COUNT	3
 #	define RFPU_SCRATCH_COUNT	8
 static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
+static const int RCPU_FREE_REGS[] = { Ebx, Esi, Edi, -1 };
+static const int RFPU_FREE_REGS[] = { -1 };
 #endif
 
-#define XMM(i)			((i) + RCPU_COUNT)
 #define PXMM(i)			REG_AT(XMM(i))
 #define REG_IS_FPU(i)	((i) >= RCPU_COUNT)
 
@@ -261,7 +268,7 @@ static const int RCPU_SCRATCH_REGS[] = { Eax, Ecx, Edx };
 #define R(id)		(ctx->vregs + (id))
 #define ASSERT(i)	{ printf("JIT ERROR %d (jit.c line %d)\n",i,(int)__LINE__); jit_exit(); }
 #define IS_FLOAT(r)	((r)->t->kind == HF64 || (r)->t->kind == HF32)
-#define RLOCK(r)		if( (r)->lock < ctx->currentPos ) (r)->lock = ctx->currentPos
+#define RLOCK(r)		if( (r)->lock < ctx->currentPos && (r)->lock >= 0 ) (r)->lock = ctx->currentPos
 #define RUNLOCK(r)		if( (r)->lock == ctx->currentPos ) (r)->lock = 0
 
 #define BREAK()		B(0xCC)
@@ -281,6 +288,7 @@ struct _jit_ctx {
 	preg pregs[REG_COUNT];
 	vreg *savedRegs[REG_COUNT];
 	int savedLocks[REG_COUNT];
+	int saveRestoreMask;
 	int *opsPos;
 	int maxRegs;
 	int maxOps;
@@ -427,13 +435,16 @@ static void save_regs( jit_ctx *ctx ) {
 
 static void restore_regs( jit_ctx *ctx ) {
 	int i;
-	for(i=0;i<ctx->maxRegs;i++)
-		ctx->vregs[i].current = NULL;
+	for(i=0;i<ctx->maxRegs;i++) {
+		vreg *r = R(i);
+		if( r->stack.kind != RUNBIND )
+			r->current = NULL;
+	}
 	for(i=0;i<REG_COUNT;i++) {
 		vreg *r = ctx->savedRegs[i];
 		preg *p = ctx->pregs + i;
 		p->holds = r;
-		p->lock = ctx->savedLocks[i];
+		if( p->lock >= 0 ) p->lock = ctx->savedLocks[i];
 		if( r ) r->current = p;
 	}
 }
@@ -579,6 +590,8 @@ static opform OP_FORMS[_CPU_LAST] = {
 		}\
 		B(b); \
 	}
+
+bool hl_opcode_writes( hl_op op );
 
 static bool is_reg8( preg *a ) {
 	return a->kind == RSTACK || a->kind == RMEM || a->kind == RCONST || (a->kind == RCPU && a->id != Esi && a->id != Edi);
@@ -774,9 +787,9 @@ static void op( jit_ctx *ctx, CpuOp o, preg *a, preg *b, bool mode64 ) {
 				if( reg > 7 ) r64 |= 1;
 				if( regOrOffs > 7 ) r64 |= 2;
 				OP(f->r_mem);
-				MOD_RM(offset == 0 ? 0 : IS_SBYTE(offset) ? 1 : 2,a->id,4);
+				MOD_RM(offset == 0 && reg != R13 ? 0 : IS_SBYTE(offset) ? 1 : 2,a->id,4);
 				SIB(mult,regOrOffs,reg);
-				if( offset ) {
+				if( offset || reg == R13 ) {
 					if( IS_SBYTE(offset) ) B(offset); else W(offset);
 				}
 			}
@@ -1018,6 +1031,7 @@ static preg *fetch( vreg *r ) {
 
 static void scratch( preg *r ) {
 	if( r && r->holds ) {
+		if( r->lock < 0 ) ASSERT(0);
 		r->holds->current = NULL;
 		r->holds = NULL;
 		r->lock = 0;
@@ -1034,8 +1048,12 @@ static void load( jit_ctx *ctx, preg *r, vreg *v ) {
 		v->current->holds = NULL;
 		from = r;
 	}
-	r->holds = v;
-	v->current = r;
+	if( v->stack.kind == RUNBIND ) {
+		BREAK();
+	} else {
+		r->holds = v;
+		v->current = r;
+	}
 	copy(ctx,r,from,v->size);
 }
 
@@ -1274,6 +1292,10 @@ static preg *copy( jit_ctx *ctx, preg *to, preg *from, int size ) {
 }
 
 static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
+	if( r->stack.kind == RUNBIND ) {
+		copy(ctx,r->current,v,r->size);
+		return;
+	}
 	if( r->current && r->current != v ) {
 		r->current->holds = NULL;
 		r->current = NULL;
@@ -1281,7 +1303,7 @@ static void store( jit_ctx *ctx, vreg *r, preg *v, bool bind ) {
 	v = copy(ctx,&r->stack,v,r->size);
 	if( IS_FLOAT(r) != (v->kind == RFPU) )
 		ASSERT(0);
-	if( bind && r->current != v && (v->kind == RCPU || v->kind == RFPU) ) {
+	if( bind && r->current != v && (v->kind == RCPU || v->kind == RFPU) && v->lock >= 0 ) {
 		scratch(v);
 		r->current = v;
 		v->holds = r;
@@ -1612,7 +1634,27 @@ static void op_enter( jit_ctx *ctx ) {
 	preg p;
 	op64(ctx, PUSH, PEBP, UNUSED);
 	op64(ctx, MOV, PEBP, PESP);
-	if( ctx->totalRegsSize ) op64(ctx, SUB, PESP, pconst(&p,ctx->totalRegsSize));
+	int size = ctx->totalRegsSize;
+	if( ctx->saveRestoreMask ) {
+		int k = 0;
+		for(k=0;k<=REG_COUNT;k++)
+			if( ctx->saveRestoreMask&(1<<k) )
+				size -= sizeof(void*);
+	}
+	if( size ) op64(ctx, SUB, PESP, pconst(&p,size));
+	if( ctx->saveRestoreMask ) {
+		int k = 0;
+		for(k=0;k<REG_COUNT;k++)
+			if( ctx->saveRestoreMask&(1<<k) ) {
+				preg *r = REG_AT(k);
+				if( r->kind == RCPU )
+					op64(ctx, PUSH, r, UNUSED);
+				else {
+					op64(ctx, SUB, PESP, pconst(&p,8));
+					op64(ctx, MOVSD, pmem(&p,Esp,0), r);
+				}
+			}
+	}
 }
 
 static void op_ret( jit_ctx *ctx, vreg *r ) {
@@ -1639,7 +1681,22 @@ static void op_ret( jit_ctx *ctx, vreg *r ) {
 			op64(ctx,MOV,PEAX,fetch(r));
 		break;
 	}
-	if( ctx->totalRegsSize ) op64(ctx, ADD, PESP, pconst(&p, ctx->totalRegsSize));
+	int size = ctx->totalRegsSize;
+	if( ctx->saveRestoreMask ) {
+		int k = 0;
+		for(k=REG_COUNT-1;k>=0;k--)
+			if( ctx->saveRestoreMask&(1<<k) ) {
+				preg *r = REG_AT(k);
+				if( r->kind == RCPU )
+					op64(ctx, POP, r, UNUSED);
+				else {
+					op64(ctx, MOVSD, r, pmem(&p,Esp,0));
+					op64(ctx, ADD, PESP, pconst(&p,8));
+				}
+				size -= sizeof(void*);
+			}
+	}
+	if( size ) op64(ctx, ADD, PESP, pconst(&p, size));
 #	ifdef JIT_DEBUG
 	{
 		int jeq;
@@ -1689,6 +1746,7 @@ static void _jit_error( jit_ctx *ctx, const char *msg, int line ) {
 static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 	preg *pa = fetch(a), *pb = fetch(b), *out = NULL;
 	CpuOp o;
+	bool is_jump = false;
 	if( IS_FLOAT(a) ) {
 		bool isf32 = a->t->kind == HF32;
 		switch( bop ) {
@@ -1704,6 +1762,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 		case OJNotEq:
 		case OJNotLt:
 		case OJNotGte:
+			is_jump = true;
 			o = isf32 ? COMISS : COMISD;
 			break;
 		case OSMod:
@@ -1745,7 +1804,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 				pa = fetch(a);
 			} else
 				RLOCK(b->current);
-			if( pa->kind != RCPU ) {
+			if( pa->kind != RCPU || pa->lock < 0 ) {
 				pa = alloc_reg(ctx, RCPU);
 				op(ctx,MOV,pa,fetch(a), is64);
 			}
@@ -1813,6 +1872,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 		case OJUGte:
 		case OJEq:
 		case OJNotEq:
+			is_jump = true;
 			switch( a->t->kind ) {
 			case HUI8:
 			case HBOOL:
@@ -1854,6 +1914,11 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
 		case ID2(RCPU,RSTACK):
+			if( pa->lock < 0 && !is_jump ) {
+				preg *p = alloc_reg(ctx, RCPU);
+				op32(ctx,MOV,p, pa);
+				pa = p;
+			}
 			op32(ctx, o, pa, pb);
 			scratch(pa);
 			out = pa;
@@ -1896,6 +1961,7 @@ static preg *op_binop( jit_ctx *ctx, vreg *dst, vreg *a, vreg *b, hl_op bop ) {
 		switch( ID2(pa->kind, pb->kind) ) {
 		case ID2(RCPU,RCPU):
 		case ID2(RCPU,RSTACK):
+			if( pa->lock < 0 && !is_jump ) ASSERT(0);
 			op64(ctx, o, pa, pb);
 			scratch(pa);
 			out = pa;
@@ -2879,6 +2945,10 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 			break;
 		}
 	}
+	if( v->stack.kind == RUNBIND ) {
+		op64(ctx,PUSH,v->current,UNUSED);
+		op64(ctx,SUB,PESP,pconst(&p,8));
+	}
 	switch( dst->t->kind ) {
 	case HF32:
 	case HF64:
@@ -2894,14 +2964,21 @@ static void make_dyn_cast( jit_ctx *ctx, vreg *dst, vreg *v ) {
 		break;
 	}
 	tmp = alloc_native_arg(ctx);
-	op64(ctx,MOV,tmp,REG_AT(Ebp));
-	if( v->stackPos >= 0 )
-		op64(ctx,ADD,tmp,pconst(&p,v->stackPos));
-	else
-		op64(ctx,SUB,tmp,pconst(&p,-v->stackPos));
+	if( v->stack.kind == RUNBIND ) {
+		op64(ctx,MOV,tmp,PESP);
+		op64(ctx,ADD,tmp,pconst(&p,8));
+	} else {
+		op64(ctx,MOV,tmp,REG_AT(Ebp));
+		if( v->stackPos >= 0 )
+			op64(ctx,ADD,tmp,pconst(&p,v->stackPos));
+		else
+			op64(ctx,SUB,tmp,pconst(&p,-v->stackPos));
+	}
 	set_native_arg(ctx,tmp);
 	call_native(ctx,get_dyncast(dst->t),size);
 	store_result(ctx, dst);
+	if( v->stack.kind == RUNBIND )
+		op64(ctx,ADD,PESP,pconst(&p,16));
 }
 
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
@@ -2914,6 +2991,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	hl_thread_info *tinf = NULL;
 	preg p;
 	ctx->f = f;
+	ctx->saveRestoreMask = 0;
 	ctx->allocOffset = 0;
 	if( f->nregs > ctx->maxRegs ) {
 		free(ctx->vregs);
@@ -2938,11 +3016,73 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
 		r->size = hl_type_size(r->t);
+		r->stackPos = 0;
 		r->current = NULL;
 		r->stack.holds = NULL;
 		r->stack.id = i;
 		r->stack.kind = RSTACK;
 	}
+
+	if( 1 ) {
+		// measure write counts
+		int loops_mult = 1;
+		for(opCount=0;opCount<f->nops;opCount++) {
+			hl_opcode *o = f->ops + opCount;
+			vreg *dst = R(o->p1);
+			if( hl_opcode_writes(o->op) )
+				dst->stackPos += loops_mult;
+			// loop detection heuristics
+			switch( o->op ) {
+			case OLabel:
+				loops_mult <<= 2;
+				break;
+			case OJAlways:
+				if( o->p1 < 0 && loops_mult > 1 ) loops_mult >>= 2;
+				break;
+			case ORef:
+				// can't assign register (need stack position)
+				R(o->p2)->stackPos = 0x80000000;
+				break;
+			default:
+				break;
+			}
+		}
+		// attribute registers
+		int rid = 0;
+		int count = 0;
+		bool cpu = true;
+		while( true ) {
+			int reg = (cpu ? RCPU_FREE_REGS : RFPU_FREE_REGS)[rid++];
+			vreg *best = NULL;
+			if( reg >= 0 ) {
+				// ignore args for now (only local temp vars, easier)
+				for(i=nargs;i<f->nregs;i++) {
+					vreg *r = R(i);
+					if( r->stackPos >= 8 && (best == NULL || r->stackPos > best->stackPos) && IS_FLOAT(r) == !cpu )
+						best = r;
+				}
+			}
+			if( best == NULL ) {
+				/*
+				// disable FPU assign for now
+				if( cpu ) {
+					rid = 0;
+					cpu = false;
+					continue;
+				}
+				*/
+				break;
+			}
+			best->current = REG_AT(reg);
+			best->stackPos = -1;
+			best->stack.kind = RUNBIND;
+			best->current->lock = -1;
+			ctx->saveRestoreMask |= 1 << reg;
+			count++;
+		}
+		//if( count > 0 ) printf("@%X ASSIGNED %d STATIC REGS\n",f->findex,count);
+	}
+
 	size = 0;
 	int argsSize = 0;
 	for(i=0;i<nargs;i++) {
@@ -2959,12 +3099,19 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			r->stackPos = -size;
 		}
 	}
+	
 	for(i=nargs;i<f->nregs;i++) {
 		vreg *r = R(i);
+		if( r->current ) continue;
 		size += r->size;
 		size += hl_pad_size(size,r->t); // align local vars
 		r->stackPos = -size;
 	}
+
+	for(i=0;i<REG_COUNT;i++)
+		if( ctx->saveRestoreMask & (1 << i) )
+			size += sizeof(void*);
+
 #	ifdef HL_64
 	size += (-size) & 15; // align on 16 bytes
 #	else
@@ -3007,6 +3154,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		ctx->currentPos = opCount + 1;
 		jit_buf(ctx);
 #		ifdef JIT_DEBUG
+		i = 0;
+		while( true ) {
+			int r = RCPU_FREE_REGS[i++];
+			if( r < 0 ) break;
+			preg *rr = REG_AT(r);
+			if( rr->holds || rr->lock > 0 ) ASSERT(0);
+		}
 		if( opCount == 0 || f->ops[opCount-1].op != OAsm ) {
 			int uid = opCount + (f->findex<<16);
 			op32(ctx, PUSH, pconst(&p,uid), UNUSED);
@@ -3182,6 +3336,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 						op32(ctx,MOV,pmem(&p,Eax,HDYN_VALUE+4),tmp);
 						ra->stackPos -= 4;
 					}
+				} else if( ra->current && ra->current->kind == RFPU ) {
+					op64(ctx,MOVSD,pmem(&p,Eax,HDYN_VALUE),ra->current);
 				} else {
 					preg *tmp = REG_AT(RCPU_SCRATCH_REGS[1]);
 					copy_from(ctx,tmp,ra);
@@ -3996,6 +4152,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 			break;
 		case ORef:
 			{
+				if( ra->stack.kind == RUNBIND ) ASSERT(0);
 				scratch(ra->current);
 				op64(ctx,MOV,alloc_cpu(ctx,dst,false),REG_AT(Ebp));
 				if( ra->stackPos < 0 )
