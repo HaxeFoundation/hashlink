@@ -43,7 +43,13 @@
 #	endif
 #endif
 #define HL_DEFINE_PRIM(t,name,args) HL_DEFINE_PRIM_WITH_NAME(t,name,args,name)
-#define HL_PRIM						HL_EXTERN_C EXPORT
-#define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C EXPORT void *hlp_##realName( const char **sign ) { *sign = HL_FUN(t,args); return (void*)(&HL_NAME(name)); }
+
+#ifdef HL_NAME
+#	define HL_PRIM					HL_EXTERN_C EXPORT
+#	define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C EXPORT void *hlp_##realName( const char **sign ) { *sign = HL_FUN(t,args); return (void*)(&HL_NAME(name)); }
+#else
+#	define HL_PRIM					HL_EXTERN_C
+#	define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#endif
 
 #endif // ifndef HLFFI_H
