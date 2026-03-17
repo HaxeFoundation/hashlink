@@ -876,7 +876,11 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)
 
-#define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
+#if defined(LIBHL_EXPORTS)
+#	define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
+#else
+#	define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
+#endif
 #define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 
 #endif // HL_DISABLE_LEGACY_FFI
@@ -886,8 +890,6 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #	ifdef LIBHL_EXPORTS
 #		define HL_PRIM				EXPORT
 #		ifndef HL_DISABLE_LEGACY_FFI
-#			undef DEFINE_PRIM
-#			define DEFINE_PRIM(t,name,args)						_DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
 #			define DEFINE_PRIM_WITH_NAME						_DEFINE_PRIM_WITH_NAME
 #		endif
 #	else
