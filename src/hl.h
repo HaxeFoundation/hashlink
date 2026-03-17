@@ -196,9 +196,15 @@
 #endif
 
 #ifdef __cplusplus
-#	define C_FUNCTION_BEGIN extern "C" {
+#	ifndef HL_EXTERN_C
+#		define HL_EXTERN_C	extern "C"
+# 	endif
+#	define C_FUNCTION_BEGIN HL_EXTERN_C {
 #	define C_FUNCTION_END	};
 #else
+#	ifndef HL_EXTERN_C
+#		define HL_EXTERN_C
+# 	endif
 #	define C_FUNCTION_BEGIN
 #	define C_FUNCTION_END
 #endif
@@ -892,20 +898,12 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 
 #if (defined(HL_NAME) && !defined(LIBHL_STATIC)) || defined(LIBHL_EXPORTS)
 #	ifndef HL_PRIM
-#		ifdef __cplusplus
-#			define	HL_PRIM			extern "C" EXPORT
-#		else
-#			define HL_PRIM			EXPORT
-#		endif
+#		define	HL_PRIM				HL_EXTERN_C EXPORT
 #	endif
-#   define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
+#   define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); }
 #else
 #	ifndef HL_PRIM
-#		ifdef __cplusplus
-#			define	HL_PRIM			extern "C"
-#		else
-#			define HL_PRIM
-#		endif
+#		define	HL_PRIM				HL_EXTERN_C
 #	endif
 #	define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #endif
