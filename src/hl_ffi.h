@@ -27,9 +27,7 @@
 
 #define HL_STRING					HL_OBJ(HL_BYTES HL_I32)
 
-#define HL__DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = HL_FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
-
-#define HL_DEFINE_PRIM(t,name,args) HL__DEFINE_PRIM_WITH_NAME(t,name,args,name)
-#define HL_DEFINE_PRIM_WITH_NAME    HL__DEFINE_PRIM_WITH_NAME
+#define HL_DEFINE_PRIM(t,name,args) HL_DEFINE_PRIM_WITH_NAME(t,name,args,name)
+#define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)    C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = HL_FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 
 #endif // ifndef HLFFI_H
