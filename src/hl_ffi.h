@@ -27,7 +27,13 @@
 
 #define HL_STRING					HL_OBJ(HL_BYTES HL_I32)
 
+#ifdef __cplusplus
+#	define HL_EXTERN_C				extern "C"
+#else
+#	define HL_EXTERN_C
+#endif
 #define HL_DEFINE_PRIM(t,name,args) HL_DEFINE_PRIM_WITH_NAME(t,name,args,name)
-#define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)    C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = HL_FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
+#define HL_PRIM						HL_EXTERN_C EXPORT
+#define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C EXPORT void *hlp_##realName( const char **sign ) { *sign = HL_FUN(t,args); return (void*)(&HL_NAME(name)); }
 
 #endif // ifndef HLFFI_H
