@@ -847,6 +847,14 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 
 #ifndef HL_DISABLE_LEGACY_FFI
 
+#if defined(HLFFI_H)
+#	if defined(_MSC_VER)
+#		pragma message("Warning: Please define HL_DISABLE_LEGACY_FFI if using hl.h with hl_ffi.h")
+#	else
+#		warning	Please define HL_DISABLE_LEGACY_FFI if using hl.h with hl_ffi.h
+#	endif
+#endif
+
 // match GNU C++ mangling
 #define TYPE_STR	"vcsilfdbBDPOATR??X?N?S?g"
 
@@ -883,17 +891,21 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #endif
 
 #if (defined(HL_NAME) && !defined(LIBHL_STATIC)) || defined(LIBHL_EXPORTS)
-#	ifdef __cplusplus
-#		define	HL_PRIM				extern "C" EXPORT
-#	else
-#		define HL_PRIM				EXPORT
+#	ifndef HL_PRIM
+#		ifdef __cplusplus
+#			define	HL_PRIM			extern "C" EXPORT
+#		else
+#			define HL_PRIM			EXPORT
+#		endif
 #	endif
 #   define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 #else
-#	ifdef __cplusplus
-#		define	HL_PRIM				extern "C"
-#	else
-#		define	HL_PRIM
+#	ifndef HL_PRIM
+#		ifdef __cplusplus
+#			define	HL_PRIM			extern "C"
+#		else
+#			define HL_PRIM
+#		endif
 #	endif
 #	define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #endif

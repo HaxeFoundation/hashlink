@@ -1,6 +1,14 @@
 #ifndef HLFFI_H
 #define HLFFI_H
 
+#if defined(HL_H) && !defined(HL_DISABLE_LEGACY_FFI)
+#	if defined(_MSC_VER)
+#		pragma message("Warning: Please define HL_DISABLE_LEGACY_FFI if using hl.h before hl_ffi.h")
+#	else
+#		warning	Please define HL_DISABLE_LEGACY_FFI if using hl.h before hl_ffi.h
+#	endif
+#endif
+
 // match GNU C++ mangling
 #define HL_TYPE_STR "vcsilfdbBDPOATR??X?N?S?g"
 
