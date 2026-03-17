@@ -881,42 +881,28 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #else
 #	define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
 #endif
-#define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
 
-#endif // HL_DISABLE_LEGACY_FFI
-
-#if !defined(HL_NAME)
-#	define HL_NAME(p)					p
-#	ifdef LIBHL_EXPORTS
-#		define HL_PRIM				EXPORT
-#		ifndef HL_DISABLE_LEGACY_FFI
-#			define DEFINE_PRIM_WITH_NAME						_DEFINE_PRIM_WITH_NAME
-#		endif
+#if (defined(HL_NAME) && !defined(LIBHL_STATIC)) || defined(LIBHL_EXPORTS)
+#	ifdef __cplusplus
+#		define	HL_PRIM				extern "C" EXPORT
 #	else
-#		define HL_PRIM
-#		ifndef HL_DISABLE_LEGACY_FFI
-#			define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
-#		endif
+#		define HL_PRIM				EXPORT
 #	endif
-#elif defined(LIBHL_STATIC)
+#   define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
+#else
 #	ifdef __cplusplus
 #		define	HL_PRIM				extern "C"
 #	else
 #		define	HL_PRIM
 #	endif
-#	ifndef HL_DISABLE_LEGACY_FFI
-#		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
-#	endif
-#else
-#	ifdef __cplusplus
-#		define	HL_PRIM				extern "C" EXPORT
-#	else
-#		define	HL_PRIM				EXPORT
-#	endif
-#	ifndef HL_DISABLE_LEGACY_FFI
-#		define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
-#	endif
+#	define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
 #endif
+
+#ifndef HL_NAME
+#   define HL_NAME(p) p
+#endif
+
+#endif // HL_DISABLE_LEGACY_FFI
 
 typedef struct {
 	hl_type *t;
