@@ -42,11 +42,20 @@
 #		define HL_EXTERN_C
 #	endif
 #endif
+
+#if defined(_WIN32)
+#	define HL_EXPORT __declspec( dllexport )
+#elif defined(__GNUC__) || defined(__clang__)
+#	define HL_EXPORT __attribute__((visibility("default")))
+#else
+#	define HL_EXPORT
+#endif
+
 #define HL_DEFINE_PRIM(t,name,args) HL_DEFINE_PRIM_WITH_NAME(t,name,args,name)
 
 #ifdef HL_NAME
-#	define HL_PRIM					HL_EXTERN_C EXPORT
-#	define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C EXPORT void *hlp_##realName( const char **sign ) { *sign = HL_FUN(t,args); return (void*)(&HL_NAME(name)); }
+#	define HL_PRIM					HL_EXTERN_C HL_EXPORT
+#	define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C HL_EXPORT void *hlp_##realName( const char **sign ) { *sign = HL_FUN(t,args); return (void*)(&HL_NAME(name)); }
 #else
 #	define HL_PRIM					HL_EXTERN_C
 #	define HL_DEFINE_PRIM_WITH_NAME(t,name,args,realName)
