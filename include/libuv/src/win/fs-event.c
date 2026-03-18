@@ -33,7 +33,7 @@
 const unsigned int uv_directory_watcher_buffer_size = 4096;
 
 
-static void uv_fs_event_queue_readdirchanges(uv_loop_t* loop,
+static void uv__fs_event_queue_readdirchanges(uv_loop_t* loop,
     uv_fs_event_t* handle) {
   assert(handle->dir_handle != INVALID_HANDLE_VALUE);
   assert(!handle->req_pending);
@@ -57,18 +57,19 @@ static void uv_fs_event_queue_readdirchanges(uv_loop_t* loop,
                              NULL)) {
     /* Make this req pending reporting an error. */
     SET_REQ_ERROR(&handle->req, GetLastError());
-    uv_insert_pending_req(loop, (uv_req_t*)&handle->req);
+    uv__insert_pending_req(loop, (uv_req_t*)&handle->req);
   }
 
   handle->req_pending = 1;
 }
 
-static void uv_relative_path(const WCHAR* filename,
-                             const WCHAR* dir,
-                             WCHAR** relpath) {
+static void uv__relative_path(const WCHAR* filename,
+                              const WCHAR* dir,
+                              WCHAR** relpath) {
   size_t relpathlen;
   size_t filenamelen = wcslen(filename);
   size_t dirlen = wcslen(dir);
+  assert(!_wcsnicmp(filename, dir, dirlen));
   if (dirlen > 0 && dir[dirlen - 1] == '\\')
     dirlen--;
   relpathlen = filenamelen - dirlen - 1;
@@ -79,27 +80,41 @@ static void uv_relative_path(const WCHAR* filename,
   (*relpath)[relpathlen] = L'\0';
 }
 
-static int uv_split_path(const WCHAR* filename, WCHAR** dir,
+static int uv__split_path(const WCHAR* filename, WCHAR** dir,
     WCHAR** file) {
-  int len = wcslen(filename);
-  int i = len;
+  size_t len, i;
+  DWORD dir_len;
+
+  if (filename == NULL) {
+    if (dir != NULL)
+      *dir = NULL;
+    *file = NULL;
+    return 0;
+  }
+
+  len = wcslen(filename);
+  i = len;
   while (i > 0 && filename[--i] != '\\' && filename[i] != '/');
 
   if (i == 0) {
     if (dir) {
-      *dir = (WCHAR*)uv__malloc((MAX_PATH + 1) * sizeof(WCHAR));
+      dir_len = GetCurrentDirectoryW(0, NULL);
+      if (dir_len == 0) {
+        return -1;
+      }
+      *dir = (WCHAR*)uv__malloc(dir_len * sizeof(WCHAR));
       if (!*dir) {
         uv_fatal_error(ERROR_OUTOFMEMORY, "uv__malloc");
       }
 
-      if (!GetCurrentDirectoryW(MAX_PATH, *dir)) {
+      if (!GetCurrentDirectoryW(dir_len, *dir)) {
         uv__free(*dir);
         *dir = NULL;
         return -1;
       }
     }
 
-    *file = wcsdup(filename);
+    *file = _wcsdup(filename);
   } else {
     if (dir) {
       *dir = (WCHAR*)uv__malloc((i + 2) * sizeof(WCHAR));
@@ -131,8 +146,7 @@ int uv_fs_event_init(uv_loop_t* loop, uv_fs_event_t* handle) {
   handle->short_filew = NULL;
   handle->dirw = NULL;
 
-  uv_req_init(loop, (uv_req_t*)&handle->req);
-  handle->req.type = UV_FS_EVENT_REQ;
+  UV_REQ_INIT(&handle->req, UV_FS_EVENT_REQ);
   handle->req.data = handle;
 
   return 0;
@@ -143,10 +157,14 @@ int uv_fs_event_start(uv_fs_event_t* handle,
                       uv_fs_event_cb cb,
                       const char* path,
                       unsigned int flags) {
-  int name_size, is_path_dir;
-  DWORD attr, last_error;
-  WCHAR* dir = NULL, *dir_to_watch, *pathw = NULL;
-  WCHAR short_path[MAX_PATH];
+  int is_path_dir;
+  DWORD last_error;
+  WCHAR* dir, *pathw = NULL;
+  DWORD short_path_buffer_len;
+  WCHAR *short_path_buffer;
+  WCHAR* short_path = NULL;
+  HANDLE file_handle = INVALID_HANDLE_VALUE;
+  BY_HANDLE_FILE_INFORMATION info;
 
   if (uv__is_active(handle))
     return UV_EINVAL;
@@ -159,78 +177,107 @@ int uv_fs_event_start(uv_fs_event_t* handle,
 
   uv__handle_start(handle);
 
-  /* Convert name to UTF16. */
+  last_error = uv__convert_utf8_to_utf16(path, &pathw);
+  if (last_error)
+    goto error_uv;
 
-  name_size = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0) *
-              sizeof(WCHAR);
-  pathw = (WCHAR*)uv__malloc(name_size);
-  if (!pathw) {
-    uv_fatal_error(ERROR_OUTOFMEMORY, "uv__malloc");
-  }
-
-  if (!MultiByteToWideChar(CP_UTF8,
-                           0,
-                           path,
-                           -1,
-                           pathw,
-                           name_size / sizeof(WCHAR))) {
-    return uv_translate_sys_error(GetLastError());
-  }
-
-  /* Determine whether path is a file or a directory. */
-  attr = GetFileAttributesW(pathw);
-  if (attr == INVALID_FILE_ATTRIBUTES) {
+  file_handle = CreateFileW(pathw,
+                            FILE_LIST_DIRECTORY,
+                            FILE_SHARE_READ|FILE_SHARE_DELETE|FILE_SHARE_WRITE,
+                            NULL,
+                            OPEN_EXISTING,
+                            FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OVERLAPPED,
+                            NULL);
+  if (file_handle == INVALID_HANDLE_VALUE) {
     last_error = GetLastError();
     goto error;
   }
 
-  is_path_dir = (attr & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
+  if (!GetFileInformationByHandle(file_handle, &info)) {
+    last_error = GetLastError();
+    goto error;
+  }
 
-  if (is_path_dir) {
-     /* path is a directory, so that's the directory that we will watch. */
-    handle->dirw = pathw;
-    dir_to_watch = pathw;
-  } else {
+  is_path_dir = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
+
+  if (!is_path_dir) {
     /*
      * path is a file.  So we split path into dir & file parts, and
      * watch the dir directory.
      */
 
     /* Convert to short path. */
-    if (!GetShortPathNameW(pathw, short_path, ARRAY_SIZE(short_path))) {
+    short_path_buffer = NULL;
+    short_path_buffer_len = GetShortPathNameW(pathw, NULL, 0);
+    if (short_path_buffer_len == 0) {
+      goto short_path_done;
+    }
+    short_path_buffer = uv__malloc(short_path_buffer_len * sizeof(WCHAR));
+    if (short_path_buffer == NULL) {
+      goto short_path_done;
+    }
+    if (GetShortPathNameW(pathw,
+                          short_path_buffer,
+                          short_path_buffer_len) == 0) {
+      uv__free(short_path_buffer);
+      short_path_buffer = NULL;
+    }
+short_path_done:
+    short_path = short_path_buffer;
+
+    if (uv__split_path(pathw, &dir, &handle->filew) != 0) {
       last_error = GetLastError();
       goto error;
     }
 
-    if (uv_split_path(pathw, &dir, &handle->filew) != 0) {
+    if (uv__split_path(short_path, NULL, &handle->short_filew) != 0) {
       last_error = GetLastError();
       goto error;
     }
 
-    if (uv_split_path(short_path, NULL, &handle->short_filew) != 0) {
-      last_error = GetLastError();
-      goto error;
-    }
-
-    dir_to_watch = dir;
+    uv__free(short_path);
+    short_path = NULL;
     uv__free(pathw);
     pathw = NULL;
-  }
 
-  handle->dir_handle = CreateFileW(dir_to_watch,
-                                   FILE_LIST_DIRECTORY,
-                                   FILE_SHARE_READ | FILE_SHARE_DELETE |
-                                     FILE_SHARE_WRITE,
-                                   NULL,
-                                   OPEN_EXISTING,
-                                   FILE_FLAG_BACKUP_SEMANTICS |
-                                     FILE_FLAG_OVERLAPPED,
-                                   NULL);
-
-  if (dir) {
+    /* Open the containing directory and watch that instead. Events for
+     * other files are filtered out in uv__process_fs_event_req().
+     * Not super efficient but c'est ça.
+     */
+    CloseHandle(file_handle);
+    file_handle = CreateFileW(dir,
+                              FILE_LIST_DIRECTORY,
+                              FILE_SHARE_READ|FILE_SHARE_DELETE|FILE_SHARE_WRITE,
+                              NULL,
+                              OPEN_EXISTING,
+                              FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OVERLAPPED,
+                              NULL);
     uv__free(dir);
     dir = NULL;
+    if (file_handle == INVALID_HANDLE_VALUE) {
+      last_error = GetLastError();
+      goto error;
+    }
+
+    if (!GetFileInformationByHandle(file_handle, &info)) {
+      last_error = GetLastError();
+      goto error;
+    }
+
+    /* Race with another process: directory foo in foo/bar was replaced
+     * with a file. Bail out with an error, we're not recursing upwards.
+     */
+    if (!(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+      /* TODO(bnoordhuis) ERROR_DIRECTORY is translated to UV_ENOENT,
+       * there's currently nothing that maps to UV_ENOTDIR.
+       */
+      last_error = ERROR_DIRECTORY;
+      goto error;
+    }
   }
+
+  handle->dir_handle = file_handle;
+  file_handle = INVALID_HANDLE_VALUE;
 
   if (handle->dir_handle == INVALID_HANDLE_VALUE) {
     last_error = GetLastError();
@@ -274,10 +321,20 @@ int uv_fs_event_start(uv_fs_event_t* handle,
     goto error;
   }
 
+  assert(is_path_dir ? pathw != NULL : pathw == NULL);
+  handle->dirw = pathw;
   handle->req_pending = 1;
   return 0;
 
 error:
+  last_error = uv_translate_sys_error(last_error);
+
+error_uv:
+  if (file_handle != INVALID_HANDLE_VALUE) {
+    CloseHandle(file_handle);
+    file_handle = INVALID_HANDLE_VALUE;
+  }
+
   if (handle->path) {
     uv__free(handle->path);
     handle->path = NULL;
@@ -305,7 +362,12 @@ error:
     handle->buffer = NULL;
   }
 
-  return uv_translate_sys_error(last_error);
+  if (uv__is_active(handle))
+    uv__handle_stop(handle);
+
+  uv__free(short_path);
+
+  return last_error;
 }
 
 
@@ -344,7 +406,26 @@ int uv_fs_event_stop(uv_fs_event_t* handle) {
 }
 
 
-void uv_process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
+static int file_info_cmp(WCHAR* str, WCHAR* file_name, size_t file_name_len) {
+  size_t str_len;
+
+  if (str == NULL)
+    return -1;
+
+  str_len = wcslen(str);
+
+  /*
+    Since we only care about equality, return early if the strings
+    aren't the same length
+  */
+  if (str_len != (file_name_len / sizeof(WCHAR)))
+    return -1;
+
+  return _wcsnicmp(str, file_name, str_len);
+}
+
+
+void uv__process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
     uv_fs_event_t* handle) {
   FILE_NOTIFY_INFORMATION* file_info;
   int err, sizew, size;
@@ -362,8 +443,8 @@ void uv_process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
    * - We are not active, just ignore the callback
    */
   if (!uv__is_active(handle)) {
-    if (handle->flags & UV__HANDLE_CLOSING) {
-      uv_want_endgame(loop, (uv_handle_t*) handle);
+    if (handle->flags & UV_HANDLE_CLOSING) {
+      uv__want_endgame(loop, (uv_handle_t*) handle);
     }
     return;
   }
@@ -383,10 +464,12 @@ void uv_process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
          * or if the filename filter matches.
          */
         if (handle->dirw ||
-          _wcsnicmp(handle->filew, file_info->FileName,
-            file_info->FileNameLength / sizeof(WCHAR)) == 0 ||
-          _wcsnicmp(handle->short_filew, file_info->FileName,
-            file_info->FileNameLength / sizeof(WCHAR)) == 0) {
+            file_info_cmp(handle->filew,
+                          file_info->FileName,
+                          file_info->FileNameLength) == 0 ||
+            file_info_cmp(handle->short_filew,
+                          file_info->FileName,
+                          file_info->FileNameLength) == 0) {
 
           if (handle->dirw) {
             /*
@@ -407,7 +490,7 @@ void uv_process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
               }
 
               _snwprintf(filenamew, size, L"%s\\%.*s", handle->dirw,
-                file_info->FileNameLength / sizeof(WCHAR),
+                file_info->FileNameLength / (DWORD)sizeof(WCHAR),
                 file_info->FileName);
 
               filenamew[size - 1] = L'\0';
@@ -434,9 +517,9 @@ void uv_process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
 
               if (long_filenamew) {
                 /* Get the file name out of the long path. */
-                uv_relative_path(long_filenamew,
-                                 handle->dirw,
-                                 &filenamew);
+                uv__relative_path(long_filenamew,
+                                  handle->dirw,
+                                  &filenamew);
                 uv__free(long_filenamew);
                 long_filenamew = filenamew;
                 sizew = -1;
@@ -484,37 +567,57 @@ void uv_process_fs_event_req(uv_loop_t* loop, uv_req_t* req,
         }
 
         offset = file_info->NextEntryOffset;
-      } while (offset && !(handle->flags & UV__HANDLE_CLOSING));
+      } while (offset && !(handle->flags & UV_HANDLE_CLOSING));
     } else {
       handle->cb(handle, NULL, UV_CHANGE, 0);
     }
   } else {
     err = GET_REQ_ERROR(req);
-    handle->cb(handle, NULL, 0, uv_translate_sys_error(err));
+    /*
+     * Check whether the ERROR_ACCESS_DENIED is caused by the watched directory
+     * being actually deleted (not an actual error) or a legit error. Retrieve
+     * FileStandardInfo to check whether the directory is pending deletion.
+     */
+    FILE_STANDARD_INFO info;
+    if (err == ERROR_ACCESS_DENIED &&
+        handle->dirw != NULL &&
+        GetFileInformationByHandleEx(handle->dir_handle,
+                                     FileStandardInfo,
+                                     &info,
+                                     sizeof(info)) &&
+        info.Directory &&
+        info.DeletePending) {
+      uv__convert_utf16_to_utf8(handle->dirw, -1, &filename);
+      handle->cb(handle, filename, UV_RENAME, 0);
+      uv__free(filename);
+      filename = NULL;
+    } else {
+      handle->cb(handle, NULL, 0, uv_translate_sys_error(err));
+    }
   }
 
-  if (!(handle->flags & UV__HANDLE_CLOSING)) {
-    uv_fs_event_queue_readdirchanges(loop, handle);
-  } else {
-    uv_want_endgame(loop, (uv_handle_t*)handle);
+  if (handle->flags & UV_HANDLE_CLOSING) {
+    uv__want_endgame(loop, (uv_handle_t*)handle);
+  } else if (uv__is_active(handle)) {
+    uv__fs_event_queue_readdirchanges(loop, handle);
   }
 }
 
 
-void uv_fs_event_close(uv_loop_t* loop, uv_fs_event_t* handle) {
+void uv__fs_event_close(uv_loop_t* loop, uv_fs_event_t* handle) {
   uv_fs_event_stop(handle);
 
   uv__handle_closing(handle);
 
   if (!handle->req_pending) {
-    uv_want_endgame(loop, (uv_handle_t*)handle);
+    uv__want_endgame(loop, (uv_handle_t*)handle);
   }
 
 }
 
 
-void uv_fs_event_endgame(uv_loop_t* loop, uv_fs_event_t* handle) {
-  if ((handle->flags & UV__HANDLE_CLOSING) && !handle->req_pending) {
+void uv__fs_event_endgame(uv_loop_t* loop, uv_fs_event_t* handle) {
+  if ((handle->flags & UV_HANDLE_CLOSING) && !handle->req_pending) {
     assert(!(handle->flags & UV_HANDLE_CLOSED));
 
     if (handle->buffer) {

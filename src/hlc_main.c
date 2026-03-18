@@ -128,11 +128,14 @@ static int hlc_capture_stack( void **stack, int size ) {
 	}
 #	endif
 #	ifdef HL_WIN_DESKTOP
-	count = CaptureStackBackTrace(2, size, stack, NULL) - 8; // 8 startup
+	count = CaptureStackBackTrace(2, size, stack, NULL);
+	if( size == HL_EXC_MAX_STACK ) count -= 8; // 8 startup
 #	elif defined(HL_LINUX_BACKTRACE)
-	count = backtrace(stack, size) - 8;
+	count = backtrace(stack, size);
+	if( size == HL_EXC_MAX_STACK ) count -= 8;
 #	elif defined(HL_MAC)
-	count = backtrace(stack, size) - 6;
+	count = backtrace(stack, size);
+	if( size == HL_EXC_MAX_STACK ) count -= 6;
 #	endif
 	if( count < 0 ) count = 0;
 	return count;

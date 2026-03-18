@@ -20,6 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hl.h>
+#include <hlsystem.h>
 #include "opcodes.h"
 
 typedef struct {
@@ -115,6 +116,10 @@ typedef struct {
 	int *functions_indexes;
 } hl_code_hash;
 
+#if defined(HL_64) && defined(HL_WIN)
+#define WIN64_UNWIND_TABLES
+#endif
+
 typedef struct {
 	hl_code *code;
 	int codesize;
@@ -128,6 +133,9 @@ typedef struct {
 	hl_debug_infos *jit_debug;
 	jit_ctx *jit_ctx;
 	hl_module_context ctx;
+#ifdef WIN64_UNWIND_TABLES
+	PRUNTIME_FUNCTION unwind_table;
+#endif
 } hl_module;
 
 hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg );

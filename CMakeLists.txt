@@ -36,6 +36,7 @@ else()
     set(_DOWNLOAD_DEPENDENCIES OFF)
 endif()
 option(DOWNLOAD_DEPENDENCIES "Download & build third-party dependencies" ${_DOWNLOAD_DEPENDENCIES})
+option(WITH_SYSTEM_PCRE2 "Link libhl against system installation of pcre2" OFF)
 
 if(MSVC)
     if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -64,6 +65,8 @@ list(APPEND CMAKE_MODULE_PATH
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+
+set(CMAKE_C_VISIBILITY_PRESET hidden)
 
 # put output in "bin"
 
@@ -156,14 +159,12 @@ if(IOS_PLATFORM)
 endif()
 
 add_library(libhl
-    ${pcre_srcs}
     src/gc.c
     ${std_srcs}
 )
 
 target_include_directories(libhl
     PUBLIC src
-    PRIVATE include include/pcre
 )
 
 # C11 / C++11 are required for features such as unicode strings
@@ -196,8 +197,32 @@ set_target_properties(libhl
     PROPERTIES
     VERSION ${HL_VERSION}
     SOVERSION ${HL_VERSION_MAJOR}
-    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;HAVE_CONFIG_H;PCRE2_CODE_UNIT_WIDTH=16"
+    COMPILE_DEFINITIONS "_USRDLL;LIBHL_EXPORTS;PCRE2_CODE_UNIT_WIDTH=16"
 )
+
+if(WITH_SYSTEM_PCRE2)
+    target_link_libraries(libhl pcre2-16)
+else()
+    target_sources(libhl PRIVATE ${pcre_srcs})
+    target_include_directories(libhl PRIVATE include/pcre)
+    target_compile_definitions(libhl PRIVATE HAVE_CONFIG_H PCRE2_STATIC)
+endif()
+
+if(APPLE)
+    target_include_directories(libhl PRIVATE include)
+endif()
+
+if(WIN32)
+    target_link_libraries(libhl ws2_32 user32 winmm)
+else()
+    target_link_libraries(libhl m dl)
+
+    if(ANDROID)
+        target_link_libraries(libhl log)
+    else()
+        target_link_libraries(libhl pthread)
+    endif()
+endif()
 
 if (WITH_VM)
     add_executable(hl
@@ -225,18 +250,6 @@ if (WITH_VM)
     endif()
 endif()
 
-if(WIN32)
-    target_link_libraries(libhl ws2_32 user32 winmm)
-else()
-    target_link_libraries(libhl m dl)
-
-    if(ANDROID)
-        target_link_libraries(libhl log)
-    else()
-        target_link_libraries(libhl pthread)
-    endif()
-endif()
-
 if(BUILD_TESTING)
 
     find_program(
@@ -244,16 +257,12 @@ if(BUILD_TESTING)
         haxe
     )
 
-    if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "Win32")
-        SET(HAXE_FLAGS -D hl-legacy32)
-    else()
-        SET(HAXE_FLAGS )
+    if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+        SET(HAXE_HL_FLAGS -D hl-legacy32)
     endif()
 
     if(MINGW)
         set(HLC_LIBRARIES dbghelp)
-    else()
-        set(HLC_LIBRARIES)
     endif()
 
     #####################
@@ -261,7 +270,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
         COMMAND ${HAXE_COMPILER}
-            ${HAXE_FLAGS}
+            ${HAXE_HL_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello.hl
             -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
     )
@@ -274,7 +283,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
         COMMAND ${HAXE_COMPILER}
-            ${HAXE_FLAGS}
+            ${HAXE_HL_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads.hl
             -cp ${CMAKE_SOURCE_DIR}/other/tests -main Threads
     )
@@ -287,7 +296,7 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
         COMMAND ${HAXE_COMPILER}
-            ${HAXE_FLAGS}
+            ${HAXE_HL_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample.hl
             -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
     )
@@ -300,7 +309,6 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello/hello.c
         COMMAND ${HAXE_COMPILER}
-            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/hello/hello.c
             -cp ${CMAKE_SOURCE_DIR}/other/tests -main HelloWorld
     )
@@ -324,7 +332,6 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads/threads.c
         COMMAND ${HAXE_COMPILER}
-            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/threads/threads.c
             -cp ${CMAKE_SOURCE_DIR}/other/tests -main Threads
     )
@@ -348,7 +355,6 @@ if(BUILD_TESTING)
 
     add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
         COMMAND ${HAXE_COMPILER}
-            ${HAXE_FLAGS}
             -hl ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test/uvsample/uvsample.c
             -cp ${CMAKE_SOURCE_DIR}/other/uvsample -main UVSample
     )

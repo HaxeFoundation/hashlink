@@ -568,9 +568,10 @@ class Memory {
 	public function getMemStats() : MemStats {
 		if( memStats != null )
 			return memStats;
-		var pagesSize = 0, reserved = 0;
-		var used = 0;
-		var fUsed = 0;
+		var pagesSize = 0.;
+		var reserved = 0.;
+		var used = 0.;
+		var fUsed = 0.;
 		for( p in pages ) {
 			pagesSize += p.size;
 			reserved += p.reserved;

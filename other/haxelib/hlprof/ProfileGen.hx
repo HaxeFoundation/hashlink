@@ -182,7 +182,8 @@ class ProfileGen {
 			var tid = f.readInt32();
 			var tname = f.readString(f.readInt32());
 			var t = hthreads.get(tid);
-			t.name = tname;
+			if( t != null )
+				t.name = tname;
 		}
 
 		f.close();

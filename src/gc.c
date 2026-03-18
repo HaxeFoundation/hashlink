@@ -957,10 +957,12 @@ static void mark_thread_main( void *param ) {
 	}
 }
 
-int gc_get_mark_threads( hl_thread **tids ) {
-	if (gc_mark_threads <= 1)
+HL_API int hl_gc_get_mark_threads( hl_thread **tids ) {
+	if( gc_mark_threads <= 1 )
 		return 0;
-	for (int i = 0; i < gc_mark_threads; i++) {
+	if( tids == NULL )
+		return gc_mark_threads;
+	for( int i = 0; i < gc_mark_threads; i++ ) {
 		tids[i] = mark_threads[i].tid;
 	}
 	return gc_mark_threads;
@@ -1042,6 +1044,19 @@ HL_API void hl_blocking( bool b ) {
 			gc_global_lock(true);
 			gc_global_lock(false);
 		}
+	}
+}
+
+HL_API void hl_gc_safepoint() {
+	hl_thread_info *t = current_thread;
+	if( !t )
+		return; // allow hl_gc_safepoint in non-GC threads
+	if( t->gc_blocking == 0 && gc_threads.stopping_world ) {
+#		ifdef HL_THREADS
+		gc_save_context(t,&t);
+#		endif
+		gc_global_lock(true);
+		gc_global_lock(false);
 	}
 }
 
@@ -1525,4 +1540,5 @@ DEFINE_PRIM(_I32, gc_get_flags, _NO_ARG);
 DEFINE_PRIM(_VOID, gc_set_flags, _I32);
 DEFINE_PRIM(_DYN, debug_call, _I32 _DYN);
 DEFINE_PRIM(_VOID, blocking, _BOOL);
+DEFINE_PRIM(_VOID, gc_safepoint, _NO_ARG);
 DEFINE_PRIM(_VOID, set_thread_flags, _I32 _I32);

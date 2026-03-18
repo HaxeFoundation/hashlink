@@ -5,13 +5,34 @@
     <ClCompile Include="..\..\include\libuv\src\fs-poll.c">
       <Filter>libuv</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\idna.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\inet.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\random.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\strscpy.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\strtok.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\thread-common.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\threadpool.c">
       <Filter>libuv</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\timer.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\uv-common.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\uv-data-getter-setters.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\version.c">
@@ -21,6 +42,9 @@
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\core.c">
+      <Filter>libuv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\libuv\src\win\detect-wakeup.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\dl.c">
@@ -59,13 +83,7 @@
     <ClCompile Include="..\..\include\libuv\src\win\process-stdio.c">
       <Filter>libuv</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\req.c">
-      <Filter>libuv</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\signal.c">
-      <Filter>libuv</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\snprintf.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\stream.c">
@@ -75,9 +93,6 @@
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\thread.c">
-      <Filter>libuv</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\libuv\src\win\timer.c">
       <Filter>libuv</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\libuv\src\win\tty.c">

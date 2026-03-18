@@ -222,7 +222,7 @@ elseif(DOWNLOAD_DEPENDENCIES)
     set_target_properties(vorbisfile PROPERTIES IMPORTED_LOCATION ${VORBIS_INSTALL_DIR}/lib/libvorbisfile.a)
 
     set(VORBIS_INCLUDE_DIR ${VORBIS_INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR} ${OGG_INCLUDE_DIR})
-    set(OGGVORBIS_LIBRARIES vorbis ogg vorbisfile)
+    set(OGGVORBIS_LIBRARIES vorbisfile vorbis ogg)
 
     add_dependencies(vorbisfile libvorbis)
     add_dependencies(vorbis libvorbis)

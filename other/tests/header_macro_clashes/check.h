@@ -73,6 +73,9 @@
 #ifdef INT_MIN
 #error "INT_MIN is defined"
 #endif
+#ifdef INT16_MAX
+#error "INT16_MAX is defined"
+#endif
 #ifdef BIG_ENDIAN
 #error "BIG_ENDIAN is defined"
 #endif
