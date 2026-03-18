@@ -2671,7 +2671,7 @@ static void jit_hl2c( jit_ctx *ctx ) {
 // setjump storage.
 //
 // Another more reliable way of handling this would be to use RtlAddFunctionTable
-// but this would require complex creation of unwind info
+// but some platform does not have it.
 static void jit_longjump( jit_ctx *ctx ) {
 	preg *buf = REG_AT(CALL_REGS[0]);
 	preg *ret = REG_AT(CALL_REGS[1]);
