@@ -23,6 +23,7 @@
 #define HLC_H
 
 #include <math.h>
+#define HL_DISABLE_LEGACY_FFI
 #include <hl.h>
 
 #ifdef HLC_BOOT
