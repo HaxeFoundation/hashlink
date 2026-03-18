@@ -73,6 +73,7 @@ typedef struct {
 
 static dx_driver *static_driver = NULL;
 static int CURRENT_NODEMASK = 0;
+static LARGE_INTEGER driver_version = {0};
 
 HL_PRIM void dx12_flush_messages();
 
@@ -158,6 +159,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *de
 		}
 		if( SUCCEEDED(D3D12CreateDevice(adapter,D3D_FEATURE_LEVEL_12_0,IID_PPV_ARGS(&drv->device))) ) {
 			drv->adapter = adapter;
+			adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driver_version);
 			break;
 		}
 		adapter->Release();
@@ -235,6 +237,15 @@ void register_frame_events() {
 	CHKERR(drv->device->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &drv->pipelineToken));
 }
 #endif
+
+HL_PRIM int64 HL_NAME(get_driver_version)() {
+	union {
+		LARGE_INTEGER i;
+		int64 i64;
+	} v;
+	v.i = driver_version;
+	return v.i64;
+}
 
 HL_PRIM void HL_NAME(suspend)() {
 #ifdef HL_XBS
@@ -396,6 +407,7 @@ DEFINE_PRIM(_VOID, wait, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
 DEFINE_PRIM(_I64, get_timestamp_frequency, _NO_ARG);
+DEFINE_PRIM(_I64, get_driver_version, _NO_ARG);
 
 /// --- utilities (from d3dx12.h)
 

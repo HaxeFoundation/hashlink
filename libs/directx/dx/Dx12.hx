@@ -1758,6 +1758,11 @@ class Dx12 {
 		return null;
 	}
 
+	@:hlNative("dx12", "get_driver_version")
+	public static function getDriverVersion() : Int64 {
+		return 0;
+	}
+
 	@:hlNative("dx12", "create")
 	static function dxCreate( win : hl.Abstract<"dx_window">, flags : DriverInitFlags, deviceName : hl.Bytes ) : DriverInstance {
 		return null;
