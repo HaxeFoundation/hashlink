@@ -1032,4 +1032,9 @@ HL_API hl_track_info hl_track;
 
 C_FUNCTION_END
 
+#ifndef HL_DISABLE_LEGACY_FFI
+#	undef C_FUNCTION_BEGIN
+#	undef C_FUNCTION_END
+#endif
+
 #endif
