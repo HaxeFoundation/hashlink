@@ -43,12 +43,14 @@
 #	endif
 #endif
 
-#if defined(_WIN32)
-#	define HL_EXPORT __declspec( dllexport )
-#elif defined(__GNUC__) || defined(__clang__)
-#	define HL_EXPORT __attribute__((visibility("default")))
-#else
-#	define HL_EXPORT
+#ifndef HL_EXPORT
+#	if defined(_WIN32)
+#		define HL_EXPORT __declspec( dllexport )
+#	elif defined(__GNUC__) || defined(__clang__)
+#		define HL_EXPORT __attribute__((visibility("default")))
+#	else
+#		define HL_EXPORT
+#	endif
 #endif
 
 #define HL_DEFINE_PRIM(t,name,args) HL_DEFINE_PRIM_WITH_NAME(t,name,args,name)

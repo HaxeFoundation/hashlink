@@ -165,16 +165,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if defined(HL_VCC) || defined(HL_MINGW)
-#	define EXPORT __declspec( dllexport )
-#	define IMPORT __declspec( dllimport )
-#else
-#if defined(HL_GCC) || defined(HL_CLANG)
-#	define EXPORT __attribute__((visibility("default")))
-#else
-#	define EXPORT
+#ifndef HL_EXPORT
+#	ifdef HL_WIN
+#		define HL_EXPORT __declspec( dllexport )
+#	elif defined(HL_GCC) || defined(HL_CLANG)
+#		define HL_EXPORT __attribute__((visibility("default")))
+#	else
+#		define HL_EXPORT
+#	endif
 #endif
-#	define IMPORT extern
+
+#ifdef HL_WIN
+#	define HL_IMPORT __declspec( dllimport )
+#else
+#	define HL_IMPORT extern
 #endif
 
 #ifdef HL_64
@@ -219,11 +223,11 @@ typedef unsigned long long uint64;
 #include <memory.h>
 
 #if defined(LIBHL_EXPORTS)
-#define HL_API extern EXPORT
+#define HL_API extern HL_EXPORT
 #elif defined(LIBHL_STATIC)
 #define HL_API extern
 #else
-#define	HL_API IMPORT
+#define	HL_API HL_IMPORT
 #endif
 
 #if defined(HL_VCC)
@@ -898,9 +902,9 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 
 #if (defined(HL_NAME) && !defined(LIBHL_STATIC)) || defined(LIBHL_EXPORTS)
 #	ifndef HL_PRIM
-#		define	HL_PRIM				HL_EXTERN_C EXPORT
+#		define	HL_PRIM				HL_EXTERN_C HL_EXPORT
 #	endif
-#   define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); }
+#   define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C HL_EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); }
 #else
 #	ifndef HL_PRIM
 #		define	HL_PRIM				HL_EXTERN_C
@@ -911,6 +915,9 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #ifndef HL_NAME
 #   define HL_NAME(p) p
 #endif
+
+#define EXPORT HL_EXPORT
+#define IMPORT HL_IMPORT
 
 #endif // HL_DISABLE_LEGACY_FFI
 
