@@ -680,7 +680,7 @@ static void hl_module_add( hl_module *m ) {
 
 int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
-	jit_ctx *ctx;
+	emit_ctx *ctx;
 	// expand globals
 	if( hot_reload ) {
 		int nsize = m->globals_size + HOT_RELOAD_EXTRA_GLOBALS * sizeof(void*);
@@ -706,20 +706,20 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	hl_module_init_natives(m);
 	hl_module_init_indexes(m);
 	// JIT
-	ctx = hl_jit_alloc();
+	ctx = hl_emit_alloc();
 	if( ctx == NULL )
 		return 0;
-	hl_jit_init(ctx, m);
+	hl_emit_init(ctx, m);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
-		int fpos = hl_jit_function(ctx, m, f);
+		int fpos = hl_emit_function(ctx, m, f);
 		if( fpos < 0 ) {
-			hl_jit_free(ctx, false);
+			hl_emit_free(ctx, false);
 			return 0;
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
 	}
-	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
+	m->jit_code = hl_emit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
@@ -736,10 +736,10 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 #	ifdef HL_VTUNE
 	hl_setup.vtune_init = modules_init_vtune;
 #	endif
-	hl_jit_free(ctx, hot_reload);
+	hl_emit_free(ctx, hot_reload);
 	if( hot_reload ) {
 		hl_code_hash_finalize(m->hash);
-		m->jit_ctx = ctx;
+		m->emit_ctx = ctx;
 	}
 	return 1;
 }
@@ -824,7 +824,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	int i,i1,i2;
 	bool has_changes = false;
 	int changes_count = 0;
-	jit_ctx *ctx = m1->jit_ctx;
+	emit_ctx *ctx = m1->emit_ctx;
 
 	hl_module *m2 = hl_module_alloc(c);
 	m2->hash = hl_code_hash_alloc(c);
@@ -849,7 +849,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 
 	hl_module_init_natives(m2);
 	hl_module_init_indexes(m2);
-	hl_jit_reset(ctx, m2);
+	hl_emit_reset(ctx, m2);
 	hl_code_hash_finalize(m2->hash);
 
 	for(i=0;i<m2->code->nconstants;i++) {
@@ -893,7 +893,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 				changes_count++;
 
 				m1->hash->functions_hashes[i1] = hash2; // update hash
-				int fpos = hl_jit_function(ctx, m2, f2);
+				int fpos = hl_emit_function(ctx, m2, f2);
 				if( fpos < 0 ) return false;
 				m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
 				has_changes = true;
@@ -902,7 +902,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		}
 		if( i1 == m1->code->nfunctions ) {
 			// not found (signature changed or new method) : inject new method!
-			int fpos = hl_jit_function(ctx, m2, f2);
+			int fpos = hl_emit_function(ctx, m2, f2);
 			if( fpos < 0 ) return false;
 			m2->hash->functions_hashes[i2] = -1;
 			m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
@@ -921,7 +921,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	if( !has_changes ) {
 		printf("[HotReload] No changes found\n");
 		fflush(stdout);
-		hl_jit_free(ctx, true);
+		hl_emit_free(ctx, true);
 		return false;
 	}
 
@@ -969,7 +969,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		}
 	}
 
-	m2->jit_code = hl_jit_code(ctx, m2, &m2->codesize, &m2->jit_debug, m1);
+	m2->jit_code = hl_emit_code(ctx, m2, &m2->codesize, &m2->jit_debug, m1);
 
 	// patch missing debug info
 	int start = -1;
@@ -984,7 +984,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		}
 	}
 
-	hl_jit_free(ctx,true);
+	hl_emit_free(ctx,true);
 
 	if( m2->jit_code == NULL ) {
 		printf("[HotReload] Couldn't JIT result\n");
@@ -1054,7 +1054,7 @@ void hl_module_free( hl_module *m ) {
 			free(m->jit_debug[i].offsets);
 		free(m->jit_debug);
 	}
-	if( m->jit_ctx )
-		hl_jit_free(m->jit_ctx,false);
+	if( m->emit_ctx )
+		hl_emit_free(m->emit_ctx,false);
 	free(m);
 }
