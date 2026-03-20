@@ -43,7 +43,7 @@ class Build {
 					case 'x86_32': ["EXTRA_CFLAGS=-m32", "EXTRA_LDFLAGS=-m32"];
 					case _: [];
 				};
-				Sys.command("make", ["-C", targetDir].concat(platformArgs));
+				Sys.command("make", ["-C", targetDir].concat(platformArgs).concat(config.defines.exists("debug") ? ["DEBUG=1"] : []));
 			case "hxcpp":
 				var platformArgs = switch config.defines.get("hlgen.build.architecture") {
 					case 'x86_32': ["HXCPP_M32"];
@@ -64,7 +64,8 @@ class Build {
 							case 'x86_32': 'x86';
 							case _: 'x64';
 						};
-						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", "-property:Configuration=Release", '-property:Platform=$platform'];
+						var configuration = config.defines.exists("debug") ? "Debug" : "Release";
+						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", '-property:Configuration=$configuration', '-property:Platform=$platform'];
 						log('"$msbuild"' + " " + msbuildArgs.join(" "));
 						Sys.setCwd(targetDir);
 						code = Sys.command(msbuild, msbuildArgs);
