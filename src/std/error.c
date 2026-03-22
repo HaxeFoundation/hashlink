@@ -52,10 +52,25 @@ HL_PRIM uchar *hl_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	return hl_setup.resolve_symbol(addr, out, outSize);
 }
 
+static void (*throw_jump)( jmp_buf, int ) = NULL;
+
+HL_PRIM void hl_setup_longjump( void *j ) {
+	throw_jump = j;
+}
+
+HL_PRIM void hl_setup_exception( void *resolve_symbol, void *capture_stack ) {
+	hl_setup.resolve_symbol = resolve_symbol;
+	hl_setup.capture_stack = capture_stack;
+}
+
 HL_PRIM void hl_set_error_handler( vclosure *d ) {
 	hl_thread_info *t = hl_get_thread();
 	t->trap_uncaught = t->trap_current;
 	t->exc_handler = d;
+}
+
+HL_PRIM void hl_set_debug_mode( bool b ) {
+	hl_setup.is_debugger_enabled = b;
 }
 
 static bool break_on_trap( hl_thread_info *t, hl_trap_ctx *trap, vdynamic *v ) {

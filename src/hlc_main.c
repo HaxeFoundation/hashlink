@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
 	hl_setup.get_wrapper = hlc_get_wrapper;
 	hl_setup.sys_args = (pchar**)(argv + 1);
 	hl_setup.sys_nargs = argc - 1;
-	hl_sys_init();
+	hl_sys_init(NULL, 0, NULL);
 	tf.ret = &hlt_void;
 	clt.kind = HFUN;
 	clt.fun = &tf;

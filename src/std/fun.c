@@ -113,6 +113,20 @@ HL_PRIM bool hl_fun_compare( vdynamic *a, vdynamic *b ) {
 
 // ------------ DYNAMIC CALLS
 
+typedef void *(*fptr_static_call)(void *fun, hl_type *t, void **args, vdynamic *out);
+typedef void *(*fptr_get_wrapper)(hl_type *t);
+
+HL_PRIM void hl_setup_callbacks2( void *c, void *w, int flags ) {
+	hl_setup.static_call = (fptr_static_call)c;
+	hl_setup.get_wrapper = (fptr_get_wrapper)w;
+	hl_setup.static_call_ref = flags & 1;
+}
+
+HL_PRIM void hl_setup_callbacks( void *c, void *w ) {
+	hl_setup.static_call = (fptr_static_call)c;
+	hl_setup.get_wrapper = (fptr_get_wrapper)w;
+}
+
 #define HL_MAX_ARGS 9
 
 HL_PRIM vdynamic* hl_call_method( vdynamic *c, varray *args ) {

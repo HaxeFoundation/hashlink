@@ -272,7 +272,7 @@ int main(int argc, pchar *argv[]) {
 	hl_setup.file_path = file;
 	hl_setup.sys_args = (pchar**)argv;
 	hl_setup.sys_nargs = argc;
-	hl_sys_init();
+	hl_sys_init(NULL, 0, NULL);
 	hl_register_thread(&ctx);
 	main_ctx = &ctx;
 	ctx.file = file;
