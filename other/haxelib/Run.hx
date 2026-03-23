@@ -1,3 +1,10 @@
+typedef Config = {
+	var version:Int;
+	var libs:Array<String>;
+	var defines:haxe.DynamicAccess<String>;
+	var files:Array<String>;
+};
+
 class Build {
 
 	var output : String;
@@ -5,12 +12,7 @@ class Build {
 	var sourcesDir : String;
 	var targetDir : String;
 	var dataPath : String;
-	var config : {
-		var version : Int;
-		var libs : Array<String>;
-		var defines : haxe.DynamicAccess<String>;
-		var files : Array<String>;
-	};
+	var config : Config;
 
 	public function new(dataPath,output,config) {
 		this.output = output;
@@ -227,6 +229,26 @@ class Build {
 }
 
 class Run {
+	static function applyCliDefines(config:Config, args:Array<String>) {
+		while (args.length > 0) {
+			switch args.shift() {
+				case '-D' | '--define':
+					var pair = args.shift();
+					var equalsPosition = pair.indexOf("=");
+					if (equalsPosition == -1) {
+						config.defines.set(pair, "1");
+					} else {
+						var name = pair.substr(0, equalsPosition);
+						var value = pair.substr(equalsPosition + 1);
+						config.defines.set(name, value);
+					}
+				case unknown:
+					Sys.stderr().writeString('Warning: Unrecognised argument $unknown\n');
+					Sys.stderr().flush();
+			}
+		}
+	}
+
 	static function main() {
 		var args = Sys.args();
 		var originalPath = args.pop();
@@ -239,7 +261,8 @@ class Run {
 			var path = new haxe.io.Path(output);
 			path.file = "hlc";
 			path.ext = "json";
-			var config = haxe.Json.parse(sys.io.File.getContent(path.toString()));
+			var config:Config = haxe.Json.parse(sys.io.File.getContent(path.toString()));
+			applyCliDefines(config, args);
 			final build = new Build(haxelibPath,output,config);
 			build.generate();
 			Sys.exit(build.compile());
