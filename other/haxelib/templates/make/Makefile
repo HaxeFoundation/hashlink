@@ -1,13 +1,19 @@
 # Auto-generated from hashlink's Makefile template; do not edit
 
 UNAME := $(shell uname)
-CFLAGS = -O3 -std=c11 $(EXTRA_CFLAGS)
+CFLAGS = -std=c11 $(EXTRA_CFLAGS)
 CPPFLAGS = -DHL_MAKE -I$$makePath(::relDir::)
 LDFLAGS = $(EXTRA_LDFLAGS)
 ifeq ($(UNAME),Darwin)
 LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: /usr/local/lib/::name::.hdll::end::
 else
 LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: -l:::name::.hdll::end::
+endif
+
+ifdef DEBUG
+CFLAGS += -g
+else
+CFLAGS += -O3
 endif
 
 ifdef HASHLINK
