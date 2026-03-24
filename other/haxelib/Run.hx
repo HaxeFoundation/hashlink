@@ -109,7 +109,10 @@ class Build {
 		if( tpl == null || tpl == "1" )
 			tpl = "vs2015";
 		var srcDir = tpl;
-		var jumboBuild = config.defines.get("hlgen.makefile.jumbo");
+		var jumboBuild = switch config.defines.get("hlgen.makefile.jumbo") {
+			case "1": "true";
+			case value: value;
+		};
 		var relDir = "";
 		if( config.defines["hlgen.makefilepath"] != null ) {
 			targetDir = config.defines.get("hlgen.makefilepath");
