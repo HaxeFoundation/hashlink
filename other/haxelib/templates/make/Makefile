@@ -4,11 +4,6 @@ UNAME := $(shell uname)
 CFLAGS = -std=c11 $(EXTRA_CFLAGS)
 CPPFLAGS = -DHL_MAKE -I$$makePath(::relDir::)
 LDFLAGS = $(EXTRA_LDFLAGS)
-ifeq ($(UNAME),Darwin)
-LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: /usr/local/lib/::name::.hdll::end::
-else
-LDLIBS=-lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: -l:::name::.hdll::end::
-endif
 
 ifdef DEBUG
 CFLAGS += -g
@@ -18,7 +13,17 @@ endif
 
 ifdef HASHLINK
 CPPFLAGS += -I$(HASHLINK)/include -I$(HASHLINK)/src
-LDFLAGS+=-L$(HASHLINK)/lib -L$(HASHLINK)
+LDFLAGS += -L$(HASHLINK)/lib -L$(HASHLINK)
+else
+HASHLINK = /usr/local
+endif
+
+ifeq ($(UNAME),Darwin)
+LDLIBS = -lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: $(HASHLINK)/lib/::name::.hdll::end::
+LDFLAGS += -rpath $(HASHLINK)/lib
+else
+LDLIBS = -lhl -lm::foreach libraries::::if (name == "uv"):: -luv::end:: -l:::name::.hdll::end::
+LDFLAGS += -Wl,-rpath $(HASHLINK)/lib
 endif
 
 ifeq ($(OS),Windows_NT)
