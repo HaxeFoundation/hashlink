@@ -2,7 +2,7 @@
 
 UNAME := $(shell uname)
 CFLAGS = -std=c11 $(EXTRA_CFLAGS)
-CPPFLAGS = -DHL_MAKE -I$$makePath(::relDir::)
+CPPFLAGS = ::if (jumboBuild != "true")::-DHL_MAKE ::end::-I$$makePath(::relDir::)
 LDFLAGS = $(EXTRA_LDFLAGS)
 
 ifdef DEBUG
@@ -31,7 +31,10 @@ LDFLAGS+=-municode
 LDLIBS+=-ldbghelp
 EXE_SUFFIX=.exe
 endif
-
+::if (jumboBuild == "true")::
+::name::$(EXE_SUFFIX): ::name::.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+::else::
 SRC_FILES=::foreach cfiles:: \
 	::path::::end::
 
@@ -40,14 +43,14 @@ OBJ_FILES=$(patsubst %.c,%.o,$(SRC_FILES))
 DEP_FILES=$(patsubst %.c,%.d,$(SRC_FILES))
 
 ::name::$(EXE_SUFFIX): $(OBJ_FILES)
-	$(CC) $(OBJ_FILES) -o $@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 -include $(DEP_FILES)
 
 %.o:
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c ::relDir::$*.c -o $@
-
+::end::
 clean:
 	find . \( -name '*.o' -o -name '*.d' \) -delete
 	rm ::name::$(EXE_SUFFIX)
