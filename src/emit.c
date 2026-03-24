@@ -371,7 +371,12 @@ static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 }
 
 static void store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
-	if( count < 0 || count > 64 ) emit_assert();
+	if( count < 0 ) emit_assert();
+	if( e->op == PHI ) {
+		if( count > 0x200 ) emit_error("Too many branches");
+	} else {
+		if( count > 64 ) emit_error("Too many arguments");
+	}
 	e->nargs = (unsigned char)count;
 	if( count == 0 ) return;
 	if( count == 1 ) {
@@ -562,6 +567,7 @@ static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
 		if( ref.index >= 0 )
 			return LOAD_MEM(ref,0,r->t);
 		einstr *p = emit_instr(ctx, PHI);
+		p->mode = hl_type_mode(r->t);
 		int_alloc_reset(&ctx->phi_gather);
 		emit_gather_phi_rec(ctx, ctx->current_block, r);
 		if( ctx->phi_gather.cur == 1 && ctx->phi_gather.data[0] != -1 ) {
@@ -1471,7 +1477,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case OArraySize:
-		STORE(dst, LOAD_MEM_PTR(LOAD(ra),HL_WSIZE*2));
+		STORE(dst, LOAD_MEM(LOAD(ra),HL_WSIZE*2,&hlt_i32));
 		break;
 	case ORef:
 		{
@@ -2018,7 +2024,7 @@ void hl_emit_dump( emit_ctx *ctx ) {
 		default:
 			break;
 		}
-		if( e->mode )
+		if( e->mode && e->op != PHI )
 			printf("%s", emit_mode_str(e->mode));
 		switch( e->op ) {
 		case CALL_FUN:
@@ -2045,6 +2051,17 @@ void hl_emit_dump( emit_ctx *ctx ) {
 			break;
 		case PHI:
 			hl_dump_args(ctx,e);
+			{
+				int i;
+				ereg *args = hl_emit_get_args(ctx, e);
+				for(i=0;i<e->nargs;i++) {
+					einstr *a = ctx->instrs + args[i].index;
+					if( a->mode != e->mode ) {
+						printf(" ???");
+						break;
+					}
+				}
+			}
 			break;
 		case JUMP:
 		case JCOND:
