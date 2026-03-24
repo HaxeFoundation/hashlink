@@ -42,8 +42,12 @@ OBJ_FILES=$(patsubst %.c,%.o,$(SRC_FILES))
 
 DEP_FILES=$(patsubst %.c,%.d,$(SRC_FILES))
 
+RSP_FILE = objects.txt
+$(shell rm -f $(RSP_FILE))
+$(foreach o,$(OBJ_FILES),$(eval $(shell printf '%s\n' '$(o)' >> $(RSP_FILE))))
+
 ::name::$(EXE_SUFFIX): $(OBJ_FILES)
-	$(CC) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(CC) @$(RSP_FILE) -o $@ $(LDFLAGS) $(LDLIBS)
 
 -include $(DEP_FILES)
 
@@ -53,6 +57,6 @@ DEP_FILES=$(patsubst %.c,%.d,$(SRC_FILES))
 ::end::
 clean:
 	find . \( -name '*.o' -o -name '*.d' \) -delete
-	rm ::name::$(EXE_SUFFIX)
+	rm -f ::name::$(EXE_SUFFIX) objects.txt
 
 .SUFFIXES:
