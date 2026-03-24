@@ -45,7 +45,7 @@ class Build {
 					case 'x86_32': ["EXTRA_CFLAGS=-m32", "EXTRA_LDFLAGS=-m32"];
 					case _: [];
 				};
-				Sys.command("make", ["-C", targetDir].concat(platformArgs).concat(config.defines.exists("debug") ? ["DEBUG=1"] : []));
+				Sys.command("make", ["-j", "-C", targetDir].concat(platformArgs).concat(config.defines.exists("debug") ? ["DEBUG=1"] : []));
 			case "hxcpp":
 				var platformArgs = switch config.defines.get("hlgen.build.architecture") {
 					case 'x86_32': ["HXCPP_M32"];
