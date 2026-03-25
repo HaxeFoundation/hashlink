@@ -141,6 +141,7 @@ struct _emit_block {
 	int id;
 	int start_pos;
 	int wait_nexts;
+	int mark;
 	linked_inf *preds;
 	linked_inf *written_vars;
 	linked_inf *incomplete_phis;
@@ -161,6 +162,7 @@ struct _emit_ctx {
 	int max_regs;
 	int emit_pos;
 	int op_pos;
+	int uid;
 
 	ereg tmp_args[MAX_TMP_ARGS];
 	ereg traps[MAX_TRAPS];
@@ -373,7 +375,7 @@ static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 static void store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
 	if( count < 0 ) emit_assert();
 	if( e->op == PHI ) {
-		if( count > 0x200 ) emit_error("Too many branches");
+		if( count > 256 ) emit_error("Too many branches");
 	} else {
 		if( count > 64 ) emit_error("Too many arguments");
 	}
@@ -540,22 +542,24 @@ static void emit_test( emit_ctx *ctx, ereg v, hl_op o ) {
 	emit_gen_ext(ctx, TEST, v, ENULL, ctx->instrs[v.index].mode, o);
 }
 
-static void emit_gather_phi_rec( emit_ctx *ctx, emit_block *b, vreg *r ) {
+static void emit_gather_phi_rec( emit_ctx *ctx, emit_block *b, vreg *r, int uid ) {
 	if( b->wait_nexts > 0 ) {
 		if( ctx->instrs[ctx->emit_pos-1].op != PHI ) emit_assert();
 		int_alloc_store_unique(&ctx->phi_gather, -1);
 		b->incomplete_phis = link_add_sort_unique(ctx, ctx->emit_pos - 1, r, b->incomplete_phis);
 		return;
 	}
+	if( b->mark == uid )
+		return;
+	b->mark = uid;
 	int eid = (int)(int_val)link_sort_lookup(b->written_vars, r->id) - 1;
 	if( eid >= 0 ) {
 		if( eid != ctx->emit_pos - 1 )
 			int_alloc_store_unique(&ctx->phi_gather, eid);
 	} else {
-		b->written_vars = link_add_sort_unique(ctx, r->id, (void*)(int_val)ctx->emit_pos, b->written_vars);
 		linked_inf *l = b->preds;
 		while( l ) {
-			emit_gather_phi_rec(ctx, (emit_block*)l->ptr, r);
+			emit_gather_phi_rec(ctx, (emit_block*)l->ptr, r, uid);
 			l = l->next;
 		}
 	}
@@ -569,7 +573,7 @@ static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
 		einstr *p = emit_instr(ctx, PHI);
 		p->mode = hl_type_mode(r->t);
 		int_alloc_reset(&ctx->phi_gather);
-		emit_gather_phi_rec(ctx, ctx->current_block, r);
+		emit_gather_phi_rec(ctx, ctx->current_block, r, ++ctx->uid);
 		if( ctx->phi_gather.cur == 1 && ctx->phi_gather.data[0] != -1 ) {
 #			ifdef BLOCK_DEBUG
 			printf("  SKIP-PHI @%X\n",ctx->emit_pos-1);
@@ -749,7 +753,7 @@ int hl_emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
 	ctx->current_block = alloc_block(ctx);
 	ctx->arrival_points = NULL;
 #	ifdef BLOCK_DEBUG
-	printf("---- begin ----\n");
+	printf("---- begin [%X] ----\n",f->findex);
 #	endif
 	if( f->nregs > ctx->max_regs ) {
 		free(ctx->vregs);
@@ -851,9 +855,10 @@ static bool seal_block_rec( emit_ctx *ctx, emit_block *b, int target ) {
 				int prev_emit = ctx->emit_pos;
 				ctx->emit_pos = l->id + 1;
 				int_alloc_reset(&ctx->phi_gather);
-				emit_gather_phi_rec(ctx, b, r);
+				emit_gather_phi_rec(ctx, b, r, ++ctx->uid);
 				ctx->emit_pos = prev_emit;
 				store_args(ctx, e, (ereg*)ctx->phi_gather.data, ctx->phi_gather.cur);
+				b->written_vars = link_add_sort_unique(ctx,r->id,(void*)(int_val)(l->id + 1), b->written_vars);
 				l = l->next;
 			}
 			b->incomplete_phis = NULL;
