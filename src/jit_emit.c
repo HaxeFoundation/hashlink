@@ -20,82 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <hlmodule.h>
-
-typedef enum {
-	LOAD_ADDR,
-	LOAD_IMM,
-	LOAD_ARG,
-	STORE,
-	LEA,
-	TEST,
-	CMP,
-	JCOND,
-	JUMP,
-	JUMP_TABLE,
-	BINOP,
-	UNOP,
-	CONV,
-	CONV_UNSIGNED,
-	RET,
-	CALL_PTR,
-	CALL_REG,
-	CALL_FUN,
-	PHI,
-	ALLOC_STACK,
-	FREE_STACK,
-	NATIVE_REG,
-	PREFETCH,
-	DEBUG_BREAK,
-} emit_op;
-
-static const char *op_names[] = {
-	"load-addr",
-	"load-imm",
-	"load-arg",
-	"store",
-	"lea",
-	"test",
-	"cmp",
-	"jcond",
-	"jump",
-	"jump-table",
-	"binop",
-	"unop",
-	"conv",
-	"conv-unsigned",
-	"ret",
-	"call",
-	"call",
-	"call",
-	"phi",
-	"alloc-stack",
-	"free-stack",
-	"native-reg",
-	"prefetch",
-	"debug-break",
-};
-
-typedef enum {
-	REG_RBP,
-} native_reg;
-
-typedef enum {
-	M_NONE,
-	M_UI8,
-	M_UI16,
-	M_I32,
-	M_I64,
-	M_F32,
-	M_F64,
-	M_PTR,
-	M_VOID,
-	M_NORET,
-} emit_mode;
-
-
-typedef struct {
-	int index;
-} ereg;
+#include <jit.h>
 
 typedef struct {
 	hl_type *t;
@@ -103,26 +28,6 @@ typedef struct {
 	ereg current;
 	bool written;
 } vreg;
-
-typedef struct {
-	union {
-		struct {
-			unsigned char op;
-			unsigned char mode;
-			unsigned char nargs;
-			unsigned char _unused;
-		};
-		int header;
-	};
-	int size_offs;
-	union {
-		struct {
-			ereg a;
-			ereg b;
-		};
-		uint64 value;
-	};
-} einstr;
 
 #define MAX_TMP_ARGS	32
 #define MAX_TRAPS		32
@@ -147,15 +52,11 @@ struct _emit_block {
 	linked_inf *incomplete_phis;
 };
 
-typedef struct {
-	int *data;
-	int max;
-	int cur;
-} int_alloc;
-
 struct _emit_ctx {
 	hl_module *mod;
 	hl_function *fun;
+	jit_ctx *jit;
+
 	einstr *instrs;
 	vreg *vregs;
 	int max_instrs;
@@ -180,16 +81,12 @@ struct _emit_ctx {
 	int_alloc block_writes;
 	int_alloc phi_gather;
 	
-	hl_alloc falloc;
 	emit_block *current_block;
 	linked_inf *arrival_points;
 	void *closure_list; // TODO : patch with good addresses
 }; 
 
 #define R(i)	(ctx->vregs + (i))
-
-#define emit_error(msg)	_emit_error(msg,__LINE__)
-#define emit_assert()	emit_error("")
 
 #define LOAD(r) emit_load_reg(ctx, r)
 #define STORE(r, v) emit_store_reg(ctx, r, v)
@@ -210,63 +107,9 @@ struct _emit_ctx {
 static hl_type hlt_ui8 = { HUI8, 0 };
 static hl_type hlt_ui16 = { HUI16, 0 };
 static ereg ENULL = {-1};
-static emit_ctx *current_ctx = NULL;
-
-//#define BLOCK_DEBUG
-
-static void _emit_error( const char *msg, int line ) {
-	printf("*** EMIT ERROR line %d (%s) ****\n", line, msg);
-	if( current_ctx ) hl_emit_dump(current_ctx);
-	hl_debug_break();
-	fflush(stdout);
-	exit(-1);
-}
-
-static void hl_stub_null_field_access() { emit_assert(); }
-static void hl_stub_null_access() { emit_assert(); }
-static void hl_stub_assert() { emit_assert(); }
-
-static void int_alloc_reset( int_alloc *a ) {
-	a->cur = 0;
-}
-
-static void int_alloc_free( int_alloc *a ) {
-	free(a->data);
-	a->cur = 0;
-	a->max = 0;
-	a->data = NULL;
-}
-
-static int *int_alloc_get( int_alloc *a, int count ) {
-	while( a->cur + count > a->max ) {
-		int next_size = a->max ? a->max << 1 : 128; 
-		int *new_data = (int*)malloc(sizeof(int) * next_size);
-		if( new_data == NULL ) emit_error("Out of memory");
-		memcpy(new_data, a->data, sizeof(int) * a->cur);
-		free(a->data);
-		a->data = new_data;
-		a->max = next_size;
-	}
-	int *ptr = a->data + a->cur;
-	a->cur += count;
-	return ptr;
-}
-
-static void int_alloc_store( int_alloc *a, int v ) {
-	*int_alloc_get(a,1) = v;
-}
-
-static void int_alloc_store_unique( int_alloc *a, int v ) {
-	int i = 0;
-	while( i < a->cur ) {
-		if( a->data[i] == v ) return;
-		i++;
-	}
-	*int_alloc_get(a,1) = v;
-}
 
 static linked_inf *link_add( emit_ctx *ctx, int id, void *ptr, linked_inf *head ) {
-	linked_inf *l = hl_malloc(&ctx->falloc,sizeof(linked_inf));
+	linked_inf *l = hl_malloc(&ctx->jit->falloc,sizeof(linked_inf));
 	l->id = id;
 	l->ptr = ptr;
 	l->next = head;
@@ -287,7 +130,7 @@ static linked_inf *link_add_sort_unique( emit_ctx *ctx, int id, void *ptr, linke
 		cur = cur->next;
 	}
 	// insert
-	linked_inf *l = hl_malloc(&ctx->falloc,sizeof(linked_inf));
+	linked_inf *l = hl_malloc(&ctx->jit->falloc,sizeof(linked_inf));
 	l->id = id;
 	l->ptr = ptr;
 	if( !prev ) {
@@ -325,7 +168,7 @@ static void mark_no_return( emit_ctx *ctx ) {
 }
 
 void hl_jit_patch_method( void*fun, void**newt ) {
-	emit_assert();
+	jit_assert();
 }
 
 static ereg __current_reg( emit_ctx *ctx ) {
@@ -334,7 +177,7 @@ static ereg __current_reg( emit_ctx *ctx ) {
 }
 
 static ereg *get_tmp_args( emit_ctx *ctx, int count ) {
-	if( count > MAX_TMP_ARGS ) emit_error("Too many arguments");
+	if( count > MAX_TMP_ARGS ) jit_error("Too many arguments");
 	return ctx->tmp_args;
 }
 
@@ -351,7 +194,7 @@ static einstr *emit_instr( emit_ctx *ctx, emit_op op ) {
 		int pos = ctx->emit_pos;
 		int next_size = ctx->max_instrs ? (ctx->max_instrs << 1) : 256;
 		einstr *instrs = (einstr*)malloc(sizeof(einstr) * next_size);
-		if( instrs == NULL ) emit_error("Out of memory");
+		if( instrs == NULL ) jit_error("Out of memory");
 		memcpy(instrs, ctx->instrs, pos * sizeof(einstr));
 		memset(instrs + pos, 0, (next_size - pos) * sizeof(einstr));
 		free(ctx->instrs);
@@ -373,11 +216,11 @@ static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 }
 
 static void store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
-	if( count < 0 ) emit_assert();
+	if( count < 0 ) jit_assert();
 	if( e->op == PHI ) {
-		if( count > 256 ) emit_error("Too many branches");
+		if( count > 256 ) jit_error("Too many branches");
 	} else {
-		if( count > 64 ) emit_error("Too many arguments");
+		if( count > 64 ) jit_error("Too many arguments");
 	}
 	e->nargs = (unsigned char)count;
 	if( count == 0 ) return;
@@ -406,7 +249,7 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e ) {
 
 static ereg emit_gen_ext( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode, int size_offs ) {
 	einstr *e = emit_instr(ctx, op);
-	if( (unsigned char)mode != mode ) emit_assert();
+	if( (unsigned char)mode != mode ) jit_assert();
 	e->mode = (unsigned char)mode;
 	e->size_offs = size_offs;
 	e->a = a;
@@ -424,7 +267,7 @@ static ereg emit_gen_size( emit_ctx *ctx, emit_op op, int size_offs ) {
 
 static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
 	unsigned char mode = ctx->instrs[v1.index].mode;
-	if( mode != ctx->instrs[v2.index].mode ) emit_assert();
+	if( mode != ctx->instrs[v2.index].mode ) jit_assert();
 	einstr *e = emit_instr(ctx, PHI);
 	e->mode = mode;
 	ereg args[2];
@@ -445,14 +288,12 @@ static void patch_jump( emit_ctx *ctx, int jpos ) {
 }
 
 static emit_block *alloc_block( emit_ctx *ctx ) {
-	return hl_zalloc(&ctx->falloc, sizeof(emit_block));
+	return hl_zalloc(&ctx->jit->falloc, sizeof(emit_block));
 }
 
 static void block_add_prec( emit_ctx *ctx, emit_block *b, emit_block *p ) {
 	b->preds = link_add(ctx,0,p,b->preds);
-#	ifdef BLOCK_DEBUG
-	printf("  PRED %d\n",p->id);
-#	endif
+	jit_debug("  PRED %d\n",p->id);
 }
 
 static void split_block( emit_ctx *ctx ) {
@@ -462,9 +303,7 @@ static void split_block( emit_ctx *ctx ) {
 	while( i < ctx->block_writes.cur ) {
 		vreg *r = R(ctx->block_writes.data[i++]);
 		cur->written_vars = link_add_sort_unique(ctx,r->id,(void*)(int_val)(r->current.index+1),cur->written_vars);
-#		ifdef BLOCK_DEBUG
-		printf("  WRITES R%d @%X\n", r->id, r->current.index);
-#		endif
+		jit_debug("  WRITES R%d @%X\n", r->id, r->current.index);
 		r->current.index = -1;
 		r->written = false;
 	}
@@ -473,9 +312,7 @@ static void split_block( emit_ctx *ctx ) {
 	emit_block *b = alloc_block(ctx);
 	b->id = ctx->current_block->id + 1;
 	b->start_pos = ctx->emit_pos;
-#	ifdef BLOCK_DEBUG
-	printf("BLOCK #%d@%X\n",b->id,ctx->op_pos);
-#	endif
+	jit_debug("BLOCK #%d@%X\n",b->id,ctx->op_pos);
 	einstr *eprev = &ctx->instrs[ctx->emit_pos-1];
 	if( (eprev->op != JUMP && eprev->op != RET) || ctx->fun->ops[ctx->op_pos].op == OTrap )
 		block_add_prec(ctx, b, ctx->current_block);
@@ -514,7 +351,7 @@ static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t ) 
 
 static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 	if( to->t->kind == HVOID ) return;
-	if( v.index < 0 ) emit_assert();
+	if( v.index < 0 ) jit_assert();
 	if( !to->written ) {
 		to->written = true;
 		int_alloc_store(&ctx->block_writes,to->id);
@@ -544,7 +381,7 @@ static void emit_test( emit_ctx *ctx, ereg v, hl_op o ) {
 
 static void emit_gather_phi_rec( emit_ctx *ctx, emit_block *b, vreg *r, int uid ) {
 	if( b->wait_nexts > 0 ) {
-		if( ctx->instrs[ctx->emit_pos-1].op != PHI ) emit_assert();
+		if( ctx->instrs[ctx->emit_pos-1].op != PHI ) jit_assert();
 		int_alloc_store_unique(&ctx->phi_gather, -1);
 		b->incomplete_phis = link_add_sort_unique(ctx, ctx->emit_pos - 1, r, b->incomplete_phis);
 		return;
@@ -575,14 +412,12 @@ static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
 		int_alloc_reset(&ctx->phi_gather);
 		emit_gather_phi_rec(ctx, ctx->current_block, r, ++ctx->uid);
 		if( ctx->phi_gather.cur == 1 && ctx->phi_gather.data[0] != -1 ) {
-#			ifdef BLOCK_DEBUG
-			printf("  SKIP-PHI @%X\n",ctx->emit_pos-1);
-#			endif
+			jit_debug("  SKIP-PHI @%X\n",ctx->emit_pos-1);
 			// remove phi
 			ctx->emit_pos--;
 			r->current.index = ctx->phi_gather.data[0];
 		} else {
-			if( ctx->phi_gather.cur == 0 ) emit_assert();
+			if( ctx->phi_gather.cur == 0 ) jit_assert();
 			store_args(ctx, p, (ereg*)ctx->phi_gather.data, ctx->phi_gather.cur);
 			r->current = CUR_REG();
 		}
@@ -727,7 +562,8 @@ static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
 
 static void emit_opcode( emit_ctx *ctx, hl_opcode *o );
 
-static void hl_emit_flush( emit_ctx *ctx ) {
+void hl_emit_flush( jit_ctx *jit ) {
+	emit_ctx *ctx = jit->emit;
 	int i = 0;
 	while( i < ctx->jump_regs.cur ) {
 		int pos = ctx->jump_regs.data[i++];
@@ -736,11 +572,16 @@ static void hl_emit_flush( emit_ctx *ctx ) {
 		e->size_offs = ctx->pos_map[target] - (pos + 1);
 	}
 	ctx->pos_map[ctx->fun->nops] = -1;
+	jit->instrs = ctx->instrs;
+	jit->instr_count = ctx->emit_pos;
+	jit->emit_pos_map = ctx->pos_map;
 }
 
-int hl_emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
+void hl_emit_function( jit_ctx *jit ) {
+	emit_ctx *ctx = jit->emit;
+	hl_function *f = jit->fun;
 	int i;
-	ctx->mod = m;
+	ctx->mod = jit->mod;
 	ctx->fun = f;
 	ctx->emit_pos = 0;
 	ctx->trap_count = 0;
@@ -748,18 +589,13 @@ int hl_emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
 	int_alloc_reset(&ctx->args_data);
 	int_alloc_reset(&ctx->jump_regs);
 	int_alloc_reset(&ctx->block_writes);
-	current_ctx = ctx;
-	hl_free(&ctx->falloc);
 	ctx->current_block = alloc_block(ctx);
 	ctx->arrival_points = NULL;
-#	ifdef BLOCK_DEBUG
-	printf("---- begin [%X] ----\n",f->findex);
-#	endif
+	jit_debug("---- begin [%X] ----\n",f->findex);
 	if( f->nregs > ctx->max_regs ) {
 		free(ctx->vregs);
 		ctx->vregs = (vreg*)malloc(sizeof(vreg) * (f->nregs + 1));
-		if( ctx->vregs == NULL )
-			return false;
+		if( ctx->vregs == NULL ) jit_assert();
 		for(i=0;i<f->nregs;i++)
 			R(i)->id = i;
 		ctx->max_regs = f->nregs;
@@ -781,7 +617,7 @@ int hl_emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
 		if( o->op == ORef ) {
 			ereg ref = resolve_ref(ctx, o->p2);
 			if( ref.index >= 0 ) continue;
-			if( ctx->ref_count == MAX_REFS ) emit_error("Too many refs");
+			if( ctx->ref_count == MAX_REFS ) jit_error("Too many refs");
 			ctx->refs[ctx->ref_count].r = emit_gen_size(ctx, ALLOC_STACK, hl_type_size(R(o->p2)->t));
 			ctx->refs[ctx->ref_count].reg = o->p2;
 			ctx->ref_count++;
@@ -791,8 +627,7 @@ int hl_emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
 	if( f->nops >= ctx->pos_map_size ) {
 		free(ctx->pos_map);
 		ctx->pos_map = (int*)malloc(sizeof(int) * (f->nops+1));
-		if( ctx->pos_map == NULL )
-			return false;
+		if( ctx->vregs == NULL ) jit_assert();
 		ctx->pos_map_size = f->nops;
 	}
 
@@ -804,22 +639,20 @@ int hl_emit_function( emit_ctx *ctx, hl_module *m, hl_function *f ) {
 		emit_opcode(ctx,f->ops + op_pos);
 	}
 
-	hl_emit_flush(ctx);
-	current_ctx = NULL;
-	return true;
+	hl_emit_flush(ctx->jit);
 }
 
-emit_ctx *hl_emit_alloc() {
+void hl_emit_alloc( jit_ctx *jit ) {
 	emit_ctx *ctx = (emit_ctx*)malloc(sizeof(emit_ctx));
-	if( ctx == NULL ) return NULL;
+	if( ctx == NULL ) jit_assert();
 	memset(ctx,0,sizeof(emit_ctx));
-	if( sizeof(einstr) != 16 ) emit_assert();
-	hl_alloc_init(&ctx->falloc);
-	return ctx;
+	ctx->jit = jit;
+	jit->emit = ctx;
+	if( sizeof(einstr) != 16 ) jit_assert();
 }
 
-void hl_emit_free( emit_ctx *ctx, h_bool can_reset ) {
-	hl_free(&ctx->falloc);
+void hl_emit_free( jit_ctx *jit ) {
+	emit_ctx *ctx = jit->emit;
 	free(ctx->vregs);
 	free(ctx->instrs);
 	free(ctx->pos_map);
@@ -827,12 +660,7 @@ void hl_emit_free( emit_ctx *ctx, h_bool can_reset ) {
 	int_alloc_free(&ctx->args_data);
 	int_alloc_free(&ctx->block_writes);
 	free(ctx);
-}
-
-void hl_emit_init( emit_ctx *ctx, hl_module *m ) {
-}
-
-void hl_emit_reset( emit_ctx *ctx, hl_module *m ) {
+	jit->emit = NULL;
 }
 
 static bool seal_block_rec( emit_ctx *ctx, emit_block *b, int target ) {
@@ -843,15 +671,13 @@ static bool seal_block_rec( emit_ctx *ctx, emit_block *b, int target ) {
 		b->preds = link_add(ctx,0,ctx->current_block,b->preds);
 		split_block(ctx);
 		if( b->wait_nexts == 0 ) {
-#			ifdef BLOCK_DEBUG
-			printf("  SEAL #%d\n",b->id);
-#			endif
+			jit_debug("  SEAL #%d\n",b->id);
 			// seal block
 			linked_inf *l = b->incomplete_phis;
 			while( l ) {
 				einstr *e = ctx->instrs + l->id;
 				vreg *r = (vreg*)l->ptr;
-				if( e->op != PHI ) emit_assert();
+				if( e->op != PHI ) jit_assert();
 				int prev_emit = ctx->emit_pos;
 				ctx->emit_pos = l->id + 1;
 				int_alloc_reset(&ctx->phi_gather);
@@ -881,7 +707,7 @@ static void register_block_jump( emit_ctx *ctx, int offs, bool cond ) {
 	if( offs < 0 ) {
 		int target = ctx->pos_map[ctx->op_pos + 1 + offs];
 		emit_block *b = ctx->current_block;
-		if( !seal_block_rec(ctx, b, target) ) emit_assert();
+		if( !seal_block_rec(ctx, b, target) ) jit_assert();
 	}
 }
 
@@ -1045,7 +871,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case ODecr:
 		{
 			if( IS_FLOAT(dst->t) ) {
-				emit_assert();
+				jit_assert();
 			} else {
 				STORE(dst, emit_gen_ext(ctx,UNOP,LOAD(dst),ENULL,hl_type_mode(dst->t),o->op));
 			}
@@ -1069,7 +895,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				allocFun = hl_alloc_virtual;
 				break;
 			default:
-				emit_assert();
+				jit_assert();
 			}
 			if( nargs ) arg = LOAD_CONST_PTR(dst->t);
 			STORE(dst, emit_native_call(ctx,allocFun,&arg,nargs,dst->t));
@@ -1114,7 +940,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			ereg st = emit_gen_size(ctx, ALLOC_STACK, o->p3);
 			for(i=0;i<o->p3;i++) {
 				vreg *r = R(o->extra[i]);
-				if( !hl_is_dynamic(r->t) ) emit_assert();
+				if( !hl_is_dynamic(r->t) ) jit_assert();
 				STORE_MEM(st,i*HL_WSIZE,LOAD(r));
 			}
 			ereg args[3];
@@ -1189,7 +1015,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				}
 				break;
 			default:
-				emit_assert();
+				jit_assert();
 				break;
 			}
 		}
@@ -1240,7 +1066,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				}
 				break;
 			default:
-				emit_assert();
+				jit_assert();
 				break;
 			}
 		}
@@ -1350,7 +1176,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				}
 				break;
 			default:
-				emit_assert();
+				jit_assert();
 				break;
 			}
 		}
@@ -1398,9 +1224,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					break;
 				}
 				if( offs < 0 && i + 1 + offs == ctx->op_pos ) {
-#					ifdef BLOCK_DEBUG
-					printf("  WAIT @%X\n",i);
-#					endif
+					jit_debug("  WAIT @%X\n",i);
 					ctx->current_block->wait_nexts++;
 				}
 			}
@@ -1487,7 +1311,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case ORef:
 		{
 			ereg ref = resolve_ref(ctx, ra->id);
-			if( ref.index < 0 ) emit_assert();
+			if( ref.index < 0 ) jit_assert();
 			if( ra->current.index >= 0 ) STORE_MEM(ref, 0, LOAD(ra));
 			ra->current.index = -1; // ref will be modified
 			STORE(dst, ref);
@@ -1505,7 +1329,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			STORE(dst, OFFSET(LOAD(ra),ENULL,0,sizeof(varray)));
 			break;
 		default:
-			emit_assert();
+			jit_assert();
 		}
 		break;
 	case ORefOffset:
@@ -1576,7 +1400,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					f = hl_obj_field_fetch(dst->t, fid);
 				else if( dst->t->kind == HVIRTUAL )
 					f = dst->t->virt->fields + fid;
-				if( f == NULL ) emit_assert();
+				if( f == NULL ) jit_assert();
 				null_field_access = true;
 				hashed_name = f->hashed_name;
 			} else if( (next->op >= OCall1 && next->op <= OCallN) && next->p3 == o->p1 ) {
@@ -1588,7 +1412,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			}
 			// -----------------------------------------
 			ereg arg = null_field_access ? LOAD_CONST(hashed_name,&hlt_i32) : ENULL;
-			emit_native_call(ctx, null_field_access ? hl_stub_null_field_access : hl_stub_null_access, &arg, null_field_access ? 1 : 0, &hlt_void);
+			emit_native_call(ctx, null_field_access ? hl_jit_null_field_access : hl_jit_null_access, &arg, null_field_access ? 1 : 0, &hlt_void);
 			mark_no_return(ctx);
 			patch_jump(ctx, jok);
 		}
@@ -1694,13 +1518,13 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			register_jump(ctx, jtrap, o->p2);
 			patch_jump(ctx, jskip);
 
-			if( ctx->trap_count == MAX_TRAPS ) emit_error("Too many try/catch depth");
+			if( ctx->trap_count == MAX_TRAPS ) jit_error("Too many try/catch depth");
 			ctx->traps[ctx->trap_count++] = st;
 		}
 		break;
 	case OEndTrap:
 		{
-			if( ctx->trap_count == 0 ) emit_assert();
+			if( ctx->trap_count == 0 ) jit_assert();
 			ereg st = ctx->traps[ctx->trap_count - 1];
 
 			ereg thread, current_addr;
@@ -1750,7 +1574,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		STORE(dst, LOAD_MEM(LOAD(ra),0,&hlt_i32));
 		break;
 	case OAssert:
-		emit_native_call(ctx, hl_stub_assert, NULL, 0, &hlt_void);
+		emit_native_call(ctx, hl_jit_assert, NULL, 0, &hlt_void);
 		break;
 	case ONop:
 		break;
@@ -1767,7 +1591,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					}
 					break;
 				default:
-					emit_assert();
+					jit_assert();
 					break;
 				}
 			}
@@ -1775,343 +1599,13 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case OAsm:
-		emit_assert();
+		jit_assert();
 		break;
 	case OCatch:
 		// Only used by OTrap typing
 		break;
 	default:
-		emit_error(hl_op_name(o->op));
+		jit_error(hl_op_name(o->op));
 		break;
 	}
-}
-
-// -------------------- CODE ----------------------------------------------------------
-
-void *hl_emit_code( emit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
-	printf("TODO:emit_code\n");
-	exit(0);
-	return NULL;
-}
-
-// -------------------- DUMP ----------------------------------------------------------
-
-static void hl_dump_arg( emit_ctx *ctx, int fmt, int val, char sep ) {
-	if( fmt == 0 ) return;
-	printf("%c", sep);
-	switch( fmt ) {
-	case 1:
-	case 2:
-		printf("R%d", val);
-		if( val < 0 || val >= ctx->fun->nregs ) printf("?");
-		break;
-	case 3:
-		printf("%d", val);
-		break;
-	case 4:
-		printf("[%d]", val);
-		break;
-	case 5:
-	case 6:
-		printf("@%X", val + ctx->op_pos + 1);
-		break;
-	default:
-		printf("?#%d", fmt);
-		break;
-	}
-}
-
-#define OP(_,_a,_b,_c) ((_a) | (((_b)&0xFF) << 8) | (((_c)&0xFF) << 16)),
-#define OP_BEGIN static int hl_op_fmt[] = {
-#define OP_END };
-#undef R
-#include "opcodes.h"
-
-static void hl_dump_op( emit_ctx *ctx, hl_opcode *op ) {
-	printf("%s", hl_op_name(op->op) + 1);
-	int fmt = hl_op_fmt[op->op];
-	hl_dump_arg(ctx, fmt & 0xFF, op->p1, ' ');
-	if( ((fmt >> 8) & 0xFF) == 5 ) {
-		int count = (fmt >> 16) & 0xFF;
-		printf(" [");
-		if( count == 4 ) {
-			printf("%d", op->p2);
-			printf(",%d", op->p3);
-			printf(",%d", (int)(int_val)op->extra);
-		} else if( op->op == OSwitch ) {
-			for(int i=0;i<op->p2;i++) {
-				if( i != 0 ) printf(",");
-				printf("@%X", (op->extra[i] + ctx->op_pos + 1));
-			}
-			printf(",def=@%X", op->p3 + ctx->op_pos + 1);
-		} else {
-			if( count == 0xFF ) count = op->p3;
-			for(int i=0;i<count;i++) {
-				if( i != 0 ) printf(",");
-				printf("%d", op->extra[i]);
-			}
-		}
-		printf("]");
-	} else {
-		hl_dump_arg(ctx, (fmt >> 8) & 0xFF, op->p2,',');
-		hl_dump_arg(ctx, fmt >> 16, op->p3,',');
-	}
-}
-
-static const char *emit_mode_str( emit_mode mode ) {
-	switch( mode ) {
-	case M_UI8: return "-ui8";
-	case M_UI16: return "-ui16";
-	case M_I32: return "-i32";
-	case M_I64: return "-i64";
-	case M_F32: return "-f32";
-	case M_F64: return "-f64";
-	case M_PTR: return "";
-	case M_VOID: return "-void";
-	case M_NORET: return "-noret";
-	default:
-		static char buf[50];
-		sprintf(buf,"?%d",mode);
-		return buf;
-	}
-}
-
-static void dump_value( emit_ctx *ctx, uint64 value, emit_mode mode ) {
-	union {
-		uint64 v;
-		double d;
-		float f;
-	} tmp;
-	hl_module *mod = ctx->mod;
-	hl_code *code = ctx->mod->code;
-	switch( mode ) {
-	case M_NONE:
-		printf("?0x%llX",value);
-		break;
-	case M_UI8:
-	case M_UI16:
-	case M_I32:
-		if( (int)value >= -0x10000 && (int)value <= 0x10000 )
-			printf("%d",(int)value);
-		else
-			printf("0x%X",(int)value);
-		break;
-	case M_F32:
-		tmp.v = value;
-		printf("%f",tmp.f);
-		break;
-	case M_F64:
-		tmp.v = value;
-		printf("%g",tmp.d);
-		break;
-	default:
-		if( value == 0 )
-			printf("NULL");
-		else if( mode == M_PTR && value >= (uint64)code->types && value < (uint64)(code->types + code->ntypes) )
-			uprintf(USTR("<%s>"),hl_type_str((hl_type*)value));
-		else if( mode == M_PTR && value >= (uint64)mod->globals_data && value < (uint64)(mod->globals_data + mod->globals_size) )
-			printf("<global@%X>",(int)(value - (uint64)mod->globals_data));
-		else if( value == (uint64)&hlt_void )
-			printf("<void>");
-		else
-			printf("0x%llX",value);
-		break;
-	}
-}
-
-static void hl_dump_fun_name( hl_function *f ) {
-	if( f->obj )
-		uprintf(USTR("%s.%s"),f->obj->name,f->field.name);
-	else if( f->field.ref )
-		uprintf(USTR("%s.~%s.%d"),f->field.ref->obj->name, f->field.ref->field.name, f->ref);
-	printf("[%X]", f->findex);
-}
-
-static void hl_dump_args( emit_ctx *ctx, einstr *e ) {
-	ereg *v = hl_emit_get_args(ctx, e);
-	printf("(");
-	for(int i=0;i<e->nargs;i++) {
-		if( i != 0 ) printf(",");
-		printf("@%X", v[i].index);
-	}
-	printf(")");
-}
-
-
-typedef struct { const char *name; void *ptr; } named_ptr;
-static void hl_dump_ptr_name( emit_ctx *ctx, void *ptr ) {
-#	define N(v)	ptr_names[i].name = #v; ptr_names[i].ptr = v; i++
-#	define N2(n,v)	ptr_names[i].name = n; ptr_names[i].ptr = v; i++
-#	define DYN(p) N2("dyn_get" #p, hl_dyn_get##p); N2("dyn_set" #p, hl_dyn_set##p); N2("dyn_cast" #p, hl_dyn_cast##p)
-	static named_ptr ptr_names[256] = { NULL };
-	int i = 0;
-	if( !ptr_names[0].ptr ) {
-		N(hl_alloc_dynbool);
-		N(hl_alloc_dynamic);
-		N(hl_alloc_obj);
-		N(hl_alloc_dynobj);
-		N(hl_alloc_virtual);
-		N(hl_alloc_closure_ptr);
-		N(hl_dyn_call);
-		N(hl_dyn_call_obj);
-		N(hl_throw);
-		N(hl_rethrow);
-		N(hl_to_virtual);
-		N(hl_alloc_enum);
-		DYN(f);
-		DYN(d);
-		DYN(i64);
-		DYN(i);
-		DYN(p);
-		N2("null_field",hl_stub_null_field_access);
-		N2("null_access",hl_stub_null_access);
-		N(hl_get_thread);
-		N(setjmp);
-		N(_setjmp);
-		N2("assert",hl_stub_assert);
-		i = 0;
-	}
-#	undef N
-#	undef N2
-	while( true ) {
-		named_ptr p = ptr_names[i++];
-		if( !p.ptr ) break;
-		if( p.ptr == ptr ) {
-			printf("<%s>",p.name);
-			return;
-		}
-	}
-	for(i=0;i<ctx->mod->code->nnatives;i++) {
-		hl_native *n = ctx->mod->code->natives + i;
-		if( ctx->mod->functions_ptrs[n->findex] == ptr ) {
-			printf("<%s.%s>",n->lib[0] == '?' ? n->lib + 1 : n->lib,n->name);
-			return;
-		}
-	}
-	printf("<?0x%llX>",(uint64)ptr);
-}
-
-void hl_emit_dump( emit_ctx *ctx ) {
-	int i;
-	int cur_op = 0;
-	hl_function *f = ctx->fun;
-	int nargs = f->type->fun->nargs;
-	hl_emit_flush(ctx); // if it not was not before (in case of dump during emit)
-	printf("function ");
-	hl_dump_fun_name(f);
-	printf("(");
-	for(i=0;i<nargs;i++) {
-		if( i > 0 ) printf(",");
-		uprintf(USTR("R%d"), i);
-	}
-	printf(")\n");
-	for(i=0;i<f->nregs;i++)
-		uprintf(USTR("\tR%d : %s\n"),i, hl_type_str(f->regs[i]));
-	for(i=0;i<ctx->emit_pos;i++) {
-		while( ctx->pos_map[cur_op] == i ) {
-			printf("@%X ", cur_op);
-			ctx->op_pos = cur_op;
-			hl_dump_op(ctx, f->ops + cur_op);
-			printf("\n");
-			cur_op++;
-		}
-		einstr *e = ctx->instrs + i;
-		printf("\t\t@%X %s", i, op_names[e->op]);
-		switch( e->op ) {
-		case TEST:
-		case CMP:
-			printf("-%s", hl_op_name(e->size_offs)+2);
-			break;
-		case BINOP:
-		case UNOP:
-			printf("-%s", hl_op_name(e->size_offs)+1);
-			break;
-		default:
-			break;
-		}
-		if( e->mode && e->op != PHI )
-			printf("%s", emit_mode_str(e->mode));
-		switch( e->op ) {
-		case CALL_FUN:
-			printf(" ");
-			{
-				int fid = ctx->mod->functions_indexes[e->a.index];
-				hl_code *code = ctx->mod->code;
-				if( fid < code->nfunctions ) {
-					hl_dump_fun_name(&code->functions[fid]);
-				} else {
-					printf("???");
-				}
-			}
-			hl_dump_args(ctx,e);
-			break;
-		case CALL_REG:
-			printf(" @%X", e->a.index);
-			hl_dump_args(ctx,e);
-			break;
-		case CALL_PTR:
-			printf(" ");
-			hl_dump_ptr_name(ctx, (void*)e->value);
-			hl_dump_args(ctx,e);
-			break;
-		case PHI:
-			hl_dump_args(ctx,e);
-			{
-				int i;
-				ereg *args = hl_emit_get_args(ctx, e);
-				for(i=0;i<e->nargs;i++) {
-					einstr *a = ctx->instrs + args[i].index;
-					if( a->mode != e->mode ) {
-						printf(" ???");
-						break;
-					}
-				}
-			}
-			break;
-		case JUMP:
-		case JCOND:
-			printf(" @%X", i + 1 + e->size_offs);
-			break;
-		case LOAD_IMM:
-			printf(" ");
-			dump_value(ctx, e->value, e->mode);
-			break;
-		case ALLOC_STACK:
-			printf(" %d", e->size_offs);
-			break;
-		case LOAD_ADDR:
-			if( (e->b.index>>8) )
-				printf(" @%X[%Xh]", e->a.index, e->b.index);
-			else
-				printf(" @%X[%d]", e->a.index, e->b.index);
-			break;
-		case STORE:
-			{
-				int offs = e->size_offs;
-				if( offs == 0 )
-					printf(" [@%X] = @%X", e->a.index, e->b.index);
-				else
-					printf(" @%X[%d] = @%X", e->a.index, offs, e->b.index);
-				if( e->mode == 0 || e->mode != ctx->instrs[e->b.index].mode )
-					printf(" ???");
-			}
-			break;
-		default:
-			if( e->a.index >= 0 ) {
-				printf(" @%X", e->a.index);
-				if( e->b.index >= 0 ) printf(", @%X", e->b.index);
-			}
-			break;
-		}
-		printf("\n");
-	}
-	// interrupted
-	if( cur_op < f->nops ) {
-		printf("@%X ", cur_op);
-		ctx->op_pos = cur_op;
-		hl_dump_op(ctx, f->ops + cur_op);
-		printf("\n\t\t...\n");
-	}
-	printf("\n\n");
-	fflush(stdout);
 }
