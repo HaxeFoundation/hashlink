@@ -19,6 +19,9 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#ifndef HL_MODULE_H
+#define HL_MODULE_H
+
 #include <hl.h>
 #include <hlsystem.h>
 #include "opcodes.h"
@@ -104,9 +107,6 @@ typedef struct {
 	bool large;
 } hl_debug_infos;
 
-typedef struct _emit_ctx emit_ctx;
-
-
 typedef struct {
 	hl_code *code;
 	int *types_hashes;
@@ -120,6 +120,8 @@ typedef struct {
 #define WIN64_UNWIND_TABLES
 #endif
 
+typedef struct _jit_ctx jit_ctx;
+
 typedef struct {
 	hl_code *code;
 	int codesize;
@@ -131,7 +133,7 @@ typedef struct {
 	void *jit_code;
 	hl_code_hash *hash;
 	hl_debug_infos *jit_debug;
-	emit_ctx *emit_ctx;
+	jit_ctx *jit_ctx;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
 	PRUNTIME_FUNCTION unwind_table;
@@ -161,11 +163,4 @@ hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err );
 void hl_profile_setup( int sample_count );
 void hl_profile_end();
 
-emit_ctx *hl_emit_alloc();
-void hl_emit_free( emit_ctx *ctx, h_bool can_reset );
-void hl_emit_reset( emit_ctx *ctx, hl_module *m );
-void hl_emit_init( emit_ctx *ctx, hl_module *m );
-void hl_emit_dump( emit_ctx *ctx );
-int hl_emit_function( emit_ctx *ctx, hl_module *m, hl_function *f );
-void *hl_emit_code( emit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );
-void hl_jit_patch_method( void *old_fun, void **new_fun_table );
+#endif
