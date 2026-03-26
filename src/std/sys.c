@@ -678,9 +678,6 @@ HL_PRIM void hl_sys_init() {
 #ifdef HL_WIN
 	QueryPerformanceFrequency(&qpcFrequency);
 #endif
-#	ifdef HL_WIN_DESKTOP
-	setlocale(LC_CTYPE, ""); // printf to current locale
-#	endif
 }
 
 HL_PRIM vbyte *hl_sys_hl_file() {
