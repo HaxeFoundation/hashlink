@@ -464,7 +464,7 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Download binary
       uses: actions/download-artifact@v4
       with:
@@ -534,7 +534,7 @@ jobs:
     - name: Setup haxelib
       run: haxelib dev hashlink ./other/haxelib
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         repository: HaxeFoundation/haxe
         path: haxe
