@@ -25,7 +25,11 @@ static jit_ctx *current_ctx = NULL;
 
 void hl_jit_error( const char *msg, int line ) {
 	printf("*** EMIT ERROR line %d (%s) ****\n", line, msg);
-	if( current_ctx  ) hl_emit_dump(current_ctx);
+	if( current_ctx  ) {
+		jit_ctx *ctx = current_ctx;
+		current_ctx = NULL;
+		hl_emit_dump(ctx);
+	}
 	hl_debug_break();
 	fflush(stdout);
 	exit(-1);

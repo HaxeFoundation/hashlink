@@ -92,7 +92,6 @@ typedef struct {
 	};
 } einstr;
 
-typedef struct _emit_ctx emit_ctx;
 
 typedef struct {
 	int *data;
@@ -100,7 +99,19 @@ typedef struct {
 	int cur;
 } int_alloc;
 
-typedef struct _jit_ctx jit_ctx;
+typedef struct _eblock {
+	int id;
+	int start_pos;
+	int end_pos;
+	int next_count;
+	int pred_count;
+	int *preds;
+	int *nexts;
+} eblock;
+
+typedef struct _emit_ctx emit_ctx;
+
+typedef struct _jit_ctx ji_ctx;
 
 struct _jit_ctx {
 	hl_module *mod;
@@ -108,8 +119,10 @@ struct _jit_ctx {
 	hl_alloc falloc;
 	emit_ctx *emit;
 	// emit output
-	einstr *instrs;
 	int instr_count;
+	int block_count;
+	einstr *instrs;
+	eblock *blocks;
 	int *emit_pos_map;
 };
 
@@ -146,7 +159,7 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
 #	define jit_debug(...)
 #endif
 
-void hl_jit_error( const char *msg, int line );
+HL_NO_RETURN( void hl_jit_error( const char *msg, int line ) );
 
 
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );

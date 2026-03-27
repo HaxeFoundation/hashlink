@@ -45,8 +45,10 @@ struct _linked_inf {
 struct _emit_block {
 	int id;
 	int start_pos;
+	int end_pos;
 	int wait_nexts;
 	int mark;
+	linked_inf *nexts;
 	linked_inf *preds;
 	linked_inf *written_vars;
 	linked_inf *incomplete_phis;
@@ -81,6 +83,7 @@ struct _emit_ctx {
 	int_alloc block_writes;
 	int_alloc phi_gather;
 	
+	emit_block *root_block;
 	emit_block *current_block;
 	linked_inf *arrival_points;
 	void *closure_list; // TODO : patch with good addresses
@@ -293,6 +296,7 @@ static emit_block *alloc_block( emit_ctx *ctx ) {
 
 static void block_add_prec( emit_ctx *ctx, emit_block *b, emit_block *p ) {
 	b->preds = link_add(ctx,0,p,b->preds);
+	p->nexts = link_add(ctx,0,b,p->nexts);
 	jit_debug("  PRED %d\n",p->id);
 }
 
@@ -320,6 +324,7 @@ static void split_block( emit_ctx *ctx ) {
 		block_add_prec(ctx, b, (emit_block*)ctx->arrival_points->ptr);
 		ctx->arrival_points = ctx->arrival_points->next;
 	}
+	ctx->current_block->end_pos = b->start_pos - 1;
 	ctx->current_block = b;
 }
 
@@ -562,6 +567,42 @@ static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
 
 static void emit_opcode( emit_ctx *ctx, hl_opcode *o );
 
+static void emit_flush_blocks( jit_ctx *jit, emit_block *b ) {
+	eblock *bl = jit->blocks + b->id;
+	if( bl->id ) return; // already set
+	bl->id = b->id;
+	bl->start_pos = b->start_pos;
+	bl->end_pos = b->end_pos;
+	linked_inf *tmp;
+	tmp = b->preds;
+	while( tmp ) {
+		bl->pred_count++;
+		tmp = tmp->next;
+	}
+	tmp = b->nexts;
+	while( tmp ) {
+		bl->next_count++;
+		tmp = tmp->next;
+	}
+	bl->preds = (int*)hl_malloc(&jit->falloc,sizeof(int)*bl->pred_count);
+	bl->nexts = (int*)hl_malloc(&jit->falloc,sizeof(int)*bl->next_count);
+	int i;
+	i = 0;
+	tmp = b->preds;
+	while( tmp ) {
+		bl->preds[i++] = ((emit_block*)tmp->ptr)->id;
+		tmp = tmp->next;
+	}
+	i = 0;
+	tmp = b->nexts;
+	while( tmp ) {
+		emit_block *n = (emit_block*)tmp->ptr;
+		bl->nexts[i++] = n->id;
+		if( n->start_pos > b->start_pos ) emit_flush_blocks(jit, n);
+		tmp = tmp->next;
+	}
+}
+
 void hl_emit_flush( jit_ctx *jit ) {
 	emit_ctx *ctx = jit->emit;
 	int i = 0;
@@ -572,9 +613,13 @@ void hl_emit_flush( jit_ctx *jit ) {
 		e->size_offs = ctx->pos_map[target] - (pos + 1);
 	}
 	ctx->pos_map[ctx->fun->nops] = -1;
+	ctx->current_block->end_pos = ctx->emit_pos - 1;
 	jit->instrs = ctx->instrs;
 	jit->instr_count = ctx->emit_pos;
 	jit->emit_pos_map = ctx->pos_map;
+	jit->block_count = ctx->current_block->id + 1;
+	jit->blocks = hl_zalloc(&jit->falloc,sizeof(eblock) * jit->block_count);
+	emit_flush_blocks(jit, ctx->root_block);
 }
 
 void hl_emit_function( jit_ctx *jit ) {
@@ -589,7 +634,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	int_alloc_reset(&ctx->args_data);
 	int_alloc_reset(&ctx->jump_regs);
 	int_alloc_reset(&ctx->block_writes);
-	ctx->current_block = alloc_block(ctx);
+	ctx->root_block = ctx->current_block = alloc_block(ctx);
 	ctx->arrival_points = NULL;
 	jit_debug("---- begin [%X] ----\n",f->findex);
 	if( f->nregs > ctx->max_regs ) {
