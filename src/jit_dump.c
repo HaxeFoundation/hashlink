@@ -266,6 +266,17 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	printf(")\n");
 	for(i=0;i<f->nregs;i++)
 		uprintf(USTR("\tR%d : %s\n"),i, hl_type_str(f->regs[i]));
+	// check blocks intervals
+	int cur = 0;
+	for(i=0;i<ctx->block_count;i++) {
+		eblock *b = ctx->blocks + i;
+		if( b->id < 0 || b->id >= ctx->block_count ) jit_assert();
+		if( b->start_pos != cur ) printf("  ??? BLOCK %d START AT %X != %X\n", i, b->start_pos, cur);
+		cur = b->end_pos + 1;
+	}
+	if( cur != ctx->instr_count )
+		printf("  ??? MISSING BLOCK FOR RANGE %X-%X\n", cur, ctx->instr_count);
+	// print instrs
 	for(i=0;i<ctx->instr_count;i++) {
 		while( ctx->emit_pos_map[cur_op] == i ) {
 			printf("@%X ", cur_op);
