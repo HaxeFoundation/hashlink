@@ -630,7 +630,7 @@ typedef struct {
 } hl_setup_t;
 
 HL_API hl_setup_t hl_setup;
-HL_API void hl_sys_init();
+HL_API void hl_sys_init( void **args, int nargs, void *hlfile );
 
 HL_API double hl_nan( void );
 HL_API bool hl_is_dynamic( hl_type *t );
@@ -1019,6 +1019,15 @@ HL_API hl_track_info hl_track;
 #define hl_track_call(a,b)
 
 #endif
+
+// -------------- COMPAT ------------------------------------
+
+HL_API void hl_setup_longjump( void *j );
+HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
+HL_API void hl_set_debug_mode( bool b );
+HL_API void hl_setup_callbacks(void* sc, void* gw);
+HL_API void hl_setup_callbacks2(void* sc, void* gw, int flags);
+HL_API void hl_setup_reload_check( void *freload, void *param );
 
 C_FUNCTION_END
 
