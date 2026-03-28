@@ -23,8 +23,8 @@
 
 static jit_ctx *current_ctx = NULL;
 
-void hl_jit_error( const char *msg, int line ) {
-	printf("*** EMIT ERROR line %d (%s) ****\n", line, msg);
+void hl_jit_error( const char *msg, const char *func, int line ) {
+	printf("*** JIT ERROR %s:%d (%s)****\n", func, line, msg);
 	if( current_ctx  ) {
 		jit_ctx *ctx = current_ctx;
 		current_ctx = NULL;
