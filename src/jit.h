@@ -122,8 +122,10 @@ struct _jit_ctx {
 	// emit output
 	int instr_count;
 	int block_count;
+	int value_count;
 	einstr *instrs;
 	eblock *blocks;
+	int *values_writes;
 	int *emit_pos_map;
 };
 
