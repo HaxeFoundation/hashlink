@@ -40,6 +40,7 @@ static const char *op_names[] = {
 	"call",
 	"call",
 	"call",
+	"mov",
 	"phi",
 	"alloc-stack",
 	"free-stack",
@@ -270,8 +271,9 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	int cur = 0;
 	for(i=0;i<ctx->block_count;i++) {
 		eblock *b = ctx->blocks + i;
-		if( b->id < 0 || b->id >= ctx->block_count ) jit_assert();
+		if( b->id != i ) printf("  ??? BLOCK @%d ID is %d\n",i,b->id);
 		if( b->start_pos != cur ) printf("  ??? BLOCK %d START AT %X != %X\n", i, b->start_pos, cur);
+		if( b->end_pos < b->start_pos ) printf("  ??? BLOCK %d RANGE [%X,%X]\n", i, b->start_pos, b->end_pos);
 		cur = b->end_pos + 1;
 	}
 	if( cur != ctx->instr_count )
