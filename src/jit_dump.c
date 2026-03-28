@@ -191,7 +191,7 @@ static void hl_dump_args( jit_ctx *ctx, einstr *e ) {
 	printf("(");
 	for(int i=0;i<e->nargs;i++) {
 		if( i != 0 ) printf(",");
-		printf("@%X", v[i].index);
+		printf("V%d", v[i].index);
 	}
 	printf(")");
 }
@@ -279,6 +279,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	if( cur != ctx->instr_count )
 		printf("  ??? MISSING BLOCK FOR RANGE %X-%X\n", cur, ctx->instr_count);
 	// print instrs
+	int vpos = 0;
 	for(i=0;i<ctx->instr_count;i++) {
 		while( ctx->emit_pos_map[cur_op] == i ) {
 			printf("@%X ", cur_op);
@@ -287,15 +288,21 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			cur_op++;
 		}
 		einstr *e = ctx->instrs + i;
-		printf("\t\t@%X %s", i, op_names[e->op]);
+		printf("\t\t@%X ", i);
+		if( vpos < ctx->value_count && ctx->values_writes[vpos] == i )
+			printf("V%d = ", vpos++);
+		printf("%s", op_names[e->op]);
+		bool show_size = true;
 		switch( e->op ) {
 		case TEST:
 		case CMP:
 			printf("-%s", hl_op_name(e->size_offs)+2);
+			show_size = false;
 			break;
 		case BINOP:
 		case UNOP:
 			printf("-%s", hl_op_name(e->size_offs)+1);
+			show_size = false;
 			break;
 		default:
 			break;
@@ -317,7 +324,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			hl_dump_args(ctx,e);
 			break;
 		case CALL_REG:
-			printf(" @%X", e->a.index);
+			printf(" V%d", e->a.index);
 			hl_dump_args(ctx,e);
 			break;
 		case CALL_PTR:
@@ -331,7 +338,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 				int i;
 				ereg *args = hl_emit_get_args(ctx->emit, e);
 				for(i=0;i<e->nargs;i++) {
-					einstr *a = ctx->instrs + args[i].index;
+					einstr *a = ctx->instrs + ctx->values_writes[args[i].index];
 					if( a->mode != e->mode ) {
 						printf(" ???");
 						break;
@@ -347,35 +354,37 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			printf(" ");
 			dump_value(ctx, e->value, e->mode);
 			break;
-		case ALLOC_STACK:
-			printf(" %d", e->size_offs);
-			break;
 		case LOAD_ADDR:
 			if( (e->b.index>>8) )
-				printf(" @%X[%Xh]", e->a.index, e->b.index);
+				printf(" V%d[%Xh]", e->a.index, e->b.index);
 			else
-				printf(" @%X[%d]", e->a.index, e->b.index);
+				printf(" V%d[%d]", e->a.index, e->b.index);
 			break;
 		case STORE:
 			{
 				int offs = e->size_offs;
 				if( offs == 0 )
-					printf(" [@%X] = @%X", e->a.index, e->b.index);
+					printf(" [V%d] = V%d", e->a.index, e->b.index);
 				else
-					printf(" @%X[%d] = @%X", e->a.index, offs, e->b.index);
-				if( e->mode == 0 || e->mode != ctx->instrs[e->b.index].mode )
+					printf(" V%d[%d] = V%d", e->a.index, offs, e->b.index);
+				if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
 					printf(" ???");
 			}
 			break;
 		default:
 			if( e->a.index >= 0 ) {
-				printf(" @%X", e->a.index);
-				if( e->b.index >= 0 ) printf(", @%X", e->b.index);
+				printf(" V%d", e->a.index);
+				if( e->b.index >= 0 ) printf(", V%d", e->b.index);
 			}
+			if( show_size && e->size_offs != 0 )
+				printf(" %d", e->size_offs);
 			break;
 		}
 		printf("\n");
 	}
+	// invalid ?
+	while( vpos < ctx->value_count )
+		printf("  ??? UNWRITTEN VALUE V%d @%X\n", vpos, ctx->values_writes[vpos++]);
 	// interrupted
 	if( cur_op < f->nops ) {
 		printf("@%X ", cur_op);

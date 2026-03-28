@@ -82,6 +82,7 @@ struct _emit_ctx {
 	int_alloc jump_regs;
 	int_alloc block_writes;
 	int_alloc phi_gather;
+	int_alloc values;
 	
 	emit_block *root_block;
 	emit_block *current_block;
@@ -101,7 +102,7 @@ struct _emit_ctx {
 #define LOAD_OBJ_METHOD(obj,id) LOAD_MEM_PTR(LOAD_MEM_PTR(LOAD_MEM_PTR(obj,0),HL_WSIZE*2),HL_WSIZE*(id))
 #define OFFSET(base,index,mult,offset) emit_gen_ext(ctx, LEA, base, index, M_PTR, (mult) | ((offset) << 8))
 #define BREAK() emit_gen(ctx, DEBUG_BREAK, ENULL, ENULL, 0)
-#define CUR_REG() __current_reg(ctx)
+#define GET_WRITE(r) ctx->instrs[ctx->values.data[(r).index]]
 
 #define HDYN_VALUE 8
 
@@ -166,16 +167,13 @@ static emit_mode hl_type_mode( hl_type *t ) {
 	return M_PTR;
 }
 
-static void mark_no_return( emit_ctx *ctx ) {
-	ctx->instrs[ctx->emit_pos-1].mode = M_NORET;
-}
-
 void hl_jit_patch_method( void*fun, void**newt ) {
 	jit_assert();
 }
 
-static ereg __current_reg( emit_ctx *ctx ) {
-	ereg r = {ctx->emit_pos-1};
+static ereg new_value( emit_ctx *ctx ) {
+	ereg r = {ctx->values.cur};
+	int_alloc_store(&ctx->values, ctx->emit_pos-1);
 	return r;
 }
 
@@ -212,7 +210,7 @@ static einstr *emit_instr( emit_ctx *ctx, emit_op op ) {
 
 static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 	einstr *e = emit_instr(ctx, STORE);
-	e->mode = ctx->instrs[from.index].mode;
+	e->mode = GET_WRITE(from).mode;
 	e->size_offs = offs;
 	e->a = to;
 	e->b = from;
@@ -257,7 +255,7 @@ static ereg emit_gen_ext( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode, i
 	e->size_offs = size_offs;
 	e->a = a;
 	e->b = b;
-	return CUR_REG();
+	return mode == 0 || mode == M_NORET ? ENULL : new_value(ctx);
 }
 
 static ereg emit_gen( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode ) {
@@ -269,15 +267,15 @@ static ereg emit_gen_size( emit_ctx *ctx, emit_op op, int size_offs ) {
 }
 
 static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
-	unsigned char mode = ctx->instrs[v1.index].mode;
-	if( mode != ctx->instrs[v2.index].mode ) jit_assert();
+	unsigned char mode = GET_WRITE(v1).mode;
+	if( mode != GET_WRITE(v2).mode ) jit_assert();
 	einstr *e = emit_instr(ctx, PHI);
 	e->mode = mode;
 	ereg args[2];
 	args[0] = v1;
 	args[1] = v2;
 	store_args(ctx, e, args, 2);
-	return CUR_REG();
+	return new_value(ctx);
 }
 
 static int emit_jump( emit_ctx *ctx, bool cond ) {
@@ -321,12 +319,12 @@ static void split_block( emit_ctx *ctx ) {
 	b->id = ctx->current_block->id + 1;
 	b->start_pos = ctx->emit_pos;
 	jit_debug("BLOCK #%d@%X\n",b->id,ctx->op_pos);
-	einstr *eprev = &ctx->instrs[ctx->emit_pos-1];
 	while( ctx->arrival_points && ctx->arrival_points->id == ctx->op_pos ) {
 		block_add_prec(ctx, b, (emit_block*)ctx->arrival_points->ptr);
 		ctx->arrival_points = ctx->arrival_points->next;
 	}
 	bool dead_code = b->preds == NULL; // if we have no reach, force previous block dependency, this is rare dead code emit by compiler
+	einstr *eprev = &ctx->instrs[ctx->emit_pos-1];
 	if( (eprev->op != JUMP && eprev->op != RET) || ctx->fun->ops[ctx->op_pos].op == OTrap || dead_code )
 		block_add_prec(ctx, b, ctx->current_block);
 	ctx->current_block->end_pos = ctx->emit_pos - 1;
@@ -348,7 +346,7 @@ static ereg emit_load_const( emit_ctx *ctx, uint64 value, hl_type *size_t ) {
 	einstr *e = emit_instr(ctx, LOAD_IMM);
 	e->mode = hl_type_mode(size_t);
 	e->value = value;
-	return CUR_REG();
+	return new_value(ctx);
 }
 
 static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t ) {
@@ -356,7 +354,7 @@ static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t ) 
 	e->mode = hl_type_mode(size_t);
 	e->a = v;
 	e->b.index = offset;
-	return CUR_REG();
+	return new_value(ctx);
 }
 
 static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
@@ -371,10 +369,10 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 
 static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int nargs, hl_type *ret ) {
 	einstr *e = emit_instr(ctx, CALL_PTR);
-	e->mode = hl_type_mode(ret);
+	e->mode = (unsigned char)(ret ? hl_type_mode(ret) : M_NORET);
 	e->value = (int_val)native_ptr;
 	store_args(ctx, e, args, nargs);
-	return CUR_REG();
+	return ret == NULL || e->mode == M_VOID ? ENULL : new_value(ctx);
 }
 
 static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_type *ret ) {
@@ -382,11 +380,16 @@ static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_typ
 	e->mode = hl_type_mode(ret);
 	e->a = f;
 	store_args(ctx, e, args, nargs);
-	return CUR_REG();
+	return e->mode == M_VOID ? ENULL : new_value(ctx);
+}
+
+static void patch_instr_mode( emit_ctx *ctx, int mode ) {
+	ctx->instrs[ctx->emit_pos-1].mode = (unsigned char)mode;
 }
 
 static void emit_test( emit_ctx *ctx, ereg v, hl_op o ) {
-	emit_gen_ext(ctx, TEST, v, ENULL, ctx->instrs[v.index].mode, o);
+	emit_gen_ext(ctx, TEST, v, ENULL, 0, o);
+	patch_instr_mode(ctx, GET_WRITE(v).mode);
 }
 
 static void emit_gather_phi_rec( emit_ctx *ctx, emit_block *b, vreg *r, int uid ) {
@@ -429,7 +432,7 @@ static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
 		} else {
 			if( ctx->phi_gather.cur == 0 ) jit_assert();
 			store_args(ctx, p, (ereg*)ctx->phi_gather.data, ctx->phi_gather.cur);
-			r->current = CUR_REG();
+			r->current = new_value(ctx);
 		}
 	}
 	return r->current;
@@ -449,7 +452,7 @@ static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int 
 		e->mode = hl_type_mode(dst->t);
 		e->a.index = findex;
 		store_args(ctx, e, args, count);
-		STORE(dst, CUR_REG());
+		STORE(dst, e->mode == M_VOID ? ENULL : new_value(ctx));
 	}
 }
 
@@ -624,6 +627,8 @@ void hl_emit_flush( jit_ctx *jit ) {
 	jit->emit_pos_map = ctx->pos_map;
 	jit->block_count = ctx->current_block->id + 1;
 	jit->blocks = hl_zalloc(&jit->falloc,sizeof(eblock) * jit->block_count);
+	jit->value_count = ctx->values.cur;
+	jit->values_writes = ctx->values.data;
 	emit_write_blocks(jit, ctx->root_block);
 }
 
@@ -639,6 +644,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	int_alloc_reset(&ctx->args_data);
 	int_alloc_reset(&ctx->jump_regs);
 	int_alloc_reset(&ctx->block_writes);
+	int_alloc_reset(&ctx->values);
 	ctx->root_block = ctx->current_block = alloc_block(ctx);
 	ctx->arrival_points = NULL;
 	jit_debug("---- begin [%X] ----\n",f->findex);
@@ -651,6 +657,13 @@ void hl_emit_function( jit_ctx *jit ) {
 		ctx->max_regs = f->nregs;
 	}
 
+	if( f->nops >= ctx->pos_map_size ) {
+		free(ctx->pos_map);
+		ctx->pos_map = (int*)malloc(sizeof(int) * (f->nops+1));
+		if( ctx->pos_map == NULL ) jit_assert();
+		ctx->pos_map_size = f->nops;
+	}
+
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
@@ -659,7 +672,9 @@ void hl_emit_function( jit_ctx *jit ) {
 	}
 
 	for(i=0;i<f->type->fun->nargs;i++) {
-		STORE(R(i), emit_gen(ctx, LOAD_ARG, ENULL, ENULL, hl_type_mode(f->type->fun->args[i])));
+		hl_type *t = f->type->fun->args[i];
+		if( t->kind == HVOID ) continue;
+		STORE(R(i), emit_gen(ctx, LOAD_ARG, ENULL, ENULL, hl_type_mode(t)));
 	}
 
 	for(i=f->nops-1;i>=0;i--) {
@@ -672,13 +687,6 @@ void hl_emit_function( jit_ctx *jit ) {
 			ctx->refs[ctx->ref_count].reg = o->p2;
 			ctx->ref_count++;
 		}
-	}
-
-	if( f->nops >= ctx->pos_map_size ) {
-		free(ctx->pos_map);
-		ctx->pos_map = (int*)malloc(sizeof(int) * (f->nops+1));
-		if( ctx->vregs == NULL ) jit_assert();
-		ctx->pos_map_size = f->nops;
 	}
 
 	for(int op_pos=0;op_pos<f->nops;op_pos++) {
@@ -888,7 +896,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OJNotLt:
 	case OJNotGte:
 		{
-			emit_gen_ext(ctx, CMP, LOAD(dst), LOAD(ra), hl_type_mode(dst->t), o->op);
+			emit_gen_ext(ctx, CMP, LOAD(dst), LOAD(ra), 0, o->op);
+			patch_instr_mode(ctx, hl_type_mode(dst->t));
 			register_block_jump(ctx, o->p3, true);
 		}
 		break;
@@ -912,10 +921,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		STORE(dst, emit_conv(ctx,LOAD(ra),hl_type_mode(dst->t), o->op == OToUFloat));
 		break;
 	case ORet:
-		if( dst->t->kind == HVOID )
-			emit_gen(ctx,RET,ENULL,ENULL,M_VOID);
-		else
-			emit_gen(ctx, RET, LOAD(dst), ENULL, hl_type_mode(dst->t));
+		emit_gen(ctx, RET, dst->t->kind == HVOID ? ENULL : LOAD(dst), ENULL, M_NORET);
+		patch_instr_mode(ctx, hl_type_mode(dst->t));
 		break;
 	case OIncr:
 	case ODecr:
@@ -1017,7 +1024,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				args[i] = LOAD(R(o->extra[i]));
 			ereg v2 = emit_dyn_call(ctx,LOAD_MEM_PTR(r,HL_WSIZE),args,o->p3,dst->t);
 			patch_jump(ctx, jend);
-			STORE(dst, emit_phi(ctx,v1,v2));
+			if( dst->t->kind != HVOID ) STORE(dst, emit_phi(ctx,v1,v2));
 		}
 		break;
 	case OStaticClosure:
@@ -1222,7 +1229,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					emit_gen_size(ctx, FREE_STACK, o->p3 + (need_dyn ? dyn_size : 0));
 					patch_jump(ctx, jend);
 
-					STORE(dst, emit_phi(ctx, v1, v2));
+					if( dst->t->kind != HVOID ) STORE(dst, emit_phi(ctx, v1, v2));
 				}
 				break;
 			default:
@@ -1235,8 +1242,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case ORethrow:
 		{
 			ereg arg = LOAD(dst);
-			emit_native_call(ctx, o->op == OThrow ? hl_throw : hl_rethrow, &arg, 1, &hlt_void);
-			mark_no_return(ctx);
+			emit_native_call(ctx, o->op == OThrow ? hl_throw : hl_rethrow, &arg, 1, NULL);
 		}
 		break;
 	case OLabel:
@@ -1462,8 +1468,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			}
 			// -----------------------------------------
 			ereg arg = null_field_access ? LOAD_CONST(hashed_name,&hlt_i32) : ENULL;
-			emit_native_call(ctx, null_field_access ? hl_jit_null_field_access : hl_jit_null_access, &arg, null_field_access ? 1 : 0, &hlt_void);
-			mark_no_return(ctx);
+			emit_native_call(ctx, null_field_access ? hl_jit_null_field_access : hl_jit_null_access, &arg, null_field_access ? 1 : 0, NULL);
 			patch_jump(ctx, jok);
 		}
 		break;
@@ -1610,7 +1615,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg v = LOAD(dst);
 			int count = o->p2;
-			emit_gen_ext(ctx, CMP, v, LOAD_CONST(count,&hlt_i32), M_I32, OJUGte);
+			emit_gen_ext(ctx, CMP, v, LOAD_CONST(count,&hlt_i32), 0, OJUGte);
+			patch_instr_mode(ctx, M_I32);
 			int jdefault = emit_jump(ctx, true);
 			emit_gen_ext(ctx, JUMP_TABLE, v, ENULL, 0, count);
 			for(int i=0; i<count; i++) {
