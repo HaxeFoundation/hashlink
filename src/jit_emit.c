@@ -300,8 +300,7 @@ static void block_add_prec( emit_ctx *ctx, emit_block *b, emit_block *p ) {
 	jit_debug("  PRED %d\n",p->id);
 }
 
-static void split_block( emit_ctx *ctx ) {
-	// flush previous block
+static void flush_block( emit_ctx *ctx ) {
 	int i = 0;
 	emit_block *cur = ctx->current_block;
 	while( i < ctx->block_writes.cur ) {
@@ -312,19 +311,25 @@ static void split_block( emit_ctx *ctx ) {
 		r->written = false;
 	}
 	int_alloc_reset(&ctx->block_writes);
+}
+
+static void split_block( emit_ctx *ctx ) {
+	flush_block(ctx);
+
 	// split
 	emit_block *b = alloc_block(ctx);
 	b->id = ctx->current_block->id + 1;
 	b->start_pos = ctx->emit_pos;
 	jit_debug("BLOCK #%d@%X\n",b->id,ctx->op_pos);
 	einstr *eprev = &ctx->instrs[ctx->emit_pos-1];
-	if( (eprev->op != JUMP && eprev->op != RET) || ctx->fun->ops[ctx->op_pos].op == OTrap )
-		block_add_prec(ctx, b, ctx->current_block);
 	while( ctx->arrival_points && ctx->arrival_points->id == ctx->op_pos ) {
 		block_add_prec(ctx, b, (emit_block*)ctx->arrival_points->ptr);
 		ctx->arrival_points = ctx->arrival_points->next;
 	}
-	ctx->current_block->end_pos = b->start_pos - 1;
+	bool dead_code = b->preds == NULL; // if we have no reach, force previous block dependency, this is rare dead code emit by compiler
+	if( (eprev->op != JUMP && eprev->op != RET) || ctx->fun->ops[ctx->op_pos].op == OTrap || dead_code )
+		block_add_prec(ctx, b, ctx->current_block);
+	ctx->current_block->end_pos = ctx->emit_pos - 1;
 	ctx->current_block = b;
 }
 
@@ -567,7 +572,7 @@ static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
 
 static void emit_opcode( emit_ctx *ctx, hl_opcode *o );
 
-static void emit_flush_blocks( jit_ctx *jit, emit_block *b ) {
+static void emit_write_blocks( jit_ctx *jit, emit_block *b ) {
 	eblock *bl = jit->blocks + b->id;
 	if( bl->id ) return; // already set
 	bl->id = b->id;
@@ -598,7 +603,7 @@ static void emit_flush_blocks( jit_ctx *jit, emit_block *b ) {
 	while( tmp ) {
 		emit_block *n = (emit_block*)tmp->ptr;
 		bl->nexts[i++] = n->id;
-		if( n->start_pos > b->start_pos ) emit_flush_blocks(jit, n);
+		if( n->start_pos > b->start_pos ) emit_write_blocks(jit, n);
 		tmp = tmp->next;
 	}
 }
@@ -619,7 +624,7 @@ void hl_emit_flush( jit_ctx *jit ) {
 	jit->emit_pos_map = ctx->pos_map;
 	jit->block_count = ctx->current_block->id + 1;
 	jit->blocks = hl_zalloc(&jit->falloc,sizeof(eblock) * jit->block_count);
-	emit_flush_blocks(jit, ctx->root_block);
+	emit_write_blocks(jit, ctx->root_block);
 }
 
 void hl_emit_function( jit_ctx *jit ) {
@@ -714,7 +719,7 @@ static bool seal_block_rec( emit_ctx *ctx, emit_block *b, int target ) {
 	if( b->start_pos == target ) {
 		b->wait_nexts--;
 		b->preds = link_add(ctx,0,ctx->current_block,b->preds);
-		split_block(ctx);
+		flush_block(ctx);
 		if( b->wait_nexts == 0 ) {
 			jit_debug("  SEAL #%d\n",b->id);
 			// seal block
@@ -767,7 +772,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	switch( o->op ) {
 	case OMov:
 	case OUnsafeCast:
-		STORE(dst, LOAD(ra));
+		STORE(dst, emit_gen(ctx,MOV,LOAD(ra),ENULL,hl_type_mode(ra->t)));
 		break;
 	case OInt:
 		STORE(dst, LOAD_CONST(m->code->ints[o->p2], dst->t));

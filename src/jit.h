@@ -43,6 +43,7 @@ typedef enum {
 	CALL_PTR,
 	CALL_REG,
 	CALL_FUN,
+	MOV,
 	PHI,
 	ALLOC_STACK,
 	FREE_STACK,
@@ -150,7 +151,7 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
 #	define JIT_DEBUG
 #endif
 
-#define jit_error(msg)	hl_jit_error(msg,__LINE__)
+#define jit_error(msg)	hl_jit_error(msg,__func__,__LINE__)
 #define jit_assert()	jit_error("")
 
 #ifdef JIT_DEBUG
@@ -159,7 +160,7 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
 #	define jit_debug(...)
 #endif
 
-HL_NO_RETURN( void hl_jit_error( const char *msg, int line ) );
+HL_NO_RETURN( void hl_jit_error( const char *msg, const char *func, int line ) );
 
 
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );
