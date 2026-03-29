@@ -295,7 +295,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	int vpos = 0;
 	cur = 0;
 	for(i=0;i<ctx->instr_count;i++) {
-		while( ctx->blocks[cur].start_pos == i ) {
+		while( cur < ctx->block_count && ctx->blocks[cur].start_pos == i ) {
 			eblock *b = &ctx->blocks[cur];
 			printf("--- BLOCK #%d ---\n", cur);
 			for(int k=0;k<b->phi_count;k++) {

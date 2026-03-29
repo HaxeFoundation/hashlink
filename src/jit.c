@@ -30,9 +30,7 @@ void hl_jit_error( const char *msg, const char *func, int line ) {
 		current_ctx = NULL;
 		hl_emit_dump(ctx);
 	}
-	hl_debug_break();
 	fflush(stdout);
-	exit(-1);
 }
 
 void hl_jit_null_field_access() { jit_assert(); }
