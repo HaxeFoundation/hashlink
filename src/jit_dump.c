@@ -41,13 +41,26 @@ static const char *op_names[] = {
 	"call",
 	"call",
 	"mov",
-	"phi",
 	"alloc-stack",
 	"free-stack",
 	"native-reg",
 	"prefetch",
 	"debug-break",
 };
+
+const char *hl_emit_regstr( ereg v ) {
+	static char fmts[4][10];
+	static int flip = 0;
+	// allow up to four concurrent val_str
+	char *fmt = fmts[flip++&3];
+	if( IS_NULL(v) )
+		sprintf(fmt,"NULL???");
+	else if( v.index < 0 )
+		sprintf(fmt,"P%d",-v.index);
+	else
+		sprintf(fmt,"V%d",v.index);
+	return fmt;
+}
 
 static void hl_dump_arg( hl_function *fun, int fmt, int val, char sep, int pos ) {
 	if( fmt == 0 ) return;
@@ -191,7 +204,7 @@ static void hl_dump_args( jit_ctx *ctx, einstr *e ) {
 	printf("(");
 	for(int i=0;i<e->nargs;i++) {
 		if( i != 0 ) printf(",");
-		printf("V%d", v[i].index);
+		printf("%s", val_str(v[i]));
 	}
 	printf(")");
 }
@@ -280,7 +293,25 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		printf("  ??? MISSING BLOCK FOR RANGE %X-%X\n", cur, ctx->instr_count);
 	// print instrs
 	int vpos = 0;
+	cur = 0;
 	for(i=0;i<ctx->instr_count;i++) {
+		while( ctx->blocks[cur].start_pos == i ) {
+			eblock *b = &ctx->blocks[cur];
+			printf("--- BLOCK #%d ---\n", cur);
+			for(int k=0;k<b->phi_count;k++) {
+				ephi *p = b->phis + k;
+				printf("\t\t@%X %s = phi(",i,val_str(p->value));
+				for(int n=0;n<p->nvalues;n++) {
+					if( n > 0 ) printf(",");
+					printf("%s",val_str(p->values[n]));
+				}
+				printf(")");
+				if( p->nvalues <= 1 )
+					printf(" ???");
+				printf("\n");
+			}
+			cur++;
+		}
 		while( ctx->emit_pos_map[cur_op] == i ) {
 			printf("@%X ", cur_op);
 			hl_dump_op(ctx->fun, f->ops + cur_op);
@@ -307,7 +338,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		default:
 			break;
 		}
-		if( e->mode && e->op != PHI )
+		if( e->mode )
 			printf("%s", emit_mode_str(e->mode));
 		switch( e->op ) {
 		case CALL_FUN:
@@ -324,27 +355,13 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			hl_dump_args(ctx,e);
 			break;
 		case CALL_REG:
-			printf(" V%d", e->a.index);
+			printf(" %s", val_str(e->a));
 			hl_dump_args(ctx,e);
 			break;
 		case CALL_PTR:
 			printf(" ");
 			hl_dump_ptr_name(ctx, (void*)e->value);
 			hl_dump_args(ctx,e);
-			break;
-		case PHI:
-			hl_dump_args(ctx,e);
-			{
-				int i;
-				ereg *args = hl_emit_get_args(ctx->emit, e);
-				for(i=0;i<e->nargs;i++) {
-					einstr *a = ctx->instrs + ctx->values_writes[args[i].index];
-					if( a->mode != e->mode ) {
-						printf(" ???");
-						break;
-					}
-				}
-			}
 			break;
 		case JUMP:
 		case JCOND:
@@ -356,25 +373,27 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			break;
 		case LOAD_ADDR:
 			if( (e->b.index>>8) )
-				printf(" V%d[%Xh]", e->a.index, e->b.index);
+				printf(" %s[%Xh]", val_str(e->a), e->b.index);
 			else
-				printf(" V%d[%d]", e->a.index, e->b.index);
+				printf(" %s[%d]", val_str(e->a), e->b.index);
 			break;
 		case STORE:
 			{
 				int offs = e->size_offs;
 				if( offs == 0 )
-					printf(" [V%d] = V%d", e->a.index, e->b.index);
+					printf(" [%s]", val_str(e->a));
 				else
-					printf(" V%d[%d] = V%d", e->a.index, offs, e->b.index);
-				if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
-					printf(" ???");
+					printf(" %s[%d]", val_str(e->a), offs);
+				printf(" = %s", val_str(e->b));
+				//if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
+				//	printf(" ???");
 			}
 			break;
 		default:
-			if( e->a.index >= 0 ) {
-				printf(" V%d", e->a.index);
-				if( e->b.index >= 0 ) printf(", V%d", e->b.index);
+			if( !IS_NULL(e->a) ) {
+				printf(" %s", val_str(e->a));
+				if( !IS_NULL(e->b) ) printf(", %s", val_str(e->b));
+				if( e->a.index >= vpos || e->b.index >= vpos ) printf(" ???");
 			}
 			if( show_size && e->size_offs != 0 )
 				printf(" %d", e->size_offs);

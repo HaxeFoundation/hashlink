@@ -713,6 +713,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	hl_jit_init(ctx, m);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
+		if( f->findex != 0x16E ) continue;
 		int fpos = hl_jit_function(ctx, m, f);
 		if( fpos < 0 ) {
 			hl_jit_free(ctx, false);

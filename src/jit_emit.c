@@ -25,8 +25,6 @@
 typedef struct {
 	hl_type *t;
 	int id;
-	ereg current;
-	bool written;
 } vreg;
 
 #define MAX_TMP_ARGS	32
@@ -35,6 +33,7 @@ typedef struct {
 
 typedef struct _linked_inf linked_inf;
 typedef struct _emit_block emit_block;
+typedef struct _tmp_phi tmp_phi;
 
 struct _linked_inf {
 	int id;
@@ -47,11 +46,19 @@ struct _emit_block {
 	int start_pos;
 	int end_pos;
 	int wait_nexts;
-	int mark;
+	bool sealed;
 	linked_inf *nexts;
 	linked_inf *preds;
 	linked_inf *written_vars;
-	linked_inf *incomplete_phis;
+	linked_inf *phis;
+	emit_block *wait_seal_next;
+};
+
+struct _tmp_phi {
+	ereg value;
+	vreg *r;
+	emit_block *b;
+	linked_inf *vals;
 };
 
 struct _emit_ctx {
@@ -65,7 +72,8 @@ struct _emit_ctx {
 	int max_regs;
 	int emit_pos;
 	int op_pos;
-	int uid;
+	int phi_count;
+	bool flushed;
 
 	ereg tmp_args[MAX_TMP_ARGS];
 	ereg traps[MAX_TRAPS];
@@ -80,15 +88,14 @@ struct _emit_ctx {
 
 	int_alloc args_data;
 	int_alloc jump_regs;
-	int_alloc block_writes;
-	int_alloc phi_gather;
 	int_alloc values;
 	
 	emit_block *root_block;
 	emit_block *current_block;
+	emit_block *wait_seal;
 	linked_inf *arrival_points;
 	void *closure_list; // TODO : patch with good addresses
-}; 
+};
 
 #define R(i)	(ctx->vregs + (i))
 
@@ -110,7 +117,7 @@ struct _emit_ctx {
 
 static hl_type hlt_ui8 = { HUI8, 0 };
 static hl_type hlt_ui16 = { HUI16, 0 };
-static ereg ENULL = {-1};
+static ereg ENULL = {VAL_NULL};
 
 static linked_inf *link_add( emit_ctx *ctx, int id, void *ptr, linked_inf *head ) {
 	linked_inf *l = hl_malloc(&ctx->jit->falloc,sizeof(linked_inf));
@@ -147,12 +154,54 @@ static linked_inf *link_add_sort_unique( emit_ctx *ctx, int id, void *ptr, linke
 	}
 }
 
+static linked_inf *link_add_sort_replace( emit_ctx *ctx, int id, void *ptr, linked_inf *head ) {
+	linked_inf *prev = NULL;
+	linked_inf *cur = head;
+	while( cur && cur->id < id ) {
+		prev = cur;
+		cur = cur->next;
+	}
+	// replace duplicate
+	if( cur && cur->id == id ) {
+		cur->ptr = ptr;
+		return head;
+	}
+	// insert
+	linked_inf *l = hl_malloc(&ctx->jit->falloc,sizeof(linked_inf));
+	l->id = id;
+	l->ptr = ptr;
+	if( !prev ) {
+		l->next = head;
+		return l;
+	} else {
+		l->next = prev->next;
+		prev->next = l;
+		return head;
+	}
+}
+
 static void *link_sort_lookup( linked_inf *head, int id ) {
 	while( head && head->id < id )
 		head = head->next;
 	if( head && head->id == id )
 		return head->ptr;
 	return NULL;
+}
+
+static void *link_sort_remove( linked_inf *head, int id ) {
+	linked_inf *prev = NULL;
+	linked_inf *cur = head;
+	while( cur && cur->id < id ) {
+		prev = cur;
+		cur = cur->next;
+	}
+	if( cur && cur->id == id ) {
+		if( !prev )
+			return head->ptr;
+		prev->next = cur->next;
+		return head;
+	}
+	return head;
 }
 
 static emit_mode hl_type_mode( hl_type *t ) {
@@ -165,10 +214,6 @@ static emit_mode hl_type_mode( hl_type *t ) {
 	if( t->kind == HGUID )
 		return M_I64;
 	return M_PTR;
-}
-
-void hl_jit_patch_method( void*fun, void**newt ) {
-	jit_assert();
 }
 
 static ereg new_value( emit_ctx *ctx ) {
@@ -218,19 +263,11 @@ static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 
 static void store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
 	if( count < 0 ) jit_assert();
-	if( e->op == PHI ) {
-		if( count > 256 ) jit_error("Too many branches");
-	} else {
-		if( count > 64 ) jit_error("Too many arguments");
-	}
+	if( count > 64 ) jit_error("Too many arguments");
 	e->nargs = (unsigned char)count;
 	if( count == 0 ) return;
 	if( count == 1 ) {
 		e->size_offs = args[0].index;
-		return;
-	}
-	if( e->op == PHI && count <= 3 ) {
-		memcpy(&e->size_offs, args, sizeof(int) * count);
 		return;
 	}
 	int *args_data = int_alloc_get(&ctx->args_data, count);
@@ -242,8 +279,6 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e ) {
 	if( e->nargs == 0 )
 		return NULL;
 	if( e->nargs == 1 )
-		return (ereg*)&e->size_offs;
-	if( e->op == PHI && e->nargs <= 3 )
 		return (ereg*)&e->size_offs;
 	return (ereg*)(ctx->args_data.data + e->size_offs);
 }
@@ -266,16 +301,17 @@ static ereg emit_gen_size( emit_ctx *ctx, emit_op op, int size_offs ) {
 	return emit_gen_ext(ctx,op,ENULL,ENULL,op==ALLOC_STACK ? M_PTR : 0,size_offs);
 }
 
-static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
-	unsigned char mode = GET_WRITE(v1).mode;
-	if( mode != GET_WRITE(v2).mode ) jit_assert();
-	einstr *e = emit_instr(ctx, PHI);
-	e->mode = mode;
-	ereg args[2];
-	args[0] = v1;
-	args[1] = v2;
-	store_args(ctx, e, args, 2);
-	return new_value(ctx);
+static void patch_instr_mode( emit_ctx *ctx, int mode ) {
+	ctx->instrs[ctx->emit_pos-1].mode = (unsigned char)mode;
+}
+
+static tmp_phi *alloc_phi( emit_ctx *ctx, emit_block *b, vreg *r ) {
+	tmp_phi *p = (tmp_phi*)hl_zalloc(&ctx->jit->falloc, sizeof(tmp_phi));
+	p->b = b;
+	p->r = r;
+	p->value.index = -(++ctx->phi_count);
+	b->phis = link_add(ctx, r->id, p, b->phis);
+	return p;
 }
 
 static int emit_jump( emit_ctx *ctx, bool cond ) {
@@ -292,41 +328,44 @@ static emit_block *alloc_block( emit_ctx *ctx ) {
 	return hl_zalloc(&ctx->jit->falloc, sizeof(emit_block));
 }
 
-static void block_add_prec( emit_ctx *ctx, emit_block *b, emit_block *p ) {
+static void block_add_pred( emit_ctx *ctx, emit_block *b, emit_block *p ) {
 	b->preds = link_add(ctx,0,p,b->preds);
 	p->nexts = link_add(ctx,0,b,p->nexts);
-	jit_debug("  PRED %d\n",p->id);
+	jit_debug("  PRED #%d\n",p->id);
 }
 
-static void flush_block( emit_ctx *ctx ) {
-	int i = 0;
-	emit_block *cur = ctx->current_block;
-	while( i < ctx->block_writes.cur ) {
-		vreg *r = R(ctx->block_writes.data[i++]);
-		cur->written_vars = link_add_sort_unique(ctx,r->id,(void*)(int_val)(r->current.index+1),cur->written_vars);
-		jit_debug("  WRITES R%d @%X\n", r->id, r->current.index);
-		r->current.index = -1;
-		r->written = false;
-	}
-	int_alloc_reset(&ctx->block_writes);
+static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
+	if( IS_NULL(v) ) jit_assert();
+	b->written_vars = link_add_sort_replace(ctx,r->id,(void*)(int_val)(v.index < 0 ? v.index : v.index + 1),b->written_vars); 
+}
+
+static ereg lookup_block_var( emit_block *b, vreg *r ) {
+	void *p = link_sort_lookup(b->written_vars,r->id);
+	if( !p ) return ENULL;
+	int e = (int)(int_val)p;
+	ereg v;
+	v.index = e < 0 ? e : e-1;
+	return v;
+}
+
+static void remove_block_var( emit_block *b, vreg *r ) {
+	b->written_vars = link_sort_remove(b->written_vars, r->id);
 }
 
 static void split_block( emit_ctx *ctx ) {
-	flush_block(ctx);
-
-	// split
 	emit_block *b = alloc_block(ctx);
+	b->sealed = true;
 	b->id = ctx->current_block->id + 1;
 	b->start_pos = ctx->emit_pos;
-	jit_debug("BLOCK #%d@%X\n",b->id,ctx->op_pos);
+	jit_debug("BLOCK #%d@%X[%X]\n",b->id,b->start_pos,ctx->op_pos);
 	while( ctx->arrival_points && ctx->arrival_points->id == ctx->op_pos ) {
-		block_add_prec(ctx, b, (emit_block*)ctx->arrival_points->ptr);
+		block_add_pred(ctx, b, (emit_block*)ctx->arrival_points->ptr);
 		ctx->arrival_points = ctx->arrival_points->next;
 	}
 	bool dead_code = b->preds == NULL; // if we have no reach, force previous block dependency, this is rare dead code emit by compiler
 	einstr *eprev = &ctx->instrs[ctx->emit_pos-1];
-	if( (eprev->op != JUMP && eprev->op != RET) || ctx->fun->ops[ctx->op_pos].op == OTrap || dead_code )
-		block_add_prec(ctx, b, ctx->current_block);
+	if( (eprev->op != JUMP && eprev->op != RET && eprev->mode != M_NORET) || ctx->fun->ops[ctx->op_pos].op == OTrap || dead_code )
+		block_add_pred(ctx, b, ctx->current_block);
 	ctx->current_block->end_pos = ctx->emit_pos - 1;
 	ctx->current_block = b;
 }
@@ -359,12 +398,8 @@ static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t ) 
 
 static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 	if( to->t->kind == HVOID ) return;
-	if( v.index < 0 ) jit_assert();
-	if( !to->written ) {
-		to->written = true;
-		int_alloc_store(&ctx->block_writes,to->id);
-	}
-	to->current = v;
+	if( IS_NULL(v) ) jit_assert();
+	store_block_var(ctx,ctx->current_block,to,v);
 }
 
 static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int nargs, hl_type *ret ) {
@@ -383,59 +418,94 @@ static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_typ
 	return e->mode == M_VOID ? ENULL : new_value(ctx);
 }
 
-static void patch_instr_mode( emit_ctx *ctx, int mode ) {
-	ctx->instrs[ctx->emit_pos-1].mode = (unsigned char)mode;
-}
-
 static void emit_test( emit_ctx *ctx, ereg v, hl_op o ) {
 	emit_gen_ext(ctx, TEST, v, ENULL, 0, o);
 	patch_instr_mode(ctx, GET_WRITE(v).mode);
 }
 
-static void emit_gather_phi_rec( emit_ctx *ctx, emit_block *b, vreg *r, int uid ) {
-	if( b->wait_nexts > 0 ) {
-		if( ctx->instrs[ctx->emit_pos-1].op != PHI ) jit_assert();
-		int_alloc_store_unique(&ctx->phi_gather, -1);
-		b->incomplete_phis = link_add_sort_unique(ctx, ctx->emit_pos - 1, r, b->incomplete_phis);
+static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
+	if( !p->b ) jit_assert();
+	if( IS_NULL(v) ) jit_assert();
+	if( link_sort_lookup(p->vals,v.index) )
 		return;
-	}
-	if( b->mark == uid )
-		return;
-	b->mark = uid;
-	int eid = (int)(int_val)link_sort_lookup(b->written_vars, r->id) - 1;
-	if( eid >= 0 ) {
-		if( eid != ctx->emit_pos - 1 )
-			int_alloc_store_unique(&ctx->phi_gather, eid);
-	} else {
-		linked_inf *l = b->preds;
-		while( l ) {
-			emit_gather_phi_rec(ctx, (emit_block*)l->ptr, r, uid);
+	jit_debug("  PHI-DEP %s = %s\n", val_str(p->value), val_str(v));
+	p->vals = link_add_sort_unique(ctx,v.index,p,p->vals);
+}
+
+static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
+	ereg same = ENULL;
+	linked_inf *l = p->vals;
+	while( l ) {
+		if( l->id == same.index || l->id == p->value.index ) {
 			l = l->next;
+			continue;
 		}
+		if( !IS_NULL(same) )
+			return p->value;
+		same.index = l->id;
+		l = l->next;
 	}
+	if( IS_NULL(same) ) jit_assert(); // unwritten var access ?
+	// TODO
+	jit_debug("  PHI-OPT %s = %s\n", val_str(p->value), val_str(same));
+	return same;
+}
+
+static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r );
+
+static ereg gather_phis( emit_ctx *ctx, tmp_phi *p ) {
+	linked_inf *l = p->b->preds;
+	while( l ) {
+		ereg r = emit_load_reg_block(ctx, (emit_block*)l->ptr, p->r);
+		phi_add_val(ctx, p, r);
+		l = l->next;
+	}
+	return optimize_phi_rec(ctx, p);
+}
+
+static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r ) {
+	ereg v = lookup_block_var(b,r);
+	if( !IS_NULL(v) )
+		return v;
+	if( !b->sealed ) {
+		tmp_phi *p = alloc_phi(ctx,b,r);
+		v = p->value;
+	} else if( b->preds && !b->preds->next )
+		v = emit_load_reg_block(ctx, (emit_block*)b->preds->ptr, r);
+	else {
+		tmp_phi *p = alloc_phi(ctx,b,r);
+		store_block_var(ctx,b,r,p->value);
+		v = gather_phis(ctx, p);
+	}
+	store_block_var(ctx,b,r,v);
+	return v;
 }
 
 static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
-	if( r->current.index < 0 ) {
-		ereg ref = resolve_ref(ctx, r->id);
-		if( ref.index >= 0 )
-			return LOAD_MEM(ref,0,r->t);
-		einstr *p = emit_instr(ctx, PHI);
-		p->mode = hl_type_mode(r->t);
-		int_alloc_reset(&ctx->phi_gather);
-		emit_gather_phi_rec(ctx, ctx->current_block, r, ++ctx->uid);
-		if( ctx->phi_gather.cur == 1 && ctx->phi_gather.data[0] != -1 ) {
-			jit_debug("  SKIP-PHI @%X\n",ctx->emit_pos-1);
-			// remove phi
-			ctx->emit_pos--;
-			r->current.index = ctx->phi_gather.data[0];
-		} else {
-			if( ctx->phi_gather.cur == 0 ) jit_assert();
-			store_args(ctx, p, (ereg*)ctx->phi_gather.data, ctx->phi_gather.cur);
-			r->current = new_value(ctx);
-		}
+	ereg ref = resolve_ref(ctx, r->id);
+	if( ref.index >= 0 )
+		return LOAD_MEM(ref,0,r->t);
+	return emit_load_reg_block(ctx, ctx->current_block, r);
+}
+
+static void seal_block( emit_ctx *ctx, emit_block *b ) {
+	jit_debug("  SEAL #%d\n",b->id);
+	linked_inf *l = b->phis;
+	while( l ) {
+		tmp_phi *p = (tmp_phi*)l->ptr;
+		gather_phis(ctx, p);
+		l = l->next;
 	}
-	return r->current;
+	b->sealed = true;
+}
+
+static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
+	unsigned char mode = GET_WRITE(v1).mode;
+	if( mode != GET_WRITE(v2).mode ) jit_assert();
+	tmp_phi *p = alloc_phi(ctx, ctx->current_block, NULL);
+	phi_add_val(ctx, p, v1);
+	phi_add_val(ctx, p, v2);
+	return p->value;
 }
 
 static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int *args_regs ) {
@@ -577,7 +647,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o );
 
 static void emit_write_blocks( jit_ctx *jit, emit_block *b ) {
 	eblock *bl = jit->blocks + b->id;
-	if( bl->id ) return; // already set
+	if( bl->id >= 0 ) return; // already set
 	bl->id = b->id;
 	bl->start_pos = b->start_pos;
 	bl->end_pos = b->end_pos;
@@ -609,11 +679,40 @@ static void emit_write_blocks( jit_ctx *jit, emit_block *b ) {
 		if( n->start_pos > b->start_pos ) emit_write_blocks(jit, n);
 		tmp = tmp->next;
 	}
+	// write phis
+	tmp = b->phis;
+	while( tmp ) {
+		bl->phi_count++;
+		tmp = tmp->next;
+	}
+	bl->phis = (ephi*)hl_zalloc(&jit->falloc,sizeof(ephi)*bl->phi_count);
+	tmp = b->phis;
+	i = 0;
+	while( tmp ) {
+		tmp_phi *p = (tmp_phi*)tmp->ptr;
+		ephi *p2 = bl->phis + i++;
+		p2->value = p->value;
+		linked_inf *l = p->vals;
+		while( l ) {
+			p2->nvalues++;
+			l = l->next;
+		}
+		p2->values = (ereg*)hl_malloc(&jit->falloc,sizeof(ereg)*p2->nvalues);
+		l = p->vals;
+		int k = 0;
+		while( l ) {
+			p2->values[k++].index = l->id;
+			l = l->next;
+		}
+		tmp = tmp->next;
+	}
 }
 
 void hl_emit_flush( jit_ctx *jit ) {
 	emit_ctx *ctx = jit->emit;
 	int i = 0;
+	if( ctx->flushed ) return;
+	ctx->flushed = true;
 	while( i < ctx->jump_regs.cur ) {
 		int pos = ctx->jump_regs.data[i++];
 		einstr *e = ctx->instrs + pos;
@@ -627,6 +726,8 @@ void hl_emit_flush( jit_ctx *jit ) {
 	jit->emit_pos_map = ctx->pos_map;
 	jit->block_count = ctx->current_block->id + 1;
 	jit->blocks = hl_zalloc(&jit->falloc,sizeof(eblock) * jit->block_count);
+	for(i=0;i<jit->block_count;i++)
+		jit->blocks[i].id = -1;
 	jit->value_count = ctx->values.cur;
 	jit->values_writes = ctx->values.data;
 	emit_write_blocks(jit, ctx->root_block);
@@ -641,11 +742,13 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->emit_pos = 0;
 	ctx->trap_count = 0;
 	ctx->ref_count = 0;
+	ctx->phi_count = 0;
+	ctx->flushed = false;
 	int_alloc_reset(&ctx->args_data);
 	int_alloc_reset(&ctx->jump_regs);
-	int_alloc_reset(&ctx->block_writes);
 	int_alloc_reset(&ctx->values);
 	ctx->root_block = ctx->current_block = alloc_block(ctx);
+	ctx->current_block->sealed = true;
 	ctx->arrival_points = NULL;
 	jit_debug("---- begin [%X] ----\n",f->findex);
 	if( f->nregs > ctx->max_regs ) {
@@ -667,8 +770,6 @@ void hl_emit_function( jit_ctx *jit ) {
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
-		r->current = ENULL;
-		r->written = false;
 	}
 
 	for(i=0;i<f->type->fun->nargs;i++) {
@@ -716,7 +817,7 @@ void hl_emit_free( jit_ctx *jit ) {
 	free(ctx->pos_map);
 	int_alloc_free(&ctx->jump_regs);
 	int_alloc_free(&ctx->args_data);
-	int_alloc_free(&ctx->block_writes);
+	int_alloc_free(&ctx->values);
 	free(ctx);
 	jit->emit = NULL;
 }
@@ -726,26 +827,11 @@ static bool seal_block_rec( emit_ctx *ctx, emit_block *b, int target ) {
 		return false;
 	if( b->start_pos == target ) {
 		b->wait_nexts--;
-		b->preds = link_add(ctx,0,ctx->current_block,b->preds);
-		flush_block(ctx);
-		if( b->wait_nexts == 0 ) {
-			jit_debug("  SEAL #%d\n",b->id);
-			// seal block
-			linked_inf *l = b->incomplete_phis;
-			while( l ) {
-				einstr *e = ctx->instrs + l->id;
-				vreg *r = (vreg*)l->ptr;
-				if( e->op != PHI ) jit_assert();
-				int prev_emit = ctx->emit_pos;
-				ctx->emit_pos = l->id + 1;
-				int_alloc_reset(&ctx->phi_gather);
-				emit_gather_phi_rec(ctx, b, r, ++ctx->uid);
-				ctx->emit_pos = prev_emit;
-				store_args(ctx, e, (ereg*)ctx->phi_gather.data, ctx->phi_gather.cur);
-				b->written_vars = link_add_sort_unique(ctx,r->id,(void*)(int_val)(l->id + 1), b->written_vars);
-				l = l->next;
-			}
-			b->incomplete_phis = NULL;
+		block_add_pred(ctx, b, ctx->current_block);
+		while( b && b->wait_nexts == 0 && ctx->wait_seal == b ) {
+			seal_block(ctx,b);
+			b = b->wait_seal_next;
+			ctx->wait_seal = b;
 		}
 		return true;
 	}
@@ -766,6 +852,51 @@ static void register_block_jump( emit_ctx *ctx, int offs, bool cond ) {
 		int target = ctx->pos_map[ctx->op_pos + 1 + offs];
 		emit_block *b = ctx->current_block;
 		if( !seal_block_rec(ctx, b, target) ) jit_assert();
+	}
+}
+
+static void prepare_loop_block( emit_ctx *ctx ) {
+	int i, last_jump = -1;
+	emit_block *b = ctx->current_block;
+	// gather all backward jumps to know when the block will be finished
+	for(i=ctx->op_pos+1;i<ctx->fun->nops;i++) {
+		hl_opcode *op = &ctx->fun->ops[i];
+		int offs = 0;
+		switch( op->op ) {
+		case OJFalse:
+		case OJTrue:
+		case OJNotNull:
+		case OJNull:
+			offs = op->p2;
+			break;
+		case OJAlways:
+			offs = op->p1;
+			break;
+		case OJEq:
+		case OJNotEq:
+		case OJSLt:
+		case OJSGte:
+		case OJSLte:
+		case OJSGt:
+		case OJULt:
+		case OJUGte:
+		case OJNotLt:
+		case OJNotGte:
+			offs = op->p3;
+			break;
+		default:
+			break;
+		}
+		if( offs < 0 && i + 1 + offs == ctx->op_pos ) {
+			jit_debug("  WAIT @%X\n",i);
+			b->wait_nexts++;
+			if( b->sealed ) {
+				b->sealed = false;
+				b->wait_seal_next = ctx->wait_seal;
+				ctx->wait_seal = b;
+			}
+			last_jump = i;
+		}
 	}
 }
 
@@ -1246,45 +1377,9 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case OLabel:
-		// NOP
-		{
-			if( ctx->current_block->start_pos != ctx->emit_pos )
-				split_block(ctx);
-			int i;
-			for(i=ctx->op_pos+1;i<ctx->fun->nops;i++) {
-				hl_opcode *op = &ctx->fun->ops[i];
-				int offs = 0;
-				switch( op->op ) {
-				case OJFalse:
-				case OJTrue:
-				case OJNotNull:
-				case OJNull:
-					offs = op->p2;
-					break;
-				case OJAlways:
-					offs = op->p1;
-					break;
-				case OJEq:
-				case OJNotEq:
-				case OJSLt:
-				case OJSGte:
-				case OJSLte:
-				case OJSGt:
-				case OJULt:
-				case OJUGte:
-				case OJNotLt:
-				case OJNotGte:
-					offs = op->p3;
-					break;
-				default:
-					break;
-				}
-				if( offs < 0 && i + 1 + offs == ctx->op_pos ) {
-					jit_debug("  WAIT @%X\n",i);
-					ctx->current_block->wait_nexts++;
-				}
-			}
-		}
+		if( ctx->current_block->start_pos != ctx->emit_pos )
+			split_block(ctx);
+		prepare_loop_block(ctx);
 		break;
 	case OGetI8:
 	case OGetI16:
@@ -1367,9 +1462,12 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case ORef:
 		{
 			ereg ref = resolve_ref(ctx, ra->id);
-			if( ref.index < 0 ) jit_assert();
-			if( ra->current.index >= 0 ) STORE_MEM(ref, 0, LOAD(ra));
-			ra->current.index = -1; // ref will be modified
+			if( IS_NULL(ref) ) jit_assert();
+			ereg r = lookup_block_var(ctx->current_block, ra);
+			if( !IS_NULL(r) ) {
+				STORE_MEM(ref, 0, LOAD(ra));
+				remove_block_var(ctx->current_block, ra);
+			}
 			STORE(dst, ref);
 		}
 		break;

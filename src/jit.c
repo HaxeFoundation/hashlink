@@ -69,15 +69,6 @@ void int_alloc_store( int_alloc *a, int v ) {
 	*int_alloc_get(a,1) = v;
 }
 
-void int_alloc_store_unique( int_alloc *a, int v ) {
-	int i = 0;
-	while( i < a->cur ) {
-		if( a->data[i] == v ) return;
-		i++;
-	}
-	*int_alloc_get(a,1) = v;
-}
-
 void hl_emit_alloc( jit_ctx *jit );
 void hl_emit_free( jit_ctx *jit );
 void hl_emit_function( jit_ctx *jit );
@@ -116,4 +107,8 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	printf("TODO:emit_code\n");
 	exit(0);
 	return NULL;
+}
+
+void hl_jit_patch_method( void*fun, void**newt ) {
+	jit_assert();
 }
