@@ -57,8 +57,11 @@ struct _emit_block {
 struct _tmp_phi {
 	ereg value;
 	vreg *r;
+	bool locked;
+	unsigned char mode;
 	emit_block *b;
 	linked_inf *vals;
+	linked_inf *uses;
 };
 
 struct _emit_ctx {
@@ -68,11 +71,14 @@ struct _emit_ctx {
 
 	einstr *instrs;
 	vreg *vregs;
+	tmp_phi **phis;
 	int max_instrs;
 	int max_regs;
+	int max_phis;
 	int emit_pos;
 	int op_pos;
 	int phi_count;
+	int phi_depth;
 	bool flushed;
 
 	ereg tmp_args[MAX_TMP_ARGS];
@@ -109,8 +115,8 @@ struct _emit_ctx {
 #define LOAD_OBJ_METHOD(obj,id) LOAD_MEM_PTR(LOAD_MEM_PTR(LOAD_MEM_PTR(obj,0),HL_WSIZE*2),HL_WSIZE*(id))
 #define OFFSET(base,index,mult,offset) emit_gen_ext(ctx, LEA, base, index, M_PTR, (mult) | ((offset) << 8))
 #define BREAK() emit_gen(ctx, DEBUG_BREAK, ENULL, ENULL, 0)
-#define GET_WRITE(r) ctx->instrs[ctx->values.data[(r).index]]
-
+#define GET_MODE(r) emit_get_mode(ctx,r)
+#define GET_PHI(r) ctx->phis[-(r).index-1]
 #define HDYN_VALUE 8
 
 #define IS_FLOAT(t)	((t)->kind == HF64 || (t)->kind == HF32)
@@ -188,7 +194,7 @@ static void *link_sort_lookup( linked_inf *head, int id ) {
 	return NULL;
 }
 
-static void *link_sort_remove( linked_inf *head, int id ) {
+static linked_inf *link_sort_remove( linked_inf *head, int id ) {
 	linked_inf *prev = NULL;
 	linked_inf *cur = head;
 	while( cur && cur->id < id ) {
@@ -197,7 +203,7 @@ static void *link_sort_remove( linked_inf *head, int id ) {
 	}
 	if( cur && cur->id == id ) {
 		if( !prev )
-			return head->ptr;
+			return cur->next;
 		prev->next = cur->next;
 		return head;
 	}
@@ -235,6 +241,22 @@ static ereg resolve_ref( emit_ctx *ctx, int reg ) {
 	return ENULL;
 }
 
+static unsigned char emit_get_mode( emit_ctx *ctx, ereg v ) {
+	if( IS_NULL(v) ) jit_assert();
+	if( v.index < 0 )
+		return GET_PHI(v)->mode;
+	return ctx->instrs[ctx->values.data[v.index]].mode;
+}
+
+static const char *phi_prefix( emit_ctx *ctx ) {
+	static char tmp[20];
+	int sp = 3 + ctx->phi_depth * 2;
+	if( sp > 19 ) sp = 19;
+	memset(tmp,0x20,sp);
+	tmp[sp] = 0;
+	return tmp;
+}
+
 static einstr *emit_instr( emit_ctx *ctx, emit_op op ) {
 	if( ctx->emit_pos == ctx->max_instrs ) {
 		int pos = ctx->emit_pos;
@@ -255,7 +277,7 @@ static einstr *emit_instr( emit_ctx *ctx, emit_op op ) {
 
 static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 	einstr *e = emit_instr(ctx, STORE);
-	e->mode = GET_WRITE(from).mode;
+	e->mode = GET_MODE(from);
 	e->size_offs = offs;
 	e->a = to;
 	e->b = from;
@@ -306,11 +328,22 @@ static void patch_instr_mode( emit_ctx *ctx, int mode ) {
 }
 
 static tmp_phi *alloc_phi( emit_ctx *ctx, emit_block *b, vreg *r ) {
+	if( ctx->phi_count == ctx->max_phis ) {
+		int new_size = ctx->max_phis ? ctx->max_phis << 1 : 64;
+		tmp_phi **phis = (tmp_phi**)malloc(sizeof(tmp_phi*) * new_size);
+		if( phis == NULL ) jit_error("Out of memory");
+		memcpy(phis, ctx->phis, sizeof(tmp_phi*) * ctx->phi_count);
+		free(ctx->phis);
+		ctx->phis = phis;
+		ctx->max_phis = new_size;
+	}
 	tmp_phi *p = (tmp_phi*)hl_zalloc(&ctx->jit->falloc, sizeof(tmp_phi));
 	p->b = b;
 	p->r = r;
+	if( r ) p->mode = hl_type_mode(r->t);
 	p->value.index = -(++ctx->phi_count);
-	b->phis = link_add(ctx, r->id, p, b->phis);
+	b->phis = link_add(ctx, 0, p, b->phis);
+	GET_PHI(p->value) = p;
 	return p;
 }
 
@@ -420,19 +453,31 @@ static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_typ
 
 static void emit_test( emit_ctx *ctx, ereg v, hl_op o ) {
 	emit_gen_ext(ctx, TEST, v, ENULL, 0, o);
-	patch_instr_mode(ctx, GET_WRITE(v).mode);
+	patch_instr_mode(ctx, GET_MODE(v));
+}
+
+static void phi_remove_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
+	p->vals = link_sort_remove(p->vals,v.index);
+	jit_debug("%sPHI-REM-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
 }
 
 static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 	if( !p->b ) jit_assert();
 	if( IS_NULL(v) ) jit_assert();
+	if( p->value.index == v.index )
+		return;
 	if( link_sort_lookup(p->vals,v.index) )
 		return;
-	jit_debug("  PHI-DEP %s = %s\n", val_str(p->value), val_str(v));
+	jit_debug("%sPHI-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
 	p->vals = link_add_sort_unique(ctx,v.index,p,p->vals);
+	if( v.index < 0 ) {
+		tmp_phi *p2 = GET_PHI(v);
+		p2->uses = link_add(ctx,0,p,p2->uses);
+	}
 }
 
 static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
+	if( p->locked ) jit_assert();
 	ereg same = ENULL;
 	linked_inf *l = p->vals;
 	while( l ) {
@@ -445,9 +490,30 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 		same.index = l->id;
 		l = l->next;
 	}
-	if( IS_NULL(same) ) jit_assert(); // unwritten var access ?
-	// TODO
-	jit_debug("  PHI-OPT %s = %s\n", val_str(p->value), val_str(same));
+	if( IS_NULL(same) ) 
+		same = p->value; // unwritten var access ?
+	if( !p->uses )
+		return same;
+
+	jit_debug("%sPHI-OPT %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
+	ctx->phi_depth++;
+	l = p->uses;
+	while( l ) {
+		tmp_phi *p2 = (tmp_phi*)l->ptr;
+		phi_remove_val(ctx,p2,p->value);
+		phi_add_val(ctx,p2,same);
+		l = l->next;
+	}
+	l = p->uses;
+	p->uses = NULL;
+	while( l ) {
+		tmp_phi *p2 = (tmp_phi*)l->ptr;
+		optimize_phi_rec(ctx, p2);
+		l = l->next;
+	}
+	ctx->phi_depth--;
+	same = optimize_phi_rec(ctx,p); // check again
+	jit_debug("%sPHI-OPT-DONE %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
 	return same;
 }
 
@@ -455,11 +521,13 @@ static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r );
 
 static ereg gather_phis( emit_ctx *ctx, tmp_phi *p ) {
 	linked_inf *l = p->b->preds;
+	p->locked = true;
 	while( l ) {
-		ereg r = emit_load_reg_block(ctx, (emit_block*)l->ptr, p->r);
+		ereg r = p->r ? emit_load_reg_block(ctx, (emit_block*)l->ptr, p->r) : p->value;
 		phi_add_val(ctx, p, r);
 		l = l->next;
 	}
+	p->locked = false;
 	return optimize_phi_rec(ctx, p);
 }
 
@@ -500,9 +568,10 @@ static void seal_block( emit_ctx *ctx, emit_block *b ) {
 }
 
 static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
-	unsigned char mode = GET_WRITE(v1).mode;
-	if( mode != GET_WRITE(v2).mode ) jit_assert();
+	unsigned char mode = GET_MODE(v1);
+	if( mode != GET_MODE(v2) ) jit_assert();
 	tmp_phi *p = alloc_phi(ctx, ctx->current_block, NULL);
+	p->mode = mode;
 	phi_add_val(ctx, p, v1);
 	phi_add_val(ctx, p, v2);
 	return p->value;
