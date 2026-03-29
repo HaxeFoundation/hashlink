@@ -44,7 +44,6 @@ typedef enum {
 	CALL_REG,
 	CALL_FUN,
 	MOV,
-	PHI,
 	ALLOC_STACK,
 	FREE_STACK,
 	NATIVE_REG,
@@ -93,6 +92,8 @@ typedef struct {
 	};
 } einstr;
 
+#define VAL_NULL 0x80000000
+#define IS_NULL(e) ((e).index == VAL_NULL)
 
 typedef struct {
 	int *data;
@@ -100,14 +101,24 @@ typedef struct {
 	int cur;
 } int_alloc;
 
+typedef struct _ephi ephi;
+
+struct _ephi {
+	ereg value;
+	int nvalues;
+	ereg *values;
+};
+
 typedef struct _eblock {
 	int id;
 	int start_pos;
 	int end_pos;
 	int next_count;
 	int pred_count;
-	int *preds;
+	int phi_count;
 	int *nexts;
+	int *preds;
+	ephi *phis;
 } eblock;
 
 typedef struct _emit_ctx emit_ctx;
@@ -143,11 +154,13 @@ void int_alloc_reset( int_alloc *a );
 void int_alloc_free( int_alloc *a );
 int *int_alloc_get( int_alloc *a, int count );
 void int_alloc_store( int_alloc *a, int v );
-void int_alloc_store_unique( int_alloc *a, int v );
-
 
 void hl_emit_dump( jit_ctx *ctx );
+const char *hl_emit_regstr( ereg v );
 ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
+
+#define val_str(v) hl_emit_regstr(v)
+
 
 #ifdef HL_DEBUG
 #	define JIT_DEBUG
