@@ -21,6 +21,7 @@
  */
 #include <hlmodule.h>
 #include <jit.h>
+#include "data_struct.h"
 
 typedef struct {
 	hl_type *t;
@@ -35,6 +36,14 @@ typedef struct _linked_inf linked_inf;
 typedef struct _emit_block emit_block;
 typedef struct _tmp_phi tmp_phi;
 
+#define DEF_ALLOC &ctx->jit->falloc
+
+#define S_TYPE			blocks
+#define S_NAME(name)	blocks_##name
+#define S_VALUE			emit_block*
+#include "data_struct.c"
+#define blocks_add(set,v)		blocks_add_impl(DEF_ALLOC,&(set),v)
+
 struct _linked_inf {
 	int id;
 	void *ptr;
@@ -48,9 +57,9 @@ struct _emit_block {
 	int wait_nexts;
 	int mark;
 	bool sealed;
-	linked_inf *nexts;
-	linked_inf *preds;
-	linked_inf *written_vars;
+	blocks nexts;
+	blocks preds;
+	int_map written_vars;
 	linked_inf *phis;
 	emit_block *wait_seal_next;
 };
@@ -367,14 +376,14 @@ static emit_block *alloc_block( emit_ctx *ctx ) {
 }
 
 static void block_add_pred( emit_ctx *ctx, emit_block *b, emit_block *p ) {
-	b->preds = link_add(ctx,0,p,b->preds);
-	p->nexts = link_add(ctx,0,b,p->nexts);
+	blocks_add(b->preds,p);
+	blocks_add(p->nexts,b);
 	jit_debug("  PRED #%d\n",p->id);
 }
 
 static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
 	if( IS_NULL(v) ) jit_assert();
-	b->written_vars = link_add_sort_replace(ctx,r->id,(void*)(int_val)(v.index < 0 ? v.index : v.index + 1),b->written_vars); 
+	int_map_replace(b->written_vars,r->id,v.index < 0 ? v.index : v.index + 1); 
 	if( v.index < 0 ) {
 		tmp_phi *p = GET_PHI(v);
 		p->ref_blocks = link_add_sort_unique(ctx,b->id,b,p->ref_blocks);
@@ -382,16 +391,11 @@ static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
 }
 
 static ereg lookup_block_var( emit_block *b, vreg *r ) {
-	void *p = link_sort_lookup(b->written_vars,r->id);
-	if( !p ) return ENULL;
-	int e = (int)(int_val)p;
+	int e = int_map_find(b->written_vars,r->id);
+	if( !e ) return ENULL;
 	ereg v;
 	v.index = e < 0 ? e : e-1;
 	return v;
-}
-
-static void remove_block_var( emit_block *b, vreg *r ) {
-	b->written_vars = link_sort_remove(b->written_vars, r->id);
 }
 
 static void split_block( emit_ctx *ctx ) {
@@ -404,7 +408,7 @@ static void split_block( emit_ctx *ctx ) {
 		block_add_pred(ctx, b, (emit_block*)ctx->arrival_points->ptr);
 		ctx->arrival_points = ctx->arrival_points->next;
 	}
-	bool dead_code = b->preds == NULL; // if we have no reach, force previous block dependency, this is rare dead code emit by compiler
+	bool dead_code = blocks_count(b->preds) == 0; // if we have no reach, force previous block dependency, this is rare dead code emit by compiler
 	einstr *eprev = &ctx->instrs[ctx->emit_pos-1];
 	if( (eprev->op != JUMP && eprev->op != RET && eprev->mode != M_NORET) || ctx->fun->ops[ctx->op_pos].op == OTrap || dead_code )
 		block_add_pred(ctx, b, ctx->current_block);
@@ -434,6 +438,7 @@ static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t ) 
 	einstr *e = emit_instr(ctx, LOAD_ADDR);
 	e->mode = hl_type_mode(size_t);
 	e->a = v;
+	e->b = ENULL;
 	e->size_offs = offset;
 	return new_value(ctx);
 }
@@ -541,12 +546,10 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r );
 
 static ereg gather_phis( emit_ctx *ctx, tmp_phi *p ) {
-	linked_inf *l = p->b->preds;
 	p->locked = true;
-	while( l ) {
-		ereg r = p->r ? emit_load_reg_block(ctx, (emit_block*)l->ptr, p->r) : p->value;
+	for_iter(blocks,b,p->b->preds) {
+		ereg r = p->r ? emit_load_reg_block(ctx, b, p->r) : p->value;
 		phi_add_val(ctx, p, r);
-		l = l->next;
 	}
 	p->locked = false;
 	return optimize_phi_rec(ctx, p);
@@ -560,8 +563,8 @@ static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r ) {
 		tmp_phi *p = alloc_phi(ctx,b,r);
 		jit_debug("%sPHI-SEALED %s = R%d\n",phi_prefix(ctx),val_str(p->value),r->id);
 		v = p->value;
-	} else if( b->preds && !b->preds->next )
-		v = emit_load_reg_block(ctx, (emit_block*)b->preds->ptr, r);
+	} else if( blocks_count(b->preds) == 1 )
+		v = emit_load_reg_block(ctx, blocks_get(b->preds,0), r);
 	else {
 		tmp_phi *p = alloc_phi(ctx,b,r);
 		store_block_var(ctx,b,r,p->value);
@@ -575,11 +578,8 @@ static void emit_walk_blocks_rec( emit_ctx *ctx, emit_block *b, int mark, void (
 	if( b->mark == mark ) return;
 	b->mark = mark;
 	fun(ctx, b);
-	linked_inf *tmp = b->nexts;
-	while( tmp ) {
-		emit_walk_blocks_rec(ctx,(emit_block*)tmp->ptr,mark,fun);
-		tmp = tmp->next;
-	}
+	for_iter(blocks,n,b->nexts)
+		emit_walk_blocks_rec(ctx,n,mark,fun);
 }
 
 static void emit_walk_blocks( emit_ctx *ctx, void (*fun)(emit_ctx*,emit_block*) ) {
@@ -776,35 +776,16 @@ static void emit_write_block( emit_ctx *ctx, emit_block *b ) {
 	bl->id = b->id;
 	bl->start_pos = b->start_pos;
 	bl->end_pos = b->end_pos;
-	linked_inf *tmp;
-	tmp = b->preds;
-	while( tmp ) {
-		bl->pred_count++;
-		tmp = tmp->next;
-	}
-	tmp = b->nexts;
-	while( tmp ) {
-		bl->next_count++;
-		tmp = tmp->next;
-	}
+	bl->pred_count = blocks_count(b->preds);
+	bl->next_count = blocks_count(b->nexts);
 	bl->preds = (int*)hl_malloc(&jit->falloc,sizeof(int)*bl->pred_count);
 	bl->nexts = (int*)hl_malloc(&jit->falloc,sizeof(int)*bl->next_count);
-	int i;
-	i = 0;
-	tmp = b->preds;
-	while( tmp ) {
-		bl->preds[i++] = ((emit_block*)tmp->ptr)->id;
-		tmp = tmp->next;
-	}
-	i = 0;
-	tmp = b->nexts;
-	while( tmp ) {
-		emit_block *n = (emit_block*)tmp->ptr;
-		bl->nexts[i++] = n->id;
-		tmp = tmp->next;
-	}
+	for(int i=0;i<bl->pred_count;i++)
+		bl->preds[i++] = blocks_get(b->preds,i)->id;
+	for(int i=0;i<bl->next_count;i++)
+		bl->nexts[i++] = blocks_get(b->nexts,i)->id;
 	// write phis
-	tmp = b->phis;
+	linked_inf *tmp = b->phis;
 	while( tmp ) {
 		tmp_phi *p = (tmp_phi*)tmp->ptr;
 		if( p->final_id >= 0 )
@@ -813,7 +794,7 @@ static void emit_write_block( emit_ctx *ctx, emit_block *b ) {
 	}
 	bl->phis = (ephi*)hl_zalloc(&jit->falloc,sizeof(ephi)*bl->phi_count);
 	tmp = b->phis;
-	i = 0;
+	int i = 0;
 	while( tmp ) {
 		tmp_phi *p = (tmp_phi*)tmp->ptr;
 		if( p->final_id < 0 ) {
@@ -1022,13 +1003,9 @@ static bool seal_block_rec( emit_ctx *ctx, emit_block *b, int target ) {
 		}
 		return true;
 	}
-	linked_inf *l = b->preds;
-	while( l ) {
-		emit_block *n = (emit_block*)l->ptr;
-		if( n->start_pos < b->start_pos && seal_block_rec(ctx,n,target) )
+	for_iter(blocks,p,b->preds)
+		if( p->start_pos < b->start_pos && seal_block_rec(ctx,p,target) )
 			return true;
-		l = l->next;
-	}
 	return false;
 }
 
@@ -1653,7 +1630,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			ereg r = lookup_block_var(ctx->current_block, ra);
 			if( !IS_NULL(r) ) {
 				STORE_MEM(ref, 0, LOAD(ra));
-				remove_block_var(ctx->current_block, ra);
+				int_map_remove(&ctx->current_block->written_vars, ra->id);
 			}
 			STORE(dst, ref);
 		}
