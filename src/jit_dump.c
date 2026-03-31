@@ -372,10 +372,10 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			dump_value(ctx, e->value, e->mode);
 			break;
 		case LOAD_ADDR:
-			if( (e->b.index>>8) )
-				printf(" %s[%Xh]", val_str(e->a), e->b.index);
+			if( (e->size_offs>>8) )
+				printf(" %s[%Xh]", val_str(e->a), e->size_offs);
 			else
-				printf(" %s[%d]", val_str(e->a), e->b.index);
+				printf(" %s[%d]", val_str(e->a), e->size_offs);
 			break;
 		case STORE:
 			{
