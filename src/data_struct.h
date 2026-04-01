@@ -24,6 +24,14 @@
 
 #include <hl.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define INLINE __forceinline
+#else
+#define INLINE inline
+#endif
+
 #define STRUCT_DEF_SIZE 2
 #define for_iter(name,var,set) name##__value var; for(int __idx=0;name##_iter_next(set,&var,__idx);__idx++)
 
