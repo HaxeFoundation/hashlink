@@ -23,6 +23,8 @@
 #include <jit.h>
 #include "data_struct.h"
 
+static ereg ENULL = {VAL_NULL};
+
 typedef struct {
 	hl_type *t;
 	int id;
@@ -44,6 +46,21 @@ typedef struct _tmp_phi tmp_phi;
 #include "data_struct.c"
 #define blocks_add(set,v)		blocks_add_impl(DEF_ALLOC,&(set),v)
 
+#define S_SORTED
+#define S_DEFVAL		ENULL
+#define S_CMP(a,b)		a.index > b.index	
+#define S_TYPE			ereg_map
+#define S_NAME(name)	ereg_##name
+#define S_VALUE			ereg
+#include "data_struct.c"
+#define ereg_add(set,v)		ereg_add_impl(DEF_ALLOC,&(set),v)
+
+#define S_TYPE			phi_arr
+#define S_NAME(name)	phi_##name
+#define S_VALUE			tmp_phi*
+#include "data_struct.c"
+#define phi_add(set,v)		phi_add_impl(DEF_ALLOC,&(set),v)
+
 struct _linked_inf {
 	int id;
 	void *ptr;
@@ -60,7 +77,7 @@ struct _emit_block {
 	blocks nexts;
 	blocks preds;
 	int_map written_vars;
-	linked_inf *phis;
+	phi_arr phis;
 	emit_block *wait_seal_next;
 };
 
@@ -73,8 +90,8 @@ struct _tmp_phi {
 	bool opt;
 	unsigned char mode;
 	emit_block *b;
-	linked_inf *vals;
-	linked_inf *ref_phis;
+	ereg_map vals;
+	phi_arr ref_phis;
 	linked_inf *ref_blocks;
 };
 
@@ -137,7 +154,6 @@ struct _emit_ctx {
 
 static hl_type hlt_ui8 = { HUI8, 0 };
 static hl_type hlt_ui16 = { HUI16, 0 };
-static ereg ENULL = {VAL_NULL};
 
 static linked_inf *link_add( emit_ctx *ctx, int id, void *ptr, linked_inf *head ) {
 	linked_inf *l = hl_malloc(&ctx->jit->falloc,sizeof(linked_inf));
@@ -356,7 +372,7 @@ static tmp_phi *alloc_phi( emit_ctx *ctx, emit_block *b, vreg *r ) {
 	p->r = r;
 	if( r ) p->mode = hl_type_mode(r->t);
 	p->value.index = -(++ctx->phi_count);
-	b->phis = link_add(ctx, 0, p, b->phis);
+	phi_add(b->phis,p);
 	GET_PHI(p->value) = p;
 	return p;
 }
@@ -471,7 +487,7 @@ static void emit_test( emit_ctx *ctx, ereg v, hl_op o ) {
 }
 
 static void phi_remove_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
-	p->vals = link_sort_remove(p->vals,v.index);
+	ereg_remove(&p->vals,v);
 	jit_debug("%sPHI-REM-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
 }
 
@@ -480,13 +496,12 @@ static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 	if( IS_NULL(v) ) jit_assert();
 	if( p->value.index == v.index )
 		return;
-	if( link_sort_lookup(p->vals,v.index) )
+	if( !ereg_add(p->vals,v) )
 		return;
 	jit_debug("%sPHI-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
-	p->vals = link_add_sort_unique(ctx,v.index,p,p->vals);
 	if( v.index < 0 ) {
 		tmp_phi *p2 = GET_PHI(v);
-		p2->ref_phis = link_add(ctx,0,p,p2->ref_phis);
+		phi_add(p2->ref_phis,p);
 	}
 }
 
@@ -494,21 +509,17 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 	
 	if( p->locked ) jit_assert();
 	ereg same = ENULL;
-	linked_inf *l = p->vals;
-	while( l ) {
-		if( l->id == same.index || l->id == p->value.index ) {
-			l = l->next;
+	for_iter(ereg,v,p->vals) {
+		if( v.index == same.index || v.index == p->value.index )
 			continue;
-		}
 		if( !IS_NULL(same) )
 			return p->value;
-		same.index = l->id;
-		l = l->next;
+		same = v;
 	}
 	if( IS_NULL(same) )
 		return p->value; // sealed (no dep yet)
 
-	if( !p->ref_phis && !p->ref_blocks )
+	if( !phi_count(p->ref_phis) && !p->ref_blocks )
 		return same;
 
 	if( p->locked || p->opt ) jit_assert();
@@ -516,28 +527,22 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 	jit_debug("%sPHI-OPT %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
 	p->opt = true;
 	ctx->phi_depth++;
-	l = p->ref_blocks;
+	linked_inf *l = p->ref_blocks;
 	while( l ) {
 		emit_block *b = (emit_block*)l->ptr;
 		if( lookup_block_var(b,p->r).index == p->value.index )
 			store_block_var(ctx,b,p->r,same);
 		l = l->next;
 	}
-	l = p->ref_phis;
-	while( l ) {
-		tmp_phi *p2 = (tmp_phi*)l->ptr;
+	for_iter(phi,p2,p->ref_phis) {
 		phi_remove_val(ctx,p2,p->value);
 		phi_add_val(ctx,p2,same);
-		l = l->next;
 	}
-	l = p->ref_phis;
-	p->ref_phis = NULL;
 	p->ref_blocks = NULL;
-	while( l ) {
-		tmp_phi *p2 = (tmp_phi*)l->ptr;
-		optimize_phi_rec(ctx, p2);
-		l = l->next;
-	}
+	int count = phi_count(p->ref_phis);
+	tmp_phi **phis = phi_free(&p->ref_phis);
+	for(int i=0;i<count;i++)
+		optimize_phi_rec(ctx, phis[i]);
 	ctx->phi_depth--;
 	jit_debug("%sPHI-OPT-DONE %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
 	return optimize_phi_rec(ctx,p);
@@ -598,12 +603,8 @@ static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
 
 static void seal_block( emit_ctx *ctx, emit_block *b ) {
 	jit_debug("  SEAL #%d\n",b->id);
-	linked_inf *l = b->phis;
-	while( l ) {
-		tmp_phi *p = (tmp_phi*)l->ptr;
+	for_iter(phi,p,b->phis)
 		gather_phis(ctx, p);
-		l = l->next;
-	}
 	b->sealed = true;
 }
 
@@ -785,42 +786,28 @@ static void emit_write_block( emit_ctx *ctx, emit_block *b ) {
 	for(int i=0;i<bl->next_count;i++)
 		bl->nexts[i++] = blocks_get(b->nexts,i)->id;
 	// write phis
-	linked_inf *tmp = b->phis;
-	while( tmp ) {
-		tmp_phi *p = (tmp_phi*)tmp->ptr;
-		if( p->final_id >= 0 )
-			bl->phi_count++;
-		tmp = tmp->next;
+	{
+		for_iter(phi,p,b->phis)
+			if( p->final_id >= 0 )
+				bl->phi_count++;
 	}
 	bl->phis = (ephi*)hl_zalloc(&jit->falloc,sizeof(ephi)*bl->phi_count);
-	tmp = b->phis;
 	int i = 0;
-	while( tmp ) {
-		tmp_phi *p = (tmp_phi*)tmp->ptr;
-		if( p->final_id < 0 ) {
-			tmp = tmp->next;
+	for_iter(phi,p,b->phis) {
+		if( p->final_id < 0 )
 			continue;
-		}
 		ephi *p2 = bl->phis + i++;
 		if( p->final_id == 0 )
 			p2->value = p->value;
 		else
 			p2->value.index = -p->final_id;
-		linked_inf *l = p->vals;
-		while( l ) {
-			p2->nvalues++;
-			l = l->next;
-		}
+		p2->nvalues = ereg_count(p->vals);
 		p2->values = (ereg*)hl_malloc(&jit->falloc,sizeof(ereg)*p2->nvalues);
-		l = p->vals;
 		int k = 0;
-		while( l ) {
-			ereg v = {l->id};
+		for_iter(ereg,v,p->vals) {
 			remap_phi_reg(ctx, &v);
 			p2->values[k++] = v;
-			l = l->next;
 		}
-		tmp = tmp->next;
 	}
 }
 
