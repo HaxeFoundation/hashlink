@@ -16,5 +16,6 @@
     <ClInclude Include="src\hl.h" />
     <ClInclude Include="src\hlsystem.h" />
     <ClInclude Include="src\jit.h" />
+    <ClInclude Include="src\data_struct.h" />
   </ItemGroup>
 </Project>
