@@ -50,7 +50,7 @@ typedef struct {
 
 typedef S_VALUE	S_NAME(_value);
 
-static void S_NAME(check_size)( hl_alloc *alloc, S_TYPE *st ) {
+INLINE static void S_NAME(check_size)( hl_alloc *alloc, S_TYPE *st ) {
 	if( st->cur == st->max ) {
 		int n = st->max ? (st->max << 1) : STRUCT_DEF_SIZE;
 		S_KEY *keys = (S_KEY*)hl_malloc(alloc,sizeof(S_KEY) * n);
@@ -67,7 +67,7 @@ static void S_NAME(check_size)( hl_alloc *alloc, S_TYPE *st ) {
 
 #ifndef S_SORTED
 
-static void S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
+INLINE static void S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	S_NAME(check_size)(alloc,st);
 	st->keys[st->cur] = k;
 #	ifdef S_MAP
@@ -76,7 +76,7 @@ static void S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	st->cur++;
 }
 
-static bool S_NAME(exists)( S_TYPE st, S_KEY k ) {
+INLINE static bool S_NAME(exists)( S_TYPE st, S_KEY k ) {
 	for(int i=0;i<st.cur;i++)
 		if( st.keys[i] == k )
 			return true;
@@ -95,7 +95,7 @@ static S_VALUE S_NAME(find)( S_TYPE st, S_KEY k ) {
 
 #else
 
-static bool S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
+INLINE static bool S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	int min = 0;
 	int max = st->cur;
 	int pos;
@@ -119,7 +119,7 @@ static bool S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 }
 
 #ifdef S_MAP
-static void S_NAME(replace_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
+INLINE static void S_NAME(replace_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	int min = 0;
 	int max = st->cur;
 	int pos;
@@ -141,7 +141,7 @@ static void S_NAME(replace_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 }
 #endif
 
-static bool S_NAME(exists)( S_TYPE st, S_KEY k ) {
+INLINE static bool S_NAME(exists)( S_TYPE st, S_KEY k ) {
 	int min = 0;
 	int max = st.cur;
 	while( min < max ) {
@@ -153,7 +153,7 @@ static bool S_NAME(exists)( S_TYPE st, S_KEY k ) {
 }
 
 #ifdef S_MAP
-static S_VALUE S_NAME(find)( S_TYPE st, S_KEY k ) {
+INLINE static S_VALUE S_NAME(find)( S_TYPE st, S_KEY k ) {
 	int min = 0;
 	int max = st.cur;
 	while( min < max ) {
@@ -161,11 +161,11 @@ static S_VALUE S_NAME(find)( S_TYPE st, S_KEY k ) {
 		S_KEY k2 = st.keys[mid];
 		if( k2 < k ) min = mid + 1; else if( k2 > k ) max = mid; else return st.values[mid];
 	}
-	return (S_VALUE)0;
+	return S_DEFVAL;
 }
 #endif
 
-static bool S_NAME(remove)( S_TYPE *st, S_KEY k ) {
+INLINE static bool S_NAME(remove)( S_TYPE *st, S_KEY k ) {
 	int min = 0;
 	int max = st->cur;
 	while( min < max ) {
@@ -186,11 +186,11 @@ static bool S_NAME(remove)( S_TYPE *st, S_KEY k ) {
 
 #endif
 
-static void S_NAME(reset)( S_TYPE *st ) {
+INLINE static void S_NAME(reset)( S_TYPE *st ) {
 	st->cur = 0;
 }
 
-static S_VALUE *S_NAME(free)( S_TYPE *st ) {
+INLINE static S_VALUE *S_NAME(free)( S_TYPE *st ) {
 	st->cur = 0;
 	st->max = 0;
 	S_VALUE *vals = st->values;
@@ -201,19 +201,19 @@ static S_VALUE *S_NAME(free)( S_TYPE *st ) {
 	return vals;
 }
 
-static int S_NAME(count)( S_TYPE st ) {
+INLINE static int S_NAME(count)( S_TYPE st ) {
 	return st.cur;
 }
 
-static S_VALUE S_NAME(get)( S_TYPE st, int idx ) {
+INLINE static S_VALUE S_NAME(get)( S_TYPE st, int idx ) {
 	return st.values[idx];
 }
 
-static S_VALUE S_NAME(first)( S_TYPE st ) {
+INLINE static S_VALUE S_NAME(first)( S_TYPE st ) {
 	return st.cur == 0 ? S_DEFVAL : st.values[0];
 }
 
-static bool S_NAME(iter_next)( S_TYPE st, S_VALUE *val, int idx ) {
+INLINE static bool S_NAME(iter_next)( S_TYPE st, S_VALUE *val, int idx ) {
 	if( idx < st.cur ) *val = st.values[idx];
 	return idx < st.cur;
 }

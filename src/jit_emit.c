@@ -24,6 +24,7 @@
 #include "data_struct.h"
 
 static ereg ENULL = {VAL_NULL};
+static void __ignore( void *value ) {}
 
 typedef struct {
 	hl_type *t;
@@ -46,7 +47,14 @@ typedef struct _tmp_phi tmp_phi;
 #include "data_struct.c"
 #define blocks_add(set,v)		blocks_add_impl(DEF_ALLOC,&(set),v)
 
+#define S_TYPE			phi_arr
+#define S_NAME(name)	phi_##name
+#define S_VALUE			tmp_phi*
+#include "data_struct.c"
+#define phi_add(set,v)		phi_add_impl(DEF_ALLOC,&(set),v)
+
 #define S_SORTED
+
 #define S_DEFVAL		ENULL
 #define S_CMP(a,b)		a.index > b.index	
 #define S_TYPE			ereg_map
@@ -55,11 +63,15 @@ typedef struct _tmp_phi tmp_phi;
 #include "data_struct.c"
 #define ereg_add(set,v)		ereg_add_impl(DEF_ALLOC,&(set),v)
 
-#define S_TYPE			phi_arr
-#define S_NAME(name)	phi_##name
-#define S_VALUE			tmp_phi*
+#define S_MAP
+
+#define S_DEFVAL		ENULL
+#define S_TYPE			vreg_map
+#define S_NAME(name)	vreg_##name
+#define S_KEY			int
+#define S_VALUE			ereg
 #include "data_struct.c"
-#define phi_add(set,v)		phi_add_impl(DEF_ALLOC,&(set),v)
+#define vreg_replace(set,k,v) vreg_replace_impl(DEF_ALLOC,&(set),k,v)
 
 struct _linked_inf {
 	int id;
@@ -76,7 +88,7 @@ struct _emit_block {
 	bool sealed;
 	blocks nexts;
 	blocks preds;
-	int_map written_vars;
+	vreg_map written_vars;
 	phi_arr phis;
 	emit_block *wait_seal_next;
 };
@@ -399,19 +411,11 @@ static void block_add_pred( emit_ctx *ctx, emit_block *b, emit_block *p ) {
 
 static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
 	if( IS_NULL(v) ) jit_assert();
-	int_map_replace(b->written_vars,r->id,v.index < 0 ? v.index : v.index + 1); 
+	vreg_replace(b->written_vars,r->id,v); 
 	if( v.index < 0 ) {
 		tmp_phi *p = GET_PHI(v);
 		p->ref_blocks = link_add_sort_unique(ctx,b->id,b,p->ref_blocks);
 	}
-}
-
-static ereg lookup_block_var( emit_block *b, vreg *r ) {
-	int e = int_map_find(b->written_vars,r->id);
-	if( !e ) return ENULL;
-	ereg v;
-	v.index = e < 0 ? e : e-1;
-	return v;
 }
 
 static void split_block( emit_ctx *ctx ) {
@@ -530,7 +534,7 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 	linked_inf *l = p->ref_blocks;
 	while( l ) {
 		emit_block *b = (emit_block*)l->ptr;
-		if( lookup_block_var(b,p->r).index == p->value.index )
+		if( vreg_find(b->written_vars,p->r->id).index == p->value.index )
 			store_block_var(ctx,b,p->r,same);
 		l = l->next;
 	}
@@ -561,7 +565,7 @@ static ereg gather_phis( emit_ctx *ctx, tmp_phi *p ) {
 }
 
 static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r ) {
-	ereg v = lookup_block_var(b,r);
+	ereg v = vreg_find(b->written_vars,r->id);
 	if( !IS_NULL(v) )
 		return v;
 	if( !b->sealed ) {
@@ -1058,6 +1062,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	hl_module *m = ctx->mod;
 #ifdef HL_DEBUG
 	int uid = (ctx->fun->findex << 16) | ctx->op_pos;
+	__ignore(&uid);
 #endif
 	switch( o->op ) {
 	case OMov:
@@ -1614,10 +1619,10 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg ref = resolve_ref(ctx, ra->id);
 			if( IS_NULL(ref) ) jit_assert();
-			ereg r = lookup_block_var(ctx->current_block, ra);
+			ereg r = vreg_find(ctx->current_block->written_vars, ra->id);
 			if( !IS_NULL(r) ) {
 				STORE_MEM(ref, 0, LOAD(ra));
-				int_map_remove(&ctx->current_block->written_vars, ra->id);
+				vreg_remove(&ctx->current_block->written_vars, ra->id);
 			}
 			STORE(dst, ref);
 		}
