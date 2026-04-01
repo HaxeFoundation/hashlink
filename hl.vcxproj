@@ -297,6 +297,7 @@
     <ClCompile Include="src\profile.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\data_struct.h" />
     <ClInclude Include="src\hl.h" />
     <ClInclude Include="src\hlmodule.h" />
     <ClInclude Include="src\hlsystem.h" />
