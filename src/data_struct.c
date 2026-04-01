@@ -28,6 +28,15 @@
 #else
 #	define S_ARGS	S_VALUE k
 #	define S_KEY	S_VALUE
+#	define keys		values
+#endif
+
+#ifndef S_DEFVAL
+#	define S_DEFVAL	(S_VALUE)0
+#endif
+
+#ifndef S_CMP
+#	define S_CMP(a,b) a > b
 #endif
 
 typedef struct {
@@ -86,14 +95,14 @@ static S_VALUE S_NAME(find)( S_TYPE st, S_KEY k ) {
 
 #else
 
-static void S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
+static bool S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	int min = 0;
 	int max = st->cur;
 	int pos;
 	while( min < max ) {
 		int mid = (min + max) >> 1;
 		S_KEY k2 = st->keys[mid];
-		if( k2 < k ) min = mid + 1; else if( k2 > k ) max = mid; else return;
+		if( S_CMP(k,k2) ) min = mid + 1; else if( S_CMP(k2,k) ) max = mid; else return false;
 	}
 	S_NAME(check_size)(alloc,st);
 	pos = (min + max) >> 1;
@@ -106,6 +115,7 @@ static void S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	st->values[pos] = v;
 #	endif
 	st->cur++;
+	return true;
 }
 
 #ifdef S_MAP
@@ -137,7 +147,7 @@ static bool S_NAME(exists)( S_TYPE st, S_KEY k ) {
 	while( min < max ) {
 		int mid = (min + max) >> 1;
 		S_KEY k2 = st.keys[mid];
-		if( k2 < k ) min = mid + 1; else if( k2 > k ) max = mid; else return true;
+		if( S_CMP(k,k2) ) min = mid + 1; else if( S_CMP(k2,k) ) max = mid; else return true;
 	}
 	return false;
 }
@@ -161,7 +171,7 @@ static bool S_NAME(remove)( S_TYPE *st, S_KEY k ) {
 	while( min < max ) {
 		int mid = (min + max) >> 1;
 		S_KEY k2 = st->keys[mid];
-		if( k2 < k ) min = mid + 1; else if( k2 > k ) max = mid; else {
+		if( S_CMP(k,k2) ) min = mid + 1; else if( S_CMP(k2,k) ) max = mid; else {
 			int pos = mid;
 			memmove(st->keys + pos, st->keys + pos + 1, (st->cur - pos - 1) * sizeof(S_KEY));
 #			ifdef S_MAP
@@ -180,24 +190,31 @@ static void S_NAME(reset)( S_TYPE *st ) {
 	st->cur = 0;
 }
 
+static S_VALUE *S_NAME(free)( S_TYPE *st ) {
+	st->cur = 0;
+	st->max = 0;
+	S_VALUE *vals = st->values;
+#	ifdef S_MAP
+	st->keys = NULL;
+#	endif
+	st->values = NULL;
+	return vals;
+}
+
 static int S_NAME(count)( S_TYPE st ) {
 	return st.cur;
 }
 
 static S_VALUE S_NAME(get)( S_TYPE st, int idx ) {
-#	ifdef S_MAP
 	return st.values[idx];
-#	else
-	return st.keys[idx];
-#	endif
 }
 
 static S_VALUE S_NAME(first)( S_TYPE st ) {
-	return S_NAME(get)(st,0);
+	return st.cur == 0 ? S_DEFVAL : st.values[0];
 }
 
 static bool S_NAME(iter_next)( S_TYPE st, S_VALUE *val, int idx ) {
-	if( idx < st.cur ) *val = S_NAME(get)(st,idx);
+	if( idx < st.cur ) *val = st.values[idx];
 	return idx < st.cur;
 }
 
@@ -207,5 +224,8 @@ static bool S_NAME(iter_next)( S_TYPE st, S_VALUE *val, int idx ) {
 #undef S_KEY
 #undef S_ARGS
 #undef STRUCT_NAME
+#undef S_CMP
+#undef S_DEFVAL
+#undef keys
 
 #endif
