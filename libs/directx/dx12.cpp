@@ -397,9 +397,14 @@ HL_PRIM int64 HL_NAME(get_timestamp_frequency)() {
 	return (int64)f;
 }
 
+#ifndef HL_XBS
 HL_PRIM void HL_NAME(query_video_memory_info)( int group, DXGI_QUERY_VIDEO_MEMORY_INFO *mem ) {
 	CHKERR(static_driver->adapter->QueryVideoMemoryInfo(0,(DXGI_MEMORY_SEGMENT_GROUP)group,mem));
 }
+#else
+HL_PRIM void HL_NAME(query_video_memory_info)( int group, void *mem ) {
+}
+#endif
 
 #define _DRIVER _ABSTRACT(dx_driver)
 #define _RES _ABSTRACT(dx_resource)
