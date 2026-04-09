@@ -181,7 +181,7 @@
 #	define HL_WSIZE 8
 #	define IS_64	1
 #	if defined(HL_VCC) || defined(HL_MINGW)
-#		define _PTR_FMT	L"%IX"
+#		define _PTR_FMT	L"%lX"
 #	else
 #		define _PTR_FMT	u"%lX"
 #	endif
@@ -189,7 +189,7 @@
 #	define HL_WSIZE 4
 #	define IS_64	0
 #	if defined(HL_VCC) || defined(HL_MINGW)
-#		define _PTR_FMT	L"%IX"
+#		define _PTR_FMT	L"%lX"
 #	else
 #		define _PTR_FMT	u"%X"
 #	endif
