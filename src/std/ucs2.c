@@ -221,6 +221,8 @@ sprintf_loop:
 						cfmt[i++] = 0;
 						if( cfmt[i-3] == 'l' )
 							size = sprintf(tmp,cfmt,va_arg(arglist,void*));
+						else if( cfmt[i-3] == 'I' )
+							size = sprintf(tmp,cfmt,va_arg(arglist,size_t));
 						else
 							size = sprintf(tmp,cfmt,va_arg(arglist,int));
 						goto sprintf_add;
@@ -244,6 +246,7 @@ sprintf_loop:
 					case '8':
 					case '9':
 					case 'l':
+					case 'I':
 						break;
 					default:
 						hl_fatal("Unsupported printf format");
