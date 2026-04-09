@@ -492,6 +492,7 @@ jobs:
     - name: Install brew packages
       if: matrix.os == 'darwin'
       run: |
+        brew update
         brew install libpng jpeg-turbo libvorbis sqlite mbedtls
 
     - name: Install msbuild
