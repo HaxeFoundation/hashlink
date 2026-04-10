@@ -188,6 +188,10 @@ class Window {
 		warpMouseInWindow(win, x, y);
 	}
 
+	public function captureMouseEvents(enable: Bool) {
+		captureMouse(enable);
+	}
+
 	function get_width() {
 		var w = 0;
 		winGetSize(win, w, null);
@@ -400,4 +404,8 @@ class Window {
 	static function warpMouseInWindow( win : WinPtr, x : Int, y : Int ) : Void {
 	}
 
+	@:hlNative("?sdl", "capture_mouse")
+	static function captureMouse(enable: Bool) {
+		return 0;
+	}
 }

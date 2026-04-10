@@ -462,6 +462,10 @@ HL_PRIM bool HL_NAME(get_relative_mouse_mode)() {
 	return SDL_GetRelativeMouseMode();
 }
 
+HL_PRIM int HL_NAME(capture_mouse)(bool enable) {
+	return SDL_CaptureMouse(enable);
+}
+
 HL_PRIM int HL_NAME(warp_mouse_global)(int x, int y) {
 	return SDL_WarpMouseGlobal(x, y);
 }
@@ -512,6 +516,7 @@ DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 DEFINE_PRIM(_VOID, text_input, _BOOL);
 DEFINE_PRIM(_I32, set_relative_mouse_mode, _BOOL);
 DEFINE_PRIM(_BOOL, get_relative_mouse_mode, _NO_ARG);
+DEFINE_PRIM(_I32, capture_mouse, _BOOL);
 DEFINE_PRIM(_I32, warp_mouse_global, _I32 _I32);
 DEFINE_PRIM(_VOID, warp_mouse_in_window, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, set_window_grab, TWIN _BOOL);

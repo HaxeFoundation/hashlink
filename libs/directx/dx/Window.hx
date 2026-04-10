@@ -123,6 +123,14 @@ class Window {
 		return winGetRelativeMouseMode();
 	}
 
+	public function captureMouseEvents(enable: Bool) {
+		if (enable) {
+			winSetCapture(win);
+		} else {
+			winReleaseCapture();
+		}
+	}
+
 	public function center( centerPrimary : Bool = true ) {
 		winCenter(win, centerPrimary);
 	}
@@ -370,6 +378,14 @@ class Window {
 
 	static function winGetRelativeMouseMode() : Bool {
 		return false;
+	}
+
+	@:hlNative("?directx", "win_set_capture")
+	static function winSetCapture(win: WinPtr) {
+	}
+
+	@:hlNative("?directx", "win_release_capture")
+	static function winReleaseCapture() {
 	}
 
 	@:hlNative("?directx", "win_set_drag_accept_files")
