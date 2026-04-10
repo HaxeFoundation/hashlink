@@ -464,9 +464,9 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Download binary
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: |
           ${{ matrix.os }}-${{ matrix.os == 'windows' && 'vs2019' || 'make' }}-${{
@@ -492,6 +492,7 @@ jobs:
     - name: Install brew packages
       if: matrix.os == 'darwin'
       run: |
+        brew update
         brew install libpng jpeg-turbo libvorbis sqlite mbedtls
 
     - name: Install msbuild
@@ -534,7 +535,7 @@ jobs:
     - name: Setup haxelib
       run: haxelib dev hashlink ./other/haxelib
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         repository: HaxeFoundation/haxe
         path: haxe

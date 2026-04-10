@@ -309,6 +309,7 @@ sqlite.hdll: $(SQLITE) $(LIBHL)
 CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 
 $(HEAPS): CPPFLAGS += $(HEAPS_CPPFLAGS)
+heaps_LDLIBS = -ldl
 heaps.hdll: HDLL_LINK = $(CXX) $(LDFLAGS)
 heaps.hdll: $(HEAPS) $(LIBHL)
 

@@ -1,3 +1,10 @@
+typedef Config = {
+	var version:Int;
+	var libs:Array<String>;
+	var defines:haxe.DynamicAccess<String>;
+	var files:Array<String>;
+};
+
 class Build {
 
 	var output : String;
@@ -5,12 +12,7 @@ class Build {
 	var sourcesDir : String;
 	var targetDir : String;
 	var dataPath : String;
-	var config : {
-		var version : Int;
-		var libs : Array<String>;
-		var defines : haxe.DynamicAccess<String>;
-		var files : Array<String>;
-	};
+	var config : Config;
 
 	public function new(dataPath,output,config) {
 		this.output = output;
@@ -27,11 +29,17 @@ class Build {
 			Sys.println(message);
 	}
 
+	static function getDefaultTemplate() {
+		return (Sys.systemName() == "Windows") ? "vs2022" : "make";
+	}
 
 	public function generate() {
 		var tpl = config.defines.get("hlgen.makefile");
-		if( tpl != null )
+		if (tpl != null) {
+			if (tpl == "1")
+				tpl = config.defines["hlgen.makefile"] = getDefaultTemplate();
 			generateTemplates(tpl);
+		}
 		log('Code generated in $output');
 	}
 
@@ -43,7 +51,7 @@ class Build {
 					case 'x86_32': ["EXTRA_CFLAGS=-m32", "EXTRA_LDFLAGS=-m32"];
 					case _: [];
 				};
-				Sys.command("make", ["-C", targetDir].concat(platformArgs));
+				Sys.command("make", ["-j", "-C", targetDir].concat(platformArgs).concat(config.defines.exists("debug") ? ["DEBUG=1"] : []));
 			case "hxcpp":
 				var platformArgs = switch config.defines.get("hlgen.build.architecture") {
 					case 'x86_32': ["HXCPP_M32"];
@@ -64,7 +72,8 @@ class Build {
 							case 'x86_32': 'x86';
 							case _: 'x64';
 						};
-						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", "-property:Configuration=Release", '-property:Platform=$platform'];
+						var configuration = config.defines.exists("debug") ? "Debug" : "Release";
+						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", '-property:Configuration=$configuration', '-property:Platform=$platform'];
 						log('"$msbuild"' + " " + msbuildArgs.join(" "));
 						Sys.setCwd(targetDir);
 						code = Sys.command(msbuild, msbuildArgs);
@@ -80,8 +89,7 @@ class Build {
 				vswhereProc.close();
 				code;
 			case null:
-				var suggestion = (Sys.systemName() == "Windows") ? "vs2019" : "make";
-				log('Set -D hlgen.makefile=${suggestion} for automatic native compilation');
+				log('Set -D hlgen.makefile for automatic native compilation');
 				0;
 			case unimplemented:
 				log('Automatic native compilation not yet implemented for $unimplemented');
@@ -103,10 +111,11 @@ class Build {
 	}
 
 	function generateTemplates( ?tpl ) {
-		if( tpl == null || tpl == "1" )
-			tpl = "vs2015";
 		var srcDir = tpl;
-		var jumboBuild = config.defines.get("hlgen.makefile.jumbo");
+		var jumboBuild = switch config.defines.get("hlgen.makefile.jumbo") {
+			case "1": "true";
+			case value: value;
+		};
 		var relDir = "";
 		if( config.defines["hlgen.makefilepath"] != null ) {
 			targetDir = config.defines.get("hlgen.makefilepath");
@@ -226,6 +235,26 @@ class Build {
 }
 
 class Run {
+	static function applyCliDefines(config:Config, args:Array<String>) {
+		while (args.length > 0) {
+			switch args.shift() {
+				case '-D' | '--define':
+					var pair = args.shift();
+					var equalsPosition = pair.indexOf("=");
+					if (equalsPosition == -1) {
+						config.defines.set(pair, "1");
+					} else {
+						var name = pair.substr(0, equalsPosition);
+						var value = pair.substr(equalsPosition + 1);
+						config.defines.set(name, value);
+					}
+				case unknown:
+					Sys.stderr().writeString('Warning: Unrecognised argument $unknown\n');
+					Sys.stderr().flush();
+			}
+		}
+	}
+
 	static function main() {
 		var args = Sys.args();
 		var originalPath = args.pop();
@@ -238,7 +267,8 @@ class Run {
 			var path = new haxe.io.Path(output);
 			path.file = "hlc";
 			path.ext = "json";
-			var config = haxe.Json.parse(sys.io.File.getContent(path.toString()));
+			var config:Config = haxe.Json.parse(sys.io.File.getContent(path.toString()));
+			applyCliDefines(config, args);
 			final build = new Build(haxelibPath,output,config);
 			build.generate();
 			Sys.exit(build.compile());

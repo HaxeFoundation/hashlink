@@ -302,6 +302,9 @@ struct _jit_ctx {
 	hl_debug_infos *debug;
 	int c2hl;
 	int hl2c;
+#ifdef JIT_CUSTOM_LONGJUMP
+	int longjump;
+#endif
 	void *static_functions[8];
 	bool static_function_offset;
 #ifdef WIN64_UNWIND_TABLES
@@ -2662,6 +2665,38 @@ static void jit_hl2c( jit_ctx *ctx ) {
 	op64(ctx,RET,UNUSED,UNUSED);
 }
 
+#ifdef JIT_CUSTOM_LONGJUMP
+// Win64 debug CRT performs a Rtl stack check in debug mode, preventing from
+// using longjump. This in an alternate implementation that follows the native
+// setjump storage.
+//
+// Another more reliable way of handling this would be to use RtlAddFunctionTable
+// but some platform does not have it.
+static void jit_longjump( jit_ctx *ctx ) {
+	preg *buf = REG_AT(CALL_REGS[0]);
+	preg *ret = REG_AT(CALL_REGS[1]);
+	preg p;
+	int i;
+	op64(ctx,MOV,PEAX,ret); // return value
+	op64(ctx,MOV,REG_AT(Edx),pmem(&p,buf->id,0x0));
+	op64(ctx,MOV,REG_AT(Ebx),pmem(&p,buf->id,0x8));
+	op64(ctx,MOV,REG_AT(Esp),pmem(&p,buf->id,0x10));
+	op64(ctx,MOV,REG_AT(Ebp),pmem(&p,buf->id,0x18));
+	op64(ctx,MOV,REG_AT(Esi),pmem(&p,buf->id,0x20));
+	op64(ctx,MOV,REG_AT(Edi),pmem(&p,buf->id,0x28));
+	op64(ctx,MOV,REG_AT(R12),pmem(&p,buf->id,0x30));
+	op64(ctx,MOV,REG_AT(R13),pmem(&p,buf->id,0x38));
+	op64(ctx,MOV,REG_AT(R14),pmem(&p,buf->id,0x40));
+	op64(ctx,MOV,REG_AT(R15),pmem(&p,buf->id,0x48));
+	op64(ctx,LDMXCSR,pmem(&p,buf->id,0x58), UNUSED);
+	op64(ctx,FLDCW,pmem(&p,buf->id,0x5C), UNUSED);
+	for(i=0;i<10;i++)
+		op64(ctx,MOVSD,REG_AT(XMM(i+6)),pmem(&p,buf->id,0x60 + i * 16));
+	op64(ctx,PUSH,pmem(&p,buf->id,0x50),UNUSED);
+	op64(ctx,RET,UNUSED,UNUSED);
+}
+#endif
+
 static void jit_fail( uchar *msg ) {
 	if( msg == NULL ) {
 		hl_debug_break();
@@ -2748,6 +2783,9 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	hl_jit_init_module(ctx,m);
 	ctx->c2hl = jit_build(ctx, jit_c2hl);
 	ctx->hl2c = jit_build(ctx, jit_hl2c);
+#	ifdef JIT_CUSTOM_LONGJUMP
+	ctx->longjump = jit_build(ctx, jit_longjump);
+#	endif
 	ctx->static_functions[0] = (void*)(int_val)jit_build(ctx,jit_null_access);
 	ctx->static_functions[1] = (void*)(int_val)jit_build(ctx,jit_assert);
 	ctx->static_functions[2] = (void*)(int_val)jit_build(ctx,jit_null_field_access);
@@ -4652,6 +4690,9 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 		hl_setup.get_wrapper = get_wrapper;
 		hl_setup.static_call = callback_c2hl;
 		hl_setup.static_call_ref = true;
+#		ifdef JIT_CUSTOM_LONGJUMP
+		hl_setup.throw_jump = (void(*)(jmp_buf, int))(code + ctx->longjump);
+#		endif
 	}
 #ifdef WIN64_UNWIND_TABLES
 	m->unwind_table = ctx->unwind_table;

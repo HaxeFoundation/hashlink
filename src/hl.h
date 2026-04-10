@@ -242,16 +242,6 @@ typedef unsigned long long uint64;
 #	include <wchar.h>
 typedef wchar_t	uchar;
 #	define USTR(str)	L##str
-#	define HL_NATIVE_UCHAR_FUN
-#	define usprintf		swprintf
-#	define uprintf		wprintf
-#	define ustrlen		wcslen
-#	define ustrdup		_wcsdup
-HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
-#	define utod(s,end)	wcstod(s,end)
-#	define utoi(s,end)	wcstol(s,end,10)
-#	define ucmp(a,b)	wcscmp(a,b)
-#	define utostr(out,size,str) wcstombs(out,str,size)
 #else
 #	include <stdarg.h>
 #if defined(HL_IOS) || defined(HL_TVOS) || defined(HL_MAC)
@@ -270,7 +260,6 @@ typedef char16_t uchar;
 #endif
 
 C_FUNCTION_BEGIN
-#ifndef HL_NATIVE_UCHAR_FUN
 HL_API double utod( const uchar *str, uchar **end );
 HL_API int utoi( const uchar *str, uchar **end );
 HL_API int ustrlen( const uchar *str );
@@ -280,7 +269,6 @@ HL_API int utostr( char *out, int out_size, const uchar *str );
 HL_API int usprintf( uchar *out, int out_size, const uchar *fmt, ... );
 HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list arglist );
 HL_API void uprintf( const uchar *fmt, const uchar *str );
-#endif
 C_FUNCTION_END
 
 #if defined(HL_VCC)

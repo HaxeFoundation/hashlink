@@ -117,7 +117,11 @@ typedef struct {
 } hl_code_hash;
 
 #if defined(HL_64) && defined(HL_WIN)
+#if defined(HL_CONSOLE)
+#define JIT_CUSTOM_LONGJUMP
+#else
 #define WIN64_UNWIND_TABLES
+#endif
 #endif
 
 typedef struct {
