@@ -165,16 +165,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if defined(HL_VCC) || defined(HL_MINGW)
-#	define EXPORT __declspec( dllexport )
-#	define IMPORT __declspec( dllimport )
-#else
-#if defined(HL_GCC) || defined(HL_CLANG)
-#	define EXPORT __attribute__((visibility("default")))
-#else
-#	define EXPORT
+#ifndef HL_EXPORT
+#	ifdef HL_WIN
+#		define HL_EXPORT __declspec( dllexport )
+#	elif defined(HL_GCC) || defined(HL_CLANG)
+#		define HL_EXPORT __attribute__((visibility("default")))
+#	else
+#		define HL_EXPORT
+#	endif
 #endif
-#	define IMPORT extern
+
+#ifdef HL_WIN
+#	define HL_IMPORT __declspec( dllimport )
+#else
+#	define HL_IMPORT extern
 #endif
 
 #ifdef HL_64
@@ -196,9 +200,15 @@
 #endif
 
 #ifdef __cplusplus
-#	define C_FUNCTION_BEGIN extern "C" {
+#	ifndef HL_EXTERN_C
+#		define HL_EXTERN_C	extern "C"
+# 	endif
+#	define C_FUNCTION_BEGIN HL_EXTERN_C {
 #	define C_FUNCTION_END	};
 #else
+#	ifndef HL_EXTERN_C
+#		define HL_EXTERN_C
+# 	endif
 #	define C_FUNCTION_BEGIN
 #	define C_FUNCTION_END
 #endif
@@ -213,11 +223,11 @@ typedef unsigned long long uint64;
 #include <memory.h>
 
 #if defined(LIBHL_EXPORTS)
-#define HL_API extern EXPORT
+#define HL_API extern HL_EXPORT
 #elif defined(LIBHL_STATIC)
 #define HL_API extern
 #else
-#define	HL_API IMPORT
+#define	HL_API HL_IMPORT
 #endif
 
 #if defined(HL_VCC)
@@ -833,6 +843,16 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 
 // ----------------------- FFI ------------------------------------------------------
 
+#ifndef HL_DISABLE_LEGACY_FFI
+
+#if defined(HLFFI_H)
+#	if defined(_MSC_VER)
+#		pragma message("Warning: Please define HL_DISABLE_LEGACY_FFI if using hl.h with hl_ffi.h")
+#	else
+#		warning	Please define HL_DISABLE_LEGACY_FFI if using hl.h with hl_ffi.h
+#	endif
+#endif
+
 // match GNU C++ mangling
 #define TYPE_STR	"vcsilfdbBDPOATR??X?N?S?g"
 
@@ -862,41 +882,38 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)
 
+#if defined(LIBHL_EXPORTS)
+#	define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
+#else
+#	define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
+#endif
+
+#if (defined(HL_NAME) && !defined(LIBHL_STATIC)) || defined(LIBHL_EXPORTS)
+#	ifndef HL_PRIM
+#		define	HL_PRIM				HL_EXTERN_C HL_EXPORT
+#	endif
+#   define DEFINE_PRIM_WITH_NAME(t,name,args,realName)	HL_EXTERN_C HL_EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); }
+#else
+#	ifndef HL_PRIM
+#		define	HL_PRIM				HL_EXTERN_C
+#	endif
+#	define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
+#endif
+
+#ifndef HL_NAME
+#   define HL_NAME(p) p
+#endif
+
+#define EXPORT HL_EXPORT
+#define IMPORT HL_IMPORT
+
+#endif // HL_DISABLE_LEGACY_FFI
+
 typedef struct {
 	hl_type *t;
 	uchar *bytes;
 	int length;
 } vstring;
-
-#define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,name,args,name)
-#define _DEFINE_PRIM_WITH_NAME(t,name,args,realName)	C_FUNCTION_BEGIN EXPORT void *hlp_##realName( const char **sign ) { *sign = _FUN(t,args); return (void*)(&HL_NAME(name)); } C_FUNCTION_END
-
-#if !defined(HL_NAME)
-#	define HL_NAME(p)					p
-#	ifdef LIBHL_EXPORTS
-#		define HL_PRIM				EXPORT
-#		undef DEFINE_PRIM
-#		define DEFINE_PRIM(t,name,args)						_DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
-#		define DEFINE_PRIM_WITH_NAME						_DEFINE_PRIM_WITH_NAME
-#	else
-#		define HL_PRIM
-#		define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
-#	endif
-#elif defined(LIBHL_STATIC)
-#	ifdef __cplusplus
-#		define	HL_PRIM				extern "C"
-#	else
-#		define	HL_PRIM
-#	endif
-#define DEFINE_PRIM_WITH_NAME(t,name,args,realName)
-#else
-#	ifdef __cplusplus
-#		define	HL_PRIM				extern "C" EXPORT
-#	else
-#		define	HL_PRIM				EXPORT
-#	endif
-#	define DEFINE_PRIM_WITH_NAME	_DEFINE_PRIM_WITH_NAME
-#endif
 
 #if defined(HL_GCC) && !defined(HL_CONSOLE)
 #	ifdef HL_CLANG
@@ -1009,5 +1026,10 @@ HL_API hl_track_info hl_track;
 #endif
 
 C_FUNCTION_END
+
+#ifndef HL_DISABLE_LEGACY_FFI
+#	undef C_FUNCTION_BEGIN
+#	undef C_FUNCTION_END
+#endif
 
 #endif
