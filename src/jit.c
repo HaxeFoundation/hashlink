@@ -71,11 +71,18 @@ void hl_emit_alloc( jit_ctx *jit );
 void hl_emit_free( jit_ctx *jit );
 void hl_emit_function( jit_ctx *jit );
 
+
+void hl_regs_alloc( jit_ctx *jit );
+void hl_regs_free( jit_ctx *jit );
+void hl_regs_function( jit_ctx *jit );
+
+
 jit_ctx *hl_jit_alloc() {
 	jit_ctx *ctx = (jit_ctx*)malloc(sizeof(jit_ctx));
 	memset(ctx,0,sizeof(jit_ctx));
 	hl_alloc_init(&ctx->falloc);
 	hl_emit_alloc(ctx);
+	hl_regs_alloc(ctx);
 	return ctx;
 }
 
@@ -83,6 +90,7 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 }
 
 void hl_jit_free( jit_ctx *ctx, h_bool can_reset ) {
+	hl_regs_free(ctx);
 	hl_emit_free(ctx);
 	hl_free(&ctx->falloc);
 	free(ctx);
@@ -97,6 +105,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	ctx->fun = f;
 	current_ctx = ctx;
 	hl_emit_function(ctx);
+	hl_regs_function(ctx);
 	current_ctx = NULL;
 	return 0;
 }
