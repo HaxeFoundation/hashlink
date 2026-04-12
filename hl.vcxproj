@@ -186,7 +186,7 @@
       <WarningLevel>EnableAllWarnings</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;HL_VTUNE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/wd4456 /wd4100 /wd4204 /wd4702 /wd4457 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/wd4456 /wd4100 /wd4204 /wd4702 /wd4457 /we4013 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
@@ -363,6 +363,8 @@
     <ClCompile Include="src\jit.c" />
     <ClCompile Include="src\jit_dump.c" />
     <ClCompile Include="src\jit_emit.c" />
+    <ClCompile Include="src\jit_regs.c" />
+    <ClCompile Include="src\jit_x86_64.c" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\module.c" />
     <ClCompile Include="src\profile.c" />

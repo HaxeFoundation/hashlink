@@ -9,6 +9,8 @@
     <ClCompile Include="src\jit_dump.c" />
     <ClCompile Include="src\jit_emit.c" />
     <ClCompile Include="src\jit.c" />
+    <ClCompile Include="src\jit_regs.c" />
+    <ClCompile Include="src\jit_x86_64.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\hlmodule.h" />
