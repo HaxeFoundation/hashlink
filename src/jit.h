@@ -26,7 +26,7 @@
 
 typedef enum {
 	LOAD_ADDR,
-	LOAD_IMM,
+	LOAD_CONST,
 	LOAD_ARG,
 	STORE,
 	LEA,
@@ -44,6 +44,9 @@ typedef enum {
 	CALL_REG,
 	CALL_FUN,
 	MOV,
+	PUSH_CONST,
+	PUSH,
+	POP,
 	ALLOC_STACK,
 	FREE_STACK,
 	NATIVE_REG,
@@ -68,9 +71,7 @@ typedef enum {
 	M_NORET,
 } emit_mode;
 
-typedef struct {
-	int index;
-} ereg;
+typedef int ereg;
 
 typedef struct {
 	union {
@@ -92,8 +93,14 @@ typedef struct {
 	};
 } einstr;
 
-#define VAL_NULL 0x80000000
-#define IS_NULL(e) ((e).index == VAL_NULL)
+#define VAL_NULL	0x80000000
+#define FL_NATREG	0x40000000
+#define FL_STACKREG (FL_NATREG | 0x20000000)
+#define IS_NULL(e) ((e) == VAL_NULL)
+#define IS_NATREG(e) ((e) & FL_NATREG)
+#define MK_STACK_REG(v)	(((v)&0xFFFFFFF) | FL_STACKREG)
+#define GET_STACK_OFFS(v) (((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF));
+#define IS_CALL(op)	((op) == CALL_PTR || (op) == CALL_REG || (op) == CALL_FUN)
 
 typedef struct {
 	int *data;
@@ -106,6 +113,7 @@ typedef struct _ephi ephi;
 struct _ephi {
 	ereg value;
 	int nvalues;
+	emit_mode mode;
 	ereg *values;
 };
 
@@ -122,22 +130,41 @@ typedef struct _eblock {
 } eblock;
 
 typedef struct _emit_ctx emit_ctx;
-
+typedef struct _regs_ctx regs_ctx;
 typedef struct _jit_ctx ji_ctx;
+
+typedef struct {
+	int nscratchs;
+	int npersists;
+	int nargs;
+	ereg ret;
+	ereg *scratch;
+	ereg *persist;
+	ereg *arg;
+} reg_config;
+
+typedef reg_config regs_config[2];
 
 struct _jit_ctx {
 	hl_module *mod;
 	hl_function *fun;
 	hl_alloc falloc;
 	emit_ctx *emit;
+	regs_ctx *regs;
 	// emit output
 	int instr_count;
 	int block_count;
 	int value_count;
+	int phi_count;
 	einstr *instrs;
 	eblock *blocks;
 	int *values_writes;
 	int *emit_pos_map;
+	// regs output
+	int reg_instr_count;
+	einstr *reg_instrs;
+	ereg *reg_writes;
+	int *reg_pos_map;
 };
 
 jit_ctx *hl_jit_alloc();
@@ -155,12 +182,14 @@ void int_alloc_free( int_alloc *a );
 int *int_alloc_get( int_alloc *a, int count );
 void int_alloc_store( int_alloc *a, int v );
 
+// emit & dump
 void hl_emit_dump( jit_ctx *ctx );
 const char *hl_emit_regstr( ereg v );
 ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
-
+ereg **hl_emit_get_regs( einstr *e, int *count );
+void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( void *, ereg * ) );
+extern int hl_emit_mode_sizes[];
 #define val_str(v) hl_emit_regstr(v)
-
 
 #ifdef HL_DEBUG
 #	define JIT_DEBUG
@@ -169,11 +198,15 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
 #define jit_error(msg)	{ hl_jit_error(msg,__func__,__LINE__); hl_debug_break(); exit(-1); }
 #define jit_assert()	jit_error("")
 
-#ifdef JIT_DEBUG
+#if defined(JIT_DEBUG)
 #	define jit_debug(...)	printf(__VA_ARGS__)
 #else
 #	define jit_debug(...)
 #endif
+
+#define DEF_ALLOC &ctx->jit->falloc
+
+#define jit_pad_size(size,k)	((k == 0) ? 0 : ((-(size)) & (k - 1)))
 
 void hl_jit_error( const char *msg, const char *func, int line );
 

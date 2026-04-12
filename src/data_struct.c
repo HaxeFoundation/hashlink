@@ -83,6 +83,20 @@ INLINE static bool S_NAME(exists)( S_TYPE st, S_KEY k ) {
 	return false;
 }
 
+INLINE static bool S_NAME(remove)( S_TYPE *st, S_KEY k ) {
+	for(int i=0;i<st->cur;i++)
+		if( st->keys[i] == k ) {
+			int pos = i;
+			memmove(st->keys + pos, st->keys + pos + 1, (st->cur - pos - 1) * sizeof(S_KEY));
+#			ifdef S_MAP
+			memmove(st->values + pos, st->values + pos + 1, (st->cur - pos - 1) * sizeof(S_VALUE));
+#			endif
+			st->cur--;
+			return true;
+		}
+	return false;
+}
+
 #ifdef S_MAP
 static S_VALUE S_NAME(find)( S_TYPE st, S_KEY k ) {
 	for(int i=0;i<st.cur;i++)

@@ -23,7 +23,7 @@
 
 static const char *op_names[] = {
 	"load-addr",
-	"load-imm",
+	"load-const",
 	"load-arg",
 	"store",
 	"lea",
@@ -41,12 +41,17 @@ static const char *op_names[] = {
 	"call",
 	"call",
 	"mov",
+	"push-const",
+	"push",
+	"pop",
 	"alloc-stack",
 	"free-stack",
 	"native-reg",
 	"prefetch",
 	"debug-break",
 };
+
+const char *hl_natreg_str( int reg );
 
 const char *hl_emit_regstr( ereg v ) {
 	static char fmts[4][10];
@@ -55,10 +60,18 @@ const char *hl_emit_regstr( ereg v ) {
 	char *fmt = fmts[flip++&3];
 	if( IS_NULL(v) )
 		sprintf(fmt,"NULL???");
-	else if( v.index < 0 )
-		sprintf(fmt,"P%d",-v.index);
+	else if( v < 0 )
+		sprintf(fmt,"P%d",-v);
+	else if( (v&FL_STACKREG) == FL_STACKREG ) {
+		int index = GET_STACK_OFFS(v);
+		if( index < 0 )
+			sprintf(fmt,"[ST%d]", index);
+		else
+			sprintf(fmt,"[ST+%d]", index);
+	} else if( IS_NATREG(v) )
+		sprintf(fmt,"%s", hl_natreg_str(v&(FL_NATREG-1)));
 	else
-		sprintf(fmt,"V%d",v.index);
+		sprintf(fmt,"V%d",v);
 	return fmt;
 }
 
@@ -200,6 +213,8 @@ static void hl_dump_fun_name( hl_function *f ) {
 }
 
 static void hl_dump_args( jit_ctx *ctx, einstr *e ) {
+	if( e->nargs == 0xFF )
+		return;
 	ereg *v = hl_emit_get_args(ctx->emit, e);
 	printf("(");
 	for(int i=0;i<e->nargs;i++) {
@@ -263,13 +278,97 @@ static void hl_dump_ptr_name( jit_ctx *ctx, void *ptr ) {
 }
 
 void hl_emit_flush( jit_ctx *ctx );
+void hl_regs_flush( jit_ctx *ctx );
+
+
+static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
+	printf("%s", op_names[e->op]);
+	bool show_size = true;
+	switch( e->op ) {
+	case TEST:
+	case CMP:
+		printf("-%s", hl_op_name(e->size_offs)+2);
+		show_size = false;
+		break;
+	case BINOP:
+	case UNOP:
+		printf("-%s", hl_op_name(e->size_offs)+1);
+		show_size = false;
+		break;
+	default:
+		break;
+	}
+	if( e->mode )
+		printf("%s", emit_mode_str(e->mode));
+	switch( e->op ) {
+	case CALL_FUN:
+		printf(" ");
+		{
+			int fid = ctx->mod->functions_indexes[e->a];
+			hl_code *code = ctx->mod->code;
+			if( fid < code->nfunctions ) {
+				hl_dump_fun_name(&code->functions[fid]);
+			} else {
+				printf("???");
+			}
+		}
+		hl_dump_args(ctx,e);
+		break;
+	case CALL_REG:
+		printf(" %s", val_str(e->a));
+		hl_dump_args(ctx,e);
+		break;
+	case CALL_PTR:
+		printf(" ");
+		hl_dump_ptr_name(ctx, (void*)e->value);
+		hl_dump_args(ctx,e);
+		break;
+	case JUMP:
+	case JCOND:
+		printf(" @%X", cur_pos + 1 + e->size_offs);
+		break;
+	case LOAD_CONST:
+	case PUSH_CONST:
+		printf(" ");
+		dump_value(ctx, e->value, e->mode);
+		break;
+	case LOAD_ADDR:
+		if( (e->size_offs>>8) )
+			printf(" %s[%Xh]", val_str(e->a), e->size_offs);
+		else
+			printf(" %s[%d]", val_str(e->a), e->size_offs);
+		break;
+	case STORE:
+		{
+			int offs = e->size_offs;
+			if( offs == 0 )
+				printf(" [%s]", val_str(e->a));
+			else
+				printf(" %s[%d]", val_str(e->a), offs);
+			printf(" = %s", val_str(e->b));
+			//if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
+			//	printf(" ???");
+		}
+		break;
+	default:
+		if( !IS_NULL(e->a) ) {
+			printf(" %s", val_str(e->a));
+			if( !IS_NULL(e->b) ) printf(", %s", val_str(e->b));
+		}
+		if( show_size && e->size_offs != 0 )
+			printf(" %d", e->size_offs);
+		break;
+	}
+}
 
 void hl_emit_dump( jit_ctx *ctx ) {
 	int i;
 	int cur_op = 0;
 	hl_function *f = ctx->fun;
 	int nargs = f->type->fun->nargs;
-	hl_emit_flush(ctx); // if it not was not before (in case of dump during emit)
+	// if it not was not before (in case of dump during process)
+	hl_emit_flush(ctx);
+	hl_regs_flush(ctx);
 	printf("function ");
 	hl_dump_fun_name(f);
 	printf("(");
@@ -293,6 +392,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		printf("  ??? MISSING BLOCK FOR RANGE %X-%X\n", cur, ctx->instr_count);
 	// print instrs
 	int vpos = 0;
+	int rpos = 0;
 	cur = 0;
 	for(i=0;i<ctx->instr_count;i++) {
 		while( cur < ctx->block_count && ctx->blocks[cur].start_pos == i ) {
@@ -300,7 +400,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			printf("--- BLOCK #%d ---\n", cur);
 			for(int k=0;k<b->phi_count;k++) {
 				ephi *p = b->phis + k;
-				printf("\t\t@%X %s = phi(",i,val_str(p->value));
+				printf("\t\t@%X %s = phi%s(",i,val_str(p->value),emit_mode_str(p->mode));
 				for(int n=0;n<p->nvalues;n++) {
 					if( n > 0 ) printf(",");
 					printf("%s",val_str(p->values[n]));
@@ -322,82 +422,14 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		printf("\t\t@%X ", i);
 		if( vpos < ctx->value_count && ctx->values_writes[vpos] == i )
 			printf("V%d = ", vpos++);
-		printf("%s", op_names[e->op]);
-		bool show_size = true;
-		switch( e->op ) {
-		case TEST:
-		case CMP:
-			printf("-%s", hl_op_name(e->size_offs)+2);
-			show_size = false;
-			break;
-		case BINOP:
-		case UNOP:
-			printf("-%s", hl_op_name(e->size_offs)+1);
-			show_size = false;
-			break;
-		default:
-			break;
-		}
-		if( e->mode )
-			printf("%s", emit_mode_str(e->mode));
-		switch( e->op ) {
-		case CALL_FUN:
-			printf(" ");
-			{
-				int fid = ctx->mod->functions_indexes[e->a.index];
-				hl_code *code = ctx->mod->code;
-				if( fid < code->nfunctions ) {
-					hl_dump_fun_name(&code->functions[fid]);
-				} else {
-					printf("???");
-				}
-			}
-			hl_dump_args(ctx,e);
-			break;
-		case CALL_REG:
-			printf(" %s", val_str(e->a));
-			hl_dump_args(ctx,e);
-			break;
-		case CALL_PTR:
-			printf(" ");
-			hl_dump_ptr_name(ctx, (void*)e->value);
-			hl_dump_args(ctx,e);
-			break;
-		case JUMP:
-		case JCOND:
-			printf(" @%X", i + 1 + e->size_offs);
-			break;
-		case LOAD_IMM:
-			printf(" ");
-			dump_value(ctx, e->value, e->mode);
-			break;
-		case LOAD_ADDR:
-			if( (e->size_offs>>8) )
-				printf(" %s[%Xh]", val_str(e->a), e->size_offs);
-			else
-				printf(" %s[%d]", val_str(e->a), e->size_offs);
-			break;
-		case STORE:
-			{
-				int offs = e->size_offs;
-				if( offs == 0 )
-					printf(" [%s]", val_str(e->a));
-				else
-					printf(" %s[%d]", val_str(e->a), offs);
-				printf(" = %s", val_str(e->b));
-				//if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
-				//	printf(" ???");
-			}
-			break;
-		default:
-			if( !IS_NULL(e->a) ) {
-				printf(" %s", val_str(e->a));
-				if( !IS_NULL(e->b) ) printf(", %s", val_str(e->b));
-				if( e->a.index >= vpos || e->b.index >= vpos ) printf(" ???");
-			}
-			if( show_size && e->size_offs != 0 )
-				printf(" %d", e->size_offs);
-			break;
+		dump_instr(ctx, e, i);
+		while( rpos < ctx->reg_instr_count && rpos < ctx->reg_pos_map[i+1] ) {
+			ereg out = ctx->reg_writes[rpos];
+			einstr *er = ctx->reg_instrs + rpos;
+			printf("\n\t\t\t\t@%X ",rpos);
+			if( !IS_NULL(out) ) printf("%s = ",val_str(out));
+			dump_instr(ctx,er,rpos);
+			rpos++;
 		}
 		printf("\n");
 	}
