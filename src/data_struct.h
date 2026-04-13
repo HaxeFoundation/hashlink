@@ -47,6 +47,7 @@
 #define S_VALUE			int
 #include "data_struct.c"
 #define int_arr_add(set,v)		int_arr_add_impl(DEF_ALLOC,&(set),v)
+#define int_arr_reserve(set,v)	int_arr_reserve_impl(DEF_ALLOC,&(set),v)
 
 #define S_SORTED
 
