@@ -48,7 +48,6 @@ typedef enum {
 	PUSH,
 	POP,
 	ALLOC_STACK,
-	FREE_STACK,
 	NATIVE_REG,
 	PREFETCH,
 	DEBUG_BREAK,
@@ -95,10 +94,13 @@ typedef struct {
 
 #define VAL_NULL	0x80000000
 #define FL_NATREG	0x40000000
+#define FL_NATMASK	0x70000000
 #define FL_STACKREG (FL_NATREG | 0x20000000)
+#define FL_STACKOFFS (FL_NATREG | 0x10000000)
 #define IS_NULL(e) ((e) == VAL_NULL)
 #define IS_NATREG(e) ((e) & FL_NATREG)
 #define MK_STACK_REG(v)	(((v)&0xFFFFFFF) | FL_STACKREG)
+#define MK_STACK_OFFS(v)(((v)&0xFFFFFFF) | FL_STACKOFFS)
 #define GET_STACK_OFFS(v) (((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF));
 #define IS_CALL(op)	((op) == CALL_PTR || (op) == CALL_REG || (op) == CALL_FUN)
 
