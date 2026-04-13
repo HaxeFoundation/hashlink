@@ -717,7 +717,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	for(i=0;i<hl_setup.sys_nargs;i++) {
 		uchar *arg = hl_setup.sys_args[i];
 		if( ucmp(arg,USTR("--dump")) == 0 ) dump = true;
-		if( memcmp(arg,USTR("--dump="),sizeof(USTR("--dump="))) == 0 ) {
+		if( memcmp(arg,USTR("--dump="),sizeof(USTR("--dump"))) == 0 ) {
 			dump = true;
 			filter = 0;
 			int pos = 7;
@@ -726,7 +726,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 				if( arg[pos] >= '0' && arg[pos] <= '9' )
 					filter |= arg[pos] - '0';
 				else
-					filter |= arg[pos] - 'A';
+					filter |= arg[pos] - 'A' + 10;
 				pos++;
 			}
 		}

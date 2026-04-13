@@ -48,7 +48,6 @@ typedef enum {
 	PUSH,
 	POP,
 	ALLOC_STACK,
-	NATIVE_REG,
 	PREFETCH,
 	DEBUG_BREAK,
 } emit_op;
@@ -63,9 +62,9 @@ typedef enum {
 	M_UI16,
 	M_I32,
 	M_I64,
-	M_F32,
-	M_F64,
 	M_PTR,
+	M_F64,
+	M_F32,
 	M_VOID,
 	M_NORET,
 } emit_mode;
@@ -178,11 +177,6 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void hl_jit_null_field_access();
 void hl_jit_null_access();
 void hl_jit_assert();
-
-void int_alloc_reset( int_alloc *a );
-void int_alloc_free( int_alloc *a );
-int *int_alloc_get( int_alloc *a, int count );
-void int_alloc_store( int_alloc *a, int v );
 
 // emit & dump
 void hl_emit_dump( jit_ctx *ctx );
