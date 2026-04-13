@@ -232,6 +232,11 @@ INLINE static bool S_NAME(iter_next)( S_TYPE st, S_VALUE *val, int idx ) {
 	return idx < st.cur;
 }
 
+INLINE static bool S_NAME(iter_prev)( S_TYPE st, S_VALUE *val, int idx ) {
+	if( idx >= 0 ) *val = st.values[idx];
+	return idx >= 0;
+}
+
 #undef S_NAME
 #undef S_TYPE
 #undef S_VALUE

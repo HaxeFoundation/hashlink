@@ -34,6 +34,7 @@
 
 #define STRUCT_DEF_SIZE 2
 #define for_iter(name,var,set) name##__value var; for(int __idx=0;name##_iter_next(set,&var,__idx);__idx++)
+#define for_iter_back(name,var,set) name##__value var; for(int __idx=(set).cur-1;name##_iter_prev(set,&var,__idx);__idx--)
 
 #define S_TYPE			ptr_set
 #define S_NAME(name)	ptr_set_##name

@@ -23,17 +23,25 @@
 #include <jit.h>
 #include "data_struct.h"
 
+//#define EMIT_DEBUG
+
+#ifdef EMIT_DEBUG
+#	define emit_debug	jit_debug
+#else
+#	define emit_debug(...)
+#endif
+
 static void __ignore( void *value ) {}
-int hl_emit_mode_sizes[] = {0,1,2,4,8,4,8,sizeof(void*),0,0};
+int hl_emit_mode_sizes[] = {0,1,2,4,8,4,8,HL_WSIZE,0,0};
 
 typedef struct {
 	hl_type *t;
 	int id;
+	ereg ref;
 } vreg;
 
 #define MAX_TMP_ARGS	32
 #define MAX_TRAPS		32
-#define MAX_REFS		512 // TODO : different impl
 
 typedef struct _linked_inf linked_inf;
 typedef struct _emit_block emit_block;
@@ -123,14 +131,9 @@ struct _emit_ctx {
 
 	ereg tmp_args[MAX_TMP_ARGS];
 	ereg traps[MAX_TRAPS];
-	struct {
-		ereg r;
-		int reg;
-	} refs[MAX_REFS];
 	int *pos_map;
 	int pos_map_size;
 	int trap_count;
-	int ref_count;
 
 	int_alloc args_data;
 	int_alloc jump_regs;
@@ -272,14 +275,6 @@ static ereg *get_tmp_args( emit_ctx *ctx, int count ) {
 	return ctx->tmp_args;
 }
 
-static ereg resolve_ref( emit_ctx *ctx, int reg ) {
-	for(int i=0;i<ctx->ref_count;i++) {
-		if( ctx->refs[i].reg == reg )
-			return ctx->refs[i].r;
-	}
-	return VAL_NULL;
-}
-
 static unsigned char emit_get_mode( emit_ctx *ctx, ereg v ) {
 	if( IS_NULL(v) ) jit_assert();
 	if( v < 0 )
@@ -403,7 +398,7 @@ static emit_block *alloc_block( emit_ctx *ctx ) {
 static void block_add_pred( emit_ctx *ctx, emit_block *b, emit_block *p ) {
 	blocks_add(b->preds,p);
 	blocks_add(p->nexts,b);
-	jit_debug("  PRED #%d\n",p->id);
+	emit_debug("  PRED #%d\n",p->id);
 }
 
 static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
@@ -420,7 +415,7 @@ static void split_block( emit_ctx *ctx ) {
 	b->sealed = true;
 	b->id = ctx->current_block->id + 1;
 	b->start_pos = ctx->emit_pos;
-	jit_debug("BLOCK #%d@%X[%X]\n",b->id,b->start_pos,ctx->op_pos);
+	emit_debug("BLOCK #%d@%X[%X]\n",b->id,b->start_pos,ctx->op_pos);
 	while( ctx->arrival_points && ctx->arrival_points->id == ctx->op_pos ) {
 		block_add_pred(ctx, b, (emit_block*)ctx->arrival_points->ptr);
 		ctx->arrival_points = ctx->arrival_points->next;
@@ -489,7 +484,7 @@ static void emit_test( emit_ctx *ctx, ereg v, hl_op o ) {
 
 static void phi_remove_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 	ereg_remove(&p->vals,v);
-	jit_debug("%sPHI-REM-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
+	emit_debug("%sPHI-REM-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
 }
 
 static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
@@ -499,7 +494,7 @@ static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 		return;
 	if( !ereg_add(p->vals,v) )
 		return;
-	jit_debug("%sPHI-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
+	emit_debug("%sPHI-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
 	if( v < 0 ) {
 		tmp_phi *p2 = GET_PHI(v);
 		phi_add(p2->ref_phis,p);
@@ -525,7 +520,7 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 
 	if( p->locked || p->opt ) jit_assert();
 
-	jit_debug("%sPHI-OPT %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
+	emit_debug("%sPHI-OPT %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
 	p->opt = true;
 	ctx->phi_depth++;
 	linked_inf *l = p->ref_blocks;
@@ -545,7 +540,7 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 	for(int i=0;i<count;i++)
 		optimize_phi_rec(ctx, phis[i]);
 	ctx->phi_depth--;
-	jit_debug("%sPHI-OPT-DONE %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
+	emit_debug("%sPHI-OPT-DONE %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
 	return optimize_phi_rec(ctx,p);
 }
 
@@ -567,7 +562,7 @@ static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r ) {
 		return v;
 	if( !b->sealed ) {
 		tmp_phi *p = alloc_phi(ctx,b,r);
-		jit_debug("%sPHI-SEALED %s = R%d\n",phi_prefix(ctx),val_str(p->value),r->id);
+		emit_debug("%sPHI-SEALED %s = R%d\n",phi_prefix(ctx),val_str(p->value),r->id);
 		v = p->value;
 	} else if( blocks_count(b->preds) == 1 )
 		v = emit_load_reg_block(ctx, blocks_get(b->preds,0), r);
@@ -596,14 +591,13 @@ static void emit_walk_blocks( emit_ctx *ctx, void (*fun)(emit_ctx*,emit_block*) 
 }
 
 static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
-	ereg ref = resolve_ref(ctx, r->id);
-	if( ref >= 0 )
-		return LOAD_MEM(ref,0,r->t);
+	if( !IS_NULL(r->ref) )
+		return LOAD_MEM(r->ref,0,r->t);
 	return emit_load_reg_block(ctx, ctx->current_block, r);
 }
 
 static void seal_block( emit_ctx *ctx, emit_block *b ) {
-	jit_debug("  SEAL #%d\n",b->id);
+	emit_debug("  SEAL #%d\n",b->id);
 	for_iter(phi,p,b->phis)
 		gather_phis(ctx, p);
 	b->sealed = true;
@@ -743,14 +737,13 @@ static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
 		return emit_phi(ctx, v1, v2);
 	}
 	bool need_dyn = dyn_need_type(dt);
-	ereg st = emit_gen_size(ctx, ALLOC_STACK, 1);
+	ereg st = emit_gen_size(ctx, ALLOC_STACK, HL_WSIZE);
 	STORE_MEM(st, 0, v);
 	ereg args[3];
 	args[0] = st;
 	args[1] = LOAD_CONST_PTR(t);
 	if( need_dyn ) args[2] = LOAD_CONST_PTR(dt);
 	ereg r = emit_native_call(ctx, get_dyncast(dt), args, need_dyn ? 3 : 2, dt);
-	emit_gen_size(ctx, FREE_STACK, 1);
 	return r;
 }
 
@@ -925,7 +918,6 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->fun = f;
 	ctx->emit_pos = 0;
 	ctx->trap_count = 0;
-	ctx->ref_count = 0;
 	ctx->phi_count = 0;
 	ctx->flushed = false;
 	int_alloc_reset(&ctx->args_data);
@@ -934,7 +926,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->root_block = ctx->current_block = alloc_block(ctx);
 	ctx->current_block->sealed = true;
 	ctx->arrival_points = NULL;
-	jit_debug("---- begin [%X] ----\n",f->findex);
+	emit_debug("---- begin [%X] ----\n",f->findex);
 	if( f->nregs > ctx->max_regs ) {
 		free(ctx->vregs);
 		ctx->vregs = (vreg*)malloc(sizeof(vreg) * (f->nregs + 1));
@@ -954,24 +946,13 @@ void hl_emit_function( jit_ctx *jit ) {
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
+		r->ref = VAL_NULL;
 	}
 
 	for(i=0;i<f->type->fun->nargs;i++) {
 		hl_type *t = f->type->fun->args[i];
 		if( t->kind == HVOID ) continue;
 		STORE(R(i), emit_gen(ctx, LOAD_ARG, VAL_NULL, VAL_NULL, hl_type_mode(t)));
-	}
-
-	for(i=f->nops-1;i>=0;i--) {
-		hl_opcode *o = f->ops + i;
-		if( o->op == ORef ) {
-			ereg ref = resolve_ref(ctx, o->p2);
-			if( ref >= 0 ) continue;
-			if( ctx->ref_count == MAX_REFS ) jit_error("Too many refs");
-			ctx->refs[ctx->ref_count].r = emit_gen_size(ctx, ALLOC_STACK, hl_type_size(R(o->p2)->t));
-			ctx->refs[ctx->ref_count].reg = o->p2;
-			ctx->ref_count++;
-		}
 	}
 
 	for(int op_pos=0;op_pos<f->nops;op_pos++) {
@@ -1069,7 +1050,7 @@ static void prepare_loop_block( emit_ctx *ctx ) {
 			break;
 		}
 		if( offs < 0 && i + 1 + offs == ctx->op_pos ) {
-			jit_debug("  WAIT @%X\n",i);
+			emit_debug("  WAIT @%X\n",i);
 			b->wait_nexts++;
 			if( b->sealed ) {
 				b->sealed = false;
@@ -1307,7 +1288,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OCallClosure:
 		if( ra->t->kind == HDYN ) {
 			int i;
-			ereg st = emit_gen_size(ctx, ALLOC_STACK, o->p3);
+			ereg st = emit_gen_size(ctx, ALLOC_STACK, o->p3 * HL_WSIZE);
 			for(i=0;i<o->p3;i++) {
 				vreg *r = R(o->extra[i]);
 				if( !hl_is_dynamic(r->t) ) jit_assert();
@@ -1318,7 +1299,6 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			args[1] = st;
 			args[2] = LOAD_CONST(o->p3,&hlt_i32);
 			STORE(dst, emit_dyn_cast(ctx,emit_native_call(ctx,hl_dyn_call,args,3,dst->t),ra->t,dst->t));
-			emit_gen_size(ctx, FREE_STACK, o->p3);
 		} else {
 			ereg r = LOAD(ra);
 			ereg *args = get_tmp_args(ctx,o->p3+1);
@@ -1524,11 +1504,11 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					patch_jump(ctx, jidx);
 
 					nargs = o->p3 - 1;
-					ereg eargs = emit_gen_size(ctx, ALLOC_STACK, nargs);
+					ereg eargs = emit_gen_size(ctx, ALLOC_STACK, nargs * HL_WSIZE);
 					for(i=0;i<nargs;i++)
 						STORE_MEM(eargs,i*HL_WSIZE,LOAD(R(o->extra[i+1])));
 					bool need_dyn = !hl_is_ptr(dst->t) && dst->t->kind != HVOID;
-					int dyn_size = sizeof(vdynamic)/HL_WSIZE;
+					int dyn_size = sizeof(vdynamic);
 					ereg edyn = need_dyn ? emit_gen_size(ctx, ALLOC_STACK, dyn_size) : LOAD_CONST_PTR(NULL);
 
 					args = get_tmp_args(ctx, 4);
@@ -1539,7 +1519,6 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 
 					ereg v2 = emit_native_call(ctx, hl_dyn_call_obj, args, 4, dst->t);
 
-					emit_gen_size(ctx, FREE_STACK, o->p3 + (need_dyn ? dyn_size : 0));
 					patch_jump(ctx, jend);
 
 					if( dst->t->kind != HVOID ) STORE(dst, emit_phi(ctx, v1, v2));
@@ -1643,21 +1622,21 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case ORef:
 		{
-			ereg ref = resolve_ref(ctx, ra->id);
-			if( IS_NULL(ref) ) jit_assert();
+			if( IS_NULL(ra->ref) )
+				ra->ref = emit_gen_size(ctx, ALLOC_STACK, hl_type_size(ra->t));
 			ereg r = vreg_find(ctx->current_block->written_vars, ra->id);
 			if( !IS_NULL(r) ) {
-				STORE_MEM(ref, 0, LOAD(ra));
+				STORE_MEM(ra->ref, 0, r);
 				vreg_remove(&ctx->current_block->written_vars, ra->id);
 			}
-			STORE(dst, ref);
+			STORE(dst,ra->ref);
 		}
 		break;
 	case OUnref:
-		STORE(dst, LOAD_MEM(LOAD(ra),0,dst->t));
+		STORE(dst, LOAD_MEM(ra->ref,0,dst->t));
 		break;
 	case OSetref:
-		STORE_MEM(LOAD(dst),0,LOAD(ra));
+		STORE_MEM(dst->ref,0,LOAD(ra));
 		break;
 	case ORefData:
 		switch( ra->t->kind ) {
@@ -1846,7 +1825,6 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			ereg ret = emit_native_call(ctx, fun, args, nargs, &hlt_i32);
 			emit_test(ctx, ret, OJNull);
 			int jskip = emit_jump(ctx, true);
-			emit_gen_size(ctx, FREE_STACK, sizeof(hl_trap_ctx));
 			STORE(dst, tinf ? LOAD_CONST_PTR(&tinf->exc_value) : LOAD_MEM_PTR(thread,(int)(int_val)&tinf->exc_value));
 
 			int jtrap = emit_jump(ctx, false);
@@ -1887,8 +1865,6 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				STORE_MEM(st, offset, LOAD_CONST_PTR(NULL));
 			}
 #			endif
-
-			emit_gen_size(ctx, FREE_STACK, sizeof(hl_trap_ctx));
 		}
 		break;
 	case OSwitch:

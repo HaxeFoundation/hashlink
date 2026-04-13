@@ -45,50 +45,47 @@ typedef enum {
 	_UNUSED = 0xFF
 } Reg;
 
-typedef enum {
-	K64 = 0,
-	K32 = 1,
-	K16 = 2,
-	K8 = 3,
-	KF32 = 4,
-	KF64 = 5
-} RegKind;
-
-#define R(id,k)		((id) | ((k) << 8) | FL_NATREG)
-#define X(id)		R(id,K64)
+#define R(id,mode)		((mode) | ((id)<<8) | FL_NATREG)
+#define X(id)		R(id,M_NONE)
+#define MMX(id)		R(id+64,M_F64)
 
 const char *hl_natreg_str( int reg ) {
-	static char out[8];
+	static char out[16];
 	static const char *regs_str[] = { "AX", "CX", "DX", "BX", "SP", "BP", "SI", "DI" };
-	RegKind k = (reg >> 8) & 0xFF;
-	Reg r = (reg & 0xFF);
+	emit_mode k = (reg & 0xFF);
+	Reg r = ((reg >> 8) & 0xFF);
 	switch( k ) {
-	case K64:
-		if( r < 8 )
-			sprintf(out,"R%s",regs_str[r]);
-		else
-			sprintf(out,"R%d",r);
-		break;
-	case K32:
+	case M_I32:
 		if( r < 8 )
 			sprintf(out,"E%s",regs_str[r]);
 		else
-			sprintf(out,"R%dD",r);
+			sprintf(out,"R%dD%s",r,r<16?"":"???");
 		break;
-	case K16:
+	case M_UI16:
 		if( r < 8 )
 			sprintf(out,"%s",regs_str[r]);
 		else
-			sprintf(out,"R%dW",r);
+			sprintf(out,"R%dW%s",r,r<16?"":"???");
 		break;
-	case K8:
+	case M_UI8:
 		if( r < 8 )
 			sprintf(out,"%s",regs_str[r]);
 		else
-			sprintf(out,"R%dB",r);
+			sprintf(out,"R%dB%s",r,r<16?"":"???");
+		break;
+	case M_F32:
+		r -= 64;
+		sprintf(out,"XMM%df%s",r,r >= 0 && r < 16 ? "" : "???");
+		break;
+	case M_F64:
+		r -= 64;
+		sprintf(out,"XMM%d%s",r,r >= 0 && r < 16 ? "" : "???");
 		break;
 	default:
-		sprintf(out,"XMM%d",r);
+		if( r < 8 )
+			sprintf(out,"R%s",regs_str[r]);
+		else
+			sprintf(out,"R%d%s",r,r<16?"":"???");
 		break;
 	}
 	return out;
@@ -109,10 +106,10 @@ void hl_jit_init_regs( regs_config cfg ) {
 	cfg[1].nscratchs = 16;
 #	endif
 	static int floats[] = {
-		R(0,KF64), R(1,KF64), R(2,KF64), R(3,KF64), 
-		R(4,KF64), R(5,KF64), R(6,KF64), R(7,KF64), 
-		R(8,KF64), R(9,KF64), R(10,KF64), R(11,KF64), 
-		R(12,KF64), R(13,KF64), R(14,KF64), R(15,KF64)
+		MMX(0), MMX(1), MMX(2), MMX(3), 
+		MMX(4), MMX(5), MMX(6), MMX(7), 
+		MMX(8), MMX(9), MMX(10), MMX(11), 
+		MMX(12), MMX(13), MMX(14), MMX(15)
 	};
 	cfg[0].ret = scratch_regs[0];
 	cfg[0].nscratchs = sizeof(scratch_regs) / sizeof(int);

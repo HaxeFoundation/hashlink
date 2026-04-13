@@ -711,8 +711,32 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	if( ctx == NULL )
 		return 0;
 	hl_jit_init(ctx, m);
+#	ifdef HL_DEBUG
+	bool dump = false;
+	int filter = -1;
+	for(i=0;i<hl_setup.sys_nargs;i++) {
+		uchar *arg = hl_setup.sys_args[i];
+		if( ucmp(arg,USTR("--dump")) == 0 ) dump = true;
+		if( memcmp(arg,USTR("--dump="),sizeof(USTR("--dump="))) == 0 ) {
+			dump = true;
+			filter = 0;
+			int pos = 7;
+			while( arg[pos] ) {
+				filter *= 16;
+				if( arg[pos] >= '0' && arg[pos] <= '9' )
+					filter |= arg[pos] - '0';
+				else
+					filter |= arg[pos] - 'A';
+				pos++;
+			}
+		}
+	}
+#	endif
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
+#		ifdef HL_DEBUG
+		if( filter >= 0 && filter != f->findex ) continue;
+#		endif
 		int fpos = hl_jit_function(ctx, m, f);
 		if( fpos < 0 ) {
 			hl_jit_free(ctx, false);
@@ -720,7 +744,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
 #		ifdef HL_DEBUG
-		if( hl_setup.sys_nargs > 0 && ucmp(hl_setup.sys_args[0],USTR("--dump")) == 0 ) hl_emit_dump(ctx);
+		if( dump ) hl_emit_dump(ctx);
 #		endif
 	}
 	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);

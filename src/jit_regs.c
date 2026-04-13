@@ -36,7 +36,9 @@
 
 typedef struct {
 	int stack_pos;
+	int last_read;
 	emit_mode mode;
+	ereg arg_reg;
 	ereg current;
 	bool saved;
 } value_info;
@@ -55,6 +57,7 @@ struct _regs_ctx {
 	int max_instrs;
 	int cur_op;
 	int emit_pos;
+	int stack_size;
 	int persists_uses[2];
 	einstr *instrs;
 	ereg *out_write;
@@ -143,6 +146,20 @@ static void regs_assign( regs_ctx *ctx, value_info *v, ereg *forced ) {
 		// lookup available reg
 		int mode = REG_MODE(v->mode);
 		reg_config *cfg = &ctx->cfg[mode];
+		if( !IS_NULL(v->arg_reg) ) {
+			bool free = true;
+			for_iter(values,v2,ctx->scratch) {
+				if( v2->current == v->arg_reg ) {				
+					free = false;
+					break;
+				}
+			}
+			if( free ) {
+				v->current = v->arg_reg;
+				values_add(ctx->scratch,v);
+				return;
+			}
+		}
 		for(int i=0;i<cfg->nscratchs;i++) {
 			ereg r = cfg->scratch[i];
 			for_iter(values,v2,ctx->scratch) {
@@ -173,9 +190,14 @@ static void regs_assign( regs_ctx *ctx, value_info *v, ereg *forced ) {
 	}
 }
 
+static int regs_alloc_stack( regs_ctx *ctx, int size ) {
+	ctx->stack_size += size;
+	ctx->stack_size += jit_pad_size(ctx->stack_size,size);
+	return -ctx->stack_size;
+}
+
 static void regs_assign_stack_regs( regs_ctx *ctx ) {
 	// dummy regs assign for testing : set all values on stack
-	int stack_pos = 0;
 	int nargs = ctx->jit->fun->type->fun->nargs;
 	call_regs regs = {0};
 	int args_size = 0;
@@ -197,9 +219,7 @@ static void regs_assign_stack_regs( regs_ctx *ctx ) {
 				continue;
 			}
 		}
-		stack_pos += size;
-		stack_pos += jit_pad_size(stack_pos,size);
-		v->stack_pos = MK_STACK_REG(-stack_pos);
+		v->stack_pos = MK_STACK_REG(regs_alloc_stack(ctx,size));
 	}
 	for(int i=0;i<ctx->jit->block_count;i++) {
 		eblock *b = ctx->jit->blocks + i;
@@ -207,9 +227,30 @@ static void regs_assign_stack_regs( regs_ctx *ctx ) {
 			ephi *p = b->phis + k;
 			int size = hl_emit_mode_sizes[p->mode];
 			value_info *v = VAL(VIDX(p->value));
-			stack_pos += size;
-			stack_pos += jit_pad_size(stack_pos,size);
-			v->stack_pos = MK_STACK_REG(-stack_pos);
+			v->stack_pos = MK_STACK_REG(regs_alloc_stack(ctx,size));
+		}
+	}
+}
+
+static void regs_write_live( regs_ctx *ctx, ereg *r ) {
+	value_info *v = VAL(VIDX(*r));
+	v->last_read = ctx->cur_op;
+}
+
+static void regs_compute_liveness( regs_ctx *ctx ) {
+	for(int i=0;i<ctx->jit->instr_count;i++) {
+		einstr *e = ctx->jit->instrs + i;
+		ctx->cur_op = i;
+		hl_emit_reg_iter(ctx->jit,e,ctx,regs_write_live);
+		if( IS_CALL(e->op) ) {
+			// anticipate register usage in call so we can previlege this assign
+			ereg *r = hl_emit_get_args(ctx->jit->emit, e);
+			call_regs regs = {0};
+			for(int k=0;k<e->nargs;k++) {
+				value_info *v = VAL(VIDX(r[k]));
+				if( !IS_NULL(v->arg_reg) ) continue;
+				v->arg_reg = get_call_reg(ctx,regs,v->mode);			
+			}
 		}
 	}
 }
@@ -228,7 +269,7 @@ void hl_regs_flush( jit_ctx *jit ) {
 	jit->reg_instrs = ctx->instrs;
 	jit->reg_writes = ctx->out_write;
 	jit->reg_pos_map = ctx->pos_map;
-	ctx->pos_map[ctx->cur_op+1] = ctx->emit_pos;
+	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op+1] = ctx->emit_pos;
 }
 
 void hl_regs_function( jit_ctx *jit ) {
@@ -239,6 +280,7 @@ void hl_regs_function( jit_ctx *jit ) {
 	ctx->pos_map = (int*)malloc((jit->instr_count + 1) * sizeof(int));
 	ctx->emit_pos = 0;
 	ctx->cur_op = 0;
+	ctx->stack_size = 0;
 	ctx->pos_map[0] = 0;
 	values_reset(&ctx->scratch);
 	ctx->values = malloc(sizeof(value_info) * nvalues);
@@ -246,20 +288,27 @@ void hl_regs_function( jit_ctx *jit ) {
 	for(int i=0;i<nvalues;i++) {
 		value_info *v = VAL(i);
 		v->current = VAL_NULL;
+		v->arg_reg = VAL_NULL;
+		v->last_read = -1;
 	}
+	regs_compute_liveness(ctx);
 	regs_assign_stack_regs(ctx);
 	int write_index = 0;
-	for(int i=0;i<jit->instr_count;i++) {
-		einstr e = jit->instrs[i];
+	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
+		einstr e = jit->instrs[cur_op];
 		ereg *ret_val = NULL;
 		int nread;
-		ctx->cur_op = i;
-		if( i > 0 )
-			ctx->pos_map[i] = ctx->emit_pos;
+		ctx->cur_op = cur_op;
+		if( cur_op > 0 )
+			ctx->pos_map[cur_op] = ctx->emit_pos;
+		for_iter_back(values,v,ctx->scratch) {
+			if( v->last_read < cur_op )
+				values_remove(&ctx->scratch,v);
+		}
 		if( IS_CALL(e.op) ) {
 			ereg *args = hl_emit_get_args(ctx->jit->emit,&e);
 			for_iter(values,v,ctx->scratch) {
-				if( !v->saved ) {
+				if( !v->saved && v->last_read > cur_op ) {
 					v->saved = true;
 					regs_emit_mov(ctx, MK_STACK_REG(v->stack_pos), v->current, v->mode);
 				}
@@ -293,9 +342,12 @@ void hl_regs_function( jit_ctx *jit ) {
 			}
 		}
 		ereg out;
-		if( write_index < jit->value_count && jit->values_writes[write_index] == i ) {
+		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op ) {
 			value_info *v = VAL(write_index++);
-			regs_assign(ctx,v,ret_val);
+			if( e.op == ALLOC_STACK )
+				v->current = MK_STACK_OFFS(regs_alloc_stack(ctx, e.size_offs));
+			else
+				regs_assign(ctx,v,ret_val);
 			out = v->current;
 		} else
 			out = VAL_NULL;
