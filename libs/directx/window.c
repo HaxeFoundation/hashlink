@@ -828,6 +828,14 @@ HL_PRIM bool HL_NAME(win_get_relative_mouse_mode)() {
 	return relative_mouse;
 }
 
+HL_PRIM void HL_NAME(win_set_capture)(dx_window *win) {
+	SetCapture(win);
+}
+
+HL_PRIM void HL_NAME(win_release_capture)() {
+	ReleaseCapture();
+}
+
 HL_PRIM void HL_NAME(win_set_drag_accept_files)( dx_window* wnd, bool enabled ) {
 	DragAcceptFiles(wnd, enabled);
 }
@@ -954,6 +962,8 @@ DEFINE_PRIM(_BOOL, set_cursor_pos, _I32 _I32);
 DEFINE_PRIM(_BOOL, win_set_cursor_pos, TWIN _I32 _I32);
 DEFINE_PRIM(_BOOL, win_set_relative_mouse_mode, TWIN _BOOL);
 DEFINE_PRIM(_BOOL, win_get_relative_mouse_mode, _NO_ARG);
+DEFINE_PRIM(_VOID, win_set_capture, TWIN);
+DEFINE_PRIM(_VOID, win_release_capture, _NO_ARG);
 DEFINE_PRIM(_VOID, win_set_drag_accept_files, TWIN _BOOL);
 DEFINE_PRIM(_ARR, win_get_display_settings, _BYTES);
 DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES _BOOL);
