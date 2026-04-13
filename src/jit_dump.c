@@ -45,7 +45,6 @@ static const char *op_names[] = {
 	"push",
 	"pop",
 	"alloc-stack",
-	"free-stack",
 	"native-reg",
 	"prefetch",
 	"debug-break",
@@ -68,6 +67,12 @@ const char *hl_emit_regstr( ereg v ) {
 			sprintf(fmt,"[ST%d]", index);
 		else
 			sprintf(fmt,"[ST+%d]", index);
+	} else if( (v&FL_STACKOFFS) == FL_STACKOFFS ) {
+		int index = GET_STACK_OFFS(v);
+		if( index < 0 )
+			sprintf(fmt,"ST%d", index);
+		else
+			sprintf(fmt,"ST+%d]", index);
 	} else if( IS_NATREG(v) )
 		sprintf(fmt,"%s", hl_natreg_str(v&(FL_NATREG-1)));
 	else
@@ -280,6 +285,7 @@ static void hl_dump_ptr_name( jit_ctx *ctx, void *ptr ) {
 void hl_emit_flush( jit_ctx *ctx );
 void hl_regs_flush( jit_ctx *ctx );
 
+#define reg_str(r) val_str((((r) & FL_NATMASK) == FL_NATREG ? (((r)&~0xFF)|e->mode) : (r)))
 
 static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	printf("%s", op_names[e->op]);
@@ -345,15 +351,15 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 				printf(" [%s]", val_str(e->a));
 			else
 				printf(" %s[%d]", val_str(e->a), offs);
-			printf(" = %s", val_str(e->b));
+			printf(" = %s", reg_str(e->b));
 			//if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
 			//	printf(" ???");
 		}
 		break;
 	default:
 		if( !IS_NULL(e->a) ) {
-			printf(" %s", val_str(e->a));
-			if( !IS_NULL(e->b) ) printf(", %s", val_str(e->b));
+			printf(" %s", reg_str(e->a));
+			if( !IS_NULL(e->b) ) printf(", %s", reg_str(e->b));
 		}
 		if( show_size && e->size_offs != 0 )
 			printf(" %d", e->size_offs);
@@ -425,10 +431,10 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		dump_instr(ctx, e, i);
 		while( rpos < ctx->reg_instr_count && rpos < ctx->reg_pos_map[i+1] ) {
 			ereg out = ctx->reg_writes[rpos];
-			einstr *er = ctx->reg_instrs + rpos;
+			e = ctx->reg_instrs + rpos;
 			printf("\n\t\t\t\t@%X ",rpos);
-			if( !IS_NULL(out) ) printf("%s = ",val_str(out));
-			dump_instr(ctx,er,rpos);
+			if( !IS_NULL(out) ) printf("%s = ",reg_str(out));
+			dump_instr(ctx,e,rpos);
 			rpos++;
 		}
 		printf("\n");
