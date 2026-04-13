@@ -104,6 +104,19 @@ static S_VALUE S_NAME(find)( S_TYPE st, S_KEY k ) {
 			return st.values[i];
 	return (S_VALUE)0;
 }
+#else
+static S_VALUE *S_NAME(reserve_impl)( hl_alloc *alloc, S_TYPE *st, int count ) {
+	if( st->cur + count > st->max ) {
+		int n = st->max ? (st->max << 1) : STRUCT_DEF_SIZE;
+		while( n < st->cur + count ) n <<= 1;
+		S_KEY *keys = (S_KEY*)hl_malloc(alloc,sizeof(S_KEY) * n);
+		memcpy(keys,st->keys,sizeof(S_KEY) * st->cur);
+		st->keys = keys;
+	}
+	S_VALUE *ptr = st->keys + st->cur;
+	st->cur += count;
+	return ptr;
+}
 #endif
 
 

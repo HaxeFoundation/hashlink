@@ -37,36 +37,6 @@ void hl_jit_null_field_access() { jit_assert(); }
 void hl_jit_null_access() { jit_assert(); }
 void hl_jit_assert() { jit_assert(); }
 
-void int_alloc_reset( int_alloc *a ) {
-	a->cur = 0;
-}
-
-void int_alloc_free( int_alloc *a ) {
-	free(a->data);
-	a->cur = 0;
-	a->max = 0;
-	a->data = NULL;
-}
-
-int *int_alloc_get( int_alloc *a, int count ) {
-	while( a->cur + count > a->max ) {
-		int next_size = a->max ? a->max << 1 : 128; 
-		int *new_data = (int*)malloc(sizeof(int) * next_size);
-		if( new_data == NULL ) jit_error("Out of memory");
-		memcpy(new_data, a->data, sizeof(int) * a->cur);
-		free(a->data);
-		a->data = new_data;
-		a->max = next_size;
-	}
-	int *ptr = a->data + a->cur;
-	a->cur += count;
-	return ptr;
-}
-
-void int_alloc_store( int_alloc *a, int v ) {
-	*int_alloc_get(a,1) = v;
-}
-
 void hl_emit_alloc( jit_ctx *jit );
 void hl_emit_free( jit_ctx *jit );
 void hl_emit_function( jit_ctx *jit );

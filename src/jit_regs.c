@@ -31,7 +31,7 @@
 #	define IS_WINCALL64 0
 #endif
 
-#define VIDX(e)	(((e) < 0) ? ctx->jit->value_count + (-(e)-1) : (e)) 
+#define VIDX(e)	(((e) < 0) ? ctx->jit->value_count + (-(e)-1) : (e))
 #define REG_MODE(m)	(((m) == M_F32 || (m) == M_F64) ? 1 :0)
 
 typedef struct {
@@ -54,6 +54,7 @@ struct _regs_ctx {
 	regs_config cfg;
 	value_info *values;
 	values scratch;
+	int_arr jump_regs;
 	int max_instrs;
 	int cur_op;
 	int emit_pos;
@@ -62,6 +63,7 @@ struct _regs_ctx {
 	einstr *instrs;
 	ereg *out_write;
 	int *pos_map;
+	bool flushed;
 };
 
 typedef int call_regs[2];
@@ -128,7 +130,7 @@ static void regs_emit_todo_impl( regs_ctx *ctx, int line ) {
 
 
 static void regs_assign( regs_ctx *ctx, value_info *v, ereg *forced ) {
-	if( forced ) {		
+	if( forced ) {
 		if( v->current == *forced )
 			return;
 		// erase previous value
@@ -149,7 +151,7 @@ static void regs_assign( regs_ctx *ctx, value_info *v, ereg *forced ) {
 		if( !IS_NULL(v->arg_reg) ) {
 			bool free = true;
 			for_iter(values,v2,ctx->scratch) {
-				if( v2->current == v->arg_reg ) {				
+				if( v2->current == v->arg_reg ) {
 					free = false;
 					break;
 				}
@@ -182,7 +184,7 @@ static void regs_assign( regs_ctx *ctx, value_info *v, ereg *forced ) {
 		value_info *v2 = values_first(ctx->scratch);
 		if( !v2->saved ) {
 			regs_emit_mov(ctx, MK_STACK_REG(v2->stack_pos), v2->current, v2->mode);
-			v2->saved = true;			
+			v2->saved = true;
 		}
 		v->current = v2->current;
 		values_remove(&ctx->scratch, v2);
@@ -233,6 +235,8 @@ static void regs_assign_stack_regs( regs_ctx *ctx ) {
 }
 
 static void regs_write_live( regs_ctx *ctx, ereg *r ) {
+	if( IS_NULL(*r) ) jit_assert();
+	if( IS_NATREG(*r) ) return;
 	value_info *v = VAL(VIDX(*r));
 	v->last_read = ctx->cur_op;
 }
@@ -249,7 +253,7 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			for(int k=0;k<e->nargs;k++) {
 				value_info *v = VAL(VIDX(r[k]));
 				if( !IS_NULL(v->arg_reg) ) continue;
-				v->arg_reg = get_call_reg(ctx,regs,v->mode);			
+				v->arg_reg = get_call_reg(ctx,regs,v->mode);
 			}
 		}
 	}
@@ -265,11 +269,20 @@ void hl_regs_alloc( jit_ctx *jit ) {
 
 void hl_regs_flush( jit_ctx *jit ) {
 	regs_ctx *ctx = jit->regs;
+	if( ctx->flushed ) return;
+	ctx->flushed = true;
 	jit->reg_instr_count = ctx->emit_pos;
 	jit->reg_instrs = ctx->instrs;
 	jit->reg_writes = ctx->out_write;
 	jit->reg_pos_map = ctx->pos_map;
 	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op+1] = ctx->emit_pos;
+	int i = 0;
+	while( i < int_arr_count(ctx->jump_regs) ) {
+		int pos = int_arr_get(ctx->jump_regs,i++);
+		einstr *e = ctx->instrs + pos;
+		int target = int_arr_get(ctx->jump_regs,i++);
+		e->size_offs = ctx->pos_map[target] - (pos + 1);
+	}
 }
 
 void hl_regs_function( jit_ctx *jit ) {
@@ -277,12 +290,15 @@ void hl_regs_function( jit_ctx *jit ) {
 	int nvalues = jit->value_count + jit->phi_count;
 	memset(ctx->persists_uses,0,sizeof(ctx->persists_uses));
 	free(ctx->pos_map);
+	ctx->flushed = false;
 	ctx->pos_map = (int*)malloc((jit->instr_count + 1) * sizeof(int));
 	ctx->emit_pos = 0;
 	ctx->cur_op = 0;
 	ctx->stack_size = 0;
 	ctx->pos_map[0] = 0;
-	values_reset(&ctx->scratch);
+	jit->reg_instrs = NULL;
+	values_free(&ctx->scratch);
+	int_arr_free(&ctx->jump_regs);
 	ctx->values = malloc(sizeof(value_info) * nvalues);
 	memset(ctx->values, 0, sizeof(value_info) * nvalues);
 	for(int i=0;i<nvalues;i++) {
@@ -290,6 +306,10 @@ void hl_regs_function( jit_ctx *jit ) {
 		v->current = VAL_NULL;
 		v->arg_reg = VAL_NULL;
 		v->last_read = -1;
+		if( i < jit->value_count )
+			v->mode = jit->instrs[jit->values_writes[i]].mode;
+		else
+			v->mode = M_NONE; // TODO : phi mode
 	}
 	regs_compute_liveness(ctx);
 	regs_assign_stack_regs(ctx);
@@ -307,10 +327,13 @@ void hl_regs_function( jit_ctx *jit ) {
 		}
 		if( IS_CALL(e.op) ) {
 			ereg *args = hl_emit_get_args(ctx->jit->emit,&e);
-			for_iter(values,v,ctx->scratch) {
-				if( !v->saved && v->last_read > cur_op ) {
-					v->saved = true;
-					regs_emit_mov(ctx, MK_STACK_REG(v->stack_pos), v->current, v->mode);
+			bool will_scratch = e.mode != M_NORET;
+			if( will_scratch ) {
+				for_iter(values,v,ctx->scratch) {
+					if( !v->saved && v->last_read > cur_op ) {
+						v->saved = true;
+						regs_emit_mov(ctx, MK_STACK_REG(v->stack_pos), v->current, v->mode);
+					}
 				}
 			}
 			call_regs regs = {0};
@@ -324,15 +347,18 @@ void hl_regs_function( jit_ctx *jit ) {
 				else
 					regs_emit_mov(ctx, r, v->current, v->mode);
 			}
-			for_iter(values,v2,ctx->scratch)
-				v2->current = VAL_NULL;
-			values_reset(&ctx->scratch);
+			if( will_scratch ) {
+				for_iter(values,v2,ctx->scratch)
+					v2->current = VAL_NULL;
+				values_reset(&ctx->scratch);
+			}
 			e.nargs = 0xFF;
 			ret_val = &ctx->cfg[REG_MODE(e.mode)].ret;
 		} else {
 			ereg **regs = hl_emit_get_regs(&e,&nread);
 			for(int k=0;k<nread;k++) {
 				ereg *r = regs[k];
+				if( IS_NATREG(*r) ) continue;
 				value_info *v = VAL(VIDX(*r));
 				if( IS_NULL(v->current) ) {
 					regs_assign(ctx,v,NULL);
@@ -352,6 +378,13 @@ void hl_regs_function( jit_ctx *jit ) {
 		} else
 			out = VAL_NULL;
 		regs_write_instr(ctx, &e, out);
+		switch( e.op ) {
+		case JUMP:
+		case JCOND:
+			int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
+			int_arr_add(ctx->jump_regs, cur_op + 1 + e.size_offs);
+			break;
+		}
 	}
 	free(ctx->values);
 	hl_regs_flush(ctx->jit);

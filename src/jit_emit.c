@@ -32,7 +32,7 @@
 #endif
 
 static void __ignore( void *value ) {}
-int hl_emit_mode_sizes[] = {0,1,2,4,8,4,8,HL_WSIZE,0,0};
+int hl_emit_mode_sizes[] = {0,1,2,4,8,HL_WSIZE,8,4,0,0};
 
 typedef struct {
 	hl_type *t;
@@ -135,10 +135,10 @@ struct _emit_ctx {
 	int pos_map_size;
 	int trap_count;
 
-	int_alloc args_data;
-	int_alloc jump_regs;
-	int_alloc values;
-	
+	int_arr args_data;
+	int_arr jump_regs;
+	int_arr values;
+
 	emit_block *root_block;
 	emit_block *current_block;
 	emit_block *wait_seal;
@@ -265,8 +265,8 @@ static emit_mode hl_type_mode( hl_type *t ) {
 }
 
 static ereg new_value( emit_ctx *ctx ) {
-	ereg r = {ctx->values.cur};
-	int_alloc_store(&ctx->values, ctx->emit_pos-1);
+	ereg r = int_arr_count(ctx->values);
+	int_arr_add(ctx->values, ctx->emit_pos-1);
 	return r;
 }
 
@@ -279,7 +279,7 @@ static unsigned char emit_get_mode( emit_ctx *ctx, ereg v ) {
 	if( IS_NULL(v) ) jit_assert();
 	if( v < 0 )
 		return GET_PHI(v)->mode;
-	return ctx->instrs[ctx->values.data[v]].mode;
+	return ctx->instrs[int_arr_get(ctx->values,v)].mode;
 }
 
 static const char *phi_prefix( emit_ctx *ctx ) {
@@ -326,8 +326,8 @@ static void store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
 		e->size_offs = args[0];
 		return;
 	}
-	int *args_data = int_alloc_get(&ctx->args_data, count);
-	e->size_offs = (int)(args_data - ctx->args_data.data);
+	int *args_data = int_arr_reserve(ctx->args_data, count);
+	e->size_offs = (int)(args_data - ctx->args_data.values);
 	memcpy(args_data, args, sizeof(int) * count);
 }
 
@@ -336,7 +336,7 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e ) {
 		return NULL;
 	if( e->nargs == 1 )
 		return (ereg*)&e->size_offs;
-	return (ereg*)(ctx->args_data.data + e->size_offs);
+	return (ereg*)(ctx->args_data.values + e->size_offs);
 }
 
 static ereg emit_gen_ext( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode, int size_offs ) {
@@ -388,7 +388,7 @@ static int emit_jump( emit_ctx *ctx, bool cond ) {
 }
 
 static void patch_jump( emit_ctx *ctx, int jpos ) {
-	ctx->instrs[jpos].size_offs = ctx->emit_pos - (jpos + 1); 
+	ctx->instrs[jpos].size_offs = ctx->emit_pos - (jpos + 1);
 }
 
 static emit_block *alloc_block( emit_ctx *ctx ) {
@@ -403,7 +403,7 @@ static void block_add_pred( emit_ctx *ctx, emit_block *b, emit_block *p ) {
 
 static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
 	if( IS_NULL(v) ) jit_assert();
-	vreg_replace(b->written_vars,r->id,v); 
+	vreg_replace(b->written_vars,r->id,v);
 	if( v < 0 ) {
 		tmp_phi *p = GET_PHI(v);
 		p->ref_blocks = link_add_sort_unique(ctx,b->id,b,p->ref_blocks);
@@ -430,8 +430,8 @@ static void split_block( emit_ctx *ctx ) {
 
 static void register_jump( emit_ctx *ctx, int jpos, int offs ) {
 	int target = offs + ctx->op_pos + 1;
-	int_alloc_store(&ctx->jump_regs, jpos);
-	int_alloc_store(&ctx->jump_regs, target);
+	int_arr_add(ctx->jump_regs, jpos);
+	int_arr_add(ctx->jump_regs, target);
 	if( offs > 0 ) {
 		ctx->arrival_points = link_add_sort_unique(ctx, target, ctx->current_block, ctx->arrival_points);
 		if( ctx->arrival_points->id != ctx->op_pos + 1 && ctx->fun->ops[ctx->op_pos].op != OSwitch )
@@ -502,7 +502,7 @@ static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 }
 
 static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
-	
+
 	if( p->locked ) jit_assert();
 	ereg same = VAL_NULL;
 	for_iter(ereg,v,p->vals) {
@@ -717,8 +717,8 @@ static void emit_store_size( emit_ctx *ctx, ereg dst, int dst_offset, ereg src, 
 	}
 }
 
-static ereg emit_conv( emit_ctx *ctx, ereg v, emit_mode mode, bool _unsigned ) {
-	return emit_gen(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, VAL_NULL, mode);
+static ereg emit_conv( emit_ctx *ctx, ereg v, emit_mode from, emit_mode to, bool _unsigned ) {
+	return emit_gen_ext(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, VAL_NULL, to, from);
 }
 
 static bool dyn_need_type( hl_type *t ) {
@@ -812,10 +812,10 @@ void hl_emit_flush( jit_ctx *jit ) {
 	int i = 0;
 	if( ctx->flushed ) return;
 	ctx->flushed = true;
-	while( i < ctx->jump_regs.cur ) {
-		int pos = ctx->jump_regs.data[i++];
+	while( i < int_arr_count(ctx->jump_regs) ) {
+		int pos = int_arr_get(ctx->jump_regs,i++);
 		einstr *e = ctx->instrs + pos;
-		int target = ctx->jump_regs.data[i++];
+		int target = int_arr_get(ctx->jump_regs,i++);
 		e->size_offs = ctx->pos_map[target] - (pos + 1);
 	}
 	ctx->pos_map[ctx->fun->nops] = -1;
@@ -828,8 +828,8 @@ void hl_emit_flush( jit_ctx *jit ) {
 	jit->blocks = hl_zalloc(&jit->falloc,sizeof(eblock) * jit->block_count);
 	for(i=0;i<jit->block_count;i++)
 		jit->blocks[i].id = -1;
-	jit->value_count = ctx->values.cur;
-	jit->values_writes = ctx->values.data;
+	jit->value_count = int_arr_count(ctx->values);
+	jit->values_writes = ctx->values.values;
 	emit_walk_blocks(ctx,emit_write_block);
 }
 
@@ -920,9 +920,9 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->trap_count = 0;
 	ctx->phi_count = 0;
 	ctx->flushed = false;
-	int_alloc_reset(&ctx->args_data);
-	int_alloc_reset(&ctx->jump_regs);
-	int_alloc_reset(&ctx->values);
+	int_arr_free(&ctx->args_data);
+	int_arr_free(&ctx->jump_regs);
+	int_arr_free(&ctx->values);
 	ctx->root_block = ctx->current_block = alloc_block(ctx);
 	ctx->current_block->sealed = true;
 	ctx->arrival_points = NULL;
@@ -981,9 +981,6 @@ void hl_emit_free( jit_ctx *jit ) {
 	free(ctx->vregs);
 	free(ctx->instrs);
 	free(ctx->pos_map);
-	int_alloc_free(&ctx->jump_regs);
-	int_alloc_free(&ctx->args_data);
-	int_alloc_free(&ctx->values);
 	free(ctx);
 	jit->emit = NULL;
 }
@@ -1212,7 +1209,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OToSFloat:
 	case OToInt:
 	case OToUFloat:
-		STORE(dst, emit_conv(ctx,LOAD(ra),hl_type_mode(dst->t), o->op == OToUFloat));
+		STORE(dst, emit_conv(ctx,LOAD(ra),hl_type_mode(ra->t),hl_type_mode(dst->t), o->op == OToUFloat));
 		break;
 	case ORet:
 		emit_gen(ctx, RET, dst->t->kind == HVOID ? VAL_NULL : LOAD(dst), VAL_NULL, M_NORET);
@@ -1311,7 +1308,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			for(i=0;i<o->p3;i++)
 				args[i+1] = LOAD(R(o->extra[i]));
 			ereg v1 = emit_dyn_call(ctx,LOAD_MEM_PTR(r,HL_WSIZE),args,o->p3 + 1,dst->t);
-			int jend = emit_jump(ctx, false);			
+			int jend = emit_jump(ctx, false);
 			patch_jump(ctx, jidx);
 			for(i=0;i<o->p3;i++)
 				args[i] = LOAD(R(o->extra[i]));
@@ -1548,7 +1545,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg offs = OFFSET(LOAD(ra),LOAD(rb),1,0);
 			ereg val = LOAD_MEM(offs, 0, dst->t);
-			if( o->op != OGetMem ) val = emit_conv(ctx, val, M_I32, false);
+			if( o->op != OGetMem ) val = emit_conv(ctx, val, M_I32, hl_type_mode(dst->t), false);
 			STORE(dst, val);
 		}
 		break;
@@ -1558,7 +1555,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg offs = OFFSET(LOAD(dst), LOAD(ra),1,0);
 			ereg val = LOAD(rb);
-			if( o->op != OSetMem ) val = emit_conv(ctx, val, M_I32, false);
+			if( o->op != OSetMem ) val = emit_conv(ctx, val, M_I32, hl_type_mode(dst->t), false);
 			STORE_MEM(offs, 0, val);
 		}
 		break;
@@ -1633,7 +1630,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case OUnref:
-		STORE(dst, LOAD_MEM(ra->ref,0,dst->t));
+		STORE(dst, LOAD_MEM(LOAD(ra),0,dst->t));
 		break;
 	case OSetref:
 		STORE_MEM(dst->ref,0,LOAD(ra));
@@ -1667,7 +1664,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			STORE(dst, en);
 			hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
 			for(int i=0;i<c->nparams;i++)
-				STORE_MEM(en, c->offsets[i], LOAD(R(o->extra[i])));			
+				STORE_MEM(en, c->offsets[i], LOAD(R(o->extra[i])));
 		}
 		break;
 	case OEnumAlloc:
@@ -1761,7 +1758,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OTrap:
 		{
 			ereg st = emit_gen_size(ctx, ALLOC_STACK, sizeof(hl_trap_ctx));
-			
+
 			ereg thread, current_addr;
 			static hl_thread_info *tinf = NULL;
 			static hl_trap_ctx *trap = NULL;
@@ -1812,12 +1809,12 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			void *fun = setjmp;
 			ereg args[2];
 			int nargs = 1;
-			args[0] = OFFSET(st, VAL_NULL, 0, (int)(int_val)&trap->buf);
+			args[0] = st;
 #if defined(HL_WIN) && defined(HL_64)
 			// On Win64 setjmp actually takes two arguments
 			// the jump buffer and the frame pointer (or the stack pointer if there is no FP)
 			nargs = 2;
-			args[1] = emit_gen(ctx, NATIVE_REG, VAL_NULL, VAL_NULL, REG_RBP);
+			args[1] = emit_gen(ctx,MOV,MK_STACK_OFFS(0),VAL_NULL,M_PTR);
 #endif
 #ifdef HL_MINGW
 			fun = _setjmp;
@@ -1850,7 +1847,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			thread = emit_native_call(ctx, hl_get_thread, NULL, 0, &hlt_bytes);
 			current_addr = OFFSET(thread, VAL_NULL, 0, (int)(int_val)&tinf->trap_current);
 #			endif
-			
+
 			STORE_MEM(current_addr, 0, LOAD_MEM_PTR(st,(int)(int_val)&trap->prev));
 
 #			ifdef HL_WIN

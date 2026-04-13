@@ -45,7 +45,6 @@ static const char *op_names[] = {
 	"push",
 	"pop",
 	"alloc-stack",
-	"native-reg",
 	"prefetch",
 	"debug-break",
 };
@@ -72,7 +71,7 @@ const char *hl_emit_regstr( ereg v ) {
 		if( index < 0 )
 			sprintf(fmt,"ST%d", index);
 		else
-			sprintf(fmt,"ST+%d]", index);
+			sprintf(fmt,"ST+%d", index);
 	} else if( IS_NATREG(v) )
 		sprintf(fmt,"%s", hl_natreg_str(v&(FL_NATREG-1)));
 	else
@@ -130,7 +129,7 @@ static void hl_dump_op( hl_function *fun, hl_opcode *op ) {
 			}
 			printf(",def=@%X", op->p3 + pos + 1);
 		} else {
-			if( count == 0xFF ) 
+			if( count == 0xFF )
 				count = op->p3;
 			else {
 				printf("%d,%d,",op->p2,op->p3);
@@ -285,7 +284,8 @@ static void hl_dump_ptr_name( jit_ctx *ctx, void *ptr ) {
 void hl_emit_flush( jit_ctx *ctx );
 void hl_regs_flush( jit_ctx *ctx );
 
-#define reg_str(r) val_str((((r) & FL_NATMASK) == FL_NATREG ? (((r)&~0xFF)|e->mode) : (r)))
+#define reg_mode(r,mode) (((r) & FL_NATMASK) == FL_NATREG ? (((r)&~0xFF)|(mode)) : (r))
+#define reg_str(r) val_str(reg_mode(r,e->mode))
 
 static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	printf("%s", op_names[e->op]);
@@ -355,6 +355,10 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 			//if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
 			//	printf(" ???");
 		}
+		break;
+	case CONV:
+	case CONV_UNSIGNED:
+		printf("%s %s", emit_mode_str(e->size_offs), val_str(reg_mode(e->a,e->size_offs)));
 		break;
 	default:
 		if( !IS_NULL(e->a) ) {
