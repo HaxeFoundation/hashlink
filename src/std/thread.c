@@ -64,13 +64,6 @@ struct _hl_condition {
 	CRITICAL_SECTION cs;
 	CONDITION_VARIABLE cond;
 };
-
-struct _hl_tls {
-	void (*free)( hl_tls * );
-	DWORD tid;
-	bool gc;
-};
-
 #else
 
 #	include <pthread.h>
@@ -104,13 +97,6 @@ struct _hl_condition {
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 };
-
-struct _hl_tls {
-	void (*free)( hl_tls * );
-	pthread_key_t key;
-	bool gc;
-};
-
 #endif
 
 // ----------------- ALLOC
@@ -463,95 +449,45 @@ DEFINE_PRIM(_VOID, condition_broadcast, _CONDITION)
 
 // ----------------- THREAD LOCAL
 
-#if defined(HL_THREADS)
-static void **_tls_get( hl_tls *t ) {
-#	ifdef HL_WIN
-	return (void**)TlsGetValue(t->tid);
-#	else
-	return (void**)pthread_getspecific(t->key);
-#	endif
-}
-static void _tls_set( hl_tls *t, void *store ) {
-#	ifdef HL_WIN
-	TlsSetValue(t->tid, store);
-#	else
-	pthread_setspecific(t->key, store);
-#	endif
-}
-#endif
+int get_tls_slot();
+void free_tls_slot(int id);
+
+struct _hl_tls {
+	void (*free)( hl_tls * );
+	int key;
+	bool gc;
+};
+
+static void tls_free(hl_tls *l) { free_tls_slot(l->key); }
 
 HL_PRIM hl_tls *hl_tls_alloc( bool gc_value ) {
-#	if !defined(HL_THREADS)
 	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
-	l->free = hl_tls_free;
-	l->value = NULL;
-	return l;
-#	elif defined(HL_WIN)
-	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
-	l->free = hl_tls_free;
-	l->tid = TlsAlloc();
+	l->free = tls_free;
 	l->gc = gc_value;
-	TlsSetValue(l->tid,NULL);
+	l->key = get_tls_slot();
 	return l;
-#	else
-	hl_tls *l = (hl_tls*)hl_gc_alloc_finalizer(sizeof(hl_tls));
-	l->free = hl_tls_free;
-	l->gc = gc_value;
-	pthread_key_create(&l->key,NULL);
-	return l;
-#	endif
-}
-
-HL_PRIM void hl_tls_free( hl_tls *l ) {
-#	if !defined(HL_THREADS)
-	free(l);
-#	elif defined(HL_WIN)
-	if( l->free ) {
-		TlsFree(l->tid);
-		l->free = NULL;
-	}
-#	else
-	if( l->free ) {
-		pthread_key_delete(l->key);
-		l->free = NULL;
-	}
-#	endif
 }
 
 HL_PRIM void hl_tls_set( hl_tls *l, void *v ) {
-#	if !defined(HL_THREADS)
-	l->value = v;
-#	else
-	if( l->gc ) {
-		void **store = _tls_get(l);
-		if( !store) {
-			if( !v )
-				return;
-			store = (void**)malloc(sizeof(void*));
-			hl_add_root(store);
-			_tls_set(l, store);
-		} else {
-			if( !v ) {
-				free(store);
-				hl_remove_root(store);
-				_tls_set(l, NULL);
-				return;
-			}
-		}
-		*store = v;
-	} else
-		_tls_set(l, v);
-#	endif
+	hl_thread_info *info = hl_get_thread();
+	if (l->key >= info->tls_arr_size) {
+		int new_max = info->tls_arr_size > 0 ? info->tls_arr_size * 2 : 16;
+		new_max = l->key > new_max ? l->key : new_max; 
+		void **new_arr = hl_gc_alloc_raw(sizeof(void*) * new_max);
+		memcpy(new_arr, info->tls_arr, info->tls_arr_size * sizeof(void*));
+		info->tls_arr = new_arr;
+		info->tls_arr_size = new_max;
+	}
+	info->tls_arr[l->key] = v;
 }
 
 HL_PRIM void *hl_tls_get( hl_tls *l ) {
-#	if !defined(HL_THREADS)
-	return l->value;
-#	else
-	void **store = _tls_get(l);
-	if( !l->gc ) return store;
-	return store ? *store : NULL;
-#	endif
+	hl_thread_info *info = hl_get_thread();
+	if (l->key < info->tls_arr_size) {
+		return info->tls_arr[l->key];
+	} else {
+		return NULL;
+	}
 }
 
 #define _TLS _ABSTRACT(hl_tls)
