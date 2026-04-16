@@ -26,6 +26,15 @@
 #define OP_END };
 #include "opcodes.h"
 
+#define OP(_,_a,_b,_c) (_a == R ? 1 : 0),
+#define OP_BEGIN static unsigned char hl_op_writes[] = {
+#define OP_END };
+#include "opcodes.h"
+
+bool hl_opcode_writes( hl_op op ) {
+	return (bool)hl_op_writes[op];
+}
+
 #define OP(n,_a,_b,_c) #n,
 #define OP_BEGIN static const char *hl_op_names[] = {
 #define OP_END };
