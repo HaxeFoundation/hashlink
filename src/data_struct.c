@@ -112,6 +112,7 @@ static S_VALUE *S_NAME(reserve_impl)( hl_alloc *alloc, S_TYPE *st, int count ) {
 		S_KEY *keys = (S_KEY*)hl_malloc(alloc,sizeof(S_KEY) * n);
 		memcpy(keys,st->keys,sizeof(S_KEY) * st->cur);
 		st->keys = keys;
+		st->max = n;
 	}
 	S_VALUE *ptr = st->keys + st->cur;
 	st->cur += count;

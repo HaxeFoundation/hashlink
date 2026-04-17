@@ -49,9 +49,9 @@ static const char *op_names[] = {
 	"debug-break",
 };
 
-const char *hl_natreg_str( int reg );
+const char *hl_natreg_str( int reg, emit_mode m );
 
-const char *hl_emit_regstr( ereg v ) {
+const char *hl_emit_regstr( ereg v, emit_mode m ) {
 	static char fmts[4][10];
 	static int flip = 0;
 	// allow up to four concurrent val_str
@@ -73,7 +73,7 @@ const char *hl_emit_regstr( ereg v ) {
 		else
 			sprintf(fmt,"ST+%d", index);
 	} else if( IS_NATREG(v) )
-		sprintf(fmt,"%s", hl_natreg_str(v&(FL_NATREG-1)));
+		sprintf(fmt,"%s", hl_natreg_str(v,m));
 	else
 		sprintf(fmt,"V%d",v);
 	return fmt;
@@ -223,7 +223,7 @@ static void hl_dump_args( jit_ctx *ctx, einstr *e ) {
 	printf("(");
 	for(int i=0;i<e->nargs;i++) {
 		if( i != 0 ) printf(",");
-		printf("%s", val_str(v[i]));
+		printf("%s", val_str(v[i],M_NONE));
 	}
 	printf(")");
 }
@@ -283,9 +283,9 @@ static void hl_dump_ptr_name( jit_ctx *ctx, void *ptr ) {
 
 void hl_emit_flush( jit_ctx *ctx );
 void hl_regs_flush( jit_ctx *ctx );
+void hl_codegen_flush( jit_ctx *ctx );
 
-#define reg_mode(r,mode) (((r) & FL_NATMASK) == FL_NATREG ? (((r)&~0xFF)|(mode)) : (r))
-#define reg_str(r) val_str(reg_mode(r,e->mode))
+#define reg_str(r) val_str(r,e->mode)
 
 static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	printf("%s", op_names[e->op]);
@@ -321,7 +321,7 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		hl_dump_args(ctx,e);
 		break;
 	case CALL_REG:
-		printf(" %s", val_str(e->a));
+		printf(" %s", val_str(e->a,M_PTR));
 		hl_dump_args(ctx,e);
 		break;
 	case CALL_PTR:
@@ -340,17 +340,17 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		break;
 	case LOAD_ADDR:
 		if( (e->size_offs>>8) )
-			printf(" %s[%Xh]", val_str(e->a), e->size_offs);
+			printf(" %s[%Xh]", val_str(e->a,M_PTR), e->size_offs);
 		else
-			printf(" %s[%d]", val_str(e->a), e->size_offs);
+			printf(" %s[%d]", val_str(e->a,M_PTR), e->size_offs);
 		break;
 	case STORE:
 		{
 			int offs = e->size_offs;
 			if( offs == 0 )
-				printf(" [%s]", val_str(e->a));
+				printf(" [%s]", val_str(e->a,M_PTR));
 			else
-				printf(" %s[%d]", val_str(e->a), offs);
+				printf(" %s[%d]", val_str(e->a,M_PTR), offs);
 			printf(" = %s", reg_str(e->b));
 			//if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
 			//	printf(" ???");
@@ -358,7 +358,7 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		break;
 	case CONV:
 	case CONV_UNSIGNED:
-		printf("%s %s", emit_mode_str(e->size_offs), val_str(reg_mode(e->a,e->size_offs)));
+		printf("%s %s", emit_mode_str(e->size_offs), val_str(e->a,(emit_mode)e->size_offs));
 		break;
 	default:
 		if( !IS_NULL(e->a) ) {
@@ -379,6 +379,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	// if it not was not before (in case of dump during process)
 	hl_emit_flush(ctx);
 	hl_regs_flush(ctx);
+	hl_codegen_flush(ctx);
 	printf("function ");
 	hl_dump_fun_name(f);
 	printf("(");
@@ -403,6 +404,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	// print instrs
 	int vpos = 0;
 	int rpos = 0;
+	int cpos = 0;
 	cur = 0;
 	for(i=0;i<ctx->instr_count;i++) {
 		while( cur < ctx->block_count && ctx->blocks[cur].start_pos == i ) {
@@ -410,10 +412,10 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			printf("--- BLOCK #%d ---\n", cur);
 			for(int k=0;k<b->phi_count;k++) {
 				ephi *p = b->phis + k;
-				printf("\t\t@%X %s = phi%s(",i,val_str(p->value),emit_mode_str(p->mode));
+				printf("\t\t@%X %s = phi%s(",i,val_str(p->value,p->mode),emit_mode_str(p->mode));
 				for(int n=0;n<p->nvalues;n++) {
 					if( n > 0 ) printf(",");
-					printf("%s",val_str(p->values[n]));
+					printf("%s",val_str(p->values[n],p->mode));
 				}
 				printf(")");
 				if( p->nvalues <= 1 )
@@ -436,7 +438,17 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		while( rpos < ctx->reg_instr_count && rpos < ctx->reg_pos_map[i+1] ) {
 			ereg out = ctx->reg_writes[rpos];
 			e = ctx->reg_instrs + rpos;
-			printf("\n\t\t\t\t@%X ",rpos);
+			printf("\n\t\t\t");
+			int count = 0;
+			while( cpos < ctx->code_size && cpos < ctx->code_pos_map[rpos+1] ) {
+				printf("%.2X",ctx->code_instrs[cpos++]);
+				count++;
+			}
+			while( count++ < 6 )
+				printf("  ");
+
+			printf(" @%X ",rpos);
+
 			if( !IS_NULL(out) ) printf("%s = ",reg_str(out));
 			dump_instr(ctx,e,rpos);
 			rpos++;

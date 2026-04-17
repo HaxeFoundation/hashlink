@@ -100,7 +100,7 @@ typedef struct {
 #define IS_NATREG(e) ((e) & FL_NATREG)
 #define MK_STACK_REG(v)	(((v)&0xFFFFFFF) | FL_STACKREG)
 #define MK_STACK_OFFS(v)(((v)&0xFFFFFFF) | FL_STACKOFFS)
-#define GET_STACK_OFFS(v) (((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF));
+#define GET_STACK_OFFS(v) ((int)(((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF)))
 #define IS_CALL(op)	((op) == CALL_PTR || (op) == CALL_REG || (op) == CALL_FUN)
 
 typedef struct {
@@ -132,7 +132,8 @@ typedef struct _eblock {
 
 typedef struct _emit_ctx emit_ctx;
 typedef struct _regs_ctx regs_ctx;
-typedef struct _jit_ctx ji_ctx;
+typedef struct _code_ctx code_ctx;
+typedef struct _jit_ctx jit_ctx;
 
 typedef struct {
 	int nscratchs;
@@ -150,8 +151,10 @@ struct _jit_ctx {
 	hl_module *mod;
 	hl_function *fun;
 	hl_alloc falloc;
+	hl_alloc galloc;
 	emit_ctx *emit;
 	regs_ctx *regs;
+	code_ctx *code;
 	// emit output
 	int instr_count;
 	int block_count;
@@ -166,6 +169,10 @@ struct _jit_ctx {
 	einstr *reg_instrs;
 	ereg *reg_writes;
 	int *reg_pos_map;
+	// gen output
+	int code_size;
+	unsigned char *code_instrs;
+	int *code_pos_map;
 };
 
 jit_ctx *hl_jit_alloc();
@@ -180,12 +187,12 @@ void hl_jit_assert();
 
 // emit & dump
 void hl_emit_dump( jit_ctx *ctx );
-const char *hl_emit_regstr( ereg v );
+const char *hl_emit_regstr( ereg v, emit_mode m );
 ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
 ereg **hl_emit_get_regs( einstr *e, int *count );
 void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( void *, ereg * ) );
 extern int hl_emit_mode_sizes[];
-#define val_str(v) hl_emit_regstr(v)
+#define val_str(v,m) hl_emit_regstr(v,m)
 
 #ifdef HL_DEBUG
 #	define JIT_DEBUG

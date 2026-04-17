@@ -23,6 +23,19 @@
 #include <jit.h>
 #include "data_struct.h"
 
+#define S_TYPE			byte_arr
+#define S_NAME(name)	byte_##name
+#define S_VALUE			unsigned char
+#include "data_struct.c"
+#define byte_reserve(set,count)	byte_reserve_impl(DEF_ALLOC,&set,count)
+#define VAL_CONST		(VAL_NULL-1)
+#define FL_MEM			(FL_NATREG | 0x8000000)
+#define VAL_MEM(reg)	(FL_MEM | (reg))
+
+#define IS_FLOAT(mode)	((mode) == M_F64 || (mode) == M_F32)
+
+#define UNUSED			VAL_NULL
+
 typedef enum {
 	RAX = 0,
 	RCX = 1,
@@ -43,18 +56,254 @@ typedef enum {
 	R15	= 15,
 #endif
 	_UNUSED = 0xFF
-} Reg;
+} CpuReg;
 
-#define R(id,mode)		((mode) | ((id)<<8) | FL_NATREG)
-#define X(id)		R(id,M_NONE)
-#define MMX(id)		R(id+64,M_F64)
+#define R(id)		((id) | FL_NATREG)
+#define X(id)		R(id)
+#define MMX(id)		R(id+64)
 
-const char *hl_natreg_str( int reg ) {
+typedef enum {
+	_MOV,
+	_LEA,
+	_PUSH,
+	ADD,
+	SUB,
+	IMUL,	// only overflow flag changes compared to MUL
+	DIV,
+	IDIV,
+	CDQ,
+	CDQE,
+	_POP,
+	_RET,
+	_CALL,
+	AND,
+	OR,
+	XOR,
+	_CMP,
+	_TEST,
+	NOP,
+	SHL,
+	SHR,
+	SAR,
+	INC,
+	DEC,
+	JMP,
+	// FPU
+	FSTP,
+	FSTP32,
+	FLD,
+	FLD32,
+	FLDCW,
+	// SSE
+	MOVSD,
+	MOVSS,
+	COMISD,
+	COMISS,
+	ADDSD,
+	SUBSD,
+	MULSD,
+	DIVSD,
+	ADDSS,
+	SUBSS,
+	MULSS,
+	DIVSS,
+	XORPD,
+	CVTSI2SD,
+	CVTSI2SS,
+	CVTSD2SI,
+	CVTSD2SS,
+	CVTSS2SD,
+	CVTSS2SI,
+	STMXCSR,
+	LDMXCSR,
+	// 8-16 bits
+	MOV8,
+	CMP8,
+	TEST8,
+	PUSH8,
+	MOV16,
+	CMP16,
+	TEST16,
+	// prefetchs
+	PREFETCHT0,
+	PREFETCHT1,
+	PREFETCHT2,
+	PREFETCHNTA,
+	PREFETCHW,
+	// --
+	_CPU_LAST
+} CpuOp;
+
+#define JAlways			0xE9
+#define JAlways_short	0xEB
+#define JOverflow	0x80
+#define JULt		0x82
+#define JUGte		0x83
+#define JEq			0x84
+#define JNeq		0x85
+#define JULte		0x86
+#define JUGt		0x87
+#define JParity		0x8A
+#define JNParity	0x8B
+#define JSLt		0x8C
+#define JSGte		0x8D
+#define JSLte		0x8E
+#define JSGt		0x8F
+
+#define JCarry		JLt
+#define JZero		JEq
+#define JNotZero	JNeq
+
+#define FLAG_LONGOP	0x80000000
+#define FLAG_16B	0x40000000
+#define FLAG_8B		0x20000000
+#define FLAG_DUAL   0x10000000
+#define FLAG_DEF64	0x08000000
+
+#define RM(op,id) ((op) | (((id)+1)<<8))
+#define GET_RM(op)	(((op) >> ((op) < 0 ? 24 : 8)) & 15)
+#define SBYTE(op) ((op) << 16)
+#define LONG_OP(op)	((op) | FLAG_LONGOP)
+#define OP16(op)	LONG_OP((op) | FLAG_16B)
+#define LONG_RM(op,id)	LONG_OP(op | (((id) + 1) << 24))
+
+typedef struct {
+	const char *name;						// single operand
+	int r_mem;		// r32 / r/m32				r32
+	int mem_r;		// r/m32 / r32				r/m32
+	int r_const;	// r32 / imm32				imm32
+	int r_i8;		// r32 / imm8				imm8
+	int mem_const;	// r/m32 / imm32			N/A
+} opform;
+
+static opform OP_FORMS[] = {
+	{ "MOV", 0x8B, 0x89, 0xB8, 0, RM(0xC7,0) },
+	{ "LEA", 0x8D },
+	{ "PUSH", 0x50 | FLAG_DEF64, RM(0xFF,6), 0x68, 0x6A },
+	{ "ADD", 0x03, 0x01, RM(0x81,0), RM(0x83,0) },
+	{ "SUB", 0x2B, 0x29, RM(0x81,5), RM(0x83,5) },
+	{ "IMUL", LONG_OP(0x0FAF), 0, 0x69 | FLAG_DUAL, 0x6B | FLAG_DUAL },
+	{ "DIV", RM(0xF7,6), RM(0xF7,6) },
+	{ "IDIV", RM(0xF7,7), RM(0xF7,7) },
+	{ "CDQ", 0x99 },
+	{ "CDQE", 0x98 },
+	{ "POP", 0x58 | FLAG_DEF64, RM(0x8F,0) },
+	{ "RET", 0xC3 },
+	{ "CALL", RM(0xFF,2) | FLAG_DEF64, RM(0xFF,2), 0xE8 },
+	{ "AND", 0x23, 0x21, RM(0x81,4), RM(0x83,4) },
+	{ "OR", 0x0B, 0x09, RM(0x81,1), RM(0x83,1) },
+	{ "XOR", 0x33, 0x31, RM(0x81,6), RM(0x83,6) },
+	{ "CMP", 0x3B, 0x39, RM(0x81,7), RM(0x83,7) },
+	{ "TEST", 0x85, 0x85/*SWP?*/, RM(0xF7,0) },
+	{ "NOP", 0x90 },
+	{ "SHL", RM(0xD3,4), 0, 0, RM(0xC1,4) },
+	{ "SHR", RM(0xD3,5), 0, 0, RM(0xC1,5) },
+	{ "SAR", RM(0xD3,7), 0, 0, RM(0xC1,7) },
+	{ "INC", IS_64 ? RM(0xFF,0) : 0x40, RM(0xFF,0) },
+	{ "DEC", IS_64 ? RM(0xFF,1) : 0x48, RM(0xFF,1) },
+	{ "JMP", RM(0xFF,4) },
+	// FPU
+	{ "FSTP", 0, RM(0xDD,3) },
+	{ "FSTP32", 0, RM(0xD9,3) },
+	{ "FLD", 0, RM(0xDD,0) },
+	{ "FLD32", 0, RM(0xD9,0) },
+	{ "FLDCW", 0, RM(0xD9, 5) },
+	// SSE
+	{ "MOVSD", 0xF20F10, 0xF20F11  },
+	{ "MOVSS", 0xF30F10, 0xF30F11  },
+	{ "COMISD", 0x660F2F },
+	{ "COMISS", LONG_OP(0x0F2F) },
+	{ "ADDSD", 0xF20F58 },
+	{ "SUBSD", 0xF20F5C },
+	{ "MULSD", 0xF20F59 },
+	{ "DIVSD", 0xF20F5E },
+	{ "ADDSS", 0xF30F58 },
+	{ "SUBSS", 0xF30F5C },
+	{ "MULSS", 0xF30F59 },
+	{ "DIVSS", 0xF30F5E },
+	{ "XORPD", 0x660F57 },
+	{ "CVTSI2SD", 0xF20F2A },
+	{ "CVTSI2SS", 0xF30F2A },
+	{ "CVTSD2SI", 0xF20F2D },
+	{ "CVTSD2SS", 0xF20F5A },
+	{ "CVTSS2SD", 0xF30F5A },
+	{ "CVTSS2SI", 0xF30F2D },
+	{ "STMXCSR", 0, LONG_RM(0x0FAE,3) },
+	{ "LDMXCSR", 0, LONG_RM(0x0FAE,2) },
+	// 8 bits,
+	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
+	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
+	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
+	{ "PUSH8", FLAG_DEF64, 0, 0x6A | FLAG_8B },
+	{ "MOV16", OP16(0x8B), OP16(0x89), OP16(0xB8) },
+	{ "CMP16", OP16(0x3B), OP16(0x39) },
+	{ "TEST16", OP16(0x85) },
+	// prefetchs
+	{ "PREFETCHT0", FLAG_DEF64, LONG_RM(0x0F18,1) },
+	{ "PREFETCHT1", FLAG_DEF64, LONG_RM(0x0F18,2) },
+	{ "PREFETCHT2", FLAG_DEF64, LONG_RM(0x0F18,3) },
+	{ "PREFETCHNTA", FLAG_DEF64, LONG_RM(0x0F18,0) },
+	{ "PREFETCHW", FLAG_DEF64, LONG_RM(0x0F0D,1) },
+};
+
+#ifdef HL_64
+#	define REX()	if( r64 ) B(r64 | 0x40)
+#else
+#	define REX()
+#endif
+
+static const int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
+
+#define B(v)					ctx->code.values[ctx->code.cur++] = (unsigned char)(v)
+#define W(wv)					*(int*)&ctx->code.values[_incr(&ctx->code.cur,4)] = wv
+#define W64(v64)				*(int_val*)&ctx->code.values[_incr(&ctx->code.cur,8)] = v64
+
+#define MOD_RM(mod,reg,rm)		B(((mod) << 6) | (((reg)&7) << 3) | ((rm)&7))
+#define SIB(mult,rmult,rbase)	B((SIB_MULT[mult]<<6) | (((rmult)&7)<<3) | ((rbase)&7))
+#define IS_SBYTE(c)				( (c) >= -128 && (c) < 128 )
+
+#define BREAK()					B(0xCC)
+
+#define	OP(b)	\
+	if( (b) & 0xFF0000 ) { \
+		B((b)>>16); \
+		if( r64 ) B(r64 | 0x40); /* also in 32 bits mode */ \
+		B((b)>>8); \
+		B(b); \
+	} else { \
+		if( (b) & FLAG_16B ) { \
+			B(0x66); \
+			REX(); \
+		} else {\
+			REX(); \
+			if( (b) & FLAG_LONGOP ) B((b)>>8); \
+		}\
+		B(b); \
+	}
+
+struct _code_ctx {
+	jit_ctx *jit;
+	byte_arr code;
+	int_arr funs;
+	int_arr short_jumps;
+	int_arr near_jumps;
+	int *pos_map;
+	int cur_op;
+	int fun_start_pos;
+	bool flushed;
+};
+
+static int _incr( int*v, int n ) {
+	int k = *v;
+	*v += n;
+	return k;
+}
+
+const char *hl_natreg_str( int reg, emit_mode m ) {
 	static char out[16];
 	static const char *regs_str[] = { "AX", "CX", "DX", "BX", "SP", "BP", "SI", "DI" };
-	emit_mode k = (reg & 0xFF);
-	Reg r = ((reg >> 8) & 0xFF);
-	switch( k ) {
+	CpuReg r = (reg & 0xFF);
+	switch( m ) {
 	case M_I32:
 		if( r < 8 )
 			sprintf(out,"E%s",regs_str[r]);
@@ -124,3 +373,499 @@ void hl_jit_init_regs( regs_config cfg ) {
 	cfg[1].persist = (ereg*)floats+cfg[1].nscratchs;
 	cfg[1].npersists = 16 - cfg[1].nscratchs;
 }
+
+#define EMIT(op,a,b,mode) emit_ext(ctx,op,a,b,mode,0)
+#define ID2(a,b)	((a) | ((b)<<8))
+
+typedef enum {
+	RCPU = 0,
+	RFPU = 1,
+	RSTACK = 2,
+	RCONST = 3,
+	RADDR = 4,
+	RMEM = 5,
+	RUNUSED = 6,
+} preg_kind;
+
+typedef struct {
+	preg_kind kind;
+	CpuReg reg;
+	int value;
+} preg;
+
+#define ERRIF(v)	if( v ) jit_assert()
+
+static preg make_reg( ereg r, emit_mode m ) {
+	preg p;
+	if( IS_NULL(r) ) {
+		p.kind = RUNUSED;
+		return p;
+	}
+	if( r == VAL_CONST ) {
+		p.kind = RCONST;
+		return p;
+	}
+	if( (r & (FL_MEM | FL_NATMASK)) == FL_MEM ) {
+		p.kind = RMEM;
+		p.reg = (r&0xFFFF);
+		p.value = 0;
+		return p;
+	}
+	ERRIF(!IS_NATREG(r));
+	ERRIF((r&FL_NATMASK) == FL_STACKOFFS);
+	if( (r & FL_NATMASK) == FL_STACKREG ) {
+		p.kind = RSTACK;
+		p.value = GET_STACK_OFFS(r);
+	} else if( m == M_F32 || m == M_F64 ) {
+		p.kind = RFPU;
+		p.reg = (r&0xFF) - 64;
+	} else {
+		p.kind = RCPU;
+		p.reg = (r&0xFF);
+	}
+	return p;
+}
+
+static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode, int_val value ) {
+	opform *f = &OP_FORMS[op];
+	int r64 = (mode == M_PTR || mode == M_I64) && (f->r_mem&FLAG_DEF64) == 0 ? 8 : 0;
+	preg a = make_reg(_a,mode), b = make_reg(_b,mode);
+	switch( ID2(a.kind,b.kind) ) {
+	case ID2(RUNUSED,RUNUSED):
+		ERRIF(f->r_mem == 0);
+		OP(f->r_mem);
+		break;
+	case ID2(RCPU,RCPU):
+	case ID2(RFPU,RFPU):
+		ERRIF( f->r_mem == 0 && f->mem_r == 0 );
+		if( a.reg > 7 ) r64 |= 4;
+		if( b.reg > 7 ) r64 |= 1;
+		OP(f->mem_r ? f->mem_r : f->r_mem);
+		MOD_RM(3,a.reg,b.reg);
+		break;
+	case ID2(RCPU,RFPU):
+	case ID2(RFPU,RCPU):
+		ERRIF( (f->r_mem>>16) == 0 );
+		if( a.reg > 7 ) r64 |= 4;
+		if( b.reg > 7 ) r64 |= 1;
+		OP(f->r_mem);
+		MOD_RM(3,a.reg,b.reg);
+		break;
+	case ID2(RCPU,RUNUSED):
+		ERRIF( f->r_mem == 0 );
+		if( a.reg > 7 ) r64 |= 1;
+		if( GET_RM(f->r_mem) > 0 ) {
+			OP(f->r_mem);
+			MOD_RM(3, GET_RM(f->r_mem)-1, a.reg);
+		} else
+			OP(f->r_mem + (a.reg&7));
+		break;
+	case ID2(RSTACK,RUNUSED):
+		ERRIF( f->mem_r == 0 || GET_RM(f->mem_r) == 0 );
+		{
+			OP(f->mem_r);
+			if( IS_SBYTE(a.value) ) {
+				MOD_RM(1,GET_RM(f->mem_r)-1,RBP);
+				B(a.value);
+			} else {
+				MOD_RM(2,GET_RM(f->mem_r)-1,RBP);
+				W(a.value);
+			}
+		}
+		break;
+	case ID2(RCPU,RCONST):
+		ERRIF( f->r_const == 0 && f->r_i8 == 0 );
+		if( a.reg > 7 ) r64 |= 1;
+		{
+			// short byte form
+			if( f->r_i8 && IS_SBYTE(value) ) {
+				if( (f->r_i8&FLAG_DUAL) && a.reg > 7 ) r64 |= 4;
+				OP(f->r_i8);
+				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a.reg,a.reg); else MOD_RM(3,GET_RM(f->r_i8)-1,a.reg);
+				B(value);
+			} else if( GET_RM(f->r_const) > 0 || (f->r_const&FLAG_DUAL) ) {
+				if( (f->r_i8&FLAG_DUAL) && a.reg > 7 ) r64 |= 4;
+				OP(f->r_const&0xFF);
+				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a.reg,a.reg); else MOD_RM(3,GET_RM(f->r_const)-1,a.reg);
+				if( r64 && IS_64 && op == _MOV ) W64(value); else W((int)value);
+			} else {
+				ERRIF( f->r_const == 0);
+				OP((f->r_const&0xFF) + (a.reg&7));
+				if( r64 && IS_64 && op == _MOV ) W64(value); else W((int)value);
+			}
+		}
+		break;
+	case ID2(RSTACK,RCPU):
+	case ID2(RSTACK,RFPU):
+		ERRIF( f->mem_r == 0 );
+		if( b.reg > 7 ) r64 |= 4;
+		{
+			OP(f->mem_r);
+			if( IS_SBYTE(a.value) ) {
+				MOD_RM(1,b.reg,RBP);
+				B(a.value);
+			} else {
+				MOD_RM(2,b.reg,RBP);
+				W(a.value);
+			}
+		}
+		break;
+	case ID2(RCPU,RSTACK):
+	case ID2(RFPU,RSTACK):
+		ERRIF( f->r_mem == 0 );
+		if( a.reg > 7 ) r64 |= 4;
+		{
+			OP(f->r_mem);
+			if( IS_SBYTE(b.value) ) {
+				MOD_RM(1,a.reg,RBP);
+				B(b.value);
+			} else {
+				MOD_RM(2,a.reg,RBP);
+				W(b.value);
+			}
+		}
+		break;
+	case ID2(RCONST,RUNUSED):
+		ERRIF( f->r_const == 0 );
+		{
+			OP(f->r_const);
+			if( f->r_const & FLAG_8B ) B(value); else W((int)value);
+		}
+		break;
+	case ID2(RMEM,RUNUSED):
+		ERRIF( f->mem_r == 0 );
+		{
+			int mult = a.value;
+			CpuReg reg = (a.reg & 0xFF);
+			if( mult == 0 ) {
+				if( reg > 7 ) r64 |= 1;
+				OP(f->mem_r);
+				if( value == 0 && (reg&7) != RBP ) {
+					MOD_RM(0,GET_RM(f->mem_r)-1,reg);
+					if( (reg&7) == RSP ) B(0x24);
+				} else if( IS_SBYTE(value) ) {
+					MOD_RM(1,GET_RM(f->mem_r)-1,reg);
+					if( (reg&7) == RSP ) B(0x24);
+					B(value);
+				} else {
+					MOD_RM(2,GET_RM(f->mem_r)-1,reg);
+					if( (reg&7) == RSP ) B(0x24);
+					W((int)value);
+				}
+			} else {
+				// [eax + ebx * M]
+				ERRIF(1);
+			}
+		}
+		break;
+	case ID2(RCPU, RMEM):
+	case ID2(RFPU, RMEM):
+		ERRIF( f->r_mem == 0 );
+		{
+			int mult = b.value;
+			CpuReg reg = b.reg & 0xFF;
+			if( mult == 15 ) {
+				int pos;
+				if( a.reg > 7 ) r64 |= 4;
+				OP(f->r_mem);
+				MOD_RM(0,a.reg,5);
+				if( IS_64 ) {
+					// offset wrt current code
+					pos = ctx->code.cur + 4;
+					W((int)(value - pos));
+				} else {
+					ERRIF(1);
+				}
+			} else if( mult == 0 ) {
+				if( a.reg > 7 ) r64 |= 4;
+				if( reg > 7 ) r64 |= 1;
+				OP(f->r_mem);
+				if( value == 0 && (reg&7) != RBP ) {
+					MOD_RM(0,a.reg,reg);
+					if( (reg&7) == RSP ) B(0x24);
+				} else if( IS_SBYTE(value) ) {
+					MOD_RM(1,a.reg,reg);
+					if( (reg&7) == RSP ) B(0x24);
+					B(value);
+				} else {
+					MOD_RM(2,a.reg,reg);
+					if( (reg&7) == RSP ) B(0x24);
+					W((int)value);
+				}
+			} else {
+				jit_assert();
+				/*
+				if( a.reg > 7 ) r64 |= 4;
+				if( reg > 7 ) r64 |= 1;
+				if( regOrOffs > 7 ) r64 |= 2;
+				OP(f->r_mem);
+				MOD_RM(offset == 0 ? 0 : IS_SBYTE(offset) ? 1 : 2,a.reg,4);
+				SIB(mult,regOrOffs,reg);
+				if( offset ) {
+					if( IS_SBYTE(offset) ) B(offset); else W(offset);
+				}
+				*/
+			}
+		}
+		break;
+#	ifndef HL_64
+	case ID2(RFPU,RADDR):
+#	endif
+	case ID2(RCPU,RADDR):
+		ERRIF( f->r_mem == 0 );
+		if( a.reg > 7 ) r64 |= 4;
+		OP(f->r_mem);
+		MOD_RM(0,a.reg,5);
+		if( IS_64 )
+			W64((int_val)value);
+		else
+			W((int)(int_val)value);
+		break;
+#	ifndef HL_64
+	case ID2(RADDR,RFPU):
+#	endif
+	case ID2(RADDR,RCPU):
+		ERRIF( f->mem_r == 0 );
+		if( b.reg > 7 ) r64 |= 4;
+		OP(f->mem_r);
+		MOD_RM(0,b.reg,5);
+		if( IS_64 )
+			W64((int_val)value);
+		else
+			W((int)(int_val)value);
+		break;
+	case ID2(RMEM, RCPU):
+	case ID2(RMEM, RFPU):
+		ERRIF( f->mem_r == 0 );
+		{
+			int mult = a.value;
+			CpuReg reg = a.reg & 0xFF;
+			if( mult == 15 ) {
+				int pos;
+				if( b.reg > 7 ) r64 |= 4;
+				OP(f->mem_r);
+				MOD_RM(0,b.reg,5);
+				if( IS_64 ) {
+					// offset wrt current code
+					pos = ctx->code.cur + 4;
+					W((int)(value - pos));
+				} else {
+					ERRIF(1);
+				}
+			} else if( mult == 0 ) {
+				if( b.reg > 7 ) r64 |= 4;
+				if( reg > 7 ) r64 |= 1;
+				OP(f->mem_r);
+				if( value == 0 && (reg&7) != RBP ) {
+					MOD_RM(0,b.reg,reg);
+					if( (reg&7) == RSP ) B(0x24);
+				} else if( IS_SBYTE(value) ) {
+					MOD_RM(1,b.reg,reg);
+					if( (reg&7) == RSP ) B(0x24);
+					B(value);
+				} else {
+					MOD_RM(2,b.reg,reg);
+					if( (reg&7) == RSP ) B(0x24);
+					W((int)value);
+				}
+			} else {
+				jit_assert();
+				/*
+				if( b.reg > 7 ) r64 |= 4;
+				if( reg > 7 ) r64 |= 1;
+				if( value > 7 ) r64 |= 2;
+				OP(f->mem_r);
+				MOD_RM(offset == 0 ? 0 : IS_SBYTE(offset) ? 1 : 2,b.reg,4);
+				SIB(mult,value,reg);
+				if( offset ) {
+					if( IS_SBYTE(offset) ) B(offset); else W(offset);
+				}
+				*/
+			}
+		}
+		break;
+	default:
+		ERRIF(1);
+	}
+}
+
+static void emit_jump( code_ctx *ctx, int mode, int offset ) {
+	if( IS_SBYTE(offset*8) ) {
+		// assume it's ok to use short jump
+		B(mode == JAlways ? JAlways_short : mode - 0x10);
+		int_arr_add(ctx->short_jumps, byte_count(ctx->code));
+		int_arr_add(ctx->short_jumps, ctx->cur_op + offset + 1);
+		B(-2);
+	} else {
+		B(mode);
+		int_arr_add(ctx->near_jumps, byte_count(ctx->code));
+		int_arr_add(ctx->near_jumps, ctx->cur_op + offset + 1);
+		W(-5);
+	}
+}
+
+void hl_codegen_flush( jit_ctx *jit ) {
+	code_ctx *ctx = jit->code;
+	if( ctx->flushed ) return;
+	ctx->flushed = true;
+	jit->code_size = ctx->code.cur;
+	jit->code_instrs = ctx->code.values;
+	jit->code_pos_map = ctx->pos_map;
+	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op+1] = ctx->code.cur;
+}
+
+void hl_codegen_function( jit_ctx *jit ) {
+	code_ctx *ctx = jit->code;
+	ctx->flushed = false;
+	byte_free(&ctx->code);
+	free(ctx->pos_map);
+	ctx->pos_map = (int*)malloc((jit->reg_instr_count + 1) * sizeof(int));
+	for(int cur_pos=0;cur_pos<jit->reg_instr_count;cur_pos++) {
+		einstr *e = jit->reg_instrs + cur_pos;
+		ereg out = jit->reg_writes[cur_pos];
+		byte_reserve(ctx->code,64);
+		ctx->code.cur -= 64;
+		ctx->cur_op = cur_pos;
+		ctx->pos_map[cur_pos] = ctx->code.cur;
+		switch( e->op ) {
+		case LOAD_ARG:
+		case ALLOC_STACK:
+			continue; // nop
+		case MOV:
+			if( (e->a & FL_NATMASK) == FL_STACKOFFS )
+				emit_ext(ctx,_LEA,out,VAL_MEM(R(RBP)),M_PTR,GET_STACK_OFFS(e->a));
+			else
+				EMIT(_MOV, out, e->a, e->mode);
+			break;
+		case STORE:
+			if( (e->a & FL_NATMASK) == FL_STACKOFFS )
+				emit_ext(ctx,_MOV, VAL_MEM(R(RBP)), e->b, e->mode, e->size_offs + GET_STACK_OFFS(e->a));
+			else
+				emit_ext(ctx,_MOV, VAL_MEM(e->a), e->b, e->mode, e->size_offs);
+			break;
+		case PUSH_CONST:
+			emit_ext(ctx, _PUSH, VAL_CONST, UNUSED, e->mode, e->value);
+			break;
+		case DEBUG_BREAK:
+			BREAK();
+			break;
+		case CALL_PTR:
+			emit_ext(ctx, _MOV, R(RAX), VAL_CONST, M_PTR, e->value);
+			EMIT(_CALL, R(RAX), UNUSED, M_NONE);
+			break;
+		case RET:
+			if( !IS_NULL(e->a) && e->a != R(RAX) )
+				EMIT(_MOV, R(RAX), e->a, e->mode);
+			EMIT(_RET, UNUSED, UNUSED, M_NONE);
+			break;
+		case LOAD_CONST:
+			if( e->value == 0 )
+				EMIT(XOR, out, out, e->mode);
+			else
+				emit_ext(ctx, _MOV, out, VAL_CONST, e->mode, e->value);
+			break;
+		case LOAD_ADDR:
+			if( (e->a & FL_NATMASK) == FL_STACKOFFS )
+				emit_ext(ctx,_MOV,out,VAL_MEM(R(RBP)),e->mode, e->size_offs + GET_STACK_OFFS(e->a));
+			else
+				emit_ext(ctx,_MOV,out,VAL_MEM(e->a),e->mode, e->size_offs);
+			break;
+		case CALL_FUN:
+			B(0xE8);
+			{
+				int pos = ctx->fun_start_pos + byte_count(ctx->code);
+				int fid = e->a;
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,pos);
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
+			}
+			W(0x80000000);
+			break;
+		case TEST:
+			EMIT(_TEST,e->a,e->a,e->mode);
+			break;
+		case CMP:
+			EMIT(_CMP,e->a,e->b,e->mode);
+			break;
+		case JCOND:
+			{
+				einstr *p = &e[-1];
+				int op;
+				switch( p->size_offs ) {
+				case OJFalse:
+				case OJNull:
+					op = JZero;
+					break;
+				case OJTrue:
+				case OJNotNull:
+					op = JNotZero;
+					break;
+				case OJSGte:
+					op = IS_FLOAT(p->mode) ? JUGte : JSGte;
+					break;
+				case OJSGt:
+					op = IS_FLOAT(p->mode) ? JUGt : JSGt;
+					break;
+				case OJUGte:
+					op = JUGte;
+					break;
+				case OJSLt:
+					op = IS_FLOAT(p->mode) ? JULt : JSLt;
+					break;
+				case OJSLte:
+					op = IS_FLOAT(p->mode) ? JULte : JSLte;
+					break;
+				case OJULt:
+					op = JULt;
+					break;
+				case OJEq:
+					op = JEq;
+					break;
+				case OJNotEq:
+					op = JNeq;
+					break;
+				case OJNotLt:
+					op = JUGte;
+					break;
+				case OJNotGte:
+					op = JULt;
+					break;
+				default:
+					jit_assert();
+					break;
+				}
+				emit_jump(ctx, op, e->size_offs);
+			}
+			break;
+		case JUMP:
+			emit_jump(ctx, JAlways, e->size_offs);
+			break;
+		case JUMP_TABLE:
+			BREAK();
+			break;
+		case CONV:
+			BREAK();
+			break;
+		default:
+			jit_assert();
+			break;
+		}
+		if( ctx->code.cur > ctx->code.max ) jit_assert();
+	}
+	hl_codegen_flush(jit);
+	ctx->fun_start_pos += byte_count(ctx->code);
+}
+
+
+void hl_codegen_alloc( jit_ctx *jit ) {
+	code_ctx *ctx = (code_ctx*)malloc(sizeof(code_ctx));
+	memset(ctx,0,sizeof(code_ctx));
+	jit->code = ctx;
+	ctx->jit = jit;
+}
+
+void hl_codegen_free( jit_ctx *jit ) {
+	code_ctx *ctx = jit->code;
+	free(ctx->pos_map);
+	free(ctx);
+}
+
