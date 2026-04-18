@@ -47,6 +47,7 @@ static const char *op_names[] = {
 	"alloc-stack",
 	"prefetch",
 	"debug-break",
+	"block",
 };
 
 const char *hl_natreg_str( int reg, emit_mode m );
@@ -335,6 +336,9 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	case JCOND:
 		printf(" @%X", cur_pos + 1 + e->size_offs);
 		break;
+	case BLOCK:
+		printf(" #%d", e->size_offs);
+		break;
 	case LOAD_CONST:
 	case PUSH_CONST:
 		printf(" ");
@@ -396,10 +400,9 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	int cur = 0;
 	for(i=0;i<ctx->block_count;i++) {
 		eblock *b = ctx->blocks + i;
-		if( b->id != i ) printf("  ??? BLOCK @%d ID is %d\n",i,b->id);
 		if( b->start_pos != cur ) printf("  ??? BLOCK %d START AT %X != %X\n", i, b->start_pos, cur);
 		if( b->end_pos < b->start_pos ) printf("  ??? BLOCK %d RANGE [%X,%X]\n", i, b->start_pos, b->end_pos);
-		cur = b->end_pos + 1;
+		cur = b->end_pos;
 	}
 	if( cur != ctx->instr_count )
 		printf("  ??? MISSING BLOCK FOR RANGE %X-%X\n", cur, ctx->instr_count);
@@ -409,23 +412,6 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	int cpos = 0;
 	cur = 0;
 	for(i=0;i<ctx->instr_count;i++) {
-		while( cur < ctx->block_count && ctx->blocks[cur].start_pos == i ) {
-			eblock *b = &ctx->blocks[cur];
-			printf("--- BLOCK #%d ---\n", cur);
-			for(int k=0;k<b->phi_count;k++) {
-				ephi *p = b->phis + k;
-				printf("\t\t@%X %s = phi%s(",i,val_str(p->value,p->mode),emit_mode_str(p->mode));
-				for(int n=0;n<p->nvalues;n++) {
-					if( n > 0 ) printf(",");
-					printf("%s",val_str(p->values[n],p->mode));
-				}
-				printf(")");
-				if( p->nvalues <= 1 )
-					printf(" ???");
-				printf("\n");
-			}
-			cur++;
-		}
 		while( ctx->emit_pos_map[cur_op] == i ) {
 			printf("@%X ", cur_op);
 			hl_dump_op(ctx->fun, f->ops + cur_op);
@@ -437,15 +423,34 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		if( vpos < ctx->value_count && ctx->values_writes[vpos] == i )
 			printf("V%d = ", vpos++);
 		dump_instr(ctx, e, i);
+		if( e->op == BLOCK ) {
+			eblock *b = &ctx->blocks[e->size_offs];
+			for(int k=0;k<b->phi_count;k++) {
+				ephi *p = b->phis + k;
+				printf("\n\t\t@%X %s = phi%s(",i,val_str(p->value,p->mode),emit_mode_str(p->mode));
+				for(int n=0;n<p->nvalues;n++) {
+					if( n > 0 ) printf(",");
+					printf("%s",val_str(p->values[n],p->mode));
+				}
+				printf(")");
+				if( p->nvalues <= 1 )
+					printf(" ???");
+			}
+		}
 		while( rpos < ctx->reg_instr_count && rpos < ctx->reg_pos_map[i+1] ) {
 			ereg out = ctx->reg_writes[rpos];
 			e = ctx->reg_instrs + rpos;
 			printf("\n\t\t\t\t@%X ",rpos);
 			if( !IS_NULL(out) ) printf("%s = ",reg_str(out));
 			dump_instr(ctx,e,rpos);
-			printf("\033[80G");
-			while( cpos < ctx->code_size && cpos < ctx->code_pos_map[rpos+1] )
+			bool first = true;
+			while( cpos < ctx->code_size && cpos < ctx->code_pos_map[rpos+1] ) {
+				if( first ) {
+					printf("\033[80G");
+					first = false;
+				}
 				printf("%.2X",ctx->code_instrs[cpos++]);
+			}
 			rpos++;
 		}
 		printf("\n");

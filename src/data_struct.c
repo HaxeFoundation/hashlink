@@ -97,6 +97,14 @@ INLINE static bool S_NAME(remove)( S_TYPE *st, S_KEY k ) {
 	return false;
 }
 
+INLINE static void S_NAME(remove_range)( S_TYPE *st, int pos, int count ) {
+	memmove(st->keys + pos, st->keys + pos + count, (st->cur - pos - count) * sizeof(S_KEY));
+#	ifdef S_MAP
+	memmove(st->values + pos, st->values + pos + count, (st->cur - pos - count) * sizeof(S_VALUE));
+#	endif
+	st->cur -= count;
+}
+
 #ifdef S_MAP
 static S_VALUE S_NAME(find)( S_TYPE st, S_KEY k ) {
 	for(int i=0;i<st.cur;i++)
