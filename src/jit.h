@@ -50,6 +50,7 @@ typedef enum {
 	ALLOC_STACK,
 	PREFETCH,
 	DEBUG_BREAK,
+	BLOCK,
 } emit_op;
 
 typedef enum {
@@ -98,7 +99,7 @@ typedef struct {
 #define FL_STACKREG (FL_NATREG | FL_MEMPTR | FL_STACK)
 #define FL_STACKOFFS (FL_NATREG | FL_STACK)
 #define IS_NULL(e) ((e) == 0)
-#define IS_NATREG(e) ((e) & FL_NATREG)
+#define IS_NATREG(e) (((e) & (0x80000000 | FL_NATREG)) == FL_NATREG)
 #define MK_STACK_REG(v)	(((v)&0xFFFFFFF) | FL_STACKREG)
 #define MK_STACK_OFFS(v)(((v)&0xFFFFFFF) | FL_STACKOFFS)
 #define GET_STACK_OFFS(v) ((int)(((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF)))
@@ -121,7 +122,6 @@ struct _ephi {
 };
 
 typedef struct _eblock {
-	int id;
 	int start_pos;
 	int end_pos;
 	int next_count;
@@ -171,6 +171,7 @@ struct _jit_ctx {
 	einstr *reg_instrs;
 	ereg *reg_writes;
 	int *reg_pos_map;
+	int persists_uses[2];
 	// gen output
 	int code_size;
 	unsigned char *code_instrs;
