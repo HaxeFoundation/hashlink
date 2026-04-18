@@ -87,7 +87,6 @@ struct _emit_block {
 	int start_pos;
 	int end_pos;
 	int wait_nexts;
-	int mark;
 	bool sealed;
 	blocks nexts;
 	blocks preds;
@@ -137,7 +136,7 @@ struct _emit_ctx {
 	int_arr jump_regs;
 	int_arr values;
 
-	emit_block *root_block;
+	blocks blocks;
 	emit_block *current_block;
 	emit_block *wait_seal;
 	linked_inf *arrival_points;
@@ -259,6 +258,10 @@ static emit_mode hl_type_mode( hl_type *t ) {
 		return sizeof(bool) == 1 ? M_UI8 : M_I32;
 	if( t->kind == HGUID )
 		return M_I64;
+	if( t->kind == HF32 )
+		return M_F32;
+	if( t->kind == HF64 )
+		return M_F64;
 	return M_PTR;
 }
 
@@ -390,7 +393,12 @@ static void patch_jump( emit_ctx *ctx, int jpos ) {
 }
 
 static emit_block *alloc_block( emit_ctx *ctx ) {
-	return hl_zalloc(&ctx->jit->falloc, sizeof(emit_block));
+	emit_block *b = hl_zalloc(&ctx->jit->falloc, sizeof(emit_block));
+	b->id = blocks_count(ctx->blocks);
+	b->start_pos = ctx->emit_pos;
+	blocks_add(ctx->blocks, b);
+	if( b->id > 0 ) emit_gen_size(ctx, BLOCK, b->id);
+	return b;
 }
 
 static void block_add_pred( emit_ctx *ctx, emit_block *b, emit_block *p ) {
@@ -411,18 +419,16 @@ static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
 static void split_block( emit_ctx *ctx ) {
 	emit_block *b = alloc_block(ctx);
 	b->sealed = true;
-	b->id = ctx->current_block->id + 1;
-	b->start_pos = ctx->emit_pos;
 	emit_debug("BLOCK #%d@%X[%X]\n",b->id,b->start_pos,ctx->op_pos);
 	while( ctx->arrival_points && ctx->arrival_points->id == ctx->op_pos ) {
 		block_add_pred(ctx, b, (emit_block*)ctx->arrival_points->ptr);
 		ctx->arrival_points = ctx->arrival_points->next;
 	}
 	bool dead_code = blocks_count(b->preds) == 0; // if we have no reach, force previous block dependency, this is rare dead code emit by compiler
-	einstr *eprev = &ctx->instrs[ctx->emit_pos-1];
+	einstr *eprev = &ctx->instrs[b->start_pos-1];
 	if( (eprev->op != JUMP && eprev->op != RET && eprev->mode != M_NORET) || ctx->fun->ops[ctx->op_pos].op == OTrap || dead_code )
 		block_add_pred(ctx, b, ctx->current_block);
-	ctx->current_block->end_pos = ctx->emit_pos - 1;
+	ctx->current_block->end_pos = b->start_pos;
 	ctx->current_block = b;
 }
 
@@ -432,7 +438,7 @@ static void register_jump( emit_ctx *ctx, int jpos, int offs ) {
 	int_arr_add(ctx->jump_regs, target);
 	if( offs > 0 ) {
 		ctx->arrival_points = link_add_sort_unique(ctx, target, ctx->current_block, ctx->arrival_points);
-		if( ctx->arrival_points->id != ctx->op_pos + 1 && ctx->fun->ops[ctx->op_pos].op != OSwitch )
+		if( ctx->arrival_points->id != ctx->op_pos + 1 && ctx->fun->ops[ctx->op_pos].op != OSwitch && ctx->fun->ops[ctx->op_pos+1].op != OLabel )
 			split_block(ctx);
 	}
 }
@@ -487,7 +493,7 @@ static void emit_cmp( emit_ctx *ctx, ereg a, ereg b, hl_op o ) {
 
 static void phi_remove_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 	ereg_remove(&p->vals,v);
-	emit_debug("%sPHI-REM-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
+	emit_debug("%sPHI-REM-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(v,p->mode));
 }
 
 static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
@@ -497,7 +503,7 @@ static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 		return;
 	if( !ereg_add(p->vals,v) )
 		return;
-	emit_debug("%sPHI-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(v));
+	emit_debug("%sPHI-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(v,p->mode));
 	if( v < 0 ) {
 		tmp_phi *p2 = GET_PHI(v);
 		phi_add(p2->ref_phis,p);
@@ -523,7 +529,7 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 
 	if( p->locked || p->opt ) jit_assert();
 
-	emit_debug("%sPHI-OPT %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
+	emit_debug("%sPHI-OPT %s = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(same,p->mode));
 	p->opt = true;
 	ctx->phi_depth++;
 	linked_inf *l = p->ref_blocks;
@@ -543,7 +549,7 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 	for(int i=0;i<count;i++)
 		optimize_phi_rec(ctx, phis[i]);
 	ctx->phi_depth--;
-	emit_debug("%sPHI-OPT-DONE %s = %s\n", phi_prefix(ctx), val_str(p->value), val_str(same));
+	emit_debug("%sPHI-OPT-DONE %s = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(same,p->mode));
 	return optimize_phi_rec(ctx,p);
 }
 
@@ -565,7 +571,7 @@ static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r ) {
 		return v;
 	if( !b->sealed ) {
 		tmp_phi *p = alloc_phi(ctx,b,r);
-		emit_debug("%sPHI-SEALED %s = R%d\n",phi_prefix(ctx),val_str(p->value),r->id);
+		emit_debug("%sPHI-SEALED %s = R%d\n",phi_prefix(ctx),val_str(p->value,p->mode),r->id);
 		v = p->value;
 	} else if( blocks_count(b->preds) == 1 )
 		v = emit_load_reg_block(ctx, blocks_get(b->preds,0), r);
@@ -576,21 +582,6 @@ static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r ) {
 	}
 	store_block_var(ctx,b,r,v);
 	return v;
-}
-
-static void emit_walk_blocks_rec( emit_ctx *ctx, emit_block *b, int mark, void (*fun)(emit_ctx*,emit_block*) ) {
-	if( b->mark == mark ) return;
-	b->mark = mark;
-	fun(ctx, b);
-	for_iter(blocks,n,b->nexts)
-		emit_walk_blocks_rec(ctx,n,mark,fun);
-}
-
-static void emit_walk_blocks( emit_ctx *ctx, void (*fun)(emit_ctx*,emit_block*) ) {
-	static int MARK_UID = 0;
-	int mark = ++MARK_UID;
-	if( mark == 0 ) mark = ++MARK_UID;
-	emit_walk_blocks_rec(ctx, ctx->root_block, mark, fun);
 }
 
 static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
@@ -771,8 +762,7 @@ static void remap_phi_reg( emit_ctx *ctx, ereg *r ) {
 static void emit_write_block( emit_ctx *ctx, emit_block *b ) {
 	jit_ctx *jit = ctx->jit;
 	eblock *bl = jit->blocks + b->id;
-	bl->id = b->id;
-	bl->start_pos = b->start_pos;
+	bl->start_pos = b->id == 0 ? 0 : b->start_pos;
 	bl->end_pos = b->end_pos;
 	bl->pred_count = blocks_count(b->preds);
 	bl->next_count = blocks_count(b->nexts);
@@ -822,18 +812,17 @@ void hl_emit_flush( jit_ctx *jit ) {
 		e->size_offs = ctx->pos_map[target] - (pos + 1);
 	}
 	ctx->pos_map[ctx->fun->nops] = -1;
-	ctx->current_block->end_pos = ctx->emit_pos - 1;
+	ctx->current_block->end_pos = ctx->emit_pos;
 	jit->instrs = ctx->instrs;
 	jit->instr_count = ctx->emit_pos;
 	jit->emit_pos_map = ctx->pos_map;
 	jit->phi_count = 0;
 	jit->block_count = ctx->current_block->id + 1;
 	jit->blocks = hl_zalloc(&jit->falloc,sizeof(eblock) * jit->block_count);
-	for(i=0;i<jit->block_count;i++)
-		jit->blocks[i].id = -1;
 	jit->value_count = int_arr_count(ctx->values);
 	jit->values_writes = ctx->values.values;
-	emit_walk_blocks(ctx,emit_write_block);
+	for_iter(blocks,b,ctx->blocks)
+		emit_write_block(ctx,b);
 }
 
 void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( void *, ereg * ) ) {
@@ -926,8 +915,9 @@ void hl_emit_function( jit_ctx *jit ) {
 	int_arr_free(&ctx->args_data);
 	int_arr_free(&ctx->jump_regs);
 	int_arr_free(&ctx->values);
+	blocks_free(&ctx->blocks);
 	int_arr_add(ctx->values,-1);
-	ctx->root_block = ctx->current_block = alloc_block(ctx);
+	ctx->current_block = alloc_block(ctx);
 	ctx->current_block->sealed = true;
 	ctx->arrival_points = NULL;
 	emit_debug("---- begin [%X] ----\n",f->findex);
@@ -962,6 +952,10 @@ void hl_emit_function( jit_ctx *jit ) {
 	for(int op_pos=0;op_pos<f->nops;op_pos++) {
 		ctx->op_pos = op_pos;
 		ctx->pos_map[op_pos] = ctx->emit_pos;
+		if( op_pos == 0 ) {
+			ctx->current_block->start_pos = ctx->emit_pos;
+			emit_gen_size(ctx, BLOCK, 0);
+		}
 		if( ctx->arrival_points && ctx->arrival_points->id == op_pos )
 			split_block(ctx);
 		emit_opcode(ctx,f->ops + op_pos);
@@ -969,6 +963,7 @@ void hl_emit_function( jit_ctx *jit ) {
 
 	hl_emit_clean_phis(ctx);
 	hl_emit_flush(ctx->jit);
+	if( ctx->wait_seal ) jit_assert();
 }
 
 void hl_emit_alloc( jit_ctx *jit ) {
@@ -1759,7 +1754,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case OLabel:
-		if( ctx->current_block->start_pos != ctx->emit_pos )
+		if( ctx->current_block->start_pos != ctx->emit_pos-1 )
 			split_block(ctx);
 		prepare_loop_block(ctx);
 		break;
