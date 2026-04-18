@@ -91,17 +91,19 @@ typedef struct {
 	};
 } einstr;
 
-#define VAL_NULL	0x80000000
-#define FL_NATREG	0x40000000
 #define FL_NATMASK	0x70000000
-#define FL_STACKREG (FL_NATREG | 0x20000000)
-#define FL_STACKOFFS (FL_NATREG | 0x10000000)
-#define IS_NULL(e) ((e) == VAL_NULL)
+#define FL_NATREG	0x40000000
+#define FL_MEMPTR	0x20000000
+#define FL_STACK	0x10000000
+#define FL_STACKREG (FL_NATREG | FL_MEMPTR | FL_STACK)
+#define FL_STACKOFFS (FL_NATREG | FL_STACK)
+#define IS_NULL(e) ((e) == 0)
 #define IS_NATREG(e) ((e) & FL_NATREG)
 #define MK_STACK_REG(v)	(((v)&0xFFFFFFF) | FL_STACKREG)
 #define MK_STACK_OFFS(v)(((v)&0xFFFFFFF) | FL_STACKOFFS)
 #define GET_STACK_OFFS(v) ((int)(((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF)))
 #define IS_CALL(op)	((op) == CALL_PTR || (op) == CALL_REG || (op) == CALL_FUN)
+#define UNUSED		((ereg)0)
 
 typedef struct {
 	int *data;
