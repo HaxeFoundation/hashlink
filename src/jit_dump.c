@@ -248,6 +248,8 @@ static void hl_dump_ptr_name( jit_ctx *ctx, void *ptr ) {
 		N(hl_rethrow);
 		N(hl_to_virtual);
 		N(hl_alloc_enum);
+		N(hl_dyn_compare);
+		N(hl_same_type);
 		DYN(f);
 		DYN(d);
 		DYN(i64);
@@ -402,7 +404,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	if( cur != ctx->instr_count )
 		printf("  ??? MISSING BLOCK FOR RANGE %X-%X\n", cur, ctx->instr_count);
 	// print instrs
-	int vpos = 0;
+	int vpos = 1;
 	int rpos = 0;
 	int cpos = 0;
 	cur = 0;
@@ -438,19 +440,12 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		while( rpos < ctx->reg_instr_count && rpos < ctx->reg_pos_map[i+1] ) {
 			ereg out = ctx->reg_writes[rpos];
 			e = ctx->reg_instrs + rpos;
-			printf("\n\t\t\t");
-			int count = 0;
-			while( cpos < ctx->code_size && cpos < ctx->code_pos_map[rpos+1] ) {
-				printf("%.2X",ctx->code_instrs[cpos++]);
-				count++;
-			}
-			while( count++ < 6 )
-				printf("  ");
-
-			printf(" @%X ",rpos);
-
+			printf("\n\t\t\t\t@%X ",rpos);
 			if( !IS_NULL(out) ) printf("%s = ",reg_str(out));
 			dump_instr(ctx,e,rpos);
+			printf("\033[80G");
+			while( cpos < ctx->code_size && cpos < ctx->code_pos_map[rpos+1] )
+				printf("%.2X",ctx->code_instrs[cpos++]);
 			rpos++;
 		}
 		printf("\n");

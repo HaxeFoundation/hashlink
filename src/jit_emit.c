@@ -61,7 +61,6 @@ typedef struct _tmp_phi tmp_phi;
 
 #define S_SORTED
 
-#define S_DEFVAL		VAL_NULL
 #define S_TYPE			ereg_map
 #define S_NAME(name)	ereg_##name
 #define S_VALUE			ereg
@@ -70,7 +69,6 @@ typedef struct _tmp_phi tmp_phi;
 
 #define S_MAP
 
-#define S_DEFVAL		VAL_NULL
 #define S_TYPE			vreg_map
 #define S_NAME(name)	vreg_##name
 #define S_KEY			int
@@ -157,7 +155,7 @@ struct _emit_ctx {
 #define STORE_MEM(to, offs, v) emit_store_mem(ctx, to, offs, v)
 #define LOAD_OBJ_METHOD(obj,id) LOAD_MEM_PTR(LOAD_MEM_PTR(LOAD_MEM_PTR(obj,0),HL_WSIZE*2),HL_WSIZE*(id))
 #define OFFSET(base,index,mult,offset) emit_gen_ext(ctx, LEA, base, index, M_PTR, (mult) | ((offset) << 8))
-#define BREAK() emit_gen(ctx, DEBUG_BREAK, VAL_NULL, VAL_NULL, 0)
+#define BREAK() emit_gen(ctx, DEBUG_BREAK, UNUSED, UNUSED, 0)
 #define GET_MODE(r) emit_get_mode(ctx,r)
 #define GET_PHI(r) ctx->phis[-(r)-1]
 #define HDYN_VALUE 8
@@ -346,7 +344,7 @@ static ereg emit_gen_ext( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode, i
 	e->size_offs = size_offs;
 	e->a = a;
 	e->b = b;
-	return mode == 0 || mode == M_NORET ? VAL_NULL : new_value(ctx);
+	return mode == 0 || mode == M_NORET ? UNUSED : new_value(ctx);
 }
 
 static ereg emit_gen( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode ) {
@@ -354,7 +352,7 @@ static ereg emit_gen( emit_ctx *ctx, emit_op op, ereg a, ereg b, int mode ) {
 }
 
 static ereg emit_gen_size( emit_ctx *ctx, emit_op op, int size_offs ) {
-	return emit_gen_ext(ctx,op,VAL_NULL,VAL_NULL,op==ALLOC_STACK ? M_PTR : 0,size_offs);
+	return emit_gen_ext(ctx,op,UNUSED,UNUSED,op==ALLOC_STACK ? M_PTR : 0,size_offs);
 }
 
 static void patch_instr_mode( emit_ctx *ctx, int mode ) {
@@ -383,7 +381,7 @@ static tmp_phi *alloc_phi( emit_ctx *ctx, emit_block *b, vreg *r ) {
 
 static int emit_jump( emit_ctx *ctx, bool cond ) {
 	int p = ctx->emit_pos;
-	emit_gen(ctx, cond ? JCOND : JUMP, VAL_NULL, VAL_NULL, 0);
+	emit_gen(ctx, cond ? JCOND : JUMP, UNUSED, UNUSED, 0);
 	return p;
 }
 
@@ -450,7 +448,7 @@ static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t ) 
 	einstr *e = emit_instr(ctx, LOAD_ADDR);
 	e->mode = hl_type_mode(size_t);
 	e->a = v;
-	e->b = VAL_NULL;
+	e->b = UNUSED;
 	e->size_offs = offset;
 	return new_value(ctx);
 }
@@ -466,7 +464,7 @@ static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int 
 	e->mode = (unsigned char)(ret ? hl_type_mode(ret) : M_NORET);
 	e->value = (int_val)native_ptr;
 	store_args(ctx, e, args, nargs);
-	return ret == NULL || e->mode == M_VOID ? VAL_NULL : new_value(ctx);
+	return ret == NULL || e->mode == M_VOID ? UNUSED : new_value(ctx);
 }
 
 static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_type *ret ) {
@@ -474,11 +472,11 @@ static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_typ
 	e->mode = hl_type_mode(ret);
 	e->a = f;
 	store_args(ctx, e, args, nargs);
-	return e->mode == M_VOID ? VAL_NULL : new_value(ctx);
+	return e->mode == M_VOID ? UNUSED : new_value(ctx);
 }
 
 static void emit_test( emit_ctx *ctx, ereg v, hl_op o ) {
-	emit_gen_ext(ctx, TEST, v, VAL_NULL, 0, o);
+	emit_gen_ext(ctx, TEST, v, UNUSED, 0, o);
 	patch_instr_mode(ctx, GET_MODE(v));
 }
 
@@ -509,7 +507,7 @@ static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 
 	if( p->locked ) jit_assert();
-	ereg same = VAL_NULL;
+	ereg same = UNUSED;
 	for_iter(ereg,v,p->vals) {
 		if( v == same || v == p->value )
 			continue;
@@ -632,7 +630,7 @@ static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int 
 		e->mode = hl_type_mode(dst->t);
 		e->a = findex;
 		store_args(ctx, e, args, count);
-		STORE(dst, e->mode == M_VOID ? VAL_NULL : new_value(ctx));
+		STORE(dst, e->mode == M_VOID ? UNUSED : new_value(ctx));
 	}
 }
 
@@ -723,7 +721,7 @@ static void emit_store_size( emit_ctx *ctx, ereg dst, int dst_offset, ereg src, 
 }
 
 static ereg emit_conv( emit_ctx *ctx, ereg v, emit_mode from, emit_mode to, bool _unsigned ) {
-	return emit_gen_ext(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, VAL_NULL, to, from);
+	return emit_gen_ext(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, UNUSED, to, from);
 }
 
 static bool dyn_need_type( hl_type *t ) {
@@ -928,6 +926,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	int_arr_free(&ctx->args_data);
 	int_arr_free(&ctx->jump_regs);
 	int_arr_free(&ctx->values);
+	int_arr_add(ctx->values,-1);
 	ctx->root_block = ctx->current_block = alloc_block(ctx);
 	ctx->current_block->sealed = true;
 	ctx->arrival_points = NULL;
@@ -951,13 +950,13 @@ void hl_emit_function( jit_ctx *jit ) {
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
-		r->ref = VAL_NULL;
+		r->ref = 0;
 	}
 
 	for(i=0;i<f->type->fun->nargs;i++) {
 		hl_type *t = f->type->fun->args[i];
 		if( t->kind == HVOID ) continue;
-		STORE(R(i), emit_gen(ctx, LOAD_ARG, VAL_NULL, VAL_NULL, hl_type_mode(t)));
+		STORE(R(i), emit_gen(ctx, LOAD_ARG, UNUSED, UNUSED, hl_type_mode(t)));
 	}
 
 	for(int op_pos=0;op_pos<f->nops;op_pos++) {
@@ -1300,7 +1299,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	switch( o->op ) {
 	case OMov:
 	case OUnsafeCast:
-		STORE(dst, emit_gen(ctx,MOV,LOAD(ra),VAL_NULL,hl_type_mode(ra->t)));
+		STORE(dst, emit_gen(ctx,MOV,LOAD(ra),UNUSED,hl_type_mode(ra->t)));
 		break;
 	case OInt:
 		STORE(dst, LOAD_CONST(m->code->ints[o->p2], dst->t));
@@ -1394,7 +1393,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case ONeg:
 	case ONot:
-		STORE(dst, emit_gen_ext(ctx, UNOP, LOAD(ra), VAL_NULL, hl_type_mode(dst->t), o->op));
+		STORE(dst, emit_gen_ext(ctx, UNOP, LOAD(ra), UNUSED, hl_type_mode(dst->t), o->op));
 		break;
 	case OJFalse:
 	case OJTrue:
@@ -1437,7 +1436,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		STORE(dst, emit_conv(ctx,LOAD(ra),hl_type_mode(ra->t),hl_type_mode(dst->t), o->op == OToUFloat));
 		break;
 	case ORet:
-		emit_gen(ctx, RET, dst->t->kind == HVOID ? VAL_NULL : LOAD(dst), VAL_NULL, M_NORET);
+		emit_gen(ctx, RET, dst->t->kind == HVOID ? UNUSED : LOAD(dst), 0, M_NORET);
 		patch_instr_mode(ctx, hl_type_mode(dst->t));
 		break;
 	case OIncr:
@@ -1446,13 +1445,13 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			if( IS_FLOAT(dst->t) ) {
 				jit_assert();
 			} else {
-				STORE(dst, emit_gen_ext(ctx,UNOP,LOAD(dst),VAL_NULL,hl_type_mode(dst->t),o->op));
+				STORE(dst, emit_gen_ext(ctx,UNOP,LOAD(dst),UNUSED,hl_type_mode(dst->t),o->op));
 			}
 		}
 		break;
 	case ONew:
 		{
-			ereg arg = VAL_NULL;
+			ereg arg = UNUSED;
 			void *allocFun = NULL;
 			int nargs = 1;
 			switch( dst->t->kind ) {
@@ -1559,7 +1558,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					if( dst->t->kind == HSTRUCT ) {
 						hl_type *ft = hl_obj_field_fetch(ra->t,o->p3)->t;
 						if( ft->kind == HPACKED ) {
-							STORE(dst,OFFSET(r, VAL_NULL, 0, rt->fields_indexes[o->p3]));
+							STORE(dst,OFFSET(r, UNUSED, 0, rt->fields_indexes[o->p3]));
 							break;
 						}
 					}
@@ -1652,7 +1651,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			if( dst->t->kind == HSTRUCT ) {
 				hl_type *ft = hl_obj_field_fetch(r->t,o->p2)->t;
 				if( ft->kind == HPACKED ) {
-					STORE(dst, OFFSET(obj, VAL_NULL, 0, field_pos));
+					STORE(dst, OFFSET(obj, UNUSED, 0, field_pos));
 					break;
 				}
 			}
@@ -1863,7 +1862,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case ORefData:
 		switch( ra->t->kind ) {
 		case HARRAY:
-			STORE(dst, OFFSET(LOAD(ra),VAL_NULL,0,sizeof(varray)));
+			STORE(dst, OFFSET(LOAD(ra),UNUSED,0,sizeof(varray)));
 			break;
 		default:
 			jit_assert();
@@ -1948,7 +1947,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				hashed_name = hl_hash_gen(name, true);
 			}
 			// -----------------------------------------
-			ereg arg = null_field_access ? LOAD_CONST(hashed_name,&hlt_i32) : VAL_NULL;
+			ereg arg = null_field_access ? LOAD_CONST(hashed_name,&hlt_i32) : UNUSED;
 			emit_native_call(ctx, null_field_access ? hl_jit_null_field_access : hl_jit_null_access, &arg, null_field_access ? 1 : 0, NULL);
 			patch_jump(ctx, jok);
 		}
@@ -1992,7 +1991,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			current_addr = LOAD_CONST_PTR(&tinf->trap_current);
 #			else
 			thread = emit_native_call(ctx, hl_get_thread, NULL, 0, &hlt_bytes);
-			current_addr = OFFSET(thread, VAL_NULL, 0, (int)(int_val)&tinf->trap_current);
+			current_addr = OFFSET(thread, UNUSED, 0, (int)(int_val)&tinf->trap_current);
 #			endif
 			STORE_MEM(st, (int)(int_val)&trap->prev, LOAD_MEM_PTR(current_addr,0));
 			STORE_MEM(current_addr, 0, st);
@@ -2039,7 +2038,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			// On Win64 setjmp actually takes two arguments
 			// the jump buffer and the frame pointer (or the stack pointer if there is no FP)
 			nargs = 2;
-			args[1] = emit_gen(ctx,LEA,MK_STACK_REG(0),VAL_NULL,M_PTR);
+			args[1] = emit_gen(ctx,LEA,MK_STACK_REG(0),UNUSED,M_PTR);
 #endif
 #ifdef HL_MINGW
 			fun = _setjmp;
@@ -2070,7 +2069,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			current_addr = LOAD_CONST_PTR(&tinf->trap_current);
 #			else
 			thread = emit_native_call(ctx, hl_get_thread, NULL, 0, &hlt_bytes);
-			current_addr = OFFSET(thread, VAL_NULL, 0, (int)(int_val)&tinf->trap_current);
+			current_addr = OFFSET(thread, UNUSED, 0, (int)(int_val)&tinf->trap_current);
 #			endif
 
 			STORE_MEM(current_addr, 0, LOAD_MEM_PTR(st,(int)(int_val)&trap->prev));
@@ -2095,7 +2094,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			int count = o->p2;
 			emit_cmp(ctx,v,LOAD_CONST(count,&hlt_i32),OJUGte);
 			int jdefault = emit_jump(ctx, true);
-			emit_gen_ext(ctx, JUMP_TABLE, v, VAL_NULL, 0, count);
+			emit_gen_ext(ctx, JUMP_TABLE, v, UNUSED, 0, count);
 			for(int i=0; i<count; i++) {
 				int j = emit_jump(ctx, false);
 				register_jump(ctx, j, o->extra[i]);
@@ -2120,7 +2119,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				case HSTRUCT:
 					{
 						hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
-						r = OFFSET(r, VAL_NULL, 0, rt->fields_indexes[o->p2-1]);
+						r = OFFSET(r, UNUSED, 0, rt->fields_indexes[o->p2-1]);
 					}
 					break;
 				default:
@@ -2128,7 +2127,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					break;
 				}
 			}
-			emit_gen(ctx, PREFETCH, r, VAL_NULL, o->p3);
+			emit_gen(ctx, PREFETCH, r, UNUSED, o->p3);
 		}
 		break;
 	case OAsm:
