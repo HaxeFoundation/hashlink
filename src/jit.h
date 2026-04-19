@@ -188,6 +188,7 @@ struct _jit_ctx {
 	unsigned char *code_instrs;
 	int *code_pos_map;
 	// accum output
+	int fdef_index;
 	int out_pos;
 	int out_max;
 	unsigned char *output;
@@ -199,9 +200,9 @@ void hl_jit_free( jit_ctx *ctx, h_bool can_reset );
 void hl_jit_reset( jit_ctx *ctx, hl_module *m );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
+void hl_jit_define_function( jit_ctx *ctx, int start, int size );
 
 void hl_jit_null_field_access();
-void hl_jit_null_access();
 void hl_jit_assert();
 
 // emit & dump

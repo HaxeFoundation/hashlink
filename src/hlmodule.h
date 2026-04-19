@@ -136,6 +136,7 @@ typedef struct {
 	jit_ctx *jit_ctx;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
+	int unwind_table_size;
 	PRUNTIME_FUNCTION unwind_table;
 #endif
 } hl_module;

@@ -1957,8 +1957,13 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				hashed_name = hl_hash_gen(name, true);
 			}
 			// -----------------------------------------
-			ereg arg = null_field_access ? LOAD_CONST(hashed_name,&hlt_i32) : UNUSED;
-			emit_native_call(ctx, null_field_access ? hl_jit_null_field_access : hl_jit_null_access, &arg, null_field_access ? 1 : 0, NULL);
+			null_field_access = false;
+			if( null_field_access ) {
+				einstr *e = emit_instr(ctx, PUSH_CONST);
+				e->mode = M_PTR;
+				e->value = hashed_name;
+			}
+			emit_native_call(ctx, null_field_access ? hl_jit_null_field_access : hl_null_access, NULL, 0, NULL);
 			patch_jump(ctx, jok);
 		}
 		break;

@@ -287,6 +287,8 @@ struct _code_ctx {
 	int *pos_map;
 	int cur_op;
 	bool flushed;
+	int null_access_pos;
+	int null_field_pos;
 };
 
 static int _incr( int*v, int n ) {
@@ -394,9 +396,8 @@ typedef enum {
 	RFPU = 1,
 	RSTACK = 2,
 	RCONST = 3,
-	RADDR = 4,
-	RMEM = 5,
-	RUNUSED = 6,
+	RMEM = 4,
+	RUNUSED = 5,
 } preg_kind;
 
 typedef struct {
@@ -451,6 +452,7 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	case ID2(RCPU,RCPU):
 	case ID2(RFPU,RFPU):
 		if( f->mem_r ) {
+			// canonical form
 			if( a.reg > 7 ) r64 |= 1;
 			if( b.reg > 7 ) r64 |= 4;
 			OP(f->mem_r);
@@ -482,226 +484,118 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 		break;
 	case ID2(RSTACK,RUNUSED):
 		ERRIF( f->mem_r == 0 || GET_RM(f->mem_r) == 0 );
-		{
-			OP(f->mem_r);
-			if( IS_SBYTE(a.value) ) {
-				MOD_RM(1,GET_RM(f->mem_r)-1,RBP);
-				B(a.value);
-			} else {
-				MOD_RM(2,GET_RM(f->mem_r)-1,RBP);
-				W(a.value);
-			}
+		OP(f->mem_r);
+		if( IS_SBYTE(a.value) ) {
+			MOD_RM(1,GET_RM(f->mem_r)-1,RBP);
+			B(a.value);
+		} else {
+			MOD_RM(2,GET_RM(f->mem_r)-1,RBP);
+			W(a.value);
 		}
 		break;
 	case ID2(RCPU,RCONST):
 		ERRIF( f->r_const == 0 && f->r_i8 == 0 );
 		if( a.reg > 7 ) r64 |= 1;
-		{
-			// short byte form
-			if( f->r_i8 && IS_SBYTE(value) ) {
-				if( (f->r_i8&FLAG_DUAL) && a.reg > 7 ) r64 |= 4;
-				OP(f->r_i8);
-				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a.reg,a.reg); else MOD_RM(3,GET_RM(f->r_i8)-1,a.reg);
-				B(value);
-			} else if( GET_RM(f->r_const) > 0 || (f->r_const&FLAG_DUAL) ) {
-				if( (f->r_i8&FLAG_DUAL) && a.reg > 7 ) r64 |= 4;
-				OP(f->r_const&0xFF);
-				if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a.reg,a.reg); else MOD_RM(3,GET_RM(f->r_const)-1,a.reg);
-				if( mode64 && IS_64 && op == _MOV ) W64(value); else W((int)value);
-			} else {
-				ERRIF( f->r_const == 0);
-				OP((f->r_const&0xFF) + (a.reg&7));
-				if( mode64 && IS_64 && op == _MOV ) W64(value); else W((int)value);
-			}
+		if( f->r_i8 && IS_SBYTE(value) ) {
+			if( (f->r_i8&FLAG_DUAL) && a.reg > 7 ) r64 |= 4;
+			OP(f->r_i8);
+			if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a.reg,a.reg); else MOD_RM(3,GET_RM(f->r_i8)-1,a.reg);
+			B(value);
+		} else if( GET_RM(f->r_const) > 0 || (f->r_const&FLAG_DUAL) ) {
+			if( (f->r_i8&FLAG_DUAL) && a.reg > 7 ) r64 |= 4;
+			OP(f->r_const&0xFF);
+			if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a.reg,a.reg); else MOD_RM(3,GET_RM(f->r_const)-1,a.reg);
+			if( mode64 && IS_64 && op == _MOV ) W64(value); else W((int)value);
+		} else {
+			ERRIF( f->r_const == 0);
+			OP((f->r_const&0xFF) + (a.reg&7));
+			if( mode64 && IS_64 && op == _MOV ) W64(value); else W((int)value);
 		}
 		break;
 	case ID2(RSTACK,RCPU):
 	case ID2(RSTACK,RFPU):
 		ERRIF( f->mem_r == 0 );
 		if( b.reg > 7 ) r64 |= 4;
-		{
-			OP(f->mem_r);
-			if( IS_SBYTE(a.value) ) {
-				MOD_RM(1,b.reg,RBP);
-				B(a.value);
-			} else {
-				MOD_RM(2,b.reg,RBP);
-				W(a.value);
-			}
+		OP(f->mem_r);
+		if( IS_SBYTE(a.value) ) {
+			MOD_RM(1,b.reg,RBP);
+			B(a.value);
+		} else {
+			MOD_RM(2,b.reg,RBP);
+			W(a.value);
 		}
 		break;
 	case ID2(RCPU,RSTACK):
 	case ID2(RFPU,RSTACK):
 		ERRIF( f->r_mem == 0 );
 		if( a.reg > 7 ) r64 |= 4;
-		{
-			OP(f->r_mem);
-			if( IS_SBYTE(b.value) ) {
-				MOD_RM(1,a.reg,RBP);
-				B(b.value);
-			} else {
-				MOD_RM(2,a.reg,RBP);
-				W(b.value);
-			}
+		OP(f->r_mem);
+		if( IS_SBYTE(b.value) ) {
+			MOD_RM(1,a.reg,RBP);
+			B(b.value);
+		} else {
+			MOD_RM(2,a.reg,RBP);
+			W(b.value);
 		}
 		break;
 	case ID2(RCONST,RUNUSED):
 		ERRIF( f->r_const == 0 );
-		{
-			OP(f->r_const);
-			if( f->r_const & FLAG_8B ) B(value); else W((int)value);
-		}
+		OP(f->r_const);
+		if( f->r_const & FLAG_8B ) B(value); else W((int)value);
 		break;
 	case ID2(RMEM,RUNUSED):
 		ERRIF( f->mem_r == 0 );
-		{
-			int mult = a.value;
-			CpuReg reg = (a.reg & 0xFF);
-			if( mult == 0 ) {
-				if( reg > 7 ) r64 |= 1;
-				OP(f->mem_r);
-				if( value == 0 && (reg&7) != RBP ) {
-					MOD_RM(0,GET_RM(f->mem_r)-1,reg);
-					if( (reg&7) == RSP ) B(0x24);
-				} else if( IS_SBYTE(value) ) {
-					MOD_RM(1,GET_RM(f->mem_r)-1,reg);
-					if( (reg&7) == RSP ) B(0x24);
-					B(value);
-				} else {
-					MOD_RM(2,GET_RM(f->mem_r)-1,reg);
-					if( (reg&7) == RSP ) B(0x24);
-					W((int)value);
-				}
-			} else {
-				// [eax + ebx * M]
-				ERRIF(1);
-			}
+		if( a.reg > 7 ) r64 |= 1;
+		OP(f->mem_r);
+		if( value == 0 && (a.reg&7) != RBP ) {
+			MOD_RM(0,GET_RM(f->mem_r)-1,a.reg);
+			if( (a.reg&7) == RSP ) B(0x24);
+		} else if( IS_SBYTE(value) ) {
+			MOD_RM(1,GET_RM(f->mem_r)-1,a.reg);
+			if( (a.reg&7) == RSP ) B(0x24);
+			B(value);
+		} else {
+			MOD_RM(2,GET_RM(f->mem_r)-1,a.reg);
+			if( (a.reg&7) == RSP ) B(0x24);
+			W((int)value);
 		}
 		break;
 	case ID2(RCPU, RMEM):
 	case ID2(RFPU, RMEM):
 		ERRIF( f->r_mem == 0 );
-		{
-			int mult = b.value;
-			CpuReg reg = b.reg & 0xFF;
-			if( mult == 15 ) {
-				int pos;
-				if( a.reg > 7 ) r64 |= 4;
-				OP(f->r_mem);
-				MOD_RM(0,a.reg,5);
-				if( IS_64 ) {
-					// offset wrt current code
-					pos = ctx->code.cur + 4;
-					W((int)(value - pos));
-				} else {
-					ERRIF(1);
-				}
-			} else if( mult == 0 ) {
-				if( a.reg > 7 ) r64 |= 4;
-				if( reg > 7 ) r64 |= 1;
-				OP(f->r_mem);
-				if( value == 0 && (reg&7) != RBP ) {
-					MOD_RM(0,a.reg,reg);
-					if( (reg&7) == RSP ) B(0x24);
-				} else if( IS_SBYTE(value) ) {
-					MOD_RM(1,a.reg,reg);
-					if( (reg&7) == RSP ) B(0x24);
-					B(value);
-				} else {
-					MOD_RM(2,a.reg,reg);
-					if( (reg&7) == RSP ) B(0x24);
-					W((int)value);
-				}
-			} else {
-				jit_assert();
-				/*
-				if( a.reg > 7 ) r64 |= 4;
-				if( reg > 7 ) r64 |= 1;
-				if( regOrOffs > 7 ) r64 |= 2;
-				OP(f->r_mem);
-				MOD_RM(offset == 0 ? 0 : IS_SBYTE(offset) ? 1 : 2,a.reg,4);
-				SIB(mult,regOrOffs,reg);
-				if( offset ) {
-					if( IS_SBYTE(offset) ) B(offset); else W(offset);
-				}
-				*/
-			}
-		}
-		break;
-#	ifndef HL_64
-	case ID2(RFPU,RADDR):
-#	endif
-	case ID2(RCPU,RADDR):
-		ERRIF( f->r_mem == 0 );
 		if( a.reg > 7 ) r64 |= 4;
+		if( b.reg > 7 ) r64 |= 1;
 		OP(f->r_mem);
-		MOD_RM(0,a.reg,5);
-		if( IS_64 )
-			W64((int_val)value);
-		else
-			W((int)(int_val)value);
-		break;
-#	ifndef HL_64
-	case ID2(RADDR,RFPU):
-#	endif
-	case ID2(RADDR,RCPU):
-		ERRIF( f->mem_r == 0 );
-		if( b.reg > 7 ) r64 |= 4;
-		OP(f->mem_r);
-		MOD_RM(0,b.reg,5);
-		if( IS_64 )
-			W64((int_val)value);
-		else
-			W((int)(int_val)value);
+		if( value == 0 && (b.reg&7) != RBP ) {
+			MOD_RM(0,a.reg,b.reg);
+			if( (b.reg&7) == RSP ) B(0x24);
+		} else if( IS_SBYTE(value) ) {
+			MOD_RM(1,a.reg,b.reg);
+			if( (b.reg&7) == RSP ) B(0x24);
+			B(value);
+		} else {
+			MOD_RM(2,a.reg,b.reg);
+			if( (b.reg&7) == RSP ) B(0x24);
+			W((int)value);
+		}
 		break;
 	case ID2(RMEM, RCPU):
 	case ID2(RMEM, RFPU):
 		ERRIF( f->mem_r == 0 );
-		{
-			int mult = a.value;
-			CpuReg reg = a.reg & 0xFF;
-			if( mult == 15 ) {
-				int pos;
-				if( b.reg > 7 ) r64 |= 4;
-				OP(f->mem_r);
-				MOD_RM(0,b.reg,5);
-				if( IS_64 ) {
-					// offset wrt current code
-					pos = ctx->code.cur + 4;
-					W((int)(value - pos));
-				} else {
-					ERRIF(1);
-				}
-			} else if( mult == 0 ) {
-				if( b.reg > 7 ) r64 |= 4;
-				if( reg > 7 ) r64 |= 1;
-				OP(f->mem_r);
-				if( value == 0 && (reg&7) != RBP ) {
-					MOD_RM(0,b.reg,reg);
-					if( (reg&7) == RSP ) B(0x24);
-				} else if( IS_SBYTE(value) ) {
-					MOD_RM(1,b.reg,reg);
-					if( (reg&7) == RSP ) B(0x24);
-					B(value);
-				} else {
-					MOD_RM(2,b.reg,reg);
-					if( (reg&7) == RSP ) B(0x24);
-					W((int)value);
-				}
-			} else {
-				jit_assert();
-				/*
-				if( b.reg > 7 ) r64 |= 4;
-				if( reg > 7 ) r64 |= 1;
-				if( value > 7 ) r64 |= 2;
-				OP(f->mem_r);
-				MOD_RM(offset == 0 ? 0 : IS_SBYTE(offset) ? 1 : 2,b.reg,4);
-				SIB(mult,value,reg);
-				if( offset ) {
-					if( IS_SBYTE(offset) ) B(offset); else W(offset);
-				}
-				*/
-			}
+		if( a.reg > 7 ) r64 |= 1;
+		if( b.reg > 7 ) r64 |= 4;
+		OP(f->mem_r);
+		if( value == 0 && (a.reg&7) != RBP ) {
+			MOD_RM(0,b.reg,a.reg);
+			if( (a.reg&7) == RSP ) B(0x24);
+		} else if( IS_SBYTE(value) ) {
+			MOD_RM(1,b.reg,a.reg);
+			if( (a.reg&7) == RSP ) B(0x24);
+			B(value);
+		} else {
+			MOD_RM(2,b.reg,a.reg);
+			if( (a.reg&7) == RSP ) B(0x24);
+			W((int)value);
 		}
 		break;
 	default:
@@ -731,10 +625,11 @@ static void emit_jump( code_ctx *ctx, int mode, int offset ) {
 	}
 }
 
+#define RTMP R(R11)
 static ereg get_tmp( emit_mode mode ) {
 	if( IS_FLOAT(mode) ) 
 		return MMX(scratch_float_reg);
-	return R(R11);
+	return RTMP;
 }
 
 static void emit_mov( code_ctx *ctx, ereg out, ereg val, emit_mode mode, int_val value ) {
@@ -751,7 +646,7 @@ static void emit_mov( code_ctx *ctx, ereg out, ereg val, emit_mode mode, int_val
 	if( !IS_PURE(out) && !IS_PURE(val) ) {
 		ereg tmp = get_tmp(mode);
 		emit_mov(ctx, tmp, val, mode, value);
-		emit_mov(ctx, out, tmp, mode, value);
+		emit_mov(ctx, out, tmp, mode, 0);
 	} else {
 		static CpuOp MOV_OP[] = {_MOV,MOV8,MOV16,_MOV,_MOV,_MOV,MOVSD,MOVSS,_MOV,_MOV};
 		emit_ext(ctx, MOV_OP[mode],out,val,mode,value);
@@ -792,15 +687,14 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		{
 			ereg f = R(RCX);
 			if( b != f ) {
-				ereg tmp = get_tmp(M_I32);
 				if( a == f ) {
-					EMIT(_MOV,tmp,a,M_I32);
-					a = tmp;
+					EMIT(_MOV,RTMP,a,M_I32);
+					a = RTMP;
 				}
 				EMIT(_PUSH,f,UNUSED,M_I32);
 				EMIT(_MOV,f,b,M_I32);
 				emit_anyop(ctx, op, out, a, f, mode);
-				EMIT(_POP,out == f ? tmp : f,UNUSED,M_I32);
+				EMIT(_POP,out == f ? RTMP : f,UNUSED,M_I32);
 				return;
 			}
 		}
@@ -869,6 +763,29 @@ static void emit_nop( code_ctx *ctx, int size ) {
 	B(0x90);
 }
 
+static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
+	einstr e = *_e;
+	if( e.a && (e.a & FL_NATMASK) == FL_STACKOFFS ) {
+		e.value += GET_STACK_OFFS(e.a);
+		e.a = R(RBP);
+	}
+	if( !IS_PURE(e.a) ) {
+		emit_mov(ctx, RTMP, e.a, e.mode, 0);
+		e.a = RTMP;
+		//if( !IS_PURE(e.b) ) jit_assert();
+	} else if( e.b && !IS_PURE(e.b) ) {
+		emit_mov(ctx, RTMP, e.b, e.mode, 0);
+		e.b = RTMP;
+	}
+	BREAK();
+	//emit_ext(ctx,_LEA,out,e.a,e.mode,e.value | ((e.b & 0xFF) << 16));
+}
+
+static void align_function( code_ctx *ctx ) {
+	while( byte_count(ctx->code) & 15 )
+		emit_nop(ctx,16 - (byte_count(ctx->code) & 15));
+}
+
 void hl_codegen_function( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
 	ctx->flushed = false;
@@ -894,9 +811,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 #		ifdef HL_DEBUG
 		int rid = cur_pos | (jit->fun->findex << 16);
 		while( reg_index < jit->instr_count && jit->reg_pos_map[reg_index] <= cur_pos ) reg_index++;
+		int uid = emit_index | (jit->fun->findex << 16);
 		if( emit_index < jit->fun->nops && jit->emit_pos_map[emit_index] < reg_index ) {
-			int uid = emit_index | (jit->fun->findex << 16);
-			emit_ext(ctx,_MOV,get_tmp(M_I32),VAL_CONST,M_I32,uid);
+			emit_ext(ctx,_MOV,RTMP,VAL_CONST,M_I32,uid);
 			__ignore(&uid);
 			__ignore(&rid);
 			emit_index++;
@@ -914,9 +831,8 @@ void hl_codegen_function( jit_ctx *jit ) {
 		case STORE:
 			if( !IS_PURE(e->a) && !IS_PURE(e->b) && (e->a & FL_NATMASK) != FL_STACKOFFS ) {
 				EMIT(_PUSH,e->b,UNUSED,e->mode);
-				ereg tmp = get_tmp(M_PTR);
-				emit_mov(ctx, tmp, e->a, M_PTR, 0);
-				emit_ext(ctx, _POP,VAL_MEM(tmp), UNUSED, e->mode, e->size_offs);
+				emit_mov(ctx, RTMP, e->a, M_PTR, 0);
+				emit_ext(ctx, _POP,VAL_MEM(RTMP), UNUSED, e->mode, e->size_offs);
 			} else
 				emit_mov(ctx, VAL_MEM(e->a), e->b, e->mode, e->size_offs);
 			break;
@@ -927,7 +843,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			emit_ext(ctx, _POP, e->a, UNUSED, e->mode, 0);
 			break;
 		case PUSH_CONST:
-			emit_ext(ctx, _PUSH, VAL_CONST, UNUSED, e->mode, e->value);
+			emit_ext(ctx, (e->value&0xFF) == e->value && e->mode == M_PTR ? PUSH8 : _PUSH, VAL_CONST, UNUSED, e->mode, e->value);
 			break;
 		case DEBUG_BREAK:
 			BREAK();
@@ -943,7 +859,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			{
 				ereg w = IS_PURE(out) ? out : get_tmp(e->mode);
 				if( e->value == 0 )
-					EMIT(XOR, w, w, e->mode);
+					EMIT(IS_FLOAT(e->mode) ? XORPD : XOR, w, w, e->mode);
 				else
 					emit_mov(ctx, w, VAL_CONST, e->mode, e->value);
 				if( w != out )
@@ -951,7 +867,16 @@ void hl_codegen_function( jit_ctx *jit ) {
 			}
 			break;
 		case LOAD_ADDR:
-			emit_mov(ctx,out,VAL_MEM(e->a),e->mode, e->size_offs);
+			{
+				ereg addr;
+				if( (e->a & FL_STACKREG) == FL_STACKREG ) {
+					emit_mov(ctx,RTMP,e->a,M_PTR,0);
+					addr = VAL_MEM(RTMP);
+				} else {
+					addr = VAL_MEM(e->a);
+				}
+				emit_mov(ctx,out,addr,e->mode,e->size_offs);
+			}
 			break;
 		case CALL_FUN:
 			B(0xE8);
@@ -960,12 +885,19 @@ void hl_codegen_function( jit_ctx *jit ) {
 				int fid = e->a;
 				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,pos);
 				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
-				W(0xBADBAD00 - (pos + 4));
+				W(0);
 			}
 			break;
 		case CALL_PTR:
-			emit_ext(ctx, _MOV, R(RAX), VAL_CONST, M_PTR, e->value);
-			EMIT(_CALL, R(RAX), UNUSED, M_NONE);
+			if( e->value == (uint64)hl_null_access || e->value == (uint64)hl_jit_null_field_access ) {
+				// call near
+				int target = e->value == (uint64)hl_null_access ? ctx->null_access_pos : ctx->null_field_pos;
+				B(0xE8);
+				W(target - (jit->out_pos + byte_count(ctx->code) + 4));
+			} else {
+				emit_ext(ctx, _MOV, R(RAX), VAL_CONST, M_PTR, e->value);
+				EMIT(_CALL, R(RAX), UNUSED, M_NONE);
+			}
 			break;
 		case CALL_REG:
 			EMIT(_CALL, e->a, UNUSED, M_NONE);
@@ -1068,10 +1000,10 @@ void hl_codegen_function( jit_ctx *jit ) {
 		case LEA:
 			if( !IS_PURE(out) ) {
 				ereg tmp = get_tmp(e->mode);
-				EMIT(_LEA,tmp,e->a,e->mode);
+				emit_lea(ctx,tmp,e);
 				emit_mov(ctx,out,tmp,e->mode,0);
 			} else
-				EMIT(_LEA,out,e->a,e->mode);
+				emit_lea(ctx,out,e);
 			break;
 		case STACK_OFFS:
 			if( e->size_offs >= 0 )
@@ -1085,8 +1017,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 		}
 		if( ctx->code.cur > ctx->code.max ) jit_assert();
 	}
-	while( byte_count(ctx->code) & 15 )
-		emit_nop(ctx,16 - (byte_count(ctx->code) & 15));
+	align_function(ctx);
 	hl_codegen_flush(jit);
 	for(int i=0;i<int_arr_count(ctx->short_jumps);i+=2) {
 		int pos = int_arr_get(ctx->short_jumps,i);
@@ -1109,6 +1040,33 @@ void hl_codegen_alloc( jit_ctx *jit ) {
 	memset(ctx,0,sizeof(code_ctx));
 	jit->code = ctx;
 	ctx->jit = jit;
+}
+
+void hl_codegen_init( jit_ctx *jit ) {
+	code_ctx *ctx = jit->code;
+	byte_reserve(ctx->code,256);
+	ctx->code.cur -= 256;
+	ctx->null_access_pos = jit->out_pos + byte_count(ctx->code);
+	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
+	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
+	emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,0x20);
+	emit_mov(ctx,R(RAX),VAL_CONST,M_PTR,(int_val)hl_null_access);
+	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
+	BREAK();
+	hl_jit_define_function(jit, ctx->null_access_pos, jit->out_pos + byte_count(ctx->code) - ctx->null_access_pos);
+	align_function(ctx);
+	ctx->null_field_pos = jit->out_pos + byte_count(ctx->code);
+	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
+	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
+	emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,0x28);
+	emit_mov(ctx,R(RCX),VAL_MEM(R(RBP)),M_I32,HL_WSIZE*2);
+	emit_mov(ctx,R(RAX),VAL_CONST,M_PTR,(int_val)hl_jit_null_field_access);
+	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
+	BREAK();
+	hl_jit_define_function(jit, ctx->null_field_pos, jit->out_pos + byte_count(ctx->code) - ctx->null_field_pos);
+	align_function(ctx);
+	if( byte_count(ctx->code) > ctx->code.max ) jit_assert();
+	hl_codegen_flush(jit);
 }
 
 void hl_codegen_free( jit_ctx *jit ) {
