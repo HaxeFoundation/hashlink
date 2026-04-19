@@ -100,6 +100,7 @@ typedef struct {
 #define FL_STACKOFFS (FL_NATREG | FL_STACK)
 #define IS_NULL(e) ((e) == 0)
 #define IS_NATREG(e) (((e) & (0x80000000 | FL_NATREG)) == FL_NATREG)
+#define IS_PURE(e)		((e) != UNUSED && ((e)&(FL_MEMPTR | FL_STACK)) == 0)
 #define MK_STACK_REG(v)	(((v)&0xFFFFFFF) | FL_STACKREG)
 #define MK_STACK_OFFS(v)(((v)&0xFFFFFFF) | FL_STACKOFFS)
 #define GET_STACK_OFFS(v) ((int)(((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF)))
@@ -147,7 +148,13 @@ typedef struct {
 	ereg *arg;
 } reg_config;
 
-typedef reg_config regs_config[2];
+typedef struct {
+	reg_config regs;
+	reg_config floats;
+	ereg req_bit_shifts;
+	ereg req_div_a;
+	ereg req_div_b;
+} regs_config;
 
 struct _jit_ctx {
 	hl_module *mod;
@@ -168,6 +175,7 @@ struct _jit_ctx {
 	int *emit_pos_map;
 	// regs output
 	int reg_instr_count;
+	int reg_stack_usage;
 	einstr *reg_instrs;
 	ereg *reg_writes;
 	int *reg_pos_map;
@@ -195,6 +203,7 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
 ereg **hl_emit_get_regs( einstr *e, int *count );
 void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( void *, ereg * ) );
 extern int hl_emit_mode_sizes[];
+extern bool hl_jit_dump_bin;
 #define val_str(v,m) hl_emit_regstr(v,m)
 
 #ifdef HL_DEBUG
@@ -210,9 +219,17 @@ extern int hl_emit_mode_sizes[];
 #	define jit_debug(...)
 #endif
 
+#if defined(HL_WIN_CALL) && defined(HL_64)
+#	define IS_WINCALL64 1
+#else
+#	define IS_WINCALL64 0
+#endif
+
 #define DEF_ALLOC &ctx->jit->falloc
 
 #define jit_pad_size(size,k)	((k == 0) ? 0 : ((-(size)) & (k - 1)))
+
+static void __ignore( void *value ) {}
 
 void hl_jit_error( const char *msg, const char *func, int line );
 
