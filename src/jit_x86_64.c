@@ -337,38 +337,51 @@ const char *hl_natreg_str( int reg, emit_mode m ) {
 	return out;
 }
 
-void hl_jit_init_regs( regs_config cfg ) {
+static int scratch_float_reg = -1;
+
+void hl_jit_init_regs( regs_config *cfg ) {
+	// exclude R11 at it's use as temporary for various ops
 #	ifdef HL_WIN_CALL
-	static int scratch_regs[] = { X(RAX), X(RCX), X(RDX), X(R8), X(R9), X(R10), X(R11) };
+	static int scratch_regs[] = { X(RAX), X(RCX), X(RDX), X(R8), X(R9), X(R10), /*X(R11)*/ };
 	static int free_regs[] = { X(RSI), X(RDI), X(RBX), X(R12), X(R13), X(R14), X(R15) };
 	static int call_regs[] = { X(RCX), X(RDX), X(R8), X(R9) };
-	cfg[1].nargs = 4;
-	cfg[1].nscratchs = 6;
 #	else
-	static int scratch_regs[] = { X(RAX), X(RCX), X(RDX), X(RSI), X(RDI), X(R8), X(R9), X(R10), X(R11) };
+	static int scratch_regs[] = { X(RAX), X(RCX), X(RDX), X(RSI), X(RDI), X(R8), X(R9), X(R10), /*X(R11)*/ };
 	static int free_regs[] = { X(RBX), X(R12), X(R13), X(R14), X(R15) };
 	static int call_regs[] = { X(RDI), X(RSI), X(RDX), X(RCX), X(R8), X(R9) };
-	cfg[1].nargs = 8;
-	cfg[1].nscratchs = 16;
 #	endif
+	cfg->regs.ret = scratch_regs[0];
+	cfg->regs.nscratchs = sizeof(scratch_regs) / sizeof(int);
+	cfg->regs.npersists = sizeof(free_regs) / sizeof(int);
+	cfg->regs.nargs = sizeof(call_regs) / sizeof(int);
+	cfg->regs.scratch = (ereg*)scratch_regs;
+	cfg->regs.persist = (ereg*)free_regs;
+	cfg->regs.arg = (ereg*)call_regs;
+	// floats
 	static int floats[] = {
 		MMX(0), MMX(1), MMX(2), MMX(3), 
 		MMX(4), MMX(5), MMX(6), MMX(7), 
 		MMX(8), MMX(9), MMX(10), MMX(11), 
 		MMX(12), MMX(13), MMX(14), MMX(15)
 	};
-	cfg[0].ret = scratch_regs[0];
-	cfg[0].nscratchs = sizeof(scratch_regs) / sizeof(int);
-	cfg[0].npersists = sizeof(free_regs) / sizeof(int);
-	cfg[0].nargs = sizeof(call_regs) / sizeof(int);
-	cfg[0].scratch = (ereg*)scratch_regs;
-	cfg[0].persist = (ereg*)free_regs;
-	cfg[0].arg = (ereg*)call_regs;
-	cfg[1].ret = floats[0];
-	cfg[1].scratch = (ereg*)floats;
-	cfg[1].arg = (ereg*)floats;
-	cfg[1].persist = (ereg*)floats+cfg[1].nscratchs;
-	cfg[1].npersists = 16 - cfg[1].nscratchs;
+#	ifdef HL_WIN_CALL
+	cfg->floats.nargs = 4;
+	cfg->floats.nscratchs = 6;
+#	else
+	cfg.floats.nargs = 8;
+	cfg.floats.nscratchs = 16;
+#	endif
+	scratch_float_reg = cfg->floats.nscratchs - 1;
+	cfg->floats.nscratchs--;
+	cfg->floats.ret = floats[0];
+	cfg->floats.scratch = (ereg*)floats;
+	cfg->floats.arg = (ereg*)floats;
+	cfg->floats.persist = (ereg*)floats + cfg->floats.nscratchs + 1;
+	cfg->floats.npersists = 15 - cfg->floats.nscratchs;
+	// extra
+	cfg->req_bit_shifts = R(RCX);
+	cfg->req_div_a = R(RAX);
+	cfg->req_div_b = R(RDX);
 }
 
 #define EMIT(op,a,b,mode) emit_ext(ctx,op,a,b,mode,0)
@@ -402,7 +415,7 @@ static preg make_reg( ereg r, emit_mode m ) {
 		p.kind = RCONST;
 		return p;
 	}
-	if( (r & FL_NATMASK) == FL_MEMPTR ) {
+	if( (r & FL_NATMASK) == (FL_NATREG | FL_MEMPTR) ) {
 		p.kind = RMEM;
 		p.reg = (r&0xFFFF);
 		p.value = 0;
@@ -708,7 +721,15 @@ static void emit_jump( code_ctx *ctx, int mode, int offset ) {
 	}
 }
 
+static ereg get_tmp( emit_mode mode ) {
+	if( IS_FLOAT(mode) ) 
+		return MMX(scratch_float_reg);
+	return R(R11);
+}
+
 static void emit_mov( code_ctx *ctx, ereg out, ereg val, emit_mode mode, int_val value ) {
+	if( out == val )
+		return;
 	if( (val & FL_NATMASK) == FL_STACKOFFS ) {
 		emit_mov(ctx,out,VAL_MEM(R(RBP)),mode, value + GET_STACK_OFFS(val));
 		return;
@@ -717,7 +738,12 @@ static void emit_mov( code_ctx *ctx, ereg out, ereg val, emit_mode mode, int_val
 		emit_mov(ctx,VAL_MEM(R(RBP)),val,mode, value + GET_STACK_OFFS(val));
 		return;
 	}
-	emit_ext(ctx,mode == M_F32 ? MOVSS : mode == M_F64 ? MOVSD : _MOV,out,val,mode,value);
+	if( !IS_PURE(out) && !IS_PURE(val) ) {
+		ereg tmp = get_tmp(mode);
+		emit_mov(ctx, tmp, val, mode, value);
+		emit_mov(ctx, out, tmp, mode, value);
+	} else
+		emit_ext(ctx,mode == M_F32 ? MOVSS : mode == M_F64 ? MOVSD : _MOV,out,val,mode,value);
 }
 
 static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_mode mode ) {
@@ -727,18 +753,75 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 	case OAdd:
 		F_OP(ADD,ADDSS,ADDSD);
 		break;
+	case OSub:
+		F_OP(SUB,SUBSS,SUBSD);
+		break;
+	case OMul:
+		F_OP(IMUL,MULSS,MULSD);
+		break;
 	case OIncr:
 		cop = INC;
 		break;
 	case ODecr:
 		cop = DEC;
 		break;
+	case OAnd:
+		cop = AND;
+		break;
+	case OOr:
+		cop = OR;
+		break;
+	case OXor:
+		cop = XOR;
+		break;
+	case OShl:
+	case OSShr:
+	case OUShr:
+		{
+			ereg f = R(RCX);
+			if( b != f ) {
+				ereg tmp = get_tmp(M_I32);
+				if( a == f ) {
+					EMIT(_MOV,tmp,a,M_I32);
+					a = tmp;
+				}
+				EMIT(_PUSH,f,UNUSED,M_I32);
+				EMIT(_MOV,f,b,M_I32);
+				emit_anyop(ctx, op, out, a, f, mode);
+				EMIT(_POP,out == f ? tmp : f,UNUSED,M_I32);
+				return;
+			}
+		}
+		b = UNUSED;
+		cop = (op == OShl ? SHL : (op == OSShr ? SAR : SHR));
+		break;
+	case OSMod:
+	case OSDiv:
+	case OUMod:
+	case OUDiv:
+		BREAK();
+		return;
 	default:
 		jit_assert();
 		break;
 	}
-	emit_mov(ctx, out, a, mode, 0);
-	EMIT(cop,out,b,mode);
+	if( !IS_PURE(out) ) {
+		ereg tmp = get_tmp(mode);
+		emit_mov(ctx, tmp, a, mode, 0);
+		EMIT(cop,tmp,b,mode);
+		emit_mov(ctx, out, tmp, mode, 0);
+	} else {
+		emit_mov(ctx, out, a, mode, 0);
+		EMIT(cop,out,b,mode);
+	}
+}
+
+static void before_call( code_ctx *ctx, einstr *e ) {
+	if( IS_WINCALL64 && e->mode != M_NORET ) emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,32);
+}
+
+static void after_call( code_ctx *ctx, einstr *e ) {
+	if( IS_WINCALL64 && e->mode != M_NORET ) emit_ext(ctx,ADD,R(RSP),VAL_CONST,M_PTR,32);
 }
 
 void hl_codegen_flush( jit_ctx *jit ) {
@@ -753,6 +836,10 @@ void hl_codegen_flush( jit_ctx *jit ) {
 
 void hl_codegen_function( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
+	int stack_offset = jit->reg_stack_usage;
+	int push_size = HL_WSIZE * 2; // RIP + RBP save
+	int align = (stack_offset + push_size) & 15;
+	if( align ) stack_offset += 16 - align;
 	ctx->flushed = false;
 	byte_free(&ctx->code);
 	int_arr_free(&ctx->near_jumps);
@@ -762,8 +849,8 @@ void hl_codegen_function( jit_ctx *jit ) {
 	ctx->pos_map[0] = 0;
 	byte_reserve(ctx->code,64);
 	ctx->code.cur -= 64;
-	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
 	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
+	if( stack_offset ) emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,stack_offset);
 	for(int cur_pos=0;cur_pos<jit->reg_instr_count;cur_pos++) {
 		einstr *e = jit->reg_instrs + cur_pos;
 		ereg out = jit->reg_writes[cur_pos];
@@ -771,6 +858,10 @@ void hl_codegen_function( jit_ctx *jit ) {
 		ctx->code.cur -= 64;
 		ctx->cur_op = cur_pos;
 		if( cur_pos > 0 ) ctx->pos_map[cur_pos] = ctx->code.cur;
+#		ifdef HL_DEBUG
+		int uid = cur_pos | (jit->fun->findex << 16);
+		__ignore(&uid);
+#		endif
 		switch( e->op ) {
 		case LOAD_ARG:
 		case ALLOC_STACK:
@@ -790,28 +881,31 @@ void hl_codegen_function( jit_ctx *jit ) {
 		case DEBUG_BREAK:
 			BREAK();
 			break;
-		case CALL_PTR:
-			emit_ext(ctx, _MOV, R(RAX), VAL_CONST, M_PTR, e->value);
-			EMIT(_CALL, R(RAX), UNUSED, M_NONE);
-			break;
 		case RET:
 			if( !IS_NULL(e->a) ) {
 				ereg ret = IS_FLOAT(e->mode) ? MMX(0) : R(RAX);
 				if( e->a != ret ) emit_mov(ctx, ret, e->a, e->mode, 0);
 			}
+			if( stack_offset ) emit_ext(ctx,ADD,R(RSP),VAL_CONST,M_PTR,stack_offset);
 			EMIT(_POP,R(RBP),UNUSED,M_PTR);
 			EMIT(_RET, UNUSED, UNUSED, M_NONE);
 			break;
 		case LOAD_CONST:
-			if( e->value == 0 )
-				EMIT(XOR, out, out, e->mode);
-			else
-				emit_ext(ctx, _MOV, out, VAL_CONST, e->mode, e->value);
+			{
+				ereg w = IS_PURE(out) ? out : get_tmp(e->mode);
+				if( e->value == 0 )
+					EMIT(XOR, w, w, e->mode);
+				else
+					emit_mov(ctx, w, VAL_CONST, e->mode, e->value);
+				if( w != out )
+					emit_mov(ctx, out, w, e->mode, 0);
+			}
 			break;
 		case LOAD_ADDR:
 			emit_mov(ctx,out,VAL_MEM(e->a),e->mode, e->size_offs);
 			break;
 		case CALL_FUN:
+			before_call(ctx,e);
 			B(0xE8);
 			{
 				int pos = ctx->fun_start_pos + byte_count(ctx->code);
@@ -820,32 +914,54 @@ void hl_codegen_function( jit_ctx *jit ) {
 				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
 			}
 			W(0x80000000);
+			after_call(ctx,e);
+			break;
+		case CALL_PTR:
+			before_call(ctx,e);
+			emit_ext(ctx, _MOV, R(RAX), VAL_CONST, M_PTR, e->value);
+			EMIT(_CALL, R(RAX), UNUSED, M_NONE);
+			after_call(ctx,e);
+			break;
+		case CALL_REG:
+			before_call(ctx,e);
+			EMIT(_CALL, e->a, UNUSED, M_NONE);
+			after_call(ctx,e);
 			break;
 		case TEST:
-			EMIT(_TEST,e->a,e->a,e->mode);
+			if( IS_FLOAT(e->mode) )
+				jit_assert();
+			if( !IS_PURE(e->a) ) {
+				ereg tmp = get_tmp(e->mode);
+				emit_mov(ctx, tmp, e->a, e->mode, 0);
+				EMIT(_TEST,tmp,tmp,e->mode);
+			} else
+				EMIT(_TEST,e->a,e->a,e->mode);
 			break;
 		case CMP:
-			switch( e->mode ) {
-			case M_UI8:
-				EMIT(CMP8,e->a,e->b,e->mode);
-				break;
-			case M_UI16:
-				EMIT(CMP16,e->a,e->b,e->mode);
-				break;
-			case M_F32:
-				EMIT(COMISS,e->a,e->b,e->mode);
-				break;
-			case M_F64:
-				EMIT(COMISD,e->a,e->b,e->mode);
-				break;
-			default:
-				EMIT(_CMP,e->a,e->b,e->mode);
-				break;
+			{
+				CpuOp op;
+				switch( e->mode ) {
+				case M_UI8: op = CMP8; break;
+				case M_UI16: op = CMP16; break;
+				case M_F32: op = COMISS; break;
+				case M_F64: op = COMISD; break;
+				default: op = _CMP; break;
+				}
+				if( !IS_PURE(e->a) && !IS_PURE(e->b) ) {
+					ereg tmp = get_tmp(e->mode);
+					emit_mov(ctx, tmp, e->b, e->mode, 0);
+					EMIT(op,e->a,tmp,e->mode);
+				} else
+					EMIT(op,e->a,e->b,e->mode);
 			}
 			break;
 		case JCOND:
 			{
-				einstr *p = &e[-1];
+				int prev = 0;
+				einstr *p;
+				do {
+					p = &e[--prev];
+				} while( p->op == MOV );
 				int op;
 				switch( p->size_offs ) {
 				case OJFalse:
@@ -906,14 +1022,37 @@ void hl_codegen_function( jit_ctx *jit ) {
 		case UNOP:
 			emit_anyop(ctx, e->size_offs, out, e->a, e->b, e->mode);
 			break;
+		case LEA:
+			if( !IS_PURE(out) ) {
+				ereg tmp = get_tmp(e->mode);
+				EMIT(_LEA,tmp,e->a,e->mode);
+				emit_mov(ctx,out,tmp,e->mode,0);
+			} else
+				EMIT(_LEA,out,e->a,e->mode);
+			break;
 		default:
 			jit_assert();
 			break;
 		}
 		if( ctx->code.cur > ctx->code.max ) jit_assert();
 	}
+	while( byte_count(ctx->code) & 7 )
+		byte_add_impl(&jit->falloc,&ctx->code,0xCC); // breaks
 	hl_codegen_flush(jit);
 	ctx->fun_start_pos += byte_count(ctx->code);
+	for(int i=0;i<int_arr_count(ctx->short_jumps);i+=2) {
+		int pos = int_arr_get(ctx->short_jumps,i);
+		int target = int_arr_get(ctx->short_jumps,i+1);
+		int offset = ctx->pos_map[target] - (pos + 1);
+		if( !IS_SBYTE(offset) ) jit_assert();
+		*(char*)&ctx->code.values[pos] = (char)offset;
+	}
+	for(int i=0;i<int_arr_count(ctx->near_jumps);i+=2) {
+		int pos = int_arr_get(ctx->near_jumps,i);
+		int target = int_arr_get(ctx->near_jumps,i+1);
+		int offset = ctx->pos_map[target] - (pos + 4);
+		*(int*)&ctx->code.values[pos] = offset;
+	}
 }
 
 

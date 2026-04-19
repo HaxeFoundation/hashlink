@@ -50,6 +50,8 @@ static const char *op_names[] = {
 	"block",
 };
 
+bool hl_jit_dump_bin = false;
+
 const char *hl_natreg_str( int reg, emit_mode m );
 
 const char *hl_emit_regstr( ereg v, emit_mode m ) {
@@ -64,15 +66,15 @@ const char *hl_emit_regstr( ereg v, emit_mode m ) {
 	else if( (v&FL_STACKREG) == FL_STACKREG ) {
 		int index = GET_STACK_OFFS(v);
 		if( index < 0 )
-			sprintf(fmt,"[ST%d]", index);
+			sprintf(fmt,"[ST-%Xh]", -index);
 		else
-			sprintf(fmt,"[ST+%d]", index);
+			sprintf(fmt,"[ST+%Xh]", index);
 	} else if( (v&FL_STACKOFFS) == FL_STACKOFFS ) {
 		int index = GET_STACK_OFFS(v);
 		if( index < 0 )
-			sprintf(fmt,"ST%d", index);
+			sprintf(fmt,"ST-%Xh", -index);
 		else
-			sprintf(fmt,"ST+%d", index);
+			sprintf(fmt,"ST+%Xh", index);
 	} else if( IS_NATREG(v) )
 		sprintf(fmt,"%s", hl_natreg_str(v,m));
 	else
@@ -366,6 +368,11 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	case CONV_UNSIGNED:
 		printf("%s %s", emit_mode_str(e->size_offs), val_str(e->a,(emit_mode)e->size_offs));
 		break;
+	case LEA:
+		printf(" %s", reg_str(e->a));
+		if( !IS_NULL(e->b) ) printf("+%s", reg_str(e->b));
+		if( e->size_offs > 1 ) printf("*%d",e->size_offs);
+		break;	
 	default:
 		if( !IS_NULL(e->a) ) {
 			printf(" %s", reg_str(e->a));
@@ -446,7 +453,10 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			bool first = true;
 			while( cpos < ctx->code_size && cpos < ctx->code_pos_map[rpos+1] ) {
 				if( first ) {
-					printf("\033[80G");
+					if( hl_jit_dump_bin )
+						printf("\t\t\t");
+					else
+						printf("\033[80G");
 					first = false;
 				}
 				printf("%.2X",ctx->code_instrs[cpos++]);
@@ -463,6 +473,16 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		printf("@%X ", cur_op);
 		hl_dump_op(ctx->fun, f->ops + cur_op);
 		printf("\n\t\t...\n");
+	}
+	if( cpos == ctx->code_size && cpos > 0 ) {
+		int n = 1;
+		for(int i=0;i<cpos;i++) {
+			if( ctx->code_pos_map[n] == i ) {
+				if( (n & 15) == 0 ) printf("\n"); else printf(" ");
+				n++;
+			}
+			printf("%.2X", ctx->code_instrs[i]);
+		}
 	}
 	printf("\n\n");
 	fflush(stdout);

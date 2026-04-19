@@ -25,13 +25,6 @@
 
 #define VAL(k)		(ctx->values + (k))
 
-#if defined(HL_WIN_CALL) && defined(HL_64)
-#	define IS_WINCALL64 1
-#else
-#	define IS_WINCALL64 0
-#endif
-
-
 //#define REGS_DEBUG
 
 #ifdef REGS_DEBUG
@@ -45,7 +38,7 @@
 #define VIDX(e)	(((e) < 0) ? ctx->jit->value_count + (-(e)-1) : (e))
 #define VAL_REG(e) VAL(VIDX(e))
 #define REG_MODE(m)	(((m) == M_F32 || (m) == M_F64) ? 1 :0)
-#define IS_PURE(e)		((e) != UNUSED && ((e)&(FL_MEMPTR | FL_STACK)) == 0)
+#define REG_CFG(m)	(m ? &ctx->cfg.floats : &ctx->cfg.regs)
 
 typedef struct {
 	int stack_pos;
@@ -81,12 +74,12 @@ struct _regs_ctx {
 
 typedef int call_regs[2];
 
-void hl_jit_init_regs( regs_config cfg );
+void hl_jit_init_regs( regs_config *cfg );
 
 static ereg get_call_reg( regs_ctx *ctx, call_regs regs, emit_mode m ) {
 	ereg r;
 	int mode = REG_MODE(m);
-	reg_config *cfg = &ctx->cfg[mode];
+	reg_config *cfg = REG_CFG(mode);
 	if( regs[mode] < cfg->nargs )
 		r = cfg->arg[regs[mode]++];
 	else
@@ -168,7 +161,7 @@ static void spill( regs_ctx *ctx, value_info *v ) {
 static bool regs_alloc_reg( regs_ctx *ctx, value_info *v ) {
 	// lookup available reg
 	int mode = REG_MODE(v->mode);
-	reg_config *cfg = &ctx->cfg[mode];
+	reg_config *cfg = REG_CFG(mode);
 	if( !IS_NULL(v->pref_reg) ) {
 		bool free = true;
 		for_iter(values,v2,ctx->scratch) {
@@ -201,6 +194,7 @@ static bool regs_alloc_reg( regs_ctx *ctx, value_info *v ) {
 	}
 	// free the oldest scratch reg
 	value_info *v2 = values_first(ctx->scratch);
+	if( !v2 ) jit_assert();
 	v->reg = v2->reg;
 	spill(ctx, v2);
 	return true;
@@ -261,7 +255,7 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 	jit_ctx *jit = ctx->jit;
 	hl_type *tret = ctx->jit->fun->type->fun->ret;
 	emit_mode mret = tret->kind == HF32 || tret->kind == HF64 ? M_F64 : M_PTR;
-	ereg ret = ctx->cfg[REG_MODE(mret)].ret;
+	ereg ret = REG_CFG(REG_MODE(mret))->ret;
 	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
 		einstr *e = jit->instrs + cur_op;
 		value_info *write = NULL;
@@ -281,12 +275,28 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 				v->pref_reg = get_call_reg(ctx,regs,v->mode);
 			}
 			if( write && IS_NULL(write->pref_reg) )
-				write->pref_reg = ctx->cfg[REG_MODE(e->mode)].ret;
+				write->pref_reg = REG_CFG(REG_MODE(e->mode))->ret;
 		} else switch( e->op ) {
 		case RET:
 			if( e->a ) {
 				value_info *v = VAL_REG(e->a);
 				if( v->pref_reg == UNUSED ) v->pref_reg = ret;
+			}
+			break;
+		case BINOP:
+			switch( e->size_offs ) {
+			case OSShr:
+			case OUShr:
+			case OShl:
+				if( ctx->cfg.req_bit_shifts ) VAL_REG(e->b)->pref_reg = ctx->cfg.req_bit_shifts;
+				break;
+			case OSDiv:
+			case OUDiv:
+			case OSMod:
+			case OUMod:
+				if( ctx->cfg.req_div_a ) VAL_REG(e->a)->pref_reg = ctx->cfg.req_div_a;
+				if( ctx->cfg.req_div_b ) VAL_REG(e->b)->pref_reg = ctx->cfg.req_div_b;
+				break;
 			}
 			break;
 		default:
@@ -463,6 +473,7 @@ static void flush_phis( regs_ctx *ctx, eblock *b ) {
 static void regs_emit_instrs( regs_ctx *ctx ) {
 	jit_ctx *jit = ctx->jit;
 	eblock *cur_block = NULL;
+	call_regs regs = {0};
 	int write_index = 1;
 	ctx->pos_map[0] = 0;
 	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
@@ -482,7 +493,9 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 					regs_emit_mov(ctx, r, v->reg, v->mode);
 			}
 			e.nargs = 0xFF;
-			ret_val = &ctx->cfg[REG_MODE(e.mode)].ret;
+			ret_val = &REG_CFG(REG_MODE(e.mode))->ret;
+			if( e.op == CALL_REG )
+				e.a = VAL(VIDX(e.a))->reg;
 		} else {
 			ereg **regs = hl_emit_get_regs(&e,&nread);
 			for(int k=0;k<nread;k++) {
@@ -492,23 +505,36 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				*r = v->reg;
 			}
 		}
-		ereg out;
+		ereg out = UNUSED;
 		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op )
 			out = VAL(write_index++)->reg;
-		else
-			out = UNUSED;
-		if( e.op == JUMP || e.op == JCOND )
-			flush_phis(ctx,cur_block);
-		if( e.op == BLOCK ) {
+		switch( e.op ) {
+		case BLOCK:
 			flush_phis(ctx,cur_block);
 			cur_block = jit->blocks + e.size_offs;
-		} else
-			regs_write_instr(ctx, &e, out);
-		switch( e.op ) {
+			break;
+		case LOAD_ARG:
+			{
+				ereg def = get_call_reg(ctx,regs,e.mode);
+				if( def && out != def )
+					regs_emit_mov(ctx,out,def,e.mode);
+				else
+					regs_write_instr(ctx, &e, out);
+			}
+			break;
 		case JUMP:
 		case JCOND:
+			flush_phis(ctx,cur_block);
+			regs_write_instr(ctx, &e, out);
 			int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
 			int_arr_add(ctx->jump_regs, cur_op + 1 + e.size_offs);
+			break;
+		default:
+			if( ret_val && out ) {
+				regs_write_instr(ctx, &e, *ret_val);
+				regs_emit_mov(ctx, out, *ret_val, e.mode);
+			} else
+				regs_write_instr(ctx, &e, out);
 			break;
 		}
 		ctx->pos_map[cur_op+1] = ctx->emit_pos;
@@ -523,6 +549,7 @@ void hl_regs_flush( jit_ctx *jit ) {
 	jit->reg_instrs = ctx->instrs;
 	jit->reg_writes = ctx->out_write;
 	jit->reg_pos_map = ctx->pos_map;
+	jit->reg_stack_usage = ctx->stack_size;
 	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op+1] = ctx->emit_pos;
 	int i = 0;
 	while( i < int_arr_count(ctx->jump_regs) ) {
@@ -572,7 +599,7 @@ void hl_regs_alloc( jit_ctx *jit ) {
 	memset(ctx,0,sizeof(regs_ctx));
 	ctx->jit = jit;
 	jit->regs = ctx;
-	hl_jit_init_regs(ctx->cfg);
+	hl_jit_init_regs(&ctx->cfg);
 }
 
 void hl_regs_free( regs_ctx *ctx ) {
