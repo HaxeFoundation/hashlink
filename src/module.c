@@ -717,6 +717,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	for(i=0;i<hl_setup.sys_nargs;i++) {
 		uchar *arg = hl_setup.sys_args[i];
 		if( ucmp(arg,USTR("--dump")) == 0 ) dump = true;
+		if( ucmp(arg,USTR("--dump-bin")) == 0 ) hl_jit_dump_bin = true;
 		if( memcmp(arg,USTR("--dump="),sizeof(USTR("--dump"))) == 0 ) {
 			dump = true;
 			filter = 0;

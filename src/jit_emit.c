@@ -31,7 +31,6 @@
 #	define emit_debug(...)
 #endif
 
-static void __ignore( void *value ) {}
 int hl_emit_mode_sizes[] = {0,1,2,4,8,HL_WSIZE,8,4,0,0};
 
 typedef struct {
@@ -722,12 +721,15 @@ static bool dyn_need_type( hl_type *t ) {
 static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
 	if( t->kind == HNULL && t->tparam->kind == dt->kind ) {
 		emit_test(ctx, v, OJNotNull);
-		int jnot = emit_jump(ctx, false);
+		int jnot = emit_jump(ctx, true);
+		split_block(ctx);
 		ereg v1 = LOAD_CONST(0,dt);
-		int jend = emit_jump(ctx, true);
+		int jend = emit_jump(ctx, false);
 		patch_jump(ctx, jnot);
+		split_block(ctx);
 		ereg v2 = LOAD_MEM(v,0,dt);
 		patch_jump(ctx, jend);
+		split_block(ctx);
 		return emit_phi(ctx, v1, v2);
 	}
 	bool need_dyn = dyn_need_type(dt);
