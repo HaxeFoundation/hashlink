@@ -40,6 +40,12 @@
 #define REG_MODE(m)	(((m) == M_F32 || (m) == M_F64) ? 1 :0)
 #define REG_CFG(m)	(m ? &ctx->cfg.floats : &ctx->cfg.regs)
 
+#if defined(HL_WIN_CALL) && defined(HL_64)
+#	define IS_WINCALL64 1
+#else
+#	define IS_WINCALL64 0
+#endif
+
 typedef struct {
 	int stack_pos;
 	int last_read;
@@ -70,6 +76,8 @@ struct _regs_ctx {
 	ereg *out_write;
 	int *pos_map;
 	bool flushed;
+	bool has_direct_call;
+	int persists_uses[2];
 };
 
 typedef int call_regs[2];
@@ -188,8 +196,8 @@ static bool regs_alloc_reg( regs_ctx *ctx, value_info *v ) {
 			return true;
 		}
 	}
-	if( ctx->jit->persists_uses[mode] < cfg->npersists ) {
-		v->reg = cfg->persist[ctx->jit->persists_uses[mode]++];
+	if( ctx->persists_uses[mode] < cfg->npersists ) {
+		v->reg = cfg->persist[ctx->persists_uses[mode]++];
 		return false;
 	}
 	// free the oldest scratch reg
@@ -269,11 +277,16 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			// anticipate register usage in call so we can previlege this assign
 			ereg *r = hl_emit_get_args(jit->emit, e);
 			call_regs regs = {0};
+			bool needs_push = false;
 			for(int k=0;k<e->nargs;k++) {
 				value_info *v = VAL_REG(r[k]);
-				if( !IS_NULL(v->pref_reg) ) continue;
+				if( !IS_NULL(v->pref_reg) ) {
+					needs_push = true;
+					continue;
+				}
 				v->pref_reg = get_call_reg(ctx,regs,v->mode);
 			}
+			if( !needs_push && e->mode != M_NORET ) ctx->has_direct_call = true;
 			if( write && IS_NULL(write->pref_reg) )
 				write->pref_reg = REG_CFG(REG_MODE(e->mode))->ret;
 		} else switch( e->op ) {
@@ -470,12 +483,31 @@ static void flush_phis( regs_ctx *ctx, eblock *b ) {
 	int_arr_reset(&ctx->phi_movs);
 }
 
+static void regs_emit( regs_ctx *ctx, ereg out, emit_op op, ereg a, ereg b, emit_mode m, int size_offs ) {
+	einstr e;
+	e.header = op;
+	e.mode = m;
+	e.a = a;
+	e.b = b;
+	e.size_offs = size_offs;
+	regs_write_instr(ctx, &e, out);
+}
+
 static void regs_emit_instrs( regs_ctx *ctx ) {
 	jit_ctx *jit = ctx->jit;
 	eblock *cur_block = NULL;
 	call_regs regs = {0};
 	int write_index = 1;
 	ctx->pos_map[0] = 0;
+
+	int stack_offset = ctx->stack_size;
+	int push_size = HL_WSIZE * 2; // RIP + RBP save
+	if( IS_WINCALL64 && ctx->has_direct_call ) stack_offset += 0x20; // reserve
+	if( ctx->cfg.stack_align ) {
+		int align = (stack_offset + push_size + ctx->cfg.stack_align_offset) % ctx->cfg.stack_align;
+		if( align ) stack_offset += ctx->cfg.stack_align - align;
+	}
+
 	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
 		einstr e = jit->instrs[cur_op];
 		ereg *ret_val = NULL;
@@ -509,6 +541,8 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op )
 			out = VAL(write_index++)->reg;
 		switch( e.op ) {
+		case ALLOC_STACK:
+			break;
 		case BLOCK:
 			flush_phis(ctx,cur_block);
 			cur_block = jit->blocks + e.size_offs;
@@ -522,6 +556,13 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 					regs_write_instr(ctx, &e, out);
 			}
 			break;
+		case ENTER:
+			{
+				regs_emit(ctx,UNUSED,PUSH,ctx->cfg.stack_pos,UNUSED,M_PTR,0);
+				regs_emit_mov(ctx,ctx->cfg.stack_pos,ctx->cfg.stack_reg,M_PTR);
+				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
+			}
+			break;
 		case JUMP:
 		case JCOND:
 			flush_phis(ctx,cur_block);
@@ -529,6 +570,10 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
 			int_arr_add(ctx->jump_regs, cur_op + 1 + e.size_offs);
 			break;
+		case RET:
+			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
+			regs_emit(ctx,UNUSED,POP,ctx->cfg.stack_pos,UNUSED,M_PTR,0);
+			// fallback
 		default:
 			if( ret_val && out ) {
 				regs_write_instr(ctx, &e, *ret_val);
@@ -549,7 +594,6 @@ void hl_regs_flush( jit_ctx *jit ) {
 	jit->reg_instrs = ctx->instrs;
 	jit->reg_writes = ctx->out_write;
 	jit->reg_pos_map = ctx->pos_map;
-	jit->reg_stack_usage = ctx->stack_size;
 	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op+1] = ctx->emit_pos;
 	int i = 0;
 	while( i < int_arr_count(ctx->jump_regs) ) {
@@ -563,9 +607,10 @@ void hl_regs_flush( jit_ctx *jit ) {
 void hl_regs_function( jit_ctx *jit ) {
 	regs_ctx *ctx = jit->regs;
 	int nvalues = jit->value_count + jit->phi_count;
-	memset(jit->persists_uses,0,sizeof(jit->persists_uses));
+	memset(ctx->persists_uses,0,sizeof(ctx->persists_uses));
 	free(ctx->pos_map);
 	ctx->flushed = false;
+	ctx->has_direct_call = false;
 	ctx->pos_map = (int*)malloc((jit->instr_count + 1) * sizeof(int));
 	ctx->emit_pos = 0;
 	ctx->cur_op = 0;
@@ -602,7 +647,8 @@ void hl_regs_alloc( jit_ctx *jit ) {
 	hl_jit_init_regs(&ctx->cfg);
 }
 
-void hl_regs_free( regs_ctx *ctx ) {
+void hl_regs_free( jit_ctx *jit ) {
+	regs_ctx *ctx = jit->regs;
 	free(ctx->pos_map);
 	free(ctx->instrs);
 	free(ctx->out_write);

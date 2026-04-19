@@ -221,6 +221,10 @@ HL_PRIM vdynamic *hl_dyn_call( vclosure *c, vdynamic **args, int nargs ) {
 			tmp.args[i+1] = args[i];
 		c = &ctmp;
 	} else {
+		if( nargs == 0 && c->t->fun->ret->kind == HVOID ) {
+			((void (*)(void))c->fun)();
+			return NULL;
+		}
 		for(i=0;i<nargs;i++)
 			tmp.args[i] = args[i];
 	}

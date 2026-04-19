@@ -51,6 +51,8 @@ typedef enum {
 	PREFETCH,
 	DEBUG_BREAK,
 	BLOCK,
+	ENTER,
+	STACK_OFFS,
 } emit_op;
 
 typedef enum {
@@ -151,6 +153,10 @@ typedef struct {
 typedef struct {
 	reg_config regs;
 	reg_config floats;
+	ereg stack_reg;
+	ereg stack_pos;
+	int stack_align;
+	int stack_align_offset;
 	ereg req_bit_shifts;
 	ereg req_div_a;
 	ereg req_div_b;
@@ -175,15 +181,18 @@ struct _jit_ctx {
 	int *emit_pos_map;
 	// regs output
 	int reg_instr_count;
-	int reg_stack_usage;
 	einstr *reg_instrs;
 	ereg *reg_writes;
 	int *reg_pos_map;
-	int persists_uses[2];
-	// gen output
+	// codegen output
 	int code_size;
 	unsigned char *code_instrs;
 	int *code_pos_map;
+	// accum output
+	int out_pos;
+	int out_max;
+	unsigned char *output;
+	unsigned char *final_code;
 };
 
 jit_ctx *hl_jit_alloc();
@@ -217,12 +226,6 @@ extern bool hl_jit_dump_bin;
 #	define jit_debug(...)	printf(__VA_ARGS__)
 #else
 #	define jit_debug(...)
-#endif
-
-#if defined(HL_WIN_CALL) && defined(HL_64)
-#	define IS_WINCALL64 1
-#else
-#	define IS_WINCALL64 0
 #endif
 
 #define DEF_ALLOC &ctx->jit->falloc

@@ -48,6 +48,8 @@ static const char *op_names[] = {
 	"prefetch",
 	"debug-break",
 	"block",
+	"enter",
+	"stack",
 };
 
 bool hl_jit_dump_bin = false;
@@ -341,6 +343,12 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	case BLOCK:
 		printf(" #%d", e->size_offs);
 		break;
+	case STACK_OFFS:
+		if( e->size_offs >= 0 )
+			printf(" +%Xh", e->size_offs);
+		else
+			printf(" -%Xh", -e->size_offs);
+		break;
 	case LOAD_CONST:
 	case PUSH_CONST:
 		printf(" ");
@@ -477,7 +485,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	if( cpos == ctx->code_size && cpos > 0 ) {
 		int n = 1;
 		for(int i=0;i<cpos;i++) {
-			if( ctx->code_pos_map[n] == i ) {
+			while( ctx->code_pos_map[n] == i ) {
 				if( (n & 15) == 0 ) printf("\n"); else printf(" ");
 				n++;
 			}
