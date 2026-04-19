@@ -139,7 +139,7 @@ struct _emit_ctx {
 	emit_block *current_block;
 	emit_block *wait_seal;
 	linked_inf *arrival_points;
-	void *closure_list; // TODO : patch with good addresses
+	vclosure *closure_list;
 };
 
 #define R(i)	(ctx->vregs + (i))
@@ -945,6 +945,7 @@ void hl_emit_function( jit_ctx *jit ) {
 		r->ref = 0;
 	}
 
+	emit_gen(ctx,ENTER,UNUSED,UNUSED,M_NONE);
 	for(i=0;i<f->type->fun->nargs;i++) {
 		hl_type *t = f->type->fun->args[i];
 		if( t->kind == HVOID ) continue;
@@ -984,6 +985,18 @@ void hl_emit_free( jit_ctx *jit ) {
 	free(ctx->pos_map);
 	free(ctx);
 	jit->emit = NULL;
+}
+
+void hl_emit_final( jit_ctx *jit ) {
+	emit_ctx *ctx = jit->emit;
+	vclosure *l = ctx->closure_list;
+	while( l ) {
+		vclosure *n = (vclosure*)l->value;
+		l->value = NULL;
+		l->fun = jit->final_code + (int_val)jit->mod->functions_ptrs[(int_val)l->fun];
+		l = n;
+	}
+	ctx->closure_list = NULL;
 }
 
 static bool seal_block_rec( emit_ctx *ctx, emit_block *b, int target ) {

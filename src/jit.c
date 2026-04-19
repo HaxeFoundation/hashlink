@@ -40,7 +40,7 @@ void hl_jit_assert() { jit_assert(); }
 void hl_emit_alloc( jit_ctx *jit );
 void hl_emit_free( jit_ctx *jit );
 void hl_emit_function( jit_ctx *jit );
-
+void hl_emit_final( jit_ctx *jit );
 
 void hl_regs_alloc( jit_ctx *jit );
 void hl_regs_free( jit_ctx *jit );
@@ -49,6 +49,7 @@ void hl_regs_function( jit_ctx *jit );
 void hl_codegen_alloc( jit_ctx *jit );
 void hl_codegen_free( jit_ctx *jit );
 void hl_codegen_function( jit_ctx *jit );
+void hl_codegen_final( jit_ctx *jit );
 
 jit_ctx *hl_jit_alloc() {
 	jit_ctx *ctx = (jit_ctx*)malloc(sizeof(jit_ctx));
@@ -84,14 +85,35 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	hl_emit_function(ctx);
 	hl_regs_function(ctx);
 	hl_codegen_function(ctx);
+	int pos = ctx->out_pos;
+	if( pos + ctx->code_size > ctx->out_max ) {
+		int nsize = ctx->out_max ? ctx->out_max * 3 : 4096;
+		while( pos + ctx->code_size > nsize ) nsize *= 3;
+		unsigned char *nout = malloc(nsize);
+		if( !nout ) return -1;
+		memcpy(nout,ctx->output,pos);
+		free(ctx->output);
+		ctx->output = nout;
+		ctx->out_max = nsize;
+	}
+	memcpy(ctx->output + pos, ctx->code_instrs, ctx->code_size);
+	ctx->out_pos += ctx->code_size;
 	current_ctx = NULL;
-	return 0;
+	return pos;
 }
 
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
-	printf("TODO:emit_code\n");
-	exit(0);
-	return NULL;
+	int size = ctx->out_pos;
+	if( size & 4095 ) size += 4096 - (size&4095);
+	unsigned char *code = (unsigned char*)hl_alloc_executable_memory(size);
+	if( code == NULL ) return NULL;
+	memcpy(code,ctx->output,size);
+	*codesize = size;
+	*debug = NULL;
+	ctx->final_code = code;
+	hl_emit_final(ctx);
+	hl_codegen_final(ctx);
+	return code;
 }
 
 void hl_jit_patch_method( void*fun, void**newt ) {
