@@ -33,9 +33,21 @@ void hl_jit_error( const char *msg, const char *func, int line ) {
 	fflush(stdout);
 }
 
-void hl_jit_null_field_access() { jit_assert(); }
-void hl_jit_null_access() { jit_assert(); }
-void hl_jit_assert() { jit_assert(); }
+void hl_jit_null_field_access( int fhash ) {
+	vbyte *field = hl_field_name(fhash);
+	hl_buffer *b = hl_alloc_buffer();
+	hl_buffer_str(b, USTR("Null access ."));
+	hl_buffer_str(b, (uchar*)field);
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
+	d->v.ptr = hl_buffer_content(b,NULL);
+	hl_throw(d);
+}
+
+void hl_jit_assert() {
+	vdynamic *d = hl_alloc_dynamic(&hlt_bytes);
+	d->v.ptr = USTR("Assert");
+	hl_throw(d);
+}
 
 void hl_emit_alloc( jit_ctx *jit );
 void hl_emit_free( jit_ctx *jit );
@@ -47,6 +59,7 @@ void hl_regs_free( jit_ctx *jit );
 void hl_regs_function( jit_ctx *jit );
 
 void hl_codegen_alloc( jit_ctx *jit );
+void hl_codegen_init( jit_ctx *jit );
 void hl_codegen_free( jit_ctx *jit );
 void hl_codegen_function( jit_ctx *jit );
 void hl_codegen_final( jit_ctx *jit );
@@ -59,6 +72,15 @@ jit_ctx *hl_jit_alloc() {
 	hl_regs_alloc(ctx);
 	hl_codegen_alloc(ctx);
 	return ctx;
+}
+
+void hl_jit_define_function( jit_ctx *ctx, int start, int size ) {
+#ifdef WIN64_UNWIND_TABLES
+	int fid = ctx->fdef_index++;
+	if( fid >= ctx->mod->unwind_table_size ) jit_assert();
+	ctx->mod->unwind_table[fid].BeginAddress = start;
+	ctx->mod->unwind_table[fid].EndAddress = start + size;
+#endif
 }
 
 static bool jit_code_reserve( jit_ctx *ctx, int size ) {
@@ -76,7 +98,17 @@ static bool jit_code_reserve( jit_ctx *ctx, int size ) {
 	return true;
 }
 
+static bool jit_code_append( jit_ctx *ctx ) {
+	if( !jit_code_reserve(ctx,ctx->code_size) )
+		return false;
+	int pos = ctx->out_pos;
+	memcpy(ctx->output + pos, ctx->code_instrs, ctx->code_size);
+	ctx->out_pos += ctx->code_size;
+	return true;
+}
+
 void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
+	ctx->mod = m;
 #ifdef WIN64_UNWIND_TABLES
 	unsigned char version = 1;
 	unsigned char flags = 0;
@@ -95,6 +127,8 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	UW(1, 0 /*UWOP_PUSH_NONVOL*/, 5);
 	while( ctx->out_pos & 15 ) B(0);
 #endif
+	hl_codegen_init(ctx);
+	jit_code_append(ctx);
 }
 
 void hl_jit_free( jit_ctx *ctx, h_bool can_reset ) {
@@ -118,16 +152,10 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	hl_emit_function(ctx);
 	hl_regs_function(ctx);
 	hl_codegen_function(ctx);
-	if( !jit_code_reserve(ctx, ctx->code_size) )
-		return -1;
 	int pos = ctx->out_pos;
-	memcpy(ctx->output + pos, ctx->code_instrs, ctx->code_size);
-#ifdef WIN64_UNWIND_TABLES
-	int fid = (int)(f - ctx->mod->code->functions);
-	ctx->mod->unwind_table[fid].BeginAddress = ctx->out_pos;
-	ctx->mod->unwind_table[fid].EndAddress = ctx->out_pos + ctx->code_size;
-#endif
-	ctx->out_pos += ctx->code_size;
+	hl_jit_define_function(ctx, pos, ctx->code_size);
+	if( !jit_code_append(ctx) )
+		return -1;
 	current_ctx = NULL;
 	return pos;
 }

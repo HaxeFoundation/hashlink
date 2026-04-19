@@ -131,8 +131,8 @@ static void regs_emit_mov( regs_ctx *ctx, ereg to, ereg from, emit_mode m ) {
 static void regs_emit_todo_impl( regs_ctx *ctx, int line ) {
 	einstr e;
 	e.header = PUSH_CONST;
-	e.mode = M_I32;
-	e.value = line;
+	e.mode = M_PTR;
+	e.size_offs = line;
 	regs_write_instr(ctx, &e, UNUSED);
 	einstr e2;
 	e2.header = DEBUG_BREAK;
