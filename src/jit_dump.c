@@ -261,7 +261,7 @@ static void hl_dump_ptr_name( jit_ctx *ctx, void *ptr ) {
 		DYN(i);
 		DYN(p);
 		N2("null_field",hl_jit_null_field_access);
-		N2("null_access",hl_jit_null_access);
+		N2("null_access",hl_null_access);
 		N(hl_get_thread);
 		N(setjmp);
 		N(_setjmp);
@@ -355,10 +355,7 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		dump_value(ctx, e->value, e->mode);
 		break;
 	case LOAD_ADDR:
-		if( (e->size_offs>>8) )
-			printf(" %s[%Xh]", val_str(e->a,M_PTR), e->size_offs);
-		else
-			printf(" %s[%d]", val_str(e->a,M_PTR), e->size_offs);
+		printf(" %s[%Xh]", val_str(e->a,M_PTR), e->size_offs);
 		break;
 	case STORE:
 		{
@@ -366,10 +363,8 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 			if( offs == 0 )
 				printf(" [%s]", val_str(e->a,M_PTR));
 			else
-				printf(" %s[%d]", val_str(e->a,M_PTR), offs);
+				printf(" %s[%Xh]", val_str(e->a,M_PTR), offs);
 			printf(" = %s", reg_str(e->b));
-			//if( e->mode == 0 || e->mode != ctx->instrs[ctx->values_writes[e->b.index]].mode )
-			//	printf(" ???");
 		}
 		break;
 	case CONV:
@@ -379,7 +374,8 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	case LEA:
 		printf(" %s", reg_str(e->a));
 		if( !IS_NULL(e->b) ) printf("+%s", reg_str(e->b));
-		if( e->size_offs > 1 ) printf("*%d",e->size_offs);
+		if( (e->size_offs&0xFF) > 1 ) printf("*%d",e->size_offs&0xFF);
+		if( e->size_offs >> 8 ) printf("+%Xh", e->size_offs>>8);
 		break;	
 	default:
 		if( !IS_NULL(e->a) ) {

@@ -707,8 +707,9 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	hl_module_init_natives(m);
 	hl_module_init_indexes(m);
 #	ifdef WIN64_UNWIND_TABLES
-	m->unwind_table = malloc(sizeof(RUNTIME_FUNCTION) * m->code->nfunctions);
-	memset(m->unwind_table, 0, sizeof(RUNTIME_FUNCTION) * m->code->nfunctions);
+	m->unwind_table_size = m->code->nfunctions + 10; // extra space for jit internals
+	m->unwind_table = malloc(sizeof(RUNTIME_FUNCTION) * m->unwind_table_size);
+	memset(m->unwind_table, 0, sizeof(RUNTIME_FUNCTION) * m->unwind_table_size);
 #	endif
 	// JIT
 	ctx = hl_jit_alloc();
@@ -770,7 +771,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	hl_setup.vtune_init = modules_init_vtune;
 #	endif
 #	ifdef WIN64_UNWIND_TABLES
-	RtlAddFunctionTable(m->unwind_table, m->code->nfunctions, (DWORD64)m->jit_code);
+	RtlAddFunctionTable(m->unwind_table, m->unwind_table_size, (DWORD64)m->jit_code);
 #	endif
 	hl_jit_free(ctx, hot_reload);
 	if( hot_reload ) {
