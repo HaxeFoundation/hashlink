@@ -504,7 +504,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 	int push_size = HL_WSIZE * 2; // RIP + RBP save
 	if( IS_WINCALL64 && ctx->has_direct_call ) stack_offset += 0x20; // reserve
 	if( ctx->cfg.stack_align ) {
-		int align = (stack_offset + push_size + ctx->cfg.stack_align_offset) % ctx->cfg.stack_align;
+		int align = (stack_offset + push_size) % ctx->cfg.stack_align;
 		if( align ) stack_offset += ctx->cfg.stack_align - align;
 	}
 
@@ -571,9 +571,15 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			int_arr_add(ctx->jump_regs, cur_op + 1 + e.size_offs);
 			break;
 		case RET:
+			if( e.a ) {
+				ereg ret = REG_CFG(REG_MODE(e.mode))->ret;
+				if( e.a != ret )
+					regs_emit_mov(ctx, ret, e.a, e.mode);
+			}
 			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
 			regs_emit(ctx,UNUSED,POP,ctx->cfg.stack_pos,UNUSED,M_PTR,0);
-			// fallback
+			regs_emit(ctx,UNUSED,RET,UNUSED,UNUSED,M_NONE,0);
+			break;
 		default:
 			if( ret_val && out ) {
 				regs_write_instr(ctx, &e, *ret_val);
