@@ -706,6 +706,10 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	if( hot_reload ) m->hash = hl_code_hash_alloc(m->code);
 	hl_module_init_natives(m);
 	hl_module_init_indexes(m);
+#	ifdef WIN64_UNWIND_TABLES
+	m->unwind_table = malloc(sizeof(RUNTIME_FUNCTION) * m->code->nfunctions);
+	memset(m->unwind_table, 0, sizeof(RUNTIME_FUNCTION) * m->code->nfunctions);
+#	endif
 	// JIT
 	ctx = hl_jit_alloc();
 	if( ctx == NULL )
@@ -764,6 +768,9 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	hl_gc_set_dump_types(hl_module_types_dump);
 #	ifdef HL_VTUNE
 	hl_setup.vtune_init = modules_init_vtune;
+#	endif
+#	ifdef WIN64_UNWIND_TABLES
+	RtlAddFunctionTable(m->unwind_table, m->code->nfunctions, (DWORD64)m->jit_code);
 #	endif
 	hl_jit_free(ctx, hot_reload);
 	if( hot_reload ) {

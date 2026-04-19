@@ -61,7 +61,40 @@ jit_ctx *hl_jit_alloc() {
 	return ctx;
 }
 
+static bool jit_code_reserve( jit_ctx *ctx, int size ) {
+	int pos = ctx->out_pos;
+	if( pos + size > ctx->out_max ) {
+		int nsize = ctx->out_max ? ctx->out_max * 3 : 4096;
+		while( pos + ctx->code_size > nsize ) nsize *= 3;
+		unsigned char *nout = malloc(nsize);
+		if( !nout ) return false;
+		memcpy(nout,ctx->output,pos);
+		free(ctx->output);
+		ctx->output = nout;
+		ctx->out_max = nsize;
+	}
+	return true;
+}
+
 void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
+#ifdef WIN64_UNWIND_TABLES
+	unsigned char version = 1;
+	unsigned char flags = 0;
+	unsigned char CountOfCodes = 2;
+	unsigned char SizeOfProlog = 4;
+	unsigned char FrameRegister = 5; // RBP
+	unsigned char FrameOffset = 0;
+	jit_code_reserve(ctx,64);
+#	define B(v)	ctx->output[ctx->out_pos++] = v
+#	define UW(offs,code,inf)	B(offs); B((code) | (inf) << 4)
+	B((version) | (flags) << 3);
+	B(SizeOfProlog);
+	B(CountOfCodes);
+	B((FrameRegister) | (FrameOffset) << 4);
+	UW(4, 3 /*UWOP_SET_FPREG*/, 0);
+	UW(1, 0 /*UWOP_PUSH_NONVOL*/, 5);
+	while( ctx->out_pos & 15 ) B(0);
+#endif
 }
 
 void hl_jit_free( jit_ctx *ctx, h_bool can_reset ) {
@@ -85,18 +118,15 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	hl_emit_function(ctx);
 	hl_regs_function(ctx);
 	hl_codegen_function(ctx);
+	if( !jit_code_reserve(ctx, ctx->code_size) )
+		return -1;
 	int pos = ctx->out_pos;
-	if( pos + ctx->code_size > ctx->out_max ) {
-		int nsize = ctx->out_max ? ctx->out_max * 3 : 4096;
-		while( pos + ctx->code_size > nsize ) nsize *= 3;
-		unsigned char *nout = malloc(nsize);
-		if( !nout ) return -1;
-		memcpy(nout,ctx->output,pos);
-		free(ctx->output);
-		ctx->output = nout;
-		ctx->out_max = nsize;
-	}
 	memcpy(ctx->output + pos, ctx->code_instrs, ctx->code_size);
+#ifdef WIN64_UNWIND_TABLES
+	int fid = (int)(f - ctx->mod->code->functions);
+	ctx->mod->unwind_table[fid].BeginAddress = ctx->out_pos;
+	ctx->mod->unwind_table[fid].EndAddress = ctx->out_pos + ctx->code_size;
+#endif
 	ctx->out_pos += ctx->code_size;
 	current_ctx = NULL;
 	return pos;
