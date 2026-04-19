@@ -156,7 +156,6 @@ typedef struct {
 	ereg stack_reg;
 	ereg stack_pos;
 	int stack_align;
-	int stack_align_offset;
 	ereg req_bit_shifts;
 	ereg req_div_a;
 	ereg req_div_b;

@@ -228,7 +228,7 @@ static opform OP_FORMS[] = {
 	{ "STMXCSR", 0, LONG_RM(0x0FAE,3) },
 	{ "LDMXCSR", 0, LONG_RM(0x0FAE,2) },
 	// 8 bits,
-	{ "MOV8", 0x8A, 0x88, 0, 0xB0, RM(0xC6,0) },
+	{ "MOV8", 0x8A, 0x88, 0, RM(0xC6,0) },
 	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
 	{ "PUSH8", FLAG_DEF64, 0, 0x6A | FLAG_8B },
@@ -384,9 +384,6 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
-#	ifdef HL_WIN_CALL
-	cfg->stack_align_offset = 8;
-#	endif
 }
 
 #define EMIT(op,a,b,mode) emit_ext(ctx,op,a,b,mode,0)
@@ -755,8 +752,10 @@ static void emit_mov( code_ctx *ctx, ereg out, ereg val, emit_mode mode, int_val
 		ereg tmp = get_tmp(mode);
 		emit_mov(ctx, tmp, val, mode, value);
 		emit_mov(ctx, out, tmp, mode, value);
-	} else
-		emit_ext(ctx,mode == M_F32 ? MOVSS : mode == M_F64 ? MOVSD : _MOV,out,val,mode,value);
+	} else {
+		static CpuOp MOV_OP[] = {_MOV,MOV8,MOV16,_MOV,_MOV,_MOV,MOVSD,MOVSS,_MOV,_MOV};
+		emit_ext(ctx, MOV_OP[mode],out,val,mode,value);
+	}
 }
 
 static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_mode mode ) {
@@ -839,6 +838,37 @@ void hl_codegen_flush( jit_ctx *jit ) {
 	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op+1] = ctx->code.cur;
 }
 
+static void emit_nop( code_ctx *ctx, int size ) {
+	byte_reserve(ctx->code,size);
+	ctx->code.cur -= size;
+	if( size >= 8 ) {
+		W(0x841F0F);
+		W(0);
+		return;
+	}
+	if( size >= 5 ) {
+		W(0x441F0F);
+		B(0);
+		return;
+	}
+	if( size >= 4 ) {
+		W(0x401F0F);
+		return;
+	}
+	if( size >= 3 ) {
+		B(0x0F);
+		B(0x1F);
+		B(0x00);
+		return;
+	}
+	if( size >= 2 ) {
+		B(0x66);
+		B(0x90);
+		return;
+	}
+	B(0x90);
+}
+
 void hl_codegen_function( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
 	ctx->flushed = false;
@@ -882,7 +912,13 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_mov(ctx, out, e->a, e->mode, 0);
 			break;
 		case STORE:
-			emit_mov(ctx, VAL_MEM(e->a), e->b, e->mode, e->size_offs);
+			if( !IS_PURE(e->a) && !IS_PURE(e->b) && (e->a & FL_NATMASK) != FL_STACKOFFS ) {
+				EMIT(_PUSH,e->b,UNUSED,e->mode);
+				ereg tmp = get_tmp(M_PTR);
+				emit_mov(ctx, tmp, e->a, M_PTR, 0);
+				emit_ext(ctx, _POP,VAL_MEM(tmp), UNUSED, e->mode, e->size_offs);
+			} else
+				emit_mov(ctx, VAL_MEM(e->a), e->b, e->mode, e->size_offs);
 			break;
 		case PUSH:
 			emit_ext(ctx, _PUSH, e->a, UNUSED, e->mode, 0);
@@ -1049,8 +1085,8 @@ void hl_codegen_function( jit_ctx *jit ) {
 		}
 		if( ctx->code.cur > ctx->code.max ) jit_assert();
 	}
-	while( byte_count(ctx->code) & 7 )
-		byte_add_impl(&jit->falloc,&ctx->code,0xCC); // breaks
+	while( byte_count(ctx->code) & 15 )
+		emit_nop(ctx,16 - (byte_count(ctx->code) & 15));
 	hl_codegen_flush(jit);
 	for(int i=0;i<int_arr_count(ctx->short_jumps);i+=2) {
 		int pos = int_arr_get(ctx->short_jumps,i);
