@@ -77,6 +77,14 @@ static LARGE_INTEGER driver_version = {0};
 
 HL_PRIM void dx12_flush_messages();
 
+HL_PRIM void HL_NAME(suppress_debug_messages)(D3D12_INFO_QUEUE_FILTER* filter) {
+#ifndef HL_XBS
+	dx_driver* drv = static_driver;
+	if (!drv->infoQueue) return;
+	drv->infoQueue->AddStorageFilterEntries(filter);
+#endif
+}
+
 static void ReportDxError( HRESULT err, int line ) {
 	dx12_flush_messages();
 	hl_error("DXERROR %X line %d",(DWORD)err,line);
@@ -419,6 +427,7 @@ DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
 DEFINE_PRIM(_VOID, signal, _RES _I64);
 DEFINE_PRIM(_VOID, wait, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
+DEFINE_PRIM(_VOID, suppress_debug_messages, _STRUCT);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
 DEFINE_PRIM(_I64, get_timestamp_frequency, _NO_ARG);
 DEFINE_PRIM(_I64, get_driver_version, _NO_ARG);
