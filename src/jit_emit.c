@@ -794,9 +794,9 @@ static void emit_write_block( emit_ctx *ctx, emit_block *b ) {
 	bl->preds = (int*)hl_malloc(&jit->falloc,sizeof(int)*bl->pred_count);
 	bl->nexts = (int*)hl_malloc(&jit->falloc,sizeof(int)*bl->next_count);
 	for(int i=0;i<bl->pred_count;i++)
-		bl->preds[i++] = blocks_get(b->preds,i)->id;
+		bl->preds[i] = blocks_get(b->preds,i)->id;
 	for(int i=0;i<bl->next_count;i++)
-		bl->nexts[i++] = blocks_get(b->nexts,i)->id;
+		bl->nexts[i] = blocks_get(b->nexts,i)->id;
 	// write phis
 	{
 		for_iter(phi,p,b->phis)
