@@ -53,6 +53,7 @@ typedef enum {
 	BLOCK,
 	ENTER,
 	STACK_OFFS,
+	XCHG,
 } emit_op;
 
 typedef enum {
@@ -156,6 +157,7 @@ typedef struct {
 	ereg stack_reg;
 	ereg stack_pos;
 	int stack_align;
+	int debug_prefix_size;
 	ereg req_bit_shifts;
 	ereg req_div_a;
 	ereg req_div_b;
@@ -169,6 +171,7 @@ struct _jit_ctx {
 	emit_ctx *emit;
 	regs_ctx *regs;
 	code_ctx *code;
+	regs_config cfg;
 	// emit output
 	int instr_count;
 	int block_count;
@@ -208,6 +211,8 @@ void hl_jit_assert();
 // emit & dump
 void hl_emit_dump( jit_ctx *ctx );
 const char *hl_emit_regstr( ereg v, emit_mode m );
+void hl_emit_store_args( emit_ctx *ctx, einstr *e, ereg *args, int count );
+void hl_emit_remap_jumps( emit_ctx *ctx, void *jumps, einstr *instrs, int *pos_map );
 ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
 ereg **hl_emit_get_regs( einstr *e, int *count );
 void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( void *, ereg * ) );
