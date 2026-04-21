@@ -1648,6 +1648,9 @@ class Dx12 {
 	public static function flushMessages() {
 	}
 
+	public static function suppressDebugMessages( ids : hl.Bytes, count : Int ) : Void {
+	}
+
 	public static function getDescriptorHandleIncrementSize( type : DescriptorHeapType ) : Int {
 		return 0;
 	}
