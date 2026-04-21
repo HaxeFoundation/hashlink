@@ -754,6 +754,9 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 #		endif
 	}
 	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
+#	ifdef HL_DEBUG
+	if( filter >= 0 ) exit(0);
+#	endif
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);

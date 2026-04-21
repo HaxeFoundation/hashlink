@@ -64,9 +64,12 @@ void hl_codegen_free( jit_ctx *jit );
 void hl_codegen_function( jit_ctx *jit );
 void hl_codegen_final( jit_ctx *jit );
 
+void hl_jit_init_regs( regs_config *cfg );
+
 jit_ctx *hl_jit_alloc() {
 	jit_ctx *ctx = (jit_ctx*)malloc(sizeof(jit_ctx));
 	memset(ctx,0,sizeof(jit_ctx));
+	hl_jit_init_regs(&ctx->cfg);
 	hl_alloc_init(&ctx->falloc);
 	hl_emit_alloc(ctx);
 	hl_regs_alloc(ctx);
