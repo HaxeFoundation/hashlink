@@ -50,6 +50,7 @@ static const char *op_names[] = {
 	"block",
 	"enter",
 	"stack",
+	"xchg",
 };
 
 bool hl_jit_dump_bin = false;
@@ -340,6 +341,17 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	case JCOND:
 		printf(" @%X", cur_pos + 1 + e->size_offs);
 		break;
+	case JUMP_TABLE:
+		{
+			int *offsets = hl_emit_get_args(ctx->emit, e);
+			printf(" %s (", reg_str(e->a));
+			for(int k=0;k<e->nargs;k++) {
+				if( k > 0 ) printf(",");
+				printf("@%X", cur_pos + 1 + offsets[k]);
+			}
+			printf(")");
+		}	
+		break;
 	case BLOCK:
 		printf(" #%d", e->size_offs);
 		break;
@@ -421,12 +433,14 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	int vpos = 1;
 	int rpos = 0;
 	int cpos = 0;
+	bool new_op = false;
 	cur = 0;
 	for(i=0;i<ctx->instr_count;i++) {
 		while( ctx->emit_pos_map[cur_op] == i ) {
 			printf("@%X ", cur_op);
 			hl_dump_op(ctx->fun, f->ops + cur_op);
 			printf("\n");
+			new_op = true;
 			cur_op++;
 		}
 		einstr *e = ctx->instrs + i;
@@ -462,6 +476,10 @@ void hl_emit_dump( jit_ctx *ctx ) {
 					else
 						printf("\033[80G");
 					first = false;
+					if( new_op ) {
+						new_op = false;
+						cpos += ctx->cfg.debug_prefix_size;
+					}
 				}
 				printf("%.2X",ctx->code_instrs[cpos++]);
 			}

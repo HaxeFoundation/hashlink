@@ -317,7 +317,8 @@ static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 	e->b = from;
 }
 
-static void store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
+#define store_args hl_emit_store_args
+void hl_emit_store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
 	if( count < 0 ) jit_assert();
 	if( count > 64 ) jit_error("Too many arguments");
 	e->nargs = (unsigned char)count;
@@ -381,16 +382,6 @@ static tmp_phi *alloc_phi( emit_ctx *ctx, emit_block *b, vreg *r ) {
 	return p;
 }
 
-static int emit_jump( emit_ctx *ctx, bool cond ) {
-	int p = ctx->emit_pos;
-	emit_gen(ctx, cond ? JCOND : JUMP, UNUSED, UNUSED, 0);
-	return p;
-}
-
-static void patch_jump( emit_ctx *ctx, int jpos ) {
-	ctx->instrs[jpos].size_offs = ctx->emit_pos - (jpos + 1);
-}
-
 static emit_block *alloc_block( emit_ctx *ctx ) {
 	emit_block *b = hl_zalloc(&ctx->jit->falloc, sizeof(emit_block));
 	b->id = blocks_count(ctx->blocks);
@@ -415,7 +406,9 @@ static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
 	}
 }
 
-static void split_block( emit_ctx *ctx ) {
+static bool split_block( emit_ctx *ctx ) {
+	if( ctx->current_block->start_pos == ctx->emit_pos-1 )
+		return false;
 	emit_block *b = alloc_block(ctx);
 	b->sealed = true;
 	emit_debug("BLOCK #%d@%X[%X]\n",b->id,b->start_pos,ctx->op_pos);
@@ -425,10 +418,43 @@ static void split_block( emit_ctx *ctx ) {
 	}
 	bool dead_code = blocks_count(b->preds) == 0; // if we have no reach, force previous block dependency, this is rare dead code emit by compiler
 	einstr *eprev = &ctx->instrs[b->start_pos-1];
-	if( (eprev->op != JUMP && eprev->op != RET && eprev->mode != M_NORET) || ctx->fun->ops[ctx->op_pos].op == OTrap || dead_code )
+	if( (eprev->op != JUMP && eprev->op != JUMP_TABLE && eprev->op != RET && eprev->mode != M_NORET) || ctx->fun->ops[ctx->op_pos].op == OTrap || dead_code )
 		block_add_pred(ctx, b, ctx->current_block);
 	ctx->current_block->end_pos = b->start_pos;
 	ctx->current_block = b;
+	return true;
+}
+
+static int emit_jump( emit_ctx *ctx, bool cond ) {
+	int p = ctx->emit_pos;
+	emit_gen(ctx, cond ? JCOND : JUMP, UNUSED, UNUSED, 0);
+	split_block(ctx);
+	return p;
+}
+
+static void patch_jump( emit_ctx *ctx, int jpos ) {
+	emit_block *b = NULL;
+	// find the block or initial jump was
+	for_iter_back(blocks,b2,ctx->blocks) {
+		if( b2->start_pos <= jpos ) {
+			b = b2;
+			break;
+		}
+	}
+	if( !b ) jit_assert();
+	// patch opcode
+	ctx->instrs[jpos].size_offs = ctx->emit_pos - (jpos + 1);
+	if( ctx->current_block->start_pos == ctx->emit_pos-1 ) {
+		block_add_pred(ctx, ctx->current_block, b);
+	} else {
+		ctx->arrival_points = link_add_sort_unique(ctx, ctx->op_pos, b, ctx->arrival_points);
+		if( !split_block(ctx) ) jit_assert();
+	}
+}
+
+static void add_jump_target( emit_ctx *ctx, int jpos, int offs ) {
+	int target = offs + ctx->op_pos + 1;
+	ctx->arrival_points = link_add_sort_unique(ctx, target, ctx->current_block, ctx->arrival_points);
 }
 
 static void register_jump( emit_ctx *ctx, int jpos, int offs ) {
@@ -436,9 +462,9 @@ static void register_jump( emit_ctx *ctx, int jpos, int offs ) {
 	int_arr_add(ctx->jump_regs, jpos);
 	int_arr_add(ctx->jump_regs, target);
 	if( offs > 0 ) {
-		ctx->arrival_points = link_add_sort_unique(ctx, target, ctx->current_block, ctx->arrival_points);
+		add_jump_target(ctx, jpos, offs);
 		if( ctx->arrival_points->id != ctx->op_pos + 1 && ctx->fun->ops[ctx->op_pos].op != OSwitch && ctx->fun->ops[ctx->op_pos+1].op != OLabel )
-			split_block(ctx);
+			ctx->arrival_points = link_add_sort_unique(ctx, ctx->op_pos + 1, ctx->current_block, ctx->arrival_points);
 	}
 }
 
@@ -722,14 +748,11 @@ static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
 	if( t->kind == HNULL && t->tparam->kind == dt->kind ) {
 		emit_test(ctx, v, OJNotNull);
 		int jnot = emit_jump(ctx, true);
-		split_block(ctx);
 		ereg v1 = LOAD_CONST(0,dt);
 		int jend = emit_jump(ctx, false);
 		patch_jump(ctx, jnot);
-		split_block(ctx);
 		ereg v2 = LOAD_MEM(v,0,dt);
 		patch_jump(ctx, jend);
-		split_block(ctx);
 		return emit_phi(ctx, v1, v2);
 	}
 	bool need_dyn = dyn_need_type(dt);
@@ -802,19 +825,30 @@ static void emit_write_block( emit_ctx *ctx, emit_block *b ) {
 	}
 }
 
+void hl_emit_remap_jumps( emit_ctx *ctx, void *_jumps, einstr *instrs, int *pos_map ) {
+	int_arr jumps = *(int_arr*)_jumps;
+	int i = 0;
+	while( i < int_arr_count(jumps) ) {
+		int pos = int_arr_get(jumps,i++);
+		int target = int_arr_get(jumps,i++);
+		einstr *e = instrs + pos;
+		if( e->op == JUMP_TABLE ) {
+			int *args = (int*)hl_emit_get_args(ctx, e);
+			for(int k=0;k<e->nargs;k++)
+				args[k] = pos_map[target + args[k]] - (pos + 1);
+		} else
+			e->size_offs = pos_map[target] - (pos + 1);
+	}
+	int_arr_reset((int_arr*)_jumps);
+}
+
 void hl_emit_flush( jit_ctx *jit ) {
 	emit_ctx *ctx = jit->emit;
-	int i = 0;
 	if( ctx->flushed ) return;
 	ctx->flushed = true;
-	while( i < int_arr_count(ctx->jump_regs) ) {
-		int pos = int_arr_get(ctx->jump_regs,i++);
-		einstr *e = ctx->instrs + pos;
-		int target = int_arr_get(ctx->jump_regs,i++);
-		e->size_offs = ctx->pos_map[target] - (pos + 1);
-	}
 	ctx->pos_map[ctx->fun->nops] = -1;
 	ctx->current_block->end_pos = ctx->emit_pos;
+	hl_emit_remap_jumps(ctx,&ctx->jump_regs, ctx->instrs, ctx->pos_map);
 	jit->instrs = ctx->instrs;
 	jit->instr_count = ctx->emit_pos;
 	jit->emit_pos_map = ctx->pos_map;
@@ -954,7 +988,10 @@ void hl_emit_function( jit_ctx *jit ) {
 
 	for(int op_pos=0;op_pos<f->nops;op_pos++) {
 		ctx->op_pos = op_pos;
-		ctx->pos_map[op_pos] = ctx->emit_pos;
+		if( ctx->emit_pos > 0 && ctx->instrs[ctx->emit_pos-1].op == BLOCK )
+			ctx->pos_map[op_pos] = ctx->emit_pos-1;
+		else
+			ctx->pos_map[op_pos] = ctx->emit_pos;
 		if( op_pos == 0 ) {
 			ctx->current_block->start_pos = ctx->emit_pos;
 			emit_gen_size(ctx, BLOCK, 0);
@@ -1019,7 +1056,8 @@ static bool seal_block_rec( emit_ctx *ctx, emit_block *b, int target ) {
 }
 
 static void register_block_jump( emit_ctx *ctx, int offs, bool cond ) {
-	int jidx = emit_jump(ctx, cond);
+	int jidx = ctx->emit_pos;
+	emit_gen(ctx, cond ? JCOND : JUMP, UNUSED, UNUSED, 0);
 	register_jump(ctx, jidx, offs);
 	if( offs < 0 ) {
 		int target = ctx->pos_map[ctx->op_pos + 1 + offs];
@@ -1769,8 +1807,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case OLabel:
-		if( ctx->current_block->start_pos != ctx->emit_pos-1 )
-			split_block(ctx);
+		split_block(ctx);
 		prepare_loop_block(ctx);
 		break;
 	case OGetI8:
@@ -1957,7 +1994,6 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				hashed_name = hl_hash_gen(name, true);
 			}
 			// -----------------------------------------
-			null_field_access = false;
 			if( null_field_access ) {
 				einstr *e = emit_instr(ctx, PUSH_CONST);
 				e->mode = M_PTR;
@@ -2109,10 +2145,16 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			int count = o->p2;
 			emit_cmp(ctx,v,LOAD_CONST(count,&hlt_i32),OJUGte);
 			int jdefault = emit_jump(ctx, true);
-			emit_gen_ext(ctx, JUMP_TABLE, v, UNUSED, 0, count);
-			for(int i=0; i<count; i++) {
-				int j = emit_jump(ctx, false);
-				register_jump(ctx, j, o->extra[i]);
+			int pos = ctx->emit_pos;
+			einstr *e = emit_instr(ctx, JUMP_TABLE);
+			e->a = v;
+			store_args(ctx,e,(ereg*)o->extra,count);
+			register_jump(ctx, pos, 0);
+			for(int k=0;k<count;k++) {
+				int offs = o->extra[k];
+				if( offs < 0 ) jit_assert();
+				if( offs == 0 ) continue;
+				add_jump_target(ctx, pos, offs);
 			}
 			patch_jump(ctx, jdefault);
 		}
@@ -2121,7 +2163,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		STORE(dst, LOAD_MEM(LOAD(ra),0,&hlt_i32));
 		break;
 	case OAssert:
-		emit_native_call(ctx, hl_jit_assert, NULL, 0, &hlt_void);
+		emit_native_call(ctx, hl_jit_assert, NULL, 0, NULL);
 		break;
 	case ONop:
 		break;

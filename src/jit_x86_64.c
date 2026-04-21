@@ -386,6 +386,9 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
+#	ifdef HL_DEBUG
+	cfg->debug_prefix_size = 6;
+#	endif
 }
 
 #define EMIT(op,a,b,mode) emit_ext(ctx,op,a,b,mode,0)
@@ -811,12 +814,15 @@ void hl_codegen_function( jit_ctx *jit ) {
 #		ifdef HL_DEBUG
 		int rid = cur_pos | (jit->fun->findex << 16);
 		while( reg_index < jit->instr_count && jit->reg_pos_map[reg_index] <= cur_pos ) reg_index++;
-		int uid = emit_index | (jit->fun->findex << 16);
-		if( emit_index < jit->fun->nops && jit->emit_pos_map[emit_index] < reg_index ) {
-			emit_ext(ctx,_MOV,RTMP,VAL_CONST,M_I32,uid);
+		int uid;
+		while( emit_index < jit->fun->nops && jit->emit_pos_map[emit_index] < reg_index ) {
+			uid = emit_index | (jit->fun->findex << 16);
 			__ignore(&uid);
 			__ignore(&rid);
 			emit_index++;
+			if( emit_index >= jit->fun->nops || jit->emit_pos_map[emit_index] >= reg_index )
+				emit_ext(ctx,_MOV,RTMP,VAL_CONST,M_I32,uid);
+			if( uid == 0x19A0000 ) BREAK();
 		}
 #		endif
 		switch( e->op ) {
@@ -827,6 +833,16 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_ext(ctx,_LEA,out,VAL_MEM(R(RBP)),M_PTR,GET_STACK_OFFS(e->a));
 			else
 				emit_mov(ctx, out, e->a, e->mode, 0);
+			break;
+		case XCHG:
+			{
+				ereg tmp = get_tmp(e->mode);
+				if( !IS_PURE(e->a) && !IS_PURE(e->b) )
+					jit_assert();
+				emit_mov(ctx, tmp, e->a, e->mode, 0);
+				emit_mov(ctx, e->a, e->b, e->mode, 0);
+				emit_mov(ctx, e->b, tmp, e->mode, 0);
+			}
 			break;
 		case STORE:
 			if( !IS_PURE(e->a) && !IS_PURE(e->b) && (e->a & FL_NATMASK) != FL_STACKOFFS ) {
