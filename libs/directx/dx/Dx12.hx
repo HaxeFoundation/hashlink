@@ -1638,6 +1638,22 @@ enum abstract ShaderModel(Int) to Int {
 	public function new() {}
 }
 
+@:struct class InfoQueueFilterDesc {
+	public var numCategories : Int;
+	public var pCategoryList : hl.Bytes;
+	public var numSeverities : Int;
+	public var pSeverityList : hl.Bytes;
+	public var numIDs : Int;
+	public var pIDList : hl.Bytes;
+	public function new() {}
+}
+
+@:struct class InfoQueueFilter {
+	@:packed public var allowList(default, null) : InfoQueueFilterDesc;
+	@:packed public var denyList(default, null) : InfoQueueFilterDesc;
+	public function new() {}
+}
+
 @:hlNative("dx12")
 class Dx12 {
 
@@ -1648,7 +1664,7 @@ class Dx12 {
 	public static function flushMessages() {
 	}
 
-	public static function suppressDebugMessages( ids : hl.Bytes, count : Int ) : Void {
+	public static function suppressDebugMessages( filter : InfoQueueFilter ) : Void {
 	}
 
 	public static function getDescriptorHandleIncrementSize( type : DescriptorHeapType ) : Int {
