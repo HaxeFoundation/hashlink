@@ -23,6 +23,10 @@
 #include <jit.h>
 #include "data_struct.h"
 
+#ifdef HL_DEBUG
+#	define GEN_DEBUG
+#endif
+
 #define S_TYPE			byte_arr
 #define S_NAME(name)	byte_##name
 #define S_VALUE			unsigned char
@@ -170,11 +174,10 @@ typedef struct {
 	int mem_r;		// r/m32 / r32				r/m32
 	int r_const;	// r32 / imm32				imm32
 	int r_i8;		// r32 / imm8				imm8
-	int mem_const;	// r/m32 / imm32			N/A
 } opform;
 
 static opform OP_FORMS[] = {
-	{ "MOV", 0x8B, 0x89, 0xB8, 0, RM(0xC7,0) },
+	{ "MOV", 0x8B, 0x89, 0xB8, 0 },
 	{ "LEA", 0x8D },
 	{ "PUSH", 0x50 | FLAG_DEF64, RM(0xFF,6), 0x68, 0x6A },
 	{ "ADD", 0x03, 0x01, RM(0x81,0), RM(0x83,0) },
@@ -386,7 +389,7 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
-#	ifdef HL_DEBUG
+#	ifdef GEN_DEBUG
 	cfg->debug_prefix_size = 6;
 #	endif
 }
@@ -608,7 +611,7 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 
 static void emit_jump( code_ctx *ctx, int mode, int offset ) {
 	int op_mult;
-#	ifdef HL_DEBUG
+#	ifdef GEN_DEBUG
 	op_mult = 16; // additional debug info per op
 #	else
 	op_mult = 8;
@@ -620,7 +623,7 @@ static void emit_jump( code_ctx *ctx, int mode, int offset ) {
 		int_arr_add(ctx->short_jumps, ctx->cur_op + offset + 1);
 		B(-2);
 	} else {
-		B(0x0F);
+		if( mode != JAlways ) B(0x0F);
 		B(mode);
 		int_arr_add(ctx->near_jumps, byte_count(ctx->code));
 		int_arr_add(ctx->near_jumps, ctx->cur_op + offset + 1);
@@ -690,14 +693,20 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		{
 			ereg f = R(RCX);
 			if( b != f ) {
-				if( a == f ) {
+				if( a == f || out == f ) {
 					EMIT(_MOV,RTMP,a,M_I32);
 					a = RTMP;
 				}
-				EMIT(_PUSH,f,UNUSED,M_I32);
-				EMIT(_MOV,f,b,M_I32);
-				emit_anyop(ctx, op, out, a, f, mode);
-				EMIT(_POP,out == f ? RTMP : f,UNUSED,M_I32);
+				if( out == f ) {
+					EMIT(_MOV,f,b,M_I32);
+					emit_anyop(ctx, op, RTMP, RTMP, f, mode);
+					EMIT(_MOV,f,RTMP,M_I32);
+				} else {
+					EMIT(_PUSH,f,UNUSED,M_I32);
+					EMIT(_MOV,f,b,M_I32);
+					emit_anyop(ctx, op, out, a, f, mode);
+					EMIT(_POP,f,UNUSED,M_I32);
+				}
 				return;
 			}
 		}
@@ -773,15 +782,41 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 		e.a = R(RBP);
 	}
 	if( !IS_PURE(e.a) ) {
-		emit_mov(ctx, RTMP, e.a, e.mode, 0);
+		// a is always a mem address !
+		emit_mov(ctx, RTMP, e.a, M_PTR, 0);
 		e.a = RTMP;
-		//if( !IS_PURE(e.b) ) jit_assert();
+		if( !IS_PURE(e.b) ) {
+			BREAK(); // TODO !
+			return;
+		}
 	} else if( e.b && !IS_PURE(e.b) ) {
-		emit_mov(ctx, RTMP, e.b, e.mode, 0);
+		// b is always an int index !
+		emit_mov(ctx, RTMP, e.b, M_I32, 0);
 		e.b = RTMP;
 	}
-	BREAK();
-	//emit_ext(ctx,_LEA,out,e.a,e.mode,e.value | ((e.b & 0xFF) << 16));
+	int mult = e.size_offs & 0xFF;
+	int offs = e.size_offs >> 8;
+	if( mult == 0 ) {
+		BREAK();
+		emit_ext(ctx,_LEA,out,e.a,M_PTR,offs);
+		return;
+	}
+	int r64 = 8 | ((out&8) ? 4 : 0) | ((e.b&8) ? 2 : 0) | ((e.a & 8) ? 1 : 0);
+	REX();
+	B(0x8D);
+	MOD_RM(1,out&7,4);
+	switch( mult ) {
+	case 1: mult = 0; break;
+	case 2: mult = 1; break;
+	case 4: mult = 2; break;
+	case 8: mult = 3; break;
+	default: jit_assert();
+	}
+	SIB(mult,e.b&7,e.a&7);
+	if( IS_SBYTE(offs) )
+		B(offs);
+	else
+		jit_assert();
 }
 
 static void align_function( code_ctx *ctx ) {
@@ -800,7 +835,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 	ctx->pos_map[0] = 0;
 	byte_reserve(ctx->code,64);
 	ctx->code.cur -= 64;
-#	ifdef HL_DEBUG
+#	ifdef GEN_DEBUG
 	int reg_index = 0;
 	int emit_index = 0;
 #	endif
@@ -811,7 +846,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 		ctx->code.cur -= 64;
 		ctx->cur_op = cur_pos;
 		if( cur_pos > 0 ) ctx->pos_map[cur_pos] = ctx->code.cur;
-#		ifdef HL_DEBUG
+#		ifdef GEN_DEBUG
 		int rid = cur_pos | (jit->fun->findex << 16);
 		while( reg_index < jit->instr_count && jit->reg_pos_map[reg_index] <= cur_pos ) reg_index++;
 		int uid;
@@ -822,16 +857,16 @@ void hl_codegen_function( jit_ctx *jit ) {
 			emit_index++;
 			if( emit_index >= jit->fun->nops || jit->emit_pos_map[emit_index] >= reg_index )
 				emit_ext(ctx,_MOV,RTMP,VAL_CONST,M_I32,uid);
-			if( uid == 0x19A0000 ) BREAK();
 		}
 #		endif
 		switch( e->op ) {
 		case LOAD_ARG:
 			continue; // nop
 		case MOV:
-			if( (e->a & FL_NATMASK) == FL_STACKOFFS )
+			if( (e->a & FL_NATMASK) == FL_STACKOFFS ) {
+				if( !IS_PURE(out) ) jit_assert();
 				emit_ext(ctx,_LEA,out,VAL_MEM(R(RBP)),M_PTR,GET_STACK_OFFS(e->a));
-			else
+			} else
 				emit_mov(ctx, out, e->a, e->mode, 0);
 			break;
 		case XCHG:
@@ -849,6 +884,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 				EMIT(_PUSH,e->b,UNUSED,e->mode);
 				emit_mov(ctx, RTMP, e->a, M_PTR, 0);
 				emit_ext(ctx, _POP,VAL_MEM(RTMP), UNUSED, e->mode, e->size_offs);
+			} else if( (e->a & FL_NATMASK) == FL_STACKREG ) {
+				emit_mov(ctx, RTMP, e->a, M_PTR, 0);
+				emit_mov(ctx, VAL_MEM(RTMP), e->b, e->mode, e->size_offs);
 			} else
 				emit_mov(ctx, VAL_MEM(e->a), e->b, e->mode, e->size_offs);
 			break;

@@ -49,6 +49,7 @@
 typedef struct {
 	int stack_pos;
 	int last_read;
+	int tot_reads;
 	emit_mode mode;
 	ereg pref_reg;
 	ereg reg;
@@ -223,6 +224,7 @@ static void regs_write_live( regs_ctx *ctx, ereg *r ) {
 	if( IS_NATREG(*r) ) return;
 	value_info *v = VAL_REG(*r);
 	v->last_read = ctx->cur_op;
+	v->tot_reads++;
 }
 
 static value_info *regs_current( regs_ctx *ctx, ereg r ) {
@@ -328,12 +330,30 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			for(int k=0;k<ph->nvalues;k++) {
 				ereg v = ph->values[k];
 				eblock *b2 = resolve_block_value(ctx, v);
-				int_arr *arr = &ctx->blocks_phis[b2 - jit->blocks];
-				regs_debug("ADD PHI %s:=%s to #%d\n",val_str(ph->value,ph->mode),val_str(v,ph->mode),(int)(b2 - jit->blocks));
-				int_arr_add(*arr,v);
-				int_arr_add(*arr,ph->value);
 				value_info *val = VAL_REG(v);
-				if( val->last_read < b2->end_pos ) val->last_read = b2->end_pos;
+				if( b2->start_pos >= bl->start_pos ) {
+					// loop : insert in all predecesors
+					for(int i=0;i<bl->pred_count;i++) {
+						b2 = &jit->blocks[bl->preds[i]];
+						if( b2->start_pos >= bl->start_pos ) {
+							int_arr *arr = &ctx->blocks_phis[b2 - jit->blocks];
+							regs_debug("ADD PHI %s:=%s to #%d@%X\n",val_str(ph->value,ph->mode),val_str(v,ph->mode),(int)(b2 - jit->blocks),b2->end_pos-1);
+							int_arr_add(*arr,v);
+							int_arr_add(*arr,ph->value);
+							val->tot_reads++;
+							if( val->last_read < b2->end_pos )
+								val->last_read = b2->end_pos;
+						}
+					}
+				} else {
+					int_arr *arr = &ctx->blocks_phis[b2 - jit->blocks];
+					regs_debug("ADD PHI %s:=%s to #%d@%X\n",val_str(ph->value,ph->mode),val_str(v,ph->mode),(int)(b2 - jit->blocks),b2->end_pos-1);
+					int_arr_add(*arr,v);
+					int_arr_add(*arr,ph->value);
+					val->tot_reads++;
+					if( val->last_read < b2->end_pos )
+						val->last_read = b2->end_pos;
+				}
 			}
 		}
 	}
@@ -365,7 +385,17 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	int write_index = 1;
 	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
 		einstr e = jit->instrs[cur_op];
+		value_info *write = NULL;
 		ctx->cur_op = cur_op;
+
+		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op ) {
+			write = VAL(write_index++);
+			// try to preserve ops in the from  A = A op B
+			if( (e.op == UNOP || e.op == BINOP) && write->pref_reg == UNUSED ) {
+				value_info *v = VAL_REG(e.a);
+				if( IS_PURE(v->reg) ) write->pref_reg = v->reg;
+			}
+		}
 
 		for_iter_back(values,v,ctx->scratch) {
 			if( v->last_read <= cur_op )
@@ -413,28 +443,17 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 				regs_assign(ctx, v);
 			}
 		}
-		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op ) {
-			value_info *w = VAL(write_index++);
+		if( write ) {
 			switch( e.op ) {
 			case ALLOC_STACK:
-				w->reg = MK_STACK_OFFS(regs_alloc_stack(ctx, e.size_offs));
+				write->reg = MK_STACK_OFFS(regs_alloc_stack(ctx, e.size_offs));
 				break;
 			case LOAD_ARG:
-				if( w->reg == UNUSED )
-					regs_assign(ctx, w); // assign for stack reg
+				if( write->reg == UNUSED )
+					regs_assign(ctx, write); // assign for stack reg
 				break;
-			case UNOP:
-			case BINOP:
-				if( w->pref_reg == UNUSED ) {
-					value_info *v = VAL_REG(e.a);
-					if( IS_PURE(v->reg) ) {
-						values_remove(&ctx->scratch,v);
-						w->pref_reg = v->reg;
-					}
-				}
-				// fallback
 			default:
-				regs_assign(ctx, w);
+				regs_assign(ctx, write);
 				break;
 			}
 		}
