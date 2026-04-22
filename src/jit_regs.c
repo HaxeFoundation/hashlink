@@ -40,6 +40,9 @@
 #define REG_MODE(m)	(((m) == M_F32 || (m) == M_F64) ? 1 :0)
 #define REG_CFG(m)	(m ? &ctx->jit->cfg.floats : &ctx->jit->cfg.regs)
 
+#define EMIT(r,a,b,m)	regs_emit(ctx,UNUSED,r,a,b,m,0)
+#define BREAK()	EMIT(DEBUG_BREAK,UNUSED,UNUSED,0)
+
 #if defined(HL_WIN_CALL) && defined(HL_64)
 #	define IS_WINCALL64 1
 #else
@@ -94,6 +97,12 @@ static ereg get_call_reg( regs_ctx *ctx, call_regs regs, emit_mode m ) {
 	return r;
 }
 
+static int get_stack_size( emit_mode m ) {
+	int size = hl_emit_mode_sizes[m];
+	if( size < HL_WSIZE ) size = HL_WSIZE;
+	return size;
+}
+
 static void regs_write_instr( regs_ctx *ctx, einstr *e, ereg out ) {
 	if( ctx->emit_pos == ctx->max_instrs ) {
 		int pos = ctx->emit_pos;
@@ -128,21 +137,6 @@ static void regs_emit( regs_ctx *ctx, ereg out, emit_op op, ereg a, ereg b, emit
 static void regs_emit_mov( regs_ctx *ctx, ereg to, ereg from, emit_mode m ) {
 	if( to == from ) return;
 	regs_emit(ctx,to,MOV,from,UNUSED,m,0);
-}
-
-#define regs_todo()	regs_emit_todo_impl(ctx,__LINE__)
-static void regs_emit_todo_impl( regs_ctx *ctx, int line ) {
-	einstr e;
-	e.header = PUSH_CONST;
-	e.mode = M_PTR;
-	e.size_offs = line;
-	regs_write_instr(ctx, &e, UNUSED);
-	einstr e2;
-	e2.header = DEBUG_BREAK;
-	e2.size_offs = 0;
-	e2.a = UNUSED;
-	e2.b = UNUSED;
-	regs_write_instr(ctx, &e2, UNUSED);
 }
 
 static int regs_alloc_stack( regs_ctx *ctx, int size ) {
@@ -496,7 +490,7 @@ static void flush_movs( regs_ctx *ctx ) {
 			ereg to = int_arr_get(movs,0);
 			ereg from = int_arr_get(movs,1);
 			int mode = int_arr_get(movs,2);
-			regs_emit(ctx,UNUSED,XCHG,to,from,mode,0);
+			EMIT(XCHG,to,from,mode);
 			int_arr_remove_range(&movs,0,3);
 			size -= 3;
 			for(int k=0;k<size;k+=3) {
@@ -562,20 +556,42 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		einstr e = jit->instrs[cur_op];
 		ereg *ret_val = NULL;
 		int nread;
+		int instr_stack_offset = 0;
 		ctx->cur_op = cur_op;
 		if( IS_CALL(e.op) ) {
 			ereg *args = hl_emit_get_args(ctx->jit->emit,&e);
 			call_regs regs = {0};
+			int stack_args = 0;
+			int stack_bits = 0;
 			for(int k=0;k<e.nargs;k++) {
 				value_info *v = VAL_REG(args[k]);
 				ereg r = get_call_reg(ctx,regs,v->mode);
 				if( IS_NULL(r) ) {
-					regs_todo();
+					stack_args += get_stack_size(v->mode);
+					stack_bits |= 1 << k;
 				} else if( r != v->reg ) {
 					int_arr_add(ctx->pack_movs,r);
 					int_arr_add(ctx->pack_movs,v->reg);
 					int_arr_add(ctx->pack_movs,v->mode);
 				}
+			}
+			if( stack_args > 0 ) {
+				int offset = 0;
+				if( jit->cfg.stack_align ) {
+					int align = stack_args % jit->cfg.stack_align;
+					if( align ) offset = jit->cfg.stack_align - align;
+				}
+				if( offset )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,0,-offset);
+				for(int k=e.nargs-1;k>=0;k--) {
+					if( stack_bits & (1 << k) )
+						EMIT(PUSH,VAL_REG(args[k])->reg,UNUSED,M_PTR);
+				}
+				if( IS_WINCALL64 ) {
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,0,-0x20);
+					offset += 0x20;
+				}
+				instr_stack_offset = stack_args+offset;
 			}
 			flush_movs(ctx);
 			e.nargs = 0xFF;
@@ -598,7 +614,6 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		case ALLOC_STACK:
 			break;
 		case BLOCK:
-			flush_phis(ctx,cur_block);
 			cur_block = jit->blocks + e.size_offs;
 			break;
 		case LOAD_ARG:
@@ -612,12 +627,12 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			break;
 		case ENTER:
 			{
-				regs_emit(ctx,UNUSED,PUSH,jit->cfg.stack_pos,UNUSED,M_PTR,0);
+				EMIT(PUSH,jit->cfg.stack_pos,UNUSED,M_PTR);
 				regs_emit_mov(ctx,jit->cfg.stack_pos,jit->cfg.stack_reg,M_PTR);
 				for(int i=0;i<ctx->persists_uses[0];i++)
-					regs_emit(ctx,UNUSED,PUSH,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR,0);
+					EMIT(PUSH,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
 				for(int i=0;i<ctx->persists_uses[1];i++)
-					regs_emit(ctx,UNUSED,PUSH,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64,0);
+					EMIT(PUSH,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
 				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 			}
 			break;
@@ -641,12 +656,15 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			}
 			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
 			for(int i=ctx->persists_uses[1]-1;i>=0;i--)
-				regs_emit(ctx,UNUSED,POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64,0);
+				EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
 			for(int i=ctx->persists_uses[0]-1;i>=0;i--)
-				regs_emit(ctx,UNUSED,POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR,0);
-			regs_emit(ctx,UNUSED,POP,jit->cfg.stack_pos,UNUSED,M_PTR,0);
-			regs_emit(ctx,UNUSED,RET,UNUSED,UNUSED,M_NONE,0);
+				EMIT(POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
+			EMIT(POP,jit->cfg.stack_pos,UNUSED,M_PTR);
+			EMIT(RET,UNUSED,UNUSED,M_NONE);
 			break;
+		case MOV:
+			if( out == e.a ) break;
+			// fallthrough
 		default:
 			if( ret_val && out ) {
 				regs_write_instr(ctx, &e, *ret_val);
@@ -655,6 +673,10 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				regs_write_instr(ctx, &e, out);
 			break;
 		}
+		if( instr_stack_offset )
+			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,instr_stack_offset);
+		if( cur_block && cur_block->end_pos == cur_op+1 )
+			flush_phis(ctx,cur_block);
 		ctx->pos_map[cur_op+1] = ctx->emit_pos;
 	}
 }

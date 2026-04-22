@@ -108,6 +108,7 @@ typedef enum {
 	SUBSS,
 	MULSS,
 	DIVSS,
+	XORPS,
 	XORPD,
 	CVTSI2SD,
 	CVTSI2SS,
@@ -119,10 +120,12 @@ typedef enum {
 	LDMXCSR,
 	// 8-16 bits
 	MOV8,
+	MOVZX8,
 	CMP8,
 	TEST8,
 	PUSH8,
 	MOV16,
+	MOVZX16,
 	CMP16,
 	TEST16,
 	// prefetchs
@@ -221,6 +224,7 @@ static opform OP_FORMS[] = {
 	{ "SUBSS", 0xF30F5C },
 	{ "MULSS", 0xF30F59 },
 	{ "DIVSS", 0xF30F5E },
+	{ "XORPS", 0x0F57 },
 	{ "XORPD", 0x660F57 },
 	{ "CVTSI2SD", 0xF20F2A },
 	{ "CVTSI2SS", 0xF30F2A },
@@ -232,10 +236,12 @@ static opform OP_FORMS[] = {
 	{ "LDMXCSR", 0, LONG_RM(0x0FAE,2) },
 	// 8 bits,
 	{ "MOV8", 0x8A, 0x88, 0, RM(0xC6,0) },
+	{ "MOVZX8", LONG_OP(0x0FB6) },
 	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
 	{ "PUSH8", FLAG_DEF64, 0, 0x6A | FLAG_8B },
 	{ "MOV16", OP16(0x8B), OP16(0x89), OP16(0xB8) },
+	{ "MOVZX16", LONG_OP(0x0FB7) },
 	{ "CMP16", OP16(0x3B), OP16(0x39) },
 	{ "TEST16", OP16(0x85) },
 	// prefetchs
@@ -303,6 +309,7 @@ static int _incr( int*v, int n ) {
 const char *hl_natreg_str( int reg, emit_mode m ) {
 	static char out[16];
 	static const char *regs_str[] = { "AX", "CX", "DX", "BX", "SP", "BP", "SI", "DI" };
+	static const char *regs_str8[] = { "AL", "CL", "DL", "BL", "SPL", "BPL", "SIL", "DIL" };
 	CpuReg r = (reg & 0xFF);
 	switch( m ) {
 	case M_I32:
@@ -319,7 +326,7 @@ const char *hl_natreg_str( int reg, emit_mode m ) {
 		break;
 	case M_UI8:
 		if( r < 8 )
-			sprintf(out,"%s",regs_str[r]);
+			sprintf(out,"%s",regs_str8[r]);
 		else
 			sprintf(out,"R%dB%s",r,r<16?"":"???");
 		break;
@@ -655,7 +662,12 @@ static void emit_mov_ext( code_ctx *ctx, ereg out, int out_val, ereg val, int in
 		emit_mov_ext(ctx, out, out_val, tmp, 0, mode);
 	} else {
 		static CpuOp MOV_OP[] = {_MOV,MOV8,MOV16,_MOV,_MOV,_MOV,MOVSD,MOVSS,_MOV,_MOV};
-		emit_ext(ctx, MOV_OP[mode],out,val,mode,IS_PURE(out) ? in_val : out_val);
+		CpuOp op = MOV_OP[mode];
+		if( (mode == M_UI8 || mode == M_UI16) && IS_PURE(out) ) {
+			op++; // MOVZX
+			mode = M_I64;
+		}
+		emit_ext(ctx,op,out,val,mode,IS_PURE(out) ? in_val : out_val);
 	}
 }
 
@@ -789,9 +801,10 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 		// a is always a mem address !
 		emit_mov(ctx, RTMP, e.a, M_PTR);
 		e.a = RTMP;
-		if( !IS_PURE(e.b) ) {
-			BREAK(); // TODO !
-			return;
+		if( e.b && !IS_PURE(e.b) ) {
+			if( !IS_PURE(out) ) jit_assert();
+			emit_mov(ctx, out, e.b, M_I32);
+			e.b = out;
 		}
 	} else if( e.b && !IS_PURE(e.b) ) {
 		// b is always an int index !
@@ -801,6 +814,7 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 	int mult = e.size_offs & 0xFF;
 	int offs = e.size_offs >> 8;
 	if( mult == 0 ) {
+		// no index
 		BREAK();
 		emit_ext(ctx,_LEA,out,e.a,M_PTR,offs);
 		return;
@@ -808,19 +822,12 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 	int r64 = 8 | ((out&8) ? 4 : 0) | ((e.b&8) ? 2 : 0) | ((e.a & 8) ? 1 : 0);
 	REX();
 	B(0x8D);
-	MOD_RM(1,out&7,4);
-	switch( mult ) {
-	case 1: mult = 0; break;
-	case 2: mult = 1; break;
-	case 4: mult = 2; break;
-	case 8: mult = 3; break;
-	default: jit_assert();
-	}
+	MOD_RM(offs == 0 ? 0 : 1,out&7,4);
 	SIB(mult,e.b&7,e.a&7);
-	if( IS_SBYTE(offs) )
+	if( offs != 0 ) {
+		if( !IS_SBYTE(offs) ) jit_assert();
 		B(offs);
-	else
-		jit_assert();
+	}
 }
 
 static void align_function( code_ctx *ctx ) {
@@ -895,9 +902,11 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_mov_ext(ctx, VAL_MEM(e->a), e->size_offs, e->b, 0, e->mode);
 			break;
 		case PUSH:
+			if( IS_FLOAT(e->mode) ) BREAK();
 			emit_ext(ctx, _PUSH, e->a, UNUSED, e->mode, 0);
 			break;
 		case POP:
+			if( IS_FLOAT(e->mode) ) BREAK();
 			emit_ext(ctx, _POP, e->a, UNUSED, e->mode, 0);
 			break;
 		case PUSH_CONST:
@@ -917,9 +926,11 @@ void hl_codegen_function( jit_ctx *jit ) {
 			{
 				ereg w = IS_PURE(out) ? out : get_tmp(e->mode);
 				if( e->value == 0 )
-					EMIT(IS_FLOAT(e->mode) ? XORPD : XOR, w, w, e->mode);
-				else
+					EMIT(e->mode == M_F32 ? XORPS : e->mode == M_F64 ? XORPD : XOR, w, w, e->mode);
+				else {
+					if( IS_FLOAT(e->mode) ) BREAK();
 					emit_ext(ctx, _MOV, w, VAL_CONST, e->mode, e->value);
+				}
 				if( w != out )
 					emit_mov(ctx, out, w, e->mode);
 			}
