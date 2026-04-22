@@ -165,6 +165,10 @@ class Window {
 		winClipCursor(win, enable);
 	}
 
+	public function setDarkMode(enable : Bool) : Void {
+		winSetDarkMode(win, enable);
+	}
+
 	public static function getDisplaySettings(monitor : MonitorHandle) : Array<DisplaySetting> {
 		var a : Array<DisplaySetting> = [for(s in winGetDisplaySettings(monitor != null ? @:privateAccess monitor.bytes : null)) s];
 		a.sort((a, b) -> {
@@ -355,6 +359,10 @@ class Window {
 
 	public static function getScreenHeight() {
 		return 0;
+	}
+
+	@:hlNative("?directx", "win_set_dark_mode")
+	static function winSetDarkMode(win: WinPtr, enabled: Bool) : Void {
 	}
 
 	static function winGetNextEvent( win : WinPtr, event : Dynamic ) : Bool {
