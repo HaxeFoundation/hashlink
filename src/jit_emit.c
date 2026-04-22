@@ -1383,14 +1383,14 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case OGetGlobal:
 		{
-			void *addr = m->globals_data + m->globals_indexes[o->p2];
-			STORE(dst, LOAD_MEM_PTR(LOAD_CONST_PTR(addr),0));
+			int offs = m->globals_indexes[o->p2];
+			STORE(dst, LOAD_MEM_PTR(LOAD_CONST_PTR(m->globals_data),offs));
 		}
 		break;
 	case OSetGlobal:
 		{
-			void *addr = m->globals_data + m->globals_indexes[o->p1];
-			STORE_MEM(LOAD_CONST_PTR(addr),0,LOAD(ra));
+			int offs = m->globals_indexes[o->p1];
+			STORE_MEM(LOAD_CONST_PTR(m->globals_data),offs,LOAD(ra));
 		}
 		break;
 	case OCall0:
@@ -2072,14 +2072,17 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			hl_opcode *next = f->ops + ctx->op_pos + 1 + o->p2;
 			hl_opcode *next2 = f->ops + ctx->op_pos + 2 + o->p2;
 			void *addr = NULL;
+			int offs = 0;
 			if( cat->op == OCatch || (next->op == OGetGlobal && next2->op == OCall2 && next2->p3 == next->p1 && dst->id == (int)(int_val)next2->extra) ) {
 				int gindex = cat->op == OCatch ? cat->p1 : next->p2;
 				hl_type *gt = m->code->globals[gindex];
 				while( gt->kind == HOBJ && gt->obj->super ) gt = gt->obj->super;
-				if( gt->kind == HOBJ && gt->obj->nfields && gt->obj->fields[0].t->kind == HTYPE )
-					addr = m->globals_data + m->globals_indexes[gindex];
+				if( gt->kind == HOBJ && gt->obj->nfields && gt->obj->fields[0].t->kind == HTYPE ) {
+					addr = m->globals_data;
+					offs = m->globals_indexes[gindex];
+				}
 			}
-			STORE_MEM(st, (int)(int_val)&trap->tcheck, addr ? LOAD_MEM_PTR(LOAD_CONST_PTR(addr),0) : LOAD_CONST_PTR(NULL));
+			STORE_MEM(st, (int)(int_val)&trap->tcheck, addr ? LOAD_MEM_PTR(LOAD_CONST_PTR(addr),offs) : LOAD_CONST_PTR(NULL));
 
 			void *fun = setjmp;
 			ereg args[2];

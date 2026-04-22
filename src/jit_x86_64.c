@@ -638,25 +638,29 @@ static ereg get_tmp( emit_mode mode ) {
 	return RTMP;
 }
 
-static void emit_mov( code_ctx *ctx, ereg out, ereg val, emit_mode mode, int_val value ) {
+static void emit_mov_ext( code_ctx *ctx, ereg out, int out_val, ereg val, int in_val, emit_mode mode ) {
 	if( out == val )
 		return;
 	if( (val & FL_NATMASK) == FL_STACKOFFS ) {
-		emit_mov(ctx,out,VAL_MEM(R(RBP)),mode, value + GET_STACK_OFFS(val));
+		emit_mov_ext(ctx,out,out_val,VAL_MEM(R(RBP)),in_val + GET_STACK_OFFS(val),mode);
 		return;
 	}
 	if( (out & FL_NATMASK) == FL_STACKOFFS ) {
-		emit_mov(ctx,VAL_MEM(R(RBP)),val,mode, value + GET_STACK_OFFS(val));
+		emit_mov_ext(ctx,VAL_MEM(R(RBP)),out_val + GET_STACK_OFFS(val),val,in_val,mode);
 		return;
 	}
 	if( !IS_PURE(out) && !IS_PURE(val) ) {
 		ereg tmp = get_tmp(mode);
-		emit_mov(ctx, tmp, val, mode, value);
-		emit_mov(ctx, out, tmp, mode, 0);
+		emit_mov_ext(ctx, tmp, 0, val, in_val, mode);
+		emit_mov_ext(ctx, out, out_val, tmp, 0, mode);
 	} else {
 		static CpuOp MOV_OP[] = {_MOV,MOV8,MOV16,_MOV,_MOV,_MOV,MOVSD,MOVSS,_MOV,_MOV};
-		emit_ext(ctx, MOV_OP[mode],out,val,mode,value);
+		emit_ext(ctx, MOV_OP[mode],out,val,mode,IS_PURE(out) ? in_val : out_val);
 	}
+}
+
+static void emit_mov( code_ctx *ctx, ereg out, ereg val, emit_mode mode ) {
+	emit_mov_ext(ctx,out,0,val,0,mode);
 }
 
 static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_mode mode ) {
@@ -725,11 +729,11 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 	}
 	if( !IS_PURE(out) ) {
 		ereg tmp = get_tmp(mode);
-		emit_mov(ctx, tmp, a, mode, 0);
+		emit_mov(ctx, tmp, a, mode);
 		EMIT(cop,tmp,b,mode);
-		emit_mov(ctx, out, tmp, mode, 0);
+		emit_mov(ctx, out, tmp, mode);
 	} else {
-		emit_mov(ctx, out, a, mode, 0);
+		emit_mov(ctx, out, a, mode);
 		EMIT(cop,out,b,mode);
 	}
 }
@@ -783,7 +787,7 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 	}
 	if( !IS_PURE(e.a) ) {
 		// a is always a mem address !
-		emit_mov(ctx, RTMP, e.a, M_PTR, 0);
+		emit_mov(ctx, RTMP, e.a, M_PTR);
 		e.a = RTMP;
 		if( !IS_PURE(e.b) ) {
 			BREAK(); // TODO !
@@ -791,7 +795,7 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 		}
 	} else if( e.b && !IS_PURE(e.b) ) {
 		// b is always an int index !
-		emit_mov(ctx, RTMP, e.b, M_I32, 0);
+		emit_mov(ctx, RTMP, e.b, M_I32);
 		e.b = RTMP;
 	}
 	int mult = e.size_offs & 0xFF;
@@ -867,28 +871,28 @@ void hl_codegen_function( jit_ctx *jit ) {
 				if( !IS_PURE(out) ) jit_assert();
 				emit_ext(ctx,_LEA,out,VAL_MEM(R(RBP)),M_PTR,GET_STACK_OFFS(e->a));
 			} else
-				emit_mov(ctx, out, e->a, e->mode, 0);
+				emit_mov(ctx, out, e->a, e->mode);
 			break;
 		case XCHG:
 			{
 				ereg tmp = get_tmp(e->mode);
 				if( !IS_PURE(e->a) && !IS_PURE(e->b) )
 					jit_assert();
-				emit_mov(ctx, tmp, e->a, e->mode, 0);
-				emit_mov(ctx, e->a, e->b, e->mode, 0);
-				emit_mov(ctx, e->b, tmp, e->mode, 0);
+				emit_mov(ctx, tmp, e->a, e->mode);
+				emit_mov(ctx, e->a, e->b, e->mode);
+				emit_mov(ctx, e->b, tmp, e->mode);
 			}
 			break;
 		case STORE:
 			if( !IS_PURE(e->a) && !IS_PURE(e->b) && (e->a & FL_NATMASK) != FL_STACKOFFS ) {
 				EMIT(_PUSH,e->b,UNUSED,e->mode);
-				emit_mov(ctx, RTMP, e->a, M_PTR, 0);
+				emit_mov(ctx, RTMP, e->a, M_PTR);
 				emit_ext(ctx, _POP,VAL_MEM(RTMP), UNUSED, e->mode, e->size_offs);
 			} else if( (e->a & FL_NATMASK) == FL_STACKREG ) {
-				emit_mov(ctx, RTMP, e->a, M_PTR, 0);
-				emit_mov(ctx, VAL_MEM(RTMP), e->b, e->mode, e->size_offs);
+				emit_mov(ctx, RTMP, e->a, M_PTR);
+				emit_mov_ext(ctx, VAL_MEM(RTMP), e->size_offs, e->b, 0, e->mode);
 			} else
-				emit_mov(ctx, VAL_MEM(e->a), e->b, e->mode, e->size_offs);
+				emit_mov_ext(ctx, VAL_MEM(e->a), e->size_offs, e->b, 0, e->mode);
 			break;
 		case PUSH:
 			emit_ext(ctx, _PUSH, e->a, UNUSED, e->mode, 0);
@@ -905,7 +909,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 		case RET:
 			if( !IS_NULL(e->a) ) {
 				ereg ret = IS_FLOAT(e->mode) ? MMX(0) : R(RAX);
-				if( e->a != ret ) emit_mov(ctx, ret, e->a, e->mode, 0);
+				if( e->a != ret ) emit_mov(ctx, ret, e->a, e->mode);
 			}
 			EMIT(_RET, UNUSED, UNUSED, M_NONE);
 			break;
@@ -915,21 +919,21 @@ void hl_codegen_function( jit_ctx *jit ) {
 				if( e->value == 0 )
 					EMIT(IS_FLOAT(e->mode) ? XORPD : XOR, w, w, e->mode);
 				else
-					emit_mov(ctx, w, VAL_CONST, e->mode, e->value);
+					emit_ext(ctx, _MOV, w, VAL_CONST, e->mode, e->value);
 				if( w != out )
-					emit_mov(ctx, out, w, e->mode, 0);
+					emit_mov(ctx, out, w, e->mode);
 			}
 			break;
 		case LOAD_ADDR:
 			{
 				ereg addr;
 				if( (e->a & FL_STACKREG) == FL_STACKREG ) {
-					emit_mov(ctx,RTMP,e->a,M_PTR,0);
+					emit_mov(ctx,RTMP,e->a,M_PTR);
 					addr = VAL_MEM(RTMP);
 				} else {
 					addr = VAL_MEM(e->a);
 				}
-				emit_mov(ctx,out,addr,e->mode,e->size_offs);
+				emit_mov_ext(ctx,out,0,addr,e->size_offs,e->mode);
 			}
 			break;
 		case CALL_FUN:
@@ -961,7 +965,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 				jit_assert();
 			if( !IS_PURE(e->a) ) {
 				ereg tmp = get_tmp(e->mode);
-				emit_mov(ctx, tmp, e->a, e->mode, 0);
+				emit_mov(ctx, tmp, e->a, e->mode);
 				EMIT(_TEST,tmp,tmp,e->mode);
 			} else
 				EMIT(_TEST,e->a,e->a,e->mode);
@@ -978,7 +982,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 				}
 				if( !IS_PURE(e->a) && !IS_PURE(e->b) ) {
 					ereg tmp = get_tmp(e->mode);
-					emit_mov(ctx, tmp, e->b, e->mode, 0);
+					emit_mov(ctx, tmp, e->b, e->mode);
 					EMIT(op,e->a,tmp,e->mode);
 				} else
 					EMIT(op,e->a,e->b,e->mode);
@@ -1055,7 +1059,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			if( !IS_PURE(out) ) {
 				ereg tmp = get_tmp(e->mode);
 				emit_lea(ctx,tmp,e);
-				emit_mov(ctx,out,tmp,e->mode,0);
+				emit_mov(ctx,out,tmp,e->mode);
 			} else
 				emit_lea(ctx,out,e);
 			break;
@@ -1104,7 +1108,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
 	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
 	emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,0x20);
-	emit_mov(ctx,R(RAX),VAL_CONST,M_PTR,(int_val)hl_null_access);
+	emit_ext(ctx,_MOV,R(RAX),VAL_CONST,M_PTR,(int_val)hl_null_access);
 	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
 	BREAK();
 	hl_jit_define_function(jit, ctx->null_access_pos, jit->out_pos + byte_count(ctx->code) - ctx->null_access_pos);
@@ -1113,8 +1117,8 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
 	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
 	emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,0x28);
-	emit_mov(ctx,R(RCX),VAL_MEM(R(RBP)),M_I32,HL_WSIZE*2);
-	emit_mov(ctx,R(RAX),VAL_CONST,M_PTR,(int_val)hl_jit_null_field_access);
+	emit_ext(ctx,_MOV,R(RCX),VAL_MEM(R(RBP)),M_I32,HL_WSIZE*2);
+	emit_ext(ctx,_MOV,R(RAX),VAL_CONST,M_PTR,(int_val)hl_jit_null_field_access);
 	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
 	BREAK();
 	hl_jit_define_function(jit, ctx->null_field_pos, jit->out_pos + byte_count(ctx->code) - ctx->null_field_pos);
