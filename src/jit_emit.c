@@ -251,8 +251,6 @@ static linked_inf *link_sort_remove( linked_inf *head, int id ) {
 static emit_mode hl_type_mode( hl_type *t ) {
 	if( t->kind == HVOID )
 		return M_VOID;
-	if( t->kind < HBOOL )
-		return (emit_mode)t->kind;
 	if( t->kind == HBOOL )
 		return sizeof(bool) == 1 ? M_UI8 : M_I32;
 	if( t->kind == HGUID )
@@ -261,6 +259,8 @@ static emit_mode hl_type_mode( hl_type *t ) {
 		return M_F32;
 	if( t->kind == HF64 )
 		return M_F64;
+	if( t->kind < HBOOL )
+		return (emit_mode)t->kind;
 	return M_PTR;
 }
 
@@ -736,8 +736,14 @@ static void emit_store_size( emit_ctx *ctx, ereg dst, int dst_offset, ereg src, 
 	}
 }
 
+
 static ereg emit_conv( emit_ctx *ctx, ereg v, emit_mode from, emit_mode to, bool _unsigned ) {
-	return emit_gen_ext(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, UNUSED, to, from);
+	if( (from == M_F32 || from == M_F64) != (to == M_F32 || to == M_F64) )
+		return emit_gen_ext(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, UNUSED, to, from);
+	if( from != to && (from == M_F32 || from == M_F64) && (to == M_F32 || to == M_F64) )
+		return emit_gen_ext(ctx, CONV, v, UNUSED, to, from);
+	// no-op
+	return emit_gen(ctx,MOV,v,UNUSED,to);
 }
 
 static bool dyn_need_type( hl_type *t ) {
@@ -1365,9 +1371,10 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				double d;
 				uint64 i;
 			} v;
-			if( dst->t->kind == HF32 )
+			if( dst->t->kind == HF32 ) {
+				v.i = 0;
 				v.f = (float)m->code->floats[o->p2];
-			else
+			} else
 				v.d = m->code->floats[o->p2];
 			STORE(dst, LOAD_CONST(v.i, dst->t));
 		}
@@ -1816,7 +1823,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg offs = OFFSET(LOAD(ra),LOAD(rb),1,0);
 			ereg val = LOAD_MEM(offs, 0, dst->t);
-			if( o->op != OGetMem ) val = emit_conv(ctx, val, M_I32, hl_type_mode(dst->t), false);
+			if( o->op != OGetMem ) patch_instr_mode(ctx, o->op == OGetI8 ? M_UI8 : M_UI16);
 			STORE(dst, val);
 		}
 		break;
@@ -1826,8 +1833,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg offs = OFFSET(LOAD(dst), LOAD(ra),1,0);
 			ereg val = LOAD(rb);
-			if( o->op != OSetMem ) val = emit_conv(ctx, val, M_I32, hl_type_mode(dst->t), false);
 			STORE_MEM(offs, 0, val);
+			if( o->op != OSetMem ) patch_instr_mode(ctx, o->op == OSetI8 ? M_UI8 : M_UI16);
 		}
 		break;
 	case OType:
@@ -1921,8 +1928,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OToVirtual:
 		{
 			ereg args[2];
-			args[0] = LOAD(ra);
-			args[1] = LOAD_CONST_PTR(dst->t);
+			args[0] = LOAD_CONST_PTR(dst->t);
+			args[1] = LOAD(ra);
 			STORE(dst, emit_native_call(ctx,hl_to_virtual,args,2, dst->t));
 		}
 		break;
