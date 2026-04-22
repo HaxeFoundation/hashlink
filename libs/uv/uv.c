@@ -22,8 +22,9 @@ typedef struct sockaddr uv_sockaddr;
 #define EVT_CONNECT	0	// connect_t
 
 #define EVT_FS	0
+#define EVT_FS_EX	3
 
-#define EVT_MAX		2
+#define EVT_MAX		3
 
 typedef struct {
 	vclosure *events[EVT_MAX + 1];
@@ -236,6 +237,22 @@ static void on_fs_event(uv_fs_event_t* handle, const char* filename, int events,
 	trigger_callb((uv_handle_t*)handle, EVT_FS, args, 1, true);
 }
 
+static void on_fs_event_ex(uv_fs_event_t* handle, const char* filename, int events, int status) {
+	vdynamic name;
+	name.t = &hlt_bytes;
+	name.v.ptr = (void*)filename;
+
+	vdynamic ev;
+	ev.t = &hlt_i32;
+	ev.v.i = events;
+
+	vdynamic* args[2];
+	args[0] = &name;
+	args[1] = &ev;
+
+	trigger_callb((uv_handle_t*)handle, EVT_FS_EX, args, 2, true);
+}
+
 HL_PRIM uv_fs_event_t* HL_NAME(fs_start_wrap)(uv_loop_t* loop, vclosure* cb, char* path) {
 	uv_fs_event_t* handle = UV_ALLOC(uv_fs_event_t);
 	if (uv_fs_event_init(loop, handle) < 0) {
@@ -252,13 +269,35 @@ HL_PRIM uv_fs_event_t* HL_NAME(fs_start_wrap)(uv_loop_t* loop, vclosure* cb, cha
 	return handle;
 }
 
+HL_PRIM uv_fs_event_t* HL_NAME(fs_start_wrap_ex)(uv_loop_t* loop, vclosure* cb, char* path, bool recursive) {
+	// Uv only implements the recursive flag on Windows and MacOs
+	#if !defined(HL_WIN) && !defined(HL_MAC)
+	if (recursive)
+		return NULL;
+	#endif
+	uv_fs_event_t* handle = UV_ALLOC(uv_fs_event_t);
+	if (uv_fs_event_init(loop, handle) < 0) {
+		free(handle);
+		return NULL;
+	}
+	init_hl_data((uv_handle_t*)handle);
+	register_callb((uv_handle_t*)handle, cb, EVT_FS_EX);
+
+	if (uv_fs_event_start(handle, on_fs_event_ex, path, recursive ? UV_FS_EVENT_RECURSIVE : 0) < 0) {
+		free_handle(handle);
+		return NULL;
+	}
+	return handle;
+}
+
 HL_PRIM bool HL_NAME(fs_stop_wrap)(uv_fs_event_t* handle) {
 	clear_callb((uv_handle_t*)handle, EVT_FS);
+	clear_callb((uv_handle_t*)handle, EVT_FS_EX);
 	return uv_fs_event_stop(handle);
 }
 
 DEFINE_PRIM(_TCP, tcp_init_wrap, _LOOP);
-DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID,_BOOL));
+DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID, _BOOL));
 DEFINE_PRIM(_BOOL, tcp_bind_wrap, _TCP _I32 _I32);
 DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
 DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _TCP _BOOL);
@@ -266,6 +305,7 @@ DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _TCP _BOOL);
 // handle FS
 
 DEFINE_PRIM(_FS, fs_start_wrap, _LOOP _FUN(_VOID, _I32) _BYTES);
+DEFINE_PRIM(_FS, fs_start_wrap_ex, _LOOP _FUN(_VOID, _BYTES _I32) _BYTES _BOOL);
 DEFINE_PRIM(_BOOL, fs_stop_wrap, _FS);
 
 // loop
