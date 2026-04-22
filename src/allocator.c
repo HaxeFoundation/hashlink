@@ -313,6 +313,8 @@ static void *gc_alloc_fixed( int part, int kind ) {
 		for(i=0;i<p->block_size;i++)
 			if( ptr[i] != 0xDD )
 				hl_fatal("assert");
+			else
+				ptr[i] = 0xCD;
 	}
 #	endif
 	gc_free_pages[pid] = ph;
@@ -367,6 +369,8 @@ alloc_var:
 		for(i=0;i<size;i++)
 			if( ptr[i] != 0xDD )
 				hl_fatal("assert");
+			else
+				ptr[i] = 0xCD;
 	}
 #	endif
 	if( ph->bmp ) {
