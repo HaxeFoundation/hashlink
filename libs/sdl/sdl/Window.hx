@@ -160,6 +160,10 @@ class Window {
 		return visible = b;
 	}
 
+	public function setIcon(surface: Surface) {
+		winSetIcon(win, surface);
+	}
+
 	public function resize( width : Int, height : Int ) {
 		winSetSize(win, width, height);
 	}
@@ -258,16 +262,16 @@ class Window {
 		winSetOpacity(win, v);
 		return v;
 	}
-	
+
 	function get_grab() {
 		return getWindowGrab(win);
 	}
-	
+
 	function set_grab(v) {
 		setWindowGrab(win, v);
 		return v;
 	}
-	
+
 	function get_id() {
 		return winGetId(win);
 	}
@@ -318,6 +322,10 @@ class Window {
 	}
 
 	static function winSetTitle( win : WinPtr, title : hl.Bytes ) {
+	}
+
+	@:hlNative("?sdl", "win_set_icon")
+	static function winSetIcon(win : WinPtr, surface: Surface) {
 	}
 
 	static function winSetPosition( win : WinPtr, width : Int, height : Int ) {
@@ -396,11 +404,11 @@ class Window {
 
 	static function setWindowGrab( win : WinPtr, grab : Bool ) {
 	}
-	
+
 	static function getWindowGrab( win : WinPtr ) : Bool {
 		return false;
 	}
-	
+
 	static function warpMouseInWindow( win : WinPtr, x : Int, y : Int ) : Void {
 	}
 

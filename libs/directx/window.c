@@ -93,6 +93,9 @@ static bool capture_mouse = false;
 static bool relative_mouse = false;
 
 typedef HCURSOR dx_cursor;
+typedef HICON dx_icon;
+
+#define TICON _ABSTRACT(dx_icon)
 
 static dx_cursor cur_cursor = NULL;
 static bool show_cursor = true;
@@ -957,6 +960,11 @@ HL_PRIM int HL_NAME(win_change_display_setting)(wchar_t* device, vdynamic* ds) {
 	return ChangeDisplaySettingsExW(device, found ? &devMode : NULL, NULL, found ? CDS_FULLSCREEN : 0, NULL);
 }
 
+HL_PRIM void HL_NAME(win_set_icon)(HWND wnd, dx_icon icon) {
+	SendMessage(wnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+	SendMessage(wnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
+}
+
 #define TWIN _ABSTRACT(dx_window)
 DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
@@ -990,6 +998,7 @@ DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES _BOOL);
 DEFINE_PRIM(_I32, win_change_display_setting, _BYTES _DYN);
 DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);
+DEFINE_PRIM(_VOID, win_set_icon, TWIN TICON);
 DEFINE_PRIM(_VOID, win_set_dark_mode, TWIN _BOOL);
 
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
@@ -999,17 +1008,17 @@ HL_PRIM dx_cursor HL_NAME(load_cursor)( int res ) {
 	return LoadCursor(NULL,MAKEINTRESOURCE(res));
 }
 
-HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, int hotX, int hotY ) {
+static HICON create_icon_internal(int width, int height, vbyte* data, bool icon, int hotX, int hotY) {
 	int pad = sizeof(void*) << 3;
 	HICON hicon;
 	HDC hdc = GetDC(NULL);
 	BITMAPV4HEADER bmh;
-	void *pixels;
-	void *maskbits;
+	void* pixels;
+	void* maskbits;
 	int maskbitslen;
 	ICONINFO ii;
 
-	ZeroMemory(&bmh,sizeof(bmh));
+	ZeroMemory(&bmh, sizeof(bmh));
 	bmh.bV4Size = sizeof(bmh);
 	bmh.bV4Width = width;
 	bmh.bV4Height = -height;
@@ -1017,20 +1026,22 @@ HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, in
 	bmh.bV4BitCount = 32;
 	bmh.bV4V4Compression = BI_BITFIELDS;
 	bmh.bV4AlphaMask = 0xFF000000;
-	bmh.bV4RedMask   = 0x00FF0000;
+	bmh.bV4RedMask = 0x00FF0000;
 	bmh.bV4GreenMask = 0x0000FF00;
-	bmh.bV4BlueMask  = 0x000000FF;
+	bmh.bV4BlueMask = 0x000000FF;
 
-	maskbitslen = ((width + (-width)%pad) >> 3) * height;
+	maskbitslen = ((width + (-width) % pad) >> 3) * height;
 	maskbits = malloc(maskbitslen);
-	if( maskbits == NULL )
+	if (maskbits == NULL)
 		return NULL;
-	memset(maskbits,0xFF,maskbitslen);
+	memset(maskbits, 0xFF, maskbitslen);
 
-	memset(&ii,0,sizeof(ii));
-	ii.fIcon = FALSE;
-	ii.xHotspot = (DWORD)hotX;
-	ii.yHotspot = (DWORD)hotY;
+	memset(&ii, 0, sizeof(ii));
+	ii.fIcon = icon;
+	if (icon) {
+		ii.xHotspot = (DWORD)hotX;
+		ii.yHotspot = (DWORD)hotY;
+	}
 	ii.hbmColor = CreateDIBSection(hdc, (BITMAPINFO*)&bmh, DIB_RGB_COLORS, &pixels, NULL, 0);
 	ii.hbmMask = CreateBitmap(width, height, 1, 1, maskbits);
 	ReleaseDC(NULL, hdc);
@@ -1044,8 +1055,21 @@ HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, in
 	return hicon;
 }
 
+
+HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, int hotX, int hotY ) {
+	return create_icon_internal(width, height, data, false, hotX, hotY);
+}
+
+HL_PRIM dx_icon HL_NAME(create_icon)(int width, int height, vbyte* data) {
+	return create_icon_internal(width, height, data, true, 0, 0);
+}
+
 HL_PRIM void HL_NAME(destroy_cursor)( dx_cursor c ) {
 	DestroyIcon(c);
+}
+
+HL_PRIM void HL_NAME(destroy_icon)(dx_icon i) {
+	DestroyIcon(i);
 }
 
 HL_PRIM void HL_NAME(set_cursor)( dx_cursor c ) {
@@ -1066,7 +1090,9 @@ HL_PRIM bool HL_NAME(is_cursor_visible)() {
 #define TCURSOR _ABSTRACT(dx_cursor)
 DEFINE_PRIM(TCURSOR, load_cursor, _I32);
 DEFINE_PRIM(TCURSOR, create_cursor, _I32 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(TICON, create_icon, _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID, destroy_cursor, TCURSOR);
+DEFINE_PRIM(_VOID, destroy_icon, TICON);
 DEFINE_PRIM(_VOID, set_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, show_cursor, _BOOL);
 DEFINE_PRIM(_BOOL, is_cursor_visible, _NO_ARG);
