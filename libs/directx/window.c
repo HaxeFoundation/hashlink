@@ -848,6 +848,26 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 	return GetSystemMetrics(SM_CYSCREEN);
 }
 
+HL_PRIM void HL_NAME(win_set_dark_mode)( dx_window* wnd, bool enabled ) {
+	// Load dynamically the required function and fail silently if they are not available
+	// (which could be true for older Windows 10 versions and before)
+	HMODULE dwmapi = LoadLibraryA("Dwmapi.dll");
+
+	if (dwmapi == NULL)
+		return;
+
+	typedef HRESULT(*DwmSetWindowAttributePTR)(HWND, DWORD, LPCVOID, DWORD);
+	DwmSetWindowAttributePTR DwmSetWindowAttribute =
+		(DwmSetWindowAttributePTR)GetProcAddress(dwmapi, "DwmSetWindowAttribute");
+
+	if (DwmSetWindowAttribute == NULL)
+		return;
+
+	int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+	BOOL dark_mode = enabled;
+	DwmSetWindowAttribute(wnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, sizeof(dark_mode));
+}
+
 typedef struct {
 	int idx;
 	varray* arr;
@@ -970,6 +990,7 @@ DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES _BOOL);
 DEFINE_PRIM(_I32, win_change_display_setting, _BYTES _DYN);
 DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);
+DEFINE_PRIM(_VOID, win_set_dark_mode, TWIN _BOOL);
 
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
