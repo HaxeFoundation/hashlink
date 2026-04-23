@@ -158,8 +158,6 @@ struct _emit_ctx {
 #define GET_PHI(r) ctx->phis[-(r)-1]
 #define HDYN_VALUE 8
 
-#define IS_FLOAT(t)	((t)->kind == HF64 || (t)->kind == HF32)
-
 static hl_type hlt_ui8 = { HUI8, 0 };
 static hl_type hlt_ui16 = { HUI16, 0 };
 
@@ -320,7 +318,7 @@ static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 #define store_args hl_emit_store_args
 void hl_emit_store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
 	if( count < 0 ) jit_assert();
-	if( count > 64 ) jit_error("Too many arguments");
+	if( count > 256 ) jit_error("Too many arguments");
 	e->nargs = (unsigned char)count;
 	if( count == 0 ) return;
 	if( count == 1 ) {
@@ -738,16 +736,16 @@ static void emit_store_size( emit_ctx *ctx, ereg dst, int dst_offset, ereg src, 
 
 
 static ereg emit_conv( emit_ctx *ctx, ereg v, emit_mode from, emit_mode to, bool _unsigned ) {
-	if( (from == M_F32 || from == M_F64) != (to == M_F32 || to == M_F64) )
+	if( IS_FLOAT(from) != IS_FLOAT(to) )
 		return emit_gen_ext(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, UNUSED, to, from);
-	if( from != to && (from == M_F32 || from == M_F64) && (to == M_F32 || to == M_F64) )
+	if( from != to && IS_FLOAT(from) && IS_FLOAT(to) )
 		return emit_gen_ext(ctx, CONV, v, UNUSED, to, from);
 	// no-op
 	return emit_gen(ctx,MOV,v,UNUSED,to);
 }
 
 static bool dyn_need_type( hl_type *t ) {
-	return !(IS_FLOAT(t) || t->kind == HI64 || t->kind == HGUID);
+	return !(t->kind == HF32 || t->kind == HF64 || t->kind == HI64 || t->kind == HGUID);
 }
 
 static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
@@ -982,13 +980,12 @@ void hl_emit_function( jit_ctx *jit ) {
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
-		r->ref = 0;
+		r->ref = UNUSED;
 	}
 
 	emit_gen(ctx,ENTER,UNUSED,UNUSED,M_NONE);
 	for(i=0;i<f->type->fun->nargs;i++) {
 		hl_type *t = f->type->fun->args[i];
-		if( t->kind == HVOID ) continue;
 		STORE(R(i), emit_gen(ctx, LOAD_ARG, UNUSED, UNUSED, hl_type_mode(t)));
 	}
 
@@ -1496,13 +1493,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case OIncr:
 	case ODecr:
-		{
-			if( IS_FLOAT(dst->t) ) {
-				jit_assert();
-			} else {
-				STORE(dst, emit_gen_ext(ctx,UNOP,LOAD(dst),UNUSED,hl_type_mode(dst->t),o->op));
-			}
-		}
+		STORE(dst, emit_gen_ext(ctx,UNOP,LOAD(dst),UNUSED,hl_type_mode(dst->t),o->op));
 		break;
 	case ONew:
 		{
@@ -1911,7 +1902,10 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		STORE(dst, LOAD_MEM(LOAD(ra),0,dst->t));
 		break;
 	case OSetref:
-		STORE_MEM(dst->ref,0,LOAD(ra));
+		if( dst->ref == UNUSED )
+			STORE_MEM(LOAD(dst),0,LOAD(ra));
+		else
+			STORE_MEM(dst->ref,0,LOAD(ra));
 		break;
 	case ORefData:
 		switch( ra->t->kind ) {

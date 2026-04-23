@@ -108,6 +108,7 @@ typedef struct {
 #define MK_STACK_OFFS(v)(((v)&0xFFFFFFF) | FL_STACKOFFS)
 #define GET_STACK_OFFS(v) ((int)(((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF)))
 #define IS_CALL(op)	((op) == CALL_PTR || (op) == CALL_REG || (op) == CALL_FUN)
+#define IS_FLOAT(mode)	((mode) == M_F64 || (mode) == M_F32)
 #define UNUSED		((ereg)0)
 
 typedef struct {

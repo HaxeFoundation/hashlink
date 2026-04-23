@@ -37,7 +37,7 @@
 
 #define VIDX(e)	(((e) < 0) ? ctx->jit->value_count + (-(e)-1) : (e))
 #define VAL_REG(e) VAL(VIDX(e))
-#define REG_MODE(m)	(((m) == M_F32 || (m) == M_F64) ? 1 :0)
+#define REG_MODE(m)	(IS_FLOAT(m) ? 1 :0)
 #define REG_CFG(m)	(m ? &ctx->jit->cfg.floats : &ctx->jit->cfg.regs)
 
 #define EMIT(r,a,b,m)	regs_emit(ctx,UNUSED,r,a,b,m,0)
@@ -306,8 +306,10 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			case OUDiv:
 			case OSMod:
 			case OUMod:
-				if( jit->cfg.req_div_a ) VAL_REG(e->a)->pref_reg = jit->cfg.req_div_a;
-				if( jit->cfg.req_div_b ) VAL_REG(e->b)->pref_reg = jit->cfg.req_div_b;
+				if( !IS_FLOAT(e->mode) ) {
+					if( jit->cfg.req_div_a ) VAL_REG(e->a)->pref_reg = jit->cfg.req_div_a;
+					if( jit->cfg.req_div_b ) VAL_REG(e->b)->pref_reg = jit->cfg.req_div_b;
+				}
 				break;
 			}
 			break;
@@ -362,7 +364,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 		value_info *v = VAL(i);
 		einstr *e = ctx->jit->instrs + ctx->jit->values_writes[i];
 		int size = hl_emit_mode_sizes[e->mode];
-		if( size <= 0 ) hl_jit_assert();
+		if( size <= 0 && e->mode != M_VOID ) jit_assert();
 		ereg r = get_call_reg(ctx,regs,e->mode);
 		if( !IS_NULL(r) ) {
 			v->reg = r;
@@ -633,7 +635,8 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 					EMIT(PUSH,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
 				for(int i=0;i<ctx->persists_uses[1];i++)
 					EMIT(PUSH,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
-				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
+				if( stack_offset )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 			}
 			break;
 		case JUMP:
@@ -654,7 +657,8 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				if( e.a != ret )
 					regs_emit_mov(ctx, ret, e.a, e.mode);
 			}
-			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
+			if( stack_offset )
+				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
 			for(int i=ctx->persists_uses[1]-1;i>=0;i--)
 				EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
 			for(int i=ctx->persists_uses[0]-1;i>=0;i--)
