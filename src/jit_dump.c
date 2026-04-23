@@ -205,7 +205,7 @@ static void dump_value( jit_ctx *ctx, uint64 value, emit_mode mode ) {
 		else if( mode == M_PTR && value >= (uint64)code->types && value < (uint64)(code->types + code->ntypes) )
 			uprintf(USTR("<%s>"),hl_type_str((hl_type*)value));
 		else if( mode == M_PTR && value == (uint64)mod->globals_data )
-			printf("<globals>",(int)(value - (uint64)mod->globals_data));
+			printf("<globals>");
 		else if( value == (uint64)&hlt_void )
 			printf("<void>");
 		else

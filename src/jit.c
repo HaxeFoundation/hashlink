@@ -164,6 +164,8 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 }
 
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
+	hl_codegen_final(ctx);
+	jit_code_append(ctx);
 	int size = ctx->out_pos;
 	if( size & 4095 ) size += 4096 - (size&4095);
 	unsigned char *code = (unsigned char*)hl_alloc_executable_memory(size);
@@ -173,7 +175,6 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	*debug = NULL;
 	ctx->final_code = code;
 	hl_emit_final(ctx);
-	hl_codegen_final(ctx);
 	return code;
 }
 

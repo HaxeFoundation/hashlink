@@ -35,7 +35,19 @@
 #define VAL_CONST		0x80000000
 #define VAL_MEM(reg)	(FL_MEMPTR | (reg))
 
-#define IS_FLOAT(mode)	((mode) == M_F64 || (mode) == M_F32)
+#define S_TYPE			value_arr
+#define S_NAME(name)	value_arr_##name
+#define S_VALUE			uint64
+#include "data_struct.c"
+
+#define S_SORTED
+#define S_MAP
+#define S_TYPE			value_map
+#define S_NAME(name)	value_map_##name
+#define S_KEY			uint64
+#define S_VALUE			int
+#define S_DEFVAL		-1
+#include "data_struct.c"
 
 typedef enum {
 	RAX = 0,
@@ -72,6 +84,7 @@ typedef enum {
 	IMUL,	// only overflow flag changes compared to MUL
 	DIV,
 	IDIV,
+	NEG,
 	CDQ,
 	CDQE,
 	_POP,
@@ -188,6 +201,7 @@ static opform OP_FORMS[] = {
 	{ "IMUL", LONG_OP(0x0FAF), 0, 0x69 | FLAG_DUAL, 0x6B | FLAG_DUAL },
 	{ "DIV", RM(0xF7,6), RM(0xF7,6) },
 	{ "IDIV", RM(0xF7,7), RM(0xF7,7) },
+	{ "NEG", RM(0xF7,3) },
 	{ "CDQ", 0x99 },
 	{ "CDQE", 0x98 },
 	{ "POP", 0x58 | FLAG_DEF64, RM(0x8F,0) },
@@ -214,8 +228,8 @@ static opform OP_FORMS[] = {
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
-	{ "COMISD", 0x660F2F },
-	{ "COMISS", LONG_OP(0x0F2F) },
+	{ "COMISD", 0x660F2F, LONG_RM(0x660F2F,1) },
+	{ "COMISS", LONG_OP(0x0F2F), LONG_RM(0x0F2F,1) },
 	{ "ADDSD", 0xF20F58 },
 	{ "SUBSD", 0xF20F5C },
 	{ "MULSD", 0xF20F59 },
@@ -293,6 +307,9 @@ struct _code_ctx {
 	int_arr funs;
 	int_arr short_jumps;
 	int_arr near_jumps;
+	value_map const_table_lookup;
+	value_arr const_table;
+	int_arr const_refs;
 	int *pos_map;
 	int cur_op;
 	bool flushed;
@@ -442,7 +459,7 @@ static preg make_reg( ereg r, emit_mode m ) {
 	if( (r & FL_NATMASK) == FL_STACKREG ) {
 		p.kind = RSTACK;
 		p.value = GET_STACK_OFFS(r);
-	} else if( m == M_F32 || m == M_F64 ) {
+	} else if( IS_FLOAT(m) ) {
 		p.kind = RFPU;
 		p.reg = (r&0xFF) - 64;
 	} else {
@@ -735,6 +752,28 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 	case OUDiv:
 		BREAK();
 		return;
+	case ONot:
+		BREAK();
+		cop = XOR;
+		b = a;
+		break;
+	case ONeg:
+		if( IS_FLOAT(mode) ) {
+			BREAK();
+			if( out != a && IS_PURE(out) ) {
+				EMIT(mode == M_F32 ? XORPS : XORPD, out, out, mode);
+				EMIT(mode == M_F32 ? SUBSS : SUBSD, out, a, mode);
+			} else {
+				ereg tmp = get_tmp(mode);
+				EMIT(mode == M_F32 ? XORPS : XORPD, tmp, tmp, mode);
+				EMIT(mode == M_F32 ? SUBSS : SUBSD, tmp, a, mode);
+				EMIT(mode == M_F32 ? MOVSS : MOVSD, out, tmp, mode);
+			}
+			return;
+		}
+		BREAK();
+		cop = NEG;
+		break;
 	default:
 		jit_assert();
 		break;
@@ -835,6 +874,17 @@ static void align_function( code_ctx *ctx ) {
 		emit_nop(ctx,16 - (byte_count(ctx->code) & 15));
 }
 
+static void alloc_stored_value( code_ctx *ctx, uint64 value ) {
+	int idx = value_map_find(ctx->const_table_lookup, value);
+	if( idx < 0 ) {
+		idx = ctx->const_table.cur;
+		value_map_add_impl(&ctx->jit->galloc,&ctx->const_table_lookup,value,idx);
+		value_arr_add_impl(&ctx->jit->galloc,&ctx->const_table,value);
+	}
+	int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,ctx->jit->out_pos + byte_count(ctx->code) - 4);
+	int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,idx);
+}
+
 void hl_codegen_function( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
 	ctx->flushed = false;
@@ -875,8 +925,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 			continue; // nop
 		case MOV:
 			if( (e->a & FL_NATMASK) == FL_STACKOFFS ) {
-				if( !IS_PURE(out) ) jit_assert();
-				emit_ext(ctx,_LEA,out,VAL_MEM(R(RBP)),M_PTR,GET_STACK_OFFS(e->a));
+				ereg w = IS_PURE(out) ? out : RTMP;
+				emit_ext(ctx,_LEA,w,VAL_MEM(R(RBP)),M_PTR,GET_STACK_OFFS(e->a));
+				if( w != out ) emit_mov(ctx, out, w, M_PTR);
 			} else
 				emit_mov(ctx, out, e->a, e->mode);
 			break;
@@ -903,7 +954,11 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case PUSH:
 			if( IS_FLOAT(e->mode) ) BREAK();
-			emit_ext(ctx, _PUSH, e->a, UNUSED, e->mode, 0);
+			if( (e->a&FL_NATMASK) == FL_STACKOFFS ) {
+				emit_mov(ctx, RTMP, e->a, e->mode);
+				emit_ext(ctx, _PUSH, RTMP, UNUSED, e->mode, 0);
+			} else
+				emit_ext(ctx, _PUSH, e->a, UNUSED, e->mode, 0);
 			break;
 		case POP:
 			if( IS_FLOAT(e->mode) ) BREAK();
@@ -924,15 +979,25 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case LOAD_CONST:
 			{
-				ereg w = IS_PURE(out) ? out : get_tmp(e->mode);
+				emit_mode mode = e->mode;
+				if( !IS_PURE(out) )
+					mode = (mode == M_F32 ? M_I32 : mode == M_F64 ? M_I64 : mode); // don't use FP for stack ops
+				ereg w = IS_PURE(out) ? out : get_tmp(mode);
 				if( e->value == 0 )
-					EMIT(e->mode == M_F32 ? XORPS : e->mode == M_F64 ? XORPD : XOR, w, w, e->mode);
-				else {
-					if( IS_FLOAT(e->mode) ) BREAK();
-					emit_ext(ctx, _MOV, w, VAL_CONST, e->mode, e->value);
-				}
+					EMIT(mode == M_F32 ? XORPS : mode == M_F64 ? XORPD : XOR, w, w, mode);
+				else if( IS_FLOAT(mode) ) {
+					// MOVSS / MOVSD with data relative
+					B(e->mode == M_F32 ? 0xF3 : 0xF2);
+					if( out&8 ) B(0x44);
+					B(0x0F);
+					B(0x10);
+					MOD_RM(0,out&7,5);
+					W(0);					
+					alloc_stored_value(ctx, e->value);
+				} else
+					emit_ext(ctx, _MOV, w, VAL_CONST, mode, e->value);
 				if( w != out )
-					emit_mov(ctx, out, w, e->mode);
+					emit_mov(ctx, out, w, mode);
 			}
 			break;
 		case LOAD_ADDR:
@@ -994,6 +1059,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 				if( !IS_PURE(e->a) && !IS_PURE(e->b) ) {
 					ereg tmp = get_tmp(e->mode);
 					emit_mov(ctx, tmp, e->b, e->mode);
+					if( op == COMISS || op == COMISD ) BREAK();
 					EMIT(op,e->a,tmp,e->mode);
 				} else
 					EMIT(op,e->a,e->b,e->mode);
@@ -1004,8 +1070,8 @@ void hl_codegen_function( jit_ctx *jit ) {
 				int prev = 0;
 				einstr *p;
 				do {
-					p = &e[--prev];
-				} while( p->op == MOV );
+					p = jit->reg_instrs + ctx->cur_op - (++prev);
+				} while( p->op == MOV || p->op == JCOND );
 				int op;
 				switch( p->size_offs ) {
 				case OJFalse:
@@ -1046,6 +1112,14 @@ void hl_codegen_function( jit_ctx *jit ) {
 				case OJNotGte:
 					op = JULt;
 					break;
+				case 0:
+					if( p->op == DEBUG_BREAK ) {
+						// found a debug break !
+						BREAK();
+						op = JZero;
+						break;
+					}
+					// fallback
 				default:
 					jit_assert();
 					break;
@@ -1060,6 +1134,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			BREAK();
 			break;
 		case CONV:
+		case CONV_UNSIGNED:
 			BREAK();
 			break;
 		case BINOP:
@@ -1079,6 +1154,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_ext(ctx,ADD,R(RSP),VAL_CONST,M_PTR,e->size_offs);
 			else
 				emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,-e->size_offs);
+			break;
+		case PREFETCH:
+			BREAK();
 			break;
 		default:
 			jit_assert();
@@ -1146,11 +1224,26 @@ void hl_codegen_free( jit_ctx *jit ) {
 
 void hl_codegen_final( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
+	// patch function offsets
 	for(int i=0;i<int_arr_count(ctx->funs);i+=2) {
 		int pos = int_arr_get(ctx->funs,i);
 		int fid = int_arr_get(ctx->funs,i+1);
 		int offset = (int)(int_val)jit->mod->functions_ptrs[fid] - (pos + 4);
-		*(int*)(jit->final_code + pos) = offset;
+		*(int*)(jit->output + pos) = offset;
 	}
 	int_arr_reset(&ctx->funs);
+	// emit constant table
+	jit->code_size = value_arr_count(ctx->const_table) * sizeof(uint64);
+	jit->code_instrs = (unsigned char *)ctx->const_table.values;
+	// patch constant offsets
+	for(int i=0;i<int_arr_count(ctx->const_refs);i+=2) {
+		int pos = int_arr_get(ctx->const_refs,i);
+		int coffs = int_arr_get(ctx->const_refs,i+1) * sizeof(uint64);
+		int offset = (jit->out_pos + coffs) - (pos + 4);
+		*(int*)(jit->output + pos) = offset;
+	}
+	int_arr_reset(&ctx->const_refs);
+	// cleanup
+	value_arr_free(&ctx->const_table);
+	value_map_free(&ctx->const_table_lookup);
 }
