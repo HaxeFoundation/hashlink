@@ -9,11 +9,11 @@ abstract Icon(IconPtr) {
 	}
 
 	public function destroy() {
-		destroyCursor(this);
+		destroyIcon(this);
 	}
 
 	@:hlNative("?directx","destroy_icon")
-	static function destroyCursor( ptr : IconPtr) {
+	static function destroyIcon( ptr : IconPtr) {
 	}
 
 }
