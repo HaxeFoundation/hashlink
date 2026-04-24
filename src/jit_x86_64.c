@@ -743,11 +743,20 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 				return;
 			}
 		}
+		if( out == b ) {
+			ereg r = get_tmp(mode);
+			emit_anyop(ctx,op,r,a,b,mode);
+			emit_mov(ctx,out,r,mode);
+			return;
+		}
 		b = UNUSED;
 		cop = (op == OShl ? SHL : (op == OSShr ? SAR : SHR));
 		break;
-	case OSMod:
 	case OSDiv:
+		F_OP(IDIV,DIVSS,DIVSD);
+		if( !IS_FLOAT(mode) ) BREAK();
+		break;
+	case OSMod:
 	case OUMod:
 	case OUDiv:
 		BREAK();
@@ -778,7 +787,7 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		jit_assert();
 		break;
 	}
-	if( !IS_PURE(out) ) {
+	if( !IS_PURE(out) || out == b ) {
 		ereg tmp = get_tmp(mode);
 		emit_mov(ctx, tmp, a, mode);
 		EMIT(cop,tmp,b,mode);
@@ -965,7 +974,13 @@ void hl_codegen_function( jit_ctx *jit ) {
 			emit_ext(ctx, _POP, e->a, UNUSED, e->mode, 0);
 			break;
 		case PUSH_CONST:
-			emit_ext(ctx, (e->value&0xFF) == e->value && e->mode == M_PTR ? PUSH8 : _PUSH, VAL_CONST, UNUSED, e->mode, e->value);
+			if( e->mode != M_PTR ) jit_assert();
+			if( (e->value&0xFF) == e->value )
+				emit_ext(ctx,PUSH8, VAL_CONST, UNUSED, M_PTR, e->value);
+			else if( (e->value&0xFFFFFFFF) == e->value )
+				emit_ext(ctx,_PUSH, VAL_CONST, UNUSED, M_I32, e->value); // will push 64bits
+			else
+				emit_ext(ctx,_PUSH, VAL_CONST, UNUSED, M_PTR, e->value);
 			break;
 		case DEBUG_BREAK:
 			BREAK();
@@ -994,7 +1009,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 					MOD_RM(0,out&7,5);
 					W(0);					
 					alloc_stored_value(ctx, e->value);
-				} else
+				} else if( (mode == M_PTR || mode == M_I64) && (e->value&0xFFFFFFFF) == e->value )
+					emit_ext(ctx, _MOV, w, VAL_CONST, M_I32, e->value);
+				else
 					emit_ext(ctx, _MOV, w, VAL_CONST, mode, e->value);
 				if( w != out )
 					emit_mov(ctx, out, w, mode);
@@ -1029,8 +1046,11 @@ void hl_codegen_function( jit_ctx *jit ) {
 				B(0xE8);
 				W(target - (jit->out_pos + byte_count(ctx->code) + 4));
 			} else {
-				emit_ext(ctx, _MOV, R(RAX), VAL_CONST, M_PTR, e->value);
-				EMIT(_CALL, R(RAX), UNUSED, M_NONE);
+				// call near indirect
+				B(0xFF);
+				B(0x15);
+				W(0);
+				alloc_stored_value(ctx, (uint64)e->value);
 			}
 			break;
 		case CALL_REG:
