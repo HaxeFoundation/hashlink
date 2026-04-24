@@ -50,6 +50,7 @@
 #endif
 
 typedef struct {
+	int id;
 	int stack_pos;
 	int last_read;
 	int tot_reads;
@@ -149,9 +150,7 @@ static int regs_alloc_stack( regs_ctx *ctx, int size ) {
 
 static const char *value_to_str( regs_ctx *ctx, value_info *v ) {
 	static char out[20];
-	int idx = (int)(v - ctx->values);
-	ereg e = (ereg)(idx >= ctx->jit->value_count ? -(idx-ctx->jit->value_count) - 1 : idx);
-	sprintf(out,"%s:%s", val_str(e,v->mode), val_str(v->reg,v->mode));
+	sprintf(out,"%s:%s", val_str(v->id,v->mode), val_str(v->reg,v->mode));
 	return out;
 }
 
@@ -382,7 +381,12 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
 		einstr e = jit->instrs[cur_op];
 		value_info *write = NULL;
+#		ifdef HL_DEBUG
+		int uid = (jit->fun->findex << 16) | cur_op;
+		__ignore(&uid);
+#		endif
 		ctx->cur_op = cur_op;
+
 
 		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op ) {
 			write = VAL(write_index++);
@@ -720,10 +724,13 @@ void hl_regs_function( jit_ctx *jit ) {
 		v->pref_reg = UNUSED;
 		v->stack_pos = INVALID;
 		v->last_read = -1;
-		if( i < jit->value_count )
+		if( i < jit->value_count ) {
+			v->id = i;
 			v->mode = jit->instrs[jit->values_writes[i]].mode;
-		else
-			v->mode = M_NONE; // TODO : phi mode
+		} else {
+			v->id = -(i-jit->value_count) - 1;
+			v->mode = M_NONE;
+		}
 	}
 	regs_compute_liveness(ctx);
 	regs_assign_regs(ctx);
