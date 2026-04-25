@@ -28,6 +28,7 @@ typedef enum {
 	LOAD_ADDR,
 	LOAD_CONST,
 	LOAD_ARG,
+	LOAD_FUN,
 	STORE,
 	LEA,
 	TEST,
@@ -54,6 +55,7 @@ typedef enum {
 	ENTER,
 	STACK_OFFS,
 	XCHG,
+	CATCH,
 } emit_op;
 
 typedef enum {
