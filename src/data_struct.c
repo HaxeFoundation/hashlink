@@ -49,6 +49,9 @@ typedef struct {
 } S_TYPE;
 
 typedef S_VALUE	S_NAME(_value);
+#ifdef S_MAP
+typedef S_KEY	S_NAME(_key);
+#endif
 
 INLINE static void S_NAME(check_size)( hl_alloc *alloc, S_TYPE *st ) {
 	if( st->cur == st->max ) {
@@ -257,6 +260,13 @@ INLINE static bool S_NAME(iter_next)( S_TYPE st, S_VALUE *val, int idx ) {
 	if( idx < st.cur ) *val = st.values[idx];
 	return idx < st.cur;
 }
+
+#ifdef S_MAP
+INLINE static bool S_NAME(iter_next_key)( S_TYPE st, S_KEY *key, int idx ) {
+	if( idx < st.cur ) *key = st.keys[idx];
+	return idx < st.cur;
+}
+#endif
 
 INLINE static bool S_NAME(iter_prev)( S_TYPE st, S_VALUE *val, int idx ) {
 	if( idx >= 0 ) *val = st.values[idx];

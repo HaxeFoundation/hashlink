@@ -45,6 +45,9 @@ typedef enum {
 	CALL_REG,
 	CALL_FUN,
 	MOV,
+	CMOV,
+	XCHG,
+	CXCHG,
 	PUSH_CONST,
 	PUSH,
 	POP,
@@ -54,7 +57,6 @@ typedef enum {
 	BLOCK,
 	ENTER,
 	STACK_OFFS,
-	XCHG,
 	CATCH,
 	ADDRESS,
 } emit_op;
@@ -135,6 +137,7 @@ struct _ephi {
 	int nvalues;
 	emit_mode mode;
 	ereg *values;
+	int *blocks;
 };
 
 typedef struct _eblock {

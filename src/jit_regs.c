@@ -222,34 +222,6 @@ static value_info *regs_current( regs_ctx *ctx, ereg r ) {
 	return NULL;
 }
 
-static eblock *resolve_block_value( regs_ctx *ctx, ereg v ) {
-	if( v < 0 ) {
-		for(int i=0;i<ctx->jit->block_count;i++) {
-			eblock *b = ctx->jit->blocks + i;
-			for(int p=0;p<b->phi_count;p++) {
-				if( b->phis[p].value == v )
-					return b;
-			}
-		}
-	} else {
-		if( IS_NATREG(v) ) jit_assert();
-		int idx = ctx->jit->values_writes[v];
-		int min = 0;
-		int max = ctx->jit->block_count;
-		while( min < max ) {
-			int med = (min + max) >> 1;
-			eblock *b = ctx->jit->blocks + med;
-			if( idx < b->start_pos ) {
-				max = med;
-			} else if( idx >= b->end_pos ) {
-				min = med;
-			} else
-				return b;
-		}
-	}
-	jit_assert();
-}
-
 static void regs_compute_liveness( regs_ctx *ctx ) {
 #	define MAX_LOOP_DEPTH 256
 	int loop_saves[MAX_LOOP_DEPTH];
@@ -345,31 +317,15 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			VAL_REG(ph->value)->mode = ph->mode;
 			for(int k=0;k<ph->nvalues;k++) {
 				ereg v = ph->values[k];
-				eblock *b2 = resolve_block_value(ctx, v);
+				eblock *b2 = jit->blocks + ph->blocks[k];
 				value_info *val = VAL_REG(v);
-				if( b2->start_pos >= bl->start_pos ) {
-					// loop : insert in all predecesors
-					for(int i=0;i<bl->pred_count;i++) {
-						b2 = &jit->blocks[bl->preds[i]];
-						if( b2->start_pos >= bl->start_pos ) {
-							int_arr *arr = &ctx->blocks_phis[b2 - jit->blocks];
-							regs_debug("ADD PHI %s:=%s to #%d@%X\n",val_str(ph->value,ph->mode),val_str(v,ph->mode),(int)(b2 - jit->blocks),b2->end_pos-1);
-							int_arr_add(*arr,v);
-							int_arr_add(*arr,ph->value);
-							val->tot_reads++;
-							if( val->last_read < b2->end_pos )
-								val->last_read = b2->end_pos;
-						}
-					}
-				} else {
-					int_arr *arr = &ctx->blocks_phis[b2 - jit->blocks];
-					regs_debug("ADD PHI %s:=%s to #%d@%X\n",val_str(ph->value,ph->mode),val_str(v,ph->mode),(int)(b2 - jit->blocks),b2->end_pos-1);
-					int_arr_add(*arr,v);
-					int_arr_add(*arr,ph->value);
-					val->tot_reads++;
-					if( val->last_read < b2->end_pos )
-						val->last_read = b2->end_pos;
-				}
+				int_arr *arr = &ctx->blocks_phis[b2 - jit->blocks];
+				regs_debug("ADD PHI %s:=%s to #%d@%X\n",val_str(ph->value,ph->mode),val_str(v,ph->mode),(int)(b2 - jit->blocks),b2->end_pos-1);
+				int_arr_add(*arr,v);
+				int_arr_add(*arr,ph->value);
+				val->tot_reads++;
+				if( val->last_read < b2->end_pos )
+					val->last_read = b2->end_pos;
 			}
 		}
 	}
@@ -501,7 +457,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	}
 }
 
-static void flush_movs( regs_ctx *ctx ) {
+static void flush_movs( regs_ctx *ctx, bool cond ) {
 	int_arr movs = ctx->pack_movs;
 	while( true ) {
 		int size = int_arr_count(movs);
@@ -520,7 +476,8 @@ static void flush_movs( regs_ctx *ctx ) {
 			if( !read ) {
 				ereg from = int_arr_get(movs,k+1);
 				int mode = int_arr_get(movs,k+2);
-				regs_emit_mov(ctx,to,from,mode);
+				bool cmov = cond && IS_PURE(to); 
+				regs_emit(ctx,to,cmov?CMOV:MOV,from,UNUSED,mode,0);
 				int_arr_remove_range(&movs,k,3);
 				cycle = false;
 				break;
@@ -530,7 +487,8 @@ static void flush_movs( regs_ctx *ctx ) {
 			ereg to = int_arr_get(movs,0);
 			ereg from = int_arr_get(movs,1);
 			int mode = int_arr_get(movs,2);
-			EMIT(XCHG,to,from,mode);
+			bool cmov = cond && (IS_PURE(to) || IS_PURE(from));
+			regs_emit(ctx,UNUSED,cmov?CXCHG:XCHG,to,from,mode,0);
 			int_arr_remove_range(&movs,0,3);
 			size -= 3;
 			for(int k=0;k<size;k+=3) {
@@ -545,13 +503,14 @@ static void flush_movs( regs_ctx *ctx ) {
 	int_arr_reset(&ctx->pack_movs);
 }
 
-static void flush_phis( regs_ctx *ctx, eblock *b ) {
+static void flush_phis( regs_ctx *ctx, eblock *b, bool cond ) {
 	if( !b ) return;
 	jit_ctx *jit = ctx->jit;
 	int bid = (int)(b - jit->blocks);
 	int_arr arr = ctx->blocks_phis[bid];
 	int idx = 0;
 	int_arr movs = ctx->pack_movs;
+
 	while( idx < int_arr_count(arr) ) {
 		ereg a = int_arr_get(arr,idx++);
 		ereg b = int_arr_get(arr,idx++);
@@ -574,7 +533,7 @@ static void flush_phis( regs_ctx *ctx, eblock *b ) {
 	}
 	ctx->pack_movs = movs;
 	int_arr_free(&ctx->blocks_phis[bid]);
-	flush_movs(ctx);
+	flush_movs(ctx, cond);
 }
 
 static void regs_emit_instrs( regs_ctx *ctx ) {
@@ -641,7 +600,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				}
 				instr_stack_offset = stack_args+offset;
 			}
-			flush_movs(ctx);
+			flush_movs(ctx,0);
 			e.nargs = 0xFF;
 			if( vout && vout->last_read > cur_op ) 
 				ret_val = &REG_CFG(REG_MODE(e.mode))->ret;
@@ -688,10 +647,10 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 			}
 			break;
-		case JUMP:
 		case JCOND:
+		case JUMP:
 		case JUMP_TABLE:
-			flush_phis(ctx,cur_block);
+			flush_phis(ctx,cur_block, e.op == JCOND);
 			if( e.op == JUMP_TABLE ) {
 				// copy args (remap later)
 				hl_emit_store_args(jit->emit,&e,hl_emit_get_args(jit->emit,&e),e.nargs);
@@ -734,7 +693,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		if( instr_stack_offset )
 			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,instr_stack_offset);
 		if( cur_block && cur_block->end_pos == cur_op+1 )
-			flush_phis(ctx,cur_block);
+			flush_phis(ctx,cur_block,false);
 		ctx->pos_map[cur_op+1] = ctx->emit_pos;
 	}
 }
