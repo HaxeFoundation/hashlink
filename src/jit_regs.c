@@ -43,12 +43,6 @@
 #define EMIT(r,a,b,m)	regs_emit(ctx,UNUSED,r,a,b,m,0)
 #define BREAK()	EMIT(DEBUG_BREAK,UNUSED,UNUSED,0)
 
-#if defined(HL_WIN_CALL) && defined(HL_64)
-#	define IS_WINCALL64 1
-#else
-#	define IS_WINCALL64 0
-#endif
-
 typedef struct {
 	int id;
 	int stack_pos;

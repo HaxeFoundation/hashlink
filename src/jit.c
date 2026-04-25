@@ -164,6 +164,58 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	return pos;
 }
 
+static void *null_wrapper( hl_type *ft ) {
+	return hl_jit_assert;
+}
+
+static void *call_jit_c2hl = hl_jit_assert;
+static int arg_reg_count = 0;
+static int arg_fp_count = 0;
+
+static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
+	int nargs = t->fun->nargs;
+	if( nargs > MAX_ARGS )
+		hl_error("Too many arguments for dynamic call");
+	struct {
+		void *regs[MAX_ARGS];
+		void *stack[MAX_ARGS];
+	} vargs;
+	int rp = 0, fp = 0, sp = MAX_ARGS;
+	for(int i=0;i<t->fun->nargs;i++) {
+		hl_type *at = t->fun->args[i];
+		void *v = args[i];
+		if( at->kind == HF32 || at->kind == HF64 ) {
+			if( fp < arg_fp_count )
+				vargs.regs[arg_reg_count + fp++] = v;
+			else
+				vargs.stack[--sp] = v;
+		} else if( rp < arg_reg_count )
+			vargs.regs[rp++] = v;
+		else
+			vargs.stack[--sp] = v;
+	}
+	switch( t->fun->ret->kind ) {
+	case HUI8:
+	case HUI16:
+	case HI32:
+	case HBOOL:
+		ret->v.i = ((int (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		return &ret->v.i;
+	case HI64:
+	case HGUID:
+		ret->v.i64 = ((int64 (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		return &ret->v.i64;
+	case HF32:
+		ret->v.f = ((float (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		return &ret->v.f;
+	case HF64:
+		ret->v.d = ((double (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		return &ret->v.d;
+	default:
+		return ((void *(*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+	}
+}
+
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
 	hl_codegen_flush_consts(ctx);
 	jit_code_append(ctx);
@@ -177,6 +229,11 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	ctx->final_code = code;
 	hl_emit_final(ctx);
 	hl_codegen_final(ctx);
+	arg_reg_count = ctx->cfg.regs.nargs;
+	arg_fp_count = ctx->cfg.floats.nargs;
+	call_jit_c2hl = ctx->final_code + ctx->code_funs.c2hl;
+	hl_setup.get_wrapper = null_wrapper;
+	hl_setup.static_call = callback_c2hl;
 	return code;
 }
 
