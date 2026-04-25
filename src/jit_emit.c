@@ -36,7 +36,6 @@ int hl_emit_mode_sizes[] = {0,1,2,4,8,HL_WSIZE,8,4,0,0};
 typedef struct {
 	hl_type *t;
 	int id;
-	ereg ref;
 } vreg;
 
 #define MAX_TMP_ARGS	32
@@ -608,8 +607,6 @@ static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r ) {
 }
 
 static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
-	if( !IS_NULL(r->ref) )
-		return LOAD_MEM(r->ref,0,r->t);
 	return emit_load_reg_block(ctx, ctx->current_block, r);
 }
 
@@ -980,7 +977,6 @@ void hl_emit_function( jit_ctx *jit ) {
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
-		r->ref = UNUSED;
 	}
 
 	emit_gen(ctx,ENTER,UNUSED,UNUSED,M_NONE);
@@ -1135,7 +1131,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 		{
 			ereg args[2] = { a, b };
 			ereg ret = emit_native_call(ctx,hl_same_type,args,2,&hlt_bool);
-			emit_test(ctx, ret, op);
+			emit_test(ctx, emit_gen_ext(ctx,UNOP,ret,UNUSED,M_I32,ONot), op);
 		}
 		break;
 	case HNULL:
@@ -1890,25 +1886,13 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		STORE(dst, LOAD_MEM(LOAD(ra),HL_WSIZE*2,&hlt_i32));
 		break;
 	case ORef:
-		{
-			if( IS_NULL(ra->ref) )
-				ra->ref = emit_gen_size(ctx, ALLOC_STACK, hl_type_size(ra->t));
-			ereg r = vreg_find(ctx->current_block->written_vars, ra->id);
-			if( !IS_NULL(r) ) {
-				STORE_MEM(ra->ref, 0, r);
-				vreg_remove(&ctx->current_block->written_vars, ra->id);
-			}
-			STORE(dst,ra->ref);
-		}
+		STORE(dst, emit_gen(ctx, ADDRESS, LOAD(ra), UNUSED, M_PTR));
 		break;
 	case OUnref:
 		STORE(dst, LOAD_MEM(LOAD(ra),0,dst->t));
 		break;
 	case OSetref:
-		if( dst->ref == UNUSED )
-			STORE_MEM(LOAD(dst),0,LOAD(ra));
-		else
-			STORE_MEM(dst->ref,0,LOAD(ra));
+		STORE_MEM(LOAD(dst),0,LOAD(ra));
 		break;
 	case ORefData:
 		switch( ra->t->kind ) {
