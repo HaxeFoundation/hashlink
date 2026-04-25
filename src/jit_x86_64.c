@@ -308,11 +308,13 @@ struct _code_ctx {
 	int_arr short_jumps;
 	int_arr near_jumps;
 	value_map const_table_lookup;
-	value_arr const_table;
+	byte_arr const_table;
 	int_arr const_refs;
+	int_arr const_addr;
 	int *pos_map;
 	int cur_op;
 	bool flushed;
+	int const_table_pos;
 	int null_access_pos;
 	int null_field_pos;
 };
@@ -762,10 +764,12 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		BREAK();
 		return;
 	case ONot:
-		BREAK();
-		cop = XOR;
-		b = a;
-		break;
+		if( IS_PURE(a) ) {
+			emit_ext(ctx,XOR,a,VAL_CONST,M_I32,1);
+		} else {			
+			BREAK();
+		}
+		return;
 	case ONeg:
 		if( IS_FLOAT(mode) ) {
 			BREAK();
@@ -787,7 +791,9 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		jit_assert();
 		break;
 	}
-	if( !IS_PURE(out) || out == b ) {
+	if( out == a && IS_PURE(a) ) {
+		EMIT(cop,out,b,mode);
+	} else if( !IS_PURE(out) || out == b ) {
 		ereg tmp = get_tmp(mode);
 		emit_mov(ctx, tmp, a, mode);
 		EMIT(cop,tmp,b,mode);
@@ -841,10 +847,15 @@ static void emit_nop( code_ctx *ctx, int size ) {
 
 static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 	einstr e = *_e;
-	if( e.a && (e.a & FL_NATMASK) == FL_STACKOFFS ) {
-		e.value += GET_STACK_OFFS(e.a);
+
+	int mult = e.size_offs & 0xFF;
+	int offs = e.size_offs >> 8;
+
+	if( (e.a & FL_NATMASK) == FL_STACKOFFS ) {
+		offs += GET_STACK_OFFS(e.a);
 		e.a = R(RBP);
 	}
+
 	if( !IS_PURE(e.a) ) {
 		// a is always a mem address !
 		emit_mov(ctx, RTMP, e.a, M_PTR);
@@ -859,14 +870,14 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 		emit_mov(ctx, RTMP, e.b, M_I32);
 		e.b = RTMP;
 	}
-	int mult = e.size_offs & 0xFF;
-	int offs = e.size_offs >> 8;
+
 	if( mult == 0 ) {
+		if( e.a & FL_MEMPTR ) jit_assert();
 		// no index
-		BREAK();
-		emit_ext(ctx,_LEA,out,e.a,M_PTR,offs);
+		emit_ext(ctx,_LEA,out,e.a | FL_MEMPTR,M_PTR,offs);
 		return;
 	}
+
 	int r64 = 8 | ((out&8) ? 4 : 0) | ((e.b&8) ? 2 : 0) | ((e.a & 8) ? 1 : 0);
 	REX();
 	B(0x8D);
@@ -883,15 +894,37 @@ static void align_function( code_ctx *ctx ) {
 		emit_nop(ctx,16 - (byte_count(ctx->code) & 15));
 }
 
-static void alloc_stored_value( code_ctx *ctx, uint64 value ) {
-	int idx = value_map_find(ctx->const_table_lookup, value);
-	if( idx < 0 ) {
-		idx = ctx->const_table.cur;
-		value_map_add_impl(&ctx->jit->galloc,&ctx->const_table_lookup,value,idx);
-		value_arr_add_impl(&ctx->jit->galloc,&ctx->const_table,value);
+static int reserve_const_segment( code_ctx *ctx, int size, int align ) {
+	int pos = byte_count(ctx->const_table);
+	if( align ) {
+		int k = pos & (align-1);
+		if( k ) {
+			byte_reserve_impl(&ctx->jit->galloc,&ctx->const_table,align - k);
+			pos = byte_count(ctx->const_table);
+		}
+	}
+	byte_reserve_impl(&ctx->jit->galloc,&ctx->const_table,size);
+	return pos;
+}
+
+static void alloc_const( code_ctx *ctx, uint64 value ) {
+	int pos = value_map_find(ctx->const_table_lookup, value);
+	if( pos < 0 ) {
+		pos = reserve_const_segment(ctx,8,8);
+		*(uint64*)byte_addr(ctx->const_table,pos) = value;
+		value_map_add_impl(&ctx->jit->galloc,&ctx->const_table_lookup,value,pos);
 	}
 	int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,ctx->jit->out_pos + byte_count(ctx->code) - 4);
-	int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,idx);
+	int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,pos);
+}
+
+static int emit_lea_rel( code_ctx *ctx, ereg out ) {
+	B(0x48 + ((out & 8) ? 4 : 0));
+	B(0x8D);
+	MOD_RM(0,out&7,5);
+	int pos = ctx->jit->out_pos + byte_count(ctx->code);
+	W(0);
+	return pos;
 }
 
 void hl_codegen_function( jit_ctx *jit ) {
@@ -951,7 +984,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			}
 			break;
 		case STORE:
-			if( !IS_PURE(e->a) && !IS_PURE(e->b) && (e->a & FL_NATMASK) != FL_STACKOFFS ) {
+			if( !IS_PURE(e->a) && !IS_PURE(e->b) && (e->a & FL_NATMASK) != FL_STACKOFFS && (e->b & FL_NATMASK) != FL_STACKOFFS ) {
 				EMIT(_PUSH,e->b,UNUSED,e->mode);
 				emit_mov(ctx, RTMP, e->a, M_PTR);
 				emit_ext(ctx, _POP,VAL_MEM(RTMP), UNUSED, e->mode, e->size_offs);
@@ -1008,7 +1041,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 					B(0x10);
 					MOD_RM(0,out&7,5);
 					W(0);					
-					alloc_stored_value(ctx, e->value);
+					alloc_const(ctx, e->value);
 				} else if( (mode == M_PTR || mode == M_I64) && (e->value&0xFFFFFFFF) == e->value )
 					emit_ext(ctx, _MOV, w, VAL_CONST, M_I32, e->value);
 				else
@@ -1032,15 +1065,10 @@ void hl_codegen_function( jit_ctx *jit ) {
 		case LOAD_FUN:
 			{
 				ereg w = IS_PURE(out) ? out : RTMP;
-				// LEA relative
-				B(0x48 + ((out & 8) ? 4 : 0));
-				B(0x8D);
-				MOD_RM(0,out&7,5);
-				int pos = jit->out_pos + byte_count(ctx->code);
+				int pos = emit_lea_rel(ctx,w);
 				int fid = e->size_offs;
 				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,pos);
 				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
-				W(0);
 				if( w != out )
 					emit_mov(ctx, out, w, M_PTR);
 			}
@@ -1066,7 +1094,11 @@ void hl_codegen_function( jit_ctx *jit ) {
 				B(0xFF);
 				B(0x15);
 				W(0);
-				alloc_stored_value(ctx, (uint64)e->value);
+				alloc_const(ctx, (uint64)e->value);
+				if( e->mode == M_UI8 || e->mode == M_UI16 ) {
+					// clear value upper bits
+					EMIT(e->mode == M_UI8 ? MOVZX8 : MOVZX16,R(RAX),R(RAX),M_PTR);
+				}
 			}
 			break;
 		case CALL_REG:
@@ -1167,7 +1199,23 @@ void hl_codegen_function( jit_ctx *jit ) {
 			emit_jump(ctx, JAlways, e->size_offs);
 			break;
 		case JUMP_TABLE:
-			BREAK();
+			{
+				int start = reserve_const_segment(ctx,HL_WSIZE * e->nargs,16);
+				int pos = emit_lea_rel(ctx, RTMP);
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,pos);
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,start);
+				ereg a = RTMP;
+				ereg b = e->a;
+				B(0x40 | ((a&8)?1:0) | ((b&8)?2:0));
+				B(0xFF);
+				B(0x24);
+				SIB(3,(b&7),(a&7));
+				int here = jit->out_pos + byte_count(ctx->code);
+				for(int k=0;k<e->nargs;k++) {
+					int_arr_add_impl(&jit->galloc,&ctx->const_addr,start + k * HL_WSIZE);
+					int_arr_add_impl(&jit->galloc,&ctx->const_addr,here);
+				}
+			}
 			break;
 		case CONV:
 		case CONV_UNSIGNED:
@@ -1258,7 +1306,7 @@ void hl_codegen_free( jit_ctx *jit ) {
 	free(ctx);
 }
 
-void hl_codegen_final( jit_ctx *jit ) {
+void hl_codegen_flush_consts( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
 	// patch function offsets
 	for(int i=0;i<int_arr_count(ctx->funs);i+=2) {
@@ -1269,17 +1317,29 @@ void hl_codegen_final( jit_ctx *jit ) {
 	}
 	int_arr_reset(&ctx->funs);
 	// emit constant table
-	jit->code_size = value_arr_count(ctx->const_table) * sizeof(uint64);
-	jit->code_instrs = (unsigned char *)ctx->const_table.values;
+	jit->code_size = byte_count(ctx->const_table);
+	jit->code_instrs = ctx->const_table.values;
+	ctx->const_table_pos = jit->out_pos;
 	// patch constant offsets
 	for(int i=0;i<int_arr_count(ctx->const_refs);i+=2) {
 		int pos = int_arr_get(ctx->const_refs,i);
-		int coffs = int_arr_get(ctx->const_refs,i+1) * sizeof(uint64);
-		int offset = (jit->out_pos + coffs) - (pos + 4);
+		int coffs = int_arr_get(ctx->const_refs,i+1);
+		int offset = (ctx->const_table_pos + coffs) - (pos + 4);
 		*(int*)(jit->output + pos) = offset;
 	}
 	int_arr_reset(&ctx->const_refs);
 	// cleanup
-	value_arr_free(&ctx->const_table);
+	byte_free(&ctx->const_table);
 	value_map_free(&ctx->const_table_lookup);
+}
+
+void hl_codegen_final( jit_ctx *jit ) {
+	code_ctx *ctx = jit->code;
+	// patch absolute addresses
+	for(int i=0;i<int_arr_count(ctx->const_addr);i+=2) {
+		int pos = int_arr_get(ctx->const_addr,i);
+		int offs = int_arr_get(ctx->const_addr,i+1);
+		*(void**)(jit->final_code + ctx->const_table_pos + pos) = jit->final_code + offs;
+	}
+	int_arr_free(&ctx->const_addr);
 }
