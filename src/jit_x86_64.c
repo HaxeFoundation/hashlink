@@ -1029,6 +1029,22 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_mov_ext(ctx,out,0,addr,e->size_offs,e->mode);
 			}
 			break;
+		case LOAD_FUN:
+			{
+				ereg w = IS_PURE(out) ? out : RTMP;
+				// LEA relative
+				B(0x48 + ((out & 8) ? 4 : 0));
+				B(0x8D);
+				MOD_RM(0,out&7,5);
+				int pos = jit->out_pos + byte_count(ctx->code);
+				int fid = e->size_offs;
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,pos);
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
+				W(0);
+				if( w != out )
+					emit_mov(ctx, out, w, M_PTR);
+			}
+			break;
 		case CALL_FUN:
 			B(0xE8);
 			{
