@@ -369,6 +369,8 @@ const char *hl_natreg_str( int reg, emit_mode m ) {
 
 static int scratch_float_reg = -1;
 
+static ereg scratch_not_param[] = { X(RAX), X(R10), X(R11) };
+
 void hl_jit_init_regs( regs_config *cfg ) {
 	// exclude R11 at it's use as temporary for various ops
 #	ifdef HL_WIN_CALL
@@ -1273,10 +1275,36 @@ void hl_codegen_alloc( jit_ctx *jit ) {
 	ctx->jit = jit;
 }
 
+static void flush_function( code_ctx *ctx, int start ) {
+	hl_jit_define_function(ctx->jit, start, ctx->jit->out_pos + byte_count(ctx->code) - start);
+	align_function(ctx);
+	if( byte_count(ctx->code) > ctx->code.max ) jit_assert();
+}
+
+static int jump_near( code_ctx *ctx, int mode ) {
+	int pos = byte_count(ctx->code);
+	if( mode < 0 ) {
+		// backwards
+		int target = -mode;
+		B(JAlways_short);
+		B(target - (pos + 2)); 
+	} else {
+		B(mode == JAlways ? JAlways_short : mode - 0x10);
+		B(0);
+	}
+	return pos;
+}
+
+static void patch_jump_near( code_ctx *ctx, int jpos ) {
+	ctx->code.values[jpos + 1] = (unsigned char)(byte_count(ctx->code) - (jpos + 2));
+}
+
 void hl_codegen_init( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
-	byte_reserve(ctx->code,256);
-	ctx->code.cur -= 256;
+	byte_reserve(ctx->code,1024);
+	ctx->code.cur -= 1024;
+
+	// generate hl_null_access stub
 	ctx->null_access_pos = jit->out_pos + byte_count(ctx->code);
 	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
 	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
@@ -1284,19 +1312,55 @@ void hl_codegen_init( jit_ctx *jit ) {
 	emit_ext(ctx,_MOV,R(RAX),VAL_CONST,M_PTR,(int_val)hl_null_access);
 	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
 	BREAK();
-	hl_jit_define_function(jit, ctx->null_access_pos, jit->out_pos + byte_count(ctx->code) - ctx->null_access_pos);
-	align_function(ctx);
+	flush_function(ctx, ctx->null_access_pos);
+	
+	// generate hl_null_field access stub
 	ctx->null_field_pos = jit->out_pos + byte_count(ctx->code);
 	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
 	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
 	emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,0x28);
-	emit_ext(ctx,_MOV,R(RCX),VAL_MEM(R(RBP)),M_I32,HL_WSIZE*2);
+	emit_ext(ctx,_MOV,jit->cfg.regs.arg[0],VAL_MEM(R(RBP)),M_I32,HL_WSIZE*2);
 	emit_ext(ctx,_MOV,R(RAX),VAL_CONST,M_PTR,(int_val)hl_jit_null_field_access);
 	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
 	BREAK();
-	hl_jit_define_function(jit, ctx->null_field_pos, jit->out_pos + byte_count(ctx->code) - ctx->null_field_pos);
-	align_function(ctx);
-	if( byte_count(ctx->code) > ctx->code.max ) jit_assert();
+	flush_function(ctx, ctx->null_field_pos);
+
+	// generate c2hl stub
+	jit->code_funs.c2hl = jit->out_pos + byte_count(ctx->code);
+	regs_config *cfg = &jit->cfg;
+	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
+	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
+
+	ereg fptr = scratch_not_param[0];
+	ereg vargs = scratch_not_param[1];
+	ereg nargs = scratch_not_param[2];
+	EMIT(_MOV,fptr,cfg->regs.arg[0],M_PTR);
+	EMIT(_MOV,vargs,cfg->regs.arg[1],M_PTR);
+	EMIT(_MOV,nargs,cfg->regs.arg[2],M_I32);
+
+	for(int i=0;i<cfg->regs.nargs;i++)
+		emit_ext(ctx, _MOV, cfg->regs.arg[i], vargs|FL_MEMPTR, M_PTR, i * 8);
+	for(int i=0;i<cfg->floats.nargs;i++)
+		emit_ext(ctx, MOVSD, cfg->floats.arg[i]-64, vargs|FL_MEMPTR, M_PTR, (i + cfg->regs.nargs) * 8);
+
+	emit_ext(ctx,ADD,vargs,VAL_CONST,M_PTR,(MAX_ARGS - 1) * HL_WSIZE);
+	int begin = byte_count(ctx->code);
+	EMIT(_TEST,nargs,nargs,M_I32);
+	int pos = jump_near(ctx,JZero);
+	EMIT(_PUSH,vargs|FL_MEMPTR,UNUSED,M_PTR);
+	EMIT(DEC,nargs,UNUSED,M_I32);
+	jump_near(ctx,-begin);
+	patch_jump_near(ctx,pos);
+
+	if( IS_WINCALL64 ) emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,0x20);
+	EMIT(_CALL, fptr, UNUSED, M_NONE);
+
+	EMIT(_MOV,R(RSP),R(RBP),M_PTR);
+	EMIT(_POP,R(RBP),UNUSED,M_PTR);
+	EMIT(_RET,UNUSED,UNUSED,M_NONE);
+	
+	flush_function(ctx, ctx->null_field_pos);
+	
 	hl_codegen_flush(jit);
 }
 
