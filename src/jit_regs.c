@@ -209,7 +209,7 @@ static void regs_assign( regs_ctx *ctx, value_info *v ) {
 	if( v->reg != UNUSED ) jit_assert();
 	if( regs_alloc_reg(ctx, v) )
 		values_add(ctx->scratch, v);
-	regs_debug("REG ASSIGN %s @%X\n",value_str(v),ctx->cur_op);
+	regs_debug("REG ASSIGN %s @%X-@%X\n",value_str(v),ctx->cur_op,v->last_read);
 }
 
 static void regs_write_live( regs_ctx *ctx, ereg *r ) {
@@ -406,6 +406,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 			ereg *args = hl_emit_get_args(ctx->jit->emit,&e);
 			call_regs regs = {0};
 			bool will_scratch = e.mode != M_NORET;
+			value_info *vcall = e.op == CALL_REG ? VAL_REG(e.a) : NULL;
 			if( will_scratch ) {
 				for_iter_back(values,v2,ctx->scratch) {
 					if( v2->last_read > cur_op )
@@ -419,11 +420,14 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 					value_info *cur = regs_current(ctx,r);
 					if( cur && cur != v )
 						spill(ctx,cur);
+					if( vcall && vcall->reg == r )
+						spill(ctx,vcall);
 				}
 			}
 			if( will_scratch ) values_reset(&ctx->scratch);
 		}
-		if( e.op == BLOCK ) {
+		switch( e.op ) {
+		case BLOCK:
 			for_iter_back(values,v,ctx->scratch) {
 				if( v->last_read == cur_op )
 					values_remove(&ctx->scratch,v);
@@ -442,20 +446,23 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 				}
 				regs_assign(ctx, v);
 			}
-		}
-		if( write ) {
-			switch( e.op ) {
-			case ALLOC_STACK:
-				write->reg = MK_STACK_OFFS(regs_alloc_stack(ctx, e.size_offs));
-				break;
-			case LOAD_ARG:
-				if( write->reg == UNUSED )
-					regs_assign(ctx, write); // assign for stack reg
-				break;
-			default:
-				regs_assign(ctx, write);
-				break;
+			break;
+		case CATCH:
+			{
+				for_iter_back(values,v2,ctx->scratch)
+					spill(ctx,v2);
 			}
+			break;
+		case ALLOC_STACK:
+			write->reg = MK_STACK_OFFS(regs_alloc_stack(ctx, e.size_offs));
+			break;
+		case LOAD_ARG:
+			if( write->reg == UNUSED )
+				regs_assign(ctx, write); // assign for stack reg
+			break;
+		default:
+			if( write ) regs_assign(ctx, write);
+			break;
 		}
 	}
 	// assign stack regs
@@ -463,7 +470,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	ctx->stack_offset = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
 	for(int i=0;i<nvalues;i++) {
 		value_info *v = ctx->values + i;
-		if( v->reg == UNUSED ) v->reg = MK_STACK_REG(v->stack_pos);// + ctx->stack_offset);
+		if( v->reg == UNUSED ) v->reg = MK_STACK_REG(v->stack_pos);
 	}
 }
 
@@ -603,13 +610,13 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			e.nargs = 0xFF;
 			ret_val = &REG_CFG(REG_MODE(e.mode))->ret;
 			if( e.op == CALL_REG )
-				e.a = VAL(VIDX(e.a))->reg;
+				e.a = VAL_REG(e.a)->reg;
 		} else {
 			ereg **regs = hl_emit_get_regs(&e,&nread);
 			for(int k=0;k<nread;k++) {
 				ereg *r = regs[k];
 				if( IS_NATREG(*r) ) continue;
-				value_info *v = VAL(VIDX(*r));
+				value_info *v = VAL_REG(*r);
 				*r = v->reg;
 			}
 		}
@@ -618,6 +625,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			out = VAL(write_index++)->reg;
 		switch( e.op ) {
 		case ALLOC_STACK:
+		case CATCH:
 			break;
 		case BLOCK:
 			cur_block = jit->blocks + e.size_offs;

@@ -25,6 +25,7 @@ static const char *op_names[] = {
 	"load-addr",
 	"load-const",
 	"load-arg",
+	"load-fun",
 	"store",
 	"lea",
 	"test",
@@ -51,6 +52,7 @@ static const char *op_names[] = {
 	"enter",
 	"stack",
 	"xchg",
+	"catch",
 };
 
 bool hl_jit_dump_bin = false;

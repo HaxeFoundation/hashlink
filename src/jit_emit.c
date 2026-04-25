@@ -1271,9 +1271,10 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 			emit_jump_dyn(ctx,op,bt,b,at,a,offset); // inverse
 			return;
 		}
-		BREAK();
+		if( hl_get_obj_rt(at)->compareFun ) {
+			BREAK();
 		/*
-		if( hl_get_obj_rt(a->t)->compareFun ) {
+
 			preg *pa = alloc_cpu(ctx,a,true);
 			preg *pb = alloc_cpu(ctx,b,true);
 			preg p;
@@ -1327,9 +1328,9 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 				patch_jump(ctx,jb);
 				break;
 			}
+			*/
 			return;
 		}
-		*/
 		// fallthrough
 	default:
 		emit_cmp(ctx, a, b, op);
@@ -1523,8 +1524,10 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg args[3];
 			args[0] = LOAD_CONST_PTR(m->code->functions[m->functions_indexes[o->p2]].type);
-			// TODO : WRITE (emit_pos + op_count) to process later and replace address !
-			args[1] = LOAD_CONST_PTR(0);
+			einstr *e = emit_instr(ctx, LOAD_FUN);
+			e->mode = M_PTR;
+			e->size_offs = o->p2;
+			args[1] = new_value(ctx);
 			args[2] = LOAD(rb);
 			STORE(dst, emit_native_call(ctx,hl_alloc_closure_ptr,args,3,dst->t));
 		}
@@ -1751,12 +1754,12 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				}
 				break;
 			case HVIRTUAL:
-				// code for : if( hl_vfields(o)[f] ) dst = *hl_vfields(o)[f](o->value,args...); else dst = hl_dyn_call_obj(o->value,field,args,&ret)
+				// code for : if( (fun=hl_vfields(o)[f]) ) dst = fun(o->value,args...); else dst = hl_dyn_call_obj(o->value,field,args,&ret)
 				{
 					vreg *_o = R(o->extra[0]);
 					ereg obj = LOAD(_o);
-					ereg field = LOAD_MEM_PTR(obj,sizeof(vvirtual)+HL_WSIZE*o->p2);
-					emit_test(ctx, field, OJNull);
+					ereg fun = LOAD_MEM_PTR(obj,sizeof(vvirtual)+HL_WSIZE*o->p2);
+					emit_test(ctx, fun, OJNull);
 					int jidx = emit_jump(ctx, true);
 
 					int nargs = o->p3;
@@ -1765,7 +1768,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					args[0] = LOAD_MEM_PTR(obj,HL_WSIZE);
 					for(i=1;i<nargs;i++)
 						args[i] = LOAD(R(o->extra[i]));
-					ereg v1 = emit_dyn_call(ctx,LOAD_MEM_PTR(field,0),args,nargs,dst->t);
+					ereg v1 = emit_dyn_call(ctx,fun,args,nargs,dst->t);
 
 					int jend = emit_jump(ctx, false);
 					patch_jump(ctx, jidx);
@@ -2141,6 +2144,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				STORE_MEM(st, offset, LOAD_CONST_PTR(NULL));
 			}
 #			endif
+			emit_instr(ctx, CATCH);
 		}
 		break;
 	case OSwitch:
