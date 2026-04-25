@@ -627,6 +627,14 @@ static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
 	return p->value;
 }
 
+static ereg emit_call_fid( emit_ctx *ctx, int findex, ereg *args, int nargs, emit_mode mode ) {
+	einstr *e = emit_instr(ctx, CALL_FUN);
+	e->mode = mode;
+	e->a = findex;
+	store_args(ctx, e, args, nargs);
+	return mode == M_VOID ? UNUSED : new_value(ctx);
+}
+
 static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int *args_regs ) {
 	hl_module *m = ctx->mod;
 	int fid = m->functions_indexes[findex];
@@ -637,11 +645,8 @@ static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int 
 	if( isNative )
 		STORE(dst, emit_native_call(ctx, m->functions_ptrs[findex], args, count, dst->t));
 	else {
-		einstr *e = emit_instr(ctx, CALL_FUN);
-		e->mode = hl_type_mode(dst->t);
-		e->a = findex;
-		store_args(ctx, e, args, count);
-		STORE(dst, e->mode == M_VOID ? UNUSED : new_value(ctx));
+		ereg out = emit_call_fid(ctx,findex,args,count,hl_type_mode(dst->t));
+		if( out ) STORE(dst, out);
 	}
 }
 
@@ -1268,63 +1273,54 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 			return;
 		}
 		if( hl_get_obj_rt(at)->compareFun ) {
-			BREAK();
-		/*
-
-			preg *pa = alloc_cpu(ctx,a,true);
-			preg *pb = alloc_cpu(ctx,b,true);
-			preg p;
-			int jeq, ja, jb, jcmp;
-			int args[] = { a->stack.id, b->stack.id };
-			switch( op->op ) {
+			ereg args[] = {a,b};
+			switch( op ) {
 			case OJEq:
-				// if( a == b || (a && b && cmp(a,b) == 0) ) goto
-				op64(ctx,CMP,pa,pb);
-				XJump_small(JEq,jeq);
-				op64(ctx,TEST,pa,pa);
-				XJump_small(JZero,ja);
-				op64(ctx,TEST,pb,pb);
-				XJump_small(JZero,jb);
-				op_call_fun(ctx,NULL,(int)(int_val)a->t->obj->rt->compareFun,2,args);
-				op32(ctx,TEST,PEAX,PEAX);
-				XJump_small(JNotZero,jcmp);
-				patch_jump(ctx,jeq);
-				register_jump(ctx,do_jump(ctx,OJAlways,false),targetPos);
-				patch_jump(ctx,ja);
-				patch_jump(ctx,jb);
-				patch_jump(ctx,jcmp);
+				{
+					// if( a == b || (a && b && cmp(a,b) == 0) ) goto
+					emit_cmp(ctx,a,b,OJEq);
+					int jeq = emit_jump(ctx, true);
+					emit_test(ctx,a,OJNull);
+					int ja = emit_jump(ctx, true);
+					emit_test(ctx,b,OJNull);
+					int jb = emit_jump(ctx, true);
+					emit_test(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32),OJNotNull);
+					int jcmp = emit_jump(ctx, true);
+					patch_jump(ctx, jeq);
+					register_block_jump(ctx, offset, false);
+					patch_jump(ctx, ja);
+					patch_jump(ctx, jb);
+					patch_jump(ctx, jcmp);
+				}
 				break;
 			case OJNotEq:
-				// if( a != b && (!a || !b || cmp(a,b) != 0) ) goto
-				op64(ctx,CMP,pa,pb);
-				XJump_small(JEq,jeq);
-				op64(ctx,TEST,pa,pa);
-				register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
-				op64(ctx,TEST,pb,pb);
-				register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
-
-				op_call_fun(ctx,NULL,(int)(int_val)a->t->obj->rt->compareFun,2,args);
-				op32(ctx,TEST,PEAX,PEAX);
-				XJump_small(JZero,jcmp);
-
-				register_jump(ctx,do_jump(ctx,OJNotEq,false),targetPos);
-				patch_jump(ctx,jcmp);
-				patch_jump(ctx,jeq);
+				{
+					// if( a != b && (!a || !b || cmp(a,b) != 0) ) goto
+					emit_cmp(ctx,a,b,OJEq);
+					int jeq = emit_jump(ctx, true);
+					emit_test(ctx,a,OJEq);
+					register_block_jump(ctx,offset,true);
+					emit_test(ctx,b,OJEq);
+					register_block_jump(ctx,offset,true);
+					emit_test(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32),OJNotNull);
+					register_block_jump(ctx,offset,true);
+					patch_jump(ctx,jeq);
+				}
 				break;
 			default:
-				// if( a && b && cmp(a,b) ?? 0 ) goto
-				op64(ctx,TEST,pa,pa);
-				XJump_small(JZero,ja);
-				op64(ctx,TEST,pb,pb);
-				XJump_small(JZero,jb);
-				op_call_fun(ctx,NULL,(int)(int_val)a->t->obj->rt->compareFun,2,args);
-				op32(ctx,CMP,PEAX,pconst(&p,0));
-				register_jump(ctx,do_jump(ctx,op->op,false),targetPos);
-				patch_jump(ctx,ja);
-				patch_jump(ctx,jb);
+				{
+					// if( a && b && cmp(a,b) ~op~ 0 ) goto
+					emit_test(ctx,a,OJNull);
+					int ja = emit_jump(ctx, true);
+					emit_test(ctx,b,OJNull);
+					int jb = emit_jump(ctx, true);
+					emit_cmp(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32), LOAD_CONST(0,&hlt_i32),op);
+					register_block_jump(ctx,offset,true);
+					patch_jump(ctx,ja);
+					patch_jump(ctx,jb);
+				}
 				break;
 			}
-			*/
 			return;
 		}
 		// fallthrough
@@ -1750,7 +1746,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				}
 				break;
 			case HVIRTUAL:
-				// code for : if( (fun=hl_vfields(o)[f]) ) dst = fun(o->value,args...); else dst = hl_dyn_call_obj(o->value,field,args,&ret)
+				// code for : if( (fun=hl_vfields(o)[f]) ) dst = fun(o->value,args...); else dst = hl_dyn_call_obj(o->value,ft,field,args,&ret)
 				{
 					vreg *_o = R(o->extra[0]);
 					ereg obj = LOAD(_o);
@@ -1770,7 +1766,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					patch_jump(ctx, jidx);
 
 					nargs = o->p3 - 1;
-					ereg eargs = emit_gen_size(ctx, ALLOC_STACK, nargs * HL_WSIZE);
+					ereg eargs = nargs == 0 ? LOAD_CONST_PTR(NULL) : emit_gen_size(ctx, ALLOC_STACK, nargs * HL_WSIZE);
 					for(i=0;i<nargs;i++)
 						STORE_MEM(eargs,i*HL_WSIZE,LOAD(R(o->extra[i+1])));
 					bool need_dyn = !hl_is_ptr(dst->t) && dst->t->kind != HVOID;
@@ -1779,9 +1775,10 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 
 					args = get_tmp_args(ctx, 4);
 					args[0] = LOAD_MEM_PTR(obj,HL_WSIZE);
-					args[1] = LOAD_CONST(_o->t->virt->fields[o->p2].hashed_name,&hlt_i32);
-					args[2] = eargs;
-					args[3] = edyn;
+					args[1] = LOAD_CONST_PTR(_o->t->virt->fields[o->p2].t);
+					args[2] = LOAD_CONST(_o->t->virt->fields[o->p2].hashed_name,&hlt_i32);
+					args[3] = eargs;
+					args[4] = edyn;
 
 					ereg v2 = emit_native_call(ctx, hl_dyn_call_obj, args, 4, dst->t);
 

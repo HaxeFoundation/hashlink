@@ -269,7 +269,7 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 		einstr *e = jit->instrs + cur_op;
 		value_info *write = NULL;
 
-		if( ctx->loop_end == cur_op && cur_op ) {
+		while( ctx->loop_end == cur_op && cur_op ) {
 			ctx->loop_end = loop_saves[--loop_count];
 			ctx->loop_start = loop_saves[--loop_count];
 		}
