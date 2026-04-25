@@ -1141,7 +1141,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 				einstr *p;
 				do {
 					p = jit->reg_instrs + ctx->cur_op - (++prev);
-				} while( p->op == MOV || p->op == JCOND );
+				} while( p->op == MOV || p->op == JCOND || p->op == CMOV || p->op == XCHG || p->op == CXCHG );
 				int op;
 				switch( p->size_offs ) {
 				case OJFalse:
@@ -1242,6 +1242,10 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_ext(ctx,SUB,R(RSP),VAL_CONST,M_PTR,-e->size_offs);
 			break;
 		case PREFETCH:
+			BREAK();
+			break;
+		case CMOV:
+		case CXCHG:
 			BREAK();
 			break;
 		default:
