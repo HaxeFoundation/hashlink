@@ -114,6 +114,14 @@ typedef struct {
 #define IS_FLOAT(mode)	((mode) == M_F64 || (mode) == M_F32)
 #define UNUSED		((ereg)0)
 
+#define MAX_ARGS	16
+
+#if defined(HL_WIN_CALL) && defined(HL_64)
+#	define IS_WINCALL64 1
+#else
+#	define IS_WINCALL64 0
+#endif
+
 typedef struct {
 	int *data;
 	int max;
@@ -167,6 +175,10 @@ typedef struct {
 	ereg req_div_b;
 } regs_config;
 
+typedef struct {
+	int c2hl;
+} jit_special_funs;
+
 struct _jit_ctx {
 	hl_module *mod;
 	hl_function *fun;
@@ -194,6 +206,7 @@ struct _jit_ctx {
 	int code_size;
 	unsigned char *code_instrs;
 	int *code_pos_map;
+	jit_special_funs code_funs;
 	// accum output
 	int fdef_index;
 	int out_pos;
