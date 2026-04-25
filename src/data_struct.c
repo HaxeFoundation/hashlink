@@ -245,6 +245,10 @@ INLINE static S_VALUE S_NAME(get)( S_TYPE st, int idx ) {
 	return st.values[idx];
 }
 
+INLINE static S_VALUE *S_NAME(addr)( S_TYPE st, int idx ) {
+	return &st.values[idx];
+}
+
 INLINE static S_VALUE S_NAME(first)( S_TYPE st ) {
 	return st.cur == 0 ? S_DEFVAL : st.values[0];
 }

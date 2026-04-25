@@ -53,6 +53,7 @@ static const char *op_names[] = {
 	"stack",
 	"xchg",
 	"catch",
+	"address",
 };
 
 bool hl_jit_dump_bin = false;
@@ -386,10 +387,11 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		printf("%s %s", emit_mode_str(e->size_offs), val_str(e->a,(emit_mode)e->size_offs));
 		break;
 	case LEA:
-		printf(" %s", reg_str(e->a));
+		printf(" [%s", reg_str(e->a));
 		if( !IS_NULL(e->b) ) printf("+%s", reg_str(e->b));
 		if( (e->size_offs&0xFF) > 1 ) printf("*%d",e->size_offs&0xFF);
 		if( e->size_offs >> 8 ) printf("+%Xh", e->size_offs>>8);
+		printf("]");
 		break;	
 	default:
 		if( !IS_NULL(e->a) ) {

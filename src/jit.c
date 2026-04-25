@@ -61,6 +61,7 @@ void hl_regs_function( jit_ctx *jit );
 void hl_codegen_alloc( jit_ctx *jit );
 void hl_codegen_init( jit_ctx *jit );
 void hl_codegen_free( jit_ctx *jit );
+void hl_codegen_flush_consts( jit_ctx *jit );
 void hl_codegen_function( jit_ctx *jit );
 void hl_codegen_final( jit_ctx *jit );
 
@@ -164,7 +165,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 }
 
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
-	hl_codegen_final(ctx);
+	hl_codegen_flush_consts(ctx);
 	jit_code_append(ctx);
 	int size = ctx->out_pos;
 	if( size & 4095 ) size += 4096 - (size&4095);
@@ -175,6 +176,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	*debug = NULL;
 	ctx->final_code = code;
 	hl_emit_final(ctx);
+	hl_codegen_final(ctx);
 	return code;
 }
 
