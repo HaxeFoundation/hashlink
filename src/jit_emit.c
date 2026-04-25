@@ -59,11 +59,13 @@ typedef struct _tmp_phi tmp_phi;
 
 #define S_SORTED
 
+#define S_MAP
 #define S_TYPE			ereg_map
 #define S_NAME(name)	ereg_##name
-#define S_VALUE			ereg
+#define S_KEY			ereg
+#define S_VALUE			emit_block*
 #include "data_struct.c"
-#define ereg_add(set,v)		ereg_add_impl(DEF_ALLOC,&(set),v)
+#define ereg_add(set,k,v)		ereg_add_impl(DEF_ALLOC,&(set),k,v)
 
 #define S_MAP
 
@@ -444,7 +446,6 @@ static void patch_jump( emit_ctx *ctx, int jpos ) {
 	if( ctx->current_block->start_pos == ctx->emit_pos-1 ) {
 		block_add_pred(ctx, ctx->current_block, b);
 	} else {
-		ctx->arrival_points = link_add_sort_unique(ctx, ctx->op_pos, b, ctx->arrival_points);
 		if( !split_block(ctx) ) jit_assert();
 	}
 }
@@ -518,14 +519,14 @@ static void phi_remove_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
 	emit_debug("%sPHI-REM-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(v,p->mode));
 }
 
-static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v ) {
+static void phi_add_val( emit_ctx *ctx, tmp_phi *p, ereg v, emit_block *from ) {
 	if( !p->b ) jit_assert();
 	if( IS_NULL(v) ) jit_assert();
 	if( p->value == v )
 		return;
-	if( !ereg_add(p->vals,v) )
+	if( !ereg_add(p->vals,v,from) )
 		return;
-	emit_debug("%sPHI-DEP %s = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(v,p->mode));
+	emit_debug("%sPHI-DEP %s:#%d = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), from->id, val_str(v,p->mode));
 	if( v < 0 ) {
 		tmp_phi *p2 = GET_PHI(v);
 		phi_add(p2->ref_phis,p);
@@ -536,7 +537,7 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 
 	if( p->locked ) jit_assert();
 	ereg same = UNUSED;
-	for_iter(ereg,v,p->vals) {
+	for_iter_key(ereg,v,p->vals) {
 		if( v == same || v == p->value )
 			continue;
 		if( !IS_NULL(same) )
@@ -561,9 +562,10 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 			store_block_var(ctx,b,p->r,same);
 		l = l->next;
 	}
+	emit_block *bsame = ereg_find(p->vals,same);
 	for_iter(phi,p2,p->ref_phis) {
 		phi_remove_val(ctx,p2,p->value);
-		phi_add_val(ctx,p2,same);
+		phi_add_val(ctx,p2,same,bsame);
 	}
 	p->ref_blocks = NULL;
 	int count = phi_count(p->ref_phis);
@@ -571,7 +573,7 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 	for(int i=0;i<count;i++)
 		optimize_phi_rec(ctx, phis[i]);
 	ctx->phi_depth--;
-	emit_debug("%sPHI-OPT-DONE %s = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(same,p->mode));
+	emit_debug("%sPHI-OPT-DONE %s = %s:#%d\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(same,p->mode), bsame->id);
 	return optimize_phi_rec(ctx,p);
 }
 
@@ -581,7 +583,7 @@ static ereg gather_phis( emit_ctx *ctx, tmp_phi *p ) {
 	p->locked = true;
 	for_iter(blocks,b,p->b->preds) {
 		ereg r = p->r ? emit_load_reg_block(ctx, b, p->r) : p->value;
-		phi_add_val(ctx, p, r);
+		phi_add_val(ctx, p, r, b);
 	}
 	p->locked = false;
 	return optimize_phi_rec(ctx, p);
@@ -622,8 +624,8 @@ static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
 	if( mode != GET_MODE(v2) ) jit_assert();
 	tmp_phi *p = alloc_phi(ctx, ctx->current_block, NULL);
 	p->mode = mode;
-	phi_add_val(ctx, p, v1);
-	phi_add_val(ctx, p, v2);
+	phi_add_val(ctx, p, v1, blocks_get(ctx->blocks,ctx->current_block->id - 2));
+	phi_add_val(ctx, p, v2, blocks_get(ctx->blocks,ctx->current_block->id - 1));
 	return p->value;
 }
 
@@ -823,11 +825,15 @@ static void emit_write_block( emit_ctx *ctx, emit_block *b ) {
 		p2->mode = p->mode;
 		p2->nvalues = ereg_count(p->vals);
 		p2->values = (ereg*)hl_malloc(&jit->falloc,sizeof(ereg)*p2->nvalues);
+		p2->blocks = (ereg*)hl_malloc(&jit->falloc,sizeof(int)*p2->nvalues);
 		int k = 0;
-		for_iter(ereg,v,p->vals) {
+		for_iter_key(ereg,v,p->vals) {
 			remap_phi_reg(ctx, &v);
 			p2->values[k++] = v;
 		}
+		k = 0;
+		for_iter(ereg,bfrom,p->vals)
+			p2->blocks[k++] = bfrom->id;
 	}
 }
 
@@ -996,6 +1002,8 @@ void hl_emit_function( jit_ctx *jit ) {
 			ctx->pos_map[op_pos] = ctx->emit_pos-1;
 		else
 			ctx->pos_map[op_pos] = ctx->emit_pos;
+		if( f->findex == 0x32B && op_pos == 0x48 )
+			hl_debug_break();
 		if( op_pos == 0 ) {
 			ctx->current_block->start_pos = ctx->emit_pos;
 			emit_gen_size(ctx, BLOCK, 0);
@@ -1004,6 +1012,8 @@ void hl_emit_function( jit_ctx *jit ) {
 			split_block(ctx);
 		emit_opcode(ctx,f->ops + op_pos);
 	}
+	if( ctx->arrival_points )
+		jit_assert();
 
 	hl_emit_clean_phis(ctx);
 	hl_emit_flush(ctx->jit);

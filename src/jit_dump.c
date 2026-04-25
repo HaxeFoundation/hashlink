@@ -42,6 +42,9 @@ static const char *op_names[] = {
 	"call",
 	"call",
 	"mov",
+	"cmov",
+	"xchg",
+	"cxhg",
 	"push-const",
 	"push",
 	"pop",
@@ -51,7 +54,6 @@ static const char *op_names[] = {
 	"block",
 	"enter",
 	"stack",
-	"xchg",
 	"catch",
 	"address",
 };
@@ -452,6 +454,10 @@ void hl_emit_dump( jit_ctx *ctx ) {
 		if( vpos < ctx->value_count && ctx->values_writes[vpos] == i )
 			printf("V%d = ", vpos++);
 		dump_instr(ctx, e, i);
+		if( e->op == JCOND && (ctx->instrs[i+1].op != BLOCK || ctx->instrs[i+1+e->size_offs].op != BLOCK) )
+			printf(" ???");
+		if( e->op == JUMP && ctx->instrs[i+1+e->size_offs].op != BLOCK )
+			printf(" ???");
 		if( e->op == BLOCK ) {
 			eblock *b = &ctx->blocks[e->size_offs];
 			for(int k=0;k<b->phi_count;k++) {
@@ -459,7 +465,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 				printf("\n\t\t@%X %s = phi%s(",i,val_str(p->value,p->mode),emit_mode_str(p->mode));
 				for(int n=0;n<p->nvalues;n++) {
 					if( n > 0 ) printf(",");
-					printf("%s",val_str(p->values[n],p->mode));
+					printf("%s:%d",val_str(p->values[n],p->mode),p->blocks[n]);
 				}
 				printf(")");
 				if( p->nvalues <= 1 )
