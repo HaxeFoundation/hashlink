@@ -163,7 +163,6 @@ static const char *emit_mode_str( emit_mode mode ) {
 	case M_UI8: return "-ui8";
 	case M_UI16: return "-ui16";
 	case M_I32: return "-i32";
-	case M_I64: return "-i64";
 	case M_F32: return "-f32";
 	case M_F64: return "-f64";
 	case M_PTR: return "";

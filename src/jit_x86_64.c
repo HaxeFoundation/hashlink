@@ -413,7 +413,7 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	// extra
 	cfg->req_bit_shifts = R(RCX);
 	cfg->req_div_a = R(RAX);
-	cfg->req_div_b = R(RDX);
+	cfg->req_div_b = R(RCX);
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
@@ -475,7 +475,7 @@ static preg make_reg( ereg r, emit_mode m ) {
 
 static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode, int_val value ) {
 	opform *f = &OP_FORMS[op];
-	int mode64 = (mode == M_PTR || mode == M_I64) && (f->r_mem&FLAG_DEF64) == 0 ? 8 : 0;
+	int mode64 = mode == M_PTR && (f->r_mem&FLAG_DEF64) == 0 ? 8 : 0;
 	int r64 = mode64;
 	preg a = make_reg(_a,mode), b = make_reg(_b,mode);
 	switch( ID2(a.kind,b.kind) ) {
@@ -487,14 +487,14 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	case ID2(RFPU,RFPU):
 		if( f->mem_r ) {
 			// canonical form
-			if( a.reg > 7 ) r64 |= 1;
-			if( b.reg > 7 ) r64 |= 4;
+			if( a.reg & 8 ) r64 |= 1;
+			if( b.reg & 8 ) r64 |= 4;
 			OP(f->mem_r);
 			MOD_RM(3,b.reg,a.reg);
 		} else {
 			ERRIF( f->r_mem == 0 );
-			if( a.reg > 7 ) r64 |= 4;
-			if( b.reg > 7 ) r64 |= 1;
+			if( a.reg & 8 ) r64 |= 4;
+			if( b.reg & 8 ) r64 |= 1;
 			OP(f->r_mem);
 			MOD_RM(3,a.reg,b.reg);
 		}
@@ -502,14 +502,14 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	case ID2(RCPU,RFPU):
 	case ID2(RFPU,RCPU):
 		ERRIF( (f->r_mem>>16) == 0 );
-		if( a.reg > 7 ) r64 |= 4;
-		if( b.reg > 7 ) r64 |= 1;
+		if( a.reg & 8 ) r64 |= 4;
+		if( b.reg & 8 ) r64 |= 1;
 		OP(f->r_mem);
 		MOD_RM(3,a.reg,b.reg);
 		break;
 	case ID2(RCPU,RUNUSED):
 		ERRIF( f->r_mem == 0 );
-		if( a.reg > 7 ) r64 |= 1;
+		if( a.reg & 8 ) r64 |= 1;
 		if( GET_RM(f->r_mem) > 0 ) {
 			OP(f->r_mem);
 			MOD_RM(3, GET_RM(f->r_mem)-1, a.reg);
@@ -529,14 +529,14 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 		break;
 	case ID2(RCPU,RCONST):
 		ERRIF( f->r_const == 0 && f->r_i8 == 0 );
-		if( a.reg > 7 ) r64 |= 1;
+		if( a.reg & 8 ) r64 |= 1;
 		if( f->r_i8 && IS_SBYTE(value) ) {
-			if( (f->r_i8&FLAG_DUAL) && a.reg > 7 ) r64 |= 4;
+			if( (f->r_i8&FLAG_DUAL) && (a.reg & 8) ) r64 |= 4;
 			OP(f->r_i8);
 			if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a.reg,a.reg); else MOD_RM(3,GET_RM(f->r_i8)-1,a.reg);
 			B(value);
 		} else if( GET_RM(f->r_const) > 0 || (f->r_const&FLAG_DUAL) ) {
-			if( (f->r_i8&FLAG_DUAL) && a.reg > 7 ) r64 |= 4;
+			if( (f->r_i8&FLAG_DUAL) && (a.reg & 8) ) r64 |= 4;
 			OP(f->r_const&0xFF);
 			if( (f->r_i8&FLAG_DUAL) ) MOD_RM(3,a.reg,a.reg); else MOD_RM(3,GET_RM(f->r_const)-1,a.reg);
 			if( mode64 && IS_64 && op == _MOV ) W64(value); else W((int)value);
@@ -549,7 +549,7 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	case ID2(RSTACK,RCPU):
 	case ID2(RSTACK,RFPU):
 		ERRIF( f->mem_r == 0 );
-		if( b.reg > 7 ) r64 |= 4;
+		if( b.reg & 8 ) r64 |= 4;
 		OP(f->mem_r);
 		if( IS_SBYTE(a.value) ) {
 			MOD_RM(1,b.reg,RBP);
@@ -562,7 +562,7 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	case ID2(RCPU,RSTACK):
 	case ID2(RFPU,RSTACK):
 		ERRIF( f->r_mem == 0 );
-		if( a.reg > 7 ) r64 |= 4;
+		if( a.reg & 8 ) r64 |= 4;
 		OP(f->r_mem);
 		if( IS_SBYTE(b.value) ) {
 			MOD_RM(1,a.reg,RBP);
@@ -579,7 +579,7 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 		break;
 	case ID2(RMEM,RUNUSED):
 		ERRIF( f->mem_r == 0 );
-		if( a.reg > 7 ) r64 |= 1;
+		if( a.reg & 8 ) r64 |= 1;
 		OP(f->mem_r);
 		if( value == 0 && (a.reg&7) != RBP ) {
 			MOD_RM(0,GET_RM(f->mem_r)-1,a.reg);
@@ -597,8 +597,8 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	case ID2(RCPU, RMEM):
 	case ID2(RFPU, RMEM):
 		ERRIF( f->r_mem == 0 );
-		if( a.reg > 7 ) r64 |= 4;
-		if( b.reg > 7 ) r64 |= 1;
+		if( a.reg & 8 ) r64 |= 4;
+		if( b.reg & 8 ) r64 |= 1;
 		OP(f->r_mem);
 		if( value == 0 && (b.reg&7) != RBP ) {
 			MOD_RM(0,a.reg,b.reg);
@@ -616,8 +616,8 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	case ID2(RMEM, RCPU):
 	case ID2(RMEM, RFPU):
 		ERRIF( f->mem_r == 0 );
-		if( a.reg > 7 ) r64 |= 1;
-		if( b.reg > 7 ) r64 |= 4;
+		if( a.reg & 8 ) r64 |= 1;
+		if( b.reg & 8 ) r64 |= 4;
 		OP(f->mem_r);
 		if( value == 0 && (a.reg&7) != RBP ) {
 			MOD_RM(0,b.reg,a.reg);
@@ -682,11 +682,11 @@ static void emit_mov_ext( code_ctx *ctx, ereg out, int out_val, ereg val, int in
 		emit_mov_ext(ctx, tmp, 0, val, in_val, mode);
 		emit_mov_ext(ctx, out, out_val, tmp, 0, mode);
 	} else {
-		static CpuOp MOV_OP[] = {_MOV,MOV8,MOV16,_MOV,_MOV,_MOV,MOVSD,MOVSS,_MOV,_MOV};
+		static CpuOp MOV_OP[] = {_MOV,MOV8,MOV16,_MOV,_MOV,MOVSD,MOVSS,_MOV,_MOV};
 		CpuOp op = MOV_OP[mode];
 		if( (mode == M_UI8 || mode == M_UI16) && IS_PURE(out) ) {
 			op++; // MOVZX
-			mode = M_I64;
+			mode = M_PTR;
 		}
 		emit_ext(ctx,op,out,val,mode,IS_PURE(out) ? in_val : out_val);
 	}
@@ -694,6 +694,72 @@ static void emit_mov_ext( code_ctx *ctx, ereg out, int out_val, ereg val, int in
 
 static void emit_mov( code_ctx *ctx, ereg out, ereg val, emit_mode mode ) {
 	emit_mov_ext(ctx,out,0,val,0,mode);
+}
+
+static int jump_near( code_ctx *ctx, int mode ) {
+	int pos = byte_count(ctx->code);
+	if( mode < 0 ) {
+		// backwards
+		int target = -mode;
+		B(JAlways_short);
+		B(target - (pos + 2)); 
+	} else {
+		B(mode == JAlways ? JAlways_short : mode - 0x10);
+		B(0);
+	}
+	return pos;
+}
+
+static void patch_jump_near( code_ctx *ctx, int jpos ) {
+	if( !jpos ) return;
+	ctx->code.values[jpos + 1] = (unsigned char)(byte_count(ctx->code) - (jpos + 2));
+}
+
+static void emit_div_mod( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_mode mode ) {
+	if( IS_FLOAT(mode) ) {
+		BREAK();
+		return;
+	}
+	ereg bas = R(RAX), div = R(RDX);
+	if( out != bas ) EMIT(_PUSH,bas,UNUSED,M_PTR);
+	if( out != div ) EMIT(_PUSH,div,UNUSED,M_PTR);
+	if( b == bas || b == div || !IS_PURE(div) ) {
+		EMIT(_MOV,RTMP,b,mode);
+		b = RTMP;
+	}
+	if( a != bas ) EMIT(_MOV,bas,a,mode);
+		
+	// check for div = 0
+	EMIT(_TEST,bas,bas,mode);
+	int jz = jump_near(ctx,JZero);
+	int jz1 = 0;
+	// Prevent MIN/-1 overflow exception
+	// OSMod: r = (b == 0 || b == -1) ? 0 : a % b
+	// OSDiv: r = (b == 0 || b == -1) ? a * b : a / b
+	if( op == OSMod || op == OSDiv ) {
+		emit_ext(ctx,_CMP,bas,VAL_CONST,mode,-1);
+		jz1 = jump_near(ctx,JZero);
+	}
+	bool unsign = op == OUDiv || op == OUMod;
+	if( unsign )
+		EMIT(XOR,div,div,mode);
+	else
+		EMIT(CDQ, UNUSED, UNUSED, mode);
+	EMIT(unsign ? DIV : IDIV, b, UNUSED, mode);
+	ereg res = (op == OUDiv || op == OSDiv) ? bas : div;
+	int jn = jump_near(ctx,JAlways);
+	patch_jump_near(ctx,jz);
+	patch_jump_near(ctx,jz1);
+	if( op != OSDiv ) {
+		EMIT(XOR, res, res, mode);
+	} else {
+		if( res != bas ) EMIT(_MOV,res,bas,mode);
+		EMIT(IMUL,res,b,mode);
+	}
+	patch_jump_near(ctx,jn);
+	if( out != res ) EMIT(_MOV,out,res,mode);
+	if( out != div ) EMIT(_POP,div,UNUSED,M_PTR);	
+	if( out != bas ) EMIT(_POP,bas,UNUSED,M_PTR);
 }
 
 static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_mode mode ) {
@@ -757,13 +823,12 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		cop = (op == OShl ? SHL : (op == OSShr ? SAR : SHR));
 		break;
 	case OSDiv:
-		F_OP(IDIV,DIVSS,DIVSD);
-		if( !IS_FLOAT(mode) ) BREAK();
-		break;
+		F_OP(0,DIVSS,DIVSD);
+		if( IS_FLOAT(mode) ) break;
 	case OSMod:
 	case OUMod:
 	case OUDiv:
-		BREAK();
+		emit_div_mod(ctx,op,out,a,b,mode);
 		return;
 	case ONot:
 		if( IS_PURE(a) ) {
@@ -987,9 +1052,21 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case STORE:
 			if( !IS_PURE(e->a) && !IS_PURE(e->b) && (e->a & FL_NATMASK) != FL_STACKOFFS && (e->b & FL_NATMASK) != FL_STACKOFFS ) {
-				EMIT(_PUSH,e->b,UNUSED,e->mode);
-				emit_mov(ctx, RTMP, e->a, M_PTR);
-				emit_ext(ctx, _POP,VAL_MEM(RTMP), UNUSED, e->mode, e->size_offs);
+				if( e->mode != M_PTR ) {
+					// no push/pop 32 bit
+					ereg tmp2 = R(RAX);
+					emit_mode mode = e->mode == M_F64 ? M_PTR : e->mode == M_F32 ? M_I32 : e->mode; 
+					EMIT(_PUSH,tmp2,UNUSED,M_PTR);
+					emit_mov(ctx, RTMP, e->a, M_PTR);
+					emit_mov(ctx, tmp2, e->b, mode);
+					emit_mov_ext(ctx, VAL_MEM(RTMP), e->size_offs, tmp2, 0, mode);
+					EMIT(_POP,tmp2,UNUSED,M_PTR);
+				} else {
+					if( IS_FLOAT(e->mode) ) BREAK();
+					EMIT(_PUSH,e->b,UNUSED,e->mode);
+					emit_mov(ctx, RTMP, e->a, M_PTR);
+					emit_ext(ctx, _POP,VAL_MEM(RTMP), UNUSED, e->mode, e->size_offs);
+				}
 			} else if( (e->a & FL_NATMASK) == FL_STACKREG ) {
 				emit_mov(ctx, RTMP, e->a, M_PTR);
 				emit_mov_ext(ctx, VAL_MEM(RTMP), e->size_offs, e->b, 0, e->mode);
@@ -1031,7 +1108,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			{
 				emit_mode mode = e->mode;
 				if( !IS_PURE(out) )
-					mode = (mode == M_F32 ? M_I32 : mode == M_F64 ? M_I64 : mode); // don't use FP for stack ops
+					mode = (mode == M_F32 ? M_I32 : mode == M_F64 ? M_PTR : mode); // don't use FP for stack ops
 				ereg w = IS_PURE(out) ? out : get_tmp(mode);
 				if( e->value == 0 )
 					EMIT(mode == M_F32 ? XORPS : mode == M_F64 ? XORPD : XOR, w, w, mode);
@@ -1044,7 +1121,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 					MOD_RM(0,out&7,5);
 					W(0);					
 					alloc_const(ctx, e->value);
-				} else if( (mode == M_PTR || mode == M_I64) && (e->value&0xFFFFFFFF) == e->value )
+				} else if( mode == M_PTR && (e->value&0xFFFFFFFF) == e->value )
 					emit_ext(ctx, _MOV, w, VAL_CONST, M_I32, e->value);
 				else
 					emit_ext(ctx, _MOV, w, VAL_CONST, mode, e->value);
@@ -1219,9 +1296,60 @@ void hl_codegen_function( jit_ctx *jit ) {
 				}
 			}
 			break;
-		case CONV:
 		case CONV_UNSIGNED:
 			BREAK();
+			break;
+		case CONV:
+			{
+				emit_mode in_mode = e->size_offs;
+				ereg r = IS_PURE(e->a) ? e->a : get_tmp(in_mode);
+				if( r != e->a ) emit_mov(ctx, r, e->a, in_mode);
+				CpuOp op = 0;
+				switch( ID2(e->mode,in_mode) ) {
+				case ID2(M_F32,M_UI8):
+				case ID2(M_F32,M_UI16):
+				case ID2(M_F32,M_I32):
+				case ID2(M_F32,M_PTR):
+					op = CVTSI2SS;
+					break;
+				case ID2(M_F64,M_UI8):
+				case ID2(M_F64,M_UI16):
+				case ID2(M_F64,M_I32):
+				case ID2(M_F64,M_PTR):
+					op = CVTSI2SD;
+					break;
+				case ID2(M_UI8,M_F32):
+				case ID2(M_UI16,M_F32):
+				case ID2(M_I32,M_F32):
+				case ID2(M_PTR,M_F32):
+					op = CVTSS2SI;
+					break;
+				case ID2(M_UI8,M_F64):
+				case ID2(M_UI16,M_F64):
+				case ID2(M_I32,M_F64):
+				case ID2(M_PTR,M_F64):
+					op = CVTSD2SI;
+					break;
+				case ID2(M_F32,M_F64):
+					op = CVTSD2SS;
+					break;
+				case ID2(M_F64,M_F32):
+					op = CVTSS2SD;
+					break;
+				default:
+					jit_assert();
+					break;
+				}
+				if( op ) {
+					if( IS_PURE(out) )
+						EMIT(op,out,r,0);
+					else {
+						ereg r2 = get_tmp(e->mode);
+						EMIT(op,r2,r,0);
+						emit_mov(ctx,out,r2,e->mode);
+					}
+				}
+			}
 			break;
 		case BINOP:
 		case UNOP:
@@ -1283,24 +1411,6 @@ static void flush_function( code_ctx *ctx, int start ) {
 	hl_jit_define_function(ctx->jit, start, ctx->jit->out_pos + byte_count(ctx->code) - start);
 	align_function(ctx);
 	if( byte_count(ctx->code) > ctx->code.max ) jit_assert();
-}
-
-static int jump_near( code_ctx *ctx, int mode ) {
-	int pos = byte_count(ctx->code);
-	if( mode < 0 ) {
-		// backwards
-		int target = -mode;
-		B(JAlways_short);
-		B(target - (pos + 2)); 
-	} else {
-		B(mode == JAlways ? JAlways_short : mode - 0x10);
-		B(0);
-	}
-	return pos;
-}
-
-static void patch_jump_near( code_ctx *ctx, int jpos ) {
-	ctx->code.values[jpos + 1] = (unsigned char)(byte_count(ctx->code) - (jpos + 2));
 }
 
 void hl_codegen_init( jit_ctx *jit ) {
