@@ -31,7 +31,7 @@
 #	define emit_debug(...)
 #endif
 
-int hl_emit_mode_sizes[] = {0,1,2,4,8,HL_WSIZE,8,4,0,0};
+int hl_emit_mode_sizes[] = {0,1,2,4,HL_WSIZE,8,4,0,0};
 
 typedef struct {
 	hl_type *t;
@@ -65,7 +65,7 @@ typedef struct _tmp_phi tmp_phi;
 #define S_KEY			ereg
 #define S_VALUE			emit_block*
 #include "data_struct.c"
-#define ereg_add(set,k,v)		ereg_add_impl(DEF_ALLOC,&(set),k,v)
+#define ereg_add(set,k,v)		ereg_add_pair_impl(DEF_ALLOC,&(set),k,v)
 
 #define S_MAP
 
@@ -248,18 +248,18 @@ static linked_inf *link_sort_remove( linked_inf *head, int id ) {
 }
 
 static emit_mode hl_type_mode( hl_type *t ) {
-	if( t->kind == HVOID )
-		return M_VOID;
-	if( t->kind == HBOOL )
-		return sizeof(bool) == 1 ? M_UI8 : M_I32;
-	if( t->kind == HGUID )
-		return M_I64;
-	if( t->kind == HF32 )
-		return M_F32;
-	if( t->kind == HF64 )
-		return M_F64;
-	if( t->kind < HBOOL )
-		return (emit_mode)t->kind;
+	static emit_mode CONV[] = {
+		M_VOID,
+		M_UI8,
+		M_UI16,
+		M_I32,
+		M_PTR,
+		M_F32,
+		M_F64,
+		sizeof(bool) == 1 ? M_UI8 : M_I32,
+	};
+	if( t->kind <= HBOOL )
+		return CONV[t->kind];
 	return M_PTR;
 }
 
