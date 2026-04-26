@@ -133,6 +133,10 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 #endif
 	hl_codegen_init(ctx);
 	jit_code_append(ctx);
+	if( m->code->hasdebug ) {
+		m->jit_debug = (hl_debug_infos*)malloc(sizeof(hl_debug_infos) * m->code->nfunctions);
+		memset(m->jit_debug, -1, sizeof(hl_debug_infos) * m->code->nfunctions);
+	}
 }
 
 void hl_jit_free( jit_ctx *ctx, h_bool can_reset ) {
@@ -158,6 +162,23 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	hl_codegen_function(ctx);
 	int pos = ctx->out_pos;
 	hl_jit_define_function(ctx, pos, ctx->code_size);
+	if( m->jit_debug ) {
+		bool compact = ctx->code_size < 0xFFFF;
+		void *debug = malloc((compact ? sizeof(unsigned short) : sizeof(int)) * (f->nops + 1));
+		for(int i=0;i<=f->nops;i++) {
+			int ipos = ctx->emit_pos_map[i];
+			int rpos = ctx->reg_pos_map[ipos];
+			int cpos = ctx->code_pos_map[rpos];
+			if( compact )
+				((unsigned short*)debug)[i] = (unsigned short)cpos;
+			else
+				((int*)debug)[i] = cpos;
+		}
+		int fid = (int)(f - m->code->functions);
+		m->jit_debug[fid].start = pos;
+		m->jit_debug[fid].offsets = debug;
+		m->jit_debug[fid].large = !compact;
+	}
 	if( !jit_code_append(ctx) )
 		return -1;
 	current_ctx = NULL;
@@ -225,7 +246,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	if( code == NULL ) return NULL;
 	memcpy(code,ctx->output,size);
 	*codesize = size;
-	*debug = NULL;
+	*debug = m->jit_debug;
 	ctx->final_code = code;
 	hl_emit_final(ctx);
 	hl_codegen_final(ctx);

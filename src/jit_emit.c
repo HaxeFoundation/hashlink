@@ -860,7 +860,7 @@ void hl_emit_flush( jit_ctx *jit ) {
 	emit_ctx *ctx = jit->emit;
 	if( ctx->flushed ) return;
 	ctx->flushed = true;
-	ctx->pos_map[ctx->fun->nops] = -1;
+	ctx->pos_map[ctx->fun->nops] = ctx->emit_pos;
 	ctx->current_block->end_pos = ctx->emit_pos;
 	hl_emit_remap_jumps(ctx,&ctx->jump_regs, ctx->instrs, ctx->pos_map);
 	jit->instrs = ctx->instrs;
@@ -1460,7 +1460,14 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg va = LOAD(ra);
 			ereg vb = LOAD(rb);
-			STORE(dst, emit_gen_ext(ctx, BINOP, va, vb, hl_type_mode(dst->t), o->op));
+			ereg r;
+			if( (dst->t->kind == HF32 || dst->t->kind == HF64) && o->op == OSMod ) {
+				ereg args[] = {va,vb};
+				r = emit_native_call(ctx, dst->t->kind == HF32 ? (void*)fmodf : (void*)fmod, args, 2, dst->t);
+			} else {
+				r = emit_gen_ext(ctx, BINOP, va, vb, hl_type_mode(dst->t), o->op);
+			}
+			STORE(dst, r);
 		}
 		break;
 	case ONeg:
