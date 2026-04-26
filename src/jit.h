@@ -23,6 +23,7 @@
 #define JIT_H
 
 #include <hlmodule.h>
+#include <math.h>
 
 typedef enum {
 	LOAD_ADDR,

@@ -73,7 +73,7 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 	while( min < max ) {
 		int mid = (min + max) >> 1;
 		int offset = dbg->large ? ((int*)dbg->offsets)[mid] : ((unsigned short*)dbg->offsets)[mid];
-		if( offset <= code_pos )
+		if( offset < code_pos )
 			min = mid + 1;
 		else
 			max = mid;
@@ -225,10 +225,8 @@ static int module_capture_stack( void **stack, int size ) {
 			unsigned char *code = m->jit_code;
 			int code_size = m->codesize;
 			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-				if( stack && count == size ) {
+				if( stack && count == size )
 					break;
-				}
-
 				if( stack )
 					stack[count++] = module_addr;
 				else

@@ -851,7 +851,6 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 			}
 			return;
 		}
-		BREAK();
 		cop = NEG;
 		break;
 	default:
