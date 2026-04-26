@@ -178,6 +178,28 @@ INLINE static void S_NAME(replace_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	st->values[pos] = v;
 	st->cur++;
 }
+
+INLINE static bool S_NAME(add_pair_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
+	int min = 0;
+	int max = st->cur;
+	int pos;
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		S_KEY k2 = st->keys[mid];
+		if( k2 < k ) min = mid + 1; else if( k2 > k ) max = mid; else {
+			S_VALUE v2 = st->values[mid];
+			if( S_CMP(v,v2) ) min = mid+1; else if( S_CMP(v2,v) ) max = mid; else return false;
+		}
+	}
+	S_NAME(check_size)(alloc,st);
+	pos = (min + max) >> 1;
+	memmove(st->keys + pos + 1, st->keys + pos, (st->cur - pos) * sizeof(S_KEY));
+	memmove(st->values + pos + 1, st->values + pos, (st->cur - pos) * sizeof(S_VALUE));
+	st->keys[pos] = k;
+	st->values[pos] = v;
+	st->cur++;
+	return true;
+}
 #endif
 
 INLINE static bool S_NAME(exists)( S_TYPE st, S_KEY k ) {

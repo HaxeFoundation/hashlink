@@ -70,7 +70,6 @@ typedef enum {
 	M_UI8,
 	M_UI16,
 	M_I32,
-	M_I64,
 	M_PTR,
 	M_F64,
 	M_F32,
