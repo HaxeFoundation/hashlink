@@ -359,6 +359,8 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		break;
 	case BLOCK:
 		printf(" #%d", e->size_offs);
+		if( e->size_offs && ctx->blocks[e->size_offs].pred_count == 0 )
+			printf(" ???DEAD");
 		break;
 	case STACK_OFFS:
 		if( e->size_offs >= 0 )
@@ -407,8 +409,6 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 }
 
 void hl_emit_dump( jit_ctx *ctx ) {
-	int i;
-	int cur_op = 0;
 	hl_function *f = ctx->fun;
 	int nargs = f->type->fun->nargs;
 	// if it not was not before (in case of dump during process)
@@ -418,16 +418,16 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	printf("function ");
 	hl_dump_fun_name(f);
 	printf("(");
-	for(i=0;i<nargs;i++) {
+	for(int i=0;i<nargs;i++) {
 		if( i > 0 ) printf(",");
 		uprintf(USTR("R%d"), i);
 	}
 	printf(")\n");
-	for(i=0;i<f->nregs;i++)
+	for(int i=0;i<f->nregs;i++)
 		uprintf(USTR("\tR%d : %s\n"),i, hl_type_str(f->regs[i]));
 	// check blocks intervals
 	int cur = 0;
-	for(i=0;i<ctx->block_count;i++) {
+	for(int i=0;i<ctx->block_count;i++) {
 		eblock *b = ctx->blocks + i;
 		if( b->start_pos != cur ) printf("  ??? BLOCK %d START AT %X != %X\n", i, b->start_pos, cur);
 		if( b->end_pos < b->start_pos ) printf("  ??? BLOCK %d RANGE [%X,%X]\n", i, b->start_pos, b->end_pos);
@@ -439,30 +439,60 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	int vpos = 1;
 	int rpos = 0;
 	int cpos = 0;
+	int cur_op = 0;
 	bool new_op = false;
-	cur = 0;
-	for(i=0;i<ctx->instr_count;i++) {
-		while( ctx->emit_pos_map[cur_op] == i ) {
+	eblock *cur_block = NULL;
+	for(int icount=0;icount<ctx->instr_count;icount++) {
+		while( ctx->emit_pos_map[cur_op] == icount ) {
 			printf("@%X ", cur_op);
 			hl_dump_op(ctx->fun, f->ops + cur_op);
 			printf("\n");
 			new_op = true;
 			cur_op++;
 		}
-		einstr *e = ctx->instrs + i;
-		printf("\t\t@%X ", i);
-		if( vpos < ctx->value_count && ctx->values_writes[vpos] == i )
+		einstr *e = ctx->instrs + icount;
+		printf("\t\t@%X ", icount);
+		if( vpos < ctx->value_count && ctx->values_writes[vpos] == icount )
 			printf("V%d = ", vpos++);
-		dump_instr(ctx, e, i);
-		if( e->op == JCOND && (ctx->instrs[i+1].op != BLOCK || ctx->instrs[i+1+e->size_offs].op != BLOCK) )
-			printf(" ???");
-		if( e->op == JUMP && ctx->instrs[i+1+e->size_offs].op != BLOCK )
-			printf(" ???");
+		dump_instr(ctx, e, icount);
+		if( e->op == JCOND || e->op == JUMP ) {
+			int target = icount + 1 + e->size_offs;
+			bool bad = false;
+			if( icount + 1 >= ctx->instr_count || target < 0 || target >= ctx->instr_count )
+				bad = true;
+			else if( ctx->instrs[target].op != BLOCK || (e->op == JCOND && ctx->instrs[icount+1].op != BLOCK) )
+				bad = true;
+			else {
+				bool found = false;
+				for(int k=0;k<cur_block->next_count;k++) {
+					if( cur_block->nexts[k] == ctx->instrs[target].size_offs )
+						found = true;
+					if( (e->op == JUMP || e->op == JUMP_TABLE) && ctx->instrs[icount+1].op == BLOCK && ctx->instrs[icount+1].size_offs == cur_block->nexts[k] )
+						printf(" ???LEAK");
+				}
+				if( !found ) printf(" ???NEXT");
+			}
+			if( bad )
+				printf(" ???");
+		}
 		if( e->op == BLOCK ) {
 			eblock *b = &ctx->blocks[e->size_offs];
+			for(int k=0;k<b->pred_count;k++) {
+				eblock *p = &ctx->blocks[b->preds[k]];
+				einstr *pe = &ctx->instrs[p->end_pos-1];				
+				if( p->end_pos == icount )
+					continue;
+				bool bad = false;
+				if( (pe->op == JUMP || pe->op == JCOND) && pe->size_offs == icount - p->end_pos )
+					bad = false;
+				else if( pe->op != JUMP_TABLE )
+					bad = true;
+				if( bad )
+					printf(" ???PREV#%d",b->preds[k]);
+			}
 			for(int k=0;k<b->phi_count;k++) {
 				ephi *p = b->phis + k;
-				printf("\n\t\t@%X %s = phi%s(",i,val_str(p->value,p->mode),emit_mode_str(p->mode));
+				printf("\n\t\t@%X %s = phi%s(",icount,val_str(p->value,p->mode),emit_mode_str(p->mode));
 				for(int n=0;n<p->nvalues;n++) {
 					if( n > 0 ) printf(",");
 					printf("%s:%d",val_str(p->values[n],p->mode),p->blocks[n]);
@@ -471,8 +501,9 @@ void hl_emit_dump( jit_ctx *ctx ) {
 				if( p->nvalues <= 1 )
 					printf(" ???");
 			}
+			cur_block = b;
 		}
-		while( rpos < ctx->reg_instr_count && rpos < ctx->reg_pos_map[i+1] ) {
+		while( rpos < ctx->reg_instr_count && rpos < ctx->reg_pos_map[icount+1] ) {
 			ereg out = ctx->reg_writes[rpos];
 			e = ctx->reg_instrs + rpos;
 			printf("\n\t\t\t\t@%X ",rpos);
