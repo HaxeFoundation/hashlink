@@ -271,6 +271,8 @@ static void hl_dump_ptr_name( jit_ctx *ctx, void *ptr ) {
 		N(setjmp);
 		N(_setjmp);
 		N2("assert",hl_jit_assert);
+		N(fmod);
+		N(fmodf);
 		i = 0;
 	}
 #	undef N
