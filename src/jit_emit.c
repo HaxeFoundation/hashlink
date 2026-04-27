@@ -761,7 +761,7 @@ static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
 		ereg v1 = LOAD_CONST(0,dt);
 		int jend = emit_jump(ctx, false);
 		patch_jump(ctx, jnot);
-		ereg v2 = LOAD_MEM(v,0,dt);
+		ereg v2 = LOAD_MEM(v,HDYN_VALUE,dt);
 		patch_jump(ctx, jend);
 		return emit_phi(ctx, v1, v2);
 	}
@@ -1471,8 +1471,10 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case ONeg:
-	case ONot:
 		STORE(dst, emit_gen_ext(ctx, UNOP, LOAD(ra), UNUSED, hl_type_mode(dst->t), o->op));
+		break;
+	case ONot:
+		STORE(dst, emit_gen_ext(ctx, UNOP, LOAD(ra), LOAD_CONST(1,&hlt_i32), hl_type_mode(dst->t), OXor));
 		break;
 	case OJFalse:
 	case OJTrue:
