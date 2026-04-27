@@ -138,7 +138,10 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 	CONTEXT c;
 	c.ContextFlags = CONTEXT_CONTROL;
 	if( !GetThreadContext(t->h,&c) ) return NULL;
-#	ifdef HL_64
+#	if defined(_M_ARM64) || defined(_M_ARM64EC)
+	*eip = (void*)c.Pc;
+	return (void*)c.Sp;
+#	elif defined(HL_64)
 	*eip = (void*)c.Rip;
 	return (void*)c.Rsp;
 #	else
@@ -146,7 +149,11 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 	return (void*)c.Esp;
 #	endif
 #elif defined(HL_LINUX)
-#	ifdef HL_64
+#	if defined(__aarch64__)
+	mcontext_t *mc = &shared_context.context.uc_mcontext;
+	*eip = (void*)mc->pc;
+	return (void*)mc->sp;
+#	elif defined(HL_64)
 	*eip = (void*)shared_context.context.uc_mcontext.gregs[REG_RIP];
 	return (void*)shared_context.context.uc_mcontext.gregs[REG_RSP];
 #	else
