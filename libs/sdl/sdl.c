@@ -92,6 +92,7 @@ typedef struct {
 	ws_change state;
 	int keyCode;
 	int scanCode;
+	int modifier;
 	bool keyRepeat;
 	int reference;
 	int value;
@@ -189,6 +190,7 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->window = e.key.windowID;
 			event->keyCode = e.key.keysym.sym;
 			event->scanCode = e.key.keysym.scancode;
+			event->modifier = e.key.keysym.mod;
 			event->keyRepeat = e.key.repeat != 0;
 			break;
 		case SDL_KEYUP:
@@ -196,6 +198,7 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->window = e.key.windowID;
 			event->keyCode = e.key.keysym.sym;
 			event->scanCode = e.key.keysym.scancode;
+			event->modifier = e.key.keysym.mod;
 			break;
 		case SDL_SYSWMEVENT:
 			continue;
