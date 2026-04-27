@@ -839,7 +839,6 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		return;
 	case ONeg:
 		if( IS_FLOAT(mode) ) {
-			BREAK();
 			if( out != a && IS_PURE(out) ) {
 				EMIT(mode == M_F32 ? XORPS : XORPD, out, out, mode);
 				EMIT(mode == M_F32 ? SUBSS : SUBSD, out, a, mode);
@@ -911,6 +910,11 @@ static void emit_nop( code_ctx *ctx, int size ) {
 	B(0x90);
 }
 
+#define CALC_REX(w,a,b) (((w)&8) ? 4 : 0) | (((b)&8) ? 2 : 0) | (((a) & 8) ? 1 : 0)
+
+#define REX64(out,a,b)	B(0x48 | CALC_REX(out,a,b))
+#define REX32(out,a,b)	{ int v = CALC_REX(out,a,b); if( v ) B(v|0x40); }
+
 static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 	einstr e = *_e;
 
@@ -944,11 +948,10 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 		return;
 	}
 
-	int r64 = 8 | ((out&8) ? 4 : 0) | ((e.b&8) ? 2 : 0) | ((e.a & 8) ? 1 : 0);
-	REX();
+	REX64(out,e.a,e.b);
 	B(0x8D);
-	MOD_RM(offs == 0 ? 0 : 1,out&7,4);
-	SIB(mult,e.b&7,e.a&7);
+	MOD_RM(offs == 0 ? 0 : 1,out,4);
+	SIB(mult,e.b,e.a);
 	if( offs != 0 ) {
 		if( !IS_SBYTE(offs) ) jit_assert();
 		B(offs);
@@ -991,6 +994,78 @@ static int emit_lea_rel( code_ctx *ctx, ereg out ) {
 	int pos = ctx->jit->out_pos + byte_count(ctx->code);
 	W(0);
 	return pos;
+}
+
+static int get_cond_jump( code_ctx *ctx ) {
+	int prev = 0;
+	einstr *p;
+	do {
+		p = ctx->jit->reg_instrs + ctx->cur_op - (++prev);
+	} while( p->op == MOV || p->op == JCOND || p->op == CMOV || p->op == XCHG || p->op == CXCHG );
+	int op;
+	switch( p->size_offs ) {
+	case OJFalse:
+	case OJNull:
+		op = JZero;
+		break;
+	case OJTrue:
+	case OJNotNull:
+		op = JNotZero;
+		break;
+	case OJSGte:
+		op = IS_FLOAT(p->mode) ? JUGte : JSGte;
+		break;
+	case OJSGt:
+		op = IS_FLOAT(p->mode) ? JUGt : JSGt;
+		break;
+	case OJUGte:
+		op = JUGte;
+		break;
+	case OJSLt:
+		op = IS_FLOAT(p->mode) ? JULt : JSLt;
+		break;
+	case OJSLte:
+		op = IS_FLOAT(p->mode) ? JULte : JSLte;
+		break;
+	case OJULt:
+		op = JULt;
+		break;
+	case OJEq:
+		op = JEq;
+		break;
+	case OJNotEq:
+		op = JNeq;
+		break;
+	case OJNotLt:
+		op = JUGte;
+		break;
+	case OJNotGte:
+		op = JULt;
+		break;
+	case 0:
+		if( p->op == DEBUG_BREAK ) {
+			// found a debug break !
+			BREAK();
+			op = JZero;
+			break;
+		}
+		// fallback
+	default:
+		jit_assert();
+		break;
+	}
+	return op;
+}
+
+static void emit_cmov( code_ctx *ctx, ereg out, ereg r, int cond, emit_mode m ) {
+	if( IS_FLOAT(m) ) jit_assert();
+	if( hl_emit_mode_sizes[m] == 8 )
+		REX64(out,r,UNUSED);
+	else
+		REX32(out,r,UNUSED);
+	B(0x0F);
+	B(cond - 0x40);
+	MOD_RM(3,out,r);
 }
 
 void hl_codegen_function( jit_ctx *jit ) {
@@ -1202,75 +1277,22 @@ void hl_codegen_function( jit_ctx *jit ) {
 				case M_F64: op = COMISD; break;
 				default: op = _CMP; break;
 				}
+				ereg b = e->b;
 				if( !IS_PURE(e->a) && !IS_PURE(e->b) ) {
 					ereg tmp = get_tmp(e->mode);
 					emit_mov(ctx, tmp, e->b, e->mode);
-					if( op == COMISS || op == COMISD ) BREAK();
-					EMIT(op,e->a,tmp,e->mode);
-				} else
-					EMIT(op,e->a,e->b,e->mode);
+					b = tmp;
+				}
+				if( IS_FLOAT(e->mode) )
+					EMIT(op,b,e->a,e->mode);
+				else
+					EMIT(op,e->a,b,e->mode);
 			}
 			break;
 		case JCOND:
 			{
-				int prev = 0;
-				einstr *p;
-				do {
-					p = jit->reg_instrs + ctx->cur_op - (++prev);
-				} while( p->op == MOV || p->op == JCOND || p->op == CMOV || p->op == XCHG || p->op == CXCHG );
-				int op;
-				switch( p->size_offs ) {
-				case OJFalse:
-				case OJNull:
-					op = JZero;
-					break;
-				case OJTrue:
-				case OJNotNull:
-					op = JNotZero;
-					break;
-				case OJSGte:
-					op = IS_FLOAT(p->mode) ? JUGte : JSGte;
-					break;
-				case OJSGt:
-					op = IS_FLOAT(p->mode) ? JUGt : JSGt;
-					break;
-				case OJUGte:
-					op = JUGte;
-					break;
-				case OJSLt:
-					op = IS_FLOAT(p->mode) ? JULt : JSLt;
-					break;
-				case OJSLte:
-					op = IS_FLOAT(p->mode) ? JULte : JSLte;
-					break;
-				case OJULt:
-					op = JULt;
-					break;
-				case OJEq:
-					op = JEq;
-					break;
-				case OJNotEq:
-					op = JNeq;
-					break;
-				case OJNotLt:
-					op = JUGte;
-					break;
-				case OJNotGte:
-					op = JULt;
-					break;
-				case 0:
-					if( p->op == DEBUG_BREAK ) {
-						// found a debug break !
-						BREAK();
-						op = JZero;
-						break;
-					}
-					// fallback
-				default:
-					jit_assert();
-					break;
-				}
-				emit_jump(ctx, op, e->size_offs);
+				int jump = get_cond_jump(ctx);
+				emit_jump(ctx, jump, e->size_offs);
 			}
 			break;
 		case JUMP:
@@ -1372,6 +1394,17 @@ void hl_codegen_function( jit_ctx *jit ) {
 			BREAK();
 			break;
 		case CMOV:
+			{
+				int cond = get_cond_jump(ctx);
+				if( !IS_PURE(out) ) jit_assert();
+				if( IS_PURE(e->a) ) {
+					emit_cmov(ctx,out,e->a,cond,e->mode);					
+				} else {
+					emit_mov(ctx,RTMP,e->a,e->mode);
+					emit_cmov(ctx,out,RTMP,cond,e->mode);
+				}
+			}
+			break;
 		case CXCHG:
 			BREAK();
 			break;
