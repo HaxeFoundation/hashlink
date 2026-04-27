@@ -87,8 +87,9 @@ static ereg get_call_reg( regs_ctx *ctx, call_regs regs, emit_mode m ) {
 	ereg r;
 	int mode = REG_MODE(m);
 	reg_config *cfg = REG_CFG(mode);
-	if( regs[mode] < cfg->nargs )
-		r = cfg->arg[regs[mode]++];
+	int idx = IS_WINCALL64 ? 0 : mode;
+	if( regs[idx] < cfg->nargs )
+		r = cfg->arg[regs[idx]++];
 	else
 		r = UNUSED;
 	return r;
