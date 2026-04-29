@@ -206,13 +206,15 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		hl_type *at = t->fun->args[i];
 		void *v = args[i];
 		if( at->kind == HF32 || at->kind == HF64 ) {
-			if( fp < arg_fp_count )
+			if( fp < arg_fp_count ) {
 				vargs.regs[arg_reg_count + fp++] = v;
-			else
+				if( IS_WINCALL64 ) rp++;
+			} else
 				vargs.stack[--sp] = v;
-		} else if( rp < arg_reg_count )
+		} else if( rp < arg_reg_count ) {
 			vargs.regs[rp++] = v;
-		else
+			if( IS_WINCALL64 ) fp++;
+		} else
 			vargs.stack[--sp] = v;
 	}
 	switch( t->fun->ret->kind ) {

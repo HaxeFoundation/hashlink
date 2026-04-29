@@ -63,10 +63,6 @@ typedef enum {
 } emit_op;
 
 typedef enum {
-	REG_RBP,
-} native_reg;
-
-typedef enum {
 	M_NONE,
 	M_UI8,
 	M_UI16,
@@ -100,21 +96,45 @@ typedef struct {
 	};
 } einstr;
 
-#define FL_NATMASK	0x70000000
-#define FL_NATREG	0x40000000
-#define FL_MEMPTR	0x20000000
-#define FL_STACK	0x10000000
-#define FL_STACKREG (FL_NATREG | FL_MEMPTR | FL_STACK)
-#define FL_STACKOFFS (FL_NATREG | FL_STACK)
-#define IS_NULL(e) ((e) == 0)
-#define IS_NATREG(e) (((e) & (0x80000000 | FL_NATREG)) == FL_NATREG)
-#define IS_PURE(e)		((e) != UNUSED && ((e)&(FL_MEMPTR | FL_STACK)) == 0)
-#define MK_STACK_REG(v)	(((v)&0xFFFFFFF) | FL_STACKREG)
-#define MK_STACK_OFFS(v)(((v)&0xFFFFFFF) | FL_STACKOFFS)
-#define GET_STACK_OFFS(v) ((int)(((v) & 0x8000000) ? ((v) | 0xF0000000) : ((v)&0xFFFFFFF)))
+typedef enum {
+	R_VALUE			= 0,
+	R_REG			= 0x40000000,
+	R_REG_PTR		= 0x50000000,
+	R_CONST			= 0x60000000,
+	R_PHI			= 0x70000000,
+} rkind;
+
+// reg representation is :
+// higher bits
+// 0000 = positive value (for IR only VXXX)
+// X100 = native register, lower 7 bits is the register, bits 8-28 are the offset (21 bits)
+// X101 = same as above, but indirect address
+// X110 = small constant value stored in offset
+// 1111 = negative value (for IR phi  PXXX)
+// 10XX = unused
+
+#define STACK_REG	5
+
+#define UNUSED						((ereg)0)
+#define MK_REG(v,kind)				(((v)&0x7F) | (kind))
+#define MK_REG_VAL(v,kind,val)		(MK_REG(v,kind) | (((val) << 7)&0x8FFFFF80))
+
+#define REG_KIND(r)		((r)&0x70000000)
+#define REG_REG(r)		((r)&0x7F)
+#define REG_VALUE(r)	(((int)(((r) & 0x8000000) ? ((r) | 0xF0000000) : ((r)&0x0FFFFFFF)))>>7)
+#define REG_PTR(r)		_reg_chk(r,R_REG,(r)|R_REG_PTR)
+#define REG_ADD_OFFSET(r,offs) _reg_chk(r,R_REG_PTR,MK_REG_VAL(r,REG_KIND(r),REG_VALUE(r)+(offs)))
+#define REG_IS_VAL(r)		(REG_KIND(r) == R_VALUE || REG_KIND(r) == R_PHI)
+
+#define IS_NULL(r)			((r) == 0)
+#define IS_REG(r)			(REG_KIND(r) == R_REG)
+#define MK_STACK_REG(v)		MK_REG_VAL(STACK_REG,R_REG_PTR,v)
+#define MK_STACK_OFFS(v)	MK_REG_VAL(STACK_REG,R_REG,v)
+#define MK_CONST(v)			MK_REG_VAL(0,R_CONST,v)
+
+
 #define IS_CALL(op)	((op) == CALL_PTR || (op) == CALL_REG || (op) == CALL_FUN)
 #define IS_FLOAT(mode)	((mode) == M_F64 || (mode) == M_F32)
-#define UNUSED		((ereg)0)
 
 #define MAX_ARGS	16
 
@@ -263,5 +283,11 @@ void hl_jit_error( const char *msg, const char *func, int line );
 
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );
 void hl_jit_patch_method( void *old_fun, void **new_fun_table );
+
+static ereg _reg_chk( ereg r, rkind k, ereg ret ) {
+	if( REG_KIND(r) != k ) jit_assert();
+	return ret;
+}
+
 
 #endif
