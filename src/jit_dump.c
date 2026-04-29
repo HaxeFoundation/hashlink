@@ -67,26 +67,41 @@ const char *hl_emit_regstr( ereg v, emit_mode m ) {
 	static int flip = 0;
 	// allow up to four concurrent val_str
 	char *fmt = fmts[flip++&3];
-	if( IS_NULL(v) )
+	if( IS_NULL(v) ) {
 		sprintf(fmt,"NULL???");
-	else if( v < 0 )
-		sprintf(fmt,"P%d",-v);
-	else if( (v&FL_STACKREG) == FL_STACKREG ) {
-		int index = GET_STACK_OFFS(v);
-		if( index < 0 )
-			sprintf(fmt,"[ST-%Xh]", -index);
-		else
-			sprintf(fmt,"[ST+%Xh]", index);
-	} else if( (v&FL_STACKOFFS) == FL_STACKOFFS ) {
-		int index = GET_STACK_OFFS(v);
-		if( index < 0 )
-			sprintf(fmt,"ST-%Xh", -index);
-		else
-			sprintf(fmt,"ST+%Xh", index);
-	} else if( IS_NATREG(v) )
-		sprintf(fmt,"%s", hl_natreg_str(v,m));
-	else
+		return fmt;
+	}
+	int val = REG_VALUE(v);
+	switch( REG_KIND(v) ) {
+	case R_VALUE:
 		sprintf(fmt,"V%d",v);
+		break;
+	case R_PHI:
+		sprintf(fmt,"P%d",-v);
+		break;
+	case R_CONST:
+		sprintf(fmt,"%d",val);
+		break;
+	case R_REG:
+		if( val == 0 )
+			sprintf(fmt,"%s",hl_natreg_str(v,m));
+		else if( val > 0 )
+			sprintf(fmt,"%s+%Xh",hl_natreg_str(v,m),val);
+		else
+			sprintf(fmt,"%s-%Xh",hl_natreg_str(v,m),-val);
+		break;
+	case R_REG_PTR:
+		if( val == 0 )
+			sprintf(fmt,"[%s]",REG_REG(v) == STACK_REG ? "ST" : hl_natreg_str(v,M_PTR));
+		else if( val > 0 )
+			sprintf(fmt,"[%s+%Xh]",REG_REG(v) == STACK_REG ? "ST" : hl_natreg_str(v,M_PTR),val);
+		else
+			sprintf(fmt,"[%s-%Xh]",REG_REG(v) == STACK_REG ? "ST" : hl_natreg_str(v,M_PTR),-val);
+		break;
+	default:
+		jit_assert();
+		break;
+	}
 	return fmt;
 }
 
