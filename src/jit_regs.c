@@ -209,7 +209,7 @@ static void regs_assign( regs_ctx *ctx, value_info *v ) {
 
 static void regs_write_live( regs_ctx *ctx, ereg *r ) {
 	if( IS_NULL(*r) ) jit_assert();
-	if( IS_NATREG(*r) ) return;
+	if( !REG_IS_VAL(*r) ) return; // some are injections of native regs at emit
 	value_info *v = VAL_REG(*r);
 	v->last_read = ctx->loop_end && ctx->jit->values_writes[v->id] < ctx->loop_start ? ctx->loop_end : ctx->cur_op;
 	v->tot_reads++;
@@ -252,12 +252,15 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			call_regs regs = {0};
 			bool needs_push = false;
 			for(int k=0;k<e->nargs;k++) {
-				value_info *v = VAL_REG(r[k]);
-				if( !IS_NULL(v->pref_reg) ) {
+				ereg arg = r[k];
+				value_info *v = REG_IS_VAL(arg) ? VAL_REG(r[k]) : NULL;
+				ereg r = get_call_reg(ctx, regs, v ? v->mode : M_I32);
+				if( IS_NULL(r) ) {
 					needs_push = true;
 					continue;
 				}
-				v->pref_reg = get_call_reg(ctx,regs,v->mode);
+				if( v && IS_NULL(v->pref_reg) )
+					v->pref_reg = r;
 			}
 			if( !needs_push && e->mode != M_NORET ) ctx->has_direct_call = true;
 			if( write && IS_NULL(write->pref_reg) )
@@ -371,7 +374,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 			// try to preserve ops in the from  A = A op B
 			if( (e.op == UNOP || e.op == BINOP) && write->pref_reg == UNUSED ) {
 				value_info *v = VAL_REG(e.a);
-				if( IS_PURE(v->reg) ) write->pref_reg = v->reg;
+				if( IS_REG(v->reg) ) write->pref_reg = v->reg;
 			}
 		}
 
@@ -392,6 +395,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 				}
 			}
 			for(int k=0;k<e.nargs;k++) {
+				if( !REG_IS_VAL(args[k]) ) continue;
 				value_info *v = VAL_REG(args[k]);
 				ereg r = get_call_reg(ctx,regs,v->mode);
 				if( !IS_NULL(r) ) {
@@ -417,7 +421,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 				for(int n=0;n<p->nvalues;n++) {
 					value_info *vn = VAL_REG(p->values[n]);
 					// ignore previously set pref_reg (minimize moves)
-					if( IS_PURE(vn->reg) && !regs_current(ctx,vn->reg) ) {
+					if( IS_REG(vn->reg) && !regs_current(ctx,vn->reg) ) {
 						v->pref_reg = vn->reg;
 						break;
 					}
@@ -440,6 +444,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 			continue;
 		case ADDRESS:
 			{
+				if( REG_KIND(e.a) == R_CONST ) jit_assert();
 				value_info *v = VAL_REG(e.a);
 				spill(ctx, v);
 				break;
@@ -477,7 +482,7 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 			if( !read ) {
 				ereg from = int_arr_get(movs,k+1);
 				int mode = int_arr_get(movs,k+2);
-				bool cmov = cond && IS_PURE(to); 
+				bool cmov = cond && IS_REG(to); 
 				regs_emit(ctx,to,cmov?CMOV:MOV,from,UNUSED,mode,0);
 				int_arr_remove_range(&movs,k,3);
 				cycle = false;
@@ -488,7 +493,7 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 			ereg to = int_arr_get(movs,0);
 			ereg from = int_arr_get(movs,1);
 			int mode = int_arr_get(movs,2);
-			bool cmov = cond && (IS_PURE(to) || IS_PURE(from));
+			bool cmov = cond && (IS_REG(to) || IS_REG(from));
 			regs_emit(ctx,UNUSED,cmov?CXCHG:XCHG,to,from,mode,0);
 			int_arr_remove_range(&movs,0,3);
 			size -= 3;
@@ -572,15 +577,16 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			int stack_args = 0;
 			int stack_bits = 0;
 			for(int k=0;k<e.nargs;k++) {
-				value_info *v = VAL_REG(args[k]);
-				ereg r = get_call_reg(ctx,regs,v->mode);
+				value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
+				emit_mode mode = v ? v->mode : M_I32;
+				ereg r = get_call_reg(ctx,regs,mode);
 				if( IS_NULL(r) ) {
-					stack_args += get_stack_size(v->mode);
+					stack_args += get_stack_size(mode);
 					stack_bits |= 1 << k;
-				} else if( r != v->reg ) {
+				} else if( !v || r != v->reg ) {
 					int_arr_add(ctx->pack_movs,r);
-					int_arr_add(ctx->pack_movs,v->reg);
-					int_arr_add(ctx->pack_movs,v->mode);
+					int_arr_add(ctx->pack_movs,v ? v->reg : args[k]);
+					int_arr_add(ctx->pack_movs,mode);
 				}
 			}
 			if( stack_args > 0 ) {
@@ -615,7 +621,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			ereg **regs = hl_emit_get_regs(&e,&nread);
 			for(int k=0;k<nread;k++) {
 				ereg *r = regs[k];
-				if( IS_NATREG(*r) ) continue;
+				if( !REG_IS_VAL(*r) ) continue;
 				value_info *v = VAL_REG(*r);
 				*r = v->reg;
 			}
@@ -681,8 +687,8 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		default:
 			if( e.op == ADDRESS ) {
 				e.op = LEA;
-				if( !(e.a & FL_MEMPTR) ) jit_assert();
-				e.a &= ~FL_MEMPTR; 
+				if( REG_KIND(e.a) != R_REG_PTR ) jit_assert();
+				e.a = (e.a & ~R_REG_PTR) | R_REG;
 			}
 			if( ret_val && out ) {
 				regs_write_instr(ctx, &e, *ret_val);
