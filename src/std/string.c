@@ -200,7 +200,7 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int len, int *size ) {
 	uchar *end = len == 0 ? NULL : c + len;
 	int utf8bytes = 0;
 	int p = 0;
-	while( c != end ) {
+	while( c < end ) {
 		unsigned int v = (unsigned int)*c;
 		if( v == 0 && end == NULL ) break;
 		if( v < 0x80 )
@@ -216,7 +216,7 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int len, int *size ) {
 	}
 	out = hl_gc_alloc_noptr(utf8bytes + 1);
 	c = (uchar*)str;
-	while( c != end ) {
+	while( c < end ) {
 		unsigned int v = (unsigned int)*c;
 		if( v < 0x80 ) {
 			out[p++] = (vbyte)v;
@@ -244,6 +244,11 @@ HL_PRIM vbyte *hl_utf16_to_utf8( vbyte *str, int len, int *size ) {
 HL_PRIM char *hl_to_utf8( const uchar *bytes ) {
 	int size;
 	return (char*)hl_utf16_to_utf8((vbyte*)bytes, 0, &size);
+}
+
+HL_PRIM char *hl_to_utf8_len( const uchar *bytes, int len ) {
+	int size;
+	return (char*)hl_utf16_to_utf8((vbyte*)bytes, len, &size);
 }
 
 static void hl_buffer_hex( hl_buffer *b, int c ) {

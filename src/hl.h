@@ -650,6 +650,7 @@ HL_API vbyte *hl_copy_bytes( const vbyte *byte, int size );
 HL_API int hl_utf8_length( const vbyte *s, int pos );
 HL_API int hl_from_utf8( uchar *out, int outLen, const char *str );
 HL_API char *hl_to_utf8( const uchar *bytes );
+HL_API char *hl_to_utf8_len( const uchar *bytes, int len );
 HL_API uchar *hl_to_utf16( const char *str );
 HL_API uchar *hl_guid_str( int64 guid, uchar buf[14] );
 HL_API vdynamic *hl_virtual_make_value( vvirtual *v );
