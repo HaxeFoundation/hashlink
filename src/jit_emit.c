@@ -102,7 +102,7 @@ struct _tmp_phi {
 	int final_id;
 	bool locked;
 	bool opt;
-	unsigned char mode;
+	emit_mode mode;
 	emit_block *b;
 	ereg_map vals;
 	phi_arr ref_phis;
@@ -149,7 +149,7 @@ struct _emit_ctx {
 #define STORE(r, v) emit_store_reg(ctx, r, v)
 #define LOAD_CONST(v, t) emit_load_const(ctx, (uint64)(v), t)
 #define LOAD_CONST_PTR(v) LOAD_CONST(v,&hlt_bytes)
-#define LOAD_MEM(v, offs, t) emit_load_mem(ctx, v, offs, t)
+#define LOAD_MEM(v, offs, t) emit_load_mem(ctx, v, offs, t, t)
 #define LOAD_MEM_PTR(v, offs) LOAD_MEM(v, offs, &hlt_bytes)
 #define STORE_MEM(to, offs, v) emit_store_mem(ctx, to, offs, v)
 #define LOAD_OBJ_METHOD(obj,id) LOAD_MEM_PTR(LOAD_MEM_PTR(LOAD_MEM_PTR(obj,0),HL_WSIZE*2),HL_WSIZE*(id))
@@ -274,7 +274,7 @@ static ereg *get_tmp_args( emit_ctx *ctx, int count ) {
 	return ctx->tmp_args;
 }
 
-static unsigned char emit_get_mode( emit_ctx *ctx, ereg v ) {
+static emit_mode emit_get_mode( emit_ctx *ctx, ereg v ) {
 	if( IS_NULL(v) ) jit_assert();
 	if( v < 0 )
 		return GET_PHI(v)->mode;
@@ -475,11 +475,11 @@ static ereg emit_load_const( emit_ctx *ctx, uint64 value, hl_type *size_t ) {
 	return new_value(ctx);
 }
 
-static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t ) {
+static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t, hl_type *to_t ) {
 	einstr *e = emit_instr(ctx, LOAD_ADDR);
-	e->mode = hl_type_mode(size_t);
+	e->mode = hl_type_mode(to_t);
 	e->a = v;
-	e->b = UNUSED;
+	e->nargs = hl_type_mode(size_t);
 	e->size_offs = offset;
 	return new_value(ctx);
 }
@@ -993,6 +993,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	}
 
 	emit_gen(ctx,ENTER,UNUSED,UNUSED,M_NONE);
+	emit_gen_size(ctx, BLOCK, 0);
 	for(i=0;i<f->type->fun->nargs;i++) {
 		hl_type *t = f->type->fun->args[i];
 		STORE(R(i), emit_gen(ctx, LOAD_ARG, UNUSED, UNUSED, hl_type_mode(t)));
@@ -1004,10 +1005,6 @@ void hl_emit_function( jit_ctx *jit ) {
 			ctx->pos_map[op_pos] = ctx->emit_pos-1;
 		else
 			ctx->pos_map[op_pos] = ctx->emit_pos;
-		if( op_pos == 0 ) {
-			ctx->current_block->start_pos = ctx->emit_pos;
-			emit_gen_size(ctx, BLOCK, 0);
-		}
 		if( ctx->arrival_points ) {
 			if( ctx->arrival_points->id < op_pos )
 				jit_assert();
@@ -1811,14 +1808,14 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					int dyn_size = sizeof(vdynamic);
 					ereg edyn = need_dyn ? emit_gen_size(ctx, ALLOC_STACK, dyn_size) : LOAD_CONST_PTR(NULL);
 
-					args = get_tmp_args(ctx, 4);
+					args = get_tmp_args(ctx, 5);
 					args[0] = LOAD_MEM_PTR(obj,HL_WSIZE);
 					args[1] = LOAD_CONST_PTR(_o->t->virt->fields[o->p2].t);
 					args[2] = LOAD_CONST(_o->t->virt->fields[o->p2].hashed_name,&hlt_i32);
 					args[3] = eargs;
 					args[4] = edyn;
 
-					ereg v2 = emit_native_call(ctx, hl_dyn_call_obj, args, 4, dst->t);
+					ereg v2 = emit_native_call(ctx, hl_dyn_call_obj, args, 5, dst->t);
 
 					patch_jump(ctx, jend);
 
@@ -1846,9 +1843,9 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OGetI16:
 	case OGetMem:
 		{
+			hl_type *size_t = o->op == OGetI8 ? &hlt_ui8 : o->op == OGetI16 ? &hlt_ui16 : dst->t;
 			ereg offs = OFFSET(LOAD(ra),LOAD(rb),1,0);
-			ereg val = LOAD_MEM(offs, 0, dst->t);
-			if( o->op != OGetMem ) patch_instr_mode(ctx, o->op == OGetI8 ? M_UI8 : M_UI16);
+			ereg val = emit_load_mem(ctx, offs, 0, size_t, dst->t);
 			STORE(dst, val);
 		}
 		break;

@@ -339,7 +339,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	jit_ctx *jit = ctx->jit;
 	// assign args
 	call_regs regs = {0};
-	int args_size = 0;
+	int args_count = 0;
 	for(int i=1;i<=ctx->jit->fun->type->fun->nargs;i++) {
 		value_info *v = VAL(i);
 		einstr *e = ctx->jit->instrs + ctx->jit->values_writes[i];
@@ -352,8 +352,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 		}
 		if( IS_NULL(r) || IS_WINCALL64 ) {
 			// use existing stack storage
-			v->stack_pos = args_size + HL_WSIZE*2;
-			args_size += size < 4 ? 4 : size;
+			v->stack_pos = (args_count++ + 2) * HL_WSIZE;
 			if( IS_NULL(r) ) v->reg = MK_STACK_REG(v->stack_pos);
 		}
 	}
