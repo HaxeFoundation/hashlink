@@ -131,7 +131,7 @@ typedef enum {
 #define MK_STACK_REG(v)		MK_REG_VAL(STACK_REG,R_REG_PTR,v)
 #define MK_STACK_OFFS(v)	MK_REG_VAL(STACK_REG,R_REG,v)
 #define MK_CONST(v)			MK_REG_VAL(0,R_CONST,v)
-
+#define MK_ADDR(reg,offs)	MK_REG_VAL(reg,R_REG_PTR,offs)
 
 #define IS_CALL(op)	((op) == CALL_PTR || (op) == CALL_REG || (op) == CALL_FUN)
 #define IS_FLOAT(mode)	((mode) == M_F64 || (mode) == M_F32)
@@ -200,6 +200,7 @@ typedef struct {
 
 typedef struct {
 	int c2hl;
+	int hl2c;
 } jit_special_funs;
 
 struct _jit_ctx {
@@ -247,6 +248,8 @@ void hl_jit_define_function( jit_ctx *ctx, int start, int size );
 
 void hl_jit_null_field_access();
 void hl_jit_assert();
+void *hl_jit_wrapper_ptr( vclosure_wrapper *c, char *stack_args, void **regs );
+double hl_jit_wrapper_d( vclosure_wrapper *c, char *stack_args, void **regs );
 
 // emit & dump
 void hl_emit_dump( jit_ctx *ctx );
