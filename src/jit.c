@@ -185,13 +185,31 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	return pos;
 }
 
-static void *null_wrapper( hl_type *ft ) {
-	return hl_jit_assert;
-}
-
 static void *call_jit_c2hl = hl_jit_assert;
+static void *call_jit_hl2c = hl_jit_assert;
 static int arg_reg_count = 0;
 static int arg_fp_count = 0;
+
+static int get_next_reg( hl_type *t, int *rp, int *fp ) {
+	if( t->kind == HF32 || t->kind == HF64 ) {
+		if( *fp < arg_fp_count ) {
+			int r = (*fp)++;
+			if( IS_WINCALL64 ) (*rp)++;
+			return r;
+		}
+		return -1;
+	}
+	if( *rp < arg_fp_count ) {
+		int r = (*rp)++;
+		if( IS_WINCALL64 ) (*fp)++;
+		return r;
+	}
+	return -1;
+}
+
+static void *default_wrapper( hl_type *ft ) {
+	return call_jit_hl2c;
+}
 
 static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	int nargs = t->fun->nargs;
@@ -205,16 +223,10 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	for(int i=0;i<t->fun->nargs;i++) {
 		hl_type *at = t->fun->args[i];
 		void *v = args[i];
-		if( at->kind == HF32 || at->kind == HF64 ) {
-			if( fp < arg_fp_count ) {
-				vargs.regs[arg_reg_count + fp++] = v;
-				if( IS_WINCALL64 ) rp++;
-			} else
-				vargs.stack[--sp] = v;
-		} else if( rp < arg_reg_count ) {
-			vargs.regs[rp++] = v;
-			if( IS_WINCALL64 ) fp++;
-		} else
+		int r = get_next_reg(at,&rp,&fp);
+		if( r >= 0 )
+			vargs.regs[r + (at->kind == HF32 || at->kind == HF64 ? arg_reg_count : 0)] = v;
+		else
 			vargs.stack[--sp] = v;
 	}
 	switch( t->fun->ret->kind ) {
@@ -239,6 +251,55 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 	}
 }
 
+static vdynamic *callback_hl2c( vclosure_wrapper *c, char *stack_args, void **regs ) {
+	vdynamic *args[MAX_ARGS];
+	int nargs = c->cl.t->fun->nargs;
+	if( nargs > MAX_ARGS )
+		hl_error("Too many arguments for wrapped call");
+	int rp = 0, fp = 0;
+	rp++; // skip fptr in HL64 - was passed as arg0
+	if( IS_WINCALL64 ) fp++;
+	for(int i=0;i<nargs;i++) {
+		hl_type *t = c->cl.t->fun->args[i];
+		int creg = get_next_reg(t,&rp,&fp);
+		if( creg < 0 ) {
+			args[i] = hl_is_dynamic(t) ? *(vdynamic**)stack_args : hl_make_dyn(stack_args,t);
+			stack_args += (t->kind == HF64 ? 8 : HL_WSIZE);
+		} else if( hl_is_dynamic(t) ) {
+			args[i] = *(vdynamic**)(regs + creg);
+		} else if( t->kind == HF32 || t->kind == HF64 ) {
+			args[i] = hl_make_dyn(regs + arg_reg_count + creg,&hlt_f64);
+		} else {
+			args[i] = hl_make_dyn(regs + creg,t);
+		}
+	}
+	return hl_dyn_call(c->wrappedFun,args,nargs);
+}
+
+void *hl_jit_wrapper_ptr( vclosure_wrapper *c, char *stack_args, void **regs ) {
+	vdynamic *ret = callback_hl2c(c, stack_args, regs);
+	hl_type *tret = c->cl.t->fun->ret;
+	switch( tret->kind ) {
+	case HVOID:
+		return NULL;
+	case HUI8:
+	case HUI16:
+	case HI32:
+	case HBOOL:
+		return (void*)(int_val)hl_dyn_casti(&ret,&hlt_dyn,tret);
+	case HI64:
+	case HGUID:
+		return (void*)(int_val)hl_dyn_casti64(&ret,&hlt_dyn);
+	default:
+		return hl_dyn_castp(&ret,&hlt_dyn,tret);
+	}
+}
+
+double hl_jit_wrapper_d( vclosure_wrapper *c, char *stack_args, void **regs ) {
+	vdynamic *ret = callback_hl2c(c, stack_args, regs);
+	return hl_dyn_castd(&ret,&hlt_dyn);
+}
+
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
 	hl_codegen_flush_consts(ctx);
 	jit_code_append(ctx);
@@ -255,7 +316,8 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	arg_reg_count = ctx->cfg.regs.nargs;
 	arg_fp_count = ctx->cfg.floats.nargs;
 	call_jit_c2hl = ctx->final_code + ctx->code_funs.c2hl;
-	hl_setup.get_wrapper = null_wrapper;
+	call_jit_hl2c = ctx->final_code + ctx->code_funs.hl2c;
+	hl_setup.get_wrapper = default_wrapper;
 	hl_setup.static_call = callback_c2hl;
 	return code;
 }

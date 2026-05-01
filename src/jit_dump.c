@@ -515,8 +515,10 @@ void hl_emit_dump( jit_ctx *ctx ) {
 					if( n > 0 ) printf(",");
 					printf("%s:%d",val_str(p->values[n],p->mode),p->blocks[n]);
 				}
+				if( p->nvalues == 0 )
+					printf("unwritten");
 				printf(")");
-				if( p->nvalues <= 1 )
+				if( p->nvalues == 1 )
 					printf(" ???");
 			}
 			cur_block = b;
