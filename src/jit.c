@@ -225,9 +225,9 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		void *v = args[i];
 		int r = get_next_reg(at,&rp,&fp);
 		if( r >= 0 )
-			vargs.regs[r + (at->kind == HF32 || at->kind == HF64 ? arg_reg_count : 0)] = v;
+			vargs.regs[r + (at->kind == HF32 || at->kind == HF64 ? arg_reg_count : 0)] = *(void**)v;
 		else
-			vargs.stack[--sp] = v;
+			vargs.stack[--sp] = *(void**)v;
 	}
 	switch( t->fun->ret->kind ) {
 	case HUI8:

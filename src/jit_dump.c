@@ -390,8 +390,10 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		dump_value(ctx, e->value, e->mode);
 		break;
 	case LOAD_ADDR:
-		if( e->nargs != e->mode )
-			printf("%s", emit_mode_str(e->nargs));
+		if( e->nargs != e->mode ) {
+			if( e->mode == M_PTR ) printf("-ptr");
+			printf("%s", e->nargs == M_PTR ? "-ptr" : emit_mode_str(e->nargs));
+		}
 		printf(" %s[%Xh]", val_str(e->a,M_PTR), e->size_offs);
 		break;
 	case STORE:
@@ -406,7 +408,8 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		break;
 	case CONV:
 	case CONV_UNSIGNED:
-		printf("%s %s", emit_mode_str(e->size_offs), val_str(e->a,(emit_mode)e->size_offs));
+		if( e->mode == M_PTR ) printf("-i64");
+		printf("%s %s", e->size_offs == M_PTR ? "-i64" : emit_mode_str(e->size_offs), val_str(e->a,(emit_mode)e->size_offs));
 		break;
 	case LEA:
 		printf(" [%s", reg_str(e->a));
@@ -540,6 +543,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 					if( new_op ) {
 						new_op = false;
 						cpos += ctx->cfg.debug_prefix_size;
+						if( cpos == ctx->code_pos_map[rpos+1] ) break;
 					}
 				}
 				printf("%.2X",ctx->code_instrs[cpos++]);
