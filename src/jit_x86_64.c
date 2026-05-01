@@ -1071,6 +1071,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 	free(ctx->pos_map);
 	ctx->pos_map = (int*)malloc((jit->reg_instr_count + 1) * sizeof(int));
 	ctx->pos_map[0] = 0;
+	int const_addr_prev = int_arr_count(ctx->const_addr);
 	byte_reserve(ctx->code,64);
 	ctx->code.cur -= 64;
 #	ifdef GEN_DEBUG
@@ -1194,10 +1195,10 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case LOAD_ADDR:
 			if( IS_REG(e->a) ) {
-				emit_mov(ctx, out, REG_ADD_OFFSET(REG_PTR(e->a),e->size_offs), e->mode);
+				emit_mov(ctx, out, REG_ADD_OFFSET(REG_PTR(e->a),e->size_offs), e->nargs);
 			} else {
 				emit_mov(ctx, RTMP, e->a, M_PTR);
-				emit_mov(ctx, out, MK_REG_VAL(RTMP,R_REG_PTR,e->size_offs), e->mode);
+				emit_mov(ctx, out, MK_REG_VAL(RTMP,R_REG_PTR,e->size_offs), e->nargs);
 			}
 			break;
 		case LOAD_FUN:
@@ -1291,14 +1292,32 @@ void hl_codegen_function( jit_ctx *jit ) {
 				int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,start);
 				ereg a = RTMP;
 				ereg b = e->a;
-				B(0x40 | ((a&8)?1:0) | ((b&8)?2:0));
-				B(0xFF);
-				B(0x24);
-				SIB(3,(b&7),(a&7));
-				int here = jit->out_pos + byte_count(ctx->code);
+				if( IS_REG(b) ) {
+					// jump [a+b*8]
+					B(0x40 | ((a&8)?1:0) | ((b&8)?2:0));
+					B(0xFF);
+					B(0x24);
+					SIB(3,(b&7),(a&7));
+				} else {
+					ereg save = R(RAX);
+					EMIT(_PUSH,save,UNUSED,M_PTR);
+					EMIT(_MOV,save,b,M_I32);
+					// lea tmp, [tmp+save*8]
+					einstr etmp;
+					etmp.a = a;
+					etmp.b = save;
+					etmp.size_offs = 8;
+					emit_lea(ctx, RTMP, &etmp);
+					EMIT(_POP,save,UNUSED,M_PTR);
+					// jump [tmp]
+					B(0x40 | ((RTMP&8)?1:0));
+					B(0xFF);
+					MOD_RM(0,4,RTMP&7);
+				}
+				ereg *args = hl_emit_get_args(jit->emit,e);
 				for(int k=0;k<e->nargs;k++) {
 					int_arr_add_impl(&jit->galloc,&ctx->const_addr,start + k * HL_WSIZE);
-					int_arr_add_impl(&jit->galloc,&ctx->const_addr,here);
+					int_arr_add_impl(&jit->galloc,&ctx->const_addr,ctx->cur_op + (int)args[k] + 1);
 				}
 			}
 			break;
@@ -1383,10 +1402,10 @@ void hl_codegen_function( jit_ctx *jit ) {
 				int cond = get_cond_jump(ctx);
 				if( !IS_REG(out) ) jit_assert();
 				if( IS_REG(e->a) ) {
-					emit_cmov(ctx,out,e->a,cond,e->mode);					
+					emit_cmov(ctx,out,e->a,cond,M_PTR);					
 				} else {
 					emit_mov(ctx,RTMP,e->a,e->mode);
-					emit_cmov(ctx,out,RTMP,cond,e->mode);
+					emit_cmov(ctx,out,RTMP,cond,M_PTR);
 				}
 			}
 			break;
@@ -1413,6 +1432,11 @@ void hl_codegen_function( jit_ctx *jit ) {
 		int target = int_arr_get(ctx->near_jumps,i+1);
 		int offset = ctx->pos_map[target] - (pos + 4);
 		*(int*)&ctx->code.values[pos] = offset;
+	}
+	for(int i=const_addr_prev;i<int_arr_count(ctx->const_addr);i+=2) {
+		int target = int_arr_get(ctx->const_addr,i+1);
+		int offs = jit->out_pos + ctx->pos_map[target];
+		ctx->const_addr.values[i+1] = offs;
 	}
 }
 

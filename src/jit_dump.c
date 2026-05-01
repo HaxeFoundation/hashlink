@@ -390,6 +390,8 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		dump_value(ctx, e->value, e->mode);
 		break;
 	case LOAD_ADDR:
+		if( e->nargs != e->mode )
+			printf("%s", emit_mode_str(e->nargs));
 		printf(" %s[%Xh]", val_str(e->a,M_PTR), e->size_offs);
 		break;
 	case STORE:
