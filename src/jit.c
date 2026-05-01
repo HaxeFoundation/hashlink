@@ -162,7 +162,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 	hl_codegen_function(ctx);
 	int pos = ctx->out_pos;
 	hl_jit_define_function(ctx, pos, ctx->code_size);
-	if( m->jit_debug ) {
+	if( m->jit_debug && ctx->code_pos_map ) {
 		bool compact = ctx->code_size < 0xFFFF;
 		void *debug = malloc((compact ? sizeof(unsigned short) : sizeof(int)) * (f->nops + 1));
 		for(int i=0;i<=f->nops;i++) {
