@@ -742,12 +742,11 @@ static void emit_store_size( emit_ctx *ctx, ereg dst, int dst_offset, ereg src, 
 
 
 static ereg emit_conv( emit_ctx *ctx, ereg v, emit_mode from, emit_mode to, bool _unsigned ) {
+	if( from == to && !_unsigned )
+		return emit_gen(ctx,MOV,v,UNUSED,to);
 	if( IS_FLOAT(from) != IS_FLOAT(to) )
 		return emit_gen_ext(ctx, _unsigned ? CONV_UNSIGNED : CONV, v, UNUSED, to, from);
-	if( from != to && IS_FLOAT(from) && IS_FLOAT(to) )
-		return emit_gen_ext(ctx, CONV, v, UNUSED, to, from);
-	// no-op
-	return emit_gen(ctx,MOV,v,UNUSED,to);
+	return emit_gen_ext(ctx, CONV, v, UNUSED, to, from);
 }
 
 static bool dyn_need_type( hl_type *t ) {
@@ -1190,102 +1189,80 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 				patch_jump(ctx,jeq);
 			} else
 				jit_assert();
-			return;
 		}
+		return;
 	case HVIRTUAL:
-		{
-			BREAK();
-			/*
-			preg p;
-			preg *pa = alloc_cpu(ctx,a,true);
-			preg *pb = alloc_cpu(ctx,b,true);
-			int ja,jb,jav,jbv,jvalue;
-			if( b->t->kind == HOBJ ) {
-				if( op->op == OJEq ) {
-					// if( a ? (b && a->value == b) : (b == NULL) ) goto
-					op64(ctx,TEST,pa,pa);
-					XJump_small(JZero,ja);
-					op64(ctx,TEST,pb,pb);
-					XJump_small(JZero,jb);
-					op64(ctx,MOV,pa,pmem(&p,pa->id,HL_WSIZE));
-					op64(ctx,CMP,pa,pb);
-					XJump_small(JAlways,jvalue);
-					patch_jump(ctx,ja);
-					op64(ctx,TEST,pb,pb);
-					patch_jump(ctx,jvalue);
-					register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
-					patch_jump(ctx,jb);
-				} else if( op->op == OJNotEq ) {
-					// if( a ? (b == NULL || a->value != b) : (b != NULL) ) goto
-					op64(ctx,TEST,pa,pa);
-					XJump_small(JZero,ja);
-					op64(ctx,TEST,pb,pb);
-					register_jump(ctx,do_jump(ctx,OJEq,false),targetPos);
-					op64(ctx,MOV,pa,pmem(&p,pa->id,HL_WSIZE));
-					op64(ctx,CMP,pa,pb);
-					XJump_small(JAlways,jvalue);
-					patch_jump(ctx,ja);
-					op64(ctx,TEST,pb,pb);
-					patch_jump(ctx,jvalue);
-					register_jump(ctx,do_jump(ctx,OJNotEq,false),targetPos);
-				} else
-					ASSERT(op->op);
-				scratch(pa);
-				return;
-			}
-			op64(ctx,CMP,pa,pb);
-			if( op->op == OJEq ) {
-				// if( a == b || (a && b && a->value && b->value && a->value == b->value) ) goto
-				register_jump(ctx,do_jump(ctx,OJEq, false),targetPos);
-				op64(ctx,TEST,pa,pa);
-				XJump_small(JZero,ja);
-				op64(ctx,TEST,pb,pb);
-				XJump_small(JZero,jb);
-				op64(ctx,MOV,pa,pmem(&p,pa->id,HL_WSIZE));
-				op64(ctx,TEST,pa,pa);
-				XJump_small(JZero,jav);
-				op64(ctx,MOV,pb,pmem(&p,pb->id,HL_WSIZE));
-				op64(ctx,TEST,pb,pb);
-				XJump_small(JZero,jbv);
-				op64(ctx,CMP,pa,pb);
-				XJump_small(JNeq,jvalue);
-				register_jump(ctx,do_jump(ctx,OJEq, false),targetPos);
-				patch_jump(ctx,ja);
-				patch_jump(ctx,jb);
-				patch_jump(ctx,jav);
-				patch_jump(ctx,jbv);
-				patch_jump(ctx,jvalue);
-			} else if( op->op == OJNotEq ) {
-				int jnext;
-				// if( a != b && (!a || !b || !a->value || !b->value || a->value != b->value) ) goto
-				XJump_small(JEq,jnext);
-				op64(ctx,TEST,pa,pa);
-				XJump_small(JZero,ja);
-				op64(ctx,TEST,pb,pb);
-				XJump_small(JZero,jb);
-				op64(ctx,MOV,pa,pmem(&p,pa->id,HL_WSIZE));
-				op64(ctx,TEST,pa,pa);
-				XJump_small(JZero,jav);
-				op64(ctx,MOV,pb,pmem(&p,pb->id,HL_WSIZE));
-				op64(ctx,TEST,pb,pb);
-				XJump_small(JZero,jbv);
-				op64(ctx,CMP,pa,pb);
-				XJump_small(JEq,jvalue);
-				patch_jump(ctx,ja);
-				patch_jump(ctx,jb);
-				patch_jump(ctx,jav);
-				patch_jump(ctx,jbv);
-				register_jump(ctx,do_jump(ctx,OJAlways, false),targetPos);
-				patch_jump(ctx,jnext);
-				patch_jump(ctx,jvalue);
+		if( bt->kind == HOBJ ) {
+			if( op == OJEq ) {
+				// if( a == b || (a && a->value == b) ) goto
+				emit_cmp(ctx, a, b, OJEq);
+				register_block_jump(ctx,offset,true);
+				split_block(ctx);
+				emit_test(ctx, a, OJNull);
+				int jnot = emit_jump(ctx, true);
+				emit_cmp(ctx, LOAD_MEM_PTR(a,HL_WSIZE), b, OJEq);
+				register_block_jump(ctx,offset,true);
+				split_block(ctx);
+				patch_jump(ctx, jnot);
+			} else if( op == OJNotEq ) {
+				// if( a != b && (!a || a->value != b) ) goto
+				emit_cmp(ctx, a, b, OJEq);
+				int jsame = emit_jump(ctx, true);
+				emit_test(ctx, a, OJNull);
+				register_block_jump(ctx,offset,true);
+				split_block(ctx);
+				emit_cmp(ctx, LOAD_MEM_PTR(a,HL_WSIZE), b, OJNotEq);
+				register_block_jump(ctx,offset,true);
+				split_block(ctx);
+				patch_jump(ctx,jsame);
 			} else
-				ASSERT(op->op);
-			scratch(pa);
-			scratch(pb);
-			return;
-			*/
+				jit_assert();
+		} else {
+			if( op == OJEq ) {
+				// if( a == b || (a && b && a->value && a->value == b->value) ) goto
+				emit_cmp(ctx, a, b, OJEq);
+				register_block_jump(ctx,offset,true);
+				split_block(ctx);
+				emit_test(ctx, a, OJNull);
+				int ja = emit_jump(ctx, true);
+				emit_test(ctx, b, OJNull);
+				int jb = emit_jump(ctx, true);
+				ereg va = LOAD_MEM_PTR(a,HL_WSIZE);
+				emit_test(ctx, va, OJNull);
+				int jva = emit_jump(ctx, true);
+				ereg vb = LOAD_MEM_PTR(a,HL_WSIZE);
+				emit_cmp(ctx, va, vb, OJEq);
+				register_block_jump(ctx,offset,true);
+				split_block(ctx);
+				patch_jump(ctx,ja);
+				patch_jump(ctx,jb);
+				patch_jump(ctx,jva);
+			} else if( op == OJNotEq ) {
+				// if( a != b && (!a || !b || !a->value || a->value != b->value) ) goto
+				emit_cmp(ctx, a, b, OJNotEq);
+				register_block_jump(ctx,offset,true);
+				split_block(ctx);
+				emit_test(ctx, a, OJNull);
+				int ja = emit_jump(ctx, true);
+				emit_test(ctx, b, OJNull);
+				int jb = emit_jump(ctx, true);
+				ereg va = LOAD_MEM_PTR(a,HL_WSIZE);
+				emit_test(ctx, va, OJNull);
+				int jva = emit_jump(ctx, true);
+				ereg vb = LOAD_MEM_PTR(a,HL_WSIZE);
+				emit_cmp(ctx, va, vb, OJEq);
+				int jeq = emit_jump(ctx, true);
+				split_block(ctx);
+				patch_jump(ctx,ja);
+				patch_jump(ctx,jb);
+				patch_jump(ctx,jva);
+				register_block_jump(ctx,offset,true);
+				split_block(ctx);
+				patch_jump(ctx,jeq);
+			} else
+				jit_assert();
 		}
-		break;
+		return;
 	case HOBJ:
 	case HSTRUCT:
 		if( bt->kind == HVIRTUAL ) {

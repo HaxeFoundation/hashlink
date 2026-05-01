@@ -101,6 +101,7 @@ typedef enum {
 	INC,
 	DEC,
 	JMP,
+	MOVSXD,
 	// FPU
 	FSTP,
 	FSTP32,
@@ -131,13 +132,20 @@ typedef enum {
 	STMXCSR,
 	LDMXCSR,
 	// 8-16 bits
+	ADD8,
+	SUB8,
 	MOV8,
 	MOVZX8,
+	MOVSX8,
 	CMP8,
 	TEST8,
 	PUSH8,
+	ADD16,
+	SUB16,
+	IMUL16,
 	MOV16,
 	MOVZX16,
+	MOVSX16,
 	CMP16,
 	TEST16,
 	// prefetchs
@@ -180,7 +188,7 @@ typedef enum {
 #define GET_RM(op)	(((op) >> ((op) < 0 ? 24 : 8)) & 15)
 #define SBYTE(op) ((op) << 16)
 #define LONG_OP(op)	((op) | FLAG_LONGOP)
-#define OP16(op)	LONG_OP((op) | FLAG_16B)
+#define OP16(op)	((op) | FLAG_16B)
 #define LONG_RM(op,id)	LONG_OP(op | (((id) + 1) << 24))
 
 typedef struct {
@@ -218,6 +226,7 @@ static opform OP_FORMS[] = {
 	{ "INC", IS_64 ? RM(0xFF,0) : 0x40, RM(0xFF,0) },
 	{ "DEC", IS_64 ? RM(0xFF,1) : 0x48, RM(0xFF,1) },
 	{ "JMP", RM(0xFF,4) },
+	{ "MOVSXD", 0x63 },
 	// FPU
 	{ "FSTP", 0, RM(0xDD,3) },
 	{ "FSTP32", 0, RM(0xD9,3) },
@@ -248,13 +257,20 @@ static opform OP_FORMS[] = {
 	{ "STMXCSR", 0, LONG_RM(0x0FAE,3) },
 	{ "LDMXCSR", 0, LONG_RM(0x0FAE,2) },
 	// 8 bits,
+	{ "ADD8", 0, RM(0x00,3) },
+	{ "SUB8", 0, 0x28 },
 	{ "MOV8", 0x8A, 0x88, 0, RM(0xC6,0) },
 	{ "MOVZX8", LONG_OP(0x0FB6) },
+	{ "MOVSX8", LONG_OP(0x0FBE) },
 	{ "CMP8", 0x3A, 0x38, 0, RM(0x80,7) },
 	{ "TEST8", 0x84, 0x84, RM(0xF6,0) },
 	{ "PUSH8", FLAG_DEF64, 0, 0x6A | FLAG_8B },
+	{ "ADD16", 0, OP16(0x01) },
+	{ "SUB16", 0, OP16(0x29) },
+	{ "IMUL16", OP16(LONG_OP(0x0FAF)) },
 	{ "MOV16", OP16(0x8B), OP16(0x89), OP16(0xB8) },
 	{ "MOVZX16", LONG_OP(0x0FB7) },
+	{ "MOVSX16", LONG_OP(0x0FBF) },
 	{ "CMP16", OP16(0x3B), OP16(0x39) },
 	{ "TEST16", OP16(0x85) },
 	// prefetchs
@@ -295,8 +311,8 @@ static const int SIB_MULT[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
 			REX(); \
 		} else {\
 			REX(); \
-			if( (b) & FLAG_LONGOP ) B((b)>>8); \
 		}\
+		if( (b) & FLAG_LONGOP ) B((b)>>8); \
 		B(b); \
 	}
 
@@ -760,16 +776,19 @@ static void emit_div_mod( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emi
 
 static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_mode mode ) {
 	CpuOp cop;
+	int mask = 0;
 #	define F_OP(iop,f32,f64) cop = mode == M_F32 ? f32 : (mode == M_F64 ? f64 : iop);
+#	define DECL_OP(i8,i16,iop,f32,f64) static CpuOp ops_##iop[] = {-1,i8,i16,iop,iop,f64,f32,-1,-1}; cop = ops_##iop[mode]
 	switch( op ) {
 	case OAdd:
-		F_OP(ADD,ADDSS,ADDSD);
+		DECL_OP(ADD8,ADD16,ADD,ADDSS,ADDSD);
 		break;
 	case OSub:
-		F_OP(SUB,SUBSS,SUBSD);
+		DECL_OP(SUB8,SUB16,SUB,SUBSS,SUBSD);
 		break;
 	case OMul:
-		F_OP(IMUL,MULSS,MULSD);
+		DECL_OP(IMUL16/*NO IMUL8*/,IMUL16,IMUL,MULSS,MULSD);
+		if( mode == M_UI8 ) mask = 0xFF;
 		break;
 	case OIncr:
 		cop = INC;
@@ -793,18 +812,18 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 			ereg f = R(RCX);
 			if( b != f ) {
 				if( a == f || out == f ) {
-					EMIT(_MOV,RTMP,a,M_I32);
+					EMIT(_MOV,RTMP,a,mode);
 					a = RTMP;
 				}
 				if( out == f ) {
-					EMIT(_MOV,f,b,M_I32);
+					EMIT(_MOV,f,b,mode);
 					emit_anyop(ctx, op, RTMP, RTMP, f, mode);
-					EMIT(_MOV,f,RTMP,M_I32);
+					EMIT(_MOV,f,RTMP,mode);
 				} else {
-					EMIT(_PUSH,f,UNUSED,M_I32);
-					EMIT(_MOV,f,b,M_I32);
+					EMIT(_PUSH,f,UNUSED,M_PTR);
+					EMIT(_MOV,f,b,mode);
 					emit_anyop(ctx, op, out, a, f, mode);
-					EMIT(_POP,f,UNUSED,M_I32);
+					EMIT(_POP,f,UNUSED,M_PTR);
 				}
 				return;
 			}
@@ -852,17 +871,23 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		jit_assert();
 		break;
 	}
+
 	if( out == a && IS_REG(a) ) {
 		EMIT(cop,out,b,mode);
 	} else if( !IS_REG(out) || out == b ) {
 		ereg tmp = get_tmp(mode);
 		emit_mov(ctx, tmp, a, mode);
 		EMIT(cop,tmp,b,mode);
+		if( mask ) {
+			EMIT(AND,tmp,MK_CONST(mask),M_I32);
+			mask = 0;
+		}
 		emit_mov(ctx, out, tmp, mode);
 	} else {
 		emit_mov(ctx, out, a, mode);
 		EMIT(cop,out,b,mode);
 	}
+	if( mask ) EMIT(AND,out,MK_CONST(mask),M_I32);
 }
 
 void hl_codegen_flush( jit_ctx *jit ) {
@@ -1332,7 +1357,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_mode in_mode = e->size_offs;
 				ereg r = IS_REG(e->a) ? e->a : get_tmp(in_mode);
 				if( r != e->a ) emit_mov(ctx, r, e->a, in_mode);
-				CpuOp op = 0;
+				CpuOp op = -1;
 				switch( ID2(e->mode,in_mode) ) {
 				case ID2(M_F32,M_UI8):
 				case ID2(M_F32,M_UI16):
@@ -1364,18 +1389,37 @@ void hl_codegen_function( jit_ctx *jit ) {
 				case ID2(M_F64,M_F32):
 					op = CVTSS2SD;
 					break;
+				case ID2(M_PTR,M_I32):
+					// sign extend 32-64 bit conv
+					op = MOVSXD;
+					break;
+				case ID2(M_UI16,M_UI8):
+				case ID2(M_I32,M_UI8):
+				case ID2(M_PTR,M_UI8):
+				case ID2(M_UI8, M_UI16):
+				case ID2(M_UI8, M_I32):
+				case ID2(M_UI8, M_PTR):
+					op = MOVZX8;
+					break;
+				case ID2(M_I32,M_UI16):
+				case ID2(M_PTR,M_UI16):
+				case ID2(M_UI16, M_I32):
+				case ID2(M_UI16, M_PTR):
+					op = MOVZX16;
+					break;
+				case ID2(M_I32,M_PTR):
+					op = _MOV;
+					break;
 				default:
 					jit_assert();
 					break;
 				}
-				if( op ) {
-					if( IS_REG(out) )
-						EMIT(op,out,r,0);
-					else {
-						ereg r2 = get_tmp(e->mode);
-						EMIT(op,r2,r,0);
-						emit_mov(ctx,out,r2,e->mode);
-					}
+				if( IS_REG(out) || op == _MOV )
+					EMIT(op,out,r,e->mode);
+				else {
+					ereg r2 = get_tmp(e->mode);
+					EMIT(op,r2,r,e->mode);
+					emit_mov(ctx,out,r2,e->mode);
 				}
 			}
 			break;
@@ -1496,9 +1540,9 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_MOV,nargs,cfg->regs.arg[2],M_I32);
 
 	for(int i=0;i<cfg->regs.nargs;i++)
-		emit_ext(ctx, _MOV, cfg->regs.arg[i], MK_ADDR(vargs,0), M_PTR, i * 8);
+		EMIT(_MOV, cfg->regs.arg[i], MK_ADDR(vargs,i*8), M_PTR);
 	for(int i=0;i<cfg->floats.nargs;i++)
-		emit_ext(ctx, MOVSD, cfg->floats.arg[i]-64, MK_ADDR(vargs,0), M_PTR, (i + cfg->regs.nargs) * 8);
+		EMIT(MOVSD, cfg->floats.arg[i]-64, MK_ADDR(vargs,(i + cfg->regs.nargs) * 8), M_PTR);
 
 	EMIT(ADD,vargs,MK_CONST((MAX_ARGS - 1) * HL_WSIZE),M_PTR);
 	int begin = byte_count(ctx->code);
