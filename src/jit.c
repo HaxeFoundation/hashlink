@@ -224,10 +224,28 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		hl_type *at = t->fun->args[i];
 		void *v = args[i];
 		int r = get_next_reg(at,&rp,&fp);
+		int_val iv;
+		switch( at->kind ) {
+		case HBOOL:
+		case HUI8:
+		case HUI16:
+		case HI32:
+		case HF32:
+			iv = *(int*)v;
+			break;
+		case HI64:
+		case HGUID:
+		case HF64:
+			iv = *(int_val*)v;
+			break;
+		default:
+			iv = (int_val)v;
+			break;
+		}
 		if( r >= 0 )
-			vargs.regs[r + (at->kind == HF32 || at->kind == HF64 ? arg_reg_count : 0)] = *(void**)v;
+			vargs.regs[r + (at->kind == HF32 || at->kind == HF64 ? arg_reg_count : 0)] = (void*)iv;
 		else
-			vargs.stack[--sp] = *(void**)v;
+			vargs.stack[--sp] = (void*)iv;
 	}
 	switch( t->fun->ret->kind ) {
 	case HUI8:
