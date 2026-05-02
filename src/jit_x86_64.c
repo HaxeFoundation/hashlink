@@ -236,8 +236,8 @@ static opform OP_FORMS[] = {
 	// SSE
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
-	{ "COMISD", 0x660F2F, LONG_RM(0x660F2F,1) },
-	{ "COMISS", LONG_OP(0x0F2F), LONG_RM(0x0F2F,1) },
+	{ "COMISD", LONG_RM(0x660F2F,1) },
+	{ "COMISS", LONG_RM(0x0F2F,1) },
 	{ "ADDSD", 0xF20F58 },
 	{ "SUBSD", 0xF20F5C },
 	{ "MULSD", 0xF20F59 },
@@ -1291,16 +1291,13 @@ void hl_codegen_function( jit_ctx *jit ) {
 				case M_F64: op = COMISD; break;
 				default: op = _CMP; break;
 				}
-				ereg b = e->b;
-				if( !IS_REG(e->a) && !IS_REG(e->b) ) {
+				ereg a = e->a;
+				if( !IS_REG(e->a) && (IS_FLOAT(e->mode) || !IS_REG(e->b)) ) {
 					ereg tmp = get_tmp(e->mode);
-					emit_mov(ctx, tmp, e->b, e->mode);
-					b = tmp;
+					emit_mov(ctx, tmp, e->a, e->mode);
+					a = tmp;
 				}
-				if( IS_FLOAT(e->mode) )
-					EMIT(op,b,e->a,e->mode);
-				else
-					EMIT(op,e->a,b,e->mode);
+				EMIT(op,a,e->b,e->mode);
 			}
 			break;
 		case JCOND:
