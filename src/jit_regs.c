@@ -211,7 +211,8 @@ static void regs_write_live( regs_ctx *ctx, ereg *r ) {
 	if( IS_NULL(*r) ) jit_assert();
 	if( !REG_IS_VAL(*r) ) return; // some are injections of native regs at emit
 	value_info *v = VAL_REG(*r);
-	v->last_read = ctx->loop_end && ctx->jit->values_writes[v->id] < ctx->loop_start ? ctx->loop_end : ctx->cur_op;
+	int write = v->id >= 0 ? ctx->jit->values_writes[v->id] : -1;
+	v->last_read = ctx->loop_end && write < ctx->loop_start ? ctx->loop_end : ctx->cur_op;
 	v->tot_reads++;
 }
 
