@@ -125,12 +125,14 @@ typedef enum {
 	XORPD,
 	CVTSI2SD,
 	CVTSI2SS,
-	CVTSD2SI,
+	CVTTSD2SI,
 	CVTSD2SS,
 	CVTSS2SD,
-	CVTSS2SI,
+	CVTTSS2SI,
 	STMXCSR,
 	LDMXCSR,
+	STC,
+	CLC,
 	// 8-16 bits
 	ADD8,
 	SUB8,
@@ -250,12 +252,14 @@ static opform OP_FORMS[] = {
 	{ "XORPD", 0x660F57 },
 	{ "CVTSI2SD", 0xF20F2A },
 	{ "CVTSI2SS", 0xF30F2A },
-	{ "CVTSD2SI", 0xF20F2D },
+	{ "CVTTSD2SI", 0xF20F2C },
 	{ "CVTSD2SS", 0xF20F5A },
 	{ "CVTSS2SD", 0xF30F5A },
-	{ "CVTSS2SI", 0xF30F2D },
+	{ "CVTTSS2SI", 0xF30F2C },
 	{ "STMXCSR", 0, LONG_RM(0x0FAE,3) },
 	{ "LDMXCSR", 0, LONG_RM(0x0FAE,2) },
+	{ "STC", 0xF9 },
+	{ "CLC", 0xF8 },
 	// 8 bits,
 	{ "ADD8", 0, RM(0x00,3) },
 	{ "SUB8", 0, 0x28 },
@@ -1163,7 +1167,10 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_mov(ctx, REG_ADD_OFFSET(REG_PTR(e->a),e->size_offs), e->b, e->mode);
 			break;
 		case PUSH:
-			if( IS_FLOAT(e->mode) ) BREAK();
+			if( IS_FLOAT(e->mode) ) {
+				BREAK();
+				break;
+			}
 			if( IS_REG(e->a) && REG_VALUE(e->a) != 0 ) {
 				emit_mov(ctx, RTMP, e->a, e->mode);
 				emit_ext(ctx, _PUSH, RTMP, UNUSED, e->mode, 0);
@@ -1298,6 +1305,33 @@ void hl_codegen_function( jit_ctx *jit ) {
 					a = tmp;
 				}
 				EMIT(op,a,e->b,e->mode);
+				if( IS_FLOAT(e->mode) && e->size_offs != OJSGt && e->size_offs != OJNull && e->size_offs != OJNotNull ) {
+					// handle NaNs
+					int jnotnan = jump_near(ctx,JNParity);
+					switch( e->size_offs ) {
+					case OJSLt:
+					case OJNotLt:
+						// set CF=0, ZF=1
+						EMIT(XOR,RTMP,RTMP,M_I32);
+						break;
+					case OJSGte:
+					case OJNotGte:
+						// set ZF=0, CF=1
+						EMIT(XOR,RTMP,RTMP,M_I32);
+						EMIT(STC,UNUSED,UNUSED,0);
+						break;
+					case OJNotEq:
+					case OJEq:
+						// set ZF=0, CF=?
+					case OJSLte:
+						// set ZF=0, CF=0
+						EMIT(TEST,R(RSP),R(RSP),M_PTR);
+						break;
+					default:
+						jit_assert();
+					}
+					patch_jump_near(ctx,jnotnan);
+				}
 			}
 			break;
 		case JCOND:
@@ -1372,13 +1406,13 @@ void hl_codegen_function( jit_ctx *jit ) {
 				case ID2(M_UI16,M_F32):
 				case ID2(M_I32,M_F32):
 				case ID2(M_PTR,M_F32):
-					op = CVTSS2SI;
+					op = CVTTSS2SI;
 					break;
 				case ID2(M_UI8,M_F64):
 				case ID2(M_UI16,M_F64):
 				case ID2(M_I32,M_F64):
 				case ID2(M_PTR,M_F64):
-					op = CVTSD2SI;
+					op = CVTTSD2SI;
 					break;
 				case ID2(M_F32,M_F64):
 					op = CVTSD2SS;
