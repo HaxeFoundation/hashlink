@@ -1381,8 +1381,6 @@ void hl_codegen_function( jit_ctx *jit ) {
 			}
 			break;
 		case CONV_UNSIGNED:
-			BREAK();
-			break;
 		case CONV:
 			{
 				emit_mode in_mode = e->size_offs;
@@ -1446,10 +1444,10 @@ void hl_codegen_function( jit_ctx *jit ) {
 					break;
 				}
 				if( IS_REG(out) || op == _MOV )
-					EMIT(op,out,r,e->mode);
+					EMIT(op,out,r,e->op == CONV_UNSIGNED ? M_PTR : e->mode);
 				else {
 					ereg r2 = get_tmp(e->mode);
-					EMIT(op,r2,r,e->mode);
+					EMIT(op,r2,r,e->op == CONV_UNSIGNED ? M_PTR : e->mode);
 					emit_mov(ctx,out,r2,e->mode);
 				}
 			}
