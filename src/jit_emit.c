@@ -146,7 +146,7 @@ struct _emit_ctx {
 #define R(i)	(ctx->vregs + (i))
 
 #define LOAD(r) emit_load_reg(ctx, r)
-#define STORE(r, v) emit_store_reg(ctx, r, v)
+#define STORE(r, v) { ereg __v = (v); if( (r)->t->kind != HVOID ) emit_store_reg(ctx, r, __v); }
 #define LOAD_CONST(v, t) emit_load_const(ctx, (uint64)(v), t)
 #define LOAD_CONST_PTR(v) LOAD_CONST(v,&hlt_bytes)
 #define LOAD_MEM(v, offs, t) emit_load_mem(ctx, v, offs, t, t)
@@ -621,16 +621,6 @@ static void seal_block( emit_ctx *ctx, emit_block *b ) {
 	b->sealed = true;
 }
 
-static ereg emit_phi( emit_ctx *ctx, ereg v1, ereg v2 ) {
-	unsigned char mode = GET_MODE(v1);
-	if( mode != GET_MODE(v2) ) jit_assert();
-	tmp_phi *p = alloc_phi(ctx, ctx->current_block, NULL);
-	p->mode = mode;
-	phi_add_val(ctx, p, v1, blocks_get(ctx->blocks,ctx->current_block->id - 2));
-	phi_add_val(ctx, p, v2, blocks_get(ctx->blocks,ctx->current_block->id - 1));
-	return p->value;
-}
-
 static ereg emit_call_fid( emit_ctx *ctx, int findex, ereg *args, int nargs, emit_mode mode ) {
 	einstr *e = emit_instr(ctx, CALL_FUN);
 	e->mode = mode;
@@ -647,7 +637,7 @@ static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int 
 	for(int i=0;i<count;i++)
 		args[i] = LOAD(R(args_regs[i]));
 	if( isNative )
-		STORE(dst, emit_native_call(ctx, m->functions_ptrs[findex], args, count, dst->t));
+		STORE(dst, emit_native_call(ctx, m->functions_ptrs[findex], args, count, dst->t))
 	else {
 		ereg out = emit_call_fid(ctx,findex,args,count,hl_type_mode(dst->t));
 		if( out ) STORE(dst, out);
@@ -753,16 +743,19 @@ static bool dyn_need_type( hl_type *t ) {
 	return !(t->kind == HF32 || t->kind == HF64 || t->kind == HI64 || t->kind == HGUID);
 }
 
-static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
+static void emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, vreg *dst ) {
+	hl_type *dt = dst->t;
 	if( t->kind == HNULL && t->tparam->kind == dt->kind ) {
 		emit_test(ctx, v, OJNotNull);
 		int jnot = emit_jump(ctx, true);
 		ereg v1 = LOAD_CONST(0,dt);
+		STORE(dst, v1);
 		int jend = emit_jump(ctx, false);
 		patch_jump(ctx, jnot);
 		ereg v2 = LOAD_MEM(v,HDYN_VALUE,dt);
+		STORE(dst, v2);
 		patch_jump(ctx, jend);
-		return emit_phi(ctx, v1, v2);
+		return;
 	}
 	bool need_dyn = dyn_need_type(dt);
 	ereg st = emit_gen_size(ctx, ALLOC_STACK, HL_WSIZE);
@@ -772,7 +765,7 @@ static ereg emit_dyn_cast( emit_ctx *ctx, ereg v, hl_type *t, hl_type *dt ) {
 	args[1] = LOAD_CONST_PTR(t);
 	if( need_dyn ) args[2] = LOAD_CONST_PTR(dt);
 	ereg r = emit_native_call(ctx, get_dyncast(dt), args, need_dyn ? 3 : 2, dt);
-	return r;
+	STORE(dst, r);
 }
 
 static void emit_opcode( emit_ctx *ctx, hl_opcode *o );
@@ -991,8 +984,8 @@ void hl_emit_function( jit_ctx *jit ) {
 		r->t = f->regs[i];
 	}
 
-	emit_gen(ctx,ENTER,UNUSED,UNUSED,M_NONE);
 	emit_gen_size(ctx, BLOCK, 0);
+	emit_gen(ctx,ENTER,UNUSED,UNUSED,M_NONE);
 	for(i=0;i<f->type->fun->nargs;i++) {
 		hl_type *t = f->type->fun->args[i];
 		STORE(R(i), emit_gen(ctx, LOAD_ARG, UNUSED, UNUSED, hl_type_mode(t)));
@@ -1572,7 +1565,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			args[0] = LOAD(ra);
 			args[1] = st;
 			args[2] = LOAD_CONST(o->p3,&hlt_i32);
-			STORE(dst, emit_dyn_cast(ctx,emit_native_call(ctx,hl_dyn_call,args,3,dst->t),ra->t,dst->t));
+			emit_dyn_cast(ctx,emit_native_call(ctx,hl_dyn_call,args,3,dst->t),ra->t,dst);
 		} else {
 			ereg r = LOAD(ra);
 			ereg *args = get_tmp_args(ctx,o->p3+1);
@@ -1585,13 +1578,14 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			for(i=0;i<o->p3;i++)
 				args[i+1] = LOAD(R(o->extra[i]));
 			ereg v1 = emit_dyn_call(ctx,LOAD_MEM_PTR(r,HL_WSIZE),args,o->p3 + 1,dst->t);
+			STORE(dst, v1);
 			int jend = emit_jump(ctx, false);
 			patch_jump(ctx, jidx);
 			for(i=0;i<o->p3;i++)
 				args[i] = LOAD(R(o->extra[i]));
 			ereg v2 = emit_dyn_call(ctx,LOAD_MEM_PTR(r,HL_WSIZE),args,o->p3,dst->t);
+			STORE(dst, v2);
 			patch_jump(ctx, jend);
-			if( dst->t->kind != HVOID ) STORE(dst, emit_phi(ctx,v1,v2));
 		}
 		break;
 	case OStaticClosure:
@@ -1626,6 +1620,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					emit_test(ctx, field, OJNull);
 					int jidx = emit_jump(ctx, true);
 					ereg v1 = LOAD_MEM(field,0,dst->t);
+					STORE(dst, v1);
 					int jend = emit_jump(ctx, false);
 					patch_jump(ctx, jidx);
 					bool need_type = dyn_need_type(dst->t);
@@ -1634,8 +1629,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					args[1] = LOAD_CONST(ra->t->virt->fields[o->p3].hashed_name,&hlt_i32);
 					if( need_type ) args[2] = LOAD_CONST_PTR(dst->t);
 					ereg v2 = emit_native_call(ctx,get_dynget(dst->t),args,need_type?3:2,dst->t);
+					STORE(dst, v2);
 					patch_jump(ctx, jend);
-					STORE(dst, emit_phi(ctx, v1, v2));
 				}
 				break;
 			default:
@@ -1773,6 +1768,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					for(i=1;i<nargs;i++)
 						args[i] = LOAD(R(o->extra[i]));
 					ereg v1 = emit_dyn_call(ctx,fun,args,nargs,dst->t);
+					STORE(dst, v1);
 
 					int jend = emit_jump(ctx, false);
 					patch_jump(ctx, jidx);
@@ -1793,10 +1789,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					args[4] = edyn;
 
 					ereg v2 = emit_native_call(ctx, hl_dyn_call_obj, args, 5, dst->t);
-
+					STORE(dst, v2);
 					patch_jump(ctx, jend);
-
-					if( dst->t->kind != HVOID ) STORE(dst, emit_phi(ctx, v1, v2));
 				}
 				break;
 			default:
@@ -1845,11 +1839,12 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			emit_test(ctx, r, OJNotNull);
 			int jidx = emit_jump(ctx, true);
 			ereg v1 = LOAD_CONST_PTR(&hlt_void);
+			STORE(dst,v1);
 			int jend = emit_jump(ctx, false);
 			patch_jump(ctx, jidx);
 			ereg v2 = LOAD_MEM_PTR(r,0);
+			STORE(dst,v2);
 			patch_jump(ctx, jend);
-			STORE(dst, emit_phi(ctx, v1, v2));
 		}
 		break;
 	case OGetArray:
@@ -1929,10 +1924,10 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			args[0] = LOAD_CONST_PTR(dst->t);
 			args[1] = LOAD_CONST(o->p2,&hlt_i32);
 			ereg en = emit_native_call(ctx, hl_alloc_enum, args, 2, dst->t);
-			STORE(dst, en);
 			hl_enum_construct *c = &dst->t->tenum->constructs[o->p2];
 			for(int i=0;i<c->nparams;i++)
 				STORE_MEM(en, c->offsets[i], LOAD(R(o->extra[i])));
+			STORE(dst, en);
 		}
 		break;
 	case OEnumAlloc:
@@ -2002,7 +1997,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case OSafeCast:
-		STORE(dst, emit_dyn_cast(ctx, LOAD(ra), ra->t, dst->t));
+		emit_dyn_cast(ctx, LOAD(ra), ra->t, dst);
 		break;
 	case ODynGet:
 		{
