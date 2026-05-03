@@ -171,6 +171,13 @@ static bool regs_alloc_reg( regs_ctx *ctx, value_info *v ) {
 			}
 		}
 		if( free ) {
+			for(int i=0;i<ctx->persists_uses[mode];i++)
+				if( cfg->persist[i] == v->pref_reg ) {
+					free = false;
+					break;
+				}
+		}
+		if( free ) {
 			v->reg = v->pref_reg;
 			return true;
 		}
@@ -328,6 +335,7 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 				regs_debug("ADD PHI %s:=%s to #%d@%X\n",val_str(ph->value,ph->mode),val_str(v,ph->mode),(int)(b2 - jit->blocks),b2->end_pos-1);
 				int_arr_add(*arr,v);
 				int_arr_add(*arr,ph->value);
+				int_arr_add(*arr,(bl - b2) == 1);
 				val->tot_reads++;
 				if( val->last_read < b2->end_pos )
 					val->last_read = b2->end_pos;
@@ -482,7 +490,7 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 			if( !read ) {
 				ereg from = int_arr_get(movs,k+1);
 				int mode = int_arr_get(movs,k+2);
-				bool cmov = cond && IS_REG(to); 
+				bool cmov = cond && IS_REG(to);
 				regs_emit(ctx,to,cmov?CMOV:MOV,from,UNUSED,mode,0);
 				int_arr_remove_range(&movs,k,3);
 				cycle = false;
@@ -509,7 +517,7 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 	int_arr_reset(&ctx->pack_movs);
 }
 
-static void flush_phis( regs_ctx *ctx, eblock *b, bool cond ) {
+static void flush_phis( regs_ctx *ctx, eblock *b, bool cond, bool after ) {
 	if( !b ) return;
 	jit_ctx *jit = ctx->jit;
 	int bid = (int)(b - jit->blocks);
@@ -520,6 +528,9 @@ static void flush_phis( regs_ctx *ctx, eblock *b, bool cond ) {
 	while( idx < int_arr_count(arr) ) {
 		ereg a = int_arr_get(arr,idx++);
 		ereg b = int_arr_get(arr,idx++);
+		int bcount = int_arr_get(arr,idx++);
+		if( after != (bcount == 1) )
+			continue;
 		value_info *from = VAL_REG(a);
 		value_info *to = VAL_REG(b);
 		if( from->reg == to->reg ) continue;
@@ -538,7 +549,8 @@ static void flush_phis( regs_ctx *ctx, eblock *b, bool cond ) {
 		}
 	}
 	ctx->pack_movs = movs;
-	int_arr_free(&ctx->blocks_phis[bid]);
+	if( !cond )
+		int_arr_free(&ctx->blocks_phis[bid]);
 	flush_movs(ctx, cond);
 }
 
@@ -598,8 +610,10 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				if( offset )
 					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,0,-offset);
 				for(int k=e.nargs-1;k>=0;k--) {
-					if( stack_bits & (1 << k) )
-						EMIT(PUSH,VAL_REG(args[k])->reg,UNUSED,M_PTR);
+					if( stack_bits & (1 << k) ) {
+						value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
+						EMIT(PUSH,VAL_REG(args[k])->reg,UNUSED,v && IS_FLOAT(v->mode) ? v->mode : M_PTR);
+					}
 				}
 				if( IS_WINCALL64 ) {
 					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,0,-0x20);
@@ -657,7 +671,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		case JCOND:
 		case JUMP:
 		case JUMP_TABLE:
-			flush_phis(ctx,cur_block, e.op == JCOND);
+			flush_phis(ctx,cur_block, e.op == JCOND, false);
 			if( e.op == JUMP_TABLE ) {
 				// copy args (remap later)
 				hl_emit_store_args(jit->emit,&e,hl_emit_get_args(jit->emit,&e),e.nargs);
@@ -665,6 +679,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			regs_write_instr(ctx, &e, out);
 			int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
 			int_arr_add(ctx->jump_regs, cur_op + 1 + (e.op == JUMP_TABLE ? 0 : e.size_offs));
+			if( e.op == JCOND ) flush_phis(ctx,cur_block, false, true);
 			break;
 		case RET:
 			if( e.a ) {
@@ -700,7 +715,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		if( instr_stack_offset )
 			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,instr_stack_offset);
 		if( cur_block && cur_block->end_pos == cur_op+1 )
-			flush_phis(ctx,cur_block,false);
+			flush_phis(ctx,cur_block,false,true);
 		ctx->pos_map[cur_op+1] = ctx->emit_pos;
 	}
 }
