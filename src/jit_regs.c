@@ -182,10 +182,12 @@ static bool regs_alloc_reg( regs_ctx *ctx, value_info *v ) {
 			return true;
 		}
 	}
+	value_info *first = NULL;
 	for(int i=0;i<cfg->nscratchs;i++) {
 		ereg r = cfg->scratch[i];
 		for_iter(values,v2,ctx->scratch) {
 			if( v2->reg == r ) {
+				if( first == NULL ) first = v2;
 				r = UNUSED;
 				break;
 			}
@@ -200,10 +202,9 @@ static bool regs_alloc_reg( regs_ctx *ctx, value_info *v ) {
 		return false;
 	}
 	// free the oldest scratch reg
-	value_info *v2 = values_first(ctx->scratch);
-	if( !v2 ) jit_assert();
-	v->reg = v2->reg;
-	spill(ctx, v2);
+	if( !first ) jit_assert();
+	v->reg = first->reg;
+	spill(ctx, first);
 	return true;
 }
 
@@ -371,8 +372,8 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 		einstr e = jit->instrs[cur_op];
 		value_info *write = NULL;
 #		ifdef HL_DEBUG
-		int uid = (jit->fun->findex << 16) | cur_op;
-		__ignore(&uid);
+		int eid = (jit->fun->findex << 16) | cur_op;
+		__ignore(&eid);
 #		endif
 		ctx->cur_op = cur_op;
 
