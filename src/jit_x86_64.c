@@ -739,21 +739,21 @@ static void emit_div_mod( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emi
 	ereg bas = R(RAX), div = R(RDX);
 	if( out != bas ) EMIT(_PUSH,bas,UNUSED,M_PTR);
 	if( out != div ) EMIT(_PUSH,div,UNUSED,M_PTR);
-	if( b == bas || b == div || !IS_REG(div) ) {
+	if( b == bas || b == div || !IS_REG(b) ) {
 		EMIT(_MOV,RTMP,b,mode);
 		b = RTMP;
 	}
 	if( a != bas ) EMIT(_MOV,bas,a,mode);
 		
 	// check for div = 0
-	EMIT(_TEST,bas,bas,mode);
+	EMIT(_TEST,b,b,mode);
 	int jz = jump_near(ctx,JZero);
 	int jz1 = 0;
 	// Prevent MIN/-1 overflow exception
 	// OSMod: r = (b == 0 || b == -1) ? 0 : a % b
 	// OSDiv: r = (b == 0 || b == -1) ? a * b : a / b
 	if( op == OSMod || op == OSDiv ) {
-		EMIT(_CMP,bas,MK_CONST(-1),mode);
+		EMIT(_CMP,b,MK_CONST(-1),mode);
 		jz1 = jump_near(ctx,JZero);
 	}
 	bool unsign = op == OUDiv || op == OUMod;
@@ -971,11 +971,12 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 		return;
 	}
 
+	bool use_offs = offs != 0 || (e.a&7) == RBP;
 	REX64(out,e.a,e.b);
 	B(0x8D);
-	MOD_RM(offs == 0 ? 0 : 1,out,4);
+	MOD_RM(use_offs ? 1 : 0,out,4);
 	SIB(mult,e.b,e.a);
-	if( offs != 0 ) {
+	if( use_offs ) {
 		if( !IS_SBYTE(offs) ) jit_assert();
 		B(offs);
 	}
@@ -1168,18 +1169,21 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case PUSH:
 			if( IS_FLOAT(e->mode) ) {
-				BREAK();
-				break;
-			}
-			if( IS_REG(e->a) && REG_VALUE(e->a) != 0 ) {
+				if( !IS_REG(e->a) )
+					EMIT(_PUSH,e->a,UNUSED,M_PTR);
+				else {
+					EMIT(SUB,R(RSP),MK_CONST(8),M_PTR);
+					EMIT(e->mode == M_F32 ? MOVSS : MOVSD,REG_PTR(R(RSP)),e->a,e->mode);
+				}
+			} else if( IS_REG(e->a) && REG_VALUE(e->a) != 0 ) {
 				emit_mov(ctx, RTMP, e->a, e->mode);
-				emit_ext(ctx, _PUSH, RTMP, UNUSED, e->mode, 0);
+				EMIT(_PUSH, RTMP, UNUSED, M_PTR);
 			} else
-				emit_ext(ctx, _PUSH, e->a, UNUSED, e->mode, 0);
+				EMIT(_PUSH, e->a, UNUSED, M_PTR);
 			break;
 		case POP:
-			if( IS_FLOAT(e->mode) ) BREAK();
-			emit_ext(ctx, _POP, e->a, UNUSED, e->mode, 0);
+			if( IS_FLOAT(e->mode) ) jit_assert();
+			EMIT(_POP, e->a, UNUSED, M_PTR);
 			break;
 		case PUSH_CONST:
 			if( e->mode != M_PTR ) jit_assert();
