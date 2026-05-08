@@ -248,7 +248,7 @@ static opform OP_FORMS[] = {
 	{ "SUBSS", 0xF30F5C },
 	{ "MULSS", 0xF30F59 },
 	{ "DIVSS", 0xF30F5E },
-	{ "XORPS", 0x0F57 },
+	{ "XORPS", LONG_OP(0x0F57) },
 	{ "XORPD", 0x660F57 },
 	{ "CVTSI2SD", 0xF20F2A },
 	{ "CVTSI2SS", 0xF30F2A },
@@ -1475,7 +1475,23 @@ void hl_codegen_function( jit_ctx *jit ) {
 				EMIT(SUB,R(RSP),MK_CONST(-e->size_offs),M_PTR);
 			break;
 		case PREFETCH:
-			BREAK();
+			{
+				CpuOp op;
+				switch( e->size_offs ) {
+				case 0: op = PREFETCHT0; break;
+				case 1: op = PREFETCHT1; break;
+				case 2: op = PREFETCHT2; break;
+				case 3: op = PREFETCHNTA; break;
+				case 4: op = PREFETCHW; break;
+				default: jit_assert();
+				}
+				ereg a = e->a;
+				if( !IS_REG(e->a) ) {
+					emit_mov(ctx,RTMP,e->a,M_PTR);
+					a = RTMP;
+				}
+				EMIT(op,REG_PTR(a),UNUSED,M_PTR);
+			}
 			break;
 		case CMOV:
 			{
