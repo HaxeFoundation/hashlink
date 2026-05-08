@@ -1124,8 +1124,6 @@ static void prepare_loop_block( emit_ctx *ctx ) {
 	}
 }
 
-#define HL_DYN_VALUE 8
-
 static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type *bt, ereg b, int offset ) {
 	if( at->kind == HDYN || bt->kind == HDYN || at->kind == HFUN || bt->kind == HFUN ) {
 		ereg args[2] = { a, b };
@@ -1159,7 +1157,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 				emit_test(ctx,b,OJNull);
 				int jb = emit_jump(ctx,true);				
 				hl_type *vt = at->tparam;
-				emit_cmp(ctx, LOAD_MEM(a,HL_DYN_VALUE,vt), LOAD_MEM(b,HL_DYN_VALUE,vt), OJEq);
+				emit_cmp(ctx, LOAD_MEM(a,HDYN_VALUE,vt), LOAD_MEM(b,HDYN_VALUE,vt), OJEq);
 				register_block_jump(ctx,offset,true);
 				patch_jump(ctx,ja);
 				patch_jump(ctx,jb);
@@ -1174,7 +1172,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 				register_block_jump(ctx,offset,true);
 				split_block(ctx);
 				hl_type *vt = at->tparam;
-				emit_cmp(ctx, LOAD_MEM(a,HL_DYN_VALUE,vt), LOAD_MEM(b,HL_DYN_VALUE,vt), OJNull);
+				emit_cmp(ctx, LOAD_MEM(a,HDYN_VALUE,vt), LOAD_MEM(b,HDYN_VALUE,vt), OJNull);
 				add_jump_target(ctx, 0);
 				int jcmp = emit_jump(ctx,true);
 				register_block_jump(ctx,offset,true);
@@ -1223,7 +1221,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 				ereg va = LOAD_MEM_PTR(a,HL_WSIZE);
 				emit_test(ctx, va, OJNull);
 				int jva = emit_jump(ctx, true);
-				ereg vb = LOAD_MEM_PTR(a,HL_WSIZE);
+				ereg vb = LOAD_MEM_PTR(b,HL_WSIZE);
 				emit_cmp(ctx, va, vb, OJEq);
 				register_block_jump(ctx,offset,true);
 				split_block(ctx);
@@ -1232,9 +1230,8 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 				patch_jump(ctx,jva);
 			} else if( op == OJNotEq ) {
 				// if( a != b && (!a || !b || !a->value || a->value != b->value) ) goto
-				emit_cmp(ctx, a, b, OJNotEq);
-				register_block_jump(ctx,offset,true);
-				split_block(ctx);
+				emit_cmp(ctx, a, b, OJEq);
+				int jeq1 = emit_jump(ctx, true);
 				emit_test(ctx, a, OJNull);
 				int ja = emit_jump(ctx, true);
 				emit_test(ctx, b, OJNull);
@@ -1242,16 +1239,17 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 				ereg va = LOAD_MEM_PTR(a,HL_WSIZE);
 				emit_test(ctx, va, OJNull);
 				int jva = emit_jump(ctx, true);
-				ereg vb = LOAD_MEM_PTR(a,HL_WSIZE);
+				ereg vb = LOAD_MEM_PTR(b,HL_WSIZE);
 				emit_cmp(ctx, va, vb, OJEq);
-				int jeq = emit_jump(ctx, true);
+				int jeq2 = emit_jump(ctx, true);
 				split_block(ctx);
 				patch_jump(ctx,ja);
 				patch_jump(ctx,jb);
 				patch_jump(ctx,jva);
-				register_block_jump(ctx,offset,true);
+				register_block_jump(ctx,offset,false);
 				split_block(ctx);
-				patch_jump(ctx,jeq);
+				patch_jump(ctx,jeq1);
+				patch_jump(ctx,jeq2);
 			} else
 				jit_assert();
 		}
@@ -1778,8 +1776,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					for(i=0;i<nargs;i++)
 						STORE_MEM(eargs,i*HL_WSIZE,LOAD(R(o->extra[i+1])));
 					bool need_dyn = !hl_is_ptr(dst->t) && dst->t->kind != HVOID;
-					int dyn_size = sizeof(vdynamic);
-					ereg edyn = need_dyn ? emit_gen_size(ctx, ALLOC_STACK, dyn_size) : LOAD_CONST_PTR(NULL);
+					ereg edyn = need_dyn ? emit_gen_size(ctx, ALLOC_STACK, sizeof(vdynamic)) : LOAD_CONST_PTR(NULL);
 
 					args = get_tmp_args(ctx, 5);
 					args[0] = LOAD_MEM_PTR(obj,HL_WSIZE);
@@ -1788,8 +1785,11 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					args[3] = eargs;
 					args[4] = edyn;
 
-					ereg v2 = emit_native_call(ctx, hl_dyn_call_obj, args, 5, dst->t);
-					STORE(dst, v2);
+					ereg v2 = emit_native_call(ctx, hl_dyn_call_obj, args, 5, &hlt_bytes);
+					if( need_dyn )
+						STORE(dst, LOAD_MEM(edyn,HDYN_VALUE,dst->t))
+					else
+						STORE(dst, v2);
 					patch_jump(ctx, jend);
 				}
 				break;
