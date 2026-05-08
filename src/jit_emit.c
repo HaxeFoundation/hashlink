@@ -109,6 +109,12 @@ struct _tmp_phi {
 	linked_inf *ref_blocks;
 };
 
+typedef struct {
+	ereg stack;
+	int calls_count;
+	int target;
+} trap_inf;
+
 struct _emit_ctx {
 	hl_module *mod;
 	hl_function *fun;
@@ -127,7 +133,7 @@ struct _emit_ctx {
 	bool flushed;
 
 	ereg tmp_args[MAX_TMP_ARGS];
-	ereg traps[MAX_TRAPS];
+	trap_inf traps[MAX_TRAPS];
 	int *pos_map;
 	int pos_map_size;
 	int trap_count;
@@ -135,6 +141,7 @@ struct _emit_ctx {
 	int_arr args_data;
 	int_arr jump_regs;
 	int_arr values;
+	int_arr trap_calls;
 
 	blocks blocks;
 	emit_block *current_block;
@@ -490,7 +497,16 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 	store_block_var(ctx,ctx->current_block,to,v);
 }
 
+static void before_call( emit_ctx *ctx ) {
+	if( ctx->trap_count > 0 ) {
+		split_block(ctx);
+		int_arr_add(ctx->trap_calls,ctx->current_block->id);
+	}
+}
+
 static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int nargs, hl_type *ret ) {
+	if( native_ptr != hl_get_thread )
+		before_call(ctx);
 	einstr *e = emit_instr(ctx, CALL_PTR);
 	e->mode = (unsigned char)(ret ? hl_type_mode(ret) : M_NORET);
 	e->value = (int_val)native_ptr;
@@ -499,6 +515,7 @@ static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int 
 }
 
 static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_type *ret ) {
+	before_call(ctx);
 	einstr *e = emit_instr(ctx, CALL_REG);
 	e->mode = hl_type_mode(ret);
 	e->a = f;
@@ -564,8 +581,8 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 			store_block_var(ctx,b,p->r,same);
 		l = l->next;
 	}
-	emit_block *bsame = ereg_find(p->vals,same);
 	for_iter(phi,p2,p->ref_phis) {
+		emit_block *bsame = ereg_find(p2->vals,p->value);
 		phi_remove_val(ctx,p2,p->value);
 		phi_add_val(ctx,p2,same,bsame);
 	}
@@ -575,7 +592,7 @@ static ereg optimize_phi_rec( emit_ctx *ctx, tmp_phi *p ) {
 	for(int i=0;i<count;i++)
 		optimize_phi_rec(ctx, phis[i]);
 	ctx->phi_depth--;
-	emit_debug("%sPHI-OPT-DONE %s = %s:#%d\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(same,p->mode), bsame->id);
+	emit_debug("%sPHI-OPT-DONE %s = %s\n", phi_prefix(ctx), val_str(p->value,p->mode), val_str(same,p->mode));
 	return optimize_phi_rec(ctx,p);
 }
 
@@ -622,6 +639,7 @@ static void seal_block( emit_ctx *ctx, emit_block *b ) {
 }
 
 static ereg emit_call_fid( emit_ctx *ctx, int findex, ereg *args, int nargs, emit_mode mode ) {
+	before_call(ctx);
 	einstr *e = emit_instr(ctx, CALL_FUN);
 	e->mode = mode;
 	e->a = findex;
@@ -954,6 +972,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->trap_count = 0;
 	ctx->phi_count = 0;
 	ctx->flushed = false;
+	int_arr_free(&ctx->trap_calls);
 	int_arr_free(&ctx->args_data);
 	int_arr_free(&ctx->jump_regs);
 	int_arr_free(&ctx->values);
@@ -1007,6 +1026,13 @@ void hl_emit_function( jit_ctx *jit ) {
 				}
 				if( b ) block_add_pred(ctx, ctx->current_block, b);
 				ctx->arrival_points = ctx->arrival_points->next;
+			}
+			if( ctx->trap_count && ctx->traps[ctx->trap_count-1].target == ctx->op_pos ) {
+				ctx->trap_count--;
+				trap_inf *inf = &ctx->traps[ctx->trap_count]; 
+				//for(int i=inf->calls_count;i<int_arr_count(ctx->trap_calls);i++)
+				//	block_add_pred(ctx, ctx->current_block, ctx->blocks.values[int_arr_get(ctx->trap_calls,i)]);
+				ctx->trap_calls.cur = inf->calls_count;
 			}
 		}
 		emit_opcode(ctx,f->ops + op_pos);
@@ -1773,8 +1799,13 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 
 					nargs = o->p3 - 1;
 					ereg eargs = nargs == 0 ? LOAD_CONST_PTR(NULL) : emit_gen_size(ctx, ALLOC_STACK, nargs * HL_WSIZE);
-					for(i=0;i<nargs;i++)
-						STORE_MEM(eargs,i*HL_WSIZE,LOAD(R(o->extra[i+1])));
+					for(i=0;i<nargs;i++) {
+						vreg *r = R(o->extra[i+1]);
+						if( hl_is_ptr(r->t) )
+							STORE_MEM(eargs,i*HL_WSIZE,LOAD(r));
+						else
+							STORE_MEM(eargs,i*HL_WSIZE,emit_gen(ctx, ADDRESS, LOAD(r), UNUSED, M_PTR));
+					}
 					bool need_dyn = !hl_is_ptr(dst->t) && dst->t->kind != HVOID;
 					ereg edyn = need_dyn ? emit_gen_size(ctx, ALLOC_STACK, sizeof(vdynamic)) : LOAD_CONST_PTR(NULL);
 
@@ -2102,13 +2133,16 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			patch_jump(ctx, jskip);
 
 			if( ctx->trap_count == MAX_TRAPS ) jit_error("Too many try/catch depth");
-			ctx->traps[ctx->trap_count++] = st;
+			trap_inf *inf = &ctx->traps[ctx->trap_count++];
+			inf->stack = st;
+			inf->target = o->p2 + 1 + ctx->op_pos;
+			inf->calls_count = int_arr_count(ctx->trap_calls);
 		}
 		break;
 	case OEndTrap:
 		{
 			if( ctx->trap_count == 0 ) jit_assert();
-			ereg st = ctx->traps[ctx->trap_count - 1];
+			ereg st = ctx->traps[ctx->trap_count - 1].stack;
 
 			ereg thread, current_addr;
 			static hl_thread_info *tinf = NULL;
@@ -2123,18 +2157,6 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 
 			STORE_MEM(current_addr, 0, LOAD_MEM_PTR(st,(int)(int_val)&trap->prev));
 
-#			ifdef HL_WIN
-			// erase eip (prevent false positive in exception stack)
-			{
-				_JUMP_BUFFER *b = NULL;
-#				ifdef HL_64
-				int offset = (int)(int_val)&(b->Rip);
-#				else
-				int offset = (int)(int_val)&(b->Eip);
-#				endif
-				STORE_MEM(st, offset, LOAD_CONST_PTR(NULL));
-			}
-#			endif
 			emit_instr(ctx, CATCH);
 		}
 		break;
@@ -2185,7 +2207,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					break;
 				}
 			}
-			emit_gen(ctx, PREFETCH, r, UNUSED, o->p3);
+			emit_gen_ext(ctx, PREFETCH, r, UNUSED, M_NONE, o->p3);
 		}
 		break;
 	case OAsm:
