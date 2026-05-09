@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         target: [linux, darwin, windows]
-        architecture: [32, 64, arm64]
+        architecture: [64, arm64]
         build_system: [make, cmake, cmake-mingw, cmake-clang-cl, vs2019, makegcc14]
 
         include:
@@ -429,7 +429,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [darwin, linux, windows]
-        architecture: [x86_32, x86_64, arm64]
+        architecture: [x86_64, arm64]
         include:
         - architecture: arm64
           test-flags: --skip-hl-jit # not yet supported
