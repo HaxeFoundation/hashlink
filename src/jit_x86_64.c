@@ -668,7 +668,7 @@ static void emit_jump( code_ctx *ctx, int mode, int offset ) {
 #	ifdef GEN_DEBUG
 	op_mult = 16; // additional debug info per op
 #	else
-	op_mult = 8;
+	op_mult = 10;
 #	endif
 	if( IS_SBYTE(offset*op_mult) ) {
 		// assume it's ok to use short jump
@@ -945,6 +945,7 @@ static void emit_lea( code_ctx *ctx, ereg out, einstr *_e ) {
 
 	int mult = e.size_offs & 0xFF;
 	int offs = e.size_offs >> 8;
+	if( mult != 0 && (mult < 0 || mult > 8 || (mult & (mult - 1)) != 0) ) jit_assert();
 
 	if( IS_REG(e.a) )
 		offs += REG_VALUE(e.a);

@@ -1889,12 +1889,12 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					hl_runtime_obj *rt = hl_get_obj_rt(dst->t);
 					osize = rt->size; // a mem offset into it
 				}
-				ereg pos = OFFSET(LOAD(ra), LOAD(rb), osize, 0);
+				ereg pos = (osize <= 8 && ((osize - 1) & osize) == 0) ? OFFSET(LOAD(ra), LOAD(rb), osize, 0) : OFFSET(LOAD(ra), emit_gen_ext(ctx,BINOP,LOAD(rb),MK_CONST(osize),M_I32,OMul),1,0);
 				ereg val = isPtr ? LOAD_MEM_PTR(pos,0) : pos;
 				STORE(dst, val);
 			} else {
 				ereg pos = OFFSET(LOAD(ra), LOAD(rb), hl_type_size(dst->t), sizeof(varray));
-				STORE(dst, LOAD_MEM_PTR(pos,0));
+				STORE(dst, LOAD_MEM(pos,0,dst->t));
 			}
 		}
 		break;
@@ -1909,7 +1909,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					hl_runtime_obj *rt = hl_get_obj_rt(rb->t);
 					osize = rt->size;
 				}
-				ereg pos = OFFSET(LOAD(dst), LOAD(ra), osize, 0);
+				ereg pos = (osize <= 8 && ((osize - 1) & osize) == 0) ? OFFSET(LOAD(dst), LOAD(ra), osize, 0) : OFFSET(LOAD(dst), emit_gen_ext(ctx,BINOP,LOAD(ra),MK_CONST(osize),M_I32,OMul),1,0);
 				emit_store_size(ctx, pos, 0, LOAD(rb), 0, osize);
 			} else  {
 				ereg pos = OFFSET(LOAD(dst), LOAD(ra), hl_type_size(dst->t), sizeof(varray));
