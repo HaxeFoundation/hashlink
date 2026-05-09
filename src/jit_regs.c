@@ -480,6 +480,12 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 		bool cycle = true;
 		for(int k=0;k<size;k+=3) {
 			ereg to = int_arr_get(movs,k);
+			ereg from = int_arr_get(movs,k+1);
+			if( to == from ) {
+				int_arr_remove_range(&movs,k,3);
+				cycle = false;
+				continue;
+			}
 			bool read = false;
 			for(int k2=1;k2<size;k2+=3) {
 				ereg from = int_arr_get(movs,k2);
@@ -564,7 +570,6 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 
 	int stack_offset = ctx->stack_size;
 	int push_size = HL_WSIZE * 2 + ctx->stack_offset; // RIP + RBP save
-	if( IS_WINCALL64 && ctx->has_direct_call ) stack_offset += 0x20; // reserve
 	if( jit->cfg.stack_align ) {
 		int align = (stack_offset + push_size) % jit->cfg.stack_align;
 		if( align ) stack_offset += jit->cfg.stack_align - align;
@@ -667,6 +672,8 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 					EMIT(PUSH,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
 				for(int i=0;i<ctx->persists_uses[1];i++)
 					EMIT(PUSH,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
+				if( IS_WINCALL64 && ctx->has_direct_call )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-0x20);
 			}
 			break;
 		case JCOND:
@@ -688,19 +695,21 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				if( e.a != ret )
 					regs_emit_mov(ctx, ret, e.a, e.mode);
 			}
+#			ifdef WIN64_UNWIND_TABLES
+			// if we have our stack offset just after a call, the unwind algorithm
+			// will subtract and create invalid stack frame. this is because we do
+			// not register the stack offset in our unwind table so all functions
+			// can share the same definition
+			if( cur_op && IS_CALL(jit->instrs[cur_op-1].op) )
+				EMIT(NOP,UNUSED,UNUSED,M_NONE);
+#			endif
+			if( IS_WINCALL64 && ctx->has_direct_call )
+				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,0x20);
 			for(int i=ctx->persists_uses[1]-1;i>=0;i--)
 				EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
 			for(int i=ctx->persists_uses[0]-1;i>=0;i--)
 				EMIT(POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
 			if( stack_offset ) {
-#				ifdef WIN64_UNWIND_TABLES
-				// if we have our stack offset just after a call, the unwind algorithm
-				// will subtract and create invalid stack frame. this is because we do
-				// not register the stack offset in our unwind table so all functions
-				// can share the same definition
-				if( cur_op && IS_CALL(ctx->instrs[cur_op-1].op) )
-					EMIT(NOP,UNUSED,UNUSED,M_NONE);
-#				endif
 				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
 			}
 			EMIT(POP,jit->cfg.stack_pos,UNUSED,M_PTR);
