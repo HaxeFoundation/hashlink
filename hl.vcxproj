@@ -196,6 +196,7 @@
       <AdditionalDependencies>libhl.lib;user32.lib;include/vtune/jitprofiling.lib</AdditionalDependencies>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>false</DataExecutionPrevention>
+      <StackReserveSize>4194304</StackReserveSize>
     </Link>
     <Manifest>
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>

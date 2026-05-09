@@ -662,11 +662,9 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 }
 
 static void emit_jump( code_ctx *ctx, int mode, int offset ) {
-	int op_mult;
+	int op_mult = 10;
 #	ifdef GEN_DEBUG
-	op_mult = 16; // additional debug info per op
-#	else
-	op_mult = 10;
+	op_mult += 6; // additional debug info per op
 #	endif
 	if( IS_SBYTE(offset*op_mult) ) {
 		// assume it's ok to use short jump
@@ -1181,8 +1179,12 @@ void hl_codegen_function( jit_ctx *jit ) {
 				EMIT(_PUSH, e->a, UNUSED, M_PTR);
 			break;
 		case POP:
-			if( IS_FLOAT(e->mode) ) jit_assert();
-			EMIT(_POP, e->a, UNUSED, M_PTR);
+			if( IS_FLOAT(e->mode) ) {
+				EMIT(e->mode == M_F32 ? MOVSS : MOVSD,REG_PTR(R(RSP)),e->a,e->mode);
+				EMIT(ADD,R(RSP),MK_CONST(8),M_PTR);
+			} else {
+				EMIT(_POP, e->a, UNUSED, M_PTR);
+			}
 			break;
 		case PUSH_CONST:
 			if( e->mode != M_PTR ) jit_assert();
