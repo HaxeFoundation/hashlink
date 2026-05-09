@@ -662,7 +662,7 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 }
 
 static void emit_jump( code_ctx *ctx, int mode, int offset ) {
-	int op_mult = 10;
+	int op_mult = 16;
 #	ifdef GEN_DEBUG
 	op_mult += 6; // additional debug info per op
 #	endif
