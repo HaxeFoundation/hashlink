@@ -94,7 +94,6 @@ typedef enum {
 	XOR,
 	_CMP,
 	_TEST,
-	NOP,
 	SHL,
 	SHR,
 	SAR,
@@ -221,7 +220,6 @@ static opform OP_FORMS[] = {
 	{ "XOR", 0x33, 0x31, RM(0x81,6), RM(0x83,6) },
 	{ "CMP", 0x3B, 0x39, RM(0x81,7), RM(0x83,7) },
 	{ "TEST", 0x85, 0x85/*SWP?*/, RM(0xF7,0) },
-	{ "NOP", 0x90 },
 	{ "SHL", RM(0xD3,4), 0, 0, RM(0xC1,4) },
 	{ "SHR", RM(0xD3,5), 0, 0, RM(0xC1,5) },
 	{ "SAR", RM(0xD3,7), 0, 0, RM(0xC1,7) },
@@ -1509,6 +1507,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 		case CXCHG:
 			BREAK();
 			break;
+		case NOP:
+			emit_nop(ctx,1);
+			break;
 		default:
 			jit_assert();
 			break;
@@ -1599,6 +1600,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_TEST,nargs,nargs,M_I32);
 	int pos = jump_near(ctx,JZero);
 	EMIT(_PUSH,MK_ADDR(vargs,0),UNUSED,M_PTR);
+	EMIT(SUB,vargs,MK_CONST(HL_WSIZE),M_PTR);
 	EMIT(DEC,nargs,UNUSED,M_I32);
 	jump_near(ctx,-begin);
 	patch_jump_near(ctx,pos);

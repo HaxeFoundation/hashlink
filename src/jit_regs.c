@@ -692,8 +692,17 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
 			for(int i=ctx->persists_uses[0]-1;i>=0;i--)
 				EMIT(POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
-			if( stack_offset )
+			if( stack_offset ) {
+#				ifdef WIN64_UNWIND_TABLES
+				// if we have our stack offset just after a call, the unwind algorithm
+				// will subtract and create invalid stack frame. this is because we do
+				// not register the stack offset in our unwind table so all functions
+				// can share the same definition
+				if( cur_op && IS_CALL(ctx->instrs[cur_op-1].op) )
+					EMIT(NOP,UNUSED,UNUSED,M_NONE);
+#				endif
 				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
+			}
 			EMIT(POP,jit->cfg.stack_pos,UNUSED,M_PTR);
 			EMIT(RET,UNUSED,UNUSED,M_NONE);
 			break;
