@@ -21,6 +21,7 @@
 
 #define TWIN _ABSTRACT(sdl_window)
 #define TGL _ABSTRACT(sdl_gl)
+#define _SURF _ABSTRACT(sdl_surface)
 
 typedef struct {
 	int x;
@@ -100,6 +101,7 @@ typedef struct {
 } event_data;
 
 static bool isGlOptionsSet = false;
+
 
 HL_PRIM bool HL_NAME(init_once)() {
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
@@ -462,6 +464,10 @@ HL_PRIM bool HL_NAME(get_relative_mouse_mode)() {
 	return SDL_GetRelativeMouseMode();
 }
 
+HL_PRIM int HL_NAME(capture_mouse)(bool enable) {
+	return SDL_CaptureMouse(enable);
+}
+
 HL_PRIM int HL_NAME(warp_mouse_global)(int x, int y) {
 	return SDL_WarpMouseGlobal(x, y);
 }
@@ -512,6 +518,7 @@ DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
 DEFINE_PRIM(_VOID, text_input, _BOOL);
 DEFINE_PRIM(_I32, set_relative_mouse_mode, _BOOL);
 DEFINE_PRIM(_BOOL, get_relative_mouse_mode, _NO_ARG);
+DEFINE_PRIM(_I32, capture_mouse, _BOOL);
 DEFINE_PRIM(_I32, warp_mouse_global, _I32 _I32);
 DEFINE_PRIM(_VOID, warp_mouse_in_window, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, set_window_grab, TWIN _BOOL);
@@ -629,6 +636,10 @@ HL_PRIM void HL_NAME(win_set_title)(SDL_Window *win, vbyte *title) {
 	SDL_SetWindowTitle(win, (char*)title);
 }
 
+HL_PRIM void HL_NAME(win_set_icon)(SDL_Window *win, SDL_Surface *s) {
+	SDL_SetWindowIcon(win, s);
+}
+
 HL_PRIM void HL_NAME(win_set_position)(SDL_Window *win, int x, int y) {
 	SDL_SetWindowPosition(win, x, y);
 }
@@ -733,6 +744,7 @@ DEFINE_PRIM(_I32, win_display_handle, TWIN);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_raise, TWIN);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
+DEFINE_PRIM(_VOID, win_set_icon, TWIN _SURF);
 DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
@@ -865,7 +877,6 @@ HL_PRIM void HL_NAME(free_surface)( SDL_Surface *s ) {
 	SDL_FreeSurface(s);
 }
 
-#define _SURF	_ABSTRACT(sdl_surface)
 DEFINE_PRIM(_SURF, surface_from, _BYTES _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, free_surface, _SURF);
 

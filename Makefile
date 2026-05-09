@@ -194,6 +194,7 @@ endif
 
 LIBHL_LDFLAGS += -install_name @rpath/libhl.dylib
 USE_LIBHL_LDFLAGS = -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
+HDLL_LDFLAGS += -install_name @rpath/$@
 else
 
 ifeq ($(ARCH),aarch64)
@@ -256,11 +257,11 @@ endif
 	cp *.hdll $(INSTALL_LIB_DIR)
 	cp $(LIBHL) $(INSTALL_LIB_DIR)
 	mkdir -p $(INSTALL_INCLUDE_DIR)
-	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
+	cp src/hl.h src/hl_ffi.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
 
 uninstall:
 	rm -f $(INSTALL_BIN_DIR)/$(HL) $(INSTALL_LIB_DIR)/$(LIBHL) $(INSTALL_LIB_DIR)/*.hdll
-	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
+	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hl_ffi.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
 
 libs: $(LIBS)
 
@@ -276,7 +277,7 @@ $(HL) $(HLC):
 
 %.hdll: HDLL_LINK = $(CC) $(LDFLAGS)
 %.hdll:
-	$(HDLL_LINK) $(USE_LIBHL_LDFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
+	$(HDLL_LINK) $(USE_LIBHL_LDFLAGS) $(HDLL_LDFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
 
 $(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
 fmt_LDLIBS = -lpng -lturbojpeg -lvorbisfile -lz -lm
@@ -308,6 +309,7 @@ sqlite.hdll: $(SQLITE) $(LIBHL)
 CXXFLAGS:=$(filter-out -std=c11,$(CFLAGS)) -std=c++11
 
 $(HEAPS): CPPFLAGS += $(HEAPS_CPPFLAGS)
+heaps_LDLIBS = -ldl
 heaps.hdll: HDLL_LINK = $(CXX) $(LDFLAGS)
 heaps.hdll: $(HEAPS) $(LIBHL)
 
@@ -349,10 +351,11 @@ release_prepare:
 	rm -rf $(PACKAGE_NAME)
 	mkdir $(PACKAGE_NAME)
 	mkdir $(PACKAGE_NAME)/include
-	cp src/hl.h src/hlc.h src/hlc_main.c $(PACKAGE_NAME)/include
+	cp src/hl.h src/hl_ffi.h src/hlc.h src/hlc_main.c $(PACKAGE_NAME)/include
 
 release_win:
 	cp $(BUILD_DIR)/{$(HL),libhl.dll,*.hdll,*.lib} $(PACKAGE_NAME)
+	rm  $(PACKAGE_NAME)/hl.lib # avoid confusion between hl.lib and libhl.lib
 	cp $(VS_RUNTIME_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_SDL_LIBRARY) $(PACKAGE_NAME)
 	cp $(VS_OPENAL_LIBRARY) $(PACKAGE_NAME)/OpenAL32.dll

@@ -51,7 +51,7 @@ typedef struct {
 	ID3D12CommandQueue *commandQueue;
 #ifndef HL_XBS
 	IDXGIFactory4 *factory;
-	IDXGIAdapter1 *adapter;
+	IDXGIAdapter3 *adapter;
 	IDXGISwapChain4 *swapchain;
 	ID3D12Device *device;
 	ID3D12Debug1 *debug;
@@ -73,8 +73,17 @@ typedef struct {
 
 static dx_driver *static_driver = NULL;
 static int CURRENT_NODEMASK = 0;
+static LARGE_INTEGER driver_version = {0};
 
 HL_PRIM void dx12_flush_messages();
+
+HL_PRIM void HL_NAME(suppress_debug_messages)(D3D12_INFO_QUEUE_FILTER* filter) {
+#ifndef HL_XBS
+	dx_driver* drv = static_driver;
+	if (!drv->infoQueue) return;
+	drv->infoQueue->AddStorageFilterEntries(filter);
+#endif
+}
 
 static void ReportDxError( HRESULT err, int line ) {
 	dx12_flush_messages();
@@ -149,6 +158,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *de
 
 	UINT index = 0;
 	IDXGIAdapter1 *adapter = NULL;
+	IDXGIAdapter3 *adapter3 = NULL;
 	while( drv->factory->EnumAdapters1(index++,&adapter) != DXGI_ERROR_NOT_FOUND ) {
 		DXGI_ADAPTER_DESC1 desc;
 		adapter->GetDesc1(&desc);
@@ -156,8 +166,13 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *de
 			adapter->Release();
 			continue;
 		}
-		if( SUCCEEDED(D3D12CreateDevice(adapter,D3D_FEATURE_LEVEL_12_0,IID_PPV_ARGS(&drv->device))) ) {
-			drv->adapter = adapter;
+		if( !SUCCEEDED(adapter->QueryInterface(__uuidof(IDXGIAdapter3), (void**)&adapter3)) ) {
+			adapter->Release();
+			continue;
+		}
+		if( SUCCEEDED(D3D12CreateDevice(adapter3,D3D_FEATURE_LEVEL_12_0,IID_PPV_ARGS(&drv->device))) ) {
+			drv->adapter = adapter3;
+			adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driver_version);
 			break;
 		}
 		adapter->Release();
@@ -235,6 +250,15 @@ void register_frame_events() {
 	CHKERR(drv->device->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &drv->pipelineToken));
 }
 #endif
+
+HL_PRIM int64 HL_NAME(get_driver_version)() {
+	union {
+		LARGE_INTEGER i;
+		int64 i64;
+	} v;
+	v.i = driver_version;
+	return v.i64;
+}
 
 HL_PRIM void HL_NAME(suspend)() {
 #ifdef HL_XBS
@@ -377,9 +401,18 @@ HL_PRIM const uchar *HL_NAME(get_device_name)() {
 
 HL_PRIM int64 HL_NAME(get_timestamp_frequency)() {
 	UINT64 f = 0;
-	CHKERR(static_driver->commandQueue->GetTimestampFrequency(&f))
+	CHKERR(static_driver->commandQueue->GetTimestampFrequency(&f));
 	return (int64)f;
 }
+
+#ifndef HL_XBS
+HL_PRIM void HL_NAME(query_video_memory_info)( int group, DXGI_QUERY_VIDEO_MEMORY_INFO *mem ) {
+	CHKERR(static_driver->adapter->QueryVideoMemoryInfo(0,(DXGI_MEMORY_SEGMENT_GROUP)group,mem));
+}
+#else
+HL_PRIM void HL_NAME(query_video_memory_info)( int group, void *mem ) {
+}
+#endif
 
 #define _DRIVER _ABSTRACT(dx_driver)
 #define _RES _ABSTRACT(dx_resource)
@@ -394,8 +427,11 @@ DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
 DEFINE_PRIM(_VOID, signal, _RES _I64);
 DEFINE_PRIM(_VOID, wait, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
+DEFINE_PRIM(_VOID, suppress_debug_messages, _STRUCT);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
 DEFINE_PRIM(_I64, get_timestamp_frequency, _NO_ARG);
+DEFINE_PRIM(_I64, get_driver_version, _NO_ARG);
+DEFINE_PRIM(_VOID, query_video_memory_info, _I32 _STRUCT);
 
 /// --- utilities (from d3dx12.h)
 

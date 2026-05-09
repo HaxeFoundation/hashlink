@@ -22,8 +22,6 @@
 #include <hl.h>
 #include <stdarg.h>
 
-#ifndef HL_NATIVE_UCHAR_FUN
-
 #ifdef HL_ANDROID
 #	include <android/log.h>
 #	ifndef HL_ANDROID_LOG_TAG
@@ -176,10 +174,6 @@ void uprintf( const uchar *fmt, const uchar *str ) {
 	free(cstr);
 }
 
-#endif
-
-#if !defined(HL_NATIVE_UCHAR_FUN) || defined(HL_WIN)
-
 #ifdef HL_VCC
 #pragma warning(disable:4774)
 #endif
@@ -227,6 +221,8 @@ sprintf_loop:
 						cfmt[i++] = 0;
 						if( cfmt[i-3] == 'l' )
 							size = sprintf(tmp,cfmt,va_arg(arglist,void*));
+						else if( cfmt[i-3] == 'I' )
+							size = sprintf(tmp,cfmt,va_arg(arglist,size_t));
 						else
 							size = sprintf(tmp,cfmt,va_arg(arglist,int));
 						goto sprintf_add;
@@ -250,6 +246,7 @@ sprintf_loop:
 					case '8':
 					case '9':
 					case 'l':
+					case 'I':
 						break;
 					default:
 						hl_fatal("Unsupported printf format");
@@ -271,4 +268,3 @@ sprintf_add:
 	return 0;
 }
 
-#endif

@@ -235,10 +235,15 @@ static void dump_value( jit_ctx *ctx, uint64 value, emit_mode mode ) {
 }
 
 static void hl_dump_fun_name( hl_function *f ) {
-	if( f->obj )
-		uprintf(USTR("%s.%s"),f->obj->name,f->field.name);
-	else if( f->field.ref )
-		uprintf(USTR("%s.~%s.%d"),f->field.ref->obj->name, f->field.ref->field.name, f->ref);
+	if( f->obj ) {
+		uprintf(USTR("%s."),f->obj->name);
+		uprintf(USTR("%s"),f->field.name);
+	}
+	else if( f->field.ref ) {
+		uprintf(USTR("%s."),f->field.ref->obj->name);
+		uprintf(USTR("~%s"),f->field.ref->field.name);
+		printf(".%d",f->ref);
+	}
 	printf("[%X]", f->findex);
 }
 
@@ -442,11 +447,13 @@ void hl_emit_dump( jit_ctx *ctx ) {
 	printf("(");
 	for(int i=0;i<nargs;i++) {
 		if( i > 0 ) printf(",");
-		uprintf(USTR("R%d"), i);
+		printf("R%d", i);
 	}
 	printf(")\n");
-	for(int i=0;i<f->nregs;i++)
-		uprintf(USTR("\tR%d : %s\n"),i, hl_type_str(f->regs[i]));
+	for(int i=0;i<f->nregs;i++) {
+		printf("\tR%d : ",i);
+		uprintf(USTR("%s\n"), hl_type_str(f->regs[i]));
+	}
 	// check blocks intervals
 	int cur = 0;
 	for(int i=0;i<ctx->block_count;i++) {
