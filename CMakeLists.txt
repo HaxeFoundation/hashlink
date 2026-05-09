@@ -228,6 +228,10 @@ if (WITH_VM)
     add_executable(hl
         src/code.c
         src/jit.c
+        src/jit_emit.c
+        src/jit_regs.c
+        src/jit_x86_64.c
+        src/jit_dump.c
         src/main.c
         src/module.c
         src/debugger.c
