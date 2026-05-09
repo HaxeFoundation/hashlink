@@ -254,7 +254,7 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			write = VAL(write_index++);
 
 		ctx->cur_op = cur_op;
-		hl_emit_reg_iter(jit,e,ctx,regs_write_live);
+		hl_emit_reg_iter(jit,e,ctx,(void*)regs_write_live);
 		if( IS_CALL(e->op) ) {
 			// anticipate register usage in call so we can previlege this assign
 			ereg *r = hl_emit_get_args(jit->emit, e);
