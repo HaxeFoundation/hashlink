@@ -661,12 +661,12 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			{
 				EMIT(PUSH,jit->cfg.stack_pos,UNUSED,M_PTR);
 				regs_emit_mov(ctx,jit->cfg.stack_pos,jit->cfg.stack_reg,M_PTR);
+				if( stack_offset )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 				for(int i=0;i<ctx->persists_uses[0];i++)
 					EMIT(PUSH,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
 				for(int i=0;i<ctx->persists_uses[1];i++)
 					EMIT(PUSH,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
-				if( stack_offset )
-					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 			}
 			break;
 		case JCOND:
@@ -688,12 +688,12 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				if( e.a != ret )
 					regs_emit_mov(ctx, ret, e.a, e.mode);
 			}
-			if( stack_offset )
-				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
 			for(int i=ctx->persists_uses[1]-1;i>=0;i--)
 				EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
 			for(int i=ctx->persists_uses[0]-1;i>=0;i--)
 				EMIT(POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
+			if( stack_offset )
+				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
 			EMIT(POP,jit->cfg.stack_pos,UNUSED,M_PTR);
 			EMIT(RET,UNUSED,UNUSED,M_NONE);
 			break;
