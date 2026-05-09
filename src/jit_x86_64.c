@@ -1138,9 +1138,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 				ereg tmp = get_tmp(e->mode);
 				if( !IS_REG(e->a) && !IS_REG(e->b) )
 					jit_assert();
-				emit_mov(ctx, tmp, e->a, e->mode);
-				emit_mov(ctx, e->a, e->b, e->mode);
-				emit_mov(ctx, e->b, tmp, e->mode);
+				emit_mov(ctx, tmp, e->a, M_PTR);
+				emit_mov(ctx, e->a, e->b, M_PTR);
+				emit_mov(ctx, e->b, tmp, M_PTR);
 			}
 			break;
 		case STORE:
