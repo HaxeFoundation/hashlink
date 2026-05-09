@@ -41,7 +41,7 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL_OBJ = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
+HL_OBJ = src/code.o src/jit.o src/jit_emit.o src/jit_regs.o src/jit_x86_64.o src/jit_dump.o src/main.o src/module.o src/debugger.o src/profile.o
 
 FMT_CPPFLAGS = -I include/mikktspace -I include/minimp3
 
