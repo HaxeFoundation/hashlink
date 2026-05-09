@@ -247,7 +247,7 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
 void hl_jit_define_function( jit_ctx *ctx, int start, int size );
 
-void hl_jit_null_field_access();
+void hl_jit_null_field_access( int fhash );
 void hl_jit_assert();
 void *hl_jit_wrapper_ptr( vclosure_wrapper *c, char *stack_args, void **regs );
 double hl_jit_wrapper_d( vclosure_wrapper *c, char *stack_args, void **regs );

@@ -21,6 +21,7 @@
  */
 #include <hlmodule.h>
 #include <jit.h>
+#include <setjmp.h>
 #include "data_struct.h"
 
 //#define EMIT_DEBUG
@@ -954,7 +955,7 @@ static void hl_emit_clean_phis( emit_ctx *ctx ) {
 			p->final_id = -1;
 	}
 	for(int i=0;i<ctx->emit_pos;i++)
-		hl_emit_reg_iter(ctx->jit, ctx->instrs + i, ctx, remap_phi_reg);
+		hl_emit_reg_iter(ctx->jit, ctx->instrs + i, ctx, (void*)remap_phi_reg);
 }
 
 void hl_emit_function( jit_ctx *jit ) {
@@ -2014,7 +2015,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				e->mode = M_PTR;
 				e->value = hashed_name;
 			}
-			emit_native_call(ctx, null_field_access ? hl_jit_null_field_access : hl_null_access, NULL, 0, NULL);
+			emit_native_call(ctx, null_field_access ? (void*)hl_jit_null_field_access : (void*)hl_null_access, NULL, 0, NULL);
 			patch_jump(ctx, jok);
 		}
 		break;
