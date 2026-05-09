@@ -335,6 +335,9 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	arg_fp_count = ctx->cfg.floats.nargs;
 	call_jit_c2hl = ctx->final_code + ctx->code_funs.c2hl;
 	call_jit_hl2c = ctx->final_code + ctx->code_funs.hl2c;
+#	ifdef WIN64_UNWIND_TABLES
+	ctx->mod->unwind_table_size = ctx->fdef_index;
+#	endif
 	hl_setup.get_wrapper = default_wrapper;
 	hl_setup.static_call = callback_c2hl;
 	return code;

@@ -1610,7 +1610,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_POP,R(RBP),UNUSED,M_PTR);
 	EMIT(_RET,UNUSED,UNUSED,M_NONE);
 	
-	flush_function(ctx, ctx->null_field_pos);
+	flush_function(ctx, jit->code_funs.c2hl);
 
 	// generate hl2c stub
 	jit->code_funs.hl2c = jit->out_pos + byte_count(ctx->code);
