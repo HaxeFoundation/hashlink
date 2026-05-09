@@ -417,8 +417,8 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->floats.nargs = 4;
 	cfg->floats.nscratchs = 6;
 #	else
-	cfg.floats.nargs = 8;
-	cfg.floats.nscratchs = 16;
+	cfg->floats.nargs = 8;
+	cfg->floats.nscratchs = 16;
 #	endif
 	scratch_float_reg = cfg->floats.nscratchs - 1;
 	cfg->floats.nscratchs--;

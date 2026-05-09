@@ -1099,10 +1099,9 @@ static void register_block_jump( emit_ctx *ctx, int offs, bool cond ) {
 }
 
 static void prepare_loop_block( emit_ctx *ctx ) {
-	int i, last_jump = -1;
 	emit_block *b = ctx->current_block;
 	// gather all backward jumps to know when the block will be finished
-	for(i=ctx->op_pos+1;i<ctx->fun->nops;i++) {
+	for(int i=ctx->op_pos+1;i<ctx->fun->nops;i++) {
 		hl_opcode *op = &ctx->fun->ops[i];
 		int offs = 0;
 		switch( op->op ) {
@@ -1138,7 +1137,6 @@ static void prepare_loop_block( emit_ctx *ctx ) {
 				b->wait_seal_next = ctx->wait_seal;
 				ctx->wait_seal = b;
 			}
-			last_jump = i;
 		}
 	}
 }
