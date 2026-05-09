@@ -35,6 +35,10 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 
 #define HOT_RELOAD_EXTRA_GLOBALS	4096
 
+#ifdef HL_DEBUG
+#	define ALLOW_DUMP
+#endif
+
 HL_API void hl_prim_not_loaded( const uchar *err );
 
 static hl_module **cur_modules = NULL;
@@ -714,7 +718,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	if( ctx == NULL )
 		return 0;
 	hl_jit_init(ctx, m);
-#	ifdef HL_DEBUG
+#	ifdef ALLOW_DUMP
 	bool dump = false;
 	int filter = -1;
 	for(i=0;i<hl_setup.sys_nargs;i++) {
@@ -738,7 +742,7 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 #	endif
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
-#		ifdef HL_DEBUG
+#		ifdef ALLOW_DUMP
 		if( filter >= 0 && filter != f->findex ) continue;
 #		endif
 		int fpos = hl_jit_function(ctx, m, f);
@@ -747,12 +751,12 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 			return 0;
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
-#		ifdef HL_DEBUG
+#		ifdef ALLOW_DUMP
 		if( dump ) hl_emit_dump(ctx);
 #		endif
 	}
 	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
-#	ifdef HL_DEBUG
+#	ifdef ALLOW_DUMP
 	if( filter >= 0 ) exit(0);
 #	endif
 	for(i=0;i<m->code->nfunctions;i++) {

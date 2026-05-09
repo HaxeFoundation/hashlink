@@ -56,6 +56,7 @@ static const char *op_names[] = {
 	"stack",
 	"catch",
 	"address",
+	"nop"
 };
 
 bool hl_jit_dump_bin = false;
