@@ -60,6 +60,7 @@ typedef enum {
 	STACK_OFFS,
 	CATCH,
 	ADDRESS,
+	NOP,
 } emit_op;
 
 typedef enum {
