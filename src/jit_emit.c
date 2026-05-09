@@ -36,6 +36,7 @@ int hl_emit_mode_sizes[] = {0,1,2,4,HL_WSIZE,8,4,0,0};
 typedef struct {
 	hl_type *t;
 	int id;
+	ereg stored;
 } vreg;
 
 #define MAX_TMP_ARGS	32
@@ -111,7 +112,6 @@ struct _tmp_phi {
 
 typedef struct {
 	ereg stack;
-	int calls_count;
 	int target;
 } trap_inf;
 
@@ -141,7 +141,6 @@ struct _emit_ctx {
 	int_arr args_data;
 	int_arr jump_regs;
 	int_arr values;
-	int_arr trap_calls;
 
 	blocks blocks;
 	emit_block *current_block;
@@ -153,7 +152,7 @@ struct _emit_ctx {
 #define R(i)	(ctx->vregs + (i))
 
 #define LOAD(r) emit_load_reg(ctx, r)
-#define STORE(r, v) { ereg __v = (v); if( (r)->t->kind != HVOID ) emit_store_reg(ctx, r, __v); }
+#define STORE(r, v) emit_store_reg(ctx, r, v)
 #define LOAD_CONST(v, t) emit_load_const(ctx, (uint64)(v), t)
 #define LOAD_CONST_PTR(v) LOAD_CONST(v,&hlt_bytes)
 #define LOAD_MEM(v, offs, t) emit_load_mem(ctx, v, offs, t, t)
@@ -495,18 +494,16 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 	if( to->t->kind == HVOID ) return;
 	if( IS_NULL(v) ) jit_assert();
 	store_block_var(ctx,ctx->current_block,to,v);
-}
-
-static void before_call( emit_ctx *ctx ) {
 	if( ctx->trap_count > 0 ) {
-		split_block(ctx);
-		int_arr_add(ctx->trap_calls,ctx->current_block->id);
+		// if the value was written before the trap, let's update it
+		if( !IS_NULL(to->stored) )
+			STORE_MEM(emit_gen(ctx,ADDRESS,to->stored,UNUSED,M_PTR), 0, v);
+	} else {
+		to->stored = v;
 	}
 }
 
 static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int nargs, hl_type *ret ) {
-	if( native_ptr != hl_get_thread )
-		before_call(ctx);
 	einstr *e = emit_instr(ctx, CALL_PTR);
 	e->mode = (unsigned char)(ret ? hl_type_mode(ret) : M_NORET);
 	e->value = (int_val)native_ptr;
@@ -515,7 +512,6 @@ static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int 
 }
 
 static ereg emit_dyn_call( emit_ctx *ctx, ereg f, ereg args[], int nargs, hl_type *ret ) {
-	before_call(ctx);
 	einstr *e = emit_instr(ctx, CALL_REG);
 	e->mode = hl_type_mode(ret);
 	e->a = f;
@@ -639,7 +635,6 @@ static void seal_block( emit_ctx *ctx, emit_block *b ) {
 }
 
 static ereg emit_call_fid( emit_ctx *ctx, int findex, ereg *args, int nargs, emit_mode mode ) {
-	before_call(ctx);
 	einstr *e = emit_instr(ctx, CALL_FUN);
 	e->mode = mode;
 	e->a = findex;
@@ -655,7 +650,7 @@ static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int 
 	for(int i=0;i<count;i++)
 		args[i] = LOAD(R(args_regs[i]));
 	if( isNative )
-		STORE(dst, emit_native_call(ctx, m->functions_ptrs[findex], args, count, dst->t))
+		STORE(dst, emit_native_call(ctx, m->functions_ptrs[findex], args, count, dst->t));
 	else {
 		ereg out = emit_call_fid(ctx,findex,args,count,hl_type_mode(dst->t));
 		if( out ) STORE(dst, out);
@@ -972,7 +967,6 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->trap_count = 0;
 	ctx->phi_count = 0;
 	ctx->flushed = false;
-	int_arr_free(&ctx->trap_calls);
 	int_arr_free(&ctx->args_data);
 	int_arr_free(&ctx->jump_regs);
 	int_arr_free(&ctx->values);
@@ -1001,6 +995,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
+		r->stored = UNUSED;
 	}
 
 	emit_gen_size(ctx, BLOCK, 0);
@@ -1027,16 +1022,14 @@ void hl_emit_function( jit_ctx *jit ) {
 				if( b ) block_add_pred(ctx, ctx->current_block, b);
 				ctx->arrival_points = ctx->arrival_points->next;
 			}
-			if( ctx->trap_count && ctx->traps[ctx->trap_count-1].target == ctx->op_pos ) {
+			if( ctx->trap_count && ctx->traps[ctx->trap_count-1].target == ctx->op_pos )
 				ctx->trap_count--;
-				trap_inf *inf = &ctx->traps[ctx->trap_count]; 
-				//for(int i=inf->calls_count;i<int_arr_count(ctx->trap_calls);i++)
-				//	block_add_pred(ctx, ctx->current_block, ctx->blocks.values[int_arr_get(ctx->trap_calls,i)]);
-				ctx->trap_calls.cur = inf->calls_count;
-			}
 		}
 		emit_opcode(ctx,f->ops + op_pos);
 	}
+	// emit a break if we're not supposed to reach here : will fix RtlUnwind on windows too.
+	if( f->nops == 0 || f->ops[f->nops-1].op != ORet )
+		BREAK();
 	if( ctx->arrival_points )
 		jit_assert();
 
@@ -1818,7 +1811,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 
 					ereg v2 = emit_native_call(ctx, hl_dyn_call_obj, args, 5, &hlt_bytes);
 					if( need_dyn )
-						STORE(dst, LOAD_MEM(edyn,HDYN_VALUE,dst->t))
+						STORE(dst, LOAD_MEM(edyn,HDYN_VALUE,dst->t));
 					else
 						STORE(dst, v2);
 					patch_jump(ctx, jend);
@@ -2136,7 +2129,6 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			trap_inf *inf = &ctx->traps[ctx->trap_count++];
 			inf->stack = st;
 			inf->target = o->p2 + 1 + ctx->op_pos;
-			inf->calls_count = int_arr_count(ctx->trap_calls);
 		}
 		break;
 	case OEndTrap:
