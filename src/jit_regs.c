@@ -94,9 +94,11 @@ static ereg get_call_reg( regs_ctx *ctx, call_regs regs, emit_mode m ) {
 	return r;
 }
 
-static int get_stack_size( emit_mode m ) {
+static int get_stack_size( regs_ctx *ctx, emit_mode m ) {
 	int size = hl_emit_mode_sizes[m];
 	if( size < HL_WSIZE ) size = HL_WSIZE;
+	int min = ctx->jit->cfg.stack_arg_size;
+	if( min && size < min ) size = min;
 	return size;
 }
 
@@ -583,7 +585,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				emit_mode mode = v ? v->mode : M_I32;
 				ereg r = get_call_reg(ctx,regs,mode);
 				if( IS_NULL(r) ) {
-					stack_args += get_stack_size(mode);
+					stack_args += get_stack_size(ctx, mode);
 					stack_bits |= 1 << k;
 				} else if( !v || r != v->reg ) {
 					int_arr_add(ctx->pack_movs,r);

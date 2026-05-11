@@ -196,6 +196,11 @@ typedef struct {
 	ereg stack_reg;
 	ereg stack_pos;
 	int stack_align;
+	// Minimum bytes consumed by each stack argument. Defaults to HL_WSIZE
+	// when 0. Backends like AArch64 set this to 16 because each PUSH must
+	// move SP by 16 bytes to keep SP 16-byte aligned (any [SP, ...] access
+	// with a misaligned SP traps under EL0).
+	int stack_arg_size;
 	int debug_prefix_size;
 	ereg req_bit_shifts;
 	ereg req_div_a;
