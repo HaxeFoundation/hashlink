@@ -95,9 +95,11 @@ static ereg get_call_reg( regs_ctx *ctx, call_regs regs, emit_mode m ) {
 	return r;
 }
 
-static int get_stack_size( emit_mode m ) {
+static int get_stack_size( regs_ctx *ctx, emit_mode m ) {
 	int size = hl_emit_mode_sizes[m];
 	if( size < HL_WSIZE ) size = HL_WSIZE;
+	int min = ctx->jit->cfg.stack_arg_size;
+	if( min && size < min ) size = min;
 	return size;
 }
 
@@ -512,11 +514,16 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 			regs_emit(ctx,UNUSED,cmov?CXCHG:XCHG,to,from,mode,0);
 			int_arr_remove_range(&movs,0,3);
 			size -= 3;
+			// After XCHG(to,from) the data that was in `to` is now in `from`
+			// and vice versa.  Rename the FROM-slot of each remaining mov so
+			// it reads from the physical register where the value actually
+			// lives.  (The TO-slot is the desired destination physical reg
+			// and is unaffected by the XCHG.)
 			for(int k=0;k<size;k+=3) {
-				if( int_arr_get(movs,k) == to )
-					movs.values[k] = from;
-				else if( int_arr_get(movs,k) == from )
-					movs.values[k] = to;
+				if( int_arr_get(movs,k+1) == to )
+					movs.values[k+1] = from;
+				else if( int_arr_get(movs,k+1) == from )
+					movs.values[k+1] = to;
 			}
 		}
 	}
@@ -599,7 +606,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				emit_mode mode = v ? v->mode : M_I32;
 				ereg r = get_call_reg(ctx,regs,mode);
 				if( IS_NULL(r) ) {
-					stack_args += get_stack_size(mode);
+					stack_args += get_stack_size(ctx, mode);
 					stack_bits |= 1 << k;
 				} else if( !v || r != v->reg ) {
 					int_arr_add(ctx->pack_movs,r);
