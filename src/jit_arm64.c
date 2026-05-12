@@ -438,6 +438,113 @@ static void a64_brk( jit_ctx *ctx, uint16_t imm16 ) {
 }
 
 // -----------------------------------------------------------------------
+//  C2HL trampoline.
+//
+//  hl_call_method (libhl/fun.c) invokes a JIT'd HL function via
+//  hl_setup.static_call. We expose callback_c2hl_arm64 there. It packs the
+//  arguments described by hl_type into a fixed buffer and then jumps to a
+//  JIT-emitted trampoline that loads the buffer back into x0..x7 / d0..d7
+//  and BLR's the target.
+//
+//  Bring-up restrictions:
+//    - No stack overflow handling. Functions with > 8 GPR or > 8 FPR args
+//      are not callable via callback_c2hl_arm64 yet (BRK on the path).
+//    - hl_setup.static_call_ref = 1 (we receive a void** to the closure).
+//
+//  Buffer layout passed from C to the JIT trampoline:
+//    buf[0..7]   : 8 × int64_t — values for x0..x7
+//    buf[8..15]  : 8 × double  — values for d0..d7
+//
+//  Trampoline signature (called as):
+//    void *trampoline(void *fun_ptr, void *buf);
+//    // result lands in x0 or d0 depending on caller-side cast.
+// -----------------------------------------------------------------------
+
+static void *call_jit_c2hl_native = NULL;
+
+static void *callback_c2hl_arm64( void *_f, hl_type *t, void **args, vdynamic *ret ) {
+	void **f = (void**)_f;
+	int nargs = t->fun->nargs;
+	if( nargs > 8 ) hl_error("c2hl: > 8 args not supported in bring-up");
+	uint64_t buf[16] = {0};
+	int ngpr = 0, nfpr = 0;
+	for( int i = 0; i < nargs; i++ ) {
+		hl_type *at = t->fun->args[i];
+		void *v = args[i];
+		int is_fp = (at->kind == HF32 || at->kind == HF64);
+		if( is_fp ) {
+			if( nfpr >= 8 ) hl_error("c2hl: > 8 FP args not supported");
+			if( at->kind == HF32 ) {
+				float fv = *(float*)v;
+				memcpy(&buf[8 + nfpr], &fv, sizeof(float));
+			} else {
+				double dv = *(double*)v;
+				memcpy(&buf[8 + nfpr], &dv, sizeof(double));
+			}
+			nfpr++;
+		} else {
+			if( ngpr >= 8 ) hl_error("c2hl: > 8 GPR args not supported");
+			switch( at->kind ) {
+			case HBOOL: case HUI8:  buf[ngpr] = *(unsigned char*)v; break;
+			case HUI16:             buf[ngpr] = *(unsigned short*)v; break;
+			case HI32:              buf[ngpr] = (uint64_t)(int64_t)*(int32_t*)v; break;
+			case HI64: case HGUID:  buf[ngpr] = *(uint64_t*)v; break;
+			default:                buf[ngpr] = (uint64_t)(intptr_t)v; break;
+			}
+			ngpr++;
+		}
+	}
+	switch( t->fun->ret->kind ) {
+	case HVOID:
+		((void(*)(void*, void*))call_jit_c2hl_native)(*f, buf);
+		return NULL;
+	case HUI8: case HUI16: case HI32: case HBOOL:
+		ret->v.i = ((int(*)(void*, void*))call_jit_c2hl_native)(*f, buf);
+		return &ret->v.i;
+	case HI64: case HGUID:
+		ret->v.i64 = ((int64(*)(void*, void*))call_jit_c2hl_native)(*f, buf);
+		return &ret->v.i64;
+	case HF32:
+		ret->v.f = ((float(*)(void*, void*))call_jit_c2hl_native)(*f, buf);
+		return &ret->v.f;
+	case HF64:
+		ret->v.d = ((double(*)(void*, void*))call_jit_c2hl_native)(*f, buf);
+		return &ret->v.d;
+	default:
+		return ((void*(*)(void*, void*))call_jit_c2hl_native)(*f, buf);
+	}
+}
+
+// Emit the JIT trampoline. Entry: x0 = fun_ptr, x1 = buf.
+// Returns the offset within the buffer.
+static int emit_c2hl_trampoline( jit_ctx *ctx ) {
+	jit_buf(ctx);
+	int pos = BUF_POS();
+	// Prologue.
+	a64_stp_pre(ctx, A64_FP, A64_LR, A64_SP_OR_ZR, -16);
+	a64_add_imm(ctx, A64_FP, A64_SP_OR_ZR, 0, 1);
+	// Move fun_ptr / buf into scratches that won't be clobbered by the
+	// upcoming x0/x1 reload.
+	a64_mov_reg(ctx, A64_X16, A64_X0, 1); // x16 = fun ptr
+	a64_mov_reg(ctx, A64_X17, A64_X1, 1); // x17 = buf
+	// Load x0..x7 from buf[0..7].
+	for( int i = 0; i < 8; i++ ) {
+		a64_ldr_imm(ctx, (a64_greg)(A64_X0 + i), A64_X17, i * 8, 8, 0);
+	}
+	// Load d0..d7 from buf[8..15] (FP regs reuse the same buffer).
+	for( int i = 0; i < 8; i++ ) {
+		a64_ldr_fp(ctx, (a64_vreg)(A64_V0 + i), A64_X17, 64 + i * 8, 1);
+	}
+	// Call the target.
+	a64_blr(ctx, A64_X16);
+	// Epilogue.
+	a64_add_imm(ctx, A64_SP_OR_ZR, A64_FP, 0, 1);
+	a64_ldp_post(ctx, A64_FP, A64_LR, A64_SP_OR_ZR, 16);
+	a64_ret(ctx);
+	return pos;
+}
+
+// -----------------------------------------------------------------------
 //  Prologue / epilogue.
 //  We currently spill every HL vreg to the stack, no register allocator.
 //  The frame is laid out so that vreg #i lives at [FP - 8*(i+1)] (8 bytes
@@ -745,11 +852,17 @@ static void hl_jit_init_module( jit_ctx *ctx, hl_module *m ) {
 
 void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	hl_jit_init_module(ctx, m);
+	// Trampolines must sit at known offsets the JIT later patches into
+	// hl_setup. Emit them upfront so functions land at offset >= c2hl_size.
+	ctx->c2hl = emit_c2hl_trampoline(ctx);
+	ctx->hl2c = -1; // not yet implemented; OCallClosure will BRK
 }
 
 void hl_jit_reset( jit_ctx *ctx, hl_module *m ) {
 	ctx->buf.b = ctx->startBuf;
 	hl_jit_init_module(ctx, m);
+	ctx->c2hl = emit_c2hl_trampoline(ctx);
+	ctx->hl2c = -1;
 }
 
 // Per-opcode codegen.
@@ -1037,6 +1150,32 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous ) {
 	int size = BUF_POS();
 	if( size & 4095 ) size += 4096 - (size & 4095);
+	// Debug: dump the raw buffer to a file before placing it into the
+	// executable region. Disassemble with:
+	//   llvm-objdump --disassemble --triple=arm64 --raw -b binary <file>
+	// (or `--mattr=+all` to enable everything). Enable with HL_JIT_DUMP=<path>.
+	const char *dumpPath = getenv("HL_JIT_DUMP");
+	if( dumpPath ) {
+		FILE *fp = fopen(dumpPath, "wb");
+		if( fp ) {
+			fwrite(ctx->startBuf, 1, BUF_POS(), fp);
+			fclose(fp);
+			// Also dump function offsets so we can locate each function in the
+			// disassembly. One line per function: "<findex> <byte-offset>".
+			char idxPath[512];
+			snprintf(idxPath, sizeof(idxPath), "%s.idx", dumpPath);
+			FILE *fi = fopen(idxPath, "w");
+			if( fi ) {
+				for( int i = 0; i < m->code->nfunctions; i++ ) {
+					hl_function *f = m->code->functions + i;
+					void *fp2 = m->functions_ptrs[f->findex];
+					fprintf(fi, "%d 0x%x %d\n",
+						f->findex, (unsigned)(intptr_t)fp2, f->nops);
+				}
+				fclose(fi);
+			}
+		}
+	}
 	void *code = hl_alloc_executable_memory(size);
 	if( code == NULL ) return NULL;
 	hl_jit_write_begin();
@@ -1067,6 +1206,14 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	ctx->calls = NULL;
 	(void)previous;
 	hl_jit_write_end(code, size);
+	// Patch hl_setup so libhl's dynamic call path (hl_call_method) can
+	// reach into our JIT'd code. This is the AArch64 equivalent of the
+	// block at jit.c:4686-4694.
+	if( call_jit_c2hl_native == NULL ) {
+		call_jit_c2hl_native = (unsigned char*)code + ctx->c2hl;
+		hl_setup.static_call = callback_c2hl_arm64;
+		hl_setup.static_call_ref = true;
+	}
 	*codesize = size;
 	*debug = ctx->debug;
 	return code;
