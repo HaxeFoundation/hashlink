@@ -75,6 +75,7 @@ struct _jit_ctx {
 
 	jlist *jumps;        // pending intra-function branches
 	jlist *calls;        // pending HL function calls
+	vclosure *closure_list; // OStaticClosure objects to patch in hl_jit_code
 
 	hl_alloc falloc;     // per-function arena (reset between functions)
 	hl_alloc galloc;     // global arena, lives the whole module
@@ -867,6 +868,7 @@ jit_ctx *hl_jit_alloc( void ) {
 	memset(ctx, 0, sizeof(jit_ctx));
 	hl_alloc_init(&ctx->falloc);
 	hl_alloc_init(&ctx->galloc);
+	ctx->closure_list = NULL;
 	return ctx;
 }
 
@@ -991,7 +993,6 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 			hl_runtime_obj *rt = hl_get_obj_rt(st);
 			int field_off = rt->fields_indexes[op->p3];
 			load_vreg(ctx, A64_X9, op->p2);
-			// LDR from [x9, #field_off] — use add+ldr if offset escapes imm12.
 			if( field_off >= 0 && field_off < 4096 * 8 && (field_off & 7) == 0 ) {
 				a64_ldr_imm(ctx, A64_X10, A64_X9, field_off, 8, 0);
 			} else {
@@ -999,8 +1000,47 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 				a64_ldr_imm(ctx, A64_X10, A64_X9, 0, 8, 0);
 			}
 			store_vreg(ctx, A64_X10, op->p1);
+		} else if( st->kind == HVIRTUAL ) {
+			// vptr = hl_vfields(o)[op->p3] — i.e. *(void**)(o + sizeof(vvirtual) + op->p3*HL_WSIZE)
+			// if non-null:  dst = *vptr
+			// if null:      dst = hl_dyn_get*(o, hash(field), dst_type)
+			hl_type *dt = f->regs[op->p1];
+			int vfield_off = (int)sizeof(vvirtual) + op->p3 * (int)sizeof(void*);
+			load_vreg(ctx, A64_X9, op->p2);            // x9 = o
+			a64_ldr_imm(ctx, A64_X10, A64_X9, vfield_off, 8, 0); // x10 = vfield[p3]
+			a64_cmp_imm(ctx, A64_X10, 0, 1);
+			int j_has = a64_bcond(ctx, A64_NE, 0);
+			// null path: hl_dyn_get
+			int hash = st->virt->fields[op->p3].hashed_name;
+			load_vreg(ctx, A64_X0, op->p2);
+			a64_mov_imm32(ctx, A64_X1, hash);
+			void *fn; int needs_type = 1;
+			switch( dt->kind ) {
+			case HF32: fn = (void*)hl_dyn_getf;  needs_type = 0; break;
+			case HF64: fn = (void*)hl_dyn_getd;  needs_type = 0; break;
+			case HI64: case HGUID: fn = (void*)hl_dyn_geti64; needs_type = 0; break;
+			case HI32: case HUI16: case HUI8: case HBOOL: fn = (void*)hl_dyn_geti; break;
+			default: fn = (void*)hl_dyn_getp; break;
+			}
+			if( needs_type ) a64_mov_imm64(ctx, A64_X2, (int64_t)(intptr_t)dt);
+			emit_call_native_ptr(ctx, fn);
+			if( dt->kind == HF32 || dt->kind == HF64 )
+				store_vreg_fp(ctx, A64_V0, op->p1);
+			else
+				store_vreg(ctx, A64_X0, op->p1);
+			int j_end = a64_b(ctx, 0);
+			// non-null path: dst = *vptr
+			a64_patch_branch(ctx, j_has, BUF_POS());
+			if( vreg_is_fp(f, op->p1) ) {
+				a64_ldr_fp(ctx, A64_V16, A64_X10, 0, dt->kind == HF64);
+				store_vreg_fp(ctx, A64_V16, op->p1);
+			} else {
+				a64_ldr_imm(ctx, A64_X11, A64_X10, 0, vreg_size(f, op->p1), 0);
+				store_vreg(ctx, A64_X11, op->p1);
+			}
+			a64_patch_branch(ctx, j_end, BUF_POS());
 		} else {
-			a64_brk(ctx, 0xF1E1); // OField on virtual/dyn — not yet
+			a64_brk(ctx, 0xF1E1);
 		}
 		break;
 	}
@@ -1151,6 +1191,186 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		}
 		emit_epilogue(ctx);
 		break;
+
+	// ---------------- Dynamic field access ----------------
+	// Field name is m->code->strings[op->p3]; the hash is computed at JIT
+	// time and embedded as a constant.
+	case ODynGet: {
+		hl_type *dt = f->regs[op->p1];
+		int hash = hl_hash_utf8(m->code->strings[op->p3]);
+		load_vreg(ctx, A64_X0, op->p2);
+		a64_mov_imm32(ctx, A64_X1, hash);
+		void *fn;
+		int needs_type = 1;
+		switch( dt->kind ) {
+		case HF32:  fn = (void*)hl_dyn_getf;  needs_type = 0; break;
+		case HF64:  fn = (void*)hl_dyn_getd;  needs_type = 0; break;
+		case HI64: case HGUID: fn = (void*)hl_dyn_geti64; needs_type = 0; break;
+		case HI32: case HUI16: case HUI8: case HBOOL:
+			fn = (void*)hl_dyn_geti; break;
+		default:    fn = (void*)hl_dyn_getp; break;
+		}
+		if( needs_type ) a64_mov_imm64(ctx, A64_X2, (int64_t)(intptr_t)dt);
+		emit_call_native_ptr(ctx, fn);
+		if( dt->kind == HF32 || dt->kind == HF64 )
+			store_vreg_fp(ctx, A64_V0, op->p1);
+		else
+			store_vreg(ctx, A64_X0, op->p1);
+		break;
+	}
+	case ODynSet: {
+		// Encoding: p1 = obj vreg, p2 = field-name *string index*,
+		// p3 = value vreg. The "R" in the opcode descriptor for p2 is
+		// misleading — it's actually a constant index into code->strings.
+		hl_type *vt = f->regs[op->p3];
+		int hash = (int)hl_hash_gen(hl_get_ustring(m->code, op->p2), true);
+		load_vreg(ctx, A64_X0, op->p1);              // obj
+		a64_mov_imm32(ctx, A64_X1, hash);             // hfield
+		void *fn;
+		switch( vt->kind ) {
+		case HF32:
+			fn = (void*)hl_dyn_setf;
+			load_vreg_fp(ctx, A64_V0, op->p3);
+			break;
+		case HF64:
+			fn = (void*)hl_dyn_setd;
+			load_vreg_fp(ctx, A64_V0, op->p3);
+			break;
+		case HI64: case HGUID:
+			fn = (void*)hl_dyn_seti64;
+			load_vreg(ctx, A64_X2, op->p3);
+			break;
+		case HI32: case HUI16: case HUI8: case HBOOL:
+			fn = (void*)hl_dyn_seti;
+			a64_mov_imm64(ctx, A64_X2, (int64_t)(intptr_t)vt);
+			load_vreg(ctx, A64_X3, op->p3);
+			break;
+		default:
+			fn = (void*)hl_dyn_setp;
+			a64_mov_imm64(ctx, A64_X2, (int64_t)(intptr_t)vt);
+			load_vreg(ctx, A64_X3, op->p3);
+			break;
+		}
+		emit_call_native_ptr(ctx, fn);
+		break;
+	}
+
+	// ---------------- Closures ----------------
+	case OStaticClosure: {
+		// Allocate a vclosure in module-lifetime storage; chain it on
+		// closure_list so hl_jit_code can patch its fun pointer from
+		// "findex" to the absolute target address once functions are placed.
+		int fid = op->p2;
+		vclosure *c = (vclosure*)hl_malloc(&m->ctx.alloc, sizeof(vclosure));
+		c->hasValue = 0;
+		int fidx = m->functions_indexes[fid];
+		if( fidx >= m->code->nfunctions ) {
+			c->t = m->code->natives[fidx - m->code->nfunctions].t;
+			c->fun = m->functions_ptrs[fid];
+			c->value = NULL;
+		} else {
+			c->t = m->code->functions[fidx].type;
+			c->fun = (void*)(intptr_t)fid;
+			c->value = ctx->closure_list;
+			ctx->closure_list = c;
+		}
+		a64_mov_imm64(ctx, A64_X9, (int64_t)(intptr_t)c);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
+	case OInstanceClosure:
+		// hl_alloc_closure_ptr(fun_type, fun_ptr, captured). Staging the
+		// fun_ptr immediate across MOVZ+MOVK requires extending the patch
+		// machinery; deferred to a follow-up.
+		a64_brk(ctx, 0xC1C1);
+		break;
+	case OCallClosure: {
+		// Simple path: c->hasValue ? c->fun(c->value, args...) : c->fun(args...)
+		// (HDYN dynamic-call variant not yet covered; that path needs
+		// hl_dyn_call + a vdynamic** packing prologue.)
+		if( f->regs[op->p2]->kind == HDYN ) { a64_brk(ctx, 0xCDDA); break; }
+		// Load hasValue field (offset HL_WSIZE*2 = 16).
+		load_vreg(ctx, A64_X16, op->p2);
+		a64_ldr_imm(ctx, A64_X9, A64_X16, 16, 4, 0);
+		a64_cmp_imm(ctx, A64_X9, 0, 0);
+		int jnz = a64_bcond(ctx, A64_NE, 0);
+		// No captured value: prepare args, load c->fun (offset 8), BLR.
+		prepare_call_args(ctx, op->p3, op->extra);
+		load_vreg(ctx, A64_X16, op->p2);
+		a64_ldr_imm(ctx, A64_X16, A64_X16, 8, 8, 0);
+		a64_blr(ctx, A64_X16);
+		int jend = a64_b(ctx, 0);
+		a64_patch_branch(ctx, jnz, BUF_POS());
+		// With captured value: build [captured, args...] in regs.
+		// Shift args by 1: x0 = captured value, x1..x7 = original args.
+		// For simplicity, we load all into a temp buffer on the stack
+		// then re-issue prepare_call_args is overkill. Direct approach:
+		// load captured + use load_vreg for each subsequent arg.
+		// Limitation: this only handles up to 7 user args (8 with captured).
+		if( op->p3 > 7 ) { a64_brk(ctx, 0xCD08); break; }
+		load_vreg(ctx, A64_X16, op->p2);
+		a64_ldr_imm(ctx, A64_X0, A64_X16, 24, 8, 0); // c->value at HL_WSIZE*3
+		for( int i = 0; i < op->p3; i++ ) {
+			load_vreg(ctx, (a64_greg)(A64_X1 + i), op->extra[i]);
+		}
+		load_vreg(ctx, A64_X16, op->p2);
+		a64_ldr_imm(ctx, A64_X16, A64_X16, 8, 8, 0);
+		a64_blr(ctx, A64_X16);
+		a64_patch_branch(ctx, jend, BUF_POS());
+		if( op->p1 >= 0 && f->regs[op->p1]->kind != HVOID ) {
+			if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
+			else store_vreg(ctx, A64_X0, op->p1);
+		}
+		break;
+	}
+
+	// ---------------- Cast helpers ----------------
+	case OToVirtual: {
+		// dst = hl_to_virtual(dst_type, src)
+		hl_type *dt = f->regs[op->p1];
+		// Ensure the runtime obj of src is initialised (x86 backend does
+		// hl_get_obj_rt() unconditionally for HOBJ inputs at JIT time).
+		hl_type *st = f->regs[op->p2];
+		if( st->kind == HOBJ ) hl_get_obj_rt(st);
+		a64_mov_imm64(ctx, A64_X0, (int64_t)(intptr_t)dt);
+		load_vreg(ctx, A64_X1, op->p2);
+		emit_call_native_ptr(ctx, (void*)hl_to_virtual);
+		store_vreg(ctx, A64_X0, op->p1);
+		break;
+	}
+	case OToInt: {
+		hl_type *st = f->regs[op->p2];
+		hl_type *dt = f->regs[op->p1];
+		if( op->p1 == op->p2 ) break;
+		if( st->kind == HF64 ) {
+			load_vreg_fp(ctx, A64_V16, op->p2);
+			a64_fcvtzs_d(ctx, A64_X9, A64_V16, dt->kind == HI64);
+			store_vreg(ctx, A64_X9, op->p1);
+		} else if( st->kind == HF32 ) {
+			// FCVTZS Wd, Sn (single-precision): same encoder bit layout
+			// as the double form except ftype=00; reuse a64_fcvtzs_d for
+			// double then sextend? For accuracy, route through a helper:
+			// emit FMOV S→W then? Simplest: convert single→double, then
+			// fcvtzs on double. AArch64 has FCVT to widen.
+			// Actually, FCVTZS exists for single too — just bit 22 = 0.
+			// We don't have an encoder for it yet; emit a brk for now.
+			a64_brk(ctx, 0xF32C);
+		} else if( dt->kind == HI64 && st->kind == HI32 ) {
+			// Sign-extend 32→64. Use SXTW Xd, Wn — encoded as SBFM #0,#31.
+			// Quick path: load 4-byte signed, store as 8-byte (ldur with
+			// signed extend then stur 8-byte). Our load_vreg with size 4
+			// is zero-extend, so we must sign-extend explicitly: SBFM.
+			load_vreg(ctx, A64_X9, op->p2);
+			// SBFM Xd, Xn, #0, #31  (SXTW)
+			a64_emit(ctx, 0x93407C00 | ((A64_X9 & 0x1f) << 5) | (A64_X9 & 0x1f));
+			store_vreg(ctx, A64_X9, op->p1);
+		} else {
+			// Plain copy — load and store with appropriate widths.
+			load_vreg(ctx, A64_X9, op->p2);
+			store_vreg(ctx, A64_X9, op->p1);
+		}
+		break;
+	}
 
 	// ---------------- Box primitives into Dynamic ----------------
 	case OToDyn: {
@@ -1594,6 +1814,21 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 		c = c->next;
 	}
 	ctx->calls = NULL;
+	// Patch OStaticClosure structs: their c->fun fields hold the target
+	// findex; rewrite each one to the absolute target address now that
+	// functions_ptrs has been populated. Mirrors jit.c:4745-4768.
+	{
+		vclosure *cls = ctx->closure_list;
+		while( cls ) {
+			vclosure *next = (vclosure*)cls->value;
+			int fidx = (int)(intptr_t)cls->fun;
+			void *fabs = m->functions_ptrs[fidx];
+			cls->fun = (fabs == NULL) ? NULL : ((unsigned char*)code + (intptr_t)fabs);
+			cls->value = NULL;
+			cls = next;
+		}
+		ctx->closure_list = NULL;
+	}
 	(void)previous;
 	hl_jit_write_end(code, size);
 	// Patch hl_setup so libhl's dynamic call path (hl_call_method) can
