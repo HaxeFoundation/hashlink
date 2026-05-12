@@ -1693,8 +1693,9 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		break;
 	}
 	case OCallMethod: {
-		// HOBJ case only — virtual dispatch.
-		if( f->regs[op->extra[0]]->kind == HOBJ ) {
+		hl_type *ot = f->regs[op->extra[0]];
+		if( ot->kind == HOBJ ) {
+			// Vtable dispatch: this->t->vobj_proto[p2](this, args...)
 			prepare_call_args(ctx, op->p3, op->extra);
 			load_vreg(ctx, A64_X16, op->extra[0]);
 			a64_ldr_imm(ctx, A64_X16, A64_X16, 0, 8, 0);
@@ -1705,8 +1706,112 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 				if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
 				else store_vreg(ctx, A64_X0, op->p1);
 			}
+		} else if( ot->kind == HVIRTUAL ) {
+			// vfield_ptr = hl_vfields(o)[op->p2]  (the resolved method)
+			//   if non-null: call vfield_ptr(o->value, args[1..])
+			//   else: hl_dyn_call_obj(o->value, ftype, hashed_name, packed_args, ret)
+			int vfield_off = (int)sizeof(vvirtual) + op->p2 * (int)sizeof(void*);
+			load_vreg(ctx, A64_X9, op->extra[0]);              // x9 = o
+			a64_ldr_imm(ctx, A64_X10, A64_X9, vfield_off, 8, 0); // x10 = vfield
+			a64_cmp_imm(ctx, A64_X10, 0, 1);
+			int j_has = a64_bcond(ctx, A64_NE, 0);
+			// ---- NULL path: hl_dyn_call_obj ----
+			// Build packed args[op->p3-1] on the stack, plus an optional
+			// vdynamic for non-pointer non-void return values.
+			hl_type *dt = (op->p1 >= 0) ? f->regs[op->p1] : NULL;
+			int nargs = op->p3 - 1;
+			int need_dyn = (dt && !hl_is_ptr(dt) && dt->kind != HVOID) ? 1 : 0;
+			int params_size = nargs * 8 + (need_dyn ? (int)sizeof(vdynamic) : 0);
+			if( params_size & 15 ) params_size += 16 - (params_size & 15);
+			if( params_size ) a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, params_size, 1);
+			// Fill arg slots at [sp+0..sp+(nargs-1)*8] with pointer-to-value
+			// (for non-ptr types, we need the address of the source vreg slot;
+			// for ptr types, the value itself).
+			for( int i = 0; i < nargs; i++ ) {
+				int vi = op->extra[i + 1];
+				hl_type *at = f->regs[vi];
+				if( hl_is_ptr(at) ) {
+					load_vreg(ctx, A64_X11, vi);
+				} else {
+					int off = vreg_offset(vi);
+					if( off >= -4095 && off <= 0 )
+						a64_sub_imm(ctx, A64_X11, A64_FP, -off, 1);
+					else if( off >= 0 && off <= 4095 )
+						a64_add_imm(ctx, A64_X11, A64_FP, off, 1);
+					else {
+						a64_mov_imm64(ctx, A64_X11, off);
+						a64_add_reg(ctx, A64_X11, A64_FP, A64_X11, 1);
+					}
+				}
+				a64_str_imm(ctx, A64_X11, A64_SP_OR_ZR, i * 8, 8);
+			}
+			// args: x0 = o->value, x1 = ftype, x2 = hashed_name,
+			//       x3 = packed args ptr (sp), x4 = ret ptr (or NULL)
+			load_vreg(ctx, A64_X0, op->extra[0]);
+			a64_ldr_imm(ctx, A64_X0, A64_X0, 8, 8, 0); // o->value (offset HL_WSIZE)
+			a64_mov_imm64(ctx, A64_X1, (int64_t)(intptr_t)ot->virt->fields[op->p2].t);
+			a64_mov_imm32(ctx, A64_X2, ot->virt->fields[op->p2].hashed_name);
+			a64_mov_reg(ctx, A64_X3, A64_SP_OR_ZR, 1);
+			a64_add_imm(ctx, A64_X3, A64_SP_OR_ZR, 0, 1);
+			if( need_dyn ) {
+				int dyn_off = params_size - (int)sizeof(vdynamic);
+				a64_add_imm(ctx, A64_X4, A64_SP_OR_ZR, dyn_off, 1);
+			} else {
+				a64_mov_imm64(ctx, A64_X4, 0);
+			}
+			emit_call_native_ptr(ctx, (void*)hl_dyn_call_obj);
+			// Result handling.
+			if( op->p1 >= 0 && dt->kind != HVOID ) {
+				if( need_dyn ) {
+					int dyn_off = params_size - (int)sizeof(vdynamic);
+					if( vreg_is_fp(f, op->p1) )
+						a64_ldr_fp(ctx, A64_V0, A64_SP_OR_ZR, dyn_off + 8, dt->kind == HF64);
+					else
+						a64_ldr_imm(ctx, A64_X0, A64_SP_OR_ZR, dyn_off + 8, vreg_size(f, op->p1), 0);
+				}
+				if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
+				else                        store_vreg(ctx, A64_X0, op->p1);
+			}
+			if( params_size ) a64_add_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, params_size, 1);
+			int j_end = a64_b(ctx, 0);
+			// ---- Non-NULL path: call vfield_ptr(o->value, args[1..]) ----
+			a64_patch_branch(ctx, j_has, BUF_POS());
+			// Replace extra[0] with o->value: load o->value, set up regs
+			// the same way prepare_call_args does, but with x0 = o->value.
+			// We need to first stash the vfield ptr (in x10) somewhere that
+			// survives prepare_call_args (which uses x9/x10 internally).
+			// Push x10 to a temp stack slot above sp.
+			a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, 16, 1);
+			a64_str_imm(ctx, A64_X10, A64_SP_OR_ZR, 0, 8);
+			// Compute o->value into x11 and stash it too.
+			load_vreg(ctx, A64_X11, op->extra[0]);
+			a64_ldr_imm(ctx, A64_X11, A64_X11, 8, 8, 0);
+			a64_str_imm(ctx, A64_X11, A64_SP_OR_ZR, 8, 8);
+			// Prepare remaining args (extra[1..p3-1]) into x1..x{nargs}.
+			// Use prepare_call_args-style logic but starting from x1, not x0.
+			// Cheapest: iterate by hand for the common case.
+			if( nargs > 7 ) { a64_brk(ctx, 0xCAA8); break; }
+			for( int i = 0; i < nargs; i++ ) {
+				int vi = op->extra[i + 1];
+				if( vreg_is_fp(f, vi) ) {
+					// FP args still go in d0..d7 separately; rare for now.
+					load_vreg_fp(ctx, (a64_vreg)(A64_V0 + i), vi);
+				} else {
+					load_vreg(ctx, (a64_greg)(A64_X1 + i), vi);
+				}
+			}
+			// Pop o->value into x0 and vfield ptr into x16, restore sp.
+			a64_ldr_imm(ctx, A64_X16, A64_SP_OR_ZR, 0, 8, 0);
+			a64_ldr_imm(ctx, A64_X0, A64_SP_OR_ZR, 8, 8, 0);
+			a64_add_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, 16, 1);
+			a64_blr(ctx, A64_X16);
+			if( op->p1 >= 0 && f->regs[op->p1]->kind != HVOID ) {
+				if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
+				else                         store_vreg(ctx, A64_X0, op->p1);
+			}
+			a64_patch_branch(ctx, j_end, BUF_POS());
 		} else {
-			a64_brk(ctx, 0xCAA0); // HVIRTUAL method dispatch not yet
+			a64_brk(ctx, 0xCAA0);
 		}
 		break;
 	}
