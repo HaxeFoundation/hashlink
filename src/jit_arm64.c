@@ -551,16 +551,44 @@ static int emit_c2hl_trampoline( jit_ctx *ctx ) {
 //  per slot regardless of HL type — wasteful but correct for bring-up).
 // -----------------------------------------------------------------------
 
+// Forward decls for helpers defined further down the file — needed because
+// emit_prologue spills incoming x0..x7 / d0..d7 into vreg slots.
+static void store_vreg( jit_ctx *ctx, a64_greg src, int vi );
+static void store_vreg_fp( jit_ctx *ctx, a64_vreg src, int vi );
+
 static void emit_prologue( jit_ctx *ctx, int frameSize ) {
-	// Align frame to 16 bytes.
 	if( frameSize & 0xf ) frameSize += 16 - (frameSize & 0xf);
 	ctx->totalRegsSize = frameSize;
-	// stp x29, x30, [sp, #-16]!
+	// stp x29, x30, [sp, #-16]!  ;  mov x29, sp  ;  sub sp, sp, #frame
 	a64_stp_pre(ctx, A64_FP, A64_LR, A64_SP_OR_ZR, -16);
-	// mov x29, sp  (encoded as ADD x29, sp, #0)
 	a64_add_imm(ctx, A64_FP, A64_SP_OR_ZR, 0, 1);
-	// sub sp, sp, #frameSize
 	if( frameSize ) a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, frameSize, 1);
+	// Spill incoming arguments to their vreg slots. AAPCS64 passes the
+	// first 8 non-FP arguments in x0..x7 and the first 8 FP arguments
+	// in d0..d7. Beyond that, args come on the caller's stack — which
+	// the spill-everything codegen does not yet reach into.
+	hl_function *f = ctx->f;
+	int ngpr = 0, nfpr = 0;
+	int nargs = f->type->fun->nargs;
+	for( int i = 0; i < nargs; i++ ) {
+		hl_type *at = f->type->fun->args[i];
+		int is_fp = (at->kind == HF32 || at->kind == HF64);
+		if( is_fp ) {
+			if( nfpr < 8 ) {
+				store_vreg_fp(ctx, (a64_vreg)(A64_V0 + nfpr), i);
+				nfpr++;
+			} else {
+				a64_brk(ctx, 0xA50F); // > 8 FP args at entry
+			}
+		} else {
+			if( ngpr < 8 ) {
+				store_vreg(ctx, (a64_greg)(A64_X0 + ngpr), i);
+				ngpr++;
+			} else {
+				a64_brk(ctx, 0xA50A); // > 8 GPR args at entry
+			}
+		}
+	}
 }
 
 static void emit_epilogue( jit_ctx *ctx ) {
@@ -744,6 +772,13 @@ static void op_call_fun( jit_ctx *ctx, int dst, int findex, int count, int *args
 		if( vreg_is_fp(ctx->f, dst) ) store_vreg_fp(ctx, A64_V0, dst);
 		else store_vreg(ctx, A64_X0, dst);
 	}
+}
+
+// Call an external C function whose address is known at JIT time.
+// Arguments must already be in x0..x7 / d0..d7. Clobbers x16.
+static void emit_call_native_ptr( jit_ctx *ctx, void *fn ) {
+	a64_mov_imm64(ctx, A64_X16, (int64_t)(intptr_t)fn);
+	a64_blr(ctx, A64_X16);
 }
 
 // Integer binary op. Loads operands from their slots into x9/x10, emits the
@@ -1111,6 +1146,252 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		}
 		emit_epilogue(ctx);
 		break;
+
+	// ---------------- Casts ----------------
+	case OSafeCast: {
+		// dst = hl_dyn_cast<X>(&src, src_type, dst_type)
+		// (FP/I64 variants drop the dst_type arg.)
+		hl_type *dt = f->regs[op->p1];
+		hl_type *st = f->regs[op->p2];
+		// x0 = &src_slot
+		int off = vreg_offset(op->p2);
+		if( off >= -4095 && off <= 4095 ) {
+			if( off < 0 ) a64_sub_imm(ctx, A64_X0, A64_FP, -off, 1);
+			else          a64_add_imm(ctx, A64_X0, A64_FP, off, 1);
+		} else {
+			a64_mov_imm64(ctx, A64_X0, off);
+			a64_add_reg(ctx, A64_X0, A64_FP, A64_X0, 1);
+		}
+		a64_mov_imm64(ctx, A64_X1, (int64_t)(intptr_t)st);
+		void *fn; int two_arg = 0;
+		switch( dt->kind ) {
+		case HF32:  fn = (void*)hl_dyn_castf;  two_arg = 1; break;
+		case HF64:  fn = (void*)hl_dyn_castd;  two_arg = 1; break;
+		case HI64: case HGUID: fn = (void*)hl_dyn_casti64; two_arg = 1; break;
+		case HI32: case HUI16: case HUI8: case HBOOL:
+			fn = (void*)hl_dyn_casti; break;
+		default:    fn = (void*)hl_dyn_castp; break;
+		}
+		if( !two_arg ) a64_mov_imm64(ctx, A64_X2, (int64_t)(intptr_t)dt);
+		emit_call_native_ptr(ctx, fn);
+		if( dt->kind == HF32 || dt->kind == HF64 )
+			store_vreg_fp(ctx, A64_V0, op->p1);
+		else
+			store_vreg(ctx, A64_X0, op->p1);
+		break;
+	}
+
+	// ---------------- Type metadata ----------------
+	case OType:
+		a64_mov_imm64(ctx, A64_X9, (int64_t)(intptr_t)(m->code->types + op->p2));
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	case OGetType: {
+		// dst = (src != NULL) ? src->t : &hlt_void
+		load_vreg(ctx, A64_X9, op->p2);
+		a64_cmp_imm(ctx, A64_X9, 0, 1);
+		int pos_nz = a64_bcond(ctx, A64_NE, 0);
+		// null branch
+		a64_mov_imm64(ctx, A64_X9, (int64_t)(intptr_t)&hlt_void);
+		int pos_end = a64_b(ctx, 0);
+		// non-null branch
+		int nz_target = BUF_POS();
+		a64_patch_branch(ctx, pos_nz, nz_target);
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 0, 8, 0); // load v->t
+		int end_target = BUF_POS();
+		a64_patch_branch(ctx, pos_end, end_target);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
+	case OGetTID:
+		// dst = src->kind (int32 at offset 0 of hl_type)
+		load_vreg(ctx, A64_X9, op->p2);
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 0, 4, 0);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+
+	// ---------------- Allocation ----------------
+	case ONew: {
+		// dst = hl_alloc_obj/dynobj/virtual(dst_type)
+		hl_type *t = f->regs[op->p1];
+		void *allocFn = NULL;
+		int nargs = 1;
+		switch( t->kind ) {
+		case HOBJ: case HSTRUCT: allocFn = (void*)hl_alloc_obj; break;
+		case HDYNOBJ: allocFn = (void*)hl_alloc_dynobj; nargs = 0; break;
+		case HVIRTUAL: allocFn = (void*)hl_alloc_virtual; break;
+		default: a64_brk(ctx, 0x0E01); goto onew_done; // unhandled type
+		}
+		if( nargs ) a64_mov_imm64(ctx, A64_X0, (int64_t)(intptr_t)t);
+		emit_call_native_ptr(ctx, allocFn);
+		store_vreg(ctx, A64_X0, op->p1);
+		onew_done:;
+		break;
+	}
+
+	// ---------------- Calls (extended) ----------------
+	case OCallThis: {
+		// Equivalent to OCallN where arg 0 = vreg 0 (this), method index = p2.
+		// vtable: this->t->vobj_proto[p2]
+		int nargs = op->p3 + 1;
+		int *callargs = (int*)hl_malloc(&ctx->falloc, sizeof(int) * nargs);
+		callargs[0] = 0;
+		for( int i = 1; i < nargs; i++ ) callargs[i] = op->extra[i-1];
+		// First, fetch the function pointer from the vtable.
+		// this is vreg 0, t is at offset 0, vobj_proto at offset 16 (HL_WSIZE*2).
+		load_vreg(ctx, A64_X9, 0);
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 0, 8, 0);   // x9 = this->t
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 16, 8, 0);  // x9 = t->vobj_proto
+		// Now we'd want to load proto[p2] and BLR it. But we also need to
+		// set up args first. Pre-compute the function pointer into x19? No,
+		// we don't preserve x19 across our trivial codegen. Simplest: stash
+		// the proto base in [fp - frame - 8] temp slot? For bring-up just
+		// reload after arg setup.
+		// Strategy: do prepare_call_args first (uses x9/x10 internally,
+		// but only the load_vreg helpers — they end with the loaded value).
+		// Then re-fetch the proto pointer.
+		(void)callargs; // suppress unused — we use it below.
+		prepare_call_args(ctx, nargs, callargs);
+		load_vreg(ctx, A64_X16, 0);
+		a64_ldr_imm(ctx, A64_X16, A64_X16, 0, 8, 0);  // this->t
+		a64_ldr_imm(ctx, A64_X16, A64_X16, 16, 8, 0); // t->vobj_proto
+		a64_ldr_imm(ctx, A64_X16, A64_X16, op->p2 * 8, 8, 0);
+		a64_blr(ctx, A64_X16);
+		if( op->p1 >= 0 && f->regs[op->p1]->kind != HVOID ) {
+			if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
+			else store_vreg(ctx, A64_X0, op->p1);
+		}
+		break;
+	}
+	case OCallMethod: {
+		// HOBJ case only — virtual dispatch.
+		if( f->regs[op->extra[0]]->kind == HOBJ ) {
+			prepare_call_args(ctx, op->p3, op->extra);
+			load_vreg(ctx, A64_X16, op->extra[0]);
+			a64_ldr_imm(ctx, A64_X16, A64_X16, 0, 8, 0);
+			a64_ldr_imm(ctx, A64_X16, A64_X16, 16, 8, 0);
+			a64_ldr_imm(ctx, A64_X16, A64_X16, op->p2 * 8, 8, 0);
+			a64_blr(ctx, A64_X16);
+			if( op->p1 >= 0 && f->regs[op->p1]->kind != HVOID ) {
+				if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
+				else store_vreg(ctx, A64_X0, op->p1);
+			}
+		} else {
+			a64_brk(ctx, 0xCAA0); // HVIRTUAL method dispatch not yet
+		}
+		break;
+	}
+
+	// ---------------- Exceptions (no return) ----------------
+	case OThrow:
+		load_vreg(ctx, A64_X0, op->p1);
+		emit_call_native_ptr(ctx, (void*)hl_throw);
+		// unreachable, but be safe
+		break;
+	case ORethrow:
+		load_vreg(ctx, A64_X0, op->p1);
+		emit_call_native_ptr(ctx, (void*)hl_rethrow);
+		break;
+
+	// ---------------- Ref operations ----------------
+	case ORef: {
+		// dst = &vreg[op->p2] — i.e. compute FP + vreg_offset(p2)
+		int off = vreg_offset(op->p2);
+		if( off >= -4095 && off <= 4095 ) {
+			if( off < 0 ) a64_sub_imm(ctx, A64_X9, A64_FP, -off, 1);
+			else          a64_add_imm(ctx, A64_X9, A64_FP, off, 1);
+		} else {
+			a64_mov_imm64(ctx, A64_X10, off);
+			a64_add_reg(ctx, A64_X9, A64_FP, A64_X10, 1);
+		}
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
+	case OUnref:
+		load_vreg(ctx, A64_X9, op->p2);
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 0, 8, 0);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	case OSetref:
+		load_vreg(ctx, A64_X9, op->p1);   // ref
+		load_vreg(ctx, A64_X10, op->p2);  // value
+		a64_str_imm(ctx, A64_X10, A64_X9, 0, 8);
+		break;
+
+	// ---------------- Array ----------------
+	case OArraySize: {
+		// dst = src->size — for non-abstract arrays at offset 16 (HL_WSIZE*2)
+		hl_type *st = f->regs[op->p2];
+		int offset = (st->kind == HABSTRACT) ? 12 : 16; // wsize+4 vs wsize*2
+		load_vreg(ctx, A64_X9, op->p2);
+		a64_ldr_imm(ctx, A64_X9, A64_X9, offset, 4, 0);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
+
+	// ---------------- Untyped memory access ----------------
+	// OGetI8/I16/OGetMem: dst = *(T*)(base + index)
+	case OGetI8: {
+		load_vreg(ctx, A64_X9, op->p2);   // base
+		load_vreg(ctx, A64_X10, op->p3);  // index
+		a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 0, 1, 0);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
+	case OGetI16: {
+		load_vreg(ctx, A64_X9, op->p2);
+		load_vreg(ctx, A64_X10, op->p3);
+		a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 0, 2, 0);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
+	case OGetMem: {
+		// Size of dst type determines the access width.
+		int sz = vreg_size(f, op->p1);
+		load_vreg(ctx, A64_X9, op->p2);
+		load_vreg(ctx, A64_X10, op->p3);
+		a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		if( vreg_is_fp(f, op->p1) ) {
+			a64_ldr_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p1]->kind == HF64);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else {
+			a64_ldr_imm(ctx, A64_X9, A64_X9, 0, sz, 0);
+			store_vreg(ctx, A64_X9, op->p1);
+		}
+		break;
+	}
+	case OSetI8: {
+		load_vreg(ctx, A64_X9, op->p1);   // base
+		load_vreg(ctx, A64_X10, op->p2);  // index
+		load_vreg(ctx, A64_X11, op->p3);  // value
+		a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		a64_str_imm(ctx, A64_X11, A64_X9, 0, 1);
+		break;
+	}
+	case OSetI16: {
+		load_vreg(ctx, A64_X9, op->p1);
+		load_vreg(ctx, A64_X10, op->p2);
+		load_vreg(ctx, A64_X11, op->p3);
+		a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		a64_str_imm(ctx, A64_X11, A64_X9, 0, 2);
+		break;
+	}
+	case OSetMem: {
+		int sz = vreg_size(f, op->p3);
+		load_vreg(ctx, A64_X9, op->p1);
+		load_vreg(ctx, A64_X10, op->p2);
+		a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		if( vreg_is_fp(f, op->p3) ) {
+			load_vreg_fp(ctx, A64_V16, op->p3);
+			a64_str_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p3]->kind == HF64);
+		} else {
+			load_vreg(ctx, A64_X11, op->p3);
+			a64_str_imm(ctx, A64_X11, A64_X9, 0, sz);
+		}
+		break;
+	}
 
 	default:
 		// Loud failure: BRK with the opcode in the immediate.
