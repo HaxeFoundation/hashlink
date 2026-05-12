@@ -1241,6 +1241,80 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		a64_ldr_imm(ctx, A64_X9, A64_X9, 8, 4, 0);
 		store_vreg(ctx, A64_X9, op->p1);
 		break;
+	case OEnumAlloc: {
+		// dst = hl_alloc_enum(dst_type, constructor_idx)
+		hl_type *t = f->regs[op->p1];
+		a64_mov_imm64(ctx, A64_X0, (int64_t)(intptr_t)t);
+		a64_mov_imm32(ctx, A64_X1, op->p2);
+		emit_call_native_ptr(ctx, (void*)hl_alloc_enum);
+		store_vreg(ctx, A64_X0, op->p1);
+		break;
+	}
+	case OMakeEnum: {
+		// Like OEnumAlloc + copy each param to result + construct->offsets[i].
+		hl_type *t = f->regs[op->p1];
+		hl_enum_construct *cons = &t->tenum->constructs[op->p2];
+		a64_mov_imm64(ctx, A64_X0, (int64_t)(intptr_t)t);
+		a64_mov_imm32(ctx, A64_X1, op->p2);
+		emit_call_native_ptr(ctx, (void*)hl_alloc_enum);
+		// Keep result ptr in x19 (callee-saved, but we don't preserve it
+		// across function calls — fine as we don't make any below).
+		// Use x20 instead via a stash; simplest: save on the frame.
+		// Cheap path: we make no further calls in this opcode, so x0
+		// is preserved throughout. Just use x0 as the base.
+		for( int i = 0; i < cons->nparams; i++ ) {
+			int off = cons->offsets[i];
+			hl_type *pt = cons->params[i];
+			int is_fp = (pt->kind == HF32 || pt->kind == HF64);
+			int sz = hl_type_size(pt);
+			if( is_fp ) {
+				load_vreg_fp(ctx, A64_V16, op->extra[i]);
+				a64_str_fp(ctx, A64_V16, A64_X0, off, pt->kind == HF64);
+			} else {
+				load_vreg(ctx, A64_X9, op->extra[i]);
+				a64_str_imm(ctx, A64_X9, A64_X0, off, sz);
+			}
+		}
+		store_vreg(ctx, A64_X0, op->p1);
+		break;
+	}
+	case OEnumField: {
+		// p2 = src enum vreg, p3 = constructor index,
+		// (int)(intptr_t)op->extra = field index inside that constructor.
+		// (Note: the AR descriptor in opcodes.h is misleading — extra is
+		// encoded as a single int cast, not as an array pointer.)
+		hl_type *st = f->regs[op->p2];
+		int cidx = op->p3;
+		int fidx = (int)(intptr_t)op->extra;
+		hl_enum_construct *cons = &st->tenum->constructs[cidx];
+		int off = cons->offsets[fidx];
+		hl_type *pt = cons->params[fidx];
+		load_vreg(ctx, A64_X9, op->p2);
+		if( vreg_is_fp(f, op->p1) ) {
+			a64_ldr_fp(ctx, A64_V16, A64_X9, off, pt->kind == HF64);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else {
+			a64_ldr_imm(ctx, A64_X10, A64_X9, off, hl_type_size(pt), 0);
+			store_vreg(ctx, A64_X10, op->p1);
+		}
+		break;
+	}
+	case OSetEnumField: {
+		// (venum)dst->fields[op->p2] = src
+		hl_type *dt = f->regs[op->p1];
+		hl_enum_construct *cons = &dt->tenum->constructs[0]; // SetEnumField targets construct 0 in HL
+		int off = cons->offsets[op->p2];
+		hl_type *pt = cons->params[op->p2];
+		load_vreg(ctx, A64_X9, op->p1);
+		if( vreg_is_fp(f, op->p3) ) {
+			load_vreg_fp(ctx, A64_V16, op->p3);
+			a64_str_fp(ctx, A64_V16, A64_X9, off, pt->kind == HF64);
+		} else {
+			load_vreg(ctx, A64_X10, op->p3);
+			a64_str_imm(ctx, A64_X10, A64_X9, off, hl_type_size(pt));
+		}
+		break;
+	}
 
 	// ---------------- Switch ----------------
 	// Bring-up uses a linear cmp-and-branch chain. A proper jump table
