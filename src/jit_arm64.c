@@ -994,14 +994,24 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		if( st->kind == HOBJ || st->kind == HSTRUCT ) {
 			hl_runtime_obj *rt = hl_get_obj_rt(st);
 			int field_off = rt->fields_indexes[op->p3];
+			int sz = hl_type_size(f->regs[op->p1]);
+			int is_fp = vreg_is_fp(f, op->p1);
 			load_vreg(ctx, A64_X9, op->p2);
-			if( field_off >= 0 && field_off < 4096 * 8 && (field_off & 7) == 0 ) {
-				a64_ldr_imm(ctx, A64_X10, A64_X9, field_off, 8, 0);
+			if( is_fp ) {
+				int is_d = f->regs[op->p1]->kind == HF64;
+				if( field_off >= 0 && (field_off & ((is_d ? 7 : 3))) == 0
+					&& field_off < (is_d ? 32768 : 16384) ) {
+					a64_ldr_fp(ctx, A64_V16, A64_X9, field_off, is_d);
+				} else {
+					a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
+					a64_ldr_fp(ctx, A64_V16, A64_X9, 0, is_d);
+				}
+				store_vreg_fp(ctx, A64_V16, op->p1);
 			} else {
 				a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
-				a64_ldr_imm(ctx, A64_X10, A64_X9, 0, 8, 0);
+				a64_ldr_imm(ctx, A64_X10, A64_X9, 0, sz, 0);
+				store_vreg(ctx, A64_X10, op->p1);
 			}
-			store_vreg(ctx, A64_X10, op->p1);
 		} else if( st->kind == HVIRTUAL ) {
 			// vptr = hl_vfields(o)[op->p3] — i.e. *(void**)(o + sizeof(vvirtual) + op->p3*HL_WSIZE)
 			// if non-null:  dst = *vptr
@@ -1051,13 +1061,16 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		if( dt->kind == HOBJ || dt->kind == HSTRUCT ) {
 			hl_runtime_obj *rt = hl_get_obj_rt(dt);
 			int field_off = rt->fields_indexes[op->p2];
+			int sz = hl_type_size(f->regs[op->p3]);
+			int is_fp = vreg_is_fp(f, op->p3);
 			load_vreg(ctx, A64_X9, op->p1);
-			load_vreg(ctx, A64_X10, op->p3);
-			if( field_off >= 0 && field_off < 4096 * 8 && (field_off & 7) == 0 ) {
-				a64_str_imm(ctx, A64_X10, A64_X9, field_off, 8);
+			a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
+			if( is_fp ) {
+				load_vreg_fp(ctx, A64_V16, op->p3);
+				a64_str_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p3]->kind == HF64);
 			} else {
-				a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
-				a64_str_imm(ctx, A64_X10, A64_X9, 0, 8);
+				load_vreg(ctx, A64_X10, op->p3);
+				a64_str_imm(ctx, A64_X10, A64_X9, 0, sz);
 			}
 		} else {
 			a64_brk(ctx, 0xF1E2);
@@ -1068,26 +1081,32 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		// vreg 0 holds "this"
 		hl_runtime_obj *rt = hl_get_obj_rt(f->regs[0]);
 		int field_off = rt->fields_indexes[op->p2];
+		int sz = hl_type_size(f->regs[op->p1]);
+		int is_fp = vreg_is_fp(f, op->p1);
 		load_vreg(ctx, A64_X9, 0);
-		if( field_off >= 0 && field_off < 4096 * 8 && (field_off & 7) == 0 ) {
-			a64_ldr_imm(ctx, A64_X10, A64_X9, field_off, 8, 0);
+		a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
+		if( is_fp ) {
+			a64_ldr_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p1]->kind == HF64);
+			store_vreg_fp(ctx, A64_V16, op->p1);
 		} else {
-			a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
-			a64_ldr_imm(ctx, A64_X10, A64_X9, 0, 8, 0);
+			a64_ldr_imm(ctx, A64_X10, A64_X9, 0, sz, 0);
+			store_vreg(ctx, A64_X10, op->p1);
 		}
-		store_vreg(ctx, A64_X10, op->p1);
 		break;
 	}
 	case OSetThis: {
 		hl_runtime_obj *rt = hl_get_obj_rt(f->regs[0]);
 		int field_off = rt->fields_indexes[op->p1];
+		int sz = hl_type_size(f->regs[op->p2]);
+		int is_fp = vreg_is_fp(f, op->p2);
 		load_vreg(ctx, A64_X9, 0);
-		load_vreg(ctx, A64_X10, op->p2);
-		if( field_off >= 0 && field_off < 4096 * 8 && (field_off & 7) == 0 ) {
-			a64_str_imm(ctx, A64_X10, A64_X9, field_off, 8);
+		a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
+		if( is_fp ) {
+			load_vreg_fp(ctx, A64_V16, op->p2);
+			a64_str_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p2]->kind == HF64);
 		} else {
-			a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
-			a64_str_imm(ctx, A64_X10, A64_X9, 0, 8);
+			load_vreg(ctx, A64_X10, op->p2);
+			a64_str_imm(ctx, A64_X10, A64_X9, 0, sz);
 		}
 		break;
 	}
