@@ -949,15 +949,20 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		store_vreg(ctx, A64_X9, op->p1);
 		break;
 	case OString: {
-		// String constant — m->code->strings[op->p2] is a uchar*.
-		void *s = (void*)m->code->ustrings[op->p2];
+		// Use hl_get_ustring — m->code->ustrings is lazily populated and
+		// reading the raw array can yield NULL strings at JIT time. The
+		// helper widens the UTF-8 entry to UTF-16 on demand and caches it.
+		const uchar *s = hl_get_ustring(m->code, op->p2);
 		a64_mov_imm64(ctx, A64_X9, (int64_t)(intptr_t)s);
 		store_vreg(ctx, A64_X9, op->p1);
 		break;
 	}
 	case OBytes: {
-		// HL bytes are accessed via m->code->bytes + m->code->bytes_pos[op->p2].
-		void *bp = m->code->bytes + m->code->bytes_pos[op->p2];
+		// version >= 5 stores bytes in a single blob indexed by bytes_pos;
+		// earlier versions inlined them in strings[].
+		char *bp = m->code->version >= 5
+			? m->code->bytes + m->code->bytes_pos[op->p2]
+			: m->code->strings[op->p2];
 		a64_mov_imm64(ctx, A64_X9, (int64_t)(intptr_t)bp);
 		store_vreg(ctx, A64_X9, op->p1);
 		break;
@@ -1147,6 +1152,42 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		emit_epilogue(ctx);
 		break;
 
+	// ---------------- Box primitives into Dynamic ----------------
+	case OToDyn: {
+		// For pointer-kinded source: if NULL, dst = NULL; else hl_alloc_dynamic(ra->t),
+		// store the pointer at offset 8.
+		// For non-pointer: hl_alloc_dynamic(ra->t), store value at offset 8.
+		hl_type *st = f->regs[op->p2];
+		int is_ptr = hl_is_ptr(st);
+		int sz = vreg_size(f, op->p2);
+		int is_fp = vreg_is_fp(f, op->p2);
+		int jskip_pos = -1;
+		if( is_ptr ) {
+			load_vreg(ctx, A64_X9, op->p2);
+			a64_cmp_imm(ctx, A64_X9, 0, 1);
+			int jnz = a64_bcond(ctx, A64_NE, 0);
+			// null branch: result = NULL
+			a64_mov_imm64(ctx, A64_X9, 0);
+			store_vreg(ctx, A64_X9, op->p1);
+			jskip_pos = a64_b(ctx, 0);
+			a64_patch_branch(ctx, jnz, BUF_POS());
+		}
+		// hl_alloc_dynamic(ra->t)
+		a64_mov_imm64(ctx, A64_X0, (int64_t)(intptr_t)st);
+		emit_call_native_ptr(ctx, (void*)hl_alloc_dynamic);
+		// Copy value into result at offset 8 (HDYN_VALUE).
+		if( is_fp ) {
+			load_vreg_fp(ctx, A64_V16, op->p2);
+			a64_str_fp(ctx, A64_V16, A64_X0, 8, st->kind == HF64);
+		} else {
+			load_vreg(ctx, A64_X9, op->p2);
+			a64_str_imm(ctx, A64_X9, A64_X0, 8, sz <= 4 ? 4 : 8);
+		}
+		store_vreg(ctx, A64_X0, op->p1);
+		if( jskip_pos >= 0 ) a64_patch_branch(ctx, jskip_pos, BUF_POS());
+		break;
+	}
+
 	// ---------------- Casts ----------------
 	case OSafeCast: {
 		// dst = hl_dyn_cast<X>(&src, src_type, dst_type)
@@ -1326,6 +1367,74 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		load_vreg(ctx, A64_X9, op->p2);
 		a64_ldr_imm(ctx, A64_X9, A64_X9, offset, 4, 0);
 		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
+
+	// ---------------- Typed array element access ----------------
+	// dst = arr[idx]. Non-abstract (regular) varray only — abstract arrays
+	// (raw memory) need a separate path the bring-up doesn't cover yet.
+	case OGetArray: {
+		hl_type *src_t = f->regs[op->p2];
+		if( src_t->kind == HABSTRACT ) { a64_brk(ctx, 0xAB01); break; }
+		int elem_sz = hl_type_size(f->regs[op->p1]);
+		int header = (int)sizeof(varray);
+		load_vreg(ctx, A64_X9, op->p2);    // array ptr
+		load_vreg(ctx, A64_X10, op->p3);   // index
+		// addr = ptr + idx * elem_sz + header
+		if( elem_sz == 1 ) {
+			a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		} else {
+			// idx * elem_sz: synthesise via shift if power of two.
+			if( elem_sz == 2 )      a64_mov_imm32(ctx, A64_X11, 1);
+			else if( elem_sz == 4 ) a64_mov_imm32(ctx, A64_X11, 2);
+			else if( elem_sz == 8 ) a64_mov_imm32(ctx, A64_X11, 3);
+			else                    { a64_mov_imm32(ctx, A64_X11, elem_sz); }
+			if( elem_sz == 2 || elem_sz == 4 || elem_sz == 8 ) {
+				a64_lsl_reg(ctx, A64_X10, A64_X10, A64_X11, 1);
+			} else {
+				a64_mul(ctx, A64_X10, A64_X10, A64_X11, 1);
+			}
+			a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		}
+		a64_add_imm(ctx, A64_X9, A64_X9, header, 1);
+		if( vreg_is_fp(f, op->p1) ) {
+			a64_ldr_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p1]->kind == HF64);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else {
+			a64_ldr_imm(ctx, A64_X9, A64_X9, 0, elem_sz, 0);
+			store_vreg(ctx, A64_X9, op->p1);
+		}
+		break;
+	}
+	case OSetArray: {
+		hl_type *dst_t = f->regs[op->p1];
+		if( dst_t->kind == HABSTRACT ) { a64_brk(ctx, 0xAB02); break; }
+		int elem_sz = hl_type_size(f->regs[op->p3]);
+		int header = (int)sizeof(varray);
+		load_vreg(ctx, A64_X9, op->p1);    // array ptr
+		load_vreg(ctx, A64_X10, op->p2);   // index
+		if( elem_sz == 1 ) {
+			a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		} else {
+			if( elem_sz == 2 )      a64_mov_imm32(ctx, A64_X11, 1);
+			else if( elem_sz == 4 ) a64_mov_imm32(ctx, A64_X11, 2);
+			else if( elem_sz == 8 ) a64_mov_imm32(ctx, A64_X11, 3);
+			else                    { a64_mov_imm32(ctx, A64_X11, elem_sz); }
+			if( elem_sz == 2 || elem_sz == 4 || elem_sz == 8 ) {
+				a64_lsl_reg(ctx, A64_X10, A64_X10, A64_X11, 1);
+			} else {
+				a64_mul(ctx, A64_X10, A64_X10, A64_X11, 1);
+			}
+			a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+		}
+		a64_add_imm(ctx, A64_X9, A64_X9, header, 1);
+		if( vreg_is_fp(f, op->p3) ) {
+			load_vreg_fp(ctx, A64_V16, op->p3);
+			a64_str_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p3]->kind == HF64);
+		} else {
+			load_vreg(ctx, A64_X11, op->p3);
+			a64_str_imm(ctx, A64_X11, A64_X9, 0, elem_sz);
+		}
 		break;
 	}
 
