@@ -825,6 +825,16 @@ HL_API void hl_global_lock( bool lock );
 HL_API void *hl_alloc_executable_memory( int size );
 HL_API void hl_free_executable_memory( void *ptr, int size );
 
+// On platforms that enforce W^X for JIT pages (macOS arm64 hardened runtime),
+// the executable region returned by hl_alloc_executable_memory starts in the
+// "executable" state. Wrap every write/patch into the buffer between
+// hl_jit_write_begin() and hl_jit_write_end(); the helpers toggle the
+// per-thread W^X mode and flush the i-cache for the patched range.
+// On platforms that do not enforce W^X (Windows, Linux, macOS x86-64), these
+// are cheap inlines/no-ops, so callers can use them unconditionally.
+HL_API void hl_jit_write_begin( void );
+HL_API void hl_jit_write_end( void *code, int size );
+
 // ----------------------- BUFFER --------------------------------------------------
 
 typedef struct hl_buffer hl_buffer;
