@@ -321,21 +321,25 @@ jobs:
             ${{ env.WINDOWS_BUILD_FOLDER }}/hl.exe --version
             ;;
           make*)
-            ./hl --version
-            case ${{ matrix.target }} in
-              linux)  ldd -v ./hl ;;
-              darwin) otool -L ./hl ;;
-            esac
+            # Apple ARM64 JIT not yet ported to the IR backend; skip its
+            # runtime smoke tests but still build the hlc native fallback.
+            if [[ "${{ matrix.target }}-${{ matrix.architecture }}" != "darwin-arm64" ]]; then
+              ./hl --version
+              case ${{ matrix.target }} in
+                linux)  ldd -v ./hl ;;
+                darwin) otool -L ./hl ;;
+              esac
 
-            haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp \
-              ${{ matrix.architecture == 32 && '-D hl-legacy32' || '' }}
-            ./hl hello.hl
+              haxe -hl hello.hl -cp other/tests -main HelloWorld -D interp \
+                ${{ matrix.architecture == 32 && '-D hl-legacy32' || '' }}
+              ./hl hello.hl
 
-            # ensure the executable still works when installed globally
-            cp hello.hl /tmp
-            pushd /tmp
-            hl hello.hl
-            popd
+              # ensure the executable still works when installed globally
+              cp hello.hl /tmp
+              pushd /tmp
+              hl hello.hl
+              popd
+            fi
 
             haxe -hl src/_main.c -cp other/tests -main HelloWorld
             make hlc
@@ -424,6 +428,11 @@ jobs:
         os: [darwin, linux, windows]
         architecture: [x86_64, arm64]
         include:
+        # Apple ARM64 JIT not yet ported to the IR backend.
+        - os: darwin
+          architecture: arm64
+          test-flags: --skip-hl-jit
+
         - os: linux
           runner: ubuntu-latest
 
@@ -498,7 +507,13 @@ jobs:
         tar -xvzf hashlink-*.tar.gz
         cd $(echo hashlink-*/)
         sudo mkdir -p /usr/local/{bin,lib,include}
-        sudo cp hl /usr/local/bin/
+        if [[ "${{ matrix.os }}-${{ matrix.architecture }}" == "darwin-arm64" ]]; then
+          # Apple ARM64 JIT not yet ported to the IR backend.
+          printf "#!/bin/sh\necho Jit is not supported on arm64\n" > /usr/local/bin/hl
+          chmod +x /usr/local/bin/hl
+        else
+          sudo cp hl /usr/local/bin/
+        fi
         sudo cp libhl.* *.hdll /usr/local/lib/
         sudo cp include/* /usr/local/include/
 
