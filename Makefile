@@ -41,7 +41,7 @@ STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/da
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-ifeq ($(ARCH),arm64)
+ifneq (,$(filter aarch64 arm64,$(ARCH)))
 HL_JIT_BACKEND_OBJ = src/jit_aarch64.o src/jit_aarch64_emit.o
 else
 HL_JIT_BACKEND_OBJ = src/jit_x86_64.o

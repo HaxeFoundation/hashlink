@@ -21,7 +21,7 @@ include(CTest)
 
 set(WITH_VM_DEFAULT ON)
 # 32-bit ARM has no JIT backend; aarch64/arm64 uses src/jit_aarch64.c.
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm$|^armv7" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm$|^armv[0-9]" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
     set(WITH_VM_DEFAULT OFF)
 endif()
 

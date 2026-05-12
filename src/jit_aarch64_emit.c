@@ -354,7 +354,7 @@ void encode_ldur_stur(code_ctx *ctx, int size, int V, int opc, int imm9, Arm64Re
  *              0x02 = signed-offset load  (LDP Xt1, Xt2, [Xn, #imm])
  *              0x03 = pre-indexed store   (STP Xt1, Xt2, [Xn, #imm]!)
  *              0x12 = signed-offset store (STP Xt1, Xt2, [Xn, #imm])
- *              0x13 = pre-indexed load    (LDP Xt1, Xt2, [Xn, #imm]!)
+ *              0x13 = pre-indexed store   (STP Xt1, Xt2, [Xn, #imm]!)
  *              0x11 = post-indexed store  (STP Xt1, Xt2, [Xn], #imm)
  * @param imm7  Signed 7-bit offset (scaled by register size: *4 for 32-bit, *8 for 64-bit)
  * @param Rt2   Second register

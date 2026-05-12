@@ -119,6 +119,16 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	// alignment enforcement on Linux/macOS. emit_push correspondingly moves
 	// SP by 16 per arg, so the IR's call-arg accounting matches.
 	cfg->stack_arg_size = 16;
+	// HL→native calls follow the platform C ABI, which differs from the HL
+	// internal convention. Linux/Windows AAPCS64 uses 8-byte slots; Apple
+	// ARM64 packs args at their natural size with natural alignment. The
+	// regs phase emits these via STACK_OFFS + STORE-to-[SP+offs] instead of
+	// the PUSH-based path used for HL→HL.
+#if defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS)
+	cfg->native_stack_layout = NATIVE_STACK_LAYOUT_APPLE_ARM64;
+#else
+	cfg->native_stack_layout = NATIVE_STACK_LAYOUT_AAPCS64;
+#endif
 
 #ifdef GEN_DEBUG
 	cfg->debug_prefix_size = 4; // ARM instructions are fixed 4 bytes
@@ -1729,17 +1739,24 @@ static void emit_c2hl_trampoline( code_ctx *ctx ) {
 	encode_ldp_stp(ctx, 0x01, 1, 0x02, 12, (Arm64Reg)5, ARM_TMP2, (Arm64Reg)4);  // LDP D4,D5, [X17, #96]
 	encode_ldp_stp(ctx, 0x01, 1, 0x02, 14, (Arm64Reg)7, ARM_TMP2, (Arm64Reg)6);  // LDP D6,D7, [X17, #112]
 
-	// Push stack args, padding SP to 16 bytes if N is odd.
-	// total bytes = N*8 + (N&1)*8 — always a multiple of 16.
+	// Push stack args.  callback_c2hl in src/jit.c writes the i-th stack-passed
+	// arg to vargs.stack[--sp] starting at sp = MAX_ARGS = 16.  So:
+	//   stack[15]   = first/leftmost stack arg   (at vargs + 248)
+	//   stack[14]   = second
+	//   ...
+	//   stack[16-N] = last/rightmost stack arg
+	// AAPCS64 requires [SP+0] = leftmost stack arg.  We walk SOURCE DOWN from
+	// &stack[15] while DEST walks UP from SP — N iterations total.  SP is
+	// pre-allocated rounded up to a multiple of 16 (= N*8 + (N&1)*8 bytes).
 
 	// CBZ X9, no_stack — skip everything if no stack args.
 	int cbz_skip_pos = byte_count(ctx->code);
 	encode_cbz_cbnz(ctx, /*sf=*/1, /*op=*/0, 0, X9);
 
-	// X10 = X9 * 8        (size in bytes; LSL #3 via UBFM).
+	// X10 = X9 * 8 (size in bytes; LSL #3 via UBFM).
 	emit_bitfield(ctx, /*sf=*/1, /*opc=UBFM*/0x02, /*immr=*/(64 - 3) & 0x3F, /*imms=*/63 - 3, X9, X10);
 
-	// Pad: if X9 is odd, allocate +8.  X10 += (X9 & 1) << 3
+	// Pad: if X9 is odd, allocate +8 so SP stays 16-aligned.
 	// AND X11, X9, #1 ; LSL X11, X11, #3 ; ADD X10, X10, X11.
 	encode_logical_imm(ctx, 1, 0x00, 1, 0, 0, X9, X11);  // AND X11, X9, #1 (immr=0,imms=0,N=1 → 1)
 	emit_bitfield(ctx, 1, 0x02, (64 - 3) & 0x3F, 63 - 3, X11, X11);
@@ -1749,22 +1766,22 @@ static void emit_c2hl_trampoline( code_ctx *ctx ) {
 	// form treats register 31 as XZR, not SP, so this would silently NOP out.
 	encode_add_sub_ext(ctx, 1, 1, 0, X10, /*UXTX*/3, 0, SP_REG, SP_REG);
 
-	// Source pointer X12 = vargs + (32 - N) * 8 = vargs + 256 - X10
-	// Compute via X12 = vargs + 256, then X12 -= X10.
-	encode_add_sub_imm(ctx, 1, 0, 0, 0, 256, ARM_TMP2, X12);            // ADD X12, X17, #256
-	encode_add_sub_reg(ctx, 1, 1, 0, 0, X10, 0, X12, X12);              // SUB X12, X12, X10
+	// X12 = &vargs.stack[15] = vargs + 128 + 15*8 = vargs + 248
+	// (the slot holding the LEFTMOST stack arg; source walks DOWN from here).
+	encode_add_sub_imm(ctx, 1, 0, 0, 0, 248, ARM_TMP2, X12);            // ADD X12, X17, #248
 
-	// Destination pointer X13 = SP
+	// Destination pointer X13 = SP ([SP+0] = leftmost per AAPCS64).
 	emit_mov_gpr(ctx, X13, SP_REG, 1);
 
-	// Counter X14 = X9
+	// Counter X14 = X9.
 	emit_mov_gpr(ctx, X14, X9, 1);
 
-	// Copy loop: while X14 != 0: *X13++ = *X12++ ; X14--.
+	// Copy loop: walk SOURCE down, DEST up, X14 times.
+	//   *X13 = *X12 ; X12 -= 8 ; X13 += 8 ; X14--.
 	int loop_top = byte_count(ctx->code);
 	encode_ldr_str_imm(ctx, 3, 0, 1, 0, X12, X15);                      // LDR X15, [X12, #0]
-	encode_add_sub_imm(ctx, 1, 0, 0, 0, 8, X12, X12);                   // ADD X12, X12, #8
 	encode_ldr_str_imm(ctx, 3, 0, 0, 0, X13, X15);                      // STR X15, [X13, #0]
+	encode_add_sub_imm(ctx, 1, 1, 0, 0, 8, X12, X12);                   // SUB X12, X12, #8
 	encode_add_sub_imm(ctx, 1, 0, 0, 0, 8, X13, X13);                   // ADD X13, X13, #8
 	encode_add_sub_imm(ctx, 1, 1, 1, 0, 1, X14, X14);                   // SUBS X14, X14, #1
 	int loop_branch_pos = byte_count(ctx->code);
@@ -1922,8 +1939,12 @@ void hl_codegen_flush_consts( jit_ctx *jit ) {
 		int kind = int_arr_get(ctx->funs, i + 2);
 		intptr_t target_offs = (intptr_t)jit->mod->functions_ptrs[fid];
 		if( kind == 0 ) {
-			// BL imm26.
+			// BL imm26. AArch64 BL has a ±128 MB direct-call range; if the JIT
+			// buffer ever grows beyond that, we'd silently truncate and call
+			// the wrong address. Fail fast instead.
 			intptr_t delta = target_offs - (intptr_t)pos;
+			if( delta < -(intptr_t)(1<<27) || delta >= (intptr_t)(1<<27) )
+				jit_error("aarch64 BL target out of imm26 range");
 			int imm26 = (int)(delta >> 2);
 			unsigned int *insn = (unsigned int*)(jit->output + pos);
 			*insn = (*insn & ~0x03FFFFFFu) | ((unsigned)imm26 & 0x03FFFFFF);
