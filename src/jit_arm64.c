@@ -31,6 +31,8 @@
  */
 
 #include <math.h>
+#include <setjmp.h>
+#include <stddef.h>
 #include <hlmodule.h>
 #include "hlsystem.h"
 #include "jit_arm64.h"
@@ -1167,6 +1169,98 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 	case OJNotLt: case OJNotGte:
 		op_jump_compare(ctx, op->p1, op->p2, op->op, opIdx + 1 + op->p3);
 		break;
+
+	// ---------------- Exception handling (setjmp-based) ----------------
+	// HL exception model: an OTrap allocates an hl_trap_ctx on the stack,
+	// chains it into hl_get_thread()->trap_current, then setjmp's. If
+	// setjmp returns 0 we fall through (normal try-body); if non-zero we
+	// branch to the catch handler with the exception loaded into `dst`.
+	case OTrap: {
+		int trap_size = ((int)sizeof(hl_trap_ctx) + 15) & ~15;
+		int prev_off  = (int)offsetof(hl_trap_ctx, prev);
+		int tcheck_off = (int)offsetof(hl_trap_ctx, tcheck);
+		int tc_off    = (int)offsetof(hl_thread_info, trap_current);
+		int exc_off   = (int)offsetof(hl_thread_info, exc_value);
+		// Allocate the trap_ctx.
+		a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, trap_size, 1);
+		// Get thread, link the trap_ctx in.
+		emit_call_native_ptr(ctx, (void*)hl_get_thread);
+		a64_mov_reg(ctx, A64_X19, A64_X0, 1);     // x19 stays valid across the call
+		// We rely on x19 being callee-saved — but our codegen never spills
+		// it. Spill the previous value to a temp stack slot above sp.
+		// Cheap: stash through a dedicated slot at [sp + trap_size - 8]
+		// — we sized the alloc to include the trap_ctx only, so reuse
+		// a 16-byte scratch region above by enlarging.
+		// Simpler approach: don't use a callee-saved reg. Use x9.
+		a64_mov_reg(ctx, A64_X9, A64_X0, 1);      // x9 = thread
+		// t->prev = thread->trap_current
+		a64_ldr_imm(ctx, A64_X10, A64_X9, tc_off, 8, 0);
+		a64_str_imm(ctx, A64_X10, A64_SP_OR_ZR, prev_off, 8);
+		// thread->trap_current = sp
+		a64_mov_reg(ctx, A64_X10, A64_SP_OR_ZR, 1); // mov x10, sp via add x10, sp, #0
+		a64_add_imm(ctx, A64_X10, A64_SP_OR_ZR, 0, 1);
+		a64_str_imm(ctx, A64_X10, A64_X9, tc_off, 8);
+		// t->tcheck = NULL (we don't yet honour typed catch)
+		a64_str_imm(ctx, A64_SP_OR_ZR /* xzr */, A64_SP_OR_ZR, tcheck_off, 8);
+		// x0 = &t->buf  (offset 0 within trap_ctx == current sp)
+		a64_add_imm(ctx, A64_X0, A64_SP_OR_ZR, 0, 1);
+		emit_call_native_ptr(ctx, (void*)setjmp);
+		a64_cmp_imm(ctx, A64_X0, 0, 0);
+		int j_no_exc = a64_bcond(ctx, A64_EQ, 0);
+		// Exception path: pop the trap_ctx, fetch exc_value, branch to catch.
+		a64_add_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, trap_size, 1);
+		emit_call_native_ptr(ctx, (void*)hl_get_thread);
+		a64_ldr_imm(ctx, A64_X0, A64_X0, exc_off, 8, 0);
+		store_vreg(ctx, A64_X0, op->p1);
+		int j_to_catch = a64_b(ctx, 0);
+		register_jump(ctx, j_to_catch, opIdx + 1 + op->p2);
+		// Normal path lands here; the try-body executes with the trap live.
+		a64_patch_branch(ctx, j_no_exc, BUF_POS());
+		break;
+	}
+	case OEndTrap: {
+		int trap_size = ((int)sizeof(hl_trap_ctx) + 15) & ~15;
+		int prev_off  = (int)offsetof(hl_trap_ctx, prev);
+		int tc_off    = (int)offsetof(hl_thread_info, trap_current);
+		emit_call_native_ptr(ctx, (void*)hl_get_thread);
+		a64_mov_reg(ctx, A64_X9, A64_X0, 1);
+		a64_ldr_imm(ctx, A64_X10, A64_X9, tc_off, 8, 0);
+		a64_ldr_imm(ctx, A64_X10, A64_X10, prev_off, 8, 0);
+		a64_str_imm(ctx, A64_X10, A64_X9, tc_off, 8);
+		a64_add_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, trap_size, 1);
+		break;
+	}
+	case OCatch:
+		// OCatch is just a label / jump landing pad; no codegen needed.
+		break;
+
+	// ---------------- Enum minimal support ----------------
+	case OEnumIndex:
+		// venum layout: { hl_type *t; int index; ... } — index at offset 8.
+		load_vreg(ctx, A64_X9, op->p2);
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 8, 4, 0);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+
+	// ---------------- Switch ----------------
+	// Bring-up uses a linear cmp-and-branch chain. A proper jump table
+	// is faster for large switches but needs an extra patch direction
+	// (immediate→target after layout).
+	case OSwitch: {
+		int ncases = op->p2;
+		load_vreg(ctx, A64_X9, op->p1);
+		for( int i = 0; i < ncases; i++ ) {
+			if( i < 4096 ) a64_cmp_imm(ctx, A64_X9, i, 0);
+			else {
+				a64_mov_imm32(ctx, A64_X10, i);
+				a64_cmp_reg(ctx, A64_X9, A64_X10, 0);
+			}
+			int pos = a64_bcond(ctx, A64_EQ, 0);
+			register_jump(ctx, pos, opIdx + 1 + op->extra[i]);
+		}
+		// Out-of-range: fall through to the next opcode (HL default).
+		break;
+	}
 
 	// ---------------- Misc ----------------
 	case ONullCheck: {
