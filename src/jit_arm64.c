@@ -1496,8 +1496,8 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		// OCatch is just a label / jump landing pad; no codegen needed.
 		break;
 	case OAssert:
-		// HL inserts OAssert at compiler-rejected casts and similar; just
-		// call hl_assert which throws an HL exception with a diagnostic.
+		// HL inserts OAssert at compiler-rejected casts and similar; call
+		// hl_assert which throws an HL exception with message "assert".
 		emit_call_native_ptr(ctx, (void*)hl_assert);
 		break;
 	case OPrefetch:
