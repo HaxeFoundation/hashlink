@@ -1009,6 +1009,62 @@ static void op_jump_compare( jit_ctx *ctx, int a, int b, hl_op op, int targetOpI
 		}
 		return;
 	}
+	// HOBJ/HSTRUCT with a runtime compareFun (e.g. String): a == b iff
+	// pointer-equal OR both non-null AND compareFun(a,b) == 0. Without
+	// this, `"pos"+"ition" == "position"` returns false because the two
+	// String objects have different identities.
+	if( (ka == HOBJ || ka == HSTRUCT) && (op == OJEq || op == OJNotEq) ) {
+		hl_runtime_obj *rt = hl_get_obj_rt(ctx->f->regs[a]);
+		// Route through hl_dyn_compare instead of the rt->compareFun
+		// shortcut — same end result for the value-equal case, and avoids
+		// edge cases with un-initialised rt->compareFun pointers.
+		void *compareFn = (rt && rt->compareFun) ? (void*)hl_dyn_compare : NULL;
+		if( compareFn ) {
+			//   cmp a, b
+			//   b.eq  L_eq           ; same pointer → equal
+			//   cbz a, L_neq         ; a==null    → not equal
+			//   cbz b, L_neq         ; b==null    → not equal
+			//   call compareFun(a, b)
+			//   cbz w0, L_eq         ; result==0  → equal
+			// L_neq:                  ; "not equal" lands here
+			//   {OJEq: nothing | OJNotEq: b target}
+			//   b L_done
+			// L_eq:                   ; "equal" lands here
+			//   {OJEq: b target | OJNotEq: nothing}
+			// L_done:
+			load_vreg(ctx, A64_X9, a);
+			load_vreg(ctx, A64_X10, b);
+			a64_cmp_reg(ctx, A64_X9, A64_X10, 1);
+			int j_ptreq  = a64_bcond(ctx, A64_EQ, 0);    // → L_eq
+			a64_cmp_imm(ctx, A64_X9, 0, 1);
+			int j_a_null = a64_bcond(ctx, A64_EQ, 0);    // → L_neq
+			a64_cmp_imm(ctx, A64_X10, 0, 1);
+			int j_b_null = a64_bcond(ctx, A64_EQ, 0);    // → L_neq
+			a64_mov_reg(ctx, A64_X0, A64_X9, 1);
+			a64_mov_reg(ctx, A64_X1, A64_X10, 1);
+			emit_call_native_ptr(ctx, compareFn);
+			a64_cmp_imm(ctx, A64_X0, 0, 0);
+			int j_cmpeq  = a64_bcond(ctx, A64_EQ, 0);    // → L_eq
+			// fall-through here is "not equal" — patch the null branches:
+			a64_patch_branch(ctx, j_a_null, BUF_POS());
+			a64_patch_branch(ctx, j_b_null, BUF_POS());
+			if( op == OJNotEq ) {
+				int p = a64_b(ctx, 0);
+				register_jump(ctx, p, targetOpIdx);
+			}
+			int j_to_done = a64_b(ctx, 0);
+			// L_eq lands here:
+			a64_patch_branch(ctx, j_ptreq, BUF_POS());
+			a64_patch_branch(ctx, j_cmpeq, BUF_POS());
+			if( op == OJEq ) {
+				int p = a64_b(ctx, 0);
+				register_jump(ctx, p, targetOpIdx);
+			}
+			// L_done:
+			a64_patch_branch(ctx, j_to_done, BUF_POS());
+			return;
+		}
+	}
 	// HNULL — Haxe `Null<T>` boxing. Pointer-equal OR (both non-null and
 	// deep value compare). For now we approximate with hl_dyn_compare too
 	// (the dyn-compare path handles HNULL correctly via type-tagged unbox).
