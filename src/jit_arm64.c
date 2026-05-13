@@ -429,6 +429,39 @@ void a64_fcvtzs_d( jit_ctx *ctx, a64_greg rd, a64_vreg vn, int sf64 ) {
 		(0x18 << 16) | ((vn & 0x1f) << 5) | (rd & 0x1f);
 	a64_emit(ctx, ins);
 }
+// SCVTF single-precision (Sd <- Wn or Xn). ftype=00.
+static void a64_scvtf_s( jit_ctx *ctx, a64_vreg vd, a64_greg rn, int sf64 ) {
+	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x0 << 22) | (1u << 21) |
+		(0x2 << 16) | ((rn & 0x1f) << 5) | (vd & 0x1f);
+	a64_emit(ctx, ins);
+}
+// UCVTF double / single (unsigned int → fp).
+static void a64_ucvtf_d( jit_ctx *ctx, a64_vreg vd, a64_greg rn, int sf64 ) {
+	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x1 << 22) | (1u << 21) |
+		(0x3 << 16) | ((rn & 0x1f) << 5) | (vd & 0x1f);
+	a64_emit(ctx, ins);
+}
+static void a64_ucvtf_s( jit_ctx *ctx, a64_vreg vd, a64_greg rn, int sf64 ) {
+	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x0 << 22) | (1u << 21) |
+		(0x3 << 16) | ((rn & 0x1f) << 5) | (vd & 0x1f);
+	a64_emit(ctx, ins);
+}
+// FCVT between precisions. opc selects target type:
+//   D→S: ftype=01, opc=00 → 0x1E624000
+//   S→D: ftype=00, opc=01 → 0x1E22C000
+//   D→H/H→D etc not needed yet.
+static void a64_fcvt_d_to_s( jit_ctx *ctx, a64_vreg vd, a64_vreg vn ) {
+	a64_emit(ctx, 0x1E624000 | ((vn & 0x1f) << 5) | (vd & 0x1f));
+}
+static void a64_fcvt_s_to_d( jit_ctx *ctx, a64_vreg vd, a64_vreg vn ) {
+	a64_emit(ctx, 0x1E22C000 | ((vn & 0x1f) << 5) | (vd & 0x1f));
+}
+// FCVTZS single-precision (Wd <- Sn or Xd <- Sn). ftype=00.
+static void a64_fcvtzs_s( jit_ctx *ctx, a64_greg rd, a64_vreg vn, int sf64 ) {
+	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x0 << 22) | (1u << 21) |
+		(0x18 << 16) | ((vn & 0x1f) << 5) | (rd & 0x1f);
+	a64_emit(ctx, ins);
+}
 void a64_ldr_fp( jit_ctx *ctx, a64_vreg vt, a64_greg rn, int32_t imm, int is_double ) {
 	int sz_log = is_double ? 3 : 2;
 	int scaled = imm >> sz_log;
@@ -1627,6 +1660,48 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		store_vreg(ctx, A64_X0, op->p1);
 		break;
 	}
+	case OToSFloat: {
+		// dst (HF32 or HF64) ← src (int* or other float)
+		if( op->p1 == op->p2 ) break;
+		hl_type *st = f->regs[op->p2];
+		hl_type *dt = f->regs[op->p1];
+		if( st->kind == HI32 || st->kind == HUI16 || st->kind == HUI8 ) {
+			load_vreg(ctx, A64_X9, op->p2);
+			if( dt->kind == HF64 ) a64_scvtf_d(ctx, A64_V16, A64_X9, 0);
+			else                    a64_scvtf_s(ctx, A64_V16, A64_X9, 0);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else if( st->kind == HI64 ) {
+			load_vreg(ctx, A64_X9, op->p2);
+			if( dt->kind == HF64 ) a64_scvtf_d(ctx, A64_V16, A64_X9, 1);
+			else                    a64_scvtf_s(ctx, A64_V16, A64_X9, 1);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else if( st->kind == HF64 && dt->kind == HF32 ) {
+			load_vreg_fp(ctx, A64_V16, op->p2);
+			a64_fcvt_d_to_s(ctx, A64_V16, A64_V16);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else if( st->kind == HF32 && dt->kind == HF64 ) {
+			load_vreg_fp(ctx, A64_V16, op->p2);
+			a64_fcvt_s_to_d(ctx, A64_V16, A64_V16);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else {
+			a64_brk(ctx, 0xF20C);
+		}
+		break;
+	}
+	case OToUFloat: {
+		if( op->p1 == op->p2 ) break;
+		hl_type *st = f->regs[op->p2];
+		hl_type *dt = f->regs[op->p1];
+		if( st->kind == HI32 || st->kind == HUI16 || st->kind == HUI8 ) {
+			load_vreg(ctx, A64_X9, op->p2);
+			if( dt->kind == HF64 ) a64_ucvtf_d(ctx, A64_V16, A64_X9, 0);
+			else                    a64_ucvtf_s(ctx, A64_V16, A64_X9, 0);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else {
+			a64_brk(ctx, 0xF20D);
+		}
+		break;
+	}
 	case OToInt: {
 		hl_type *st = f->regs[op->p2];
 		hl_type *dt = f->regs[op->p1];
@@ -1636,14 +1711,9 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 			a64_fcvtzs_d(ctx, A64_X9, A64_V16, dt->kind == HI64);
 			store_vreg(ctx, A64_X9, op->p1);
 		} else if( st->kind == HF32 ) {
-			// FCVTZS Wd, Sn (single-precision): same encoder bit layout
-			// as the double form except ftype=00; reuse a64_fcvtzs_d for
-			// double then sextend? For accuracy, route through a helper:
-			// emit FMOV S→W then? Simplest: convert single→double, then
-			// fcvtzs on double. AArch64 has FCVT to widen.
-			// Actually, FCVTZS exists for single too — just bit 22 = 0.
-			// We don't have an encoder for it yet; emit a brk for now.
-			a64_brk(ctx, 0xF32C);
+			load_vreg_fp(ctx, A64_V16, op->p2);
+			a64_fcvtzs_s(ctx, A64_X9, A64_V16, dt->kind == HI64);
+			store_vreg(ctx, A64_X9, op->p1);
 		} else if( dt->kind == HI64 && st->kind == HI32 ) {
 			// Sign-extend 32→64. Use SXTW Xd, Wn — encoded as SBFM #0,#31.
 			// Quick path: load 4-byte signed, store as 8-byte (ldur with
