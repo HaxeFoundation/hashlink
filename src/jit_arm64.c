@@ -863,7 +863,13 @@ static void op_binop_fp( jit_ctx *ctx, int dst, int a, int b, hl_op bop ) {
 // corresponding to the HL OJxxx semantics ; targetOpIdx is the HL opcode
 // position to branch to (we'll resolve to a byte position later).
 static void op_jump_compare( jit_ctx *ctx, int a, int b, hl_op op, int targetOpIdx ) {
-	int is64 = ctx->f->regs[a]->kind == HI64 || ctx->f->regs[a]->kind == HVOID ? 1 : 1; // 64-bit compares are always safe
+	// Use 64-bit compare for pointer types and HI64; 32-bit for HI32 etc.
+	// Doing 64-bit compare on zero-extended HI32 values silently turns a
+	// negative i32 (e.g. -1 = 0xFFFFFFFF) into a large positive 64-bit
+	// value, which flips signed comparisons — this was the qsort bug
+	// (JSLt 0 < -1 was incorrectly returning true).
+	hl_type_kind k = ctx->f->regs[a]->kind;
+	int is64 = (k == HI64 || k == HGUID || hl_is_ptr(ctx->f->regs[a])) ? 1 : 0;
 	load_vreg(ctx, A64_X9, a);
 	load_vreg(ctx, A64_X10, b);
 	a64_cmp_reg(ctx, A64_X9, A64_X10, is64);
@@ -1096,6 +1102,59 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 				load_vreg(ctx, A64_X10, op->p3);
 				a64_str_imm(ctx, A64_X10, A64_X9, 0, sz);
 			}
+		} else if( dt->kind == HVIRTUAL ) {
+			// vfield = hl_vfields(o)[op->p2]
+			//   non-null: *vfield = src
+			//   null:     hl_dyn_set{p,i,...}(o, hash, vt, src)
+			int vfield_off = (int)sizeof(vvirtual) + op->p2 * (int)sizeof(void*);
+			hl_type *vt = dt->virt->fields[op->p2].t;
+			int hash = dt->virt->fields[op->p2].hashed_name;
+			load_vreg(ctx, A64_X9, op->p1);
+			a64_ldr_imm(ctx, A64_X10, A64_X9, vfield_off, 8, 0);
+			a64_cmp_imm(ctx, A64_X10, 0, 1);
+			int j_has = a64_bcond(ctx, A64_NE, 0);
+			// null: dyn_set
+			load_vreg(ctx, A64_X0, op->p1);
+			a64_mov_imm32(ctx, A64_X1, hash);
+			void *fn;
+			hl_type *src_t = f->regs[op->p3];
+			switch( src_t->kind ) {
+			case HF32:
+				fn = (void*)hl_dyn_setf;
+				load_vreg_fp(ctx, A64_V0, op->p3);
+				break;
+			case HF64:
+				fn = (void*)hl_dyn_setd;
+				load_vreg_fp(ctx, A64_V0, op->p3);
+				break;
+			case HI64: case HGUID:
+				fn = (void*)hl_dyn_seti64;
+				load_vreg(ctx, A64_X2, op->p3);
+				break;
+			case HI32: case HUI16: case HUI8: case HBOOL:
+				fn = (void*)hl_dyn_seti;
+				a64_mov_imm64(ctx, A64_X2, (int64_t)(intptr_t)src_t);
+				load_vreg(ctx, A64_X3, op->p3);
+				break;
+			default:
+				fn = (void*)hl_dyn_setp;
+				a64_mov_imm64(ctx, A64_X2, (int64_t)(intptr_t)src_t);
+				load_vreg(ctx, A64_X3, op->p3);
+				break;
+			}
+			emit_call_native_ptr(ctx, fn);
+			int j_end = a64_b(ctx, 0);
+			// non-null: *vfield = src
+			a64_patch_branch(ctx, j_has, BUF_POS());
+			if( vreg_is_fp(f, op->p3) ) {
+				load_vreg_fp(ctx, A64_V16, op->p3);
+				a64_str_fp(ctx, A64_V16, A64_X10, 0, src_t->kind == HF64);
+			} else {
+				load_vreg(ctx, A64_X11, op->p3);
+				a64_str_imm(ctx, A64_X11, A64_X10, 0, hl_type_size(src_t));
+			}
+			(void)vt;
+			a64_patch_branch(ctx, j_end, BUF_POS());
 		} else {
 			a64_brk(ctx, 0xF1E2);
 		}
@@ -1160,6 +1219,10 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		break;
 	case OIncr:
 		load_vreg(ctx, A64_X9, op->p1);
+		// add_imm 64-bit is fine on the zero-extended low 32 bits: the
+		// upper 32 bits stay zero, and the subsequent store_vreg writes
+		// only `vreg_size` bytes (4 for HI32) so we never expose the
+		// high half.
 		a64_add_imm(ctx, A64_X9, A64_X9, 1, f->regs[op->p1]->kind == HI64);
 		store_vreg(ctx, A64_X9, op->p1);
 		break;
