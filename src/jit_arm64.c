@@ -1154,16 +1154,23 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 			int sz = hl_type_size(f->regs[op->p1]);
 			int is_fp = vreg_is_fp(f, op->p1);
 			load_vreg(ctx, A64_X9, op->p2);
+			// LDR unsigned-offset imm12 is scaled by access size, so the
+			// max representable byte offset is 4095 * sz, aligned.
+			int fits_imm = (field_off >= 0)
+				&& ((field_off & (sz - 1)) == 0)
+				&& (field_off / sz <= 4095);
 			if( is_fp ) {
 				int is_d = f->regs[op->p1]->kind == HF64;
-				if( field_off >= 0 && (field_off & ((is_d ? 7 : 3))) == 0
-					&& field_off < (is_d ? 32768 : 16384) ) {
+				if( fits_imm ) {
 					a64_ldr_fp(ctx, A64_V16, A64_X9, field_off, is_d);
 				} else {
 					a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
 					a64_ldr_fp(ctx, A64_V16, A64_X9, 0, is_d);
 				}
 				store_vreg_fp(ctx, A64_V16, op->p1);
+			} else if( fits_imm ) {
+				a64_ldr_imm(ctx, A64_X10, A64_X9, field_off, sz, 0);
+				store_vreg(ctx, A64_X10, op->p1);
 			} else {
 				a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
 				a64_ldr_imm(ctx, A64_X10, A64_X9, 0, sz, 0);
@@ -1220,14 +1227,20 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 			int field_off = rt->fields_indexes[op->p2];
 			int sz = hl_type_size(f->regs[op->p3]);
 			int is_fp = vreg_is_fp(f, op->p3);
+			int fits_imm = (field_off >= 0)
+				&& ((field_off & (sz - 1)) == 0)
+				&& (field_off / sz <= 4095);
 			load_vreg(ctx, A64_X9, op->p1);
-			a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
+			if( !fits_imm ) {
+				a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
+				field_off = 0;
+			}
 			if( is_fp ) {
 				load_vreg_fp(ctx, A64_V16, op->p3);
-				a64_str_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p3]->kind == HF64);
+				a64_str_fp(ctx, A64_V16, A64_X9, field_off, f->regs[op->p3]->kind == HF64);
 			} else {
 				load_vreg(ctx, A64_X10, op->p3);
-				a64_str_imm(ctx, A64_X10, A64_X9, 0, sz);
+				a64_str_imm(ctx, A64_X10, A64_X9, field_off, sz);
 			}
 		} else if( dt->kind == HVIRTUAL ) {
 			// vfield = hl_vfields(o)[op->p2]
@@ -1293,13 +1306,16 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		int field_off = rt->fields_indexes[op->p2];
 		int sz = hl_type_size(f->regs[op->p1]);
 		int is_fp = vreg_is_fp(f, op->p1);
+		int fits_imm = (field_off >= 0)
+			&& ((field_off & (sz - 1)) == 0)
+			&& (field_off / sz <= 4095);
 		load_vreg(ctx, A64_X9, 0);
-		a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
+		if( !fits_imm ) { a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1); field_off = 0; }
 		if( is_fp ) {
-			a64_ldr_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p1]->kind == HF64);
+			a64_ldr_fp(ctx, A64_V16, A64_X9, field_off, f->regs[op->p1]->kind == HF64);
 			store_vreg_fp(ctx, A64_V16, op->p1);
 		} else {
-			a64_ldr_imm(ctx, A64_X10, A64_X9, 0, sz, 0);
+			a64_ldr_imm(ctx, A64_X10, A64_X9, field_off, sz, 0);
 			store_vreg(ctx, A64_X10, op->p1);
 		}
 		break;
@@ -1309,14 +1325,17 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		int field_off = rt->fields_indexes[op->p1];
 		int sz = hl_type_size(f->regs[op->p2]);
 		int is_fp = vreg_is_fp(f, op->p2);
+		int fits_imm = (field_off >= 0)
+			&& ((field_off & (sz - 1)) == 0)
+			&& (field_off / sz <= 4095);
 		load_vreg(ctx, A64_X9, 0);
-		a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1);
+		if( !fits_imm ) { a64_add_imm(ctx, A64_X9, A64_X9, field_off, 1); field_off = 0; }
 		if( is_fp ) {
 			load_vreg_fp(ctx, A64_V16, op->p2);
-			a64_str_fp(ctx, A64_V16, A64_X9, 0, f->regs[op->p2]->kind == HF64);
+			a64_str_fp(ctx, A64_V16, A64_X9, field_off, f->regs[op->p2]->kind == HF64);
 		} else {
 			load_vreg(ctx, A64_X10, op->p2);
-			a64_str_imm(ctx, A64_X10, A64_X9, 0, sz);
+			a64_str_imm(ctx, A64_X10, A64_X9, field_off, sz);
 		}
 		break;
 	}
