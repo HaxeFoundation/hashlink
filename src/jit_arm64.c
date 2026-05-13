@@ -118,6 +118,38 @@ static void jit_buf( jit_ctx *ctx ) {
 }
 
 // -----------------------------------------------------------------------
+//  Peephole register cache: skip redundant load_vreg/store_vreg around
+//  consecutive opcodes that exchange data through the same physical reg.
+//
+//  Two single-slot caches (one GPR, one FP). They remember which HL vreg
+//  is currently held in which physical reg. Every other emit clears the
+//  cache (because we don't know what it wrote); store_vreg / load_vreg
+//  re-populate the relevant slot after their own emit.
+//
+//  Correctness rests on: a64_emit clears the cache, so any instruction
+//  that writes a register makes the cache miss next time. Jumps, calls,
+//  labels, branches all go through a64_emit (or have explicit clears at
+//  jump-target opcodes — see hl_jit_function's is_jump_target prescan).
+// -----------------------------------------------------------------------
+
+static struct { int vi; a64_greg reg; } cache_gpr = { -1, A64_X9 };
+static struct { int vi; a64_vreg reg; } cache_fp  = { -1, A64_V16 };
+
+// Set HL_JIT_NO_CACHE=1 at runtime to disable the peephole cache —
+// useful for A/B perf measurement and for confirming correctness when
+// chasing a regression.
+static int cache_disabled = -1;
+static int is_cache_disabled( void ) {
+	if( cache_disabled < 0 ) cache_disabled = (getenv("HL_JIT_NO_CACHE") != NULL) ? 1 : 0;
+	return cache_disabled;
+}
+
+static inline void cache_clear( void ) {
+	cache_gpr.vi = -1;
+	cache_fp.vi  = -1;
+}
+
+// -----------------------------------------------------------------------
 //  Encoder primitives — all 32-bit words, all written via W().
 //  Naming and bit layouts follow the ARM ARM (DDI 0487) — comments cite
 //  the encoding section so future readers can verify by hand.
@@ -126,6 +158,11 @@ static void jit_buf( jit_ctx *ctx ) {
 static inline void a64_emit( jit_ctx *ctx, uint32_t ins ) {
 	jit_buf(ctx);
 	W(ins);
+	// Conservative: every emit invalidates the cache. The 2 callers that
+	// want to *preserve* the cache (store_vreg, load_vreg) re-populate it
+	// immediately after their own emit.
+	cache_gpr.vi = -1;
+	cache_fp.vi  = -1;
 }
 
 // MOVZ / MOVK / MOVN — Move wide (immediate). C6.2.190/188/189.
@@ -375,6 +412,14 @@ void a64_ret( jit_ctx *ctx ) {
 }
 
 int a64_patch_branch( jit_ctx *ctx, int pos, int target ) {
+	// A patched branch makes `target` reachable from `pos`. If the
+	// current BUF_POS *is* the target (the usual case when we patch a
+	// forward branch right where it lands), then this point is a join
+	// and the reg cache state from "the fall-through path that emitted
+	// the most recent store_vreg" no longer matches "the path that took
+	// the branch and skipped that store". Clear the cache so any
+	// subsequent load_vreg falls back to a real LDUR.
+	if( target == BUF_POS() ) cache_clear();
 	int delta_words = (target - pos) >> 2;
 	uint32_t *slot = (uint32_t*)(ctx->startBuf + pos);
 	uint32_t ins = *slot;
@@ -686,17 +731,23 @@ static int vreg_size( hl_function *f, int i ) {
 // Emit "load vreg #vi into Xreg". For FP-typed vregs the caller is expected
 // to call load_vreg_fp() instead.
 static void load_vreg( jit_ctx *ctx, a64_greg dst, int vi ) {
+	if( !is_cache_disabled() && cache_gpr.vi == vi ) {
+		if( cache_gpr.reg == dst ) return; // free
+		a64_mov_reg(ctx, dst, cache_gpr.reg, 1);
+		cache_gpr.vi  = vi;
+		cache_gpr.reg = dst;
+		return;
+	}
 	int off = vreg_offset(vi);
 	int sz  = vreg_size(ctx->f, vi);
-	int sign = (ctx->f->regs[vi]->kind == HI32 || ctx->f->regs[vi]->kind == HUI16 || ctx->f->regs[vi]->kind == HUI8) ? 0 : 0;
-	// Treat sub-word as zero-extending loads for now (UI8/UI16/BOOL — HL semantics).
 	if( off >= -256 ) {
-		a64_ldur(ctx, dst, A64_FP, off, sz, sign);
+		a64_ldur(ctx, dst, A64_FP, off, sz, 0);
 	} else {
-		// Materialise FP + off in dst via SUB, then LDR with 0 offset.
 		a64_sub_imm(ctx, A64_X16, A64_FP, -off, 1);
-		a64_ldr_imm(ctx, dst, A64_X16, 0, sz, sign);
+		a64_ldr_imm(ctx, dst, A64_X16, 0, sz, 0);
 	}
+	cache_gpr.vi  = vi;
+	cache_gpr.reg = dst;
 }
 static void store_vreg( jit_ctx *ctx, a64_greg src, int vi ) {
 	int off = vreg_offset(vi);
@@ -707,8 +758,19 @@ static void store_vreg( jit_ctx *ctx, a64_greg src, int vi ) {
 		a64_sub_imm(ctx, A64_X16, A64_FP, -off, 1);
 		a64_str_imm(ctx, src, A64_X16, 0, sz);
 	}
+	// `src` still holds the value just written; cache it for the next
+	// opcode's first load_vreg.
+	cache_gpr.vi  = vi;
+	cache_gpr.reg = src;
 }
 static void load_vreg_fp( jit_ctx *ctx, a64_vreg dst, int vi ) {
+	if( !is_cache_disabled() && cache_fp.vi == vi ) {
+		if( cache_fp.reg == dst ) return;
+		a64_fmov_d(ctx, dst, cache_fp.reg);
+		cache_fp.vi  = vi;
+		cache_fp.reg = dst;
+		return;
+	}
 	int off = vreg_offset(vi);
 	int is_double = ctx->f->regs[vi]->kind == HF64;
 	if( off >= -256 ) {
@@ -717,6 +779,8 @@ static void load_vreg_fp( jit_ctx *ctx, a64_vreg dst, int vi ) {
 		a64_sub_imm(ctx, A64_X16, A64_FP, -off, 1);
 		a64_ldr_fp(ctx, dst, A64_X16, 0, is_double);
 	}
+	cache_fp.vi  = vi;
+	cache_fp.reg = dst;
 }
 static void store_vreg_fp( jit_ctx *ctx, a64_vreg src, int vi ) {
 	int off = vreg_offset(vi);
@@ -727,6 +791,8 @@ static void store_vreg_fp( jit_ctx *ctx, a64_vreg src, int vi ) {
 		a64_sub_imm(ctx, A64_X16, A64_FP, -off, 1);
 		a64_str_fp(ctx, src, A64_X16, 0, is_double);
 	}
+	cache_fp.vi  = vi;
+	cache_fp.reg = src;
 }
 
 // Register a jump to be patched once we know the target opcode's buffer
@@ -2239,9 +2305,42 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 
 	// Frame size: 8 bytes per vreg. Real backend will pack by type.
 	int frame = 8 * f->nregs;
+	cache_clear();
 	emit_prologue(ctx, frame);
 
+	// Prescan for jump targets — those opcodes start with cache cleared
+	// since the incoming control flow might come from elsewhere with a
+	// different cache state. Labels and Catch points are unconditional
+	// targets; J* opcodes name an explicit target offset.
+	unsigned char *is_target = (unsigned char*)hl_malloc(&ctx->falloc, f->nops);
+	memset(is_target, 0, f->nops);
 	for( int i = 0; i < f->nops; i++ ) {
+		hl_opcode *o = f->ops + i;
+		int t = -1;
+		switch( o->op ) {
+		case OJAlways: t = i + 1 + o->p1; break;
+		case OJTrue: case OJFalse: case OJNull: case OJNotNull:
+		case OTrap:
+			t = i + 1 + o->p2; break;
+		case OJSLt: case OJSGte: case OJSGt: case OJSLte:
+		case OJULt: case OJUGte: case OJNotLt: case OJNotGte:
+		case OJEq: case OJNotEq:
+			t = i + 1 + o->p3; break;
+		case OSwitch:
+			for( int k = 0; k < o->p2; k++ ) {
+				int tk = i + 1 + o->extra[k];
+				if( tk >= 0 && tk < f->nops ) is_target[tk] = 1;
+			}
+			break;
+		default: break;
+		}
+		if( t >= 0 && t < f->nops ) is_target[t] = 1;
+		// Labels and Catch are always targets (or boundary).
+		if( o->op == OLabel || o->op == OCatch ) is_target[i] = 1;
+	}
+
+	for( int i = 0; i < f->nops; i++ ) {
+		if( is_target[i] ) cache_clear();
 		jit_opcode(ctx, f->ops + i, i);
 	}
 
