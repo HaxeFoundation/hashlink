@@ -1495,6 +1495,14 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 	case OCatch:
 		// OCatch is just a label / jump landing pad; no codegen needed.
 		break;
+	case OAssert:
+		// HL inserts OAssert at compiler-rejected casts and similar; just
+		// call hl_assert which throws an HL exception with a diagnostic.
+		emit_call_native_ptr(ctx, (void*)hl_assert);
+		break;
+	case OPrefetch:
+		// Prefetch is a hint; safely ignored on a non-optimised backend.
+		break;
 
 	// ---------------- Enum minimal support ----------------
 	case OEnumIndex:
