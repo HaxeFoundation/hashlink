@@ -354,10 +354,10 @@ class ProfileGen {
 		write.sort(function(s1,s2) return s1.id - s2.id);
 		return [for( s in write ) {
 			callFrame : s.elt.file == null ? cast {
-				functionName : s.elt.desc + (s.repeat > 1 ? '(${s.repeat})' : ""),
+				functionName : s.elt.desc,
 				scriptId : 0,
 			} : {
-				functionName : s.elt.desc + (s.repeat > 1 ? '(${s.repeat})' : ""),
+				functionName : s.elt.desc,
 				scriptId : 1,
 				url : s.elt.file.split("\\").join("/"),
 				lineNumber : s.elt.line - 1,
