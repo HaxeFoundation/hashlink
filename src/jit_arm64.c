@@ -1264,9 +1264,19 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		else                        op_binop_int(ctx, op->p1, op->p2, op->p3, op->op);
 		break;
 	case ONeg:
-		load_vreg(ctx, A64_X9, op->p2);
-		a64_sub_reg(ctx, A64_X9, A64_SP_OR_ZR, A64_X9, f->regs[op->p1]->kind == HI64);
-		store_vreg(ctx, A64_X9, op->p1);
+		if( vreg_is_fp(f, op->p1) ) {
+			// FNEG (scalar) double: 0x1E614000 | (vn << 5) | vd
+			//                single: 0x1E214000 | (vn << 5) | vd
+			load_vreg_fp(ctx, A64_V16, op->p2);
+			int is_d = f->regs[op->p1]->kind == HF64;
+			a64_emit(ctx, (is_d ? 0x1E614000 : 0x1E214000)
+				| ((A64_V16 & 0x1f) << 5) | (A64_V16 & 0x1f));
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else {
+			load_vreg(ctx, A64_X9, op->p2);
+			a64_sub_reg(ctx, A64_X9, A64_SP_OR_ZR, A64_X9, f->regs[op->p1]->kind == HI64);
+			store_vreg(ctx, A64_X9, op->p1);
+		}
 		break;
 	case ONot:
 		load_vreg(ctx, A64_X9, op->p2);
