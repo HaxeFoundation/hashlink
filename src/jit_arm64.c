@@ -57,6 +57,17 @@ struct jlist {
 	jlist *next;
 };
 
+// Targets for staged HL-function references that need patching once
+// functions_ptrs is populated. Stored in jlist.target with these tags:
+//   - target >= 0           → BL @ jlist.pos  needs its imm26 patched
+//   - target == -1000-fid   → 4xMOVZ/MOVK sequence @ jlist.pos materialises
+//                              the absolute address of function `fid`
+//                              (used by OInstanceClosure for x1).
+#define CALL_TARGET_IS_BL(t)      ((t) >= 0)
+#define CALL_TARGET_IS_IMM64(t)   ((t) <= -1000)
+#define IMM64_FINDEX(t)           (-1000 - (t))
+#define IMM64_TAG(fid)            (-1000 - (fid))
+
 struct _jit_ctx {
 	union {
 		unsigned char *b;
@@ -76,7 +87,7 @@ struct _jit_ctx {
 	int *opsPos;         // opsPos[i] = buffer offset of HL opcode i
 
 	jlist *jumps;        // pending intra-function branches
-	jlist *calls;        // pending HL function calls
+	jlist *calls;        // pending HL function calls (BL patches + imm64 patches)
 	vclosure *closure_list; // OStaticClosure objects to patch in hl_jit_code
 
 	hl_alloc falloc;     // per-function arena (reset between functions)
@@ -464,6 +475,19 @@ static void a64_brk( jit_ctx *ctx, uint16_t imm16 ) {
 // -----------------------------------------------------------------------
 
 static void *call_jit_c2hl_native = NULL;
+
+// Stub get_wrapper: libhl calls hl_setup.get_wrapper(ft) from
+// hl_dyn_call_obj and hl_make_fun_wrapper. The result is stored into
+// vclosure_wrapper.cl.fun and is only actually invoked when the wrapper
+// closure is itself called as a function (rare path: passing the
+// wrapper outside HL and back in). Returning NULL here is safe for the
+// inline hl_wrapper_call path that hl_dyn_call_obj uses to dispatch
+// virtual-fallback calls — that path reads wrappedFun->fun, not cl.fun.
+// A proper HL2C trampoline can replace this later for full coverage.
+static void *get_wrapper_arm64( hl_type *t ) {
+	(void)t;
+	return NULL;
+}
 
 static void *callback_c2hl_arm64( void *_f, hl_type *t, void **args, vdynamic *ret ) {
 	void **f = (void**)_f;
@@ -1465,12 +1489,27 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		store_vreg(ctx, A64_X9, op->p1);
 		break;
 	}
-	case OInstanceClosure:
-		// hl_alloc_closure_ptr(fun_type, fun_ptr, captured). Staging the
-		// fun_ptr immediate across MOVZ+MOVK requires extending the patch
-		// machinery; deferred to a follow-up.
-		a64_brk(ctx, 0xC1C1);
+	case OInstanceClosure: {
+		// dst = hl_alloc_closure_ptr(ftype, fun_ptr, captured_value)
+		// fun_ptr is staged via a 4-instruction MOVZ+3xMOVK chain patched in
+		// hl_jit_code once functions_ptrs is final.
+		hl_type *fnt = m->code->functions[m->functions_indexes[op->p2]].type;
+		a64_mov_imm64(ctx, A64_X0, (int64_t)(intptr_t)fnt);
+		int patch_pos = BUF_POS();
+		a64_movz(ctx, A64_X1, 0, 0, 1);
+		a64_movk(ctx, A64_X1, 0, 1, 1);
+		a64_movk(ctx, A64_X1, 0, 2, 1);
+		a64_movk(ctx, A64_X1, 0, 3, 1);
+		jlist *j = (jlist*)hl_malloc(&ctx->galloc, sizeof(jlist));
+		j->pos = patch_pos;
+		j->target = IMM64_TAG(op->p2);
+		j->next = ctx->calls;
+		ctx->calls = j;
+		load_vreg(ctx, A64_X2, op->p3);
+		emit_call_native_ptr(ctx, (void*)hl_alloc_closure_ptr);
+		store_vreg(ctx, A64_X0, op->p1);
 		break;
+	}
 	case OCallClosure: {
 		// Simple path: c->hasValue ? c->fun(c->value, args...) : c->fun(args...)
 		// (HDYN dynamic-call variant not yet covered; that path needs
@@ -2090,7 +2129,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	uint32_t *base = (uint32_t*)code;
 	jlist *c = ctx->calls;
 	while( c ) {
-		if( c->target >= 0 ) {
+		if( CALL_TARGET_IS_BL(c->target) ) {
 			void *fp = m->functions_ptrs[c->target];
 			if( fp != NULL ) {
 				int target_off = (int)(intptr_t)fp;
@@ -2101,6 +2140,18 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 				}
 				uint32_t *slot = base + (c->pos >> 2);
 				*slot = (*slot & 0xfc000000) | ((uint32_t)delta_words & 0x03ffffff);
+			}
+		} else if( CALL_TARGET_IS_IMM64(c->target) ) {
+			// Patch a 4-instruction MOVZ+3xMOVK chain at c->pos to
+			// materialise the absolute address of function `fid`.
+			int fid = IMM64_FINDEX(c->target);
+			void *fp = m->functions_ptrs[fid];
+			uint64_t abs_addr = (uint64_t)(uintptr_t)((unsigned char*)code + (intptr_t)fp);
+			uint32_t *slot = base + (c->pos >> 2);
+			for( int k = 0; k < 4; k++ ) {
+				uint16_t chunk = (uint16_t)((abs_addr >> (k*16)) & 0xffff);
+				// Clear bits 20:5 (imm16) and set them to chunk.
+				slot[k] = (slot[k] & 0xFFE0001F) | ((uint32_t)chunk << 5);
 			}
 		}
 		c = c->next;
@@ -2130,6 +2181,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 		call_jit_c2hl_native = (unsigned char*)code + ctx->c2hl;
 		hl_setup.static_call = callback_c2hl_arm64;
 		hl_setup.static_call_ref = true;
+		hl_setup.get_wrapper = get_wrapper_arm64;
 	}
 	*codesize = size;
 	*debug = ctx->debug;
