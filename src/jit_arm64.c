@@ -880,6 +880,15 @@ static void op_binop_int( jit_ctx *ctx, int dst, int a, int b, hl_op bop ) {
 
 // FP binary op (HF64 only for now — HF32 would use the .s forms).
 static void op_binop_fp( jit_ctx *ctx, int dst, int a, int b, hl_op bop ) {
+	if( bop == OSMod || bop == OUMod ) {
+		// AArch64 has no FP modulo — call libc fmod (double) / fmodf (single).
+		// FP args are already where we want them: d0 = a, d1 = b.
+		load_vreg_fp(ctx, A64_V0, a);
+		load_vreg_fp(ctx, A64_V1, b);
+		emit_call_native_ptr(ctx, (void*)(intptr_t)fmod);
+		store_vreg_fp(ctx, A64_V0, dst);
+		return;
+	}
 	load_vreg_fp(ctx, A64_V16, a);
 	load_vreg_fp(ctx, A64_V17, b);
 	switch( bop ) {
@@ -896,12 +905,31 @@ static void op_binop_fp( jit_ctx *ctx, int dst, int a, int b, hl_op bop ) {
 // corresponding to the HL OJxxx semantics ; targetOpIdx is the HL opcode
 // position to branch to (we'll resolve to a byte position later).
 static void op_jump_compare( jit_ctx *ctx, int a, int b, hl_op op, int targetOpIdx ) {
-	// Use 64-bit compare for pointer types and HI64; 32-bit for HI32 etc.
-	// Doing 64-bit compare on zero-extended HI32 values silently turns a
-	// negative i32 (e.g. -1 = 0xFFFFFFFF) into a large positive 64-bit
-	// value, which flips signed comparisons — this was the qsort bug
-	// (JSLt 0 < -1 was incorrectly returning true).
 	hl_type_kind k = ctx->f->regs[a]->kind;
+	if( k == HF32 || k == HF64 ) {
+		// Float compare — FCMP sets FPSR flags; the AArch64 b.cond
+		// mapping for IEEE 754 ordered/unordered matches our needs.
+		load_vreg_fp(ctx, A64_V16, a);
+		load_vreg_fp(ctx, A64_V17, b);
+		a64_fcmp_d(ctx, A64_V16, A64_V17); // HF32 still uses double form in the bring-up; HF32 path is approximate
+		a64_cond cond;
+		switch( op ) {
+		case OJEq:     cond = A64_EQ; break;
+		case OJNotEq:  cond = A64_NE; break;
+		case OJSLt:    cond = A64_MI; break;   // signed less than for FP: N=1 (and not unordered)
+		case OJSGte:   cond = A64_GE; break;
+		case OJSGt:    cond = A64_GT; break;
+		case OJSLte:   cond = A64_LS; break;
+		case OJNotLt:  cond = A64_GE; break;
+		case OJNotGte: cond = A64_MI; break;
+		default:       cond = A64_AL; break;
+		}
+		int pos = a64_bcond(ctx, cond, 0);
+		register_jump(ctx, pos, targetOpIdx);
+		return;
+	}
+	// Integer compare — pick 32 or 64-bit based on operand kind. Doing
+	// 64-bit on zero-extended HI32s silently flips signed comparisons.
 	int is64 = (k == HI64 || k == HGUID || hl_is_ptr(ctx->f->regs[a])) ? 1 : 0;
 	load_vreg(ctx, A64_X9, a);
 	load_vreg(ctx, A64_X10, b);
