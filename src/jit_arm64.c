@@ -971,8 +971,57 @@ static void op_binop_fp( jit_ctx *ctx, int dst, int a, int b, hl_op bop ) {
 // corresponding to the HL OJxxx semantics ; targetOpIdx is the HL opcode
 // position to branch to (we'll resolve to a byte position later).
 static void op_jump_compare( jit_ctx *ctx, int a, int b, hl_op op, int targetOpIdx ) {
-	hl_type_kind k = ctx->f->regs[a]->kind;
-	if( k == HF32 || k == HF64 ) {
+	hl_type_kind ka = ctx->f->regs[a]->kind;
+	hl_type_kind kb = ctx->f->regs[b]->kind;
+	// Mixed-type / Dynamic / function comparisons: route through
+	// hl_dyn_compare so boxed values get unboxed and compared deeply.
+	// This is what makes `Null<Bool> == Bool` (after ToDyn) work — both
+	// sides arrive as vdynamic pointers, and a raw pointer-compare would
+	// always say "different object". See jit.c::op_jump:2088.
+	if( ka == HDYN || kb == HDYN || ka == HFUN || kb == HFUN ) {
+		load_vreg(ctx, A64_X0, a);
+		load_vreg(ctx, A64_X1, b);
+		emit_call_native_ptr(ctx, (void*)hl_dyn_compare);
+		// Result in x0. For JEq/JNotEq: check x0 == 0.
+		// For JSLt/JSGt/etc.: invalid sentinel (0xAABBCCDD) must short-
+		// circuit to "no jump"; otherwise compare result to 0 signed.
+		if( op == OJEq || op == OJNotEq ) {
+			a64_cmp_imm(ctx, A64_X0, 0, 0);
+			int pos = a64_bcond(ctx, op == OJEq ? A64_EQ : A64_NE, 0);
+			register_jump(ctx, pos, targetOpIdx);
+		} else {
+			// Treat invalid as "do not jump" by setting x0 = 0 in that case.
+			a64_mov_imm32(ctx, A64_X9, (int32_t)0xAABBCCDD);
+			a64_cmp_reg(ctx, A64_X0, A64_X9, 0);
+			int skip = a64_bcond(ctx, A64_EQ, 0);
+			a64_cmp_imm(ctx, A64_X0, 0, 0);
+			a64_cond cond;
+			switch( op ) {
+			case OJSLt: cond = A64_LT; break;
+			case OJSGte: cond = A64_GE; break;
+			case OJSGt: cond = A64_GT; break;
+			case OJSLte: cond = A64_LE; break;
+			default: cond = A64_AL; break;
+			}
+			int pos = a64_bcond(ctx, cond, 0);
+			register_jump(ctx, pos, targetOpIdx);
+			a64_patch_branch(ctx, skip, BUF_POS());
+		}
+		return;
+	}
+	// HNULL — Haxe `Null<T>` boxing. Pointer-equal OR (both non-null and
+	// deep value compare). For now we approximate with hl_dyn_compare too
+	// (the dyn-compare path handles HNULL correctly via type-tagged unbox).
+	if( ka == HNULL || kb == HNULL ) {
+		load_vreg(ctx, A64_X0, a);
+		load_vreg(ctx, A64_X1, b);
+		emit_call_native_ptr(ctx, (void*)hl_dyn_compare);
+		a64_cmp_imm(ctx, A64_X0, 0, 0);
+		int pos = a64_bcond(ctx, op == OJEq ? A64_EQ : op == OJNotEq ? A64_NE : A64_AL, 0);
+		register_jump(ctx, pos, targetOpIdx);
+		return;
+	}
+	if( ka == HF32 || ka == HF64 ) {
 		// Float compare — FCMP sets FPSR flags; the AArch64 b.cond
 		// mapping for IEEE 754 ordered/unordered matches our needs.
 		load_vreg_fp(ctx, A64_V16, a);
@@ -996,7 +1045,7 @@ static void op_jump_compare( jit_ctx *ctx, int a, int b, hl_op op, int targetOpI
 	}
 	// Integer compare — pick 32 or 64-bit based on operand kind. Doing
 	// 64-bit on zero-extended HI32s silently flips signed comparisons.
-	int is64 = (k == HI64 || k == HGUID || hl_is_ptr(ctx->f->regs[a])) ? 1 : 0;
+	int is64 = (ka == HI64 || ka == HGUID || hl_is_ptr(ctx->f->regs[a])) ? 1 : 0;
 	load_vreg(ctx, A64_X9, a);
 	load_vreg(ctx, A64_X10, b);
 	a64_cmp_reg(ctx, A64_X9, A64_X10, is64);
