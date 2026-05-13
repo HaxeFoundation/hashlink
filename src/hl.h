@@ -835,6 +835,12 @@ HL_API void hl_free_executable_memory( void *ptr, int size );
 HL_API void hl_jit_write_begin( void );
 HL_API void hl_jit_write_end( void *code, int size );
 
+// On macOS arm64 (hardened runtime + MAP_JIT), each thread that wants to
+// execute JIT'd code must flip its per-thread W^X state to "executable"
+// once. Threads spawned by hl_thread_start call this before invoking the
+// user closure. Cheap no-op everywhere else.
+HL_API void hl_jit_thread_init( void );
+
 // ----------------------- BUFFER --------------------------------------------------
 
 typedef struct hl_buffer hl_buffer;

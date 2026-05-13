@@ -1182,6 +1182,14 @@ HL_PRIM void hl_jit_write_begin( void ) {
 #endif
 }
 
+HL_PRIM void hl_jit_thread_init( void ) {
+#if defined(__APPLE__) && defined(__aarch64__)
+	// New thread starts in "writable" mode by default; switch to
+	// "executable" so the upcoming BLR into the shared JIT mapping works.
+	pthread_jit_write_protect_np(1);
+#endif
+}
+
 HL_PRIM void hl_jit_write_end( void *code, int size ) {
 #if defined(__APPLE__) && defined(__aarch64__)
 	pthread_jit_write_protect_np(1); // back to executable
