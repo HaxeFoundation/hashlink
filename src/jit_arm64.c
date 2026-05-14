@@ -148,9 +148,23 @@ static int8_t reg_owner_fp[32];
 // Set HL_JIT_NO_CACHE=1 at runtime to disable the peephole cache —
 // useful for A/B perf measurement and for confirming correctness when
 // chasing a regression.
+//
+// Default-disabled on Android: the cache works on macOS arm64 (validated
+// across the bench suite + Heaps demos) but breaks h2d rendering on the
+// Android arm64 emulator with a JIT'd-code SIGSEGV at fault addresses
+// looking like 0x240xxx060. h3d.scene.Mesh + texture works fine, but any
+// h2d.Bitmap or h2d.Particles batch path crashes. Root cause not yet
+// found — fault is reproducible with HeapDemo (80 sprites). Until the
+// fix lands, disable by default and keep the env override.
 static int cache_disabled = -1;
 static int is_cache_disabled( void ) {
-	if( cache_disabled < 0 ) cache_disabled = (getenv("HL_JIT_NO_CACHE") != NULL) ? 1 : 0;
+	if( cache_disabled < 0 ) {
+#ifdef HL_ANDROID
+		cache_disabled = 1;
+#else
+		cache_disabled = (getenv("HL_JIT_NO_CACHE") != NULL) ? 1 : 0;
+#endif
+	}
 	return cache_disabled;
 }
 
