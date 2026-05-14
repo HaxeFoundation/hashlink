@@ -1552,13 +1552,11 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, trap_size, 1);
 		// Get thread, link the trap_ctx in.
 		emit_call_native_ptr(ctx, (void*)hl_get_thread);
-		a64_mov_reg(ctx, A64_X19, A64_X0, 1);     // x19 stays valid across the call
-		// We rely on x19 being callee-saved — but our codegen never spills
-		// it. Spill the previous value to a temp stack slot above sp.
-		// Cheap: stash through a dedicated slot at [sp + trap_size - 8]
-		// — we sized the alloc to include the trap_ctx only, so reuse
-		// a 16-byte scratch region above by enlarging.
-		// Simpler approach: don't use a callee-saved reg. Use x9.
+		// CRITICAL: x19 is callee-saved (AAPCS64) and our prologue does NOT
+		// save it. Writing to it here clobbered the caller's value across
+		// the JIT'd function — observed as a libhl C function whose `b`
+		// (a hl_buffer*) became the `hl_get_thread()` return value because
+		// the compiler had stashed `b` in x19. Use x9 (caller-saved) only.
 		a64_mov_reg(ctx, A64_X9, A64_X0, 1);      // x9 = thread
 		// t->prev = thread->trap_current
 		a64_ldr_imm(ctx, A64_X10, A64_X9, tc_off, 8, 0);
