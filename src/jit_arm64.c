@@ -132,8 +132,18 @@ static void jit_buf( jit_ctx *ctx ) {
 //  jump-target opcodes — see hl_jit_function's is_jump_target prescan).
 // -----------------------------------------------------------------------
 
-static struct { int vi; a64_greg reg; } cache_gpr = { -1, A64_X9 };
-static struct { int vi; a64_vreg reg; } cache_fp  = { -1, A64_V16 };
+// Per-register ownership cache. reg_owner_gpr[r] is the vreg currently
+// known to live in physical register r, or -1 if unknown/dead. Same for
+// reg_owner_fp[v]. Replaces the old single-slot cache so multiple values
+// can stay live in registers across encoders within a basic block.
+//
+// Updated by:
+//   - load_vreg / store_vreg (set the owner after the LDR/STR)
+//   - kill_gpr / kill_fp (called by encoders BEFORE their write so the
+//     stale ownership doesn't survive)
+//   - cache_reset (full wipe, called at branch targets and after calls)
+static int8_t reg_owner_gpr[32];
+static int8_t reg_owner_fp[32];
 
 // Set HL_JIT_NO_CACHE=1 at runtime to disable the peephole cache —
 // useful for A/B perf measurement and for confirming correctness when
@@ -144,9 +154,62 @@ static int is_cache_disabled( void ) {
 	return cache_disabled;
 }
 
-static inline void cache_clear( void ) {
-	cache_gpr.vi = -1;
-	cache_fp.vi  = -1;
+static inline void cache_reset( void ) {
+	for( int i = 0; i < 32; i++ ) { reg_owner_gpr[i] = -1; reg_owner_fp[i] = -1; }
+}
+// Backwards-compat alias used by older code paths.
+static inline void cache_clear( void ) { cache_reset(); }
+
+// Mark a single GPR/FP as no longer holding any vreg. Called by encoders
+// BEFORE they overwrite the register so stale ownership doesn't linger.
+static inline void kill_gpr( a64_greg r ) {
+	reg_owner_gpr[r & 0x1f] = -1;
+}
+static inline void kill_fp( a64_vreg v ) {
+	reg_owner_fp[v & 0x1f] = -1;
+}
+// After a function call, every caller-saved register is clobbered.
+// AAPCS64: x0-x17 are caller-saved. v0-v7 and v16-v31 are caller-saved
+// (low 64 bits of v8-v15 are callee-saved, but we never touch them).
+static inline void kill_caller_saved( void ) {
+	for( int i = 0; i <= 17; i++ ) reg_owner_gpr[i] = -1;
+	for( int i = 0; i <= 7; i++ )  reg_owner_fp[i]  = -1;
+	for( int i = 16; i < 32; i++ ) reg_owner_fp[i]  = -1;
+}
+// After a write that updates memory[vi] OR a register holding vi's value,
+// invalidate ALL OTHER registers (both banks) that claimed vi: their cached
+// value is stale. Then mark the new owner.
+//
+// The cross-bank invalidation matters because some opcodes write a vreg via
+// the integer path (e.g. OFloat stores the bit-pattern through X9) while
+// other opcodes read it via the FP path. Without clearing the FP cache, a
+// stale FP-side claim would skip the LDUR and use the old value.
+static inline void claim_gpr( a64_greg r, int vi ) {
+	if( vi < 0 ) return;
+	for( int i = 0; i < 32; i++ ) {
+		if( reg_owner_gpr[i] == vi ) reg_owner_gpr[i] = -1;
+		if( reg_owner_fp[i]  == vi ) reg_owner_fp[i]  = -1;
+	}
+	reg_owner_gpr[r & 0x1f] = (int8_t)vi;
+}
+static inline void claim_fp( a64_vreg v, int vi ) {
+	if( vi < 0 ) return;
+	for( int i = 0; i < 32; i++ ) {
+		if( reg_owner_gpr[i] == vi ) reg_owner_gpr[i] = -1;
+		if( reg_owner_fp[i]  == vi ) reg_owner_fp[i]  = -1;
+	}
+	reg_owner_fp[v & 0x1f] = (int8_t)vi;
+}
+// Look up which physical register holds vi (or -1 if none).
+static inline int find_gpr( int vi ) {
+	if( vi < 0 || is_cache_disabled() ) return -1;
+	for( int i = 0; i < 32; i++ ) if( reg_owner_gpr[i] == vi ) return i;
+	return -1;
+}
+static inline int find_fp( int vi ) {
+	if( vi < 0 || is_cache_disabled() ) return -1;
+	for( int i = 0; i < 32; i++ ) if( reg_owner_fp[i] == vi ) return i;
+	return -1;
 }
 
 // -----------------------------------------------------------------------
@@ -158,11 +221,10 @@ static inline void cache_clear( void ) {
 static inline void a64_emit( jit_ctx *ctx, uint32_t ins ) {
 	jit_buf(ctx);
 	W(ins);
-	// Conservative: every emit invalidates the cache. The 2 callers that
-	// want to *preserve* the cache (store_vreg, load_vreg) re-populate it
-	// immediately after their own emit.
-	cache_gpr.vi = -1;
-	cache_fp.vi  = -1;
+	// No wholesale cache wipe here. Encoders that write a register call
+	// kill_gpr/kill_fp(dst) BEFORE this emit so stale ownership is dropped.
+	// Encoders that don't write any register (str_imm, branches, cmp) leave
+	// the cache untouched.
 }
 
 // MOVZ / MOVK / MOVN — Move wide (immediate). C6.2.190/188/189.
@@ -173,6 +235,10 @@ static void mov_wide( jit_ctx *ctx, int opc, a64_greg rd, uint16_t imm16, int sh
 	uint32_t ins =
 		((sf64 & 1) << 31) | ((opc & 3) << 29) | (0x25 << 23) |
 		(hw << 21) | ((uint32_t)imm16 << 5) | (rd & 0x1f);
+	// MOVK preserves bits, MOVZ/MOVN replace — but in either case the prior
+	// owner of rd is gone after this insn. Only kill on the FIRST emit of a
+	// chain (caller responsibility for chained MOVK).
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
 }
 void a64_movz( jit_ctx *ctx, a64_greg rd, uint16_t imm16, int shift, int sf64 ) { mov_wide(ctx, 0x2, rd, imm16, shift, sf64); }
@@ -229,16 +295,48 @@ void a64_mov_imm32( jit_ctx *ctx, a64_greg rd, int32_t value ) {
 	a64_movk(ctx, rd, hi, 1, 0);
 }
 
+// ADD/SUB (shifted register), shift = LSL #0. C6.2.5 / C6.2.343.
+// Forward-declared so addsub_imm() can fall back to the register form when the
+// immediate is too large for any 12-bit encoding.
+static void addsub_reg( jit_ctx *ctx, int is_sub, a64_greg rd, a64_greg rn, a64_greg rm, int sf64 );
+
 // ADD/SUB (immediate). C6.2.4 / C6.2.342.
-static void addsub_imm( jit_ctx *ctx, int is_sub, a64_greg rd, a64_greg rn, int32_t imm, int sf64 ) {
-	int sh = 0;
-	if( imm < 0 ) { is_sub ^= 1; imm = -imm; }
-	if( (imm & ~0xfff) && !(imm & 0xfff) ) { sh = 1; imm >>= 12; }
-	// imm must now fit 12 bits unsigned. Caller is responsible for fall-back via a scratch.
+// Emit a single ADD/SUB (immediate) form, ARMv8 C6.2.4 / C6.2.342.
+// imm MUST fit in 12 bits when sh=0, or be a 12-bit value shifted left 12 (sh=1).
+// This is the raw encoder — addsub_imm() below splits large values for you.
+static void addsub_imm_one( jit_ctx *ctx, int is_sub, a64_greg rd, a64_greg rn, uint32_t imm, int sh, int sf64 ) {
 	uint32_t ins =
 		((sf64 & 1) << 31) | ((is_sub & 1) << 30) | (0 << 29) | (0x11 << 24) |
 		((sh & 1) << 22) | ((imm & 0xfff) << 10) | ((rn & 0x1f) << 5) | (rd & 0x1f);
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
+}
+
+static void addsub_imm( jit_ctx *ctx, int is_sub, a64_greg rd, a64_greg rn, int32_t imm, int sf64 ) {
+	if( imm < 0 ) { is_sub ^= 1; imm = -imm; }
+	// Fast path: fits in 12 bits as-is.
+	if( (imm & ~0xfff) == 0 ) {
+		addsub_imm_one(ctx, is_sub, rd, rn, (uint32_t)imm, 0, sf64);
+		return;
+	}
+	// Fast path: only the upper 12 bits are set (low 12 zero).
+	if( (imm & 0xfff) == 0 && (((uint32_t)imm >> 12) & ~0xfff) == 0 ) {
+		addsub_imm_one(ctx, is_sub, rd, rn, (uint32_t)imm >> 12, 1, sf64);
+		return;
+	}
+	// Mixed bits: emit upper part with sh=1, then lower part with sh=0.
+	// This handles any imm up to (4095<<12)+4095 = 0xFFFFFF (~16MB).
+	if( (((uint32_t)imm >> 12) & ~0xfff) == 0 ) {
+		addsub_imm_one(ctx, is_sub, rd, rn, (uint32_t)imm >> 12, 1, sf64);
+		addsub_imm_one(ctx, is_sub, rd, rd, (uint32_t)imm & 0xfff, 0, sf64);
+		return;
+	}
+	// Imm too large for the two-instruction sequence (>16MB). Materialise it
+	// via MOVZ/MOVK into x16 then use ADD/SUB (shifted register, shift=0).
+	// We deliberately clobber x16 (IP0); callers using x16 as a live value
+	// must spill first — this is consistent with the rest of the backend.
+	a64_mov_imm64(ctx, A64_X16, (int64_t)(uint32_t)imm);
+	addsub_reg(ctx, is_sub, rd, rn, A64_X16, sf64);
 }
 void a64_add_imm( jit_ctx *ctx, a64_greg rd, a64_greg rn, int32_t imm, int sf64 ) { addsub_imm(ctx, 0, rd, rn, imm, sf64); }
 void a64_sub_imm( jit_ctx *ctx, a64_greg rd, a64_greg rn, int32_t imm, int sf64 ) { addsub_imm(ctx, 1, rd, rn, imm, sf64); }
@@ -248,6 +346,7 @@ static void addsub_reg( jit_ctx *ctx, int is_sub, a64_greg rd, a64_greg rn, a64_
 	uint32_t ins =
 		((sf64 & 1) << 31) | ((is_sub & 1) << 30) | (0 << 29) | (0x0b << 24) |
 		((rm & 0x1f) << 16) | (0 << 10) | ((rn & 0x1f) << 5) | (rd & 0x1f);
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
 }
 void a64_add_reg( jit_ctx *ctx, a64_greg rd, a64_greg rn, a64_greg rm, int sf64 ) { addsub_reg(ctx, 0, rd, rn, rm, sf64); }
@@ -258,6 +357,7 @@ void a64_mul( jit_ctx *ctx, a64_greg rd, a64_greg rn, a64_greg rm, int sf64 ) {
 	uint32_t ins =
 		((sf64 & 1) << 31) | (0x0d8 << 21) | ((rm & 0x1f) << 16) |
 		(0 << 15) | (0x1f << 10) | ((rn & 0x1f) << 5) | (rd & 0x1f);
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
 }
 // SDIV / UDIV. C6.2.296 / C6.2.371.
@@ -265,6 +365,7 @@ static void divreg( jit_ctx *ctx, int is_signed, a64_greg rd, a64_greg rn, a64_g
 	uint32_t ins =
 		((sf64 & 1) << 31) | (0x0d6 << 21) | ((rm & 0x1f) << 16) |
 		(0x2 << 10) | ((is_signed & 1) << 10) | ((rn & 0x1f) << 5) | (rd & 0x1f);
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
 }
 void a64_sdiv( jit_ctx *ctx, a64_greg rd, a64_greg rn, a64_greg rm, int sf64 ) { divreg(ctx, 1, rd, rn, rm, sf64); }
@@ -276,6 +377,8 @@ static void logical_reg( jit_ctx *ctx, int opc, a64_greg rd, a64_greg rn, a64_gr
 	uint32_t ins =
 		((sf64 & 1) << 31) | ((opc & 3) << 29) | (0x0a << 24) |
 		((rm & 0x1f) << 16) | ((rn & 0x1f) << 5) | (rd & 0x1f);
+	// ANDS (opc=3) writes flags AND rd. The other 3 only write rd.
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
 }
 void a64_and_reg( jit_ctx *ctx, a64_greg rd, a64_greg rn, a64_greg rm, int sf64 ) { logical_reg(ctx, 0, rd, rn, rm, sf64); }
@@ -290,6 +393,7 @@ static void shift_reg( jit_ctx *ctx, int opc, a64_greg rd, a64_greg rn, a64_greg
 	uint32_t ins =
 		((sf64 & 1) << 31) | (0x0d6 << 21) | ((rm & 0x1f) << 16) |
 		((opc & 0xf) << 10) | ((rn & 0x1f) << 5) | (rd & 0x1f);
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
 }
 void a64_lsl_reg( jit_ctx *ctx, a64_greg rd, a64_greg rn, a64_greg rm, int sf64 ) { shift_reg(ctx, 0x8, rd, rn, rm, sf64); }
@@ -320,15 +424,43 @@ void a64_cmp_imm( jit_ctx *ctx, a64_greg rn, int32_t imm, int sf64 ) {
 void a64_ldr_imm( jit_ctx *ctx, a64_greg rt, a64_greg rn, int32_t imm, int size, int sign_extend ) {
 	int sz_log = (size == 1) ? 0 : (size == 2) ? 1 : (size == 4) ? 2 : 3;
 	int scaled = imm >> sz_log;
+	// If imm isn't representable as a 12-bit scaled offset (must be a multiple
+	// of `size` and within [0, 4095*size]), fall back to materialising the
+	// effective address in x16 then doing a zero-offset load. Silently
+	// truncating to the low 12 bits — which the original code did — produced
+	// reads from the wrong offset and shipped corrupted GC objects.
+	if( (imm & ((1<<sz_log)-1)) || scaled < 0 || scaled > 0xfff ) {
+		kill_gpr(A64_X16);
+		a64_add_imm(ctx, A64_X16, rn, imm, 1);
+		int opc_fb = sign_extend ? 0x2 : 0x1;
+		uint32_t ins_fb =
+			((sz_log & 3) << 30) | (0x39 << 24) | ((opc_fb & 3) << 22) |
+			((0 & 0xfff) << 10) | ((A64_X16 & 0x1f) << 5) | (rt & 0x1f);
+		kill_gpr(rt);
+		a64_emit(ctx, ins_fb);
+		return;
+	}
 	int opc = sign_extend ? 0x2 : 0x1; // LDR=01, LDRS*=10
 	uint32_t ins =
 		((sz_log & 3) << 30) | (0x39 << 24) | ((opc & 3) << 22) |
 		((scaled & 0xfff) << 10) | ((rn & 0x1f) << 5) | (rt & 0x1f);
+	kill_gpr(rt);
 	a64_emit(ctx, ins);
 }
 void a64_str_imm( jit_ctx *ctx, a64_greg rt, a64_greg rn, int32_t imm, int size ) {
 	int sz_log = (size == 1) ? 0 : (size == 2) ? 1 : (size == 4) ? 2 : 3;
 	int scaled = imm >> sz_log;
+	// Same fallback as a64_ldr_imm — out-of-range offsets must compute the
+	// effective address in a scratch instead of silently truncating.
+	if( (imm & ((1<<sz_log)-1)) || scaled < 0 || scaled > 0xfff ) {
+		kill_gpr(A64_X16);
+		a64_add_imm(ctx, A64_X16, rn, imm, 1);
+		uint32_t ins_fb =
+			((sz_log & 3) << 30) | (0x39 << 24) | (0 << 22) |
+			((0 & 0xfff) << 10) | ((A64_X16 & 0x1f) << 5) | (rt & 0x1f);
+		a64_emit(ctx, ins_fb);
+		return;
+	}
 	uint32_t ins =
 		((sz_log & 3) << 30) | (0x39 << 24) | (0 << 22) |
 		((scaled & 0xfff) << 10) | ((rn & 0x1f) << 5) | (rt & 0x1f);
@@ -345,6 +477,8 @@ static void ldst_unscaled( jit_ctx *ctx, int opc, a64_greg rt, a64_greg rn, int3
 	uint32_t ins =
 		((sz_log & 3) << 30) | (0x38 << 24) | ((opc & 3) << 22) |
 		(i9 << 12) | ((rn & 0x1f) << 5) | (rt & 0x1f);
+	// opc=0 is STUR (mem write only), 1/2 are LDUR variants (kill rt).
+	if( opc != 0 ) kill_gpr(rt);
 	a64_emit(ctx, ins);
 }
 void a64_ldur( jit_ctx *ctx, a64_greg rt, a64_greg rn, int32_t imm, int size, int sign_extend ) {
@@ -360,6 +494,7 @@ static void ldst_unscaled_fp( jit_ctx *ctx, int opc, a64_vreg vt, a64_greg rn, i
 	uint32_t ins =
 		((sz_log & 3) << 30) | (0x3c << 24) | ((opc & 3) << 22) |
 		(i9 << 12) | ((rn & 0x1f) << 5) | (vt & 0x1f);
+	if( opc != 0 ) kill_fp(vt); // STUR=0 (write-only mem); LDUR kills vt
 	a64_emit(ctx, ins);
 }
 void a64_ldur_fp( jit_ctx *ctx, a64_vreg vt, a64_greg rn, int32_t imm, int is_double ) { ldst_unscaled_fp(ctx, 0x1, vt, rn, imm, is_double); }
@@ -379,6 +514,8 @@ void a64_ldp_post( jit_ctx *ctx, a64_greg rt1, a64_greg rt2, a64_greg base, int3
 	uint32_t ins =
 		(0x2 << 30) | (0xa3 << 22) | ((scaled & 0x7f) << 15) |
 		((rt2 & 0x1f) << 10) | ((base & 0x1f) << 5) | (rt1 & 0x1f);
+	kill_gpr(rt1);
+	kill_gpr(rt2);
 	a64_emit(ctx, ins);
 }
 
@@ -393,6 +530,8 @@ int a64_bl( jit_ctx *ctx, int32_t offset_words ) {
 	int pos = BUF_POS();
 	uint32_t ins = (1u << 31) | (0x5 << 26) | (offset_words & 0x03ffffff);
 	a64_emit(ctx, ins);
+	// Like BLR: AAPCS64 says the callee may clobber every caller-saved reg.
+	kill_caller_saved();
 	return pos;
 }
 int a64_bcond( jit_ctx *ctx, a64_cond cond, int32_t offset_words ) {
@@ -406,6 +545,8 @@ void a64_br( jit_ctx *ctx, a64_greg rn ) {
 }
 void a64_blr( jit_ctx *ctx, a64_greg rn ) {
 	a64_emit(ctx, (0xd63f << 16) | ((rn & 0x1f) << 5));
+	// AAPCS64: every caller-saved reg is clobbered across a call.
+	kill_caller_saved();
 }
 void a64_ret( jit_ctx *ctx ) {
 	a64_emit(ctx, (0xd65f << 16) | ((A64_LR & 0x1f) << 5));
@@ -446,6 +587,7 @@ static void fp_dp2( jit_ctx *ctx, int op, a64_vreg vd, a64_vreg vn, a64_vreg vm 
 	uint32_t ins =
 		(0x1e << 24) | (0x1 << 22) | (1u << 21) | ((vm & 0x1f) << 16) |
 		((op & 0xf) << 12) | (0x2 << 10) | ((vn & 0x1f) << 5) | (vd & 0x1f);
+	kill_fp(vd);
 	a64_emit(ctx, ins);
 }
 void a64_fadd_d( jit_ctx *ctx, a64_vreg vd, a64_vreg vn, a64_vreg vm ) { fp_dp2(ctx, 0x2, vd, vn, vm); }
@@ -457,6 +599,7 @@ void a64_fmov_d( jit_ctx *ctx, a64_vreg vd, a64_vreg vn ) {
 	// FMOV (register), double. C6.2.122.
 	uint32_t ins = (0x1e << 24) | (0x1 << 22) | (1u << 21) | (0x10 << 10) |
 		((vn & 0x1f) << 5) | (vd & 0x1f);
+	kill_fp(vd);
 	a64_emit(ctx, ins);
 }
 void a64_fcmp_d( jit_ctx *ctx, a64_vreg vn, a64_vreg vm ) {
@@ -467,28 +610,33 @@ void a64_fcmp_d( jit_ctx *ctx, a64_vreg vn, a64_vreg vm ) {
 void a64_scvtf_d( jit_ctx *ctx, a64_vreg vd, a64_greg rn, int sf64 ) {
 	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x1 << 22) | (1u << 21) |
 		(0x2 << 16) | ((rn & 0x1f) << 5) | (vd & 0x1f);
+	kill_fp(vd);
 	a64_emit(ctx, ins);
 }
 void a64_fcvtzs_d( jit_ctx *ctx, a64_greg rd, a64_vreg vn, int sf64 ) {
 	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x1 << 22) | (1u << 21) |
 		(0x18 << 16) | ((vn & 0x1f) << 5) | (rd & 0x1f);
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
 }
 // SCVTF single-precision (Sd <- Wn or Xn). ftype=00.
 static void a64_scvtf_s( jit_ctx *ctx, a64_vreg vd, a64_greg rn, int sf64 ) {
 	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x0 << 22) | (1u << 21) |
 		(0x2 << 16) | ((rn & 0x1f) << 5) | (vd & 0x1f);
+	kill_fp(vd);
 	a64_emit(ctx, ins);
 }
 // UCVTF double / single (unsigned int → fp).
 static void a64_ucvtf_d( jit_ctx *ctx, a64_vreg vd, a64_greg rn, int sf64 ) {
 	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x1 << 22) | (1u << 21) |
 		(0x3 << 16) | ((rn & 0x1f) << 5) | (vd & 0x1f);
+	kill_fp(vd);
 	a64_emit(ctx, ins);
 }
 static void a64_ucvtf_s( jit_ctx *ctx, a64_vreg vd, a64_greg rn, int sf64 ) {
 	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x0 << 22) | (1u << 21) |
 		(0x3 << 16) | ((rn & 0x1f) << 5) | (vd & 0x1f);
+	kill_fp(vd);
 	a64_emit(ctx, ins);
 }
 // FCVT between precisions. opc selects target type:
@@ -496,15 +644,18 @@ static void a64_ucvtf_s( jit_ctx *ctx, a64_vreg vd, a64_greg rn, int sf64 ) {
 //   S→D: ftype=00, opc=01 → 0x1E22C000
 //   D→H/H→D etc not needed yet.
 static void a64_fcvt_d_to_s( jit_ctx *ctx, a64_vreg vd, a64_vreg vn ) {
+	kill_fp(vd);
 	a64_emit(ctx, 0x1E624000 | ((vn & 0x1f) << 5) | (vd & 0x1f));
 }
 static void a64_fcvt_s_to_d( jit_ctx *ctx, a64_vreg vd, a64_vreg vn ) {
+	kill_fp(vd);
 	a64_emit(ctx, 0x1E22C000 | ((vn & 0x1f) << 5) | (vd & 0x1f));
 }
 // FCVTZS single-precision (Wd <- Sn or Xd <- Sn). ftype=00.
 static void a64_fcvtzs_s( jit_ctx *ctx, a64_greg rd, a64_vreg vn, int sf64 ) {
 	uint32_t ins = ((sf64 & 1) << 31) | (0x1e << 24) | (0x0 << 22) | (1u << 21) |
 		(0x18 << 16) | ((vn & 0x1f) << 5) | (rd & 0x1f);
+	kill_gpr(rd);
 	a64_emit(ctx, ins);
 }
 void a64_ldr_fp( jit_ctx *ctx, a64_vreg vt, a64_greg rn, int32_t imm, int is_double ) {
@@ -513,6 +664,7 @@ void a64_ldr_fp( jit_ctx *ctx, a64_vreg vt, a64_greg rn, int32_t imm, int is_dou
 	uint32_t ins =
 		((sz_log & 3) << 30) | (0x3d << 24) | (1u << 22) |
 		((scaled & 0xfff) << 10) | ((rn & 0x1f) << 5) | (vt & 0x1f);
+	kill_fp(vt);
 	a64_emit(ctx, ins);
 }
 void a64_str_fp( jit_ctx *ctx, a64_vreg vt, a64_greg rn, int32_t imm, int is_double ) {
@@ -669,6 +821,10 @@ static void emit_prologue( jit_ctx *ctx, int frameSize ) {
 	a64_stp_pre(ctx, A64_FP, A64_LR, A64_SP_OR_ZR, -16);
 	a64_add_imm(ctx, A64_FP, A64_SP_OR_ZR, 0, 1);
 	if( frameSize ) a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, frameSize, 1);
+	// Spill incoming arguments to their vreg slots. AAPCS64 passes the
+	// first 8 non-FP arguments in x0..x7 and the first 8 FP arguments
+	// in d0..d7. Beyond that, args come on the caller's stack — which
+	// the spill-everything codegen does not yet reach into.
 	hl_function *f = ctx->f;
 	int ngpr = 0, nfpr = 0;
 	int nargs = f->type->fun->nargs;
@@ -739,23 +895,26 @@ static int vreg_size( hl_function *f, int i ) {
 // Emit "load vreg #vi into Xreg". For FP-typed vregs the caller is expected
 // to call load_vreg_fp() instead.
 static void load_vreg( jit_ctx *ctx, a64_greg dst, int vi ) {
-	if( !is_cache_disabled() && cache_gpr.vi == vi ) {
-		if( cache_gpr.reg == dst ) return; // free
-		a64_mov_reg(ctx, dst, cache_gpr.reg, 1);
-		cache_gpr.vi  = vi;
-		cache_gpr.reg = dst;
+	int holder = find_gpr(vi);
+	if( holder >= 0 ) {
+		if( holder == (int)dst ) return; // already there
+		// vi lives in some other reg → MOV is cheaper than re-loading from memory.
+		a64_mov_reg(ctx, dst, (a64_greg)holder, 1);
+		// a64_mov_reg → orr_reg → killed dst before emit; re-claim now.
+		claim_gpr(dst, vi);
 		return;
 	}
 	int off = vreg_offset(vi);
 	int sz  = vreg_size(ctx->f, vi);
+	kill_gpr(dst);
 	if( off >= -256 ) {
 		a64_ldur(ctx, dst, A64_FP, off, sz, 0);
 	} else {
+		kill_gpr(A64_X16);
 		a64_sub_imm(ctx, A64_X16, A64_FP, -off, 1);
 		a64_ldr_imm(ctx, dst, A64_X16, 0, sz, 0);
 	}
-	cache_gpr.vi  = vi;
-	cache_gpr.reg = dst;
+	claim_gpr(dst, vi);
 }
 static void store_vreg( jit_ctx *ctx, a64_greg src, int vi ) {
 	int off = vreg_offset(vi);
@@ -763,32 +922,32 @@ static void store_vreg( jit_ctx *ctx, a64_greg src, int vi ) {
 	if( off >= -256 ) {
 		a64_stur(ctx, src, A64_FP, off, sz);
 	} else {
+		kill_gpr(A64_X16);
 		a64_sub_imm(ctx, A64_X16, A64_FP, -off, 1);
 		a64_str_imm(ctx, src, A64_X16, 0, sz);
 	}
-	// `src` still holds the value just written; cache it for the next
-	// opcode's first load_vreg.
-	cache_gpr.vi  = vi;
-	cache_gpr.reg = src;
+	// `src` still holds the value just written.
+	claim_gpr(src, vi);
 }
 static void load_vreg_fp( jit_ctx *ctx, a64_vreg dst, int vi ) {
-	if( !is_cache_disabled() && cache_fp.vi == vi ) {
-		if( cache_fp.reg == dst ) return;
-		a64_fmov_d(ctx, dst, cache_fp.reg);
-		cache_fp.vi  = vi;
-		cache_fp.reg = dst;
+	int holder = find_fp(vi);
+	if( holder >= 0 ) {
+		if( holder == (int)dst ) return;
+		a64_fmov_d(ctx, dst, (a64_vreg)holder);
+		claim_fp(dst, vi);
 		return;
 	}
 	int off = vreg_offset(vi);
 	int is_double = ctx->f->regs[vi]->kind == HF64;
+	kill_fp(dst);
 	if( off >= -256 ) {
 		a64_ldur_fp(ctx, dst, A64_FP, off, is_double);
 	} else {
+		kill_gpr(A64_X16);
 		a64_sub_imm(ctx, A64_X16, A64_FP, -off, 1);
 		a64_ldr_fp(ctx, dst, A64_X16, 0, is_double);
 	}
-	cache_fp.vi  = vi;
-	cache_fp.reg = dst;
+	claim_fp(dst, vi);
 }
 static void store_vreg_fp( jit_ctx *ctx, a64_vreg src, int vi ) {
 	int off = vreg_offset(vi);
@@ -796,11 +955,11 @@ static void store_vreg_fp( jit_ctx *ctx, a64_vreg src, int vi ) {
 	if( off >= -256 ) {
 		a64_stur_fp(ctx, src, A64_FP, off, is_double);
 	} else {
+		kill_gpr(A64_X16);
 		a64_sub_imm(ctx, A64_X16, A64_FP, -off, 1);
 		a64_str_fp(ctx, src, A64_X16, 0, is_double);
 	}
-	cache_fp.vi  = vi;
-	cache_fp.reg = src;
+	claim_fp(src, vi);
 }
 
 // Register a jump to be patched once we know the target opcode's buffer
@@ -1633,17 +1792,18 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 	}
 	case OMakeEnum: {
 		// Like OEnumAlloc + copy each param to result + construct->offsets[i].
+		// IMPORTANT: iterate up to op->p3 (the bytecode-encoded param count
+		// and the length of op->extra), NOT cons->nparams. They match for
+		// well-formed bytecode, but reading past op->extra reads stale memory
+		// and writes whatever junk vreg slots happen to be there. Iterating
+		// by op->p3 also bounds the writes at exactly the params the source
+		// program intends to set.
 		hl_type *t = f->regs[op->p1];
 		hl_enum_construct *cons = &t->tenum->constructs[op->p2];
 		a64_mov_imm64(ctx, A64_X0, (int64_t)(intptr_t)t);
 		a64_mov_imm32(ctx, A64_X1, op->p2);
 		emit_call_native_ptr(ctx, (void*)hl_alloc_enum);
-		// Keep result ptr in x19 (callee-saved, but we don't preserve it
-		// across function calls — fine as we don't make any below).
-		// Use x20 instead via a stash; simplest: save on the frame.
-		// Cheap path: we make no further calls in this opcode, so x0
-		// is preserved throughout. Just use x0 as the base.
-		for( int i = 0; i < cons->nparams; i++ ) {
+		for( int i = 0; i < op->p3; i++ ) {
 			int off = cons->offsets[i];
 			hl_type *pt = cons->params[i];
 			int is_fp = (pt->kind == HF32 || pt->kind == HF64);
@@ -2522,6 +2682,7 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 			if( is_addr ) {
 				store_vreg(ctx, A64_X9, op->p1);  // return the address
 			} else {
+				// Load value at addr. Use dst's vreg_size.
 				int sz = vreg_size(f, op->p1);
 				if( vreg_is_fp(f, op->p1) ) {
 					a64_ldr_fp(ctx, A64_V16, A64_X9, 0, dt->kind == HF64);
@@ -2580,6 +2741,7 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 			}
 			load_vreg(ctx, A64_X9, op->p1);   // base
 			load_vreg(ctx, A64_X10, op->p2);  // index
+			// addr = base + idx*osize → X9
 			if( osize == 1 ) {
 				a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
 			} else if( osize == 2 || osize == 4 || osize == 8 ) {
@@ -2595,12 +2757,13 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 				a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
 			}
 			if( is_struct_copy ) {
-				// memcpy(addr, src_ptr, osize)
+				// memcpy(addr, src_ptr, osize) — src is HOBJ/HSTRUCT pointer.
 				a64_mov_reg(ctx, A64_X0, A64_X9, 1);
 				load_vreg(ctx, A64_X1, op->p3);
 				a64_mov_imm32(ctx, A64_X2, osize);
 				emit_call_native_ptr(ctx, (void*)memcpy);
 			} else {
+				// Simple value store. Use sizeof(void*) bytes.
 				load_vreg(ctx, A64_X11, op->p3);
 				a64_str_imm(ctx, A64_X11, A64_X9, 0, 8);
 			}
