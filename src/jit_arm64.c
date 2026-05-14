@@ -2482,7 +2482,50 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 	// (raw memory) need a separate path the bring-up doesn't cover yet.
 	case OGetArray: {
 		hl_type *src_t = f->regs[op->p2];
-		if( src_t->kind == HABSTRACT ) { a64_brk(ctx, 0xAB01); break; }
+		if( src_t->kind == HABSTRACT ) {
+			// HABSTRACT array: raw memory, no varray header.
+			// If dst is HOBJ/HSTRUCT: return the *address* (LEA, osize = rt->size).
+			// Else: read the value at addr (osize = sizeof(void*)).
+			hl_type *dt = f->regs[op->p1];
+			int is_addr = (dt->kind == HOBJ || dt->kind == HSTRUCT);
+			int osize;
+			if( is_addr ) {
+				hl_runtime_obj *rt = hl_get_obj_rt(dt);
+				osize = rt->size;
+			} else {
+				osize = 8;
+			}
+			load_vreg(ctx, A64_X9, op->p2);   // base
+			load_vreg(ctx, A64_X10, op->p3);  // index
+			// addr = base + idx*osize
+			if( osize == 1 ) {
+				a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+			} else if( osize == 2 || osize == 4 || osize == 8 ) {
+				int sh = (osize == 2) ? 1 : (osize == 4) ? 2 : 3;
+				uint32_t ins =
+					(1u << 31) | (0x0B << 24) | (0u << 22) |
+					((A64_X10 & 0x1f) << 16) | ((sh & 0x3f) << 10) |
+					((A64_X9 & 0x1f) << 5) | (A64_X9 & 0x1f);
+				a64_emit(ctx, ins);
+			} else {
+				a64_mov_imm64(ctx, A64_X11, osize);
+				a64_mul(ctx, A64_X10, A64_X10, A64_X11, 1);
+				a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+			}
+			if( is_addr ) {
+				store_vreg(ctx, A64_X9, op->p1);  // return the address
+			} else {
+				int sz = vreg_size(f, op->p1);
+				if( vreg_is_fp(f, op->p1) ) {
+					a64_ldr_fp(ctx, A64_V16, A64_X9, 0, dt->kind == HF64);
+					store_vreg_fp(ctx, A64_V16, op->p1);
+				} else {
+					a64_ldr_imm(ctx, A64_X9, A64_X9, 0, sz, 0);
+					store_vreg(ctx, A64_X9, op->p1);
+				}
+			}
+			break;
+		}
 		int elem_sz = hl_type_size(f->regs[op->p1]);
 		int header = (int)sizeof(varray);
 		load_vreg(ctx, A64_X9, op->p2);    // array ptr
@@ -2515,7 +2558,47 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 	}
 	case OSetArray: {
 		hl_type *dst_t = f->regs[op->p1];
-		if( dst_t->kind == HABSTRACT ) { a64_brk(ctx, 0xAB02); break; }
+		if( dst_t->kind == HABSTRACT ) {
+			// HABSTRACT array: arr[idx] = value, no varray header.
+			// If value is HOBJ/HSTRUCT: memcpy struct contents (rt->size bytes).
+			// Else: write value (sizeof(void*) bytes).
+			hl_type *rb_t = f->regs[op->p3];
+			int is_struct_copy = (rb_t->kind == HOBJ || rb_t->kind == HSTRUCT);
+			int osize;
+			if( is_struct_copy ) {
+				hl_runtime_obj *rt = hl_get_obj_rt(rb_t);
+				osize = rt->size;
+			} else {
+				osize = 8;
+			}
+			load_vreg(ctx, A64_X9, op->p1);   // base
+			load_vreg(ctx, A64_X10, op->p2);  // index
+			if( osize == 1 ) {
+				a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+			} else if( osize == 2 || osize == 4 || osize == 8 ) {
+				int sh = (osize == 2) ? 1 : (osize == 4) ? 2 : 3;
+				uint32_t ins =
+					(1u << 31) | (0x0B << 24) | (0u << 22) |
+					((A64_X10 & 0x1f) << 16) | ((sh & 0x3f) << 10) |
+					((A64_X9 & 0x1f) << 5) | (A64_X9 & 0x1f);
+				a64_emit(ctx, ins);
+			} else {
+				a64_mov_imm64(ctx, A64_X11, osize);
+				a64_mul(ctx, A64_X10, A64_X10, A64_X11, 1);
+				a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+			}
+			if( is_struct_copy ) {
+				// memcpy(addr, src_ptr, osize)
+				a64_mov_reg(ctx, A64_X0, A64_X9, 1);
+				load_vreg(ctx, A64_X1, op->p3);
+				a64_mov_imm32(ctx, A64_X2, osize);
+				emit_call_native_ptr(ctx, (void*)memcpy);
+			} else {
+				load_vreg(ctx, A64_X11, op->p3);
+				a64_str_imm(ctx, A64_X11, A64_X9, 0, 8);
+			}
+			break;
+		}
 		int elem_sz = hl_type_size(f->regs[op->p3]);
 		int header = (int)sizeof(varray);
 		load_vreg(ctx, A64_X9, op->p1);    // array ptr
