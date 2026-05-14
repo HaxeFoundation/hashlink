@@ -1883,10 +1883,59 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		break;
 	}
 	case OCallClosure: {
-		// Simple path: c->hasValue ? c->fun(c->value, args...) : c->fun(args...)
-		// (HDYN dynamic-call variant not yet covered; that path needs
-		// hl_dyn_call + a vdynamic** packing prologue.)
-		if( f->regs[op->p2]->kind == HDYN ) { a64_brk(ctx, 0xCDDA); break; }
+		// HDYN closure: args are HDYN, we use hl_dyn_call(c, args[], nargs)
+		// then convert result via the matching hl_dyn_castX helper.
+		if( f->regs[op->p2]->kind == HDYN ) {
+			int nargs = op->p3;
+			int args_size = nargs * 8;
+			if( args_size & 15 ) args_size += 16 - (args_size & 15);
+			// Total stack: args array + 16B scratch for result cast.
+			int total = args_size + 16;
+			a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, total, 1);
+			// Build args[i] = the vdynamic* sitting in op->extra[i]'s slot.
+			for( int i = 0; i < nargs; i++ ) {
+				load_vreg(ctx, A64_X9, op->extra[i]);
+				a64_str_imm(ctx, A64_X9, A64_SP_OR_ZR, i * 8, 8);
+			}
+			// hl_dyn_call(closure, args_ptr, nargs)
+			load_vreg(ctx, A64_X0, op->p2);
+			a64_mov_reg(ctx, A64_X1, A64_SP_OR_ZR, 1);
+			a64_add_imm(ctx, A64_X1, A64_SP_OR_ZR, 0, 1);
+			a64_mov_imm32(ctx, A64_X2, nargs);
+			emit_call_native_ptr(ctx, (void*)hl_dyn_call);
+			// Result vdynamic* in X0. Cast to dst type if not void.
+			if( op->p1 >= 0 && f->regs[op->p1]->kind != HVOID ) {
+				hl_type *dt = f->regs[op->p1];
+				if( dt->kind == HDYN ) {
+					// Direct store, no cast needed.
+					store_vreg(ctx, A64_X0, op->p1);
+				} else {
+					// Stash vdynamic* at SP+args_size, pass &stash to cast helper.
+					a64_str_imm(ctx, A64_X0, A64_SP_OR_ZR, args_size, 8);
+					a64_add_imm(ctx, A64_X0, A64_SP_OR_ZR, args_size, 1);
+					// Argument 2 is always source-type = HDYN; arg 3 (if any) is dst type.
+					static hl_type t_dynamic = { HDYN };
+					a64_mov_imm64(ctx, A64_X1, (int64_t)(intptr_t)&t_dynamic);
+					void *cast_fn;
+					int has_arg3 = 0;
+					switch( dt->kind ) {
+					case HF32: cast_fn = (void*)hl_dyn_castf; break;
+					case HF64: cast_fn = (void*)hl_dyn_castd; break;
+					case HI64: case HGUID: cast_fn = (void*)hl_dyn_casti64; break;
+					case HI32: case HUI16: case HUI8: case HBOOL:
+						cast_fn = (void*)hl_dyn_casti; has_arg3 = 1; break;
+					default:
+						cast_fn = (void*)hl_dyn_castp; has_arg3 = 1; break;
+					}
+					if( has_arg3 ) a64_mov_imm64(ctx, A64_X2, (int64_t)(intptr_t)dt);
+					emit_call_native_ptr(ctx, cast_fn);
+					if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
+					else                        store_vreg(ctx, A64_X0, op->p1);
+				}
+			}
+			a64_add_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, total, 1);
+			break;
+		}
 		// Load hasValue field (offset HL_WSIZE*2 = 16).
 		load_vreg(ctx, A64_X16, op->p2);
 		a64_ldr_imm(ctx, A64_X9, A64_X16, 16, 4, 0);
