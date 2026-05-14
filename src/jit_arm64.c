@@ -1721,13 +1721,15 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 	case ONullCheck: {
 		load_vreg(ctx, A64_X9, op->p1);
 		a64_cmp_imm(ctx, A64_X9, 0, 1);
-		// On null: call hl_null_access. We don't yet have a clean exception
-		// path, so emit a BRK that surfaces during dev.
-		int pos = a64_bcond(ctx, A64_NE, 0);
-		a64_brk(ctx, 0x0A55); // "ASS" — null assert
-		// Patch the bcond to skip the BRK if non-null.
+		int pos_nz = a64_bcond(ctx, A64_NE, 0);
+		// Null: call hl_null_access — throws a proper HL exception that the
+		// try/catch infrastructure can intercept.
+		emit_call_native_ptr(ctx, (void*)hl_null_access);
+		// hl_null_access does not return, but emit_call_native_ptr followed by
+		// the patch lets us continue codegen cleanly. The patch makes non-null
+		// paths skip the call.
 		int after = BUF_POS();
-		a64_patch_branch(ctx, pos, after);
+		a64_patch_branch(ctx, pos_nz, after);
 		break;
 	}
 	case ORet:
@@ -2050,10 +2052,15 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		if( op->p1 == op->p2 ) break;
 		hl_type *st = f->regs[op->p2];
 		hl_type *dt = f->regs[op->p1];
-		if( st->kind == HI32 || st->kind == HUI16 || st->kind == HUI8 ) {
+		if( st->kind == HI32 || st->kind == HUI16 || st->kind == HUI8 || st->kind == HBOOL ) {
 			load_vreg(ctx, A64_X9, op->p2);
 			if( dt->kind == HF64 ) a64_ucvtf_d(ctx, A64_V16, A64_X9, 0);
 			else                    a64_ucvtf_s(ctx, A64_V16, A64_X9, 0);
+			store_vreg_fp(ctx, A64_V16, op->p1);
+		} else if( st->kind == HI64 ) {
+			load_vreg(ctx, A64_X9, op->p2);
+			if( dt->kind == HF64 ) a64_ucvtf_d(ctx, A64_V16, A64_X9, 1);
+			else                    a64_ucvtf_s(ctx, A64_V16, A64_X9, 1);
 			store_vreg_fp(ctx, A64_V16, op->p1);
 		} else {
 			a64_brk(ctx, 0xF20D);
