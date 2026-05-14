@@ -512,7 +512,7 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 			regs_emit(ctx,UNUSED,cmov?CXCHG:XCHG,to,from,mode,0);
 			int_arr_remove_range(&movs,0,3);
 			size -= 3;
-			for(int k=0;k<size;k+=3) {
+			for(int k=1;k<size;k+=3) {
 				if( int_arr_get(movs,k) == to )
 					movs.values[k] = from;
 				else if( int_arr_get(movs,k) == from )
