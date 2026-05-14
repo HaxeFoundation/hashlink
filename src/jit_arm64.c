@@ -1840,6 +1840,40 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		store_vreg(ctx, A64_X0, op->p1);
 		break;
 	}
+	case OVirtualClosure: {
+		// dst = hl_alloc_closure_ptr(method_type, obj->type->vobj_proto[p3], obj)
+		// method_type is resolved at JIT time by walking ra->t->obj proto/super
+		// chain to find the proto with pindex == p3. The function pointer comes
+		// from runtime: obj->type (off 0) -> ->vobj_proto (off 16) -> [p3 * 8].
+		hl_type *ot = f->regs[op->p2];
+		hl_type *mt = NULL;
+		while( mt == NULL && ot != NULL && ot->kind == HOBJ ) {
+			for( int i = 0; i < ot->obj->nproto; i++ ) {
+				hl_obj_proto *pp = ot->obj->proto + i;
+				if( pp->pindex == op->p3 ) {
+					mt = m->code->functions[m->functions_indexes[pp->findex]].type;
+					break;
+				}
+			}
+			ot = ot->obj->super;
+		}
+		if( mt == NULL ) { a64_brk(ctx, 0xCDDC); break; }
+		// x9 = obj
+		load_vreg(ctx, A64_X9, op->p2);
+		// x9 = obj->type  (offset 0)
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 0, 8, 0);
+		// x9 = obj->type->vobj_proto  (offset HL_WSIZE*2 = 16)
+		a64_ldr_imm(ctx, A64_X9, A64_X9, 16, 8, 0);
+		// x9 = vobj_proto[p3]
+		a64_ldr_imm(ctx, A64_X9, A64_X9, op->p3 * 8, 8, 0);
+		// hl_alloc_closure_ptr(mt, x9, obj)
+		a64_mov_imm64(ctx, A64_X0, (int64_t)(intptr_t)mt);
+		a64_mov_reg(ctx, A64_X1, A64_X9, 1);
+		load_vreg(ctx, A64_X2, op->p2);
+		emit_call_native_ptr(ctx, (void*)hl_alloc_closure_ptr);
+		store_vreg(ctx, A64_X0, op->p1);
+		break;
+	}
 	case OCallClosure: {
 		// Simple path: c->hasValue ? c->fun(c->value, args...) : c->fun(args...)
 		// (HDYN dynamic-call variant not yet covered; that path needs
@@ -2276,6 +2310,45 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		load_vreg(ctx, A64_X10, op->p2);  // value
 		a64_str_imm(ctx, A64_X10, A64_X9, 0, 8);
 		break;
+	case ORefData: {
+		// dst = ra + sizeof(varray) — pointer to the array's payload data.
+		// x86 backend only handles HARRAY here; mirror that.
+		hl_type *st = f->regs[op->p2];
+		if( st->kind != HARRAY ) { a64_brk(ctx, 0xCDDB); break; }
+		load_vreg(ctx, A64_X9, op->p2);
+		a64_add_imm(ctx, A64_X9, A64_X9, (int)sizeof(varray), 1);
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
+	case ORefOffset: {
+		// dst = ra + rb * sizeof(elem), elem size from dst->t->tparam.
+		int elem_sz = hl_type_size(f->regs[op->p1]->tparam);
+		load_vreg(ctx, A64_X9, op->p2);   // base
+		load_vreg(ctx, A64_X10, op->p3);  // offset count
+		switch( elem_sz ) {
+		case 1:
+			a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+			break;
+		case 2: case 4: case 8: {
+			// add x9, x9, x10, lsl #log2(elem_sz)
+			int sh = (elem_sz == 2) ? 1 : (elem_sz == 4) ? 2 : 3;
+			uint32_t ins =
+				(1u << 31) | (0x0B << 24) | (0u << 22) /*LSL*/ |
+				((A64_X10 & 0x1f) << 16) | ((sh & 0x3f) << 10) |
+				((A64_X9 & 0x1f) << 5) | (A64_X9 & 0x1f);
+			a64_emit(ctx, ins);
+			break;
+		}
+		default:
+			// Generic: x10 *= elem_sz then add. Use MOVZ + MUL.
+			a64_mov_imm64(ctx, A64_X11, elem_sz);
+			a64_mul(ctx, A64_X10, A64_X10, A64_X11, 1);
+			a64_add_reg(ctx, A64_X9, A64_X9, A64_X10, 1);
+			break;
+		}
+		store_vreg(ctx, A64_X9, op->p1);
+		break;
+	}
 
 	// ---------------- Array ----------------
 	case OArraySize: {
