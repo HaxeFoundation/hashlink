@@ -660,6 +660,7 @@ static int emit_c2hl_trampoline( jit_ctx *ctx ) {
 // emit_prologue spills incoming x0..x7 / d0..d7 into vreg slots.
 static void store_vreg( jit_ctx *ctx, a64_greg src, int vi );
 static void store_vreg_fp( jit_ctx *ctx, a64_vreg src, int vi );
+static int  vreg_size( hl_function *f, int i );
 
 static void emit_prologue( jit_ctx *ctx, int frameSize ) {
 	if( frameSize & 0xf ) frameSize += 16 - (frameSize & 0xf);
@@ -668,13 +669,14 @@ static void emit_prologue( jit_ctx *ctx, int frameSize ) {
 	a64_stp_pre(ctx, A64_FP, A64_LR, A64_SP_OR_ZR, -16);
 	a64_add_imm(ctx, A64_FP, A64_SP_OR_ZR, 0, 1);
 	if( frameSize ) a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, frameSize, 1);
-	// Spill incoming arguments to their vreg slots. AAPCS64 passes the
-	// first 8 non-FP arguments in x0..x7 and the first 8 FP arguments
-	// in d0..d7. Beyond that, args come on the caller's stack — which
-	// the spill-everything codegen does not yet reach into.
 	hl_function *f = ctx->f;
 	int ngpr = 0, nfpr = 0;
 	int nargs = f->type->fun->nargs;
+	// AAPCS64 stack-arg layout: after our prologue, FP = caller_sp - 16.
+	// The first stack-passed arg (the 9th GPR or 9th FP, in declaration order)
+	// sits at [FP + 16], then +24, +32, ... Each arg is 8-byte slot regardless
+	// of its actual size (fixed-arity AAPCS64; we don't generate varargs).
+	int stack_off = 16;
 	for( int i = 0; i < nargs; i++ ) {
 		hl_type *at = f->type->fun->args[i];
 		int is_fp = (at->kind == HF32 || at->kind == HF64);
@@ -683,14 +685,20 @@ static void emit_prologue( jit_ctx *ctx, int frameSize ) {
 				store_vreg_fp(ctx, (a64_vreg)(A64_V0 + nfpr), i);
 				nfpr++;
 			} else {
-				a64_brk(ctx, 0xA50F); // > 8 FP args at entry
+				// Load FP arg from caller's stack into V16 then spill to vreg slot.
+				a64_ldur_fp(ctx, A64_V16, A64_FP, stack_off, at->kind == HF64);
+				store_vreg_fp(ctx, A64_V16, i);
+				stack_off += 8;
 			}
 		} else {
 			if( ngpr < 8 ) {
 				store_vreg(ctx, (a64_greg)(A64_X0 + ngpr), i);
 				ngpr++;
 			} else {
-				a64_brk(ctx, 0xA50A); // > 8 GPR args at entry
+				int sz = vreg_size(f, i);
+				a64_ldur(ctx, A64_X9, A64_FP, stack_off, sz, 0);
+				store_vreg(ctx, A64_X9, i);
+				stack_off += 8;
 			}
 		}
 	}
@@ -1891,21 +1899,54 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 		a64_blr(ctx, A64_X16);
 		int jend = a64_b(ctx, 0);
 		a64_patch_branch(ctx, jnz, BUF_POS());
-		// With captured value: build [captured, args...] in regs.
-		// Shift args by 1: x0 = captured value, x1..x7 = original args.
-		// For simplicity, we load all into a temp buffer on the stack
-		// then re-issue prepare_call_args is overkill. Direct approach:
-		// load captured + use load_vreg for each subsequent arg.
-		// Limitation: this only handles up to 7 user args (8 with captured).
-		if( op->p3 > 7 ) { a64_brk(ctx, 0xCD08); break; }
-		load_vreg(ctx, A64_X16, op->p2);
-		a64_ldr_imm(ctx, A64_X0, A64_X16, 24, 8, 0); // c->value at HL_WSIZE*3
-		for( int i = 0; i < op->p3; i++ ) {
-			load_vreg(ctx, (a64_greg)(A64_X1 + i), op->extra[i]);
+		// With captured value: x0 = captured, then user args fill x1..x7 +
+		// d0..d7 + stack following AAPCS64 with one fewer GPR slot.
+		// Pass 1: count stack-passed args (x0 taken by captured → ngpr starts at 1).
+		{
+			int ngpr_c = 1, nfpr_c = 0;
+			int stack_bytes_c = 0;
+			for( int i = 0; i < op->p3; i++ ) {
+				hl_type *t = f->regs[op->extra[i]];
+				int is_fp = (t->kind == HF32 || t->kind == HF64);
+				if( is_fp ) { if( nfpr_c < 8 ) nfpr_c++; else stack_bytes_c += 8; }
+				else        { if( ngpr_c < 8 ) ngpr_c++; else stack_bytes_c += 8; }
+			}
+			if( stack_bytes_c & 0xf ) stack_bytes_c += 16 - (stack_bytes_c & 0xf);
+			if( stack_bytes_c ) a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, stack_bytes_c, 1);
+			// Pass 2: place args.
+			ngpr_c = 1; nfpr_c = 0;
+			int stack_off_c = 0;
+			for( int i = 0; i < op->p3; i++ ) {
+				hl_type *t = f->regs[op->extra[i]];
+				int is_fp = (t->kind == HF32 || t->kind == HF64);
+				if( is_fp ) {
+					if( nfpr_c < 8 ) {
+						load_vreg_fp(ctx, (a64_vreg)(A64_V0 + nfpr_c), op->extra[i]);
+						nfpr_c++;
+					} else {
+						load_vreg_fp(ctx, A64_V16, op->extra[i]);
+						a64_str_fp(ctx, A64_V16, A64_SP_OR_ZR, stack_off_c, t->kind == HF64);
+						stack_off_c += 8;
+					}
+				} else {
+					if( ngpr_c < 8 ) {
+						load_vreg(ctx, (a64_greg)(A64_X0 + ngpr_c), op->extra[i]);
+						ngpr_c++;
+					} else {
+						load_vreg(ctx, A64_X9, op->extra[i]);
+						a64_str_imm(ctx, A64_X9, A64_SP_OR_ZR, stack_off_c, vreg_size(f, op->extra[i]));
+						stack_off_c += 8;
+					}
+				}
+			}
+			// Load c->value into x0 last so the loop's load_vreg into x1+ doesn't
+			// clobber it via cache MOV.
+			load_vreg(ctx, A64_X16, op->p2);
+			a64_ldr_imm(ctx, A64_X0, A64_X16, 24, 8, 0);
+			a64_ldr_imm(ctx, A64_X16, A64_X16, 8, 8, 0);
+			a64_blr(ctx, A64_X16);
+			if( stack_bytes_c ) a64_add_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, stack_bytes_c, 1);
 		}
-		load_vreg(ctx, A64_X16, op->p2);
-		a64_ldr_imm(ctx, A64_X16, A64_X16, 8, 8, 0);
-		a64_blr(ctx, A64_X16);
 		a64_patch_branch(ctx, jend, BUF_POS());
 		if( op->p1 >= 0 && f->regs[op->p1]->kind != HVOID ) {
 			if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
@@ -2235,38 +2276,64 @@ static void jit_opcode( jit_ctx *ctx, hl_opcode *op, int opIdx ) {
 			int j_end = a64_b(ctx, 0);
 			// ---- Non-NULL path: call vfield_ptr(o->value, args[1..]) ----
 			a64_patch_branch(ctx, j_has, BUF_POS());
-			// Replace extra[0] with o->value: load o->value, set up regs
-			// the same way prepare_call_args does, but with x0 = o->value.
-			// We need to first stash the vfield ptr (in x10) somewhere that
-			// survives prepare_call_args (which uses x9/x10 internally).
-			// Push x10 to a temp stack slot above sp.
-			a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, 16, 1);
-			a64_str_imm(ctx, A64_X10, A64_SP_OR_ZR, 0, 8);
-			// Compute o->value into x11 and stash it too.
-			load_vreg(ctx, A64_X11, op->extra[0]);
-			a64_ldr_imm(ctx, A64_X11, A64_X11, 8, 8, 0);
-			a64_str_imm(ctx, A64_X11, A64_SP_OR_ZR, 8, 8);
-			// Prepare remaining args (extra[1..p3-1]) into x1..x{nargs}.
-			// Use prepare_call_args-style logic but starting from x1, not x0.
-			// Cheapest: iterate by hand for the common case.
-			if( nargs > 7 ) { a64_brk(ctx, 0xCAA8); break; }
-			for( int i = 0; i < nargs; i++ ) {
-				int vi = op->extra[i + 1];
-				if( vreg_is_fp(f, vi) ) {
-					// FP args still go in d0..d7 separately; rare for now.
-					load_vreg_fp(ctx, (a64_vreg)(A64_V0 + i), vi);
-				} else {
-					load_vreg(ctx, (a64_greg)(A64_X1 + i), vi);
+			// AAPCS64: x0 reserved for o->value. Args extra[1..nargs] fill
+			// x1..x7 + d0..d7 + stack (in declaration order across both banks
+			// for the overflow). Compute the overflow stack first.
+			{
+				int ngpr_m = 1, nfpr_m = 0;
+				int stack_overflow = 0;
+				for( int i = 0; i < nargs; i++ ) {
+					hl_type *at = f->regs[op->extra[i + 1]];
+					int is_fp = (at->kind == HF32 || at->kind == HF64);
+					if( is_fp ) { if( nfpr_m < 8 ) nfpr_m++; else stack_overflow += 8; }
+					else        { if( ngpr_m < 8 ) ngpr_m++; else stack_overflow += 8; }
 				}
-			}
-			// Pop o->value into x0 and vfield ptr into x16, restore sp.
-			a64_ldr_imm(ctx, A64_X16, A64_SP_OR_ZR, 0, 8, 0);
-			a64_ldr_imm(ctx, A64_X0, A64_SP_OR_ZR, 8, 8, 0);
-			a64_add_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, 16, 1);
-			a64_blr(ctx, A64_X16);
-			if( op->p1 >= 0 && f->regs[op->p1]->kind != HVOID ) {
-				if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
-				else                         store_vreg(ctx, A64_X0, op->p1);
+				if( stack_overflow & 0xf ) stack_overflow += 16 - (stack_overflow & 0xf);
+				int total = 16 + stack_overflow; // 16B stash + overflow
+				int stash_off = stack_overflow;  // stash above overflow args
+				a64_sub_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, total, 1);
+				// Stash vfield (currently in x10) at [SP + stash_off + 0].
+				a64_str_imm(ctx, A64_X10, A64_SP_OR_ZR, stash_off, 8);
+				// Compute o->value into x11 and stash at [SP + stash_off + 8].
+				load_vreg(ctx, A64_X11, op->extra[0]);
+				a64_ldr_imm(ctx, A64_X11, A64_X11, 8, 8, 0);
+				a64_str_imm(ctx, A64_X11, A64_SP_OR_ZR, stash_off + 8, 8);
+				// Place args.
+				ngpr_m = 1; nfpr_m = 0;
+				int stack_off_m = 0;
+				for( int i = 0; i < nargs; i++ ) {
+					int vi = op->extra[i + 1];
+					hl_type *at = f->regs[vi];
+					int is_fp = (at->kind == HF32 || at->kind == HF64);
+					if( is_fp ) {
+						if( nfpr_m < 8 ) {
+							load_vreg_fp(ctx, (a64_vreg)(A64_V0 + nfpr_m), vi);
+							nfpr_m++;
+						} else {
+							load_vreg_fp(ctx, A64_V16, vi);
+							a64_str_fp(ctx, A64_V16, A64_SP_OR_ZR, stack_off_m, at->kind == HF64);
+							stack_off_m += 8;
+						}
+					} else {
+						if( ngpr_m < 8 ) {
+							load_vreg(ctx, (a64_greg)(A64_X0 + ngpr_m), vi);
+							ngpr_m++;
+						} else {
+							load_vreg(ctx, A64_X9, vi);
+							a64_str_imm(ctx, A64_X9, A64_SP_OR_ZR, stack_off_m, vreg_size(f, vi));
+							stack_off_m += 8;
+						}
+					}
+				}
+				// Recover vfield and o->value.
+				a64_ldr_imm(ctx, A64_X16, A64_SP_OR_ZR, stash_off, 8, 0);
+				a64_ldr_imm(ctx, A64_X0,  A64_SP_OR_ZR, stash_off + 8, 8, 0);
+				a64_blr(ctx, A64_X16);
+				if( op->p1 >= 0 && f->regs[op->p1]->kind != HVOID ) {
+					if( vreg_is_fp(f, op->p1) ) store_vreg_fp(ctx, A64_V0, op->p1);
+					else                         store_vreg(ctx, A64_X0, op->p1);
+				}
+				a64_add_imm(ctx, A64_SP_OR_ZR, A64_SP_OR_ZR, total, 1);
 			}
 			a64_patch_branch(ctx, j_end, BUF_POS());
 		} else {
