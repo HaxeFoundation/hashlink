@@ -149,22 +149,9 @@ static int8_t reg_owner_fp[32];
 // useful for A/B perf measurement and for confirming correctness when
 // chasing a regression.
 //
-// Default-disabled on Android: the cache works on macOS arm64 (validated
-// across the bench suite + Heaps demos) but breaks h2d rendering on the
-// Android arm64 emulator with a JIT'd-code SIGSEGV at fault addresses
-// looking like 0x240xxx060. h3d.scene.Mesh + texture works fine, but any
-// h2d.Bitmap or h2d.Particles batch path crashes. Root cause not yet
-// found — fault is reproducible with HeapDemo (80 sprites). Until the
-// fix lands, disable by default and keep the env override.
 static int cache_disabled = -1;
 static int is_cache_disabled( void ) {
-	if( cache_disabled < 0 ) {
-#ifdef HL_ANDROID
-		cache_disabled = 1;
-#else
-		cache_disabled = (getenv("HL_JIT_NO_CACHE") != NULL) ? 1 : 0;
-#endif
-	}
+	if( cache_disabled < 0 ) cache_disabled = (getenv("HL_JIT_NO_CACHE") != NULL) ? 1 : 0;
 	return cache_disabled;
 }
 
@@ -909,15 +896,16 @@ static int vreg_size( hl_function *f, int i ) {
 // Emit "load vreg #vi into Xreg". For FP-typed vregs the caller is expected
 // to call load_vreg_fp() instead.
 static void load_vreg( jit_ctx *ctx, a64_greg dst, int vi ) {
+	// Only the "already in dst" shortcut is taken — the cross-reg MOV form
+	// (find_gpr returns a different holder → MOV dst, holder) used to live
+	// here but introduced a stale-value crash on Heaps h2d.RenderContext
+	// rendering. The Android Heaps demo (HeapDemo, 80 sprites) reproduced
+	// it as a SIGSEGV in JIT'd hxd.BufferFormat.resolveMapping with a
+	// dereferenced address pattern ~0x240xxx060. Same-reg shortcut still
+	// catches the very common store-then-load-same-reg case from the
+	// emit_prologue arg spills and from sequential opcode patterns.
 	int holder = find_gpr(vi);
-	if( holder >= 0 ) {
-		if( holder == (int)dst ) return; // already there
-		// vi lives in some other reg → MOV is cheaper than re-loading from memory.
-		a64_mov_reg(ctx, dst, (a64_greg)holder, 1);
-		// a64_mov_reg → orr_reg → killed dst before emit; re-claim now.
-		claim_gpr(dst, vi);
-		return;
-	}
+	if( holder == (int)dst ) return;
 	int off = vreg_offset(vi);
 	int sz  = vreg_size(ctx->f, vi);
 	kill_gpr(dst);
@@ -944,13 +932,9 @@ static void store_vreg( jit_ctx *ctx, a64_greg src, int vi ) {
 	claim_gpr(src, vi);
 }
 static void load_vreg_fp( jit_ctx *ctx, a64_vreg dst, int vi ) {
+	// See note in load_vreg about why we only take the same-reg shortcut.
 	int holder = find_fp(vi);
-	if( holder >= 0 ) {
-		if( holder == (int)dst ) return;
-		a64_fmov_d(ctx, dst, (a64_vreg)holder);
-		claim_fp(dst, vi);
-		return;
-	}
+	if( holder == (int)dst ) return;
 	int off = vreg_offset(vi);
 	int is_double = ctx->f->regs[vi]->kind == HF64;
 	kill_fp(dst);
