@@ -983,12 +983,14 @@ static void hl_gc_init() {
 #	endif
 	gc_stats.mark_bytes = 4; // prevent reading out of bmp
 	memset(&gc_threads,0,sizeof(gc_threads));
-	gc_threads.global_lock = hl_mutex_alloc(false);
-	gc_threads.exclusive_lock = hl_mutex_alloc(false);
 #	ifdef HL_THREADS
 	hl_add_root(&gc_threads.global_lock);
 	hl_add_root(&gc_threads.exclusive_lock);
 	hl_add_root(&mark_threads_done);
+#	endif
+	gc_threads.global_lock = hl_mutex_alloc(false);
+	gc_threads.exclusive_lock = hl_mutex_alloc(false);
+#	ifdef HL_THREADS
 	mark_threads_done = hl_semaphore_alloc(0);
 	char *nthreads = getenv("HL_GC_THREADS");
 	if( nthreads ) {
