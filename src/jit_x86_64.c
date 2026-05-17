@@ -101,6 +101,8 @@ typedef enum {
 	DEC,
 	JMP,
 	MOVSXD,
+	PUSHFQ,
+	POPFQ,
 	// FPU
 	FSTP,
 	FSTP32,
@@ -108,6 +110,7 @@ typedef enum {
 	FLD32,
 	FLDCW,
 	// SSE
+	MOVQ,
 	MOVSD,
 	MOVSS,
 	COMISD,
@@ -121,6 +124,9 @@ typedef enum {
 	MULSS,
 	DIVSS,
 	XORPS,
+	ANDPD,
+	ANDNPD,
+	ORPD,
 	XORPD,
 	CVTSI2SD,
 	CVTSI2SS,
@@ -227,6 +233,8 @@ static opform OP_FORMS[] = {
 	{ "DEC", IS_64 ? RM(0xFF,1) : 0x48, RM(0xFF,1) },
 	{ "JMP", RM(0xFF,4) },
 	{ "MOVSXD", 0x63 },
+	{ "PUSHFQ", 0x9C },
+	{ "POPFQ", 0x9D },
 	// FPU
 	{ "FSTP", 0, RM(0xDD,3) },
 	{ "FSTP32", 0, RM(0xD9,3) },
@@ -234,6 +242,7 @@ static opform OP_FORMS[] = {
 	{ "FLD32", 0, RM(0xD9,0) },
 	{ "FLDCW", 0, RM(0xD9, 5) },
 	// SSE
+	{ "MOVQ", 0x660F6E },
 	{ "MOVSD", 0xF20F10, 0xF20F11  },
 	{ "MOVSS", 0xF30F10, 0xF30F11  },
 	{ "COMISD", LONG_RM(0x660F2F,1) },
@@ -247,6 +256,9 @@ static opform OP_FORMS[] = {
 	{ "MULSS", 0xF30F59 },
 	{ "DIVSS", 0xF30F5E },
 	{ "XORPS", LONG_OP(0x0F57) },
+	{ "ANDPD", 0x660F54 },
+	{ "ANDNPD", 0x660F55 },
+	{ "ORPD", 0x660F56 },
 	{ "XORPD", 0x660F57 },
 	{ "CVTSI2SD", 0xF20F2A },
 	{ "CVTSI2SS", 0xF30F2A },
@@ -1089,6 +1101,13 @@ static void emit_cmov( code_ctx *ctx, ereg out, ereg r, int cond, emit_mode m ) 
 	MOD_RM(3,out,r);
 }
 
+static void emit_cset( code_ctx *ctx, ereg out, int cond ) {
+	if( (out&8) ) B(0x41);
+	B(0x0F);
+	B(cond + 0x10);
+	MOD_RM(3,0,out);
+}
+
 void hl_codegen_function( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
 	ctx->flushed = false;
@@ -1500,7 +1519,33 @@ void hl_codegen_function( jit_ctx *jit ) {
 			{
 				int cond = get_cond_jump(ctx);
 				if( !IS_REG(out) ) jit_assert();
-				if( IS_REG(e->a) ) {
+				if( IS_FLOAT(e->mode) ) {
+					EMIT(PUSHFQ,UNUSED,UNUSED,M_PTR);
+					// create a mask in RTMP to be used for xmm
+					emit_cset(ctx,RTMP,cond);
+					EMIT(MOVZX8,RTMP,RTMP,M_PTR);
+					EMIT(NEG,RTMP,UNUSED,M_PTR);
+					// do dst := (mask & src) | (dst & ~mask)
+					ereg tmp = get_tmp(M_F64);
+					EMIT(MOVQ,tmp,RTMP,M_PTR);
+					EMIT(ANDNPD,tmp,out,M_F64);
+					EMIT(MOVQ,out,RTMP,M_PTR);
+					if( !IS_REG(e->a) ) {
+						// ANDNPD requires aligned address !
+						ereg tmp2 = out == MMX(0) ? MMX(1) : MMX(0);
+						EMIT(SUB,R(RSP),MK_CONST(8),M_PTR);
+						EMIT(MOVSD,REG_PTR(R(RSP)),tmp2,M_F64);
+						EMIT(e->mode == M_F32 ? MOVSS : MOVSD,tmp2,e->a,e->mode);
+						EMIT(ANDPD,out,tmp2,M_F64);
+						EMIT(ORPD,out,tmp,M_F64);
+						EMIT(MOVSD,tmp2,REG_PTR(R(RSP)),M_PTR);
+						EMIT(ADD,R(RSP),MK_CONST(8),M_PTR);
+					} else {
+						EMIT(ANDPD,out,e->a,M_F64);
+						EMIT(ORPD,out,tmp,M_F64);
+					}
+					EMIT(POPFQ,UNUSED,UNUSED,M_PTR);
+				} else if( IS_REG(e->a) ) {
 					emit_cmov(ctx,out,e->a,cond,M_PTR);					
 				} else {
 					emit_mov(ctx,RTMP,e->a,e->mode);
