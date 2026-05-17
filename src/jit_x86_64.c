@@ -1201,7 +1201,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case POP:
 			if( IS_FLOAT(e->mode) ) {
-				EMIT(e->mode == M_F32 ? MOVSS : MOVSD,REG_PTR(R(RSP)),e->a,e->mode);
+				EMIT(e->mode == M_F32 ? MOVSS : MOVSD,e->a,REG_PTR(R(RSP)),e->mode);
 				EMIT(ADD,R(RSP),MK_CONST(8),M_PTR);
 			} else {
 				EMIT(_POP, e->a, UNUSED, M_PTR);
