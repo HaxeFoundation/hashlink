@@ -879,6 +879,28 @@ void hl_emit_flush( jit_ctx *jit ) {
 	jit->values_writes = ctx->values.values;
 	for_iter(blocks,b,ctx->blocks)
 		emit_write_block(ctx,b);
+	{
+		eblock *cur_loop = NULL;
+		for(int b=0;b<jit->block_count;b++) {
+			eblock *bl = jit->blocks + b;
+			while( cur_loop != NULL && bl->start_pos > cur_loop->loop_end )
+				cur_loop = cur_loop->loop_parent;
+			int new_loop_end = -1;
+			for(int k=0;k<bl->pred_count;k++) {
+				eblock *pred = jit->blocks + bl->preds[k];
+				if( pred->start_pos > bl->start_pos && pred->end_pos - 1 > new_loop_end )
+					new_loop_end = pred->end_pos - 1;
+			}
+			if( new_loop_end > 0 ) {
+				bl->loop_end = new_loop_end;
+				bl->loop_parent = cur_loop;
+				cur_loop = bl;
+			} else {
+				bl->loop_end = 0;
+				bl->loop_parent = cur_loop;
+			}
+		}
+	}
 }
 
 void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( void *, ereg * ) ) {

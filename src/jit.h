@@ -161,16 +161,20 @@ struct _ephi {
 	int *blocks;
 };
 
-typedef struct _eblock {
+typedef struct _eblock eblock;
+
+struct _eblock {
 	int start_pos;
 	int end_pos;
 	int next_count;
 	int pred_count;
 	int phi_count;
+	int loop_end;
 	int *nexts;
 	int *preds;
 	ephi *phis;
-} eblock;
+	eblock *loop_parent;
+};
 
 typedef struct _emit_ctx emit_ctx;
 typedef struct _regs_ctx regs_ctx;
