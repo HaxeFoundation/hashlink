@@ -232,6 +232,16 @@ static value_info *regs_current( regs_ctx *ctx, ereg r ) {
 	return NULL;
 }
 
+static int get_loop_end( regs_ctx *ctx, eblock *b ) {
+	int loop_end = -1;
+	for(int k=0;k<b->pred_count;k++) {
+		eblock *b2 = ctx->jit->blocks + b->preds[k];
+		if( b2->start_pos > b->start_pos && b2->end_pos >= loop_end )
+			loop_end = b2->end_pos - 1;
+	}
+	return loop_end;
+}
+
 static void regs_compute_liveness( regs_ctx *ctx ) {
 #	define MAX_LOOP_DEPTH 256
 	int loop_saves[MAX_LOOP_DEPTH];
@@ -303,12 +313,7 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			{
 				// are we in loop ?
 				eblock *bl = jit->blocks + e->size_offs;
-				int loop_end = -1;
-				for(int k=0;k<bl->pred_count;k++) {
-					eblock *b2 = jit->blocks + bl->preds[k];
-					if( b2->start_pos > bl->start_pos && b2->end_pos >= loop_end )
-						loop_end = b2->end_pos - 1;
-				}
+				int loop_end = get_loop_end(ctx,bl);
 				if( loop_end > 0 ) {
 					loop_saves[loop_count++] = ctx->loop_start;
 					loop_saves[loop_count++] = ctx->loop_end;
@@ -340,6 +345,13 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 				val->tot_reads++;
 				if( val->last_read < b2->end_pos )
 					val->last_read = b2->end_pos;
+				// make sure our merged values are preserved if they are in a loop
+				int write_pos = val->id >= 0 ? jit->values_writes[val->id] : -1;
+				if( write_pos < b2->start_pos ) {
+					int loop_end = get_loop_end(ctx,b2);
+					if( loop_end > 0 && val->last_read < loop_end )
+						val->last_read = loop_end;
+				}
 			}
 		}
 	}

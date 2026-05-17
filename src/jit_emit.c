@@ -990,7 +990,7 @@ void hl_emit_function( jit_ctx *jit ) {
 		free(ctx->pos_map);
 		ctx->pos_map = (int*)malloc(sizeof(int) * (f->nops+1));
 		if( ctx->pos_map == NULL ) jit_assert();
-		ctx->pos_map_size = f->nops;
+		ctx->pos_map_size = f->nops + 1;
 	}
 
 	for(i=0;i<f->nregs;i++) {
@@ -2004,10 +2004,12 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				hashed_name = f->hashed_name;
 			} else if( (next->op >= OCall1 && next->op <= OCallN) && next->p3 == o->p1 ) {
 				int fid = next->p2 < 0 ? -1 : m->functions_indexes[next->p2];
-				hl_function *cf = m->code->functions + fid;
-				const uchar *name = fun_field_name(cf);
-				null_field_access = true;
-				hashed_name = hl_hash_gen(name, true);
+				if( fid >= 0 && fid < m->code->nfunctions ) {
+					hl_function *cf = m->code->functions + fid;
+					const uchar *name = fun_field_name(cf);
+					null_field_access = true;
+					hashed_name = hl_hash_gen(name, true);
+				}
 			}
 			// -----------------------------------------
 			if( null_field_access ) {
