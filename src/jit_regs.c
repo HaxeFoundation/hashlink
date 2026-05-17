@@ -71,10 +71,9 @@ struct _regs_ctx {
 	int emit_pos;
 	int stack_size;
 	int stack_offset;
-	int loop_start;
-	int loop_end;
 	einstr *instrs;
 	ereg *out_write;
+	eblock *cur_block;
 	int *pos_map;
 	bool flushed;
 	bool has_direct_call;
@@ -215,13 +214,23 @@ static void regs_assign( regs_ctx *ctx, value_info *v ) {
 	regs_debug("REG ASSIGN %s @%X-@%X\n",value_str(v),ctx->cur_op,v->last_read);
 }
 
+static void regs_loop_liveness( regs_ctx *ctx, eblock *block, value_info *v, int pos ) {
+	int write = v->id >= 0 ? ctx->jit->values_writes[v->id] : -1;
+	eblock *b = (block->loop_end > 0) ? block : block->loop_parent;
+	while( b ) {
+		if( write >= b->start_pos ) break;
+		if( pos < b->loop_end ) pos = b->loop_end;
+		b = b->loop_parent;
+	}
+	if( v->last_read < pos ) v->last_read = pos;
+	v->tot_reads++;
+}
+
 static void regs_write_live( regs_ctx *ctx, ereg *r ) {
 	if( IS_NULL(*r) ) jit_assert();
 	if( !REG_IS_VAL(*r) ) return; // some are injections of native regs at emit
 	value_info *v = VAL_REG(*r);
-	int write = v->id >= 0 ? ctx->jit->values_writes[v->id] : -1;
-	v->last_read = ctx->loop_end && write < ctx->loop_start ? ctx->loop_end : ctx->cur_op;
-	v->tot_reads++;
+	regs_loop_liveness(ctx, ctx->cur_block, v, ctx->cur_op);
 }
 
 static value_info *regs_current( regs_ctx *ctx, ereg r ) {
@@ -232,20 +241,8 @@ static value_info *regs_current( regs_ctx *ctx, ereg r ) {
 	return NULL;
 }
 
-static int get_loop_end( regs_ctx *ctx, eblock *b ) {
-	int loop_end = -1;
-	for(int k=0;k<b->pred_count;k++) {
-		eblock *b2 = ctx->jit->blocks + b->preds[k];
-		if( b2->start_pos > b->start_pos && b2->end_pos >= loop_end )
-			loop_end = b2->end_pos - 1;
-	}
-	return loop_end;
-}
 
 static void regs_compute_liveness( regs_ctx *ctx ) {
-#	define MAX_LOOP_DEPTH 256
-	int loop_saves[MAX_LOOP_DEPTH];
-	int loop_count = 0;
 	int write_index = 1;
 	jit_ctx *jit = ctx->jit;
 	hl_type *tret = ctx->jit->fun->type->fun->ret;
@@ -254,11 +251,6 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
 		einstr *e = jit->instrs + cur_op;
 		value_info *write = NULL;
-
-		while( ctx->loop_end == cur_op && cur_op ) {
-			ctx->loop_end = loop_saves[--loop_count];
-			ctx->loop_start = loop_saves[--loop_count];
-		}
 
 		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op )
 			write = VAL(write_index++);
@@ -310,23 +302,12 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 			}
 			break;
 		case BLOCK:
-			{
-				// are we in loop ?
-				eblock *bl = jit->blocks + e->size_offs;
-				int loop_end = get_loop_end(ctx,bl);
-				if( loop_end > 0 ) {
-					loop_saves[loop_count++] = ctx->loop_start;
-					loop_saves[loop_count++] = ctx->loop_end;
-					ctx->loop_start = cur_op;
-					ctx->loop_end = loop_end;
-				}
-			}
+			ctx->cur_block = jit->blocks + e->size_offs;
 			break;
 		default:
 			break;
 		}
 	}
-	if( loop_count != 0 ) jit_assert();
 	// compute reverse phis
 	for(int b=0;b<jit->block_count;b++) {
 		eblock *bl = jit->blocks + b;
@@ -342,16 +323,7 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 				int_arr_add(*arr,v);
 				int_arr_add(*arr,ph->value);
 				int_arr_add(*arr,(bl - b2) == 1);
-				val->tot_reads++;
-				if( val->last_read < b2->end_pos )
-					val->last_read = b2->end_pos;
-				// make sure our merged values are preserved if they are in a loop
-				int write_pos = val->id >= 0 ? jit->values_writes[val->id] : -1;
-				if( write_pos < b2->start_pos ) {
-					int loop_end = get_loop_end(ctx,b2);
-					if( loop_end > 0 && val->last_read < loop_end )
-						val->last_read = loop_end;
-				}
+				regs_loop_liveness(ctx, b2, val, b2->end_pos);
 			}
 		}
 	}
