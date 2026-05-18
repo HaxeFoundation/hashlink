@@ -1708,7 +1708,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					STORE_MEM(field, 0, val);
 					int jend = emit_jump(ctx, false);
 					patch_jump(ctx, jidx);
-					bool need_type = dyn_need_type(dst->t);
+					bool need_type = dyn_need_type(rb->t);
 					ereg args[4];
 					args[0] = obj;
 					args[1] = LOAD_CONST(dst->t->virt->fields[o->p2].hashed_name,&hlt_i32);
@@ -1718,7 +1718,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 					} else {
 						args[2] = val;
 					}
-					emit_native_call(ctx,get_dynset(dst->t),args,need_type?4:3,dst->t);
+					emit_native_call(ctx,get_dynset(rb->t),args,need_type?4:3,dst->t);
 					patch_jump(ctx, jend);
 				}
 				break;
