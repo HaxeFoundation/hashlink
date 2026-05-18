@@ -766,6 +766,13 @@ void hl_regs_function( jit_ctx *jit ) {
 			v->mode = M_NONE;
 		}
 	}
+	for(int b=0;b<jit->block_count;b++) {
+		eblock *bl = jit->blocks + b;
+		for(int p=0;p<bl->phi_count;p++) {
+			ephi *ph = bl->phis + p;
+			VAL_REG(ph->value)->mode = ph->mode;
+		}
+	}
 	regs_compute_liveness(ctx);
 	regs_assign_regs(ctx);
 	regs_emit_instrs(ctx);
