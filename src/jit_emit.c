@@ -327,7 +327,7 @@ static void emit_store_mem( emit_ctx *ctx, ereg to, int offs, ereg from ) {
 void hl_emit_store_args( emit_ctx *ctx, einstr *e, ereg *args, int count ) {
 	if( count < 0 ) jit_assert();
 	if( count > 256 ) jit_error("Too many arguments");
-	e->nargs = (unsigned char)count;
+	e->nargs = (unsigned short)count;
 	if( count == 0 ) return;
 	if( count == 1 ) {
 		e->size_offs = args[0];

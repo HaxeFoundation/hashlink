@@ -82,8 +82,7 @@ typedef struct {
 		struct {
 			unsigned char op;
 			unsigned char mode;
-			unsigned char nargs;
-			unsigned char _unused;
+			unsigned short nargs;
 		};
 		int header;
 	};
