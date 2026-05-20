@@ -4,6 +4,8 @@ import haxe.Int64;
 
 typedef DriverInstance = hl.Abstract<"dx_driver">;
 
+typedef Device = hl.Abstract<"dx_device">;
+
 enum DriverInitFlag {
 	DEBUG;
 	GPU_BASED_VALIDATION;
@@ -1659,6 +1661,10 @@ class Dx12 {
 
 	public static function create( win : Window, flags : DriverInitFlags, ?deviceName : String ) {
 		return dxCreate(@:privateAccess win.win, flags, deviceName == null ? null : @:privateAccess deviceName.bytes);
+	}
+
+	public static function getDevice() : Device {
+		return null;
 	}
 
 	public static function flushMessages() {
