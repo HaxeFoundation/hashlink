@@ -154,7 +154,6 @@ static void hl_dump_op( hl_function *fun, hl_opcode *op ) {
 				if( i != 0 ) printf(",");
 				printf("@%X", (op->extra[i] + pos + 1));
 			}
-			printf(",def=@%X", op->p3 + pos + 1);
 		} else {
 			if( count == 0xFF )
 				count = op->p3;
