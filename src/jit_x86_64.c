@@ -1652,7 +1652,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 	for(int i=0;i<cfg->floats.nargs;i++)
 		EMIT(MOVSD, cfg->floats.arg[i]-64, MK_ADDR(vargs,(i + cfg->regs.nargs) * 8), M_PTR);
 
-	EMIT(ADD,vargs,MK_CONST((MAX_ARGS - 1) * HL_WSIZE),M_PTR);
+	EMIT(ADD,vargs,MK_CONST((2 * MAX_ARGS - 1) * HL_WSIZE),M_PTR);
 	int begin = byte_count(ctx->code);
 	EMIT(_TEST,nargs,nargs,M_I32);
 	int pos = jump_near(ctx,JZero);
