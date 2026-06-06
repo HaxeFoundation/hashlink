@@ -1,0 +1,300 @@
+/*
+ * Copyright (C)2005-2016 Haxe Foundation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+#ifndef JIT_H
+#define JIT_H
+
+#include <hlmodule.h>
+#include <math.h>
+
+typedef enum {
+	LOAD_ADDR,
+	LOAD_CONST,
+	LOAD_ARG,
+	LOAD_FUN,
+	STORE,
+	LEA,
+	TEST,
+	CMP,
+	JCOND,
+	JUMP,
+	JUMP_TABLE,
+	BINOP,
+	UNOP,
+	CONV,
+	CONV_UNSIGNED,
+	RET,
+	CALL_PTR,
+	CALL_REG,
+	CALL_FUN,
+	MOV,
+	CMOV,
+	XCHG,
+	CXCHG,
+	PUSH_CONST,
+	PUSH,
+	POP,
+	ALLOC_STACK,
+	PREFETCH,
+	DEBUG_BREAK,
+	BLOCK,
+	ENTER,
+	STACK_OFFS,
+	CATCH,
+	ADDRESS,
+	NOP,
+} emit_op;
+
+typedef enum {
+	M_NONE,
+	M_UI8,
+	M_UI16,
+	M_I32,
+	M_PTR,
+	M_F64,
+	M_F32,
+	M_VOID,
+	M_NORET,
+} emit_mode;
+
+typedef int ereg;
+
+typedef struct {
+	union {
+		struct {
+			unsigned char op;
+			unsigned char mode;
+			unsigned short nargs;
+		};
+		int header;
+	};
+	int size_offs;
+	union {
+		struct {
+			ereg a;
+			ereg b;
+		};
+		uint64 value;
+	};
+} einstr;
+
+typedef enum {
+	R_VALUE			= 0,
+	R_REG			= 0x40000000,
+	R_REG_PTR		= 0x50000000,
+	R_CONST			= 0x60000000,
+	R_PHI			= 0x70000000,
+} rkind;
+
+// reg representation is :
+// higher bits
+// 0000 = positive value (for IR only VXXX)
+// X100 = native register, lower 7 bits is the register, bits 8-28 are the offset (21 bits)
+// X101 = same as above, but indirect address
+// X110 = small constant value stored in offset
+// 1111 = negative value (for IR phi  PXXX)
+// 10XX = unused
+
+#define STACK_REG	5
+
+#define UNUSED						((ereg)0)
+#define MK_REG(v,kind)				(((v)&0x7F) | (kind))
+#define MK_REG_VAL(v,kind,val)		(MK_REG(v,kind) | (((val) << 7)&0x8FFFFF80))
+
+#define REG_KIND(r)		((r)&0x70000000)
+#define REG_REG(r)		((r)&0x7F)
+#define REG_VALUE(r)	(((int)(((r) & 0x8000000) ? ((r) | 0xF0000000) : ((r)&0x0FFFFFFF)))>>7)
+#define REG_PTR(r)		_reg_chk(r,R_REG,(r)|R_REG_PTR)
+#define REG_ADD_OFFSET(r,offs) _reg_chk(r,R_REG_PTR,MK_REG_VAL(r,REG_KIND(r),REG_VALUE(r)+(offs)))
+#define REG_IS_VAL(r)		(REG_KIND(r) == R_VALUE || REG_KIND(r) == R_PHI)
+
+#define IS_NULL(r)			((r) == 0)
+#define IS_REG(r)			(REG_KIND(r) == R_REG)
+#define MK_STACK_REG(v)		MK_REG_VAL(STACK_REG,R_REG_PTR,v)
+#define MK_STACK_OFFS(v)	MK_REG_VAL(STACK_REG,R_REG,v)
+#define MK_CONST(v)			MK_REG_VAL(0,R_CONST,v)
+#define MK_ADDR(reg,offs)	MK_REG_VAL(reg,R_REG_PTR,offs)
+
+#define IS_CALL(op)	((op) == CALL_PTR || (op) == CALL_REG || (op) == CALL_FUN)
+#define IS_FLOAT(mode)	((mode) == M_F64 || (mode) == M_F32)
+
+#define MAX_ARGS	16
+
+#if defined(HL_WIN_CALL) && defined(HL_64)
+#	define IS_WINCALL64 1
+#else
+#	define IS_WINCALL64 0
+#endif
+
+typedef struct {
+	int *data;
+	int max;
+	int cur;
+} int_alloc;
+
+typedef struct _ephi ephi;
+
+struct _ephi {
+	ereg value;
+	int nvalues;
+	emit_mode mode;
+	ereg *values;
+	int *blocks;
+};
+
+typedef struct _eblock eblock;
+
+struct _eblock {
+	int start_pos;
+	int end_pos;
+	int next_count;
+	int pred_count;
+	int phi_count;
+	int loop_end;
+	int *nexts;
+	int *preds;
+	ephi *phis;
+	eblock *loop_parent;
+};
+
+typedef struct _emit_ctx emit_ctx;
+typedef struct _regs_ctx regs_ctx;
+typedef struct _code_ctx code_ctx;
+typedef struct _jit_ctx jit_ctx;
+
+typedef struct {
+	int nscratchs;
+	int npersists;
+	int nargs;
+	ereg ret;
+	ereg *scratch;
+	ereg *persist;
+	ereg *arg;
+} reg_config;
+
+typedef struct {
+	reg_config regs;
+	reg_config floats;
+	ereg stack_reg;
+	ereg stack_pos;
+	int stack_align;
+	int debug_prefix_size;
+	ereg req_bit_shifts;
+	ereg req_div_a;
+	ereg req_div_b;
+} regs_config;
+
+typedef struct {
+	int c2hl;
+	int hl2c;
+} jit_special_funs;
+
+struct _jit_ctx {
+	hl_module *mod;
+	hl_function *fun;
+	hl_alloc falloc;
+	hl_alloc galloc;
+	emit_ctx *emit;
+	regs_ctx *regs;
+	code_ctx *code;
+	regs_config cfg;
+	// emit output
+	int instr_count;
+	int block_count;
+	int value_count;
+	int phi_count;
+	einstr *instrs;
+	eblock *blocks;
+	int *values_writes;
+	int *emit_pos_map;
+	// regs output
+	int reg_instr_count;
+	einstr *reg_instrs;
+	ereg *reg_writes;
+	int *reg_pos_map;
+	// codegen output
+	int code_size;
+	unsigned char *code_instrs;
+	int *code_pos_map;
+	jit_special_funs code_funs;
+	// accum output
+	int fdef_index;
+	int out_pos;
+	int out_max;
+	unsigned char *output;
+	unsigned char *final_code;
+};
+
+jit_ctx *hl_jit_alloc();
+void hl_jit_free( jit_ctx *ctx, h_bool can_reset );
+void hl_jit_reset( jit_ctx *ctx, hl_module *m );
+void hl_jit_init( jit_ctx *ctx, hl_module *m );
+int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
+void hl_jit_define_function( jit_ctx *ctx, int start, int size );
+
+void hl_jit_null_field_access( int fhash );
+void hl_jit_assert();
+void *hl_jit_wrapper_ptr( vclosure_wrapper *c, char *stack_args, void **regs );
+double hl_jit_wrapper_d( vclosure_wrapper *c, char *stack_args, void **regs );
+
+// emit & dump
+void hl_emit_dump( jit_ctx *ctx );
+const char *hl_emit_regstr( ereg v, emit_mode m );
+void hl_emit_store_args( emit_ctx *ctx, einstr *e, ereg *args, int count );
+void hl_emit_remap_jumps( emit_ctx *ctx, void *jumps, einstr *instrs, int *pos_map );
+ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
+ereg **hl_emit_get_regs( einstr *e, int *count );
+void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( void *, ereg * ) );
+extern int hl_emit_mode_sizes[];
+extern bool hl_jit_dump_bin;
+#define val_str(v,m) hl_emit_regstr(v,m)
+
+#ifdef HL_DEBUG
+#	define JIT_DEBUG
+#endif
+
+#define jit_error(msg)	{ hl_jit_error(msg,__func__,__LINE__); hl_debug_break(); exit(-1); }
+#define jit_assert()	jit_error("")
+
+#if defined(JIT_DEBUG)
+#	define jit_debug(...)	printf(__VA_ARGS__)
+#else
+#	define jit_debug(...)
+#endif
+
+#define DEF_ALLOC &ctx->jit->falloc
+
+#define jit_pad_size(size,k)	((k == 0) ? 0 : ((-(size)) & (k - 1)))
+
+static void __ignore( void *value ) {}
+
+void hl_jit_error( const char *msg, const char *func, int line );
+
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );
+void hl_jit_patch_method( void *old_fun, void **new_fun_table );
+
+static ereg _reg_chk( ereg r, rkind k, ereg ret ) {
+	if( REG_KIND(r) != k ) jit_assert();
+	return ret;
+}
+
+
+#endif

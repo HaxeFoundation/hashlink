@@ -21,6 +21,7 @@
  */
 #include <hl.h>
 #include <hlmodule.h>
+#include <jit.h>
 
 #ifdef HL_WIN
 #	undef _GUID
@@ -33,6 +34,10 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #endif
 
 #define HOT_RELOAD_EXTRA_GLOBALS	4096
+
+#ifdef HL_DEBUG
+#	define ALLOW_DUMP
+#endif
 
 HL_API void hl_prim_not_loaded( const uchar *err );
 
@@ -72,7 +77,7 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 	while( min < max ) {
 		int mid = (min + max) >> 1;
 		int offset = dbg->large ? ((int*)dbg->offsets)[mid] : ((unsigned short*)dbg->offsets)[mid];
-		if( offset <= code_pos )
+		if( offset < code_pos )
 			min = mid + 1;
 		else
 			max = mid;
@@ -224,10 +229,8 @@ static int module_capture_stack( void **stack, int size ) {
 			unsigned char *code = m->jit_code;
 			int code_size = m->codesize;
 			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-				if( stack && count == size ) {
+				if( stack && count == size )
 					break;
-				}
-
 				if( stack )
 					stack[count++] = module_addr;
 				else
@@ -705,21 +708,57 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	if( hot_reload ) m->hash = hl_code_hash_alloc(m->code);
 	hl_module_init_natives(m);
 	hl_module_init_indexes(m);
+#	ifdef WIN64_UNWIND_TABLES
+	m->unwind_table_size = m->code->nfunctions + 10; // extra space for jit internals
+	m->unwind_table = malloc(sizeof(RUNTIME_FUNCTION) * m->unwind_table_size);
+	memset(m->unwind_table, 0, sizeof(RUNTIME_FUNCTION) * m->unwind_table_size);
+#	endif
 	// JIT
 	ctx = hl_jit_alloc();
 	if( ctx == NULL )
 		return 0;
 	hl_jit_init(ctx, m);
+#	ifdef ALLOW_DUMP
+	bool dump = false;
+	int filter = -1;
+	for(i=0;i<hl_setup.sys_nargs;i++) {
+		uchar *arg = hl_setup.sys_args[i];
+		if( ucmp(arg,USTR("--dump")) == 0 ) dump = true;
+		if( ucmp(arg,USTR("--dump-bin")) == 0 ) hl_jit_dump_bin = true;
+		if( memcmp(arg,USTR("--dump="),sizeof(USTR("--dump"))) == 0 ) {
+			dump = true;
+			filter = 0;
+			int pos = 7;
+			while( arg[pos] ) {
+				filter *= 16;
+				if( arg[pos] >= '0' && arg[pos] <= '9' )
+					filter |= arg[pos] - '0';
+				else
+					filter |= arg[pos] - 'A' + 10;
+				pos++;
+			}
+		}
+	}
+#	endif
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
+#		ifdef ALLOW_DUMP
+		if( filter >= 0 && filter != f->findex ) continue;
+#		endif
 		int fpos = hl_jit_function(ctx, m, f);
 		if( fpos < 0 ) {
 			hl_jit_free(ctx, false);
 			return 0;
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
+#		ifdef ALLOW_DUMP
+		if( dump ) hl_emit_dump(ctx);
+#		endif
 	}
 	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
+#	ifdef ALLOW_DUMP
+	if( filter >= 0 ) exit(0);
+#	endif
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);
@@ -735,6 +774,9 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	hl_gc_set_dump_types(hl_module_types_dump);
 #	ifdef HL_VTUNE
 	hl_setup.vtune_init = modules_init_vtune;
+#	endif
+#	ifdef WIN64_UNWIND_TABLES
+	RtlAddFunctionTable(m->unwind_table, m->unwind_table_size, (DWORD64)m->jit_code);
 #	endif
 	hl_jit_free(ctx, hot_reload);
 	if( hot_reload ) {

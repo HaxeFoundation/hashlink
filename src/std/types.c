@@ -35,7 +35,7 @@ HL_PRIM hl_type hlt_bool = { HBOOL };
 HL_PRIM hl_type hlt_abstract = { HABSTRACT, {USTR("<abstract>")} };
 
 static const uchar *TSTR[] = {
-	USTR("void"), USTR("i8"), USTR("i16"), USTR("i32"), USTR("i64"), USTR("f32"), USTR("f64"),
+	USTR("void"), USTR("ui8"), USTR("ui16"), USTR("i32"), USTR("i64"), USTR("f32"), USTR("f64"),
 	USTR("bool"), USTR("bytes"), USTR("dynamic"), NULL, NULL,
 	USTR("array"), USTR("type"), NULL, NULL, USTR("dynobj"),
 	NULL, NULL, NULL, NULL, NULL, NULL, USTR("guid")
@@ -43,8 +43,8 @@ static const uchar *TSTR[] = {
 
 static int T_SIZES[] = {
 	0, // VOID
-	1, // I8
-	2, // I16
+	1, // UI8
+	2, // UI16
 	4, // I32
 	8, // I64
 	4, // F32
@@ -160,8 +160,8 @@ HL_PRIM bool hl_same_type( hl_type *a, hl_type *b ) {
 HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 	static bool T_IS_DYNAMIC[] = {
 		false, // HVOID,
-		false, // HI8
-		false, // HI16
+		false, // HUI8
+		false, // HUI16
 		false, // HI32
 		false, // HI64
 		false, // HF32
@@ -190,8 +190,8 @@ HL_PRIM bool hl_is_dynamic( hl_type *t ) {
 HL_PRIM bool hl_is_ptr( hl_type *t ) {
 	static bool T_IS_PTR[] = {
 		false, // HVOID,
-		false, // HI8
-		false, // HI16
+		false, // HUI8
+		false, // HUI16
 		false, // HI32
 		false, // HI64
 		false, // HF32

@@ -19,6 +19,9 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#ifndef HL_MODULE_H
+#define HL_MODULE_H
+
 #include <hl.h>
 #include <hlsystem.h>
 #include "opcodes.h"
@@ -104,9 +107,6 @@ typedef struct {
 	bool large;
 } hl_debug_infos;
 
-typedef struct _jit_ctx jit_ctx;
-
-
 typedef struct {
 	hl_code *code;
 	int *types_hashes;
@@ -124,6 +124,8 @@ typedef struct {
 #endif
 #endif
 
+typedef struct _jit_ctx jit_ctx;
+
 typedef struct {
 	hl_code *code;
 	int codesize;
@@ -138,6 +140,7 @@ typedef struct {
 	jit_ctx *jit_ctx;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
+	int unwind_table_size;
 	PRUNTIME_FUNCTION unwind_table;
 #endif
 } hl_module;
@@ -165,10 +168,4 @@ hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err );
 void hl_profile_setup( int sample_count );
 void hl_profile_end();
 
-jit_ctx *hl_jit_alloc();
-void hl_jit_free( jit_ctx *ctx, h_bool can_reset );
-void hl_jit_reset( jit_ctx *ctx, hl_module *m );
-void hl_jit_init( jit_ctx *ctx, hl_module *m );
-int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );
-void hl_jit_patch_method( void *old_fun, void **new_fun_table );
+#endif
