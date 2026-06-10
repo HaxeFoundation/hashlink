@@ -209,7 +209,7 @@ jobs:
           gcc --version
 
     - name: Install haxe
-      uses: tobil4sk/setup-haxe@9d1527c4bb9d1d449d196a0822118692ceeac457
+      uses: krdlab/setup-haxe@v2
       with:
         haxe-version: latest
 
@@ -530,17 +530,31 @@ jobs:
 
     - name: Check binary
       run: hl --version
-    - uses: tobil4sk/setup-haxe@9d1527c4bb9d1d449d196a0822118692ceeac457
+
+    - uses: krdlab/setup-haxe@v2
       with:
         haxe-version: latest
 
     - name: Setup haxelib
       run: haxelib dev hashlink ./other/haxelib
 
+    - name: Get Haxe commit SHA
+      id: haxe_sha
+      shell: bash
+      run: |
+        version=$(haxe --version)
+        short_sha=${version##*+}
+        full_sha=$(curl -fsSL "https://api.github.com/repos/HaxeFoundation/haxe/commits/$short_sha" | jq -r '.sha')
+        echo "sha=$full_sha" >> "$GITHUB_OUTPUT"
+        echo "Haxe version: $version"
+        echo "Commit SHA: $short_sha, Full SHA: $full_sha"
+
     - uses: actions/checkout@v6
       with:
         repository: HaxeFoundation/haxe
         path: haxe
+        ref: ${{ steps.haxe_sha.outputs.sha }}
+
     - name: Test
       run: |
         if [[ "${{ matrix.os }}" == "darwin" ]]; then
