@@ -23,7 +23,7 @@ jobs:
       matrix:
         target: [linux, darwin, windows]
         architecture: [32, 64, arm64]
-        build_system: [make, cmake, cmake-mingw, cmake-clang-cl, vs2019, makegcc14]
+        build_system: [make, cmake, cmake-mingw, cmake-clang-cl, vs2026, makegcc14]
 
         include:
           - target: linux
@@ -59,25 +59,25 @@ jobs:
           - build_system: cmake-clang-cl
             cmake_configuration: RelWithDebInfo
 
-          - build_system: vs2019
+          - build_system: vs2026
             msbuild_configuration: Release
 
           - target: windows
-            runner: windows-2022 # has VS 2022 preinstalled which supports PlatformToolset <= v142, WindowsTargetPlatformVersion 10
+            runner: windows-2025-vs2026 # has VS 2026 preinstalled which supports PlatformToolset <= v145, WindowsTargetPlatformVersion 10
             haxe_nightly_dir: windows64
             archive_ext: zip
 
           - target: windows
             build_system: cmake
-            cmake_generator: Visual Studio 17 2022
+            cmake_generator: Visual Studio 18 2026
 
           - target: windows
-            runner: windows-2025
+            runner: windows-latest
             build_system: cmake-mingw
 
           - target: windows
             build_system: cmake-clang-cl
-            cmake_generator: Visual Studio 17 2022
+            cmake_generator: Visual Studio 18 2026
 
           - target: windows
             architecture: 32
@@ -91,10 +91,10 @@ jobs:
 
         exclude:
           - target: linux
-            build_system: vs2019
+            build_system: vs2026
 
           - target: darwin
-            build_system: vs2019
+            build_system: vs2026
 
           - target: darwin
             architecture: 32
@@ -128,8 +128,8 @@ jobs:
       uses: actions/checkout@v6
 
     - name: "Add msbuild to PATH"
-      if: matrix.build_system == 'vs2019'
-      uses: microsoft/setup-msbuild@v2
+      if: matrix.build_system == 'vs2026'
+      uses: microsoft/setup-msbuild@v3
 
     - name: "Mac homebrew workaround"
       if: matrix.target == 'darwin'
@@ -276,7 +276,7 @@ jobs:
             BUILD_FOLDER=build/bin
             ;;
 
-          vs2019)
+          vs2026)
             MSBuild.exe hl.sln //nologo //m //clp:ErrorsOnly \
               //p:Configuration=${{ matrix.msbuild_configuration }} \
               //p:Platform=${{ matrix.architecture_string }}
@@ -322,7 +322,7 @@ jobs:
             esac
             cd build && ctest --verbose --build-config ${{ matrix.cmake_configuration }}
             ;;
-          vs2019)
+          vs2026)
             ${{ env.WINDOWS_BUILD_FOLDER }}/hl.exe --version
             ;;
           make*)
@@ -455,7 +455,7 @@ jobs:
           runner: macos-latest
 
         - os: windows
-          runner: windows-latest
+          runner: windows-2025-vs2026
 
         exclude:
         - os: darwin
@@ -471,7 +471,7 @@ jobs:
       uses: actions/download-artifact@v8
       with:
         name: |
-          ${{ matrix.os }}-${{ matrix.os == 'windows' && 'vs2019' || 'make' }}-${{
+          ${{ matrix.os }}-${{ matrix.os == 'windows' && 'vs2026' || 'make' }}-${{
             matrix.architecture == 'arm64' && 'arm64' ||
             matrix.architecture == 'x86_64' && '64' ||
             matrix.architecture == 'x86_32' && '32'
@@ -498,7 +498,7 @@ jobs:
         brew install libpng jpeg-turbo libvorbis sqlite mbedtls
 
     - name: Install msbuild
-      uses: microsoft/setup-msbuild@v2
+      uses: microsoft/setup-msbuild@v3
       if: matrix.os == 'windows'
       with:
         msbuild-architecture: ${{ matrix.architecture == 'x86_64' && 'x64' || 'x86' }}
@@ -590,6 +590,6 @@ jobs:
           "linux-make-32/hashlink-${short_commit}-linux-i386.tar.gz#hashlink-latest-linux-i386.tar.gz" \
           "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "linux-make-arm64/hashlink-${short_commit}-linux-arm64.tar.gz#hashlink-latest-linux-arm64.tar.gz" \
-          "windows-vs2019-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
-          "windows-vs2019-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip" \
+          "windows-vs2026-32/hashlink-${short_commit}-win32.zip#hashlink-latest-win32.zip" \
+          "windows-vs2026-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip" \
           "windows-cmake-mingw-64/hashlink-${short_commit}-win64-cmake-mingw.zip#hashlink-latest-win64-mingw.zip"

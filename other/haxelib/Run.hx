@@ -30,7 +30,7 @@ class Build {
 	}
 
 	static function getDefaultTemplate() {
-		return (Sys.systemName() == "Windows") ? "vs2022" : "make";
+		return (Sys.systemName() == "Windows") ? "vs2026" : "make";
 	}
 
 	public function generate() {
@@ -58,9 +58,15 @@ class Build {
 					case _: [];
 				};
 				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []).concat(platformArgs));
-			case "vs2019", "vs2022":
+			case "vs2019", "vs2022", "vs2026":
+				var version = switch (tpl) {
+					case "vs2019": "[16.0,17.0]";
+					case "vs2022": "[17.0,18.0]";
+					case "vs2026": "[18.0,19.0]";
+					default: null;
+				}
 				var vswhereProc = new sys.io.Process("C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe", ["-requires", "Microsoft.Component.MSBuild", "-find", "MSBuild",
-					"-version", tpl == "vs2019" ? "[16.0,17.0]" : "[17.0,18.0]"
+					"-version", version
 				]);
 				var code = 0;
 				if( vswhereProc.exitCode() == 0 ) {
