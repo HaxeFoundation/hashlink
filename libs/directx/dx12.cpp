@@ -75,6 +75,24 @@ static dx_driver *static_driver = NULL;
 static int CURRENT_NODEMASK = 0;
 static LARGE_INTEGER driver_version = {0};
 
+typedef ID3D12Device2 dx_device;
+
+#define _DEVICE _ABSTRACT(dx_device)
+
+HL_PRIM ID3D12Device* HL_NAME(get_device)() {
+	dx_driver* drv = static_driver;
+	return drv->device;
+}
+
+typedef IDXGIAdapter dx_adapter;
+
+#define _ADAPTER _ABSTRACT(dx_adapter)
+
+HL_PRIM IDXGIAdapter* HL_NAME(get_adapter)() {
+	dx_driver* drv = static_driver;
+	return drv->adapter;
+}
+
 HL_PRIM void dx12_flush_messages();
 
 HL_PRIM void HL_NAME(suppress_debug_messages)(D3D12_INFO_QUEUE_FILTER* filter) {
@@ -419,6 +437,8 @@ HL_PRIM void HL_NAME(query_video_memory_info)( int group, void *mem ) {
 
 DEFINE_PRIM(_ARR, list_devices, _NO_ARG);
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _BYTES);
+DEFINE_PRIM(_DEVICE, get_device, _NO_ARG);
+DEFINE_PRIM(_ADAPTER, get_adapter, _NO_ARG);
 DEFINE_PRIM(_VOID, resize, _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, present, _BOOL);
 DEFINE_PRIM(_VOID, suspend, _NO_ARG);
