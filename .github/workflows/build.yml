@@ -543,10 +543,11 @@ jobs:
       shell: bash
       run: |
         version=$(haxe --version)
-        sha=${version##*+}
-        echo "sha=$sha" >> "$GITHUB_OUTPUT"
+        short_sha=${version##*+}
+        full_sha=$(curl -fsSL "https://api.github.com/repos/HaxeFoundation/haxe/commits/$short_sha" | jq -r '.sha')
+        echo "sha=$full_sha" >> "$GITHUB_OUTPUT"
         echo "Haxe version: $version"
-        echo "Commit SHA: $sha"
+        echo "Commit SHA: $short_sha, Full SHA: $full_sha"
 
     - uses: actions/checkout@v6
       with:
