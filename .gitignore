@@ -10,7 +10,6 @@
 *.n
 Debug
 Release
-ReleaseVS2013
 x64
 *.stackdump
 *.hdll
