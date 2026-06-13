@@ -493,7 +493,7 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 			ereg from = int_arr_get(movs,1);
 			int mode = int_arr_get(movs,2);
 			bool cmov = cond && (IS_REG(to) || IS_REG(from));
-			regs_emit(ctx,UNUSED,cmov?CXCHG:XCHG,to,from,mode,0);
+			regs_emit(ctx,UNUSED,cmov?CXCHG:XCHG,to,from,IS_FLOAT(mode)?M_F64:M_PTR,0);
 			int_arr_remove_range(&movs,0,3);
 			size -= 3;
 			for(int k=1;k<size;k+=3) {
