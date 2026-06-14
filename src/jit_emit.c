@@ -2058,7 +2058,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case ODynSet:
 		{
-			bool need_type = dyn_need_type(dst->t);
+			bool need_type = dyn_need_type(rb->t);
 			ereg args[4];
 			args[0] = LOAD(dst);
 			args[1] = LOAD_CONST(hl_hash_utf8(m->code->strings[o->p2]),&hlt_i32);
