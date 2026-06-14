@@ -219,7 +219,7 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		void *regs[MAX_ARGS];
 		void *stack[MAX_ARGS];
 	} vargs;
-	int rp = 0, fp = 0, sp = MAX_ARGS;
+	int rp = 0, fp = 0, sp = 0;
 	for(int i=0;i<t->fun->nargs;i++) {
 		hl_type *at = t->fun->args[i];
 		void *v = args[i];
@@ -245,27 +245,28 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		if( r >= 0 )
 			vargs.regs[r + (at->kind == HF32 || at->kind == HF64 ? arg_reg_count : 0)] = (void*)iv;
 		else
-			vargs.stack[--sp] = (void*)iv;
+			vargs.stack[sp++] = (void*)iv;
 	}
+	if( sp & 1 ) sp++; // align stack
 	switch( t->fun->ret->kind ) {
 	case HUI8:
 	case HUI16:
 	case HI32:
 	case HBOOL:
-		ret->v.i = ((int (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		ret->v.i = ((int (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, sp);
 		return &ret->v.i;
 	case HI64:
 	case HGUID:
-		ret->v.i64 = ((int64 (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		ret->v.i64 = ((int64 (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, sp);
 		return &ret->v.i64;
 	case HF32:
-		ret->v.f = ((float (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		ret->v.f = ((float (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, sp);
 		return &ret->v.f;
 	case HF64:
-		ret->v.d = ((double (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		ret->v.d = ((double (*)(void *, void *, int))call_jit_c2hl)(f, &vargs, sp);
 		return &ret->v.d;
 	default:
-		return ((void *(*)(void *, void *, int))call_jit_c2hl)(f, &vargs, MAX_ARGS - sp);
+		return ((void *(*)(void *, void *, int))call_jit_c2hl)(f, &vargs, sp);
 	}
 }
 
