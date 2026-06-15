@@ -119,21 +119,6 @@ HL_PRIM int hl_file_write( hl_fdesc *f, vbyte *buf, int pos, int len ) {
 	int ret;
 	if( !f ) return -1;
 	hl_blocking(true);
-#	ifdef HL_WIN_DESKTOP
-	if( f->is_std ) {
-		// except utf8, handle the case where it's not \0 terminated
-		uchar *out = (uchar*)malloc((len+1)*2);
-		vbyte prev = buf[pos+len-1];
-		if( buf[pos+len] ) buf[pos+len-1] = 0;
-		int olen = hl_from_utf8(out,len,(const char*)(buf+pos));
-		buf[pos+len-1] = prev;
-		_setmode(fileno(f->f),_O_U8TEXT);
-		ret = _write(fileno(f->f),out,olen<<1);
-		_setmode(fileno(f->f),_O_TEXT);
-		if( ret > 0 ) ret = len;
-		free(out);
-	} else
-#	endif
 	ret = (int)fwrite(buf+pos,1,len,f->f);
 	hl_blocking(false);
 	return ret;
@@ -153,15 +138,6 @@ HL_PRIM bool hl_file_write_char( hl_fdesc *f, int c ) {
 	unsigned char cc = (unsigned char)c;
 	if( !f ) return false;
 	hl_blocking(true);
-#	ifdef HL_WIN_DESKTOP
-	if( f->is_std ) {
-		uchar wcc = cc;
-		_setmode(fileno(f->f),_O_U8TEXT);
-		ret = _write(fileno(f->f),&wcc,2);
-		_setmode(fileno(f->f),_O_TEXT);
-		if( ret > 0 ) ret = 1;
-	} else
-#	endif
 	ret = fwrite(&cc,1,1,f->f);
 	hl_blocking(false);
 	return ret == 1;

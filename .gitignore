@@ -10,7 +10,6 @@
 *.n
 Debug
 Release
-ReleaseVS2013
 x64
 *.stackdump
 *.hdll
@@ -55,3 +54,5 @@ node_modules
 /*.tgz
 args.txt
 /other/benchs/hlc
+/packages
+packages.config

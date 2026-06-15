@@ -957,10 +957,12 @@ static void mark_thread_main( void *param ) {
 	}
 }
 
-int gc_get_mark_threads( hl_thread **tids ) {
-	if (gc_mark_threads <= 1)
+HL_API int hl_gc_get_mark_threads( hl_thread **tids ) {
+	if( gc_mark_threads <= 1 )
 		return 0;
-	for (int i = 0; i < gc_mark_threads; i++) {
+	if( tids == NULL )
+		return gc_mark_threads;
+	for( int i = 0; i < gc_mark_threads; i++ ) {
 		tids[i] = mark_threads[i].tid;
 	}
 	return gc_mark_threads;

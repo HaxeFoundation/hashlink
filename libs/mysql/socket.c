@@ -22,6 +22,7 @@
 #define _GNU_SOURCE
 #include "socket.h"
 #include <string.h>
+#include <hl.h>
 
 #ifdef OS_WINDOWS
 	static int init_done = 0;
@@ -97,23 +98,29 @@ void psock_close( PSOCK s ) {
 
 int psock_send( PSOCK s, const char *buf, int size ) {
 	int ret;
+	hl_blocking(true);
 	POSIX_LABEL(send_again);
 	ret = send(s,buf,size,MSG_NOSIGNAL);
 	if( ret == SOCKET_ERROR ) {
 		HANDLE_EINTR(send_again);
+		hl_blocking(false);
 		return block_error();
 	}
+	hl_blocking(false);
 	return ret;
 }
 
 int psock_recv( PSOCK s, char *buf, int size ) {
 	int ret;
+	hl_blocking(true);
 	POSIX_LABEL(recv_again);
 	ret = recv(s,buf,size,MSG_NOSIGNAL);
 	if( ret == SOCKET_ERROR ) {
 		HANDLE_EINTR(recv_again);
+		hl_blocking(false);
 		return block_error();
 	}
+	hl_blocking(false);
 	return ret;
 }
 
@@ -121,6 +128,7 @@ PHOST phost_resolve( const char *host ) {
 	PHOST ip = inet_addr(host);
 	if( ip == INADDR_NONE ) {
 		struct hostent *h;
+		hl_blocking(true);
 #	if defined(OS_WINDOWS) || defined(OS_MAC) || defined(OS_CYGWIN)
 		h = gethostbyname(host);
 #	else
@@ -129,6 +137,7 @@ PHOST phost_resolve( const char *host ) {
 		int errcode;
 		gethostbyname_r(host,&hbase,buf,1024,&h,&errcode);
 #	endif
+		hl_blocking(false);
 		if( h == NULL )
 			return UNRESOLVED_HOST;
 		ip = *((unsigned int*)h->h_addr_list[0]);
@@ -142,8 +151,12 @@ SERR psock_connect( PSOCK s, PHOST host, int port ) {
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 	*(int*)&addr.sin_addr.s_addr = host;
-	if( connect(s,(struct sockaddr*)&addr,sizeof(addr)) != 0 )
+	hl_blocking(true);
+	if( connect(s,(struct sockaddr*)&addr,sizeof(addr)) != 0 ) {
+		hl_blocking(false);
 		return block_error();
+	}
+	hl_blocking(false);
 	return PS_OK;
 }
 
@@ -193,6 +206,7 @@ SERR psock_set_fastsend( PSOCK s, int fast ) {
 }
 
 void psock_wait( PSOCK s ) {
+	hl_blocking(true);
 #	ifdef OS_WINDOWS
 	fd_set set;
 	FD_ZERO(&set);
@@ -208,6 +222,7 @@ void psock_wait( PSOCK s ) {
 		HANDLE_EINTR(poll_again);
 	}
 #	endif
+	hl_blocking(false);
 }
 
 /* ************************************************************************ */

@@ -126,9 +126,6 @@
     <ClInclude Include="..\..\include\libuv\src\uv-common.h">
       <Filter>libuv</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\libuv\src\win\atomicops-inl.h">
-      <Filter>libuv</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\libuv\src\win\handle-inl.h">
       <Filter>libuv</Filter>
     </ClInclude>

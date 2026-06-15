@@ -426,13 +426,15 @@ HL_PRIM int hl_dyn_compare( vdynamic *a, vdynamic *b ) {
 		return (int)a->v.ui16 - (int)b->v.ui16;
 	case TK2(HI32,HI32):
 		{
-			int d = a->v.i - b->v.i;
-			return d == hl_invalid_comparison ? -1 : d;
+			int ia = a->v.i;
+			int ib = b->v.i;
+			return ia == ib ? 0 : (ia > ib ? 1 : -1);
 		}
 	case TK2(HI64,HI64):
 		{
-			int64 d = a->v.i64 - b->v.i64;
-			return d == 0 ? 0 : (d > 0 ? 1 : -1);
+			int64 ia = a->v.i64;
+			int64 ib = b->v.i64;
+			return ia == ib ? 0 : (ia > ib ? 1 : -1);
 		}
 	case TK2(HF32,HF32):
 		return fcompare(a->v.f,b->v.f);

@@ -1,3 +1,10 @@
+typedef Config = {
+	var version:Int;
+	var libs:Array<String>;
+	var defines:haxe.DynamicAccess<String>;
+	var files:Array<String>;
+};
+
 class Build {
 
 	var output : String;
@@ -5,12 +12,7 @@ class Build {
 	var sourcesDir : String;
 	var targetDir : String;
 	var dataPath : String;
-	var config : {
-		var version : Int;
-		var libs : Array<String>;
-		var defines : haxe.DynamicAccess<String>;
-		var files : Array<String>;
-	};
+	var config : Config;
 
 	public function new(dataPath,output,config) {
 		this.output = output;
@@ -27,11 +29,17 @@ class Build {
 			Sys.println(message);
 	}
 
+	static function getDefaultTemplate() {
+		return (Sys.systemName() == "Windows") ? "vs2026" : "make";
+	}
 
 	public function generate() {
 		var tpl = config.defines.get("hlgen.makefile");
-		if( tpl != null )
+		if (tpl != null) {
+			if (tpl == "1")
+				tpl = config.defines["hlgen.makefile"] = getDefaultTemplate();
 			generateTemplates(tpl);
+		}
 		log('Code generated in $output');
 	}
 
@@ -39,12 +47,26 @@ class Build {
 		var tpl = config.defines.get("hlgen.makefile");
 		return switch tpl {
 			case "make":
-				Sys.command("make", ["-C", targetDir]);
+				var platformArgs = switch config.defines.get("hlgen.build.architecture") {
+					case 'x86_32': ["EXTRA_CFLAGS=-m32", "EXTRA_LDFLAGS=-m32"];
+					case _: [];
+				};
+				Sys.command("make", ["-j", "-C", targetDir].concat(platformArgs).concat(config.defines.exists("debug") ? ["DEBUG=1"] : []));
 			case "hxcpp":
-				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []));
-			case "vs2019", "vs2022":
+				var platformArgs = switch config.defines.get("hlgen.build.architecture") {
+					case 'x86_32': ["HXCPP_M32"];
+					case _: [];
+				};
+				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []).concat(platformArgs));
+			case "vs2019", "vs2022", "vs2026":
+				var version = switch (tpl) {
+					case "vs2019": "[16.0,17.0]";
+					case "vs2022": "[17.0,18.0]";
+					case "vs2026": "[18.0,19.0]";
+					default: null;
+				}
 				var vswhereProc = new sys.io.Process("C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe", ["-requires", "Microsoft.Component.MSBuild", "-find", "MSBuild",
-					"-version", tpl == "vs2019" ? "[16.0,17.0]" : "[17.0,18.0]"
+					"-version", version
 				]);
 				var code = 0;
 				if( vswhereProc.exitCode() == 0 ) {
@@ -52,7 +74,12 @@ class Build {
 					if( msbuildPath.length > 0 ) {
 						var prevCwd = Sys.getCwd();
 						var msbuild = '$msbuildPath\\Current\\Bin\\MSBuild.exe';
-						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", "-property:Configuration=Release", "-property:Platform=x64"];
+						var platform = switch config.defines.get("hlgen.build.architecture") {
+							case 'x86_32': 'x86';
+							case _: 'x64';
+						};
+						var configuration = config.defines.exists("debug") ? "Debug" : "Release";
+						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", '-property:Configuration=$configuration', '-property:Platform=$platform'];
 						log('"$msbuild"' + " " + msbuildArgs.join(" "));
 						Sys.setCwd(targetDir);
 						code = Sys.command(msbuild, msbuildArgs);
@@ -68,8 +95,7 @@ class Build {
 				vswhereProc.close();
 				code;
 			case null:
-				var suggestion = (Sys.systemName() == "Windows") ? "vs2019" : "make";
-				log('Set -D hlgen.makefile=${suggestion} for automatic native compilation');
+				log('Set -D hlgen.makefile for automatic native compilation');
 				0;
 			case unimplemented:
 				log('Automatic native compilation not yet implemented for $unimplemented');
@@ -91,10 +117,11 @@ class Build {
 	}
 
 	function generateTemplates( ?tpl ) {
-		if( tpl == null || tpl == "1" )
-			tpl = "vs2015";
 		var srcDir = tpl;
-		var jumboBuild = config.defines.get("hlgen.makefile.jumbo");
+		var jumboBuild = switch config.defines.get("hlgen.makefile.jumbo") {
+			case "1": "true";
+			case value: value;
+		};
 		var relDir = "";
 		if( config.defines["hlgen.makefilepath"] != null ) {
 			targetDir = config.defines.get("hlgen.makefilepath");
@@ -214,6 +241,26 @@ class Build {
 }
 
 class Run {
+	static function applyCliDefines(config:Config, args:Array<String>) {
+		while (args.length > 0) {
+			switch args.shift() {
+				case '-D' | '--define':
+					var pair = args.shift();
+					var equalsPosition = pair.indexOf("=");
+					if (equalsPosition == -1) {
+						config.defines.set(pair, "1");
+					} else {
+						var name = pair.substr(0, equalsPosition);
+						var value = pair.substr(equalsPosition + 1);
+						config.defines.set(name, value);
+					}
+				case unknown:
+					Sys.stderr().writeString('Warning: Unrecognised argument $unknown\n');
+					Sys.stderr().flush();
+			}
+		}
+	}
+
 	static function main() {
 		var args = Sys.args();
 		var originalPath = args.pop();
@@ -226,7 +273,8 @@ class Run {
 			var path = new haxe.io.Path(output);
 			path.file = "hlc";
 			path.ext = "json";
-			var config = haxe.Json.parse(sys.io.File.getContent(path.toString()));
+			var config:Config = haxe.Json.parse(sys.io.File.getContent(path.toString()));
+			applyCliDefines(config, args);
 			final build = new Build(haxelibPath,output,config);
 			build.generate();
 			Sys.exit(build.compile());

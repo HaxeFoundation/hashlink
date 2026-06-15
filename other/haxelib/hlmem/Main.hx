@@ -53,33 +53,49 @@ class Main {
 			res.sort(sortByCount);
 			res.print();
 		case "locate":
-			var lt = mem.resolveType(args.shift());
-			if( lt != null ) {
-				var res = mem.locate(lt, Std.parseInt(args.shift()));
-				res.sort(sortByCount);
-				res.print();
+			if (args.length == 0) {
+				Sys.println("Must specify type");
+			} else {
+				var lt = mem.resolveType(args.shift());
+				if( lt != null ) {
+					var res = mem.locate(lt, Std.parseInt(args.shift()));
+					res.sort(sortByCount);
+					res.print();
+				}
 			}
 		case "count":
-			var lt = mem.resolveType(args.shift());
-			if( lt != null ) {
-				var res = mem.count(lt, args);
-				res.sort(sortByCount);
-				res.printWithSum = true;
-				res.print();
+			if (args.length == 0) {
+				Sys.println("Must specify type");
+			} else {
+				var lt = mem.resolveType(args.shift());
+				if( lt != null ) {
+					var res = mem.count(lt, args);
+					res.sort(sortByCount);
+					res.printWithSum = true;
+					res.print();
+				}
 			}
 		case "parents":
-			var lt = mem.resolveType(args.shift());
-			if( lt != null ) {
-				var res = mem.parents(lt);
-				res.sort(sortByCount);
-				res.print();
+			if (args.length == 0) {
+				Sys.println("Must specify type");
+			} else {
+				var lt = mem.resolveType(args.shift());
+				if( lt != null ) {
+					var res = mem.parents(lt);
+					res.sort(sortByCount);
+					res.print();
+				}
 			}
 		case "subs":
-			var lt = mem.resolveType(args.shift());
-			if( lt != null ) {
-				var res = mem.subs(lt, Std.parseInt(args.shift()));
-				res.sort(sortByCount);
-				res.print();
+			if (args.length == 0) {
+				Sys.println("Must specify type");
+			} else {
+				var lt = mem.resolveType(args.shift());
+				if( lt != null ) {
+					var res = mem.subs(lt, Std.parseInt(args.shift()));
+					res.sort(sortByCount);
+					res.print();
+				}
 			}
 		case "sort":
 			switch( args.shift() ) {
@@ -137,7 +153,7 @@ class Main {
 		var code = null, memory = null;
 		while( args.length > 0 ) {
 			var arg = args.shift();
-			if( StringTools.endsWith(arg, ".hl") ) {
+			if( StringTools.endsWith(arg, ".hl") || StringTools.endsWith(arg, ".dat") ) {
 				code = arg;
 				analyzer.loadBytecode(arg);
 				continue;

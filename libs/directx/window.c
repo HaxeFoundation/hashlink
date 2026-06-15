@@ -93,6 +93,9 @@ static bool capture_mouse = false;
 static bool relative_mouse = false;
 
 typedef HCURSOR dx_cursor;
+typedef HICON dx_icon;
+
+#define TICON _ABSTRACT(dx_icon)
 
 static dx_cursor cur_cursor = NULL;
 static bool show_cursor = true;
@@ -828,6 +831,14 @@ HL_PRIM bool HL_NAME(win_get_relative_mouse_mode)() {
 	return relative_mouse;
 }
 
+HL_PRIM void HL_NAME(win_set_capture)(dx_window *win) {
+	SetCapture(win);
+}
+
+HL_PRIM void HL_NAME(win_release_capture)() {
+	ReleaseCapture();
+}
+
 HL_PRIM void HL_NAME(win_set_drag_accept_files)( dx_window* wnd, bool enabled ) {
 	DragAcceptFiles(wnd, enabled);
 }
@@ -838,6 +849,26 @@ HL_PRIM int HL_NAME(get_screen_width)() {
 
 HL_PRIM int HL_NAME(get_screen_height)() {
 	return GetSystemMetrics(SM_CYSCREEN);
+}
+
+HL_PRIM void HL_NAME(win_set_dark_mode)( dx_window* wnd, bool enabled ) {
+	// Load dynamically the required function and fail silently if they are not available
+	// (which could be true for older Windows 10 versions and before)
+	HMODULE dwmapi = LoadLibraryA("Dwmapi.dll");
+
+	if (dwmapi == NULL)
+		return;
+
+	typedef HRESULT(*DwmSetWindowAttributePTR)(HWND, DWORD, LPCVOID, DWORD);
+	DwmSetWindowAttributePTR DwmSetWindowAttribute =
+		(DwmSetWindowAttributePTR)GetProcAddress(dwmapi, "DwmSetWindowAttribute");
+
+	if (DwmSetWindowAttribute == NULL)
+		return;
+
+	int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+	BOOL dark_mode = enabled;
+	DwmSetWindowAttribute(wnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, sizeof(dark_mode));
 }
 
 typedef struct {
@@ -929,6 +960,11 @@ HL_PRIM int HL_NAME(win_change_display_setting)(wchar_t* device, vdynamic* ds) {
 	return ChangeDisplaySettingsExW(device, found ? &devMode : NULL, NULL, found ? CDS_FULLSCREEN : 0, NULL);
 }
 
+HL_PRIM void HL_NAME(win_set_icon)(HWND wnd, dx_icon icon) {
+	SendMessage(wnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+	SendMessage(wnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
+}
+
 #define TWIN _ABSTRACT(dx_window)
 DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
@@ -954,12 +990,16 @@ DEFINE_PRIM(_BOOL, set_cursor_pos, _I32 _I32);
 DEFINE_PRIM(_BOOL, win_set_cursor_pos, TWIN _I32 _I32);
 DEFINE_PRIM(_BOOL, win_set_relative_mouse_mode, TWIN _BOOL);
 DEFINE_PRIM(_BOOL, win_get_relative_mouse_mode, _NO_ARG);
+DEFINE_PRIM(_VOID, win_set_capture, TWIN);
+DEFINE_PRIM(_VOID, win_release_capture, _NO_ARG);
 DEFINE_PRIM(_VOID, win_set_drag_accept_files, TWIN _BOOL);
 DEFINE_PRIM(_ARR, win_get_display_settings, _BYTES);
 DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES _BOOL);
 DEFINE_PRIM(_I32, win_change_display_setting, _BYTES _DYN);
 DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);
+DEFINE_PRIM(_VOID, win_set_icon, TWIN TICON);
+DEFINE_PRIM(_VOID, win_set_dark_mode, TWIN _BOOL);
 
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
@@ -968,17 +1008,17 @@ HL_PRIM dx_cursor HL_NAME(load_cursor)( int res ) {
 	return LoadCursor(NULL,MAKEINTRESOURCE(res));
 }
 
-HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, int hotX, int hotY ) {
+static HICON create_icon_internal(int width, int height, vbyte* data, bool icon, int hotX, int hotY) {
 	int pad = sizeof(void*) << 3;
 	HICON hicon;
 	HDC hdc = GetDC(NULL);
 	BITMAPV4HEADER bmh;
-	void *pixels;
-	void *maskbits;
+	void* pixels;
+	void* maskbits;
 	int maskbitslen;
 	ICONINFO ii;
 
-	ZeroMemory(&bmh,sizeof(bmh));
+	ZeroMemory(&bmh, sizeof(bmh));
 	bmh.bV4Size = sizeof(bmh);
 	bmh.bV4Width = width;
 	bmh.bV4Height = -height;
@@ -986,18 +1026,18 @@ HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, in
 	bmh.bV4BitCount = 32;
 	bmh.bV4V4Compression = BI_BITFIELDS;
 	bmh.bV4AlphaMask = 0xFF000000;
-	bmh.bV4RedMask   = 0x00FF0000;
+	bmh.bV4RedMask = 0x00FF0000;
 	bmh.bV4GreenMask = 0x0000FF00;
-	bmh.bV4BlueMask  = 0x000000FF;
+	bmh.bV4BlueMask = 0x000000FF;
 
-	maskbitslen = ((width + (-width)%pad) >> 3) * height;
+	maskbitslen = ((width + (-width) % pad) >> 3) * height;
 	maskbits = malloc(maskbitslen);
-	if( maskbits == NULL )
+	if (maskbits == NULL)
 		return NULL;
-	memset(maskbits,0xFF,maskbitslen);
+	memset(maskbits, 0xFF, maskbitslen);
 
-	memset(&ii,0,sizeof(ii));
-	ii.fIcon = FALSE;
+	memset(&ii, 0, sizeof(ii));
+	ii.fIcon = icon;
 	ii.xHotspot = (DWORD)hotX;
 	ii.yHotspot = (DWORD)hotY;
 	ii.hbmColor = CreateDIBSection(hdc, (BITMAPINFO*)&bmh, DIB_RGB_COLORS, &pixels, NULL, 0);
@@ -1013,8 +1053,21 @@ HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, in
 	return hicon;
 }
 
+
+HL_PRIM dx_cursor HL_NAME(create_cursor)( int width, int height, vbyte *data, int hotX, int hotY ) {
+	return create_icon_internal(width, height, data, false, hotX, hotY);
+}
+
+HL_PRIM dx_icon HL_NAME(create_icon)(int width, int height, vbyte* data) {
+	return create_icon_internal(width, height, data, true, 0, 0);
+}
+
 HL_PRIM void HL_NAME(destroy_cursor)( dx_cursor c ) {
 	DestroyIcon(c);
+}
+
+HL_PRIM void HL_NAME(destroy_icon)(dx_icon i) {
+	DestroyIcon(i);
 }
 
 HL_PRIM void HL_NAME(set_cursor)( dx_cursor c ) {
@@ -1035,7 +1088,9 @@ HL_PRIM bool HL_NAME(is_cursor_visible)() {
 #define TCURSOR _ABSTRACT(dx_cursor)
 DEFINE_PRIM(TCURSOR, load_cursor, _I32);
 DEFINE_PRIM(TCURSOR, create_cursor, _I32 _I32 _BYTES _I32 _I32);
+DEFINE_PRIM(TICON, create_icon, _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID, destroy_cursor, TCURSOR);
+DEFINE_PRIM(_VOID, destroy_icon, TICON);
 DEFINE_PRIM(_VOID, set_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, show_cursor, _BOOL);
 DEFINE_PRIM(_BOOL, is_cursor_visible, _NO_ARG);
