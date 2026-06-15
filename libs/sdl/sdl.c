@@ -1016,7 +1016,7 @@ HL_PRIM varray* HL_NAME(get_displays)() {
 		hl_dyn_seti(obj, hl_hash_utf8("bottom"), &hlt_i32, rect.y+rect.h);
 		hl_dyn_seti(obj, hl_hash_utf8("left"), &hlt_i32, rect.x);
 		hl_dyn_seti(obj, hl_hash_utf8("top"), &hlt_i32, rect.y);
-		hl_dyn_seti(obj, hl_hash_utf8("handle"), &hlt_i32, i);
+		hl_dyn_seti(obj, hl_hash_utf8("handle"), &hlt_i32, display);
 		const char *name = SDL_GetDisplayName(display);
 		hl_dyn_setp(obj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes(name, (int) strlen(name)+1));
 		hl_aptr(arr, vdynamic*)[i] = obj;
