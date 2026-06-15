@@ -224,7 +224,6 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 				//printf("Unknown window state code %d\\n", e.window.event);
 				continue;
 			}
-
 			return true;
 		}
 
@@ -295,7 +294,6 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			event->mouseX = e.wheel.x;
 			event->mouseY = e.wheel.y;
 			break;
-			
 		case SDL_EVENT_TEXT_EDITING:
 			// skip
 			continue;
@@ -419,7 +417,6 @@ HL_PRIM int HL_NAME(get_screen_width)() {
 HL_PRIM int HL_NAME(get_screen_height)() {
 	int count;
 	SDL_DisplayID *displays = SDL_GetDisplays( &count );
-
 	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[0]);
 	SDL_free( displays );
 	return e->h;
@@ -459,51 +456,46 @@ HL_PRIM bool HL_NAME(detect_win32)() {
 #	endif
 }
 
-// sdl2 compat: start input for all windows
+// SDL2 compat: start input for all windows
 HL_PRIM void HL_NAME(text_input)( bool enable ) {
-
 	SDL_Window **windows;
-
-    /* First, enable text events */
-    SDL_SetEventEnabled(SDL_EVENT_TEXT_INPUT, true );
-    SDL_SetEventEnabled(SDL_EVENT_TEXT_EDITING, true);
-
-    windows = SDL_GetWindows(NULL);
-    if (windows) {
-        int i;
-        for (i = 0; windows[i]; ++i) {
+	// First, enable text events
+	SDL_SetEventEnabled(SDL_EVENT_TEXT_INPUT, true );
+	SDL_SetEventEnabled(SDL_EVENT_TEXT_EDITING, true);
+	windows = SDL_GetWindows(NULL);
+	if (windows) {
+		int i;
+		for (i = 0; windows[i]; ++i) {
 			if( enable )
-            	SDL_StartTextInput(windows[i]);
-			else 
+				SDL_StartTextInput(windows[i]);
+			else
 				SDL_StopTextInput(windows[i]);
 
-        }
-        SDL_free(windows);
-    }
+		}
+		SDL_free(windows);
+	}
 }
 
 
-// sdl2 compat: We need to internally store relative mouse mode state
+// SDL2 compat: We need to internally store relative mouse mode state
 static bool relative_mouse_mode = false;
 
 HL_PRIM int HL_NAME(set_relative_mouse_mode)( bool enable) {
 	int retval = 0;
-    SDL_Window **windows = SDL_GetWindows(NULL);
-    if (windows) {
-        int i;
-
-        for (i = 0; windows[i]; ++i) {
-            if (!SDL_SetWindowRelativeMouseMode(windows[i], enable)) {
-                retval = -1;
-            }
-        }
-
-        SDL_free(windows);
-    }
-    if (retval == 0) {
-        relative_mouse_mode = enable;
-    }
-    return retval;
+	SDL_Window **windows = SDL_GetWindows(NULL);
+	if (windows) {
+		int i;
+		for (i = 0; windows[i]; ++i) {
+			if (!SDL_SetWindowRelativeMouseMode(windows[i], enable)) {
+				retval = -1;
+			}
+		}
+		SDL_free(windows);
+	}
+	if (retval == 0) {
+		relative_mouse_mode = enable;
+	}
+	return retval;
 }
 
 HL_PRIM bool HL_NAME(get_relative_mouse_mode)() {
@@ -522,11 +514,10 @@ HL_PRIM void HL_NAME(warp_mouse_in_window)(SDL_Window* window, int x, int y) {
 	SDL_WarpMouseInWindow(window, x, y);
 }
 
-// SDl2 compat: Check emulated `SDL_HINT_GRAB_KEYBOARD` hint
+// SDL2 compat: Check emulated `SDL_HINT_GRAB_KEYBOARD` hint
 HL_PRIM void HL_NAME(set_window_grab)(SDL_Window* window, bool grabbed) {
 	if( hint_window_grab_keyboard )
 		SDL_SetWindowKeyboardGrab(window, grabbed);
-		
 	SDL_SetWindowMouseGrab(window, grabbed);
 }
 
@@ -535,7 +526,7 @@ HL_PRIM bool HL_NAME(get_window_grab)(SDL_Window* window) {
 	return SDL_GetWindowMouseGrab(window);
 }
 
-// sdl2 compat:
+// SDL2 compat:
 HL_PRIM int HL_NAME(get_global_mouse_state)(int* x, int* y) {
 	float fx, fy;
 	int retval = SDL_GetGlobalMouseState(&fx, &fy);
@@ -596,16 +587,15 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	}
 
 #ifdef	HL_MOBILE
-	SDL_Window* win = SDL_CreateWindow("", width, height,
-					   SDL_WINDOW_BORDERLESS | sdlFlags);
+	SDL_Window* win = SDL_CreateWindow("", width, height, SDL_WINDOW_BORDERLESS | sdlFlags);
 #else
 	SDL_PropertiesID props = SDL_CreateProperties();
-    SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "");
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, x);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, y);
-    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
+	SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "");
+	SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width);
+	SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
+	SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, x);
+	SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, y);
+	SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
 	if( sdlFlags & SDL_WINDOW_BORDERLESS )
 		SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
 	if( sdlFlags & SDL_WINDOW_FULLSCREEN )
@@ -635,10 +625,8 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	if( sdlFlags & SDL_WINDOW_POPUP_MENU )
 		SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_MENU_BOOLEAN, true);
 
-
-
-    SDL_Window* win = SDL_CreateWindowWithProperties(props);
-    SDL_DestroyProperties(props);
+	SDL_Window* win = SDL_CreateWindowWithProperties(props);
+	SDL_DestroyProperties(props);
 
 #endif
 #	ifdef HL_WIN
@@ -652,7 +640,6 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 
 	// SDL2 compat
 	SDL_StartTextInput(win);
-
 	return win;
 }
 
@@ -687,7 +674,6 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 HL_PRIM bool HL_NAME(win_set_display_mode)(SDL_Window *win, int width, int height, int framerate) {
 	SDL_DisplayMode mode;
 	int display_idx = SDL_GetDisplayForWindow(win);
-
 	if( SDL_GetClosestFullscreenDisplayMode( display_idx, width, height, framerate, true, &mode ) )
 	{
 		return SDL_SetWindowFullscreenMode(win, &mode);
@@ -894,7 +880,6 @@ HL_PRIM int HL_NAME(joy_count)() {
 	int count;
 	SDL_JoystickID *sticks = SDL_GetJoysticks(&count);
 	SDL_free(sticks);
-
 	return count;
 }
 
@@ -946,7 +931,7 @@ HL_PRIM varray *HL_NAME(get_joysticks)() {
 	SDL_JoystickID *idx = hl_aptr(result,SDL_JoystickID);
 	while( *sticks )
 	{
-		*idx++ = *sticks++; 
+		*idx++ = *sticks++;
 	}
 	return result;
 }
@@ -972,7 +957,7 @@ DEFINE_PRIM(_VOID, free_surface, _SURF);
 HL_PRIM void HL_NAME(show_cursor)( bool b ) {
 	if( b )
 		SDL_ShowCursor();
-	else 
+	else
 		SDL_HideCursor();
 }
 
@@ -1038,13 +1023,10 @@ HL_PRIM varray* HL_NAME(get_displays)() {
 	}
 
 	SDL_free( displays );
-
 	return arr;
 }
 
 HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
-
-
 	SDL_DisplayMode **modes;
 	int count;
 	modes = SDL_GetFullscreenDisplayModes(display_id, &count);
@@ -1052,7 +1034,6 @@ HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
 
 	for (int i = 0; i < count; i++) {
 		SDL_DisplayMode *mode = modes[i];
-		
 		vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
 		hl_dyn_seti(obj, hl_hash_utf8("width"), &hlt_i32, mode->w);
 		hl_dyn_seti(obj, hl_hash_utf8("height"), &hlt_i32, mode->h);

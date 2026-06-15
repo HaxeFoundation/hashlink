@@ -20,7 +20,7 @@ sudo apt-get install --no-install-recommends -y \
   libmbedtls-dev \
   libopenal-dev \
   libpng-dev \
-  libsdl2-dev \
+  libsdl3-dev \
   libturbojpeg-dev \
   libuv1-dev \
   libvorbis-dev \
