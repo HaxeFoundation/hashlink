@@ -33,7 +33,6 @@ class Window {
 	public static inline var SDL_WINDOW_MINIMIZED          = 0x00000040;
 	public static inline var SDL_WINDOW_MAXIMIZED          = 0x00000080;
 	public static inline var SDL_WINDOW_MOUSE_GRABBED      = 0x00000100;
-
 	public static inline var SDL_WINDOW_INPUT_FOCUS        = 0x00000200;
 	public static inline var SDL_WINDOW_MOUSE_FOCUS        = 0x00000400;
 	public static inline var SDL_WINDOW_FOREIGN            = 0x00000800;
@@ -42,7 +41,6 @@ class Window {
 	public static inline var SDL_WINDOW_MOUSE_CAPTURE      = 0x00004000;
 	public static inline var SDL_WINDOW_ALWAYS_ON_TOP      = 0x00010000;
 	public static inline var SDL_WINDOW_UTILITY            = 0x00020000;
-
 	public static inline var SDL_WINDOW_TOOLTIP            = 0x00040000;
 	public static inline var SDL_WINDOW_POPUP_MENU         = 0x00080000;
 	public static inline var SDL_WINDOW_VULKAN             = 0x10000000;
@@ -417,6 +415,7 @@ class Window {
 
 	static function warpMouseInWindow( win : WinPtr, x : Int, y : Int ) : Void {
 	}
+
 	@:hlNative("?sdl", "capture_mouse")
 	static function captureMouse(enable: Bool) {
 		return 0;

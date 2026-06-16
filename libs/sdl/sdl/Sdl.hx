@@ -166,7 +166,6 @@ class Sdl {
 			return @:privateAccess String.fromUTF8(t);
 	}
 
-
 	public static function getError() : String {
 		var t = _getError();
 		if( t == null )
@@ -265,7 +264,6 @@ class Sdl {
 	private static function _getError() : hl.Bytes {
 		return null;
 	}
-
 
 	//
 	// SDL3 Joystick API
