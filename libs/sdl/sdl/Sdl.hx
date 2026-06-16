@@ -270,8 +270,13 @@ class Sdl {
 	//
 	// SDL3 Joystick API
 	//
+	public static function getJoysticks() : Array<Int> {
+		var ids = _getJoysticks();
+		return ids == null ? [] : [for( id in ids ) id];
+	}
+
 	@:hlNative("?sdl", "get_joysticks")
-	public static function getJoysticks() : hl.NativeArray<Int> {
+	private static function _getJoysticks() : hl.NativeArray<Int> {
 		return null;
 	}
 }

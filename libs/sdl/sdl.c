@@ -408,18 +408,22 @@ HL_PRIM void HL_NAME(delay)( int time ) {
 HL_PRIM int HL_NAME(get_screen_width)() {
 	int count;
 	SDL_DisplayID *displays = SDL_GetDisplays( &count );
-	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[0]);
+	const SDL_DisplayMode *e = NULL;
+	if( displays != NULL && count > 0 )
+		e = SDL_GetCurrentDisplayMode(displays[0]);
 	SDL_free( displays );
-	return e->w;
+	return e != NULL ? e->w : 0;
 }
 
 // SDL2 compat: Assume display 0.
 HL_PRIM int HL_NAME(get_screen_height)() {
 	int count;
 	SDL_DisplayID *displays = SDL_GetDisplays( &count );
-	const SDL_DisplayMode *e = SDL_GetCurrentDisplayMode(displays[0]);
+	const SDL_DisplayMode *e = NULL;
+	if( displays != NULL && count > 0 )
+		e = SDL_GetCurrentDisplayMode(displays[0]);
 	SDL_free( displays );
-	return e->h;
+	return e != NULL ? e->h : 0;
 }
 
 HL_PRIM int HL_NAME(get_screen_width_of_window)(SDL_Window* win) {
@@ -923,15 +927,13 @@ DEFINE_PRIM(_BYTES, joy_get_name, TJOY);
 
 // SDL3 Joystick API
 HL_PRIM varray *HL_NAME(get_joysticks)() {
-	SDL_JoystickID *sticks;
 	int count;
-	sticks = SDL_GetJoysticks( &count );
+	SDL_JoystickID *sticks = SDL_GetJoysticks( &count );
 	varray *result = hl_alloc_array(&hlt_i32, count);
 	SDL_JoystickID *idx = hl_aptr(result,SDL_JoystickID);
-	while( *sticks )
-	{
-		*idx++ = *sticks++;
-	}
+	for( int i = 0; i < count; i++ )
+		idx[i] = sticks[i];
+	SDL_free(sticks);
 	return result;
 }
 
