@@ -622,8 +622,6 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 		SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_MENU_BOOLEAN, true);
 	if( sdlFlags & SDL_WINDOW_MODAL )
 		SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_MODAL_BOOLEAN, true);
-	if( sdlFlags & SDL_WINDOW_POPUP_MENU )
-		SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_MENU_BOOLEAN, true);
 
 	SDL_Window* win = SDL_CreateWindowWithProperties(props);
 	SDL_DestroyProperties(props);
@@ -656,16 +654,17 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 	case 0: // WINDOWED
 		return SDL_SetWindowFullscreen(win, false);
 
-	case 1: // FULLSCREEN
-		// sdl3 non-standard behavior; force mode to get exclusive fullscreen.
-		const SDL_DisplayMode *mode = SDL_GetWindowFullscreenMode(win);
-		if( mode != NULL )
-			return SDL_SetWindowFullscreenMode(win, mode);
-
-		// Fall back to borderless if we can't find a mode.
+	case 1: { // FULLSCREEN
+		// Rebuild mode from the current display to avoid stale monitor config
+		SDL_DisplayID display = SDL_GetDisplayForWindow(win);
+		const SDL_DisplayMode *fs_mode = SDL_GetDesktopDisplayMode(display);
+		if( fs_mode != NULL )
+			SDL_SetWindowFullscreenMode(win, fs_mode);
 		return SDL_SetWindowFullscreen(win, true);
+	}
 
 	case 2: // BORDERLESS
+		SDL_SetWindowFullscreenMode(win, NULL);
 		return SDL_SetWindowFullscreen(win, true);
 	}
 	return false;
@@ -673,8 +672,8 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 
 HL_PRIM bool HL_NAME(win_set_display_mode)(SDL_Window *win, int width, int height, int framerate) {
 	SDL_DisplayMode mode;
-	int display_idx = SDL_GetDisplayForWindow(win);
-	if( SDL_GetClosestFullscreenDisplayMode( display_idx, width, height, framerate, true, &mode ) )
+	SDL_DisplayID display = SDL_GetDisplayForWindow(win);
+	if( SDL_GetClosestFullscreenDisplayMode( display, width, height, framerate, true, &mode ) )
 	{
 		return SDL_SetWindowFullscreenMode(win, &mode);
 	}
