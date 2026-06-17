@@ -332,34 +332,45 @@ HL_PRIM bool HL_NAME(ui_set_clipboard_text)(char* text) {
 		CloseClipboard();
 		return false;
 	}
-	int len = (int) strlen(text);
-	HGLOBAL g = GlobalAlloc(0, (len + 1) * sizeof(TCHAR));
+	wchar_t* wtext = hl_to_utf16(text);
+	int wlen = (int) wcslen(wtext);
+	HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE, (wlen + 1) * sizeof(wchar_t));
 	if (g == NULL) {
 		CloseClipboard();
 		return false;
 	}
-	char* chr = GlobalLock(g);
-	memcpy(chr, text, len);
-	chr[len] = '\0';
+	wchar_t* dst = (wchar_t*) GlobalLock(g);
+	if (dst == NULL) {
+		GlobalFree(g);
+		CloseClipboard();
+		return false;
+	}
+	memcpy(dst, wtext, (wlen + 1) * sizeof(wchar_t));
 	GlobalUnlock(g);
-	HANDLE h = SetClipboardData(CF_TEXT, g);
+	HANDLE h = SetClipboardData(CF_UNICODETEXT, g);
+	if (h == NULL) {
+		GlobalFree(g);
+		CloseClipboard();
+		return false;
+	}
 	CloseClipboard();
-	return h != NULL;
+	return true;
 }
 
 HL_PRIM byte* HL_NAME(ui_get_clipboard_text)() {
 	if (!OpenClipboard(NULL))
 		return NULL;
-	HANDLE d = GetClipboardData(CF_TEXT);
+	HANDLE d = GetClipboardData(CF_UNICODETEXT);
 	if (d == NULL) {
 		CloseClipboard();
 		return NULL;
 	}
-	char* chr = (char*) GlobalLock(d);
-	if (chr == NULL) {
+	wchar_t* wchr = (wchar_t*) GlobalLock(d);
+	if (wchr == NULL) {
 		CloseClipboard();
 		return NULL;
 	}
+	char* chr = hl_to_utf8(wchr);
 	vbyte* b = hl_copy_bytes(chr, (int) strlen(chr) + 1);
 	GlobalUnlock(d);
 	CloseClipboard();
