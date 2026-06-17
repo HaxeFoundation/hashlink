@@ -20,17 +20,46 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install --no-install-recommends -y \
+            cmake \
+            libasound2-dev \
+            libaudio-dev \
+            libdbus-1-dev \
+            libdecor-0-dev \
+            libdrm-dev \
+            libegl1-mesa-dev \
+            libgbm-dev \
+            libgles2-mesa-dev \
+            libgl1-mesa-dev \
+            libibus-1.0-dev \
+            libjack-dev \
             libmbedtls-dev \
             libopenal-dev \
+            libpipewire-0.3-dev \
             libpng-dev \
-            libsdl2-dev \
+            libpulse-dev \
+            libsndio-dev \
             libturbojpeg-dev \
+            libudev-dev \
+            liburing-dev \
             libuv1-dev \
+            libvulkan-dev \
             libvorbis-dev \
-            libsqlite3-dev
+            libwayland-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libxi-dev \
+            libxkbcommon-dev \
+            libxrandr-dev \
+            libxss-dev \
+            libxtst-dev \
+            libsqlite3-dev \
+            pkg-config \
+            wget
 
       - name: Install Haxe
-        uses: tobil4sk/setup-haxe@9d1527c4bb9d1d449d196a0822118692ceeac457
+        uses: krdlab/setup-haxe@v2
         with:
           haxe-version: latest
 
@@ -38,6 +67,17 @@ jobs:
         run: |
           haxelib setup ~/haxelib
           haxelib install hashlink
+
+      - name: Build and install SDL3
+        run: |
+          wget https://github.com/libsdl-org/SDL/releases/download/release-3.4.10/SDL3-3.4.10.tar.gz
+          tar -xzvf SDL3-3.4.10.tar.gz
+          cd SDL3-3.4.10/
+          mkdir build
+          cd build
+          cmake ..
+          make
+          sudo make install
 
       - name: Build and install HashLink
         run: |
