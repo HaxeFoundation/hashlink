@@ -802,6 +802,7 @@ static void compact_write_data( mem_context *ctx, hl_type *t, void *addr ) {
 
 static void compact_pad( mem_context *ctx, hl_type *t ) {
 	int sz = hl_pad_size(ctx->buf_pos,t);
+	compact_grow(buf, buf_pos, buf_size, sz, char);
 	ctx->buf_pos += sz;
 }
 
