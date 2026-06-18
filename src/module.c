@@ -763,14 +763,21 @@ static bool check_same_type( hl_type *t1, hl_type *t2 ) {
 				return false;
 		return check_same_type(t1->fun->ret, t2->fun->ret);
 	case HVIRTUAL:
+		if( t1->virt == t2->virt )
+			return true;
 		if( t1->virt->nfields != t2->virt->nfields )
 			return false;
+		hl_type_virtual *vt2 = t2->virt;
+		t2->virt = t1->virt; // assume equals !
 		for(i=0;i<t1->virt->nfields;i++) {
 			hl_obj_field *f1 = t1->virt->fields + i;
 			hl_obj_field *f2 = t2->virt->fields + i;
-			if( f1->hashed_name != f2->hashed_name || !check_same_type(f1->t, f2->t) )
+			if( f1->hashed_name != f2->hashed_name || !check_same_type(f1->t, f2->t) ) {
+				t2->virt = vt2;
 				return false;
+			}
 		}
+		t2->virt = vt2;
 		return true;
 	case HABSTRACT:
 		return ucmp(t1->abs_name, t2->abs_name) == 0;
