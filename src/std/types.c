@@ -244,7 +244,7 @@ HL_PRIM bool hl_safe_cast( hl_type *t, hl_type *to ) {
 			hl_type_obj *o = t->obj;
 			hl_type_obj *oto = to->obj;
 			while( true ) {
-				if( o == oto ) return true;
+				if( o == oto || o->name == oto->name ) return true;
 				if( o->super == NULL ) return false;
 				o = o->super->obj;
 			}
