@@ -121,7 +121,7 @@ static bool load_plugin( pchar *file ) {
 	int i;
 	for(i=0;i<code->ntypes;i++) {
 		hl_type *t1 = code->types + i;
-		if( t1->kind != HOBJ ) continue;
+		if( t1->kind != HOBJ && t1->kind != HSTRUCT ) continue;
 		hl_type *t2 = hl_module_resolve_type(main_ctx->m, t1, false);
 		// ensure that cast will work between types !
 		if( t2 ) t1->obj->name = t2->obj->name;
@@ -142,7 +142,7 @@ static bool load_plugin( pchar *file ) {
 
 static vdynamic *resolve_type( hl_type *t, hl_type *gt ) {
 	hl_type *t2 = hl_module_resolve_type(main_ctx->m, t, true);
-	if( t2 == NULL || t2->kind != HOBJ )
+	if( t2 == NULL || (t2->kind != HOBJ && t2->kind != HSTRUCT))
 		return NULL;
 	hl_module_context *m = t->obj->m;
 	hl_module_context *m2 = t2->obj->m;
