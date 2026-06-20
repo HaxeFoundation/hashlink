@@ -145,7 +145,7 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 	*eip = (void*)c.Eip;
 	return (void*)c.Esp;
 #	endif
-#elif defined(HL_LINUX)
+#elif defined(HL_LINUX) && (defined(__x86_64__) || defined(__i386__))
 #	ifdef HL_64
 	*eip = (void*)shared_context.context.uc_mcontext.gregs[REG_RIP];
 	return (void*)shared_context.context.uc_mcontext.gregs[REG_RSP];
@@ -153,6 +153,10 @@ static void *get_thread_stackptr( thread_handle *t, void **eip ) {
 	*eip = (void*)shared_context.context.uc_mcontext.gregs[REG_EIP];
 	return (void*)shared_context.context.uc_mcontext.gregs[REG_ESP];
 #	endif
+#elif defined(HL_LINUX) && defined(__aarch64__)
+	// Linux/Android ARM64: uc_mcontext has direct regs[] / sp / pc fields.
+	*eip = (void*)shared_context.context.uc_mcontext.pc;
+	return (void*)shared_context.context.uc_mcontext.sp;
 #elif defined(HL_MAC) && defined(__x86_64__)
 	struct __darwin_mcontext64 *mcontext = shared_context.context.uc_mcontext;
 	if (mcontext != NULL) {
