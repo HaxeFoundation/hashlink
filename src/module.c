@@ -807,11 +807,11 @@ static int check_same_obj( hl_type_obj *o1, hl_type_obj *o2 ) {
 
 hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err ) {
 	int i;
-	if( t->kind != HOBJ )
+	if( t->kind != HOBJ && t->kind != HSTRUCT )
 		return NULL;
 	for(i=0;i<m->code->ntypes;i++) {
 		hl_type *t2 = m->code->types + i;
-		if( t2->kind == HOBJ && ucmp(t->obj->name,t2->obj->name) == 0 ) {
+		if( t2->kind == t->kind && ucmp(t->obj->name,t2->obj->name) == 0 ) {
 			int r = check_same_obj(t->obj,t2->obj);
 			if( r == 0 )
 				return t2;
