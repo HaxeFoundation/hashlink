@@ -783,6 +783,8 @@ static bool check_same_type( hl_type *t1, hl_type *t2 ) {
 		return ucmp(t1->abs_name, t2->abs_name) == 0;
 	case HENUM:
 		return ucmp(t1->tenum->name, t2->tenum->name) == 0;
+	case HPACKED:
+		return check_same_type(t1->tparam, t2->tparam);
 	default:
 		break;
 	}
