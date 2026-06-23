@@ -111,6 +111,9 @@ class GL {
 	public static function cullFace( face : Int ) {
 	}
 
+	public static function frontFace( direction : Int ) {
+	}
+
 	public static function blendFunc( src : Int, dst : Int ) {
 	}
 
@@ -148,6 +151,9 @@ class GL {
 
 	public static function createProgram() : Program {
 		return null;
+	}
+
+	public static function deleteProgram( p : Program ) {
 	}
 
 	public static function bindFragDataLocation( p : Program, colorNumber : Int, name : String ) : Void {
@@ -387,10 +393,28 @@ class GL {
 	public static function uniform1i( u : Uniform, i : Int ) {
 	}
 
+	public static function uniform3fv( u : Uniform, buffer : hl.Bytes, bufPos : Int, count : Int ) {
+	}
+
 	public static function uniform4fv( u : Uniform, buffer : hl.Bytes, bufPos : Int, count : Int ) {
 	}
 
+	public static function uniformMatrix3fv( u : Uniform, transpose : Bool, buffer : hl.Bytes, bufPos : Int, count : Int ) {
+	}
+
 	public static function uniformMatrix4fv( u : Uniform, transpose : Bool, buffer : hl.Bytes, bufPos : Int, count : Int ) {
+	}
+
+	public static function uniform1f( u : Uniform, x : Float ) {
+	}
+
+	public static function uniform2f( u : Uniform, x : Float, y : Float ) {
+	}
+
+	public static function uniform3f( u : Uniform, x : Float, y : Float, z : Float ) {
+	}
+
+	public static function uniform4f( u : Uniform, x : Float, y : Float, z : Float, w : Float ) {
 	}
 
 	// compute
