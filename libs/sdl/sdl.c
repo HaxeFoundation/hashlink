@@ -703,6 +703,10 @@ HL_PRIM void HL_NAME(win_get_position)(SDL_Window *win, int *x, int *y) {
 }
 
 HL_PRIM void HL_NAME(win_set_size)(SDL_Window *win, int width, int height) {
+	SDL_WindowFlags flags = SDL_GetWindowFlags(win);
+	if( flags & SDL_WINDOW_MAXIMIZED ) {
+		SDL_RestoreWindow(win);
+	}
 	SDL_SetWindowSize(win, width, height);
 }
 
