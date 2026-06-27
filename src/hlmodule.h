@@ -48,10 +48,12 @@ struct hl_function {
 	int nregs;
 	int nops;
 	int ref;
+	int nassigns;
 	hl_type *type;
 	hl_type **regs;
 	hl_opcode *ops;
 	int *debug;
+	int *assigns;
 
 	hl_type_obj *obj;
 	union {
@@ -103,7 +105,9 @@ typedef struct {
 
 typedef struct {
 	void *offsets;
+	int *vars;
 	int start;
+	int nvars;
 	bool large;
 } hl_debug_infos;
 
@@ -164,6 +168,7 @@ h_bool hl_module_patch( hl_module *m, hl_code *code );
 void hl_module_free( hl_module *m );
 h_bool hl_module_debug( hl_module *m, int port, h_bool wait );
 hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err );
+hl_module **hl_get_modules( int *count );
 
 void hl_profile_setup( int sample_count );
 void hl_profile_end();

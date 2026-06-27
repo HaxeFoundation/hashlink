@@ -88,6 +88,11 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 	return true;
 }
 
+hl_module **hl_get_modules( int *count ) {
+	*count = modules_count;
+	return cur_modules;
+}
+
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr ) {
 	int *debug_addr;
 	int file, line;

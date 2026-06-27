@@ -506,13 +506,15 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 		if( c->hasdebug ) {
 			c->functions[i].debug = hl_read_debug_infos(r,c->functions[i].nops);
 			if( c->version >= 3 ) {
-				// skip assigns (no need here)
 				int nassigns = UINDEX();
+				int *assigns = (int*)malloc(sizeof(int)*nassigns*2);
 				int j;
 				for(j=0;j<nassigns;j++) {
-					UINDEX();
-					INDEX();
+					assigns[j<<1] = UINDEX();
+					assigns[(j<<1)|1] = INDEX() - 1;
 				}
+				c->functions[i].nassigns = nassigns;
+				c->functions[i].assigns = assigns;
 			}
 		}
 	}
