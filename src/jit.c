@@ -339,6 +339,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	ctx->final_code = code;
 	hl_emit_final(ctx);
 	hl_codegen_final(ctx);
+	hl_flush_executable_memory(code, size);
 	arg_reg_count = ctx->cfg.regs.nargs;
 	arg_fp_count = ctx->cfg.floats.nargs;
 	call_jit_c2hl = ctx->final_code + ctx->code_funs.c2hl;

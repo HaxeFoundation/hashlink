@@ -824,6 +824,7 @@ HL_API void hl_global_lock( bool lock );
 
 HL_API void *hl_alloc_executable_memory( int size );
 HL_API void hl_free_executable_memory( void *ptr, int size );
+HL_API void hl_flush_executable_memory( void *code, int size );
 
 // ----------------------- BUFFER --------------------------------------------------
 

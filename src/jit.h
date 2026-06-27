@@ -190,12 +190,31 @@ typedef struct {
 	ereg *arg;
 } reg_config;
 
+// HL→native stack-arg layout. HL→HL calls always use the HL convention
+// (cfg.stack_arg_size stride, PUSH-based). HL→native calls follow the
+// platform C ABI, which on AArch64 differs from HL's convention:
+//   - Linux/Windows AArch64 (AAPCS64): each stack arg occupies an 8-byte slot.
+//   - Apple ARM64: stack args are packed at their natural size with
+//     natural alignment.
+typedef enum {
+	NATIVE_STACK_LAYOUT_HL = 0,        // default: same as HL stride (x86_64, etc.)
+	NATIVE_STACK_LAYOUT_AAPCS64,       // 8-byte slots (Linux/Win AArch64 native)
+	NATIVE_STACK_LAYOUT_APPLE_ARM64,   // natural-size packed (Apple ARM64 native)
+} native_stack_layout_kind;
+
 typedef struct {
 	reg_config regs;
 	reg_config floats;
 	ereg stack_reg;
 	ereg stack_pos;
 	int stack_align;
+	// Minimum bytes consumed by each stack argument. Defaults to HL_WSIZE
+	// when 0. Backends like AArch64 set this to 16 because each PUSH must
+	// move SP by 16 bytes to keep SP 16-byte aligned (any [SP, ...] access
+	// with a misaligned SP traps under EL0).
+	int stack_arg_size;
+	// Layout for HL→native (CALL_PTR) stack args. See native_stack_layout_kind.
+	int native_stack_layout;
 	int debug_prefix_size;
 	ereg req_bit_shifts;
 	ereg req_div_a;
