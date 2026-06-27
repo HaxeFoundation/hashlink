@@ -221,15 +221,19 @@ struct _jit_ctx {
 	int block_count;
 	int value_count;
 	int phi_count;
+	int track_count;
 	einstr *instrs;
 	eblock *blocks;
 	int *values_writes;
+	int *values_track;
 	int *emit_pos_map;
 	// regs output
 	int reg_instr_count;
+	int regs_track_count;
 	einstr *reg_instrs;
 	ereg *reg_writes;
 	int *reg_pos_map;
+	int *regs_track;
 	// codegen output
 	int code_size;
 	unsigned char *code_instrs;
