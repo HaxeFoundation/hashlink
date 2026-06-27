@@ -143,6 +143,9 @@ struct _emit_ctx {
 	int_arr jump_regs;
 	int_arr values;
 
+	int_arr values_track;
+	int current_assign;
+
 	blocks blocks;
 	emit_block *current_block;
 	emit_block *wait_seal;
@@ -501,6 +504,12 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 			STORE_MEM(emit_gen(ctx,ADDRESS,to->stored,UNUSED,M_PTR), 0, v);
 	} else {
 		to->stored = v;
+		if( ctx->current_assign < ctx->fun->nassigns && ctx->fun->assigns[(ctx->current_assign<<1)|1] == ctx->op_pos ) {
+			int_arr_add(ctx->values_track,ctx->current_assign);
+			int_arr_add(ctx->values_track,v);
+			//printf("@%X R%d[%s] := V%d\n",ctx->emit_pos - 1, to->id, ctx->jit->mod->code->strings[ctx->fun->assigns[(ctx->current_assign<<1)]], v);
+			ctx->current_assign++;
+		}
 	}
 }
 
@@ -877,6 +886,8 @@ void hl_emit_flush( jit_ctx *jit ) {
 	jit->blocks = hl_zalloc(&jit->falloc,sizeof(eblock) * jit->block_count);
 	jit->value_count = int_arr_count(ctx->values);
 	jit->values_writes = ctx->values.values;
+	jit->track_count = int_arr_count(ctx->values_track) >> 1;
+	jit->values_track = ctx->values_track.values;
 	for_iter(blocks,b,ctx->blocks)
 		emit_write_block(ctx,b);
 	{
@@ -989,10 +1000,12 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->emit_pos = 0;
 	ctx->trap_count = 0;
 	ctx->phi_count = 0;
+	ctx->current_assign = 0;
 	ctx->flushed = false;
 	int_arr_free(&ctx->args_data);
 	int_arr_free(&ctx->jump_regs);
 	int_arr_free(&ctx->values);
+	int_arr_free(&ctx->values_track);
 	blocks_free(&ctx->blocks);
 	int_arr_add(ctx->values,-1);
 	ctx->current_block = alloc_block(ctx);
@@ -1025,7 +1038,14 @@ void hl_emit_function( jit_ctx *jit ) {
 	emit_gen(ctx,ENTER,UNUSED,UNUSED,M_NONE);
 	for(i=0;i<f->type->fun->nargs;i++) {
 		hl_type *t = f->type->fun->args[i];
-		STORE(R(i), emit_gen(ctx, LOAD_ARG, UNUSED, UNUSED, hl_type_mode(t)));
+		ereg r = emit_gen(ctx, LOAD_ARG, UNUSED, UNUSED, hl_type_mode(t));
+		STORE(R(i), r);
+		if( ctx->current_assign < f->nassigns && f->assigns[(ctx->current_assign<<1)|1] < 0 ) {
+			//printf("@%X R%d[%s] := V%d\n",ctx->emit_pos - 1, i, ctx->jit->mod->code->strings[f->assigns[(ctx->current_assign<<1)]], r);
+			int_arr_add(ctx->values_track,ctx->current_assign);
+			int_arr_add(ctx->values_track,r);
+			ctx->current_assign++;
+		}
 	}
 
 	for(int op_pos=0;op_pos<f->nops;op_pos++) {

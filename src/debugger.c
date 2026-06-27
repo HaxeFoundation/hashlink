@@ -45,7 +45,7 @@ static void send( void *ptr, int size ) {
 	hl_socket_send(client_socket, ptr, 0, size);
 }
 
-static void hl_debug_loop( hl_module *m ) {
+static void hl_debug_loop() {
 	void *inf_addr = hl_gc_threads_info();
 	int flags = 0;
 	int hl_ver = HL_VERSION;
@@ -64,41 +64,49 @@ static void hl_debug_loop( hl_module *m ) {
 #	endif
 	hl_get_thread()->flags |= HL_THREAD_INVISIBLE;
 	do {
-		int i;
 		vbyte cmd;
 		hl_socket *s = hl_socket_accept(debug_socket);
 		if( s == NULL ) break;
 		client_socket = s;
-		send("HLD1",4);
+		send("HLD2",4);
 		send(&flags,4);
 		send(&hl_ver, 4);
 		send(&pid,4);
 		send(&inf_addr, sizeof(void*));
-		send(&m->globals_data,sizeof(void*));
-		send(&m->jit_code,sizeof(void*));
-		send(&m->codesize,4);
-		send(&m->code->types,sizeof(void*));
 
-		for(i=1;i<=HBYTES;i++) {
+		for(int i=1;i<=HBYTES;i++) {
 			hl_type t = {(hl_type_kind)i};
 			int k = 1 + hl_pad_struct(1,&t);
 			send(&k,4);
 		}
 
-		send(&m->code->nfunctions,4);
-		for(i=0;i<m->code->nfunctions;i++) {
-			hl_function *f = m->code->functions + i;
-			hl_debug_infos *d = m->jit_debug + i;
-			struct {
-				int nops;
-				int start;
-				unsigned char large;
-			} fdata;
-			fdata.nops = f->nops;
-			fdata.start = d->start;
-			fdata.large = (unsigned char)d->large;
-			send(&fdata,9);
-			send(d->offsets,(d->large ? sizeof(int) : sizeof(unsigned short)) * (f->nops + 1));
+		int nmodules;
+		hl_module **mods = hl_get_modules(&nmodules);
+		send(&nmodules,4);
+		for(int i=0;i<nmodules;i++) {
+			hl_module *m = mods[i];
+			send(&m->globals_data,sizeof(void*));
+			send(&m->jit_code,sizeof(void*));
+			send(&m->codesize,4);
+			send(&m->code->types,sizeof(void*));
+			send(&m->code->nfunctions,4);
+			for(int j=0;j<m->code->nfunctions;j++) {
+				hl_function *f = m->code->functions + j;
+				hl_debug_infos *d = m->jit_debug + j;
+				struct {
+					int nops;
+					int start;
+					int nvars;
+					unsigned char large;
+				} fdata;
+				fdata.nops = f->nops;
+				fdata.start = d->start;
+				fdata.nvars = d->nvars;
+				fdata.large = (unsigned char)d->large;
+				send(&fdata,13);
+				send(d->offsets,(d->large ? sizeof(int) : sizeof(unsigned short)) * (f->nops + 1));
+				send(d->vars,d->nvars * 4);
+			}
 		}
 
 		hl_setup.closure_stack_capture = 8;

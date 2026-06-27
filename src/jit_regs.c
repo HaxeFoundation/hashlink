@@ -45,9 +45,11 @@
 
 typedef struct {
 	int id;
+	int start;
 	int stack_pos;
 	int last_read;
 	int tot_reads;
+	int tracked;
 	emit_mode mode;
 	ereg pref_reg;
 	ereg reg;
@@ -733,6 +735,23 @@ void hl_regs_flush( jit_ctx *jit ) {
 	jit->reg_pos_map = ctx->pos_map;
 	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op+1] = ctx->emit_pos;
 	hl_emit_remap_jumps(jit->emit, &ctx->jump_regs, ctx->instrs, ctx->pos_map);
+
+	int_arr regs_track;
+	int_arr_free(&regs_track);
+	for(int i=0;i<jit->value_count + jit->phi_count;i++) {
+		value_info *v = VAL(i);
+		if( v->tracked && v->reg ) {
+			int start = ctx->pos_map[v->start];
+			int end = v->last_read < 0 ? start : ctx->pos_map[v->last_read];
+			//printf("  @%X %s := %s\n", ctx->pos_map[v->start], jit->mod->code->strings[jit->fun->assigns[(v->tracked - 1) << 1]], val_str(v->reg,v->mode));
+			int_arr_add(regs_track, v->tracked - 1);
+			int_arr_add(regs_track, start);
+			int_arr_add(regs_track, end);
+			int_arr_add(regs_track, v->reg);
+		}
+	}
+	jit->regs_track = regs_track.values;
+	jit->regs_track_count = regs_track.cur >> 2;
 }
 
 void hl_regs_function( jit_ctx *jit ) {
@@ -760,17 +779,26 @@ void hl_regs_function( jit_ctx *jit ) {
 		v->last_read = -1;
 		if( i < jit->value_count ) {
 			v->id = i;
-			v->mode = jit->instrs[jit->values_writes[i]].mode;
+			v->start = jit->values_writes[i];
+			v->mode = jit->instrs[v->start].mode;
 		} else {
 			v->id = -(i-jit->value_count) - 1;
 			v->mode = M_NONE;
 		}
 	}
+	for(int i=0;i<jit->track_count;i++) {
+		int v = jit->values_track[(i<<1)|1];
+		VAL(v)->tracked = jit->values_track[i<<1] + 1;
+	}
 	for(int b=0;b<jit->block_count;b++) {
 		eblock *bl = jit->blocks + b;
 		for(int p=0;p<bl->phi_count;p++) {
 			ephi *ph = bl->phis + p;
-			VAL_REG(ph->value)->mode = ph->mode;
+			value_info *v = VAL_REG(ph->value);
+			v->start = bl->start_pos;
+			v->mode = ph->mode;
+			if( ph->nvalues )
+				v->tracked = VAL_REG(ph->values[0])->tracked;
 		}
 	}
 	regs_compute_liveness(ctx);

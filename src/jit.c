@@ -135,7 +135,7 @@ void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	jit_code_append(ctx);
 	if( m->code->hasdebug ) {
 		m->jit_debug = (hl_debug_infos*)malloc(sizeof(hl_debug_infos) * m->code->nfunctions);
-		memset(m->jit_debug, -1, sizeof(hl_debug_infos) * m->code->nfunctions);
+		memset(m->jit_debug, 0, sizeof(hl_debug_infos) * m->code->nfunctions);
 	}
 }
 
@@ -175,9 +175,16 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 				((int*)debug)[i] = cpos;
 		}
 		int fid = (int)(f - m->code->functions);
-		m->jit_debug[fid].start = pos;
-		m->jit_debug[fid].offsets = debug;
-		m->jit_debug[fid].large = !compact;
+		hl_debug_infos *dbg = &m->jit_debug[fid];
+		dbg->start = pos;
+		dbg->offsets = debug;
+		dbg->large = !compact;
+		dbg->nvars = ctx->regs_track_count;
+		dbg->vars = ctx->regs_track;
+		for(int i=0;i<ctx->regs_track_count;i++) {
+			dbg->vars[(i<<2)|1] = ctx->code_pos_map[dbg->vars[(i<<2)|1]];
+			dbg->vars[(i<<2)|2] = ctx->code_pos_map[dbg->vars[(i<<2)|2]];
+		}
 	}
 	if( !jit_code_append(ctx) )
 		return -1;
