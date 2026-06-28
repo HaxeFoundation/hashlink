@@ -46,6 +46,7 @@
 #	define glPolygonMode(face,mode) if( mode != 0x1B02 ) ES_NOT_SUPPORTED
 #	define glGetQueryObjectiv glGetQueryObjectuiv
 #	define glClearDepth glClearDepthf
+#	define glColorMaski(...) ES_NOT_SUPPORTED
 #endif
 
 #if !defined(HL_CONSOLE) && !defined(GL_IMPORT)
