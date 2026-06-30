@@ -652,6 +652,21 @@ HL_PRIM SDL_GLContext HL_NAME(win_get_glcontext)(SDL_Window *win) {
 }
 
 HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
+#ifdef HL_WIN
+	SDL_PropertiesID props = SDL_GetWindowProperties(win);
+	HWND wnd = (HWND)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+	wsave_pos *save = (wsave_pos*)SDL_GetPointerProperty(props, "save", NULL);
+	if( save && mode != 2 ) {
+		// exit borderless
+		SetWindowLong(wnd, GWL_STYLE, save->style);
+		SetWindowPos(wnd, NULL, save->x, save->y, save->w, save->h, 0);
+		SDL_SetWindowSize(win, save->w, save->h);
+		free(save);
+		SDL_SetPointerProperty(props, "save", NULL);
+		save = NULL;
+	}
+#endif
+
 	switch( mode ) {
 	case 0: // WINDOWED
 		return SDL_SetWindowFullscreen(win, false);
@@ -666,8 +681,34 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 	}
 
 	case 2: // BORDERLESS
+#ifdef HL_WIN
+	{
+		if( save != NULL )
+			return true;
+		if( !SDL_SetWindowFullscreen(win, false) )
+			return false;
+		HMONITOR hmon = MonitorFromWindow(wnd, MONITOR_DEFAULTTONEAREST);
+		MONITORINFO mi = { sizeof(mi) };
+		RECT r;
+		if( !GetMonitorInfo(hmon, &mi) )
+			return false;
+		GetWindowRect(wnd,&r);
+		save = (wsave_pos*)malloc(sizeof(wsave_pos));
+		save->x = r.left;
+		save->y = r.top;
+		save->w = r.right - r.left;
+		save->h = r.bottom - r.top;
+		save->style = GetWindowLong(wnd, GWL_STYLE);
+		SDL_SetPointerProperty(props, "save", save);
+		SetWindowLong(wnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+		// prevent opengl driver to use exclusive mode !
+		SetWindowPos(wnd, NULL, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top + 2, 0);
+		return true;
+	}
+#else
 		SDL_SetWindowFullscreenMode(win, NULL);
 		return SDL_SetWindowFullscreen(win, true);
+#endif
 	}
 	return false;
 }
