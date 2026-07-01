@@ -228,14 +228,14 @@ static void sentinel_loop( vsentinel *s ) {
 				// simulate a call
 #				ifdef HL_64
 				int_val* rsp = (int_val*)regs.Rsp;
+				// ensure the stack is aligned to 16 bytes 
+				rsp = (int_val*)((int_val)rsp & ~15);
 				*--rsp = (int_val)regs.Rip;
-				*--rsp = (int_val)rsp;
 				regs.Rsp = (int_val)rsp;
 				regs.Rip = (int_val)s->callback;
 #				else
 				int_val* esp = (int_val*)regs.Esp;
 				*--esp = (int_val)regs.Eip;
-				*--esp = (int_val)esp;
 				regs.Esp = (int_val)esp;
 				regs.Eip = (int_val)s->callback;
 #				endif
