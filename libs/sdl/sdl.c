@@ -7,6 +7,12 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gamepad.h>
 
+#ifdef HL_ANDROID
+// SDL3 no longer pulls SDL_main.h (where SDL_SetMainReady lives) in via SDL.h.
+#	define SDL_MAIN_HANDLED
+#	include <SDL3/SDL_main.h>
+#endif
+
 #if defined (HL_IOS) || defined(HL_TVOS)
 #	include <OpenGLES/ES3/gl.h>
 #	include <OpenGLES/ES3/glext.h>
@@ -102,6 +108,10 @@ static bool isGlOptionsSet = false;
 
 HL_PRIM bool HL_NAME(init_once)() {
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+#	ifdef HL_ANDROID
+	// Pure HL binary has no Activity/SDL_main; tell SDL init was set up
+	SDL_SetMainReady();
+#	endif
 	if( !SDL_Init( SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD ) ) {
 		hl_error("SDL_Init failed: %s", hl_to_utf16(SDL_GetError()));
 		return false;
