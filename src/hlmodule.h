@@ -105,9 +105,9 @@ typedef struct {
 
 typedef struct {
 	void *offsets;
-	int *vars;
+	void *vars;
 	int start;
-	int nvars;
+	int vars_size;
 	bool large;
 } hl_debug_infos;
 
