@@ -50,6 +50,7 @@ typedef struct {
 	int last_read;
 	int tot_reads;
 	int tracked;
+	int overwrite;
 	emit_mode mode;
 	ereg pref_reg;
 	ereg reg;
@@ -738,20 +739,25 @@ void hl_regs_flush( jit_ctx *jit ) {
 
 	int_arr regs_track;
 	int_arr_free(&regs_track);
+	int rarg = 0;
+	int end_pos = ctx->emit_pos;
 	for(int i=0;i<jit->value_count + jit->phi_count;i++) {
 		value_info *v = VAL(i);
 		if( v->tracked && v->reg ) {
 			int start = ctx->pos_map[v->start];
-			int end = v->last_read < 0 ? start : ctx->pos_map[v->last_read];
-			//printf("  @%X %s := %s\n", ctx->pos_map[v->start], jit->mod->code->strings[jit->fun->assigns[(v->tracked - 1) << 1]], val_str(v->reg,v->mode));
-			int_arr_add(regs_track, v->tracked - 1);
+			int end = v->overwrite < 0 ? end_pos : ctx->pos_map[v->last_read];
+			int track = (v->tracked - 1) << 1;
+//			printf("  @%X-%X %s := %s\n", start, end, jit->mod->code->strings[jit->fun->assigns[track]], val_str(v->reg,v->mode));
+			int assign = jit->fun->assigns[track+1];
+			if( assign < 0 ) assign = rarg++;
+			int_arr_add(regs_track, assign);
 			int_arr_add(regs_track, start);
 			int_arr_add(regs_track, end);
 			int_arr_add(regs_track, v->reg);
 		}
 	}
 	jit->regs_track = regs_track.values;
-	jit->regs_track_count = regs_track.cur >> 2;
+	jit->regs_track_count = regs_track.cur;
 }
 
 void hl_regs_function( jit_ctx *jit ) {
@@ -777,6 +783,7 @@ void hl_regs_function( jit_ctx *jit ) {
 		v->pref_reg = UNUSED;
 		v->stack_pos = INVALID;
 		v->last_read = -1;
+		v->overwrite = -1;
 		if( i < jit->value_count ) {
 			v->id = i;
 			v->start = jit->values_writes[i];

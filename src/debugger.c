@@ -96,16 +96,16 @@ static void hl_debug_loop() {
 				struct {
 					int nops;
 					int start;
-					int nvars;
+					int vars_size;
 					unsigned char large;
 				} fdata;
 				fdata.nops = f->nops;
 				fdata.start = d->start;
-				fdata.nvars = d->nvars;
+				fdata.vars_size = d->vars_size;
 				fdata.large = (unsigned char)d->large;
 				send(&fdata,13);
 				send(d->offsets,(d->large ? sizeof(int) : sizeof(unsigned short)) * (f->nops + 1));
-				send(d->vars,d->nvars * 4);
+				send(d->vars,d->vars_size);
 			}
 		}
 
