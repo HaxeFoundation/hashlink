@@ -179,12 +179,13 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		dbg->start = pos;
 		dbg->offsets = debug;
 		dbg->large = !compact;
-		dbg->nvars = ctx->regs_track_count;
-		dbg->vars = ctx->regs_track;
-		for(int i=0;i<ctx->regs_track_count;i++) {
-			dbg->vars[(i<<2)|1] = ctx->code_pos_map[dbg->vars[(i<<2)|1]];
-			dbg->vars[(i<<2)|2] = ctx->code_pos_map[dbg->vars[(i<<2)|2]];
+		dbg->vars_size = ctx->regs_track_count * sizeof(int);
+		dbg->vars = malloc(dbg->vars_size);
+		for(int i=0;i<ctx->regs_track_count>>2;i++) {
+			ctx->regs_track[(i<<2)|1] = ctx->code_pos_map[ctx->regs_track[(i<<2)|1] + 1];
+			ctx->regs_track[(i<<2)|2] = ctx->code_pos_map[ctx->regs_track[(i<<2)|2]];
 		}
+		memcpy(dbg->vars,ctx->regs_track,dbg->vars_size);
 	}
 	if( !jit_code_append(ctx) )
 		return -1;
