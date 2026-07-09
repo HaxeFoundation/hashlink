@@ -863,12 +863,13 @@ HL_PRIM void HL_NAME(win_set_dark_mode)( dx_window* wnd, bool enabled ) {
 	DwmSetWindowAttributePTR DwmSetWindowAttribute =
 		(DwmSetWindowAttributePTR)GetProcAddress(dwmapi, "DwmSetWindowAttribute");
 
-	if (DwmSetWindowAttribute == NULL)
-		return;
+	if (DwmSetWindowAttribute != NULL) {
+		int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+		BOOL dark_mode = enabled;
+		DwmSetWindowAttribute(wnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, sizeof(dark_mode));
+	}
 
-	int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-	BOOL dark_mode = enabled;
-	DwmSetWindowAttribute(wnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, sizeof(dark_mode));
+	FreeLibrary(dwmapi);
 }
 
 typedef struct {
