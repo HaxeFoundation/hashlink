@@ -18,6 +18,7 @@ if(WITH_DIRECTX)
         d3dcompiler
         xinput9_1_0
         dinput8
+		Shcore
     )
 
     install(

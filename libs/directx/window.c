@@ -1,6 +1,7 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
 #include "hlsystem.h"
+#include "shellscalingapi.h"
 
 #define MAX_EVENTS 1024
 
@@ -653,6 +654,17 @@ HL_PRIM void HL_NAME(win_get_max_size)(dx_window *win, int *width, int *height) 
 	if( height ) *height = buf->max_height;
 }
 
+HL_PRIM double HL_NAME(win_get_scale_factor_for_window)(dx_window *win) {
+	HMONITOR handle = MonitorFromWindow(win, MONITOR_DEFAULTTOPRIMARY);
+	int dpi = 96;
+	UINT dpiX, dpiY;
+	if (GetDpiForMonitor(handle, MDT_EFFECTIVE_DPI, &dpiX, &dpiY) == S_OK) {
+        dpi = (int)dpiY;
+	}
+
+	return dpi / 96.0;
+}
+
 HL_PRIM void HL_NAME(win_get_position)(dx_window *win, int *x, int *y) {
 	RECT r;
 	GetWindowRect(win,&r);
@@ -1000,6 +1012,7 @@ DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);
 DEFINE_PRIM(_VOID, win_set_icon, TWIN TICON);
 DEFINE_PRIM(_VOID, win_set_dark_mode, TWIN _BOOL);
+DEFINE_PRIM(_F64, win_get_scale_factor_for_window, TWIN);
 
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);

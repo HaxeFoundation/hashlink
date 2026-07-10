@@ -54,6 +54,8 @@ class Window {
 	public var vsync : Bool;
 	public var dragAndDropEnabled(default, set) : Bool;
 
+	public var displayScale(get, never) : Float;
+
 	var icon : Icon = null;
 
 	public function new( title : String, width : Int, height : Int, x : Int = CW_USEDEFAULT, y : Int = CW_USEDEFAULT, windowFlags : Int = RESIZABLE ) {
@@ -261,6 +263,15 @@ class Window {
 		var h = 0;
 		winGetMaxSize(win, null, h);
 		return h;
+	}
+
+	function get_displayScale() : Float {
+		return winGetScaleFactorForWindow(win);
+	}
+
+	@:hlNative("?directx", "win_get_scale_factor_for_window")
+	static function winGetScaleFactorForWindow(win: WinPtr) : Float {
+		return 1.0;
 	}
 
 	function get_x() {
