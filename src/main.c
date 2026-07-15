@@ -307,7 +307,7 @@ int main(int argc, pchar *argv[]) {
 	if( isExc ) {
 		hl_print_uncaught_exception(ctx.ret);
 		hl_debug_break();
-		hl_global_free();
+		// skip hl_global_free(): background threads may still be running and access the HL runtime
 		return 1;
 	}
 	hl_module_free(ctx.m);
