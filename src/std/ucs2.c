@@ -22,6 +22,9 @@
 #include <hl.h>
 #include <stdarg.h>
 
+#ifdef HL_CONSOLE
+#	include <posix/posix.h>
+#endif
 #ifdef HL_ANDROID
 #	include <android/log.h>
 #	ifndef HL_ANDROID_LOG_TAG
@@ -163,6 +166,13 @@ static char *utos( const uchar *s ) {
 }
 
 void uprintf( const uchar *fmt, const uchar *str ) {
+#if defined(HL_XBO) || defined(HL_XBS)
+	int size = ustrlen(fmt) + ustrlen(str) + 1;
+	uchar *buffer = malloc(size * sizeof(uchar));
+	usprintf(buffer, size, fmt, str);
+	OutputDebugStringW((LPCWSTR)buffer);
+	free(buffer);
+#else
 	char *cfmt = utos(fmt);
 	char *cstr = utos(str);
 #ifdef HL_ANDROID
@@ -172,6 +182,7 @@ void uprintf( const uchar *fmt, const uchar *str ) {
 #endif
 	free(cfmt);
 	free(cstr);
+#endif
 }
 
 #ifdef HL_VCC

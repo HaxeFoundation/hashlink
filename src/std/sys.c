@@ -143,9 +143,6 @@ HL_PRIM int hl_sys_set_flags( int flags ) {
 
 HL_PRIM void hl_sys_print( vbyte *msg ) {
 	hl_blocking(true);
-#	if defined(HL_XBO) || defined(HL_XBS)
-	OutputDebugStringW((LPCWSTR)msg);
-#	else
 #	ifdef HL_WIN_DESKTOP
 	if( print_flags & PR_WIN_UTF8 ) _setmode(_fileno(stdout),_O_U8TEXT);
 #	endif
@@ -153,8 +150,6 @@ HL_PRIM void hl_sys_print( vbyte *msg ) {
 	if( print_flags & PR_AUTO_FLUSH ) fflush(stdout);
 #	ifdef HL_WIN_DESKTOP
 	if( print_flags & PR_WIN_UTF8 ) _setmode(_fileno(stdout),_O_TEXT);
-#	endif
-
 #	endif
 	hl_blocking(false);
 }
