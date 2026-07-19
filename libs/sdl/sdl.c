@@ -1160,20 +1160,19 @@ DEFINE_PRIM(_BYTES, get_error, _NO_ARG);
 // SDL Dialogs API
 void FileDialogCallback(void *userdata, const char* const *filelist, int filter) {
 	// these callbacks may come via threads on some platforms
-	bool on_thread = !hl_get_thread();
-	if( on_thread )
-	{
-		vdynamic* ctx;
+	bool on_unregistered_thread = !hl_get_thread();
+	if( on_unregistered_thread ) {
+		vdynamic *ctx;
 		hl_register_thread(&ctx);
 	}
 
-    vclosure* vcallback = (vclosure*)userdata;
+	vclosure **closure_store = userdata;
+	vclosure *vcallback = *closure_store;
 
 	int count = 0;
 
 	varray *array;
-	if( filelist )
-	{
+	if( filelist ) {
 		const char * const *p = filelist;
 		while(*p++)
 			count++;
@@ -1187,16 +1186,15 @@ void FileDialogCallback(void *userdata, const char* const *filelist, int filter)
 			memcpy(bytes, filelist[i], len);
 			data[i] = bytes;
 		}
-	}
-	else 
-	{
+	} else {
 		array = hl_alloc_array(&hlt_bytes, 0 );
 	}
 
 	hl_call1( void, vcallback, varray*, array );
-	hl_remove_root( &vcallback );
+	hl_remove_root( closure_store );
+	free( closure_store );
 
-	if( on_thread )
+	if( on_unregistered_thread )
 		hl_unregister_thread();
 }
 
@@ -1218,35 +1216,38 @@ SDL_DialogFileFilter* CreateFileDialogFilters( varray *filters ) {
 }
 
 HL_PRIM void HL_NAME(show_open_file_dialog)( vclosure *callback, SDL_Window *window, varray *filters, vstring *default_location, bool allow_many ) {
-
-	hl_add_root( &callback );
-
-	const char *clocation = default_location ? hl_to_utf8(default_location->bytes) : NULL;
+	vclosure **closure_store = malloc(sizeof(vclosure*));
+	*closure_store = callback;
+	const char *location = default_location ? hl_to_utf8(default_location->bytes) : NULL;
+	
+	hl_add_root(closure_store);
 	
 	SDL_DialogFileFilter *sdlfilters = CreateFileDialogFilters( filters );
-	SDL_ShowOpenFileDialog( FileDialogCallback, callback, window, sdlfilters, filters ? filters->size : 0, clocation, allow_many );
+	SDL_ShowOpenFileDialog( FileDialogCallback, closure_store, window, sdlfilters, filters ? filters->size : 0, location, allow_many );
 
 	free( sdlfilters );
 }
 
 HL_PRIM void HL_NAME(show_open_folder_dialog)( vclosure *callback, SDL_Window *window, vstring *default_location, bool allow_many ) {
-
-	hl_add_root( &callback );
-
-	const char *clocation = default_location ? hl_to_utf8(default_location->bytes) : NULL;
+	vclosure **closure_store = malloc(sizeof(vclosure*));
+	*closure_store = callback;
+	const char *location = default_location ? hl_to_utf8(default_location->bytes) : NULL;
 	
-	SDL_ShowOpenFolderDialog( FileDialogCallback, callback, window, clocation, allow_many );
+	hl_add_root(closure_store);
+	
+	SDL_ShowOpenFolderDialog( FileDialogCallback, closure_store, window, location, allow_many );
 
 }
 
 HL_PRIM void HL_NAME(show_save_file_dialog)( vclosure *callback, SDL_Window *window, varray *filters, vstring *default_location ) {
-	
-	hl_add_root( &callback );
+	vclosure **closure_store = malloc(sizeof(vclosure*));
+	*closure_store = callback;
+	const char *location = default_location ? hl_to_utf8(default_location->bytes) : NULL;
 
-	const char *clocation = default_location ? hl_to_utf8(default_location->bytes) : NULL;
+	hl_add_root(closure_store);
 
 	SDL_DialogFileFilter *sdlfilters = CreateFileDialogFilters( filters );
-	SDL_ShowSaveFileDialog( FileDialogCallback, callback, window, sdlfilters, filters ? filters->size : 0, clocation );
+	SDL_ShowSaveFileDialog( FileDialogCallback, closure_store, window, sdlfilters, filters ? filters->size : 0, location );
 
 	free( sdlfilters );
 }
