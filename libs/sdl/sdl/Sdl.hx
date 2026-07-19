@@ -288,7 +288,7 @@ class Sdl {
 	// SDL3 Dialogs API
 	//
 
-	static function processFilters(filters: Array<DialogFileFilter> = null)
+	private static function processFilters(filters: Array<DialogFileFilter> = null)
 	{
 		var nativeFilters = null;
 		if( filters != null )
@@ -346,7 +346,6 @@ class Sdl {
 
 		var nativeFilters = processFilters( filters );
 
-
 		_showSaveFileDialog( cb, window != null ? @:privateAccess window.win : null, nativeFilters, defaultLocation);
 	}
 
@@ -355,12 +354,12 @@ class Sdl {
 	private static function _showOpenFileDialog(callback: (bytes: hl.NativeArray<hl.Bytes>) -> Void, window: sdl.Window.WinPtr, filters: hl.NativeArray<Dynamic>, defaultLocation: String, allowMultiple: Bool) : Void {
 	}
 
-	@:hlNative("?sdl", "show_save_file_dialog")
-	private static function _showSaveFileDialog(callback: (bytes: hl.NativeArray<hl.Bytes>) -> Void, window: sdl.Window.WinPtr, filters: hl.NativeArray<Dynamic>, defaultLocation: String) : Void {
-	}
-
 	@:hlNative("?sdl", "show_open_folder_dialog")
 	private static function _showOpenFolderDialog(callback: (bytes: hl.NativeArray<hl.Bytes>) -> Void, window: sdl.Window.WinPtr,  defaultLocation: String, allowMultiple: Bool) : Void {
+	}
+
+	@:hlNative("?sdl", "show_save_file_dialog")
+	private static function _showSaveFileDialog(callback: (bytes: hl.NativeArray<hl.Bytes>) -> Void, window: sdl.Window.WinPtr, filters: hl.NativeArray<Dynamic>, defaultLocation: String) : Void {
 	}
 }
 
