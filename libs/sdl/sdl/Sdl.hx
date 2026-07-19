@@ -16,6 +16,12 @@ typedef ScreenMode = {
 	var framerate : Int;
 };
 
+typedef FileDialogCallback = ( Array<String> ) -> Void;
+typedef DialogFileFilter = {
+	public var name: String;
+	public var pattern: String;
+}
+
 @:hlNative("sdl")
 class Sdl {
 
@@ -276,6 +282,85 @@ class Sdl {
 	@:hlNative("?sdl", "get_joysticks")
 	private static function _getJoysticks() : hl.NativeArray<Int> {
 		return null;
+	}
+
+	//
+	// SDL3 Dialogs API
+	//
+
+	static function processFilters(filters: Array<DialogFileFilter> = null)
+	{
+		var nativeFilters = null;
+		if( filters != null )
+		{
+			nativeFilters = new hl.NativeArray<Dynamic>( filters.length );
+			for( i in 0 ... filters.length )
+			{
+				@:privateAccess
+				{
+					nativeFilters[i] = {
+						"name": filters[i].name.toUtf8(),
+						"pattern": filters[i].pattern.toUtf8(),
+					};
+				}
+			}
+		}
+		return nativeFilters;
+
+	}
+
+	public static function showOpenFileDialog(callback: FileDialogCallback, window: sdl.Window = null, filters: Array<DialogFileFilter> = null, defaultLocation: String = null, allowMultiple: Bool = false) {
+		var cb = ( bytes: hl.NativeArray<hl.Bytes>) -> {
+			var files = [];
+			for( b in bytes )
+				files.push( @:privateAccess String.fromUTF8( b ) );
+
+			callback(files);
+		};
+
+		var nativeFilters = processFilters( filters );
+
+		_showOpenFileDialog( cb, window != null ? @:privateAccess window.win : null, nativeFilters, defaultLocation, allowMultiple);
+	}
+
+	public static function showOpenFolderDialog(callback: FileDialogCallback, window: sdl.Window = null, defaultLocation: String = null, allowMultiple: Bool = false) {
+		var cb = ( bytes: hl.NativeArray<hl.Bytes>) -> {
+			var files = [];
+			for( b in bytes )
+				files.push( @:privateAccess String.fromUTF8( b ) );
+
+			callback(files);
+		};
+
+		_showOpenFolderDialog( cb, window != null ? @:privateAccess window.win : null, defaultLocation, allowMultiple);
+	}
+
+	public static function showSaveFileDialog(callback: FileDialogCallback, window: sdl.Window = null, filters: Array<DialogFileFilter> = null, defaultLocation: String = null) {
+		var cb = ( bytes: hl.NativeArray<hl.Bytes>) -> {
+			var files = [];
+			for( b in bytes )
+				files.push( @:privateAccess String.fromUTF8( b ) );
+
+			callback(files);
+		};
+
+		var nativeFilters = processFilters( filters );
+
+
+		_showSaveFileDialog( cb, window != null ? @:privateAccess window.win : null, nativeFilters, defaultLocation);
+	}
+
+
+	@:hlNative("?sdl", "show_open_file_dialog")
+	private static function _showOpenFileDialog(callback: (bytes: hl.NativeArray<hl.Bytes>) -> Void, window: sdl.Window.WinPtr, filters: hl.NativeArray<Dynamic>, defaultLocation: String, allowMultiple: Bool) : Void {
+	}
+
+	@:hlNative("?sdl", "show_save_file_dialog")
+	private static function _showSaveFileDialog(callback: (bytes: hl.NativeArray<hl.Bytes>) -> Void, window: sdl.Window.WinPtr, filters: hl.NativeArray<Dynamic>, defaultLocation: String) : Void {
+	}
+
+	@:hlNative("?sdl", "show_open_folder_dialog")
+	private static function _showOpenFolderDialog(callback: (bytes: hl.NativeArray<hl.Bytes>) -> Void, window: sdl.Window.WinPtr,  defaultLocation: String, allowMultiple: Bool) : Void {
 	}
 }
 
