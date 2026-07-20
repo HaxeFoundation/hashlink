@@ -314,12 +314,12 @@ int main(int argc, pchar *argv[]) {
 #endif
 		return 1;
 	}
-	hl_module_free(ctx.m);
-	hl_free(&ctx.code->alloc);
 #ifdef HL_THREADS
 	// other threads may still be running and crash if globals are freed, so only run a gc here
 	hl_gc_major();
 #else
+	hl_module_free(ctx.m);
+	hl_free(&ctx.code->alloc);
 	hl_global_free();
 #endif
 	return 0;
