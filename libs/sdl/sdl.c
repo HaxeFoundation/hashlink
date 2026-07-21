@@ -1203,7 +1203,7 @@ void FileDialogCallback(void *userdata, const char* const *filelist, int filter)
 	dialog_data *data = (dialog_data*)userdata;
 	int count = 0;
 
-	varray *array;
+	varray *array = NULL;
 	if( filelist ) {
 		const char * const *p = filelist;
 		while(*p++)
@@ -1218,8 +1218,6 @@ void FileDialogCallback(void *userdata, const char* const *filelist, int filter)
 			memcpy(bytes, filelist[i], len);
 			array_ptr[i] = bytes;
 		}
-	} else {
-		array = hl_alloc_array(&hlt_bytes, 0 );
 	}
 
 	hl_call1( void, data->closure, varray*, array );

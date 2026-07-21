@@ -307,6 +307,9 @@ class Sdl {
 
 	public static function showOpenFileDialog(callback: FileDialogCallback, window: sdl.Window = null, filters: Array<DialogFileFilter> = null, defaultLocation: String = null, allowMultiple: Bool = false) {
 		var cb = ( bytes: hl.NativeArray<hl.Bytes>) -> {
+			if( bytes == null )
+				throw getError();
+			
 			var files = [];
 			for( b in bytes )
 				files.push( @:privateAccess String.fromUTF8( b ) );
@@ -321,6 +324,9 @@ class Sdl {
 
 	public static function showOpenFolderDialog(callback: FileDialogCallback, window: sdl.Window = null, defaultLocation: String = null, allowMultiple: Bool = false) {
 		var cb = ( bytes: hl.NativeArray<hl.Bytes>) -> {
+			if( bytes == null )
+				throw getError();
+
 			var files = [];
 			for( b in bytes )
 				files.push( @:privateAccess String.fromUTF8( b ) );
@@ -333,6 +339,9 @@ class Sdl {
 
 	public static function showSaveFileDialog(callback: FileDialogCallback, window: sdl.Window = null, filters: Array<DialogFileFilter> = null, defaultLocation: String = null) {
 		var cb = ( bytes: hl.NativeArray<hl.Bytes>) -> {
+			if( bytes == null )
+				throw getError();
+
 			var files = [];
 			for( b in bytes )
 				files.push( @:privateAccess String.fromUTF8( b ) );
