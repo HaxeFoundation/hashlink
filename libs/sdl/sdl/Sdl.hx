@@ -288,16 +288,12 @@ class Sdl {
 	// SDL3 Dialogs API
 	//
 
-	private static function processFilters(filters: Array<DialogFileFilter> = null)
-	{
+	private static function processFilters(filters: Array<DialogFileFilter> = null) {
 		var nativeFilters = null;
-		if( filters != null )
-		{
+		if( filters != null ) {
 			nativeFilters = new hl.NativeArray<Dynamic>( filters.length );
-			for( i in 0 ... filters.length )
-			{
-				@:privateAccess
-				{
+			for( i in 0 ... filters.length ) {
+				@:privateAccess {
 					nativeFilters[i] = {
 						"name": filters[i].name.toUtf8(),
 						"pattern": filters[i].pattern.toUtf8(),
