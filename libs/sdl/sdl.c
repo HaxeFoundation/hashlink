@@ -1159,25 +1159,27 @@ DEFINE_PRIM(_BYTES, get_error, _NO_ARG);
 
 // SDL Dialogs API
 typedef struct {
-	vclosure **closure_store;
+	vclosure *closure;
 	SDL_DialogFileFilter* filters;
+	int filters_size;
 } dialog_data;
 
 dialog_data* CreateFileDialogData( vclosure *callback, varray *filters ) {
 	dialog_data *data = malloc( sizeof( dialog_data ) );
-	data->closure_store = malloc(sizeof(vclosure*));
-	*data->closure_store = callback;
+	data->closure = callback;
 
-	if( filters && filters->size > 0 ) {
+	data->filters_size = filters ? filters->size : 0;
+
+	if( data->filters_size > 0 ) {
 		SDL_DialogFileFilter *sdl_filters = (SDL_DialogFileFilter *)malloc(sizeof( SDL_DialogFileFilter ) * filters->size );
 
-		for(int i=0;i<filters->size;i++) {
+		for(int i=0;i<data->filters_size;i++) {
 			vdynamic *filter = hl_aptr(filters, vdynamic*)[i];
 			const char *name = (const char*) hl_dyn_getp(filter,hl_hash_utf8("name"),&hlt_bytes);
 			const char *pattern = (const char*) hl_dyn_getp(filter,hl_hash_utf8("pattern"),&hlt_bytes);
-			
-			sdl_filters[i].name = name;
-			sdl_filters[i].pattern = pattern;
+
+			sdl_filters[i].name = strdup(name);
+			sdl_filters[i].pattern = strdup(pattern);
 		}
 
 		data->filters = sdl_filters;
@@ -1185,7 +1187,7 @@ dialog_data* CreateFileDialogData( vclosure *callback, varray *filters ) {
 	else 
 		data->filters = NULL;
 
-	hl_add_root(data->closure_store);
+	hl_add_root(&data->closure);
 
 	return data;
 }
@@ -1199,8 +1201,6 @@ void FileDialogCallback(void *userdata, const char* const *filelist, int filter)
 	}
 
 	dialog_data *data = (dialog_data*)userdata;
-	vclosure *vcallback = *data->closure_store;
-
 	int count = 0;
 
 	varray *array;
@@ -1222,9 +1222,14 @@ void FileDialogCallback(void *userdata, const char* const *filelist, int filter)
 		array = hl_alloc_array(&hlt_bytes, 0 );
 	}
 
-	hl_call1( void, vcallback, varray*, array );
-	hl_remove_root( data->closure_store );
-	free( data->closure_store );
+	hl_call1( void, data->closure, varray*, array );
+	hl_remove_root( &data->closure );
+
+	for( int i=0; i<data->filters_size; i++) {
+		free( data->filters[i].name );
+		free( data->filters[i].pattern );
+	}
+
 	free( data->filters );
 	free( data );
 
