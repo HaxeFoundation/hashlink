@@ -1163,14 +1163,12 @@ typedef struct {
 	SDL_DialogFileFilter* filters;
 } dialog_data;
 
-dialog_data* CreateFileDialogData( vclosure *callback, varray *filters )
-{
+dialog_data* CreateFileDialogData( vclosure *callback, varray *filters ) {
 	dialog_data *data = malloc( sizeof( dialog_data ) );
 	data->closure_store = malloc(sizeof(vclosure*));
 	*data->closure_store = callback;
 
-	if( filters && filters->size > 0 )
-	{
+	if( filters && filters->size > 0 ) {
 		SDL_DialogFileFilter *sdl_filters = (SDL_DialogFileFilter *)malloc(sizeof( SDL_DialogFileFilter ) * filters->size );
 
 		for(int i=0;i<filters->size;i++) {
