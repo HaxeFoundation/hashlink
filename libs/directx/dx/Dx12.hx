@@ -1810,4 +1810,8 @@ class Dx12 {
 	static function dxCreate( win : hl.Abstract<"dx_window">, flags : DriverInitFlags, deviceName : hl.Bytes ) : DriverInstance {
 		return null;
 	}
+
+	@:hlNative("dx12", "set_gpu_crash_handler")
+	public static function setGpuCrashHandler( f : (name : hl.Bytes, bytes : hl.Bytes, size : Int, lastFile : Bool) -> Void ) {
+	}
 }
