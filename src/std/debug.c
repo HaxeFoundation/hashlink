@@ -26,7 +26,64 @@
 #	include <sys/wait.h>
 #	include <sys/user.h>
 #	include <signal.h>
+#	include <time.h>
+#	ifndef __WALL
+#		define __WALL 0x40000000
+#	endif
 #	define USE_PTRACE
+#endif
+
+#ifdef USE_PTRACE
+// -- Linux multi-thread ptrace support.
+//
+// PTRACE_ATTACH traces a single thread. If hl_debug_start attached only the
+// main thread, a breakpoint executed by any other thread would be untraced and
+// its SIGTRAP would take the default action, killing the whole process. So the
+// main thread is instead PTRACE_SEIZEd with PTRACE_O_TRACECLONE: the kernel
+// then auto-traces every thread the program clones, reporting each one (in
+// hl_debug_wait) as it is born. The traced-thread set below is maintained
+// purely from those clone events — no /proc scan. On any stop the other traced
+// threads are frozen too, matching the all-stop behaviour of the HL_WIN
+// implementation above (WaitForDebugEvent/ContinueDebugEvent).
+#define HL_PT_MAX 1024
+static int pt_tids[HL_PT_MAX];
+static char pt_stopped[HL_PT_MAX];
+static int pt_count = 0;
+static int pt_main = 0;
+
+static int pt_index( int tid ) {
+	int i;
+	for( i = 0; i < pt_count; i++ ) if( pt_tids[i] == tid ) return i;
+	return -1;
+}
+static void pt_add( int tid, int stopped ) {
+	if( pt_index(tid) >= 0 || pt_count >= HL_PT_MAX ) return;
+	pt_tids[pt_count] = tid;
+	pt_stopped[pt_count] = (char)stopped;
+	pt_count++;
+}
+static void pt_remove( int tid ) {
+	int i = pt_index(tid);
+	if( i < 0 ) return;
+	pt_tids[i] = pt_tids[pt_count-1];
+	pt_stopped[i] = pt_stopped[pt_count-1];
+	pt_count--;
+}
+
+// All-stop: freeze every RUNNING traced thread except `keep`, so the whole
+// process is stopped when a stop is reported. hl_debug_read and the main
+// thread's hl_debug_read_register go through the main tid, which ptrace
+// requires to be stopped. The stopped flag avoids waiting on an
+// already-stopped thread (which would block).
+static void pt_stop_others( int keep ) {
+	int i;
+	for( i = 0; i < pt_count; i++ ) {
+		if( pt_tids[i] == keep || pt_stopped[i] ) continue;
+		if( ptrace(PTRACE_INTERRUPT, pt_tids[i], 0, 0) < 0 ) continue;
+		int status;
+		if( waitpid(pt_tids[i], &status, __WALL) == pt_tids[i] ) pt_stopped[i] = 1;
+	}
+}
 #endif
 
 #if defined(HL_MAC) && defined(__x86_64__)
@@ -71,7 +128,16 @@ HL_API bool hl_debug_start( int pid ) {
 #	elif defined(MAC_DEBUG)
 	return mdbg_session_attach(pid);
 #	elif defined(USE_PTRACE)
-	return ptrace(PTRACE_ATTACH,pid,0,0) >= 0;
+	// SEIZE (not ATTACH): sets PTRACE_O_TRACECLONE atomically and sends no
+	// SIGSTOP, so every thread the program clones is auto-traced and born
+	// stopped. INTERRUPT then leaves an initial stop pending, so the first
+	// hl_debug_wait returns it just as ATTACH's SIGSTOP used to.
+	pt_count = 0;
+	pt_main = pid;
+	if( ptrace(PTRACE_SEIZE, pid, 0, (void*)(size_t)PTRACE_O_TRACECLONE) < 0 ) return false;
+	pt_add(pid, 0);
+	ptrace(PTRACE_INTERRUPT, pid, 0, 0);
+	return true;
 #	else
 	return false;
 #	endif
@@ -85,7 +151,12 @@ HL_API bool hl_debug_stop( int pid ) {
 #	elif defined(MAC_DEBUG)
 	return mdbg_session_detach(pid);
 #	elif defined(USE_PTRACE)
-	return ptrace(PTRACE_DETACH,pid,0,0) >= 0;
+	{
+		int i;
+		for( i = 0; i < pt_count; i++ ) ptrace(PTRACE_DETACH, pt_tids[i], 0, 0);
+		pt_count = 0;
+		return true;
+	}
 #	else
 	return false;
 #	endif
@@ -248,20 +319,60 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 #	elif defined(MAC_DEBUG)
 	return mdbg_session_wait(pid, thread, timeout);
 #	elif defined(USE_PTRACE)
-	int status;
-	int ret = waitpid(pid,&status,0);
-	//printf("WAITPID=%X %X\n",ret,status);
-	*thread = ret;
-	if( WIFEXITED(status) )
-		return 0;
-	if( WIFSTOPPED(status) ) {
+	// waitpid(-1, __WALL): observe EVERY traced thread, not just the main one
+	// (__WALL is required to see non-leader clone threads). A real timeout too
+	// (the original ignored it — a blocking waitpid).
+	struct timespec slice = { 0, 1000000 }; // 1ms
+	int elapsed = 0;
+	for(;;) {
+		int status;
+		int tid = waitpid(-1, &status, __WALL | WNOHANG);
+		if( tid == 0 ) {
+			if( timeout >= 0 && elapsed >= timeout ) return -1;
+			nanosleep(&slice, NULL);
+			elapsed++;
+			continue;
+		}
+		if( tid < 0 ) { *thread = pt_main; return 0; } // no tracee left: gone
+		if( WIFEXITED(status) || WIFSIGNALED(status) ) {
+			pt_remove(tid);
+			*thread = tid;
+			if( tid == pt_main ) return 0; // main gone: process exit
+			continue;                      // a worker died: keep waiting
+		}
+		if( !WIFSTOPPED(status) ) continue;
 		int sig = WSTOPSIG(status);
-		//printf(" STOPSIG=%d\n",sig);
-		if( sig == SIGSTOP || sig == SIGTRAP )
+		// A newly cloned thread. PTRACE_O_TRACECLONE has the kernel create it
+		// already ptrace-stopped (the only race-free way to trace it before it
+		// can run into a breakpoint); it is continued again right here, together
+		// with its parent, so the program observes no lasting stop — the thread
+		// just starts running as usual. Return 4 (handled), the benign lifecycle
+		// event the HL_WIN branch reports for CREATE_THREAD. None of this runs
+		// unless a debugger is attached; unattached execution is unchanged.
+		if( sig == SIGTRAP && (status >> 8) == (SIGTRAP | (PTRACE_EVENT_CLONE << 8)) ) {
+			unsigned long newtid = 0;
+			ptrace(PTRACE_GETEVENTMSG, tid, 0, &newtid);
+			pt_add((int)newtid, 0);
+			ptrace(PTRACE_CONT, (int)newtid, 0, 0);
+			ptrace(PTRACE_CONT, tid, 0, 0);
+			*thread = tid;
+			return 4;
+		}
+		int i = pt_index(tid);
+		if( i >= 0 ) pt_stopped[i] = 1;
+		// A real stop (breakpoint/step = SIGTRAP, interrupt = SIGSTOP): freeze
+		// the rest of the debuggee (all-stop) and report this thread.
+		if( sig == SIGSTOP || sig == SIGTRAP ) {
+			pt_stop_others(tid);
+			*thread = tid;
 			return 1;
+		}
+		// Any other signal is a real program signal: stop the world and report
+		// it as an error stop.
+		pt_stop_others(tid);
+		*thread = tid;
 		return 3;
 	}
-	return 4;
 #	else
 	return 0;
 #	endif
@@ -273,7 +384,20 @@ HL_API bool hl_debug_resume( int pid, int thread ) {
 #	elif defined(MAC_DEBUG)
 	return mdbg_session_resume(pid);
 #	elif defined(USE_PTRACE)
-	return ptrace(PTRACE_CONT,pid,0,0) >= 0;
+	// All-stop resume: continue every tracked thread that is stopped, like the
+	// HL_WIN branch's ContinueDebugEvent resuming the whole process. Signal
+	// suppressed (0): breakpoint/step traps are consumed, not re-delivered.
+	{
+		int i;
+		bool ok = true;
+		for( i = 0; i < pt_count; i++ ) {
+			if( !pt_stopped[i] ) continue;
+			if( ptrace(PTRACE_CONT, pt_tids[i], 0, 0) < 0 ) ok = false;
+			else pt_stopped[i] = 0;
+		}
+		(void)thread;
+		return ok;
+	}
 #	else
 	return false;
 #	endif
