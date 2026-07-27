@@ -325,3 +325,8 @@ int main(int argc, pchar *argv[]) {
 	return 0;
 }
 
+#ifdef HL_WIN
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLine, int nCmdShow) {
+	return wmain(__argc, __wargv);
+}
+#endif
