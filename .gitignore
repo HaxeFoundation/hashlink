@@ -10,6 +10,8 @@
 *.n
 Debug
 Release
+ReleaseAftermath
+ReleaseDX12Agility
 x64
 *.stackdump
 *.hdll
@@ -25,6 +27,7 @@ x64
 /hl
 /include/sdl
 /include/openal
+/include/aftermath
 ReleaseStatic
 /other/benchs/bench.*
 /other/benchs/cpp
