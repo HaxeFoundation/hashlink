@@ -122,24 +122,7 @@ public:
 
 	void OnResourceSetName(ID3D12Resource* pRes)
 	{
-		std::lock_guard<std::mutex> lock(m_mutex);
-		auto it = m_resources.find(pRes);
-		if (it != m_resources.end())
-			GFSDK_Aftermath_DX12_UnregisterResource(it->second);
-		GFSDK_Aftermath_ResourceHandle rh;
-		GFSDK_Aftermath_DX12_RegisterResource(pRes, &rh);
-		m_resources[pRes] = rh;
-	}
-
-	void OnResourceRelease(ID3D12Resource* pRes)
-	{
-		std::lock_guard<std::mutex> lock(m_mutex);
-		auto it = m_resources.find(pRes);
-		if (it != m_resources.end()) 
-		{
-			GFSDK_Aftermath_DX12_UnregisterResource(it->second);
-			m_resources.erase(it);
-		}
+		GFSDK_Aftermath_DX12_UpdateResourceInfo(pRes);
 	}
 private:
 	void RegisterShader(const D3D12_SHADER_BYTECODE& shader)
@@ -249,7 +232,6 @@ private:
 	std::mutex m_mutex;
 	std::map<uint64_t, D3D12_SHADER_BYTECODE> m_shaders;
 	std::map<GFSDK_Aftermath_ShaderDebugInfoIdentifier, std::vector<uint8_t>> m_shaderDebugInfo;
-	std::map<ID3D12Resource*, GFSDK_Aftermath_ResourceHandle> m_resources;
 #else
 #error GpuCrashTracker not implemented on this platform
 #endif
@@ -259,7 +241,6 @@ public:
 	void OnCreateGraphicsPipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC* pDesc){}
 	void OnCreateComputePipeline(const D3D12_COMPUTE_PIPELINE_STATE_DESC* pDesc){}
 	void OnResourceSetName(ID3D12Resource* pRes){}
-	void OnResourceRelease(ID3D12Resource* pRes){}
 #endif
 public:
 	static vclosure* s_pfnOnGpuCrashFile;
@@ -868,8 +849,6 @@ HL_PRIM int64 HL_NAME(resource_get_gpu_virtual_address)( ID3D12Resource *res ) {
 }
 
 HL_PRIM void HL_NAME(resource_release)( IUnknown *res ) {
-	if (static_driver->gpuCrashTracker)
-		static_driver->gpuCrashTracker->OnResourceRelease((ID3D12Resource*)res);
 	res->Release();
 }
 
