@@ -196,7 +196,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>../../$(Configuration)/$(TargetName).hdll</OutputFile>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib;dxgi.lib;D3D12.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugAll|Win32'">
@@ -213,7 +213,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>../../$(Configuration)/$(TargetName).hdll</OutputFile>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib;dxgi.lib;D3D12.lib;GFSDK_Aftermath_Lib.x86.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -245,7 +245,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib;sl.interposer.lib;GFSDK_Aftermath_Lib.x64.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -270,7 +270,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>../../$(Configuration)/$(TargetName).hdll</OutputFile>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib;dxgi.lib;D3D12.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseAll|Win32'">
@@ -295,7 +295,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>../../$(Configuration)/$(TargetName).hdll</OutputFile>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib;dxgi.lib;D3D12.lib;GFSDK_Aftermath_Lib.x86.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -319,7 +319,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib;dxgi.lib;D3D12.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseAll|x64'">
@@ -342,7 +342,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib;sl.interposer.lib;GFSDK_Aftermath_Lib.x64.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
