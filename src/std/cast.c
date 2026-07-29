@@ -183,6 +183,7 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 	if( to->kind == HDYN && hl_is_dynamic(t) )
 		return *(vdynamic**)data;
 	if( t->kind == HDYN || t->kind == HNULL ) {
+		ASAN_JIT_STACK(data, HL_WSIZE);
 		vdynamic *v = *(vdynamic**)data;
 		if( v == NULL )
 			return NULL;
@@ -191,6 +192,7 @@ HL_PRIM void *hl_dyn_castp( void *data, hl_type *t, hl_type *to ) {
 		t = v->t;
 		if( !hl_is_dynamic(t) ) data = &v->v;
 	} else if( hl_is_dynamic(t) ) {
+		ASAN_JIT_STACK(data, HL_WSIZE);
 		vdynamic *v = *(vdynamic**)data;
 		if( v == NULL ) return NULL;
 		t = v->t;

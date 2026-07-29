@@ -162,6 +162,15 @@
 #	define HL_THREAD_STATIC_VAR static
 #endif
 
+#if defined(HL_VCC) && defined(__SANITIZE_ADDRESS__)
+#	include <sanitizer/asan_interface.h>
+#	define ASAN_JIT_STACK(ptr,size)	__asan_unpoison_memory_region(ptr,size)
+#	define ASAN_DISABLE				__declspec(no_sanitize_address)
+#else
+#	define ASAN_JIT_STACK(ptr,size)
+#	define ASAN_DISABLE
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 
