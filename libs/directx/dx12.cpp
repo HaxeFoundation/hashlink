@@ -2,6 +2,13 @@
 #include <hl.h>
 #undef _GUID
 
+#ifdef HL_STREAMLINE
+#pragma comment(lib, "sl.interposer.lib")
+#else
+#pragma comment(lib, "D3D12.lib")
+#pragma comment(lib, "dxgi.lib")
+#endif
+
 #ifdef HL_WIN_DESKTOP
 #include <dxgi.h>
 #include <dxgi1_5.h>
@@ -9,6 +16,11 @@
 #include <dxcapi.h>
 
 #ifdef HL_AFTERMATH
+#ifdef HL_64
+#pragma comment(lib, "GFSDK_Aftermath_Lib.x64.lib")
+#else
+#pragma comment(lib, "GFSDK_Aftermath_Lib.x86.lib")
+#endif
 #include <GFSDK_Aftermath.h>
 #include <GFSDK_Aftermath_GpuCrashDump.h>
 #include <GFSDK_Aftermath_GpuCrashDumpDecoding.h>
