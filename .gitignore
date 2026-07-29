@@ -9,8 +9,9 @@
 *.user
 *.n
 Debug
+DebugAll
 Release
-ReleaseAftermath
+ReleaseAll
 ReleaseDX12Agility
 x64
 *.stackdump
