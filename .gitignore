@@ -29,6 +29,7 @@ x64
 /include/sdl
 /include/openal
 /include/aftermath
+/include/streamline
 ReleaseStatic
 /other/benchs/bench.*
 /other/benchs/cpp

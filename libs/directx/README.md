@@ -35,7 +35,9 @@ You can also manually remove the preprocessor (`HL_AFTERMATH`) from the **Releas
 
 The default Agility SDK configuration links against sl.interposer.lib to enable the DLSS implementation provided by hlheaps. (https://github.com/HeapsIO/hlheaps/).
 
-The required Streamline DLLs must be placed next to the application executable so they can be loaded at runtime which you can find on the [Streamline GitHub](https://github.com/NVIDIA-RTX/Streamline) (tested with version API 2.12.0). 
+To build with this, the [Streamline SDK](https://github.com/NVIDIA-RTX/Streamline) (tested with 2026.3 - Version API 2.12.0) must be extracted to `<hashlink>/include/streamline/`. 
+
+In addition, the required Streamline DLLs must be placed next to the application executable so they can be loaded at runtime.
 
 ### Building Without Streamline
 
