@@ -2079,7 +2079,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			bool need_type = dyn_need_type(rb->t);
 			ereg args[4];
 			args[0] = LOAD(dst);
-			args[1] = LOAD_CONST(hl_hash_utf8(m->code->strings[o->p2]),&hlt_i32);
+			args[1] = LOAD_CONST(hl_hash_gen(hl_get_ustring(m->code,o->p2),true),&hlt_i32);
 			if( need_type ) {
 				args[2] = LOAD_CONST_PTR(rb->t);
 				args[3] = LOAD(rb);
