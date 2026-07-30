@@ -228,6 +228,12 @@ static void dump_value( jit_ctx *ctx, uint64 value, emit_mode mode ) {
 			printf("<globals>");
 		else if( value == (uint64)&hlt_void )
 			printf("<void>");
+		else if( value == (uint64)hl_emit_dyn_bools )
+			printf("<dyn_bools>");
+		else if( value == (uint64)hl_emit_dyn_bools[0] )
+			printf("<dyn_false>");
+		else if( value == (uint64)hl_emit_dyn_bools[1] )
+			printf("<dyn_true>");
 		else
 			printf("0x%llX",value);
 		break;

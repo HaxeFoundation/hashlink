@@ -172,6 +172,9 @@ struct _emit_ctx {
 static hl_type hlt_ui8 = { HUI8, 0 };
 static hl_type hlt_ui16 = { HUI16, 0 };
 
+static vdynamic jit_dyn_bool_values[2];
+vdynamic * const hl_emit_dyn_bools[2] = { &jit_dyn_bool_values[0], &jit_dyn_bool_values[1] };
+
 static linked_inf *link_add( emit_ctx *ctx, int id, void *ptr, linked_inf *head ) {
 	linked_inf *l = hl_malloc(&ctx->jit->falloc,sizeof(linked_inf));
 	l->id = id;
@@ -289,6 +292,23 @@ static emit_mode emit_get_mode( emit_ctx *ctx, ereg v ) {
 	if( v < 0 )
 		return GET_PHI(v)->mode;
 	return ctx->instrs[int_arr_get(ctx->values,v)].mode;
+}
+
+static bool emit_get_const( emit_ctx *ctx, ereg v, uint64 *out ) {
+	einstr *e;
+	if( IS_NULL(v) || v < 0 )
+		return false; // phis are not resolved here
+	if( REG_KIND(v) == R_CONST ) {
+		*out = (uint64)(int64)REG_VALUE(v);
+		return true;
+	}
+	if( REG_KIND(v) != R_VALUE )
+		return false;
+	e = ctx->instrs + int_arr_get(ctx->values,v);
+	if( e->op != LOAD_CONST )
+		return false;
+	*out = e->value;
+	return true;
 }
 
 static const char *phi_prefix( emit_ctx *ctx ) {
@@ -1116,6 +1136,10 @@ void hl_emit_alloc( jit_ctx *jit ) {
 	ctx->jit = jit;
 	jit->emit = ctx;
 	if( sizeof(einstr) != 16 ) jit_assert();
+	jit_dyn_bool_values[0].t = &hlt_bool;
+	jit_dyn_bool_values[1].t = &hlt_bool;
+	jit_dyn_bool_values[0].v.b = false;
+	jit_dyn_bool_values[1].v.b = true;
 }
 
 void hl_emit_free( jit_ctx *jit ) {
@@ -1556,7 +1580,14 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OToDyn:
 		if( ra->t->kind == HBOOL ) {
 			ereg arg = LOAD(ra);
-			STORE(dst, emit_native_call(ctx,hl_alloc_dynbool,&arg,1,&hlt_dyn));
+			uint64 cval;
+			if( emit_get_const(ctx, arg, &cval) )
+				STORE(dst, LOAD_CONST_PTR(hl_emit_dyn_bools[cval ? 1 : 0]));
+			else {
+				ereg idx = emit_gen_ext(ctx, CONV, arg, UNUSED, M_PTR, M_UI8);
+				ereg addr = OFFSET(LOAD_CONST_PTR(hl_emit_dyn_bools), idx, HL_WSIZE, 0);
+				STORE(dst, LOAD_MEM_PTR(addr, 0));
+			}
 		} else {
 			ereg arg = LOAD_CONST_PTR(ra->t);
 			ereg ret = emit_native_call(ctx,hl_alloc_dynamic,&arg,1,&hlt_dyn);
