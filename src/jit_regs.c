@@ -230,7 +230,7 @@ static void regs_alloc_reg( regs_ctx *ctx, value_info *v, bool across_call ) {
 		ereg r = cfg->scratch[i];
 		for_iter(values,v2,ctx->scratch) {
 			if( v2->reg == r ) {
-				if( first == NULL ) first = v2;
+				if( first == NULL || v2->tot_reads < first->tot_reads ) first = v2;
 				r = UNUSED;
 				break;
 			}
@@ -262,6 +262,16 @@ static void regs_assign( regs_ctx *ctx, value_info *v ) {
 	regs_debug("REG ASSIGN %s @%X-@%X\n",value_str(v),ctx->cur_op,v->last_read);
 }
 
+static int block_loop_depth( eblock *block ) {
+	int d = 0;
+	eblock *b = (block->loop_end > 0) ? block : block->loop_parent;
+	while( b && d < 7 ) {
+		d++;
+		b = b->loop_parent;
+	}
+	return d;
+}
+
 static void regs_loop_liveness( regs_ctx *ctx, eblock *block, value_info *v, int pos ) {
 	int write = v->id >= 0 ? ctx->jit->values_writes[v->id] : -1;
 	eblock *b = (block->loop_end > 0) ? block : block->loop_parent;
@@ -271,7 +281,7 @@ static void regs_loop_liveness( regs_ctx *ctx, eblock *block, value_info *v, int
 		b = b->loop_parent;
 	}
 	if( v->last_read < pos ) v->last_read = pos;
-	v->tot_reads++;
+	v->tot_reads += 1 << (block_loop_depth(block) * 3);
 }
 
 static void regs_write_live( regs_ctx *ctx, ereg *r ) {
