@@ -514,6 +514,9 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	int mode64 = mode == M_PTR && (f->r_mem&FLAG_DEF64) == 0 ? 8 : 0;
 	int r64 = mode64;
 	preg a = make_reg(_a,_value), b = make_reg(_b,_value);
+	if( (mode == M_UI8 || (op >= ADD8 && op <= PUSH8)) &&
+		((a.kind == RCPU && a.reg >= 4) || (b.kind == RCPU && b.reg >= 4)) )
+		r64 |= 0x40;
 	switch( ID2(a.kind,b.kind) ) {
 	case ID2(RUNUSED,RUNUSED):
 		ERRIF(f->r_mem == 0);
@@ -1102,7 +1105,7 @@ static void emit_cmov( code_ctx *ctx, ereg out, ereg r, int cond, emit_mode m ) 
 }
 
 static void emit_cset( code_ctx *ctx, ereg out, int cond ) {
-	if( (out&8) ) B(0x41);
+	if( out >= 4 ) B(0x40 | ((out&8) ? 1 : 0));
 	B(0x0F);
 	B(cond + 0x10);
 	MOD_RM(3,0,out);
@@ -1553,13 +1556,23 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case CXCHG:
 			{
-				if( IS_FLOAT(e->mode) ) BREAK();
-				if( !IS_REG(e->a) || !IS_REG(e->b) ) BREAK();
 				int cond = get_cond_jump(ctx);
-				ereg tmp = get_tmp(e->mode);
-				emit_mov(ctx, tmp, e->a, e->mode);
-				emit_cmov(ctx, e->a, e->b, cond, M_PTR);
-				emit_cmov(ctx, e->b, tmp, cond, M_PTR);
+				if( !IS_REG(e->a) || !IS_REG(e->b) ) jit_assert();
+				if( IS_FLOAT(e->mode) ) {
+					B(((cond ^ 1) & 0xFF) - 0x10);
+					int jpos = byte_count(ctx->code);
+					B(0);
+					ereg tmp = get_tmp(e->mode);
+					emit_mov(ctx, tmp, e->a, e->mode);
+					emit_mov(ctx, e->a, e->b, e->mode);
+					emit_mov(ctx, e->b, tmp, e->mode);
+					*(char*)&ctx->code.values[jpos] = (char)(byte_count(ctx->code) - (jpos + 1));
+				} else {
+					ereg tmp = get_tmp(e->mode);
+					emit_mov(ctx, tmp, e->a, e->mode);
+					emit_cmov(ctx, e->a, e->b, cond, M_PTR);
+					emit_cmov(ctx, e->b, tmp, cond, M_PTR);
+				}
 			}
 			break;
 		case NOP:
