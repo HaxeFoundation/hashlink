@@ -54,6 +54,8 @@ typedef struct {
 	emit_mode mode;
 	ereg pref_reg;
 	ereg reg;
+	int_arr reads;
+	int read_cur;
 } value_info;
 
 #define S_TYPE			values
@@ -196,10 +198,36 @@ static bool live_across_call( regs_ctx *ctx, value_info *v, int from ) {
 	return ctx->ncalls[v->last_read] > ctx->ncalls[from + 1];
 }
 
+static int next_use( value_info *v, int pos ) {
+	while( v->read_cur < int_arr_count(v->reads) && int_arr_get(v->reads,v->read_cur) < pos )
+		v->read_cur++;
+	return v->read_cur < int_arr_count(v->reads) ? int_arr_get(v->reads,v->read_cur) : INVALID;
+}
+
+static int spill_cost( regs_ctx *ctx, value_info *v, int pos ) {
+	int n = next_use(v, pos);
+	if( n == INVALID )
+		return v->last_read > pos ? 0 : 0x7FFFFFFF;
+	return n - pos;
+}
+
 static bool reg_is_persist( reg_config *cfg, ereg r ) {
 	for(int i=0;i<cfg->npersists;i++)
 		if( cfg->persist[i] == r ) return true;
 	return false;
+}
+
+static ereg steal_persist( regs_ctx *ctx, int mode, int weight ) {
+	reg_config *cfg = REG_CFG(mode);
+	value_info *best = NULL;
+	for_iter(values,v,ctx->persists) {
+		if( REG_MODE(v->mode) != mode || !reg_is_persist(cfg,v->reg) ) continue;
+		if( best == NULL || v->tot_reads < best->tot_reads ) best = v;
+	}
+	if( best == NULL || best->tot_reads * 2 > weight ) return UNUSED;
+	ereg r = best->reg;
+	spill(ctx, best);
+	return r;
 }
 
 static void regs_alloc_reg( regs_ctx *ctx, value_info *v, bool across_call ) {
@@ -214,6 +242,7 @@ static void regs_alloc_reg( regs_ctx *ctx, value_info *v, bool across_call ) {
 			mark_persist_used(ctx, mode, r);
 		} else
 			r = alloc_persist(ctx, mode);
+		if( IS_NULL(r) ) r = steal_persist(ctx, mode, v->tot_reads);
 		if( !IS_NULL(r) ) {
 			v->reg = r;
 			values_add(ctx->persists, v);
@@ -226,11 +255,16 @@ static void regs_alloc_reg( regs_ctx *ctx, value_info *v, bool across_call ) {
 		return;
 	}
 	value_info *first = NULL;
+	int first_cost = -1;
 	for(int i=0;i<cfg->nscratchs;i++) {
 		ereg r = cfg->scratch[i];
 		for_iter(values,v2,ctx->scratch) {
 			if( v2->reg == r ) {
-				if( first == NULL || v2->tot_reads < first->tot_reads ) first = v2;
+				int cost = spill_cost(ctx, v2, ctx->cur_op);
+				if( first == NULL || cost > first_cost || (cost == first_cost && v2->tot_reads < first->tot_reads) ) {
+					first = v2;
+					first_cost = cost;
+				}
 				r = UNUSED;
 				break;
 			}
@@ -288,6 +322,9 @@ static void regs_write_live( regs_ctx *ctx, ereg *r ) {
 	if( IS_NULL(*r) ) jit_assert();
 	if( !REG_IS_VAL(*r) ) return; // some are injections of native regs at emit
 	value_info *v = VAL_REG(*r);
+	int n = int_arr_count(v->reads);
+	if( n == 0 || int_arr_get(v->reads,n-1) != ctx->cur_op )
+		int_arr_add(v->reads, ctx->cur_op);
 	regs_loop_liveness(ctx, ctx->cur_block, v, ctx->cur_op);
 }
 
@@ -407,8 +444,14 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 		if( size <= 0 && e->mode != M_VOID ) jit_assert();
 		ereg r = get_call_reg(ctx,regs,e->mode);
 		if( !IS_NULL(r) ) {
-			v->reg = r;
-			values_add(ctx->scratch,v);
+			ereg p = live_across_call(ctx,v,0) ? alloc_persist(ctx,REG_MODE(e->mode)) : UNUSED;
+			if( !IS_NULL(p) ) {
+				v->reg = p;
+				values_add(ctx->persists,v);
+			} else {
+				v->reg = r;
+				values_add(ctx->scratch,v);
+			}
 		}
 		if( IS_NULL(r) || IS_WINCALL64 ) {
 			// use existing stack storage
@@ -856,6 +899,7 @@ void hl_regs_function( jit_ctx *jit ) {
 	values_free(&ctx->persists);
 	int_arr_free(&ctx->jump_regs);
 	int_arr_free(&ctx->pack_movs);
+	ctx->cur_block = NULL;
 	ctx->ncalls = (int*)hl_zalloc(&jit->falloc,sizeof(int) * (jit->instr_count + 1));
 	for(int i=0;i<jit->instr_count;i++) {
 		einstr *e = jit->instrs + i;
