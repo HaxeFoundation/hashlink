@@ -327,6 +327,10 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 				int_arr_add(*arr,ph->value);
 				int_arr_add(*arr,(bl - b2) == 1);
 				regs_loop_liveness(ctx, b2, val, b2->end_pos);
+				// since we jump at end of instruction (after cmovs), let's keep the index live longer
+				einstr *term = jit->instrs + b2->end_pos - 1;
+				if( term->op == JUMP_TABLE && REG_IS_VAL(term->a) )
+					regs_loop_liveness(ctx, b2, VAL_REG(term->a), bl->start_pos + 1);
 			}
 		}
 	}
