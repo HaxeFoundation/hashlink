@@ -1526,6 +1526,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case OJAlways:
 		register_block_jump(ctx, o->p1, false);
+		if( o->p1 == 0 ) add_jump_target(ctx, 0);
 		break;
 	case OToDyn:
 		if( ra->t->kind == HBOOL ) {
