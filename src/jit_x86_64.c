@@ -1217,6 +1217,14 @@ void hl_codegen_function( jit_ctx *jit ) {
 			else
 				emit_ext(ctx,_PUSH, VAL_CONST, UNUSED, M_PTR, e->value);
 			break;
+		case PUSH_ADDR:
+			{
+				int pos = emit_lea_rel(ctx, RTMP);
+				int_arr_add(ctx->near_jumps, pos - jit->out_pos);
+				int_arr_add(ctx->near_jumps, ctx->cur_op + e->size_offs + 1);
+				EMIT(_PUSH, RTMP, UNUSED, M_PTR);
+			}
+			break;
 		case DEBUG_BREAK:
 			BREAK();
 			break;
@@ -1286,9 +1294,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case CALL_PTR:
 			if( e->value == (uint64)hl_null_access || e->value == (uint64)hl_jit_null_field_access ) {
-				// call near
+				// jump near : PUSH_ADDR already pushed the return address
 				int target = e->value == (uint64)hl_null_access ? ctx->null_access_pos : ctx->null_field_pos;
-				B(0xE8);
+				B(0xE9);
 				W(target - (jit->out_pos + byte_count(ctx->code) + 4));
 			} else {
 				// call near indirect

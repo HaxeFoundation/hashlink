@@ -50,6 +50,7 @@ typedef enum {
 	XCHG,
 	CXCHG,
 	PUSH_CONST,
+	PUSH_ADDR,
 	PUSH,
 	POP,
 	ALLOC_STACK,

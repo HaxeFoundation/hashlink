@@ -142,7 +142,7 @@ struct _emit_ctx {
 	int_arr args_data;
 	int_arr jump_regs;
 	int_arr values;
-
+	int_arr null_checks;
 	int_arr values_track;
 	int current_assign;
 
@@ -929,6 +929,7 @@ void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( voi
 		break;
 	case LOAD_CONST:
 	case PUSH_CONST:
+	case PUSH_ADDR:
 		// skip
 		break;
 	default:
@@ -952,6 +953,7 @@ ereg **hl_emit_get_regs( einstr *e, int *count ) {
 		break;
 	case LOAD_CONST:
 	case PUSH_CONST:
+	case PUSH_ADDR:
 		// skip
 		break;
 	default:
@@ -991,6 +993,30 @@ static void hl_emit_clean_phis( emit_ctx *ctx ) {
 		hl_emit_reg_iter(ctx->jit, ctx->instrs + i, ctx, (void*)remap_phi_reg);
 }
 
+static void emit_null_checks( emit_ctx *ctx ) {
+	int count = int_arr_count(ctx->null_checks);
+	for(int i=0;i<count;i+=2) {
+		int jthrow = int_arr_get(ctx->null_checks,i);
+		int hashed_name = int_arr_get(ctx->null_checks,i+1);
+		patch_jump(ctx, jthrow);
+		for_iter_back(blocks,from,ctx->blocks) {
+			if( from->start_pos <= jthrow ) {
+				block_add_pred(ctx, ctx->current_block, from);
+				break;
+			}
+		}
+		if( hashed_name ) {
+			einstr *e = emit_instr(ctx, PUSH_CONST);
+			e->mode = M_PTR;
+			e->value = hashed_name;
+		}
+		einstr *e = emit_instr(ctx, PUSH_ADDR);
+		e->mode = M_PTR;
+		e->size_offs = jthrow - (ctx->emit_pos - 1);
+		emit_native_call(ctx, hashed_name ? (void*)hl_jit_null_field_access : (void*)hl_null_access, NULL, 0, NULL);
+	}
+}
+
 void hl_emit_function( jit_ctx *jit ) {
 	emit_ctx *ctx = jit->emit;
 	hl_function *f = jit->fun;
@@ -1005,6 +1031,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	int_arr_free(&ctx->args_data);
 	int_arr_free(&ctx->jump_regs);
 	int_arr_free(&ctx->values);
+	int_arr_free(&ctx->null_checks);
 	int_arr_free(&ctx->values_track);
 	blocks_free(&ctx->blocks);
 	int_arr_add(ctx->values,-1);
@@ -1076,6 +1103,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	if( ctx->arrival_points )
 		jit_assert();
 
+	emit_null_checks(ctx);
 	hl_emit_clean_phis(ctx);
 	hl_emit_flush(ctx->jit);
 	if( ctx->wait_seal ) jit_assert();
@@ -2019,14 +2047,12 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case ONullCheck:
 		{
-			emit_test(ctx, LOAD(dst), OJNotNull);
-			add_jump_target(ctx, 0);
-			int jok = emit_jump(ctx, true);
+			emit_test(ctx, LOAD(dst), OJNull);
+			int jthrow = emit_jump(ctx, true);
 
 			// ----- DETECT FIELD ACCESS ----------------
 			hl_function *f = ctx->fun;
 			hl_opcode *next = f->ops + ctx->op_pos + 1;
-			bool null_field_access = false;
 			int hashed_name = 0;
 			// skip const and operation between nullcheck and access
 			while( (next < f->ops + f->nops - 1) && (next->op >= OInt && next->op <= ODecr) ) {
@@ -2040,25 +2066,18 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				else if( dst->t->kind == HVIRTUAL )
 					f = dst->t->virt->fields + fid;
 				if( f == NULL ) jit_assert();
-				null_field_access = true;
 				hashed_name = f->hashed_name;
 			} else if( (next->op >= OCall1 && next->op <= OCallN) && next->p3 == o->p1 ) {
 				int fid = next->p2 < 0 ? -1 : m->functions_indexes[next->p2];
 				if( fid >= 0 && fid < m->code->nfunctions ) {
 					hl_function *cf = m->code->functions + fid;
 					const uchar *name = fun_field_name(cf);
-					null_field_access = true;
 					hashed_name = hl_hash_gen(name, true);
 				}
 			}
 			// -----------------------------------------
-			if( null_field_access ) {
-				einstr *e = emit_instr(ctx, PUSH_CONST);
-				e->mode = M_PTR;
-				e->value = hashed_name;
-			}
-			emit_native_call(ctx, null_field_access ? (void*)hl_jit_null_field_access : (void*)hl_null_access, NULL, 0, NULL);
-			patch_jump(ctx, jok);
+			int_arr_add(ctx->null_checks, jthrow);
+			int_arr_add(ctx->null_checks, hashed_name);
 		}
 		break;
 	case OSafeCast:

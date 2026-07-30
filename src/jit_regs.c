@@ -797,6 +797,11 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 			}
 			break;
+		case PUSH_ADDR:
+			regs_write_instr(ctx, &e, out);
+			int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
+			int_arr_add(ctx->jump_regs, cur_op + 1 + e.size_offs);
+			break;
 		case JCOND:
 		case JUMP:
 		case JUMP_TABLE:

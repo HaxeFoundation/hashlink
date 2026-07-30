@@ -46,6 +46,7 @@ static const char *op_names[] = {
 	"xchg",
 	"cxhg",
 	"push-const",
+	"push-addr",
 	"push",
 	"pop",
 	"alloc-stack",
@@ -388,6 +389,9 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 	case PUSH_CONST:
 		printf(" ");
 		dump_value(ctx, e->value, e->mode);
+		break;
+	case PUSH_ADDR:
+		printf(" @%X", cur_pos + 1 + e->size_offs);
 		break;
 	case LOAD_ADDR:
 		if( e->nargs != e->mode ) {
