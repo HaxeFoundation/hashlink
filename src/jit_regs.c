@@ -66,6 +66,8 @@ struct _regs_ctx {
 	jit_ctx *jit;
 	value_info *values;
 	values scratch;
+	values persists;
+	int *ncalls;
 	int_arr jump_regs;
 	int_arr pack_movs;
 	int_arr *blocks_phis;
@@ -157,32 +159,71 @@ static void spill( regs_ctx *ctx, value_info *v ) {
 	if( v->stack_pos == INVALID ) v->stack_pos = regs_alloc_stack(ctx, hl_emit_mode_sizes[v->mode]);
 	v->reg = MK_STACK_REG(v->stack_pos);
 	values_remove(&ctx->scratch,v);
+	values_remove(&ctx->persists,v);
 	regs_debug("REG SPILL %s @%X\n",value_str(v),ctx->cur_op);
 }
 
-static bool regs_alloc_reg( regs_ctx *ctx, value_info *v ) {
+static bool reg_is_free( regs_ctx *ctx, ereg r ) {
+	for_iter(values,v,ctx->scratch)
+		if( v->reg == r ) return false;
+	for_iter(values,v2,ctx->persists)
+		if( v2->reg == r ) return false;
+	return true;
+}
+
+static void mark_persist_used( regs_ctx *ctx, int mode, ereg r ) {
+	reg_config *cfg = REG_CFG(mode);
+	for(int i=0;i<cfg->npersists;i++)
+		if( cfg->persist[i] == r ) {
+			if( ctx->persists_uses[mode] < i + 1 ) ctx->persists_uses[mode] = i + 1;
+			return;
+		}
+}
+
+static ereg alloc_persist( regs_ctx *ctx, int mode ) {
+	reg_config *cfg = REG_CFG(mode);
+	for(int i=0;i<cfg->npersists;i++) {
+		ereg r = cfg->persist[i];
+		if( !reg_is_free(ctx,r) ) continue;
+		mark_persist_used(ctx, mode, r);
+		return r;
+	}
+	return UNUSED;
+}
+
+static bool live_across_call( regs_ctx *ctx, value_info *v, int from ) {
+	if( v->last_read <= from + 1 ) return false;
+	return ctx->ncalls[v->last_read] > ctx->ncalls[from + 1];
+}
+
+static bool reg_is_persist( reg_config *cfg, ereg r ) {
+	for(int i=0;i<cfg->npersists;i++)
+		if( cfg->persist[i] == r ) return true;
+	return false;
+}
+
+static void regs_alloc_reg( regs_ctx *ctx, value_info *v, bool across_call ) {
 	// lookup available reg
 	int mode = REG_MODE(v->mode);
 	reg_config *cfg = REG_CFG(mode);
-	if( !IS_NULL(v->pref_reg) ) {
-		bool free = true;
-		for_iter(values,v2,ctx->scratch) {
-			if( v2->reg == v->pref_reg ) {
-				free = false;
-				break;
-			}
+	bool pref_free = !IS_NULL(v->pref_reg) && reg_is_free(ctx,v->pref_reg);
+	if( across_call ) {
+		ereg r;
+		if( pref_free && reg_is_persist(cfg,v->pref_reg) ) {
+			r = v->pref_reg;
+			mark_persist_used(ctx, mode, r);
+		} else
+			r = alloc_persist(ctx, mode);
+		if( !IS_NULL(r) ) {
+			v->reg = r;
+			values_add(ctx->persists, v);
+			return;
 		}
-		if( free ) {
-			for(int i=0;i<ctx->persists_uses[mode];i++)
-				if( cfg->persist[i] == v->pref_reg ) {
-					free = false;
-					break;
-				}
-		}
-		if( free ) {
-			v->reg = v->pref_reg;
-			return true;
-		}
+	}
+	if( pref_free && !reg_is_persist(cfg,v->pref_reg) ) {
+		v->reg = v->pref_reg;
+		values_add(ctx->scratch, v);
+		return;
 	}
 	value_info *first = NULL;
 	for(int i=0;i<cfg->nscratchs;i++) {
@@ -196,24 +237,28 @@ static bool regs_alloc_reg( regs_ctx *ctx, value_info *v ) {
 		}
 		if( !IS_NULL(r) ) {
 			v->reg = r;
-			return true;
+			values_add(ctx->scratch, v);
+			return;
 		}
 	}
-	if( ctx->persists_uses[mode] < cfg->npersists ) {
-		v->reg = cfg->persist[ctx->persists_uses[mode]++];
-		return false;
+	{
+		ereg r = alloc_persist(ctx, mode);
+		if( !IS_NULL(r) ) {
+			v->reg = r;
+			values_add(ctx->persists, v);
+			return;
+		}
 	}
 	// free the oldest scratch reg
 	if( !first ) jit_assert();
 	v->reg = first->reg;
 	spill(ctx, first);
-	return true;
+	values_add(ctx->scratch, v);
 }
 
 static void regs_assign( regs_ctx *ctx, value_info *v ) {
 	if( v->reg != UNUSED ) jit_assert();
-	if( regs_alloc_reg(ctx, v) )
-		values_add(ctx->scratch, v);
+	regs_alloc_reg(ctx, v, live_across_call(ctx, v, ctx->cur_op));
 	regs_debug("REG ASSIGN %s @%X-@%X\n",value_str(v),ctx->cur_op,v->last_read);
 }
 
@@ -240,6 +285,10 @@ static value_info *regs_current( regs_ctx *ctx, ereg r ) {
 	for_iter(values,v,ctx->scratch) {
 		if( v->reg == r )
 			return v;
+	}
+	for_iter(values,v2,ctx->persists) {
+		if( v2->reg == r )
+			return v2;
 	}
 	return NULL;
 }
@@ -382,6 +431,10 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 			if( v->last_read <= cur_op )
 				values_remove(&ctx->scratch,v);
 		}
+		for_iter_back(values,v2,ctx->persists) {
+			if( v2->last_read <= cur_op )
+				values_remove(&ctx->persists,v2);
+		}
 
 		if( IS_CALL(e.op) ) {
 			ereg *args = hl_emit_get_args(ctx->jit->emit,&e);
@@ -414,6 +467,10 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 				if( v->last_read == cur_op )
 					values_remove(&ctx->scratch,v);
 			}
+			for_iter_back(values,v2,ctx->persists) {
+				if( v2->last_read == cur_op )
+					values_remove(&ctx->persists,v2);
+			}
 			eblock *bl = jit->blocks + e.size_offs;
 			for(int k=0;k<bl->phi_count;k++) {
 				ephi *p = bl->phis + k;
@@ -433,6 +490,8 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 			{
 				for_iter_back(values,v2,ctx->scratch)
 					spill(ctx,v2);
+				for_iter_back(values,v3,ctx->persists)
+					spill(ctx,v3);
 			}
 			break;
 		case ALLOC_STACK:
@@ -784,8 +843,14 @@ void hl_regs_function( jit_ctx *jit ) {
 	ctx->stack_size = 0;
 	jit->reg_instrs = NULL;
 	values_free(&ctx->scratch);
+	values_free(&ctx->persists);
 	int_arr_free(&ctx->jump_regs);
 	int_arr_free(&ctx->pack_movs);
+	ctx->ncalls = (int*)hl_zalloc(&jit->falloc,sizeof(int) * (jit->instr_count + 1));
+	for(int i=0;i<jit->instr_count;i++) {
+		einstr *e = jit->instrs + i;
+		ctx->ncalls[i+1] = ctx->ncalls[i] + (IS_CALL(e->op) && e->mode != M_NORET ? 1 : 0);
+	}
 	ctx->blocks_phis = (int_arr*)hl_zalloc(&jit->falloc,sizeof(int_arr) * jit->block_count);
 	ctx->values = (value_info*)hl_zalloc(&jit->falloc,sizeof(value_info) * nvalues);
 	for(int i=1;i<nvalues;i++) {
