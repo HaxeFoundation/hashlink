@@ -2197,6 +2197,27 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg v = LOAD(dst);
 			int count = o->p2;
+			int ncases = 0;
+			for(int k=0;k<count;k++) {
+				int offs = o->extra[k];
+				if( offs < 0 ) jit_assert();
+				if( offs ) ncases++;
+			}
+			if( ncases <= 3 ) {
+				if( ncases == 0 ) break;
+				// translate to tests with jumps
+				for(int k=0;k<count;k++) {
+					int offs = o->extra[k];
+					if( offs == 0 ) continue;
+					emit_cmp(ctx,v,LOAD_CONST(k,&hlt_i32),OJEq);
+					register_block_jump(ctx, offs, true);
+					if( --ncases )
+						split_block(ctx);
+					else
+						add_jump_target(ctx, 0);
+				}
+				break;
+			}
 			emit_cmp(ctx,v,LOAD_CONST(count,&hlt_i32),OJUGte);
 			add_jump_target(ctx, 0);
 			int jdefault = emit_jump(ctx, true);
