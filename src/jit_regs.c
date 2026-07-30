@@ -511,7 +511,13 @@ static void flush_movs( regs_ctx *ctx, bool cond ) {
 	int_arr_reset(&ctx->pack_movs);
 }
 
-static void flush_phis( regs_ctx *ctx, eblock *b, bool cond, bool after ) {
+typedef enum {
+	PHI_COND = 0,
+	PHI_NEXT = 1,
+	PHI_JUMP = 2,
+} phi_edges;
+
+static void flush_phis( regs_ctx *ctx, eblock *b, phi_edges edges ) {
 	if( !b ) return;
 	jit_ctx *jit = ctx->jit;
 	int bid = (int)(b - jit->blocks);
@@ -523,7 +529,7 @@ static void flush_phis( regs_ctx *ctx, eblock *b, bool cond, bool after ) {
 		ereg a = int_arr_get(arr,idx++);
 		ereg b = int_arr_get(arr,idx++);
 		int bcount = int_arr_get(arr,idx++);
-		if( after != (bcount == 1) )
+		if( edges != PHI_JUMP && (edges == PHI_NEXT) != (bcount == 1) )
 			continue;
 		value_info *from = VAL_REG(a);
 		value_info *to = VAL_REG(b);
@@ -543,6 +549,7 @@ static void flush_phis( regs_ctx *ctx, eblock *b, bool cond, bool after ) {
 		}
 	}
 	ctx->pack_movs = movs;
+	bool cond = edges == PHI_COND;
 	if( !cond )
 		int_arr_free(&ctx->blocks_phis[bid]);
 	flush_movs(ctx, cond);
@@ -666,7 +673,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		case JCOND:
 		case JUMP:
 		case JUMP_TABLE:
-			flush_phis(ctx,cur_block, e.op == JCOND, false);
+			flush_phis(ctx,cur_block, e.op == JCOND ? PHI_COND: PHI_JUMP);
 			if( e.op == JUMP_TABLE ) {
 				// copy args (remap later)
 				hl_emit_store_args(jit->emit,&e,hl_emit_get_args(jit->emit,&e),e.nargs);
@@ -674,7 +681,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			regs_write_instr(ctx, &e, out);
 			int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
 			int_arr_add(ctx->jump_regs, cur_op + 1 + (e.op == JUMP_TABLE ? 0 : e.size_offs));
-			if( e.op == JCOND ) flush_phis(ctx,cur_block, false, true);
+			if( e.op == JCOND ) flush_phis(ctx,cur_block, PHI_NEXT);
 			break;
 		case RET:
 			if( e.a ) {
@@ -721,7 +728,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		if( instr_stack_offset )
 			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,instr_stack_offset);
 		if( cur_block && cur_block->end_pos == cur_op+1 )
-			flush_phis(ctx,cur_block,false,true);
+			flush_phis(ctx,cur_block,PHI_NEXT);
 		ctx->pos_map[cur_op+1] = ctx->emit_pos;
 	}
 }
