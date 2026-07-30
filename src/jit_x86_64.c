@@ -23,6 +23,15 @@
 #include <jit.h>
 #include "data_struct.h"
 
+#if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
+#	define HAS_CPUID
+#	ifdef _MSC_VER
+#		include <intrin.h>
+#	else
+#		include <cpuid.h>
+#	endif
+#endif
+
 #ifdef HL_DEBUG
 #	define GEN_DEBUG
 #endif
@@ -400,7 +409,47 @@ static int scratch_float_reg = -1;
 
 static ereg scratch_not_param[] = { R(RAX), R(R10), R(R11) };
 
+static bool cpu_avx = false;
+
+static void detect_cpu_features() {
+#ifdef HAS_CPUID
+	unsigned int ecx;
+	uint64 xcr0;
+	cpu_avx = false;
+	if( getenv("HL_JIT_NO_AVX") ) return;
+#	ifdef _MSC_VER
+	{
+		int regs[4];
+		__cpuid(regs,0);
+		if( regs[0] < 1 ) return;
+		__cpuid(regs,1);
+		ecx = (unsigned int)regs[2];
+	}
+#	else
+	{
+		unsigned int eax, ebx, edx;
+		if( !__get_cpuid(1,&eax,&ebx,&ecx,&edx) ) return;
+	}
+#	endif
+	// AVX (bit 28) is only usable if the OS enabled XSAVE (bit 27) so that XCR0 can be read
+	if( (ecx & (1<<27)) == 0 || (ecx & (1<<28)) == 0 ) return;
+#	ifdef _MSC_VER
+	xcr0 = _xgetbv(0);
+#	else
+	{
+		unsigned int xlo, xhi;
+		__asm__ __volatile__("xgetbv" : "=a"(xlo), "=d"(xhi) : "c"(0));
+		xcr0 = xlo | ((uint64)xhi << 32);
+	}
+#	endif
+	// the OS must save both the XMM (bit 1) and YMM (bit 2) states on context switch
+	if( (xcr0 & 6) != 6 ) return;
+	cpu_avx = true;
+#endif
+}
+
 void hl_jit_init_regs( regs_config *cfg ) {
+	detect_cpu_features();
 	// exclude R11 at it's use as temporary for various ops
 #	ifdef HL_WIN_CALL
 	static int scratch_regs[] = { R(RAX), R(RCX), R(RDX), R(R8), R(R9), R(R10), /*R(R11)*/ };
@@ -676,6 +725,40 @@ static void emit_ext( code_ctx *ctx, CpuOp op, ereg _a, ereg _b, emit_mode mode,
 	}
 }
 
+#define VEX_PP(form)	( ((form)&0xFF0000) == 0x660000 ? 1 : ((form)&0xFF0000) == 0xF30000 ? 2 : ((form)&0xFF0000) == 0xF20000 ? 3 : 0 )
+
+static void emit_vex( code_ctx *ctx, CpuOp op, ereg out, ereg a, ereg b ) {
+	int form = OP_FORMS[op].r_mem;
+	preg d = make_reg(out,0), s = make_reg(a,0), r = make_reg(b,0);
+	if( d.kind != RFPU || s.kind != RFPU ) jit_assert();
+	if( r.kind != RFPU && r.kind != RSTACK && r.kind != RMEM ) jit_assert();
+	if( r.reg & 8 ) {
+		// three bytes form : R / X=0 / B=1 / 0F map
+		B(0xC4);
+		B(((d.reg & 8) ? 0 : 0x80) | 0x40 | 0x01);
+		B(((~s.reg & 15) << 3) | VEX_PP(form)); // W=0 / vvvv / L=0 / pp
+	} else {
+		// two bytes form (implies X=B=0 and W=0)
+		B(0xC5);
+		B(((d.reg & 8) ? 0 : 0x80) | ((~s.reg & 15) << 3) | VEX_PP(form));
+	}
+	B(form);
+	if( r.kind == RFPU ) {
+		MOD_RM(3,d.reg,r.reg);
+	} else if( r.value == 0 && (r.reg&7) != RBP ) {
+		MOD_RM(0,d.reg,r.reg);
+		if( (r.reg&7) == RSP ) B(0x24);
+	} else if( IS_SBYTE(r.value) ) {
+		MOD_RM(1,d.reg,r.reg);
+		if( (r.reg&7) == RSP ) B(0x24);
+		B(r.value);
+	} else {
+		MOD_RM(2,d.reg,r.reg);
+		if( (r.reg&7) == RSP ) B(0x24);
+		W((int)r.value);
+	}
+}
+
 static void emit_jump( code_ctx *ctx, int mode, int offset ) {
 	int op_mult = 24;
 #	ifdef GEN_DEBUG
@@ -869,6 +952,14 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 		return;
 	case ONeg:
 		if( IS_FLOAT(mode) ) {
+			if( cpu_avx ) {
+				ereg z = get_tmp(mode);
+				ereg d = IS_REG(out) ? out : z;
+				emit_vex(ctx, mode == M_F32 ? XORPS : XORPD, z, z, z);
+				emit_vex(ctx, mode == M_F32 ? SUBSS : SUBSD, d, z, a);
+				if( d != out ) emit_mov(ctx, out, d, mode);
+				return;
+			}
 			if( out != a && IS_REG(out) ) {
 				EMIT(mode == M_F32 ? XORPS : XORPD, out, out, mode);
 				EMIT(mode == M_F32 ? SUBSS : SUBSD, out, a, mode);
@@ -885,6 +976,23 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 	default:
 		jit_assert();
 		break;
+	}
+
+	if( cpu_avx && IS_FLOAT(mode) && (op == OAdd || op == OSub || op == OMul || op == OSDiv) ) {
+		ereg d = IS_REG(out) ? out : get_tmp(mode);
+		ereg s = a;
+		if( !IS_REG(s) ) {
+			if( (op == OAdd || op == OMul) && IS_REG(b) ) {
+				s = b;
+				b = a;
+			} else {
+				s = get_tmp(mode);
+				emit_mov(ctx, s, a, mode);
+			}
+		}
+		emit_vex(ctx, cop, d, s, b);
+		if( d != out ) emit_mov(ctx, out, d, mode);
+		return;
 	}
 
 	if( out == a && IS_REG(a) ) {
@@ -1537,6 +1645,22 @@ void hl_codegen_function( jit_ctx *jit ) {
 					// do dst := (mask & src) | (dst & ~mask)
 					ereg tmp = get_tmp(M_F64);
 					EMIT(MOVQ,tmp,RTMP,M_PTR);
+					if( cpu_avx ) {
+						emit_vex(ctx,ANDNPD,out,tmp,out); // out := ~mask & out
+						if( !IS_REG(e->a) ) {
+							ereg tmp2 = out == MMX(0) ? MMX(1) : MMX(0);
+							EMIT(SUB,R(RSP),MK_CONST(8),M_PTR);
+							EMIT(MOVSD,REG_PTR(R(RSP)),tmp2,M_F64);
+							EMIT(e->mode == M_F32 ? MOVSS : MOVSD,tmp2,e->a,e->mode);
+							emit_vex(ctx,ANDPD,tmp,tmp,tmp2); // tmp := mask & src
+							EMIT(MOVSD,tmp2,REG_PTR(R(RSP)),M_PTR);
+							EMIT(ADD,R(RSP),MK_CONST(8),M_PTR);
+						} else
+							emit_vex(ctx,ANDPD,tmp,tmp,e->a); // tmp := mask & src
+						emit_vex(ctx,ORPD,out,out,tmp);
+						EMIT(POPFQ,UNUSED,UNUSED,M_PTR);
+						break;
+					}
 					EMIT(ANDNPD,tmp,out,M_F64);
 					EMIT(MOVQ,out,RTMP,M_PTR);
 					if( !IS_REG(e->a) ) {
