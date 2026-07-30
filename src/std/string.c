@@ -24,6 +24,7 @@
 HL_PRIM vbyte *hl_itos( int i, int *len ) {
 	uchar tmp[24];
 	int k = (int)usprintf(tmp,24,USTR("%d"),i);
+	ASAN_JIT_STACK(len, 4);
 	*len = k;
 	return hl_copy_bytes((vbyte*)tmp,(k + 1)<<1);
 }
@@ -31,6 +32,7 @@ HL_PRIM vbyte *hl_itos( int i, int *len ) {
 HL_PRIM vbyte *hl_ftos( double d, int *len ) {
 	uchar tmp[24];
 	int k;
+	ASAN_JIT_STACK(len, 4);
 	if( d != d ) {
 		*len = 3;
 		return hl_copy_bytes((vbyte*)USTR("NaN"),8);

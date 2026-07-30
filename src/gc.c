@@ -225,13 +225,14 @@ HL_API hl_thread_info *hl_get_thread() {
 }
 
 static void gc_save_context(hl_thread_info *t, void *prev_stack ) {
-	void *stack_cur = &t;
 	setjmp(t->gc_regs);
 	// some compilers (such as clang) might push/pop some callee registers in call
 	// to gc_save_context (or before) which might hold a gc value !
 	// let's capture them immediately in extra per-thread data
 	t->stack_cur = &prev_stack;
 
+#	ifndef HL_DEBUG
+	void* stack_cur = &t;
 	// We have no guarantee prev_stack is pointer-aligned
 	// All calls are passing a pointer to a bool, which is aligned on 1 byte
 	// If pointer is wrongly aligned, the extra_stack_data is misaligned
@@ -242,6 +243,7 @@ static void gc_save_context(hl_thread_info *t, void *prev_stack ) {
 	if( size > HL_MAX_EXTRA_STACK ) hl_fatal("GC_SAVE_CONTEXT");
 	t->extra_stack_size = size;
 	memcpy(t->extra_stack_data, prev_stack, size*sizeof(void*));
+#	endif
 }
 
 #ifndef HL_THREADS
@@ -777,6 +779,7 @@ static int gc_flush_mark( gc_mstack *stack ) {
 	return count;
 }
 
+ASAN_DISABLE
 static void gc_mark_stack( void *start, void *end ) {
 	GC_STACK_BEGIN(&global_mark_stack);
 	void **stack_head = (void**)start;
