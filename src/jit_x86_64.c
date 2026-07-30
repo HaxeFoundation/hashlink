@@ -1352,7 +1352,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 						// set ZF=0, CF=?
 					case OJSLte:
 						// set ZF=0, CF=0
-						EMIT(TEST,R(RSP),R(RSP),M_PTR);
+						EMIT(_TEST,R(RSP),R(RSP),M_PTR);
 						break;
 					default:
 						jit_assert();
