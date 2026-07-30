@@ -1152,8 +1152,6 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case XCHG:
 			{
-				if( IS_FLOAT(e->mode) )
-					BREAK();
 				ereg tmp = get_tmp(e->mode);
 				if( !IS_REG(e->a) && !IS_REG(e->b) )
 					jit_assert();
