@@ -149,6 +149,14 @@ static int regs_alloc_stack( regs_ctx *ctx, int size ) {
 	return -ctx->stack_size;
 }
 
+static ereg shift_local( regs_ctx *ctx, ereg r ) {
+	rkind k = REG_KIND(r);
+	if( REG_REG(r) != STACK_REG || (k != R_REG && k != R_REG_PTR) ) return r;
+	int offs = REG_VALUE(r);
+	if( offs >= 0 ) return r;
+	return MK_REG_VAL(STACK_REG,k,offs - ctx->stack_offset);
+}
+
 #define value_str(v)	value_to_str(ctx,v)
 
 static const char *value_to_str( regs_ctx *ctx, value_info *v ) {
@@ -568,10 +576,12 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	}
 	// assign stack regs
 	int nvalues = jit->value_count + jit->phi_count;
-	ctx->stack_offset = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
+	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
+	ctx->stack_offset = persists_size + jit_pad_size(persists_size,jit->cfg.stack_align);
 	for(int i=0;i<nvalues;i++) {
 		value_info *v = ctx->values + i;
 		if( v->reg == UNUSED ) v->reg = MK_STACK_REG(v->stack_pos);
+		v->reg = shift_local(ctx, v->reg);
 	}
 }
 
@@ -678,12 +688,15 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 	int write_index = 1;
 	ctx->pos_map[0] = 0;
 
-	int stack_offset = ctx->stack_size;
-	int push_size = HL_WSIZE * 2 + ctx->stack_offset; // RIP + RBP save
+	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
+	int stack_offset = ctx->stack_size + ctx->stack_offset - persists_size;
+	int push_size = HL_WSIZE * 2 + persists_size; // RIP + RBP save
 	if( jit->cfg.stack_align ) {
 		int align = (stack_offset + push_size) % jit->cfg.stack_align;
 		if( align ) stack_offset += jit->cfg.stack_align - align;
 	}
+	if( IS_WINCALL64 && ctx->has_direct_call )
+		stack_offset += 0x20;
 
 	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
 		einstr e = jit->instrs[cur_op];
@@ -776,14 +789,12 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			{
 				EMIT(PUSH,jit->cfg.stack_pos,UNUSED,M_PTR);
 				regs_emit_mov(ctx,jit->cfg.stack_pos,jit->cfg.stack_reg,M_PTR);
-				if( stack_offset )
-					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 				for(int i=0;i<ctx->persists_uses[0];i++)
 					EMIT(PUSH,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
 				for(int i=0;i<ctx->persists_uses[1];i++)
 					EMIT(PUSH,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
-				if( IS_WINCALL64 && ctx->has_direct_call )
-					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-0x20);
+				if( stack_offset )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 			}
 			break;
 		case JCOND:
@@ -813,15 +824,12 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			if( cur_op && IS_CALL(jit->instrs[cur_op-1].op) )
 				EMIT(NOP,UNUSED,UNUSED,M_NONE);
 #			endif
-			if( IS_WINCALL64 && ctx->has_direct_call )
-				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,0x20);
+			if( stack_offset )
+				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
 			for(int i=ctx->persists_uses[1]-1;i>=0;i--)
 				EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
 			for(int i=ctx->persists_uses[0]-1;i>=0;i--)
 				EMIT(POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
-			if( stack_offset ) {
-				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
-			}
 			EMIT(POP,jit->cfg.stack_pos,UNUSED,M_PTR);
 			EMIT(RET,UNUSED,UNUSED,M_NONE);
 			break;
