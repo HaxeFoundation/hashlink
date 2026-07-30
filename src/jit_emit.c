@@ -1944,7 +1944,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				ereg pos = (osize <= 8 && ((osize - 1) & osize) == 0) ? OFFSET(LOAD(dst), LOAD(ra), osize, 0) : OFFSET(LOAD(dst), emit_gen_ext(ctx,BINOP,LOAD(ra),MK_CONST(osize),M_I32,OMul),1,0);
 				emit_store_size(ctx, pos, 0, LOAD(rb), 0, osize);
 			} else  {
-				ereg pos = OFFSET(LOAD(dst), LOAD(ra), hl_type_size(dst->t), sizeof(varray));
+				ereg pos = OFFSET(LOAD(dst), LOAD(ra), hl_type_size(rb->t), sizeof(varray));
 				STORE_MEM(pos, 0, LOAD(rb));
 			}
 		}
