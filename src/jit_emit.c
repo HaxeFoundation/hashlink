@@ -1232,11 +1232,8 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 				register_block_jump(ctx,offset,true);
 				split_block(ctx);
 				hl_type *vt = at->tparam;
-				emit_cmp(ctx, LOAD_MEM(a,HDYN_VALUE,vt), LOAD_MEM(b,HDYN_VALUE,vt), OJNull);
-				add_jump_target(ctx, 0);
-				int jcmp = emit_jump(ctx,true);
+				emit_cmp(ctx, LOAD_MEM(a,HDYN_VALUE,vt), LOAD_MEM(b,HDYN_VALUE,vt), OJNotEq);
 				register_block_jump(ctx,offset,true);
-				patch_jump(ctx,jcmp);
 				patch_jump(ctx,jeq);
 			} else
 				jit_assert();
