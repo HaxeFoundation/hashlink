@@ -4725,6 +4725,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 			c = next;
 		}
 	}
+	hl_flush_executable_memory(code, size);
 	return code;
 }
 

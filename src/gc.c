@@ -28,6 +28,10 @@
 #	include <sys/mman.h>
 #endif
 
+#if defined(__APPLE__) && defined(__aarch64__)
+#	include <pthread.h>
+#endif
+
 #if defined(HL_EMSCRIPTEN)
 #	include <emscripten/heap.h>
 #endif
@@ -1153,8 +1157,32 @@ retry_jit_alloc:
 	return NULL;
 #else
 	void *p;
-	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,(MAP_PRIVATE|MAP_ANONYMOUS),-1,0);
+	int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+#	if defined(__APPLE__) && defined(__aarch64__)
+	// Apple Silicon requires MAP_JIT for W^X-protected JIT pages; the binary
+	// must also carry the com.apple.security.cs.allow-jit entitlement.
+#		ifndef MAP_JIT
+#			define MAP_JIT 0x800
+#		endif
+	flags |= MAP_JIT;
+#	endif
+	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,flags,-1,0);
+	if( p == MAP_FAILED ) return NULL;
+#	if defined(__APPLE__) && defined(__aarch64__)
+	// Leave the caller's thread in write mode so it can populate the page;
+	// hl_flush_executable_memory flips back to exec when emission is done.
+	pthread_jit_write_protect_np(false);
+#	endif
 	return p;
+#endif
+}
+
+HL_PRIM void hl_flush_executable_memory( void *code, int size ) {
+#if defined(__GNUC__) || defined(__clang__)
+	__builtin___clear_cache((char*)code, (char*)code + size);
+#endif
+#if defined(__APPLE__) && defined(__aarch64__)
+	pthread_jit_write_protect_np(true);
 #endif
 }
 

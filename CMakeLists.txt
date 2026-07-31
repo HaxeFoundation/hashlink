@@ -20,7 +20,8 @@ include(FindPkgConfig)
 include(CTest)
 
 set(WITH_VM_DEFAULT ON)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
+# 32-bit ARM has no JIT backend; aarch64/arm64 uses src/jit_aarch64.c.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm$|^armv[0-9]" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
     set(WITH_VM_DEFAULT OFF)
 endif()
 
@@ -225,12 +226,17 @@ else()
 endif()
 
 if (WITH_VM)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+        set(HL_JIT_BACKEND src/jit_aarch64.c src/jit_aarch64_emit.c)
+    else()
+        set(HL_JIT_BACKEND src/jit_x86_64.c)
+    endif()
     add_executable(hl
         src/code.c
         src/jit.c
         src/jit_emit.c
         src/jit_regs.c
-        src/jit_x86_64.c
+        ${HL_JIT_BACKEND}
         src/jit_dump.c
         src/main.c
         src/module.c
