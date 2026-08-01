@@ -26,6 +26,8 @@
 #	include <sys/wait.h>
 #	include <sys/user.h>
 #	include <signal.h>
+#	include <errno.h>
+#	include <unistd.h> // usleep
 #	define USE_PTRACE
 #endif
 
@@ -85,6 +87,7 @@ HL_API bool hl_debug_stop( int pid ) {
 #	elif defined(MAC_DEBUG)
 	return mdbg_session_detach(pid);
 #	elif defined(USE_PTRACE)
+	kill(pid, SIGTRAP); // DETACH needs ptrace-stop
 	return ptrace(PTRACE_DETACH,pid,0,0) >= 0;
 #	else
 	return false;
@@ -249,9 +252,21 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 	return mdbg_session_wait(pid, thread, timeout);
 #	elif defined(USE_PTRACE)
 	int status;
-	int ret = waitpid(pid,&status,0);
+	// *** HACK ***
+	// usleep here is needed for a good result.
+	// Without it, waitpid can miss many stop event;
+	// With it, and more we wait, less we miss stop event.
+	usleep(100 * 1000);
+	int ret = waitpid(pid, &status, WNOHANG);
+	if( ret == -1 && errno == ECHILD ) {
+		// the process is gone : report it as an exit instead of an error
+		*thread = pid;
+		return 0;
+	}
 	//printf("WAITPID=%X %X\n",ret,status);
 	*thread = ret;
+	if( ret <= 0 )
+		return -1;
 	if( WIFEXITED(status) )
 		return 0;
 	if( WIFSTOPPED(status) ) {
@@ -259,6 +274,11 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 		//printf(" STOPSIG=%d\n",sig);
 		if( sig == SIGSTOP || sig == SIGTRAP )
 			return 1;
+		if( sig == SIGSEGV )
+			return 3;
+		// other signals such as SIGCHLD, ignore and continue
+		if( ptrace(PTRACE_CONT,pid,0,0) >= 0 )
+			return 4;
 		return 3;
 	}
 	return 4;
