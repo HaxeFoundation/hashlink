@@ -269,7 +269,6 @@ ereg *hl_emit_get_args( emit_ctx *ctx, einstr *e );
 ereg **hl_emit_get_regs( einstr *e, int *count );
 void hl_emit_reg_iter( jit_ctx *jit, einstr *e, void *ctx, void (*iter_reg)( void *, ereg * ) );
 extern int hl_emit_mode_sizes[];
-extern bool hl_jit_dump_bin;
 extern vdynamic * const hl_emit_dyn_bools[2];
 #define val_str(v,m) hl_emit_regstr(v,m)
 
