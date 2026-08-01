@@ -917,9 +917,8 @@ void hl_regs_flush( jit_ctx *jit ) {
 		value_info *v = VAL(i);
 		if( v->tracked && v->reg ) {
 			int start = ctx->pos_map[v->start];
+			if( v->id < 0 && start > 0 ) start--;
 			int end = v->overwrite < 0 ? end_pos : ctx->pos_map[v->last_read];
-			// an argument is identified by its index (tracked is negative for arguments),
-			// a variable by the op position of its assign, shifted above the arguments
 			int assign;
 			if( v->tracked < 0 )
 				assign = -v->tracked - 1;
