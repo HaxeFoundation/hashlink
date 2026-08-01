@@ -182,6 +182,7 @@ int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f ) {
 		dbg->vars_size = ctx->regs_track_count * sizeof(int);
 		dbg->vars = malloc(dbg->vars_size);
 		for(int i=0;i<ctx->regs_track_count>>2;i++) {
+			if( ctx->regs_track[i<<2] < 0 ) continue; // saved register, not a code range
 			ctx->regs_track[(i<<2)|1] = ctx->code_pos_map[ctx->regs_track[(i<<2)|1] + 1];
 			ctx->regs_track[(i<<2)|2] = ctx->code_pos_map[ctx->regs_track[(i<<2)|2]];
 		}
