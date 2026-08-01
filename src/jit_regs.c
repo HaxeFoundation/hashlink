@@ -85,6 +85,7 @@ struct _regs_ctx {
 	bool flushed;
 	bool has_direct_call;
 	int persists_uses[2];
+	int epilog_pos;
 };
 
 typedef int call_regs[2];
@@ -841,14 +842,23 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				(!stack_offset && ctx->emit_pos > 1 && ctx->instrs[ctx->emit_pos-1].op == STACK_OFFS && IS_CALL(ctx->instrs[ctx->emit_pos-2].op)) )
 				EMIT(NOP,UNUSED,UNUSED,M_NONE);
 #			endif
-			if( stack_offset )
-				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
-			for(int i=ctx->persists_uses[1]-1;i>=0;i--)
-				EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
-			for(int i=ctx->persists_uses[0]-1;i>=0;i--)
-				EMIT(POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
-			EMIT(POP,jit->cfg.stack_pos,UNUSED,M_PTR);
-			EMIT(RET,UNUSED,UNUSED,M_NONE);
+			if( ctx->epilog_pos >= 0 ) {
+				regs_emit(ctx,UNUSED,JUMP,UNUSED,UNUSED,M_NONE,ctx->epilog_pos - (ctx->emit_pos + 1));
+				break;
+			}
+			{
+				int epilog_start = ctx->emit_pos;
+				if( stack_offset )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
+				for(int i=ctx->persists_uses[1]-1;i>=0;i--)
+					EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
+				for(int i=ctx->persists_uses[0]-1;i>=0;i--)
+					EMIT(POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
+				EMIT(POP,jit->cfg.stack_pos,UNUSED,M_PTR);
+				EMIT(RET,UNUSED,UNUSED,M_NONE);
+				if( ctx->emit_pos - epilog_start >= 6 )
+					ctx->epilog_pos = epilog_start;
+			}
 			break;
 		case MOV:
 			if( out == e.a ) break;
@@ -936,6 +946,7 @@ void hl_regs_function( jit_ctx *jit ) {
 	ctx->emit_pos = 0;
 	ctx->cur_op = 0;
 	ctx->stack_size = 0;
+	ctx->epilog_pos = -1;
 	jit->reg_instrs = NULL;
 	values_free(&ctx->scratch);
 	values_free(&ctx->persists);
