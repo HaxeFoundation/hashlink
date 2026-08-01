@@ -918,7 +918,7 @@ void hl_regs_flush( jit_ctx *jit ) {
 		if( v->tracked && v->reg ) {
 			int start = ctx->pos_map[v->start];
 			if( v->id < 0 && start > 0 ) start--;
-			int end = v->overwrite < 0 ? end_pos : ctx->pos_map[v->last_read];
+			int end = v->id < 0 && v->last_read >= 0 ? ctx->pos_map[v->last_read] : end_pos;
 			int assign;
 			if( v->tracked < 0 )
 				assign = -v->tracked - 1;
