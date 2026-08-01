@@ -522,6 +522,7 @@ static void hl_module_init_indexes( hl_module *m ) {
 
 #ifdef HL_VTUNE
 #include <jitprofiling.h>
+#define VTUNE_OFFSET(dbg,j)	((int)(dbg->large ? ((int*)dbg->offsets)[j] : ((unsigned short*)dbg->offsets)[j]))
 h_bool hl_module_init_vtune( hl_module *m ) {
 	int i;
 	if( !iJIT_IsProfilingActive() || m->jit_debug == NULL )
@@ -529,9 +530,11 @@ h_bool hl_module_init_vtune( hl_module *m ) {
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		void *faddr = m->functions_ptrs[f->findex];
+		hl_debug_infos *dbg = m->jit_debug + i;
 
 		iJIT_Method_Load jm = {0};
 		char out[256];
+		if( dbg->offsets == NULL ) continue;
 		jm.method_id = iJIT_GetNewMethodID();
 		if( f->obj ) {
 			jm.class_file_name = hl_to_utf8(f->obj->name);
@@ -544,32 +547,24 @@ h_bool hl_module_init_vtune( hl_module *m ) {
 			jm.method_name = out;
 		}
 		jm.method_load_address = faddr;
-		jm.method_size = 0;
-		int j;
-		for(j=0;j<m->code->nfunctions;j++) {
-			hl_function *f2 = m->code->functions + j;
-			if( f2 == f ) continue;
-			void *addr = m->functions_ptrs[f2->findex];
-			int_val dif = (char*)addr - (char*)faddr;
-			if( dif <= 0 ) continue;
-			if( jm.method_size == 0 || dif < jm.method_size ) jm.method_size = (int)dif;
-		}
+		jm.method_size = VTUNE_OFFSET(dbg,f->nops);
 
+		int j;
 		int file = f->debug[0] & 0x7FFFFFFF;
 		int curline = -1;
 		LineNumberInfo *lines = (LineNumberInfo*)malloc(sizeof(LineNumberInfo)*f->nops);
 		int nlines = 0;
-		hl_debug_infos *dbg = m->jit_debug + i;
 		jm.source_file_name = m->code->debugfiles[file];
 		for(j=0;j<f->nops;j++) {
 			int file2 = f->debug[j<<1] & 0x7FFFFFFF;
 			int line = f->debug[(j<<1)|1];
 			if( file2 != file || line == curline ) continue;
-			lines[nlines].Offset = dbg->large ? ((int*)dbg->offsets)[j] : ((unsigned short*)dbg->offsets)[j];
-			lines[nlines].LineNumber = line - 1;
+			if( nlines ) lines[nlines-1].Offset = VTUNE_OFFSET(dbg,j);
+			lines[nlines].LineNumber = line;
 			curline = line;
 			nlines++;
 		}
+		if( nlines ) lines[nlines-1].Offset = jm.method_size;
 		if( nlines && jm.method_size ) {
 			jm.line_number_table = lines;
 			jm.line_number_size = nlines;
