@@ -987,8 +987,10 @@ void hl_regs_function( jit_ctx *jit ) {
 			value_info *v = VAL_REG(ph->value);
 			v->start = bl->start_pos;
 			v->mode = ph->mode;
-			if( ph->nvalues )
-				v->tracked = VAL_REG(ph->values[0])->tracked;
+			for(int k=0;k<ph->nvalues;k++) {
+				int t = VAL_REG(ph->values[k])->tracked;
+				if( t && (!v->tracked || t < v->tracked) ) v->tracked = t;
+			}
 		}
 	}
 	regs_compute_liveness(ctx);
