@@ -875,6 +875,20 @@ void hl_regs_flush( jit_ctx *jit ) {
 
 	int_arr regs_track;
 	int_arr_free(&regs_track);
+	
+	// register persist backup for debugger
+	int nsaved = 0;
+	for(int mode=0;mode<2;mode++) {
+		reg_config *cfg = mode ? &jit->cfg.floats : &jit->cfg.regs;
+		for(int i=0;i<ctx->persists_uses[mode];i++) {
+			int_arr_add(regs_track, -1);
+			int_arr_add(regs_track, -(++nsaved) * HL_WSIZE); // offset from EBP
+			int_arr_add(regs_track, 0);
+			int_arr_add(regs_track, cfg->persist[i]);
+		}
+	}
+	
+	// register variables ranges for debugger
 	int rarg = 0;
 	int end_pos = ctx->emit_pos;
 	for(int i=0;i<jit->value_count + jit->phi_count;i++) {
@@ -883,7 +897,6 @@ void hl_regs_flush( jit_ctx *jit ) {
 			int start = ctx->pos_map[v->start];
 			int end = v->overwrite < 0 ? end_pos : ctx->pos_map[v->last_read];
 			int track = (v->tracked - 1) << 1;
-//			printf("  @%X-%X %s := %s\n", start, end, jit->mod->code->strings[jit->fun->assigns[track]], val_str(v->reg,v->mode));
 			int assign = jit->fun->assigns[track+1];
 			if( assign < 0 ) assign = rarg++;
 			int_arr_add(regs_track, assign);
