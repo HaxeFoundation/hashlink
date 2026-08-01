@@ -837,7 +837,8 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			// will subtract and create invalid stack frame. this is because we do
 			// not register the stack offset in our unwind table so all functions
 			// can share the same definition
-			if( stack_offset && ctx->emit_pos && IS_CALL(ctx->instrs[ctx->emit_pos-1].op) )
+			if( (ctx->emit_pos && IS_CALL(ctx->instrs[ctx->emit_pos-1].op)) ||
+				(!stack_offset && ctx->emit_pos > 1 && ctx->instrs[ctx->emit_pos-1].op == STACK_OFFS && IS_CALL(ctx->instrs[ctx->emit_pos-2].op)) )
 				EMIT(NOP,UNUSED,UNUSED,M_NONE);
 #			endif
 			if( stack_offset )
