@@ -440,6 +440,17 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 	}
 }
 
+static void regs_extend_debug_liveness( regs_ctx *ctx ) {
+	jit_ctx *jit = ctx->jit;
+	int nops = jit->fun->nops;
+	for(int i=0;i<jit->live_ends_count;i++) {
+		value_info *v = VAL_REG(jit->live_ends[i<<1]);
+		int scope_end = jit->live_ends[(i<<1)|1];
+		int end = scope_end < 0 || scope_end >= nops ? jit->instr_count : jit->emit_pos_map[scope_end];
+		if( v->last_read < end ) v->last_read = end;
+	}
+}
+
 static void regs_assign_regs( regs_ctx *ctx ) {
 	jit_ctx *jit = ctx->jit;
 	// assign args
@@ -902,7 +913,7 @@ void hl_regs_flush( jit_ctx *jit ) {
 			if( v->tracked < 0 )
 				assign = -v->tracked - 1;
 			else
-				assign = nargs + jit->fun->assigns[((v->tracked - 1) << 1) + 1];
+				assign = nargs + ASSIGN_POS(jit->fun, v->tracked - 1);
 			int_arr_add(regs_track, assign);
 			int_arr_add(regs_track, start);
 			int_arr_add(regs_track, end);
@@ -969,6 +980,7 @@ void hl_regs_function( jit_ctx *jit ) {
 		}
 	}
 	regs_compute_liveness(ctx);
+	regs_extend_debug_liveness(ctx);
 	regs_assign_regs(ctx);
 	regs_emit_instrs(ctx);
 	hl_regs_flush(ctx->jit);
