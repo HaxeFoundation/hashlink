@@ -889,16 +889,20 @@ void hl_regs_flush( jit_ctx *jit ) {
 	}
 	
 	// register variables ranges for debugger
-	int rarg = 0;
+	int nargs = jit->fun->type->fun->nargs;
 	int end_pos = ctx->emit_pos;
 	for(int i=0;i<jit->value_count + jit->phi_count;i++) {
 		value_info *v = VAL(i);
 		if( v->tracked && v->reg ) {
 			int start = ctx->pos_map[v->start];
 			int end = v->overwrite < 0 ? end_pos : ctx->pos_map[v->last_read];
-			int track = (v->tracked - 1) << 1;
-			int assign = jit->fun->assigns[track+1];
-			if( assign < 0 ) assign = rarg++;
+			// an argument is identified by its index (tracked is negative for arguments),
+			// a variable by the op position of its assign, shifted above the arguments
+			int assign;
+			if( v->tracked < 0 )
+				assign = -v->tracked - 1;
+			else
+				assign = nargs + jit->fun->assigns[((v->tracked - 1) << 1) + 1];
 			int_arr_add(regs_track, assign);
 			int_arr_add(regs_track, start);
 			int_arr_add(regs_track, end);
