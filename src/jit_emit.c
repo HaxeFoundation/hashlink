@@ -145,6 +145,7 @@ struct _emit_ctx {
 	int_arr null_checks;
 	int_arr values_track;
 	int current_assign;
+	bool in_args;
 
 	blocks blocks;
 	emit_block *current_block;
@@ -524,7 +525,8 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 			STORE_MEM(emit_gen(ctx,ADDRESS,to->stored,UNUSED,M_PTR), 0, v);
 	} else {
 		to->stored = v;
-		if( ctx->current_assign < ctx->fun->nassigns && ctx->fun->assigns[(ctx->current_assign<<1)|1] == ctx->op_pos ) {
+		// arguments are tracked by index by the caller, they have no op position
+		if( !ctx->in_args && ctx->current_assign < ctx->fun->nassigns && ctx->fun->assigns[(ctx->current_assign<<1)|1] == ctx->op_pos ) {
 			int_arr_add(ctx->values_track,ctx->current_assign);
 			int_arr_add(ctx->values_track,v);
 			//printf("@%X R%d[%s] := V%d\n",ctx->emit_pos - 1, to->id, ctx->jit->mod->code->strings[ctx->fun->assigns[(ctx->current_assign<<1)]], v);
@@ -1047,6 +1049,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->trap_count = 0;
 	ctx->phi_count = 0;
 	ctx->current_assign = 0;
+	ctx->in_args = false;
 	ctx->flushed = false;
 	int_arr_free(&ctx->args_data);
 	int_arr_free(&ctx->jump_regs);
@@ -1083,17 +1086,21 @@ void hl_emit_function( jit_ctx *jit ) {
 
 	emit_gen_size(ctx, BLOCK, 0);
 	emit_gen(ctx,ENTER,UNUSED,UNUSED,M_NONE);
+	ctx->op_pos = 0;
+	ctx->in_args = true;
 	for(i=0;i<f->type->fun->nargs;i++) {
 		hl_type *t = f->type->fun->args[i];
 		ereg r = emit_gen(ctx, LOAD_ARG, UNUSED, UNUSED, hl_type_mode(t));
 		STORE(R(i), r);
-		if( ctx->current_assign < f->nassigns && f->assigns[(ctx->current_assign<<1)|1] < 0 ) {
-			//printf("@%X R%d[%s] := V%d\n",ctx->emit_pos - 1, i, ctx->jit->mod->code->strings[f->assigns[(ctx->current_assign<<1)]], r);
-			int_arr_add(ctx->values_track,ctx->current_assign);
-			int_arr_add(ctx->values_track,r);
-			ctx->current_assign++;
-		}
+		// track every argument by its index : the compiler emits no assign for `this`,
+		// so assigns cannot be paired with arguments positionally
+		int_arr_add(ctx->values_track,-(i+2));
+		int_arr_add(ctx->values_track,r);
 	}
+	ctx->in_args = false;
+	// skip the arguments and captures assigns, they are not op positions
+	while( ctx->current_assign < f->nassigns && f->assigns[(ctx->current_assign<<1)|1] < 0 )
+		ctx->current_assign++;
 
 	for(int op_pos=0;op_pos<f->nops;op_pos++) {
 		ctx->op_pos = op_pos;
