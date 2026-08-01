@@ -450,6 +450,15 @@ static void regs_extend_debug_liveness( regs_ctx *ctx ) {
 		int end = scope_end < 0 || scope_end >= nops ? jit->instr_count : jit->emit_pos_map[scope_end];
 		if( v->last_read < end ) v->last_read = end;
 	}
+	for(int i=jit->value_count;i<jit->value_count + jit->phi_count;i++) {
+		value_info *v = ctx->values + i;
+		if( !v->tracked ) continue;
+		for(int k=0;k<jit->live_ends_count;k++) {
+			value_info *a = VAL_REG(jit->live_ends[k<<1]);
+			if( a->tracked != v->tracked ) continue;
+			if( v->last_read < a->last_read ) v->last_read = a->last_read;
+		}
+	}
 }
 
 static void regs_assign_regs( regs_ctx *ctx ) {
@@ -918,7 +927,7 @@ void hl_regs_flush( jit_ctx *jit ) {
 		if( v->tracked && v->reg ) {
 			int start = ctx->pos_map[v->start];
 			if( v->id < 0 && start > 0 ) start--;
-			int end = v->id < 0 && v->last_read >= 0 ? ctx->pos_map[v->last_read] : end_pos;
+			int end = v->id < 0 && v->last_read >= 0 && v->last_read < jit->instr_count ? ctx->pos_map[v->last_read + 1] : end_pos;
 			int assign;
 			if( v->tracked < 0 )
 				assign = -v->tracked - 1;
