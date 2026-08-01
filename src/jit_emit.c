@@ -2210,7 +2210,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			}
 			STORE_MEM(st, (int)(int_val)&trap->tcheck, addr ? LOAD_MEM_PTR(LOAD_CONST_PTR(addr),offs) : LOAD_CONST_PTR(NULL));
 
-			void *fun = setjmp;
+			void *fun = SETJMP_FUN;
 			ereg args[2];
 			int nargs = 1;
 			args[0] = st;
@@ -2219,9 +2219,6 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			// the jump buffer and the frame pointer (or the stack pointer if there is no FP)
 			nargs = 2;
 			args[1] = emit_gen(ctx,LEA,MK_STACK_REG(0),UNUSED,M_PTR);
-#endif
-#ifdef HL_MINGW
-			fun = _setjmp;
 #endif
 			ereg ret = emit_native_call(ctx, fun, args, nargs, &hlt_i32);
 			emit_test(ctx, ret, OJNull);
