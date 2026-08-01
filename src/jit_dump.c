@@ -288,7 +288,7 @@ static void hl_dump_ptr_name( jit_ctx *ctx, void *ptr ) {
 		N2("null_field",hl_jit_null_field_access);
 		N2("null_access",hl_null_access);
 		N(hl_get_thread);
-		N(setjmp);
+		N2("setjmp",SETJMP_FUN);
 		N(_setjmp);
 		N2("assert",hl_jit_assert);
 		N(fmod);
