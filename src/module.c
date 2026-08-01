@@ -35,10 +35,6 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 
 #define HOT_RELOAD_EXTRA_GLOBALS	4096
 
-#ifdef HL_DEBUG
-#	define ALLOW_DUMP
-#endif
-
 HL_API void hl_prim_not_loaded( const uchar *err );
 
 static hl_module **cur_modules = NULL;
@@ -686,9 +682,10 @@ static void hl_module_add( hl_module *m ) {
 	free(old_modules);
 }
 
-int hl_module_init( hl_module *m, h_bool hot_reload ) {
+int hl_module_init( hl_module *m, int flags ) {
 	int i;
 	jit_ctx *ctx;
+	bool hot_reload = (flags & HL_MODULE_HOT_RELOAD) != 0;
 	// expand globals
 	if( hot_reload ) {
 		int nsize = m->globals_size + HOT_RELOAD_EXTRA_GLOBALS * sizeof(void*);
@@ -723,47 +720,18 @@ int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	if( ctx == NULL )
 		return 0;
 	hl_jit_init(ctx, m);
-#	ifdef ALLOW_DUMP
-	bool dump = false;
-	int filter = -1;
-	for(i=0;i<hl_setup.sys_nargs;i++) {
-		uchar *arg = hl_setup.sys_args[i];
-		if( ucmp(arg,USTR("--dump")) == 0 ) dump = true;
-		if( ucmp(arg,USTR("--dump-bin")) == 0 ) hl_jit_dump_bin = true;
-		if( memcmp(arg,USTR("--dump="),sizeof(USTR("--dump"))) == 0 ) {
-			dump = true;
-			filter = 0;
-			int pos = 7;
-			while( arg[pos] ) {
-				filter *= 16;
-				if( arg[pos] >= '0' && arg[pos] <= '9' )
-					filter |= arg[pos] - '0';
-				else
-					filter |= arg[pos] - 'A' + 10;
-				pos++;
-			}
-		}
-	}
-#	endif
+	bool dump = (flags & HL_MODULE_DUMP) != 0;
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
-#		ifdef ALLOW_DUMP
-		if( filter >= 0 && filter != f->findex ) continue;
-#		endif
 		int fpos = hl_jit_function(ctx, m, f);
 		if( fpos < 0 ) {
 			hl_jit_free(ctx, false);
 			return 0;
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
-#		ifdef ALLOW_DUMP
 		if( dump ) hl_emit_dump(ctx);
-#		endif
 	}
 	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
-#	ifdef ALLOW_DUMP
-	if( filter >= 0 ) exit(0);
-#	endif
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		m->functions_ptrs[f->findex] = ((unsigned char*)m->jit_code) + ((int_val)m->functions_ptrs[f->findex]);

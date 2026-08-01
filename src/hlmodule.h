@@ -162,8 +162,12 @@ const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
 
 typedef unsigned char h_bool;
+
+#define HL_MODULE_HOT_RELOAD 1
+#define HL_MODULE_DUMP 2
+
 hl_module *hl_module_alloc( hl_code *code );
-int hl_module_init( hl_module *m, h_bool hot_reload );
+int hl_module_init( hl_module *m, int flags );
 h_bool hl_module_patch( hl_module *m, hl_code *code );
 void hl_module_free( hl_module *m );
 h_bool hl_module_debug( hl_module *m, int port, h_bool wait );

@@ -60,8 +60,6 @@ static const char *op_names[] = {
 	"nop"
 };
 
-bool hl_jit_dump_bin = false;
-
 const char *hl_natreg_str( int reg, emit_mode m );
 
 const char *hl_emit_regstr( ereg v, emit_mode m ) {
@@ -552,10 +550,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			bool first = true;
 			while( cpos < ctx->code_size && cpos < ctx->code_pos_map[rpos+1] ) {
 				if( first ) {
-					if( hl_jit_dump_bin )
-						printf("\t\t\t");
-					else
-						printf("\033[80G");
+					printf("\t\t\t");
 					first = false;
 					if( new_op ) {
 						new_op = false;
