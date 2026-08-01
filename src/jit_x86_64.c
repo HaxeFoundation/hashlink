@@ -759,13 +759,72 @@ static void emit_vex( code_ctx *ctx, CpuOp op, ereg out, ereg a, ereg b ) {
 	}
 }
 
-static void emit_jump( code_ctx *ctx, int mode, int offset ) {
-	int op_mult = 24;
+#define OP_SIZE_NONE	0
+#define OP_SIZE_SMALL	16
+#define OP_SIZE_MEDIUM	32
+#define OP_SIZE_BIG		64
+
+static int max_op_size( einstr *e ) {
+	int size;
+	switch( e->op ) {
+	case LOAD_ARG:
+		size = OP_SIZE_NONE;
+		break;
+	case NOP:
+	case JUMP:
+	case JCOND:
+	case RET:
+	case PUSH:
+	case POP:
+	case PUSH_CONST:
+	case PUSH_ADDR:
+	case CALL_FUN:
+	case CALL_REG:
+	case CALL_PTR:
+	case DEBUG_BREAK:
+	case STACK_OFFS:
+	case PREFETCH:
+	case TEST:
+		size = OP_SIZE_SMALL;
+		break;
+	case MOV:
+	case XCHG:
+	case CXCHG:
+	case CMP:
+	case LEA:
+	case CONV:
+	case CONV_UNSIGNED:
+	case LOAD_CONST:
+	case LOAD_ADDR:
+	case LOAD_FUN:
+		size = OP_SIZE_MEDIUM;
+		break;
+	default:
+		size = OP_SIZE_BIG;
+		break;
+	}
 #	ifdef GEN_DEBUG
-	op_mult += 6; // additional debug info per op
+	size += 8; // additional debug info per op
 #	endif
-	if( IS_SBYTE(offset*op_mult) ) {
-		// assume it's ok to use short jump
+	return size;
+}
+
+static bool can_jump_short( code_ctx *ctx, int offset ) {
+	int target = ctx->cur_op + offset + 1;
+	if( target <= ctx->cur_op ) {
+		int pos = byte_count(ctx->code) + 1; // the offset byte follows the opcode
+		return IS_SBYTE(ctx->pos_map[target] - (pos + 1));
+	}
+	int size = 0;
+	for(int i=ctx->cur_op+1;i<target;i++) {
+		size += max_op_size(ctx->jit->reg_instrs + i);
+		if( !IS_SBYTE(size) ) return false;
+	}
+	return true;
+}
+
+static void emit_jump( code_ctx *ctx, int mode, int offset ) {
+	if( can_jump_short(ctx,offset) ) {
 		B(mode == JAlways ? JAlways_short : mode - 0x10);
 		int_arr_add(ctx->short_jumps, byte_count(ctx->code));
 		int_arr_add(ctx->short_jumps, ctx->cur_op + offset + 1);
