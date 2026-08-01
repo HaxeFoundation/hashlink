@@ -80,11 +80,6 @@ jobs:
             cmake_generator: Visual Studio 17 2022
 
           - target: windows
-            architecture: 32
-            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648055/ffmpeg-3.4.2-win32-dev.zip
-            architecture_string: Win32
-
-          - target: windows
             architecture: 64
             ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
             architecture_string: x64
@@ -433,9 +428,6 @@ jobs:
         include:
         - architecture: arm64
           test-flags: --skip-hl-jit # not yet supported
-
-        - architecture: x86_32
-          test-flags: --skip-hl-jit --msbuild-platform x86 -D hlgen.build.architecture=x86_32 # not stable
 
         - os: linux
           runner: ubuntu-latest
