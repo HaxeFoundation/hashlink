@@ -227,6 +227,8 @@ struct _jit_ctx {
 	eblock *blocks;
 	int *values_writes;
 	int *values_track;
+	int live_ends_count;
+	int *live_ends;
 	int *emit_pos_map;
 	// regs output
 	int reg_instr_count;

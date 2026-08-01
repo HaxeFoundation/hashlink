@@ -209,6 +209,7 @@ int main(int argc, pchar *argv[]) {
 	char *error_msg = NULL;
 	int debug_port = -1;
 	bool debug_wait = false;
+	bool debug_opt = false;
 	bool hot_reload = false;
 	bool dump = false;
 	int profile_count = -1;
@@ -228,6 +229,10 @@ int main(int argc, pchar *argv[]) {
 		}
 		if( pcompare(arg,PSTR("--debug-wait")) == 0 ) {
 			debug_wait = true;
+			continue;
+		}
+		if( pcompare(arg,PSTR("--debug-opt")) == 0 ) {
+			debug_opt = true;
 			continue;
 		}
 		if( pcompare(arg,PSTR("--version")) == 0 ) {
@@ -294,7 +299,7 @@ int main(int argc, pchar *argv[]) {
 	ctx.m = hl_module_alloc(ctx.code);
 	if( ctx.m == NULL )
 		return 2;
-	if( !hl_module_init(ctx.m,(hot_reload?HL_MODULE_HOT_RELOAD:0) | (dump?HL_MODULE_DUMP:0)) )
+	if( !hl_module_init(ctx.m,(hot_reload?HL_MODULE_HOT_RELOAD:0) | (dump?HL_MODULE_DUMP:0) | (debug_port > 0 && !debug_opt?HL_MODULE_DEBUG_VARS:0)) )
 		return 3;
 	if( hot_reload ) {
 		ctx.file_time = pfiletime(ctx.file);
