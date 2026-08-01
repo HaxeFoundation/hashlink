@@ -54,6 +54,9 @@ struct hl_function {
 	hl_opcode *ops;
 	int *debug;
 	int *assigns;
+#	define ASSIGN_NAME(f,i)		((f)->assigns[(i)*3])
+#	define ASSIGN_POS(f,i)		((f)->assigns[(i)*3+1])
+#	define ASSIGN_SCOPE_END(f,i)	((f)->assigns[(i)*3+2])
 
 	hl_type_obj *obj;
 	union {
@@ -142,6 +145,7 @@ typedef struct {
 	hl_code_hash *hash;
 	hl_debug_infos *jit_debug;
 	jit_ctx *jit_ctx;
+	bool debug_vars;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
 	int unwind_table_size;
@@ -165,6 +169,7 @@ typedef unsigned char h_bool;
 
 #define HL_MODULE_HOT_RELOAD 1
 #define HL_MODULE_DUMP 2
+#define HL_MODULE_DEBUG_VARS 4
 
 hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m, int flags );
