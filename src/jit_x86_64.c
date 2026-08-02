@@ -1458,6 +1458,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
 				W(0);
 			}
+			if( ctx->jit->mod->debug ) emit_mov(ctx, MK_ADDR(RSP,-HL_WSIZE), R(RBP), M_PTR);
 			break;
 		case CALL_PTR:
 			if( e->value == (uint64)hl_null_access || e->value == (uint64)hl_jit_null_field_access ) {
@@ -1479,6 +1480,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case CALL_REG:
 			EMIT(_CALL, e->a, UNUSED, M_NONE);
+			if( ctx->jit->mod->debug ) emit_mov(ctx, MK_ADDR(RSP,-HL_WSIZE), R(RBP), M_PTR);
 			break;
 		case TEST:
 			if( IS_FLOAT(e->mode) )

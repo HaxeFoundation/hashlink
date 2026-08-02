@@ -530,7 +530,7 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 		if( !ctx->in_args && ctx->current_assign < ctx->fun->nassigns && ASSIGN_POS(ctx->fun,ctx->current_assign) == ctx->op_pos ) {
 			int_arr_add(ctx->values_track,ctx->current_assign);
 			int_arr_add(ctx->values_track,v);
-			if( ctx->mod->debug_vars ) {
+			if( ctx->mod->debug ) {
 				int_arr_add(ctx->live_ends,v);
 				int_arr_add(ctx->live_ends,ASSIGN_SCOPE_END(ctx->fun,ctx->current_assign));
 			}
@@ -1103,7 +1103,7 @@ void hl_emit_function( jit_ctx *jit ) {
 		// so assigns cannot be paired with arguments positionally
 		int_arr_add(ctx->values_track,-(i+2));
 		int_arr_add(ctx->values_track,r);
-		if( ctx->mod->debug_vars ) {
+		if( ctx->mod->debug ) {
 			int_arr_add(ctx->live_ends,r);
 			int_arr_add(ctx->live_ends,-1);
 		}
