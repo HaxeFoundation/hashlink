@@ -82,6 +82,9 @@ static void hl_debug_loop() {
 
 		int nmodules;
 		hl_module **mods = hl_get_modules(&nmodules);
+
+		send(&hl_jit_trampoline,4);
+
 		send(&nmodules,4);
 		for(int i=0;i<nmodules;i++) {
 			hl_module *m = mods[i];

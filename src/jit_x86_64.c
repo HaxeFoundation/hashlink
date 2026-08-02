@@ -838,6 +838,8 @@ static void emit_jump( code_ctx *ctx, int mode, int offset ) {
 	}
 }
 
+#define TRAMPOLINE_STACK_ARGS	32
+
 #define RTMP R(R11)
 static ereg get_tmp( emit_mode mode ) {
 	if( IS_FLOAT(mode) ) 
@@ -1467,11 +1469,18 @@ void hl_codegen_function( jit_ctx *jit ) {
 				B(0xE9);
 				W(target - (jit->out_pos + byte_count(ctx->code) + 4));
 			} else {
-				// call near indirect
-				B(0xFF);
-				B(0x15);
-				W(0);
-				alloc_const(ctx, (uint64)e->value);
+				if( jit->mod->debug && e->size_offs <= TRAMPOLINE_STACK_ARGS && hl_jit_is_callback((void*)e->value) ) {
+					// call through the trampoline
+					emit_ext(ctx,_MOV,RTMP,VAL_CONST,M_PTR,(int_val)e->value);
+					B(0xE8);
+					W(jit->code_funs.trampoline - (jit->out_pos + byte_count(ctx->code) + 4));
+				} else {
+					// call near indirect
+					B(0xFF);
+					B(0x15);
+					W(0);
+					alloc_const(ctx, (uint64)e->value);
+				}
 				if( e->mode == M_UI8 || e->mode == M_UI16 ) {
 					// clear value upper bits
 					EMIT(e->mode == M_UI8 ? MOVZX8 : MOVZX16,R(RAX),R(RAX),M_PTR);
@@ -1938,7 +1947,39 @@ void hl_codegen_init( jit_ctx *jit ) {
 	
 	flush_function(ctx, jit->code_funs.hl2c);
 
-	
+	// generate the trampoline, entered with [rsp] = call site and R11 = the native
+	if( jit->mod->debug ) {
+		int shadow = IS_WINCALL64 ? 0x20 : 0;
+		int nregs = cfg->regs.npersists + cfg->floats.npersists;
+		int regs_size = nregs * HL_WSIZE;
+		regs_size += jit_pad_size(regs_size,cfg->stack_align);
+		int frame = shadow + TRAMPOLINE_STACK_ARGS + regs_size;
+
+		byte_reserve(ctx->code,1024);
+		ctx->code.cur -= 1024;
+		jit->code_funs.trampoline = jit->out_pos + byte_count(ctx->code);
+
+		EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
+		EMIT(SUB,R(RSP),MK_CONST(frame),M_PTR);
+		for(int i=0;i<nregs;i++) {
+			bool is_float = i >= cfg->regs.npersists;
+			ereg r = is_float ? cfg->floats.persist[i - cfg->regs.npersists] : cfg->regs.persist[i];
+			emit_mov(ctx, MK_ADDR(RSP,shadow + TRAMPOLINE_STACK_ARGS + i * HL_WSIZE), r, is_float ? M_F64 : M_PTR);
+		}
+		for(int i=0;i<TRAMPOLINE_STACK_ARGS;i+=HL_WSIZE) {
+			EMIT(_MOV,R(R10),MK_ADDR(RSP,frame + shadow + HL_WSIZE * 2 + i),M_PTR);
+			emit_mov(ctx, MK_ADDR(RSP,shadow + i), R(R10), M_PTR);
+		}
+		EMIT(_CALL,RTMP,UNUSED,M_PTR);
+		hl_jit_trampoline = jit->out_pos + byte_count(ctx->code);
+		emit_mov(ctx, MK_ADDR(RSP,-HL_WSIZE), R(RBP), M_PTR);
+		EMIT(ADD,R(RSP),MK_CONST(frame),M_PTR);
+		EMIT(_POP,R(RBP),UNUSED,M_PTR);
+		EMIT(_RET,UNUSED,UNUSED,M_NONE);
+
+		flush_function(ctx, jit->code_funs.trampoline);
+	}
+
 	hl_codegen_flush(jit);
 }
 

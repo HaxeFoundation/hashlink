@@ -20,8 +20,22 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <jit.h>
+#include "data_struct.h"
 
 static jit_ctx *current_ctx = NULL;
+
+int hl_jit_trampoline = -1;
+
+static hl_alloc callback_alloc = {0};
+static ptr_set callback_natives = {0};
+
+void hl_jit_tag_callback( void *native ) {
+	ptr_set_add_impl(&callback_alloc,&callback_natives,native);
+}
+
+bool hl_jit_is_callback( void *native ) {
+	return ptr_set_exists(callback_natives,native);
+}
 
 void hl_jit_error( const char *msg, const char *func, int line ) {
 	printf("*** JIT ERROR %s:%d (%s)****\n", func, line, msg);
@@ -113,6 +127,8 @@ static bool jit_code_append( jit_ctx *ctx ) {
 
 void hl_jit_init( jit_ctx *ctx, hl_module *m ) {
 	ctx->mod = m;
+	hl_jit_tag_callback(hl_dyn_call);
+	hl_jit_tag_callback(hl_dyn_call_obj);
 #ifdef WIN64_UNWIND_TABLES
 	unsigned char version = 1;
 	unsigned char flags = 0;

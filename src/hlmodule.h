@@ -171,6 +171,9 @@ typedef unsigned char h_bool;
 #define HL_MODULE_DUMP 2
 #define HL_MODULE_DEBUG 4
 
+extern int hl_jit_trampoline;
+void hl_jit_tag_callback( void *native );
+
 hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m, int flags );
 h_bool hl_module_patch( hl_module *m, hl_code *code );

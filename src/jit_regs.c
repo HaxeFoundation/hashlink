@@ -773,6 +773,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			}
 			flush_movs(ctx,0);
 			e.nargs = 0xFF;
+			e.size_offs = stack_args;
 			if( vout && vout->last_read > cur_op ) 
 				ret_val = &REG_CFG(REG_MODE(e.mode))->ret;
 			else if( e.mode != M_NORET ) {
