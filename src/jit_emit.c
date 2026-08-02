@@ -1115,6 +1115,8 @@ void hl_emit_function( jit_ctx *jit ) {
 
 	for(int op_pos=0;op_pos<f->nops;op_pos++) {
 		ctx->op_pos = op_pos;
+		while( ctx->current_assign < f->nassigns && ASSIGN_POS(f,ctx->current_assign) < op_pos )
+			ctx->current_assign++;
 		if( ctx->emit_pos > 0 && ctx->instrs[ctx->emit_pos-1].op == BLOCK )
 			ctx->pos_map[op_pos] = ctx->emit_pos-1;
 		else
