@@ -145,6 +145,7 @@ struct _emit_ctx {
 	int_arr null_checks;
 	int_arr values_track;
 	int_arr live_ends;
+	int_arr debug_scopes;
 	int current_assign;
 	bool in_args;
 
@@ -531,8 +532,11 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 			int_arr_add(ctx->values_track,ctx->current_assign);
 			int_arr_add(ctx->values_track,v);
 			if( ctx->mod->debug ) {
+				int scope_end = ASSIGN_SCOPE_END(ctx->fun,ctx->current_assign);
 				int_arr_add(ctx->live_ends,v);
-				int_arr_add(ctx->live_ends,ASSIGN_SCOPE_END(ctx->fun,ctx->current_assign));
+				int_arr_add(ctx->live_ends,scope_end);
+				int_arr_add(ctx->debug_scopes,to->id);
+				int_arr_add(ctx->debug_scopes,scope_end);
 			}
 			ctx->current_assign++;
 		}
@@ -661,6 +665,16 @@ static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r ) {
 
 static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
 	return emit_load_reg_block(ctx, ctx->current_block, r);
+}
+
+static void emit_debug_scope_phis( emit_ctx *ctx ) {
+	int count = int_arr_count(ctx->debug_scopes) >> 1;
+	int nops = ctx->fun->nops;
+	for(int i=0;i<count;i++) {
+		int scope_end = int_arr_get(ctx->debug_scopes,(i<<1)|1);
+		if( scope_end >= 0 && scope_end < nops && scope_end <= ctx->op_pos ) continue;
+		emit_load_reg_block(ctx, ctx->current_block, R(int_arr_get(ctx->debug_scopes,i<<1)));
+	}
 }
 
 static void seal_block( emit_ctx *ctx, emit_block *b ) {
@@ -1063,6 +1077,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	int_arr_free(&ctx->null_checks);
 	int_arr_free(&ctx->values_track);
 	int_arr_free(&ctx->live_ends);
+	int_arr_free(&ctx->debug_scopes);
 	blocks_free(&ctx->blocks);
 	int_arr_add(ctx->values,-1);
 	ctx->current_block = alloc_block(ctx);
@@ -1134,6 +1149,8 @@ void hl_emit_function( jit_ctx *jit ) {
 			}
 			if( ctx->trap_count && ctx->traps[ctx->trap_count-1].target == ctx->op_pos )
 				ctx->trap_count--;
+			if( ctx->mod->debug && blocks_count(ctx->current_block->preds) > 1 )
+				emit_debug_scope_phis(ctx);
 		}
 		emit_opcode(ctx,f->ops + op_pos);
 	}
