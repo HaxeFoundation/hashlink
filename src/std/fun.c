@@ -426,7 +426,7 @@ DEFINE_PRIM(_DYN, make_closure, _DYN _DYN);
 DEFINE_PRIM(_DYN, get_closure_value, _DYN);
 DEFINE_PRIM(_BOOL, fun_compare, _DYN _DYN);
 DEFINE_PRIM(_DYN, make_var_args, _FUN(_DYN,_ARR));
-DEFINE_PRIM(_DYN, call_method, _DYN _ARR);
+DEFINE_PRIM(_DYN HL_CALLB, call_method, _DYN _ARR);
 DEFINE_PRIM(_BOOL, is_prim_loaded, _DYN);
 
 #if defined(HL_VCC) && !defined(HL_XBO)

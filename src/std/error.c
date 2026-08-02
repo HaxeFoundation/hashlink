@@ -58,6 +58,12 @@ HL_PRIM void hl_set_error_handler( vclosure *d ) {
 	t->exc_handler = d;
 }
 
+static void capture_break_context( hl_thread_info *t ) {
+	t->break_rip = NULL;
+	if( hl_setup.capture_break_context )
+		hl_setup.capture_break_context(&t->break_rip,t->break_regs);
+}
+
 static bool break_on_trap( hl_thread_info *t, hl_trap_ctx *trap, vdynamic *v ) {
 	bool unwrapped = false;
 	vdynamic *vvalue = NULL;
@@ -95,7 +101,9 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	call_handler = trap == t->trap_uncaught || t->trap_current == NULL;
 	if( (t->flags&HL_EXC_CATCH_ALL) || break_on_trap(t,trap,v) ) {
 		t->flags |= HL_EXC_IS_THROW;
+		capture_break_context(t);
 		hl_debug_break();
+		t->break_rip = NULL;
 		t->flags &= ~HL_EXC_IS_THROW;
 	}
 	if( trap == t->trap_uncaught ) t->trap_uncaught = NULL;
@@ -234,7 +242,10 @@ HL_PRIM void hl_fatal_fmt( const char *file, int line, const char *fmt, ...) {
 #	pragma optimize( "", off )
 #endif
 HL_PRIM HL_NO_OPT void hl_breakpoint() {
+	hl_thread_info *t = hl_get_thread();
+	capture_break_context(t);
 	hl_debug_break();
+	t->break_rip = NULL;
 }
 #ifdef HL_VCC
 #	pragma optimize( "", on )
@@ -284,7 +295,10 @@ HL_PRIM bool hl_detect_debugger() {
 #	pragma optimize( "", off )
 #endif
 HL_PRIM HL_NO_OPT void hl_assert() {
+	hl_thread_info *t = hl_get_thread();
+	capture_break_context(t);
 	hl_debug_break();
+	t->break_rip = NULL;
 	hl_error("assert");
 }
 #ifdef HL_VCC

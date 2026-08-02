@@ -257,6 +257,42 @@ static int module_capture_stack( void **stack, int size ) {
 #endif
 }
 
+static bool module_is_jit_code( void *addr ) {
+	for(int i=0;i<modules_count;i++) {
+		hl_module *m = cur_modules[i];
+		unsigned char *code = m->jit_code;
+		if( addr >= (void*)code && addr < (void*)(code + m->codesize) )
+			return true;
+	}
+	return false;
+}
+
+static bool module_capture_break_context( void **rip, void **regs ) {
+#ifdef WIN64_UNWIND_TABLES
+	CONTEXT c;
+	RtlCaptureContext(&c);
+	while( !module_is_jit_code((void*)c.Rip) ) {
+		DWORD64 base;
+		PRUNTIME_FUNCTION fn_entry = RtlLookupFunctionEntry(c.Rip, &base, NULL);
+		if( !fn_entry ) return false;
+		void *handler_data;
+		ULONG64 establisher_frame;
+		RtlVirtualUnwind(0, base, c.Rip, fn_entry, &c, &handler_data, &establisher_frame, NULL);
+		if( c.Rip == 0 ) return false;
+	}
+	*rip = (void*)c.Rip;
+	regs[0] = (void*)c.Rax; regs[1] = (void*)c.Rcx; regs[2] = (void*)c.Rdx; regs[3] = (void*)c.Rbx;
+	regs[4] = (void*)c.Rsp; regs[5] = (void*)c.Rbp; regs[6] = (void*)c.Rsi; regs[7] = (void*)c.Rdi;
+	regs[8] = (void*)c.R8; regs[9] = (void*)c.R9; regs[10] = (void*)c.R10; regs[11] = (void*)c.R11;
+	regs[12] = (void*)c.R12; regs[13] = (void*)c.R13; regs[14] = (void*)c.R14; regs[15] = (void*)c.R15;
+	for(int i=0;i<16;i++)
+		regs[16+i] = (void*)((M128A*)&c.Xmm0)[i].Low;
+	return true;
+#else
+	return false;
+#endif
+}
+
 static void hl_module_types_dump( void (*fdump)( void *, int) ) {
 	int ntypes = 0;
 	int i, j, fcount = 0;
@@ -618,8 +654,15 @@ static void hl_module_init_natives( hl_module *m ) {
 		p = tmp;
 		append_type(&p,n->t);
 		*p++ = 0;
-		if( sign && memcmp(sign,tmp,strlen(sign)+1) != 0 )
-			hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
+		if( sign ) {
+			int slen = (int)strlen(sign);
+			if( slen && sign[slen-1] == *HL_CALLB ) {
+				hl_jit_tag_callback(m->functions_ptrs[n->findex]);
+				slen--;
+			}
+			if( slen != (int)strlen(tmp) || memcmp(sign,tmp,slen) != 0 )
+				hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
+		}
 	}
 }
 
@@ -714,9 +757,9 @@ int hl_module_init( hl_module *m, int flags ) {
 	ctx = hl_jit_alloc();
 	if( ctx == NULL )
 		return 0;
-	hl_jit_init(ctx, m);
 	bool dump = (flags & HL_MODULE_DUMP) != 0;
 	m->debug = (flags & HL_MODULE_DEBUG) != 0;
+	hl_jit_init(ctx, m);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		int fpos = hl_jit_function(ctx, m, f);
@@ -740,6 +783,7 @@ int hl_module_init( hl_module *m, int flags ) {
 	hl_module_add(m);
 	hl_setup.resolve_symbol = module_resolve_symbol;
 	hl_setup.capture_stack = module_capture_stack;
+	hl_setup.capture_break_context = module_capture_break_context;
 	hl_gc_set_dump_types(hl_module_types_dump);
 #	ifdef HL_VTUNE
 	hl_setup.vtune_init = modules_init_vtune;
