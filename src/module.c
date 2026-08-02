@@ -716,7 +716,7 @@ int hl_module_init( hl_module *m, int flags ) {
 		return 0;
 	hl_jit_init(ctx, m);
 	bool dump = (flags & HL_MODULE_DUMP) != 0;
-	m->debug_vars = (flags & HL_MODULE_DEBUG_VARS) != 0 && m->code->hasdebug && m->code->version >= 6;
+	m->debug = (flags & HL_MODULE_DEBUG) != 0;
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		int fpos = hl_jit_function(ctx, m, f);

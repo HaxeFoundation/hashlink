@@ -145,7 +145,7 @@ typedef struct {
 	hl_code_hash *hash;
 	hl_debug_infos *jit_debug;
 	jit_ctx *jit_ctx;
-	bool debug_vars;
+	bool debug;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
 	int unwind_table_size;
@@ -169,7 +169,7 @@ typedef unsigned char h_bool;
 
 #define HL_MODULE_HOT_RELOAD 1
 #define HL_MODULE_DUMP 2
-#define HL_MODULE_DEBUG_VARS 4
+#define HL_MODULE_DEBUG 4
 
 hl_module *hl_module_alloc( hl_code *code );
 int hl_module_init( hl_module *m, int flags );

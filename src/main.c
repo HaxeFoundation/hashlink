@@ -299,7 +299,7 @@ int main(int argc, pchar *argv[]) {
 	ctx.m = hl_module_alloc(ctx.code);
 	if( ctx.m == NULL )
 		return 2;
-	if( !hl_module_init(ctx.m,(hot_reload?HL_MODULE_HOT_RELOAD:0) | (dump?HL_MODULE_DUMP:0) | (debug_port > 0 && !debug_opt?HL_MODULE_DEBUG_VARS:0)) )
+	if( !hl_module_init(ctx.m,(hot_reload?HL_MODULE_HOT_RELOAD:0) | (dump?HL_MODULE_DUMP:0) | (debug_port > 0 && !debug_opt?HL_MODULE_DEBUG:0)) )
 		return 3;
 	if( hot_reload ) {
 		ctx.file_time = pfiletime(ctx.file);
