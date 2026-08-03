@@ -34,10 +34,13 @@
 
 int hl_emit_mode_sizes[] = {0,1,2,4,HL_WSIZE,8,4,0,0};
 
+#define SCOPE_NONE	-2
+
 typedef struct {
 	hl_type *t;
 	int id;
 	ereg stored;
+	int scope_end;
 } vreg;
 
 #define MAX_TMP_ARGS	32
@@ -145,7 +148,7 @@ struct _emit_ctx {
 	int_arr null_checks;
 	int_arr values_track;
 	int_arr live_ends;
-	int_arr debug_scopes;
+	int_arr debug_live;
 	int current_assign;
 	bool in_args;
 
@@ -535,8 +538,11 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 				int scope_end = ASSIGN_SCOPE_END(ctx->fun,ctx->current_assign);
 				int_arr_add(ctx->live_ends,v);
 				int_arr_add(ctx->live_ends,scope_end);
-				int_arr_add(ctx->debug_scopes,to->id);
-				int_arr_add(ctx->debug_scopes,scope_end);
+				if( scope_end >= 0 ) {
+					if( to->scope_end == SCOPE_NONE )
+						int_arr_add(ctx->debug_live,to->id);
+					to->scope_end = scope_end;
+				}
 			}
 			ctx->current_assign++;
 		}
@@ -668,13 +674,21 @@ static ereg emit_load_reg( emit_ctx *ctx, vreg *r ) {
 }
 
 static void emit_debug_scope_phis( emit_ctx *ctx ) {
-	int count = int_arr_count(ctx->debug_scopes) >> 1;
+	int count = int_arr_count(ctx->debug_live);
 	int nops = ctx->fun->nops;
+	int w = 0;
 	for(int i=0;i<count;i++) {
-		int scope_end = int_arr_get(ctx->debug_scopes,(i<<1)|1);
-		if( scope_end >= 0 && scope_end < nops && scope_end <= ctx->op_pos ) continue;
-		emit_load_reg_block(ctx, ctx->current_block, R(int_arr_get(ctx->debug_scopes,i<<1)));
+		int id = int_arr_get(ctx->debug_live,i);
+		vreg *r = R(id);
+		int scope_end = r->scope_end;
+		if( scope_end >= 0 && scope_end < nops && scope_end <= ctx->op_pos ) {
+			r->scope_end = SCOPE_NONE;
+			continue;
+		}
+		*int_arr_addr(ctx->debug_live,w++) = id;
+		emit_load_reg_block(ctx, ctx->current_block, r);
 	}
+	ctx->debug_live.cur = w;
 }
 
 static void seal_block( emit_ctx *ctx, emit_block *b ) {
@@ -1077,7 +1091,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	int_arr_free(&ctx->null_checks);
 	int_arr_free(&ctx->values_track);
 	int_arr_free(&ctx->live_ends);
-	int_arr_free(&ctx->debug_scopes);
+	int_arr_free(&ctx->debug_live);
 	blocks_free(&ctx->blocks);
 	int_arr_add(ctx->values,-1);
 	ctx->current_block = alloc_block(ctx);
@@ -1104,6 +1118,7 @@ void hl_emit_function( jit_ctx *jit ) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
 		r->stored = UNUSED;
+		r->scope_end = SCOPE_NONE;
 	}
 
 	emit_gen_size(ctx, BLOCK, 0);
@@ -1149,7 +1164,7 @@ void hl_emit_function( jit_ctx *jit ) {
 			}
 			if( ctx->trap_count && ctx->traps[ctx->trap_count-1].target == ctx->op_pos )
 				ctx->trap_count--;
-			if( ctx->mod->debug && blocks_count(ctx->current_block->preds) > 1 )
+			if( ctx->mod->debug && f->ops[op_pos].op != OLabel && blocks_count(ctx->current_block->preds) > 1 )
 				emit_debug_scope_phis(ctx);
 		}
 		emit_opcode(ctx,f->ops + op_pos);
@@ -1968,6 +1983,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case OLabel:
 		split_block(ctx);
 		prepare_loop_block(ctx);
+		if( ctx->mod->debug && (!ctx->current_block->sealed || blocks_count(ctx->current_block->preds) > 1) )
+			emit_debug_scope_phis(ctx);
 		break;
 	case OGetI8:
 	case OGetI16:
