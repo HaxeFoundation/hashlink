@@ -63,7 +63,7 @@ static const char *op_names[] = {
 const char *hl_natreg_str( int reg, emit_mode m );
 
 const char *hl_emit_regstr( ereg v, emit_mode m ) {
-	static char fmts[4][10];
+	static char fmts[4][32];
 	static int flip = 0;
 	// allow up to four concurrent val_str
 	char *fmt = fmts[flip++&3];
