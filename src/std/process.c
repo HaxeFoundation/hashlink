@@ -186,14 +186,20 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 HL_PRIM int hl_process_stdout_read( vprocess *p, vbyte *str, int pos, int len ) {
 #	ifdef HL_WIN
 	DWORD nbytes;
-	if( !ReadFile(p->oread,str+pos,len,&nbytes,NULL) )
+	BOOL ret;
+	hl_blocking(true);
+	ret = ReadFile(p->oread,str+pos,len,&nbytes,NULL);
+	hl_blocking(false);
+	if( !ret )
 		return -1;
 	return nbytes;
 #	else
 	int nbytes;
+	hl_blocking(true);
 	do {
 		nbytes = read(p->oread,str+pos,len);
 	} while (nbytes == -1 && errno == EINTR);
+	hl_blocking(false);
 	if( nbytes <= 0 )
 		return -1;
 	return nbytes;
@@ -203,14 +209,20 @@ HL_PRIM int hl_process_stdout_read( vprocess *p, vbyte *str, int pos, int len ) 
 HL_PRIM int hl_process_stderr_read( vprocess *p, vbyte *str, int pos, int len ) {
 #	ifdef HL_WIN
 	DWORD nbytes;
-	if( !ReadFile(p->eread,str+pos,len,&nbytes,NULL) )
+	BOOL ret;
+	hl_blocking(true);
+	ret = ReadFile(p->eread,str+pos,len,&nbytes,NULL);
+	hl_blocking(false);
+	if( !ret )
 		return -1;
 	return nbytes;
 #	else
 	int nbytes;
+	hl_blocking(true);
 	do {
 		nbytes = read(p->eread,str+pos,len);
 	} while (nbytes == -1 && errno == EINTR);
+	hl_blocking(false);
 	if( nbytes <= 0 )
 		return -1;
 	return nbytes;
@@ -220,14 +232,20 @@ HL_PRIM int hl_process_stderr_read( vprocess *p, vbyte *str, int pos, int len ) 
 HL_PRIM int hl_process_stdin_write( vprocess *p, vbyte *str, int pos, int len ) {
 #	ifdef HL_WIN
 	DWORD nbytes;
-	if( !WriteFile(p->iwrite,str+pos,len,&nbytes,NULL) )
+	BOOL ret;
+	hl_blocking(true);
+	ret = WriteFile(p->iwrite,str+pos,len,&nbytes,NULL);
+	hl_blocking(false);
+	if( !ret )
 		return -1;
 	return nbytes;
 #	else
 	int nbytes;
+	hl_blocking(true);
 	do {
 		nbytes = write(p->iwrite,str+pos,len);
 	} while (nbytes == -1 && errno == EINTR);
+	hl_blocking(false);
 	if( nbytes < 0 )
 		return -1;
 	return nbytes;
@@ -250,8 +268,11 @@ HL_PRIM bool hl_process_stdin_close( vprocess *p ) {
 HL_PRIM int hl_process_exit( vprocess *p, bool *running ) {
 #	ifdef HL_WIN
 	DWORD rval;
-	if( !running )
+	if( !running ) {
+		hl_blocking(true);
 		WaitForSingleObject(p->pinf.hProcess,INFINITE);
+		hl_blocking(false);
+	}
 	if( !GetExitCodeProcess(p->pinf.hProcess,&rval) )
 		return -1;
 	if( running ) {
@@ -261,7 +282,10 @@ HL_PRIM int hl_process_exit( vprocess *p, bool *running ) {
 	return rval;
 #	else
 	int rval = 0;
-	int wret = waitpid(p->pid,&rval,running ? WNOHANG : 0);
+	int wret;
+	if( !running ) hl_blocking(true);
+	wret = waitpid(p->pid,&rval,running ? WNOHANG : 0);
+	if( !running ) hl_blocking(false);
 	if( running ) *running = false;
 	if( wret != p->pid ) {
 		if( running ) {
