@@ -2,13 +2,6 @@
 #include <hl.h>
 #undef _GUID
 
-#ifdef HL_STREAMLINE
-#pragma comment(lib, "sl.interposer.lib")
-#else
-#pragma comment(lib, "D3D12.lib")
-#pragma comment(lib, "dxgi.lib")
-#endif
-
 #ifdef HL_WIN_DESKTOP
 #include <dxgi.h>
 #include <dxgi1_5.h>
@@ -290,22 +283,43 @@ static int CURRENT_NODEMASK = 0;
 static LARGE_INTEGER driver_version = {0};
 
 typedef ID3D12Device2 dx_device;
+typedef IDXGIFactory4 dx_factory;
+typedef IDXGIAdapter dx_adapter;
 
 #define _DEVICE _ABSTRACT(dx_device)
+#define _FACTORY _ABSTRACT(dx_factory)
+#define _ADAPTER _ABSTRACT(dx_adapter)
 
 HL_PRIM ID3D12Device* HL_NAME(get_device)() {
 	dx_driver* drv = static_driver;
 	return drv->device;
 }
 
-typedef IDXGIAdapter dx_adapter;
-
-#define _ADAPTER _ABSTRACT(dx_adapter)
+HL_PRIM IDXGIFactory4* HL_NAME(get_factory)() {
+	dx_driver* drv = static_driver;
+	return drv->factory;
+}
 
 HL_PRIM IDXGIAdapter* HL_NAME(get_adapter)() {
 	dx_driver* drv = static_driver;
 	return drv->adapter;
 }
+
+HL_PRIM void HL_NAME(set_device)(ID3D12Device2* device) {
+	dx_driver* drv = static_driver;
+	drv->device = device;
+}
+
+HL_PRIM void HL_NAME(set_factory)(IDXGIFactory4* factory) {
+	dx_driver* drv = static_driver;
+	drv->factory = factory;
+}
+
+DEFINE_PRIM(_DEVICE, get_device, _NO_ARG);
+DEFINE_PRIM(_FACTORY, get_factory, _NO_ARG);
+DEFINE_PRIM(_ADAPTER, get_adapter, _NO_ARG);
+DEFINE_PRIM(_VOID, set_device, _DEVICE);
+DEFINE_PRIM(_VOID, set_factory, _FACTORY);
 
 HL_PRIM void dx12_flush_messages();
 
@@ -456,17 +470,18 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *de
 	if (GpuCrashTracker::s_pfnOnGpuCrashFile)
 		drv->gpuCrashTracker = new GpuCrashTracker(drv->device);
 
-	{
-		D3D12_COMMAND_QUEUE_DESC desc = {};
-		desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-		desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		desc.NodeMask = CURRENT_NODEMASK;
-		CHKERR(drv->device->CreateCommandQueue(&desc, IID_PPV_ARGS(&drv->commandQueue)));
-	}
-
 	static_driver = drv;
 	return drv;
+}
+
+HL_PRIM void HL_NAME(create_command_queue)() {
+	dx_driver* drv = static_driver;
+	D3D12_COMMAND_QUEUE_DESC desc = {};
+	desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+	desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	desc.NodeMask = CURRENT_NODEMASK;
+	CHKERR(drv->device->CreateCommandQueue(&desc, IID_PPV_ARGS(&drv->commandQueue)));
 }
 
 #ifdef HL_XBS
@@ -654,8 +669,7 @@ HL_PRIM void HL_NAME(query_video_memory_info)( int group, void *mem ) {
 
 DEFINE_PRIM(_ARR, list_devices, _NO_ARG);
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _BYTES);
-DEFINE_PRIM(_DEVICE, get_device, _NO_ARG);
-DEFINE_PRIM(_ADAPTER, get_adapter, _NO_ARG);
+DEFINE_PRIM(_VOID, create_command_queue, _NO_ARG);
 DEFINE_PRIM(_VOID, resize, _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, present, _BOOL);
 DEFINE_PRIM(_VOID, suspend, _NO_ARG);

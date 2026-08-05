@@ -8,6 +8,8 @@ typedef Device = hl.Abstract<"dx_device">;
 
 typedef Adapter = hl.Abstract<"dx_adapter">;
 
+typedef Factory = hl.Abstract<"dx_factory">;
+
 enum DriverInitFlag {
 	DEBUG;
 	GPU_BASED_VALIDATION;
@@ -1665,12 +1667,25 @@ class Dx12 {
 		return dxCreate(@:privateAccess win.win, flags, deviceName == null ? null : @:privateAccess deviceName.bytes);
 	}
 
+	public static function createCommandQueue() {
+	}
+
 	public static function getDevice() : Device {
+		return null;
+	}
+
+	public static function getFactory() : Factory {
 		return null;
 	}
 
 	public static function getAdapter() : Adapter {
 		return null;
+	}
+
+	public static function setDevice(device : Device) {
+	}
+
+	public static function setFactory(factory : Factory) {
 	}
 
 	public static function flushMessages() {
