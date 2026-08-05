@@ -8,7 +8,7 @@ typedef Device = hl.Abstract<"dx_device">;
 
 typedef Adapter = hl.Abstract<"dx_adapter">;
 
-typedef DxRef = hl.Abstract<"dx_ref">;
+typedef Factory = hl.Abstract<"dx_factory">;
 
 enum DriverInitFlag {
 	DEBUG;
@@ -1674,16 +1674,18 @@ class Dx12 {
 		return null;
 	}
 
-	public static function getDeviceRef() : DxRef {
-		return null;
-	}
-
-	public static function getFactoryRef() : DxRef {
+	public static function getFactory() : Factory {
 		return null;
 	}
 
 	public static function getAdapter() : Adapter {
 		return null;
+	}
+
+	public static function setDevice(device : Device) {
+	}
+
+	public static function setFactory(factory : Factory) {
 	}
 
 	public static function flushMessages() {
