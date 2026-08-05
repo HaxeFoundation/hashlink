@@ -229,7 +229,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib;D3D12.lib;dxgi.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugAll|x64'">
@@ -245,7 +245,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib;D3D12.lib;dxgi.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -319,7 +319,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib;D3D12.lib;dxgi.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseAll|x64'">
@@ -329,7 +329,7 @@
       </PrecompiledHeader>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>HL_AFTERMATH;NDEBUG;_WINDOWS;_USRDLL;DIRECTX_EXPORTS;%(PreprocessorDefinitions);HL_AFTERMATH</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;DIRECTX_EXPORTS;%(PreprocessorDefinitions);HL_AFTERMATH</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -342,7 +342,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libhl.lib;dxcompiler.lib</AdditionalDependencies>
+      <AdditionalDependencies>libhl.lib;dxcompiler.lib;D3D12.lib;dxgi.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
