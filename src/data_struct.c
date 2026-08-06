@@ -158,7 +158,8 @@ INLINE static bool S_NAME(add_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 }
 
 #ifdef S_MAP
-INLINE static void S_NAME(replace_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
+// returns false if the key was already mapped to this exact value
+INLINE static bool S_NAME(replace_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	int min = 0;
 	int max = st->cur;
 	int pos;
@@ -166,8 +167,9 @@ INLINE static void S_NAME(replace_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 		int mid = (min + max) >> 1;
 		S_KEY k2 = st->keys[mid];
 		if( k2 < k ) min = mid + 1; else if( k2 > k ) max = mid; else {
+			if( st->values[mid] == v ) return false;
 			st->values[mid] = v;
-			return;
+			return true;
 		}
 	}
 	S_NAME(check_size)(alloc,st);
@@ -177,6 +179,7 @@ INLINE static void S_NAME(replace_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
 	st->keys[pos] = k;
 	st->values[pos] = v;
 	st->cur++;
+	return true;
 }
 
 INLINE static bool S_NAME(add_pair_impl)( hl_alloc *alloc, S_TYPE *st, S_ARGS ) {
