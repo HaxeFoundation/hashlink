@@ -454,7 +454,7 @@ static bool split_block( emit_ctx *ctx ) {
 		ctx->arrival_points = ctx->arrival_points->next;
 	}
 	einstr *eprev = &ctx->instrs[b->start_pos-1];
-	if( eprev->op != JUMP && eprev->op != JUMP_TABLE && eprev->op != RET && eprev->mode != M_NORET )
+	if( eprev->op == JCOND || (eprev->op != JUMP && eprev->op != JUMP_TABLE && eprev->op != RET && eprev->mode != M_NORET) )
 		block_add_pred(ctx, b, ctx->current_block);
 	ctx->current_block->end_pos = b->start_pos;
 	ctx->current_block = b;
@@ -1057,11 +1057,13 @@ static void emit_null_checks( emit_ctx *ctx ) {
 	for(int i=0;i<count;i+=2) {
 		int jthrow = int_arr_get(ctx->null_checks,i);
 		int hashed_name = int_arr_get(ctx->null_checks,i+1);
-		patch_jump(ctx, jthrow);
-		{
-			emit_block *from = find_block_at(ctx, jthrow);
-			if( from ) block_add_pred(ctx, ctx->current_block, from);
-		}
+		// like patch_jump, but the block was not split at the jump so it may still be the current one
+		emit_block *from = find_block_at(ctx, jthrow);
+		if( !from ) jit_assert();
+		bool after_block = ctx->current_block->start_pos == ctx->emit_pos-1;
+		ctx->instrs[jthrow].size_offs = ctx->emit_pos - (after_block?1:0) - (jthrow + 1);
+		if( !after_block && !split_block(ctx) ) jit_assert();
+		block_add_pred(ctx, ctx->current_block, from);
 		if( hashed_name ) {
 			einstr *e = emit_instr(ctx, PUSH_CONST);
 			e->mode = M_PTR;
@@ -2134,7 +2136,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 	case ONullCheck:
 		{
 			emit_test(ctx, LOAD(dst), OJNull);
-			int jthrow = emit_jump(ctx, true);
+			int jthrow = ctx->emit_pos;
+			emit_gen(ctx, JCOND, UNUSED, UNUSED, M_NORET);
 
 			// ----- DETECT FIELD ACCESS ----------------
 			hl_function *f = ctx->fun;

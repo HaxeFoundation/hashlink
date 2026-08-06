@@ -827,15 +827,18 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 		case JCOND:
 		case JUMP:
 		case JUMP_TABLE:
-			flush_phis(ctx,cur_block, e.op == JCOND ? PHI_COND: PHI_JUMP);
-			if( e.op == JUMP_TABLE ) {
-				// copy args (remap later)
-				hl_emit_store_args(jit->emit,&e,hl_emit_get_args(jit->emit,&e),e.nargs);
+			{
+				bool noret = e.op == JCOND && e.mode == M_NORET;
+				if( !noret ) flush_phis(ctx,cur_block, e.op == JCOND ? PHI_COND: PHI_JUMP);
+				if( e.op == JUMP_TABLE ) {
+					// copy args (remap later)
+					hl_emit_store_args(jit->emit,&e,hl_emit_get_args(jit->emit,&e),e.nargs);
+				}
+				regs_write_instr(ctx, &e, out);
+				int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
+				int_arr_add(ctx->jump_regs, cur_op + 1 + (e.op == JUMP_TABLE ? 0 : e.size_offs));
+				if( e.op == JCOND && !noret ) flush_phis(ctx,cur_block, PHI_NEXT);
 			}
-			regs_write_instr(ctx, &e, out);
-			int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
-			int_arr_add(ctx->jump_regs, cur_op + 1 + (e.op == JUMP_TABLE ? 0 : e.size_offs));
-			if( e.op == JCOND ) flush_phis(ctx,cur_block, PHI_NEXT);
 			break;
 		case RET:
 			if( e.a ) {
