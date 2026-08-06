@@ -187,6 +187,8 @@ static void updateTitleBarTheme(HWND wnd) {
 	if (result != ERROR_SUCCESS)
 		return;
 
+	// Load dynamically the required function and fail silently if they are not available
+	// (which could be true for older Windows 10 versions and before)
 	HMODULE dwmapi = LoadLibraryA("Dwmapi.dll");
 
 	if (dwmapi == NULL)
