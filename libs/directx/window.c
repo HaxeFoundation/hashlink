@@ -170,6 +170,41 @@ static dx_event *addEvent( HWND wnd, EventType type ) {
 	return e;
 }
 
+static void updateTitleBarTheme(HWND wnd) {
+	DWORD value = 1;
+	DWORD size = sizeof(value);
+
+	LONG result = RegGetValueW(
+		HKEY_CURRENT_USER,
+		L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+		L"AppsUseLightTheme",
+		RRF_RT_REG_DWORD,
+		NULL,
+		&value,
+		&size
+	);
+
+	if (result != ERROR_SUCCESS)
+		return;
+
+	HMODULE dwmapi = LoadLibraryA("Dwmapi.dll");
+
+	if (dwmapi == NULL)
+		return;
+
+	typedef HRESULT(*DwmSetWindowAttributePTR)(HWND, DWORD, LPCVOID, DWORD);
+	DwmSetWindowAttributePTR DwmSetWindowAttribute =
+		(DwmSetWindowAttributePTR)GetProcAddress(dwmapi, "DwmSetWindowAttribute");
+
+	if (DwmSetWindowAttribute != NULL) {
+		int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+		BOOL dark_mode = (value == 0);
+		DwmSetWindowAttribute(wnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, sizeof(dark_mode));
+	}
+
+	FreeLibrary(dwmapi);
+}
+
 #define addMouse(etype,but) { \
 	e = addEvent(wnd,etype); \
 	e->button = but; \
@@ -525,6 +560,9 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 	case WM_CLOSE:
 		addState(Close);
 		return 0;
+	case WM_SETTINGCHANGE:
+	case WM_THEMECHANGED:
+		updateTitleBarTheme(wnd);
 	}
 	return DefWindowProc(wnd, umsg, wparam, lparam);
 }
@@ -565,6 +603,7 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 	event_buffer->normal_style = style;
 	event_buffer->opacity = 1.0;
 	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, x, y, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
+	updateTitleBarTheme(win);
 	SetTimer(win,0,10,NULL);
 	if( !(windowFlags & Hidden) ) {
 		ShowWindow(win, SW_SHOW);
@@ -863,27 +902,6 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 	return GetSystemMetrics(SM_CYSCREEN);
 }
 
-HL_PRIM void HL_NAME(win_set_dark_mode)( dx_window* wnd, bool enabled ) {
-	// Load dynamically the required function and fail silently if they are not available
-	// (which could be true for older Windows 10 versions and before)
-	HMODULE dwmapi = LoadLibraryA("Dwmapi.dll");
-
-	if (dwmapi == NULL)
-		return;
-
-	typedef HRESULT(*DwmSetWindowAttributePTR)(HWND, DWORD, LPCVOID, DWORD);
-	DwmSetWindowAttributePTR DwmSetWindowAttribute =
-		(DwmSetWindowAttributePTR)GetProcAddress(dwmapi, "DwmSetWindowAttribute");
-
-	if (DwmSetWindowAttribute != NULL) {
-		int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-		BOOL dark_mode = enabled;
-		DwmSetWindowAttribute(wnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, sizeof(dark_mode));
-	}
-
-	FreeLibrary(dwmapi);
-}
-
 typedef struct {
 	int idx;
 	varray* arr;
@@ -1012,7 +1030,6 @@ DEFINE_PRIM(_I32, win_change_display_setting, _BYTES _DYN);
 DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);
 DEFINE_PRIM(_VOID, win_set_icon, TWIN TICON);
-DEFINE_PRIM(_VOID, win_set_dark_mode, TWIN _BOOL);
 DEFINE_PRIM(_F64, win_get_scale_factor_for_window, TWIN);
 
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
