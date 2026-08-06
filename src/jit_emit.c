@@ -437,10 +437,9 @@ static void block_add_pred( emit_ctx *ctx, emit_block *b, emit_block *p ) {
 
 static void store_block_var( emit_ctx *ctx, emit_block *b, vreg *r, ereg v ) {
 	if( IS_NULL(v) ) jit_assert();
-	vreg_replace(b->written_vars,r->id,v);
-	if( v < 0 ) {
+	if( vreg_replace(b->written_vars,r->id,v) && v < 0 ) {
 		tmp_phi *p = GET_PHI(v);
-		p->ref_blocks = link_add_sort_unique(ctx,b->id,b,p->ref_blocks);
+		p->ref_blocks = link_add(ctx,b->id,b,p->ref_blocks);
 	}
 }
 
@@ -477,15 +476,19 @@ static int emit_jump( emit_ctx *ctx, bool cond ) {
 	return p;
 }
 
-static void patch_jump( emit_ctx *ctx, int jpos ) {
-	emit_block *b = NULL;
-	// find the block or initial jump was
-	for_iter_back(blocks,b2,ctx->blocks) {
-		if( b2->start_pos <= jpos ) {
-			b = b2;
-			break;
-		}
+static emit_block *find_block_at( emit_ctx *ctx, int pos ) {
+	int min = 0;
+	int max = blocks_count(ctx->blocks);
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		if( blocks_get(ctx->blocks,mid)->start_pos <= pos ) min = mid + 1; else max = mid;
 	}
+	return min == 0 ? NULL : blocks_get(ctx->blocks,min-1);
+}
+
+static void patch_jump( emit_ctx *ctx, int jpos ) {
+	// find the block our initial jump was
+	emit_block *b = find_block_at(ctx, jpos);
 	if( !b || b == ctx->current_block ) jit_assert();
 	// patch opcode
 	bool after_block = ctx->current_block->start_pos == ctx->emit_pos-1;
@@ -1055,11 +1058,9 @@ static void emit_null_checks( emit_ctx *ctx ) {
 		int jthrow = int_arr_get(ctx->null_checks,i);
 		int hashed_name = int_arr_get(ctx->null_checks,i+1);
 		patch_jump(ctx, jthrow);
-		for_iter_back(blocks,from,ctx->blocks) {
-			if( from->start_pos <= jthrow ) {
-				block_add_pred(ctx, ctx->current_block, from);
-				break;
-			}
+		{
+			emit_block *from = find_block_at(ctx, jthrow);
+			if( from ) block_add_pred(ctx, ctx->current_block, from);
 		}
 		if( hashed_name ) {
 			einstr *e = emit_instr(ctx, PUSH_CONST);
