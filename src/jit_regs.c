@@ -1,0 +1,1030 @@
+/*
+ * Copyright (C)2015-2016 Haxe Foundation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+#include <hlmodule.h>
+#include <jit.h>
+#include "data_struct.h"
+
+#define VAL(k)		(ctx->values + (k))
+
+//#define REGS_DEBUG
+
+#ifdef REGS_DEBUG
+#	define regs_debug	jit_debug
+#else
+#	define regs_debug(...)
+#endif
+
+#define INVALID	0x80000000
+
+#define VIDX(e)	(((e) < 0) ? ctx->jit->value_count + (-(e)-1) : (e))
+#define VAL_REG(e) VAL(VIDX(e))
+#define REG_MODE(m)	(IS_FLOAT(m) ? 1 :0)
+#define REG_CFG(m)	(m ? &ctx->jit->cfg.floats : &ctx->jit->cfg.regs)
+
+#define EMIT(r,a,b,m)	regs_emit(ctx,UNUSED,r,a,b,m,0)
+#define BREAK()	EMIT(DEBUG_BREAK,UNUSED,UNUSED,0)
+
+typedef struct {
+	int id;
+	int start;
+	int stack_pos;
+	int last_read;
+	int tot_reads;
+	int tracked;
+	int overwrite;
+	emit_mode mode;
+	ereg pref_reg;
+	ereg reg;
+	int_arr reads;
+	int read_cur;
+} value_info;
+
+#define S_TYPE			values
+#define S_NAME(name)	values_##name
+#define S_VALUE			value_info*
+#include "data_struct.c"
+#define values_add(set,v)		values_add_impl(DEF_ALLOC,&(set),v)
+
+struct _regs_ctx {
+	jit_ctx *jit;
+	value_info *values;
+	values scratch;
+	values persists;
+	int *ncalls;
+	int_arr jump_regs;
+	int_arr pack_movs;
+	int_arr *blocks_phis;
+	int max_instrs;
+	int cur_op;
+	int emit_pos;
+	int stack_size;
+	int stack_offset;
+	einstr *instrs;
+	ereg *out_write;
+	eblock *cur_block;
+	int *pos_map;
+	bool flushed;
+	bool has_direct_call;
+	int persists_uses[2];
+	int epilog_pos;
+};
+
+typedef int call_regs[2];
+
+static ereg get_call_reg( regs_ctx *ctx, call_regs regs, emit_mode m ) {
+	ereg r;
+	int mode = REG_MODE(m);
+	reg_config *cfg = REG_CFG(mode);
+	int idx = IS_WINCALL64 ? 0 : mode;
+	if( regs[idx] < cfg->nargs )
+		r = cfg->arg[regs[idx]++];
+	else
+		r = UNUSED;
+	return r;
+}
+
+static int get_stack_size( emit_mode m ) {
+	int size = hl_emit_mode_sizes[m];
+	if( size < HL_WSIZE ) size = HL_WSIZE;
+	return size;
+}
+
+static void regs_write_instr( regs_ctx *ctx, einstr *e, ereg out ) {
+	if( ctx->emit_pos == ctx->max_instrs ) {
+		int pos = ctx->emit_pos;
+		int next_size = ctx->max_instrs ? (ctx->max_instrs << 1) : 256;
+		einstr *instrs = (einstr*)malloc(sizeof(einstr) * next_size);
+		ereg *out = (ereg*)malloc(sizeof(ereg) * next_size);
+		if( instrs == NULL || out == NULL ) jit_error("Out of memory");
+		memcpy(instrs, ctx->instrs, pos * sizeof(einstr));
+		memcpy(out, ctx->out_write, pos * sizeof(ereg));
+		memset(instrs + pos, 0, (next_size - pos) * sizeof(einstr));
+		free(ctx->instrs);
+		free(ctx->out_write);
+		ctx->instrs = instrs;
+		ctx->out_write = out;
+		ctx->max_instrs = next_size;
+	} else if( (ctx->emit_pos & 0xFF) == 0 )
+		memset(ctx->instrs + ctx->emit_pos, 0, 256 * sizeof(einstr));
+	ctx->out_write[ctx->emit_pos] = out;
+	ctx->instrs[ctx->emit_pos++] = *e;
+}
+
+static void regs_emit( regs_ctx *ctx, ereg out, emit_op op, ereg a, ereg b, emit_mode m, int size_offs ) {
+	einstr e;
+	e.header = op;
+	e.mode = m;
+	e.a = a;
+	e.b = b;
+	e.size_offs = size_offs;
+	regs_write_instr(ctx, &e, out);
+}
+
+static void regs_emit_mov( regs_ctx *ctx, ereg to, ereg from, emit_mode m ) {
+	if( to == from ) return;
+	regs_emit(ctx,to,MOV,from,UNUSED,m,0);
+}
+
+static int regs_alloc_stack( regs_ctx *ctx, int size ) {
+	ctx->stack_size += size;
+	ctx->stack_size += jit_pad_size(ctx->stack_size,size);
+	return -ctx->stack_size;
+}
+
+static ereg shift_local( regs_ctx *ctx, ereg r ) {
+	rkind k = REG_KIND(r);
+	if( REG_REG(r) != STACK_REG || (k != R_REG && k != R_REG_PTR) ) return r;
+	int offs = REG_VALUE(r);
+	if( offs >= 0 ) return r;
+	return MK_REG_VAL(STACK_REG,k,offs - ctx->stack_offset);
+}
+
+#define value_str(v)	value_to_str(ctx,v)
+
+static const char *value_to_str( regs_ctx *ctx, value_info *v ) {
+	static char out[20];
+	sprintf(out,"%s:%s", val_str(v->id,v->mode), val_str(v->reg,v->mode));
+	return out;
+}
+
+static void spill( regs_ctx *ctx, value_info *v ) {
+	if( v->stack_pos == INVALID ) v->stack_pos = regs_alloc_stack(ctx, hl_emit_mode_sizes[v->mode]);
+	v->reg = MK_STACK_REG(v->stack_pos);
+	values_remove(&ctx->scratch,v);
+	values_remove(&ctx->persists,v);
+	regs_debug("REG SPILL %s @%X\n",value_str(v),ctx->cur_op);
+}
+
+static bool reg_is_free( regs_ctx *ctx, ereg r ) {
+	for_iter(values,v,ctx->scratch)
+		if( v->reg == r ) return false;
+	for_iter(values,v2,ctx->persists)
+		if( v2->reg == r ) return false;
+	return true;
+}
+
+static void mark_persist_used( regs_ctx *ctx, int mode, ereg r ) {
+	reg_config *cfg = REG_CFG(mode);
+	for(int i=0;i<cfg->npersists;i++)
+		if( cfg->persist[i] == r ) {
+			if( ctx->persists_uses[mode] < i + 1 ) ctx->persists_uses[mode] = i + 1;
+			return;
+		}
+}
+
+static ereg alloc_persist( regs_ctx *ctx, int mode ) {
+	reg_config *cfg = REG_CFG(mode);
+	for(int i=0;i<cfg->npersists;i++) {
+		ereg r = cfg->persist[i];
+		if( !reg_is_free(ctx,r) ) continue;
+		mark_persist_used(ctx, mode, r);
+		return r;
+	}
+	return UNUSED;
+}
+
+static bool live_across_call( regs_ctx *ctx, value_info *v, int from ) {
+	if( v->last_read <= from + 1 ) return false;
+	return ctx->ncalls[v->last_read] > ctx->ncalls[from + 1];
+}
+
+static int next_use( value_info *v, int pos ) {
+	while( v->read_cur < int_arr_count(v->reads) && int_arr_get(v->reads,v->read_cur) < pos )
+		v->read_cur++;
+	return v->read_cur < int_arr_count(v->reads) ? int_arr_get(v->reads,v->read_cur) : INVALID;
+}
+
+static int spill_cost( regs_ctx *ctx, value_info *v, int pos ) {
+	int n = next_use(v, pos);
+	if( n == INVALID )
+		return v->last_read > pos ? 0 : 0x7FFFFFFF;
+	return n - pos;
+}
+
+static bool reg_is_persist( reg_config *cfg, ereg r ) {
+	for(int i=0;i<cfg->npersists;i++)
+		if( cfg->persist[i] == r ) return true;
+	return false;
+}
+
+static ereg steal_persist( regs_ctx *ctx, int mode, int weight ) {
+	reg_config *cfg = REG_CFG(mode);
+	value_info *best = NULL;
+	for_iter(values,v,ctx->persists) {
+		if( REG_MODE(v->mode) != mode || !reg_is_persist(cfg,v->reg) ) continue;
+		if( best == NULL || v->tot_reads < best->tot_reads ) best = v;
+	}
+	if( best == NULL || best->tot_reads * 2 > weight ) return UNUSED;
+	ereg r = best->reg;
+	spill(ctx, best);
+	return r;
+}
+
+static void regs_alloc_reg( regs_ctx *ctx, value_info *v, bool across_call ) {
+	// lookup available reg
+	int mode = REG_MODE(v->mode);
+	reg_config *cfg = REG_CFG(mode);
+	bool pref_free = !IS_NULL(v->pref_reg) && reg_is_free(ctx,v->pref_reg);
+	if( across_call ) {
+		ereg r;
+		if( pref_free && reg_is_persist(cfg,v->pref_reg) ) {
+			r = v->pref_reg;
+			mark_persist_used(ctx, mode, r);
+		} else
+			r = alloc_persist(ctx, mode);
+		if( IS_NULL(r) ) r = steal_persist(ctx, mode, v->tot_reads);
+		if( !IS_NULL(r) ) {
+			v->reg = r;
+			values_add(ctx->persists, v);
+			return;
+		}
+	}
+	if( pref_free && !reg_is_persist(cfg,v->pref_reg) ) {
+		v->reg = v->pref_reg;
+		values_add(ctx->scratch, v);
+		return;
+	}
+	value_info *first = NULL;
+	int first_cost = -1;
+	for(int i=0;i<cfg->nscratchs;i++) {
+		ereg r = cfg->scratch[i];
+		for_iter(values,v2,ctx->scratch) {
+			if( v2->reg == r ) {
+				int cost = spill_cost(ctx, v2, ctx->cur_op);
+				if( first == NULL || cost > first_cost || (cost == first_cost && v2->tot_reads < first->tot_reads) ) {
+					first = v2;
+					first_cost = cost;
+				}
+				r = UNUSED;
+				break;
+			}
+		}
+		if( !IS_NULL(r) ) {
+			v->reg = r;
+			values_add(ctx->scratch, v);
+			return;
+		}
+	}
+	{
+		ereg r = alloc_persist(ctx, mode);
+		if( !IS_NULL(r) ) {
+			v->reg = r;
+			values_add(ctx->persists, v);
+			return;
+		}
+	}
+	// free the oldest scratch reg
+	if( !first ) jit_assert();
+	v->reg = first->reg;
+	spill(ctx, first);
+	values_add(ctx->scratch, v);
+}
+
+static void regs_assign( regs_ctx *ctx, value_info *v ) {
+	if( v->reg != UNUSED ) jit_assert();
+	regs_alloc_reg(ctx, v, live_across_call(ctx, v, ctx->cur_op));
+	regs_debug("REG ASSIGN %s @%X-@%X\n",value_str(v),ctx->cur_op,v->last_read);
+}
+
+static int block_loop_depth( eblock *block ) {
+	int d = 0;
+	eblock *b = (block->loop_end > 0) ? block : block->loop_parent;
+	while( b && d < 7 ) {
+		d++;
+		b = b->loop_parent;
+	}
+	return d;
+}
+
+static void regs_loop_liveness( regs_ctx *ctx, eblock *block, value_info *v, int pos ) {
+	int write = v->id >= 0 ? ctx->jit->values_writes[v->id] : -1;
+	eblock *b = (block->loop_end > 0) ? block : block->loop_parent;
+	while( b ) {
+		if( write >= b->start_pos ) break;
+		if( pos < b->loop_end ) pos = b->loop_end;
+		b = b->loop_parent;
+	}
+	if( v->last_read < pos ) v->last_read = pos;
+	v->tot_reads += 1 << (block_loop_depth(block) * 3);
+}
+
+static void regs_write_live( regs_ctx *ctx, ereg *r ) {
+	if( IS_NULL(*r) ) jit_assert();
+	if( !REG_IS_VAL(*r) ) return; // some are injections of native regs at emit
+	value_info *v = VAL_REG(*r);
+	int n = int_arr_count(v->reads);
+	if( n == 0 || int_arr_get(v->reads,n-1) != ctx->cur_op )
+		int_arr_add(v->reads, ctx->cur_op);
+	regs_loop_liveness(ctx, ctx->cur_block, v, ctx->cur_op);
+}
+
+static value_info *regs_current( regs_ctx *ctx, ereg r ) {
+	for_iter(values,v,ctx->scratch) {
+		if( v->reg == r )
+			return v;
+	}
+	for_iter(values,v2,ctx->persists) {
+		if( v2->reg == r )
+			return v2;
+	}
+	return NULL;
+}
+
+
+static void regs_compute_liveness( regs_ctx *ctx ) {
+	int write_index = 1;
+	jit_ctx *jit = ctx->jit;
+	hl_type *tret = ctx->jit->fun->type->fun->ret;
+	emit_mode mret = tret->kind == HF32 || tret->kind == HF64 ? M_F64 : M_PTR;
+	ereg ret = REG_CFG(REG_MODE(mret))->ret;
+	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
+		einstr *e = jit->instrs + cur_op;
+		value_info *write = NULL;
+
+		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op )
+			write = VAL(write_index++);
+
+		ctx->cur_op = cur_op;
+		hl_emit_reg_iter(jit,e,ctx,(void*)regs_write_live);
+		if( IS_CALL(e->op) ) {
+			// anticipate register usage in call so we can previlege this assign
+			ereg *r = hl_emit_get_args(jit->emit, e);
+			call_regs regs = {0};
+			bool needs_push = false;
+			for(int k=0;k<e->nargs;k++) {
+				ereg arg = r[k];
+				value_info *v = REG_IS_VAL(arg) ? VAL_REG(r[k]) : NULL;
+				ereg r = get_call_reg(ctx, regs, v ? v->mode : M_I32);
+				if( IS_NULL(r) ) {
+					needs_push = true;
+					continue;
+				}
+				if( v && IS_NULL(v->pref_reg) )
+					v->pref_reg = r;
+			}
+			if( !needs_push && e->mode != M_NORET ) ctx->has_direct_call = true;
+			if( write && IS_NULL(write->pref_reg) )
+				write->pref_reg = REG_CFG(REG_MODE(e->mode))->ret;
+		} else switch( e->op ) {
+		case RET:
+			if( e->a ) {
+				value_info *v = VAL_REG(e->a);
+				if( v->pref_reg == UNUSED ) v->pref_reg = ret;
+			}
+			break;
+		case BINOP:
+			switch( e->size_offs ) {
+			case OSShr:
+			case OUShr:
+			case OShl:
+				if( jit->cfg.req_bit_shifts ) VAL_REG(e->b)->pref_reg = jit->cfg.req_bit_shifts;
+				break;
+			case OSDiv:
+			case OUDiv:
+			case OSMod:
+			case OUMod:
+				if( !IS_FLOAT(e->mode) ) {
+					if( jit->cfg.req_div_a ) VAL_REG(e->a)->pref_reg = jit->cfg.req_div_a;
+					if( jit->cfg.req_div_b ) VAL_REG(e->b)->pref_reg = jit->cfg.req_div_b;
+				}
+				break;
+			}
+			break;
+		case BLOCK:
+			ctx->cur_block = jit->blocks + e->size_offs;
+			break;
+		default:
+			break;
+		}
+	}
+	// compute reverse phis
+	for(int b=0;b<jit->block_count;b++) {
+		eblock *bl = jit->blocks + b;
+		for(int p=0;p<bl->phi_count;p++) {
+			ephi *ph = bl->phis + p;
+			VAL_REG(ph->value)->mode = ph->mode;
+			for(int k=0;k<ph->nvalues;k++) {
+				ereg v = ph->values[k];
+				eblock *b2 = jit->blocks + ph->blocks[k];
+				value_info *val = VAL_REG(v);
+				int_arr *arr = &ctx->blocks_phis[b2 - jit->blocks];
+				regs_debug("ADD PHI %s:=%s to #%d@%X\n",val_str(ph->value,ph->mode),val_str(v,ph->mode),(int)(b2 - jit->blocks),b2->end_pos-1);
+				int_arr_add(*arr,v);
+				int_arr_add(*arr,ph->value);
+				int_arr_add(*arr,(bl - b2) == 1);
+				regs_loop_liveness(ctx, b2, val, b2->end_pos);
+				// since we jump at end of instruction (after cmovs), let's keep the index live longer
+				einstr *term = jit->instrs + b2->end_pos - 1;
+				if( term->op == JUMP_TABLE && REG_IS_VAL(term->a) )
+					regs_loop_liveness(ctx, b2, VAL_REG(term->a), bl->start_pos + 1);
+			}
+		}
+	}
+}
+
+static void regs_extend_debug_liveness( regs_ctx *ctx ) {
+	jit_ctx *jit = ctx->jit;
+	int nops = jit->fun->nops;
+	for(int i=0;i<jit->live_ends_count;i++) {
+		value_info *v = VAL_REG(jit->live_ends[i<<1]);
+		int scope_end = jit->live_ends[(i<<1)|1];
+		int end = scope_end < 0 || scope_end >= nops ? jit->instr_count : jit->emit_pos_map[scope_end];
+		if( v->last_read < end ) v->last_read = end;
+	}
+	for(int i=jit->value_count;i<jit->value_count + jit->phi_count;i++) {
+		value_info *v = ctx->values + i;
+		if( !v->tracked ) continue;
+		for(int k=0;k<jit->live_ends_count;k++) {
+			value_info *a = VAL_REG(jit->live_ends[k<<1]);
+			if( a->tracked != v->tracked ) continue;
+			if( v->last_read < a->last_read ) v->last_read = a->last_read;
+		}
+	}
+}
+
+static void regs_assign_regs( regs_ctx *ctx ) {
+	jit_ctx *jit = ctx->jit;
+	// assign args
+	call_regs regs = {0};
+	int args_count = 0;
+	for(int i=1;i<=ctx->jit->fun->type->fun->nargs;i++) {
+		value_info *v = VAL(i);
+		einstr *e = ctx->jit->instrs + ctx->jit->values_writes[i];
+		int size = hl_emit_mode_sizes[e->mode];
+		if( size <= 0 && e->mode != M_VOID ) jit_assert();
+		ereg r = get_call_reg(ctx,regs,e->mode);
+		if( !IS_NULL(r) ) {
+			ereg p = live_across_call(ctx,v,0) ? alloc_persist(ctx,REG_MODE(e->mode)) : UNUSED;
+			if( !IS_NULL(p) ) {
+				v->reg = p;
+				values_add(ctx->persists,v);
+			} else {
+				v->reg = r;
+				values_add(ctx->scratch,v);
+			}
+		}
+		if( IS_NULL(r) || IS_WINCALL64 ) {
+			// use existing stack storage
+			v->stack_pos = (args_count++ + 2) * HL_WSIZE;
+			if( IS_NULL(r) ) v->reg = MK_STACK_REG(v->stack_pos);
+		}
+	}
+	// assign registers
+	int write_index = 1;
+	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
+		einstr e = jit->instrs[cur_op];
+		value_info *write = NULL;
+#		ifdef HL_DEBUG
+		int eid = (jit->fun->findex << 16) | cur_op;
+		__ignore(&eid);
+#		endif
+		ctx->cur_op = cur_op;
+
+
+		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op ) {
+			write = VAL(write_index++);
+			// try to preserve ops in the from  A = A op B
+			if( (e.op == UNOP || e.op == BINOP) && write->pref_reg == UNUSED ) {
+				value_info *v = VAL_REG(e.a);
+				if( IS_REG(v->reg) ) write->pref_reg = v->reg;
+			}
+		}
+
+		for_iter_back(values,v,ctx->scratch) {
+			if( v->last_read <= cur_op )
+				values_remove(&ctx->scratch,v);
+		}
+		for_iter_back(values,v2,ctx->persists) {
+			if( v2->last_read <= cur_op )
+				values_remove(&ctx->persists,v2);
+		}
+
+		if( IS_CALL(e.op) ) {
+			ereg *args = hl_emit_get_args(ctx->jit->emit,&e);
+			call_regs regs = {0};
+			bool will_scratch = e.mode != M_NORET;
+			value_info *vcall = e.op == CALL_REG ? VAL_REG(e.a) : NULL;
+			if( will_scratch ) {
+				for_iter_back(values,v2,ctx->scratch) {
+					if( v2->last_read > cur_op )
+						spill(ctx,v2);
+				}
+			}
+			for(int k=0;k<e.nargs;k++) {
+				if( !REG_IS_VAL(args[k]) ) continue;
+				value_info *v = VAL_REG(args[k]);
+				ereg r = get_call_reg(ctx,regs,v->mode);
+				if( !IS_NULL(r) ) {
+					value_info *cur = regs_current(ctx,r);
+					if( cur && cur != v )
+						spill(ctx,cur);
+					if( vcall && vcall->reg == r )
+						spill(ctx,vcall);
+				}
+			}
+			if( will_scratch ) values_reset(&ctx->scratch);
+		}
+		switch( e.op ) {
+		case BLOCK:
+			for_iter_back(values,v,ctx->scratch) {
+				if( v->last_read == cur_op )
+					values_remove(&ctx->scratch,v);
+			}
+			for_iter_back(values,v2,ctx->persists) {
+				if( v2->last_read == cur_op )
+					values_remove(&ctx->persists,v2);
+			}
+			eblock *bl = jit->blocks + e.size_offs;
+			for(int k=0;k<bl->phi_count;k++) {
+				ephi *p = bl->phis + k;
+				value_info *v = VAL_REG(p->value);
+				for(int n=0;n<p->nvalues;n++) {
+					value_info *vn = VAL_REG(p->values[n]);
+					// ignore previously set pref_reg (minimize moves)
+					if( IS_REG(vn->reg) && !regs_current(ctx,vn->reg) ) {
+						v->pref_reg = vn->reg;
+						break;
+					}
+				}
+				regs_assign(ctx, v);
+			}
+			break;
+		case CATCH:
+			{
+				for_iter_back(values,v2,ctx->scratch)
+					spill(ctx,v2);
+				for_iter_back(values,v3,ctx->persists)
+					spill(ctx,v3);
+			}
+			break;
+		case ALLOC_STACK:
+			write->reg = MK_STACK_OFFS(regs_alloc_stack(ctx, e.size_offs));
+			continue;
+		case LOAD_ARG:
+			if( write->reg == UNUSED )
+				regs_assign(ctx, write); // assign for stack reg
+			continue;
+		case ADDRESS:
+			{
+				if( REG_KIND(e.a) == R_CONST ) jit_assert();
+				value_info *v = VAL_REG(e.a);
+				spill(ctx, v);
+				break;
+			}
+		default:
+			break;
+		}
+		if( write ) regs_assign(ctx, write);
+	}
+	// assign stack regs
+	int nvalues = jit->value_count + jit->phi_count;
+	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
+	ctx->stack_offset = persists_size + jit_pad_size(persists_size,jit->cfg.stack_align);
+	for(int i=0;i<nvalues;i++) {
+		value_info *v = ctx->values + i;
+		if( v->reg == UNUSED ) v->reg = MK_STACK_REG(v->stack_pos);
+		v->reg = shift_local(ctx, v->reg);
+	}
+}
+
+static void flush_movs( regs_ctx *ctx, bool cond ) {
+	int_arr movs = ctx->pack_movs;
+	while( true ) {
+		int size = int_arr_count(movs);
+		if( !size ) break;
+		bool cycle = true;
+		for(int k=0;k<size;k+=3) {
+			ereg to = int_arr_get(movs,k);
+			ereg from = int_arr_get(movs,k+1);
+			if( to == from ) {
+				int_arr_remove_range(&movs,k,3);
+				cycle = false;
+				continue;
+			}
+			bool read = false;
+			for(int k2=1;k2<size;k2+=3) {
+				ereg from = int_arr_get(movs,k2);
+				if( from == to ) {
+					read = true;
+					break;
+				}
+			}
+			if( !read ) {
+				ereg from = int_arr_get(movs,k+1);
+				int mode = int_arr_get(movs,k+2);
+				bool cmov = cond && IS_REG(to);
+				regs_emit(ctx,to,cmov?CMOV:MOV,from,UNUSED,mode,0);
+				int_arr_remove_range(&movs,k,3);
+				cycle = false;
+				break;
+			}
+		}
+		if( cycle ) {
+			ereg to = int_arr_get(movs,0);
+			ereg from = int_arr_get(movs,1);
+			int mode = int_arr_get(movs,2);
+			bool cmov = cond && (IS_REG(to) || IS_REG(from));
+			regs_emit(ctx,UNUSED,cmov?CXCHG:XCHG,to,from,IS_FLOAT(mode)?M_F64:M_PTR,0);
+			int_arr_remove_range(&movs,0,3);
+			size -= 3;
+			for(int k=1;k<size;k+=3) {
+				if( int_arr_get(movs,k) == to )
+					movs.values[k] = from;
+				else if( int_arr_get(movs,k) == from )
+					movs.values[k] = to;
+			}
+		}
+	}
+	ctx->pack_movs = movs;
+	int_arr_reset(&ctx->pack_movs);
+}
+
+typedef enum {
+	PHI_COND = 0,
+	PHI_NEXT = 1,
+	PHI_JUMP = 2,
+} phi_edges;
+
+static void flush_phis( regs_ctx *ctx, eblock *b, phi_edges edges ) {
+	if( !b ) return;
+	jit_ctx *jit = ctx->jit;
+	int bid = (int)(b - jit->blocks);
+	int_arr arr = ctx->blocks_phis[bid];
+	int idx = 0;
+	int_arr movs = ctx->pack_movs;
+
+	while( idx < int_arr_count(arr) ) {
+		ereg a = int_arr_get(arr,idx++);
+		ereg b = int_arr_get(arr,idx++);
+		int bcount = int_arr_get(arr,idx++);
+		if( edges != PHI_JUMP && (edges == PHI_NEXT) != (bcount == 1) )
+			continue;
+		value_info *from = VAL_REG(a);
+		value_info *to = VAL_REG(b);
+		if( from->reg == to->reg ) continue;
+		int size = int_arr_count(movs);
+		bool dup = false;
+		for(int k=0;k<size;k+=3) {
+			if( int_arr_get(movs,k) == to->reg && int_arr_get(movs,k+1) == from->reg ) {
+				dup = true;
+				break;
+			}
+		}
+		if( !dup ) {
+			int_arr_add(movs, to->reg);
+			int_arr_add(movs, from->reg);
+			int_arr_add(movs, from->mode);
+		}
+	}
+	ctx->pack_movs = movs;
+	bool cond = edges == PHI_COND;
+	if( !cond )
+		int_arr_free(&ctx->blocks_phis[bid]);
+	flush_movs(ctx, cond);
+}
+
+static void regs_emit_instrs( regs_ctx *ctx ) {
+	jit_ctx *jit = ctx->jit;
+	eblock *cur_block = NULL;
+	call_regs regs = {0};
+	int write_index = 1;
+	ctx->pos_map[0] = 0;
+
+	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
+	int stack_offset = ctx->stack_size + ctx->stack_offset - persists_size;
+	int push_size = HL_WSIZE * 2 + persists_size; // RIP + RBP save
+	if( jit->cfg.stack_align ) {
+		int align = (stack_offset + push_size) % jit->cfg.stack_align;
+		if( align ) stack_offset += jit->cfg.stack_align - align;
+	}
+	if( IS_WINCALL64 && ctx->has_direct_call )
+		stack_offset += 0x20;
+
+	for(int cur_op=0;cur_op<jit->instr_count;cur_op++) {
+		einstr e = jit->instrs[cur_op];
+		ereg *ret_val = NULL;
+		int nread;
+		int instr_stack_offset = 0;
+		ctx->cur_op = cur_op;
+
+		value_info *vout = NULL;
+		ereg out = UNUSED;
+		if( write_index < jit->value_count && jit->values_writes[write_index] == cur_op ) {
+			vout = VAL(write_index++);
+			out = vout->reg;
+		}
+
+		if( IS_CALL(e.op) ) {
+			ereg *args = hl_emit_get_args(ctx->jit->emit,&e);
+			call_regs regs = {0};
+			int stack_args = 0;
+			int stack_bits = 0;
+			for(int k=0;k<e.nargs;k++) {
+				value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
+				emit_mode mode = v ? v->mode : M_I32;
+				ereg r = get_call_reg(ctx,regs,mode);
+				if( IS_NULL(r) ) {
+					stack_args += get_stack_size(mode);
+					stack_bits |= 1 << k;
+				} else if( !v || r != v->reg ) {
+					int_arr_add(ctx->pack_movs,r);
+					int_arr_add(ctx->pack_movs,v ? v->reg : args[k]);
+					int_arr_add(ctx->pack_movs,mode);
+				}
+			}
+			if( stack_args > 0 ) {
+				int offset = 0;
+				if( jit->cfg.stack_align ) {
+					int align = stack_args % jit->cfg.stack_align;
+					if( align ) offset = jit->cfg.stack_align - align;
+				}
+				if( offset )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,0,-offset);
+				for(int k=e.nargs-1;k>=0;k--) {
+					if( stack_bits & (1 << k) ) {
+						value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
+						EMIT(PUSH,VAL_REG(args[k])->reg,UNUSED,v && IS_FLOAT(v->mode) ? v->mode : M_PTR);
+					}
+				}
+				if( IS_WINCALL64 ) {
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,0,-0x20);
+					offset += 0x20;
+				}
+				instr_stack_offset = stack_args+offset;
+			}
+			flush_movs(ctx,0);
+			e.nargs = 0xFF;
+			e.size_offs = stack_args;
+			if( vout && vout->last_read > cur_op ) 
+				ret_val = &REG_CFG(REG_MODE(e.mode))->ret;
+			else if( e.mode != M_NORET ) {
+				e.mode = M_VOID; // ignore output
+				out = UNUSED;
+			}
+			if( e.op == CALL_REG )
+				e.a = VAL_REG(e.a)->reg;
+		} else {
+			ereg **regs = hl_emit_get_regs(&e,&nread);
+			for(int k=0;k<nread;k++) {
+				ereg *r = regs[k];
+				if( !REG_IS_VAL(*r) ) continue;
+				value_info *v = VAL_REG(*r);
+				*r = v->reg;
+			}
+		}
+		switch( e.op ) {
+		case ALLOC_STACK:
+		case CATCH:
+			break;
+		case BLOCK:
+			cur_block = jit->blocks + e.size_offs;
+			break;
+		case LOAD_ARG:
+			{
+				ereg def = get_call_reg(ctx,regs,e.mode);
+				if( def && out != def )
+					regs_emit_mov(ctx,out,def,e.mode);
+				else
+					regs_write_instr(ctx, &e, out);
+			}
+			break;
+		case ENTER:
+			{
+				EMIT(PUSH,jit->cfg.stack_pos,UNUSED,M_PTR);
+				regs_emit_mov(ctx,jit->cfg.stack_pos,jit->cfg.stack_reg,M_PTR);
+				for(int i=0;i<ctx->persists_uses[0];i++)
+					EMIT(PUSH,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
+				for(int i=0;i<ctx->persists_uses[1];i++)
+					EMIT(PUSH,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
+				if( stack_offset )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
+			}
+			break;
+		case PUSH_ADDR:
+			regs_write_instr(ctx, &e, out);
+			int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
+			int_arr_add(ctx->jump_regs, cur_op + 1 + e.size_offs);
+			break;
+		case JCOND:
+		case JUMP:
+		case JUMP_TABLE:
+			{
+				bool noret = e.op == JCOND && e.mode == M_NORET;
+				if( !noret ) flush_phis(ctx,cur_block, e.op == JCOND ? PHI_COND: PHI_JUMP);
+				if( e.op == JUMP_TABLE ) {
+					// copy args (remap later)
+					hl_emit_store_args(jit->emit,&e,hl_emit_get_args(jit->emit,&e),e.nargs);
+				}
+				regs_write_instr(ctx, &e, out);
+				int_arr_add(ctx->jump_regs, ctx->emit_pos - 1);
+				int_arr_add(ctx->jump_regs, cur_op + 1 + (e.op == JUMP_TABLE ? 0 : e.size_offs));
+				if( e.op == JCOND && !noret ) flush_phis(ctx,cur_block, PHI_NEXT);
+			}
+			break;
+		case RET:
+			if( e.a ) {
+				ereg ret = REG_CFG(REG_MODE(e.mode))->ret;
+				if( e.a != ret )
+					regs_emit_mov(ctx, ret, e.a, e.mode);
+			}
+#			ifdef WIN64_UNWIND_TABLES
+			// if we have our stack offset just after a call, the unwind algorithm
+			// will subtract and create invalid stack frame. this is because we do
+			// not register the stack offset in our unwind table so all functions
+			// can share the same definition
+			if( (ctx->emit_pos && IS_CALL(ctx->instrs[ctx->emit_pos-1].op)) ||
+				(!stack_offset && ctx->emit_pos > 1 && ctx->instrs[ctx->emit_pos-1].op == STACK_OFFS && IS_CALL(ctx->instrs[ctx->emit_pos-2].op)) )
+				EMIT(NOP,UNUSED,UNUSED,M_NONE);
+#			endif
+			if( ctx->epilog_pos >= 0 ) {
+				regs_emit(ctx,UNUSED,JUMP,UNUSED,UNUSED,M_NONE,ctx->epilog_pos - (ctx->emit_pos + 1));
+				break;
+			}
+			{
+				int epilog_start = ctx->emit_pos;
+				if( stack_offset )
+					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
+				for(int i=ctx->persists_uses[1]-1;i>=0;i--)
+					EMIT(POP,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
+				for(int i=ctx->persists_uses[0]-1;i>=0;i--)
+					EMIT(POP,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
+				EMIT(POP,jit->cfg.stack_pos,UNUSED,M_PTR);
+				EMIT(RET,UNUSED,UNUSED,M_NONE);
+				if( ctx->emit_pos - epilog_start >= 6 )
+					ctx->epilog_pos = epilog_start;
+			}
+			break;
+		case MOV:
+			if( out == e.a ) break;
+			// fallthrough
+		default:
+			if( e.op == ADDRESS ) {
+				e.op = LEA;
+				if( REG_KIND(e.a) != R_REG_PTR ) jit_assert();
+				e.a = (e.a & ~R_REG_PTR) | R_REG;
+			}
+			if( ret_val && out ) {
+				regs_write_instr(ctx, &e, *ret_val);
+				regs_emit_mov(ctx, out, *ret_val, e.mode);
+			} else
+				regs_write_instr(ctx, &e, out);
+			break;
+		}
+		if( instr_stack_offset )
+			regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,instr_stack_offset);
+		if( cur_block && cur_block->end_pos == cur_op+1 )
+			flush_phis(ctx,cur_block,PHI_NEXT);
+		ctx->pos_map[cur_op+1] = ctx->emit_pos;
+	}
+}
+
+void hl_regs_flush( jit_ctx *jit ) {
+	regs_ctx *ctx = jit->regs;
+	if( ctx->flushed ) return;
+	ctx->flushed = true;
+	jit->reg_instr_count = ctx->emit_pos;
+	jit->reg_instrs = ctx->instrs;
+	jit->reg_writes = ctx->out_write;
+	jit->reg_pos_map = ctx->pos_map;
+	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op+1] = ctx->emit_pos;
+	hl_emit_remap_jumps(jit->emit, &ctx->jump_regs, ctx->instrs, ctx->pos_map);
+
+	int_arr regs_track;
+	int_arr_free(&regs_track);
+	
+	// register persist backup for debugger
+	int nsaved = 0;
+	for(int mode=0;mode<2;mode++) {
+		reg_config *cfg = mode ? &jit->cfg.floats : &jit->cfg.regs;
+		for(int i=0;i<ctx->persists_uses[mode];i++) {
+			int_arr_add(regs_track, -1);
+			int_arr_add(regs_track, -(++nsaved) * HL_WSIZE); // offset from EBP
+			int_arr_add(regs_track, 0);
+			int_arr_add(regs_track, cfg->persist[i]);
+		}
+	}
+	
+	// register variables ranges for debugger
+	int nargs = jit->fun->type->fun->nargs;
+	int end_pos = ctx->emit_pos;
+	for(int i=0;i<jit->value_count + jit->phi_count;i++) {
+		value_info *v = VAL(i);
+		if( v->tracked && v->reg ) {
+			int start = ctx->pos_map[v->start];
+			if( v->id < 0 && start > 0 ) start--;
+			int end = v->id < 0 && v->last_read >= 0 && v->last_read < jit->instr_count ? ctx->pos_map[v->last_read + 1] : end_pos;
+			int assign;
+			if( v->tracked < 0 )
+				assign = -v->tracked - 1;
+			else
+				assign = nargs + ASSIGN_POS(jit->fun, v->tracked - 1);
+			int_arr_add(regs_track, assign);
+			int_arr_add(regs_track, start);
+			int_arr_add(regs_track, end);
+			int_arr_add(regs_track, v->reg);
+		}
+	}
+	jit->regs_track = regs_track.values;
+	jit->regs_track_count = regs_track.cur;
+}
+
+void hl_regs_function( jit_ctx *jit ) {
+	regs_ctx *ctx = jit->regs;
+	int nvalues = jit->value_count + jit->phi_count;
+	memset(ctx->persists_uses,0,sizeof(ctx->persists_uses));
+	free(ctx->pos_map);
+	ctx->flushed = false;
+	ctx->has_direct_call = false;
+	ctx->pos_map = (int*)malloc((jit->instr_count + 1) * sizeof(int));
+	ctx->emit_pos = 0;
+	ctx->cur_op = 0;
+	ctx->stack_size = 0;
+	ctx->epilog_pos = -1;
+	jit->reg_instrs = NULL;
+	values_free(&ctx->scratch);
+	values_free(&ctx->persists);
+	int_arr_free(&ctx->jump_regs);
+	int_arr_free(&ctx->pack_movs);
+	ctx->cur_block = NULL;
+	ctx->ncalls = (int*)hl_zalloc(&jit->falloc,sizeof(int) * (jit->instr_count + 1));
+	for(int i=0;i<jit->instr_count;i++) {
+		einstr *e = jit->instrs + i;
+		ctx->ncalls[i+1] = ctx->ncalls[i] + (IS_CALL(e->op) && e->mode != M_NORET ? 1 : 0);
+	}
+	ctx->blocks_phis = (int_arr*)hl_zalloc(&jit->falloc,sizeof(int_arr) * jit->block_count);
+	ctx->values = (value_info*)hl_zalloc(&jit->falloc,sizeof(value_info) * nvalues);
+	for(int i=1;i<nvalues;i++) {
+		value_info *v = VAL(i);
+		v->reg = UNUSED;
+		v->pref_reg = UNUSED;
+		v->stack_pos = INVALID;
+		v->last_read = -1;
+		v->overwrite = -1;
+		if( i < jit->value_count ) {
+			v->id = i;
+			v->start = jit->values_writes[i];
+			v->mode = jit->instrs[v->start].mode;
+		} else {
+			v->id = -(i-jit->value_count) - 1;
+			v->mode = M_NONE;
+		}
+	}
+	for(int i=0;i<jit->track_count;i++) {
+		int v = jit->values_track[(i<<1)|1];
+		VAL(v)->tracked = jit->values_track[i<<1] + 1;
+	}
+	for(int b=0;b<jit->block_count;b++) {
+		eblock *bl = jit->blocks + b;
+		for(int p=0;p<bl->phi_count;p++) {
+			ephi *ph = bl->phis + p;
+			value_info *v = VAL_REG(ph->value);
+			v->start = bl->start_pos;
+			v->mode = ph->mode;
+			for(int k=0;k<ph->nvalues;k++) {
+				int t = VAL_REG(ph->values[k])->tracked;
+				if( t && (!v->tracked || t < v->tracked) ) v->tracked = t;
+			}
+		}
+	}
+	regs_compute_liveness(ctx);
+	regs_extend_debug_liveness(ctx);
+	regs_assign_regs(ctx);
+	regs_emit_instrs(ctx);
+	hl_regs_flush(ctx->jit);
+}
+
+
+void hl_regs_alloc( jit_ctx *jit ) {
+	regs_ctx *ctx = malloc(sizeof(regs_ctx));
+	memset(ctx,0,sizeof(regs_ctx));
+	ctx->jit = jit;
+	jit->regs = ctx;
+}
+
+void hl_regs_free( jit_ctx *jit ) {
+	regs_ctx *ctx = jit->regs;
+	free(ctx->pos_map);
+	free(ctx->instrs);
+	free(ctx->out_write);
+	free(ctx);
+}
+

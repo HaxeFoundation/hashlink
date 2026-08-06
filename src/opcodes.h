@@ -67,8 +67,8 @@ OP_BEGIN
 	OP(OIncr,R,X,X)
 	OP(ODecr,R,X,X)
 
-	OP(OCall0,R,R,X)
-	OP(OCall1,R,R,R)
+	OP(OCall0,R,C,X)
+	OP(OCall1,R,C,R)
 	OP(OCall2,R,AR,4)
 	OP(OCall3,R,AR,5)
 	OP(OCall4,R,AR,6)
@@ -78,17 +78,17 @@ OP_BEGIN
 	OP(OCallClosure,R,AR,VAR_ARGS)
 
 	OP(OStaticClosure,R,G,X)
-	OP(OInstanceClosure,R,R,G)
+	OP(OInstanceClosure,R,C,R)
 	OP(OVirtualClosure,R,R,G)
 
 	OP(OGetGlobal,R,G,X)
-	OP(OSetGlobal,R_NW,G,X)
-	OP(OField,R,R,C)
-	OP(OSetField,R_NW,R,C)
-	OP(OGetThis,R,C,X)
-	OP(OSetThis,R_NW,R,X)
+	OP(OSetGlobal,G,R,X)
+	OP(OField,R,R,G)
+	OP(OSetField,R_NW,G,R)
+	OP(OGetThis,R,G,X)
+	OP(OSetThis,G,R,X)
 	OP(ODynGet,R,R,C)
-	OP(ODynSet,R_NW,R,C)
+	OP(ODynSet,R_NW,C,R)
 
 	OP(OJTrue,R_NW,J,X)
 	OP(OJFalse,R_NW,J,X)
@@ -134,7 +134,7 @@ OP_BEGIN
 
 	OP(ONew,R,X,X)
 	OP(OArraySize,R,R,X)
-	OP(OType,R,R,X)
+	OP(OType,R,G,X)
 	OP(OGetType,R,R,X)
 	OP(OGetTID,R,R,X)
 

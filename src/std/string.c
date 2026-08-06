@@ -374,7 +374,7 @@ HL_PRIM vbyte *hl_url_decode( vbyte *str, int *len ) {
 
 DEFINE_PRIM(_BYTES,itos,_I32 _REF(_I32));
 DEFINE_PRIM(_BYTES,ftos,_F64 _REF(_I32));
-DEFINE_PRIM(_BYTES,value_to_string,_DYN _REF(_I32));
+DEFINE_PRIM(_BYTES HL_CALLB,value_to_string,_DYN _REF(_I32));
 DEFINE_PRIM(_I32,ucs2length,_BYTES _I32);
 DEFINE_PRIM(_BYTES,utf8_to_utf16,_BYTES _I32 _REF(_I32));
 DEFINE_PRIM(_BYTES,utf16_to_utf8,_BYTES _I32 _REF(_I32));
