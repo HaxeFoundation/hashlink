@@ -78,6 +78,10 @@ abstract CommandQueue(Resource) {
 	public function executeCommandLists( commandLists : hl.CArray<CommandList>, count : Int ) {}
 	public function signal( fence : Fence, value : Int64 ) {}
 	public function wait( fence : Fence, value : Int64 ) {}
+	public function present( vsync : Bool ) {}
+	public function suspend() {}
+	public function resume() {}
+	public function getTimestampFrequency() : Int64 { return 0; }
 	static function create( type : CommandListType ) : Resource { return null; }
 }
 
@@ -1754,15 +1758,6 @@ class Dx12 {
 		return false;
 	}
 
-	public static function present( directQueue : CommandQueue, vsync : Bool ) {
-	}
-
-	public static function suspend( directQueue : CommandQueue ) {
-	}
-
-	public static function resume( directQueue : CommandQueue ) {
-	}
-
 	public static function getConstant( index : Int ) : Int {
 		return 0;
 	}
@@ -1785,11 +1780,6 @@ class Dx12 {
 			out.push(@:privateAccess String.fromUCS2(arr[i]));
 		}
 		return out;
-	}
-
-	@:hlNative("dx12","get_timestamp_frequency")
-	public static function getTimestampFrequency( directQueue : CommandQueue ) : Int64 {
-		return 0;
 	}
 
 	@:hlNative("dx12", "list_devices")

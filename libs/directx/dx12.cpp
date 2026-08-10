@@ -499,20 +499,6 @@ HL_PRIM int64 HL_NAME(get_driver_version)() {
 	return v.i64;
 }
 
-HL_PRIM void HL_NAME(suspend)( ID3D12CommandQueue* directQueue ) {
-#ifdef HL_XBS
-	// Must be called from the render thread
-	CHKERR(directQueue->SuspendX(0));
-#endif
-}
-
-HL_PRIM void HL_NAME(resume)( ID3D12CommandQueue* directQueue ) {
-#ifdef HL_XBS
-	CHKERR(directQueue->ResumeX());
-	register_frame_events();
-#endif
-}
-
 HL_PRIM void HL_NAME(resize)( ID3D12CommandQueue* directQueue, int width, int height, int buffer_count, DXGI_FORMAT format ) {
 	dx_driver *drv = static_driver;
 #ifndef HL_XBS
@@ -560,25 +546,6 @@ HL_PRIM void HL_NAME(resize)( ID3D12CommandQueue* directQueue, int width, int he
 	}
 
 	register_frame_events();
-#endif
-}
-
-HL_PRIM void HL_NAME(present)( ID3D12CommandQueue* directQueue, bool vsync ) {
-	dx_driver *drv = static_driver;
-#ifndef HL_XBS
-	UINT syncInterval = vsync ? 1 : 0;
-	UINT presentFlags = syncInterval == 0 ? DXGI_PRESENT_ALLOW_TEARING : 0;
-	CHKERR(drv->swapchain->Present(syncInterval, presentFlags));
-#else
-	D3D12XBOX_PRESENT_PLANE_PARAMETERS planeParameters = {};
-	planeParameters.Token = drv->pipelineToken;
-	planeParameters.ResourceCount = 1;
-	planeParameters.ppResources = &drv->swapBuffers[drv->backBufferIndex];
-	CHKERR(directQueue->PresentX(1, &planeParameters, nullptr));
-	drv->backBufferIndex = (drv->backBufferIndex + 1) % drv->swapBufferCount;
-	// Prepare next pipeline token
-	drv->pipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
-	CHKERR(drv->device->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &drv->pipelineToken));
 #endif
 }
 
@@ -630,12 +597,6 @@ HL_PRIM const uchar *HL_NAME(get_device_name)() {
 	return (uchar*)hl_copy_bytes((vbyte*)desc.Description, (int)(ustrlen((uchar*)desc.Description) + 1) * 2);
 }
 
-HL_PRIM int64 HL_NAME(get_timestamp_frequency)( ID3D12CommandQueue* directQueue ) {
-	UINT64 f = 0;
-	CHKERR(directQueue->GetTimestampFrequency(&f));
-	return (int64)f;
-}
-
 #ifndef HL_XBS
 HL_PRIM void HL_NAME(query_video_memory_info)( int group, DXGI_QUERY_VIDEO_MEMORY_INFO *mem ) {
 	CHKERR(static_driver->adapter->QueryVideoMemoryInfo(0,(DXGI_MEMORY_SEGMENT_GROUP)group,mem));
@@ -651,14 +612,10 @@ HL_PRIM void HL_NAME(query_video_memory_info)( int group, void *mem ) {
 DEFINE_PRIM(_ARR, list_devices, _NO_ARG);
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _BYTES);
 DEFINE_PRIM(_VOID, resize, _RES _I32 _I32 _I32 _I32);
-DEFINE_PRIM(_VOID, present, _RES _BOOL);
-DEFINE_PRIM(_VOID, suspend, _RES);
-DEFINE_PRIM(_VOID, resume, _RES);
 DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
 DEFINE_PRIM(_VOID, suppress_debug_messages, _STRUCT);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
-DEFINE_PRIM(_I64, get_timestamp_frequency, _RES);
 DEFINE_PRIM(_I64, get_driver_version, _NO_ARG);
 DEFINE_PRIM(_VOID, query_video_memory_info, _I32 _STRUCT);
 
@@ -1126,6 +1083,45 @@ HL_PRIM void HL_NAME(command_queue_wait)(ID3D12CommandQueue* q, ID3D12Fence* fen
 	q->Wait(fence, value);
 }
 
+HL_PRIM void HL_NAME(command_queue_present)(ID3D12CommandQueue* q, bool vsync) {
+	dx_driver *drv = static_driver;
+#ifndef HL_XBS
+	UINT syncInterval = vsync ? 1 : 0;
+	UINT presentFlags = syncInterval == 0 ? DXGI_PRESENT_ALLOW_TEARING : 0;
+	CHKERR(drv->swapchain->Present(syncInterval, presentFlags));
+#else
+	D3D12XBOX_PRESENT_PLANE_PARAMETERS planeParameters = {};
+	planeParameters.Token = drv->pipelineToken;
+	planeParameters.ResourceCount = 1;
+	planeParameters.ppResources = &drv->swapBuffers[drv->backBufferIndex];
+	CHKERR(q->PresentX(1, &planeParameters, nullptr));
+	drv->backBufferIndex = (drv->backBufferIndex + 1) % drv->swapBufferCount;
+	// Prepare next pipeline token
+	drv->pipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
+	CHKERR(drv->device->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &drv->pipelineToken));
+#endif
+}
+
+HL_PRIM void HL_NAME(command_queue_suspend)(ID3D12CommandQueue* q) {
+#ifdef HL_XBS
+	// Must be called from the render thread
+	CHKERR(q->SuspendX(0));
+#endif
+}
+
+HL_PRIM void HL_NAME(command_queue_resume)(ID3D12CommandQueue* q) {
+#ifdef HL_XBS
+	CHKERR(q->ResumeX());
+	register_frame_events();
+#endif
+}
+
+HL_PRIM int64 HL_NAME(command_queue_get_timestamp_frequency)(ID3D12CommandQueue* q) {
+	UINT64 f = 0;
+	CHKERR(q->GetTimestampFrequency(&f));
+	return (int64)f;
+}
+
 HL_PRIM ID3D12CommandAllocator *HL_NAME(command_allocator_create)( D3D12_COMMAND_LIST_TYPE type ) {
 	ID3D12CommandAllocator *a = NULL;
 	DXERR(static_driver->device->CreateCommandAllocator(type,IID_PPV_ARGS(&a)));
@@ -1296,6 +1292,10 @@ DEFINE_PRIM(_VOID, command_queue_execute_command_list, _RES _RES);
 DEFINE_PRIM(_VOID, command_queue_execute_command_lists, _RES _ABSTRACT(hl_carray) _I32);
 DEFINE_PRIM(_VOID, command_queue_signal, _RES _RES _I64);
 DEFINE_PRIM(_VOID, command_queue_wait, _RES _RES _I64);
+DEFINE_PRIM(_VOID, command_queue_present, _RES _BOOL);
+DEFINE_PRIM(_VOID, command_queue_suspend, _RES);
+DEFINE_PRIM(_VOID, command_queue_resume, _RES);
+DEFINE_PRIM(_I64, command_queue_get_timestamp_frequency, _RES);
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
 DEFINE_PRIM(_VOID, command_allocator_reset, _RES);
 DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);
