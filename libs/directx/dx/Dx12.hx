@@ -81,6 +81,7 @@ abstract CommandQueue(Resource) {
 	public function present( vsync : Bool ) {}
 	public function suspend() {}
 	public function resume() {}
+	@:hlNative("dx12","command_queue_get_timestamp_frequency")
 	public function getTimestampFrequency() : Int64 { return 0; }
 	static function create( type : CommandListType ) : Resource { return null; }
 }
