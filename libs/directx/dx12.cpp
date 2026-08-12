@@ -254,7 +254,6 @@ vclosure* GpuCrashTracker::s_pfnOnGpuCrashFile = nullptr;
 
 typedef struct {
 	HWND wnd;
-	ID3D12CommandQueue *commandQueue;
 	GpuCrashTracker* gpuCrashTracker;
 #ifndef HL_XBS
 	IDXGIFactory4 *factory;
@@ -474,16 +473,6 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *de
 	return drv;
 }
 
-HL_PRIM void HL_NAME(create_command_queue)() {
-	dx_driver* drv = static_driver;
-	D3D12_COMMAND_QUEUE_DESC desc = {};
-	desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-	desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	desc.NodeMask = CURRENT_NODEMASK;
-	CHKERR(drv->device->CreateCommandQueue(&desc, IID_PPV_ARGS(&drv->commandQueue)));
-}
-
 #ifdef HL_XBS
 void register_frame_events() {
 	dx_driver *drv = static_driver;
@@ -510,21 +499,7 @@ HL_PRIM int64 HL_NAME(get_driver_version)() {
 	return v.i64;
 }
 
-HL_PRIM void HL_NAME(suspend)() {
-#ifdef HL_XBS
-	// Must be called from the render thread
-	CHKERR(static_driver->commandQueue->SuspendX(0));
-#endif
-}
-
-HL_PRIM void HL_NAME(resume)() {
-#ifdef HL_XBS
-	CHKERR(static_driver->commandQueue->ResumeX());
-	register_frame_events();
-#endif
-}
-
-HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORMAT format ) {
+HL_PRIM void HL_NAME(resize)( ID3D12CommandQueue* directQueue, int width, int height, int buffer_count, DXGI_FORMAT format ) {
 	dx_driver *drv = static_driver;
 #ifndef HL_XBS
 	if( drv->swapchain ) {
@@ -541,7 +516,7 @@ HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORM
 		desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
 		IDXGISwapChain1 *swapchain = NULL;
-		drv->factory->CreateSwapChainForHwnd(drv->commandQueue,drv->wnd,&desc,NULL,NULL,&swapchain);
+		drv->factory->CreateSwapChainForHwnd(directQueue,drv->wnd,&desc,NULL,NULL,&swapchain);
 		if( !swapchain ) CHKERR(E_INVALIDARG);
 		swapchain->QueryInterface(IID_PPV_ARGS(&drv->swapchain));
 		drv->factory->MakeWindowAssociation(drv->wnd, DXGI_MWA_NO_ALT_ENTER);
@@ -574,39 +549,12 @@ HL_PRIM void HL_NAME(resize)( int width, int height, int buffer_count, DXGI_FORM
 #endif
 }
 
-HL_PRIM void HL_NAME(present)( bool vsync ) {
-	dx_driver *drv = static_driver;
-#ifndef HL_XBS
-	UINT syncInterval = vsync ? 1 : 0;
-	UINT presentFlags = syncInterval == 0 ? DXGI_PRESENT_ALLOW_TEARING : 0;
-	CHKERR(drv->swapchain->Present(syncInterval, presentFlags));
-#else
-	D3D12XBOX_PRESENT_PLANE_PARAMETERS planeParameters = {};
-	planeParameters.Token = drv->pipelineToken;
-	planeParameters.ResourceCount = 1;
-	planeParameters.ppResources = &drv->swapBuffers[drv->backBufferIndex];
-	CHKERR(drv->commandQueue->PresentX(1, &planeParameters, nullptr));
-	drv->backBufferIndex = (drv->backBufferIndex + 1) % drv->swapBufferCount;
-	// Prepare next pipeline token
-	drv->pipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
-	CHKERR(drv->device->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &drv->pipelineToken));
-#endif
-}
-
 HL_PRIM int HL_NAME(get_current_back_buffer_index)() {
 #ifndef HL_XBS
 	return static_driver->swapchain->GetCurrentBackBufferIndex();
 #else
 	return static_driver->backBufferIndex;
 #endif
-}
-
-HL_PRIM void HL_NAME(signal)( ID3D12Fence *fence, int64 value ) {
-	static_driver->commandQueue->Signal(fence,value);
-}
-
-HL_PRIM void HL_NAME(wait)( ID3D12Fence* fence, int64 value ) {
-	static_driver->commandQueue->Wait(fence,value);
 }
 
 HL_PRIM void HL_NAME(flush_messages)() {
@@ -649,12 +597,6 @@ HL_PRIM const uchar *HL_NAME(get_device_name)() {
 	return (uchar*)hl_copy_bytes((vbyte*)desc.Description, (int)(ustrlen((uchar*)desc.Description) + 1) * 2);
 }
 
-HL_PRIM int64 HL_NAME(get_timestamp_frequency)() {
-	UINT64 f = 0;
-	CHKERR(static_driver->commandQueue->GetTimestampFrequency(&f));
-	return (int64)f;
-}
-
 #ifndef HL_XBS
 HL_PRIM void HL_NAME(query_video_memory_info)( int group, DXGI_QUERY_VIDEO_MEMORY_INFO *mem ) {
 	CHKERR(static_driver->adapter->QueryVideoMemoryInfo(0,(DXGI_MEMORY_SEGMENT_GROUP)group,mem));
@@ -669,18 +611,11 @@ HL_PRIM void HL_NAME(query_video_memory_info)( int group, void *mem ) {
 
 DEFINE_PRIM(_ARR, list_devices, _NO_ARG);
 DEFINE_PRIM(_DRIVER, create, _ABSTRACT(dx_window) _I32 _BYTES);
-DEFINE_PRIM(_VOID, create_command_queue, _NO_ARG);
-DEFINE_PRIM(_VOID, resize, _I32 _I32 _I32 _I32);
-DEFINE_PRIM(_VOID, present, _BOOL);
-DEFINE_PRIM(_VOID, suspend, _NO_ARG);
-DEFINE_PRIM(_VOID, resume, _NO_ARG);
+DEFINE_PRIM(_VOID, resize, _RES _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_I32, get_current_back_buffer_index, _NO_ARG);
-DEFINE_PRIM(_VOID, signal, _RES _I64);
-DEFINE_PRIM(_VOID, wait, _RES _I64);
 DEFINE_PRIM(_VOID, flush_messages, _NO_ARG);
 DEFINE_PRIM(_VOID, suppress_debug_messages, _STRUCT);
 DEFINE_PRIM(_BYTES, get_device_name, _NO_ARG);
-DEFINE_PRIM(_I64, get_timestamp_frequency, _NO_ARG);
 DEFINE_PRIM(_I64, get_driver_version, _NO_ARG);
 DEFINE_PRIM(_VOID, query_video_memory_info, _I32 _STRUCT);
 
@@ -1148,6 +1083,45 @@ HL_PRIM void HL_NAME(command_queue_wait)(ID3D12CommandQueue* q, ID3D12Fence* fen
 	q->Wait(fence, value);
 }
 
+HL_PRIM void HL_NAME(command_queue_present)(ID3D12CommandQueue* q, bool vsync) {
+	dx_driver *drv = static_driver;
+#ifndef HL_XBS
+	UINT syncInterval = vsync ? 1 : 0;
+	UINT presentFlags = syncInterval == 0 ? DXGI_PRESENT_ALLOW_TEARING : 0;
+	CHKERR(drv->swapchain->Present(syncInterval, presentFlags));
+#else
+	D3D12XBOX_PRESENT_PLANE_PARAMETERS planeParameters = {};
+	planeParameters.Token = drv->pipelineToken;
+	planeParameters.ResourceCount = 1;
+	planeParameters.ppResources = &drv->swapBuffers[drv->backBufferIndex];
+	CHKERR(q->PresentX(1, &planeParameters, nullptr));
+	drv->backBufferIndex = (drv->backBufferIndex + 1) % drv->swapBufferCount;
+	// Prepare next pipeline token
+	drv->pipelineToken = D3D12XBOX_FRAME_PIPELINE_TOKEN_NULL;
+	CHKERR(drv->device->WaitFrameEventX(D3D12XBOX_FRAME_EVENT_ORIGIN, INFINITE, nullptr, D3D12XBOX_WAIT_FRAME_EVENT_FLAG_NONE, &drv->pipelineToken));
+#endif
+}
+
+HL_PRIM void HL_NAME(command_queue_suspend)(ID3D12CommandQueue* q) {
+#ifdef HL_XBS
+	// Must be called from the render thread
+	CHKERR(q->SuspendX(0));
+#endif
+}
+
+HL_PRIM void HL_NAME(command_queue_resume)(ID3D12CommandQueue* q) {
+#ifdef HL_XBS
+	CHKERR(q->ResumeX());
+	register_frame_events();
+#endif
+}
+
+HL_PRIM int64 HL_NAME(command_queue_get_timestamp_frequency)(ID3D12CommandQueue* q) {
+	UINT64 f = 0;
+	CHKERR(q->GetTimestampFrequency(&f));
+	return (int64)f;
+}
+
 HL_PRIM ID3D12CommandAllocator *HL_NAME(command_allocator_create)( D3D12_COMMAND_LIST_TYPE type ) {
 	ID3D12CommandAllocator *a = NULL;
 	DXERR(static_driver->device->CreateCommandAllocator(type,IID_PPV_ARGS(&a)));
@@ -1170,11 +1144,6 @@ HL_PRIM void HL_NAME(command_list_close)( ID3D12GraphicsCommandList *l ) {
 
 HL_PRIM void HL_NAME(command_list_reset)( ID3D12GraphicsCommandList *l, ID3D12CommandAllocator *alloc, ID3D12PipelineState *state ) {
 	CHKERR(l->Reset(alloc,state));
-}
-
-HL_PRIM void HL_NAME(command_list_execute)( ID3D12GraphicsCommandList *l ) {
-	ID3D12CommandList* const commandLists[] = { l };
-	static_driver->commandQueue->ExecuteCommandLists(1, commandLists);
 }
 
 HL_PRIM void HL_NAME(command_list_resource_barrier)( ID3D12GraphicsCommandList *l, D3D12_RESOURCE_BARRIER *barrier ) {
@@ -1323,6 +1292,10 @@ DEFINE_PRIM(_VOID, command_queue_execute_command_list, _RES _RES);
 DEFINE_PRIM(_VOID, command_queue_execute_command_lists, _RES _ABSTRACT(hl_carray) _I32);
 DEFINE_PRIM(_VOID, command_queue_signal, _RES _RES _I64);
 DEFINE_PRIM(_VOID, command_queue_wait, _RES _RES _I64);
+DEFINE_PRIM(_VOID, command_queue_present, _RES _BOOL);
+DEFINE_PRIM(_VOID, command_queue_suspend, _RES);
+DEFINE_PRIM(_VOID, command_queue_resume, _RES);
+DEFINE_PRIM(_I64, command_queue_get_timestamp_frequency, _RES);
 DEFINE_PRIM(_RES, command_allocator_create, _I32);
 DEFINE_PRIM(_VOID, command_allocator_reset, _RES);
 DEFINE_PRIM(_RES, command_list_create, _I32 _RES _RES);
@@ -1330,7 +1303,6 @@ DEFINE_PRIM(_VOID, command_list_close, _RES);
 DEFINE_PRIM(_VOID, command_list_reset, _RES _RES _RES);
 DEFINE_PRIM(_VOID, command_list_resource_barrier, _RES _STRUCT);
 DEFINE_PRIM(_VOID, command_list_resource_barriers, _RES _ABSTRACT(hl_carray) _I32);
-DEFINE_PRIM(_VOID, command_list_execute, _RES);
 DEFINE_PRIM(_VOID, command_list_clear_render_target_view, _RES _I64 _STRUCT);
 DEFINE_PRIM(_VOID, command_list_clear_depth_stencil_view, _RES _I64 _I32 _F32 _I32);
 DEFINE_PRIM(_VOID, command_list_draw_instanced, _RES _I32 _I32 _I32 _I32);
