@@ -228,7 +228,7 @@ static void sentinel_loop( vsentinel *s ) {
 				// simulate a call
 #				ifdef HL_64
 				int_val* rsp = (int_val*)regs.Rsp;
-				// ensure the stack is aligned to 16 bytes 
+				// ensure the stack is aligned to 16 bytes
 				rsp = (int_val*)((int_val)rsp & ~15);
 				*--rsp = (int_val)regs.Rip;
 				regs.Rsp = (int_val)rsp;
@@ -276,6 +276,26 @@ HL_PRIM void HL_NAME(ui_sentinel_pause)( vsentinel *s, bool pause ) {
 
 HL_PRIM bool HL_NAME(ui_sentinel_is_paused)( vsentinel *s ) {
 	return s->pause;
+}
+
+static void reattach_std() {
+	freopen("CONIN$","r",stdin);
+	freopen("CONOUT$","w",stdout);
+	freopen("CONOUT$","w",stderr);
+}
+
+HL_PRIM bool HL_NAME(ui_create_console)() {
+	if( !AllocConsole() )
+		return false;
+	reattach_std();
+	return true;
+}
+
+HL_PRIM bool HL_NAME(ui_attach_console)( int pid ) {
+	if( !AttachConsole(pid) )
+		return false;
+	reattach_std();
+	return true;
 }
 
 HL_PRIM void HL_NAME(ui_close_console)() {
@@ -390,6 +410,8 @@ DEFINE_PRIM(_VOID, ui_win_set_enable, _WIN _BOOL);
 DEFINE_PRIM(_VOID, ui_win_destroy, _WIN);
 DEFINE_PRIM(_I32, ui_loop, _BOOL);
 DEFINE_PRIM(_VOID, ui_stop_loop, _NO_ARG);
+DEFINE_PRIM(_BOOL, ui_create_console, _NO_ARG);
+DEFINE_PRIM(_BOOL, ui_attach_console, _I32);
 DEFINE_PRIM(_VOID, ui_close_console, _NO_ARG);
 
 DEFINE_PRIM(_SENTINEL, ui_start_sentinel, _F64 _FUN(_VOID,_NO_ARG));

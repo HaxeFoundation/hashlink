@@ -58,6 +58,14 @@ HL_PRIM bool HL_NAME(ui_sentinel_is_paused)( vsentinel *s ) {
 	return false;
 }
 
+HL_PRIM bool HL_NAME(ui_create_console)() {
+	return false;
+}
+
+HL_PRIM bool HL_NAME(ui_attach_console)( int pid ) {
+	return false;
+}
+
 HL_PRIM void HL_NAME(ui_close_console)() {
 }
 
@@ -86,6 +94,8 @@ DEFINE_PRIM(_VOID, ui_win_set_enable, _WIN _BOOL);
 DEFINE_PRIM(_VOID, ui_win_destroy, _WIN);
 DEFINE_PRIM(_I32, ui_loop, _BOOL);
 DEFINE_PRIM(_VOID, ui_stop_loop, _NO_ARG);
+DEFINE_PRIM(_BOOL, ui_create_console, _NO_ARG);
+DEFINE_PRIM(_BOOL, ui_attach_console, _I32);
 DEFINE_PRIM(_VOID, ui_close_console, _NO_ARG);
 
 DEFINE_PRIM(_SENTINEL, ui_start_sentinel, _F64 _FUN(_VOID,_NO_ARG));
