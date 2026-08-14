@@ -172,6 +172,10 @@ HL_PRIM void HL_NAME(gl_cull_face)( int face ) {
 	glCullFace(face);
 }
 
+HL_PRIM void HL_NAME(gl_front_face)( int direction ) {
+	glFrontFace(direction);
+}
+
 HL_PRIM void HL_NAME(gl_blend_func)( int src, int dst ) {
 	glBlendFunc(src, dst);
 }
@@ -573,8 +577,32 @@ HL_PRIM void HL_NAME(gl_uniform1i)( vdynamic *u, int i ) {
 	glUniform1i(u->v.i, i);
 }
 
+HL_PRIM void HL_NAME(gl_uniform3fv)( vdynamic *u, vbyte *buffer, int bufPos, int count ) {
+	glUniform3fv(u->v.i, count, (float*)buffer + bufPos);
+}
+
 HL_PRIM void HL_NAME(gl_uniform4fv)( vdynamic *u, vbyte *buffer, int bufPos, int count ) {
 	glUniform4fv(u->v.i, count, (float*)buffer + bufPos);
+}
+
+HL_PRIM void HL_NAME(gl_uniform1f)( vdynamic *u, double x ) {
+	glUniform1f(u->v.i, (float)x);
+}
+
+HL_PRIM void HL_NAME(gl_uniform2f)( vdynamic *u, double x, double y ) {
+	glUniform2f(u->v.i, (float)x, (float)y);
+}
+
+HL_PRIM void HL_NAME(gl_uniform3f)( vdynamic *u, double x, double y, double z ) {
+	glUniform3f(u->v.i, (float)x, (float)y, (float)z);
+}
+
+HL_PRIM void HL_NAME(gl_uniform4f)( vdynamic *u, double x, double y, double z, double w ) {
+	glUniform4f(u->v.i, (float)x, (float)y, (float)z, (float)w);
+}
+
+HL_PRIM void HL_NAME(gl_uniform_matrix3fv)( vdynamic *u, bool transpose, vbyte *buffer, int bufPos, int count ) {
+	glUniformMatrix3fv(u->v.i, count, transpose ? GL_TRUE : GL_FALSE, (float*)buffer + bufPos);
 }
 
 HL_PRIM void HL_NAME(gl_uniform_matrix4fv)( vdynamic *u, bool transpose, vbyte *buffer, int bufPos, int count ) {
@@ -758,6 +786,7 @@ DEFINE_PRIM(_VOID,gl_polygon_offset,_F32 _F32);
 DEFINE_PRIM(_VOID,gl_enable,_I32);
 DEFINE_PRIM(_VOID,gl_disable,_I32);
 DEFINE_PRIM(_VOID,gl_cull_face,_I32);
+DEFINE_PRIM(_VOID,gl_front_face,_I32);
 DEFINE_PRIM(_VOID,gl_blend_func,_I32 _I32);
 DEFINE_PRIM(_VOID,gl_blend_func_separate,_I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_blend_equation,_I32);
@@ -832,8 +861,14 @@ DEFINE_PRIM(_VOID,gl_vertex_attrib_pointer,_I32 _I32 _I32 _BOOL _I32 _I32);
 DEFINE_PRIM(_VOID,gl_vertex_attrib_ipointer,_I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_delete_buffer,_NULL(_I32));
 DEFINE_PRIM(_VOID,gl_uniform1i,_NULL(_I32) _I32);
+DEFINE_PRIM(_VOID,gl_uniform3fv,_NULL(_I32) _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_uniform4fv,_NULL(_I32) _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,gl_uniform_matrix3fv,_NULL(_I32) _BOOL _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID,gl_uniform_matrix4fv,_NULL(_I32) _BOOL _BYTES _I32 _I32);
+DEFINE_PRIM(_VOID,gl_uniform1f,_NULL(_I32) _F64);
+DEFINE_PRIM(_VOID,gl_uniform2f,_NULL(_I32) _F64 _F64);
+DEFINE_PRIM(_VOID,gl_uniform3f,_NULL(_I32) _F64 _F64 _F64);
+DEFINE_PRIM(_VOID,gl_uniform4f,_NULL(_I32) _F64 _F64 _F64 _F64);
 DEFINE_PRIM(_VOID,gl_bind_image_texture,_I32 _I32 _I32 _BOOL _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_dispatch_compute,_I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_memory_barrier,_I32);
