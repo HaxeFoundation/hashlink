@@ -907,6 +907,7 @@ HL_PRIM hl_thread *hl_thread_start( void *callback, void *param, bool withGC ) {
 }
 
 static void hl_run_thread( vclosure *c ) {
+	hl_jit_thread_init();
 	bool isExc;
 	vdynamic *exc = hl_dyn_call_safe(c,NULL,0,&isExc);
 	if( !isExc )

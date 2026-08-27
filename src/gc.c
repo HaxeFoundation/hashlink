@@ -28,6 +28,11 @@
 #	include <sys/mman.h>
 #endif
 
+#if defined(__APPLE__) && defined(__aarch64__)
+#	include <pthread.h>
+#	include <libkern/OSCacheControl.h>
+#endif
+
 #if defined(HL_EMSCRIPTEN)
 #	include <emscripten/heap.h>
 #endif
@@ -1152,10 +1157,17 @@ retry_jit_alloc:
 	return malloc(size);
 #elif defined(HL_CONSOLE)
 	return NULL;
+#elif defined(__APPLE__) && defined(__aarch64__)
+	// Hardened runtime forbids RWX pages; MAP_JIT gives a page whose mode
+	// is toggled per-thread via pthread_jit_write_protect_np(). Binary must
+	// be signed with com.apple.security.cs.allow-jit (see CMake target).
+	void *p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,
+		MAP_PRIVATE|MAP_ANONYMOUS|MAP_JIT,-1,0);
+	return p == MAP_FAILED ? NULL : p;
 #else
 	void *p;
 	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,(MAP_PRIVATE|MAP_ANONYMOUS),-1,0);
-	return p;
+	return p == MAP_FAILED ? NULL : p;
 #endif
 }
 
@@ -1164,6 +1176,32 @@ HL_PRIM void hl_free_executable_memory( void *c, int size ) {
 	VirtualFree(c,0,MEM_RELEASE);
 #elif !defined(HL_CONSOLE)
 	munmap(c, size);
+#endif
+}
+
+HL_PRIM void hl_jit_write_begin( void ) {
+#if defined(__APPLE__) && defined(__aarch64__)
+	pthread_jit_write_protect_np(0); // pages become writable for this thread
+#endif
+}
+
+HL_PRIM void hl_jit_thread_init( void ) {
+#if defined(__APPLE__) && defined(__aarch64__)
+	// New thread starts in "writable" mode by default; switch to
+	// "executable" so the upcoming BLR into the shared JIT mapping works.
+	pthread_jit_write_protect_np(1);
+#endif
+}
+
+HL_PRIM void hl_jit_write_end( void *code, int size ) {
+#if defined(__APPLE__) && defined(__aarch64__)
+	pthread_jit_write_protect_np(1); // back to executable
+	sys_icache_invalidate(code, (size_t)size);
+#elif defined(__aarch64__) || defined(__arm__)
+	// Linux/Android ARM(64): no W^X enforcement, but i-cache must still be flushed.
+	__builtin___clear_cache((char*)code, (char*)code + size);
+#else
+	(void)code; (void)size;
 #endif
 }
 

@@ -20,7 +20,19 @@ include(FindPkgConfig)
 include(CTest)
 
 set(WITH_VM_DEFAULT ON)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
+# Detect whether we'll be building the AArch64 JIT backend. On macOS we trust
+# CMAKE_OSX_ARCHITECTURES when it's set (since uname reports the host CPU,
+# not the build CPU). Elsewhere CMAKE_SYSTEM_PROCESSOR is authoritative.
+set(HL_JIT_AARCH64 OFF)
+if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+    if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+        set(HL_JIT_AARCH64 ON)
+    endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+    set(HL_JIT_AARCH64 ON)
+endif()
+# 32-bit ARM still has no JIT backend — fall back to disabling the VM there.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm$|^armv7" AND NOT HL_JIT_AARCH64)
     set(WITH_VM_DEFAULT OFF)
 endif()
 
@@ -225,9 +237,14 @@ else()
 endif()
 
 if (WITH_VM)
+    if(HL_JIT_AARCH64)
+        set(_HL_JIT_SRC src/jit_arm64.c)
+    else()
+        set(_HL_JIT_SRC src/jit.c)
+    endif()
     add_executable(hl
         src/code.c
-        src/jit.c
+        ${_HL_JIT_SRC}
         src/main.c
         src/module.c
         src/debugger.c
@@ -237,6 +254,18 @@ if (WITH_VM)
         set_target_properties(hl PROPERTIES
             INSTALL_RPATH "@executable_path;@executable_path/../${CMAKE_INSTALL_LIBDIR}"
         )
+        # On Apple Silicon, MAP_JIT pages require the binary to carry the
+        # com.apple.security.cs.allow-jit entitlement. ad-hoc-sign with the
+        # entitlement file shipped in other/osx/hl_jit.entitlements so a
+        # freshly built `hl` can JIT without the user having to re-sign.
+        if(HL_JIT_AARCH64)
+            add_custom_command(TARGET hl POST_BUILD
+                COMMAND codesign --force --sign - --entitlements
+                    "${CMAKE_CURRENT_SOURCE_DIR}/other/osx/hl_jit.entitlements"
+                    "$<TARGET_FILE:hl>"
+                COMMENT "Signing hl with allow-jit entitlement"
+            )
+        endif()
     elseif (UNIX)
         set_target_properties(hl PROPERTIES
             INSTALL_RPATH "$ORIGIN;$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
