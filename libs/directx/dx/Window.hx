@@ -220,6 +220,10 @@ class Window {
 		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null, registry);
 	}
 
+	public function isZoomed() : Bool {
+		return winIsZoomed(win);
+	}
+
 	public static function getMonitors() : Array<Monitor> {
 		var last = null;
 		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUCS2(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
@@ -303,6 +307,11 @@ class Window {
 	@:hlNative("?directx", "win_get_display_settings")
 	static function winGetDisplaySettings(monitor : hl.Bytes) : hl.NativeArray<Dynamic> {
 		return null;
+	}
+
+	@:hlNative("?directx", "win_is_zoomed")
+	static function winIsZoomed(win: WinPtr) : Bool {
+		return false;
 	}
 
 	@:hlNative("?directx", "win_get_current_display_setting")
