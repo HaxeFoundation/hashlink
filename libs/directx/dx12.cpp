@@ -316,7 +316,7 @@ HL_PRIM void HL_NAME(set_device)(ID3D12Device2* device) {
 HL_PRIM void HL_NAME(set_factory)(IDXGIFactory* factory) {
 #ifndef HL_XBS
 	dx_driver* drv = static_driver;
-	drv->factory = factory;
+	drv->factory = static_cast<IDXGIFactory4*>(factory);
 #endif
 }
 
