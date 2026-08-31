@@ -282,7 +282,7 @@ static int CURRENT_NODEMASK = 0;
 static LARGE_INTEGER driver_version = {0};
 
 typedef ID3D12Device2 dx_device;
-typedef IDXGIFactory4 dx_factory;
+typedef IDXGIFactory dx_factory;
 typedef IDXGIAdapter dx_adapter;
 
 #define _DEVICE _ABSTRACT(dx_device)
@@ -294,9 +294,13 @@ HL_PRIM ID3D12Device* HL_NAME(get_device)() {
 	return drv->device;
 }
 
-HL_PRIM IDXGIFactory4* HL_NAME(get_factory)() {
+HL_PRIM IDXGIFactory* HL_NAME(get_factory)() {
+#ifndef HL_XBS
 	dx_driver* drv = static_driver;
 	return drv->factory;
+#else
+	return NULL;
+#endif
 }
 
 HL_PRIM IDXGIAdapter* HL_NAME(get_adapter)() {
@@ -309,9 +313,11 @@ HL_PRIM void HL_NAME(set_device)(ID3D12Device2* device) {
 	drv->device = device;
 }
 
-HL_PRIM void HL_NAME(set_factory)(IDXGIFactory4* factory) {
+HL_PRIM void HL_NAME(set_factory)(IDXGIFactory* factory) {
+#ifndef HL_XBS
 	dx_driver* drv = static_driver;
 	drv->factory = factory;
+#endif
 }
 
 DEFINE_PRIM(_DEVICE, get_device, _NO_ARG);
