@@ -73,17 +73,18 @@ class Window {
 
 	function set_displayMode(mode) {
 		displayMode = mode;
+		var monitor = selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null;
 		if(mode == Windowed) {
-			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, null);
-			winSetFullscreen(win, false);
+			dx.Window.winChangeDisplaySetting(monitor, null);
+			winSetFullscreenOn(win, false, monitor);
 		}
 		else if(mode == Borderless) {
-			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, null);
-			winSetFullscreen(win,true);
+			dx.Window.winChangeDisplaySetting(monitor, null);
+			winSetFullscreenOn(win, true, monitor);
 		}
 		else {
-			var r = dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, displaySetting);
-			winSetFullscreen(win,true);
+			var r = dx.Window.winChangeDisplaySetting(monitor, displaySetting);
+			winSetFullscreenOn(win, true, monitor);
 		}
 		return mode;
 	}
@@ -346,6 +347,11 @@ class Window {
 	}
 
 	static function winSetFullscreen( win : WinPtr, fs : Bool ) {
+	}
+
+	@:hlNative("?directx", "win_set_fullscreen_on")
+	static function winSetFullscreenOn( win : WinPtr, fs : Bool, monitor : hl.Bytes ) {
+		winSetFullscreen(win, fs);
 	}
 
 	static function winSetSize( win : WinPtr, width : Int, height : Int ) {
