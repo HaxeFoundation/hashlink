@@ -769,6 +769,14 @@ HL_PRIM void HL_NAME(win_set_max_size)(SDL_Window *win, int width, int height) {
 	SDL_SetWindowMaximumSize(win, width, height);
 }
 
+HL_PRIM void HL_NAME(win_set_maximized)(SDL_Window* win, bool maximize) {
+	if (maximize) {
+		SDL_MaximizeWindow(win);
+	} else {
+		SDL_RestoreWindow(win);
+	}
+}
+
 HL_PRIM bool HL_NAME(win_maximized)(SDL_Window* win) {
 	SDL_WindowFlags flags = SDL_GetWindowFlags(win);
 	return (flags & SDL_WINDOW_MAXIMIZED) != 0;
@@ -866,6 +874,7 @@ DEFINE_PRIM(_VOID, win_get_position, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_set_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_min_size, TWIN _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_max_size, TWIN _I32 _I32);
+DEFINE_PRIM(_VOID, win_set_maximized, TWIN _BOOL);
 DEFINE_PRIM(_BOOL, win_maximized, TWIN);
 DEFINE_PRIM(_VOID, win_get_size, TWIN _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, win_get_min_size, TWIN _REF(_I32) _REF(_I32));
