@@ -73,17 +73,18 @@ class Window {
 
 	function set_displayMode(mode) {
 		displayMode = mode;
+		var monitor = selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null;
 		if(mode == Windowed) {
-			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, null);
-			winSetFullscreen(win, false);
+			dx.Window.winChangeDisplaySetting(monitor, null);
+			winSetFullscreenOn(win, false, monitor);
 		}
 		else if(mode == Borderless) {
-			dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, null);
-			winSetFullscreen(win,true);
+			dx.Window.winChangeDisplaySetting(monitor, null);
+			winSetFullscreenOn(win, true, monitor);
 		}
 		else {
-			var r = dx.Window.winChangeDisplaySetting(selectedMonitor != null ? @:privateAccess selectedMonitor.bytes : null, displaySetting);
-			winSetFullscreen(win,true);
+			var r = dx.Window.winChangeDisplaySetting(monitor, displaySetting);
+			winSetFullscreenOn(win, true, monitor);
 		}
 		return mode;
 	}
@@ -220,6 +221,10 @@ class Window {
 		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null, registry);
 	}
 
+	public function isZoomed() : Bool {
+		return winIsZoomed(win);
+	}
+
 	public static function getMonitors() : Array<Monitor> {
 		var last = null;
 		return [for(m in winGetMonitors()) @:privateAccess { name: String.fromUCS2(m.name), left: m.left, right: m.right, top: m.top, bottom: m.bottom } ];
@@ -305,6 +310,11 @@ class Window {
 		return null;
 	}
 
+	@:hlNative("?directx", "win_is_zoomed")
+	static function winIsZoomed(win: WinPtr) : Bool {
+		return false;
+	}
+
 	@:hlNative("?directx", "win_get_current_display_setting")
 	static function winGetCurrentDisplaySetting(monitor : hl.Bytes, registry : Bool) : Dynamic {
 		return null;
@@ -337,6 +347,11 @@ class Window {
 	}
 
 	static function winSetFullscreen( win : WinPtr, fs : Bool ) {
+	}
+
+	@:hlNative("?directx", "win_set_fullscreen_on")
+	static function winSetFullscreenOn( win : WinPtr, fs : Bool, monitor : hl.Bytes ) {
+		winSetFullscreen(win, fs);
 	}
 
 	static function winSetSize( win : WinPtr, width : Int, height : Int ) {

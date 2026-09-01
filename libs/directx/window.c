@@ -73,6 +73,9 @@ typedef struct {
 	int next_event;
 	bool is_over;
 	bool is_focused;
+	bool fullscreen;
+	RECT fullscreen_rect;
+	WCHAR fullscreen_device[CCHDEVICENAME];
 } dx_events;
 
 typedef struct HWND__ dx_window;
@@ -105,6 +108,58 @@ static bool show_cursor = true;
 
 static dx_events *get_events(HWND wnd) {
 	return (dx_events*)GetWindowLongPtr(wnd,GWLP_USERDATA);
+}
+
+#ifndef WM_DPICHANGED
+#	define WM_DPICHANGED 0x02E0
+#endif
+
+typedef struct {
+	const WCHAR *name;
+	HMONITOR result;
+} find_monitor_data;
+
+static BOOL CALLBACK on_find_monitor( HMONITOR monitor, HDC hdc, LPRECT rect, LPARAM param ) {
+	find_monitor_data *d = (find_monitor_data*)param;
+	MONITORINFOEXW info;
+	info.cbSize = sizeof(info);
+	if( GetMonitorInfoW(monitor,(LPMONITORINFO)&info) && wcscmp(info.szDevice,d->name) == 0 ) {
+		d->result = monitor;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static bool get_fullscreen_rect( HWND wnd, RECT *out ) {
+	dx_events *buf = get_events(wnd);
+	HMONITOR mon = NULL;
+	MONITORINFO mi;
+	if( buf != NULL && buf->fullscreen_device[0] ) {
+		find_monitor_data d;
+		d.name = buf->fullscreen_device;
+		d.result = NULL;
+		EnumDisplayMonitors(NULL,NULL,on_find_monitor,(LPARAM)&d);
+		mon = d.result;
+	}
+	if( mon == NULL )
+		mon = MonitorFromWindow(wnd,MONITOR_DEFAULTTOPRIMARY);
+	mi.cbSize = sizeof(mi);
+	// never fall back on the zeroed rect : that would move the window to 0,0 and size it 0x0
+	if( !GetMonitorInfo(mon,&mi) || IsRectEmpty(&mi.rcMonitor) )
+		return false;
+	*out = mi.rcMonitor;
+	return true;
+}
+
+static void apply_fullscreen_rect( HWND wnd, bool force ) {
+	dx_events *buf = get_events(wnd);
+	RECT r, cur;
+	if( buf == NULL || !buf->fullscreen || !get_fullscreen_rect(wnd,&r) )
+		return;
+	buf->fullscreen_rect = r;
+	if( !force && GetWindowRect(wnd,&cur) && EqualRect(&cur,&r) )
+		return;
+	SetWindowPos(wnd,NULL,r.left,r.top,r.right - r.left,r.bottom - r.top,SWP_NOOWNERZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 }
 
 static void updateClipCursor(HWND wnd) {
@@ -401,6 +456,28 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		if ( capture_mouse || relative_mouse ) ClipCursor(NULL);
 		get_events(wnd)->is_focused = false;
 		addState(Blur);
+		break;
+	case WM_WINDOWPOSCHANGING:
+	{
+		// While fullscreen, veto any move/resize we didn't ask for. 
+		dx_events *buf = get_events(wnd);
+		WINDOWPOS *wp = (WINDOWPOS*)lparam;
+		if( buf != NULL && buf->fullscreen && !IsRectEmpty(&buf->fullscreen_rect) ) {
+			// let minimize through, else alt-tab would be broken
+			bool minimizing = (wp->flags & SWP_HIDEWINDOW) != 0 || wp->x <= -30000 || wp->y <= -30000;
+			if( !minimizing && !IsIconic(wnd) ) {
+				wp->x = buf->fullscreen_rect.left;
+				wp->y = buf->fullscreen_rect.top;
+				wp->cx = buf->fullscreen_rect.right - buf->fullscreen_rect.left;
+				wp->cy = buf->fullscreen_rect.bottom - buf->fullscreen_rect.top;
+				wp->flags &= ~(SWP_NOMOVE | SWP_NOSIZE);
+			}
+		}
+		break;
+	}
+	case WM_DISPLAYCHANGE:
+	case WM_DPICHANGED:
+		apply_fullscreen_rect(wnd,true);
 		break;
 	case WM_WINDOWPOSCHANGED:
 	{
@@ -732,17 +809,43 @@ HL_PRIM void HL_NAME(win_set_focus)(dx_window* win) {
 	SetFocus(win);
 }
 
-HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
+HL_PRIM void HL_NAME(win_set_fullscreen_on)(dx_window *win, bool fs, vbyte *monitor) {
+	dx_events *buf = get_events(win);
+	if( buf == NULL )
+		return;
 	if( fs ) {
-		MONITORINFO mi = { sizeof(mi) };
-		GetMonitorInfo(MonitorFromWindow(win,MONITOR_DEFAULTTOPRIMARY), &mi);
-		SetWindowLong(win,GWL_STYLE,WS_POPUP | WS_VISIBLE);
-		SetWindowPos(win,NULL,mi.rcMonitor.left,mi.rcMonitor.top,mi.rcMonitor.right - mi.rcMonitor.left,mi.rcMonitor.bottom - mi.rcMonitor.top,SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+		if( IsIconic(win) || IsZoomed(win) )
+			ShowWindow(win,SW_RESTORE);
+		buf->fullscreen_device[0] = 0;
+		if( monitor != NULL ) {
+			const WCHAR *name = (const WCHAR*)monitor;
+			int i = 0;
+			while( i < CCHDEVICENAME - 1 && name[i] ) {
+				buf->fullscreen_device[i] = name[i];
+				i++;
+			}
+			buf->fullscreen_device[i] = 0;
+		} else {
+			MONITORINFOEXW info;
+			info.cbSize = sizeof(info);
+			if( GetMonitorInfoW(MonitorFromWindow(win,MONITOR_DEFAULTTOPRIMARY),(LPMONITORINFO)&info) )
+				memcpy(buf->fullscreen_device,info.szDevice,sizeof(info.szDevice));
+		}
+		buf->fullscreen = true;
+		SetRectEmpty(&buf->fullscreen_rect);
+		SetWindowLong(win,GWL_STYLE,(buf->normal_style & (WS_CLIPSIBLINGS|WS_CLIPCHILDREN)) | WS_POPUP | WS_VISIBLE);
+		apply_fullscreen_rect(win,true);
 	} else {
-		dx_events *buf = get_events(win);
+		buf->fullscreen = false;
+		SetRectEmpty(&buf->fullscreen_rect);
+		buf->fullscreen_device[0] = 0;
 		SetWindowLong(win,GWL_STYLE,buf->normal_style);
 		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
 	}
+}
+
+HL_PRIM void HL_NAME(win_set_fullscreen)(dx_window *win, bool fs) {
+	HL_NAME(win_set_fullscreen_on)(win,fs,NULL);
 }
 
 HL_PRIM double HL_NAME(win_get_opacity)(dx_window *win) {
@@ -907,6 +1010,10 @@ BOOL CALLBACK on_get_monitors(HMONITOR monitor, HDC hdc, LPRECT rect, LPARAM par
 	return TRUE;
 }
 
+HL_PRIM bool HL_NAME(win_is_zoomed)(HWND wnd) {
+	return IsZoomed(wnd);
+}
+
 HL_PRIM varray* HL_NAME(win_get_monitors)() {
 	get_monitors_data data;
 	data.idx = 0;
@@ -982,6 +1089,7 @@ HL_PRIM void HL_NAME(win_set_icon)(HWND wnd, dx_icon icon) {
 DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(_VOID, win_set_fullscreen, TWIN _BOOL);
+DEFINE_PRIM(_VOID, win_set_fullscreen_on, TWIN _BOOL _BYTES);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_focus, TWIN);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
@@ -1009,6 +1117,7 @@ DEFINE_PRIM(_VOID, win_set_drag_accept_files, TWIN _BOOL);
 DEFINE_PRIM(_ARR, win_get_display_settings, _BYTES);
 DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES _BOOL);
 DEFINE_PRIM(_I32, win_change_display_setting, _BYTES _DYN);
+DEFINE_PRIM(_BOOL, win_is_zoomed, TWIN);
 DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);
 DEFINE_PRIM(_VOID, win_set_icon, TWIN TICON);

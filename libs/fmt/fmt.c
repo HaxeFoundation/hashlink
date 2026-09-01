@@ -3,6 +3,7 @@
 #include <hl.h>
 
 #if defined(HL_CONSOLE) && !defined(HL_XBO)
+extern vbyte* sys_jpg_encode( vbyte* data, int width, int height, int stride, int format, int subSamp, int quality, int flags, int* outLength );
 extern bool sys_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags );
 #else
 #	include <turbojpeg.h>
@@ -20,6 +21,32 @@ extern bool sys_jpg_decode( vbyte *data, int dataLen, vbyte *out, int width, int
 typedef struct {
 	unsigned char a,r,g,b;
 } pixel;
+
+HL_PRIM vbyte* HL_NAME(jpg_encode)(vbyte* data, int width, int height, int stride, int format, int subSamp, int quality, int flags, int* outLength) {
+#if defined(HL_CONSOLE) && !defined(HL_XBO)
+	hl_blocking(true);
+	vbyte* bytes = sys_jpg_encode(data, width, height, stride, format, subSamp, quality, flags, outLength);
+	hl_blocking(false);
+	return bytes;
+#else
+	hl_blocking(true);
+	tjhandle h = tjInitCompress();
+	int result;
+	unsigned long buffSize = tjBufSize(width, height, subSamp);
+	vbyte* buffer = hl_alloc_bytes(buffSize);
+	result = tjCompress2(h, data, width, stride, height, format, &buffer, &buffSize, subSamp, quality, (flags & 1 ? TJFLAG_BOTTOMUP : 0));
+	tjDestroy(h);
+	hl_blocking(false);
+	if (result == 0) {
+		*outLength = buffSize;
+		return buffer;
+	}
+	else {
+		*outLength = 0;
+		return NULL;
+	}
+#endif
+}
 
 HL_PRIM bool HL_NAME(jpg_decode)( vbyte *data, int dataLen, vbyte *out, int width, int height, int stride, int format, int flags ) {
 #if defined(HL_CONSOLE) && !defined(HL_XBO)
@@ -148,7 +175,7 @@ HL_PRIM void HL_NAME(img_scale)( vbyte *out, int outPos, int outStride, int outW
 	hl_blocking(false);
 }
 
-
+DEFINE_PRIM(_BYTES, jpg_encode, _BYTES _I32 _I32 _I32 _I32 _I32 _I32 _I32 _REF(_I32));
 DEFINE_PRIM(_BOOL, jpg_decode, _BYTES _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_BOOL, png_decode, _BYTES _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, img_scale, _BYTES _I32 _I32 _I32 _I32 _BYTES _I32 _I32 _I32 _I32 _I32);
@@ -631,7 +658,7 @@ static void md5_process( md5_context *ctx, uint8 data[64] ) {
     P( B, C, D, A, 12, 20, 0x8D2A4C8A );
 
 #undef F
-    
+
 #define F(x,y,z) (x ^ y ^ z)
 
     P( A, B, C, D,  5,  4, 0xFFFA3942 );
