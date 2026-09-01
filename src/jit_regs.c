@@ -545,27 +545,29 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 		}
 		switch( e.op ) {
 		case BLOCK:
-			for_iter_back(values,v,ctx->scratch) {
-				if( v->last_read == cur_op )
-					values_remove(&ctx->scratch,v);
-			}
-			for_iter_back(values,v2,ctx->persists) {
-				if( v2->last_read == cur_op )
-					values_remove(&ctx->persists,v2);
-			}
-			eblock *bl = jit->blocks + e.size_offs;
-			for(int k=0;k<bl->phi_count;k++) {
-				ephi *p = bl->phis + k;
-				value_info *v = VAL_REG(p->value);
-				for(int n=0;n<p->nvalues;n++) {
-					value_info *vn = VAL_REG(p->values[n]);
-					// ignore previously set pref_reg (minimize moves)
-					if( IS_REG(vn->reg) && !regs_current(ctx,vn->reg) ) {
-						v->pref_reg = vn->reg;
-						break;
-					}
+			{
+				for_iter_back(values,v,ctx->scratch) {
+					if( v->last_read == cur_op )
+						values_remove(&ctx->scratch,v);
 				}
-				regs_assign(ctx, v);
+				for_iter_back(values,v2,ctx->persists) {
+					if( v2->last_read == cur_op )
+						values_remove(&ctx->persists,v2);
+				}
+				eblock *bl = jit->blocks + e.size_offs;
+				for(int k=0;k<bl->phi_count;k++) {
+					ephi *p = bl->phis + k;
+					value_info *v = VAL_REG(p->value);
+					for(int n=0;n<p->nvalues;n++) {
+						value_info *vn = VAL_REG(p->values[n]);
+						// ignore previously set pref_reg (minimize moves)
+						if( IS_REG(vn->reg) && !regs_current(ctx,vn->reg) ) {
+							v->pref_reg = vn->reg;
+							break;
+						}
+					}
+					regs_assign(ctx, v);
+				}
 			}
 			break;
 		case CATCH:
@@ -774,7 +776,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			flush_movs(ctx,0);
 			e.nargs = 0xFF;
 			e.size_offs = stack_args;
-			if( vout && vout->last_read > cur_op ) 
+			if( vout && vout->last_read > cur_op )
 				ret_val = &REG_CFG(REG_MODE(e.mode))->ret;
 			else if( e.mode != M_NORET ) {
 				e.mode = M_VOID; // ignore output
@@ -910,7 +912,7 @@ void hl_regs_flush( jit_ctx *jit ) {
 
 	int_arr regs_track;
 	int_arr_free(&regs_track);
-	
+
 	// register persist backup for debugger
 	int nsaved = 0;
 	for(int mode=0;mode<2;mode++) {
@@ -922,7 +924,7 @@ void hl_regs_flush( jit_ctx *jit ) {
 			int_arr_add(regs_track, cfg->persist[i]);
 		}
 	}
-	
+
 	// register variables ranges for debugger
 	int nargs = jit->fun->type->fun->nargs;
 	int end_pos = ctx->emit_pos;

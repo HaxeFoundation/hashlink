@@ -183,9 +183,11 @@ static const char *emit_mode_str( emit_mode mode ) {
 	case M_VOID: return "-void";
 	case M_NORET: return "-noret";
 	default:
-		static char buf[50];
-		sprintf(buf,"?%d",mode);
-		return buf;
+		{
+			static char buf[50];
+			sprintf(buf,"?%d",mode);
+			return buf;
+		}
 	}
 }
 
@@ -381,7 +383,7 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 				printf("@%X", cur_pos + 1 + offsets[k]);
 			}
 			printf(")");
-		}	
+		}
 		break;
 	case BLOCK:
 		printf(" #%d", e->size_offs);
@@ -430,7 +432,7 @@ static void dump_instr( jit_ctx *ctx, einstr *e, int cur_pos ) {
 		if( (e->size_offs&0xFF) > 1 ) printf("*%d",e->size_offs&0xFF);
 		if( e->size_offs >> 8 ) printf("+%Xh", e->size_offs>>8);
 		printf("]");
-		break;	
+		break;
 	default:
 		if( !IS_NULL(e->a) ) {
 			printf(" %s", reg_str(e->a));
@@ -515,7 +517,7 @@ void hl_emit_dump( jit_ctx *ctx ) {
 			eblock *b = &ctx->blocks[e->size_offs];
 			for(int k=0;k<b->pred_count;k++) {
 				eblock *p = &ctx->blocks[b->preds[k]];
-				einstr *pe = &ctx->instrs[p->end_pos-1];				
+				einstr *pe = &ctx->instrs[p->end_pos-1];
 				if( p->end_pos == icount )
 					continue;
 				bool bad = false;
