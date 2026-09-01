@@ -428,7 +428,7 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	hl_alloc alloc;
 	int i;
 	int flags;
-	int max_version = 6;
+	int max_version = 5;
 	hl_alloc_init(&alloc);
 	c = hl_zalloc(&alloc,sizeof(hl_code));
 	c->alloc = alloc;
@@ -506,16 +506,13 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 		if( c->hasdebug ) {
 			c->functions[i].debug = hl_read_debug_infos(r,c->functions[i].nops);
 			if( c->version >= 3 ) {
+				// skip assigns (no need here)
 				int nassigns = UINDEX();
-				int *assigns = (int*)malloc(sizeof(int)*nassigns*3);
 				int j;
 				for(j=0;j<nassigns;j++) {
-					assigns[j*3] = UINDEX();
-					assigns[j*3+1] = INDEX() - 1;
-					assigns[j*3+2] = c->version >= 6 ? INDEX() - 1 : -1;
+					UINDEX();
+					INDEX();
 				}
-				c->functions[i].nassigns = nassigns;
-				c->functions[i].assigns = assigns;
 			}
 		}
 	}

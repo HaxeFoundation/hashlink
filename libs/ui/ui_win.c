@@ -388,7 +388,7 @@ DEFINE_PRIM(_VOID, ui_winlog_set_text, _WIN _BYTES _BOOL);
 DEFINE_PRIM(_VOID, ui_win_set_text, _WIN _BYTES);
 DEFINE_PRIM(_VOID, ui_win_set_enable, _WIN _BOOL);
 DEFINE_PRIM(_VOID, ui_win_destroy, _WIN);
-DEFINE_PRIM(_I32 HL_CALLB, ui_loop, _BOOL);
+DEFINE_PRIM(_I32, ui_loop, _BOOL);
 DEFINE_PRIM(_VOID, ui_stop_loop, _NO_ARG);
 DEFINE_PRIM(_VOID, ui_close_console, _NO_ARG);
 

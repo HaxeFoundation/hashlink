@@ -21,7 +21,6 @@
  */
 #include <hl.h>
 #include <hlmodule.h>
-#include <jit.h>
 
 #ifdef HL_WIN
 #	undef _GUID
@@ -73,7 +72,7 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 	while( min < max ) {
 		int mid = (min + max) >> 1;
 		int offset = dbg->large ? ((int*)dbg->offsets)[mid] : ((unsigned short*)dbg->offsets)[mid];
-		if( offset < code_pos )
+		if( offset <= code_pos )
 			min = mid + 1;
 		else
 			max = mid;
@@ -82,11 +81,6 @@ static bool module_resolve_pos( hl_module *m, void *addr, int *fidx, int *fpos )
 		return false; // ???
 	*fpos = min - 1;
 	return true;
-}
-
-hl_module **hl_get_modules( int *count ) {
-	*count = modules_count;
-	return cur_modules;
 }
 
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr ) {
@@ -230,8 +224,10 @@ static int module_capture_stack( void **stack, int size ) {
 			unsigned char *code = m->jit_code;
 			int code_size = m->codesize;
 			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-				if( stack && count == size )
+				if( stack && count == size ) {
 					break;
+				}
+
 				if( stack )
 					stack[count++] = module_addr;
 				else
@@ -254,42 +250,6 @@ static int module_capture_stack( void **stack, int size ) {
 	return count;
 #else
 	return hl_module_capture_stack_range(hl_get_thread()->stack_top, (void**)&stack, stack, size);
-#endif
-}
-
-static bool module_is_jit_code( void *addr ) {
-	for(int i=0;i<modules_count;i++) {
-		hl_module *m = cur_modules[i];
-		unsigned char *code = m->jit_code;
-		if( addr >= (void*)code && addr < (void*)(code + m->codesize) )
-			return true;
-	}
-	return false;
-}
-
-static bool module_capture_break_context( void **rip, void **regs ) {
-#ifdef WIN64_UNWIND_TABLES
-	CONTEXT c;
-	RtlCaptureContext(&c);
-	while( !module_is_jit_code((void*)c.Rip) ) {
-		DWORD64 base;
-		PRUNTIME_FUNCTION fn_entry = RtlLookupFunctionEntry(c.Rip, &base, NULL);
-		if( !fn_entry ) return false;
-		void *handler_data;
-		ULONG64 establisher_frame;
-		RtlVirtualUnwind(0, base, c.Rip, fn_entry, &c, &handler_data, &establisher_frame, NULL);
-		if( c.Rip == 0 ) return false;
-	}
-	*rip = (void*)c.Rip;
-	regs[0] = (void*)c.Rax; regs[1] = (void*)c.Rcx; regs[2] = (void*)c.Rdx; regs[3] = (void*)c.Rbx;
-	regs[4] = (void*)c.Rsp; regs[5] = (void*)c.Rbp; regs[6] = (void*)c.Rsi; regs[7] = (void*)c.Rdi;
-	regs[8] = (void*)c.R8; regs[9] = (void*)c.R9; regs[10] = (void*)c.R10; regs[11] = (void*)c.R11;
-	regs[12] = (void*)c.R12; regs[13] = (void*)c.R13; regs[14] = (void*)c.R14; regs[15] = (void*)c.R15;
-	for(int i=0;i<16;i++)
-		regs[16+i] = (void*)((M128A*)&c.Xmm0)[i].Low;
-	return true;
-#else
-	return false;
 #endif
 }
 
@@ -558,7 +518,6 @@ static void hl_module_init_indexes( hl_module *m ) {
 
 #ifdef HL_VTUNE
 #include <jitprofiling.h>
-#define VTUNE_OFFSET(dbg,j)	((int)(dbg->large ? ((int*)dbg->offsets)[j] : ((unsigned short*)dbg->offsets)[j]))
 h_bool hl_module_init_vtune( hl_module *m ) {
 	int i;
 	if( !iJIT_IsProfilingActive() || m->jit_debug == NULL )
@@ -566,11 +525,9 @@ h_bool hl_module_init_vtune( hl_module *m ) {
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
 		void *faddr = m->functions_ptrs[f->findex];
-		hl_debug_infos *dbg = m->jit_debug + i;
 
 		iJIT_Method_Load jm = {0};
 		char out[256];
-		if( dbg->offsets == NULL ) continue;
 		jm.method_id = iJIT_GetNewMethodID();
 		if( f->obj ) {
 			jm.class_file_name = hl_to_utf8(f->obj->name);
@@ -583,24 +540,32 @@ h_bool hl_module_init_vtune( hl_module *m ) {
 			jm.method_name = out;
 		}
 		jm.method_load_address = faddr;
-		jm.method_size = VTUNE_OFFSET(dbg,f->nops);
-
+		jm.method_size = 0;
 		int j;
+		for(j=0;j<m->code->nfunctions;j++) {
+			hl_function *f2 = m->code->functions + j;
+			if( f2 == f ) continue;
+			void *addr = m->functions_ptrs[f2->findex];
+			int_val dif = (char*)addr - (char*)faddr;
+			if( dif <= 0 ) continue;
+			if( jm.method_size == 0 || dif < jm.method_size ) jm.method_size = (int)dif;
+		}
+
 		int file = f->debug[0] & 0x7FFFFFFF;
 		int curline = -1;
 		LineNumberInfo *lines = (LineNumberInfo*)malloc(sizeof(LineNumberInfo)*f->nops);
 		int nlines = 0;
+		hl_debug_infos *dbg = m->jit_debug + i;
 		jm.source_file_name = m->code->debugfiles[file];
 		for(j=0;j<f->nops;j++) {
 			int file2 = f->debug[j<<1] & 0x7FFFFFFF;
 			int line = f->debug[(j<<1)|1];
 			if( file2 != file || line == curline ) continue;
-			if( nlines ) lines[nlines-1].Offset = VTUNE_OFFSET(dbg,j);
-			lines[nlines].LineNumber = line;
+			lines[nlines].Offset = dbg->large ? ((int*)dbg->offsets)[j] : ((unsigned short*)dbg->offsets)[j];
+			lines[nlines].LineNumber = line - 1;
 			curline = line;
 			nlines++;
 		}
-		if( nlines ) lines[nlines-1].Offset = jm.method_size;
 		if( nlines && jm.method_size ) {
 			jm.line_number_table = lines;
 			jm.line_number_size = nlines;
@@ -654,15 +619,8 @@ static void hl_module_init_natives( hl_module *m ) {
 		p = tmp;
 		append_type(&p,n->t);
 		*p++ = 0;
-		if( sign ) {
-			int slen = (int)strlen(sign);
-			if( slen && sign[slen-1] == *HL_CALLB ) {
-				hl_jit_tag_callback(m->functions_ptrs[n->findex]);
-				slen--;
-			}
-			if( slen != (int)strlen(tmp) || memcmp(sign,tmp,slen) != 0 )
-				hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
-		}
+		if( sign && memcmp(sign,tmp,strlen(sign)+1) != 0 )
+			hl_fatal4("Invalid signature for function %s@%s : %s required but %s found in hdll",n->lib,n->name,tmp,sign);
 	}
 }
 
@@ -720,10 +678,9 @@ static void hl_module_add( hl_module *m ) {
 	free(old_modules);
 }
 
-int hl_module_init( hl_module *m, int flags ) {
+int hl_module_init( hl_module *m, h_bool hot_reload ) {
 	int i;
 	jit_ctx *ctx;
-	bool hot_reload = (flags & HL_MODULE_HOT_RELOAD) != 0;
 	// expand globals
 	if( hot_reload ) {
 		int nsize = m->globals_size + HOT_RELOAD_EXTRA_GLOBALS * sizeof(void*);
@@ -748,17 +705,10 @@ int hl_module_init( hl_module *m, int flags ) {
 	if( hot_reload ) m->hash = hl_code_hash_alloc(m->code);
 	hl_module_init_natives(m);
 	hl_module_init_indexes(m);
-#	ifdef WIN64_UNWIND_TABLES
-	m->unwind_table_size = m->code->nfunctions + 10; // extra space for jit internals
-	m->unwind_table = malloc(sizeof(RUNTIME_FUNCTION) * m->unwind_table_size);
-	memset(m->unwind_table, 0, sizeof(RUNTIME_FUNCTION) * m->unwind_table_size);
-#	endif
 	// JIT
 	ctx = hl_jit_alloc();
 	if( ctx == NULL )
 		return 0;
-	bool dump = (flags & HL_MODULE_DUMP) != 0;
-	m->debug = (flags & HL_MODULE_DEBUG) != 0;
 	hl_jit_init(ctx, m);
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
@@ -768,7 +718,6 @@ int hl_module_init( hl_module *m, int flags ) {
 			return 0;
 		}
 		m->functions_ptrs[f->findex] = (void*)(int_val)fpos;
-		if( dump ) hl_emit_dump(ctx);
 	}
 	m->jit_code = hl_jit_code(ctx, m, &m->codesize, &m->jit_debug, NULL);
 	for(i=0;i<m->code->nfunctions;i++) {
@@ -783,13 +732,9 @@ int hl_module_init( hl_module *m, int flags ) {
 	hl_module_add(m);
 	hl_setup.resolve_symbol = module_resolve_symbol;
 	hl_setup.capture_stack = module_capture_stack;
-	hl_setup.capture_break_context = module_capture_break_context;
 	hl_gc_set_dump_types(hl_module_types_dump);
 #	ifdef HL_VTUNE
 	hl_setup.vtune_init = modules_init_vtune;
-#	endif
-#	ifdef WIN64_UNWIND_TABLES
-	RtlAddFunctionTable(m->unwind_table, m->unwind_table_size, (DWORD64)m->jit_code);
 #	endif
 	hl_jit_free(ctx, hot_reload);
 	if( hot_reload ) {

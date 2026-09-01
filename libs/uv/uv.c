@@ -319,7 +319,7 @@ HL_PRIM uv_loop_t *HL_NAME(create_loop)() {
 DEFINE_PRIM(_LOOP, create_loop, _NO_ARG);
 DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
 DEFINE_PRIM(_I32, loop_close, _LOOP);
-DEFINE_PRIM(_I32 HL_CALLB, run, _LOOP _I32);
+DEFINE_PRIM(_I32, run, _LOOP _I32);
 DEFINE_PRIM(_I32, loop_alive, _LOOP);
 DEFINE_PRIM(_VOID, stop, _LOOP);
 
@@ -345,7 +345,7 @@ HL_PRIM void HL_NAME(stop_wrap)(uv_loop_t* loop) {
 
 DEFINE_PRIM(_LOOP, default_loop_wrap, _NO_ARG);
 DEFINE_PRIM(_I32, loop_close_wrap, _LOOP);
-DEFINE_PRIM(_I32 HL_CALLB, run_wrap, _LOOP _I32);
+DEFINE_PRIM(_I32, run_wrap, _LOOP _I32);
 DEFINE_PRIM(_I32, loop_alive_wrap, _LOOP);
 DEFINE_PRIM(_VOID, stop_wrap, _LOOP);
 
