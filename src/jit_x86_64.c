@@ -469,9 +469,9 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->regs.arg = (ereg*)call_regs;
 	// floats
 	static int floats[] = {
-		MMX(0), MMX(1), MMX(2), MMX(3), 
-		MMX(4), MMX(5), MMX(6), MMX(7), 
-		MMX(8), MMX(9), MMX(10), MMX(11), 
+		MMX(0), MMX(1), MMX(2), MMX(3),
+		MMX(4), MMX(5), MMX(6), MMX(7),
+		MMX(8), MMX(9), MMX(10), MMX(11),
 		MMX(12), MMX(13), MMX(14), MMX(15)
 	};
 #	ifdef HL_WIN_CALL
@@ -842,7 +842,7 @@ static void emit_jump( code_ctx *ctx, int mode, int offset ) {
 
 #define RTMP R(R11)
 static ereg get_tmp( emit_mode mode ) {
-	if( IS_FLOAT(mode) ) 
+	if( IS_FLOAT(mode) )
 		return MMX(scratch_float_reg);
 	return RTMP;
 }
@@ -873,7 +873,7 @@ static int jump_near( code_ctx *ctx, int mode ) {
 		// backwards
 		int target = -mode;
 		B(JAlways_short);
-		B(target - (pos + 2)); 
+		B(target - (pos + 2));
 	} else {
 		B(mode == JAlways ? JAlways_short : mode - 0x10);
 		B(0);
@@ -899,7 +899,7 @@ static void emit_div_mod( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emi
 		b = RTMP;
 	}
 	if( a != bas ) EMIT(_MOV,bas,a,mode);
-		
+
 	// check for div = 0
 	EMIT(_TEST,b,b,mode);
 	int jz = jump_near(ctx,JZero);
@@ -929,7 +929,7 @@ static void emit_div_mod( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emi
 	}
 	patch_jump_near(ctx,jn);
 	if( out != res ) EMIT(_MOV,out,res,mode);
-	if( out != div ) EMIT(_POP,div,UNUSED,M_PTR);	
+	if( out != div ) EMIT(_POP,div,UNUSED,M_PTR);
 	if( out != bas ) EMIT(_POP,bas,UNUSED,M_PTR);
 }
 
@@ -940,14 +940,20 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 #	define DECL_OP(i8,i16,iop,f32,f64) static CpuOp ops_##iop[] = {-1,i8,i16,iop,iop,f64,f32,-1,-1}; cop = ops_##iop[mode]
 	switch( op ) {
 	case OAdd:
-		DECL_OP(ADD8,ADD16,ADD,ADDSS,ADDSD);
+		{
+			DECL_OP(ADD8,ADD16,ADD,ADDSS,ADDSD);
+		}
 		break;
 	case OSub:
-		DECL_OP(SUB8,SUB16,SUB,SUBSS,SUBSD);
+		{
+			DECL_OP(SUB8,SUB16,SUB,SUBSS,SUBSD);
+		}
 		break;
 	case OMul:
-		DECL_OP(IMUL16/*NO IMUL8*/,IMUL16,IMUL,MULSS,MULSD);
-		if( mode == M_UI8 ) mask = 0xFF;
+		{
+			DECL_OP(IMUL16/*NO IMUL8*/,IMUL16,IMUL,MULSS,MULSD);
+			if( mode == M_UI8 ) mask = 0xFF;
+		}
 		break;
 	case OIncr:
 		cop = INC;
@@ -1007,7 +1013,7 @@ static void emit_anyop( code_ctx *ctx, hl_op op, ereg out, ereg a, ereg b, emit_
 	case ONot:
 		if( IS_REG(a) ) {
 			EMIT(XOR,a,MK_CONST(1),M_I32);
-		} else {			
+		} else {
 			BREAK();
 		}
 		return;
@@ -1337,7 +1343,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 				if( e->mode != M_PTR ) {
 					// no push/pop 32 bit
 					ereg tmp2 = R(RAX);
-					emit_mode mode = e->mode == M_F64 ? M_PTR : e->mode == M_F32 ? M_I32 : e->mode; 
+					emit_mode mode = e->mode == M_F64 ? M_PTR : e->mode == M_F32 ? M_I32 : e->mode;
 					EMIT(_PUSH,tmp2,UNUSED,M_PTR);
 					emit_mov(ctx, RTMP, e->a, M_PTR);
 					emit_mov(ctx, tmp2, e->b, mode);
@@ -1419,7 +1425,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 					B(0x0F);
 					B(0x10);
 					MOD_RM(0,out&7,5);
-					W(0);					
+					W(0);
 					alloc_const(ctx, e->value);
 				} else if( mode == M_PTR && (e->value&0xFFFFFFFF) == e->value )
 					emit_ext(ctx, _MOV, w, VAL_CONST, M_I32, e->value);
@@ -1749,7 +1755,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 					}
 					EMIT(POPFQ,UNUSED,UNUSED,M_PTR);
 				} else if( IS_REG(e->a) ) {
-					emit_cmov(ctx,out,e->a,cond,M_PTR);					
+					emit_cmov(ctx,out,e->a,cond,M_PTR);
 				} else {
 					emit_mov(ctx,RTMP,e->a,e->mode);
 					emit_cmov(ctx,out,RTMP,cond,M_PTR);
@@ -1835,7 +1841,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
 	BREAK();
 	flush_function(ctx, ctx->null_access_pos);
-	
+
 	// generate hl_null_field access stub
 	ctx->null_field_pos = jit->out_pos + byte_count(ctx->code);
 	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
@@ -1887,7 +1893,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_MOV,R(RSP),R(RBP),M_PTR);
 	EMIT(_POP,R(RBP),UNUSED,M_PTR);
 	EMIT(_RET,UNUSED,UNUSED,M_NONE);
-	
+
 	flush_function(ctx, jit->code_funs.c2hl);
 
 	// generate hl2c stub
@@ -1922,7 +1928,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_CMP,tmp,MK_CONST(HF32),M_I32);
 	int float2 = jump_near(ctx,JEq);
 	emit_ext(ctx,_MOV,fun_ptr,VAL_CONST,M_PTR,(int_val)hl_jit_wrapper_ptr);
-	
+
 	int jexit = jump_near(ctx, JAlways);
 	patch_jump_near(ctx, float1);
 	patch_jump_near(ctx, float2);
@@ -1944,7 +1950,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 	EMIT(_MOV,R(RSP),R(RBP),M_PTR);
 	EMIT(_POP,R(RBP),UNUSED,M_PTR);
 	EMIT(_RET,UNUSED,UNUSED,M_NONE);
-	
+
 	flush_function(ctx, jit->code_funs.hl2c);
 
 	// generate the trampoline, entered with [rsp] = call site and R11 = the native
