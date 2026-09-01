@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x011100
+#define HL_VERSION	0x020000
 
 #if defined(_WIN32)
 #	define HL_WIN
@@ -622,6 +622,7 @@ typedef struct {
 	void (*throw_jump)(jmp_buf, int);
 	uchar* (*resolve_symbol)(void* addr, uchar* out, int* outSize);
 	int (*capture_stack)(void** stack, int size);
+	bool (*capture_break_context)(void **rip, void **regs);
 	bool (*reload_check)(vbyte* alt_file);
 	void* (*static_call)(void* fun, hl_type* t, void** args, vdynamic* out);
 	void* (*get_wrapper)(hl_type* t);
@@ -891,6 +892,8 @@ HL_API void hl_throw_buffer( hl_buffer *b );
 #undef _STRING
 #define _STRING						_OBJ(_BYTES _I32)
 
+#define HL_CALLB					"C"
+
 #if defined(LIBHL_EXPORTS)
 #	define DEFINE_PRIM(t,name,args)						DEFINE_PRIM_WITH_NAME(t,hl_##name,args,name)
 #else
@@ -969,6 +972,7 @@ struct _hl_trap_ctx {
 #define HL_TRACK_MASK		(HL_TRACK_ALLOC | HL_TRACK_CAST | HL_TRACK_DYNFIELD | HL_TRACK_DYNCALL)
 
 #define HL_MAX_EXTRA_STACK 64
+#define HL_BREAK_REGS 32
 
 #ifdef HL_MAC
 #include <mach/mach.h>
@@ -992,6 +996,8 @@ typedef struct {
 	char thread_name[128];
 	jmp_buf gc_regs;
 	void *exc_stack_trace[HL_EXC_MAX_STACK];
+	void *break_rip;
+	void *break_regs[HL_BREAK_REGS];
 	void *extra_stack_data[HL_MAX_EXTRA_STACK];
 	int extra_stack_size;
 	#ifdef HL_MAC
