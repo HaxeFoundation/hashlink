@@ -1010,6 +1010,15 @@ BOOL CALLBACK on_get_monitors(HMONITOR monitor, HDC hdc, LPRECT rect, LPARAM par
 	return TRUE;
 }
 
+HL_PRIM void HL_NAME(win_set_zoomed)(HWND wnd, bool zoomed) {
+	if (zoomed) {
+		ShowWindow(wnd, SW_MAXIMIZE);
+	}
+	else {
+		ShowWindow(wnd, SW_RESTORE);
+	}
+}
+
 HL_PRIM bool HL_NAME(win_is_zoomed)(HWND wnd) {
 	return IsZoomed(wnd);
 }
@@ -1117,6 +1126,7 @@ DEFINE_PRIM(_VOID, win_set_drag_accept_files, TWIN _BOOL);
 DEFINE_PRIM(_ARR, win_get_display_settings, _BYTES);
 DEFINE_PRIM(_DYN, win_get_current_display_setting, _BYTES _BOOL);
 DEFINE_PRIM(_I32, win_change_display_setting, _BYTES _DYN);
+DEFINE_PRIM(_VOID, win_set_zoomed, TWIN _BOOL);
 DEFINE_PRIM(_BOOL, win_is_zoomed, TWIN);
 DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);

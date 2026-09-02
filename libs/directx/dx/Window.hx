@@ -221,6 +221,10 @@ class Window {
 		return winGetCurrentDisplaySetting(monitor != null ? @:privateAccess monitor.bytes : null, registry);
 	}
 
+	public function setZoomed(zoomed: Bool) : Void {
+		winSetZoomed(win, zoomed);
+	}
+
 	public function isZoomed() : Bool {
 		return winIsZoomed(win);
 	}
@@ -308,6 +312,10 @@ class Window {
 	@:hlNative("?directx", "win_get_display_settings")
 	static function winGetDisplaySettings(monitor : hl.Bytes) : hl.NativeArray<Dynamic> {
 		return null;
+	}
+
+	@:hlNative("?directx", "win_set_zoomed")
+	static function winSetZoomed(win: WinPtr, zoomed: Bool) {
 	}
 
 	@:hlNative("?directx", "win_is_zoomed")
