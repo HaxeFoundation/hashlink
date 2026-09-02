@@ -1713,47 +1713,9 @@ void hl_codegen_function( jit_ctx *jit ) {
 				int cond = get_cond_jump(ctx);
 				if( !IS_REG(out) ) jit_assert();
 				if( IS_FLOAT(e->mode) ) {
-					EMIT(PUSHFQ,UNUSED,UNUSED,M_PTR);
-					// create a mask in RTMP to be used for xmm
-					emit_cset(ctx,RTMP,cond);
-					EMIT(MOVZX8,RTMP,RTMP,M_PTR);
-					EMIT(NEG,RTMP,UNUSED,M_PTR);
-					// do dst := (mask & src) | (dst & ~mask)
-					ereg tmp = get_tmp(M_F64);
-					EMIT(MOVQ,tmp,RTMP,M_PTR);
-					if( cpu_avx ) {
-						emit_vex(ctx,ANDNPD,out,tmp,out); // out := ~mask & out
-						if( !IS_REG(e->a) ) {
-							ereg tmp2 = out == MMX(0) ? MMX(1) : MMX(0);
-							EMIT(SUB,R(RSP),MK_CONST(8),M_PTR);
-							EMIT(MOVSD,REG_PTR(R(RSP)),tmp2,M_F64);
-							EMIT(e->mode == M_F32 ? MOVSS : MOVSD,tmp2,e->a,e->mode);
-							emit_vex(ctx,ANDPD,tmp,tmp,tmp2); // tmp := mask & src
-							EMIT(MOVSD,tmp2,REG_PTR(R(RSP)),M_PTR);
-							EMIT(ADD,R(RSP),MK_CONST(8),M_PTR);
-						} else
-							emit_vex(ctx,ANDPD,tmp,tmp,e->a); // tmp := mask & src
-						emit_vex(ctx,ORPD,out,out,tmp);
-						EMIT(POPFQ,UNUSED,UNUSED,M_PTR);
-						break;
-					}
-					EMIT(ANDNPD,tmp,out,M_F64);
-					EMIT(MOVQ,out,RTMP,M_PTR);
-					if( !IS_REG(e->a) ) {
-						// ANDNPD requires aligned address !
-						ereg tmp2 = out == MMX(0) ? MMX(1) : MMX(0);
-						EMIT(SUB,R(RSP),MK_CONST(8),M_PTR);
-						EMIT(MOVSD,REG_PTR(R(RSP)),tmp2,M_F64);
-						EMIT(e->mode == M_F32 ? MOVSS : MOVSD,tmp2,e->a,e->mode);
-						EMIT(ANDPD,out,tmp2,M_F64);
-						EMIT(ORPD,out,tmp,M_F64);
-						EMIT(MOVSD,tmp2,REG_PTR(R(RSP)),M_PTR);
-						EMIT(ADD,R(RSP),MK_CONST(8),M_PTR);
-					} else {
-						EMIT(ANDPD,out,e->a,M_F64);
-						EMIT(ORPD,out,tmp,M_F64);
-					}
-					EMIT(POPFQ,UNUSED,UNUSED,M_PTR);
+					int jskip = jump_near(ctx, cond ^ 1);
+					emit_mov(ctx, out, e->a, e->mode);
+					patch_jump_near(ctx, jskip);
 				} else if( IS_REG(e->a) ) {
 					emit_cmov(ctx,out,e->a,cond,M_PTR);
 				} else {
