@@ -62,9 +62,19 @@ if((APPLE OR UNIX) AND NOT ANDROID)
         PRIVATE
         ${OPENGL_INCLUDE_DIR}
     )
+    if(APPLE)
+        # Only Apple's framework can serve the CGL context SDL creates.
+        # find_package(OpenGL) picks a Homebrew Mesa libGL ahead of it when
+        # CMAKE_FIND_FRAMEWORK is LAST; that links fine and then every gl*
+        # call returns 0/NULL.
+        find_library(HL_APPLE_OPENGL_FRAMEWORK OpenGL REQUIRED)
+        set(HL_SDL_GL_LIBRARY ${HL_APPLE_OPENGL_FRAMEWORK})
+    else()
+        set(HL_SDL_GL_LIBRARY ${OPENGL_gl_LIBRARY})
+    endif()
     target_link_libraries(sdl.hdll
         libhl
-        ${OPENGL_gl_LIBRARY}
+        ${HL_SDL_GL_LIBRARY}
     )
 endif()
 
