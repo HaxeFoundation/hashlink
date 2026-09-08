@@ -2,7 +2,7 @@
 #define GL_IMPORT(fun, ty)
 #endif
 #ifndef __APPLE__
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(HL_NX)
 GL_IMPORT(glClear, CLEAR);
 GL_IMPORT(glGetError, GETERROR);
 GL_IMPORT(glEnable, ENABLE);
