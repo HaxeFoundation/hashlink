@@ -314,8 +314,15 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 				int pos = t->fields_indexes[i + start] / HL_WSIZE;
 				if( ft->kind == HPACKED ) {
 					hl_runtime_obj *rts = hl_get_obj_rt(ft->tparam);
-					if( rts->t->mark_bits )
-						memcpy(mark + (pos>>5), rts->t->mark_bits, hl_mark_size(rts->size));
+					if( rts->t->mark_bits ) {
+						int nwords = (rts->size + HL_WSIZE - 1) / HL_WSIZE;
+						int k;
+						for(k=0;k<nwords;k++)
+							if( rts->t->mark_bits[k>>5] & (1<<(k&31)) ) {
+								int b = pos + k;
+								mark[b>>5] |= 1 << (b&31);
+							}
+					}
 					continue;
 				}
 				mark[pos >> 5] |= 1 << (pos & 31);
