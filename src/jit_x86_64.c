@@ -1868,7 +1868,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 
 	// push all possible call registers
 	for(int i=0;i<cfg->floats.nargs;i++)
-		EMIT(MOVSD,MK_ADDR(RSP,i*8),cfg->floats.arg[cfg->floats.nargs - 1 - i],M_F64);
+		EMIT(MOVSD,MK_ADDR(RSP,i*8),cfg->floats.arg[i],M_F64);
 	for(int i=0;i<cfg->regs.nargs;i++)
 		EMIT(_PUSH,cfg->regs.arg[cfg->regs.nargs - 1 - i],UNUSED,M_PTR);
 
