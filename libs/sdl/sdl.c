@@ -1179,7 +1179,7 @@ typedef struct {
 	int filters_size;
 } dialog_data;
 
-dialog_data* CreateFileDialogData( vclosure *callback, varray *filters ) {
+static dialog_data* CreateFileDialogData( vclosure *callback, varray *filters ) {
 	dialog_data *data = malloc( sizeof( dialog_data ) );
 	data->closure = callback;
 
@@ -1207,7 +1207,7 @@ dialog_data* CreateFileDialogData( vclosure *callback, varray *filters ) {
 	return data;
 }
 
-void FileDialogCallback(void *userdata, const char* const *filelist, int filter) {
+static void FileDialogCallback(void *userdata, const char* const *filelist, int filter) {
 	// these callbacks may come via threads on some platforms
 	bool on_unregistered_thread = !hl_get_thread();
 	if( on_unregistered_thread ) {
