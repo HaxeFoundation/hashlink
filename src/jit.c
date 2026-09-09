@@ -224,7 +224,7 @@ static int get_next_reg( hl_type *t, int *rp, int *fp ) {
 		}
 		return -1;
 	}
-	if( *rp < arg_fp_count ) {
+	if( *rp < arg_reg_count ) {
 		int r = (*rp)++;
 		if( IS_WINCALL64 ) (*fp)++;
 		return r;
