@@ -1047,7 +1047,10 @@ HL_PRIM HANDLE HL_NAME(waitevent_create)( bool initState ) {
 }
 
 HL_PRIM bool HL_NAME(waitevent_wait)( HANDLE event, int time ) {
-	return WaitForSingleObject(event,time) == 0;
+	hl_blocking(true);
+	bool ret = WaitForSingleObject(event,time) == 0;
+	hl_blocking(false);
+	return ret;
 }
 
 #define _EVENT _ABSTRACT(dx_event)
