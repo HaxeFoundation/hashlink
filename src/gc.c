@@ -224,7 +224,24 @@ HL_API hl_thread_info *hl_get_thread() {
 	return current_thread;
 }
 
+#ifndef HL_THREADS
+#	define GC_MEMORY_BARRIER()
+#	define GC_RELEASE_BARRIER()
+#elif defined(HL_VCC)
+#	define GC_MEMORY_BARRIER()	MemoryBarrier()
+#	if defined(_M_ARM) || defined(_M_ARM64)
+#		define GC_RELEASE_BARRIER()	MemoryBarrier()
+#	else
+#		define GC_RELEASE_BARRIER()	_ReadWriteBarrier()
+#	endif
+#else
+#	define GC_MEMORY_BARRIER()	__sync_synchronize()
+#	define GC_RELEASE_BARRIER()	__atomic_thread_fence(__ATOMIC_RELEASE)
+#endif
+
 static void gc_save_context(hl_thread_info *t, void *prev_stack ) {
+	t->gc_ctx_seq++;
+	GC_RELEASE_BARRIER();
 	setjmp(t->gc_regs);
 	// some compilers (such as clang) might push/pop some callee registers in call
 	// to gc_save_context (or before) which might hold a gc value !
@@ -244,6 +261,8 @@ static void gc_save_context(hl_thread_info *t, void *prev_stack ) {
 	t->extra_stack_size = size;
 	memcpy(t->extra_stack_data, prev_stack, size*sizeof(void*));
 #	endif
+	GC_RELEASE_BARRIER();
+	t->gc_ctx_seq++;
 }
 
 #ifndef HL_THREADS
@@ -257,6 +276,7 @@ static void gc_global_lock( bool lock ) {
 		if( !t )
 			hl_fatal("Can't lock GC in unregistered thread");
 		if( mt ) gc_save_context(t,&lock);
+		GC_MEMORY_BARRIER();
 		t->gc_blocking++;
 		if( mt ) hl_mutex_acquire(gc_threads.global_lock);
 	} else {
@@ -364,10 +384,12 @@ static void gc_stop_world( bool b ) {
 	if( b ) {
 		int i;
 		gc_threads.stopping_world = true;
+		GC_MEMORY_BARRIER();
 		for(i=0;i<gc_threads.count;i++) {
 			hl_thread_info *t = gc_threads.threads[i];
 			while( t->gc_blocking == 0 ) {}; // spinwait
 		}
+		GC_MEMORY_BARRIER();
 	} else {
 		// releasing global lock will release all threads
 		gc_threads.stopping_world = false;
@@ -834,9 +856,16 @@ static void gc_mark() {
 	// scan threads stacks & registers
 	for(i=0;i<gc_threads.count;i++) {
 		hl_thread_info *t = gc_threads.threads[i];
-		gc_mark_stack(t->stack_cur,t->stack_top);
-		gc_mark_stack(&t->gc_regs,(void**)&t->gc_regs + (sizeof(jmp_buf) / sizeof(void*) - 1));
-		gc_mark_stack(&t->extra_stack_data,(void**)&t->extra_stack_data + t->extra_stack_size);
+		while( true ) {
+			int seq = t->gc_ctx_seq;
+			if( seq & 1 ) continue;
+			GC_MEMORY_BARRIER();
+			gc_mark_stack(t->stack_cur,t->stack_top);
+			gc_mark_stack(&t->gc_regs,(void**)&t->gc_regs + (sizeof(jmp_buf) / sizeof(void*) - 1));
+			gc_mark_stack(&t->extra_stack_data,(void**)&t->extra_stack_data + t->extra_stack_size);
+			GC_MEMORY_BARRIER();
+			if( seq == t->gc_ctx_seq ) break;
+		}
 	}
 
 	gc_mstack *st = &global_mark_stack;
@@ -1037,17 +1066,22 @@ HL_API void hl_blocking( bool b ) {
 		return; // allow hl_blocking in non-GC threads
 	if( b ) {
 #		ifdef HL_THREADS
-		if( t->gc_blocking == 0 )
+		if( t->gc_blocking == 0 ) {
 			gc_save_context(t,&b);
+			GC_MEMORY_BARRIER();
+		}
 #		endif
 		t->gc_blocking++;
 	} else if( t->gc_blocking == 0 )
 		hl_error("Unblocked thread");
 	else {
 		t->gc_blocking--;
-		if( t->gc_blocking == 0 && gc_threads.stopping_world ) {
-			gc_global_lock(true);
-			gc_global_lock(false);
+		if( t->gc_blocking == 0 ) {
+			GC_MEMORY_BARRIER();
+			if( gc_threads.stopping_world ) {
+				gc_global_lock(true);
+				gc_global_lock(false);
+			}
 		}
 	}
 }

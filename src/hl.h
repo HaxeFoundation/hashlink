@@ -1000,6 +1000,7 @@ typedef struct {
 	void *break_regs[HL_BREAK_REGS];
 	void *extra_stack_data[HL_MAX_EXTRA_STACK];
 	int extra_stack_size;
+	volatile int gc_ctx_seq;
 	#ifdef HL_MAC
 	thread_t mach_thread_id;
 	pthread_t pthread_id;
