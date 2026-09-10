@@ -655,31 +655,33 @@ HL_PRIM void hl_deque_push( hl_deque *q, vdynamic *msg ) {
 
 HL_PRIM vdynamic *hl_deque_pop( hl_deque *q, bool block ) {
 	vdynamic *msg;
-	hl_blocking(true);
-	LOCK(q->lock);
-	while( q->first == NULL )
-		if( block ) {
-#			if !defined(HL_THREADS)
-#			elif defined(HL_WIN)
-			UNLOCK(q->lock);
-			WaitForSingleObject(q->wait,INFINITE);
-			LOCK(q->lock);
-#			else
-			pthread_cond_wait(&q->wait,&q->lock);
-#			endif
-		} else {
-			UNLOCK(q->lock);
-			hl_blocking(false);
+	tqueue *t;
+	while( true ) {
+		LOCK(q->lock);
+		t = q->first;
+		if( t != NULL ) break;
+		UNLOCK(q->lock);
+		if( !block )
 			return NULL;
-		}
-	msg = q->first->msg;
-	q->first = q->first->next;
+		hl_blocking(true);
+#		if !defined(HL_THREADS)
+#		elif defined(HL_WIN)
+		WaitForSingleObject(q->wait,INFINITE);
+#		else
+		pthread_mutex_lock(&q->lock);
+		while( q->first == NULL )
+			pthread_cond_wait(&q->wait,&q->lock);
+		pthread_mutex_unlock(&q->lock);
+#		endif
+		hl_blocking(false);
+	}
+	msg = t->msg;
+	q->first = t->next;
 	if( q->first == NULL )
 		q->last = NULL;
 	else
 		SIGNAL(q->wait);
 	UNLOCK(q->lock);
-	hl_blocking(false);
 	return msg;
 }
 
