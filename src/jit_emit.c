@@ -39,7 +39,7 @@ int hl_emit_mode_sizes[] = {0,1,2,4,HL_WSIZE,8,4,0,0};
 typedef struct {
 	hl_type *t;
 	int id;
-	ereg stored;
+	int write_pos;
 	int scope_end;
 } vreg;
 
@@ -117,6 +117,8 @@ struct _tmp_phi {
 typedef struct {
 	ereg stack;
 	int target;
+	int start;
+	emit_block *block;
 } trap_inf;
 
 struct _emit_ctx {
@@ -523,16 +525,23 @@ static ereg emit_load_mem( emit_ctx *ctx, ereg v, int offset, hl_type *size_t, h
 	return new_value(ctx);
 }
 
+static ereg emit_load_reg_block( emit_ctx *ctx, emit_block *b, vreg *r );
+
 static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 	if( to->t->kind == HVOID ) return;
 	if( IS_NULL(v) ) jit_assert();
 	store_block_var(ctx,ctx->current_block,to,v);
 	if( ctx->trap_count > 0 ) {
-		// if the value was written before the trap, let's update it
-		if( !IS_NULL(to->stored) )
-			STORE_MEM(emit_gen(ctx,ADDRESS,to->stored,UNUSED,M_PTR), 0, v);
+		ereg prev = UNUSED;
+		for(int i=0;i<ctx->trap_count;i++) {
+			trap_inf *t = &ctx->traps[i];
+			if( to->write_pos < 0 || to->write_pos > t->start ) continue;
+			ereg tv = emit_load_reg_block(ctx, t->block, to);
+			if( tv == prev ) continue;
+			STORE_MEM(emit_gen(ctx,ADDRESS,tv,UNUSED,M_PTR), 0, v);
+			prev = tv;
+		}
 	} else {
-		to->stored = v;
 		// arguments are tracked by index by the caller, they have no op position
 		if( !ctx->in_args && ctx->current_assign < ctx->fun->nassigns && ASSIGN_POS(ctx->fun,ctx->current_assign) == ctx->op_pos ) {
 			int_arr_add(ctx->values_track,ctx->current_assign);
@@ -550,6 +559,7 @@ static void emit_store_reg( emit_ctx *ctx, vreg *to, ereg v ) {
 			ctx->current_assign++;
 		}
 	}
+	if( to->write_pos < 0 ) to->write_pos = ctx->emit_pos;
 }
 
 static ereg emit_native_call( emit_ctx *ctx, void *native_ptr, ereg args[], int nargs, hl_type *ret ) {
@@ -1120,7 +1130,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	for(i=0;i<f->nregs;i++) {
 		vreg *r = R(i);
 		r->t = f->regs[i];
-		r->stored = UNUSED;
+		r->write_pos = -1;
 		r->scope_end = SCOPE_NONE;
 	}
 
@@ -2198,6 +2208,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case OTrap:
 		{
+			int trap_start = ctx->emit_pos;
 			ereg st = emit_gen_size(ctx, ALLOC_STACK, sizeof(hl_trap_ctx));
 
 			ereg thread, current_addr;
@@ -2268,6 +2279,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			int jtrap = ctx->emit_pos;
 			emit_gen(ctx, JUMP, UNUSED, UNUSED, 0);
 			register_jump(ctx, jtrap, o->p2);
+			emit_block *catch_from = ctx->current_block;
 			split_block(ctx);
 			patch_jump(ctx, jskip);
 
@@ -2275,6 +2287,8 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 			trap_inf *inf = &ctx->traps[ctx->trap_count++];
 			inf->stack = st;
 			inf->target = o->p2 + 1 + ctx->op_pos;
+			inf->start = trap_start;
+			inf->block = catch_from;
 		}
 		break;
 	case OEndTrap:
