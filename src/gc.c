@@ -185,6 +185,29 @@ static hl_threads_info gc_threads;
 
 HL_THREAD_STATIC_VAR hl_thread_info *current_thread;
 
+#if !defined(GC_EXTERN_API) && defined(HL_THREADS) && !defined(GC_DEBUG)
+#	define GC_SLICES
+#	define GC_SLICE_BYTES		2048
+#	define GC_SLICE_SLOTS		(GC_FIXED_PARTS << PAGE_KIND_BITS)
+
+typedef struct {
+	unsigned char *cur;
+	unsigned char *end;
+	int block_size;
+	int gen;
+} gc_slice;
+
+static volatile int gc_slice_gen = 1;
+HL_THREAD_STATIC_VAR gc_slice gc_slices[GC_SLICE_SLOTS];
+
+static int gc_slice_part( int size, int kind ) {
+	int sz = size + ((-size) & (GC_ALIGN - 1));
+	if( sz > GC_SIZES[GC_FIXED_PARTS-1] || kind == MEM_KIND_FINALIZER )
+		return -1;
+	return (sz >> GC_ALIGN_BITS) - 1;
+}
+#endif
+
 static struct {
 	int64 total_requested;
 	int64 total_allocated;
@@ -362,6 +385,9 @@ HL_API void hl_unregister_thread() {
 		hl_fatal("Thread not registered");
 	hl_remove_root(&t->exc_value);
 	hl_remove_root(&t->exc_handler);
+#	ifdef GC_SLICES
+	memset(gc_slices,0,sizeof(gc_slices));
+#	endif
 	gc_global_lock(true);
 	for(i=0;i<gc_threads.count;i++)
 		if( gc_threads.threads[i] == t ) {
@@ -529,6 +555,25 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 		return NULL;
 	if( size < 0 )
 		hl_error("Invalid allocation size");
+#	ifdef GC_SLICES
+	if( !hl_is_tracking(HL_TRACK_ALLOC) ) {
+		int kind = flags & PAGE_KIND_MASK;
+		int part = gc_slice_part(size, kind);
+		if( part >= 0 ) {
+			gc_slice *s = &gc_slices[(part << PAGE_KIND_BITS) | kind];
+			if( s->gen == gc_slice_gen && s->cur < s->end ) {
+				ptr = s->cur;
+				allocated = s->block_size;
+				s->cur += allocated;
+				if( flags & MEM_ZERO )
+					MZERO(ptr,allocated);
+				else if( MEM_HAS_PTR(flags) && allocated != size )
+					MZERO((char*)ptr+size,allocated-size);
+				return ptr;
+			}
+		}
+	}
+#	endif
 	gc_global_lock(true);
 	gc_check_mark();
 #	ifdef GC_MEMCHK
@@ -564,15 +609,41 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 			printf("%d\n",gc_stats.allocation_count);
 		}
 #		endif
-		ptr = gc_allocator_alloc(&allocated,flags & PAGE_KIND_MASK);
-		if( ptr == NULL ) {
-			if( allocated < 0 ) {
-				gc_global_lock(false);
-				hl_error("Required memory allocation too big");
+#		ifdef GC_SLICES
+		int tpart = hl_is_tracking(HL_TRACK_ALLOC) ? -1 : gc_slice_part(size, flags & PAGE_KIND_MASK);
+		if( tpart >= 0 ) {
+			int kind = flags & PAGE_KIND_MASK;
+			int bsize = GC_SIZES[tpart];
+			int max = GC_SLICE_BYTES / bsize;
+			int n = 0;
+			unsigned char *slice;
+			if( max < 4 ) max = 4;
+			slice = (unsigned char*)gc_alloc_fixed(tpart, kind, max, &n);
+			gc_slice *s = &gc_slices[(tpart << PAGE_KIND_BITS) | kind];
+			s->block_size = bsize;
+			s->cur = slice + bsize;
+			s->end = slice + n * bsize;
+			s->gen = gc_slice_gen;
+			allocated = bsize;
+			ptr = slice;
+			// account the whole slice, so that gc_check_mark keeps triggering at the
+			// same heap growth rate
+			gc_stats.allocation_count += n - 1;
+			gc_stats.total_requested += (int64)(n - 1) * bsize;
+			gc_stats.total_allocated += (int64)n * bsize;
+		} else
+#		endif
+		{
+			ptr = gc_allocator_alloc(&allocated,flags & PAGE_KIND_MASK);
+			if( ptr == NULL ) {
+				if( allocated < 0 ) {
+					gc_global_lock(false);
+					hl_error("Required memory allocation too big");
+				}
+				hl_fatal("TODO");
 			}
-			hl_fatal("TODO");
+			gc_stats.total_allocated += allocated;
 		}
-		gc_stats.total_allocated += allocated;
 	}
 	if( gc_flags & GC_PROFILE ) gc_stats.alloc_time += TIMESTAMP() - time;
 #	ifdef GC_DEBUG
@@ -892,6 +963,10 @@ static void count_free_memory( gc_pheader *page, int size ) {
 }
 
 static void gc_major() {
+
+#ifdef GC_SLICES
+	gc_slice_gen++;
+#endif
 
 	if( gc_flags & GC_PROFILE_MEM ) {
 		double gc_mem = gc_stats.mark_bytes;

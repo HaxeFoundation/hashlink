@@ -276,23 +276,24 @@ static void flush_free_list( gc_pheader *ph ) {
 	free_freelist(&old_fl);
 }
 
-static void *gc_alloc_fixed( int part, int kind ) {
+static void *gc_alloc_fixed( int part, int kind, int max_count, int *count ) {
 	int pid = (part << PAGE_KIND_BITS) | kind;
 	gc_pheader *ph = gc_free_pages[pid];
 	gc_allocator_page_data *p = NULL;
+	gc_fl *c = NULL;
 	int bid = -1;
+	int n = 0;
 	while( ph ) {
 		p = &ph->alloc;
 		if( p->need_flush )
 			flush_free_list(ph);
 		gc_freelist *fl = &p->free;
 		if( fl->current < fl->count ) {
-			gc_fl *c = GET_FL(fl,fl->current);
-			bid = c->pos++;
-			c->count--;
-#			ifdef GC_DEBUG
-			if( c->count < 0 ) hl_fatal("assert");
-#			endif
+			c = GET_FL(fl,fl->current);
+			bid = c->pos;
+			n = c->count < max_count ? c->count : max_count;
+			c->pos += (fl_cursor)n;
+			c->count -= (fl_cursor)n;
 			if( !c->count ) fl->current++;
 			break;
 		}
@@ -301,16 +302,20 @@ static void *gc_alloc_fixed( int part, int kind ) {
 	if( ph == NULL ) {
 		ph = gc_allocator_new_page(pid, GC_SIZES[part], GC_PAGE_SIZE, kind, false);
 		p = &ph->alloc;
-		bid = p->free.data->pos++;
-		p->free.data->count--;
+		c = p->free.data;
+		bid = c->pos;
+		n = c->count < max_count ? c->count : max_count;
+		c->pos += (fl_cursor)n;
+		c->count -= (fl_cursor)n;
+		if( !c->count ) p->free.current++;
 	}
 	unsigned char *ptr = ph->base + bid * p->block_size;
 #	ifdef GC_DEBUG
 	{
 		int i;
-		if( bid < p->first_block || bid >= p->max_blocks )
+		if( bid < p->first_block || bid + n > p->max_blocks )
 			hl_fatal("assert");
-		for(i=0;i<p->block_size;i++)
+		for(i=0;i<p->block_size * n;i++)
 			if( ptr[i] != 0xDD )
 				hl_fatal("assert");
 			else
@@ -318,6 +323,7 @@ static void *gc_alloc_fixed( int part, int kind ) {
 	}
 #	endif
 	gc_free_pages[pid] = ph;
+	*count = n;
 	return ptr;
 }
 
@@ -400,8 +406,9 @@ static void *gc_allocator_alloc( int *size, int page_kind ) {
 	}
 	if( sz <= GC_SIZES[GC_FIXED_PARTS-1] && page_kind != MEM_KIND_FINALIZER ) {
 		int part = (sz >> GC_ALIGN_BITS) - 1;
+		int count;
 		*size = GC_SIZES[part];
-		return gc_alloc_fixed(part, page_kind);
+		return gc_alloc_fixed(part, page_kind, 1, &count);
 	}
 	int p;
 	for(p=GC_FIXED_PARTS;p<GC_PARTITIONS;p++) {
