@@ -96,7 +96,7 @@ static int_val gc_hash( void *ptr ) {
 #	define GC_MAX_MARK_THREADS 1
 #else
 #	ifndef GC_MAX_MARK_THREADS
-#	define GC_MAX_MARK_THREADS 8
+#	define GC_MAX_MARK_THREADS 16
 #	endif
 #endif
 
@@ -685,7 +685,7 @@ static unsigned char *mark_data = NULL;
 static gc_mstack global_mark_stack = {0};
 static int gc_mark_threads = GC_MAX_MARK_THREADS;
 static gc_mthread mark_threads[GC_MAX_MARK_THREADS] = {0};
-static unsigned char mark_threads_active = 0;
+static volatile unsigned int mark_threads_active = 0;
 static hl_semaphore *mark_threads_done;
 
 #define GC_STACK_BEGIN(st) register void **__current_stack = (st)->cur; gc_mstack *__current_mstack = st;
@@ -724,17 +724,22 @@ HL_PRIM void **hl_gc_mark_grow( gc_mstack *stack ) {
 	return stack->cur;
 }
 
-static bool atomic_bit_unset( unsigned char *addr, unsigned char bitmask ) {
-	if( GC_MAX_MARK_THREADS <= 1 ) {
-		unsigned char v = *addr;
-		bool b = (v & bitmask) != 0;
-		if( b ) *addr = v & ~bitmask;
-		return b;
-	}
+static bool atomic_mask_unset( volatile unsigned int *addr, unsigned int bitmask ) {
 #	if defined(HL_VCC)
-	return ((unsigned)InterlockedAnd8((char*)addr,(char)~bitmask) & bitmask) != 0;
+	return (((unsigned)_InterlockedAnd((volatile long*)addr,(long)~bitmask)) & bitmask) != 0;
 #	elif defined(HL_CLANG) || defined(HL_GCC)
 	return (__sync_fetch_and_and(addr,~bitmask) & bitmask) != 0;
+#	else
+	hl_fatal("Not implemented");
+	return false;
+#	endif
+}
+
+static bool atomic_mask_set( volatile unsigned int *addr, unsigned int bitmask ) {
+#	if defined(HL_VCC)
+	return (((unsigned)_InterlockedOr((volatile long*)addr,(long)bitmask)) & bitmask) == 0;
+#	elif defined(HL_CLANG) || defined(HL_GCC)
+	return (__sync_fetch_and_or(addr,bitmask) & bitmask) == 0;
 #	else
 	hl_fatal("Not implemented");
 	return false;
@@ -773,7 +778,7 @@ static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 		return;
 	for(i=0;i<gc_mark_threads;i++) {
 		gc_mthread *t = &mark_threads[i];
-		if( !atomic_bit_set(&mark_threads_active,1<<i) )
+		if( !atomic_mask_set(&mark_threads_active,1<<i) )
 			continue;
 		int push = GC_STACK_COUNT(st);
 		if( push > count ) push = count;
@@ -1076,7 +1081,7 @@ static void mark_thread_main( void *param ) {
 	while( true ) {
 		hl_semaphore_acquire(inf->ready);
 		inf->mark_count += gc_flush_mark(&inf->stack);
-		if( !atomic_bit_unset(&mark_threads_active, 1 << index) ) hl_fatal("assert");
+		if( !atomic_mask_unset(&mark_threads_active, 1 << index) ) hl_fatal("assert");
 		if( mark_threads_active == 0 ) hl_semaphore_release(mark_threads_done);
 	}
 }
