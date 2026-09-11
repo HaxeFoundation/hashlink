@@ -691,6 +691,7 @@ typedef struct {
 	int todos_pos;
 	int todos_size;
 	int flags;
+	vdynamic * volatile root;
 } mem_context;
 
 #define compact_grow(buf,pos,size,req,type) \
@@ -965,6 +966,7 @@ HL_PRIM vdynamic *hl_mem_compact( vdynamic *d, varray *exclude, int flags, int *
 	int i;
 	int object_count = 0;
 	memset(ctx,0,sizeof(mem_context));
+	ctx->root = d; // retain the graph while we walk it
 	ctx->lookup = hl_mlookup_alloc();
 	ctx->flags = flags;
 	compact_lookup_ref(ctx,d,false);
