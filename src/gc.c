@@ -801,7 +801,7 @@ static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 	}
 }
 
-#define REGULAR_BITS 16
+#define REGULAR_BITS 8
 
 static int gc_flush_mark( gc_mstack *stack ) {
 	GC_STACK_BEGIN(stack);
