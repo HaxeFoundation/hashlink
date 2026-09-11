@@ -870,10 +870,13 @@ static int gc_flush_mark( gc_mstack *stack ) {
 			page = GC_GET_PAGE(p);
 			if( !page || !INPAGE(p,page) ) continue;
 			int bid = gc_allocator_get_block_id(page,p);
-			if( bid >= 0 && atomic_bit_set(&page->bmp[bid>>3],1<<(bid&7)) ) {
-				if( MEM_HAS_PTR(page->page_kind) ) DRAM_PREFETCH(p);
-				GC_PUSH_GEN(p,page);
-			}
+			if( bid < 0 ) continue;
+			unsigned char *bmp = &page->bmp[bid>>3];
+			unsigned char bmask = (unsigned char)(1<<(bid&7));
+			if( (*bmp & bmask) != 0 ) continue;
+			if( !atomic_bit_set(bmp,bmask) ) continue;
+			if( MEM_HAS_PTR(page->page_kind) ) DRAM_PREFETCH(p);
+			GC_PUSH_GEN(p,page);
 		}
 	}
 	GC_STACK_END();
