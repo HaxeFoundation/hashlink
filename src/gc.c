@@ -43,6 +43,16 @@
 #define DRAM_PREFETCH(addr)
 #endif
 
+#if defined(HL_VCC)
+#	define GC_CPU_PAUSE()	_mm_pause()
+#elif (defined(HL_CLANG) || defined(HL_GCC)) && (defined(__i386__) || defined(__x86_64__))
+#	define GC_CPU_PAUSE()	__builtin_ia32_pause()
+#elif (defined(HL_CLANG) || defined(HL_GCC)) && (defined(__aarch64__) || defined(__arm__))
+#	define GC_CPU_PAUSE()	__asm__ __volatile__("yield")
+#else
+#	define GC_CPU_PAUSE()
+#endif
+
 #define MZERO(ptr,size)		memset(ptr,0,size)
 
 // GC
@@ -676,6 +686,7 @@ typedef struct {
 	gc_mstack stack;
 	hl_semaphore *ready;
 	int mark_count;
+	volatile int has_work;
 	hl_thread *tid;
 } gc_mthread;
 
@@ -687,6 +698,8 @@ static int gc_mark_threads = GC_MAX_MARK_THREADS;
 static gc_mthread mark_threads[GC_MAX_MARK_THREADS] = {0};
 static volatile unsigned int mark_threads_active = 0;
 static hl_semaphore *mark_threads_done;
+static volatile bool gc_marking = false;
+static int gc_mark_spin = 2000;
 
 #define GC_STACK_BEGIN(st) register void **__current_stack = (st)->cur; gc_mstack *__current_mstack = st;
 #define GC_STACK_END() __current_mstack->cur = __current_stack;
@@ -789,14 +802,17 @@ static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 		st->cur -= push;
 		memcpy(t->stack.cur, st->cur, push * sizeof(void*));
 		t->stack.cur += push;
-		if( !all )
+		if( !all ) {
 			hl_semaphore_release(t->ready);
+			t->has_work = 1;
+		}
 	}
 	if( all ) {
 		if( nthreads != gc_mark_threads ) hl_fatal("assert");
 		for(i=0;i<gc_mark_threads;i++) {
 			gc_mthread *t = &mark_threads[i];
 			hl_semaphore_release(t->ready);
+			t->has_work = 1;
 		}
 	}
 }
@@ -954,12 +970,14 @@ static void gc_mark() {
 	if( gc_mark_threads <= 1 )
 		gc_flush_mark(st);
 	else {
+		gc_marking = true;
 		gc_dispatch_mark(st, true);
 		if( GC_STACK_COUNT(st) > 0 )
 			hl_fatal("assert");
 		// wait threads to finish
 		while( mark_threads_active )
 			hl_semaphore_acquire(mark_threads_done);
+		gc_marking = false;
 		for(i=0;i<gc_mark_threads;i++) {
 			gc_mthread *t = &mark_threads[i];
 			if( GC_STACK_COUNT(&t->stack) > 0 )
@@ -1082,7 +1100,13 @@ static void mark_thread_main( void *param ) {
 	int index = (int)(int_val)param;
 	gc_mthread *inf = &mark_threads[index];
 	while( true ) {
+		// spinwait a bit before sleeping, so we can get delivered extra work
+		// without a costly sleep/wakeup phase
+		int spin = gc_mark_spin;
+		while( !inf->has_work && gc_marking && spin-- > 0 )
+			GC_CPU_PAUSE();
 		hl_semaphore_acquire(inf->ready);
+		inf->has_work = 0;
 		inf->mark_count += gc_flush_mark(&inf->stack);
 		if( !atomic_mask_unset(&mark_threads_active, 1 << index) ) hl_fatal("assert");
 		if( mark_threads_active == 0 ) hl_semaphore_release(mark_threads_done);
