@@ -911,7 +911,7 @@ static void compact_write_content( mem_context *ctx, vdynamic *d ) {
 			compact_pad(ctx,&hlt_dyn);
 			for(i=0;i<obj->nvalues;i++) {
 				int j;
-				for(j=0;i<obj->nfields;j++) {
+				for(j=0;j<obj->nfields;j++) {
 					if( (obj->lookup[j].field_index&HL_DYNOBJ_INDEX_MASK) == i && hl_is_ptr(obj->lookup[j].t) ) {
 						compact_write_data(ctx, obj->lookup[j].t, obj->values + i);
 						break;
