@@ -120,6 +120,8 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 	}
 #	else
 	char **argv;
+	p = (vprocess*)hl_gc_alloc_finalizer(sizeof(vprocess));
+	p->finalize = NULL;
 	if( !vargs ) {
 		argv = (char**)malloc(sizeof(char*)*4);
 		argv[0] = "/bin/sh";
@@ -139,7 +141,6 @@ HL_PRIM vprocess *hl_process_run( vbyte *cmd, varray *vargs, bool detached ) {
 	int input[2], output[2], error[2];
 	if( pipe(input) || pipe(output) || pipe(error) )
 		return NULL;
-	p = (vprocess*)hl_gc_alloc_finalizer(sizeof(vprocess));
 #ifdef HL_TVOS
 	hl_error("hl_process_run() not available for this platform");
 	p->pid = -1;

@@ -1182,6 +1182,7 @@ typedef struct {
 static dialog_data* CreateFileDialogData( vclosure *callback, varray *filters ) {
 	dialog_data *data = malloc( sizeof( dialog_data ) );
 	data->closure = callback;
+	hl_add_root(&data->closure);
 
 	data->filters_size = filters ? filters->size : 0;
 
@@ -1201,8 +1202,6 @@ static dialog_data* CreateFileDialogData( vclosure *callback, varray *filters ) 
 	}
 	else 
 		data->filters = NULL;
-
-	hl_add_root(&data->closure);
 
 	return data;
 }
