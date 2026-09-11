@@ -818,14 +818,28 @@ static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 }
 
 #define REGULAR_BITS 8
+#define GC_MARK_BATCH	64
 
 static int gc_flush_mark( gc_mstack *stack ) {
 	GC_STACK_BEGIN(stack);
 	if( !__current_stack ) return 0;
 	int count = 0;
 	int regular_mask = 1 << REGULAR_BITS;
+	void *batch[GC_MARK_BATCH];
+	int bcount = 0, bpos = 0;
 	while( true ) {
-		void **block = (void**)*--__current_stack;
+		if( bpos == bcount ) {
+			bcount = 0;
+			while( bcount < GC_MARK_BATCH ) {
+				void *b = *--__current_stack;
+				if( !b ) { __current_stack++; break; }
+				DRAM_PREFETCH(b);
+				batch[bcount++] = b;
+			}
+			if( bcount == 0 ) break;
+			bpos = 0;
+		}
+		void **block = (void**)batch[bpos++];
 		gc_pheader *page = GC_GET_PAGE(block);
 		unsigned int *mark_bits = NULL;
 		int pos = 0, nwords;
@@ -833,10 +847,6 @@ static int gc_flush_mark( gc_mstack *stack ) {
 		vdynamic *ptr = (vdynamic*)block;
 		ptr += 0; // prevent unreferenced warning
 #		endif
-		if( !block ) {
-			__current_stack++;
-			break;
-		}
 		if( (count++ & (1 << REGULAR_BITS)) != regular_mask && GC_MAX_MARK_THREADS > 1 && gc_mark_threads > 1 ) {
 			regular_mask = regular_mask ? 0 : 1 << REGULAR_BITS;
 			GC_STACK_END();
