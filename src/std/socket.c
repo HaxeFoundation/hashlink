@@ -19,13 +19,14 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifdef _WIN32
+#include <hl.h>
+
+#ifdef HL_WIN
 
 #define FD_SETSIZE	65536
 #pragma warning(disable:4548)
 
 #	include <string.h>
-#	include <hl.h>
 #	undef _GUID
 #	include <winsock2.h>
 #	define FDSIZE(n)	(sizeof(void*) + (n) * sizeof(SOCKET))
@@ -37,8 +38,7 @@
 
 #else
 
-#if defined(__ORBIS__) || defined(__NX__)
-#	include <hl.h>
+#if defined(HL_PS) || defined(HL_NX)
 #	include <posix/posix.h>
 #else
 #	ifndef _GNU_SOURCE
@@ -77,8 +77,6 @@
 #	define EPOLLIN 0x001
 #	define EPOLLOUT 0x004
 #endif
-
-#include <hl.h>
 
 #if defined(HL_WIN) || defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS)
 #	define MSG_NOSIGNAL 0

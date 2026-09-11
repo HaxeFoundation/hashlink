@@ -73,7 +73,7 @@
 #	define HL_PS
 #endif
 
-#ifdef __NX__
+#ifdef __NINTENDO__
 #	define HL_NX
 #endif
 
