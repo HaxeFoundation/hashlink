@@ -29,14 +29,14 @@ HL_PRIM vbyte* HL_NAME(jpg_encode)(vbyte* data, int width, int height, int strid
 	hl_blocking(false);
 	return bytes;
 #else
-	hl_blocking(true);
 	tjhandle h = tjInitCompress();
 	int result;
 	unsigned long buffSize = tjBufSize(width, height, subSamp);
 	vbyte* buffer = hl_alloc_bytes(buffSize);
-	result = tjCompress2(h, data, width, stride, height, format, &buffer, &buffSize, subSamp, quality, (flags & 1 ? TJFLAG_BOTTOMUP : 0));
-	tjDestroy(h);
+	hl_blocking(true);
+	result = tjCompress2(h, data, width, stride, height, format, &buffer, &buffSize, subSamp, quality, TJFLAG_NOREALLOC | (flags & 1 ? TJFLAG_BOTTOMUP : 0));
 	hl_blocking(false);
+	tjDestroy(h);
 	if (result == 0) {
 		*outLength = buffSize;
 		return buffer;
