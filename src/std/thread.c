@@ -528,12 +528,13 @@ HL_PRIM void hl_tls_set( hl_tls *l, void *v ) {
 			if( !v )
 				return;
 			store = (void**)malloc(sizeof(void*));
+			*store = NULL;
 			hl_add_root(store);
 			_tls_set(l, store);
 		} else {
 			if( !v ) {
-				free(store);
 				hl_remove_root(store);
+				free(store);
 				_tls_set(l, NULL);
 				return;
 			}
