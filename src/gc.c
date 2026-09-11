@@ -26,6 +26,9 @@
 #else
 #	include <sys/types.h>
 #	include <sys/mman.h>
+#	ifndef HL_CONSOLE
+#		include <unistd.h>
+#	endif
 #endif
 
 #if defined(HL_EMSCRIPTEN)
@@ -33,7 +36,7 @@
 #endif
 
 #if defined(HL_VCC)
-#define DRAM_PREFETCH(addr) _mm_prefetch(p, 1)
+#define DRAM_PREFETCH(addr) _mm_prefetch((const char*)(addr), _MM_HINT_T0)
 #elif defined(HL_CLANG) || defined (HL_GCC)
 #define DRAM_PREFETCH(addr) __builtin_prefetch(addr)
 #elif
@@ -93,7 +96,7 @@ static int_val gc_hash( void *ptr ) {
 #	define GC_MAX_MARK_THREADS 1
 #else
 #	ifndef GC_MAX_MARK_THREADS
-#	define GC_MAX_MARK_THREADS 4
+#	define GC_MAX_MARK_THREADS 8
 #	endif
 #endif
 
@@ -1053,6 +1056,20 @@ static void gc_check_mark() {
 		gc_major();
 }
 
+static int gc_default_mark_threads() {
+	int n = 0;
+#	if defined(HL_WIN)
+	SYSTEM_INFO inf;
+	GetSystemInfo(&inf);
+	n = (int)inf.dwNumberOfProcessors;
+#	elif defined(_SC_NPROCESSORS_ONLN)
+	n = (int)sysconf(_SC_NPROCESSORS_ONLN);
+#	endif
+	if( n <= 0 ) n = 4;
+	if( n > GC_MAX_MARK_THREADS ) n = GC_MAX_MARK_THREADS;
+	return n;
+}
+
 static void mark_thread_main( void *param ) {
 	int index = (int)(int_val)param;
 	gc_mthread *inf = &mark_threads[index];
@@ -1099,6 +1116,7 @@ static void hl_gc_init() {
 	gc_threads.exclusive_lock = hl_mutex_alloc(false);
 #	ifdef HL_THREADS
 	mark_threads_done = hl_semaphore_alloc(0);
+	gc_mark_threads = gc_default_mark_threads();
 	char *nthreads = getenv("HL_GC_THREADS");
 	if( nthreads ) {
 		gc_mark_threads = atoi(nthreads);
