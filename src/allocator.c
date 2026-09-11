@@ -63,6 +63,9 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<13,0};
 #define GC_ALL_PAGES	(GC_PARTITIONS << PAGE_KIND_BITS)
 #define	GC_ALIGN		(1 << GC_ALIGN_BITS)
 
+static unsigned int GC_BLOCK_MUL[GC_PARTITIONS] = {0};
+#define GC_BLOCK_ID(p,offset)	((int)(((uint64)(unsigned int)(offset) * GC_BLOCK_MUL[(p)->size_id]) >> 32))
+
 static gc_pheader *gc_pages[GC_ALL_PAGES] = {NULL};
 static gc_pheader *gc_free_pages[GC_ALL_PAGES] = {NULL};
 
@@ -153,11 +156,7 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	gc_allocator_page_data *p = &ph->alloc;
 
 	p->block_size = block;
-	p->size_bits = 0;
-	while( block < (1<<p->size_bits) )
-		p->size_bits++;
-	if( block != (1<<p->size_bits) )
-		p->size_bits = 0;
+	p->size_id = (unsigned char)(pid >> PAGE_KIND_BITS);
 	p->max_blocks = max_blocks;
 	p->sizes = NULL;
 	if( p->max_blocks > GC_PAGE_SIZE )
@@ -549,28 +548,33 @@ static void gc_allocator_before_mark( unsigned char *mark_cur ) {
 	}
 }
 
-#define gc_allocator_fast_block_size(page,block) \
-	(page->alloc.sizes ? page->alloc.sizes[(int)(((unsigned char*)(block)) - page->base) / page->alloc.block_size] * page->alloc.block_size : page->alloc.block_size)
+static int gc_allocator_fast_block_size( gc_pheader *page, void *block ) {
+	gc_allocator_page_data *p = &page->alloc;
+	if( !p->sizes ) return p->block_size;
+	return p->sizes[GC_BLOCK_ID(p,(unsigned char*)block - page->base)] * p->block_size;
+}
 
 static void gc_allocator_init() {
+	int i;
 	if( TRAILING_ONES(0x080003FF) != 10 || TRAILING_ONES(0) != 0 || TRAILING_ONES(0xFFFFFFFF) != 32 )
 		hl_fatal("Invalid builtin tl1");
 	if( TRAILING_ZEROES((unsigned)~0x080003FF) != 10 || TRAILING_ZEROES(0) != 32 || TRAILING_ZEROES(0xFFFFFFFF) != 0 )
 		hl_fatal("Invalid builtin tl0");
+	for(i=0;i<GC_PARTITIONS;i++) {
+		int block = GC_SIZES[i];
+		if( !block ) continue;
+		GC_BLOCK_MUL[i] = (unsigned int)(0xFFFFFFFFu / (unsigned int)block) + 1;
+		uint64 err = (uint64)GC_BLOCK_MUL[i] * (unsigned int)block - 0x100000000ULL;
+		if( err && (uint64)GC_PAGE_SIZE * block * err > 0x100000000ULL )
+			hl_fatal("Invalid block mul");
+	}
 }
 
 static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 	int offset = (int)((unsigned char*)block - page->base);
-	int bid;
-	if( page->alloc.size_bits ) {
-		bid = offset >> page->alloc.size_bits;
-		if( bid << page->alloc.size_bits != offset )
-			return -1;
-	} else {
-		bid = offset / page->alloc.block_size;
-		if( bid * page->alloc.block_size != offset )
-			return -1;
-	}
+	int bid = GC_BLOCK_ID(&page->alloc,offset);
+	if( bid * page->alloc.block_size != offset )
+		return -1;
 	if( bid >= page->alloc.max_blocks )
 		return -1;
 	if( page->alloc.sizes ) {
@@ -585,7 +589,7 @@ static int gc_allocator_get_block_id( gc_pheader *page, void *block ) {
 #ifdef GC_INTERIOR_POINTERS
 static int gc_allocator_get_block_interior( gc_pheader *page, void **block ) {
 	int offset = (int)((unsigned char*)*block - page->base);
-	int bid = offset / page->alloc.block_size;
+	int bid = GC_BLOCK_ID(&page->alloc,offset);
 	if( bid >= page->alloc.max_blocks )
 		return -1;
 	if( page->alloc.sizes ) {

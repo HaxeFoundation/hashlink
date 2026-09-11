@@ -17,7 +17,7 @@ typedef struct _gc_freelist {
 
 typedef struct {
 	int block_size;
-	unsigned char size_bits;
+	unsigned char size_id;
 	unsigned char need_flush;
 	short first_block;
 	int max_blocks;
