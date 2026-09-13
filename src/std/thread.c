@@ -139,14 +139,14 @@ HL_PRIM hl_mutex *hl_mutex_alloc( bool gc_thread ) {
 }
 
 HL_PRIM void hl_mutex_acquire( hl_mutex *l ) {
-#	if !defined(HL_THREADS)
-#	elif defined(HL_WIN)
+#	if defined(HL_THREADS)
+	if( hl_mutex_try_acquire(l) ) return;
 	if( l->is_gc ) hl_blocking(true);
+#	ifdef HL_WIN
 	EnterCriticalSection(&l->cs);
-	if( l->is_gc ) hl_blocking(false);
 #	else
-	if( l->is_gc ) hl_blocking(true);
 	pthread_mutex_lock(&l->lock);
+#	endif
 	if( l->is_gc ) hl_blocking(false);
 #	endif
 }
