@@ -252,6 +252,72 @@ static int module_capture_stack( void **stack, int size ) {
 		}
 	}
 	return count;
+#elif defined(__aarch64__) || defined(_M_ARM64)
+	// On AArch64, walk the frame pointer (X29) chain instead of scanning the stack.
+	// The heuristic scanner produces false positives from callee-saved register spills
+	// (STP X19,X20 etc.) that look like (stack_addr, code_addr) pairs.
+	void *stack_top = hl_get_thread()->stack_top;
+	void **fp = (void **)__builtin_frame_address(0);
+	int count = 0;
+	bool prev_helper = false;
+	while( fp && (void *)fp < stack_top ) {
+		void *raw_lr = fp[1];
+		void *next_fp = fp[0];
+		int i;
+		// Classify the saved LR: 0 = not JIT, 1 = JIT helper/stub prefix,
+		// 2 = JIT user code.
+		int kind = 0;
+		for(i=0;i<modules_count;i++) {
+			hl_module *m = cur_modules[i];
+			unsigned char *code = m->jit_code;
+			int code_size = m->codesize;
+			if( raw_lr < (void*)code || raw_lr >= (void*)(code + code_size) )
+				continue;
+			kind = 2;
+			if( m->jit_debug ) {
+				int s = m->jit_debug[0].start;
+				if( raw_lr < (void*)(code + s) ) {
+					kind = 1;
+					break;
+				}
+			}
+			break;
+		}
+		if( kind == 2 ) {
+			// If the previous frame was a helper stub, the JIT caller entered it
+			// with a synthetic return address (PUSH_ADDR) sitting just above the
+			// stub's saved FP/LR.  That address is the real call site; prefer it
+			// over the post-call LR so null-access traces report the access line.
+			void *addr = raw_lr;
+			if( prev_helper && (void*)(fp + 2) < stack_top ) {
+				void *pushed = fp[2];
+				for(i=0;i<modules_count;i++) {
+					hl_module *m = cur_modules[i];
+					unsigned char *code = m->jit_code;
+					int code_size = m->codesize;
+					if( m->jit_debug ) {
+						int s = m->jit_debug[0].start;
+						code += s;
+						code_size -= s;
+					}
+					if( pushed >= (void*)code && pushed < (void*)(code + code_size) ) {
+						addr = pushed;
+						break;
+					}
+				}
+			}
+			if( stack ) {
+				if( count == size ) return count;
+				stack[count] = addr;
+			}
+			count++;
+		}
+		prev_helper = (kind == 1);
+		if( next_fp == NULL || next_fp <= (void *)fp || next_fp >= stack_top )
+			break;
+		fp = (void **)next_fp;
+	}
+	return count;
 #else
 	return hl_module_capture_stack_range(hl_get_thread()->stack_top, (void**)&stack, stack, size);
 #endif
