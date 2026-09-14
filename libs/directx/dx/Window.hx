@@ -180,6 +180,25 @@ class Window {
 		icon = newIcon;
 	}
 
+	/**
+		Set the window icon by loading a given .ico file from disk.
+	**/
+	public function setIconFromFile(path: String) {
+		var newIcon = Icon.loadIcon(path != null ? @:privateAccess path.bytes : null, -1, -1);
+		if (newIcon == null) {
+			throw "couldn't load icon";
+			return;
+		}
+
+		winSetIcon(win, newIcon);
+
+		if (icon != null) {
+			icon.destroy();
+		}
+
+		icon = newIcon;
+	}
+
 	public function getNextEvent( e : Event ) : Bool {
 		return winGetNextEvent(win, e);
 	}
@@ -465,6 +484,13 @@ class Window {
 
 	@:hlNative("?directx", "win_set_icon")
 	static function winSetIcon(win: WinPtr, icon: Icon) : Void {
+	}
+
+	/**
+		Set the default icon to use when creating a new window.
+	**/
+	@:hlNative("?directx", "win_set_default_icon")
+	public static function setDefaultIcon(icon: Icon) : Void {
 	}
 
 }
