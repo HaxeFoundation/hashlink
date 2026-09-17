@@ -280,14 +280,14 @@ HL_API int uvszprintf( uchar *out, int out_size, const uchar *fmt, va_list argli
 HL_API void uprintf( const uchar *fmt, const uchar *str );
 C_FUNCTION_END
 
-#if defined(HL_VCC)
-#	define hl_debug_break()	if( hl_detect_debugger() ) __debugbreak()
-#elif defined(HL_PS) && defined(_DEBUG)
+#if defined(HL_PS) && defined(_DEBUG)
 #	define hl_debug_break()	__debugbreak()
 #elif defined(HL_NX)
 C_FUNCTION_BEGIN
 HL_API void hl_debug_break( void );
 C_FUNCTION_END
+#elif defined(HL_VCC)
+#	define hl_debug_break()	if( hl_detect_debugger() ) __debugbreak()
 #elif !defined(HL_CONSOLE)
 
 // use __builtin_debugtrap when available
