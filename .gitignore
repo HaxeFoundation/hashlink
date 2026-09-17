@@ -20,6 +20,7 @@ x64
 /src/_main*
 *.dylib
 *.o
+*.d
 *.a
 *.opendb
 *.VC.db
