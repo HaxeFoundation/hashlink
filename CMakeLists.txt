@@ -215,7 +215,7 @@ endif()
 if(WIN32)
     target_link_libraries(libhl ws2_32 user32 winmm)
 else()
-    target_link_libraries(libhl m dl)
+    target_link_libraries(libhl m ${CMAKE_DL_LIBS})
 
     if(ANDROID)
         target_link_libraries(libhl log)
