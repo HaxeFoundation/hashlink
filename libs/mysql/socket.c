@@ -129,7 +129,8 @@ PHOST phost_resolve( const char *host ) {
 	if( ip == INADDR_NONE ) {
 		struct hostent *h;
 		hl_blocking(true);
-#	if defined(OS_WINDOWS) || defined(OS_MAC) || defined(OS_CYGWIN)
+#	if defined(OS_WINDOWS) || defined(OS_MAC) || defined(OS_CYGWIN) || \
+	    defined(OS_NETBSD) || defined(OS_OPENBSD)
 		h = gethostbyname(host);
 #	else
 		struct hostent hbase;
