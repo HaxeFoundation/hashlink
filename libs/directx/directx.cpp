@@ -86,11 +86,11 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	desc.BufferDesc.Format = (DXGI_FORMAT)format;
 	desc.SampleDesc.Count = 1; // NO AA for now
 	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	desc.BufferCount = 2;
 #ifdef HL_WIN_DESKTOP
-	desc.BufferCount = 1;
+	desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	desc.Windowed = true;
 #else
-	desc.BufferCount = 2;
 	desc.Windowed = false;
 #endif
 	desc.OutputWindow = window;
@@ -141,7 +141,7 @@ HL_PRIM dx_resource *HL_NAME(get_back_buffer)() {
 
 HL_PRIM bool HL_NAME(resize)(int width, int height, int format) {
 #ifdef HL_WIN_DESKTOP
-	HRESULT res = driver->swapchain->ResizeBuffers(1, width, height, (DXGI_FORMAT)format, 0); assert(res == S_OK);
+	HRESULT res = driver->swapchain->ResizeBuffers(2, width, height, (DXGI_FORMAT)format, 0); assert(res == S_OK);
 	return res == S_OK;
 #else
 	return TRUE; //Should not be called if the window is not resized (in the case here it will never happen)
