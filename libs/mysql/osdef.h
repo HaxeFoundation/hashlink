@@ -38,6 +38,18 @@
 #	define OS_BSD
 #endif
 
+#if defined(__FreeBSD__)
+#	define OS_FREEBSD
+#endif
+
+#if defined(__NetBSD__)
+#	define OS_NETBSD
+#endif
+
+#if defined(__OpenBSD__)
+#	define OS_OPENBSD
+#endif
+
 #if defined(__GNU__)
 #	define OS_HURD
 #endif
