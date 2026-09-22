@@ -76,7 +76,7 @@ HL_PRIM int hl_date_from_time( double time ) {
 HL_PRIM int hl_date_from_string( vbyte *b, int len ) {
 	struct tm t;
 	int o = 0;
-	const char *str = hl_to_utf8((uchar*)b);
+	const char *str = hl_to_utf8_len((uchar*)b, len);
 	bool recal = true;
 	memset(&t,0,sizeof(struct tm));
 	switch( strlen(str) ) {
