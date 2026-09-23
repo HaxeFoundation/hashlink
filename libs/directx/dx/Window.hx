@@ -33,6 +33,7 @@ class Window {
 
 	public static inline var HIDDEN    = 0x000001;
 	public static inline var RESIZABLE = 0x000002;
+	public static inline var NO_ACTIVATE = 0x000004;
 
 	static var _UID = 0;
 	var win : WinPtr;

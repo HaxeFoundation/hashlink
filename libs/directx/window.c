@@ -40,7 +40,8 @@ typedef enum {
 
 typedef enum {
 	Hidden    = 0x000001,
-	Resizable = 0x000002
+	Resizable = 0x000002,
+	NoActivate = 0x000004
 } WindowFlags;
 
 typedef struct {
@@ -653,8 +654,10 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, x, y, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
 	SetTimer(win,0,10,NULL);
 	if( !(windowFlags & Hidden) ) {
-		ShowWindow(win, SW_SHOW);
+		ShowWindow(win, (windowFlags & NoActivate) ? SW_SHOWNOACTIVATE : SW_SHOW);
 	}
+	if( windowFlags & NoActivate )
+		return win;
 	SetForegroundWindow(win);
 	SetFocus(win);
 	return win;
@@ -849,7 +852,7 @@ HL_PRIM void HL_NAME(win_set_fullscreen_on)(dx_window *win, bool fs, vbyte *moni
 		SetRectEmpty(&buf->fullscreen_rect);
 		buf->fullscreen_device[0] = 0;
 		SetWindowLong(win,GWL_STYLE,buf->normal_style);
-		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW|SWP_NOACTIVATE);
 	}
 }
 
