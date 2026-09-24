@@ -102,10 +102,10 @@ static ereg get_call_reg( regs_ctx *ctx, call_regs regs, emit_mode m ) {
 	return r;
 }
 
-static int get_stack_size( emit_mode m ) {
+static int get_stack_size( regs_ctx *ctx, emit_mode m ) {
 	int size = hl_emit_mode_sizes[m];
-	if( size < HL_WSIZE ) size = HL_WSIZE;
-	return size;
+	int min = ctx->jit->cfg.min_stack_args_size;
+	return size < min ? min : size;
 }
 
 static void regs_write_instr( regs_ctx *ctx, einstr *e, ereg out ) {
@@ -137,6 +137,30 @@ static void regs_emit( regs_ctx *ctx, ereg out, emit_op op, ereg a, ereg b, emit
 	e.b = b;
 	e.size_offs = size_offs;
 	regs_write_instr(ctx, &e, out);
+}
+
+static int next_native_stack_arg( regs_ctx *ctx, int *pos, emit_mode m ) {
+	int size = hl_emit_mode_sizes[m];
+	int min = ctx->jit->cfg.min_native_stack_args_size;
+	if( size < min ) size = min;
+	int offs = *pos + jit_pad_size(*pos,size);
+	*pos = offs + size;
+	return offs;
+}
+
+// emits the stores when stack_size is set, returns the stack size otherwise
+static int native_stack_args( regs_ctx *ctx, einstr *e, ereg *args, int stack_size ) {
+	call_regs regs = {0};
+	int size = 0;
+	if( stack_size ) regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_size);
+	for(int k=0;k<e->nargs;k++) {
+		value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
+		emit_mode mode = v ? v->mode : M_I32;
+		if( !IS_NULL(get_call_reg(ctx,regs,mode)) ) continue;
+		int offs = next_native_stack_arg(ctx,&size,mode);
+		if( stack_size ) regs_emit(ctx,UNUSED,STORE,ctx->jit->cfg.stack_reg,v ? v->reg : args[k],mode,offs);
+	}
+	return size + jit_pad_size(size,ctx->jit->cfg.stack_align);
 }
 
 static void regs_emit_mov( regs_ctx *ctx, ereg to, ereg from, emit_mode m ) {
@@ -466,6 +490,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	// assign args
 	call_regs regs = {0};
 	int args_count = 0;
+	int args_size = 0;
 	for(int i=1;i<=ctx->jit->fun->type->fun->nargs;i++) {
 		value_info *v = VAL(i);
 		einstr *e = ctx->jit->instrs + ctx->jit->values_writes[i];
@@ -484,7 +509,10 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 		}
 		if( IS_NULL(r) || IS_WINCALL64 ) {
 			// use existing stack storage
-			v->stack_pos = (args_count++ + 2) * HL_WSIZE;
+			if( ctx->jit->cfg.min_native_stack_args_size )
+				v->stack_pos = 2 * HL_WSIZE + next_native_stack_arg(ctx,&args_size,e->mode);
+			else
+				v->stack_pos = (args_count++ + 2) * HL_WSIZE;
 			if( IS_NULL(r) ) v->reg = MK_STACK_REG(v->stack_pos);
 		}
 	}
@@ -599,7 +627,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	}
 	// assign stack regs
 	int nvalues = jit->value_count + jit->phi_count;
-	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
+	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * jit->cfg.min_stack_args_size;
 	ctx->stack_offset = persists_size + jit_pad_size(persists_size,jit->cfg.stack_align);
 	for(int i=0;i<nvalues;i++) {
 		value_info *v = ctx->values + i;
@@ -711,7 +739,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 	int write_index = 1;
 	ctx->pos_map[0] = 0;
 
-	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
+	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * jit->cfg.min_stack_args_size;
 	int stack_offset = ctx->stack_size + ctx->stack_offset - persists_size;
 	int push_size = HL_WSIZE * 2 + persists_size; // RIP + RBP save
 	if( jit->cfg.stack_align ) {
@@ -740,20 +768,27 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			call_regs regs = {0};
 			int stack_args = 0;
 			int stack_bits = 0;
+			bool native = jit->cfg.min_native_stack_args_size != 0;
+			if( native ) stack_args = native_stack_args(ctx,&e,args,0);
 			for(int k=0;k<e.nargs;k++) {
 				value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
 				emit_mode mode = v ? v->mode : M_I32;
 				ereg r = get_call_reg(ctx,regs,mode);
 				if( IS_NULL(r) ) {
-					stack_args += get_stack_size(mode);
-					stack_bits |= 1 << k;
+					if( !native ) {
+						stack_args += get_stack_size(ctx,mode);
+						stack_bits |= 1 << k;
+					}
 				} else if( !v || r != v->reg ) {
 					int_arr_add(ctx->pack_movs,r);
 					int_arr_add(ctx->pack_movs,v ? v->reg : args[k]);
 					int_arr_add(ctx->pack_movs,mode);
 				}
 			}
-			if( stack_args > 0 ) {
+			if( native && stack_args > 0 ) {
+				native_stack_args(ctx,&e,args,stack_args);
+				instr_stack_offset = stack_args;
+			} else if( stack_args > 0 ) {
 				int offset = 0;
 				if( jit->cfg.stack_align ) {
 					int align = stack_args % jit->cfg.stack_align;
@@ -919,7 +954,7 @@ void hl_regs_flush( jit_ctx *jit ) {
 		reg_config *cfg = mode ? &jit->cfg.floats : &jit->cfg.regs;
 		for(int i=0;i<ctx->persists_uses[mode];i++) {
 			int_arr_add(regs_track, -1);
-			int_arr_add(regs_track, -(++nsaved) * HL_WSIZE); // offset from EBP
+			int_arr_add(regs_track, -(++nsaved) * jit->cfg.min_stack_args_size); // offset from EBP
 			int_arr_add(regs_track, 0);
 			int_arr_add(regs_track, cfg->persist[i]);
 		}

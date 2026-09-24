@@ -214,6 +214,14 @@ static void *call_jit_c2hl = hl_jit_assert;
 static void *call_jit_hl2c = hl_jit_assert;
 static int arg_reg_count = 0;
 static int arg_fp_count = 0;
+static int min_native_stack_args_size = 0;
+
+// size and alignment of a stack argument
+static int stack_arg_size( hl_type *t ) {
+	if( !min_native_stack_args_size ) return HL_WSIZE;
+	int size = hl_type_size(t);
+	return size < min_native_stack_args_size ? min_native_stack_args_size : size;
+}
 
 static int get_next_reg( hl_type *t, int *rp, int *fp ) {
 	if( t->kind == HF32 || t->kind == HF64 ) {
@@ -244,7 +252,7 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		void *regs[MAX_ARGS];
 		void *stack[MAX_ARGS];
 	} vargs;
-	int rp = 0, fp = 0, sp = 0;
+	int rp = 0, fp = 0, spos = 0;
 	for(int i=0;i<t->fun->nargs;i++) {
 		hl_type *at = t->fun->args[i];
 		void *v = args[i];
@@ -269,9 +277,14 @@ static void *callback_c2hl( void *f, hl_type *t, void **args, vdynamic *ret ) {
 		}
 		if( r >= 0 )
 			vargs.regs[r + (at->kind == HF32 || at->kind == HF64 ? arg_reg_count : 0)] = (void*)iv;
-		else
-			vargs.stack[sp++] = (void*)iv;
+		else {
+			int size = stack_arg_size(at);
+			spos += (-spos) & (size - 1);
+			memcpy((char*)vargs.stack + spos, &iv, size);
+			spos += size;
+		}
 	}
+	int sp = (spos + HL_WSIZE - 1) / HL_WSIZE;
 	if( sp & 1 ) sp++; // align stack
 	switch( t->fun->ret->kind ) {
 	case HUI8:
@@ -300,15 +313,17 @@ static vdynamic *callback_hl2c( vclosure_wrapper *c, char *stack_args, void **re
 	int nargs = c->cl.t->fun->nargs;
 	if( nargs > MAX_ARGS )
 		hl_error("Too many arguments for wrapped call");
-	int rp = 0, fp = 0;
+	int rp = 0, fp = 0, spos = 0;
 	rp++; // skip fptr in HL64 - was passed as arg0
 	if( IS_WINCALL64 ) fp++;
 	for(int i=0;i<nargs;i++) {
 		hl_type *t = c->cl.t->fun->args[i];
 		int creg = get_next_reg(t,&rp,&fp);
 		if( creg < 0 ) {
-			args[i] = hl_is_dynamic(t) ? *(vdynamic**)stack_args : hl_make_dyn(stack_args,t);
-			stack_args += (t->kind == HF64 ? 8 : HL_WSIZE);
+			int size = stack_arg_size(t);
+			spos += (-spos) & (size - 1);
+			args[i] = hl_is_dynamic(t) ? *(vdynamic**)(stack_args + spos) : hl_make_dyn(stack_args + spos,t);
+			spos += size;
 		} else if( hl_is_dynamic(t) ) {
 			args[i] = *(vdynamic**)(regs + creg);
 		} else if( t->kind == HF32 || t->kind == HF64 ) {
@@ -357,8 +372,10 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	ctx->final_code = code;
 	hl_emit_final(ctx);
 	hl_codegen_final(ctx);
+	hl_flush_executable_memory(code, size);
 	arg_reg_count = ctx->cfg.regs.nargs;
 	arg_fp_count = ctx->cfg.floats.nargs;
+	min_native_stack_args_size = ctx->cfg.min_native_stack_args_size;
 	call_jit_c2hl = ctx->final_code + ctx->code_funs.c2hl;
 	call_jit_hl2c = ctx->final_code + ctx->code_funs.hl2c;
 #	ifdef WIN64_UNWIND_TABLES

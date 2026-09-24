@@ -495,6 +495,7 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
+	cfg->min_stack_args_size = HL_WSIZE;
 #	ifdef GEN_DEBUG
 	cfg->debug_prefix_size = 6;
 #	endif

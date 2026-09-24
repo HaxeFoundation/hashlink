@@ -174,6 +174,13 @@ static void *get_thread_stackptr( thread_handle *t, void **pc, void **fp ) {
 		return (void*)mcontext->__ss.__rsp;
 	}
 	return NULL;
+#elif defined(HL_MAC) && defined(__aarch64__)
+	struct __darwin_mcontext64 *mcontext = shared_context.context.uc_mcontext;
+	if (mcontext != NULL) {
+		*pc = (void*)mcontext->__ss.__pc;
+		return (void*)mcontext->__ss.__sp;
+	}
+	return NULL;
 #else
 	return NULL;
 #endif
