@@ -104,45 +104,28 @@ static ereg get_call_reg( regs_ctx *ctx, call_regs regs, emit_mode m ) {
 
 static int get_stack_size( regs_ctx *ctx, emit_mode m ) {
 	int size = hl_emit_mode_sizes[m];
-	if( size < HL_WSIZE ) size = HL_WSIZE;
-	int min = ctx->jit->cfg.stack_arg_size;
-	if( min && size < min ) size = min;
-	return size;
+	int min = ctx->jit->cfg.min_stack_args_size;
+	return size < min ? min : size;
 }
 
-// Compute the native-ABI stack-arg layout for an HL->native call.
-// Fills offsets[k] with the byte offset (from the post-allocation SP) where
-// arg k lives on the stack, or -1 if arg k is passed in a register.
-// Returns the total stack frame size in bytes (rounded up to 16-byte align).
-static int compute_native_stack_layout( regs_ctx *ctx, einstr *e, ereg *args, int *offsets ) {
-	call_regs cregs = {0};
-	int offs = 0;
-	int layout = ctx->jit->cfg.native_stack_layout;
+static int get_native_stack_offsets( regs_ctx *ctx, einstr *e, ereg *args, int *offsets ) {
+	call_regs regs = {0};
+	int min = ctx->jit->cfg.min_native_stack_args_size;
+	int size = 0;
 	for(int k=0;k<e->nargs;k++) {
 		value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
 		emit_mode mode = v ? v->mode : M_I32;
-		ereg r = get_call_reg(ctx, cregs, mode);
-		if( !IS_NULL(r) ) {
+		if( !IS_NULL(get_call_reg(ctx,regs,mode)) ) {
 			offsets[k] = -1;
 			continue;
 		}
-		int size = hl_emit_mode_sizes[mode];
-		if( size <= 0 ) size = HL_WSIZE;
-		if( layout == NATIVE_STACK_LAYOUT_APPLE_ARM64 ) {
-			// Natural-size packed: align to size, then consume size bytes.
-			int align = size;
-			offs = (offs + align - 1) & ~(align - 1);
-			offsets[k] = offs;
-			offs += size;
-		} else {
-			// AAPCS64 (Linux/Win) and other AArch64 ABIs: 8-byte slots.
-			offsets[k] = offs;
-			offs += HL_WSIZE;
-		}
+		int asize = hl_emit_mode_sizes[mode];
+		if( asize < min ) asize = min;
+		size += jit_pad_size(size,asize);
+		offsets[k] = size;
+		size += asize;
 	}
-	// Pad total frame to 16-byte alignment (AAPCS64 SP alignment requirement).
-	if( offs & 15 ) offs = (offs + 15) & ~15;
-	return offs;
+	return size + jit_pad_size(size,ctx->jit->cfg.stack_align);
 }
 
 static void regs_write_instr( regs_ctx *ctx, einstr *e, ereg out ) {
@@ -520,13 +503,8 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 			}
 		}
 		if( IS_NULL(r) || IS_WINCALL64 ) {
-			// use existing stack storage. Stride must match the caller's
-			// get_stack_size() so HL->HL stack args land where the callee
-			// reads them. AArch64 uses 16-byte stride (cfg.stack_arg_size)
-			// because each PUSH moves SP by 16 to keep SP 16-byte aligned;
-			// x86_64 (and Win64 shadow stack) uses HL_WSIZE.
-			int stride = ctx->jit->cfg.stack_arg_size ? ctx->jit->cfg.stack_arg_size : HL_WSIZE;
-			v->stack_pos = 2 * HL_WSIZE + args_count++ * stride;
+			// use existing stack storage
+			v->stack_pos = 2 * HL_WSIZE + args_count++ * ctx->jit->cfg.min_stack_args_size;
 			if( IS_NULL(r) ) v->reg = MK_STACK_REG(v->stack_pos);
 		}
 	}
@@ -641,8 +619,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	}
 	// assign stack regs
 	int nvalues = jit->value_count + jit->phi_count;
-	int push_unit = jit->cfg.stack_arg_size ? jit->cfg.stack_arg_size : HL_WSIZE;
-	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * push_unit;
+	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * jit->cfg.min_stack_args_size;
 	ctx->stack_offset = persists_size + jit_pad_size(persists_size,jit->cfg.stack_align);
 	for(int i=0;i<nvalues;i++) {
 		value_info *v = ctx->values + i;
@@ -754,8 +731,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 	int write_index = 1;
 	ctx->pos_map[0] = 0;
 
-	int push_unit = jit->cfg.stack_arg_size ? jit->cfg.stack_arg_size : HL_WSIZE;
-	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * push_unit;
+	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * jit->cfg.min_stack_args_size;
 	int stack_offset = ctx->stack_size + ctx->stack_offset - persists_size;
 	int push_size = HL_WSIZE * 2 + persists_size; // RIP + RBP save
 	if( jit->cfg.stack_align ) {
@@ -784,26 +760,19 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			call_regs regs = {0};
 			int stack_args = 0;
 			int stack_bits = 0;
-			// HL->native calls (CALL_PTR) on backends with a non-default
-			// native_stack_layout (currently only AArch64) follow the
-			// platform C ABI rather than HL's internal convention. Compute
-			// the per-arg offsets up front; we emit one STACK_OFFS to allocate
-			// the frame and individual STORE instructions instead of the
-			// PUSH-based path used for HL->HL.
-			bool native_layout = (e.op == CALL_PTR && jit->cfg.native_stack_layout != NATIVE_STACK_LAYOUT_HL);
-			int native_offsets[256];
-			int native_total = 0;
-			if( native_layout ) {
-				if( e.nargs > (int)(sizeof(native_offsets)/sizeof(int)) ) jit_error("too many native call args");
-				native_total = compute_native_stack_layout(ctx, &e, args, native_offsets);
+			int native_offsets[MAX_ARGS];
+			bool native = e.op == CALL_PTR && jit->cfg.min_native_stack_args_size;
+			if( native ) {
+				if( e.nargs > MAX_ARGS ) jit_error("Too many native call args");
+				stack_args = get_native_stack_offsets(ctx,&e,args,native_offsets);
 			}
 			for(int k=0;k<e.nargs;k++) {
 				value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
 				emit_mode mode = v ? v->mode : M_I32;
 				ereg r = get_call_reg(ctx,regs,mode);
 				if( IS_NULL(r) ) {
-					if( !native_layout ) {
-						stack_args += get_stack_size(ctx, mode);
+					if( !native ) {
+						stack_args += get_stack_size(ctx,mode);
 						stack_bits |= 1 << k;
 					}
 				} else if( !v || r != v->reg ) {
@@ -812,17 +781,14 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 					int_arr_add(ctx->pack_movs,mode);
 				}
 			}
-			if( native_layout && native_total > 0 ) {
-				// SUB SP, SP, #native_total ; then STR each stack arg at [SP+offset].
-				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-native_total);
+			if( native && stack_args > 0 ) {
+				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_args);
 				for(int k=0;k<e.nargs;k++) {
 					if( native_offsets[k] < 0 ) continue;
 					value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
-					emit_mode mode = v ? v->mode : M_I32;
-					ereg src_reg = v ? v->reg : args[k];
-					regs_emit(ctx, UNUSED, STORE, jit->cfg.stack_reg, src_reg, mode, native_offsets[k]);
+					regs_emit(ctx,UNUSED,STORE,jit->cfg.stack_reg,v ? v->reg : args[k],v ? v->mode : M_I32,native_offsets[k]);
 				}
-				instr_stack_offset = native_total;
+				instr_stack_offset = stack_args;
 			} else if( stack_args > 0 ) {
 				int offset = 0;
 				if( jit->cfg.stack_align ) {
@@ -845,10 +811,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			}
 			flush_movs(ctx,0);
 			e.nargs = 0xFF;
-			// For HL->native calls with a platform native layout the PUSH-based
-			// stack_args count is unused; expose the native frame byte count so
-			// backends can gate the debug callback trampoline on it.
-			e.size_offs = native_layout ? native_total : stack_args;
+			e.size_offs = stack_args;
 			if( vout && vout->last_read > cur_op )
 				ret_val = &REG_CFG(REG_MODE(e.mode))->ret;
 			else if( e.mode != M_NORET ) {
@@ -987,13 +950,12 @@ void hl_regs_flush( jit_ctx *jit ) {
 	int_arr_free(&regs_track);
 
 	// register persist backup for debugger
-	int push_unit = jit->cfg.stack_arg_size ? jit->cfg.stack_arg_size : HL_WSIZE;
 	int nsaved = 0;
 	for(int mode=0;mode<2;mode++) {
 		reg_config *cfg = mode ? &jit->cfg.floats : &jit->cfg.regs;
 		for(int i=0;i<ctx->persists_uses[mode];i++) {
 			int_arr_add(regs_track, -1);
-			int_arr_add(regs_track, -(++nsaved) * push_unit); // offset from EBP/FP
+			int_arr_add(regs_track, -(++nsaved) * jit->cfg.min_stack_args_size); // offset from EBP
 			int_arr_add(regs_track, 0);
 			int_arr_add(regs_track, cfg->persist[i]);
 		}

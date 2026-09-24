@@ -99,14 +99,12 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->stack_reg = R(SP_REG); // X31 (SP)
 	cfg->stack_pos = R(FP);     // X29
 	cfg->stack_align = 16;      // AAPCS64 mandates
-	// Internal stack arguments use 16-byte slots so SP stays aligned, which
-	// EL0 memory access requires. Native calls follow the platform ABI:
-	// 8-byte slots on Linux/Windows, natural-size packing on Apple.
-	cfg->stack_arg_size = 16;
+	// SP must stay 16-byte aligned for any memory access through it
+	cfg->min_stack_args_size = 16;
 #if defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS)
-	cfg->native_stack_layout = NATIVE_STACK_LAYOUT_APPLE_ARM64;
+	cfg->min_native_stack_args_size = 1; // Apple packs stack args at their natural size
 #else
-	cfg->native_stack_layout = NATIVE_STACK_LAYOUT_AAPCS64;
+	cfg->min_native_stack_args_size = 8;
 #endif
 
 #ifdef GEN_DEBUG

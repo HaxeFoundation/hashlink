@@ -212,6 +212,25 @@ int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out
 	return count;
 }
 
+hl_module *hl_resolve_module( void *addr ) {
+	for(int i=0;i<modules_count;i++) {
+		hl_module *m = cur_modules[i];
+		if( addr >= (void*)m->jit_code && addr < (void*)((unsigned char*)m->jit_code + m->codesize) )
+			return m;
+	}
+	return NULL;
+}
+
+static bool module_is_jit_code( void *addr ) {
+	return hl_resolve_module(addr) != NULL;
+}
+
+bool hl_module_is_jit_function( void *addr ) {
+	hl_module *m = hl_resolve_module(addr);
+	if( !m ) return false;
+	return !m->jit_debug || addr >= (void*)((unsigned char*)m->jit_code + m->jit_debug[0].start);
+}
+
 static int module_capture_stack( void **stack, int size ) {
 #ifdef WIN64_UNWIND_TABLES
 	CONTEXT context;
@@ -253,100 +272,36 @@ static int module_capture_stack( void **stack, int size ) {
 	}
 	return count;
 #elif defined(__aarch64__) || defined(_M_ARM64)
-	// On AArch64, walk the frame pointer (X29) chain instead of scanning the stack.
-	// The heuristic scanner produces false positives from callee-saved register spills
-	// (STP X19,X20 etc.) that look like (stack_addr, code_addr) pairs.
+	// walk the frame pointer chain: scanning the stack gives false positives
+	// from callee-saved register spills
 	void *stack_top = hl_get_thread()->stack_top;
-	void **fp = (void **)__builtin_frame_address(0);
+	void **fp = (void**)__builtin_frame_address(0);
 	int count = 0;
-	bool prev_helper = false;
-	while( fp && (void *)fp < stack_top ) {
-		void *raw_lr = fp[1];
-		void *next_fp = fp[0];
-		int i;
-		// Classify the saved LR: 0 = not JIT, 1 = JIT helper/stub prefix,
-		// 2 = JIT user code.
-		int kind = 0;
-		for(i=0;i<modules_count;i++) {
-			hl_module *m = cur_modules[i];
-			unsigned char *code = m->jit_code;
-			int code_size = m->codesize;
-			if( raw_lr < (void*)code || raw_lr >= (void*)(code + code_size) )
-				continue;
-			kind = 2;
-			if( m->jit_debug ) {
-				int s = m->jit_debug[0].start;
-				if( raw_lr < (void*)(code + s) ) {
-					kind = 1;
-					break;
-				}
-			}
-			break;
-		}
-		if( kind == 2 ) {
-			// If the previous frame was a helper stub, the JIT caller entered it
-			// with a synthetic return address (PUSH_ADDR) sitting just above the
-			// stub's saved FP/LR.  That address is the real call site; prefer it
-			// over the post-call LR so null-access traces report the access line.
-			void *addr = raw_lr;
-			if( prev_helper && (void*)(fp + 2) < stack_top ) {
-				void *pushed = fp[2];
-				for(i=0;i<modules_count;i++) {
-					hl_module *m = cur_modules[i];
-					unsigned char *code = m->jit_code;
-					int code_size = m->codesize;
-					if( m->jit_debug ) {
-						int s = m->jit_debug[0].start;
-						code += s;
-						code_size -= s;
-					}
-					if( pushed >= (void*)code && pushed < (void*)(code + code_size) ) {
-						addr = pushed;
-						break;
-					}
-				}
-			}
+	bool prev_stub = false;
+	while( fp && (void*)fp < stack_top ) {
+		void *addr = fp[1];
+		hl_module *m = hl_resolve_module(addr);
+		bool stub = m && m->jit_debug && addr < (void*)((unsigned char*)m->jit_code + m->jit_debug[0].start);
+		if( m && !stub ) {
+			// a stub is called with the call site pushed above its frame record
+			if( prev_stub && (void*)(fp + 2) < stack_top && hl_module_is_jit_function(fp[2]) )
+				addr = fp[2];
 			if( stack ) {
 				if( count == size ) return count;
 				stack[count] = addr;
 			}
 			count++;
 		}
-		prev_helper = (kind == 1);
-		if( next_fp == NULL || next_fp <= (void *)fp || next_fp >= stack_top )
+		prev_stub = stub;
+		void **next = (void**)fp[0];
+		if( next <= fp || (void*)next >= stack_top )
 			break;
-		fp = (void **)next_fp;
+		fp = next;
 	}
 	return count;
 #else
 	return hl_module_capture_stack_range(hl_get_thread()->stack_top, (void**)&stack, stack, size);
 #endif
-}
-
-static bool module_is_jit_code( void *addr ) {
-	for(int i=0;i<modules_count;i++) {
-		hl_module *m = cur_modules[i];
-		unsigned char *code = m->jit_code;
-		if( addr >= (void*)code && addr < (void*)(code + m->codesize) )
-			return true;
-	}
-	return false;
-}
-
-bool hl_module_is_jit_function( void *addr ) {
-	for(int i=0;i<modules_count;i++) {
-		hl_module *m = cur_modules[i];
-		unsigned char *code = m->jit_code;
-		int code_size = m->codesize;
-		if( m->jit_debug ) {
-			int s = m->jit_debug[0].start;
-			code += s;
-			code_size -= s;
-		}
-		if( addr >= (void*)code && addr < (void*)(code + code_size) )
-			return true;
-	}
-	return false;
 }
 
 static bool module_capture_break_context( void **rip, void **regs ) {
