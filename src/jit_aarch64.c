@@ -1048,12 +1048,12 @@ static void emit_cmov_arm( code_ctx *ctx, ereg out_e, ereg a_e, emit_mode mode, 
 		encode_fp_cond_select(ctx, mode == M_F64, out, cond, a, out);
 		return;
 	}
-	// load a sub-word source (e.g. a bool) at its own width, not adjacent stack bytes
-	int sf = (hl_emit_mode_sizes[mode] == 8) ? 1 : 0;
 	Arm64Reg out = gpr_id(out_e);
+	// load a sub-word source (e.g. a bool) at its own width, not adjacent stack bytes
 	Arm64Reg a = materialize_gpr(ctx, a_e, mode, ARM_TMP1);
-	// CSEL out, a, out, cond
-	encode_cond_select(ctx, sf, 0, out, cond, 0, a, out);
+	// CSEL Xout, Xa, Xout, cond : always 64-bit like x86, a 32-bit CSEL would clear the
+	// upper half of out when the condition is false
+	encode_cond_select(ctx, 1, 0, out, cond, 0, a, out);
 }
 
 // X17 rather than X16 : a stack slot access with a large offset uses X16
