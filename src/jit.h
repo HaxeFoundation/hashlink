@@ -204,7 +204,7 @@ typedef struct {
 	ereg stack_pos;
 	int stack_align;
 	int min_stack_args_size;
-	int min_native_stack_args_size; // 0 : native calls use the same stack layout as HL calls
+	int min_native_stack_args_size; // 0 : push stack args, otherwise store them in the native layout for all calls
 	int debug_prefix_size;
 	ereg req_bit_shifts;
 	ereg req_div_a;
