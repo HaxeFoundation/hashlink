@@ -10,7 +10,7 @@ INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 LIBS = $(addsuffix .hdll,fmt sdl ssl openal ui uv mysql sqlite heaps)
 ARCH ?= $(shell uname -m)
 
-CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden
+CFLAGS = -Wall -O3 -std=c11 -fvisibility=hidden -MMD -MP
 CPPFLAGS = -I src
 LIBHL_LDFLAGS =
 LIBHL_LDLIBS = -lm -lpthread
@@ -383,10 +383,15 @@ codesign_osx:
 .SUFFIXES:
 .SUFFIXES: .cpp .c .o
 
+ALL_OBJS = ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL_OBJ} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
+DEPS = $(ALL_OBJS:.o=.d)
+
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL_OBJ} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${MYSQL} ${SQLITE} ${HEAPS} ${HL_DEBUG}
+	rm -f ${ALL_OBJS} ${DEPS}
 
 clean: clean_o
 	rm -f $(HL) $(HLC) $(LIBHL) *.hdll
 
 .PHONY: libs release
+
+-include $(DEPS)

@@ -33,6 +33,7 @@ class Window {
 
 	public static inline var HIDDEN    = 0x000001;
 	public static inline var RESIZABLE = 0x000002;
+	public static inline var NO_ACTIVATE = 0x000004;
 
 	static var _UID = 0;
 	var win : WinPtr;
@@ -170,6 +171,25 @@ class Window {
 		var newIcon = Icon.createIcon(width, height, pixels);
 		if (newIcon == null)
 			return;
+
+		winSetIcon(win, newIcon);
+
+		if (icon != null) {
+			icon.destroy();
+		}
+
+		icon = newIcon;
+	}
+
+	/**
+		Set the window icon by loading a given .ico file from disk.
+	**/
+	public function setIconFromFile(path: String) {
+		var newIcon = Icon.loadIcon(path != null ? @:privateAccess path.bytes : null, -1, -1);
+		if (newIcon == null) {
+			throw "couldn't load icon";
+			return;
+		}
 
 		winSetIcon(win, newIcon);
 
@@ -465,6 +485,13 @@ class Window {
 
 	@:hlNative("?directx", "win_set_icon")
 	static function winSetIcon(win: WinPtr, icon: Icon) : Void {
+	}
+
+	/**
+		Set the default icon to use when creating a new window.
+	**/
+	@:hlNative("?directx", "win_set_default_icon")
+	public static function setDefaultIcon(icon: Icon) : Void {
 	}
 
 }

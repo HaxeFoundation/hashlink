@@ -40,7 +40,8 @@ typedef enum {
 
 typedef enum {
 	Hidden    = 0x000001,
-	Resizable = 0x000002
+	Resizable = 0x000002,
+	NoActivate = 0x000004
 } WindowFlags;
 
 typedef struct {
@@ -103,6 +104,9 @@ typedef HICON dx_icon;
 
 static dx_cursor cur_cursor = NULL;
 static bool show_cursor = true;
+
+/** Default icon to use when creating a window. **/
+static dx_icon default_icon = NULL;
 
 #define CURSOR_VISIBLE show_cursor && !relative_mouse
 
@@ -613,13 +617,19 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 		WNDCLASSEX wc;
 		wchar_t fileName[1024];
 		GetModuleFileName(hinst,fileName,1024);
+
+		dx_icon win_icon = default_icon;
+		if (win_icon == NULL) {
+			win_icon = ExtractIcon(hinst, fileName, 0);
+		}
+
 		wc.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 		wc.lpfnWndProc   = WndProc;
 		wc.cbClsExtra    = 0;
 		wc.cbWndExtra    = 0;
 		wc.hInstance     = hinst;
-		wc.hIcon         = ExtractIcon(hinst, fileName, 0);
-		wc.hIconSm       = wc.hIcon;
+		wc.hIcon         = win_icon;
+		wc.hIconSm       = win_icon;
 		wc.hCursor       = NULL;
 		wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 		wc.lpszMenuName  = NULL;
@@ -644,8 +654,10 @@ HL_PRIM dx_window *HL_NAME(win_create_ex)( int x, int y, int width, int height, 
 	dx_window *win = CreateWindowEx(WS_EX_APPWINDOW, USTR("HL_WIN"), USTR(""), style, x, y, r.right - r.left, r.bottom - r.top, NULL, NULL, hinst, event_buffer);
 	SetTimer(win,0,10,NULL);
 	if( !(windowFlags & Hidden) ) {
-		ShowWindow(win, SW_SHOW);
+		ShowWindow(win, (windowFlags & NoActivate) ? SW_SHOWNOACTIVATE : SW_SHOW);
 	}
+	if( windowFlags & NoActivate )
+		return win;
 	SetForegroundWindow(win);
 	SetFocus(win);
 	return win;
@@ -840,7 +852,7 @@ HL_PRIM void HL_NAME(win_set_fullscreen_on)(dx_window *win, bool fs, vbyte *moni
 		SetRectEmpty(&buf->fullscreen_rect);
 		buf->fullscreen_device[0] = 0;
 		SetWindowLong(win,GWL_STYLE,buf->normal_style);
-		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+		SetWindowPos(win,NULL,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER|SWP_FRAMECHANGED|SWP_SHOWWINDOW|SWP_NOACTIVATE);
 	}
 }
 
@@ -1094,6 +1106,10 @@ HL_PRIM void HL_NAME(win_set_icon)(HWND wnd, dx_icon icon) {
 	SendMessage(wnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
 }
 
+HL_PRIM void HL_NAME(win_set_default_icon)(dx_icon icon) {
+	default_icon = icon;
+};
+
 #define TWIN _ABSTRACT(dx_window)
 DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
@@ -1131,6 +1147,7 @@ DEFINE_PRIM(_BOOL, win_is_zoomed, TWIN);
 DEFINE_PRIM(_ARR, win_get_monitors, _NO_ARG);
 DEFINE_PRIM(_BYTES, win_get_monitor_from_window, TWIN);
 DEFINE_PRIM(_VOID, win_set_icon, TWIN TICON);
+DEFINE_PRIM(_VOID, win_set_default_icon, TICON);
 DEFINE_PRIM(_VOID, win_set_dark_mode, TWIN _BOOL);
 DEFINE_PRIM(_F64, win_get_scale_factor_for_window, TWIN);
 
@@ -1195,6 +1212,17 @@ HL_PRIM dx_icon HL_NAME(create_icon)(int width, int height, vbyte* data) {
 	return create_icon_internal(width, height, data, true, 0, 0);
 }
 
+HL_PRIM dx_icon HL_NAME(load_icon)(wchar_t* path, int width, int height) {
+	UINT flags = LR_DEFAULTCOLOR | LR_LOADFROMFILE;
+	if (width == -1 && height == -1) {
+		width = 0;
+		height = 0;
+		flags |= LR_DEFAULTSIZE;
+	}
+	dx_icon image = LoadImage(NULL, path, IMAGE_ICON, width, height, flags);
+	return image;
+}
+
 HL_PRIM void HL_NAME(destroy_cursor)( dx_cursor c ) {
 	DestroyIcon(c);
 }
@@ -1222,6 +1250,7 @@ HL_PRIM bool HL_NAME(is_cursor_visible)() {
 DEFINE_PRIM(TCURSOR, load_cursor, _I32);
 DEFINE_PRIM(TCURSOR, create_cursor, _I32 _I32 _BYTES _I32 _I32);
 DEFINE_PRIM(TICON, create_icon, _I32 _I32 _BYTES);
+DEFINE_PRIM(TICON, load_icon, _BYTES _I32 _I32);
 DEFINE_PRIM(_VOID, destroy_cursor, TCURSOR);
 DEFINE_PRIM(_VOID, destroy_icon, TICON);
 DEFINE_PRIM(_VOID, set_cursor, TCURSOR);

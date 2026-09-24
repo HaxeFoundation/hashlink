@@ -8,6 +8,16 @@ abstract Icon(IconPtr) {
 		return null;
 	}
 
+	@:hlNative("?directx", "load_icon")
+	/**
+		Loads a .ico file from the given path
+		Pass -1 to width and height to get the preferred icon size for the os, 0
+		to load the highest resolution in the icon file, or the actual wanted size.
+	**/
+	public static function loadIcon(path: hl.Bytes, width: Int, height: Int) : Icon {
+		return null;
+	}
+
 	public function destroy() {
 		destroyIcon(this);
 	}

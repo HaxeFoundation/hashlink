@@ -333,6 +333,22 @@ static bool module_is_jit_code( void *addr ) {
 	return false;
 }
 
+bool hl_module_is_jit_function( void *addr ) {
+	for(int i=0;i<modules_count;i++) {
+		hl_module *m = cur_modules[i];
+		unsigned char *code = m->jit_code;
+		int code_size = m->codesize;
+		if( m->jit_debug ) {
+			int s = m->jit_debug[0].start;
+			code += s;
+			code_size -= s;
+		}
+		if( addr >= (void*)code && addr < (void*)(code + code_size) )
+			return true;
+	}
+	return false;
+}
+
 static bool module_capture_break_context( void **rip, void **regs ) {
 #ifdef WIN64_UNWIND_TABLES
 	CONTEXT c;

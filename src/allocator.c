@@ -62,6 +62,7 @@ static const int GC_SIZES[GC_PARTITIONS] = {4,8,12,16,20,	8,64,1<<13,0};
 
 #define GC_ALL_PAGES	(GC_PARTITIONS << PAGE_KIND_BITS)
 #define	GC_ALIGN		(1 << GC_ALIGN_BITS)
+#define GC_MAX_BLOCKS	0xFFFF
 
 static unsigned int GC_BLOCK_MUL[GC_PARTITIONS] = {0};
 #define GC_BLOCK_ID(p,offset)	((int)(((uint64)(unsigned int)(offset) * GC_BLOCK_MUL[(p)->size_id]) >> 32))
@@ -138,7 +139,7 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 			num_pages++;
 			ph = ph->next_page;
 		}
-		while( num_pages > 8 && (size<<1) / block <= GC_PAGE_SIZE ) {
+		while( num_pages > 8 && (size<<1) / block <= GC_MAX_BLOCKS ) {
 			size <<= 1;
 			count <<= 1;
 			num_pages /= 3;
@@ -159,7 +160,7 @@ static gc_pheader *gc_allocator_new_page( int pid, int block, int size, int kind
 	p->size_id = (unsigned char)(pid >> PAGE_KIND_BITS);
 	p->max_blocks = max_blocks;
 	p->sizes = NULL;
-	if( p->max_blocks > GC_PAGE_SIZE )
+	if( p->max_blocks > GC_MAX_BLOCKS )
 		hl_fatal("Too many blocks for this page");
 	if( varsize ) {
 		if( p->max_blocks <= SIZES_PADDING )
