@@ -1502,12 +1502,12 @@ static void emit_c2hl_trampoline( code_ctx *ctx ) {
 	encode_ldp_stp(ctx, 0x01, 1, 0x02, 12, (Arm64Reg)5, ARM_TMP2, (Arm64Reg)4);  // LDP D4,D5, [X17, #96]
 	encode_ldp_stp(ctx, 0x01, 1, 0x02, 14, (Arm64Reg)7, ARM_TMP2, (Arm64Reg)6);  // LDP D6,D7, [X17, #112]
 
-	// copy vargs.stack[0..X9] to 16-byte stack slots, matching min_stack_args_size
+	// copy X9 words of vargs.stack, already in the native layout
 	int cbz_skip_pos = byte_count(ctx->code);
 	encode_cbz_cbnz(ctx, /*sf=*/1, /*op=*/0, 0, X9);
 
-	// X10 = X9 << 4
-	emit_bitfield(ctx, /*sf=*/1, /*opc=UBFM*/0x02, /*immr=*/(64 - 4) & 0x3F, /*imms=*/63 - 4, X9, X10);
+	// X10 = X9 << 3, X9 is even so SP stays aligned
+	emit_bitfield(ctx, /*sf=*/1, /*opc=UBFM*/0x02, /*immr=*/(64 - 3) & 0x3F, /*imms=*/63 - 3, X9, X10);
 
 	// SUB SP, SP, X10 (extended-register form, see emit_sp_offs)
 	encode_add_sub_ext(ctx, 1, 1, 0, X10, /*UXTX*/3, 0, SP_REG, SP_REG);
@@ -1520,7 +1520,7 @@ static void emit_c2hl_trampoline( code_ctx *ctx ) {
 	encode_ldr_str_imm(ctx, 3, 0, 1, 0, X12, X15);                      // LDR X15, [X12, #0]
 	encode_ldr_str_imm(ctx, 3, 0, 0, 0, X13, X15);                      // STR X15, [X13, #0]
 	encode_add_sub_imm(ctx, 1, 0, 0, 0, 8, X12, X12);                   // ADD X12, X12, #8
-	encode_add_sub_imm(ctx, 1, 0, 0, 0, 16, X13, X13);                  // ADD X13, X13, #16
+	encode_add_sub_imm(ctx, 1, 0, 0, 0, 8, X13, X13);                   // ADD X13, X13, #8
 	encode_add_sub_imm(ctx, 1, 1, 1, 0, 1, X14, X14);                   // SUBS X14, X14, #1
 	int loop_branch_pos = byte_count(ctx->code);
 	encode_branch_cond(ctx, 0, COND_NE);                                 // B.NE loop_top

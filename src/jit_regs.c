@@ -108,26 +108,6 @@ static int get_stack_size( regs_ctx *ctx, emit_mode m ) {
 	return size < min ? min : size;
 }
 
-static int get_native_stack_offsets( regs_ctx *ctx, einstr *e, ereg *args, int *offsets ) {
-	call_regs regs = {0};
-	int min = ctx->jit->cfg.min_native_stack_args_size;
-	int size = 0;
-	for(int k=0;k<e->nargs;k++) {
-		value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
-		emit_mode mode = v ? v->mode : M_I32;
-		if( !IS_NULL(get_call_reg(ctx,regs,mode)) ) {
-			offsets[k] = -1;
-			continue;
-		}
-		int asize = hl_emit_mode_sizes[mode];
-		if( asize < min ) asize = min;
-		size += jit_pad_size(size,asize);
-		offsets[k] = size;
-		size += asize;
-	}
-	return size + jit_pad_size(size,ctx->jit->cfg.stack_align);
-}
-
 static void regs_write_instr( regs_ctx *ctx, einstr *e, ereg out ) {
 	if( ctx->emit_pos == ctx->max_instrs ) {
 		int pos = ctx->emit_pos;
@@ -157,6 +137,30 @@ static void regs_emit( regs_ctx *ctx, ereg out, emit_op op, ereg a, ereg b, emit
 	e.b = b;
 	e.size_offs = size_offs;
 	regs_write_instr(ctx, &e, out);
+}
+
+static int next_native_stack_arg( regs_ctx *ctx, int *pos, emit_mode m ) {
+	int size = hl_emit_mode_sizes[m];
+	int min = ctx->jit->cfg.min_native_stack_args_size;
+	if( size < min ) size = min;
+	int offs = *pos + jit_pad_size(*pos,size);
+	*pos = offs + size;
+	return offs;
+}
+
+// emits the stores when stack_size is set, returns the stack size otherwise
+static int native_stack_args( regs_ctx *ctx, einstr *e, ereg *args, int stack_size ) {
+	call_regs regs = {0};
+	int size = 0;
+	if( stack_size ) regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_size);
+	for(int k=0;k<e->nargs;k++) {
+		value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
+		emit_mode mode = v ? v->mode : M_I32;
+		if( !IS_NULL(get_call_reg(ctx,regs,mode)) ) continue;
+		int offs = next_native_stack_arg(ctx,&size,mode);
+		if( stack_size ) regs_emit(ctx,UNUSED,STORE,ctx->jit->cfg.stack_reg,v ? v->reg : args[k],mode,offs);
+	}
+	return size + jit_pad_size(size,ctx->jit->cfg.stack_align);
 }
 
 static void regs_emit_mov( regs_ctx *ctx, ereg to, ereg from, emit_mode m ) {
@@ -486,6 +490,7 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 	// assign args
 	call_regs regs = {0};
 	int args_count = 0;
+	int args_size = 0;
 	for(int i=1;i<=ctx->jit->fun->type->fun->nargs;i++) {
 		value_info *v = VAL(i);
 		einstr *e = ctx->jit->instrs + ctx->jit->values_writes[i];
@@ -504,7 +509,10 @@ static void regs_assign_regs( regs_ctx *ctx ) {
 		}
 		if( IS_NULL(r) || IS_WINCALL64 ) {
 			// use existing stack storage
-			v->stack_pos = 2 * HL_WSIZE + args_count++ * ctx->jit->cfg.min_stack_args_size;
+			if( ctx->jit->cfg.min_native_stack_args_size )
+				v->stack_pos = 2 * HL_WSIZE + next_native_stack_arg(ctx,&args_size,e->mode);
+			else
+				v->stack_pos = (args_count++ + 2) * HL_WSIZE;
 			if( IS_NULL(r) ) v->reg = MK_STACK_REG(v->stack_pos);
 		}
 	}
@@ -760,12 +768,8 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			call_regs regs = {0};
 			int stack_args = 0;
 			int stack_bits = 0;
-			int native_offsets[MAX_ARGS];
-			bool native = e.op == CALL_PTR && jit->cfg.min_native_stack_args_size;
-			if( native ) {
-				if( e.nargs > MAX_ARGS ) jit_error("Too many native call args");
-				stack_args = get_native_stack_offsets(ctx,&e,args,native_offsets);
-			}
+			bool native = jit->cfg.min_native_stack_args_size != 0;
+			if( native ) stack_args = native_stack_args(ctx,&e,args,0);
 			for(int k=0;k<e.nargs;k++) {
 				value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
 				emit_mode mode = v ? v->mode : M_I32;
@@ -782,12 +786,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				}
 			}
 			if( native && stack_args > 0 ) {
-				regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_args);
-				for(int k=0;k<e.nargs;k++) {
-					if( native_offsets[k] < 0 ) continue;
-					value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
-					regs_emit(ctx,UNUSED,STORE,jit->cfg.stack_reg,v ? v->reg : args[k],v ? v->mode : M_I32,native_offsets[k]);
-				}
+				native_stack_args(ctx,&e,args,stack_args);
 				instr_stack_offset = stack_args;
 			} else if( stack_args > 0 ) {
 				int offset = 0;
