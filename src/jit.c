@@ -214,6 +214,7 @@ static void *call_jit_c2hl = hl_jit_assert;
 static void *call_jit_hl2c = hl_jit_assert;
 static int arg_reg_count = 0;
 static int arg_fp_count = 0;
+static int min_stack_args_size = HL_WSIZE;
 
 static int get_next_reg( hl_type *t, int *rp, int *fp ) {
 	if( t->kind == HF32 || t->kind == HF64 ) {
@@ -308,7 +309,8 @@ static vdynamic *callback_hl2c( vclosure_wrapper *c, char *stack_args, void **re
 		int creg = get_next_reg(t,&rp,&fp);
 		if( creg < 0 ) {
 			args[i] = hl_is_dynamic(t) ? *(vdynamic**)stack_args : hl_make_dyn(stack_args,t);
-			stack_args += (t->kind == HF64 ? 8 : HL_WSIZE);
+			int size = t->kind == HF64 ? 8 : HL_WSIZE;
+			stack_args += size < min_stack_args_size ? min_stack_args_size : size;
 		} else if( hl_is_dynamic(t) ) {
 			args[i] = *(vdynamic**)(regs + creg);
 		} else if( t->kind == HF32 || t->kind == HF64 ) {
@@ -360,6 +362,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	hl_flush_executable_memory(code, size);
 	arg_reg_count = ctx->cfg.regs.nargs;
 	arg_fp_count = ctx->cfg.floats.nargs;
+	min_stack_args_size = ctx->cfg.min_stack_args_size;
 	call_jit_c2hl = ctx->final_code + ctx->code_funs.c2hl;
 	call_jit_hl2c = ctx->final_code + ctx->code_funs.hl2c;
 #	ifdef WIN64_UNWIND_TABLES
