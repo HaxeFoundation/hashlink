@@ -1331,8 +1331,7 @@ retry_jit_alloc:
 	void *p;
 	int flags = MAP_PRIVATE | MAP_ANONYMOUS;
 #	if defined(__APPLE__) && defined(__aarch64__)
-	// Apple Silicon requires MAP_JIT for W^X-protected JIT pages; the binary
-	// must also carry the com.apple.security.cs.allow-jit entitlement.
+	// requires the com.apple.security.cs.allow-jit entitlement
 #		ifndef MAP_JIT
 #			define MAP_JIT 0x800
 #		endif
@@ -1341,8 +1340,7 @@ retry_jit_alloc:
 	p = mmap(NULL,size,PROT_READ|PROT_WRITE|PROT_EXEC,flags,-1,0);
 	if( p == MAP_FAILED ) return NULL;
 #	if defined(__APPLE__) && defined(__aarch64__)
-	// Leave the caller's thread in write mode so it can populate the page;
-	// hl_flush_executable_memory flips back to exec when emission is done.
+	// writable until hl_flush_executable_memory
 	pthread_jit_write_protect_np(false);
 #	endif
 	return p;
