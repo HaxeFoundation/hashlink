@@ -28,15 +28,13 @@
 #include <jit.h>
 #include "data_struct.h"
 
-// Per-TU instantiation of byte_arr (the code buffer type).
-// Helpers are static-inline so two TUs may include this header without ODR conflict.
 #define S_TYPE			byte_arr
 #define S_NAME(name)	byte_##name
 #define S_VALUE			unsigned char
 #include "data_struct.c"
 #define byte_reserve(set,count)	byte_reserve_impl(DEF_ALLOC,&set,count)
 
-// Literal-pool dedup for uint64 constants.
+// constant table lookup
 #define S_SORTED
 #define S_MAP
 #define S_TYPE			value_map
@@ -48,48 +46,32 @@
 #undef S_MAP
 #undef S_SORTED
 
-// Backend codegen context (each backend defines its own _code_ctx layout).
 struct _code_ctx {
 	jit_ctx *jit;
 	byte_arr code;
-	// Each pending branch is a triple (code_byte_pos, target_ir_op, is_cond)
-	// patched after the function's pos_map is finalized.
-	int_arr branch_fixups;
-	// PUSH_ADDR labels: pairs (adrp_byte_pos, target_reg_op) patched to an
-	// ADRP+ADD pair once the function's pos_map is finalized.
-	int_arr addr_fixups;
+	int_arr branch_fixups; // (code_pos, target_op, is_cond)
+	int_arr addr_fixups; // (adrp_pos, target_op) for PUSH_ADDR
 	int *pos_map;
 	int cur_op;
 	bool flushed;
-	// Cross-function call relocations (BL imm26 or ADRP+ADD).
-	// Triples (code_byte_pos, fid, kind) where kind=0:BL, kind=1:ADRP+ADD pair.
-	int_arr funs;
-	// Constant pool. Each constant ref is (adrp_pos, const_offset); patched in
-	// hl_codegen_flush_consts to ADRP imm21 + LDR/ADD imm12 split.
+	int_arr funs; // (code_pos, fid, kind) kind 0 = BL, 1 = ADRP+ADD
 	value_map const_table_lookup;
 	byte_arr const_table;
-	int_arr const_refs;
-	// Jump-table absolute fills: pairs (table_offs, target_byte_pos_in_output).
-	// In hl_codegen_final each entry becomes `final_code + target` written into
-	// `final_code + const_table_pos + table_offs`.
-	int_arr const_addr;
+	int_arr const_refs; // (adrp_pos, const_offset)
+	int_arr const_addr; // (table_offs, code_pos) absolute addresses for jump tables
 	int const_table_pos;
-	// Direct-call shortcuts for null-access stubs (BL within ±128 MB).
 	int null_access_pos;
 	int null_field_pos;
+	bool long_cond; // emit B.cond as B.!cond +8 ; B target
+	bool cond_overflow;
 };
 
-// Write a 32-bit instruction to ctx->code. Caller is responsible for byte_reserve.
+// caller must byte_reserve first
 #define EMIT32(ctx, val) do { \
 	*(unsigned int*)&(ctx)->code.values[(ctx)->code.cur] = (unsigned int)(val); \
 	(ctx)->code.cur += 4; \
 } while(0)
 
-/*
- * AArch64 Register Definitions
- */
-
-// General Purpose Registers (64-bit: X0-X30, 32-bit: W0-W30)
 typedef enum {
 	X0  = 0,  X1  = 1,  X2  = 2,  X3  = 3,
 	X4  = 4,  X5  = 5,  X6  = 6,  X7  = 7,
@@ -100,14 +82,12 @@ typedef enum {
 	X24 = 24, X25 = 25, X26 = 26, X27 = 27,
 	X28 = 28, X29 = 29, X30 = 30,
 
-	// Special register names
-	FP = 29,      // Frame Pointer (X29)
-	LR = 30,      // Link Register (X30)
-	SP_REG = 31,  // Stack Pointer (encoding value, context-dependent)
-	XZR = 31      // Zero Register (encoding value, context-dependent)
+	FP = 29,
+	LR = 30,
+	SP_REG = 31,  // SP or ZR depending on the instruction
+	XZR = 31
 } Arm64Reg;
 
-// 32-bit register names (W registers)
 typedef enum {
 	W0  = 0,  W1  = 1,  W2  = 2,  W3  = 3,
 	W4  = 4,  W5  = 5,  W6  = 6,  W7  = 7,
@@ -117,10 +97,9 @@ typedef enum {
 	W20 = 20, W21 = 21, W22 = 22, W23 = 23,
 	W24 = 24, W25 = 25, W26 = 26, W27 = 27,
 	W28 = 28, W29 = 29, W30 = 30,
-	WZR = 31  // 32-bit zero register
+	WZR = 31
 } Arm64Reg32;
 
-// Floating-Point/SIMD Registers
 typedef enum {
 	V0  = 0,  V1  = 1,  V2  = 2,  V3  = 3,
 	V4  = 4,  V5  = 5,  V6  = 6,  V7  = 7,
@@ -132,100 +111,73 @@ typedef enum {
 	V28 = 28, V29 = 29, V30 = 30, V31 = 31
 } Arm64FpReg;
 
-// Aliases for specific precision
-// D0-D31 = 64-bit (double precision) - same encoding as V0-V31
-// S0-S31 = 32-bit (single precision) - same encoding as V0-V31
-// H0-H31 = 16-bit (half precision) - same encoding as V0-V31
-
-/*
- * Condition Codes for Conditional Branches and Selects
- */
 typedef enum {
-	COND_EQ = 0x0,  // Equal (Z == 1)
-	COND_NE = 0x1,  // Not equal (Z == 0)
-	COND_CS = 0x2,  // Carry set (C == 1), also HS (unsigned higher or same)
-	COND_CC = 0x3,  // Carry clear (C == 0), also LO (unsigned lower)
-	COND_MI = 0x4,  // Minus/negative (N == 1)
-	COND_PL = 0x5,  // Plus/positive or zero (N == 0)
-	COND_VS = 0x6,  // Overflow set (V == 1)
-	COND_VC = 0x7,  // Overflow clear (V == 0)
-	COND_HI = 0x8,  // Unsigned higher (C == 1 && Z == 0)
-	COND_LS = 0x9,  // Unsigned lower or same (C == 0 || Z == 1)
-	COND_GE = 0xA,  // Signed greater than or equal (N == V)
-	COND_LT = 0xB,  // Signed less than (N != V)
-	COND_GT = 0xC,  // Signed greater than (Z == 0 && N == V)
-	COND_LE = 0xD,  // Signed less than or equal (Z == 1 || N != V)
-	COND_AL = 0xE,  // Always (unconditional)
-	COND_NV = 0xF   // Never (reserved, don't use)
+	COND_EQ = 0x0,
+	COND_NE = 0x1,
+	COND_CS = 0x2,  // HS
+	COND_CC = 0x3,  // LO
+	COND_MI = 0x4,
+	COND_PL = 0x5,
+	COND_VS = 0x6,
+	COND_VC = 0x7,
+	COND_HI = 0x8,  // unsigned >
+	COND_LS = 0x9,  // unsigned <=
+	COND_GE = 0xA,
+	COND_LT = 0xB,
+	COND_GT = 0xC,
+	COND_LE = 0xD,
+	COND_AL = 0xE,
+	COND_NV = 0xF  // behaves as AL
 } ArmCondition;
 
-// Aliases
-#define COND_HS COND_CS  // Unsigned higher or same
-#define COND_LO COND_CC  // Unsigned lower
+#define COND_HS COND_CS
+#define COND_LO COND_CC
 
-/*
- * Extend/Shift Types
- */
 typedef enum {
-	EXTEND_UXTB = 0,  // Unsigned extend byte
-	EXTEND_UXTH = 1,  // Unsigned extend halfword
-	EXTEND_UXTW = 2,  // Unsigned extend word
-	EXTEND_UXTX = 3,  // Unsigned extend doubleword (64-bit, same as LSL)
-	EXTEND_SXTB = 4,  // Signed extend byte
-	EXTEND_SXTH = 5,  // Signed extend halfword
-	EXTEND_SXTW = 6,  // Signed extend word
-	EXTEND_SXTX = 7   // Signed extend doubleword
+	EXTEND_UXTB = 0,
+	EXTEND_UXTH = 1,
+	EXTEND_UXTW = 2,
+	EXTEND_UXTX = 3,
+	EXTEND_SXTB = 4,
+	EXTEND_SXTH = 5,
+	EXTEND_SXTW = 6,
+	EXTEND_SXTX = 7
 } ArmExtend;
 
 typedef enum {
-	SHIFT_LSL = 0,  // Logical shift left
-	SHIFT_LSR = 1,  // Logical shift right
-	SHIFT_ASR = 2,  // Arithmetic shift right
-	SHIFT_ROR = 3   // Rotate right
+	SHIFT_LSL = 0,
+	SHIFT_LSR = 1,
+	SHIFT_ASR = 2,
+	SHIFT_ROR = 3
 } ArmShift;
 
-/*
- * Function Declarations
- */
-
-// ADD/SUB instructions
 void encode_add_sub_imm(code_ctx *ctx, int sf, int op, int S, int shift, int imm12, Arm64Reg Rn, Arm64Reg Rd);
 void encode_add_sub_reg(code_ctx *ctx, int sf, int op, int S, int shift, Arm64Reg Rm, int imm6, Arm64Reg Rn, Arm64Reg Rd);
 void encode_add_sub_ext(code_ctx *ctx, int sf, int op, int S, Arm64Reg Rm, int option, int imm3, Arm64Reg Rn, Arm64Reg Rd);
 
-// Logical instructions
 void encode_logical_imm(code_ctx *ctx, int sf, int opc, int N, int immr, int imms, Arm64Reg Rn, Arm64Reg Rd);
 void encode_logical_reg(code_ctx *ctx, int sf, int opc, int shift, int N, Arm64Reg Rm, int imm6, Arm64Reg Rn, Arm64Reg Rd);
 
-// Move wide immediate
 void encode_mov_wide_imm(code_ctx *ctx, int sf, int opc, int hw, int imm16, Arm64Reg Rd);
 
-// Multiply/divide
 void encode_madd_msub(code_ctx *ctx, int sf, int op, Arm64Reg Rm, Arm64Reg Ra, Arm64Reg Rn, Arm64Reg Rd);
 void encode_div(code_ctx *ctx, int sf, int U, Arm64Reg Rm, Arm64Reg Rn, Arm64Reg Rd);
 
-// Shift instructions
 void encode_shift_reg(code_ctx *ctx, int sf, int op2, Arm64Reg Rm, Arm64Reg Rn, Arm64Reg Rd);
 
-// Load/store instructions
 void encode_ldr_str_imm(code_ctx *ctx, int size, int V, int opc, int imm12, Arm64Reg Rn, Arm64Reg Rt);
 void encode_ldr_str_reg(code_ctx *ctx, int size, int V, int opc, Arm64Reg Rm, int option, int S, Arm64Reg Rn, Arm64Reg Rt);
 void encode_ldur_stur(code_ctx *ctx, int size, int V, int opc, int imm9, Arm64Reg Rn, Arm64Reg Rt);
 void encode_ldp_stp(code_ctx *ctx, int opc, int V, int mode, int imm7, Arm64Reg Rt2, Arm64Reg Rn, Arm64Reg Rt);
 
-// PC-relative addressing
 void encode_adrp(code_ctx *ctx, int immlo, int immhi, Arm64Reg Rd);
-void encode_adr(code_ctx *ctx, int immlo, int immhi, Arm64Reg Rd);
 
-// Branch instructions
 void encode_branch_cond(code_ctx *ctx, int imm19, ArmCondition cond);
 void encode_branch_uncond(code_ctx *ctx, int imm26);
 void encode_branch_link(code_ctx *ctx, int imm26);
 void encode_branch_reg(code_ctx *ctx, int opc, Arm64Reg Rn);
 void encode_cbz_cbnz(code_ctx *ctx, int sf, int op, int imm19, Arm64Reg Rt);
-void encode_tbz_tbnz(code_ctx *ctx, int b5, int op, int b40, int imm14, Arm64Reg Rt);
 
-// Floating-point instructions
 void encode_fp_arith(code_ctx *ctx, int M, int S, int type, Arm64FpReg Rm, int opcode, Arm64FpReg Rn, Arm64FpReg Rd);
 void encode_fp_1src(code_ctx *ctx, int M, int S, int type, int opcode, Arm64FpReg Rn, Arm64FpReg Rd);
 void encode_fp_compare(code_ctx *ctx, int M, int S, int type, Arm64FpReg Rm, int op, Arm64FpReg Rn);
@@ -233,10 +185,8 @@ void encode_fcvt_int(code_ctx *ctx, int sf, int S, int type, int rmode, int opc,
 void encode_int_fcvt(code_ctx *ctx, int sf, int S, int type, int rmode, int opc, Arm64Reg Rn, Arm64FpReg Rd);
 void encode_fp_cond_select(code_ctx *ctx, int type, Arm64FpReg Rm, ArmCondition cond, Arm64FpReg Rn, Arm64FpReg Rd);
 
-// Conditional select
 void encode_cond_select(code_ctx *ctx, int sf, int op, Arm64Reg Rm, ArmCondition cond, int op2, Arm64Reg Rn, Arm64Reg Rd);
 
-// High-level helpers
 void load_immediate(code_ctx *ctx, int64_t val, Arm64Reg dst, bool is_64bit);
 
 #endif // JIT_AARCH64_EMIT_H

@@ -42,12 +42,14 @@
 // Debug callback trampolines support up to 64 bytes of overflow arguments.
 #define TRAMPOLINE_STACK_ARGS	64
 
+// largest code sequence emitted for a single IR op
+#define MAX_OP_SIZE	128
+
 #define R(id)		MK_REG(id, R_REG)
 #define V(id)		MK_REG((id) + 64, R_REG)
 
 static void patch_imm12( unsigned char *out, int pos, int target_lo12, int scale );
-
-// Register classes
+static void patch_adrp_imm21( void *code, int pc_abs, int target_abs );
 
 void hl_jit_init_regs( regs_config *cfg ) {
 	// X15-X17 are backend temporaries. X18 is reserved by some AAPCS64 platforms.
@@ -90,15 +92,14 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->floats.persist = (ereg*)float_persist;
 	cfg->floats.arg = (ereg*)float_args;
 
-	// ARM has no register pinning constraints for shifts (LSLV/LSRV/ASRV accept
-	// any source) or division (SDIV/UDIV write any destination).
+	// shifts and divisions can use any register
 	cfg->req_bit_shifts = 0;
 	cfg->req_div_a = 0;
 	cfg->req_div_b = 0;
 
-	cfg->stack_reg = R(SP_REG); // X31 (SP)
-	cfg->stack_pos = R(FP);     // X29
-	cfg->stack_align = 16;      // AAPCS64 mandates
+	cfg->stack_reg = R(SP_REG);
+	cfg->stack_pos = R(FP);
+	cfg->stack_align = 16;
 	// SP must stay 16-byte aligned for any memory access through it
 	cfg->min_stack_args_size = 16;
 #if defined(HL_MAC) || defined(HL_IOS) || defined(HL_TVOS)
@@ -115,8 +116,7 @@ void hl_jit_init_regs( regs_config *cfg ) {
 const char *hl_natreg_str( int reg, emit_mode m ) {
 	static char out[16];
 	int r = REG_REG(reg);
-	// Reverse the remappings used in gpr_id so debug output reflects the
-	// hardware register actually emitted.
+	// undo the gpr_id remapping
 	int hw = (r == X5_LOGICAL) ? 5 : (r == STACK_REG) ? 29 : r;
 	switch( m ) {
 	case M_I32:
@@ -153,8 +153,6 @@ const char *hl_natreg_str( int reg, emit_mode m ) {
 	return out;
 }
 
-// Backend lifecycle
-
 void hl_codegen_alloc( jit_ctx *jit ) {
 	code_ctx *ctx = (code_ctx*)malloc(sizeof(code_ctx));
 	memset(ctx, 0, sizeof(code_ctx));
@@ -168,14 +166,11 @@ void hl_codegen_free( jit_ctx *jit ) {
 	free(ctx);
 }
 
-// Helpers
-
 #define ARM_TMP1	X16    // backend-private scratch (IP0)
 #define ARM_TMP2	X17    // backend-private scratch (IP1)
 #define ARM_TMP3	X15    // backend-private scratch (excluded from regalloc)
 
-// Map an IR ereg to a physical AArch64 GPR encoding (0..31).
-// STACK_REG maps to FP and X5_LOGICAL maps to X5.
+// STACK_REG maps to FP and X5_LOGICAL maps to X5
 static Arm64Reg gpr_id( ereg r ) {
 	int v = REG_REG(r);
 	if( v == STACK_REG ) return FP;
@@ -185,6 +180,13 @@ static Arm64Reg gpr_id( ereg r ) {
 
 static Arm64FpReg fpr_id( ereg r ) {
 	return (Arm64FpReg)(REG_REG(r) - 64);
+}
+
+static void emit_bitfield( code_ctx *ctx, int sf, int opc, int immr, int imms, Arm64Reg Rn, Arm64Reg Rd );
+
+// UXTB/UXTH : C callers leave the upper bits of small arguments undefined
+static void emit_zero_extend( code_ctx *ctx, Arm64Reg dst, Arm64Reg src, emit_mode mode ) {
+	emit_bitfield(ctx, 0, /*UBFM*/0x02, 0, mode == M_UI8 ? 7 : 15, src, dst);
 }
 
 // LDR/STR `size` field: 0=8b, 1=16b, 2=32b, 3=64b.
@@ -201,15 +203,12 @@ static int ls_size_for( emit_mode m ) {
 }
 
 static int sf_for( emit_mode m ) {
-	// 1 = 64-bit, 0 = 32-bit (sub-word loads/stores still use 64-bit reg encoding).
+	// 1 = 64-bit, 0 = 32-bit
 	return (m == M_PTR || m == M_F64) ? 1 : 0;
 }
 
 static bool is_fp_mode( emit_mode m ) { return m == M_F32 || m == M_F64; }
 
-// Stack pointer arithmetic with arbitrary signed delta.
-// `delta > 0` => SP += delta, `delta < 0` => SP -= |delta|.
-// Uses imm12 + optional LSL #12 when possible; falls back through ARM_TMP1.
 static void emit_sp_offs( code_ctx *ctx, int delta ) {
 	if( delta == 0 ) return;
 	int op = (delta < 0) ? 1 : 0; // 0 = ADD, 1 = SUB
@@ -222,7 +221,6 @@ static void emit_sp_offs( code_ctx *ctx, int delta ) {
 		encode_add_sub_imm(ctx, 1, op, 0, 1, (int)(mag >> 12), SP_REG, SP_REG);
 		return;
 	}
-	// Try two-step imm: hi part (LSL #12) + lo part, both ≤ 0xFFF.
 	uint32_t mag_lo = mag & 0xFFF;
 	uint32_t mag_hi = mag >> 12;
 	if( mag_hi <= 0xFFF ) {
@@ -231,18 +229,12 @@ static void emit_sp_offs( code_ctx *ctx, int delta ) {
 			encode_add_sub_imm(ctx, 1, op, 0, 0, (int)mag_lo, SP_REG, SP_REG);
 		return;
 	}
-	// Fall back to register form.  Must use ADD/SUB (extended register), the
-	// shifted-register form interprets register 31 as XZR, not SP, so
-	// `SUB SP, SP, X16` would silently become `SUB XZR, XZR, X16` (a NOP).
-	// Extended-register form with option=UXTX(011), imm3=0 treats Rd/Rn=31
-	// as SP, which is what we want.
+	// must be the extended-register form: the shifted-register form reads 31 as XZR, not SP
 	load_immediate(ctx, (int64_t)mag, ARM_TMP1, true);
 	encode_add_sub_ext(ctx, 1, op, 0, ARM_TMP1, /*option=UXTX*/3, /*imm3=*/0, SP_REG, SP_REG);
 }
 
-// ADD/SUB-imm with optional 12-bit shift, returns true if `mag` fits.
-// Emits `op (ADD/SUB) Rd, Rn, #mag` using up to two instructions.
-// Caller picks 0=ADD or 1=SUB.
+// op : 0 = ADD, 1 = SUB. returns false if mag needs more than two imm12 instructions
 static bool emit_addsub_imm_2step( code_ctx *ctx, int op, Arm64Reg Rd, Arm64Reg Rn, uint32_t mag ) {
 	if( mag <= 0xFFF ) {
 		encode_add_sub_imm(ctx, 1, op, 0, 0, (int)mag, Rn, Rd);
@@ -258,20 +250,11 @@ static bool emit_addsub_imm_2step( code_ctx *ctx, int op, Arm64Reg Rd, Arm64Reg 
 	return false;
 }
 
-// Load/store with FP-relative or arbitrary base+offs.
-// Picks LDR/STR(unsigned imm scaled) when offset fits, else LDUR/STUR (signed,
-// unscaled, ±256), else falls back to a register-offset form.
-//
-// Register-form offset requires a scratch register that must NOT collide with
-// reg_t (for STR Xt,[base,Xt] would store the offset value at the offset
-// location). When base also lives in a backend temp (ARM_TMP1/TMP2), we may
-// run out of disjoint temps. In that case, fold the offset into base in place
-// using ADD/SUB-imm (preserving base across the load/store), which is valid
-// for magnitudes up to 0xFFFFFF.
+// avoid : a register holding a live value that the offset temp must not clobber
 static void emit_ld_st_ex( code_ctx *ctx, bool is_load, emit_mode mode, int reg_t, Arm64Reg base, int offs, Arm64Reg avoid ) {
 	int size = ls_size_for(mode);
 	int V = is_fp_mode(mode) ? 1 : 0;
-	int opc = is_load ? 1 : 0; // 0=STR, 1=LDR (for V=0 GPR; same for V=1 FP)
+	int opc = is_load ? 1 : 0; // 0 = STR, 1 = LDR
 	int scale = 1 << size;
 	if( offs >= 0 && (offs & (scale - 1)) == 0 && (offs / scale) < 0x1000 ) {
 		encode_ldr_str_imm(ctx, size, V, opc, offs / scale, base, (Arm64Reg)reg_t);
@@ -281,24 +264,16 @@ static void emit_ld_st_ex( code_ctx *ctx, bool is_load, emit_mode mode, int reg_
 		encode_ldur_stur(ctx, size, V, opc, offs, base, (Arm64Reg)reg_t);
 		return;
 	}
-	// Pick an offset temp.  Constraints:
-	//   - For stores, off_tmp must not equal reg_t (else STR Xt,[base,Xt]
-	//     writes the offset value instead of the data).  Loads are immune
-	//     since LDR reads the offset register before writing reg_t.
-	//   - off_tmp must not equal base (the load/store needs base intact).
-	//   - off_tmp must not equal `avoid` (a caller-supplied register the
-	//     caller has parked a live value in, typically the OUTER base in
-	//     emit_store/emit_load_addr while loading the data argument).
-	// For FP loads/stores, reg_t is a V-register, so V-vs-X never collides.
+	// offset temp must differ from base and avoid, and from reg_t for stores
+	// (a load reads the offset before writing reg_t)
 	Arm64Reg off_tmp = ARM_TMP1;
-	if( V == 0 ) {
-		bool bad_t1 = (!is_load && reg_t == ARM_TMP1) || base == ARM_TMP1 || avoid == ARM_TMP1;
-		if( bad_t1 ) off_tmp = ARM_TMP2;
-		bool bad_t2 = (!is_load && reg_t == off_tmp) || base == off_tmp || avoid == off_tmp;
-		if( bad_t2 ) off_tmp = ARM_TMP3;
-		bool bad_t3 = (!is_load && reg_t == off_tmp) || base == off_tmp || avoid == off_tmp;
-		if( bad_t3 ) jit_error("aarch64 emit_ld_st: no free offset temp");
-	}
+	bool gpr_store = V == 0 && !is_load;
+	bool bad_t1 = (gpr_store && reg_t == ARM_TMP1) || base == ARM_TMP1 || avoid == ARM_TMP1;
+	if( bad_t1 ) off_tmp = ARM_TMP2;
+	bool bad_t2 = (gpr_store && reg_t == off_tmp) || base == off_tmp || avoid == off_tmp;
+	if( bad_t2 ) off_tmp = ARM_TMP3;
+	bool bad_t3 = (gpr_store && reg_t == off_tmp) || base == off_tmp || avoid == off_tmp;
+	if( bad_t3 ) jit_error("aarch64 emit_ld_st: no free offset temp");
 	load_immediate(ctx, offs, off_tmp, true);
 	encode_ldr_str_reg(ctx, size, V, opc, off_tmp, /*option=*/3 /*LSL*/, /*S=*/0, base, (Arm64Reg)reg_t);
 }
@@ -307,54 +282,46 @@ static void emit_ld_st( code_ctx *ctx, bool is_load, emit_mode mode, int reg_t, 
 	emit_ld_st_ex(ctx, is_load, mode, reg_t, base, offs, (Arm64Reg)-1 /*no avoid*/);
 }
 
-// MOV between two GPRs. Handles SP as source/dest (ARM disallows ORR with SP).
+// ORR can't encode SP, ADD #0 can
 static void emit_mov_gpr( code_ctx *ctx, Arm64Reg dst, Arm64Reg src, int sf ) {
 	if( dst == src ) return;
 	if( dst == SP_REG || src == SP_REG ) {
-		// ADD <dst>, <src>, #0  (only form that accepts SP).
+		// ADD dst, src, #0
 		encode_add_sub_imm(ctx, sf, 0, 0, 0, 0, src, dst);
 	} else {
-		// ORR <dst>, XZR, <src>
+		// ORR dst, XZR, src
 		encode_logical_reg(ctx, sf, 0x01, 0, 0, src, 0, XZR, dst);
 	}
 }
 
-// MOV between two FP regs (preserves the lane size used by the mode).
-// Uses ORR.16B (same encoding regardless of S/D since it's a bitwise move).
-// FMOV is also an option; we use FMOV (scalar) for clarity.
 static void emit_mov_fpr( code_ctx *ctx, Arm64FpReg dst, Arm64FpReg src, emit_mode mode ) {
 	if( dst == src ) return;
 	int type = (mode == M_F64) ? 1 : 0; // 1=double, 0=single
-	// FMOV (register) opcode = 0
+	// FMOV
 	encode_fp_1src(ctx, /*M=*/0, /*S=*/0, type, /*opcode=*/0, src, dst);
 }
 
-// Generic MOV that mirrors x86's emit_mov: handles reg/reg, reg/mem, mem/reg.
-// imm-to-reg goes through emit_load_const.
 static void emit_load_const( code_ctx *ctx, ereg out, uint64_t value, emit_mode mode );
 
 static int  reserve_const_segment( code_ctx *ctx, int size, int align );
 static int  alloc_const( code_ctx *ctx, uint64_t value, int adrp_pos );
 static void emit_const_load( code_ctx *ctx, Arm64Reg dst, uint64_t value );
-static void emit_const_addr( code_ctx *ctx, Arm64Reg dst, uint64_t value );
 static void emit_pool_offset_addr( code_ctx *ctx, Arm64Reg dst, int const_offset );
 static Arm64FpReg materialize_fpr( code_ctx *ctx, ereg src, emit_mode mode, Arm64FpReg tmp );
 static Arm64Reg   materialize_gpr( code_ctx *ctx, ereg src, emit_mode mode, Arm64Reg tmp );
 static Arm64Reg   materialize_gpr_ex( code_ctx *ctx, ereg src, emit_mode mode, Arm64Reg tmp, Arm64Reg avoid );
 
-// LEA-like: out = base + offs.  Used when an operand encodes an address as
-// (R_REG, value=offs), e.g. MK_STACK_OFFS, or the LEA-rewritten ADDRESS op.
+// never uses a temp register
 static void emit_lea_imm( code_ctx *ctx, Arm64Reg out, Arm64Reg base, int offs ) {
 	if( offs == 0 ) {
 		emit_mov_gpr(ctx, out, base, 1);
-	} else if( offs > 0 && offs <= 0xFFF ) {
-		encode_add_sub_imm(ctx, 1, 0, 0, 0, offs, base, out);
-	} else if( offs < 0 && -offs <= 0xFFF ) {
-		encode_add_sub_imm(ctx, 1, 1, 0, 0, -offs, base, out);
-	} else {
-		load_immediate(ctx, offs, ARM_TMP1, true);
-		encode_add_sub_reg(ctx, 1, 0, 0, 0, ARM_TMP1, 0, base, out);
+		return;
 	}
+	if( emit_addsub_imm_2step(ctx, offs < 0, out, base, offs < 0 ? -(uint32_t)offs : (uint32_t)offs) )
+		return;
+	if( out == base ) jit_error("aarch64 LEA offset out of range");
+	load_immediate(ctx, offs, out, true);
+	encode_add_sub_reg(ctx, 1, 0, 0, 0, out, 0, base, out);
 }
 
 static void emit_mov( code_ctx *ctx, ereg dst, ereg src, emit_mode mode ) {
@@ -362,20 +329,20 @@ static void emit_mov( code_ctx *ctx, ereg dst, ereg src, emit_mode mode ) {
 	int src_kind = REG_KIND(src);
 
 	if( dst_kind == R_REG && src_kind == R_REG ) {
-		// MK_STACK_OFFS / LEA-rewritten ADDRESS: src encodes (reg, offs).
-		// Treat as an address computation: dst = src_reg + offs.
+		// MK_STACK_OFFS or LEA-rewritten ADDRESS : dst = reg + offs
 		if( !is_fp_mode(mode) && REG_VALUE(src) != 0 ) {
 			emit_lea_imm(ctx, gpr_id(dst), gpr_id(src), REG_VALUE(src));
 			return;
 		}
 		if( is_fp_mode(mode) )
 			emit_mov_fpr(ctx, fpr_id(dst), fpr_id(src), mode);
+		else if( mode == M_UI8 || mode == M_UI16 )
+			emit_zero_extend(ctx, gpr_id(dst), gpr_id(src), mode);
 		else
 			emit_mov_gpr(ctx, gpr_id(dst), gpr_id(src), sf_for(mode));
 		return;
 	}
 	if( dst_kind == R_REG && src_kind == R_REG_PTR ) {
-		// LOAD: dst <- [base + offs]
 		Arm64Reg base = gpr_id(src);
 		int offs = REG_VALUE(src);
 		int reg_t = is_fp_mode(mode) ? fpr_id(dst) : gpr_id(dst);
@@ -383,21 +350,24 @@ static void emit_mov( code_ctx *ctx, ereg dst, ereg src, emit_mode mode ) {
 		return;
 	}
 	if( dst_kind == R_REG_PTR && src_kind == R_REG ) {
-		// STORE: [base + offs] <- src
 		Arm64Reg base = gpr_id(dst);
 		int offs = REG_VALUE(dst);
-		int reg_t = is_fp_mode(mode) ? fpr_id(src) : gpr_id(src);
+		int reg_t;
+		if( is_fp_mode(mode) )
+			reg_t = fpr_id(src);
+		else if( REG_VALUE(src) != 0 ) {
+			reg_t = base == ARM_TMP1 ? ARM_TMP2 : ARM_TMP1;
+			emit_lea_imm(ctx, reg_t, gpr_id(src), REG_VALUE(src));
+		} else
+			reg_t = gpr_id(src);
 		emit_ld_st(ctx, /*is_load=*/false, mode, reg_t, base, offs);
 		return;
 	}
-	if( dst_kind == R_REG && src_kind == R_CONST ) {
+	if( src_kind == R_CONST ) {
 		emit_load_const(ctx, dst, (uint64_t)REG_VALUE(src), mode);
 		return;
 	}
 	if( dst_kind == R_REG_PTR && src_kind == R_REG_PTR ) {
-		// memory-to-memory: load through a scratch register, then store.
-		// Use V31 for FP modes and ARM_TMP1 for integer/pointer modes, both
-		// are reserved as backend-private scratch.
 		Arm64Reg sb = gpr_id(src);
 		int so = REG_VALUE(src);
 		Arm64Reg db = gpr_id(dst);
@@ -414,12 +384,9 @@ static void emit_mov( code_ctx *ctx, ereg dst, ereg src, emit_mode mode ) {
 	jit_error("aarch64 emit_mov: unhandled operand kinds");
 }
 
-// LOAD_CONST: integer immediate or floating constant.
 static void emit_load_const( code_ctx *ctx, ereg out, uint64_t value, emit_mode mode ) {
 	if( REG_KIND(out) != R_REG ) {
-		// emit-into-memory: load the bit pattern into ARM_TMP1 and store as the
-		// requested width.  For floats we treat the FP constant's bit pattern as
-		// an integer, the resulting STR writes the same bytes a FP STR would.
+		// store the bit pattern through ARM_TMP1, floats included
 		emit_mode store_mode = is_fp_mode(mode) ? (mode == M_F32 ? M_I32 : M_PTR) : mode;
 		load_immediate(ctx, (int64_t)value, ARM_TMP1, sf_for(store_mode) == 1);
 		Arm64Reg base = gpr_id(out);
@@ -428,16 +395,12 @@ static void emit_load_const( code_ctx *ctx, ereg out, uint64_t value, emit_mode 
 		return;
 	}
 	if( is_fp_mode(mode) ) {
-		// Float constants live in the literal pool: ADRP+LDR into the FP reg.
-		// jit_emit.c packs F32 constants into the low 32 bits of `value` with
-		// the upper 32 bits zeroed, so we must use the matching width-encoding
-		// (size=2 → LDR Sd, ...). Loading 8 bytes would pull the zero high
-		// half into D and yield a subnormal double when read as F64.
+		// F32 constants are stored in the low 32 bits: load them with a 32-bit LDR
 		Arm64FpReg fp_dst = fpr_id(out);
 		int adrp_pos = byte_count(ctx->code);
 		int size = (mode == M_F32) ? 2 : 3;
 		encode_adrp(ctx, 0, 0, ARM_TMP1);                              // ADRP X16, page
-		// LDR Sd|Dd, [X16, #lo12]   V=1, opc=01; imm12 patched later
+		// LDR Sd|Dd, [X16, #lo12], imm12 patched later
 		encode_ldr_str_imm(ctx, size, 1, 1, 0, ARM_TMP1, (Arm64Reg)fp_dst);
 		alloc_const(ctx, value, adrp_pos);
 		return;
@@ -445,35 +408,33 @@ static void emit_load_const( code_ctx *ctx, ereg out, uint64_t value, emit_mode 
 	load_immediate(ctx, (int64_t)value, gpr_id(out), sf_for(mode) == 1);
 }
 
-// PUSH / POP. ARM has no explicit push/pop; we use STR/LDR with pre/post-index
-// on SP. To match the x86 stack-offset accounting (which assumes 16 bytes are
-// already consumed by RIP+RBP), PUSH X29 emits STP X29, X30, [SP, #-16]! so
-// LR is implicitly saved as part of FP-save. POP X29 mirrors with LDP.
-// All other PUSH/POPs use 16-byte SP movement (8 bytes wasted) to keep SP
-// 16-byte aligned per AAPCS64.
+// PUSH FP saves FP+LR as a pair, taking the place of x86 RIP+RBP.
+// other PUSH/POP move SP by 16 to keep it aligned
 static void emit_push( code_ctx *ctx, ereg r, emit_mode mode ) {
 	if( is_fp_mode(mode) ) {
-		// SUB SP, SP, #16; STR Dn, [SP].  Materialize through V31 if r is not a register.
 		Arm64FpReg src = (REG_KIND(r) == R_REG) ? fpr_id(r) : materialize_fpr(ctx, r, mode, (Arm64FpReg)31);
 		emit_sp_offs(ctx, -16);
 		encode_ldr_str_imm(ctx, /*size=*/3, /*V=*/1, /*opc=*/0 /*STR*/, 0, SP_REG, (Arm64Reg)src);
 		return;
 	}
-	// materialize_gpr handles MK_STACK_OFFS by adding the offset; gpr_id alone
-	// would discard it (mapping STACK_REG->FP and ignoring REG_VALUE).
+	// materialize_gpr keeps the MK_STACK_OFFS offset, gpr_id would drop it
 	Arm64Reg src = materialize_gpr(ctx, r, mode, ARM_TMP1);
 	if( src == FP && REG_KIND(r) == R_REG && REG_VALUE(r) == 0 ) {
-		// True PUSH FP (prologue), emit STP x29,x30,[sp,#-16]! to also save LR.
+		// STP X29, X30, [SP, #-16]!
 		encode_ldp_stp(ctx, /*opc=*/2, /*V=*/0, /*mode=*/0x03, /*imm7=*/-2 & 0x7F, LR, SP_REG, FP);
 		return;
 	}
-	// SUB SP, SP, #16; STR Xn, [SP]
 	emit_sp_offs(ctx, -16);
 	encode_ldr_str_imm(ctx, /*size=*/3, /*V=*/0, /*opc=*/0, 0, SP_REG, src);
 }
 
 static void emit_pop( code_ctx *ctx, ereg r, emit_mode mode ) {
-	if( REG_KIND(r) != R_REG ) jit_error("aarch64 POP non-reg not implemented");
+	if( REG_KIND(r) != R_REG ) {
+		ereg tmp = is_fp_mode(mode) ? V(V29) : R(ARM_TMP2);
+		emit_pop(ctx, tmp, mode);
+		emit_mov(ctx, r, tmp, mode);
+		return;
+	}
 	if( is_fp_mode(mode) ) {
 		encode_ldr_str_imm(ctx, /*size=*/3, /*V=*/1, /*opc=*/1 /*LDR*/, 0, SP_REG, (Arm64Reg)fpr_id(r));
 		emit_sp_offs(ctx, 16);
@@ -481,42 +442,34 @@ static void emit_pop( code_ctx *ctx, ereg r, emit_mode mode ) {
 	}
 	Arm64Reg dst = gpr_id(r);
 	if( dst == FP ) {
-		// LDP X29, X30, [SP], #16   opc=10, V=0, mode=01 (post-index load), imm7=2
+		// LDP X29, X30, [SP], #16
 		encode_ldp_stp(ctx, /*opc=*/2, /*V=*/0, /*mode=*/0x01, /*imm7=*/2, LR, SP_REG, FP);
 		return;
 	}
-	// LDR Xn, [SP]; ADD SP, SP, #16
 	encode_ldr_str_imm(ctx, /*size=*/3, /*V=*/0, /*opc=*/1, 0, SP_REG, dst);
 	emit_sp_offs(ctx, 16);
 }
 
-// CMP / TEST.  e->mode tells us int width / float; e->size_offs holds the
-// upstream OJxxx opcode (consumed later by the JCOND/CMOV that follows).
+// e->size_offs holds the OJxxx opcode, read back by the following JCOND/CMOV
 static void emit_cmp( code_ctx *ctx, einstr *e ) {
 	if( is_fp_mode(e->mode) ) {
-		// FCMP. NaN handling deferred; bare FCMP is correct for ordered compares
-		// and gives QNaN-as-unordered which matches ARM defaults.
 		Arm64FpReg ra = materialize_fpr(ctx, e->a, e->mode, (Arm64FpReg)29);
 		Arm64FpReg rb = materialize_fpr(ctx, e->b, e->mode, (Arm64FpReg)30);
 		int type = (e->mode == M_F64) ? 1 : 0;
 		encode_fp_compare(ctx, /*M=*/0, /*S=*/0, type, rb, /*op=*/0, ra);
 		return;
 	}
-	// Integer compare: SUBS XZR, Xa, Xb  (or imm form).
-	// materialize_gpr handles R_REG (incl. MK_STACK_OFFS via emit_lea_imm),
-	// R_CONST, and R_REG_PTR, picking gpr_id alone would drop the FP+N
-	// offset for stack-allocated addresses.
 	int sf = sf_for(e->mode);
 	Arm64Reg a = materialize_gpr(ctx, e->a, e->mode, ARM_TMP1);
 	if( REG_KIND(e->b) == R_CONST ) {
 		int64_t val = (int64_t)REG_VALUE(e->b);
 		if( val >= 0 && val <= 0xFFF ) {
-			// CMP Xa, #imm  (SUBS XZR, Xa, #imm; sf, op=1, S=1)
+			// CMP Xa, #imm
 			encode_add_sub_imm(ctx, sf, 1, 1, 0, (int)val, a, XZR);
 			return;
 		}
 		if( val < 0 && -val <= 0xFFF ) {
-			// CMN Xa, #imm  (ADDS XZR, Xa, #imm)
+			// CMN Xa, #imm
 			encode_add_sub_imm(ctx, sf, 0, 1, 0, (int)-val, a, XZR);
 			return;
 		}
@@ -531,14 +484,11 @@ static void emit_cmp( code_ctx *ctx, einstr *e ) {
 static void emit_test( code_ctx *ctx, einstr *e ) {
 	if( is_fp_mode(e->mode) ) jit_error("aarch64 TEST float not supported");
 	int sf = sf_for(e->mode);
-	// materialize_gpr folds MK_STACK_OFFS (R_REG kind + non-zero REG_VALUE)
-	// into FP+N so we never TST raw FP for stack-allocated address operands.
 	Arm64Reg a = materialize_gpr(ctx, e->a, e->mode, ARM_TMP1);
-	// TST Xa, Xa  (ANDS XZR, Xa, Xa); opc=11 (ANDS), shift=0, N=0
+	// TST Xa, Xa
 	encode_logical_reg(ctx, sf, 0x03, 0, 0, a, 0, a, XZR);
 }
 
-// JCOND / JUMP, branch fixups patched after function emit.
 static void add_branch_fixup( code_ctx *ctx, int code_pos, int target_op, int is_cond ) {
 	int_arr_add_impl(&ctx->jit->galloc, &ctx->branch_fixups, code_pos);
 	int_arr_add_impl(&ctx->jit->galloc, &ctx->branch_fixups, target_op);
@@ -551,23 +501,26 @@ static void add_addr_fixup( code_ctx *ctx, int adrp_pos, int target_op ) {
 }
 
 static void emit_jump( code_ctx *ctx, int target_op_offset ) {
-	// target_op_offset is the IR-relative displacement, target = cur_op + 1 + offset
 	int target = ctx->cur_op + 1 + target_op_offset;
 	int pos = byte_count(ctx->code);
-	encode_branch_uncond(ctx, 0); // target patched via branch_fixups
+	encode_branch_uncond(ctx, 0);
 	add_branch_fixup(ctx, pos, target, 0);
 }
 
 static void emit_jump_cond( code_ctx *ctx, ArmCondition cond, int target_op_offset ) {
 	int target = ctx->cur_op + 1 + target_op_offset;
+	if( ctx->long_cond ) {
+		encode_branch_cond(ctx, 2, (ArmCondition)(cond ^ 1)); // skip the B
+		int pos = byte_count(ctx->code);
+		encode_branch_uncond(ctx, 0);
+		add_branch_fixup(ctx, pos, target, 0);
+		return;
+	}
 	int pos = byte_count(ctx->code);
 	encode_branch_cond(ctx, 0, cond);
 	add_branch_fixup(ctx, pos, target, 1);
 }
 
-// Mirror x86 get_cond_jump: walk back through MOV/JCOND/CMOV/XCHG/CXCHG to find
-// the comparison whose flags this JCOND/CMOV consumes.  Translate the upstream
-// OJxxx opcode into an ARM condition code.
 static ArmCondition get_cond_jump( code_ctx *ctx ) {
 	int prev = 0;
 	einstr *p;
@@ -581,13 +534,7 @@ static ArmCondition get_cond_jump( code_ctx *ctx ) {
 	case OJTrue:
 	case OJNotNull:
 		return COND_NE;
-	// For ARM64 FCMP, NaN sets N=0, Z=0, C=1, V=1.  IEEE 754 ordered
-	// predicates need to evaluate FALSE for NaN. HS (C==1) and HI (C==1
-	// && Z==0) both fire on NaN, wrong. GE (N==V) and GT (Z==0 && N==V)
-	// reject NaN since V differs from N. The x86 backend can use JUGte/JUGt
-	// for FP only because x86 UCOMISS sets CF=1 on NaN, making JAE/JA
-	// reject it; ARM's carry conventions are inverted from x86's.
-	// LO (C==0) and LS (C==0 || Z==1) already reject NaN on ARM (C=1).
+	// FCMP with a NaN sets NZCV=0011, so GE, GT, LO and LS are false
 	case OJSGte:
 		return COND_GE;
 	case OJSGt:
@@ -605,14 +552,10 @@ static ArmCondition get_cond_jump( code_ctx *ctx ) {
 	case OJNotEq:
 		return COND_NE;
 	case OJNotLt:
-		// HS (C==1) fires on NaN (C=1) and on ordered >= (C=1) ✓.
-		// GE (N==V) would reject NaN (V=1, N=0), wrong, NaN means
-		// "not less than" should fire.
+		// true for NaN
 		return COND_HS;
 	case OJNotGte:
-		// LT (N!=V) is signed less-than for INT, and for FP it fires on
-		// NaN (V=1), the right semantics for "not >=".
-		// LO (C==0) would not fire on NaN (C=1), wrong for FP.
+		// true for NaN
 		return COND_LT;
 	case 0:
 		if( p->op == DEBUG_BREAK ) return COND_EQ;
@@ -629,20 +572,21 @@ static void patch_branch( code_ctx *ctx, int pos, int target_byte_pos, int is_co
 	int imm = delta >> 2;
 	unsigned int *insn = (unsigned int*)&ctx->code.values[pos];
 	if( is_cond ) {
-		// imm19 lives in bits [23:5]; cond + 0x54000000 prefix retained.
-		if( imm < -(1 << 18) || imm >= (1 << 18) )
-			jit_error("aarch64 B.cond out of range");
+		// imm19 at [23:5]
+		if( imm < -(1 << 18) || imm >= (1 << 18) ) {
+			ctx->cond_overflow = true;
+			return;
+		}
 		*insn = (*insn & ~(0x7FFFF << 5)) | ((imm & 0x7FFFF) << 5);
 	} else {
-		// imm26 lives in bits [25:0]; opcode 000101.
+		// imm26 at [25:0]
 		if( imm < -(1 << 25) || imm >= (1 << 25) )
 			jit_error("aarch64 B out of range");
 		*insn = (*insn & ~0x03FFFFFF) | (imm & 0x03FFFFFF);
 	}
 }
 
-// Operand materialization: ensure src is a live register; load through a temp
-// if it's a constant or memory.  Returns the GPR encoding to use.
+// returns the register holding src, loading it into tmp if needed
 static Arm64Reg materialize_gpr_ex( code_ctx *ctx, ereg src, emit_mode mode, Arm64Reg tmp, Arm64Reg avoid ) {
 	if( REG_KIND(src) == R_REG ) {
 		Arm64Reg base = gpr_id(src);
@@ -656,8 +600,6 @@ static Arm64Reg materialize_gpr_ex( code_ctx *ctx, ereg src, emit_mode mode, Arm
 		return tmp;
 	}
 	if( REG_KIND(src) == R_REG_PTR ) {
-		// Load directly via emit_ld_st_ex so the offset-temp picker can avoid
-		// `avoid` (typically the caller's outer base register).
 		emit_ld_st_ex(ctx, true, mode, tmp, gpr_id(src), REG_VALUE(src), avoid);
 		return tmp;
 	}
@@ -678,7 +620,6 @@ static Arm64FpReg materialize_fpr( code_ctx *ctx, ereg src, emit_mode mode, Arm6
 		return tmp;
 	}
 	if( REG_KIND(src) == R_CONST ) {
-		// FP constants always live in the literal pool.
 		int adrp_pos = byte_count(ctx->code);
 		encode_adrp(ctx, 0, 0, ARM_TMP1);
 		encode_ldr_str_imm(ctx, 3, 1, 1, 0, ARM_TMP1, (Arm64Reg)tmp);
@@ -689,7 +630,6 @@ static Arm64FpReg materialize_fpr( code_ctx *ctx, ereg src, emit_mode mode, Arm6
 	return (Arm64FpReg)0;
 }
 
-// Bitfield helpers (SBFM / UBFM raw encoding) for sign/zero-extension.
 static void emit_bitfield( code_ctx *ctx, int sf, int opc, int immr, int imms, Arm64Reg Rn, Arm64Reg Rd ) {
 	// [31]=sf, [30:29]=opc (00=SBFM, 01=BFM, 10=UBFM), [28:23]=100110, [22]=N(=sf),
 	// [21:16]=immr, [15:10]=imms, [9:5]=Rn, [4:0]=Rd
@@ -699,17 +639,8 @@ static void emit_bitfield( code_ctx *ctx, int sf, int opc, int immr, int imms, A
 	EMIT32(ctx, insn);
 }
 
-static void emit_sxt_to_int( code_ctx *ctx, emit_mode in_mode, Arm64Reg Rn, Arm64Reg Rd ) {
-	// SXTB Wd, Wn / SXTH Wd, Wn, produce sign-extended 32-bit result.
-	switch( in_mode ) {
-	case M_UI8:  emit_bitfield(ctx, 0, 0x00, 0, 7, Rn, Rd); break;
-	case M_UI16: emit_bitfield(ctx, 0, 0x00, 0, 15, Rn, Rd); break;
-	default: jit_error("emit_sxt_to_int unsupported in_mode");
-	}
-}
-
 static void emit_sxt_to_ptr( code_ctx *ctx, emit_mode in_mode, Arm64Reg Rn, Arm64Reg Rd ) {
-	// SBFM Xd, Xn, #0, #N, sign-extend to 64-bit.
+	// SXTB / SXTH / SXTW
 	switch( in_mode ) {
 	case M_UI8:  emit_bitfield(ctx, 1, 0x00, 0, 7, Rn, Rd); break;
 	case M_UI16: emit_bitfield(ctx, 1, 0x00, 0, 15, Rn, Rd); break;
@@ -719,7 +650,6 @@ static void emit_sxt_to_ptr( code_ctx *ctx, emit_mode in_mode, Arm64Reg Rn, Arm6
 }
 
 static void emit_uxt_to_w( code_ctx *ctx, emit_mode in_mode, Arm64Reg Rn, Arm64Reg Rd ) {
-	// UXTB Wd, Wn / UXTH Wd, Wn, implemented as AND Wd, Wn, #mask.
 	switch( in_mode ) {
 	case M_UI8:  encode_logical_imm(ctx, 0, 0x00, 0, 0, 7, Rn, Rd); break;   // AND Wd, Wn, #0xFF
 	case M_UI16: encode_logical_imm(ctx, 0, 0x00, 0, 0, 15, Rn, Rd); break;  // AND Wd, Wn, #0xFFFF
@@ -727,16 +657,14 @@ static void emit_uxt_to_w( code_ctx *ctx, emit_mode in_mode, Arm64Reg Rn, Arm64R
 	}
 }
 
-// BINOP / UNOP integer.  e->size_offs encodes the upstream Haxe op (OAdd, ...).
-// ARM has 3-operand ALU so we can write directly to `out` from `a, b`.
 static void emit_div_mod( code_ctx *ctx, hl_op op, Arm64Reg out, Arm64Reg a, Arm64Reg b, int sf );
+static void patch_helper_branch( code_ctx *ctx, int pos, int target );
 
 static void emit_binop_int( code_ctx *ctx, hl_op op, ereg out_e, ereg a_e, ereg b_e, emit_mode mode ) {
 	int sf = sf_for(mode);
 	Arm64Reg out = (REG_KIND(out_e) == R_REG) ? gpr_id(out_e) : ARM_TMP1;
 	Arm64Reg a = materialize_gpr(ctx, a_e, mode, ARM_TMP1);
 
-	// Constant-imm fast paths (ADD/SUB/AND/OR/XOR with small immediates).
 	if( REG_KIND(b_e) == R_CONST ) {
 		int64_t v = (int64_t)REG_VALUE(b_e);
 		if( (op == OAdd || op == OSub) && v >= 0 && v <= 0xFFF ) {
@@ -771,8 +699,6 @@ static void emit_binop_int( code_ctx *ctx, hl_op op, ereg out_e, ereg a_e, ereg 
 		jit_error("aarch64 emit_binop_int: unsupported op");
 	}
 
-	// Sub-word result truncation.  Loads/stores already truncate, but ALU on
-	// 32-bit reg leaves upper W zero already; we only need a mask for 8/16-bit.
 	if( mode == M_UI8 ) {
 		encode_logical_imm(ctx, 0, 0x00, 0, 0, 7, out, out);   // AND Wd, Wd, #0xFF
 	} else if( mode == M_UI16 ) {
@@ -788,87 +714,65 @@ store_out:
 // Integer divide / modulo with Haxe semantics:
 //   OUDiv:  b == 0       => 0
 //   OUMod:  b == 0       => 0
-//   OSDiv:  b == 0 || -1 => a*b   (matches x86; avoids INT_MIN/-1 overflow trap)
+//   OSDiv:  b == 0 || -1 => a*b   (avoids INT_MIN / -1)
 //   OSMod:  b == 0 || -1 => 0
-// ARM SDIV/UDIV give 0 for div/0, but mod via MSUB needs explicit guarding.
 static void emit_div_mod( code_ctx *ctx, hl_op op, Arm64Reg out, Arm64Reg a, Arm64Reg b, int sf ) {
 	bool unsign = (op == OUDiv || op == OUMod);
 	bool is_div = (op == OSDiv || op == OUDiv);
 
-	// Test b for 0; signed ops also test for -1.
 	encode_logical_reg(ctx, sf, 0x03, 0, 0, b, 0, b, XZR);  // TST b, b
 	int jz_pos = byte_count(ctx->code);
 	encode_branch_cond(ctx, 0, COND_EQ);  // patched later
 
 	int jneg_pos = -1;
 	if( !unsign ) {
-		// CMN b, #1  (= b + 1; sets Z if b == -1)
+		// CMN b, #1
 		encode_add_sub_imm(ctx, sf, 0, 1, 0, 1, b, XZR);
 		jneg_pos = byte_count(ctx->code);
 		encode_branch_cond(ctx, 0, COND_EQ);
 	}
 
-	// Mainline.  encode_div's U bit is 0=UDIV, 1=SDIV (per the ARM ARM
-	// bit-10 encoding), pass `unsign ? 0 : 1`, NOT the inverse.
+	// encode_div : 0 = UDIV, 1 = SDIV
 	if( is_div ) {
-		// SDIV/UDIV out, a, b
 		encode_div(ctx, sf, unsign ? 0 : 1, b, a, out);
 	} else {
-		// MSUB needs the ORIGINAL `a` and `b` after the divide; SDIV writes
-		// `out`, so any of {out==a, out==b} would clobber a source.  Spill
-		// the aliased operand(s) to backend temps first.  ARM_TMP3 is
-		// reserved precisely for cases like this where we need a third
-		// independent register.
+		// MSUB needs a and b after the divide has written out
 		Arm64Reg a_safe = a, b_safe = b;
 		if( out == a ) {
 			emit_mov_gpr(ctx, ARM_TMP3, a, sf);
 			a_safe = ARM_TMP3;
-			if( b == a ) b_safe = ARM_TMP3; // a==b too: same value in TMP3
+			if( b == a ) b_safe = ARM_TMP3;
 		}
 		if( out == b && b_safe == b ) {
-			// Need a different temp from a_safe (which may be ARM_TMP3 already).
 			Arm64Reg t = (a_safe == ARM_TMP1) ? ARM_TMP2 : ARM_TMP1;
 			emit_mov_gpr(ctx, t, b, sf);
 			b_safe = t;
 		}
 		encode_div(ctx, sf, unsign ? 0 : 1, b_safe, a_safe, out);
-		// MSUB out, out, b_safe, a_safe  =>  out = a_safe - out * b_safe
+		// out = a - out * b
 		encode_madd_msub(ctx, sf, 1, b_safe, a_safe, out, out);
 	}
 	int jdone_pos = byte_count(ctx->code);
 	encode_branch_uncond(ctx, 0);
 
-	// Special case path: result = 0 (mod or unsigned div) or a*b (signed div).
 	int special_pos = byte_count(ctx->code);
 	if( op == OSDiv ) {
 		// out = a * b
 		encode_madd_msub(ctx, sf, 0, b, XZR, a, out);
 	} else {
-		// out = 0
 		encode_logical_reg(ctx, sf, 0x01, 0, 0, XZR, 0, XZR, out);  // ORR out, XZR, XZR
 	}
 
 	int after = byte_count(ctx->code);
 
-	// Patch branches.
-	int delta_jz = (special_pos - jz_pos) >> 2;
-	*(unsigned int*)&ctx->code.values[jz_pos] =
-		(*(unsigned int*)&ctx->code.values[jz_pos] & ~(0x7FFFF << 5)) | ((delta_jz & 0x7FFFF) << 5);
-	if( jneg_pos >= 0 ) {
-		int delta_jn = (special_pos - jneg_pos) >> 2;
-		*(unsigned int*)&ctx->code.values[jneg_pos] =
-			(*(unsigned int*)&ctx->code.values[jneg_pos] & ~(0x7FFFF << 5)) | ((delta_jn & 0x7FFFF) << 5);
-	}
-	int delta_done = (after - jdone_pos) >> 2;
-	*(unsigned int*)&ctx->code.values[jdone_pos] =
-		(*(unsigned int*)&ctx->code.values[jdone_pos] & ~0x03FFFFFF) | (delta_done & 0x03FFFFFF);
+	patch_helper_branch(ctx, jz_pos, special_pos);
+	if( jneg_pos >= 0 ) patch_helper_branch(ctx, jneg_pos, special_pos);
+	patch_helper_branch(ctx, jdone_pos, after);
 }
 
-// BINOP / UNOP float.
 static void emit_binop_fp( code_ctx *ctx, hl_op op, ereg out_e, ereg a_e, ereg b_e, emit_mode mode ) {
 	bool out_to_mem = (REG_KIND(out_e) != R_REG);
 	Arm64FpReg out = out_to_mem ? (Arm64FpReg)31 : fpr_id(out_e);
-	// Use V29/V30 as scratch FP regs (in our scratch list, won't collide with `out`=V31).
 	Arm64FpReg a = materialize_fpr(ctx, a_e, mode, (Arm64FpReg)29);
 	Arm64FpReg b = materialize_fpr(ctx, b_e, mode, (Arm64FpReg)30);
 	int type = (mode == M_F64) ? 1 : 0;
@@ -910,11 +814,11 @@ static void emit_unop( code_ctx *ctx, hl_op op, ereg out_e, ereg a_e, emit_mode 
 	Arm64Reg a = materialize_gpr(ctx, a_e, mode, ARM_TMP1);
 	switch( op ) {
 	case ONeg:
-		// SUB out, XZR, a  (NEG alias)
+		// NEG
 		encode_add_sub_reg(ctx, sf, 1, 0, 0, a, 0, XZR, out);
 		break;
 	case ONot:
-		// EOR out, a, #1  (boolean toggle).  N must equal sf for value 1.
+		// EOR out, a, #1 (N must equal sf)
 		encode_logical_imm(ctx, sf, 0x02, sf, 0, 0, a, out);
 		break;
 	case OIncr:
@@ -934,14 +838,13 @@ static void emit_unop( code_ctx *ctx, hl_op op, ereg out_e, ereg a_e, emit_mode 
 	if( REG_KIND(out_e) != R_REG ) emit_mov(ctx, out_e, R(ARM_TMP1), mode);
 }
 
-// CONV / CONV_UNSIGNED.  e->mode = output mode, e->size_offs = input mode.
+// e->size_offs is the input mode
 static void emit_conv( code_ctx *ctx, einstr *e, ereg out_e, bool unsign ) {
 	emit_mode out_mode = e->mode;
 	emit_mode in_mode = (emit_mode)e->size_offs;
 	bool out_fp = is_fp_mode(out_mode);
 	bool in_fp = is_fp_mode(in_mode);
 
-	// Materialize source.
 	Arm64Reg a_gpr = 0;
 	Arm64FpReg a_fpr = (Arm64FpReg)0;
 	if( in_fp ) {
@@ -950,38 +853,31 @@ static void emit_conv( code_ctx *ctx, einstr *e, ereg out_e, bool unsign ) {
 		a_gpr = materialize_gpr(ctx, e->a, in_mode, ARM_TMP1);
 	}
 
-	// Pick output register encoding.  When the result lives in memory we route
-	// the value through a backend-private temporary in the appropriate class.
 	bool out_to_mem = REG_KIND(out_e) != R_REG;
 	Arm64Reg dst_gpr = (!out_fp && !out_to_mem) ? gpr_id(out_e)
 	                  : (!out_fp ? ARM_TMP2 : 0);
-	// V31 is in our scratch list and serves as an FP temp; we still need to
-	// emit a follow-up STR if the output is memory.
 	Arm64FpReg dst_fpr = (out_fp && !out_to_mem) ? fpr_id(out_e)
 	                    : (out_fp ? (Arm64FpReg)31 : (Arm64FpReg)0);
 
 	if( in_fp && out_fp ) {
-		// FCVT between F32/F64
-		int type = (in_mode == M_F64) ? 1 : 0;       // input type
+		// FCVT
+		int type = (in_mode == M_F64) ? 1 : 0;
 		int opcode = (in_mode == M_F32) ? 0x05 : 0x04; // F32->F64 = 0x05, F64->F32 = 0x04
 		encode_fp_1src(ctx, 0, 0, type, opcode, a_fpr, dst_fpr);
 	} else if( in_fp && !out_fp ) {
-		// FP -> int.  FCVTZS / FCVTZU (round toward zero).
+		// FCVTZS / FCVTZU
 		int sf = sf_for(out_mode);
 		int type = (in_mode == M_F64) ? 1 : 0;
 		int rmode = 3;       // round toward zero
 		int opc = unsign ? 1 : 0;  // 0=FCVTZS, 1=FCVTZU
 		encode_fcvt_int(ctx, sf, 0, type, rmode, opc, a_fpr, dst_gpr);
 	} else if( !in_fp && out_fp ) {
-		// int -> FP. SCVTF / UCVTF.
+		// SCVTF / UCVTF
 		int sf = sf_for(in_mode);
 		int type = (out_mode == M_F64) ? 1 : 0;
 		int rmode = 0;
 		int opc = unsign ? 3 : 2;  // 2=SCVTF, 3=UCVTF
-		// First, widen sub-word inputs to full width.  UI8/UI16 are
-		// unsigned regardless of the `unsign` flag (which here selects
-		// SCVTF vs UCVTF), so always zero-extend the byte/half before
-		// the FP conversion.
+		// UI8/UI16 are always unsigned, whatever the unsign flag
 		Arm64Reg src = a_gpr;
 		if( in_mode == M_UI8 || in_mode == M_UI16 ) {
 			emit_uxt_to_w(ctx, in_mode, src, ARM_TMP1);
@@ -989,13 +885,10 @@ static void emit_conv( code_ctx *ctx, einstr *e, ereg out_e, bool unsign ) {
 		}
 		encode_int_fcvt(ctx, sf, 0, type, rmode, opc, src, dst_fpr);
 	} else {
-		// int -> int.
 		switch( in_mode ) {
 		case M_UI8:
 		case M_UI16:
-			// UI8/UI16 are inherently unsigned in HL, widening to a larger
-			// integer must always zero-extend, matching x86's MOVZX.  The
-			// `unsign` flag is only meaningful for FP conversions.
+			// UI8/UI16 are always unsigned
 			if( out_mode == M_PTR || out_mode == M_I32 ) {
 				emit_uxt_to_w(ctx, in_mode, a_gpr, dst_gpr);
 			} else if( out_mode == M_UI16 || out_mode == M_UI8 ) {
@@ -1004,7 +897,7 @@ static void emit_conv( code_ctx *ctx, einstr *e, ereg out_e, bool unsign ) {
 			break;
 		case M_I32:
 			if( out_mode == M_PTR ) {
-				if( unsign ) emit_mov_gpr(ctx, dst_gpr, a_gpr, 0); // MOV Wd, Wn, zero-extends to X
+				if( unsign ) emit_mov_gpr(ctx, dst_gpr, a_gpr, 0); // MOV Wd, Wn zero-extends
 				else emit_sxt_to_ptr(ctx, M_I32, a_gpr, dst_gpr);
 			} else {
 				emit_mov_gpr(ctx, dst_gpr, a_gpr, sf_for(out_mode));
@@ -1028,8 +921,6 @@ static void emit_conv( code_ctx *ctx, einstr *e, ereg out_e, bool unsign ) {
 
 	if( out_to_mem ) {
 		if( out_fp ) {
-			// STR D31/S31, [base+offs], base might be inside a register operand
-			// of `out_e`; use emit_ld_st with the FP class.
 			Arm64Reg base = gpr_id(out_e);
 			int offs = REG_VALUE(out_e);
 			emit_ld_st(ctx, false, out_mode, dst_fpr, base, offs);
@@ -1039,15 +930,12 @@ static void emit_conv( code_ctx *ctx, einstr *e, ereg out_e, bool unsign ) {
 	}
 }
 
-// STORE / LOAD_ADDR / LEA.
 static void emit_store( code_ctx *ctx, einstr *e ) {
 	int offs = e->size_offs;
 	Arm64Reg base;
 	if( REG_KIND(e->a) == R_REG ) {
 		base = gpr_id(e->a);
-		// MK_STACK_OFFS(v) and MK_ADDR-like values encode the offset in the
-		// register's value field; combine it with size_offs.  For regular
-		// register operands REG_VALUE is 0, so this is a no-op.
+		// MK_STACK_OFFS carries its offset in REG_VALUE
 		offs += REG_VALUE(e->a);
 	} else {
 		emit_mov(ctx, R(ARM_TMP1), e->a, M_PTR);
@@ -1057,15 +945,13 @@ static void emit_store( code_ctx *ctx, einstr *e ) {
 		if( REG_KIND(e->b) == R_REG ) {
 			emit_ld_st(ctx, false, e->mode, fpr_id(e->b), base, offs);
 		} else {
-			// Route the bit pattern through a GPR.  STR writes the same bytes
-			// regardless of FP vs. INT class.
+			// store the bit pattern through a GPR
 			Arm64Reg tmp = (base == ARM_TMP1) ? ARM_TMP2 : ARM_TMP1;
 			emit_mode int_mode = (e->mode == M_F32) ? M_I32 : M_PTR;
 			if( REG_KIND(e->b) == R_CONST ) {
 				load_immediate(ctx, (int64_t)REG_VALUE(e->b), tmp, sf_for(int_mode) == 1);
 			} else if( REG_KIND(e->b) == R_REG_PTR ) {
-				// Spilled FP vreg: load via emit_ld_st_ex so the offset-temp picker
-				// can avoid clobbering `base` (parked in ARM_TMP1 when e->a was spilled).
+				// base may be in ARM_TMP1
 				emit_ld_st_ex(ctx, true, int_mode, tmp, gpr_id(e->b), REG_VALUE(e->b), base);
 			} else {
 				emit_mov(ctx, R(tmp), e->b, int_mode);
@@ -1080,14 +966,12 @@ static void emit_store( code_ctx *ctx, einstr *e ) {
 	} else {
 		Arm64Reg tmp = (base == ARM_TMP1) ? ARM_TMP2 : ARM_TMP1;
 		if( REG_KIND(e->b) == R_REG ) {
-			// MK_STACK_OFFS / LEA-rewritten ADDRESS: source encodes (reg, offs).
-			// Materialize the effective address into tmp.
+			// MK_STACK_OFFS or LEA-rewritten ADDRESS
 			emit_lea_imm(ctx, tmp, gpr_id(e->b), REG_VALUE(e->b));
 		} else if( REG_KIND(e->b) == R_CONST ) {
 			load_immediate(ctx, (int64_t)REG_VALUE(e->b), tmp, sf_for(e->mode) == 1);
 		} else if( REG_KIND(e->b) == R_REG_PTR ) {
-			// Load directly via emit_ld_st_ex so we can tell it to avoid
-			// clobbering `base` (which lives in ARM_TMP1 when e->a was spilled).
+			// base may be in ARM_TMP1
 			emit_ld_st_ex(ctx, true, e->mode, tmp, gpr_id(e->b), REG_VALUE(e->b), base);
 		} else {
 			emit_mov(ctx, R(tmp), e->b, e->mode);
@@ -1112,7 +996,6 @@ static void emit_load_addr( code_ctx *ctx, einstr *e, ereg out_e ) {
 		if( REG_KIND(out_e) == R_REG ) {
 			emit_ld_st(ctx, true, lmode, fpr_id(out_e), base, offs);
 		} else {
-			// FP load into V31 then STR to memory dst.
 			emit_ld_st(ctx, true, lmode, (Arm64FpReg)31, base, offs);
 			Arm64Reg out_base = gpr_id(out_e);
 			int out_offs = REG_VALUE(out_e);
@@ -1142,44 +1025,21 @@ static void emit_lea( code_ctx *ctx, einstr *e, ereg out_e ) {
 	}
 
 	if( mult == 0 || IS_NULL(e->b) ) {
-		// out = a + offs
-		if( offs == 0 ) {
-			emit_mov_gpr(ctx, out, a, 1);
-		} else if( offs > 0 && offs <= 0xFFF ) {
-			encode_add_sub_imm(ctx, 1, 0, 0, 0, offs, a, out);
-		} else if( offs < 0 && -offs <= 0xFFF ) {
-			encode_add_sub_imm(ctx, 1, 1, 0, 0, -offs, a, out);
-		} else {
-			load_immediate(ctx, offs, ARM_TMP2, true);
-			encode_add_sub_reg(ctx, 1, 0, 0, 0, ARM_TMP2, 0, a, out);
-		}
+		emit_lea_imm(ctx, out, a, offs);
 	} else {
 		if( mult != 1 && mult != 2 && mult != 4 && mult != 8 )
 			jit_error("aarch64 LEA: unsupported scale");
 		int shift = (mult == 1) ? 0 : (mult == 2) ? 1 : (mult == 4) ? 2 : 3;
-		// Index width matches HL semantics, array indexes are M_I32.  Materialize
-		// from a 32-bit slot so we don't read garbage from the adjacent vreg, and
-		// use the extended-register ADD with UXTW so only the lower 32 bits feed
-		// the address calculation.
+		// the index is 32-bit: only its low 32 bits may feed the address
 		Arm64Reg b = materialize_gpr_ex(ctx, e->b, M_I32, ARM_TMP2, a);
 		// out = a + UXTW(b) << shift
 		encode_add_sub_ext(ctx, /*sf=*/1, /*op=*/0, /*S=*/0, b, /*option=UXTW*/2, shift, a, out);
-		if( offs != 0 ) {
-			if( offs > 0 && offs <= 0xFFF ) {
-				encode_add_sub_imm(ctx, 1, 0, 0, 0, offs, out, out);
-			} else if( offs < 0 && -offs <= 0xFFF ) {
-				encode_add_sub_imm(ctx, 1, 1, 0, 0, -offs, out, out);
-			} else {
-				load_immediate(ctx, offs, ARM_TMP2, true);
-				encode_add_sub_reg(ctx, 1, 0, 0, 0, ARM_TMP2, 0, out, out);
-			}
-		}
+		if( offs != 0 ) emit_lea_imm(ctx, out, out, offs);
 	}
 
 	if( REG_KIND(out_e) != R_REG ) emit_mov(ctx, out_e, R(ARM_TMP1), M_PTR);
 }
 
-// CMOV / XCHG / PUSH_CONST / PREFETCH.
 static void emit_cmov_arm( code_ctx *ctx, ereg out_e, ereg a_e, emit_mode mode, ArmCondition cond ) {
 	if( REG_KIND(out_e) != R_REG ) jit_error("aarch64 CMOV non-reg out");
 	if( is_fp_mode(mode) ) {
@@ -1188,31 +1048,22 @@ static void emit_cmov_arm( code_ctx *ctx, ereg out_e, ereg a_e, emit_mode mode, 
 		encode_fp_cond_select(ctx, mode == M_F64, out, cond, a, out);
 		return;
 	}
-	// Materialize at the value's real width so a sub-word source (e.g. a bool)
-	// is zero-extended into the result rather than loading adjacent stack bytes.
+	// load a sub-word source (e.g. a bool) at its own width, not adjacent stack bytes
 	int sf = (hl_emit_mode_sizes[mode] == 8) ? 1 : 0;
 	Arm64Reg out = gpr_id(out_e);
 	Arm64Reg a = materialize_gpr(ctx, a_e, mode, ARM_TMP1);
-	// CSEL out, a, out, cond  (if cond: out=a; else out=out)
+	// CSEL out, a, out, cond
 	encode_cond_select(ctx, sf, 0, out, cond, 0, a, out);
 }
 
+// X17 rather than X16 : a stack slot access with a large offset uses X16
 static void emit_xchg( code_ctx *ctx, einstr *e ) {
-	if( REG_KIND(e->a) != R_REG || REG_KIND(e->b) != R_REG )
-		jit_error("aarch64 XCHG with non-reg operand");
-	if( is_fp_mode(e->mode) ) {
-		Arm64FpReg ra = fpr_id(e->a);
-		Arm64FpReg rb = fpr_id(e->b);
-		emit_mov_fpr(ctx, V29, ra, e->mode);
-		emit_mov_fpr(ctx, ra, rb, e->mode);
-		emit_mov_fpr(ctx, rb, V29, e->mode);
-		return;
-	}
-	Arm64Reg ra = gpr_id(e->a);
-	Arm64Reg rb = gpr_id(e->b);
-	emit_mov_gpr(ctx, ARM_TMP1, ra, 1);
-	emit_mov_gpr(ctx, ra, rb, 1);
-	emit_mov_gpr(ctx, rb, ARM_TMP1, 1);
+	if( REG_KIND(e->a) != R_REG && REG_KIND(e->b) != R_REG )
+		jit_error("aarch64 XCHG with two memory operands");
+	ereg tmp = is_fp_mode(e->mode) ? V(V29) : R(ARM_TMP2);
+	emit_mov(ctx, tmp, e->a, e->mode);
+	emit_mov(ctx, e->a, e->b, e->mode);
+	emit_mov(ctx, e->b, tmp, e->mode);
 }
 
 static void emit_cxchg( code_ctx *ctx, einstr *e ) {
@@ -1241,8 +1092,6 @@ static void emit_push_const( code_ctx *ctx, einstr *e ) {
 	encode_ldr_str_imm(ctx, 3, 0, 0, 0, SP_REG, ARM_TMP1);  // STR X16, [SP]
 }
 
-// Constant pool
-
 static int reserve_const_segment( code_ctx *ctx, int size, int align ) {
 	int pos = byte_count(ctx->const_table);
 	if( align ) {
@@ -1256,9 +1105,7 @@ static int reserve_const_segment( code_ctx *ctx, int size, int align ) {
 	return pos;
 }
 
-// Insert (or find) a 64-bit value in the constant table; record the current
-// emission point as an ADRP+LDR (or ADRP+ADD) pair to be patched later.
-// Returns the byte offset of the value inside ctx->const_table.
+// returns the offset of value in const_table; the ADRP at adrp_pos is patched later
 static int alloc_const( code_ctx *ctx, uint64_t value, int adrp_pos ) {
 	int pos = value_map_find(ctx->const_table_lookup, value);
 	if( pos < 0 ) {
@@ -1271,7 +1118,6 @@ static int alloc_const( code_ctx *ctx, uint64_t value, int adrp_pos ) {
 	return pos;
 }
 
-// Emit ADRP dst, page ; LDR dst, [dst, #lo12] , load constant `value` from pool.
 static void emit_const_load( code_ctx *ctx, Arm64Reg dst, uint64_t value ) {
 	int adrp_pos = byte_count(ctx->code);
 	encode_adrp(ctx, 0, 0, dst);
@@ -1279,16 +1125,7 @@ static void emit_const_load( code_ctx *ctx, Arm64Reg dst, uint64_t value ) {
 	alloc_const(ctx, value, adrp_pos);
 }
 
-// Emit ADRP dst, page ; ADD dst, dst, #lo12 , load address of pool entry `value`.
-static void emit_const_addr( code_ctx *ctx, Arm64Reg dst, uint64_t value ) {
-	int adrp_pos = byte_count(ctx->code);
-	encode_adrp(ctx, 0, 0, dst);
-	encode_add_sub_imm(ctx, 1, 0, 0, 0, 0, dst, dst);           // ADD Xd, Xd, #0
-	alloc_const(ctx, value, adrp_pos);
-}
-
-// Emit ADRP+ADD pair targeting an offset INSIDE the const table (used for
-// jump-table base addressing). The offset is recorded directly, not the value.
+// address of an offset inside the const table (jump tables)
 static void emit_pool_offset_addr( code_ctx *ctx, Arm64Reg dst, int const_offset ) {
 	int adrp_pos = byte_count(ctx->code);
 	encode_adrp(ctx, 0, 0, dst);
@@ -1297,10 +1134,6 @@ static void emit_pool_offset_addr( code_ctx *ctx, Arm64Reg dst, int const_offset
 	int_arr_add_impl(&ctx->jit->galloc, &ctx->const_refs, const_offset);
 }
 
-// Calls
-
-// CALL_FUN: emit BL with a deferred imm26 patch (resolved in flush_consts once
-// jit->mod->functions_ptrs[fid] holds the in-output offset).
 static void emit_call_fun( code_ctx *ctx, einstr *e ) {
 	int pos = byte_count(ctx->code);
 	encode_branch_link(ctx, 0); // imm26 patched in flush_consts
@@ -1309,8 +1142,6 @@ static void emit_call_fun( code_ctx *ctx, einstr *e ) {
 	int_arr_add_impl(&ctx->jit->galloc, &ctx->funs, /*kind=BL*/0);
 }
 
-// LOAD_FUN: emit ADRP + ADD with a deferred imm21+imm12 patch, produces the
-// absolute address of the JIT-compiled function in `out`.
 static void emit_load_fun( code_ctx *ctx, ereg out_e, int fid ) {
 	Arm64Reg out = (REG_KIND(out_e) == R_REG) ? gpr_id(out_e) : ARM_TMP1;
 	int pos = byte_count(ctx->code);
@@ -1322,8 +1153,7 @@ static void emit_load_fun( code_ctx *ctx, ereg out_e, int fid ) {
 	if( REG_KIND(out_e) != R_REG ) emit_mov(ctx, out_e, R(ARM_TMP1), M_PTR);
 }
 
-// CALL_PTR: indirect call via constant pool, with shortcuts for the two known
-// near-call targets (hl_null_access, hl_jit_null_field_access).
+// null access functions are called through their stubs, which are in BL range
 static void emit_call_ptr( code_ctx *ctx, einstr *e ) {
 	uint64_t target = (uint64_t)e->value;
 	int near_pos = -1;
@@ -1333,17 +1163,13 @@ static void emit_call_ptr( code_ctx *ctx, einstr *e ) {
 		near_pos = ctx->null_field_pos;
 
 	if( near_pos >= 0 ) {
-		// BL <stub>, direct PC-relative call to the trampoline emitted in
-		// hl_codegen_init.  Both source and target are within the same output
-		// buffer, so resolve the imm26 immediately.
 		int pos = ctx->jit->out_pos + byte_count(ctx->code);
 		intptr_t delta = (intptr_t)near_pos - (intptr_t)pos;
 		int imm26 = (int)(delta >> 2);
 		encode_branch_link(ctx, imm26);
 	} else if( ctx->jit->mod->debug && ctx->jit->code_funs.trampoline
 		&& e->size_offs <= TRAMPOLINE_STACK_ARGS && hl_jit_is_callback((void*)target) ) {
-		// Route debugger-visible native callbacks through the trampoline so the
-		// debugger can single-step into them.
+		// lets the debugger step into native callbacks
 		emit_const_load(ctx, ARM_TMP1, target);
 		int pos = ctx->jit->out_pos + byte_count(ctx->code);
 		intptr_t delta = (intptr_t)ctx->jit->code_funs.trampoline - (intptr_t)pos;
@@ -1353,43 +1179,37 @@ static void emit_call_ptr( code_ctx *ctx, einstr *e ) {
 		emit_const_load(ctx, ARM_TMP1, target);
 		encode_branch_reg(ctx, /*BLR*/1, ARM_TMP1);
 	}
-	// Sub-word return masking to match x86's MOVZX behavior.
+	// zero-extend sub-word return values
 	if( e->mode == M_UI8 )
 		encode_logical_imm(ctx, 0, 0x00, 0, 0, 7, X0, X0);
 	else if( e->mode == M_UI16 )
 		encode_logical_imm(ctx, 0, 0x00, 0, 0, 15, X0, X0);
 }
 
-// CALL_REG: BLR <Xn>.
 static void emit_call_reg( code_ctx *ctx, einstr *e ) {
 	Arm64Reg target = materialize_gpr(ctx, e->a, M_PTR, ARM_TMP1);
 	encode_branch_reg(ctx, /*BLR*/1, target);
 }
 
-// JUMP_TABLE: dispatch through a const_table-resident jump table whose entries
-// are absolute target addresses (filled in hl_codegen_final).  Index value lives
-// in e->a (32-bit int).  Falls through after BR, caller assumes no return.
+// table entries are absolute addresses, filled in hl_codegen_final
 static void emit_jump_table( code_ctx *ctx, einstr *e ) {
 	int n = e->nargs;
 	int start = reserve_const_segment(ctx, 8 * n, 16);
 
-	// Materialize index as a zero-extended 64-bit value.  IR convention: e->a
-	// holds an int (M_I32); MOV Wn, Wn zero-extends to X.
 	Arm64Reg idx;
 	if( REG_KIND(e->a) == R_REG ) {
 		Arm64Reg src = gpr_id(e->a);
-		// MOV W17, Wsrc, clears upper 32 bits.
+		// MOV W17, Wsrc zero-extends
 		encode_logical_reg(ctx, 0, 0x01, 0, 0, src, 0, XZR, ARM_TMP2);
 		idx = ARM_TMP2;
 	} else {
 		emit_mov(ctx, R(ARM_TMP2), e->a, M_I32);
-		// Re-zero-extend to be safe.
 		encode_logical_reg(ctx, 0, 0x01, 0, 0, ARM_TMP2, 0, XZR, ARM_TMP2);
 		idx = ARM_TMP2;
 	}
 
 	emit_pool_offset_addr(ctx, ARM_TMP1, start);
-	// LDR X16, [X16, idx, LSL #3]  size=3, V=0, opc=1, option=3 (LSL/UXTX), S=1
+	// LDR X16, [X16, idx, LSL #3]
 	encode_ldr_str_reg(ctx, 3, 0, 1, idx, /*option=*/3, /*S=*/1, ARM_TMP1, ARM_TMP1);
 	encode_branch_reg(ctx, /*BR*/0, ARM_TMP1);
 
@@ -1417,11 +1237,9 @@ static void emit_prefetch( code_ctx *ctx, einstr *e ) {
 		emit_mov(ctx, R(ARM_TMP1), e->a, M_PTR);
 		base = ARM_TMP1;
 	}
-	// PRFM: size=11, V=0, opc=10, imm12=0, Rn=base, Rt=prfop
+	// PRFM
 	encode_ldr_str_imm(ctx, 3, 0, 2, 0, base, (Arm64Reg)prfop);
 }
-
-// hl_codegen_flush
 
 void hl_codegen_flush( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
@@ -1433,10 +1251,17 @@ void hl_codegen_flush( jit_ctx *jit ) {
 	if( ctx->pos_map ) ctx->pos_map[ctx->cur_op + 1] = ctx->code.cur;
 }
 
-// hl_codegen_function, the main per-IR-op switch
-
 void hl_codegen_function( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
+	int funs_prev = int_arr_count(ctx->funs);
+	int const_refs_prev = int_arr_count(ctx->const_refs);
+	int const_addr_prev = int_arr_count(ctx->const_addr);
+	ctx->long_cond = false;
+retry:
+	ctx->const_addr.cur = const_addr_prev;
+	ctx->cond_overflow = false;
+	ctx->funs.cur = funs_prev;
+	ctx->const_refs.cur = const_refs_prev;
 	ctx->flushed = false;
 	byte_free(&ctx->code);
 	int_arr_free(&ctx->branch_fixups);
@@ -1444,25 +1269,26 @@ void hl_codegen_function( jit_ctx *jit ) {
 	free(ctx->pos_map);
 	ctx->pos_map = (int*)malloc((jit->reg_instr_count + 1) * sizeof(int));
 	ctx->pos_map[0] = 0;
-	byte_reserve(ctx->code, 64);
-	ctx->code.cur -= 64;
-
-	int const_addr_prev = int_arr_count(ctx->const_addr);
+	byte_reserve(ctx->code, MAX_OP_SIZE);
+	ctx->code.cur -= MAX_OP_SIZE;
 
 	for( int cur_pos = 0; cur_pos < jit->reg_instr_count; cur_pos++ ) {
 		einstr *e = jit->reg_instrs + cur_pos;
 		ereg out = jit->reg_writes[cur_pos];
-		byte_reserve(ctx->code, 64);
-		ctx->code.cur -= 64;
+		byte_reserve(ctx->code, MAX_OP_SIZE);
+		ctx->code.cur -= MAX_OP_SIZE;
 		ctx->cur_op = cur_pos;
 		if( cur_pos > 0 ) ctx->pos_map[cur_pos] = ctx->code.cur;
 
 		switch( e->op ) {
 		case LOAD_ARG:
-			// nop, argument lives in its allocated register already
-			continue;
+			if( (e->mode == M_UI8 || e->mode == M_UI16) && REG_KIND(out) == R_REG )
+				emit_zero_extend(ctx, gpr_id(out), gpr_id(out), e->mode);
+			else
+				continue;
+			break;
 		case NOP:
-			// HINT #0  (NOP)
+			// NOP
 			EMIT32(ctx, 0xD503201F);
 			break;
 		case MOV:
@@ -1472,7 +1298,6 @@ void hl_codegen_function( jit_ctx *jit ) {
 			emit_load_const(ctx, out, e->value, e->mode);
 			break;
 		case RET:
-			// The regs phase already placed the result in the return register.
 			encode_branch_reg(ctx, /*opc=*/2 /*RET*/, LR);
 			break;
 		case PUSH:
@@ -1497,7 +1322,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			emit_jump(ctx, e->size_offs);
 			break;
 		case DEBUG_BREAK:
-			// BRK #0 , encoded as 0xD4200000
+			// BRK #0
 			EMIT32(ctx, 0xD4200000);
 			break;
 		case BINOP:
@@ -1507,10 +1332,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 				emit_binop_int(ctx, (hl_op)e->size_offs, out, e->a, e->b, e->mode);
 			break;
 		case UNOP:
-			// jit_emit.c lowers `not b` and similar boolean toggles as a UNOP
-			// with two operands (a, b=immediate, op=OXor).  Dispatch the
-			// two-operand form through the regular binop handler so OXor/OAnd/OOr
-			// don't need a second copy of the encoding.
+			// boolean not is emitted as a two-operand UNOP (OXor with a constant)
 			if( !IS_NULL(e->b) ) {
 				if( is_fp_mode(e->mode) )
 					emit_binop_fp(ctx, (hl_op)e->size_offs, out, e->a, e->b, e->mode);
@@ -1549,10 +1371,6 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case PUSH_ADDR:
 			{
-				// PUSH_ADDR pushes the address of an in-function label (used by
-				// the null-access path so the exception can report the access
-				// site). Materialize ADRP+ADD to the label and push it; the
-				// address is patched after pos_map is finalized.
 				int target_op = ctx->cur_op + 1 + e->size_offs;
 				int adrp_pos = byte_count(ctx->code);
 				encode_adrp(ctx, 0, 0, ARM_TMP1);
@@ -1583,36 +1401,17 @@ void hl_codegen_function( jit_ctx *jit ) {
 			jit_error("aarch64: ADDRESS reached backend (regs phase should rewrite)");
 			break;
 		case CATCH:
-			// IR marker only (mirrors x86), no code emitted.
 			break;
 		default:
-			{
-				static const char *op_names[] = {
-					"LOAD_ADDR", "LOAD_CONST", "LOAD_ARG", "LOAD_FUN", "STORE",
-					"LEA", "TEST", "CMP", "JCOND", "JUMP", "JUMP_TABLE",
-					"BINOP", "UNOP", "CONV", "CONV_UNSIGNED", "RET",
-					"CALL_PTR", "CALL_REG", "CALL_FUN", "MOV", "CMOV",
-					"XCHG", "CXCHG", "PUSH_CONST", "PUSH_ADDR", "PUSH", "POP",
-					"ALLOC_STACK", "PREFETCH", "DEBUG_BREAK", "BLOCK",
-					"ENTER", "STACK_OFFS", "CATCH", "ADDRESS", "NOP"
-				};
-				static char errbuf[128];
-				const char *name = (e->op < (int)(sizeof(op_names)/sizeof(*op_names)))
-					? op_names[e->op] : "?";
-				snprintf(errbuf, sizeof(errbuf), "aarch64: unhandled IR op %s (%d) at cur_op=%d",
-					name, e->op, cur_pos);
-				jit_error(errbuf);
-			}
+			jit_assert();
 			break;
 		}
 
 		if( ctx->code.cur > ctx->code.max ) jit_error("aarch64 code buffer overrun");
 	}
 
-	// AArch64 instructions keep functions 4-byte aligned.
 	hl_codegen_flush(jit);
 
-	// Patch all in-function branches.
 	for( int i = 0; i < int_arr_count(ctx->branch_fixups); i += 3 ) {
 		int pos = int_arr_get(ctx->branch_fixups, i);
 		int target_op = int_arr_get(ctx->branch_fixups, i + 1);
@@ -1620,29 +1419,23 @@ void hl_codegen_function( jit_ctx *jit ) {
 		int target_byte_pos = ctx->pos_map[target_op];
 		patch_branch(ctx, pos, target_byte_pos, is_cond);
 	}
+	if( ctx->cond_overflow ) {
+		if( ctx->long_cond ) jit_error("aarch64 branch out of range");
+		ctx->long_cond = true;
+		goto retry;
+	}
 
-	// Patch PUSH_ADDR labels: ADRP+ADD pair targeting an in-function offset.
-	// ADRP immediate arithmetic is page-granular, so it must use the function's
-	// output-relative offsets (where the page-aligned mmap base makes the page
-	// difference equal the offset page difference).  Function-local offsets are
-	// not sufficient unless jit->out_pos happens to be page-aligned.
+	// PUSH_ADDR labels. ADRP is page-relative so this must use output offsets, not function offsets
 	for( int i = 0; i < int_arr_count(ctx->addr_fixups); i += 2 ) {
 		int adrp_pos = int_arr_get(ctx->addr_fixups, i);
 		int target_op = int_arr_get(ctx->addr_fixups, i + 1);
 		int target_off = ctx->pos_map[target_op];
-		int pc_out = jit->out_pos + adrp_pos;
 		int tgt_out = jit->out_pos + target_off;
-		unsigned int *insn = (unsigned int*)(ctx->code.values + adrp_pos);
-		int imm21 = (tgt_out >> 12) - (pc_out >> 12);
-		unsigned int immlo = (unsigned)imm21 & 0x3;
-		unsigned int immhi = ((unsigned)imm21 >> 2) & 0x7FFFF;
-		*insn = (*insn & ~((0x3u << 29) | (0x7FFFFu << 5)))
-		      | (immlo << 29) | (immhi << 5);
+		patch_adrp_imm21(ctx->code.values + adrp_pos, jit->out_pos + adrp_pos, tgt_out);
 		patch_imm12(ctx->code.values, adrp_pos + 4, tgt_out & 0xFFF, /*scale=*/1);
 	}
 
-	// Convert any jump-table target_op_index entries recorded by emit_jump_table
-	// into absolute byte offsets in the output buffer.
+	// jump table entries : op index to output offset
 	for( int i = const_addr_prev; i < int_arr_count(ctx->const_addr); i += 2 ) {
 		int target_op = int_arr_get(ctx->const_addr, i + 1);
 		int offs = jit->out_pos + ctx->pos_map[target_op];
@@ -1650,11 +1443,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 	}
 }
 
-// Module emission
-
-// Helper: finalize a freshly-emitted helper stub (null-access stubs, c2hl,
-// hl2c).  Mirrors x86's flush_function: reports the start/size to the unwind
-// machinery and rounds the function buffer to 16 bytes.
+// same as flush_function in jit_x86_64.c
 static void flush_helper( code_ctx *ctx, int start ) {
 	hl_jit_define_function(ctx->jit, start, ctx->jit->out_pos + byte_count(ctx->code) - start);
 	while( byte_count(ctx->code) & 15 )
@@ -1662,178 +1451,110 @@ static void flush_helper( code_ctx *ctx, int start ) {
 	if( byte_count(ctx->code) > ctx->code.max ) jit_error("aarch64 trampoline overrun");
 }
 
-// Patch a branch at byte position `pos` to target byte position `target` in the
-// same buffer.  Selects imm26 for unconditional and imm19 for conditional based
-// on the opcode bits.
 static void patch_helper_branch( code_ctx *ctx, int pos, int target ) {
 	int delta = (target - pos) >> 2;
 	unsigned int *insn = (unsigned int*)&ctx->code.values[pos];
 	unsigned int op = (*insn >> 26) & 0x3F;
 	if( op == 0x05 || op == 0x25 ) {
-		// B / BL: imm26
+		// B / BL
 		*insn = (*insn & ~0x03FFFFFFu) | ((unsigned)delta & 0x03FFFFFF);
 	} else {
-		// B.cond: imm19 in bits [23:5]
+		// B.cond
 		*insn = (*insn & ~(0x7FFFFu << 5)) | ((unsigned)(delta & 0x7FFFF) << 5);
 	}
 }
 
-// Emit a function prologue compatible with the Apple ARM64 + AAPCS64 ABI:
-// STP X29, X30, [SP, #-16]! ; MOV X29, SP.
+// STP X29, X30, [SP, #-16]! ; MOV X29, SP
 static void emit_helper_prologue( code_ctx *ctx ) {
 	encode_ldp_stp(ctx, /*opc=*/2, /*V=*/0, /*mode=*/0x03, /*imm7=*/-2 & 0x7F, LR, SP_REG, FP);
 	emit_mov_gpr(ctx, FP, SP_REG, 1);
 }
 
-// Emit the standard epilogue used by all helpers/trampolines:
-// MOV SP, X29 ; LDP X29, X30, [SP], #16 ; RET.
+// MOV SP, X29 ; LDP X29, X30, [SP], #16 ; RET
 static void emit_helper_epilogue( code_ctx *ctx ) {
 	emit_mov_gpr(ctx, SP_REG, FP, 1);
 	encode_ldp_stp(ctx, /*opc=*/2, /*V=*/0, /*mode=*/0x01, /*imm7=*/2, LR, SP_REG, FP);
 	encode_branch_reg(ctx, /*RET*/2, LR);
 }
 
-// Emit hl_null_access stub: ADRP/LDR the C function pointer and BLR (it never
-// returns; we still emit a BRK afterward to mirror x86).
-static void emit_null_access_stub( code_ctx *ctx, void *target ) {
+// field : the field hash is pushed before the call site (PUSH_CONST, PUSH_ADDR)
+static void emit_null_stub( code_ctx *ctx, void *target, bool field ) {
 	emit_helper_prologue(ctx);
+	if( field ) encode_ldr_str_imm(ctx, 2, 0, 1, 32 / 4, FP, X0); // LDR W0, [FP, #32]
 	emit_const_load(ctx, ARM_TMP1, (uint64_t)(uintptr_t)target);
 	encode_branch_reg(ctx, /*BLR*/1, ARM_TMP1);
 	EMIT32(ctx, 0xD4200000); // BRK #0
 }
 
-// Emit hl_jit_null_field_access stub.  The caller passes the field hash in W0.
-// The C function takes one int argument (the hash), so our trampoline doesn't
-// need to marshal, just forward.
-static void emit_null_field_stub( code_ctx *ctx, void *target ) {
-	emit_helper_prologue(ctx);
-	emit_const_load(ctx, ARM_TMP1, (uint64_t)(uintptr_t)target);
-	encode_branch_reg(ctx, /*BLR*/1, ARM_TMP1);
-	EMIT32(ctx, 0xD4200000); // BRK #0
-}
-
-// Emit the c2hl trampoline.
-//
-// Called from C with: X0 = JIT-compiled fn ptr, X1 = &vargs (struct{regs[16];
-// stack[16]}), X2 = stack-arg count.
-//
-// The C side (jit.c:callback_c2hl) populates vargs.regs[0..7] with int reg
-// args, vargs.regs[8..15] with FP reg args, and vargs.stack[16-N..15] with the
-// N stack args (leftmost stack arg at vargs.stack[15]).  We:
-//   1. Load X0..X7 from [vargs+0..56] and D0..D7 from [vargs+64..120].
-//   2. Push the stack args in reverse order so the leftmost ends up at SP+0.
-//   3. BLR fn ; restore frame ; RET.
-//
-// X16/X17 hold the fn pointer and vargs through the call (they survive any
-// data-load up to BLR; the dynamic linker only clobbers them at the BLR itself,
-// at which point we're done with them).
+// X0 = function, X1 = vargs (see callback_c2hl), X2 = stack args count
 static void emit_c2hl_trampoline( code_ctx *ctx ) {
 	emit_helper_prologue(ctx);
 	emit_mov_gpr(ctx, ARM_TMP1, X0, 1);  // X16 = fn
 	emit_mov_gpr(ctx, ARM_TMP2, X1, 1);  // X17 = vargs
 	emit_mov_gpr(ctx, X9, X2, 1);        // X9  = stack count
 
-	// Load int arg regs from vargs.regs[0..7].
 	encode_ldp_stp(ctx, 0x02, 0, 0x02, 0, X1, ARM_TMP2, X0); // LDP X0,X1, [X17, #0]
 	encode_ldp_stp(ctx, 0x02, 0, 0x02, 2, X3, ARM_TMP2, X2); // LDP X2,X3, [X17, #16]
 	encode_ldp_stp(ctx, 0x02, 0, 0x02, 4, X5, ARM_TMP2, X4); // LDP X4,X5, [X17, #32]
 	encode_ldp_stp(ctx, 0x02, 0, 0x02, 6, X7, ARM_TMP2, X6); // LDP X6,X7, [X17, #48]
-	// Load FP arg regs from vargs.regs[8..15] (= byte offsets 64..120).
 	encode_ldp_stp(ctx, 0x01, 1, 0x02, 8,  (Arm64Reg)1, ARM_TMP2, (Arm64Reg)0);  // LDP D0,D1, [X17, #64]
 	encode_ldp_stp(ctx, 0x01, 1, 0x02, 10, (Arm64Reg)3, ARM_TMP2, (Arm64Reg)2);  // LDP D2,D3, [X17, #80]
 	encode_ldp_stp(ctx, 0x01, 1, 0x02, 12, (Arm64Reg)5, ARM_TMP2, (Arm64Reg)4);  // LDP D4,D5, [X17, #96]
 	encode_ldp_stp(ctx, 0x01, 1, 0x02, 14, (Arm64Reg)7, ARM_TMP2, (Arm64Reg)6);  // LDP D6,D7, [X17, #112]
 
-	// Push stack args.  callback_c2hl in src/jit.c writes the i-th stack-passed
-	// arg to vargs.stack[--sp] starting at sp = MAX_ARGS = 16.  So:
-	//   stack[15]   = first/leftmost stack arg   (at vargs + 248)
-	//   stack[14]   = second
-	//   ...
-	//   stack[16-N] = last/rightmost stack arg
-	// AAPCS64 requires [SP+0] = leftmost stack arg.  We walk SOURCE DOWN from
-	// &stack[15] while DEST walks UP from SP, N iterations total.  SP is
-	// pre-allocated rounded up to a multiple of 16 (= N*8 + (N&1)*8 bytes).
-
-	// CBZ X9, no_stack, skip everything if no stack args.
+	// copy vargs.stack[0..X9] to 16-byte stack slots, matching min_stack_args_size
 	int cbz_skip_pos = byte_count(ctx->code);
 	encode_cbz_cbnz(ctx, /*sf=*/1, /*op=*/0, 0, X9);
 
-	// X10 = X9 * 8 (size in bytes; LSL #3 via UBFM).
-	emit_bitfield(ctx, /*sf=*/1, /*opc=UBFM*/0x02, /*immr=*/(64 - 3) & 0x3F, /*imms=*/63 - 3, X9, X10);
+	// X10 = X9 << 4
+	emit_bitfield(ctx, /*sf=*/1, /*opc=UBFM*/0x02, /*immr=*/(64 - 4) & 0x3F, /*imms=*/63 - 4, X9, X10);
 
-	// Pad: if X9 is odd, allocate +8 so SP stays 16-aligned.
-	// AND X11, X9, #1 ; LSL X11, X11, #3 ; ADD X10, X10, X11.
-	encode_logical_imm(ctx, 1, 0x00, 1, 0, 0, X9, X11);  // AND X11, X9, #1 (immr=0,imms=0,N=1 → 1)
-	emit_bitfield(ctx, 1, 0x02, (64 - 3) & 0x3F, 63 - 3, X11, X11);
-	encode_add_sub_reg(ctx, 1, 0, 0, 0, X11, 0, X10, X10);
-
-	// SUB SP, SP, X10 , must use ADD/SUB (extended register); the shifted-reg
-	// form treats register 31 as XZR, not SP, so this would silently NOP out.
+	// SUB SP, SP, X10 (extended-register form, see emit_sp_offs)
 	encode_add_sub_ext(ctx, 1, 1, 0, X10, /*UXTX*/3, 0, SP_REG, SP_REG);
 
-	// X12 = &vargs.stack[15] = vargs + 128 + 15*8 = vargs + 248
-	// (the slot holding the LEFTMOST stack arg; source walks DOWN from here).
-	encode_add_sub_imm(ctx, 1, 0, 0, 0, 248, ARM_TMP2, X12);            // ADD X12, X17, #248
-
-	// Destination pointer X13 = SP ([SP+0] = leftmost per AAPCS64).
+	encode_add_sub_imm(ctx, 1, 0, 0, 0, MAX_ARGS * HL_WSIZE, ARM_TMP2, X12);  // X12 = &vargs.stack[0]
 	emit_mov_gpr(ctx, X13, SP_REG, 1);
-
-	// Counter X14 = X9.
 	emit_mov_gpr(ctx, X14, X9, 1);
 
-	// Copy loop: walk SOURCE down, DEST up, X14 times.
-	//   *X13 = *X12 ; X12 -= 8 ; X13 += 8 ; X14--.
 	int loop_top = byte_count(ctx->code);
 	encode_ldr_str_imm(ctx, 3, 0, 1, 0, X12, X15);                      // LDR X15, [X12, #0]
 	encode_ldr_str_imm(ctx, 3, 0, 0, 0, X13, X15);                      // STR X15, [X13, #0]
-	encode_add_sub_imm(ctx, 1, 1, 0, 0, 8, X12, X12);                   // SUB X12, X12, #8
-	encode_add_sub_imm(ctx, 1, 0, 0, 0, 8, X13, X13);                   // ADD X13, X13, #8
+	encode_add_sub_imm(ctx, 1, 0, 0, 0, 8, X12, X12);                   // ADD X12, X12, #8
+	encode_add_sub_imm(ctx, 1, 0, 0, 0, 16, X13, X13);                  // ADD X13, X13, #16
 	encode_add_sub_imm(ctx, 1, 1, 1, 0, 1, X14, X14);                   // SUBS X14, X14, #1
 	int loop_branch_pos = byte_count(ctx->code);
 	encode_branch_cond(ctx, 0, COND_NE);                                 // B.NE loop_top
 	patch_helper_branch(ctx, loop_branch_pos, loop_top);
 
-	// Patch the CBZ skip target = end of stack-push block.
 	int after_stack = byte_count(ctx->code);
 	patch_helper_branch(ctx, cbz_skip_pos, after_stack);
-	// --- END STACK PUSH ---
 
-	// BLR fn (X16).
 	encode_branch_reg(ctx, /*BLR*/1, ARM_TMP1);
 
 	emit_helper_epilogue(ctx);
 }
 
-// Emit the hl2c trampoline.  Called from JIT-compiled HL code; X0 holds the
-// closure (vclosure_wrapper*), X1..X7,V0..V7 hold call args.  We:
-//   1. Spill X0..X7 and V0..V7 into a 128-byte buffer beneath the saved frame.
-//   2. Inspect cl->t->fun->ret->kind to decide between hl_jit_wrapper_ptr
-//      (default) and hl_jit_wrapper_d (HF32/HF64 return).
-//   3. Call wrapper(closure, &caller_stack_args, &spilled_regs).
+// X0 = closure. calls hl_jit_wrapper_ptr, or hl_jit_wrapper_d for a float return,
+// with (closure, caller stack args, spilled arg registers)
 static void emit_hl2c_trampoline( code_ctx *ctx ) {
 	hl_type_fun *ft = NULL;
 
 	emit_helper_prologue(ctx);
-	emit_sp_offs(ctx, -128); // SUB SP, SP, #128
+	emit_sp_offs(ctx, -128);
 
-	// Spill X0..X7 → [SP+0..56].  mode 0x12 = signed-offset STORE.
 	encode_ldp_stp(ctx, 0x02, 0, 0x12, 0, X1, SP_REG, X0); // STP X0,X1, [SP, #0]
 	encode_ldp_stp(ctx, 0x02, 0, 0x12, 2, X3, SP_REG, X2); // STP X2,X3, [SP, #16]
 	encode_ldp_stp(ctx, 0x02, 0, 0x12, 4, X5, SP_REG, X4); // STP X4,X5, [SP, #32]
 	encode_ldp_stp(ctx, 0x02, 0, 0x12, 6, X7, SP_REG, X6); // STP X6,X7, [SP, #48]
-	// Spill V0..V7 → [SP+64..120] (V0 at lowest, matching wrapper expectations).
 	encode_ldp_stp(ctx, 0x01, 1, 0x12, 8,  (Arm64Reg)1, SP_REG, (Arm64Reg)0); // STP D0,D1, [SP, #64]
 	encode_ldp_stp(ctx, 0x01, 1, 0x12, 10, (Arm64Reg)3, SP_REG, (Arm64Reg)2); // STP D2,D3, [SP, #80]
 	encode_ldp_stp(ctx, 0x01, 1, 0x12, 12, (Arm64Reg)5, SP_REG, (Arm64Reg)4); // STP D4,D5, [SP, #96]
 	encode_ldp_stp(ctx, 0x01, 1, 0x12, 14, (Arm64Reg)7, SP_REG, (Arm64Reg)6); // STP D6,D7, [SP, #112]
 
-	// X9 = closure (still in X0, copy to keep X0 alive across loads).
+	// W9 = cl->t->fun->ret->kind
 	emit_mov_gpr(ctx, X9, X0, 1);
-	// X9 = X9->t            ; LDR X9, [X9, #0]
 	encode_ldr_str_imm(ctx, 3, 0, 1, 0, X9, X9);
-	// X9 = X9->fun          ; LDR X9, [X9, #8]
 	encode_ldr_str_imm(ctx, 3, 0, 1, 1, X9, X9);
-	// X9 = X9->ret          ; LDR X9, [X9, #offsetof(hl_type_fun, ret)]
 	int ret_offset = (int)(int_val)&ft->ret;
 	if( (ret_offset & 7) == 0 && (unsigned)ret_offset < 0x8000 )
 		encode_ldr_str_imm(ctx, 3, 0, 1, ret_offset / 8, X9, X9);
@@ -1841,10 +1562,8 @@ static void emit_hl2c_trampoline( code_ctx *ctx ) {
 		load_immediate(ctx, ret_offset, X10, true);
 		encode_ldr_str_reg(ctx, 3, 0, 1, X10, /*option=*/3, /*S=*/0, X9, X9);
 	}
-	// W9 = W9->kind         ; LDR W9, [X9, #0]
 	encode_ldr_str_imm(ctx, 2, 0, 1, 0, X9, X9);
 
-	// Branch on return-type kind.  HF64 / HF32 → wrapper_d; default → wrapper_ptr.
 	encode_add_sub_imm(ctx, 0, 1, 1, 0, HF64, X9, XZR);   // CMP W9, #HF64
 	int jeq_f64 = byte_count(ctx->code);
 	encode_branch_cond(ctx, 0, COND_EQ);
@@ -1852,12 +1571,10 @@ static void emit_hl2c_trampoline( code_ctx *ctx ) {
 	int jeq_f32 = byte_count(ctx->code);
 	encode_branch_cond(ctx, 0, COND_EQ);
 
-	// Default path: load wrapper_ptr.
 	emit_const_load(ctx, ARM_TMP1, (uint64_t)(uintptr_t)hl_jit_wrapper_ptr);
 	int jdone_default = byte_count(ctx->code);
 	encode_branch_uncond(ctx, 0);
 
-	// Float path.
 	int float_path = byte_count(ctx->code);
 	patch_helper_branch(ctx, jeq_f64, float_path);
 	patch_helper_branch(ctx, jeq_f32, float_path);
@@ -1866,33 +1583,20 @@ static void emit_hl2c_trampoline( code_ctx *ctx ) {
 	int after_select = byte_count(ctx->code);
 	patch_helper_branch(ctx, jdone_default, after_select);
 
-	// Set up wrapper args:
-	// X0 (closure) , already in X0 across the type-walk because the LDR chain
-	//                 above used X9 only.  ✓
-	// X1 = caller stack args = X29 + 16 (skip saved fp+lr).
+	// X1 = caller stack args, above the saved FP/LR
 	encode_add_sub_imm(ctx, 1, 0, 0, 0, 16, FP, X1);
-	// X2 = &spilled regs = SP.
 	emit_mov_gpr(ctx, X2, SP_REG, 1);
-
-	// Call wrapper.
 	encode_branch_reg(ctx, /*BLR*/1, ARM_TMP1);
 
 	emit_helper_epilogue(ctx);
 }
 
-// Debug callback trampoline
-
-// Emitted only when the module is compiled for the debugger.  JIT code routes
-// calls to natives tagged as HL callbacks (see hl_jit_is_callback) through this
-// stub so the debugger can single-step into the callback.  Entered with X16
-// holding the native function pointer and the native arguments already in
-// X0-X7/V0-V7 plus the stack area at [SP].  The stub copies the stack args
-// below its own frame, calls the native, and sets `hl_jit_trampoline` to the
-// return point so the debugger can re-arm its breakpoint there.
+// debug mode : native callbacks go through here so the debugger can step into them
+// X16 = native, stack args are copied below our frame, hl_jit_trampoline marks the return point
 static void emit_debug_trampoline( code_ctx *ctx ) {
-	emit_helper_prologue(ctx);              // STP x29,x30,[sp,#-16]! ; FP = SP
+	emit_helper_prologue(ctx);
 	emit_sp_offs(ctx, -TRAMPOLINE_STACK_ARGS);
-	// X10 = source args (entry SP == FP+16), X11 = destination (current SP).
+	// X10 = caller stack args, X11 = SP
 	encode_add_sub_imm(ctx, 1, 0, 0, 0, 16, FP, X10);
 	emit_mov_gpr(ctx, X11, SP_REG, 1);
 	for( int off = 0; off < TRAMPOLINE_STACK_ARGS; off += 16 ) {
@@ -1909,17 +1613,14 @@ void hl_codegen_init( jit_ctx *jit ) {
 	byte_reserve(ctx->code, 4096);
 	ctx->code.cur -= 4096;
 
-	// hl_null_access stub.
 	ctx->null_access_pos = jit->out_pos + byte_count(ctx->code);
-	emit_null_access_stub(ctx, (void*)hl_null_access);
+	emit_null_stub(ctx, (void*)hl_null_access, false);
 	flush_helper(ctx, ctx->null_access_pos);
 
-	// hl_jit_null_field_access stub.
 	ctx->null_field_pos = jit->out_pos + byte_count(ctx->code);
-	emit_null_field_stub(ctx, (void*)hl_jit_null_field_access);
+	emit_null_stub(ctx, (void*)hl_jit_null_field_access, true);
 	flush_helper(ctx, ctx->null_field_pos);
 
-	// c2hl + hl2c trampolines.
 	jit->code_funs.c2hl = jit->out_pos + byte_count(ctx->code);
 	emit_c2hl_trampoline(ctx);
 	flush_helper(ctx, jit->code_funs.c2hl);
@@ -1937,25 +1638,17 @@ void hl_codegen_init( jit_ctx *jit ) {
 	hl_codegen_flush(jit);
 }
 
-// hl_codegen_flush_consts: patch BL/ADRP/LDR/ADD references against absolute
-// positions, then append the constant table to the output stream.
-
-// Patch ADRP imm21 split (immlo at bits 30:29, immhi at bits 23:5) given a
-// target byte address `target_abs` and the address `pc_abs` of the ADRP insn.
-// Both are absolute byte offsets within `jit->output` (page-aligned arithmetic
-// is preserved when the buffer is later mmap'd to a page-aligned VA).
-static void patch_adrp_imm21( unsigned char *out, int pc_abs, int target_abs ) {
+// immlo at [30:29], immhi at [23:5]. offsets are in jit->output, which is mapped page aligned
+static void patch_adrp_imm21( void *code, int pc_abs, int target_abs ) {
 	int imm21 = (target_abs >> 12) - (pc_abs >> 12);
-	unsigned int *insn = (unsigned int*)(out + pc_abs);
+	unsigned int *insn = (unsigned int*)code;
 	unsigned int immlo = (unsigned)(imm21 & 0x3);
 	unsigned int immhi = (unsigned)((imm21 >> 2) & 0x7FFFF);
 	*insn = (*insn & ~((0x3u << 29) | (0x7FFFFu << 5)))
 	      | (immlo << 29) | (immhi << 5);
 }
 
-// Patch ADD/LDR imm12 (bits 21:10).  `scale` is the instruction's natural
-// immediate scale (1 for ADD, 8 for 64-bit LDR, etc.).  Caller guarantees the
-// low bits of the target are aligned to `scale`.
+// imm12 at [21:10], scale is the access size (1 for ADD)
 static void patch_imm12( unsigned char *out, int pos, int target_lo12, int scale ) {
 	unsigned int *insn = (unsigned int*)(out + pos);
 	unsigned int imm12 = (unsigned)((target_lo12 / scale) & 0xFFF);
@@ -1965,16 +1658,12 @@ static void patch_imm12( unsigned char *out, int pos, int target_lo12, int scale
 void hl_codegen_flush_consts( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
 
-	// Patch cross-function call sites recorded in `funs`.
 	for( int i = 0; i < int_arr_count(ctx->funs); i += 3 ) {
 		int pos = int_arr_get(ctx->funs, i);
 		int fid = int_arr_get(ctx->funs, i + 1);
 		int kind = int_arr_get(ctx->funs, i + 2);
 		intptr_t target_offs = (intptr_t)jit->mod->functions_ptrs[fid];
 		if( kind == 0 ) {
-			// BL imm26. AArch64 BL has a ±128 MB direct-call range; if the JIT
-			// buffer ever grows beyond that, we'd silently truncate and call
-			// the wrong address. Fail fast instead.
 			intptr_t delta = target_offs - (intptr_t)pos;
 			if( delta < -(intptr_t)(1<<27) || delta >= (intptr_t)(1<<27) )
 				jit_error("aarch64 BL target out of imm26 range");
@@ -1982,42 +1671,30 @@ void hl_codegen_flush_consts( jit_ctx *jit ) {
 			unsigned int *insn = (unsigned int*)(jit->output + pos);
 			*insn = (*insn & ~0x03FFFFFFu) | ((unsigned)imm26 & 0x03FFFFFF);
 		} else {
-			// ADRP+ADD pair: pos = ADRP, pos+4 = ADD.
-			patch_adrp_imm21(jit->output, pos, (int)target_offs);
+			// ADRP + ADD
+			patch_adrp_imm21(jit->output + pos, pos, (int)target_offs);
 			int lo12 = (int)target_offs & 0xFFF;
 			patch_imm12(jit->output, pos + 4, lo12, /*scale=*/1);
 		}
 	}
 	int_arr_reset(&ctx->funs);
 
-	// Pad jit->out_pos to an 8-byte boundary so that constants at offset 0
-	// (and every multiple of 8) within the table are reachable through LDR's
-	// 8-byte-scaled imm12 field with no precision loss.
+	// LDR imm12 is scaled by 8, the table must be 8-byte aligned
 	while( jit->out_pos & 7 ) {
 		if( jit->out_pos < jit->out_max ) jit->output[jit->out_pos] = 0;
 		jit->out_pos++;
 	}
 
-	// Append the constant table to the output stream.
 	jit->code_size = byte_count(ctx->const_table);
 	jit->code_instrs = ctx->const_table.values;
 	ctx->const_table_pos = jit->out_pos;
 
-	// Patch ADRP+(LDR|ADD) const-pool refs.
 	for( int i = 0; i < int_arr_count(ctx->const_refs); i += 2 ) {
 		int adrp_pos = int_arr_get(ctx->const_refs, i);
 		int coffs = int_arr_get(ctx->const_refs, i + 1);
 		int target = ctx->const_table_pos + coffs;
-		patch_adrp_imm21(jit->output, adrp_pos, target);
-		// Detect whether the second insn is LDR (Xt|Dt|St) or ADD by inspecting
-		// the top 10 bits (31:22). LDR (unsigned-imm) encoding is
-		// `size 111 V 01 01 imm12 Rn Rt`; the 8-byte-scaled imm12 lives in
-		// bits 21:10. ADD-imm leaves the imm12 unscaled.
-		// Top10 bits (>>22) of canonical encodings:
-		//   LDR Xt (size=11,V=0,opc=01): 0b1111100101 = 0x3E5  (scale=8)
-		//   LDR Dt (size=11,V=1,opc=01): 0b1111110101 = 0x3F5  (scale=8)
-		//   LDR St (size=10,V=1,opc=01): 0b1011110101 = 0x2F5  (scale=4)
-		// ADD-imm always falls into the else.
+		patch_adrp_imm21(jit->output + adrp_pos, adrp_pos, target);
+		// the second instruction is a LDR (scaled imm12) or an ADD
 		unsigned int second = *(unsigned int*)(jit->output + adrp_pos + 4);
 		int lo12 = target & 0xFFF;
 		switch( (second >> 22) & 0x3FF ) {
@@ -2029,7 +1706,6 @@ void hl_codegen_flush_consts( jit_ctx *jit ) {
 			patch_imm12(jit->output, adrp_pos + 4, lo12, /*scale=*/4);
 			break;
 		default:
-			// ADD (imm), unscaled.
 			patch_imm12(jit->output, adrp_pos + 4, lo12, /*scale=*/1);
 			break;
 		}
@@ -2042,7 +1718,7 @@ void hl_codegen_flush_consts( jit_ctx *jit ) {
 
 void hl_codegen_final( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
-	// Fill jump-table entries with absolute addresses inside final_code.
+	// jump table entries
 	for( int i = 0; i < int_arr_count(ctx->const_addr); i += 2 ) {
 		int table_offs = int_arr_get(ctx->const_addr, i);
 		int target_offs = int_arr_get(ctx->const_addr, i + 1);
