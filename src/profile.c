@@ -54,14 +54,8 @@
 #define MAX_STACK_SIZE (8 << 20)
 #define MAX_STACK_COUNT 2048
 
-#if defined(_M_X64) || defined(__x86_64__)
-#	define PROFILE_ARCH_X86_64
-#	define PROFILE_STACK_WALK
-#endif
-
 HL_API double hl_sys_time( void );
-int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out, int size );
-bool hl_module_is_jit_function( void *addr );
+int hl_module_capture_stack_walk( void *pc, void *fp, void *stack_base, void *stack_top, void *copy, void **out, int size );
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr );
 
 typedef struct _thread_handle thread_handle;
@@ -145,26 +139,17 @@ static void *get_thread_stackptr( thread_handle *t, void **pc, void **fp ) {
 	CONTEXT c;
 	c.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
 	if( !GetThreadContext(t->h,&c) ) return NULL;
-#	ifdef HL_64
 	*pc = (void*)c.Rip;
 	*fp = (void*)c.Rbp;
 	return (void*)c.Rsp;
-#	else
-	*pc = (void*)c.Eip;
-	return (void*)c.Esp;
-#	endif
-#elif defined(HL_LINUX) && (defined(__x86_64__) || defined(__i386__))
-#	ifdef HL_64
+#elif defined(HL_LINUX) && defined(__x86_64__)
 	*pc = (void*)shared_context.context.uc_mcontext.gregs[REG_RIP];
 	*fp = (void*)shared_context.context.uc_mcontext.gregs[REG_RBP];
 	return (void*)shared_context.context.uc_mcontext.gregs[REG_RSP];
-#	else
-	*pc = (void*)shared_context.context.uc_mcontext.gregs[REG_EIP];
-	return (void*)shared_context.context.uc_mcontext.gregs[REG_ESP];
-#	endif
 #elif defined(HL_LINUX) && defined(__aarch64__)
 	// Linux/Android ARM64: uc_mcontext has direct regs[] / sp / pc fields.
 	*pc = (void*)shared_context.context.uc_mcontext.pc;
+	*fp = (void*)shared_context.context.uc_mcontext.regs[29];
 	return (void*)shared_context.context.uc_mcontext.sp;
 #elif defined(HL_MAC) && defined(__x86_64__)
 	struct __darwin_mcontext64 *mcontext = shared_context.context.uc_mcontext;
@@ -172,6 +157,14 @@ static void *get_thread_stackptr( thread_handle *t, void **pc, void **fp ) {
 		*pc = (void*)mcontext->__ss.__rip;
 		*fp = (void*)mcontext->__ss.__rbp;
 		return (void*)mcontext->__ss.__rsp;
+	}
+	return NULL;
+#elif defined(HL_MAC) && defined(__aarch64__)
+	struct __darwin_mcontext64 *mcontext = shared_context.context.uc_mcontext;
+	if (mcontext != NULL) {
+		*pc = (void*)mcontext->__ss.__pc;
+		*fp = (void*)mcontext->__ss.__fp;
+		return (void*)mcontext->__ss.__sp;
 	}
 	return NULL;
 #else
@@ -190,102 +183,6 @@ static void thread_data_free( thread_handle *t ) {
 	CloseHandle(t->h);
 #endif
 }
-
-#ifdef PROFILE_STACK_WALK
-
-static void **walk_at( void *p, void *stack_base, void *copy ) {
-	return copy ? (void**)((char*)copy + ((char*)p - (char*)stack_base)) : (void**)p;
-}
-
-static bool is_call_site( void *ret ) {
-#ifndef PROFILE_ARCH_X86_64
-#	error "PROFILE_STACK_WALK is defined but is_call_site() has no decoder for this architecture"
-#endif
-	unsigned char *p = (unsigned char*)ret;
-	int k;
-	if( !hl_module_is_jit_function(ret) || !hl_module_is_jit_function((char*)ret - 8) ) return false;
-	if( p[-5] == 0xE8 ) return true;
-	for(k=2;k<=7;k++) {
-		int reg = (p[-k+1] >> 3) & 7;
-		if( p[-k] == 0xFF && (reg == 2 || reg == 3) ) return true;
-	}
-	return false;
-}
-
-static int frame_chain( void **fp, void *stack_base, void *stack_top, void *copy, int max, bool *clean ) {
-	int n = 0;
-	*clean = false;
-	while( n < max ) {
-		void **rec;
-		void *ret, *next;
-		if( (void*)fp < stack_base || (void*)(fp + 2) > stack_top ) break;
-		if( ((int_val)fp) & (sizeof(void*) - 1) ) break;
-		rec = walk_at(fp,stack_base,copy);
-		next = rec[0];
-		ret = rec[1];
-		if( next <= (void*)fp || next >= stack_top ) break;
-		if( !is_call_site(ret) ) {
-			*clean = !hl_module_is_jit_function(ret);
-			break;
-		}
-		n++;
-		fp = (void**)next;
-	}
-	return n;
-}
-
-static int capture_stack_walk( void *pc, void *fp, void *stack_base, void *stack_top, void *copy, void **out, int size ) {
-	void **scan = (void**)stack_base;
-	int count = 0;
-	bool have = hl_module_is_jit_function(pc);
-	while( count < size ) {
-		void **rec;
-		void *ret, *next;
-		if( !have ) {
-			void **a = scan;
-			bool clean = false;
-			while( (void*)(a + 2) <= stack_top ) {
-				int n = frame_chain(a,stack_base,stack_top,copy,3,&clean);
-				if( n >= 2 || (n == 1 && clean) ) break;
-				a++;
-			}
-			if( (void*)(a + 2) > stack_top ) break;
-			{
-				void **b = a;
-				while( b > scan ) {
-					void *v = walk_at(b - 1,stack_base,copy)[0];
-					b--;
-					if( is_call_site(v) ) {
-						out[count++] = v;
-						break;
-					}
-				}
-				if( count == size ) break;
-			}
-			rec = walk_at(a,stack_base,copy);
-			pc = rec[1];
-			fp = rec[0];
-			scan = a + 1;
-			have = true;
-		}
-		out[count++] = pc;
-		if( fp < stack_base || (void*)((char*)fp + 2 * sizeof(void*)) > stack_top ) break;
-		rec = walk_at(fp,stack_base,copy);
-		next = rec[0];
-		ret = rec[1];
-		if( next <= fp || next >= stack_top ) break;
-		if( hl_module_is_jit_function(ret) ) {
-			pc = ret;
-			fp = next;
-		} else {
-			scan = (void**)((char*)fp + 2 * sizeof(void*));
-			have = false;
-		}
-	}
-	return count;
-}
-
-#endif
 
 static bool pause_thread( thread_handle *t, bool b ) {
 #ifdef HL_WIN
@@ -347,15 +244,9 @@ static void read_thread_data( thread_handle *t ) {
 	}
 
 #if defined(HL_LINUX) || defined(HL_MAC)
-	int count = -1;
-#	ifdef PROFILE_STACK_WALK
-	count = capture_stack_walk(pc, fp, stack, t->inf->stack_top, NULL, data.stackOut, MAX_STACK_COUNT);
-#	endif
-	if( count < 0 )
-		count = hl_module_capture_stack_range(t->inf->stack_top, stack, data.stackOut, MAX_STACK_COUNT);
+	int count = hl_module_capture_stack_walk(pc, fp, stack, t->inf->stack_top, NULL, data.stackOut, MAX_STACK_COUNT);
 	pause_thread(t, false);
 #else
-	int count = -1;
 	int size = (int)((unsigned char*)t->inf->stack_top - (unsigned char*)stack);
 	if( size < 0 ) size = 0;
 	if( size > MAX_STACK_SIZE-32 ) size = MAX_STACK_SIZE-32;
@@ -363,22 +254,13 @@ static void read_thread_data( thread_handle *t ) {
 	// it seems we rarely can't make a first read on the thread stack, let's ignore errors and wait.
 	__try {
 #endif
-		memcpy(data.tmpMemory + 2,stack,size);
+		memcpy(data.tmpMemory,stack,size);
 #if defined(HL_WIN_DESKTOP) && defined(HL_VCC)
 	} __except(EXCEPTION_EXECUTE_HANDLER) {
 	}
 #endif
 	pause_thread(t, false);
-#	ifdef PROFILE_STACK_WALK
-	count = capture_stack_walk(pc, fp, stack, (char*)stack + size,
-		data.tmpMemory + 2, data.stackOut, MAX_STACK_COUNT);
-#	endif
-	if( count < 0 ) {
-		data.tmpMemory[0] = pc;
-		data.tmpMemory[1] = stack;
-		size += sizeof(void*) * 2;
-		count = hl_module_capture_stack_range((char*)data.tmpMemory+size, (void**)data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
-	}
+	int count = hl_module_capture_stack_walk(pc, fp, stack, (char*)stack + size, data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
 #endif
 	int eventId = count | 0x80000000;
 	double time = hl_sys_time();

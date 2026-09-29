@@ -35,6 +35,10 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 
 #define HOT_RELOAD_EXTRA_GLOBALS	4096
 
+#ifdef __GNUC__
+#	define STACK_WALK_C_FRAMES
+#endif
+
 HL_API void hl_prim_not_loaded( const uchar *err );
 
 static hl_module **cur_modules = NULL;
@@ -133,80 +137,120 @@ static uchar *module_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 	return hl_module_resolve_symbol_full(addr,out,outSize,NULL);
 }
 
-int hl_module_capture_stack_range( void *stack_top, void **stack_ptr, void **out, int size ) {
-#if defined(HL_64) && defined(HL_WIN)
-#else
-	void *stack_bottom = stack_ptr;
-#endif
-	int count = 0;
-	if( modules_count == 1 ) {
-		hl_module *m = cur_modules[0];
+static bool module_is_jit_code( void *addr, bool functions_only ) {
+	for(int i=0;i<modules_count;i++) {
+		hl_module *m = cur_modules[i];
 		unsigned char *code = m->jit_code;
 		int code_size = m->codesize;
-		if( m->jit_debug ) {
+		if( functions_only && m->jit_debug ) {
 			int s = m->jit_debug[0].start;
 			code += s;
 			code_size -= s;
 		}
-		while( stack_ptr < (void**)stack_top ) {
-#if defined(HL_64) && defined(HL_WIN)
-			void *module_addr = *stack_ptr++; // EIP
-			if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-				if( out ) {
-					if( count == size ) break;
-					out[count++] = module_addr;
-				} else
-					count++;
-			}
+		if( addr >= (void*)code && addr < (void*)(code + code_size) )
+			return true;
+	}
+	return false;
+}
+
+static void **walk_at( void *p, void *stack_base, void *copy ) {
+	return copy ? (void**)((char*)copy + ((char*)p - (char*)stack_base)) : (void**)p;
+}
+
+static bool is_call_site( void *ret ) {
+#if defined(_M_X64) || defined(__x86_64__)
+	unsigned char *p = (unsigned char*)ret;
+	int k;
+	if( !module_is_jit_code(ret,true) || !module_is_jit_code((char*)ret - 8,true) ) return false;
+	if( p[-5] == 0xE8 ) return true;
+	for(k=2;k<=7;k++) {
+		int reg = (p[-k+1] >> 3) & 7;
+		if( p[-k] == 0xFF && (reg == 2 || reg == 3) ) return true;
+	}
+	return false;
+#elif defined(_M_ARM64) || defined(__aarch64__)
+	unsigned int ins;
+	if( ((int_val)ret) & 3 ) return false;
+	if( !module_is_jit_code(ret,true) || !module_is_jit_code((char*)ret - 4,true) ) return false;
+	ins = ((unsigned int*)ret)[-1];
+	// BL imm26 / BLR Xn
+	return (ins & 0xFC000000) == 0x94000000 || (ins & 0xFFFFFC1F) == 0xD63F0000;
 #else
-			void *stack_addr = *stack_ptr++; // EBP
-			if( stack_addr > stack_bottom && stack_addr < stack_top ) {
-				void *module_addr = *stack_ptr; // EIP
-				if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-					if( out ) {
-						if( count == size ) break;
-						out[count++] = module_addr;
-					} else {
-						count++;
-					}
-				}
-			}
+	return false;
 #endif
+}
+
+static int frame_chain( void **fp, void *stack_base, void *stack_top, void *copy, int max, bool *clean ) {
+	int n = 0;
+	*clean = false;
+	while( n < max ) {
+		void **rec;
+		void *ret, *next;
+		if( (void*)fp < stack_base || (void*)(fp + 2) > stack_top ) break;
+		if( ((int_val)fp) & (sizeof(void*) - 1) ) break;
+		rec = walk_at(fp,stack_base,copy);
+		next = rec[0];
+		ret = rec[1];
+		if( next <= (void*)fp || next >= stack_top ) break;
+		if( !is_call_site(ret) ) {
+			*clean = !module_is_jit_code(ret,true);
+			break;
 		}
-	} else {
-		while( stack_ptr < (void**)stack_top ) {
-#if defined(HL_64) && defined(HL_WIN)
-			void *module_addr = *stack_ptr++; // EIP
+		n++;
+		fp = (void**)next;
+	}
+	return n;
+}
+
+int hl_module_capture_stack_walk( void *pc, void *fp, void *stack_base, void *stack_top, void *copy, void **out, int size ) {
+	void **scan = (void**)stack_base;
+	int count = 0;
+	bool have = module_is_jit_code(pc,true);
+	if( !out ) size = 0x7FFFFFFF;
+	while( count < size ) {
+		void **rec;
+		void *ret, *next;
+		if( !have ) {
+			void **a = scan;
+			bool clean = false;
+			while( (void*)(a + 2) <= stack_top ) {
+				int n = frame_chain(a,stack_base,stack_top,copy,3,&clean);
+				if( n >= 2 || (n == 1 && clean) ) break;
+				a++;
+			}
+			if( (void*)(a + 2) > stack_top ) break;
 			{
-#else
-			void *stack_addr = *stack_ptr++; // EBP
-			if( stack_addr > stack_bottom && stack_addr < stack_top ) {
-				void *module_addr = *stack_ptr; // EIP
-#endif
-				int i;
-				for(i=0;i<modules_count;i++) {
-					hl_module *m = cur_modules[i];
-					unsigned char *code = m->jit_code;
-					int code_size = m->codesize;
-					if( module_addr >= (void*)code && module_addr < (void*)(code + code_size) ) {
-						if( out && count == size ) {
-							stack_ptr = stack_top;
-							break;
-						}
-						if( m->jit_debug ) {
-							int s = m->jit_debug[0].start;
-							code += s;
-							code_size -= s;
-							if( module_addr < (void*)code || module_addr >= (void*)(code + code_size) ) continue;
-						}
-						if( out )
-							out[count++] = module_addr;
-						else
-							count++;
+				void **b = a;
+				while( b > scan ) {
+					void *v = walk_at(b - 1,stack_base,copy)[0];
+					b--;
+					if( is_call_site(v) ) {
+						if( out ) out[count] = v;
+						count++;
 						break;
 					}
 				}
+				if( count == size ) break;
 			}
+			rec = walk_at(a,stack_base,copy);
+			pc = rec[1];
+			fp = rec[0];
+			scan = a + 1;
+			have = true;
+		}
+		if( out ) out[count] = pc;
+		count++;
+		if( fp < stack_base || (void*)((char*)fp + 2 * sizeof(void*)) > stack_top ) break;
+		rec = walk_at(fp,stack_base,copy);
+		next = rec[0];
+		ret = rec[1];
+		if( next <= fp || next >= stack_top ) break;
+		if( module_is_jit_code(ret,true) ) {
+			pc = ret;
+			fp = next;
+		} else {
+			scan = (void**)((char*)fp + 2 * sizeof(void*));
+			have = false;
 		}
 	}
 	return count;
@@ -253,41 +297,40 @@ static int module_capture_stack( void **stack, int size ) {
 	}
 	return count;
 #else
-	return hl_module_capture_stack_range(hl_get_thread()->stack_top, (void**)&stack, stack, size);
-#endif
-}
-
-static bool module_is_jit_code( void *addr ) {
-	for(int i=0;i<modules_count;i++) {
-		hl_module *m = cur_modules[i];
-		unsigned char *code = m->jit_code;
-		if( addr >= (void*)code && addr < (void*)(code + m->codesize) )
-			return true;
-	}
-	return false;
-}
-
-bool hl_module_is_jit_function( void *addr ) {
-	for(int i=0;i<modules_count;i++) {
-		hl_module *m = cur_modules[i];
-		unsigned char *code = m->jit_code;
-		int code_size = m->codesize;
-		if( m->jit_debug ) {
-			int s = m->jit_debug[0].start;
-			code += s;
-			code_size -= s;
+	void *stack_top = hl_get_thread()->stack_top;
+	void *pc = NULL, *fp = NULL;
+#	ifdef STACK_WALK_C_FRAMES
+	void **cur = (void**)__builtin_frame_address(0);
+	bool from_stub = false;
+	int depth = 0;
+	while( depth++ < 64 ) {
+		void **next;
+		void *ret;
+		if( (void*)cur < (void*)&stack || (void*)(cur + 2) > stack_top || (((int_val)cur) & (sizeof(void*) - 1)) ) break;
+		next = (void**)cur[0];
+		ret = cur[1];
+		if( next <= cur || (void*)next >= stack_top ) break;
+		if( module_is_jit_code(ret,true) ) {
+			// null access stubs are reached with push+jmp
+			if( from_stub || is_call_site(ret) ) {
+				pc = ret;
+				fp = next;
+			}
+			break;
 		}
-		if( addr >= (void*)code && addr < (void*)(code + code_size) )
-			return true;
+		from_stub = module_is_jit_code(ret,false);
+		cur = next;
 	}
-	return false;
+#	endif
+	return hl_module_capture_stack_walk(pc, fp, (void**)&stack, stack_top, NULL, stack, size);
+#endif
 }
 
 static bool module_capture_break_context( void **rip, void **regs ) {
 #ifdef WIN64_UNWIND_TABLES
 	CONTEXT c;
 	RtlCaptureContext(&c);
-	while( !module_is_jit_code((void*)c.Rip) ) {
+	while( !module_is_jit_code((void*)c.Rip,false) ) {
 		DWORD64 base;
 		PRUNTIME_FUNCTION fn_entry = RtlLookupFunctionEntry(c.Rip, &base, NULL);
 		if( !fn_entry ) return false;
