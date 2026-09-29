@@ -261,7 +261,8 @@ static void record_sample( thread_handle *t, int count ) {
 		memcpy(t->name, t->inf->thread_name, sizeof(t->name));
 }
 
-static bool read_blocking_thread_locked( thread_handle *t, hl_thread_info *inf ) {
+static bool read_blocking_thread_data( thread_handle *t ) {
+	hl_thread_info *inf = t->inf;
 	void **stack_cur;
 	int seq, count;
 	if( inf->gc_blocking <= 0 ) return false;
@@ -291,26 +292,8 @@ static bool read_blocking_thread_locked( thread_handle *t, hl_thread_info *inf )
 	return true;
 }
 
-// hl_unregister_thread() marks the thread as blocking, then frees its info and lets its
-// stack go under the global lock : holding it keeps both alive while we read them.
-static bool read_blocking_thread_data( thread_handle *t ) {
-	hl_threads_info *gc = hl_gc_threads_info();
-	hl_thread_info *inf = t->inf;
-	bool ok = false;
-	int i;
-	if( inf->gc_blocking <= 0 || !hl_mutex_try_acquire(gc->global_lock) )
-		return false;
-	for(i=0;i<gc->count;i++)
-		if( gc->threads[i] == inf ) {
-			ok = read_blocking_thread_locked(t,inf);
-			break;
-		}
-	hl_mutex_release(gc->global_lock);
-	return ok;
-}
-
-static void read_thread_data( thread_handle *t ) {
-	if( read_blocking_thread_data(t) )
+static void read_thread_data( thread_handle *t, bool locked ) {
+	if( locked && read_blocking_thread_data(t) )
 		return;
 	if( !pause_thread(t,true) )
 		return;
@@ -427,8 +410,18 @@ static void hl_profile_loop( void *_ ) {
 				cur->inf = t;
 				thread_data_init(cur);
 			}
-			if( (t->flags & HL_THREAD_PROFILER_PAUSED) == 0 )
-				read_thread_data(cur);
+			if( (t->flags & HL_THREAD_PROFILER_PAUSED) == 0 ) {
+				bool locked = hl_mutex_try_acquire(threads->global_lock);
+				if( locked || threads->stopping_world ) {
+					int k;
+					for(k=0;k<threads->count;k++)
+						if( threads->threads[k] == t ) {
+							read_thread_data(cur,locked);
+							break;
+						}
+				}
+				if( locked ) hl_mutex_release(threads->global_lock);
+			}
 			prev = cur;
 			cur = cur->next;
 		}
