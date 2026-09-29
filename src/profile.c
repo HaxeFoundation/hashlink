@@ -54,6 +54,14 @@
 #define MAX_STACK_SIZE (8 << 20)
 #define MAX_STACK_COUNT 2048
 
+#ifndef HL_THREADS
+#	define PROFILE_BARRIER()
+#elif defined(HL_VCC)
+#	define PROFILE_BARRIER()	MemoryBarrier()
+#else
+#	define PROFILE_BARRIER()	__sync_synchronize()
+#endif
+
 HL_API double hl_sys_time( void );
 int hl_module_capture_stack_walk( void *pc, void *fp, void *stack_base, void *stack_top, void *copy, void **out, int size );
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr );
@@ -68,6 +76,10 @@ struct _thread_handle {
 #	endif
 	hl_thread_info *inf;
 	char name[128];
+	void **cached_stack;
+	int cached_count;
+	int cached_seq;
+	bool has_cache;
 	thread_handle *next;
 };
 
@@ -182,6 +194,9 @@ static void thread_data_free( thread_handle *t ) {
 #ifdef HL_WIN
 	CloseHandle(t->h);
 #endif
+	free(t->cached_stack);
+	t->cached_stack = NULL;
+	t->has_cache = false;
 }
 
 static bool pause_thread( thread_handle *t, bool b ) {
@@ -233,7 +248,70 @@ static void record_data( void *ptr, int size ) {
 	r->currentPos += size;
 }
 
+static void record_sample( thread_handle *t, int count ) {
+	int eventId = count | 0x80000000;
+	double time = hl_sys_time();
+	hl_threads_info *gc = hl_gc_threads_info();
+	if( gc->stopping_world ) eventId |= 0x40000000;
+	record_data(&time,sizeof(double));
+	record_data(&t->tid,sizeof(int));
+	record_data(&eventId,sizeof(int));
+	record_data(data.stackOut,sizeof(void*)*count);
+	if( *t->inf->thread_name && !*t->name )
+		memcpy(t->name, t->inf->thread_name, sizeof(t->name));
+}
+
+static bool read_blocking_thread_locked( thread_handle *t, hl_thread_info *inf ) {
+	void **stack_cur;
+	int seq, count;
+	if( inf->gc_blocking <= 0 ) return false;
+	seq = inf->gc_ctx_seq;
+	if( seq & 1 ) return false;
+	if( t->has_cache && t->cached_seq == seq ) {
+		memcpy(data.stackOut, t->cached_stack, t->cached_count * sizeof(void*));
+		record_sample(t,t->cached_count);
+		return true;
+	}
+	PROFILE_BARRIER();
+	stack_cur = (void**)inf->stack_cur;
+	if( stack_cur == NULL || (void*)stack_cur >= inf->stack_top ) return false;
+	count = hl_module_capture_stack_walk(NULL, NULL, stack_cur, inf->stack_top, NULL, data.stackOut, MAX_STACK_COUNT);
+	PROFILE_BARRIER();
+	if( inf->gc_ctx_seq != seq || inf->gc_blocking <= 0 )
+		return false;
+	if( t->cached_stack == NULL )
+		t->cached_stack = (void**)malloc(sizeof(void*) * MAX_STACK_COUNT);
+	if( t->cached_stack ) {
+		memcpy(t->cached_stack, data.stackOut, count * sizeof(void*));
+		t->cached_count = count;
+		t->cached_seq = seq;
+		t->has_cache = true;
+	}
+	record_sample(t,count);
+	return true;
+}
+
+// hl_unregister_thread() marks the thread as blocking, then frees its info and lets its
+// stack go under the global lock : holding it keeps both alive while we read them.
+static bool read_blocking_thread_data( thread_handle *t ) {
+	hl_threads_info *gc = hl_gc_threads_info();
+	hl_thread_info *inf = t->inf;
+	bool ok = false;
+	int i;
+	if( inf->gc_blocking <= 0 || !hl_mutex_try_acquire(gc->global_lock) )
+		return false;
+	for(i=0;i<gc->count;i++)
+		if( gc->threads[i] == inf ) {
+			ok = read_blocking_thread_locked(t,inf);
+			break;
+		}
+	hl_mutex_release(gc->global_lock);
+	return ok;
+}
+
 static void read_thread_data( thread_handle *t ) {
+	if( read_blocking_thread_data(t) )
+		return;
 	if( !pause_thread(t,true) )
 		return;
 	void *pc, *fp;
@@ -262,16 +340,7 @@ static void read_thread_data( thread_handle *t ) {
 	pause_thread(t, false);
 	int count = hl_module_capture_stack_walk(pc, fp, stack, (char*)stack + size, data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
 #endif
-	int eventId = count | 0x80000000;
-	double time = hl_sys_time();
-	hl_threads_info *gc = hl_gc_threads_info();
-	if( gc->stopping_world ) eventId |= 0x40000000;
-	record_data(&time,sizeof(double));
-	record_data(&t->tid,sizeof(int));
-	record_data(&eventId,sizeof(int));
-	record_data(data.stackOut,sizeof(void*)*count);
-	if( *t->inf->thread_name && !*t->name )
-		memcpy(t->name, t->inf->thread_name, sizeof(t->name));
+	record_sample(t,count);
 }
 
 static void profile_pause() {
@@ -335,6 +404,7 @@ static void hl_profile_loop( void *_ ) {
 							h->next = data.handles;
 							data.handles = h;
 						}
+						cur = h;
 						break;
 					}
 					hprev = h;
@@ -350,6 +420,12 @@ static void hl_profile_loop( void *_ ) {
 					cur = h;
 					if( prev == NULL ) data.handles = h; else prev->next = h;
 				}
+			}
+			if( cur->inf != t ) {
+				thread_data_free(cur);
+				memset(cur->name, 0, sizeof(cur->name));
+				cur->inf = t;
+				thread_data_init(cur);
 			}
 			if( (t->flags & HL_THREAD_PROFILER_PAUSED) == 0 )
 				read_thread_data(cur);
