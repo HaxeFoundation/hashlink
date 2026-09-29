@@ -99,7 +99,7 @@ static uchar *hlc_resolve_symbol( void *addr, uchar *out, int *outSize ) {
 		line.LineNumber = 0;
 		SymGetLineFromAddrW64(stack_process_handle, (DWORD64)(int_val)addr, &offset, &line);
 		*outSize = usprintf(out,*outSize,USTR("%s(%s:%d)"),data.sym.Name,wcsrchr(line.FileName,'\\')+1,(int)line.LineNumber);
-		return out;
+		return (uchar*)hl_copy_bytes((vbyte*)out, (*outSize + 1) * sizeof(uchar));
 	}
 #elif defined(HL_LINUX_BACKTRACE) || defined(HL_MAC)
 	void *array[1];
