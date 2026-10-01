@@ -43,6 +43,8 @@
 #define EMIT(r,a,b,m)	regs_emit(ctx,UNUSED,r,a,b,m,0)
 #define BREAK()	EMIT(DEBUG_BREAK,UNUSED,UNUSED,0)
 
+#define STACK_PROBE_SIZE	4096
+
 typedef struct {
 	int id;
 	int start;
@@ -817,6 +819,14 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 					EMIT(PUSH,ctx->jit->cfg.regs.persist[i],UNUSED,M_PTR);
 				for(int i=0;i<ctx->persists_uses[1];i++)
 					EMIT(PUSH,ctx->jit->cfg.floats.persist[i],UNUSED,M_F64);
+				// probe large frames page by page : skipping the guard page on Windows leaves
+				// guard pages in the middle of the stack, which profiler can't read
+				if( stack_offset >= STACK_PROBE_SIZE ) {
+					int sp = REG_REG(jit->cfg.stack_reg);
+					for(int offs=STACK_PROBE_SIZE;offs<stack_offset;offs+=STACK_PROBE_SIZE)
+						EMIT(TEST,MK_ADDR(sp,-offs),UNUSED,M_I32);
+					EMIT(TEST,MK_ADDR(sp,-stack_offset),UNUSED,M_I32);
+				}
 				if( stack_offset )
 					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,-stack_offset);
 			}

@@ -311,15 +311,7 @@ static void read_thread_data( thread_handle *t, bool locked ) {
 	int size = (int)((unsigned char*)t->inf->stack_top - (unsigned char*)stack);
 	if( size < 0 ) size = 0;
 	if( size > MAX_STACK_SIZE-32 ) size = MAX_STACK_SIZE-32;
-#if defined(HL_WIN_DESKTOP) && defined(HL_VCC)
-	// it seems we rarely can't make a first read on the thread stack, let's ignore errors and wait.
-	__try {
-#endif
-		memcpy(data.tmpMemory,stack,size);
-#if defined(HL_WIN_DESKTOP) && defined(HL_VCC)
-	} __except(EXCEPTION_EXECUTE_HANDLER) {
-	}
-#endif
+	memcpy(data.tmpMemory,stack,size);
 	pause_thread(t, false);
 	int count = hl_module_capture_stack_walk(pc, fp, stack, (char*)stack + size, data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
 #endif
