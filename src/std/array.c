@@ -54,6 +54,14 @@ DEFINE_PRIM(_VOID,array_blit,_ARR _I32 _ARR _I32 _I32);
 DEFINE_PRIM(_TYPE,array_type,_ARR);
 DEFINE_PRIM(_BYTES,array_bytes,_ARR);
 
+#ifndef HL_DISABLE_COMPAT
+typedef struct {
+	size_t size;
+	hl_type* type;
+} hl_carray_footer;
+#endif
+#define HL_CARRAY_GET_FOOTER(arr) ((hl_carray_footer*)((char*)(arr) + hl_gc_get_memsize((arr)) - sizeof(hl_carray_footer)))
+
 HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 	if( at->kind != HOBJ && at->kind != HSTRUCT )
 		hl_error("Invalid array type");
@@ -62,7 +70,14 @@ HL_PRIM void *hl_alloc_carray( hl_type *at, int size ) {
 
 	hl_runtime_obj *rt = at->obj->rt;
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(at);
+#ifdef HL_DISABLE_COMPAT
 	char *arr = hl_gc_alloc_gen(at, size * rt->size, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
+#else
+	char *arr = hl_gc_alloc_gen(at, size * rt->size + sizeof(hl_carray_footer), (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
+	hl_carray_footer *footer = HL_CARRAY_GET_FOOTER(arr);
+	footer->size = size;
+	footer->type = at;
+#endif
 	if( at->kind == HOBJ || rt->nbindings ) {
 		int i,k;
 		for(k=0;k<size;k++) {
@@ -92,3 +107,34 @@ HL_PRIM void hl_carray_blit( void *dst, hl_type *at, int dpos, void *src, int sp
 #define _CARRAY _ABSTRACT(hl_carray)
 DEFINE_PRIM(_CARRAY,alloc_carray,_TYPE _I32);
 DEFINE_PRIM(_VOID,carray_blit,_CARRAY _TYPE _I32 _CARRAY _I32 _I32);
+
+#ifndef HL_DISABLE_COMPAT
+// For backwards compatibility with HL 1.13
+
+HL_PRIM int hl_carray_length( void *arr ) {
+	if (!hl_is_gc_ptr(arr)) {
+		hl_error("Cannot call hl_carray_length with external carray");
+	}
+	return HL_CARRAY_GET_FOOTER(arr)->size;
+}
+
+HL_PRIM vdynamic *hl_carray_get( void *arr, int pos ) {
+	if (!hl_is_gc_ptr(arr)) {
+		hl_error("Cannot call hl_carray_get with external carray");
+	}
+
+	hl_carray_footer* footer = HL_CARRAY_GET_FOOTER(arr);
+	if (pos < 0 || pos >= footer->size) return NULL;
+	hl_type* type = footer->type;
+	void* element = (void*)((char*)arr + pos * type->obj->rt->size);
+	if (type->kind == HSTRUCT) {
+		vdynamic* dyn = hl_alloc_dynamic(type);
+		dyn->v.ptr = element;
+		return dyn;
+	}
+	return (vdynamic*)element;
+}
+
+DEFINE_PRIM(_DYN,carray_get,_CARRAY _I32);
+DEFINE_PRIM(_I32,carray_length,_CARRAY);
+#endif
