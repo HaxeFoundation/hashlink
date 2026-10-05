@@ -678,7 +678,7 @@ HL_PRIM void HL_NAME(win_set_size)(dx_window *win, int width, int height) {
 	r.right = width;
 	r.bottom = height;
 	AdjustWindowRectEx(&r,GetWindowLong(win,GWL_STYLE),GetMenu(win) != NULL,GetWindowLong(win,GWL_EXSTYLE));
-	SetWindowPos(win,NULL,0,0,r.right - r.left,r.bottom - r.top,SWP_NOMOVE|SWP_NOOWNERZORDER);
+	SetWindowPos(win,NULL,0,0,r.right - r.left,r.bottom - r.top,SWP_NOMOVE|SWP_NOOWNERZORDER|SWP_NOACTIVATE);
 }
 
 HL_PRIM void HL_NAME(win_get_size)(dx_window *win, int *width, int *height) {
@@ -762,7 +762,7 @@ HL_PRIM void HL_NAME(win_get_position)(dx_window *win, int *x, int *y) {
 }
 
 HL_PRIM void HL_NAME(win_set_position)(dx_window *win, int x, int y) {
-	SetWindowPos(win,NULL,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER);
+	SetWindowPos(win,NULL,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE);
 }
 
 // initially written with the intent to center on closest monitor; however, SDL centers to primary, so both options are provided
