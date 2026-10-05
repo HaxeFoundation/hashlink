@@ -316,20 +316,23 @@ HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 	op.lpstrInitialDir = hl_dyn_getp(options,hl_hash_utf8("directory"),&hlt_bytes);
 	op.lpstrTitle = hl_dyn_getp(options,hl_hash_utf8("title"),&hlt_bytes);
 	op.Flags |= OFN_NOCHANGEDIR;
+	// can be called from any thread: the GC must not wait for the dialog
+	bool ok;
+	hl_blocking(true);
 	if( forSave ) {
 		op.Flags |= OFN_OVERWRITEPROMPT;
-		if( !GetSaveFileName(&op) )
-			return NULL;
+		ok = GetSaveFileName(&op);
 	} else {
 		if (!isFolder) {
 			op.Flags |= OFN_CREATEPROMPT;
-			if( !GetOpenFileName(&op) )
-				return NULL;
+			ok = GetOpenFileName(&op);
 		} else {
-			if (!chooseFolder(op.lpstrTitle, op.lpstrInitialDir, outputFile))
-				return NULL;
+			ok = chooseFolder(op.lpstrTitle, op.lpstrInitialDir, outputFile);
 		}
 	}
+	hl_blocking(false);
+	if( !ok )
+		return NULL;
 	return hl_copy_bytes((vbyte*)outputFile, (int)(wcslen(outputFile)+1)*2);
 }
 
