@@ -787,6 +787,25 @@ HL_PRIM ID3D12Resource *HL_NAME(create_committed_resource)( D3D12_HEAP_PROPERTIE
 	return res;
 }
 
+HL_PRIM ID3D12Heap *HL_NAME(create_heap)( D3D12_HEAP_DESC *desc ) {
+	ID3D12Heap *heap = NULL;
+	DXERR(static_driver->device->CreateHeap(desc, IID_PPV_ARGS(&heap)));
+	return heap;
+}
+
+HL_PRIM ID3D12Resource *HL_NAME(create_placed_resource)( ID3D12Heap *heap, int64 offset, D3D12_RESOURCE_DESC *desc, D3D12_RESOURCE_STATES initialState, D3D12_CLEAR_VALUE *clearValue ) {
+	ID3D12Resource *res = NULL;
+#ifdef HL_XBS
+	initialState = (D3D12_RESOURCE_STATES)(initialState & ~D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+#endif
+	DXERR(static_driver->device->CreatePlacedResource(heap, (UINT64)offset, desc, initialState, clearValue, IID_PPV_ARGS(&res)));
+	return res;
+}
+
+HL_PRIM void HL_NAME(get_resource_allocation_info)( D3D12_RESOURCE_DESC *desc, D3D12_RESOURCE_ALLOCATION_INFO *info ) {
+	*info = static_driver->device->GetResourceAllocationInfo(0, 1, desc);
+}
+
 HL_PRIM void HL_NAME(create_render_target_view)( ID3D12Resource *res, D3D12_RENDER_TARGET_VIEW_DESC *desc, D3D12_CPU_DESCRIPTOR_HANDLE descriptor ) {
 	static_driver->device->CreateRenderTargetView(res,desc,descriptor);
 }
@@ -865,6 +884,9 @@ DEFINE_PRIM(_VOID, create_constant_buffer_view, _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_unordered_access_view, _RES _RES _STRUCT _I64);
 DEFINE_PRIM(_VOID, create_sampler, _STRUCT _I64);
 DEFINE_PRIM(_RES, create_committed_resource, _STRUCT _I32 _STRUCT _I32 _STRUCT);
+DEFINE_PRIM(_RES, create_heap, _STRUCT);
+DEFINE_PRIM(_RES, create_placed_resource, _RES _I64 _STRUCT _I32 _STRUCT);
+DEFINE_PRIM(_VOID, get_resource_allocation_info, _STRUCT _STRUCT);
 DEFINE_PRIM(_RES, get_back_buffer, _I32);
 DEFINE_PRIM(_VOID, resource_release, _RES);
 DEFINE_PRIM(_VOID, resource_set_name, _RES _BYTES);

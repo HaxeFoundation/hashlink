@@ -1569,6 +1569,26 @@ enum abstract QueryHeapType(Int) {
 abstract QueryHeap(Resource) {
 }
 
+@:forward(release, setName)
+abstract Heap(Resource) {
+}
+
+@:struct class HeapDesc {
+	public var sizeInBytes : Int64;
+	@:packed public var properties(default,null) : HeapProperties;
+	public var alignment : Int64;
+	public var flags : haxe.EnumFlags<HeapFlag>;
+	public function new() {
+	}
+}
+
+@:struct class ResourceAllocationInfo {
+	public var sizeInBytes : Int64;
+	public var alignment : Int64;
+	public function new() {
+	}
+}
+
 enum abstract PredicationOp(Int) {
 	var EQUAL_ZERO = 0;
 	var NOT_EQUAL_ZERO = 1;
@@ -1746,6 +1766,17 @@ class Dx12 {
 
 	public static function createCommittedResource( heapProperties : HeapProperties, heapFlags : haxe.EnumFlags<HeapFlag>, desc : ResourceDesc, initialState : ResourceState, clearValue : ClearValue ) : GpuResource {
 		return null;
+	}
+
+	public static function createHeap( desc : HeapDesc ) : Heap {
+		return null;
+	}
+
+	public static function createPlacedResource( heap : Heap, offset : Int64, desc : ResourceDesc, initialState : ResourceState, clearValue : ClearValue ) : GpuResource {
+		return null;
+	}
+
+	public static function getResourceAllocationInfo( desc : ResourceDesc, info : ResourceAllocationInfo ) {
 	}
 
 	public static function createCommandSignature( desc : CommandSignatureDesc, root : RootSignature ) : CommandSignature {
