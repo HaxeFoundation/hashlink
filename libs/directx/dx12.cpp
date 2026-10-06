@@ -284,10 +284,12 @@ static LARGE_INTEGER driver_version = {0};
 typedef ID3D12Device2 dx_device;
 typedef IDXGIFactory dx_factory;
 typedef IDXGIAdapter dx_adapter;
+typedef IDXGISwapChain dx_swapchain;
 
 #define _DEVICE _ABSTRACT(dx_device)
 #define _FACTORY _ABSTRACT(dx_factory)
 #define _ADAPTER _ABSTRACT(dx_adapter)
+#define _SWAPCHAIN _ABSTRACT(dx_swapchain)
 
 HL_PRIM ID3D12Device* HL_NAME(get_device)() {
 	dx_driver* drv = static_driver;
@@ -320,11 +322,19 @@ HL_PRIM void HL_NAME(set_factory)(IDXGIFactory* factory) {
 #endif
 }
 
+HL_PRIM void HL_NAME(set_swap_chain)(IDXGISwapChain* swapchain) {
+#ifndef HL_XBS
+	dx_driver* drv = static_driver;
+	drv->swapchain = static_cast<IDXGISwapChain4*>(swapchain);
+#endif
+}
+
 DEFINE_PRIM(_DEVICE, get_device, _NO_ARG);
 DEFINE_PRIM(_FACTORY, get_factory, _NO_ARG);
 DEFINE_PRIM(_ADAPTER, get_adapter, _NO_ARG);
 DEFINE_PRIM(_VOID, set_device, _DEVICE);
 DEFINE_PRIM(_VOID, set_factory, _FACTORY);
+DEFINE_PRIM(_VOID, set_swap_chain, _SWAPCHAIN);
 
 HL_PRIM void dx12_flush_messages();
 

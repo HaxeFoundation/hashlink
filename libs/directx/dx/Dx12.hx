@@ -10,6 +10,8 @@ typedef Adapter = hl.Abstract<"dx_adapter">;
 
 typedef Factory = hl.Abstract<"dx_factory">;
 
+typedef SwapChain = hl.Abstract<"dx_swapchain">;
+
 enum DriverInitFlag {
 	DEBUG;
 	GPU_BASED_VALIDATION;
@@ -1707,6 +1709,9 @@ class Dx12 {
 	}
 
 	public static function setFactory(factory : Factory) {
+	}
+
+	public static function setSwapChain(swapChain : SwapChain) {
 	}
 
 	public static function flushMessages() {
