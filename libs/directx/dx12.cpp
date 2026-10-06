@@ -284,7 +284,7 @@ static LARGE_INTEGER driver_version = {0};
 typedef ID3D12Device2 dx_device;
 typedef IDXGIFactory dx_factory;
 typedef IDXGIAdapter dx_adapter;
-typedef IUnknown dx_swapchain;
+typedef IDXGISwapChain dx_swapchain;
 
 #define _DEVICE _ABSTRACT(dx_device)
 #define _FACTORY _ABSTRACT(dx_factory)
@@ -322,7 +322,7 @@ HL_PRIM void HL_NAME(set_factory)(IDXGIFactory* factory) {
 #endif
 }
 
-HL_PRIM void HL_NAME(set_swap_chain)(dx_swapchain* swapchain) {
+HL_PRIM void HL_NAME(set_swap_chain)(IDXGISwapChain* swapchain) {
 #ifndef HL_XBS
 	dx_driver* drv = static_driver;
 	drv->swapchain = static_cast<IDXGISwapChain4*>(swapchain);
