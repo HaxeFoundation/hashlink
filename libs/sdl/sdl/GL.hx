@@ -236,6 +236,10 @@ class GL {
 	public static function texImage2D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
 	}
 
+	@:hlNative("?sdl","gl_copy_image_sub_data")
+	public static function copyImageSubData( src : Texture, srcTarget : Int, srcLevel : Int, srcX : Int, srcY : Int, srcZ : Int, dst : Texture, dstTarget : Int, dstLevel : Int, dstX : Int, dstY : Int, dstZ : Int, width : Int, height : Int, depth : Int ) {
+	}
+
 	@:hlNative("sdl","gl_tex_image3d")
 	public static function texImage3D( target : Int, level : Int, internalFormat : Int, width : Int, height : Int, depth : Int, border : Int, format : Int, type : Int, image : hl.Bytes ) {
 	}

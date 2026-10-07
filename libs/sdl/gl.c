@@ -62,6 +62,7 @@
 #if !defined GL_IMPORT_OPT
 #define GL_IMPORT_OPT(fun, t)
 #define glMultiDrawElementsIndirectCountARB(...) hl_error("function not resolved");
+#define glCopyImageSubData(...) hl_error("function not resolved");
 #endif
 
 static int GLLoadAPI() {
@@ -362,6 +363,12 @@ HL_PRIM void HL_NAME(gl_tex_image2d)( int target, int level, int internalFormat,
 
 HL_PRIM void HL_NAME(gl_tex_image3d)( int target, int level, int internalFormat, int width, int height, int depth, int border, int format, int type, vbyte *image ) {
 	glTexImage3D(target, level, internalFormat, width, height, depth, border, format, type, image);
+}
+
+HL_PRIM void HL_NAME(gl_copy_image_sub_data)( vdynamic *src, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, vdynamic *dst, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth ) {
+	// GL 4.3+ / ARB_copy_image
+	GL_IMPORT_OPT(glCopyImageSubData, COPYIMAGESUBDATA)
+	glCopyImageSubData(ZIDX(src), srcTarget, srcLevel, srcX, srcY, srcZ, ZIDX(dst), dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
 }
 
 HL_PRIM void HL_NAME(gl_tex_storage2d)( int target, int levels, int internalFormat, int width, int height) {
@@ -793,6 +800,7 @@ DEFINE_PRIM(_VOID,gl_tex_parameterf,_I32 _I32 _F32);
 DEFINE_PRIM(_VOID,gl_tex_image2d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID,gl_tex_image3d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
 DEFINE_PRIM(_VOID,gl_tex_storage2d,_I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID,gl_copy_image_sub_data,_NULL(_I32) _I32 _I32 _I32 _I32 _I32 _NULL(_I32) _I32 _I32 _I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_tex_storage3d,_I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID,gl_tex_image2d_multisample,_I32 _I32 _I32 _I32 _I32 _BOOL);
 DEFINE_PRIM(_VOID,gl_compressed_tex_image2d,_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BYTES);
