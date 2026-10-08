@@ -69,7 +69,7 @@
 #	define HL_MOBILE
 #endif
 
-#ifdef __ORBIS__
+#if defined(__ORBIS__) || defined(__PROSPERO__)
 #	define HL_PS
 #endif
 
@@ -1043,7 +1043,7 @@ HL_API hl_track_info hl_track;
 
 C_FUNCTION_END
 
-#ifndef HL_DISABLE_LEGACY_FFI
+#ifdef HL_DISABLE_LEGACY_FFI
 #	undef C_FUNCTION_BEGIN
 #	undef C_FUNCTION_END
 #endif
