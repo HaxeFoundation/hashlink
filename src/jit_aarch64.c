@@ -1153,7 +1153,6 @@ static void emit_load_fun( code_ctx *ctx, ereg out_e, int fid ) {
 	if( REG_KIND(out_e) != R_REG ) emit_mov(ctx, out_e, R(ARM_TMP1), M_PTR);
 }
 
-// null access functions are called through their stubs, which are in BL range
 static void emit_call_ptr( code_ctx *ctx, einstr *e ) {
 	uint64_t target = (uint64_t)e->value;
 	int near_pos = -1;
@@ -1163,10 +1162,10 @@ static void emit_call_ptr( code_ctx *ctx, einstr *e ) {
 		near_pos = ctx->null_field_pos;
 
 	if( near_pos >= 0 ) {
+		// jump : PUSH_ADDR already set the return address
 		int pos = ctx->jit->out_pos + byte_count(ctx->code);
 		intptr_t delta = (intptr_t)near_pos - (intptr_t)pos;
-		int imm26 = (int)(delta >> 2);
-		encode_branch_link(ctx, imm26);
+		encode_branch_uncond(ctx, (int)(delta >> 2));
 	} else if( ctx->jit->mod->debug && ctx->jit->code_funs.trampoline
 		&& e->size_offs <= TRAMPOLINE_STACK_ARGS && hl_jit_is_callback((void*)target) ) {
 		// lets the debugger step into native callbacks
@@ -1371,12 +1370,12 @@ retry:
 			break;
 		case PUSH_ADDR:
 			{
+				// only used before jumping to a null access stub : the return address goes in LR
 				int target_op = ctx->cur_op + 1 + e->size_offs;
 				int adrp_pos = byte_count(ctx->code);
-				encode_adrp(ctx, 0, 0, ARM_TMP1);
-				encode_add_sub_imm(ctx, 1, 0, 0, 0, 0, ARM_TMP1, ARM_TMP1);
+				encode_adrp(ctx, 0, 0, LR);
+				encode_add_sub_imm(ctx, 1, 0, 0, 0, 0, LR, LR);
 				add_addr_fixup(ctx, adrp_pos, target_op);
-				emit_push(ctx, R(ARM_TMP1), M_PTR);
 			}
 			break;
 		case PREFETCH:
@@ -1477,10 +1476,10 @@ static void emit_helper_epilogue( code_ctx *ctx ) {
 	encode_branch_reg(ctx, /*RET*/2, LR);
 }
 
-// field : the field hash is pushed before the call site (PUSH_CONST, PUSH_ADDR)
+// field : the field hash was pushed by PUSH_CONST, above our frame record
 static void emit_null_stub( code_ctx *ctx, void *target, bool field ) {
 	emit_helper_prologue(ctx);
-	if( field ) encode_ldr_str_imm(ctx, 2, 0, 1, 32 / 4, FP, X0); // LDR W0, [FP, #32]
+	if( field ) encode_ldr_str_imm(ctx, 2, 0, 1, 16 / 4, FP, X0); // LDR W0, [FP, #16]
 	emit_const_load(ctx, ARM_TMP1, (uint64_t)(uintptr_t)target);
 	encode_branch_reg(ctx, /*BLR*/1, ARM_TMP1);
 	EMIT32(ctx, 0xD4200000); // BRK #0
