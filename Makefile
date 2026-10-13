@@ -205,12 +205,8 @@ USE_LIBHL_LDFLAGS = -rpath @executable_path -rpath $(INSTALL_LIB_DIR)
 HDLL_LDFLAGS += -install_name @rpath/$@
 else
 
-ifeq ($(ARCH),aarch64)
-ARCH = arm64
-endif
-
 # Linux
-ifneq ($(ARCH),arm64)
+ifneq ($(ARCH),aarch64)
 CFLAGS += -m$(MARCH)
 endif
 CFLAGS += -fPIC -pthread -fno-omit-frame-pointer
