@@ -19,10 +19,9 @@ include(GNUInstallDirs)
 include(FindPkgConfig)
 include(CTest)
 
-set(WITH_VM_DEFAULT ON)
-# no JIT for 32-bit ARM
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm$|^armv[0-9]" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
-    set(WITH_VM_DEFAULT OFF)
+set(WITH_VM_DEFAULT OFF)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|aarch64|arm64|ARM64)$" OR CMAKE_OSX_ARCHITECTURES MATCHES "x86_64|arm64")
+    set(WITH_VM_DEFAULT ON)
 endif()
 
 option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
