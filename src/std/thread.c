@@ -75,7 +75,11 @@ struct _hl_tls {
 
 #	include <pthread.h>
 #	include <unistd.h>
-#	include <sys/syscall.h>
+#	ifdef HL_CONSOLE
+#		include <posix/posix.h>
+#	else
+#		include <sys/syscall.h>
+#	endif
 #	include <sys/time.h>
 
 #ifdef __APPLE__

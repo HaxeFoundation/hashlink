@@ -28,6 +28,8 @@
 #	include <sys/mman.h>
 #	ifndef HL_CONSOLE
 #		include <unistd.h>
+#	else
+#		include <posix/posix.h>
 #	endif
 #endif
 

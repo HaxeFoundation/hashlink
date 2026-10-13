@@ -38,7 +38,7 @@
 
 #else
 
-#if defined(HL_PS) || defined(HL_NX)
+#ifdef HL_CONSOLE
 #	include <posix/posix.h>
 #else
 #	ifndef _GNU_SOURCE
