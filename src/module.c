@@ -256,6 +256,212 @@ int hl_module_capture_stack_walk( void *pc, void *fp, void *stack_base, void *st
 	return count;
 }
 
+#ifdef WIN64_UNWIND_TABLES
+
+// x64 registers numbering used by the unwind codes
+#define UREG_RSP	4
+#define UREG_RBP	5
+
+static bool unwind_read( void *addr, void *stack_base, void *stack_top, void *copy, void **out ) {
+	if( addr < stack_base || (char*)addr + sizeof(void*) > (char*)stack_top || (((int_val)addr) & (sizeof(void*) - 1)) ) return false;
+	*out = *walk_at(addr,stack_base,copy);
+	return true;
+}
+
+/*
+	Unwinds one native frame with the x64 unwind tables, reading the stack (or its copy) ourselves :
+	RtlVirtualUnwind would read the live stack of a thread that is either suspended (deadlock risk)
+	or already resumed. regs[] holds the nonvolatile registers, rsp being *sp.
+*/
+static bool unwind_native_frame( void **pc, char **sp, void **regs, bool leaf, void *stack_base, void *stack_top, void *copy ) {
+	DWORD64 base;
+	PRUNTIME_FUNCTION f = RtlLookupFunctionEntry((DWORD64)*pc, &base, NULL);
+	char *rsp = *sp;
+	if( !f ) {
+		// leaf function without unwind data : the return address is at the top of the stack
+		if( !leaf || !unwind_read(rsp,stack_base,stack_top,copy,pc) ) return false;
+		*sp = rsp + sizeof(void*);
+		return true;
+	}
+	if( leaf ) {
+		// stopped inside an epilog : the prolog is partly undone, emulate the remaining instructions
+		unsigned char *p = (unsigned char*)*pc;
+		char *esp = rsp;
+		void *eregs[16];
+		bool ok = true;
+		memcpy(eregs,regs,sizeof(eregs));
+		if( p[0] == 0x48 && p[1] == 0x83 && p[2] == 0xC4 ) {
+			esp += (signed char)p[3];
+			p += 4;
+		} else if( p[0] == 0x48 && p[1] == 0x81 && p[2] == 0xC4 ) {
+			esp += *(int*)(p + 3);
+			p += 7;
+		} else if( (p[0] & 0xFE) == 0x48 && p[1] == 0x8D && ((p[2] >> 3) & 7) == UREG_RSP && (p[2] >> 6) != 0 && (p[2] >> 6) != 3 && (p[2] & 7) != UREG_RSP ) {
+			// lea rsp, [reg + disp]
+			int reg = (p[2] & 7) | ((p[0] & 1) << 3);
+			int mod = p[2] >> 6;
+			esp = (char*)eregs[reg] + (mod == 1 ? (signed char)p[3] : *(int*)(p + 3));
+			p += mod == 1 ? 4 : 7;
+		}
+		while( ok ) {
+			int reg;
+			if( p[0] >= 0x58 && p[0] <= 0x5F ) {
+				reg = p[0] - 0x58;
+				p++;
+			} else if( p[0] == 0x41 && p[1] >= 0x58 && p[1] <= 0x5F ) {
+				reg = p[1] - 0x58 + 8;
+				p += 2;
+			} else
+				break;
+			ok = unwind_read(esp,stack_base,stack_top,copy,&eregs[reg]);
+			esp += sizeof(void*);
+		}
+		// a jump only ends an epilog (tail call) after the stack was restored, otherwise it's just a jump
+		bool restored = p != (unsigned char*)*pc;
+		if( ok && (p[0] == 0xC3 || p[0] == 0xC2 || (p[0] == 0xF3 && p[1] == 0xC3) || (restored && (p[0] == 0xE9 || p[0] == 0xEB || (p[0] == 0x48 && p[1] == 0xFF && p[2] == 0x25)))) ) {
+			if( !unwind_read(esp,stack_base,stack_top,copy,pc) ) return false;
+			memcpy(regs,eregs,sizeof(eregs));
+			*sp = esp + sizeof(void*);
+			return true;
+		}
+	}
+	unsigned char *info = (unsigned char*)(base + f->UnwindData);
+	unsigned int prolog_offset = (unsigned int)((DWORD64)*pc - (base + f->BeginAddress));
+	char *frame = rsp;
+	while( true ) {
+		int flags = info[0] >> 3;
+		int ncodes = info[2];
+		int freg = info[3] & 15;
+		int foffset = info[3] >> 4;
+		unsigned short *codes = (unsigned short*)(info + 4);
+		// codes are only partly executed while still inside the prolog
+		if( prolog_offset >= info[1] ) prolog_offset = 0xFFFFFFFF;
+		if( freg ) {
+			bool fp_set = prolog_offset == 0xFFFFFFFF;
+			for(int i=0;i<ncodes && !fp_set;i++)
+				if( ((codes[i] >> 8) & 15) == 3 && (unsigned int)(codes[i] & 0xFF) <= prolog_offset ) fp_set = true;
+			if( fp_set ) frame = (char*)regs[freg] - foffset * 16;
+		}
+		for(int i=0;i<ncodes;) {
+			int offset = codes[i] & 0xFF;
+			int op = (codes[i] >> 8) & 15;
+			int opinfo = codes[i] >> 12;
+			int size;
+			switch( op ) {
+			case 1: size = opinfo ? 3 : 2; break;
+			case 4: case 6: case 8: size = 2; break;
+			case 5: case 7: case 9: size = 3; break;
+			default: size = 1; break;
+			}
+			if( i + size > ncodes ) return false;
+			if( prolog_offset != 0xFFFFFFFF && offset > (int)prolog_offset ) {
+				i += size;
+				continue;
+			}
+			switch( op ) {
+			case 0: // PUSH_NONVOL
+				if( !unwind_read(rsp,stack_base,stack_top,copy,&regs[opinfo]) ) return false;
+				rsp += sizeof(void*);
+				break;
+			case 1: // ALLOC_LARGE
+				rsp += opinfo ? (codes[i+1] | ((unsigned int)codes[i+2] << 16)) : codes[i+1] * 8;
+				break;
+			case 2: // ALLOC_SMALL
+				rsp += opinfo * 8 + 8;
+				break;
+			case 3: // SET_FPREG
+				rsp = frame;
+				break;
+			case 4: // SAVE_NONVOL
+				if( !unwind_read(frame + codes[i+1] * 8,stack_base,stack_top,copy,&regs[opinfo]) ) return false;
+				break;
+			case 5: // SAVE_NONVOL_FAR
+				if( !unwind_read(frame + (codes[i+1] | ((unsigned int)codes[i+2] << 16)),stack_base,stack_top,copy,&regs[opinfo]) ) return false;
+				break;
+			case 10: // PUSH_MACHFRAME
+				if( opinfo ) rsp += sizeof(void*);
+				if( !unwind_read(rsp,stack_base,stack_top,copy,pc) ) return false;
+				if( !unwind_read(rsp + 3 * sizeof(void*),stack_base,stack_top,copy,(void**)sp) ) return false;
+				return true;
+			default: // xmm saves and version 2 epilog descriptions
+				break;
+			}
+			i += size;
+		}
+		if( !(flags & UNW_FLAG_CHAININFO) ) break;
+		PRUNTIME_FUNCTION chained = (PRUNTIME_FUNCTION)&codes[(ncodes + 1) & ~1];
+		info = (unsigned char*)(base + chained->UnwindData);
+		prolog_offset = 0xFFFFFFFF;
+	}
+	if( !unwind_read(rsp,stack_base,stack_top,copy,pc) ) return false;
+	*sp = rsp + sizeof(void*);
+	return true;
+}
+
+/*
+	Captures the stack of a thread from a full register context : native frames are unwound with
+	the x64 unwind tables, JIT frames by following their frame pointers. Unlike scanning the stack,
+	this can't be fooled by stale frames left in the stack by previous calls.
+*/
+int hl_module_capture_stack_unwind( void *pc, void *sp, void **regs, bool leaf, void *stack_base, void *stack_top, void *copy, void **out, int size ) {
+	int count = 0;
+	char *rsp = (char*)sp;
+	if( !out ) size = 0x7FFFFFFF;
+	while( count < size && pc ) {
+		if( module_is_jit_code(pc,false) ) {
+			void **fp = (void**)regs[UREG_RBP];
+			if( (char*)fp < rsp ) fp = NULL; // not a frame of this stack part
+			if( module_is_jit_code(pc,true) ) {
+				if( out ) out[count] = pc;
+				count++;
+			}
+			// stopped before the frame is set (push rbp / mov rbp,rsp) or after it is undone (ret) :
+			// rbp is still the caller one, so get the caller return address from the stack top
+			if( leaf ) {
+				unsigned char *p = (unsigned char*)pc;
+				void *ret = NULL;
+				if( p[0] == 0x55 || p[0] == 0xC3 )
+					unwind_read(rsp,stack_base,stack_top,copy,&ret);
+				else if( p[-1] == 0x55 && p[0] == 0x48 && ((p[1] == 0x89 && p[2] == 0xE5) || (p[1] == 0x8B && p[2] == 0xEC)) )
+					unwind_read(rsp + sizeof(void*),stack_base,stack_top,copy,&ret);
+				if( ret && module_is_jit_code(ret,true) && count < size ) {
+					if( out ) out[count] = ret;
+					count++;
+				}
+			}
+			leaf = false;
+			pc = NULL;
+			while( count < size ) {
+				void *next, *ret;
+				if( !unwind_read(fp,stack_base,stack_top,copy,&next) || !unwind_read(fp + 1,stack_base,stack_top,copy,&ret) ) break;
+				if( module_is_jit_code(ret,false) ) {
+					if( (void**)next <= fp || next >= stack_top ) break;
+					if( module_is_jit_code(ret,true) ) {
+						if( out ) out[count] = ret;
+						count++;
+					}
+					fp = (void**)next;
+					continue;
+				}
+				// returning into native code : unwind it from the JIT frame end.
+				// The saved rbp is any value the native code had in it, not necessarily a frame
+				pc = ret;
+				rsp = (char*)(fp + 2);
+				regs[UREG_RBP] = next;
+				break;
+			}
+			continue;
+		}
+		char *prev = rsp;
+		if( !unwind_native_frame(&pc,&rsp,regs,leaf,stack_base,stack_top,copy) ) break;
+		if( rsp <= prev ) break;
+		leaf = false;
+	}
+	return count;
+}
+
+#endif
+
 static int module_capture_stack( void **stack, int size ) {
 #ifdef WIN64_UNWIND_TABLES
 	CONTEXT context;

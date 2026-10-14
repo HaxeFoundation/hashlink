@@ -64,6 +64,9 @@
 
 HL_API double hl_sys_time( void );
 int hl_module_capture_stack_walk( void *pc, void *fp, void *stack_base, void *stack_top, void *copy, void **out, int size );
+#ifdef WIN64_UNWIND_TABLES
+int hl_module_capture_stack_unwind( void *pc, void *sp, void **regs, bool leaf, void *stack_base, void *stack_top, void *copy, void **out, int size );
+#endif
 uchar *hl_module_resolve_symbol_full( void *addr, uchar *out, int *outSize, int **r_debug_addr );
 
 typedef struct _thread_handle thread_handle;
@@ -145,7 +148,7 @@ static void sigprof_handler(int sig, siginfo_t *info, void *ucontext)
 }
 #endif
 
-static void *get_thread_stackptr( thread_handle *t, void **pc, void **fp ) {
+static void *get_thread_stackptr( thread_handle *t, void **pc, void **fp, void **regs ) {
 	*fp = NULL;
 #ifdef HL_WIN_DESKTOP
 	CONTEXT c;
@@ -153,6 +156,11 @@ static void *get_thread_stackptr( thread_handle *t, void **pc, void **fp ) {
 	if( !GetThreadContext(t->h,&c) ) return NULL;
 	*pc = (void*)c.Rip;
 	*fp = (void*)c.Rbp;
+	if( regs ) {
+		// x64 registers numbering
+		DWORD64 *r = &c.Rax;
+		for(int i=0;i<16;i++) regs[i] = (void*)r[i];
+	}
 	return (void*)c.Rsp;
 #elif defined(HL_LINUX) && defined(__x86_64__)
 	*pc = (void*)shared_context.context.uc_mcontext.gregs[REG_RIP];
@@ -276,7 +284,35 @@ static bool read_blocking_thread_data( thread_handle *t ) {
 	PROFILE_BARRIER();
 	stack_cur = (void**)inf->stack_cur;
 	if( stack_cur == NULL || (void*)stack_cur >= inf->stack_top ) return false;
+#ifdef WIN64_UNWIND_TABLES
+	{
+		// unwind from the frame that saved the context, with the registers saved by setjmp.
+		// hl_blocking has already returned when the thread blocks : start from its caller instead
+		_JUMP_BUFFER *jb = (_JUMP_BUFFER*)&inf->gc_regs;
+		void *regs[16] = {0};
+		char *sp = (char*)inf->gc_ctx_sp;
+		void *pc = inf->gc_ctx_pc;
+		DWORD64 base = 0;
+		PRUNTIME_FUNCTION f = pc ? RtlLookupFunctionEntry((DWORD64)pc, &base, NULL) : NULL;
+		if( f && base + f->BeginAddress == (DWORD64)(void*)hl_blocking ) {
+			sp = (char*)inf->gc_ctx_caller_sp;
+			pc = inf->gc_ctx_caller_pc;
+		}
+		if( pc == NULL || sp == NULL || (void*)sp >= inf->stack_top ) return false;
+		regs[3] = (void*)jb->Rbx;
+		regs[4] = sp;
+		regs[5] = (void*)jb->Rbp;
+		regs[6] = (void*)jb->Rsi;
+		regs[7] = (void*)jb->Rdi;
+		regs[12] = (void*)jb->R12;
+		regs[13] = (void*)jb->R13;
+		regs[14] = (void*)jb->R14;
+		regs[15] = (void*)jb->R15;
+		count = hl_module_capture_stack_unwind(pc, sp, regs, false, sp, inf->stack_top, NULL, data.stackOut, MAX_STACK_COUNT);
+	}
+#else
 	count = hl_module_capture_stack_walk(NULL, NULL, stack_cur, inf->stack_top, NULL, data.stackOut, MAX_STACK_COUNT);
+#endif
 	PROFILE_BARRIER();
 	if( inf->gc_ctx_seq != seq || inf->gc_blocking <= 0 )
 		return false;
@@ -298,7 +334,8 @@ static void read_thread_data( thread_handle *t, bool locked ) {
 	if( !pause_thread(t,true) )
 		return;
 	void *pc, *fp;
-	void *stack = get_thread_stackptr(t,&pc,&fp);
+	void *regs[16] = {0};
+	void *stack = get_thread_stackptr(t,&pc,&fp,regs);
 	if( !stack ) {
 		pause_thread(t,false);
 		return;
@@ -313,7 +350,11 @@ static void read_thread_data( thread_handle *t, bool locked ) {
 	if( size > MAX_STACK_SIZE-32 ) size = MAX_STACK_SIZE-32;
 	memcpy(data.tmpMemory,stack,size);
 	pause_thread(t, false);
+#	ifdef WIN64_UNWIND_TABLES
+	int count = hl_module_capture_stack_unwind(pc, stack, regs, true, stack, (char*)stack + size, data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
+#	else
 	int count = hl_module_capture_stack_walk(pc, fp, stack, (char*)stack + size, data.tmpMemory, data.stackOut, MAX_STACK_COUNT);
+#	endif
 #endif
 	record_sample(t,count);
 }
