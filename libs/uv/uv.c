@@ -1,73 +1,83 @@
 #define HL_NAME(n) uv_##n
 #ifdef _WIN32
-#	include <uv.h>
-#	include <hl.h>
+#include <uv.h>
+#include <hl.h>
 #else
-#	include <hl.h>
-#	include <uv.h>
+#include <hl.h>
+#include <uv.h>
 #endif
 
 #if (UV_VERSION_MAJOR <= 0)
-#	error "libuv1-dev required, uv version 0.x found"
+#error "libuv1-dev required, uv version 0.x found"
 #endif
 
 typedef struct sockaddr uv_sockaddr;
 
-#define EVT_CLOSE	1
+#define EVT_CLOSE 1
 
-#define EVT_READ	0	// stream
-#define EVT_LISTEN	2	// stream
+#define EVT_READ 0	 // stream
+#define EVT_LISTEN 2 // stream
 
-#define EVT_WRITE	0	// write_t
-#define EVT_CONNECT	0	// connect_t
+#define EVT_WRITE 0	  // write_t
+#define EVT_CONNECT 0 // connect_t
 
-#define EVT_FS	0
-#define EVT_FS_EX	3
+#define EVT_FS 0
+#define EVT_FS_EX 3
 
-#define EVT_MAX		3
+#define EVT_MAX 3
 
-typedef struct {
+typedef struct
+{
 	vclosure *events[EVT_MAX + 1];
 	void *write_data;
 } events_data;
 
-#define UV_DATA(h)		((events_data*)((h)->data))
+#define UV_DATA(h) ((events_data *)((h)->data))
 
-#define _LOOP	_ABSTRACT(uv_loop)
+#define _LOOP _ABSTRACT(uv_loop)
 #define _HANDLE _ABSTRACT(uv_handle)
-#define _CALLB	_FUN(_VOID,_NO_ARG)
-#define UV_ALLOC(t)		((t*)malloc(sizeof(t)))
+#define _CALLB _FUN(_VOID, _NO_ARG)
+#define UV_ALLOC(t) ((t *)malloc(sizeof(t)))
 
 // HANDLE
 
-static events_data *init_hl_data( uv_handle_t *h ) {
+static events_data *init_hl_data(uv_handle_t *h)
+{
 	events_data *d = hl_gc_alloc_raw(sizeof(events_data));
-	memset(d,0,sizeof(events_data));
+	memset(d, 0, sizeof(events_data));
 	hl_add_root(&h->data);
 	h->data = d;
 	return d;
 }
 
-static void register_callb( uv_handle_t *h, vclosure *c, int event_kind ) {
-	if( !h || !h->data ) return;
+static void register_callb(uv_handle_t *h, vclosure *c, int event_kind)
+{
+	if (!h || !h->data)
+		return;
 	UV_DATA(h)->events[event_kind] = c;
 }
 
-static void clear_callb( uv_handle_t *h, int event_kind ) {
-	register_callb(h,NULL,event_kind);
+static void clear_callb(uv_handle_t *h, int event_kind)
+{
+	register_callb(h, NULL, event_kind);
 }
 
-static void trigger_callb( uv_handle_t *h, int event_kind, vdynamic **args, int nargs, bool repeat ) {
+static void trigger_callb(uv_handle_t *h, int event_kind, vdynamic **args, int nargs, bool repeat)
+{
 	events_data *ev = UV_DATA(h);
 	vclosure *c = ev ? ev->events[event_kind] : NULL;
-	if( !c ) return;
-	if( !repeat ) ev->events[event_kind] = NULL;
+	if (!c)
+		return;
+	if (!repeat)
+		ev->events[event_kind] = NULL;
 	hl_dyn_call(c, args, nargs);
 }
 
-static void on_close( uv_handle_t *h ) {
+static void on_close(uv_handle_t *h)
+{
 	events_data *ev = UV_DATA(h);
-	if( !ev ) return;
+	if (!ev)
+		return;
 	trigger_callb(h, EVT_CLOSE, NULL, 0, false);
 	free(ev->write_data);
 	hl_remove_root(&h->data);
@@ -75,11 +85,14 @@ static void on_close( uv_handle_t *h ) {
 	free(h);
 }
 
-static void free_handle( void *h ) {
-	if( h ) uv_close((uv_handle_t*)h, on_close);
+static void free_handle(void *h)
+{
+	if (h)
+		uv_close((uv_handle_t *)h, on_close);
 }
 
-HL_PRIM void HL_NAME(close_handle)( uv_handle_t *h, vclosure *c ) {
+HL_PRIM void HL_NAME(close_handle)(uv_handle_t *h, vclosure *c)
+{
 	register_callb(h, c, EVT_CLOSE);
 	free_handle(h);
 }
@@ -88,37 +101,42 @@ DEFINE_PRIM(_VOID, close_handle, _HANDLE _CALLB);
 
 // STREAM
 
-static void on_write( uv_write_t *wr, int status ) {
+static void on_write(uv_write_t *wr, int status)
+{
 	vdynamic b;
 	vdynamic *args = &b;
 	b.t = &hlt_bool;
 	b.v.b = status == 0;
-	trigger_callb((uv_handle_t*)wr,EVT_WRITE,&args,1,false);
-	on_close((uv_handle_t*)wr);
+	trigger_callb((uv_handle_t *)wr, EVT_WRITE, &args, 1, false);
+	on_close((uv_handle_t *)wr);
 }
 
-HL_PRIM bool HL_NAME(stream_write)( uv_stream_t *s, vbyte *b, int size, vclosure *c ) {
+HL_PRIM bool HL_NAME(stream_write)(uv_stream_t *s, vbyte *b, int size, vclosure *c)
+{
 	uv_write_t *wr = UV_ALLOC(uv_write_t);
-	events_data *d = init_hl_data((uv_handle_t*)wr);
+	events_data *d = init_hl_data((uv_handle_t *)wr);
 	// keep a copy of the data
 	uv_buf_t buf;
 	d->write_data = malloc(size);
-	memcpy(d->write_data,b,size);
+	memcpy(d->write_data, b, size);
 	buf.base = d->write_data;
 	buf.len = size;
-	register_callb((uv_handle_t*)wr,c,EVT_WRITE);
-	if( uv_write(wr,s,&buf,1,on_write) < 0 ) {
-		on_close((uv_handle_t*)wr);
+	register_callb((uv_handle_t *)wr, c, EVT_WRITE);
+	if (uv_write(wr, s, &buf, 1, on_write) < 0)
+	{
+		on_close((uv_handle_t *)wr);
 		return false;
 	}
 	return true;
 }
 
-static void on_alloc( uv_handle_t* h, size_t size, uv_buf_t *buf ) {
+static void on_alloc(uv_handle_t *h, size_t size, uv_buf_t *buf)
+{
 	*buf = uv_buf_init(malloc(size), (int)size);
 }
 
-static void on_read( uv_stream_t *s, ssize_t nread, const uv_buf_t *buf ) {
+static void on_read(uv_stream_t *s, ssize_t nread, const uv_buf_t *buf)
+{
 	vdynamic bytes;
 	vdynamic len;
 	vdynamic *args[2];
@@ -128,31 +146,35 @@ static void on_read( uv_stream_t *s, ssize_t nread, const uv_buf_t *buf ) {
 	len.v.i = (int)nread;
 	args[0] = &bytes;
 	args[1] = &len;
-	trigger_callb((uv_handle_t*)s,EVT_READ,args,2,true);
+	trigger_callb((uv_handle_t *)s, EVT_READ, args, 2, true);
 	free(buf->base);
 }
 
-HL_PRIM bool HL_NAME(stream_read_start)( uv_stream_t *s, vclosure *c ) {
-	register_callb((uv_handle_t*)s,c,EVT_READ);
-	return uv_read_start(s,on_alloc,on_read) >= 0;
+HL_PRIM bool HL_NAME(stream_read_start)(uv_stream_t *s, vclosure *c)
+{
+	register_callb((uv_handle_t *)s, c, EVT_READ);
+	return uv_read_start(s, on_alloc, on_read) >= 0;
 }
 
-HL_PRIM void HL_NAME(stream_read_stop)( uv_stream_t *s ) {
+HL_PRIM void HL_NAME(stream_read_stop)(uv_stream_t *s)
+{
 	uv_read_stop(s);
-	clear_callb((uv_handle_t*)s,EVT_READ); // clear callback
+	clear_callb((uv_handle_t *)s, EVT_READ); // clear callback
 }
 
-static void on_listen( uv_stream_t *s, int status ) {
-	trigger_callb((uv_handle_t*)s, EVT_LISTEN, NULL, 0, true);
+static void on_listen(uv_stream_t *s, int status)
+{
+	trigger_callb((uv_handle_t *)s, EVT_LISTEN, NULL, 0, true);
 }
 
-HL_PRIM bool HL_NAME(stream_listen)( uv_stream_t *s, int count, vclosure *c ) {
-	register_callb((uv_handle_t*)s,c,EVT_LISTEN);
-	return uv_listen(s,count,on_listen) >= 0;
+HL_PRIM bool HL_NAME(stream_listen)(uv_stream_t *s, int count, vclosure *c)
+{
+	register_callb((uv_handle_t *)s, c, EVT_LISTEN);
+	return uv_listen(s, count, on_listen) >= 0;
 }
 
-DEFINE_PRIM(_BOOL, stream_write, _HANDLE _BYTES _I32 _FUN(_VOID,_BOOL));
-DEFINE_PRIM(_BOOL, stream_read_start, _HANDLE _FUN(_VOID,_BYTES _I32));
+DEFINE_PRIM(_BOOL, stream_write, _HANDLE _BYTES _I32 _FUN(_VOID, _BOOL));
+DEFINE_PRIM(_BOOL, stream_read_start, _HANDLE _FUN(_VOID, _BYTES _I32));
 DEFINE_PRIM(_VOID, stream_read_stop, _HANDLE);
 DEFINE_PRIM(_BOOL, stream_listen, _HANDLE _I32 _CALLB);
 
@@ -160,140 +182,195 @@ DEFINE_PRIM(_BOOL, stream_listen, _HANDLE _I32 _CALLB);
 
 #define _TCP _HANDLE
 
-HL_PRIM uv_tcp_t *HL_NAME(tcp_init_wrap)( uv_loop_t *loop ) {
+HL_PRIM uv_tcp_t *HL_NAME(tcp_init_wrap)(uv_loop_t *loop)
+{
 	uv_tcp_t *t = UV_ALLOC(uv_tcp_t);
-	if( uv_tcp_init(loop,t) < 0 ) {
+	if (uv_tcp_init(loop, t) < 0)
+	{
 		free(t);
 		return NULL;
 	}
-	init_hl_data((uv_handle_t*)t);
+	init_hl_data((uv_handle_t *)t);
 	return t;
 }
 
-static void on_connect( uv_connect_t *cnx, int status ) {
+static void on_connect(uv_connect_t *cnx, int status)
+{
 	vdynamic b;
 	vdynamic *args = &b;
 	b.t = &hlt_bool;
 	b.v.b = status == 0;
-	trigger_callb((uv_handle_t*)cnx,EVT_CONNECT,&args,1,false);
-	on_close((uv_handle_t*)cnx);
+	trigger_callb((uv_handle_t *)cnx, EVT_CONNECT, &args, 1, false);
+	on_close((uv_handle_t *)cnx);
 }
 
-HL_PRIM uv_connect_t *HL_NAME(tcp_connect_wrap)( uv_tcp_t *t, int host, int port, vclosure *c ) {
+HL_PRIM uv_connect_t *HL_NAME(tcp_connect_wrap)(uv_tcp_t *t, int host, int port, vclosure *c)
+{
 	uv_connect_t *cnx = UV_ALLOC(uv_connect_t);
 	struct sockaddr_in addr;
-	memset(&addr,0,sizeof(addr));
+	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons((unsigned short)port);
-	*(int*)&addr.sin_addr.s_addr = host;
-	if( !t || uv_tcp_connect(cnx,t,(uv_sockaddr *)&addr,on_connect) < 0 ) {
+	*(int *)&addr.sin_addr.s_addr = host;
+	if (!t || uv_tcp_connect(cnx, t, (uv_sockaddr *)&addr, on_connect) < 0)
+	{
 		free(cnx);
 		return NULL;
 	}
-	memset(&addr,0,sizeof(addr));
-	init_hl_data((uv_handle_t*)cnx);
-	register_callb((uv_handle_t*)cnx, c, EVT_CONNECT);
+	memset(&addr, 0, sizeof(addr));
+	init_hl_data((uv_handle_t *)cnx);
+	register_callb((uv_handle_t *)cnx, c, EVT_CONNECT);
 	return cnx;
 }
 
-HL_PRIM bool HL_NAME(tcp_bind_wrap)( uv_tcp_t *t, int host, int port ) {
+HL_PRIM bool HL_NAME(tcp_bind_wrap)(uv_tcp_t *t, int host, int port)
+{
 	struct sockaddr_in addr;
-	memset(&addr,0,sizeof(addr));
+	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons((unsigned short)port);
-	*(int*)&addr.sin_addr.s_addr = host;
-	return uv_tcp_bind(t,(uv_sockaddr *)&addr,0) >= 0;
+	*(int *)&addr.sin_addr.s_addr = host;
+	return uv_tcp_bind(t, (uv_sockaddr *)&addr, 0) >= 0;
 }
 
-
-HL_PRIM uv_tcp_t *HL_NAME(tcp_accept_wrap)( uv_tcp_t *t ) {
+HL_PRIM uv_tcp_t *HL_NAME(tcp_accept_wrap)(uv_tcp_t *t)
+{
 	uv_tcp_t *client = UV_ALLOC(uv_tcp_t);
-	if( uv_tcp_init(t->loop, client) < 0 ) {
+	if (uv_tcp_init(t->loop, client) < 0)
+	{
 		free(client);
 		return NULL;
 	}
-	if( uv_accept((uv_stream_t*)t,(uv_stream_t*)client) < 0 ) {
-		uv_close((uv_handle_t*)client, NULL);
+	if (uv_accept((uv_stream_t *)t, (uv_stream_t *)client) < 0)
+	{
+		uv_close((uv_handle_t *)client, NULL);
 		return NULL;
 	}
-	init_hl_data((uv_handle_t*)client);
+	init_hl_data((uv_handle_t *)client);
 	return client;
 }
 
-HL_PRIM void HL_NAME(tcp_nodelay_wrap)( uv_tcp_t *t, bool enable ) {
-	uv_tcp_nodelay(t,enable?1:0);
+HL_PRIM void HL_NAME(tcp_nodelay_wrap)(uv_tcp_t *t, bool enable)
+{
+	uv_tcp_nodelay(t, enable ? 1 : 0);
 }
 
 #define _FS _HANDLE
 
-static void on_fs_event(uv_fs_event_t* handle, const char* filename, int events, int status) {
+static void on_fs_event(uv_fs_event_t *handle, const char *filename, int events, int status)
+{
 	vdynamic ev;
 	ev.t = &hlt_i32;
 	ev.v.i = events;
 
-	vdynamic* args[1];
+	vdynamic *args[1];
 	args[0] = &ev;
 
-	trigger_callb((uv_handle_t*)handle, EVT_FS, args, 1, true);
+	trigger_callb((uv_handle_t *)handle, EVT_FS, args, 1, true);
 }
 
-static void on_fs_event_ex(uv_fs_event_t* handle, const char* filename, int events, int status) {
+static void on_fs_event_ex(uv_fs_event_t *handle, const char *filename, int events, int status)
+{
 	vdynamic name;
 	name.t = &hlt_bytes;
-	name.v.ptr = (void*)filename;
+	name.v.ptr = (void *)filename;
 
 	vdynamic ev;
 	ev.t = &hlt_i32;
 	ev.v.i = events;
 
-	vdynamic* args[2];
+	vdynamic *args[2];
 	args[0] = &name;
 	args[1] = &ev;
 
-	trigger_callb((uv_handle_t*)handle, EVT_FS_EX, args, 2, true);
+	trigger_callb((uv_handle_t *)handle, EVT_FS_EX, args, 2, true);
 }
 
-HL_PRIM uv_fs_event_t* HL_NAME(fs_start_wrap)(uv_loop_t* loop, vclosure* cb, char* path) {
-	uv_fs_event_t* handle = UV_ALLOC(uv_fs_event_t);
-	if (uv_fs_event_init(loop, handle) < 0) {
+HL_PRIM uv_fs_event_t *HL_NAME(fs_start_wrap)(uv_loop_t *loop, vclosure *cb, char *path)
+{
+	uv_fs_event_t *handle = UV_ALLOC(uv_fs_event_t);
+	if (uv_fs_event_init(loop, handle) < 0)
+	{
 		free(handle);
 		return NULL;
 	}
-	init_hl_data((uv_handle_t*) handle);
-	register_callb((uv_handle_t*)handle, cb, EVT_FS);
+	init_hl_data((uv_handle_t *)handle);
+	register_callb((uv_handle_t *)handle, cb, EVT_FS);
 
-	if (uv_fs_event_start(handle, on_fs_event, path, 0) < 0) {
+	if (uv_fs_event_start(handle, on_fs_event, path, 0) < 0)
+	{
 		free_handle(handle);
 		return NULL;
 	}
 	return handle;
 }
 
-HL_PRIM uv_fs_event_t* HL_NAME(fs_start_wrap_ex)(uv_loop_t* loop, vclosure* cb, char* path, bool recursive) {
-	// Uv only implements the recursive flag on Windows and MacOs
-	#if !defined(HL_WIN) && !defined(HL_MAC)
+HL_PRIM uv_fs_event_t *HL_NAME(fs_start_wrap_ex)(uv_loop_t *loop, vclosure *cb, char *path, bool recursive)
+{
+// Uv only implements the recursive flag on Windows and MacOs
+#if !defined(HL_WIN) && !defined(HL_MAC)
 	if (recursive)
 		return NULL;
-	#endif
-	uv_fs_event_t* handle = UV_ALLOC(uv_fs_event_t);
-	if (uv_fs_event_init(loop, handle) < 0) {
+#endif
+	uv_fs_event_t *handle = UV_ALLOC(uv_fs_event_t);
+	if (uv_fs_event_init(loop, handle) < 0)
+	{
 		free(handle);
 		return NULL;
 	}
-	init_hl_data((uv_handle_t*)handle);
-	register_callb((uv_handle_t*)handle, cb, EVT_FS_EX);
+	init_hl_data((uv_handle_t *)handle);
+	register_callb((uv_handle_t *)handle, cb, EVT_FS_EX);
 
-	if (uv_fs_event_start(handle, on_fs_event_ex, path, recursive ? UV_FS_EVENT_RECURSIVE : 0) < 0) {
+	if (uv_fs_event_start(handle, on_fs_event_ex, path, recursive ? UV_FS_EVENT_RECURSIVE : 0) < 0)
+	{
 		free_handle(handle);
 		return NULL;
 	}
 	return handle;
 }
 
-HL_PRIM bool HL_NAME(fs_stop_wrap)(uv_fs_event_t* handle) {
-	clear_callb((uv_handle_t*)handle, EVT_FS);
-	clear_callb((uv_handle_t*)handle, EVT_FS_EX);
+HL_PRIM bool HL_NAME(fs_stop_wrap)(uv_fs_event_t *handle)
+{
+	clear_callb((uv_handle_t *)handle, EVT_FS);
+	clear_callb((uv_handle_t *)handle, EVT_FS_EX);
 	return uv_fs_event_stop(handle);
+}
+
+HL_PRIM vbyte *HL_NAME(tcp_getpeername_str_wrap)(uv_tcp_t *t)
+{
+	struct sockaddr_storage addr;
+	int addr_len = sizeof(addr);
+	if (uv_tcp_getpeername(t, (uv_sockaddr *)&addr, &addr_len) < 0)
+		return NULL;
+
+	char ip[INET6_ADDRSTRLEN];
+	ip[0] = 0;
+	int port = 0;
+
+	if (addr.ss_family == AF_INET)
+	{
+		struct sockaddr_in *a = (struct sockaddr_in *)&addr;
+		uv_inet_ntop(AF_INET, &a->sin_addr, ip, sizeof(ip));
+		port = ntohs(a->sin_port);
+	}
+	else if (addr.ss_family == AF_INET6)
+	{
+		struct sockaddr_in6 *a = (struct sockaddr_in6 *)&addr;
+		uv_inet_ntop(AF_INET6, &a->sin6_addr, ip, sizeof(ip));
+		port = ntohs(a->sin6_port);
+	}
+	else
+	{
+		return NULL;
+	}
+
+	char result[INET6_ADDRSTRLEN + 8];
+	snprintf(result, sizeof(result), "%s:%d", ip, port);
+
+	int len = (int)strlen(result);
+	vbyte *out = hl_alloc_bytes(len + 1);
+	memcpy(out, result, len + 1);
+	return out;
 }
 
 DEFINE_PRIM(_TCP, tcp_init_wrap, _LOOP);
@@ -301,8 +378,7 @@ DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID, _BOOL));
 DEFINE_PRIM(_BOOL, tcp_bind_wrap, _TCP _I32 _I32);
 DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
 DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _TCP _BOOL);
-
-// handle FS
+DEFINE_PRIM(_BYTES, tcp_getpeername_str_wrap, _TCP);
 
 DEFINE_PRIM(_FS, fs_start_wrap, _LOOP _FUN(_VOID, _I32) _BYTES);
 DEFINE_PRIM(_FS, fs_start_wrap_ex, _LOOP _FUN(_VOID, _BYTES _I32) _BYTES _BOOL);
@@ -310,8 +386,9 @@ DEFINE_PRIM(_BOOL, fs_stop_wrap, _FS);
 
 // loop
 
-HL_PRIM uv_loop_t *HL_NAME(create_loop)() {
-	uv_loop_t *l = (uv_loop_t*)hl_gc_alloc_noptr(sizeof(uv_loop_t));
+HL_PRIM uv_loop_t *HL_NAME(create_loop)()
+{
+	uv_loop_t *l = (uv_loop_t *)hl_gc_alloc_noptr(sizeof(uv_loop_t));
 	uv_loop_init(l);
 	return l;
 }
@@ -323,23 +400,28 @@ DEFINE_PRIM(_I32 HL_CALLB, run, _LOOP _I32);
 DEFINE_PRIM(_I32, loop_alive, _LOOP);
 DEFINE_PRIM(_VOID, stop, _LOOP);
 
-HL_PRIM uv_loop_t* HL_NAME(default_loop_wrap)() {
+HL_PRIM uv_loop_t *HL_NAME(default_loop_wrap)()
+{
 	return uv_default_loop();
 }
 
-HL_PRIM int HL_NAME(loop_close_wrap)(uv_loop_t* loop) {
+HL_PRIM int HL_NAME(loop_close_wrap)(uv_loop_t *loop)
+{
 	return uv_loop_close(loop);
 }
 
-HL_PRIM int HL_NAME(run_wrap)(uv_loop_t* loop, int mode) {
+HL_PRIM int HL_NAME(run_wrap)(uv_loop_t *loop, int mode)
+{
 	return uv_run(loop, (uv_run_mode)mode);
 }
 
-HL_PRIM int HL_NAME(loop_alive_wrap)(uv_loop_t* loop) {
+HL_PRIM int HL_NAME(loop_alive_wrap)(uv_loop_t *loop)
+{
 	return uv_loop_alive(loop);
 }
 
-HL_PRIM void HL_NAME(stop_wrap)(uv_loop_t* loop) {
+HL_PRIM void HL_NAME(stop_wrap)(uv_loop_t *loop)
+{
 	uv_stop(loop);
 }
 
