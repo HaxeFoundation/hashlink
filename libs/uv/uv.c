@@ -24,6 +24,9 @@ typedef struct sockaddr uv_sockaddr;
 #define EVT_FS	0
 #define EVT_FS_EX	3
 
+#define EVT_ASYNC	0	// async_t
+#define EVT_TIMER	0	// timer_t
+
 #define EVT_MAX		3
 
 typedef struct {
@@ -307,6 +310,75 @@ DEFINE_PRIM(_VOID, tcp_nodelay_wrap, _TCP _BOOL);
 DEFINE_PRIM(_FS, fs_start_wrap, _LOOP _FUN(_VOID, _I32) _BYTES);
 DEFINE_PRIM(_FS, fs_start_wrap_ex, _LOOP _FUN(_VOID, _BYTES _I32) _BYTES _BOOL);
 DEFINE_PRIM(_BOOL, fs_stop_wrap, _FS);
+
+// HANDLE REF
+
+HL_PRIM void HL_NAME(handle_ref_wrap)( uv_handle_t *h ) {
+	if( h ) uv_ref(h);
+}
+
+HL_PRIM void HL_NAME(handle_unref_wrap)( uv_handle_t *h ) {
+	if( h ) uv_unref(h);
+}
+
+DEFINE_PRIM(_VOID, handle_ref_wrap, _HANDLE);
+DEFINE_PRIM(_VOID, handle_unref_wrap, _HANDLE);
+
+// ASYNC
+
+static void on_async( uv_async_t *h ) {
+	trigger_callb((uv_handle_t*)h, EVT_ASYNC, NULL, 0, true);
+}
+
+HL_PRIM uv_async_t *HL_NAME(async_init_wrap)( uv_loop_t *loop, vclosure *c ) {
+	uv_async_t *a = UV_ALLOC(uv_async_t);
+	if( !loop || uv_async_init(loop, a, on_async) < 0 ) {
+		free(a);
+		return NULL;
+	}
+	init_hl_data((uv_handle_t*)a);
+	register_callb((uv_handle_t*)a, c, EVT_ASYNC);
+	return a;
+}
+
+HL_PRIM void HL_NAME(async_send_wrap)( uv_async_t *a ) {
+	if( a ) uv_async_send(a);
+}
+
+DEFINE_PRIM(_HANDLE, async_init_wrap, _LOOP _CALLB);
+DEFINE_PRIM(_VOID, async_send_wrap, _HANDLE);
+
+// TIMER
+
+static void on_timer( uv_timer_t *h ) {
+	trigger_callb((uv_handle_t*)h, EVT_TIMER, NULL, 0, true);
+}
+
+HL_PRIM uv_timer_t *HL_NAME(timer_init_wrap)( uv_loop_t *loop ) {
+	uv_timer_t *t = UV_ALLOC(uv_timer_t);
+	if( !loop || uv_timer_init(loop, t) < 0 ) {
+		free(t);
+		return NULL;
+	}
+	init_hl_data((uv_handle_t*)t);
+	return t;
+}
+
+HL_PRIM bool HL_NAME(timer_start_wrap)( uv_timer_t *t, vclosure *c, int timeout, int repeat ) {
+	if( !t ) return false;
+	register_callb((uv_handle_t*)t, c, EVT_TIMER);
+	return uv_timer_start(t, on_timer, (uint64_t)(timeout < 0 ? 0 : timeout), (uint64_t)(repeat < 0 ? 0 : repeat)) >= 0;
+}
+
+HL_PRIM bool HL_NAME(timer_stop_wrap)( uv_timer_t *t ) {
+	if( !t ) return false;
+	clear_callb((uv_handle_t*)t, EVT_TIMER);
+	return uv_timer_stop(t) >= 0;
+}
+
+DEFINE_PRIM(_HANDLE, timer_init_wrap, _LOOP);
+DEFINE_PRIM(_BOOL, timer_start_wrap, _HANDLE _CALLB _I32 _I32);
+DEFINE_PRIM(_BOOL, timer_stop_wrap, _HANDLE);
 
 // loop
 
