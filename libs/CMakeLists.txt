@@ -56,6 +56,11 @@ if(WIN32)
     add_subdirectory(directx)
 endif()
 
+option(WITH_VULKAN "Build vulkan.hdll." ON)
+if(WIN32 AND WITH_VULKAN)
+    add_subdirectory(vulkan)
+endif()
+
 option(WITH_FMT "Build fmt.hdll." ON)
 if(WITH_FMT)
     add_subdirectory(fmt)
