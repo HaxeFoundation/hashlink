@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="vulkan.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\vulkan\vulkan.h">
+      <Filter>vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\vulkan\vulkan_core.h">
+      <Filter>vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\vulkan\vulkan_win32.h">
+      <Filter>vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\vma\vk_mem_alloc.h">
+      <Filter>vma</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="vulkan">
+      <UniqueIdentifier>{8f1c3a2e-5b7d-4e19-9c6a-2d4f8b0e1a37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vma">
+      <UniqueIdentifier>{c2a94d71-0e3b-4f58-b6d2-7a1e9f3c5b08}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

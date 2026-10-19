@@ -6,6 +6,7 @@
 #include <locale.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_vulkan.h>
 
 #ifdef HL_ANDROID
 // SDL3 no longer pulls SDL_main.h (where SDL_SetMainReady lives) in via SDL.h.
@@ -607,7 +608,10 @@ HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, 
 	SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
 	SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, x);
 	SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, y);
-	SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
+	if( sdlFlags & SDL_WINDOW_OPENGL )
+		SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
+	if( sdlFlags & SDL_WINDOW_VULKAN )
+		SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN, true);
 	if( sdlFlags & SDL_WINDOW_BORDERLESS )
 		SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
 	if( sdlFlags & SDL_WINDOW_FULLSCREEN )
@@ -886,6 +890,29 @@ DEFINE_PRIM(_VOID, win_swap_window, TWIN);
 DEFINE_PRIM(_VOID, win_render_to, TWIN TGL);
 DEFINE_PRIM(_VOID, win_destroy, TWIN TGL);
 DEFINE_PRIM(_I32, win_get_id, TWIN);
+
+HL_PRIM varray *HL_NAME(vk_get_instance_extensions)() {
+	Uint32 count = 0;
+	char const * const *names = SDL_Vulkan_GetInstanceExtensions(&count);
+	if( !names ) return NULL;
+	varray *arr = hl_alloc_array(&hlt_bytes, count);
+	for(Uint32 i=0;i<count;i++)
+		hl_aptr(arr,vbyte*)[i] = (vbyte*)names[i];
+	return arr;
+}
+
+DEFINE_PRIM(_ARR, vk_get_instance_extensions, _NO_ARG);
+
+#ifdef HL_64
+HL_PRIM VkSurfaceKHR HL_NAME(win_vk_create_surface)( SDL_Window *win, VkInstance instance ) {
+	VkSurfaceKHR surface;
+	if( !SDL_Vulkan_CreateSurface(win, instance, NULL, &surface) )
+		return NULL;
+	return surface;
+}
+
+DEFINE_PRIM(_ABSTRACT(vk_surface), win_vk_create_surface, TWIN _ABSTRACT(vk_instance));
+#endif
 
 // game controller
 

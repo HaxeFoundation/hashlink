@@ -1,0 +1,10 @@
+{
+	"name" : "hlvk",
+	"url" : "https://github.com/HaxeFoundation/hl/tree/master/libs/vulkan",
+	"license" : "BSD",
+	"contributors" : ["ncannasse"],
+	"description" : "Vulkan support for Haxe/HL.",
+	"version" : "1.0.0",
+	"releasenote" : "",
+	"dependencies": {}
+}
