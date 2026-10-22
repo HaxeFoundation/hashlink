@@ -139,6 +139,7 @@ HL_PRIM wref *HL_NAME(ui_button_new)( wref *w, const uchar *txt, vclosure *callb
 	wref *ref = alloc_ref(but);
 	w->width -= 80;
 	ref->callb = callb;
+	hl_add_root(&ref->callb);
 	SendMessage(but,WM_SETFONT,(WPARAM)font,TRUE);
 	SetWindowText(but,txt);
 	return ref;
@@ -173,8 +174,25 @@ HL_PRIM void HL_NAME(ui_win_set_enable)( wref *w, bool enable ) {
 	EnableWindow(w->h,enable);
 }
 
+static void release_callb( wref *w ) {
+	if( !w || !w->callb ) return;
+	hl_remove_root(&w->callb);
+	w->callb = NULL;
+}
+
+static BOOL CALLBACK release_child( HWND h, LPARAM param ) {
+	wref *w = (wref*)GetProp(h,PREF);
+	release_callb(w);
+	if( w ) w->h = NULL;
+	return TRUE;
+}
+
 HL_PRIM void HL_NAME(ui_win_destroy)( wref *w ) {
+	if( !w->h ) return;
+	EnumChildWindows(w->h,release_child,0);
+	release_callb(w);
 	DestroyWindow(w->h);
+	w->h = NULL;
 }
 
 HL_PRIM int HL_NAME(ui_loop)( bool blocking ) {
