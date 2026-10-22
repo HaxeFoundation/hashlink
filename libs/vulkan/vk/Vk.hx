@@ -361,6 +361,7 @@ enum abstract StructureType(Int) to Int {
 	var BUFFER_DEVICE_ADDRESS_INFO = 1000244001;
 	var SWAPCHAIN_CREATE_INFO = 1000001000;
 	var DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO = 1000161000;
+	var PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES = 1000161002;
 }
 
 enum abstract AttachmentLoadOp(Int) to Int {
@@ -1248,7 +1249,19 @@ enum abstract DynamicState(Int) to Int {
 	var STENCIL_COMPARE_MASK = 6;
 	var STENCIL_WRITE_MASK = 7;
 	var STENCIL_REFERENCE = 8;
+	var CULL_MODE = 1000267000;
+	var FRONT_FACE = 1000267001;
+	var PRIMITIVE_TOPOLOGY = 1000267002;
 	var VERTEX_INPUT_BINDING_STRIDE = 1000267005;
+	var DEPTH_TEST_ENABLE = 1000267006;
+	var DEPTH_WRITE_ENABLE = 1000267007;
+	var DEPTH_COMPARE_OP = 1000267008;
+	var DEPTH_BOUNDS_TEST_ENABLE = 1000267009;
+	var STENCIL_TEST_ENABLE = 1000267010;
+	var STENCIL_OP = 1000267011;
+	var RASTERIZER_DISCARD_ENABLE = 1000377001;
+	var DEPTH_BIAS_ENABLE = 1000377002;
+	var PRIMITIVE_RESTART_ENABLE = 1000377004;
 }
 
 @:struct class ShaderModuleCreateInfo {
@@ -2141,6 +2154,37 @@ enum abstract AllocatorCreateFlags(Int) to Int {
 		var arr = hl.CArray.alloc(PhysicalDeviceVulkan13Features, count);
 		for( i in 0...count ) arr[i].sType = PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
 		return arr;
+	}
+}
+
+@:struct class PhysicalDeviceDescriptorIndexingProperties {
+	var sType : StructureType;
+	public var pNext : hl.Bytes;
+	public var maxUpdateAfterBindDescriptorsInAllPools : Int;
+	public var shaderUniformBufferArrayNonUniformIndexingNative : Int;
+	public var shaderSampledImageArrayNonUniformIndexingNative : Int;
+	public var shaderStorageBufferArrayNonUniformIndexingNative : Int;
+	public var shaderStorageImageArrayNonUniformIndexingNative : Int;
+	public var shaderInputAttachmentArrayNonUniformIndexingNative : Int;
+	public var robustBufferAccessUpdateAfterBind : Int;
+	public var quadDivergentImplicitLod : Int;
+	public var maxPerStageDescriptorUpdateAfterBindSamplers : Int;
+	public var maxPerStageDescriptorUpdateAfterBindUniformBuffers : Int;
+	public var maxPerStageDescriptorUpdateAfterBindStorageBuffers : Int;
+	public var maxPerStageDescriptorUpdateAfterBindSampledImages : Int;
+	public var maxPerStageDescriptorUpdateAfterBindStorageImages : Int;
+	public var maxPerStageDescriptorUpdateAfterBindInputAttachments : Int;
+	public var maxPerStageUpdateAfterBindResources : Int;
+	public var maxDescriptorSetUpdateAfterBindSamplers : Int;
+	public var maxDescriptorSetUpdateAfterBindUniformBuffers : Int;
+	public var maxDescriptorSetUpdateAfterBindUniformBuffersDynamic : Int;
+	public var maxDescriptorSetUpdateAfterBindStorageBuffers : Int;
+	public var maxDescriptorSetUpdateAfterBindStorageBuffersDynamic : Int;
+	public var maxDescriptorSetUpdateAfterBindSampledImages : Int;
+	public var maxDescriptorSetUpdateAfterBindStorageImages : Int;
+	public var maxDescriptorSetUpdateAfterBindInputAttachments : Int;
+	public function new() {
+		sType = PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
 	}
 }
 
