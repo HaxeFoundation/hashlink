@@ -1278,6 +1278,7 @@ void hl_alloc_init( hl_alloc *a ) {
 void *hl_malloc( hl_alloc *a, int size ) {
 	hl_alloc_block *b = a->cur;
 	void *p;
+	if( size < 0 ) out_of_memory("negative size");
 	if( !size ) return NULL;
 	size += hl_pad_size(size,&hlt_dyn);
 	if( b == NULL || b->size <= size ) {

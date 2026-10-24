@@ -358,12 +358,21 @@ const char *hl_op_name( int op ) {
 static char **hl_read_strings( hl_reader *r, int nstrings, int **out_lens ) {
 	int size = hl_read_i32(r);
 	hl_code *c = r->code;
-	char *sbase = (char*)hl_malloc(&c->alloc,sizeof(char) * size);
-	char *sdata = sbase;
+	char *sbase, *sdata;
 	char **strings;
 	int *lens;
 	int i;
-	hl_read_bytes(r, sdata, size);
+	if( size < 0 || size > r->size - r->pos ) {
+		ERROR("Invalid strings size");
+		return NULL;
+	}
+	if( size == 0 )
+		sbase = "";
+	else {
+		sbase = (char*)hl_malloc(&c->alloc,size);
+		hl_read_bytes(r, sbase, size);
+	}
+	sdata = sbase;
 	ALLOC(strings, char*, nstrings);
 	ALLOC(lens, int, nstrings);
 	for(i=0;i<nstrings;i++) {
