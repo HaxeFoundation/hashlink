@@ -166,19 +166,6 @@ HL_PRIM int hl_mark_size( int data_size ) {
 	return ((ptr_count + 31) >> 5) * sizeof(int);
 }
 
-/*
-	Tells if the type is the one of a class object (holding the statics of a class), named $Name.
-*/
-HL_API bool hl_is_class_object( hl_type *t ) {
-	if( t->kind != HOBJ ) return false;
-	const uchar *name = t->obj->name, *last = name;
-	while( *name ) {
-		if( *name == '.' ) last = name + 1;
-		name++;
-	}
-	return *last == '$';
-}
-
 /**
 	Builds class metadata (fields indexes, etc.)
 	Does not require the method table to be finalized.

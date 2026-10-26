@@ -470,7 +470,6 @@ HL_API int hl_type_size( hl_type *t );
 HL_API int hl_pad_struct( int size, hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
-HL_API bool hl_is_class_object( hl_type *t );
 HL_API int hl_mark_size( int data_size );
 HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, void *ctx ), void *ctx );
 HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_start, void *skip_end );

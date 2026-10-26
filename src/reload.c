@@ -314,6 +314,17 @@ static void hot_print_fields( hot_report *r, const char *what, hl_type_obj *o1, 
 	}
 }
 
+// the type of a class object (holding the statics of a class) : named $Name
+static bool hot_is_class_object( hl_type *t ) {
+	if( t->kind != HOBJ ) return false;
+	const uchar *name = t->obj->name, *last = name;
+	while( *name ) {
+		if( *name == '.' ) last = name + 1;
+		name++;
+	}
+	return *last == '$';
+}
+
 static const uchar *hot_super_name( hl_type_obj *o ) {
 	return o->super ? o->super->obj->name : USTR("");
 }
@@ -395,7 +406,7 @@ static int hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 						break;
 					}
 			}
-			bool class_object = hl_is_class_object(told);
+			bool class_object = hot_is_class_object(told);
 			if( !same && told->kind == HOBJ && ucmp(hot_super_name(o1), hot_super_name(o2)) == 0 && hot_same_virtuals(o1, o2) )
 				return HOT_LAYOUT_INSTANCES;
 			if( !same ) {
@@ -770,7 +781,7 @@ static void hot_prepare_hooks( hot_instances *h ) {
 			// a method of the instance, without argument
 			if( f->t->fun->nargs != 1 ) continue;
 			found[count++] = hl_alloc_closure_ptr(f->t, rt->methods[-f->field_index-1], o);
-		} else if( hl_is_class_object(it->t) ) {
+		} else if( hot_is_class_object(it->t) ) {
 			// a static method : a field of the class object
 			vclosure *c = *(vclosure**)(o + f->field_index);
 			if( c && c->t->fun->nargs == 0 ) found[count++] = c;
@@ -1441,7 +1452,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		// the subclasses of a type whose layout changes have their fields at other offsets
 		for(i=0;i<c->ntypes;i++) {
 			hl_type *t = c->types + i;
-			if( t->kind != HOBJ || itype_of[i] >= 0 || hl_is_class_object(t) ) continue;
+			if( t->kind != HOBJ || itype_of[i] >= 0 || hot_is_class_object(t) ) continue;
 			hl_type *p = hot_find_type(hr, t);
 			if( p == NULL ) continue;
 			hl_type *sup = t->obj->super;
