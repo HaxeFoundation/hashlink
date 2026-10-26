@@ -63,6 +63,7 @@ struct hl_function {
 		const uchar *name;
 		hl_function *ref; // obj = NULL
 	} field;
+	const uchar *lname; // the name of a local function in its method (bytecode 7), NULL if unknown
 };
 
 #define fun_obj(f) ((f)->obj ? (f)->obj : (f)->field.ref ? (f)->field.ref->obj : NULL)

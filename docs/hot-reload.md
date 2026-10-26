@@ -40,7 +40,7 @@
 - With `-dce std` (the default), the first use of something of a standard class can change its layout: a static (`Type.getClassName`, `dce_std`) or an instance field (the stack of `haxe.Exception` adds `__exceptionStack`, `dce_instance_field`). Both are handled (U1, U4).
 - Adding an instance method is accepted when the virtual slots do not change; the live type keeps its proto, so the new method is not visible to reflection on it (U5).
 - The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype and calls the address (`tests/hotreload/cases/string_compare`).
-- Shaders (Heaps): the source of a shader is the static `SRC`, and `_SHADER` caches the shader built from it. The compiler sets the static finals again at every reload (they are constants of the code); with the change of Heaps in `tests/hotreload/heaps/heaps.patch` (the hxsl macro makes `SRC` final, `SharedShader` keeps its source, and with `-D hot-reload` `Shader.initialize` builds the shader again when `SRC` changed), a changed shader source is used by the new shader instances.
+- Shaders (Heaps): the source of a shader is the static `SRC`, and `_SHADER` caches the shader built from it. The initializer of a static with `@:hotReload` runs again after every reload (`static_hot_reload`); with the change of Heaps in `tests/hotreload/heaps/heaps.patch` (the hxsl macro puts `@:hotReload` on `SRC`, `SharedShader` keeps its source, and with `-D hot-reload` `Shader.initialize` builds the shader again when `SRC` changed), a changed shader source is used by the new shader instances.
 - The global of a class or an enum is now identified by its name: its type hash changed with any type it references, which allocated a new global and lost the statics.
 
 ## What already works
@@ -184,7 +184,7 @@ After a successful upgrade, call an optional method on each upgraded instance (f
 
 A removed constructor with params and live values refuses the reload. The constant of a removed constructor without params is referenced by the enum object and a global: the reload is refused only when something else references it (a walk of the blocks, the stacks); otherwise it is detached.
 
-The signature of a local function keeps the structure of its context (an anonymous enum): when the captured variables change, the live closures keep their body and their context, the new closures use the new body (`closure_captures`).
+The signature of a local function keeps the structure of its context (an anonymous enum): when the captured variables change, the live closures keep their body and their context, the new closures use the new body (`closure_captures`). Otherwise the live closures run the new body of their function, which is identified by its name in its method rather than by its rank (bytecode 7): the compiler names a local function after what receives it (a variable, a field, the function it is passed to, `return`), prefixed by the name of the local function that holds it, with a rank among the functions of the same name (`closure_insert`). Adding a local function only shifts the ones of the same name.
 
 - Constructor added at the end: no change for live values.
 - Constructor added in the middle, removed or reordered: remap the constructor index of every live value of that enum (found by the U4 walk); values of a removed constructor have no target, so the reload is refused if any is alive.
@@ -246,7 +246,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Operation | Expected | Needs |
 |---|---|---|
 | Change the body of a local function | Accepted; new closures use it | now |
-| Add a local function before existing ones | Accepted; live closures keep their own body (positional matching fixed) | open point |
+| Add a local function before existing ones | Accepted; live closures run the new body of their own function (matched by name) | done |
 | Remove a local function | Accepted; live closures keep the old body | now |
 | Change the captured variables | Accepted for new closures; live closures keep their old environment | done |
 
@@ -276,7 +276,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Remove a static | Accepted | done |
 | Change the type of a static | Accepted as remove + add | done |
 | Change the initializer of an existing static | Accepted; the current value is kept | 5 |
-| Change a `static inline` / `final` constant | Accepted; inlined uses compiled again, a static final is set again | done |
+| Change a `static inline` / `final` constant | Accepted; inlined uses compiled again; a static keeps its value, unless it has `@:hotReload` (set again by every reload) | done |
 | Static of a new class | Accepted; value kept across later reloads | 1 |
 
 ### Classes and interfaces
@@ -339,7 +339,7 @@ Heaps checks for a reload every frame when compiled with `-D hot-reload` (`hxd.S
 ## Open points
 
 - **Detecting a file change.** `check_reload` (`src/main.c`) now compares the high resolution write time and the size. A partly written file fails to load and is read again at its next change; the compiler should still write the `.hl` atomically (temporary file, then rename).
-- **Closures matched by position.** Local functions are identified by their number in the parent function (`f->ref`, `#k` names in the linker). Adding one shifts the following ones: a live closure can then run the body of another one.
+- **Closures of the same name.** Local functions are identified by their name in their method (bytecode 7, `hl_function.lname`), by their rank before. Two functions of the same name (two closures passed to `map` in the same method) are told apart by their rank: adding one before the other shifts it.
 
 ## Out of scope for now
 

@@ -1,0 +1,5 @@
+v0 step 0 a=A1 b=B1 named=N2 arg=G1
+[HotReload] 1 objects upgraded, 1 moved
+[HotReload] 10 changes
+reload 1: applied
+v1 step 1 a=A2:1 b=B2:1 named=N2:2 arg=G2:1

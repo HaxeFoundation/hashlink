@@ -1,13 +1,14 @@
 diff --git a/hxsl/Macros.hx b/hxsl/Macros.hx
-index 7be67b4..fc08895 100644
+index 7be67b4..081f7e5 100644
 --- a/hxsl/Macros.hx
 +++ b/hxsl/Macros.hx
-@@ -609,6 +609,8 @@ class Macros {
+@@ -609,6 +609,9 @@ class Macros {
  				case FVar(_, expr) if( expr != null ):
  					var pos = expr.pos;
  					if( !Lambda.has(f.access, AStatic) ) f.access.push(AStatic);
-+					// final : a hot reload sets it again with the new source
-+					if( !Lambda.has(f.access, AFinal) ) f.access.push(AFinal);
++					// @:hotReload : a hot reload sets it again with the new source
++					if( f.meta == null ) f.meta = [];
++					f.meta.push({ name : ":hotReload", params : [], pos : pos });
  					var cl = Context.getLocalClass();
  					var c = cl.get();
  					try {

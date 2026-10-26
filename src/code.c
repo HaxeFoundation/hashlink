@@ -350,6 +350,11 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 	f->ops = (hl_opcode*)hl_malloc(&r->code->falloc, f->nops * sizeof(hl_opcode));
 	for(i=0;i<f->nops;i++)
 		hl_read_opcode(r, f, f->ops+i);
+	f->lname = NULL;
+	if( r->code->version >= 7 ) {
+		int k = UINDEX();
+		if( k > 0 && k - 1 < r->code->nstrings ) f->lname = hl_get_ustring(r->code, k - 1);
+	}
 }
 
 #undef CHK_ERROR
@@ -797,7 +802,12 @@ static int hash_fun_sign( hl_code_hash *h, hl_function *f ) {
 	} else if( f->field.ref ) {
 		HUSTR(f->field.ref->obj->name);
 		HUSTR(f->field.ref->field.name);
-		H32(f->ref);
+		// a local function : by its name when the bytecode has it, else by its rank in the method
+		if( f->lname ) {
+			HUSTR(f->lname);
+		} else {
+			H32(f->ref);
+		}
 	}
 	return hash;
 }
