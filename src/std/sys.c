@@ -683,6 +683,14 @@ HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
 	return hl_setup.reload_check != NULL && hl_setup.reload_check(debug_alt_file);
 }
 
+/*
+	Hot reload : which statics of a class the entry point must initialize, by words of 32 bits
+	(bit k of word w is the own field w * 32 + k of the class object type t), word -1 telling if the class is new.
+*/
+HL_PRIM int hl_hot_init_bits( hl_type *t, int word ) {
+	return hl_setup.hot_init_bits ? hl_setup.hot_init_bits(t, word) : 0;
+}
+
 HL_PRIM bool hl_sys_has_debugger() {
 	return hl_setup.is_debugger_attached;
 }
@@ -729,6 +737,7 @@ DEFINE_PRIM(_I32, sys_get_char, _BOOL);
 DEFINE_PRIM(_ARR, sys_args, _NO_ARG);
 DEFINE_PRIM(_I32, sys_getpid, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_check_reload, _BYTES);
+DEFINE_PRIM(_I32, hot_init_bits, _TYPE _I32);
 DEFINE_PRIM(_VOID, sys_profile_event, _I32 _BYTES _I32);
 DEFINE_PRIM(_VOID, sys_vtune_init, _NO_ARG);
 DEFINE_PRIM(_I32, sys_set_flags, _I32);

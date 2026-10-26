@@ -44,6 +44,7 @@ HL_API void hl_prim_not_loaded( const uchar *err );
 static int hot_reload_extra_globals();
 static void hot_reload_init( hl_module *m, int max_globals, int max_globals_size );
 static void hot_reload_free( hl_hot_reload *hr );
+static int hot_init_bits( hl_type *t, int word );
 
 static hl_module **cur_modules = NULL;
 static int modules_count = 0;
@@ -1063,6 +1064,7 @@ int hl_module_init( hl_module *m, int flags ) {
 #	endif
 	hl_jit_free(ctx, false);
 	if( hot_reload ) {
+		hl_setup.hot_init_bits = hot_init_bits;
 		hl_code_hash_finalize(m->hash);
 		hot_reload_init(m, m->code->nglobals + extra_globals, m->globals_size + extra_globals * (int)sizeof(void*));
 	}
@@ -1554,6 +1556,19 @@ static h_bool hot_refuse( hl_module *m2, const char *msg, const char *details ) 
 	return false;
 }
 
+// the reload whose entry point is running : the types of its code that are new
+static hl_code *hot_init_code = NULL;
+static bool *hot_init_new_types = NULL;
+
+static int hot_init_bits( hl_type *t, int word ) {
+	hl_code *c = hot_init_code;
+	if( c == NULL || t < c->types || t >= c->types + c->ntypes )
+		return 0;
+	if( !hot_init_new_types[t - c->types] )
+		return 0; // statics added to an existing class : needs the upgrade of class objects
+	return word < 0 ? 1 : -1;
+}
+
 #define HOT_SKIP		-1	// not identified : compiled, but not callable by previous code
 #define HOT_SAME		-2	// unchanged : uses the current version
 #define HOT_ADDED		-3	// new function
@@ -1682,9 +1697,11 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	}
 
 	// alias the types which have the same layout : they are different pointers but share the runtime data
+	bool *new_types = (bool*)malloc(sizeof(bool) * (c->ntypes + 1));
 	for(i=0;i<c->ntypes;i++) {
 		hl_type *t = c->types + i;
 		hl_type *p = hot_find_type(hr, t);
+		new_types[i] = p == NULL && hot_type_name(t) != NULL;
 		if( p == NULL ) continue;
 		switch( t->kind ) {
 		case HOBJ:
@@ -1704,6 +1721,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	jit_ctx *ctx = hl_jit_alloc();
 	if( ctx == NULL ) {
 		free(match);
+		free(new_types);
 		return hot_refuse(m2, "out of memory", NULL);
 	}
 #	ifdef WIN64_UNWIND_TABLES
@@ -1724,6 +1742,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		if( fpos < 0 ) {
 			hl_jit_free(ctx, false);
 			free(match);
+			free(new_types);
 			return hot_refuse(m2, "could not JIT the new code", NULL);
 		}
 		m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
@@ -1732,6 +1751,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	hl_jit_free(ctx, false);
 	if( m2->jit_code == NULL ) {
 		free(match);
+		free(new_types);
 		return hot_refuse(m2, "could not JIT the new code", NULL);
 	}
 
@@ -1815,14 +1835,25 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	fflush(stdout);
 	hl_module_add(m2);
 
-	// call the new entry point : it only initializes the new types, the statics are initialized once
+	// call the new entry point : it initializes the new types, and the statics and __init__ that
+	// hot_init_bits tells (the ones of the new classes), the other statics keep their values
 	{
 		vclosure cl;
+		bool isExc = false;
 		cl.t = c->functions[m2->functions_indexes[c->entrypoint]].type;
 		cl.fun = m2->functions_ptrs[c->entrypoint];
 		cl.hasValue = 0;
-		hl_dyn_call(&cl,NULL,0);
+		hot_init_code = c;
+		hot_init_new_types = new_types;
+		vdynamic *exc = hl_dyn_call_safe(&cl,NULL,0,&isExc);
+		hot_init_code = NULL;
+		hot_init_new_types = NULL;
+		if( isExc ) {
+			uprintf(USTR("[HotReload] Exception while initializing the new statics: %s\n"), hl_to_string(exc));
+			fflush(stdout);
+		}
 	}
+	free(new_types);
 	return true;
 }
 

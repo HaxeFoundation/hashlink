@@ -1,0 +1,8 @@
+v0 step 0
+[HotReload] 3 changes
+[HotReload] Exception while initializing the new statics: init failed
+reload 1: applied
+v1 step 1 null 0
+[HotReload] 1 changes
+reload 2: applied
+v2 step 2 null 0

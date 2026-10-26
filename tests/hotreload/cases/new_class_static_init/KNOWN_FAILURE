@@ -1,1 +1,0 @@
-the initializers of the statics of a new class are not run (the compiler must expose them apart from the entry point, item 5 / U1)

@@ -16,10 +16,10 @@
 | 2. Globals capacity | Done (`HL_HOT_RELOAD_GLOBALS`) |
 | 3. Linear-time matching | Done |
 | 4. Layout changes | Done: refused with the types and fields named |
-| 5. Entry point run again | Nothing to do in the VM (see item 5); initializers of new statics still missing |
+| 5. Entry point run again | Done: the statics and `__init__` of new classes are initialized (compiler + VM, see item 5); added statics of existing classes wait for U1 |
 | Detecting a file change | High resolution write time and size |
 | Harness `tests/hotreload/` | Done, Linux only so far, not in CI |
-| Heaps app | `tests/hotreload/heaps/run.py`: 17 steps pass, 2 known failures (shaders) |
+| Heaps app | `tests/hotreload/heaps/run.py`: 18 steps pass, 1 known failure (shader source changed) |
 | U0 to U8 | To do |
 
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
@@ -32,10 +32,9 @@
 
 - The static methods of a class are fields of its class object (`$Foo`): adding a static method, or changing its signature, changes the layout of `$Foo` and needs U1. Refused until then.
 - With `-dce std` (the default), the first use of a static of a standard class (`Type.getClassName`, the stack of `haxe.Exception`...) adds a field to its class object: refused until U1. Hot reload builds should use `-dce no`.
-- The initializers of the statics of a new class do not run (the class gets default values, which are then kept across reloads): the compiler must expose them apart from the entry point (item 5, U1).
 - Adding an instance method is accepted when the virtual slots do not change; the live type keeps its proto, so the new method is not visible to reflection on it (U5).
 - The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype and calls the address (`tests/hotreload/cases/string_compare`).
-- Shaders (Heaps): the source of a shader is the static `SRC`, set by its initializer, and `_SHADER` caches the shader built from it. A new shader class has no source (`has no shader source`), and a changed shader source is ignored. Needs the initializers of new statics, and for an existing shader a way to update `SRC` and drop `_SHADER` (a constant static could be set again by a reload, or Heaps could reset its shaders in `onReload`).
+- Shaders (Heaps): the source of a shader is the static `SRC`, set by its initializer, and `_SHADER` caches the shader built from it. A new shader class works since the statics of new classes are initialized; a changed shader source is ignored. Needs a way to update `SRC` and drop `_SHADER`: for example a `@:hotReload` static, set again by every reload, on `SRC`, and `hxsl.Shader.initialize` building the shader again when `_SHADER` was not built from the current `SRC`.
 - The global of a class or an enum is now identified by its name: its type hash changed with any type it references, which allocated a new global and lost the statics.
 
 ## What already works
@@ -81,7 +80,21 @@
 
 ### 5. Entry point run again
 
-**Result.** The generated entry point starts with `Type.init()`, which returns `false` when the types are already registered; the entry point then returns after the initialization of the classes (`Type.initClass` / `initEnum` only allocate the class objects that do not exist yet) and before the `__init__` blocks, the static initializers and `main`. A reload therefore keeps the state. What is missing is running the initializers of the *added* statics (U1).
+**Result.** The generated entry point starts with `Type.init()`, which returns `false` when the types are already registered; the entry point then returns after the initialization of the classes (`Type.initClass` / `initEnum` only allocate the class objects that do not exist yet) and before the `__init__` blocks, the static initializers and `main`. A reload therefore keeps the state, but skipped the initializers of the new statics.
+
+**Done (compiler and VM).** The entry point no longer returns after the initialization of the classes. It runs the `__init__` blocks and the static initializers in the order of a cold start, each guarded by a bit that the VM gives by words of 32 bits:
+
+```
+var bits = is_init ? -1 : $hot_init_bits(type of $Foo, w);   // once per class and per word
+if( bits & (1 << k) ) Foo.x = <init>;                         // static x is own field w * 32 + k of $Foo
+...
+if( is_init ) main();
+```
+
+- Word `-1` tells whether the class is new; it guards `__init__`.
+- `hot_init_bits` is an optional native (`?std`), never called when the program starts: no cost for a normal run, and an older VM still loads the code. HL/C keeps the previous entry point.
+- The VM answers from the reload whose entry point runs: all the bits for a class object type that is new, nothing otherwise; with U1, the bits of the statics added to an existing class.
+- The VM calls the entry point with `hl_dyn_call_safe`: an exception in an initializer is reported (the following initializers do not run, as on a cold start) and the program goes on.
 
 **Problem.** After the patch, the VM calls the entry point again ("will only update types"). With `haxe6-incremental`, the linker generates the entry point again at every compilation.
 

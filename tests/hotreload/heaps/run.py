@@ -76,7 +76,7 @@ STEPS = [
 		status="v4 objects=4003"),
 	dict(name="Heaps method reverted", heaps=[("h2d/Object.hx", "return k + 1000;", "return k;")],
 		status="v4 objects=3"),
-	dict(name="new shader class", known="the initializer of the static SRC of a new shader class does not run (item 5, U1)",
+	dict(name="new shader class",
 		game=game("v5", 'var s = new Tint2(); s.factor = 0.5; return "VERSION objects=" + app.s2d.getObjectsCount() + " shader=" + s.factor;', SHADER % ("Tint2", "1.")),
 		status="v5 objects=3 shader=0.5"),
 	dict(name="shader source changed", known="SRC keeps the source it was initialized with, and _SHADER caches the shader built from it",

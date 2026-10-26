@@ -635,6 +635,7 @@ typedef struct {
 	int closure_stack_capture;
 	bool is_debugger_enabled;
 	bool is_debugger_attached;
+	int (*hot_init_bits)( hl_type *t, int word );
 } hl_setup_t;
 
 HL_API hl_setup_t hl_setup;
