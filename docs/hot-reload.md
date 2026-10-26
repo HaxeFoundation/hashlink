@@ -19,7 +19,7 @@
 | 5. Entry point run again | Done: the statics and `__init__` of new classes are initialized (compiler + VM, see item 5); added statics of existing classes wait for U1 |
 | Detecting a file change | High resolution write time and size |
 | Harness `tests/hotreload/` | Done, Linux only so far, not in CI |
-| Heaps app | `tests/hotreload/heaps/run.py`: 18 steps pass, 1 known failure (shader source changed) |
+| Heaps app | `tests/hotreload/heaps/run.py`: all steps pass, shaders included (with `heaps.patch`) |
 | U1. Class objects | Done, with the mechanism of instances (`statics`, `statics_many`, `dce_std`, Heaps) |
 | U2. Safe point and stack checks | Done: other threads stopped during the reload, all stacks checked (`statics_on_stack`, `threads`) |
 | U0, U4, U8. Instances | Done: in place when the block has room, moved otherwise (`instance_fields`, `instance_refs`, `instance_in_place`, Heaps) |
@@ -40,7 +40,7 @@
 - With `-dce std` (the default), the first use of something of a standard class can change its layout: a static (`Type.getClassName`, `dce_std`) or an instance field (the stack of `haxe.Exception` adds `__exceptionStack`, `dce_instance_field`). Both are handled (U1, U4).
 - Adding an instance method is accepted when the virtual slots do not change; the live type keeps its proto, so the new method is not visible to reflection on it (U5).
 - The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype and calls the address (`tests/hotreload/cases/string_compare`).
-- Shaders (Heaps): the source of a shader is the static `SRC`, set by its initializer, and `_SHADER` caches the shader built from it. A new shader class works since the statics of new classes are initialized; a changed shader source is ignored. Needs a way to update `SRC` and drop `_SHADER`: for example a `@:hotReload` static, set again by every reload, on `SRC`, and `hxsl.Shader.initialize` building the shader again when `_SHADER` was not built from the current `SRC`.
+- Shaders (Heaps): the source of a shader is the static `SRC`, and `_SHADER` caches the shader built from it. The compiler sets the static finals again at every reload (they are constants of the code); with the change of Heaps in `tests/hotreload/heaps/heaps.patch` (the hxsl macro makes `SRC` final, `SharedShader` keeps its source, and with `-D hot-reload` `Shader.initialize` builds the shader again when `SRC` changed), a changed shader source is used by the new shader instances.
 - The global of a class or an enum is now identified by its name: its type hash changed with any type it references, which allocated a new global and lost the statics.
 
 ## What already works
@@ -275,7 +275,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Remove a static | Accepted | done |
 | Change the type of a static | Accepted as remove + add | done |
 | Change the initializer of an existing static | Accepted; the current value is kept | 5 |
-| Change a `static inline` / `final` constant | Accepted; inlined uses compiled again | now |
+| Change a `static inline` / `final` constant | Accepted; inlined uses compiled again, a static final is set again | done |
 | Static of a new class | Accepted; value kept across later reloads | 1 |
 
 ### Classes and interfaces

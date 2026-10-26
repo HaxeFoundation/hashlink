@@ -1,0 +1,61 @@
+diff --git a/hxsl/Macros.hx b/hxsl/Macros.hx
+index 7be67b4..fc08895 100644
+--- a/hxsl/Macros.hx
++++ b/hxsl/Macros.hx
+@@ -609,6 +609,8 @@ class Macros {
+ 				case FVar(_, expr) if( expr != null ):
+ 					var pos = expr.pos;
+ 					if( !Lambda.has(f.access, AStatic) ) f.access.push(AStatic);
++					// final : a hot reload sets it again with the new source
++					if( !Lambda.has(f.access, AFinal) ) f.access.push(AFinal);
+ 					var cl = Context.getLocalClass();
+ 					var c = cl.get();
+ 					try {
+diff --git a/hxsl/Shader.hx b/hxsl/Shader.hx
+index 9dd7740..c5c8e44 100644
+--- a/hxsl/Shader.hx
++++ b/hxsl/Shader.hx
+@@ -31,6 +31,19 @@ class Shader {
+ 			return;
+ 		var cl : Dynamic = std.Type.getClass(this);
+ 		shader = getClassShader(cl);
++		#if hot_reload
++		// a hot reload set SRC again with another source : build the shader again
++		if( shader != null ) {
++			var c : Dynamic = cl;
++			while( c != null && c.SRC == null )
++				c = std.Type.getSuperClass(c);
++			if( c != null && shader.src != c.SRC ) {
++				c._SHADER = null;
++				cl._SHADER = null;
++				shader = null;
++			}
++		}
++		#end
+ 		if( shader == null ) {
+ 			var curClass : Dynamic = cl;
+ 			while( curClass != null && curClass.SRC == null )
+diff --git a/hxsl/SharedShader.hx b/hxsl/SharedShader.hx
+index d04785f..4b27de3 100644
+--- a/hxsl/SharedShader.hx
++++ b/hxsl/SharedShader.hx
+@@ -48,6 +48,9 @@ class SharedShader {
+ 	var paramsCount : Int;
+ 	var file : hxd.fs.FileEntry;
+ 	var module : String;
++	#if hot_reload
++	public var src(default, null) : String;
++	#end
+ 
+ 	public function new(src:String,?module:String) {
+ 		instanceCache = new Map();
+@@ -55,6 +58,9 @@ class SharedShader {
+ 		globals = [];
+ 		if( src == "" )
+ 			return;
++		#if hot_reload
++		this.src = src;
++		#end
+ 		this.module = module;
+ 		data = new hxsl.Serializer().unserialize(src);
+ 		for( v in data.vars )

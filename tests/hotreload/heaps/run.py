@@ -86,7 +86,7 @@ STEPS = [
 	dict(name="new shader class",
 		game=game("v7", 'var s = new Tint2(); s.factor = 0.5; return "VERSION objects=" + app.s2d.getObjectsCount() + " shader=" + s.factor;', SHADER % ("Tint2", "1.")),
 		status="v7 objects=3 shader=0.5"),
-	dict(name="shader source changed", known="SRC keeps the source it was initialized with, and _SHADER caches the shader built from it",
+	dict(name="shader source changed",
 		game=game("v8", 'return "VERSION objects=" + app.s2d.getObjectsCount() + " changed=" + (hxsl.Printer.shaderToString(@:privateAccess new Tint().shader.data).indexOf("0.25") >= 0);', SHADER % ("Tint", "0.25")),
 		status="v8 objects=3 changed=true"),
 ] + [
@@ -139,6 +139,13 @@ def main():
 	shutil.rmtree(work, ignore_errors=True)
 	shutil.copytree(os.path.join(HERE, "src"), os.path.join(work, "src"))
 	shutil.copytree(a.heaps, os.path.join(work, "heaps"), ignore=shutil.ignore_patterns(".git", "samples"))
+	# the changes of Heaps for hot reload (shaders), until Heaps has them
+	with open(os.path.join(work, "heaps", "hxsl", "Macros.hx")) as f:
+		patched = "a hot reload sets it again" in f.read()
+	if not patched:
+		# outside of any repository : the copy is inside the one of hashlink
+		env = dict(os.environ, GIT_CEILING_DIRECTORIES=os.path.abspath(work))
+		subprocess.run(["git", "apply", os.path.join(HERE, "heaps.patch")], cwd=os.path.join(work, "heaps"), env=env, check=True)
 	for f in ("quit",):
 		if os.path.exists(os.path.join(work, f)): os.remove(os.path.join(work, f))
 

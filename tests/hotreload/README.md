@@ -49,3 +49,4 @@ python3 tests/hotreload/heaps/run.py --hl <hl> --haxe <haxe> --heaps <heaps> --f
 - On Linux without a display, the app runs in `xvfb-run`. `--gdb` runs `hl` in gdb and prints the native
   stack on a crash.
 - A step marked `known` describes a behavior that is not implemented yet: it is reported, not counted.
+- `heaps.patch` is applied to the copy of Heaps when it is not in it: the changes of Heaps for the hot reload of shaders.
