@@ -58,10 +58,12 @@
 #if defined(HL_VCC)
 #	include <intrin.h>
 #	define GC_NOINLINE		__declspec(noinline)
+#	define GC_FORCEINLINE	__forceinline
 #	define GC_RETURN_PC	_ReturnAddress()
 #	define GC_RETURN_SP	((char*)_AddressOfReturnAddress() + sizeof(void*))
 #else
 #	define GC_NOINLINE
+#	define GC_FORCEINLINE	inline __attribute__((always_inline))
 #	define GC_RETURN_PC	NULL
 #	define GC_RETURN_SP	NULL
 #endif
@@ -838,7 +840,72 @@ static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 #define REGULAR_BITS 8
 #define GC_MARK_BATCH	64
 
-static int gc_flush_mark( gc_mstack *stack ) {
+/*
+	Remaps (hot reload) : a collection that replaces the references to some blocks by references
+	to others, when it scans the blocks and the roots. The blocks replaced are no longer marked.
+*/
+static struct {
+	int size;		// power of two
+	int count;
+	void **olds;
+	void **news;
+} gc_remap = {0};
+
+static unsigned int gc_remap_hash( void *p ) {
+	uint64 h = (uint64)(int_val)p;
+	h ^= h >> 29;
+	h *= 0xbf58476d1ce4e5b9ULL;
+	h ^= h >> 32;
+	return (unsigned int)h;
+}
+
+static void *gc_remap_find( void *p ) {
+	unsigned int i = gc_remap_hash(p) & (gc_remap.size - 1);
+	while( true ) {
+		void *k = gc_remap.olds[i];
+		if( k == p ) return gc_remap.news[i];
+		if( k == NULL ) return NULL;
+		i = (i + 1) & (gc_remap.size - 1);
+	}
+}
+
+static void gc_remap_set( void *old_block, void *new_block ) {
+	unsigned int i = gc_remap_hash(old_block) & (gc_remap.size - 1);
+	while( gc_remap.olds[i] && gc_remap.olds[i] != old_block ) i = (i + 1) & (gc_remap.size - 1);
+	if( !gc_remap.olds[i] ) gc_remap.count++;
+	gc_remap.olds[i] = old_block;
+	gc_remap.news[i] = new_block;
+}
+
+static void gc_remap_grow( int count ) {
+	int osize = gc_remap.size;
+	void **olds = gc_remap.olds, **news = gc_remap.news;
+	int size = osize ? osize : 256;
+	while( count * 2 > size ) size <<= 1;
+	if( size == osize ) return;
+	gc_remap.size = size;
+	gc_remap.count = 0;
+	gc_remap.olds = (void**)calloc(gc_remap.size, sizeof(void*));
+	gc_remap.news = (void**)malloc(sizeof(void*) * gc_remap.size);
+	for(int i=0;i<osize;i++)
+		if( olds[i] ) gc_remap_set(olds[i], news[i]);
+	free(olds);
+	free(news);
+}
+
+// makes room for count more remaps
+HL_API void hl_gc_remap_reserve( int count ) {
+	gc_remap_grow(gc_remap.count + count);
+}
+
+// adds a remap for the next hl_gc_remap_apply
+HL_API void hl_gc_remap_add( void *old_block, void *new_block ) {
+	if( (gc_remap.count + 1) * 2 > gc_remap.size )
+		gc_remap_grow(gc_remap.count + 1);
+	gc_remap_set(old_block, new_block);
+}
+
+static GC_FORCEINLINE int gc_flush_mark_gen( gc_mstack *stack, bool remap ) {
 	GC_STACK_BEGIN(stack);
 	if( !__current_stack ) return 0;
 	int count = 0;
@@ -911,6 +978,13 @@ static int gc_flush_mark( gc_mstack *stack ) {
 			p = *block++;
 			pos++;
 			if( !p ) continue;
+			if( remap ) {
+				void *np = gc_remap_find(p);
+				if( np ) {
+					block[-1] = np;
+					p = np;
+				}
+			}
 			page = GC_GET_PAGE(p);
 			if( !page || !INPAGE(p,page) ) continue;
 			int bid = gc_allocator_get_block_id(page,p);
@@ -925,6 +999,16 @@ static int gc_flush_mark( gc_mstack *stack ) {
 	}
 	GC_STACK_END();
 	return count;
+}
+
+static GC_NOINLINE int gc_flush_mark_remap( gc_mstack *stack ) {
+	return gc_flush_mark_gen(stack, true);
+}
+
+static int gc_flush_mark( gc_mstack *stack ) {
+	// the usual marking stays without the test of the remaps
+	if( gc_remap.count ) return gc_flush_mark_remap(stack);
+	return gc_flush_mark_gen(stack, false);
 }
 
 ASAN_DISABLE
@@ -968,6 +1052,10 @@ static void gc_mark() {
 		void *p = *gc_roots[i];
 		gc_pheader *page;
 		if( !p ) continue;
+		if( gc_remap.count ) {
+			void *np = gc_remap_find(p);
+			if( np ) *gc_roots[i] = p = np;
+		}
 		page = GC_GET_PAGE(p);
 		if( !page || !INPAGE(p,page) ) continue; // the value was set to a not gc allocated ptr
 		int bid = gc_allocator_get_block_id(page, p);
@@ -1793,87 +1881,19 @@ HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count ) {
 	return found;
 }
 
-static struct {
-	gc_range *r;
-	int count;
-	void **news;
-	int replaced;
-} reloc;
-
-static void gc_relocate_word( void **w ) {
-	void *p = *w;
-	if( !p ) return;
-	int i = gc_range_find(reloc.r, reloc.count, p);
-	if( i < 0 || p != reloc.r[i].start ) return;
-	*w = reloc.news[i];
-	reloc.replaced++;
-}
-
-static void gc_relocate_block( void *b, int size ) {
-	void **block = (void**)b;
-	gc_pheader *page = GC_GET_PAGE(block);
-	int nwords = size / HL_WSIZE, pos = 0;
-	unsigned int *mark_bits = NULL;
-	if( page->page_kind == MEM_KIND_DYNAMIC ) {
-		hl_type *t = *(hl_type**)block;
-		if( !t ) return; // not allocated
-		if( t->mark_bits && t->kind != HFUN ) {
-			mark_bits = t->mark_bits;
-			if( t->kind == HENUM ) {
-				mark_bits += ((venum*)block)->index;
-				block += 2;
-				nwords -= 2;
-			} else {
-				block++;
-				pos++;
-			}
-		}
-	}
-	while( pos < nwords ) {
-		if( !mark_bits || (mark_bits[pos >> 5] & (1 << (pos&31))) )
-			gc_relocate_word(block);
-		block++;
-		pos++;
-	}
-}
-
-static void gc_relocate_page( gc_pheader *p, int private_data ) {
-	if( p->page_kind == MEM_KIND_DYNAMIC || p->page_kind == MEM_KIND_RAW )
-		gc_iter_live_blocks(p, gc_relocate_block);
-}
-
 /*
-	Replaces the references to the blocks olds[i] (their start) by news[i] in every allocated block
-	and in the roots. The stacks must not reference the old blocks (see hl_gc_stacks_find).
-	Returns the number of references replaced.
+	Runs a collection that applies the remaps added (hl_gc_remap_add) : the references to the old blocks,
+	from the blocks and the roots, are replaced by references to the new ones, with the parallel marking.
+	The stacks must not reference the old blocks (see hl_gc_stacks_find) : they are scanned conservatively.
 */
-HL_API int hl_gc_relocate( void **olds, int *sizes, void **news, int count ) {
-	gc_range *r = (gc_range*)malloc(sizeof(gc_range) * (count + 1));
-	void **sorted_news = (void**)malloc(sizeof(void*) * (count + 1));
-	for(int i=0;i<count;i++) {
-		r[i].start = olds[i];
-		r[i].end = (char*)olds[i] + sizes[i];
-		r[i].index = i;
-	}
-	qsort(r, count, sizeof(gc_range), gc_range_cmp);
-	for(int i=0;i<count;i++) {
-		sorted_news[i] = news[r[i].index];
-		r[i].index = i;
-	}
+HL_API void hl_gc_remap_apply() {
+	if( gc_remap.count == 0 ) return;
 	gc_global_lock(true);
-	gc_stop_world(true);
-	reloc.r = r;
-	reloc.count = count;
-	reloc.news = sorted_news;
-	reloc.replaced = 0;
-	gc_iter_pages(gc_relocate_page);
-	for(int i=0;i<gc_roots_count;i++)
-		gc_relocate_word(gc_roots[i]);
-	gc_stop_world(false);
+	gc_major();
 	gc_global_lock(false);
-	free(r);
-	free(sorted_news);
-	return reloc.replaced;
+	free(gc_remap.olds);
+	free(gc_remap.news);
+	memset(&gc_remap, 0, sizeof(gc_remap));
 }
 
 HL_API int hl_gc_get_live_objects( hl_type *t, varray *arr ) {

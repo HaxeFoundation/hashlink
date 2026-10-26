@@ -3,7 +3,7 @@
 ## Context
 
 - Compiler: `hot-reload` branch of HaxeFoundation/haxe, based on `haxe6-incremental`. Steps 1 and 2 of phase 10 in `docs/incremental-compilation.md` are done (symbolic generation per class, linker shared by cold and warm builds, classes generated in parallel). The delta (step 3) is not done.
-- VM: `hot-reload` branch, created from `master` of HaxeFoundation/hashlink, which is HL 2.0 (new JIT: `jit_emit.c`, `jit_regs.c`, `jit_x86_64.c`).
+- VM: `hot-reload` branch, created from `master`. The hot reload code is in `src/reload.c` of HaxeFoundation/hashlink, which is HL 2.0 (new JIT: `jit_emit.c`, `jit_regs.c`, `jit_x86_64.c`).
 - Decision: **no delta for now**. The VM reloads the full `.hl` produced by the compiler.
 - Environment: Windows (developers and AI agents).
 
@@ -182,7 +182,11 @@ After a successful upgrade, call an optional method on each upgraded instance (f
 
 ### U8. Relocation (optional, last)
 
-**Done** (moved before U3, which is dropped). The new block is allocated with the new size; `hl_gc_relocate` replaces the references to the previous block in every allocated block (precisely with the mark bits, conservatively for raw blocks) and in the roots; the fields of the virtuals are computed again; the object maps (`hl_ho*`, which hash the address of their keys) are registered when allocated in hot reload mode and rehashed. The previous block is garbage. A reference from a stack refuses the reload.
+**Done** (moved before U3, which is dropped). The new block is allocated with the new size and the pair is added to the remaps of the GC (`hl_gc_remap_add`); `hl_gc_remap_apply` runs a collection whose marking, parallel like any collection, replaces the references to the previous blocks when it scans a block (precisely with the mark bits, conservatively for raw blocks) and the roots: the previous blocks are no longer marked and are freed by the same collection. The marking is instantiated twice, the usual one has no test of the remaps. Then the fields of the virtuals are computed again, and the object maps (`hl_ho*`, which hash the address of their keys), registered when allocated in hot reload mode, are rehashed. A reference from a stack refuses the reload.
+
+The change of the types of the live instances (`obj`, `vobj_proto`, `mark_bits` of every alias) is in one function, `hot_set_layout`: the representation of the types will change.
+
+**Measures** (`HL_HOT_RELOAD_TIMES` prints the phases of a reload; `instance_many`, Linux, 4 cores): 200 000 instances moved, with a linked list, references between them and an object map of 50 000 keys: the walk that finds the instances 30–40 ms (a full collection, then a walk of the blocks on one thread), the allocation and copy 16–21 ms, the remap collection 24 ms with one marking thread and 13 ms with four, the object maps 5 ms. The walk and the copy could be made parallel too.
 
 When an instance has no spare room: allocate the new instance, copy, then redirect the references. Heap references are found by the U4 walk and rewritten precisely; references from globals as well. References from stacks cannot be rewritten (conservative scan): if the old address appears on any stack, refuse the reload. Kept for last because U3 should cover most cases in dev mode.
 
