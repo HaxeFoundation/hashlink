@@ -646,6 +646,7 @@ typedef struct {
 	void **virts;
 	int nvirts;
 	int max_virts;
+	varray *hooks;			// the closures of onHotReload to call after the entry point (rooted)
 	hot_pmap maps;			// the registered object maps -> 0
 	void **live_maps;
 	int nlive_maps;
@@ -698,7 +699,59 @@ static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 	}
 }
 
+/*
+	U6 : after an upgrade, the program can initialize the new fields with real values. The method
+	onHotReload() of an upgraded object is called once, and the static method onHotReload() of a
+	class whose statics changed. The closures are built while the objects are known to be alive,
+	and called after the entry point.
+*/
+static void hot_prepare_hooks( hot_instances *h ) {
+	int hash = hl_hash_utf8("onHotReload");
+	int count = 0;
+	vclosure **found = (vclosure**)malloc(sizeof(void*) * (h->nobjs + 1));
+	for(int k=0;k<h->nobjs;k++) {
+		char *o = (char*)h->objs[k];
+		hot_itype *it = h->types + h->objs_info[k * 3];
+		hl_runtime_obj *rt = it->nrt;
+		hl_field_lookup *f = NULL;
+		for(hl_runtime_obj *r=rt;r && !f;r=r->parent)
+			f = hl_lookup_find(r->lookup, r->nlookup, hash);
+		if( f == NULL || f->t->kind != HFUN ) continue;
+		if( f->field_index < 0 ) {
+			// a method of the instance, without argument
+			if( f->t->fun->nargs != 1 ) continue;
+			found[count++] = hl_alloc_closure_ptr(f->t, rt->methods[-f->field_index-1], o);
+		} else if( hl_is_class_object(it->t) ) {
+			// a static method : a field of the class object
+			vclosure *c = *(vclosure**)(o + f->field_index);
+			if( c && c->t->fun->nargs == 0 ) found[count++] = c;
+		}
+	}
+	if( count ) {
+		h->hooks = hl_alloc_array(&hlt_dyn, count);
+		memcpy(hl_aptr(h->hooks, void*), found, sizeof(void*) * count);
+		hl_add_root(&h->hooks);
+	}
+	free(found);
+}
+
+static void hot_call_hooks( hot_instances *h ) {
+	if( h->hooks == NULL ) return;
+	int errors = 0;
+	for(int i=0;i<h->hooks->size;i++) {
+		bool isExc = false;
+		vdynamic *ret = hl_dyn_call_safe(hl_aptr(h->hooks, vclosure*)[i], NULL, 0, &isExc);
+		if( isExc && errors++ < 10 ) {
+			uprintf(USTR("[HotReload] Exception in onHotReload: %s\n"), hl_to_string(ret));
+			fflush(stdout);
+		}
+	}
+	hl_remove_root(&h->hooks);
+	h->hooks = NULL;
+}
+
 static void hot_instances_free( hot_instances *h ) {
+	if( h->hooks ) hl_remove_root(&h->hooks);
 	for(int i=0;i<h->ntypes;i++) {
 		free(h->types[i].copies);
 		free(h->types[i].added);
@@ -954,6 +1007,9 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 			*(void**)(o + it->nrt->fields_indexes[b->fid]) = b->closure ? hl_alloc_closure_ptr(b->closure,b->ptr,o) : b->ptr;
 		}
 	}
+	for(int k=0;k<h->nobjs;k++)
+		h->objs[k] = news[k];
+	hot_prepare_hooks(h);
 	free(news);
 	hl_gc_enable(true);
 	if( h->nobjs ) {
@@ -961,7 +1017,7 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 		if( h->nrelocated ) printf(", %d moved", h->nrelocated);
 		printf("\n");
 	}
-	hot_time("  virtuals, bindings");
+	hot_time("  virtuals, bindings, hooks");
 	// the object maps hash the address of their keys
 	if( h->nrelocated )
 		for(int i=0;i<h->nlive_maps;i++)
@@ -1421,6 +1477,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		}
 	}
 	free(new_types);
+	hot_call_hooks(&inst);
 	hot_instances_free(&inst);
 	free(itype_of);
 	hot_time("entry point");

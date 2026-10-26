@@ -25,7 +25,8 @@
 | U0, U4, U8. Instances | Done: in place when the block has room, moved otherwise (`instance_fields`, `instance_refs`, `instance_in_place`, Heaps) |
 | U3. Spare room in instances | Dropped: hot reload must not add memory to every object |
 | U5. Virtuals | Done for the fields of virtuals; interfaces kept (`instance_fields`) |
-| U6 (hook), U7 (enums) | To do |
+| U6. Hook after upgrade | Done: `onHotReload()` (`hooks`) |
+| U7. Enums | To do |
 
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
 
@@ -173,6 +174,8 @@ In hot reload mode, object allocation reserves extra room after the fields (a co
 
 ### U6. Haxe hook after upgrade
 
+**Done.** After a reload that upgraded objects, once the entry point initialized the new statics and the other threads run again: the method `onHotReload()` (no argument) of each upgraded object is called once, and the static method `onHotReload()` of each class whose statics changed. An exception is reported (`[HotReload] Exception in onHotReload: ...`) and the other hooks still run. The closures are built while the objects are known to be alive, and kept in a rooted array until they are called. The name is a convention of the VM: with `-dce full`, the methods need `@:keep` (a `@:hotReload` metadata on the compiler side could keep them).
+
 After a successful upgrade, call an optional method on each upgraded instance (for example `@:hotReload function onHotReload()`, name to be agreed with the compiler side), and an optional static method per class. Lets the game code initialize new fields with real values (resources, derived data) instead of defaults. Exceptions thrown by the hook are reported, not fatal.
 
 ### U7. Enums
@@ -256,7 +259,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Change the initializer of an existing field | Accepted; live instances keep their value, new ones use it | now |
 | Instance whose block has no room | Moved, references updated; refused if a stack references it | done |
 | Type of a field used by a function active on the stack | Refused, function named | done (current thread) |
-| Upgrade hook `onHotReload` | Called once per upgraded instance | U6 |
+| Upgrade hook `onHotReload` | Called once per upgraded instance | done |
 
 ### Static variables
 

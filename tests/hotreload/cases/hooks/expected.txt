@@ -1,0 +1,10 @@
+v0 step 0 0,1,2,3,4
+[HotReload] 6 objects upgraded, 6 moved
+[HotReload] 5 changes
+[HotReload] Exception in onHotReload: bad item 3
+Test.onHotReload
+reload 1: applied
+v1 step 1 L0,L1,L2,null,L4 calls=5
+[HotReload] 1 changes
+reload 2: applied
+v2 step 2 L0,L1,L2,null,L4 calls=5
