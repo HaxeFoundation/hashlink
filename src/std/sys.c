@@ -680,7 +680,18 @@ HL_PRIM vbyte *hl_sys_hl_file() {
 }
 
 HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
-	return hl_setup.reload_check != NULL && hl_setup.reload_check(debug_alt_file);
+	if( hl_setup.reload_check == NULL ) return false;
+	// a reload that moves objects checks that the program stack does not reference them :
+	// that's the stack above this frame, and the registers the program gave
+	jmp_buf regs;
+	setjmp(regs);
+	hl_setup.hot_stack_limit = &regs;
+	hl_setup.hot_regs = &regs;
+	hl_setup.hot_regs_size = (int)sizeof(regs);
+	bool r = hl_setup.reload_check(debug_alt_file);
+	hl_setup.hot_stack_limit = NULL;
+	hl_setup.hot_regs = NULL;
+	return r;
 }
 
 /*

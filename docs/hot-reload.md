@@ -21,8 +21,12 @@
 | Harness `tests/hotreload/` | Done, Linux only so far, not in CI |
 | Heaps app | `tests/hotreload/heaps/run.py`: 18 steps pass, 1 known failure (shader source changed) |
 | U1. Class objects | Done (`statics`, `statics_no_room`, `dce_std`, Heaps) |
-| U2. Stack checks | Partly: the current thread, for the statics of upgraded classes (`statics_on_stack`) |
-| U0, U3 to U8 | To do |
+| U2. Stack checks | Partly: the current thread (`statics_on_stack`); other threads are not stopped yet |
+| U0, U4, U8. Instances | Done: in place when the block has room, moved otherwise (`instance_fields`, `instance_refs`, `instance_in_place`, Heaps) |
+| U3. Spare room in instances | Dropped: hot reload must not add memory to every object |
+| U5. Virtuals | Done for the fields of virtuals; interfaces kept (`instance_fields`) |
+| U6 (hook), U7 (enums) | To do |
+| Class objects | Keep their spare room for now; to move to the mechanism of instances (one mechanism) |
 
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
 
@@ -33,7 +37,7 @@
 **Findings while testing.**
 
 - The static methods of a class are fields of its class object (`$Foo`): adding a static method, or changing its signature, changes the layout of `$Foo`. Handled by U1.
-- With `-dce std` (the default), the first use of something of a standard class can change its layout: a static (`Type.getClassName`) is handled by U1, an instance field (the stack of `haxe.Exception` adds `__exceptionStack`) is refused until U4. Hot reload builds should use `-dce no`.
+- With `-dce std` (the default), the first use of something of a standard class can change its layout: a static (`Type.getClassName`, `dce_std`) or an instance field (the stack of `haxe.Exception` adds `__exceptionStack`, `dce_instance_field`). Both are handled (U1, U4).
 - Adding an instance method is accepted when the virtual slots do not change; the live type keeps its proto, so the new method is not visible to reflection on it (U5).
 - The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype and calls the address (`tests/hotreload/cases/string_compare`).
 - Shaders (Heaps): the source of a shader is the static `SRC`, set by its initializer, and `_SHADER` caches the shader built from it. A new shader class works since the statics of new classes are initialized; a changed shader source is ignored. Needs a way to update `SRC` and drop `_SHADER`: for example a `@:hotReload` static, set again by every reload, on `SRC`, and `hxsl.Shader.initialize` building the shader again when `_SHADER` was not built from the current `SRC`.
@@ -142,9 +146,18 @@ First phase to deliver, because it covers the most common edit (adding a static)
 
 ### U3. Spare room in instances (dev mode)
 
+**Dropped.** Hot reload must not add memory to every allocated object. Instances are upgraded in place when their GC block has room (the GC rounds sizes), and moved otherwise (U8). The spare room of class objects (U1) is kept for now and will go once the class objects use the same mechanism as instances.
+
 In hot reload mode, object allocation reserves extra room after the fields (a configurable ratio with a minimum number of slots), so that added fields fit in place. Also use the real size of the GC block (`hl_gc_get_memsize`), which is often larger than requested. Instances allocated before a layout change keep their spare room; instances allocated after it use the new size plus spare room. When an instance has no room left, the reload is refused (or relocated, U8).
 
 ### U4. Heap walk and in-place rewrite
+
+**Done**, with U8. A type of an object whose fields change (same superclass, same overridden methods) is upgraded, with its subclasses (their fields move).
+
+- Before anything is changed: a full collection, then a walk of the live blocks finds the instances (their first word is one of the `hl_type*` that share the previous layout: the live type, and the aliases of the reloads) and the virtuals. An instance whose block has room is rewritten in place, the others are moved; the stacks (above the call to `checkReload` for the current thread, and the registers it was called with) must not reference an instance to move, and no running function may use a type whose layout changes (U2): otherwise the reload is refused.
+- Applied after the JIT, with the collections disabled: the fields kept (same name and type, through the whole hierarchy) are copied to their new offsets, the others cleared (default value). Then every `hl_type*` of the previous layout gets the new one (`obj`, `vobj_proto`, `mark_bits`): **instances keep their type pointer**, so `Std.isOfType`, `__type__` of the class object and the `super` of other types stay valid.
+- The signature of a function no longer depends on the layout of the types of its arguments (only their names): a method of a type whose layout changes is replaced (the previous code jumps to the new one) instead of being seen as removed and added, so the live closures and vtables call the new body.
+- The VM prints `[HotReload] N instances upgraded, M moved (R references updated)`.
 
 - Enumerate the live blocks of the GC (`gc_iter_pages` / `gc_iter_live_blocks`, as the memory dump does) and keep the objects whose type pointer is an old type to upgrade (the type pointer is the first word of an object).
 - Check that every instance fits (U3) before modifying any of them: the upgrade is all or nothing.
@@ -168,6 +181,8 @@ After a successful upgrade, call an optional method on each upgraded instance (f
 - Arguments of a constructor changed: same rules as fields (U0), applied to the live values of that constructor.
 
 ### U8. Relocation (optional, last)
+
+**Done** (moved before U3, which is dropped). The new block is allocated with the new size; `hl_gc_relocate` replaces the references to the previous block in every allocated block (precisely with the mark bits, conservatively for raw blocks) and in the roots; the fields of the virtuals are computed again; the object maps (`hl_ho*`, which hash the address of their keys) are registered when allocated in hot reload mode and rehashed. The previous block is garbage. A reference from a stack refuses the reload.
 
 When an instance has no spare room: allocate the new instance, copy, then redirect the references. Heap references are found by the U4 walk and rewritten precisely; references from globals as well. References from stacks cannot be rewritten (conservative scan): if the old address appears on any stack, refuse the reload. Kept for last because U3 should cover most cases in dev mode.
 
@@ -224,18 +239,18 @@ Every operation a developer or an agent can make between two reloads, with the e
 
 | Operation | Expected | Needs |
 |---|---|---|
-| Add a field | Accepted; live instances get the default value | U0, U3, U4 |
-| Remove a field | Accepted; value dropped, GC no longer sees it | U0, U4 |
-| Change the type of a field | Accepted as remove + add (default value) | U0, U4 |
-| Reorder fields | Accepted; values kept | U0, U4 |
-| Rename a field | Accepted as remove + add | U0, U4 |
-| Add a field to a base class with live subclass instances | Accepted; subclass fields shifted, values kept | U0, U4 |
-| Field read through a structure or typedef (virtual) | Accepted; virtual field pointers updated | U5 |
-| Field read through `Reflect`/`Dynamic` | Accepted; lookup tables rebuilt | U5 |
+| Add a field | Accepted; live instances get the default value | done |
+| Remove a field | Accepted; value dropped, GC no longer sees it | done |
+| Change the type of a field | Accepted as remove + add (default value) | done |
+| Reorder fields | Accepted; values kept | done |
+| Rename a field | Accepted as remove + add | done |
+| Add a field to a base class with live subclass instances | Accepted; subclass fields shifted, values kept | done |
+| Field read through a structure or typedef (virtual) | Accepted; virtual field pointers updated | done |
+| Field read through `Reflect`/`Dynamic` | Accepted; lookup tables rebuilt | done |
 | Add a property (`get`/`set`) | Accepted | U0, U4 |
 | Change the initializer of an existing field | Accepted; live instances keep their value, new ones use it | now |
-| Instance without spare room | Refused (or relocated) | U3 (U8) |
-| Type of a field used by a function active on the stack | Refused, function named | U2 |
+| Instance whose block has no room | Moved, references updated; refused if a stack references it | done |
+| Type of a field used by a function active on the stack | Refused, function named | done (current thread) |
 | Upgrade hook `onHotReload` | Called once per upgraded instance | U6 |
 
 ### Static variables
@@ -301,7 +316,6 @@ Every operation a developer or an agent can make between two reloads, with the e
 
 Heaps checks for a reload every frame when compiled with `-D hot-reload` (`hxd.System`, which calls `sys_check_reload` and then `hxd.System.onReload`). Run the app with `hl --hot-reload app.hl` and compile it through the compilation server of `haxe6-incremental`; the `[HotReload]` messages of the VM say what was applied or why a reload was refused.
 
-- Use `-dce no` until U4 (see the findings above).
 - The main loop (`hxd.System.mainLoop`) stays on the stack: it keeps running its old body, which is fine as long as it does not change.
 - `tests/hotreload/heaps/run.py` drives such an app (see `tests/hotreload/README.md`). On a small app, with the whole of Heaps compiled (`-dce no`), on Linux: a warm compilation takes 0.7 to 1 s (2.3 s after an edit of `hxd.Math.clamp`, inlined in many places), and the reload is applied in less than 0.15 s, at the next frame.
 - Covered: method bodies of the app and of Heaps, a new class with statics, inline functions of Heaps (37 functions compiled again), a field added to a live `h2d.Text` (refused, then reverted), quick successive edits, `hxd.System.onReload` called after each reload.

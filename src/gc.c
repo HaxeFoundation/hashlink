@@ -1695,6 +1695,187 @@ static void gc_count_live_page( gc_pheader *p, int private_data ) {
 		gc_iter_live_blocks(p, gc_count_live_block);
 }
 
+static struct {
+	void (*callback)( void *block, int size, int kind, void *ctx );
+	void *ctx;
+	int kind;
+} live_iter;
+
+static void gc_iter_live_block( void *block, int size ) {
+	live_iter.callback(block, size, live_iter.kind, live_iter.ctx);
+}
+
+static void gc_iter_live_page( gc_pheader *p, int private_data ) {
+	live_iter.kind = p->page_kind;
+	gc_iter_live_blocks(p, gc_iter_live_block);
+}
+
+/*
+	Calls the callback for every live block, after a collection, with the world stopped.
+	The callback must not allocate.
+*/
+HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, void *ctx ), void *ctx ) {
+	gc_global_lock(true);
+	gc_major(); // a full collection (not only a mark) keeps the state of the allocator
+	gc_stop_world(true);
+	live_iter.callback = callback;
+	live_iter.ctx = ctx;
+	gc_iter_pages(gc_iter_live_page);
+	gc_stop_world(false);
+	gc_global_lock(false);
+}
+
+// ---- relocation of blocks (hot reload) ----
+
+typedef struct {
+	void *start;
+	void *end;
+	int index;
+} gc_range;
+
+static int gc_range_cmp( const void *a, const void *b ) {
+	char *pa = (char*)((gc_range*)a)->start, *pb = (char*)((gc_range*)b)->start;
+	return pa < pb ? -1 : pa > pb ? 1 : 0;
+}
+
+static int gc_range_find( gc_range *r, int count, void *p ) {
+	int min = 0, max = count;
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		if( (char*)p < (char*)r[mid].start )
+			max = mid;
+		else if( (char*)p >= (char*)r[mid].end )
+			min = mid + 1;
+		else
+			return r[mid].index;
+	}
+	return -1;
+}
+
+static int gc_stack_find( void **start, void **end, gc_range *r, int count ) {
+	while( start < end ) {
+		int i = gc_range_find(r, count, *start++);
+		if( i >= 0 ) return i;
+	}
+	return -1;
+}
+
+/*
+	Returns the index of a block that a stack or the saved registers of a thread reference
+	(a pointer to it or inside it), or -1. Such a block cannot be relocated.
+*/
+HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count ) {
+	gc_range *r = (gc_range*)malloc(sizeof(gc_range) * (count + 1));
+	int found = -1;
+	for(int i=0;i<count;i++) {
+		r[i].start = blocks[i];
+		r[i].end = (char*)blocks[i] + sizes[i];
+		r[i].index = i;
+	}
+	qsort(r, count, sizeof(gc_range), gc_range_cmp);
+	gc_global_lock(true);
+	gc_stop_world(true);
+	for(int i=0;i<gc_threads.count && found < 0;i++) {
+		hl_thread_info *t = gc_threads.threads[i];
+		if( t == current_thread && hl_setup.hot_stack_limit ) {
+			// the frames of the reload itself hold no value of the program, but garbage
+			found = gc_stack_find((void**)hl_setup.hot_stack_limit, (void**)t->stack_top, r, count);
+			if( found < 0 ) found = gc_stack_find((void**)hl_setup.hot_regs, (void**)((char*)hl_setup.hot_regs + hl_setup.hot_regs_size), r, count);
+			continue;
+		}
+		found = gc_stack_find((void**)t->stack_cur, (void**)t->stack_top, r, count);
+		if( found < 0 ) found = gc_stack_find((void**)&t->gc_regs, (void**)&t->gc_regs + (sizeof(jmp_buf) / sizeof(void*)), r, count);
+		if( found < 0 ) found = gc_stack_find((void**)&t->extra_stack_data, (void**)&t->extra_stack_data + t->extra_stack_size, r, count);
+	}
+	gc_stop_world(false);
+	gc_global_lock(false);
+	free(r);
+	return found;
+}
+
+static struct {
+	gc_range *r;
+	int count;
+	void **news;
+	int replaced;
+} reloc;
+
+static void gc_relocate_word( void **w ) {
+	void *p = *w;
+	if( !p ) return;
+	int i = gc_range_find(reloc.r, reloc.count, p);
+	if( i < 0 || p != reloc.r[i].start ) return;
+	*w = reloc.news[i];
+	reloc.replaced++;
+}
+
+static void gc_relocate_block( void *b, int size ) {
+	void **block = (void**)b;
+	gc_pheader *page = GC_GET_PAGE(block);
+	int nwords = size / HL_WSIZE, pos = 0;
+	unsigned int *mark_bits = NULL;
+	if( page->page_kind == MEM_KIND_DYNAMIC ) {
+		hl_type *t = *(hl_type**)block;
+		if( !t ) return; // not allocated
+		if( t->mark_bits && t->kind != HFUN ) {
+			mark_bits = t->mark_bits;
+			if( t->kind == HENUM ) {
+				mark_bits += ((venum*)block)->index;
+				block += 2;
+				nwords -= 2;
+			} else {
+				block++;
+				pos++;
+			}
+		}
+	}
+	while( pos < nwords ) {
+		if( !mark_bits || (mark_bits[pos >> 5] & (1 << (pos&31))) )
+			gc_relocate_word(block);
+		block++;
+		pos++;
+	}
+}
+
+static void gc_relocate_page( gc_pheader *p, int private_data ) {
+	if( p->page_kind == MEM_KIND_DYNAMIC || p->page_kind == MEM_KIND_RAW )
+		gc_iter_live_blocks(p, gc_relocate_block);
+}
+
+/*
+	Replaces the references to the blocks olds[i] (their start) by news[i] in every allocated block
+	and in the roots. The stacks must not reference the old blocks (see hl_gc_stacks_find).
+	Returns the number of references replaced.
+*/
+HL_API int hl_gc_relocate( void **olds, int *sizes, void **news, int count ) {
+	gc_range *r = (gc_range*)malloc(sizeof(gc_range) * (count + 1));
+	void **sorted_news = (void**)malloc(sizeof(void*) * (count + 1));
+	for(int i=0;i<count;i++) {
+		r[i].start = olds[i];
+		r[i].end = (char*)olds[i] + sizes[i];
+		r[i].index = i;
+	}
+	qsort(r, count, sizeof(gc_range), gc_range_cmp);
+	for(int i=0;i<count;i++) {
+		sorted_news[i] = news[r[i].index];
+		r[i].index = i;
+	}
+	gc_global_lock(true);
+	gc_stop_world(true);
+	reloc.r = r;
+	reloc.count = count;
+	reloc.news = sorted_news;
+	reloc.replaced = 0;
+	gc_iter_pages(gc_relocate_page);
+	for(int i=0;i<gc_roots_count;i++)
+		gc_relocate_word(gc_roots[i]);
+	gc_stop_world(false);
+	gc_global_lock(false);
+	free(r);
+	free(sorted_news);
+	return reloc.replaced;
+}
+
 HL_API int hl_gc_get_live_objects( hl_type *t, varray *arr ) {
 	if( !hl_is_dynamic(t) ) return -1;
 	gc_global_lock(true);

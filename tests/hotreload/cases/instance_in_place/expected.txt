@@ -1,0 +1,8 @@
+v0 step 0 sum=495
+[HotReload] 10 instances upgraded
+[HotReload] 3 changes
+reload 1: applied
+v1 step 1 sum=495
+[HotReload] 1 changes
+reload 2: applied
+v2 step 2 sum=505

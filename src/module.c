@@ -1455,6 +1455,7 @@ static bool hot_same_virtuals( hl_type_obj *o1, hl_type_obj *o2 ) {
 #define HOT_LAYOUT_SAME		0
 #define HOT_LAYOUT_CHANGED	1	// refused
 #define HOT_LAYOUT_UPGRADE	2	// class object whose statics changed : upgraded in place
+#define HOT_LAYOUT_INSTANCES	3	// object type whose fields changed : its live instances are upgraded
 
 static void hot_print_type_name( hot_report *r, hl_type_obj *o ) {
 	const uchar *name = o->name, *last = name;
@@ -1494,8 +1495,8 @@ static int hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 					}
 			}
 			bool class_object = hl_is_class_object(told);
-			if( !same && class_object && ucmp(hot_super_name(o1), hot_super_name(o2)) == 0 && hot_same_virtuals(o1, o2) )
-				return HOT_LAYOUT_UPGRADE;
+			if( !same && told->kind == HOBJ && ucmp(hot_super_name(o1), hot_super_name(o2)) == 0 && hot_same_virtuals(o1, o2) )
+				return class_object ? HOT_LAYOUT_UPGRADE : HOT_LAYOUT_INSTANCES;
 			if( !same ) {
 				hot_print(r, "\n  ");
 				hot_print_type_name(r, o1);
@@ -1601,8 +1602,8 @@ static bool hot_upgrade_check( hl_hot_reload *hr, hot_upgrade *u, hot_report *r 
 }
 
 /*
-	Records the class objects each function uses, to check the functions running on the stack
-	when a reload changes the statics of a class (the registers of the functions are freed after JIT).
+	Records the object types each function uses, to check the functions running on the stack
+	when a reload changes the layout of a type (the registers of the functions are freed after JIT).
 */
 static void hot_record_uses( hl_module *m ) {
 	hl_code *c = m->code;
@@ -1613,7 +1614,7 @@ static void hot_record_uses( hl_module *m ) {
 		int count = 0;
 		for(int i=0;i<f->nregs && count < 63;i++) {
 			hl_type *t = f->regs[i];
-			if( !hl_is_class_object(t) ) continue;
+			if( t->kind != HOBJ && t->kind != HSTRUCT ) continue;
 			bool found = false;
 			for(int j=0;j<count;j++)
 				if( tmp[j] == t->obj ) found = true;
@@ -1652,10 +1653,10 @@ static hl_function *hot_function_at( void *addr, hl_module **mod ) {
 
 /*
 	The functions running on the stack keep running their code after the reload : refuse it if one of
-	them reads or writes the statics of an upgraded class (it would use the previous offsets).
+	them uses a type whose layout changes (it would use the previous offsets).
 	Only the current thread is checked.
 */
-static void hot_check_stack( hot_upgrade *upgrades, int count, hot_report *r ) {
+static void hot_check_stack( hl_type_obj **layouts, int count, hot_report *r ) {
 	void *stack[512];
 	int n = count ? module_capture_stack(stack, 512) : 0;
 	for(int i=0;i<n;i++) {
@@ -1666,21 +1667,20 @@ static void hot_check_stack( hot_upgrade *upgrades, int count, hot_report *r ) {
 		if( f->findex == m->code->entrypoint ) continue;
 		hl_type_obj **fuses = m->hot_uses[f - m->code->functions];
 		for(int k=0;k<count;k++) {
-			hot_upgrade *u = upgrades + k;
 			bool uses = false;
 			for(int j=0;fuses[j] && !uses;j++)
-				uses = fuses[j] == u->old->obj;
+				uses = fuses[j] == layouts[k];
 			if( !uses ) continue;
 			hot_print(r, "\n  ");
-			hot_print_type_name(r, u->old->obj);
-			hot_print(r, ": its statics are used by ");
+			hot_print_type_name(r, layouts[k]);
+			hot_print(r, ": its layout changes and it is used by ");
 			if( fun_obj(f) ) {
 				hot_print_type_name(r, fun_obj(f));
 				hot_print(r, ".");
 				hot_print_name(r, fun_field_name(f));
 			} else
 				hot_print(r, "fun$%d", f->findex);
-			hot_print(r, ", which is running : move the code that uses them out of it");
+			hot_print(r, ", which is running : move the code that uses it out of it");
 			r->count++;
 		}
 	}
@@ -1724,6 +1724,351 @@ static void hot_upgrade_apply( hl_module *m, hot_upgrade *u ) {
 		if( own < 0 || (u->added[own >> 5] & (1u << (own & 31))) == 0 ) continue;
 		*(void**)((char*)o + nrt->fields_indexes[b->fid]) = b->closure ? hl_alloc_closure_ptr(b->closure,b->ptr,o) : b->ptr;
 	}
+}
+
+/* ---- instances upgrade (U4) ---- */
+
+// pointer -> int, open addressing
+typedef struct {
+	int size;
+	int count;
+	void **keys;
+	int *values;
+} hot_pmap;
+
+static unsigned int hot_pmap_hash( void *p ) {
+	uint64 h = (uint64)(int_val)p;
+	h ^= h >> 33;
+	h *= 0xff51afd7ed558ccdULL;
+	h ^= h >> 33;
+	return (unsigned int)h;
+}
+
+static void hot_pmap_set( hot_pmap *m, void *key, int value ) {
+	if( (m->count + 1) * 2 > m->size ) {
+		hot_pmap old = *m;
+		m->size = old.size ? old.size * 2 : 64;
+		m->count = 0;
+		m->keys = (void**)calloc(m->size, sizeof(void*));
+		m->values = (int*)malloc(sizeof(int) * m->size);
+		for(int i=0;i<old.size;i++)
+			if( old.keys[i] ) hot_pmap_set(m, old.keys[i], old.values[i]);
+		free(old.keys);
+		free(old.values);
+	}
+	unsigned int i = hot_pmap_hash(key) & (m->size - 1);
+	while( m->keys[i] && m->keys[i] != key ) i = (i + 1) & (m->size - 1);
+	if( !m->keys[i] ) m->count++;
+	m->keys[i] = key;
+	m->values[i] = value;
+}
+
+static int hot_pmap_get( hot_pmap *m, void *key ) {
+	if( !m->size || !key ) return -1;
+	unsigned int i = hot_pmap_hash(key) & (m->size - 1);
+	while( m->keys[i] ) {
+		if( m->keys[i] == key ) return m->values[i];
+		i = (i + 1) & (m->size - 1);
+	}
+	return -1;
+}
+
+static void hot_pmap_free( hot_pmap *m ) {
+	free(m->keys);
+	free(m->values);
+}
+
+typedef struct {
+	hl_type *old;			// the live type : it keeps its pointer and gets the new layout
+	hl_type *t;				// the type of the new code
+	int index;				// in the types of the new code
+	hl_type_obj *old_obj;	// the previous layout
+	hl_runtime_obj *ort;
+	hl_runtime_obj *nrt;
+	int *map;				// for each field of the new layout, its offset in the previous one, or -1
+	int ninstances;
+	int nrelocated;
+	int max_block;
+} hot_itype;
+
+typedef struct {
+	hot_itype *types;
+	int ntypes;
+	hot_pmap aliases;		// every hl_type* of a previous layout -> index in types
+	hot_pmap virtuals;		// every virtual type -> 0
+	void **objs;
+	int *objs_info;			// type index, block size, relocated
+	int nobjs;
+	int max_objs;
+	void **virts;
+	int nvirts;
+	int max_virts;
+	hot_pmap maps;			// the registered object maps -> 0
+	void **live_maps;
+	int nlive_maps;
+	int max_live_maps;
+	int nrelocated;
+} hot_instances;
+
+static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
+	hot_instances *h = (hot_instances*)ctx;
+	if( size < (int)sizeof(void*) ) return;
+	void *t = *(void**)block;
+	if( kind == MEM_KIND_RAW && hot_pmap_get(&h->maps, block) >= 0 ) {
+		if( h->nlive_maps == h->max_live_maps ) {
+			h->max_live_maps = h->max_live_maps ? h->max_live_maps * 2 : 64;
+			h->live_maps = (void**)realloc(h->live_maps, sizeof(void*) * h->max_live_maps);
+		}
+		h->live_maps[h->nlive_maps++] = block;
+		return;
+	}
+	if( kind != MEM_KIND_DYNAMIC && kind != MEM_KIND_NOPTR ) return;
+	int idx = hot_pmap_get(&h->aliases, t);
+	if( idx >= 0 ) {
+		hot_itype *it = h->types + idx;
+		it->ninstances++;
+		// moved when its block has no room for the new layout
+		bool relocate = it->nrt->size > size || (kind != MEM_KIND_DYNAMIC && it->nrt->hasPtr);
+		if( relocate ) {
+			it->nrelocated++;
+			h->nrelocated++;
+		} else if( size > it->max_block )
+			it->max_block = size;
+		if( h->nobjs == h->max_objs ) {
+			h->max_objs = h->max_objs ? h->max_objs * 2 : 256;
+			h->objs = (void**)realloc(h->objs, sizeof(void*) * h->max_objs);
+			h->objs_info = (int*)realloc(h->objs_info, sizeof(int) * 3 * h->max_objs);
+		}
+		h->objs[h->nobjs] = block;
+		h->objs_info[h->nobjs * 3] = idx;
+		h->objs_info[h->nobjs * 3 + 1] = size;
+		h->objs_info[h->nobjs * 3 + 2] = relocate;
+		h->nobjs++;
+		return;
+	}
+	if( kind == MEM_KIND_DYNAMIC && hot_pmap_get(&h->virtuals, t) >= 0 ) {
+		if( h->nvirts == h->max_virts ) {
+			h->max_virts = h->max_virts ? h->max_virts * 2 : 256;
+			h->virts = (void**)realloc(h->virts, sizeof(void*) * h->max_virts);
+		}
+		h->virts[h->nvirts++] = block;
+	}
+}
+
+static void hot_instances_free( hot_instances *h ) {
+	for(int i=0;i<h->ntypes;i++)
+		free(h->types[i].map);
+	free(h->types);
+	hot_pmap_free(&h->aliases);
+	hot_pmap_free(&h->virtuals);
+	hot_pmap_free(&h->maps);
+	free(h->live_maps);
+	free(h->objs);
+	free(h->objs_info);
+	free(h->virts);
+}
+
+/*
+	Finds the live instances of the types whose layout changes and checks that each fits in its block.
+	Called before anything is changed : a failure refuses the reload.
+*/
+static void hot_instances_check( hot_instances *h, hot_report *r ) {
+	for(int i=0;i<h->ntypes;i++) {
+		hot_itype *it = h->types + i;
+		it->old_obj = it->old->obj;
+		it->ort = hl_get_obj_rt(it->old);
+		it->nrt = hl_get_obj_rt(it->t);
+		// the fields kept : same name and type
+		it->map = (int*)malloc(sizeof(int) * (it->nrt->nfields + 1));
+		for(int fi=0;fi<it->nrt->nfields;fi++) {
+			hl_obj_field *nf = hl_obj_field_fetch(it->t, fi);
+			it->map[fi] = -1;
+			for(int j=0;j<it->ort->nfields;j++) {
+				hl_obj_field *of = hl_obj_field_fetch(it->old, j);
+				if( of->hashed_name == nf->hashed_name && check_same_type(of->t, nf->t) ) {
+					it->map[fi] = it->ort->fields_indexes[j];
+					break;
+				}
+			}
+		}
+		// every type pointer that has the previous layout
+		for(int m=0;m<modules_count;m++) {
+			hl_code *code = cur_modules[m]->code;
+			for(int k=0;k<code->ntypes;k++) {
+				hl_type *a = code->types + k;
+				if( a->kind == HOBJ && a->obj == it->old_obj ) hot_pmap_set(&h->aliases, a, i);
+			}
+		}
+		hot_pmap_set(&h->aliases, it->old, i);
+	}
+	for(int m=0;m<modules_count;m++) {
+		hl_code *code = cur_modules[m]->code;
+		for(int k=0;k<code->ntypes;k++)
+			if( code->types[k].kind == HVIRTUAL ) hot_pmap_set(&h->virtuals, code->types + k, 0);
+	}
+	int *nmaps;
+	void **maps = hl_hot_object_maps(&nmaps);
+	for(int i=0;i<*nmaps;i++)
+		hot_pmap_set(&h->maps, maps[i], 0);
+	hl_gc_iter_live(hot_scan_block, h);
+	if( h->nrelocated == 0 ) return;
+	// the instances to move must not be referenced by a stack : it cannot be rewritten
+	void **olds = (void**)malloc(sizeof(void*) * h->nrelocated);
+	int *sizes = (int*)malloc(sizeof(int) * h->nrelocated);
+	int *types = (int*)malloc(sizeof(int) * h->nrelocated);
+	int n = 0;
+	for(int k=0;k<h->nobjs;k++) {
+		if( !h->objs_info[k * 3 + 2] ) continue;
+		olds[n] = h->objs[k];
+		sizes[n] = h->objs_info[k * 3 + 1];
+		types[n] = h->objs_info[k * 3];
+		n++;
+	}
+	int found = hl_gc_stacks_find(olds, sizes, n);
+	if( found >= 0 ) {
+		hot_itype *it = h->types + types[found];
+		hot_print(r, "\n  ");
+		hot_print_type_name(r, it->old_obj);
+		hot_print(r, ": an instance that must be moved (no room for the new layout in its block) is referenced by a running function");
+		r->count++;
+	}
+	free(olds);
+	free(sizes);
+	free(types);
+}
+
+/*
+	Rewrites the live instances to the new layout, in place : the fields kept are copied to their
+	new offsets, the others are cleared. Then every type pointer of a previous layout gets the new one,
+	so that the instances keep their type, and the virtuals of the instances point to the new offsets.
+*/
+static void hot_instances_apply( hl_module *m, hot_instances *h ) {
+	for(int i=0;i<h->ntypes;i++) {
+		hot_itype *it = h->types + i;
+		it->nrt = hl_get_obj_proto(it->t);
+		// the GC scans an instance up to the end of its block
+		if( it->t->mark_bits && hl_mark_size(it->nrt->size) < hl_mark_size(it->max_block) ) {
+			unsigned int *mark = (unsigned int*)hl_zalloc(&m->ctx.alloc, hl_mark_size(it->max_block));
+			memcpy(mark, it->t->mark_bits, hl_mark_size(it->nrt->size));
+			it->t->mark_bits = mark;
+		}
+	}
+	// no collection while the instances are rewritten and moved
+	hl_gc_enable(false);
+	void **news = (void**)malloc(sizeof(void*) * (h->nobjs + 1));
+	for(int k=0;k<h->nobjs;k++) {
+		char *o = (char*)h->objs[k];
+		hot_itype *it = h->types + h->objs_info[k * 3];
+		news[k] = o;
+		if( !h->objs_info[k * 3 + 2] ) continue;
+		char *n = (char*)hl_gc_alloc_gen(*(hl_type**)o, it->nrt->size, (it->nrt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
+		*(void**)n = *(void**)o;
+		for(int fi=0;fi<it->nrt->nfields;fi++) {
+			if( it->map[fi] < 0 ) continue;
+			memcpy(n + it->nrt->fields_indexes[fi], o + it->map[fi], hot_field_size(hl_obj_field_fetch(it->t, fi)->t));
+		}
+		news[k] = n;
+	}
+	// the instances that have room are rewritten in place : tmp holds their pointers
+	int max_size = 0;
+	for(int i=0;i<h->ntypes;i++)
+		if( h->types[i].ort->size > max_size ) max_size = h->types[i].ort->size;
+	char *tmp = (char*)malloc(max_size + 1);
+	for(int k=0;k<h->nobjs;k++) {
+		if( h->objs_info[k * 3 + 2] ) continue;
+		char *o = (char*)h->objs[k];
+		hot_itype *it = h->types + h->objs_info[k * 3];
+		int block = h->objs_info[k * 3 + 1];
+		memcpy(tmp, o, it->ort->size);
+		memset(o + HL_WSIZE, 0, block - HL_WSIZE);
+		for(int fi=0;fi<it->nrt->nfields;fi++) {
+			if( it->map[fi] < 0 ) continue;
+			memcpy(o + it->nrt->fields_indexes[fi], tmp + it->map[fi], hot_field_size(hl_obj_field_fetch(it->t, fi)->t));
+		}
+	}
+	free(tmp);
+	// the type pointers of the previous layouts get the new one
+	for(int k=0;k<h->aliases.size;k++) {
+		hl_type *a = (hl_type*)h->aliases.keys[k];
+		if( a == NULL ) continue;
+		hot_itype *it = h->types + h->aliases.values[k];
+		a->obj = it->t->obj;
+		a->vobj_proto = it->t->vobj_proto;
+		a->mark_bits = it->t->mark_bits;
+	}
+	// the references to the moved instances (with the new layouts : the GC scans them precisely)
+	hot_pmap moved;
+	int replaced = 0;
+	memset(&moved, 0, sizeof(moved));
+	if( h->nrelocated ) {
+		void **olds = (void**)malloc(sizeof(void*) * h->nrelocated);
+		void **nnews = (void**)malloc(sizeof(void*) * h->nrelocated);
+		int *sizes = (int*)malloc(sizeof(int) * h->nrelocated);
+		int n = 0;
+		for(int k=0;k<h->nobjs;k++) {
+			if( !h->objs_info[k * 3 + 2] ) continue;
+			olds[n] = h->objs[k];
+			nnews[n] = news[k];
+			sizes[n] = h->objs_info[k * 3 + 1];
+			hot_pmap_set(&moved, news[k], k);
+			n++;
+		}
+		replaced = hl_gc_relocate(olds, sizes, nnews, n);
+		free(olds);
+		free(nnews);
+		free(sizes);
+	}
+	// virtuals : their fields point into the value
+	for(int k=0;k<h->nvirts;k++) {
+		vvirtual *v = (vvirtual*)h->virts[k];
+		char *o = (char*)v->value;
+		if( o == NULL ) continue;
+		int idx = hot_pmap_get(&h->aliases, *(void**)o);
+		if( idx < 0 ) continue;
+		hot_itype *it = h->types + idx;
+		int mk = hot_pmap_get(&moved, o);
+		char *prev = mk >= 0 ? (char*)h->objs[mk] : o; // where the fields were
+		for(int i=0;i<v->t->virt->nfields;i++) {
+			char *p = (char*)hl_vfields(v)[i];
+			if( p < prev || p >= prev + it->ort->size ) continue; // a method
+			hl_obj_field *vf = v->t->virt->fields + i;
+			hl_vfields(v)[i] = NULL;
+			for(int fi=0;fi<it->nrt->nfields;fi++) {
+				hl_obj_field *nf = hl_obj_field_fetch(it->t, fi);
+				if( nf->hashed_name == vf->hashed_name && hl_same_type(nf->t, vf->t) ) {
+					hl_vfields(v)[i] = o + it->nrt->fields_indexes[fi];
+					break;
+				}
+			}
+		}
+	}
+	// the previous blocks of the moved instances are garbage
+	for(int k=0;k<h->nobjs;k++)
+		if( h->objs_info[k * 3 + 2] ) *(void**)h->objs[k] = NULL;
+	hot_pmap_free(&moved);
+	free(news);
+	hl_gc_enable(true);
+	if( h->nobjs ) {
+		printf("[HotReload] %d instances upgraded", h->nobjs);
+		if( h->nrelocated ) printf(", %d moved (%d references updated)", h->nrelocated, replaced);
+		printf("\n");
+	}
+	// the object maps hash the address of their keys
+	if( h->nrelocated )
+		for(int i=0;i<h->nlive_maps;i++)
+			hl_ho_rehash(h->live_maps[i]);
+	// forget the object maps that are no longer alive
+	int *nmaps;
+	void **maps = hl_hot_object_maps(&nmaps);
+	hot_pmap live;
+	memset(&live, 0, sizeof(live));
+	for(int k=0;k<h->nlive_maps;k++)
+		hot_pmap_set(&live, h->live_maps[k], 0);
+	int keep = 0;
+	for(int i=0;i<*nmaps;i++)
+		if( hot_pmap_get(&live, maps[i]) >= 0 ) maps[keep++] = maps[i];
+	*nmaps = keep;
+	hot_pmap_free(&live);
 }
 
 /* ---- patch ---- */
@@ -1846,6 +2191,11 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	// check the layout of the live types before anything is changed
 	hot_upgrade *upgrades = (hot_upgrade*)malloc(sizeof(hot_upgrade) * (c->ntypes + 1));
 	int nupgrades = 0;
+	hot_instances inst;
+	memset(&inst, 0, sizeof(inst));
+	inst.types = (hot_itype*)malloc(sizeof(hot_itype) * (c->ntypes + 1));
+	int *itype_of = (int*)malloc(sizeof(int) * (c->ntypes + 1));
+	for(i=0;i<c->ntypes;i++) itype_of[i] = -1;
 	{
 		char buf[4096];
 		hot_report r = { buf, sizeof(buf), 0, 0 };
@@ -1853,16 +2203,43 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		for(i=0;i<c->ntypes;i++) {
 			hl_type *t = c->types + i;
 			hl_type *p = hot_find_type(hr, t);
-			if( p && hot_check_layout(p, t, &r) == HOT_LAYOUT_UPGRADE ) {
+			int k = p ? hot_check_layout(p, t, &r) : HOT_LAYOUT_SAME;
+			if( k == HOT_LAYOUT_UPGRADE ) {
 				hot_upgrade *u = upgrades + nupgrades++;
 				u->old = p;
 				u->t = t;
 				u->index = i;
 				u->obj = NULL;
 				u->added = NULL;
+			} else if( k == HOT_LAYOUT_INSTANCES ) {
+				hot_itype *it = inst.types + inst.ntypes;
+				memset(it, 0, sizeof(hot_itype));
+				it->old = p;
+				it->t = t;
+				it->index = i;
+				itype_of[i] = inst.ntypes++;
 			}
 		}
+		// the subclasses of a type whose layout changes have their fields at other offsets
+		for(i=0;i<c->ntypes;i++) {
+			hl_type *t = c->types + i;
+			if( t->kind != HOBJ || itype_of[i] >= 0 || hl_is_class_object(t) ) continue;
+			hl_type *p = hot_find_type(hr, t);
+			if( p == NULL ) continue;
+			hl_type *sup = t->obj->super;
+			while( sup && !(sup >= c->types && sup < c->types + c->ntypes && itype_of[sup - c->types] >= 0) )
+				sup = sup->obj->super;
+			if( sup == NULL ) continue;
+			hot_itype *it = inst.types + inst.ntypes;
+			memset(it, 0, sizeof(hot_itype));
+			it->old = p;
+			it->t = t;
+			it->index = i;
+			itype_of[i] = inst.ntypes++;
+		}
 		if( r.count ) {
+			free(itype_of);
+			hot_instances_free(&inst);
 			hot_free_upgrades(upgrades, nupgrades);
 			return hot_refuse(m2, "the layout of live types changed (not supported yet):", buf);
 		}
@@ -1879,11 +2256,20 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		buf[0] = 0;
 		for(i=0;i<nupgrades;i++)
 			hot_upgrade_check(hr, upgrades + i, &r);
-		if( r.count == 0 )
-			hot_check_stack(upgrades, nupgrades, &r);
+		if( r.count == 0 && inst.ntypes )
+			hot_instances_check(&inst, &r);
+		if( r.count == 0 ) {
+			hl_type_obj **layouts = (hl_type_obj**)malloc(sizeof(void*) * (nupgrades + inst.ntypes + 1));
+			for(i=0;i<nupgrades;i++) layouts[i] = upgrades[i].old->obj;
+			for(i=0;i<inst.ntypes;i++) layouts[nupgrades + i] = inst.types[i].old->obj;
+			hot_check_stack(layouts, nupgrades + inst.ntypes, &r);
+			free(layouts);
+		}
 		if( r.count ) {
+			free(itype_of);
+			hot_instances_free(&inst);
 			hot_free_upgrades(upgrades, nupgrades);
-			return hot_refuse(m2, "the statics of live classes cannot be upgraded:", buf);
+			return hot_refuse(m2, "live values cannot be upgraded:", buf);
 		}
 	}
 
@@ -1932,6 +2318,8 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	if( changes_count == 0 ) {
 		free(match);
 		hot_free_upgrades(upgrades, nupgrades);
+		hot_instances_free(&inst);
+		free(itype_of);
 		printf("[HotReload] No changes found\n");
 		fflush(stdout);
 		hot_discard(m2);
@@ -1944,6 +2332,8 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	memset(upgraded, 0, sizeof(bool) * (c->ntypes + 1));
 	for(i=0;i<nupgrades;i++)
 		upgraded[upgrades[i].index] = true;
+	for(i=0;i<inst.ntypes;i++)
+		upgraded[inst.types[i].index] = true;
 	for(i=0;i<c->ntypes;i++) {
 		hl_type *t = c->types + i;
 		hl_type *p = hot_find_type(hr, t);
@@ -1970,6 +2360,8 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		free(match);
 		free(new_types);
 		hot_free_upgrades(upgrades, nupgrades);
+		hot_instances_free(&inst);
+		free(itype_of);
 		return hot_refuse(m2, "out of memory", NULL);
 	}
 #	ifdef WIN64_UNWIND_TABLES
@@ -1992,6 +2384,8 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 			free(match);
 			free(new_types);
 			hot_free_upgrades(upgrades, nupgrades);
+			hot_instances_free(&inst);
+			free(itype_of);
 			return hot_refuse(m2, "could not JIT the new code", NULL);
 		}
 		m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
@@ -2002,6 +2396,8 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		free(match);
 		free(new_types);
 		hot_free_upgrades(upgrades, nupgrades);
+		hot_instances_free(&inst);
+		free(itype_of);
 		return hot_refuse(m2, "could not JIT the new code", NULL);
 	}
 
@@ -2084,6 +2480,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		for(int g=0;g<hr->nglobals;g++)
 			if( hr->globals_types[g] == u->old ) hr->globals_types[g] = u->t;
 	}
+	if( inst.ntypes ) hot_instances_apply(m2, &inst);
 
 	for(i=0;i<c->ntypes;i++)
 		hot_add_type(hr, c->types + i);
@@ -2121,6 +2518,8 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	}
 	free(new_types);
 	hot_free_upgrades(upgrades, nupgrades);
+	hot_instances_free(&inst);
+	free(itype_of);
 	return true;
 }
 

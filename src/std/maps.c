@@ -236,6 +236,32 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 	return key;
 }
 
+/*
+	Hot reload : the object maps hash the address of their keys, they must be rehashed when an
+	object is relocated. They are registered when allocated, and found back by the reload.
+*/
+static void **hot_object_maps = NULL;
+static int hot_object_maps_count = 0;
+static int hot_object_maps_max = 0;
+
+static void hot_register_object_map( void *m ) {
+	if( !hl_setup.hot_reload ) return;
+	hl_global_lock(true);
+	if( hot_object_maps_count == hot_object_maps_max ) {
+		hot_object_maps_max = hot_object_maps_max ? hot_object_maps_max * 2 : 64;
+		hot_object_maps = (void**)realloc(hot_object_maps, sizeof(void*) * hot_object_maps_max);
+	}
+	hot_object_maps[hot_object_maps_count++] = m;
+	hl_global_lock(false);
+}
+
+// the registered object maps : the reload removes the ones that are no longer alive by setting the count
+HL_API void **hl_hot_object_maps( int **count ) {
+	*count = &hot_object_maps_count;
+	return hot_object_maps;
+}
+
+#define _MALLOC_HOOK(m)	hot_register_object_map(m)
 #define hlt_key		hlt_dyn
 #define hl_hohash(key)	((unsigned int)(int_val)(key))
 #define _MKEY_TYPE	vdynamic*
@@ -246,6 +272,21 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 #define _MERASE(c)  m->values[c].key = NULL
 
 #include "maps.h"
+
+// rebuilds the cells of an object map after the address of some keys changed
+HL_API void hl_ho_rehash( void *map ) {
+	hl_ho_map *m = (hl_ho_map*)map;
+	if( !m->values ) return;
+	hl_ho_map old = *m; // on the stack : keeps the previous arrays alive
+	memset(m,0,sizeof(hl_ho_map));
+	for(int i=0;i<old.ncells;i++) {
+		int c = old.maxentries < 128 ? ((signed char*)old.cells)[i] : ((int*)old.cells)[i];
+		while( c >= 0 ) {
+			hl_hoset_impl(m, old.values[c].key, old.values[c].value);
+			c = old.maxentries < 128 ? ((signed char*)old.nexts)[c] : ((int*)old.nexts)[c];
+		}
+	}
+}
 
 // ----- LOOKUP MAP ---------------------------------
 

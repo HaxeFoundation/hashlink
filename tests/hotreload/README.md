@@ -32,7 +32,7 @@ Optional files of a case:
 ## Notes
 
 - With `-dce std` (the default), the first use of something of a standard class can change its layout: a new
-  static is handled (see `dce_std`), a new instance field is refused. Hot reload builds should use `-dce no`.
+  static or a new instance field, both handled (see `dce_std`, `dce_instance_field`).
 
 ## Heaps app
 

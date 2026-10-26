@@ -148,7 +148,7 @@ typedef struct {
 	jit_ctx *jit_ctx;
 	hl_hot_reload *hot;	// hot reload : the reference state, on the first module
 	void ***hot_slots;	// hot reload : for the functions this module did not compile, where their current address is
-	hl_type_obj ***hot_uses;	// hot reload : for each function, the class objects it uses (NULL terminated)
+	hl_type_obj ***hot_uses;	// hot reload : for each function, the object types it uses (NULL terminated)
 	bool debug;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES

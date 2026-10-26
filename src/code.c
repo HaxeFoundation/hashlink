@@ -721,9 +721,53 @@ static int hash_native( hl_code_hash *h, hl_native *n ) {
 	return hash;
 }
 
+// a hash of a type that does not depend on the layout of the objects and enums, only their names :
+// a function keeps its signature when the class of its arguments (this) changes layout
+static int hash_type_sign( hl_type *t, int depth ) {
+	int hash = -1;
+	int i;
+	H(t->kind);
+	if( depth > 4 ) return hash;
+	switch( t->kind ) {
+	case HFUN:
+	case HMETHOD:
+		H(t->fun->nargs);
+		for(i=0;i<t->fun->nargs;i++)
+			H32(hash_type_sign(t->fun->args[i], depth + 1));
+		H32(hash_type_sign(t->fun->ret, depth + 1));
+		break;
+	case HOBJ:
+	case HSTRUCT:
+		HUSTR(t->obj->name);
+		break;
+	case HENUM:
+		HUSTR(t->tenum->name);
+		break;
+	case HREF:
+	case HNULL:
+	case HPACKED:
+		H32(hash_type_sign(t->tparam, depth + 1));
+		break;
+	case HVIRTUAL:
+		H32(t->virt->nfields);
+		for(i=0;i<t->virt->nfields;i++) {
+			hl_obj_field *f = t->virt->fields + i;
+			H32(f->hashed_name);
+			H32(hash_type_sign(f->t, depth + 1));
+		}
+		break;
+	case HABSTRACT:
+		HUSTR(t->abs_name);
+		break;
+	default:
+		break;
+	}
+	return hash;
+}
+
 static int hash_fun_sign( hl_code_hash *h, hl_function *f ) {
 	int hash = -1;
-	HTYPE(f->type);
+	H32(hash_type_sign(f->type, 0));
 	if( f->obj ) {
 		HUSTR(f->obj->name);
 		HUSTR(f->field.name);
