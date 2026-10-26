@@ -6,8 +6,8 @@ v1 step 1 a:1,b:2/1.5 named=b2 leveled=b:2/1.5 reflect=1.5
 [HotReload] 1 objects upgraded
 [HotReload] 3 changes
 reload 2: applied
-v2 step 2 a:1,b:2/0 named=b2 leveled=b:2/0 reflect=0
+v2 step 2 a:1,b:2/1 named=b2 leveled=b:2/1 reflect=1
 [HotReload] 2 objects upgraded
 [HotReload] 6 changes
 reload 3: applied
-v3 step 3 a:1,b:2/0 named=b2 leveled=b:2/0 reflect=0
+v3 step 3 a:1,b:2/1 named=b2 leveled=b:2/1 reflect=1

@@ -1,0 +1,5 @@
+v0 step 0 count=7 ratio=2.75 maybe=5 plain=9 dyn=11 flag=true sub=1 base1=2 base2=3 obj=4 text=hi total=41
+[HotReload] 2 objects upgraded
+[HotReload] 3 changes
+reload 1: applied
+v1 step 1 count=7 ratio=2 maybe=5 plain=9 dyn=11 flag=true sub=1 base1=2 base2=null obj=4 text=hi total=41.5

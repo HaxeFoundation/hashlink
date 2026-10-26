@@ -122,16 +122,16 @@ Constraints that shape the design:
 For each object or struct type whose layout changed, compute the mapping from the old fields to the new ones, over the whole class hierarchy (a field added to a base class shifts the fields of every subclass):
 
 - fields matched by `hashed_name` and same type: value copied to the new offset;
-- added fields: initialized to their default value (zero, `null`, `0.0`, `false`);
+- added fields: their constant initializer, else their default value (zero, `null`, `0.0`, `false`);
 - removed fields: value dropped;
-- field whose type changed: treated as removed + added (no conversion);
+- field whose type changed: converted when it can be, else treated as removed + added;
 - method changes only (proto): no data to move, only the type pointer and the runtime tables.
 
 Output: an upgrade plan per type (old size, new size, list of copies), and a report printed on reload (types, added and removed fields). The plan is computed before anything is patched; any case not supported yet refuses the reload (item 4).
 
 ### U1. Class objects (static variables)
 
-**Done**, with the mechanism of instances (U4, U8): a class object is the instance of its class object type, upgraded in place when its block has room and moved otherwise. No spare room. The statics kept (same name and type) are copied to their new offsets, the others are cleared, the new static methods get their closures (the bindings of the fields added), then the entry point initializes the added statics (`hot_init_bits` returns their bits). A static whose type changed is removed and added.
+**Done**, with the mechanism of instances (U4, U8): a class object is the instance of its class object type, upgraded in place when its block has room and moved otherwise. No spare room. The statics kept (same name and type) are copied to their new offsets, the others are cleared, the new static methods get their closures (the bindings of the fields added), then the entry point initializes the added statics (`hot_init_bits` returns their bits). A static whose type changed keeps its value when it converts to the new type (see U4), else it is removed and added.
 
 The frame of the entry point is on the stack while the program runs and holds the class objects it initialized: these values are dead (it only returns after `main` or the event loop), so the search of the stacks for the blocks to move skips it. It is found from the return address into the entry point, with its frame pointer just under it, to the next return address into JIT code.
 
@@ -142,6 +142,8 @@ First phase to deliver, because it covers the most common edit (adding a static)
 ### U2. Safe point and stack checks
 
 **Done.** `hl_module_patch` stops the other threads (`hl_gc_world`, at their safe points, as for a collection) while it compares, compiles and patches the code and upgrades the live values; they run again before the entry point, which is code of the program. Before a layout changes, the reload is refused when a running function uses the type (the object types each function uses are recorded when it is compiled: its registers are freed after JIT), naming it: the stack of the current thread is walked, the stacks of the other threads, saved where they stopped, are scanned for return addresses into JIT functions. The entry point is not checked: it reads the class objects before it calls `main`, and only returns after. The search for references to the blocks to move covers every thread (`threads`).
+
+These refusals come from the code that runs, which changes: the reload is **delayed** (`[HotReload] Reload delayed`, printed once while the reason stays the same) and tried again by the next checks of the same file, at most every `HL_HOT_RELOAD_RETRY` seconds (0.5 by default), until the running code no longer uses the types (`retry_on_stack`). The other refusals (a struct, an enum constructor in use, the globals) need a restart.
 
 - The reload runs at the existing `reload_check` point, with every other HL thread stopped (stop the world, as for a collection).
 - Walk the stacks of all threads (the stack walk used by the HL2 profiler and call stack capture): if a frame belongs to a function that reads or writes fields of an upgraded type (known from the bytecode: `OField`, `OSetField`, `OGetThis`, `OSetThis` on that type or its subclasses), refuse the reload and name the function. In practice the main loop function must not touch upgraded types directly; the message tells the agent which function to move.
@@ -157,7 +159,9 @@ In hot reload mode, object allocation reserves extra room after the fields (a co
 **Done**, with U8. A class whose fields, superclass or methods change is upgraded, with its subclasses (their fields and slots move): the live instances get the new layout and the new methods. A change of a struct (`@:struct`, no type in its values) refuses the reload.
 
 - Before anything is changed: a full collection, then a walk of the live blocks finds the instances (their first word is one of the `hl_type*` that share the previous layout: the live type, and the aliases of the reloads) and the virtuals. An instance whose block has room is rewritten in place, the others are moved; the stacks (above the call to `checkReload` for the current thread, and the registers it was called with) must not reference an instance to move, and no running function may use a type whose layout changes (U2): otherwise the reload is refused.
-- Applied after the JIT, with the collections disabled: the fields kept (same name and type, through the whole hierarchy) are copied to their new offsets, the others cleared (default value). Then every `hl_type*` of the previous layout gets the new one (`obj`, `vobj_proto`, `mark_bits`): **instances keep their type pointer**, so `Std.isOfType`, `__type__` of the class object and the `super` of other types stay valid.
+- Applied after the JIT, with the collections disabled: the fields kept (same name and type, through the whole hierarchy) are copied to their new offsets, the others cleared (default value).
+- A field whose type changes keeps its value when it converts (`field_types`): between numbers (a float is truncated), `Bool`, `Null<T>` and `Dynamic` (boxed or unboxed), from an object to `Dynamic`, to its superclass, to a subclass when the value is one, to a structure (the virtual is built once every instance has its new layout). Otherwise, as a field removed and added.
+- An added field gets its constant initializer (`field_inits`): Haxe moves the initializers of the fields to the constructor, which is read from its start to its first jump, for the class and its superclasses: the constants (numbers, `Bool`, strings, `null`, boxed numbers) set to a field of `this`. Any other value (an array, a call) leaves the default value, for `onHotReload()` to set. Then every `hl_type*` of the previous layout gets the new one (`obj`, `vobj_proto`, `mark_bits`): **instances keep their type pointer**, so `Std.isOfType`, `__type__` of the class object and the `super` of other types stay valid.
 - The signature of a function no longer depends on the layout of the types of its arguments (only their names): a method of a type whose layout changes is replaced (the previous code jumps to the new one) instead of being seen as removed and added, so the live closures and vtables call the new body.
 - The VM prints `[HotReload] N instances upgraded, M moved (R references updated)`.
 
@@ -173,8 +177,8 @@ In hot reload mode, object allocation reserves extra room after the fields (a co
 - When the fields keep their offsets (only the methods change), the instances are not rewritten nor moved: the type pointer is enough.
 - The code that runs during the reload keeps its version: it calls the methods by their slot. When a slot gets another method (a virtual method inserted or removed before others), a running function that uses the type refuses the reload (`slots_on_stack`); slots added after the others, or another method in a slot (an override), are accepted.
 - The virtuals whose value is an upgraded instance are computed again as `hl_to_virtual` does: their fields and their methods (`overrides`).
-- A closure of a method (`obj.name`) keeps the method resolved when it was created; the body of that method follows its changes.
-- Changing the superclass keeps the fields of the same name and type wherever they are declared; the others get their default value, as added fields (`superclass`).
+- A closure of a method (`obj.name`) of an upgraded instance is bound again to the method of the same name and signature of its new type, which can be a new override (`overrides`); the closures are found by the heap walk.
+- Changing the superclass keeps the fields of the same name wherever they are declared; the others get their initializer or default value, as added fields (`superclass`).
 
 Plan:
 
@@ -264,9 +268,9 @@ Every operation a developer or an agent can make between two reloads, with the e
 
 | Operation | Expected | Needs |
 |---|---|---|
-| Add a field | Accepted; live instances get the default value | done |
+| Add a field | Accepted; live instances get its constant initializer, else the default value | done (`field_inits`) |
 | Remove a field | Accepted; value dropped, GC no longer sees it | done |
-| Change the type of a field | Accepted as remove + add (default value) | done |
+| Change the type of a field | Accepted; the value is converted when it can be, else the default value | done (`field_types`) |
 | Reorder fields | Accepted; values kept | done |
 | Rename a field | Accepted as remove + add | done |
 | Add a field to a base class with live subclass instances | Accepted; subclass fields shifted, values kept | done |
@@ -275,7 +279,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Add a property (`get`/`set`) | Accepted | U0, U4 |
 | Change the initializer of an existing field | Accepted; live instances keep their value, new ones use it | now |
 | Instance whose block has no room | Moved, references updated; refused if a stack references it | done |
-| Type of a field used by a function active on the stack | Refused, function named | done (current thread) |
+| Type of a field used by a function active on the stack | Delayed, function named; applied once the function returned | done (`statics_on_stack`, `threads`, `retry_on_stack`) |
 | Upgrade hook `onHotReload` | Called once per upgraded instance | done |
 
 ### Static variables
@@ -284,7 +288,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 |---|---|---|
 | Add a static to an existing class | Accepted; only its initializer runs | done |
 | Remove a static | Accepted | done |
-| Change the type of a static | Accepted as remove + add | done |
+| Change the type of a static | Accepted; the value is converted when it can be, else the static is initialized again | done (`field_types`) |
 | Change the initializer of an existing static | Accepted; the current value is kept | 5 |
 | Change a `static inline` / `final` constant | Accepted; inlined uses compiled again; a static keeps its value, unless it has `@:hotReload` (set again by every reload) | done |
 | Static of a new class | Accepted; value kept across later reloads | 1 |

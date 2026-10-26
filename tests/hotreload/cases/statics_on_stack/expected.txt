@@ -1,7 +1,7 @@
 v0 step 0
-[HotReload] Reload refused: live values cannot be upgraded:
+[HotReload] Reload delayed: live values cannot be upgraded:
   Test: its layout changes and it is used by Main.main, which is running : move the code that uses it out of it
-[HotReload] Restart required, the program keeps running the previous code
+[HotReload] Tried again until the running code no longer uses them
 reload 1: not applied counter=1
 v0 step 1
 [HotReload] 1 changes

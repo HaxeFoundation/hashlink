@@ -1,0 +1,11 @@
+v0 step 0 x=1
+[HotReload] Reload delayed: live values cannot be upgraded:
+  Foo: its layout changes and it is used by Main.update, which is running : move the code that uses it out of it
+[HotReload] Tried again until the running code no longer uses them
+in update: not applied x=1
+in update, again: not applied
+[HotReload] 1 objects upgraded
+[HotReload] 4 changes
+after update: applied
+v1 step 1 x=1 added=5
+again: not applied

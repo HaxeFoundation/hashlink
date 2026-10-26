@@ -2,8 +2,8 @@ v0 step 0 B<A b=2 a=1 isA=true isC=false, D<B<A b=2 a=1 isA=true isC=false
 [HotReload] 2 objects upgraded
 [HotReload] 5 changes
 reload 1: applied
-v1 step 1 B<C b=2 c=0 isA=false isC=true, D<B<C d=4 b=2 c=0 isA=false isC=true
+v1 step 1 B<C b=2 c=3 isA=false isC=true, D<B<C d=4 b=2 c=3 isA=false isC=true
 [HotReload] 2 objects upgraded
 [HotReload] 5 changes
 reload 2: applied
-v2 step 2 B<A b=2 a=0 isA=true isC=false, D<B<A b=2 a=0 isA=true isC=false
+v2 step 2 B<A b=2 a=1 isA=true isC=false, D<B<A b=2 a=1 isA=true isC=false

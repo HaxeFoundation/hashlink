@@ -115,14 +115,32 @@ static hl_code *load_code( const pchar *file, char **error_msg, bool print_error
 
 static main_context* main_ctx = NULL;
 
+HL_API double hl_sys_time();
+
+// a reload delayed by the running code is tried again at most every HL_HOT_RELOAD_RETRY seconds (0.5 by default)
+static double retry_delay() {
+	static double delay = -1;
+	if( delay < 0 ) {
+		const char *v = getenv("HL_HOT_RELOAD_RETRY");
+		delay = v ? atof(v) : 0.5;
+		if( delay < 0 ) delay = 0;
+	}
+	return delay;
+}
+
 static bool check_reload( vbyte *alt_file ) {
+	static double last_try = 0;
 	main_context* m = main_ctx;
 	pchar* file = alt_file ? (pchar*)alt_file : m->file;
 	int64 size;
 	int64 time = pfiletime(file,&size);
 	bool changed;
-	if( time == m->file_time && size == m->file_size )
-		return false;
+	if( time == m->file_time && size == m->file_size ) {
+		if( !hl_setup.hot_retry || hl_sys_time() - last_try < retry_delay() )
+			return false;
+	}
+	last_try = hl_sys_time();
+	hl_setup.hot_retry = false;
 	char *error_msg = NULL;
 	hl_code *code = load_code(file, &error_msg, false);
 	if( code == NULL )

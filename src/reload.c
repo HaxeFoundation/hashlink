@@ -271,6 +271,7 @@ typedef struct {
 	int size;
 	int pos;
 	int count;
+	int running;	// the problems that come from the running code : they can go away
 } hot_report;
 
 static void hot_print( hot_report *r, const char *fmt, ... ) {
@@ -456,11 +457,92 @@ static int hot_field_size( hl_type *t ) {
 	return t->kind == HPACKED ? hl_get_obj_rt(t->tparam)->size : hl_type_size(t);
 }
 
+/*
+	A field (or static) whose type changes keeps its value when it can be converted : between numbers,
+	to and from Null<T>, to Dynamic, and between objects, Dynamic and structures when the value is
+	compatible with the new type. The others get their default value.
+*/
+static bool hot_is_num( hl_type *t ) {
+	switch( t->kind ) {
+	case HUI8: case HUI16: case HI32: case HI64: case HF32: case HF64:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool hot_is_dynamic( hl_type *t ) {
+	switch( t->kind ) {
+	case HOBJ: case HDYNOBJ: case HVIRTUAL: case HENUM: case HFUN: case HARRAY: case HNULL: case HDYN:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool hot_convertible( hl_type *ot, hl_type *nt ) {
+	if( hot_is_num(ot) )
+		return hot_is_num(nt) || nt->kind == HDYN || (nt->kind == HNULL && hot_is_num(nt->tparam));
+	if( ot->kind == HNULL && (hot_is_num(ot->tparam) || ot->tparam->kind == HBOOL) && (hot_is_num(nt) || nt->kind == HBOOL) )
+		return true;
+	if( ot->kind == HBOOL && nt->kind == HNULL && nt->tparam->kind == HBOOL )
+		return true;
+	if( !hot_is_dynamic(ot) ) return false;
+	switch( nt->kind ) {
+	case HDYN:
+		return true;
+	case HNULL:
+		return (ot->kind == HDYN || ot->kind == HNULL) && hot_is_num(nt->tparam);
+	case HOBJ:
+	case HVIRTUAL:
+		return ot->kind == HOBJ || ot->kind == HDYN || ot->kind == HVIRTUAL || ot->kind == HDYNOBJ;
+	default:
+		return hot_is_num(nt) && (ot->kind == HDYN || ot->kind == HNULL);
+	}
+}
+
+// the own field of o that keeps the value of f : same name and type, or a type it converts to
 static int hot_find_field( hl_type_obj *o, hl_obj_field *f ) {
 	for(int i=0;i<o->nfields;i++)
 		if( o->fields[i].hashed_name == f->hashed_name && hl_module_same_type(o->fields[i].t, f->t) )
 			return i;
+	for(int i=0;i<o->nfields;i++)
+		if( f->hashed_name && o->fields[i].hashed_name == f->hashed_name && hot_convertible(o->fields[i].t, f->t) )
+			return i;
 	return -1;
+}
+
+static void hot_read_num( hl_type *t, void *p, double *d, int64 *i ) {
+	switch( t->kind ) {
+	case HUI8: *i = *(unsigned char*)p; break;
+	case HUI16: *i = *(unsigned short*)p; break;
+	case HI32: *i = *(int*)p; break;
+	case HI64: *i = *(int64*)p; break;
+	case HF32: *d = *(float*)p; *i = (int64)*d; return;
+	case HF64: *d = *(double*)p; *i = (int64)*d; return;
+	case HBOOL: *i = *(bool*)p; break;
+	default: *i = 0; break;
+	}
+	*d = (double)*i;
+}
+
+static void hot_write_num( hl_type *t, void *p, double d, int64 i ) {
+	switch( t->kind ) {
+	case HUI8: *(unsigned char*)p = (unsigned char)i; break;
+	case HUI16: *(unsigned short*)p = (unsigned short)i; break;
+	case HI32: *(int*)p = (int)i; break;
+	case HI64: *(int64*)p = i; break;
+	case HF32: *(float*)p = (float)d; break;
+	case HF64: *(double*)p = d; break;
+	case HBOOL: *(bool*)p = i != 0; break;
+	default: break;
+	}
+}
+
+static bool hot_is_subclass( hl_type *t, hl_type *of ) {
+	for(;t && t->kind == HOBJ;t=t->obj->super)
+		if( ucmp(t->obj->name, of->obj->name) == 0 ) return true;
+	return false;
 }
 
 /*
@@ -584,6 +666,27 @@ static void hot_pmap_free( hot_pmap *m ) {
 }
 
 typedef struct {
+	int noff;				// offset in the new layout
+	int ooff;				// offset in the previous one
+	hl_type *ot;
+	hl_type *nt;
+} hot_conv;
+
+#define HOT_INIT_NUM	0	// a number or a bool
+#define HOT_INIT_GLOBAL	1	// the value of a constant global (a string)
+#define HOT_INIT_DYN	2	// a number, boxed
+
+typedef struct {
+	int off;
+	int kind;
+	hl_type *t;				// the type of the field
+	hl_type *vt;			// the type of the value
+	int64 i;
+	double d;
+	void **global;
+} hot_finit;
+
+typedef struct {
 	hl_type *old;			// the live type : it keeps its pointer and gets the new layout
 	hl_type *t;				// the type of the new code
 	int index;				// in the types of the new code
@@ -592,6 +695,11 @@ typedef struct {
 	hl_runtime_obj *nrt;
 	int *copies;			// the fields kept : new offset, previous offset, size
 	int ncopies;
+	hot_conv *convs;		// the fields kept with another type
+	int nconvs;
+	unsigned char *filled;	// for each field of the new layout : set from the previous value
+	hot_finit *inits;		// the constant initializers of the fields added, from the constructors
+	int ninits;
 	unsigned int *added;	// bits of the own fields of t that are new (statics to initialize for a class object)
 	int *bindings;			// the bindings (methods) of the fields added
 	int nbindings;
@@ -629,7 +737,79 @@ typedef struct {
 	int nremoved;
 	int max_removed;
 	int nrelocated;
+	hot_pmap methods;		// address of a method of a previous layout -> index in mnames
+	int *mnames;			// the name of the method
+	hl_type **mtypes;		// its type
+	int nmethods;
+	int max_methods;
+	void **closures;		// the closures of a method of an instance to upgrade
+	int *closures_info;		// the type index of the instance, the method (index in mnames)
+	int nclosures;
+	int max_closures;
+	void ***vconv;			// fields converted to a structure : built once the instances are upgraded
+	hl_type **vconv_t;
+	int nvconv;
+	int max_vconv;
 } hot_instances;
+
+static void hot_convert( hot_instances *h, hl_type *ot, void *src, hl_type *nt, void *dst ) {
+	double d;
+	int64 i;
+	char tmp[8];
+	if( hot_is_num(ot) || ot->kind == HBOOL ) {
+		hot_read_num(ot, src, &d, &i);
+		if( hot_is_num(nt) || nt->kind == HBOOL )
+			hot_write_num(nt, dst, d, i);
+		else if( nt->kind == HNULL ) {
+			hot_write_num(nt->tparam, tmp, d, i);
+			*(vdynamic**)dst = hl_make_dyn(tmp, nt->tparam);
+		} else if( nt->kind == HDYN )
+			*(vdynamic**)dst = hl_make_dyn(src, ot);
+		return;
+	}
+	void *v = *(void**)src;
+	if( v == NULL ) return;
+	if( hot_is_num(nt) || nt->kind == HBOOL || nt->kind == HNULL ) {
+		// from Null<T> or Dynamic : a boxed number
+		vdynamic *dv = (vdynamic*)v;
+		if( !hot_is_num(dv->t) && dv->t->kind != HBOOL ) return;
+		hot_read_num(dv->t, &dv->v, &d, &i);
+		if( nt->kind != HNULL ) {
+			hot_write_num(nt, dst, d, i);
+			return;
+		}
+		hot_write_num(nt->tparam, tmp, d, i);
+		*(vdynamic**)dst = hl_make_dyn(tmp, nt->tparam);
+		return;
+	}
+	if( nt->kind == HDYN ) {
+		*(void**)dst = v;
+		return;
+	}
+	// an object : the value of a structure
+	hl_type *vt = *(hl_type**)v;
+	if( vt->kind == HVIRTUAL ) {
+		v = ((vvirtual*)v)->value;
+		if( v == NULL ) return;
+		vt = *(hl_type**)v;
+	}
+	if( nt->kind == HOBJ ) {
+		if( vt->kind == HOBJ && hot_is_subclass(vt, nt) ) *(void**)dst = v;
+		return;
+	}
+	if( nt->kind == HVIRTUAL && (vt->kind == HOBJ || vt->kind == HDYNOBJ) ) {
+		// the structure is built once every instance has its new layout
+		*(void**)dst = v;
+		if( h->nvconv == h->max_vconv ) {
+			h->max_vconv = h->max_vconv ? h->max_vconv * 2 : 16;
+			h->vconv = (void***)realloc(h->vconv, sizeof(void*) * h->max_vconv);
+			h->vconv_t = (hl_type**)realloc(h->vconv_t, sizeof(hl_type*) * h->max_vconv);
+		}
+		h->vconv[h->nvconv] = (void**)dst;
+		h->vconv_t[h->nvconv] = nt;
+		h->nvconv++;
+	}
+}
 
 // reports a running function f which uses one of the layouts
 static void hot_print_layout_name( hot_report *r, hot_itype *it );
@@ -654,6 +834,7 @@ static void hot_check_function( hl_module *m, hl_function *f, hot_itype *types, 
 			hot_print(r, "fun$%d", f->findex);
 		hot_print(r, ", which is running%s : move the code that uses it out of it", where);
 		r->count++;
+		r->running++;
 	}
 }
 
@@ -747,6 +928,24 @@ static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 		h->nobjs++;
 		return;
 	}
+	// a closure of a method of an instance to upgrade : bound again to the method of the same name
+	if( kind == MEM_KIND_DYNAMIC && h->nmethods && t && ((hl_type*)t)->kind == HFUN && size >= (int)sizeof(vclosure) ) {
+		vclosure *c = (vclosure*)block;
+		int mk = c->hasValue && c->value ? hot_pmap_get(&h->methods, c->fun) : -1;
+		int vi = mk >= 0 ? hot_pmap_get(&h->aliases, *(void**)c->value) : -1;
+		if( vi >= 0 && !h->types[vi].is_enum ) {
+			if( h->nclosures == h->max_closures ) {
+				h->max_closures = h->max_closures ? h->max_closures * 2 : 64;
+				h->closures = (void**)realloc(h->closures, sizeof(void*) * h->max_closures);
+				h->closures_info = (int*)realloc(h->closures_info, sizeof(int) * 2 * h->max_closures);
+			}
+			h->closures[h->nclosures] = block;
+			h->closures_info[h->nclosures * 2] = vi;
+			h->closures_info[h->nclosures * 2 + 1] = mk;
+			h->nclosures++;
+		}
+		return;
+	}
 	if( kind == MEM_KIND_DYNAMIC && hot_pmap_get(&h->virtuals, t) >= 0 ) {
 		if( h->nvirts == h->max_virts ) {
 			h->max_virts = h->max_virts ? h->max_virts * 2 : 256;
@@ -813,6 +1012,9 @@ static void hot_instances_free( hot_instances *h ) {
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
 		free(it->copies);
+		free(it->convs);
+		free(it->filled);
+		free(it->inits);
 		free(it->added);
 		free(it->bindings);
 		if( it->ccopies ) {
@@ -830,6 +1032,13 @@ static void hot_instances_free( hot_instances *h ) {
 	free(h->removed);
 	free(h->removed_info);
 	free(h->virts);
+	hot_pmap_free(&h->methods);
+	free(h->mnames);
+	free(h->mtypes);
+	free(h->closures);
+	free(h->closures_info);
+	free(h->vconv);
+	free(h->vconv_t);
 }
 
 static void hot_print_layout_name( hot_report *r, hot_itype *it ) {
@@ -999,6 +1208,171 @@ static void hot_entry_frame( void **start, void **end ) {
 	}
 }
 
+/*
+	The methods of a previous layout, by address : the closures that bind one of them to an instance
+	(obj.method) are found by the heap walk and bound again to the method of the same name of the new
+	layout, which can be an override.
+*/
+static void hot_add_methods( hot_instances *h, hot_itype *it ) {
+	hl_runtime_obj *rt = it->ort;
+	if( rt->methods == NULL || hot_is_class_object(it->old) ) return;
+	for(hl_runtime_obj *r=rt;r;r=r->parent)
+		for(int i=0;i<r->nlookup;i++) {
+			hl_field_lookup *l = r->lookup + i;
+			if( l->field_index >= 0 ) continue;
+			void *fun = rt->methods[-l->field_index-1];
+			if( fun == NULL || hot_pmap_get(&h->methods, fun) >= 0 ) continue;
+			if( h->nmethods == h->max_methods ) {
+				h->max_methods = h->max_methods ? h->max_methods * 2 : 256;
+				h->mnames = (int*)realloc(h->mnames, sizeof(int) * h->max_methods);
+				h->mtypes = (hl_type**)realloc(h->mtypes, sizeof(hl_type*) * h->max_methods);
+			}
+			h->mnames[h->nmethods] = l->hashed_name;
+			h->mtypes[h->nmethods] = l->t;
+			hot_pmap_set(&h->methods, fun, h->nmethods++);
+		}
+}
+
+// same arguments and return type, this aside (an override has the type of its class)
+static bool hot_same_method( hl_type *t1, hl_type *t2 ) {
+	if( t1->kind != HFUN || t2->kind != HFUN || t1->fun->nargs != t2->fun->nargs ) return false;
+	for(int i=1;i<t1->fun->nargs;i++)
+		if( !hl_module_same_type(t1->fun->args[i], t2->fun->args[i]) ) return false;
+	return hl_module_same_type(t1->fun->ret, t2->fun->ret);
+}
+
+static void hot_rebind_closures( hot_instances *h ) {
+	for(int k=0;k<h->nclosures;k++) {
+		vclosure *c = (vclosure*)h->closures[k];
+		hot_itype *it = h->types + h->closures_info[k * 2];
+		int mk = h->closures_info[k * 2 + 1];
+		hl_field_lookup *f = NULL;
+		for(hl_runtime_obj *r=it->nrt;r && !f;r=r->parent)
+			f = hl_lookup_find(r->lookup, r->nlookup, h->mnames[mk]);
+		// the same signature : the closure keeps its type
+		if( f && f->field_index < 0 && hot_same_method(f->t, h->mtypes[mk]) )
+			c->fun = it->nrt->methods[-f->field_index-1];
+	}
+}
+
+/*
+	The fields added to the instances of a class get the constant values their constructor sets
+	(Haxe moves the initializers of the fields to the constructor) : the start of the constructors of
+	the class and its superclasses is read until the first jump. Other values (arrays, objects,
+	expressions) leave the default value : onHotReload() can set them.
+*/
+typedef struct {
+	int kind;	// -1 : not a constant, 3 : null
+	int64 i;
+	double d;
+	int global;
+	hl_type *vt;
+} hot_rconst;
+
+static void hot_ctor_inits( hl_module *m, hl_function *f, hot_rconst *fields, int nfields ) {
+	hl_code *c = m->code;
+	hot_rconst *regs = (hot_rconst*)malloc(sizeof(hot_rconst) * (f->nregs + 1));
+	bool *isconst = (bool*)calloc(c->nglobals + 1, sizeof(bool));
+	for(int i=0;i<c->nconstants;i++) isconst[c->constants[i].global] = true;
+	for(int i=0;i<f->nregs;i++) regs[i].kind = -1;
+	for(int k=0;k<f->nops;k++) {
+		hl_opcode *o = f->ops + k;
+		hot_rconst *dst = regs + o->p1;
+		switch( o->op ) {
+		case OInt:
+			dst->kind = HOT_INIT_NUM;
+			dst->i = c->ints[o->p2];
+			dst->d = (double)dst->i;
+			break;
+		case OFloat:
+			dst->kind = HOT_INIT_NUM;
+			dst->d = c->floats[o->p2];
+			dst->i = (int64)dst->d;
+			break;
+		case OBool:
+			dst->kind = HOT_INIT_NUM;
+			dst->i = o->p2;
+			dst->d = o->p2;
+			break;
+		case ONull:
+			dst->kind = 3;
+			break;
+		case OGetGlobal:
+			dst->kind = isconst[o->p2] ? HOT_INIT_GLOBAL : -1;
+			dst->global = o->p2;
+			break;
+		case OMov:
+			*dst = regs[o->p2];
+			break;
+		case OToDyn:
+			*dst = regs[o->p2];
+			dst->kind = regs[o->p2].kind == HOT_INIT_NUM ? HOT_INIT_DYN : -1;
+			dst->vt = f->regs[o->p2];
+			break;
+		case OSetField:
+			if( o->p1 == 0 && o->p2 < nfields ) fields[o->p2] = regs[o->p3];
+			break;
+		case OSetThis:
+			if( o->p1 < nfields ) fields[o->p1] = regs[o->p2];
+			break;
+		case OJTrue: case OJFalse: case OJNull: case OJNotNull: case OJSLt: case OJSGte: case OJSGt: case OJSLte:
+		case OJULt: case OJUGte: case OJNotLt: case OJNotGte: case OJEq: case OJNotEq: case OJAlways:
+		case OLabel: case ORet: case OThrow: case ORethrow: case OSwitch: case OTrap: case OEndTrap:
+			k = f->nops; // the end of the straight code
+			break;
+		case OSetGlobal: case OSetI8: case OSetI16: case OSetMem: case OSetArray: case OSetref: case OSetEnumField:
+		case ONullCheck: case OAssert: case ONop: case OPrefetch: case OAsm: case ODynSet:
+			break;
+		default:
+			dst->kind = -1;
+			break;
+		}
+	}
+	free(isconst);
+	free(regs);
+}
+
+static void hot_field_inits( hl_module *m, hot_itype *it, hot_pmap *ctors ) {
+	hl_code *c = m->code;
+	int nfields = it->nrt->nfields;
+	bool missing = false;
+	for(int fi=0;fi<nfields;fi++)
+		if( !it->filled[fi] ) missing = true;
+	if( !missing ) return;
+	hot_rconst *fields = (hot_rconst*)malloc(sizeof(hot_rconst) * nfields);
+	for(int fi=0;fi<nfields;fi++) fields[fi].kind = -1;
+	// the constructors of the superclasses first : the ones of the subclasses set their own fields
+	hl_type *chain[256];
+	int depth = 0;
+	for(hl_type *t=it->t;t && depth < 256;t=t->obj->super)
+		chain[depth++] = t;
+	while( depth > 0 ) {
+		int fidx = hot_pmap_get(ctors, chain[--depth]);
+		if( fidx >= 0 ) hot_ctor_inits(m, c->functions + fidx, fields, nfields);
+	}
+	it->inits = (hot_finit*)malloc(sizeof(hot_finit) * nfields);
+	for(int fi=0;fi<nfields;fi++) {
+		hot_rconst *v = fields + fi;
+		if( it->filled[fi] || v->kind < 0 || v->kind == 3 ) continue;
+		hl_type *ft = hl_obj_field_fetch(it->t, fi)->t;
+		hot_finit *f = it->inits + it->ninits;
+		f->off = it->nrt->fields_indexes[fi];
+		f->kind = v->kind;
+		f->t = ft;
+		f->vt = v->vt;
+		f->i = v->i;
+		f->d = v->d;
+		if( v->kind == HOT_INIT_NUM && !hot_is_num(ft) && ft->kind != HBOOL ) continue;
+		if( v->kind == HOT_INIT_DYN && ft->kind != HDYN && ft->kind != HNULL ) continue;
+		if( v->kind == HOT_INIT_GLOBAL ) {
+			if( !hl_is_ptr(ft) ) continue;
+			f->global = (void**)(m->globals_data + m->globals_indexes[v->global]);
+		}
+		it->ninits++;
+	}
+	free(fields);
+}
+
 // the fields are at the same offsets, with the same types
 static bool hot_same_fields( hot_itype *it ) {
 	hl_runtime_obj *o = it->ort, *n = it->nrt;
@@ -1073,21 +1447,39 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 			if( hot_find_field(it->old->obj, it->t->obj->fields + fi) < 0 )
 				it->added[fi >> 5] |= 1u << (fi & 31);
 		it->copies = (int*)malloc(sizeof(int) * 3 * (it->nrt->nfields + 1));
+		it->convs = (hot_conv*)malloc(sizeof(hot_conv) * (it->nrt->nfields + 1));
+		it->filled = (unsigned char*)calloc(it->nrt->nfields + 1, 1);
 		for(int fi=0;fi<it->nrt->nfields;fi++) {
 			hl_obj_field *nf = hl_obj_field_fetch(it->t, fi);
+			int same = -1, conv = -1;
 			for(int j=0;j<it->ort->nfields;j++) {
 				hl_obj_field *of = hl_obj_field_fetch(it->old, j);
-				if( of->hashed_name == nf->hashed_name && hl_module_same_type(of->t, nf->t) ) {
-					int *c = it->copies + it->ncopies++ * 3;
-					c[0] = it->nrt->fields_indexes[fi];
-					c[1] = it->ort->fields_indexes[j];
-					c[2] = hot_field_size(nf->t);
+				if( of->hashed_name != nf->hashed_name ) continue;
+				if( hl_module_same_type(of->t, nf->t) ) {
+					same = j;
 					break;
 				}
+				// an interface has no name : only its type tells
+				if( conv < 0 && nf->hashed_name && hot_convertible(of->t, nf->t) ) conv = j;
+			}
+			if( same >= 0 ) {
+				int *c = it->copies + it->ncopies++ * 3;
+				c[0] = it->nrt->fields_indexes[fi];
+				c[1] = it->ort->fields_indexes[same];
+				c[2] = hot_field_size(nf->t);
+				it->filled[fi] = 1;
+			} else if( conv >= 0 ) {
+				hot_conv *c = it->convs + it->nconvs++;
+				c->noff = it->nrt->fields_indexes[fi];
+				c->ooff = it->ort->fields_indexes[conv];
+				c->ot = hl_obj_field_fetch(it->old, conv)->t;
+				c->nt = nf->t;
+				it->filled[fi] = 1;
 			}
 		}
 		it->fields_same = hot_same_fields(it);
 		it->slots_same = hot_same_slots(it);
+		hot_add_methods(h, it);
 		// every type pointer that has the previous layout
 		for(int m=0;m<modules_count;m++) {
 			hl_code *code = cur_modules[m]->code;
@@ -1138,6 +1530,7 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 		hot_print_layout_name(r, it);
 		hot_print(r, ": an instance that must be moved (no room for the new layout in its block) is referenced by a running function");
 		r->count++;
+		r->running++;
 	}
 	free(olds);
 	free(sizes);
@@ -1165,7 +1558,7 @@ static void hot_set_layout( hl_type *a, hl_type *t ) {
 	so that the instances keep their type, and the virtuals of the instances point to the new offsets.
 */
 // copies the kept fields (or params) of the value o (whose content is src) to n, in the new layout
-static void hot_copy_value( hot_itype *it, char *n, char *src ) {
+static void hot_copy_value( hot_instances *h, hot_itype *it, char *n, char *src ) {
 	if( it->is_enum ) {
 		int oi = ((venum*)src)->index;
 		((venum*)n)->index = it->cmap[oi];
@@ -1175,6 +1568,28 @@ static void hot_copy_value( hot_itype *it, char *n, char *src ) {
 	}
 	for(int *c=it->copies, *e=c + it->ncopies * 3;c<e;c+=3)
 		memcpy(n + c[0], src + c[1], c[2]);
+	for(int k=0;k<it->nconvs;k++) {
+		hot_conv *c = it->convs + k;
+		hot_convert(h, c->ot, src + c->ooff, c->nt, n + c->noff);
+	}
+	for(int k=0;k<it->ninits;k++) {
+		hot_finit *f = it->inits + k;
+		switch( f->kind ) {
+		case HOT_INIT_NUM:
+			hot_write_num(f->t, n + f->off, f->d, f->i);
+			break;
+		case HOT_INIT_GLOBAL:
+			*(void**)(n + f->off) = *f->global;
+			break;
+		case HOT_INIT_DYN:
+			{
+				char tmp[8];
+				hot_write_num(f->vt, tmp, f->d, f->i);
+				*(vdynamic**)(n + f->off) = hl_make_dyn(tmp, f->vt);
+			}
+			break;
+		}
+	}
 }
 
 /*
@@ -1201,10 +1616,19 @@ static void hot_enum_values( hot_itype *it ) {
 }
 
 static void hot_instances_apply( hl_module *m, hot_instances *h ) {
+	// the constructor of each class of the new code, by type
+	hot_pmap ctors;
+	memset(&ctors, 0, sizeof(ctors));
+	for(int i=0;i<m->code->nfunctions;i++) {
+		hl_function *f = m->code->functions + i;
+		if( f->obj && f->field.name && f->type->fun->nargs > 0 && ucmp(f->field.name, USTR("__constructor__")) == 0 )
+			hot_pmap_set(&ctors, f->type->fun->args[0], i);
+	}
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
 		if( it->is_enum ) continue;
 		it->nrt = hl_get_obj_proto(it->t);
+		if( !hot_is_class_object(it->t) ) hot_field_inits(m, it, &ctors);
 		// the GC scans an instance up to the end of its block
 		if( it->t->mark_bits && hl_mark_size(it->nrt->size) < hl_mark_size(it->max_block) ) {
 			unsigned int *mark = (unsigned int*)hl_zalloc(&m->ctx.alloc, hl_mark_size(it->max_block));
@@ -1212,6 +1636,7 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 			it->t->mark_bits = mark;
 		}
 	}
+	hot_pmap_free(&ctors);
 	// no collection while the instances are rewritten and moved
 	hl_gc_enable(false);
 	if( h->nremoved ) hot_detach_removed(h);
@@ -1233,7 +1658,7 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 		}
 		char *n = (char*)hl_gc_alloc_gen(*(hl_type**)o, size, (hasptr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 		*(void**)n = *(void**)o;
-		hot_copy_value(it, n, o);
+		hot_copy_value(h, it, n, o);
 		news[k] = n;
 	}
 	hot_time("  move: allocate and copy");
@@ -1249,7 +1674,7 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 		int block = h->objs_info[k * 3 + 1];
 		memcpy(tmp, o, block);
 		memset(o + HL_WSIZE, 0, block - HL_WSIZE);
-		hot_copy_value(it, o, tmp);
+		hot_copy_value(h, it, o, tmp);
 	}
 	free(tmp);
 	// the type pointers of the previous layouts get the new one
@@ -1299,6 +1724,12 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 				hl_vfields(v)[i] = f == NULL || !hl_same_type(f->t, vf->t) ? NULL : o + f->field_index;
 		}
 	}
+	// the fields converted to a structure, now that the instances have their layout
+	for(int k=0;k<h->nvconv;k++) {
+		void *v = *h->vconv[k];
+		*h->vconv[k] = v ? hl_to_virtual(h->vconv_t[k], (vdynamic*)v) : NULL;
+	}
+	hot_rebind_closures(h);
 	// the methods bound to the fields added (static methods of a class object)
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
@@ -1358,11 +1789,34 @@ static void hot_discard( hl_module *m ) {
 	free(m);
 }
 
-static h_bool hot_refuse( hl_module *m2, const char *msg, const char *details ) {
-	printf("[HotReload] Reload refused: %s%s\n[HotReload] Restart required, the program keeps running the previous code\n", msg, details ? details : "");
+/*
+	A reload refused because of the code that runs (a function that uses a type whose layout changes,
+	an instance to move referenced by a stack) is tried again by the next checks of the file
+	(hl_setup.hot_retry) : the running code changes. It is reported once while the reason stays the same.
+*/
+static char *hot_last_delay = NULL;
+
+static h_bool hot_refuse_gen( hl_module *m2, const char *msg, const char *details, bool retry ) {
+	if( !details ) details = "";
+	hl_setup.hot_retry = retry;
+	if( retry ) {
+		if( hot_last_delay == NULL || strcmp(hot_last_delay, details) != 0 ) {
+			printf("[HotReload] Reload delayed: %s%s\n[HotReload] Tried again until the running code no longer uses them\n", msg, details);
+			free(hot_last_delay);
+			hot_last_delay = strdup(details);
+		}
+	} else {
+		printf("[HotReload] Reload refused: %s%s\n[HotReload] Restart required, the program keeps running the previous code\n", msg, details);
+		free(hot_last_delay);
+		hot_last_delay = NULL;
+	}
 	fflush(stdout);
 	hot_discard(m2);
 	return false;
+}
+
+static h_bool hot_refuse( hl_module *m2, const char *msg, const char *details ) {
+	return hot_refuse_gen(m2, msg, details, false);
 }
 
 // the reload whose entry point is running : the types of its code that are new
@@ -1509,7 +1963,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		if( r.count ) {
 			free(itype_of);
 			hot_instances_free(&inst);
-			return hot_refuse(m2, "the layout of live types changed (not supported yet):", buf);
+			return hot_refuse(m2, "the layout of a struct changed:", buf);
 		}
 	}
 
@@ -1533,7 +1987,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		if( r.count ) {
 			free(itype_of);
 			hot_instances_free(&inst);
-			return hot_refuse(m2, "live values cannot be upgraded:", buf);
+			return hot_refuse_gen(m2, "live values cannot be upgraded:", buf, r.count == r.running);
 		}
 	}
 
@@ -1744,6 +2198,9 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	}
 	hr->reloads++;
 
+	free(hot_last_delay);
+	hot_last_delay = NULL;
+	hl_setup.hot_retry = false;
 	printf("[HotReload] %d changes\n", changes_count);
 	fflush(stdout);
 	hl_module_add(m2);

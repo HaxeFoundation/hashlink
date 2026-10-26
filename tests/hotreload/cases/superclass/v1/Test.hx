@@ -10,7 +10,7 @@ class C {
 	public function who() return "C";
 }
 
-// its superclass changes : the fields of A are lost, the ones of C are new
+// its superclass changes : the fields of A are lost, the ones of C are new (set to their constant initializer)
 class B extends C {
 	public var b = 2;
 	override function who() return "B<" + super.who();

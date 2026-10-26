@@ -652,6 +652,7 @@ typedef struct {
 	void *hot_stack_limit;	// during a reload : the stack of the current thread above it is the program's
 	void *hot_regs;			// during a reload : the registers when the program called it
 	int hot_regs_size;
+	bool hot_retry;			// the last reload was refused by the running code : the same file is tried again
 } hl_setup_t;
 
 HL_API hl_setup_t hl_setup;
