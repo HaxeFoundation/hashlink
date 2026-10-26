@@ -1922,6 +1922,58 @@ HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_s
 }
 
 /*
+	Remap hooks : a value whose content depends on the address of other blocks (an object map hashes
+	the address of its keys) is identified by its type (its first word), and the hook of its type is
+	called for it after a collection that moved blocks.
+*/
+#define GC_MAX_REMAP_HOOKS 8
+static struct {
+	hl_type *types[GC_MAX_REMAP_HOOKS];
+	void (*hooks[GC_MAX_REMAP_HOOKS])( void * );
+	int count;
+	void **values;
+	int *kinds;
+	int nvalues;
+	int max_values;
+} gc_remap_hooks = {0};
+
+HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) ) {
+	gc_global_lock(true);
+	int i;
+	for(i=0;i<gc_remap_hooks.count;i++)
+		if( gc_remap_hooks.types[i] == t ) break;
+	if( i == gc_remap_hooks.count ) {
+		if( i == GC_MAX_REMAP_HOOKS ) hl_fatal("Too many remap hooks");
+		gc_remap_hooks.count++;
+	}
+	gc_remap_hooks.types[i] = t;
+	gc_remap_hooks.hooks[i] = hook;
+	gc_global_lock(false);
+}
+
+static void gc_find_hook_value( void *block, int size ) {
+	if( size < (int)sizeof(void*) ) return;
+	hl_type *t = *(hl_type**)block;
+	for(int i=0;i<gc_remap_hooks.count;i++)
+		if( gc_remap_hooks.types[i] == t ) {
+			if( gc_remap_hooks.nvalues == gc_remap_hooks.max_values ) {
+				gc_remap_hooks.max_values = gc_remap_hooks.max_values ? gc_remap_hooks.max_values * 2 : 64;
+				gc_remap_hooks.values = (void**)realloc(gc_remap_hooks.values, sizeof(void*) * gc_remap_hooks.max_values);
+				gc_remap_hooks.kinds = (int*)realloc(gc_remap_hooks.kinds, sizeof(int) * gc_remap_hooks.max_values);
+			}
+			gc_remap_hooks.values[gc_remap_hooks.nvalues] = block;
+			gc_remap_hooks.kinds[gc_remap_hooks.nvalues] = i;
+			gc_remap_hooks.nvalues++;
+			return;
+		}
+}
+
+static void gc_find_hook_page( gc_pheader *p, int private_data ) {
+	if( p->page_kind == MEM_KIND_DYNAMIC || p->page_kind == MEM_KIND_RAW )
+		gc_iter_live_blocks(p, gc_find_hook_value);
+}
+
+/*
 	Runs a collection that applies the remaps added (hl_gc_remap_add) : the references to the old blocks,
 	from the blocks and the roots, are replaced by references to the new ones, with the parallel marking.
 	The stacks must not reference the old blocks (see hl_gc_stacks_find) : they are scanned conservatively.
@@ -1930,10 +1982,23 @@ HL_API void hl_gc_remap_apply() {
 	if( gc_remap.count == 0 ) return;
 	gc_global_lock(true);
 	gc_major();
+	// the values of the remap hooks, found while the marks are valid
+	gc_remap_hooks.nvalues = 0;
+	if( gc_remap_hooks.count ) gc_iter_pages(gc_find_hook_page);
 	gc_global_lock(false);
 	free(gc_remap.olds);
 	free(gc_remap.news);
 	memset(&gc_remap, 0, sizeof(gc_remap));
+	// the hooks can allocate : they are called after the walk (the values stay reachable, no code of the program runs)
+	int n = gc_remap_hooks.nvalues;
+	void **values = (void**)malloc(sizeof(void*) * (n + 1));
+	int *kinds = (int*)malloc(sizeof(int) * (n + 1));
+	memcpy(values, gc_remap_hooks.values, sizeof(void*) * n);
+	memcpy(kinds, gc_remap_hooks.kinds, sizeof(int) * n);
+	for(int i=0;i<n;i++)
+		gc_remap_hooks.hooks[kinds[i]](values[i]);
+	free(values);
+	free(kinds);
 }
 
 HL_API int hl_gc_get_live_objects( hl_type *t, varray *arr ) {

@@ -609,10 +609,6 @@ typedef struct {
 	int *removed_info;		// their type index, previous constructor
 	int nremoved;
 	int max_removed;
-	hot_pmap maps;			// the registered object maps -> 0
-	void **live_maps;
-	int nlive_maps;
-	int max_live_maps;
 	int nrelocated;
 } hot_instances;
 
@@ -675,14 +671,6 @@ static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 	hot_instances *h = (hot_instances*)ctx;
 	if( size < (int)sizeof(void*) ) return;
 	void *t = *(void**)block;
-	if( kind == MEM_KIND_RAW && hot_pmap_get(&h->maps, block) >= 0 ) {
-		if( h->nlive_maps == h->max_live_maps ) {
-			h->max_live_maps = h->max_live_maps ? h->max_live_maps * 2 : 64;
-			h->live_maps = (void**)realloc(h->live_maps, sizeof(void*) * h->max_live_maps);
-		}
-		h->live_maps[h->nlive_maps++] = block;
-		return;
-	}
 	if( kind != MEM_KIND_DYNAMIC && kind != MEM_KIND_NOPTR ) return;
 	int idx = hot_pmap_get(&h->aliases, t);
 	if( idx >= 0 ) {
@@ -815,8 +803,6 @@ static void hot_instances_free( hot_instances *h ) {
 	free(h->types);
 	hot_pmap_free(&h->aliases);
 	hot_pmap_free(&h->virtuals);
-	hot_pmap_free(&h->maps);
-	free(h->live_maps);
 	free(h->objs);
 	free(h->objs_info);
 	free(h->removed);
@@ -1050,10 +1036,6 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 		for(int k=0;k<code->ntypes;k++)
 			if( code->types[k].kind == HVIRTUAL ) hot_pmap_set(&h->virtuals, code->types + k, 0);
 	}
-	int *nmaps;
-	void **maps = hl_hot_object_maps(&nmaps);
-	for(int i=0;i<*nmaps;i++)
-		hot_pmap_set(&h->maps, maps[i], 0);
 	hl_gc_iter_live(hot_scan_block, h);
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
@@ -1286,23 +1268,6 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 		printf("\n");
 	}
 	hot_time("  virtuals, bindings, hooks");
-	// the object maps hash the address of their keys
-	if( h->nrelocated )
-		for(int i=0;i<h->nlive_maps;i++)
-			hl_ho_rehash(h->live_maps[i]);
-	hot_time("  object maps");
-	// forget the object maps that are no longer alive
-	int *nmaps;
-	void **maps = hl_hot_object_maps(&nmaps);
-	hot_pmap live;
-	memset(&live, 0, sizeof(live));
-	for(int k=0;k<h->nlive_maps;k++)
-		hot_pmap_set(&live, h->live_maps[k], 0);
-	int keep = 0;
-	for(int i=0;i<*nmaps;i++)
-		if( hot_pmap_get(&live, maps[i]) >= 0 ) maps[keep++] = maps[i];
-	*nmaps = keep;
-	hot_pmap_free(&live);
 }
 
 /* ---- patch ---- */

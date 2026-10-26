@@ -17,6 +17,9 @@
 #endif
 
 typedef struct {
+#	ifdef _MTYPE
+	hl_type *t; // identifies the map in the heap (see the remap hooks of the GC)
+#	endif
 	void *cells;
 	void *nexts;
 	t_entry *entries;
@@ -33,8 +36,11 @@ HL_PRIM
 t_map *_MNAME(alloc)() {
 	t_map *m = (t_map*)hl_gc_alloc_raw(sizeof(t_map));
 	memset(m,0,sizeof(t_map));
+#	ifdef _MTYPE
+	m->t = _MTYPE;
+#	endif
 #	ifdef _MALLOC_HOOK
-	_MALLOC_HOOK(m);
+	_MALLOC_HOOK();
 #	endif
 	return m;
 }
@@ -238,3 +244,4 @@ HL_PRIM int _MNAME(size)( t_map *m ) {
 #undef _MNEXT
 #undef _MSTATIC
 #undef _MALLOC_HOOK
+#undef _MTYPE
