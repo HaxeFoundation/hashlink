@@ -19,7 +19,7 @@
 | 5. Entry point run again | Nothing to do in the VM (see item 5); initializers of new statics still missing |
 | Detecting a file change | High resolution write time and size |
 | Harness `tests/hotreload/` | Done, Linux only so far, not in CI |
-| Heaps app | To do (see Testing on a Heaps app) |
+| Heaps app | `tests/hotreload/heaps/run.py`: 17 steps pass, 2 known failures (shaders) |
 | U0 to U8 | To do |
 
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
@@ -34,6 +34,8 @@
 - With `-dce std` (the default), the first use of a static of a standard class (`Type.getClassName`, the stack of `haxe.Exception`...) adds a field to its class object: refused until U1. Hot reload builds should use `-dce no`.
 - The initializers of the statics of a new class do not run (the class gets default values, which are then kept across reloads): the compiler must expose them apart from the entry point (item 5, U1).
 - Adding an instance method is accepted when the virtual slots do not change; the live type keeps its proto, so the new method is not visible to reflection on it (U5).
+- The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype and calls the address (`tests/hotreload/cases/string_compare`).
+- Shaders (Heaps): the source of a shader is the static `SRC`, set by its initializer, and `_SHADER` caches the shader built from it. A new shader class has no source (`has no shader source`), and a changed shader source is ignored. Needs the initializers of new statics, and for an existing shader a way to update `SRC` and drop `_SHADER` (a constant static could be set again by a reload, or Heaps could reset its shaders in `onReload`).
 - The global of a class or an enum is now identified by its name: its type hash changed with any type it references, which allocated a new global and lost the statics.
 
 ## What already works
@@ -281,7 +283,9 @@ Heaps checks for a reload every frame when compiled with `-D hot-reload` (`hxd.S
 
 - Use `-dce no` until U1 (see the findings above).
 - The main loop (`hxd.System.mainLoop`) stays on the stack: it keeps running its old body, which is fine as long as it does not change.
-- Things to check: edits of methods of the app and of Heaps (`h2d`, `h3d`), new classes, refusals on field changes, many reloads in one session, reload time on a large app (SpaceCraft).
+- `tests/hotreload/heaps/run.py` drives such an app (see `tests/hotreload/README.md`). On a small app, with the whole of Heaps compiled (`-dce no`), on Linux: a warm compilation takes 0.7 to 1 s (2.3 s after an edit of `hxd.Math.clamp`, inlined in many places), and the reload is applied in less than 0.15 s, at the next frame.
+- Covered: method bodies of the app and of Heaps, a new class with statics, inline functions of Heaps (37 functions compiled again), a field added to a live `h2d.Text` (refused, then reverted), quick successive edits, `hxd.System.onReload` called after each reload.
+- To do: reload time on a large app (SpaceCraft), Windows, shaders (see the findings above).
 
 ## Open points
 

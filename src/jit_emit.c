@@ -719,6 +719,17 @@ static ereg emit_call_fid( emit_ctx *ctx, int findex, ereg *args, int nargs, emi
 	return mode == M_VOID ? UNUSED : new_value(ctx);
 }
 
+static ereg emit_compare_call( emit_ctx *ctx, hl_type *t, ereg args[] ) {
+	hl_runtime_obj *rt = hl_get_obj_rt(t);
+	if( rt->t->obj->m != &ctx->mod->ctx ) {
+		// hot reload : the type belongs to a previous module, where compareFun is a function index
+		// until the prototype is initialized, then its address : initialize it and call the address
+		rt = hl_get_obj_proto(rt->t);
+		return emit_native_call(ctx, rt->compareFun, args, 2, &hlt_i32);
+	}
+	return emit_call_fid(ctx, (int)(int_val)rt->compareFun, args, 2, M_I32);
+}
+
 static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int *args_regs ) {
 	hl_module *m = ctx->mod;
 	int fid = m->functions_indexes[findex];
@@ -1451,7 +1462,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 					int ja = emit_jump(ctx, true);
 					emit_test(ctx,b,OJNull);
 					int jb = emit_jump(ctx, true);
-					emit_test(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32),OJNotNull);
+					emit_test(ctx, emit_compare_call(ctx,at,args),OJNotNull);
 					int jcmp = emit_jump(ctx, true);
 					patch_jump(ctx, jeq);
 					register_block_jump(ctx, offset, false);
@@ -1473,7 +1484,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 					emit_test(ctx,b,OJEq);
 					register_block_jump(ctx,offset,true);
 					split_block(ctx);
-					emit_test(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32),OJNotNull);
+					emit_test(ctx, emit_compare_call(ctx,at,args),OJNotNull);
 					register_block_jump(ctx,offset,true);
 					patch_jump(ctx,jeq);
 				}
@@ -1485,7 +1496,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 					int ja = emit_jump(ctx, true);
 					emit_test(ctx,b,OJNull);
 					int jb = emit_jump(ctx, true);
-					emit_cmp(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32), LOAD_CONST(0,&hlt_i32),op);
+					emit_cmp(ctx, emit_compare_call(ctx,at,args), LOAD_CONST(0,&hlt_i32),op);
 					register_block_jump(ctx,offset,true);
 					patch_jump(ctx,ja);
 					patch_jump(ctx,jb);
