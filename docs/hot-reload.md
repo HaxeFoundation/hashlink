@@ -20,7 +20,9 @@
 | Detecting a file change | High resolution write time and size |
 | Harness `tests/hotreload/` | Done, Linux only so far, not in CI |
 | Heaps app | `tests/hotreload/heaps/run.py`: 18 steps pass, 1 known failure (shader source changed) |
-| U0 to U8 | To do |
+| U1. Class objects | Done (`statics`, `statics_no_room`, `dce_std`, Heaps) |
+| U2. Stack checks | Partly: the current thread, for the statics of upgraded classes (`statics_on_stack`) |
+| U0, U3 to U8 | To do |
 
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
 
@@ -30,8 +32,8 @@
 
 **Findings while testing.**
 
-- The static methods of a class are fields of its class object (`$Foo`): adding a static method, or changing its signature, changes the layout of `$Foo` and needs U1. Refused until then.
-- With `-dce std` (the default), the first use of a static of a standard class (`Type.getClassName`, the stack of `haxe.Exception`...) adds a field to its class object: refused until U1. Hot reload builds should use `-dce no`.
+- The static methods of a class are fields of its class object (`$Foo`): adding a static method, or changing its signature, changes the layout of `$Foo`. Handled by U1.
+- With `-dce std` (the default), the first use of something of a standard class can change its layout: a static (`Type.getClassName`) is handled by U1, an instance field (the stack of `haxe.Exception` adds `__exceptionStack`) is refused until U4. Hot reload builds should use `-dce no`.
 - Adding an instance method is accepted when the virtual slots do not change; the live type keeps its proto, so the new method is not visible to reflection on it (U5).
 - The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype and calls the address (`tests/hotreload/cases/string_compare`).
 - Shaders (Heaps): the source of a shader is the static `SRC`, set by its initializer, and `_SHADER` caches the shader built from it. A new shader class works since the statics of new classes are initialized; a changed shader source is ignored. Needs a way to update `SRC` and drop `_SHADER`: for example a `@:hotReload` static, set again by every reload, on `SRC`, and `hxsl.Shader.initialize` building the shader again when `_SHADER` was not built from the current `SRC`.
@@ -125,11 +127,15 @@ Output: an upgrade plan per type (old size, new size, list of copies), and a rep
 
 ### U1. Class objects (static variables)
 
+**Done.** In hot reload mode, `hl_alloc_obj` allocates a class object (`$Name`) with spare room (twice its size, at least 256 more bytes, rounded to 512 bytes so that the GC does not round it again) and its mark bits cover the whole block. A reload that changes the statics of a class (same superclass) upgrades its class object in place: the statics kept (same name and type) are copied to their new offsets, the others are cleared, the new type is set, the new static methods get their closures, then the entry point initializes the added statics (`hot_init_bits` returns their bits). A static whose type changed is removed and added. The reload is refused when the new layout does not fit in the block (`statics_no_room`), naming the class.
+
 The class object of each class is a single instance held by a global. In hot reload mode, class objects are allocated with spare room (see U3) so that a new layout fits in place. Upgrade: copy according to the U0 plan, set the new type, initialize the new statics. Initializers of new static variables: run only the initializers of the **added** statics, never the existing ones (consistent with item 5); this needs the compiler to expose them separately from the entry point.
 
 First phase to deliver, because it covers the most common edit (adding a static) with a single instance and no heap walk.
 
 ### U2. Safe point and stack checks
+
+**Done for U1.** Before applying a reload that upgrades class objects, the stack of the current thread is captured, and the reload is refused when a function running on it uses one of these class objects (the class objects each function uses are recorded when it is compiled: its registers are freed after JIT). The message names the function. The entry point is not checked: it reads the class objects before it calls `main`, and only returns after. Other threads are not checked yet.
 
 - The reload runs at the existing `reload_check` point, with every other HL thread stopped (stop the world, as for a collection).
 - Walk the stacks of all threads (the stack walk used by the HL2 profiler and call stack capture): if a frame belongs to a function that reads or writes fields of an upgraded type (known from the bytecode: `OField`, `OSetField`, `OGetThis`, `OSetThis` on that type or its subclasses), refuse the reload and name the function. In practice the main loop function must not touch upgraded types directly; the message tells the agent which function to move.
@@ -193,7 +199,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Change the body of an instance method | Accepted; new body on the next call | now |
 | Change the body of a static method | Accepted | now |
 | Add an instance method (called from changed code) | Accepted, injected once across reloads | 1 |
-| Add a static method | Accepted (a static method is a field of the class object) | U1 |
+| Add a static method | Accepted (a static method is a field of the class object) | done (U1) |
 | Remove a method no longer called | Accepted; old code stays for live closures | now |
 | Change the signature (arguments, return type) | Accepted as remove + add; callers recompiled | 1 (U1 for a static method) |
 | Rename a method | Accepted as remove + add | 1 |
@@ -236,9 +242,9 @@ Every operation a developer or an agent can make between two reloads, with the e
 
 | Operation | Expected | Needs |
 |---|---|---|
-| Add a static to an existing class | Accepted; only its initializer runs | U1, 5 |
-| Remove a static | Accepted | U1 |
-| Change the type of a static | Accepted as remove + add | U1 |
+| Add a static to an existing class | Accepted; only its initializer runs | done |
+| Remove a static | Accepted | done |
+| Change the type of a static | Accepted as remove + add | done |
 | Change the initializer of an existing static | Accepted; the current value is kept | 5 |
 | Change a `static inline` / `final` constant | Accepted; inlined uses compiled again | now |
 | Static of a new class | Accepted; value kept across later reloads | 1 |
@@ -295,7 +301,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 
 Heaps checks for a reload every frame when compiled with `-D hot-reload` (`hxd.System`, which calls `sys_check_reload` and then `hxd.System.onReload`). Run the app with `hl --hot-reload app.hl` and compile it through the compilation server of `haxe6-incremental`; the `[HotReload]` messages of the VM say what was applied or why a reload was refused.
 
-- Use `-dce no` until U1 (see the findings above).
+- Use `-dce no` until U4 (see the findings above).
 - The main loop (`hxd.System.mainLoop`) stays on the stack: it keeps running its old body, which is fine as long as it does not change.
 - `tests/hotreload/heaps/run.py` drives such an app (see `tests/hotreload/README.md`). On a small app, with the whole of Heaps compiled (`-dce no`), on Linux: a warm compilation takes 0.7 to 1 s (2.3 s after an edit of `hxd.Math.clamp`, inlined in many places), and the reload is applied in less than 0.15 s, at the next frame.
 - Covered: method bodies of the app and of Heaps, a new class with statics, inline functions of Heaps (37 functions compiled again), a field added to a live `h2d.Text` (refused, then reverted), quick successive edits, `hxd.System.onReload` called after each reload.

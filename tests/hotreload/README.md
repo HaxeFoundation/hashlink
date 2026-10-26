@@ -31,9 +31,8 @@ Optional files of a case:
 
 ## Notes
 
-- With `-dce std` (the default), the first use of a static of a standard class adds a field to its class
-  object, which changes its layout (see `dce_std`). Hot reload builds should use `-dce no` until class
-  objects can be upgraded.
+- With `-dce std` (the default), the first use of something of a standard class can change its layout: a new
+  static is handled (see `dce_std`), a new instance field is refused. Hot reload builds should use `-dce no`.
 
 ## Heaps app
 

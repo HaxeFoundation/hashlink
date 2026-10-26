@@ -45,6 +45,7 @@ static int hot_reload_extra_globals();
 static void hot_reload_init( hl_module *m, int max_globals, int max_globals_size );
 static void hot_reload_free( hl_hot_reload *hr );
 static int hot_init_bits( hl_type *t, int word );
+static void hot_record_uses( hl_module *m );
 
 static hl_module **cur_modules = NULL;
 static int modules_count = 0;
@@ -996,6 +997,8 @@ int hl_module_init( hl_module *m, int flags ) {
 	bool hot_reload = (flags & HL_MODULE_HOT_RELOAD) != 0;
 	// expand globals
 	int extra_globals = hot_reload ? hot_reload_extra_globals() : 0;
+	// class objects are allocated with room for more statics
+	if( hot_reload ) hl_setup.hot_reload = true;
 	if( hot_reload ) {
 		int nsize = m->globals_size + extra_globals * sizeof(void*);
 		int *nindexes = malloc(sizeof(int) * (m->code->nglobals + extra_globals));
@@ -1064,6 +1067,7 @@ int hl_module_init( hl_module *m, int flags ) {
 #	endif
 	hl_jit_free(ctx, false);
 	if( hot_reload ) {
+		hot_record_uses(m);
 		hl_setup.hot_init_bits = hot_init_bits;
 		hl_code_hash_finalize(m->hash);
 		hot_reload_init(m, m->code->nglobals + extra_globals, m->globals_size + extra_globals * (int)sizeof(void*));
@@ -1448,7 +1452,30 @@ static bool hot_same_virtuals( hl_type_obj *o1, hl_type_obj *o2 ) {
 	Checks that a type of the new code has the same layout as the live one.
 	Until live values can be upgraded, any change refuses the reload.
 */
-static bool hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
+#define HOT_LAYOUT_SAME		0
+#define HOT_LAYOUT_CHANGED	1	// refused
+#define HOT_LAYOUT_UPGRADE	2	// class object whose statics changed : upgraded in place
+
+static void hot_print_type_name( hot_report *r, hl_type_obj *o ) {
+	const uchar *name = o->name, *last = name;
+	while( *name ) {
+		if( *name == '.' ) last = name + 1;
+		name++;
+	}
+	if( *last != '$' ) {
+		hot_print_name(r, o->name);
+		return;
+	}
+	// class object $Name : print the class name
+	char tmp[256];
+	int i = 0;
+	for(name=o->name;*name && i < 255;name++)
+		if( name != last ) tmp[i++] = *name < 128 ? (char)*name : '?';
+	tmp[i] = 0;
+	hot_print(r, "%s", tmp);
+}
+
+static int hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 	switch( told->kind ) {
 	case HOBJ:
 	case HSTRUCT:
@@ -1466,16 +1493,13 @@ static bool hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 						break;
 					}
 			}
+			bool class_object = hl_is_class_object(told);
+			if( !same && class_object && ucmp(hot_super_name(o1), hot_super_name(o2)) == 0 && hot_same_virtuals(o1, o2) )
+				return HOT_LAYOUT_UPGRADE;
 			if( !same ) {
 				hot_print(r, "\n  ");
-				if( o1->name[0] == '$' ) {
-					// class object : its fields are the statics
-					hot_print_name(r, o1->name + 1);
-					hot_print(r, ": statics changed");
-				} else {
-					hot_print_name(r, o1->name);
-					hot_print(r, ": fields changed");
-				}
+				hot_print_type_name(r, o1);
+				hot_print(r, class_object ? ": statics changed" : ": fields changed");
 				if( ucmp(hot_super_name(o1), hot_super_name(o2)) != 0 ) {
 					hot_print(r, ", superclass ");
 					hot_print_name(r, hot_super_name(o1));
@@ -1485,16 +1509,16 @@ static bool hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 				hot_print_fields(r, "added", o2, o1);
 				hot_print_fields(r, "removed", o1, o2);
 				r->count++;
-				return false;
+				return HOT_LAYOUT_CHANGED;
 			}
 			if( !hot_same_virtuals(o1, o2) ) {
 				hot_print(r, "\n  ");
-				hot_print_name(r, o1->name);
+				hot_print_type_name(r, o1);
 				hot_print(r, ": overridden methods changed");
 				r->count++;
-				return false;
+				return HOT_LAYOUT_CHANGED;
 			}
-			return true;
+			return HOT_LAYOUT_SAME;
 		}
 	case HENUM:
 		{
@@ -1517,12 +1541,188 @@ static bool hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 				hot_print_name(r, e1->name);
 				hot_print(r, ": enum constructors changed");
 				r->count++;
-				return false;
+				return HOT_LAYOUT_CHANGED;
 			}
-			return true;
+			return HOT_LAYOUT_SAME;
 		}
 	default:
-		return true;
+		return HOT_LAYOUT_SAME;
+	}
+}
+
+/* ---- class objects upgrade (U1) ---- */
+
+typedef struct {
+	hl_type *old;		// the live type
+	hl_type *t;			// the type of the new code
+	int index;			// in the types of the new code
+	vobj *obj;			// the live class object (NULL if the class was not initialized)
+	unsigned int *added;	// bits of the own fields of t that are new
+} hot_upgrade;
+
+static int hot_field_size( hl_type *t ) {
+	return t->kind == HPACKED ? hl_get_obj_rt(t->tparam)->size : hl_type_size(t);
+}
+
+static int hot_find_field( hl_type_obj *o, hl_obj_field *f ) {
+	for(int i=0;i<o->nfields;i++)
+		if( o->fields[i].hashed_name == f->hashed_name && check_same_type(o->fields[i].t, f->t) )
+			return i;
+	return -1;
+}
+
+/*
+	Checks that the new layout fits in the block of the live class object.
+	Called before anything is changed : a failure refuses the reload.
+*/
+static bool hot_upgrade_check( hl_hot_reload *hr, hot_upgrade *u, hot_report *r ) {
+	int g;
+	for(g=0;g<hr->nglobals;g++)
+		if( hr->globals_types[g] == u->old ) break;
+	u->obj = g < hr->nglobals ? *(vobj**)(hr->root->globals_data + hr->root->globals_indexes[g]) : NULL;
+	int nfields = u->t->obj->nfields;
+	u->added = (unsigned int*)malloc(sizeof(int) * ((nfields + 31) >> 5) + sizeof(int));
+	memset(u->added, 0, sizeof(int) * ((nfields + 31) >> 5) + sizeof(int));
+	for(int i=0;i<nfields;i++)
+		if( hot_find_field(u->old->obj, u->t->obj->fields + i) < 0 )
+			u->added[i >> 5] |= 1u << (i & 31);
+	if( u->obj == NULL ) return true;
+	hl_runtime_obj *rt = hl_get_obj_rt(u->t);
+	int block = hl_gc_get_memsize(u->obj);
+	if( u->obj->t == u->old && rt->size <= block ) return true;
+	hot_print(r, "\n  ");
+	hot_print_type_name(r, u->old->obj);
+	if( u->obj->t != u->old )
+		hot_print(r, ": the class object does not have the expected type");
+	else
+		hot_print(r, ": no room left for the new statics (%d bytes needed, %d available)", rt->size, block);
+	r->count++;
+	return false;
+}
+
+/*
+	Records the class objects each function uses, to check the functions running on the stack
+	when a reload changes the statics of a class (the registers of the functions are freed after JIT).
+*/
+static void hot_record_uses( hl_module *m ) {
+	hl_code *c = m->code;
+	hl_type_obj *tmp[64];
+	m->hot_uses = (hl_type_obj***)hl_malloc(&m->ctx.alloc, sizeof(void*) * c->nfunctions);
+	for(int k=0;k<c->nfunctions;k++) {
+		hl_function *f = c->functions + k;
+		int count = 0;
+		for(int i=0;i<f->nregs && count < 63;i++) {
+			hl_type *t = f->regs[i];
+			if( !hl_is_class_object(t) ) continue;
+			bool found = false;
+			for(int j=0;j<count;j++)
+				if( tmp[j] == t->obj ) found = true;
+			if( !found ) tmp[count++] = t->obj;
+		}
+		hl_type_obj **uses = (hl_type_obj**)hl_malloc(&m->ctx.alloc, sizeof(void*) * (count + 1));
+		memcpy(uses, tmp, sizeof(void*) * count);
+		uses[count] = NULL;
+		m->hot_uses[k] = uses;
+	}
+}
+
+// the function whose code holds addr, if it is JIT code
+static hl_function *hot_function_at( void *addr, hl_module **mod ) {
+	for(int i=0;i<modules_count;i++) {
+		hl_module *m = cur_modules[i];
+		unsigned char *code = (unsigned char*)m->jit_code;
+		if( (unsigned char*)addr < code || (unsigned char*)addr >= code + m->codesize ) continue;
+		hl_function *best = NULL;
+		unsigned char *best_ptr = NULL;
+		for(int k=0;k<m->code->nfunctions;k++) {
+			hl_function *f = m->code->functions + k;
+			unsigned char *ptr = (unsigned char*)m->functions_ptrs[f->findex];
+			// only the functions this module compiled (the others point to another module)
+			if( ptr < code || ptr >= code + m->codesize || ptr > (unsigned char*)addr ) continue;
+			if( ptr > best_ptr ) {
+				best = f;
+				best_ptr = ptr;
+			}
+		}
+		*mod = m;
+		return best;
+	}
+	return NULL;
+}
+
+/*
+	The functions running on the stack keep running their code after the reload : refuse it if one of
+	them reads or writes the statics of an upgraded class (it would use the previous offsets).
+	Only the current thread is checked.
+*/
+static void hot_check_stack( hot_upgrade *upgrades, int count, hot_report *r ) {
+	void *stack[512];
+	int n = count ? module_capture_stack(stack, 512) : 0;
+	for(int i=0;i<n;i++) {
+		hl_module *m = NULL;
+		hl_function *f = hot_function_at(stack[i], &m);
+		if( f == NULL || m->hot_uses == NULL ) continue;
+		// the entry point initializes the class objects before it calls main, and only returns after
+		if( f->findex == m->code->entrypoint ) continue;
+		hl_type_obj **fuses = m->hot_uses[f - m->code->functions];
+		for(int k=0;k<count;k++) {
+			hot_upgrade *u = upgrades + k;
+			bool uses = false;
+			for(int j=0;fuses[j] && !uses;j++)
+				uses = fuses[j] == u->old->obj;
+			if( !uses ) continue;
+			hot_print(r, "\n  ");
+			hot_print_type_name(r, u->old->obj);
+			hot_print(r, ": its statics are used by ");
+			if( fun_obj(f) ) {
+				hot_print_type_name(r, fun_obj(f));
+				hot_print(r, ".");
+				hot_print_name(r, fun_field_name(f));
+			} else
+				hot_print(r, "fun$%d", f->findex);
+			hot_print(r, ", which is running : move the code that uses them out of it");
+			r->count++;
+		}
+	}
+}
+
+/*
+	Rewrites the live class object to the new layout, in place : the statics kept are copied to
+	their new offsets, the new ones are cleared (their initializers run in the entry point) and
+	the new static methods get their closures.
+*/
+static void hot_upgrade_apply( hl_module *m, hot_upgrade *u ) {
+	vobj *o = u->obj;
+	if( o == NULL ) return;
+	hl_runtime_obj *ort = hl_get_obj_rt(u->old);
+	hl_runtime_obj *nrt = hl_get_obj_proto(u->t);
+	int block = hl_gc_get_memsize(o);
+	// the GC scans the class object up to the end of its block
+	if( u->t->mark_bits && hl_mark_size(hl_class_object_size(nrt->size)) < hl_mark_size(block) ) {
+		unsigned int *mark = (unsigned int*)hl_zalloc(&m->ctx.alloc, hl_mark_size(block));
+		memcpy(mark, u->t->mark_bits, hl_mark_size(nrt->size));
+		u->t->mark_bits = mark;
+	}
+	int ostart = ort->parent ? ort->parent->nfields : 0;
+	int nstart = nrt->parent ? nrt->parent->nfields : 0;
+	int base = nrt->parent ? nrt->parent->size - nrt->parent->pad_size : HL_WSIZE;
+	// no GC allocation until the object is consistent again : tmp holds its pointers
+	char *tmp = (char*)malloc(ort->size);
+	memcpy(tmp, o, ort->size);
+	memset((char*)o + base, 0, block - base);
+	for(int i=0;i<u->t->obj->nfields;i++) {
+		hl_obj_field *f = u->t->obj->fields + i;
+		int j = hot_find_field(u->old->obj, f);
+		if( j < 0 ) continue;
+		memcpy((char*)o + nrt->fields_indexes[nstart + i], tmp + ort->fields_indexes[ostart + j], hot_field_size(f->t));
+	}
+	o->t = u->t;
+	free(tmp);
+	for(int i=0;i<nrt->nbindings;i++) {
+		hl_runtime_binding *b = nrt->bindings + i;
+		int own = b->fid - nstart;
+		if( own < 0 || (u->added[own >> 5] & (1u << (own & 31))) == 0 ) continue;
+		*(void**)((char*)o + nrt->fields_indexes[b->fid]) = b->closure ? hl_alloc_closure_ptr(b->closure,b->ptr,o) : b->ptr;
 	}
 }
 
@@ -1549,6 +1749,12 @@ static void hot_discard( hl_module *m ) {
 	free(m);
 }
 
+static void hot_free_upgrades( hot_upgrade *upgrades, int count ) {
+	for(int i=0;i<count;i++)
+		free(upgrades[i].added);
+	free(upgrades);
+}
+
 static h_bool hot_refuse( hl_module *m2, const char *msg, const char *details ) {
 	printf("[HotReload] Reload refused: %s%s\n[HotReload] Restart required, the program keeps running the previous code\n", msg, details ? details : "");
 	fflush(stdout);
@@ -1559,14 +1765,23 @@ static h_bool hot_refuse( hl_module *m2, const char *msg, const char *details ) 
 // the reload whose entry point is running : the types of its code that are new
 static hl_code *hot_init_code = NULL;
 static bool *hot_init_new_types = NULL;
+static hot_upgrade *hot_init_upgrades = NULL;
+static int hot_init_nupgrades = 0;
 
 static int hot_init_bits( hl_type *t, int word ) {
 	hl_code *c = hot_init_code;
 	if( c == NULL || t < c->types || t >= c->types + c->ntypes )
 		return 0;
-	if( !hot_init_new_types[t - c->types] )
-		return 0; // statics added to an existing class : needs the upgrade of class objects
-	return word < 0 ? 1 : -1;
+	if( hot_init_new_types[t - c->types] )
+		return word < 0 ? 1 : -1;
+	// statics added to an existing class
+	for(int i=0;i<hot_init_nupgrades;i++) {
+		hot_upgrade *u = hot_init_upgrades + i;
+		if( u->t != t ) continue;
+		if( word < 0 || word > (u->t->obj->nfields >> 5) ) return 0;
+		return (int)u->added[word];
+	}
+	return 0;
 }
 
 #define HOT_SKIP		-1	// not identified : compiled, but not callable by previous code
@@ -1629,6 +1844,8 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	}
 
 	// check the layout of the live types before anything is changed
+	hot_upgrade *upgrades = (hot_upgrade*)malloc(sizeof(hot_upgrade) * (c->ntypes + 1));
+	int nupgrades = 0;
 	{
 		char buf[4096];
 		hot_report r = { buf, sizeof(buf), 0, 0 };
@@ -1636,15 +1853,39 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		for(i=0;i<c->ntypes;i++) {
 			hl_type *t = c->types + i;
 			hl_type *p = hot_find_type(hr, t);
-			if( p ) hot_check_layout(p, t, &r);
+			if( p && hot_check_layout(p, t, &r) == HOT_LAYOUT_UPGRADE ) {
+				hot_upgrade *u = upgrades + nupgrades++;
+				u->old = p;
+				u->t = t;
+				u->index = i;
+				u->obj = NULL;
+				u->added = NULL;
+			}
 		}
-		if( r.count )
+		if( r.count ) {
+			hot_free_upgrades(upgrades, nupgrades);
 			return hot_refuse(m2, "the layout of live types changed (not supported yet):", buf);
+		}
 	}
 
 	hl_module_init_natives(m2);
 	hl_module_init_indexes(m2);
 	hl_code_hash_finalize(m2->hash);
+
+	// the class objects whose statics changed must have room for the new layout
+	{
+		char buf[4096];
+		hot_report r = { buf, sizeof(buf), 0, 0 };
+		buf[0] = 0;
+		for(i=0;i<nupgrades;i++)
+			hot_upgrade_check(hr, upgrades + i, &r);
+		if( r.count == 0 )
+			hot_check_stack(upgrades, nupgrades, &r);
+		if( r.count ) {
+			hot_free_upgrades(upgrades, nupgrades);
+			return hot_refuse(m2, "the statics of live classes cannot be upgraded:", buf);
+		}
+	}
 
 	// match functions with the reference ones
 	int nfuns = c->nfunctions;
@@ -1690,6 +1931,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	free(taken);
 	if( changes_count == 0 ) {
 		free(match);
+		hot_free_upgrades(upgrades, nupgrades);
 		printf("[HotReload] No changes found\n");
 		fflush(stdout);
 		hot_discard(m2);
@@ -1698,11 +1940,15 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 
 	// alias the types which have the same layout : they are different pointers but share the runtime data
 	bool *new_types = (bool*)malloc(sizeof(bool) * (c->ntypes + 1));
+	bool *upgraded = (bool*)malloc(sizeof(bool) * (c->ntypes + 1));
+	memset(upgraded, 0, sizeof(bool) * (c->ntypes + 1));
+	for(i=0;i<nupgrades;i++)
+		upgraded[upgrades[i].index] = true;
 	for(i=0;i<c->ntypes;i++) {
 		hl_type *t = c->types + i;
 		hl_type *p = hot_find_type(hr, t);
 		new_types[i] = p == NULL && hot_type_name(t) != NULL;
-		if( p == NULL ) continue;
+		if( p == NULL || upgraded[i] ) continue;
 		switch( t->kind ) {
 		case HOBJ:
 		case HSTRUCT:
@@ -1716,12 +1962,14 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 			break;
 		}
 	}
+	free(upgraded);
 
 	// JIT the new and changed functions
 	jit_ctx *ctx = hl_jit_alloc();
 	if( ctx == NULL ) {
 		free(match);
 		free(new_types);
+		hot_free_upgrades(upgrades, nupgrades);
 		return hot_refuse(m2, "out of memory", NULL);
 	}
 #	ifdef WIN64_UNWIND_TABLES
@@ -1743,6 +1991,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 			hl_jit_free(ctx, false);
 			free(match);
 			free(new_types);
+			hot_free_upgrades(upgrades, nupgrades);
 			return hot_refuse(m2, "could not JIT the new code", NULL);
 		}
 		m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
@@ -1752,6 +2001,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	if( m2->jit_code == NULL ) {
 		free(match);
 		free(new_types);
+		hot_free_upgrades(upgrades, nupgrades);
 		return hot_refuse(m2, "could not JIT the new code", NULL);
 	}
 
@@ -1823,6 +2073,18 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 	}
 	free(match);
 
+	hot_record_uses(m2);
+
+	// upgrade the class objects whose statics changed, now that the new functions have their address
+	for(i=0;i<nupgrades;i++) {
+		hot_upgrade *u = upgrades + i;
+		hot_upgrade_apply(m2, u);
+		for(int k=0;k<hr->ntypes;k++)
+			if( hr->types[k].t == u->old ) hr->types[k].t = u->t;
+		for(int g=0;g<hr->nglobals;g++)
+			if( hr->globals_types[g] == u->old ) hr->globals_types[g] = u->t;
+	}
+
 	for(i=0;i<c->ntypes;i++)
 		hot_add_type(hr, c->types + i);
 	for(i=0;i<hr->ntypes;i++) {
@@ -1845,15 +2107,20 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		cl.hasValue = 0;
 		hot_init_code = c;
 		hot_init_new_types = new_types;
+		hot_init_upgrades = upgrades;
+		hot_init_nupgrades = nupgrades;
 		vdynamic *exc = hl_dyn_call_safe(&cl,NULL,0,&isExc);
 		hot_init_code = NULL;
 		hot_init_new_types = NULL;
+		hot_init_upgrades = NULL;
+		hot_init_nupgrades = 0;
 		if( isExc ) {
 			uprintf(USTR("[HotReload] Exception while initializing the new statics: %s\n"), hl_to_string(exc));
 			fflush(stdout);
 		}
 	}
 	free(new_types);
+	hot_free_upgrades(upgrades, nupgrades);
 	return true;
 }
 

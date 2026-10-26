@@ -76,12 +76,18 @@ STEPS = [
 		status="v4 objects=4003"),
 	dict(name="Heaps method reverted", heaps=[("h2d/Object.hx", "return k + 1000;", "return k;")],
 		status="v4 objects=3"),
+	dict(name="statics added to a live Heaps class", heaps=[("h2d/Object.hx", "\tstatic var nullDrawable : h2d.Drawable;\n", "\tstatic var nullDrawable : h2d.Drawable;\n\tpublic static var reloadValue = 7;\n\tpublic static function reloadLabel() return \"label\" + reloadValue;\n")],
+		game=game("v5", 'return "VERSION objects=" + app.s2d.getObjectsCount() + " " + h2d.Object.reloadLabel();'),
+		status="v5 objects=3 label7"),
+	dict(name="statics removed from a live Heaps class", heaps=[("h2d/Object.hx", "\tpublic static var reloadValue = 7;\n\tpublic static function reloadLabel() return \"label\" + reloadValue;\n", "")],
+		game=game("v6", 'return "VERSION objects=" + app.s2d.getObjectsCount();'),
+		status="v6 objects=3"),
 	dict(name="new shader class",
-		game=game("v5", 'var s = new Tint2(); s.factor = 0.5; return "VERSION objects=" + app.s2d.getObjectsCount() + " shader=" + s.factor;', SHADER % ("Tint2", "1.")),
-		status="v5 objects=3 shader=0.5"),
+		game=game("v7", 'var s = new Tint2(); s.factor = 0.5; return "VERSION objects=" + app.s2d.getObjectsCount() + " shader=" + s.factor;', SHADER % ("Tint2", "1.")),
+		status="v7 objects=3 shader=0.5"),
 	dict(name="shader source changed", known="SRC keeps the source it was initialized with, and _SHADER caches the shader built from it",
-		game=game("v6", 'return "VERSION objects=" + app.s2d.getObjectsCount() + " changed=" + (hxsl.Printer.shaderToString(@:privateAccess new Tint().shader.data).indexOf("0.25") >= 0);', SHADER % ("Tint", "0.25")),
-		status="v6 objects=3 changed=true"),
+		game=game("v8", 'return "VERSION objects=" + app.s2d.getObjectsCount() + " changed=" + (hxsl.Printer.shaderToString(@:privateAccess new Tint().shader.data).indexOf("0.25") >= 0);', SHADER % ("Tint", "0.25")),
+		status="v8 objects=3 changed=true"),
 ] + [
 	dict(name="quick edit %d" % i, game=game("q%d" % i, 'return "VERSION objects=" + app.s2d.getObjectsCount();'), status="q%d objects=3" % i)
 	for i in range(10)

@@ -1494,6 +1494,10 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(t);
 	if( t->kind == HSTRUCT ) {
 		o = (vobj*)hl_gc_alloc_gen(t, rt->size, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
+	} else if( hl_setup.hot_reload && rt->hasPtr && hl_is_class_object(t) ) {
+		// room for the statics a reload adds
+		o = (vobj*)hl_gc_alloc_gen(t, hl_class_object_size(rt->size), MEM_KIND_DYNAMIC | MEM_ZERO);
+		o->t = t;
 	} else {
 		o = (vobj*)hl_gc_alloc_gen(t, rt->size, (rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 		o->t = t;

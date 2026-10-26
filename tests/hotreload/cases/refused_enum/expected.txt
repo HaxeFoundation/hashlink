@@ -1,7 +1,6 @@
 v0 step 0 rgb123
 [HotReload] Reload refused: the layout of live types changed (not supported yet):
   Color: enum constructors changed
-  Color: statics changed, added Blue
 [HotReload] Restart required, the program keeps running the previous code
 reload 1: not applied
 v0 step 1 rgb123

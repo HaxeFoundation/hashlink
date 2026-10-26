@@ -469,6 +469,9 @@ HL_API int hl_type_size( hl_type *t );
 HL_API int hl_pad_struct( int size, hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
+HL_API bool hl_is_class_object( hl_type *t );
+HL_API int hl_class_object_size( int size );
+HL_API int hl_mark_size( int data_size );
 HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
 HL_API void hl_flush_proto( hl_type *ot );
 HL_API void hl_init_enum( hl_type *et, hl_module_context *m );
@@ -636,6 +639,7 @@ typedef struct {
 	bool is_debugger_enabled;
 	bool is_debugger_attached;
 	int (*hot_init_bits)( hl_type *t, int word );
+	bool hot_reload;
 } hl_setup_t;
 
 HL_API hl_setup_t hl_setup;

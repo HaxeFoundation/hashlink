@@ -166,6 +166,29 @@ HL_PRIM int hl_mark_size( int data_size ) {
 	return ((ptr_count + 31) >> 5) * sizeof(int);
 }
 
+/*
+	Tells if the type is the one of a class object (holding the statics of a class), named $Name.
+*/
+HL_API bool hl_is_class_object( hl_type *t ) {
+	if( t->kind != HOBJ ) return false;
+	const uchar *name = t->obj->name, *last = name;
+	while( *name ) {
+		if( *name == '.' ) last = name + 1;
+		name++;
+	}
+	return *last == '$';
+}
+
+/*
+	Hot reload : a class object is allocated with room for more statics, so that a reload can
+	change its layout in place. The size is a multiple of 512 bytes, which the GC does not round up.
+*/
+HL_API int hl_class_object_size( int size ) {
+	int spare = size < 256 ? 256 : size;
+	size += spare;
+	return (size + 511) & ~511;
+}
+
 /**
 	Builds class metadata (fields indexes, etc.)
 	Does not require the method table to be finalized.
@@ -305,7 +328,9 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 
 	// mark bits
 	if( t->hasPtr ) {
-		unsigned int *mark = (unsigned int*)hl_zalloc(alloc,hl_mark_size(t->size));
+		// with hot reload, a class object is scanned up to the end of its spare room
+		int msize = hl_setup.hot_reload && hl_is_class_object(ot) ? hl_class_object_size(t->size) : t->size;
+		unsigned int *mark = (unsigned int*)hl_zalloc(alloc,hl_mark_size(msize));
 		ot->mark_bits = mark;
 		if( p && p->t->mark_bits ) memcpy(mark, p->t->mark_bits, hl_mark_size(p->size));
 		for(i=0;i<o->nfields;i++) {
