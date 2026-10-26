@@ -1452,7 +1452,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		// the subclasses of a type whose layout changes have their fields at other offsets
 		for(i=0;i<c->ntypes;i++) {
 			hl_type *t = c->types + i;
-			if( t->kind != HOBJ || itype_of[i] >= 0 || hot_is_class_object(t) ) continue;
+			if( t->kind != HOBJ || itype_of[i] >= 0 ) continue;
 			hl_type *p = hot_find_type(hr, t);
 			if( p == NULL ) continue;
 			hl_type *sup = t->obj->super;
