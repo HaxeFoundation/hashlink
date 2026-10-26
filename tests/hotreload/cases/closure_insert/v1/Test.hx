@@ -13,7 +13,7 @@ class Test {
 		arg = f;
 	}
 	static function make( x : Int ) {
-		// a local function in a local function : maker/return
+		// a local function in a local function : maker.return
 		var maker = function() return function() return "I2:" + x;
 		nested = maker();
 		// local functions inserted before the others, of the same type and context :
