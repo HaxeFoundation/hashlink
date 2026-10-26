@@ -2,7 +2,7 @@
 
 ## Context
 
-- Compiler: `haxe6-incremental` branch of HaxeFoundation/haxe. Steps 1 and 2 of phase 10 in `docs/incremental-compilation.md` are done (symbolic generation per class, linker shared by cold and warm builds, classes generated in parallel). The delta (step 3) is not done.
+- Compiler: `hot-reload` branch of HaxeFoundation/haxe, based on `haxe6-incremental`. Steps 1 and 2 of phase 10 in `docs/incremental-compilation.md` are done (symbolic generation per class, linker shared by cold and warm builds, classes generated in parallel). The delta (step 3) is not done.
 - VM: `hot-reload` branch, created from `master` of HaxeFoundation/hashlink, which is HL 2.0 (new JIT: `jit_emit.c`, `jit_regs.c`, `jit_x86_64.c`).
 - Decision: **no delta for now**. The VM reloads the full `.hl` produced by the compiler.
 - Environment: Windows (developers and AI agents).
