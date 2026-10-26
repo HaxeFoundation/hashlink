@@ -1,5 +1,5 @@
 v0 step 0 sum=1225 map=50 captured=7 method=item9 holder=3 same=true is=true
-[HotReload] 50 instances upgraded, 50 moved
+[HotReload] 50 objects upgraded, 50 moved
 [HotReload] 5 changes
 reload 1: applied
 v1 step 1 sum=1225 map=50 captured=7 method=item9 holder=3 same=true is=true

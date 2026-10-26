@@ -1582,10 +1582,6 @@ vdynamic *hl_alloc_obj( hl_type *t ) {
 	if( rt == NULL || rt->methods == NULL ) rt = hl_get_obj_proto(t);
 	if( t->kind == HSTRUCT ) {
 		o = (vobj*)hl_gc_alloc_gen(t, rt->size, (rt->hasPtr ? MEM_KIND_RAW : MEM_KIND_NOPTR) | MEM_ZERO);
-	} else if( hl_setup.hot_reload && rt->hasPtr && hl_is_class_object(t) ) {
-		// room for the statics a reload adds
-		o = (vobj*)hl_gc_alloc_gen(t, hl_class_object_size(rt->size), MEM_KIND_DYNAMIC | MEM_ZERO);
-		o->t = t;
 	} else {
 		o = (vobj*)hl_gc_alloc_gen(t, rt->size, (rt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 		o->t = t;
@@ -1850,9 +1846,10 @@ static int gc_stack_find( void **start, void **end, gc_range *r, int count ) {
 
 /*
 	Returns the index of a block that a stack or the saved registers of a thread reference
-	(a pointer to it or inside it), or -1. Such a block cannot be relocated.
+	(a pointer to it or inside it), or -1. Such a block cannot be relocated. The words of the
+	current thread stack in [skip_start, skip_end) are ignored (a frame whose values are dead).
 */
-HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count ) {
+HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_start, void *skip_end ) {
 	gc_range *r = (gc_range*)malloc(sizeof(gc_range) * (count + 1));
 	int found = -1;
 	for(int i=0;i<count;i++) {
@@ -1867,7 +1864,12 @@ HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count ) {
 		hl_thread_info *t = gc_threads.threads[i];
 		if( t == current_thread && hl_setup.hot_stack_limit ) {
 			// the frames of the reload itself hold no value of the program, but garbage
-			found = gc_stack_find((void**)hl_setup.hot_stack_limit, (void**)t->stack_top, r, count);
+			void **start = (void**)hl_setup.hot_stack_limit;
+			if( skip_start && skip_start >= (void*)start && skip_end <= t->stack_top ) {
+				found = gc_stack_find(start, (void**)skip_start, r, count);
+				start = (void**)skip_end;
+			}
+			if( found < 0 ) found = gc_stack_find(start, (void**)t->stack_top, r, count);
 			if( found < 0 ) found = gc_stack_find((void**)hl_setup.hot_regs, (void**)((char*)hl_setup.hot_regs + hl_setup.hot_regs_size), r, count);
 			continue;
 		}

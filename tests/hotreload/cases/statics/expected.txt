@@ -1,13 +1,16 @@
 v0 step 0 counter=1 name=kept
+[HotReload] 1 objects upgraded, 1 moved
 [HotReload] 3 changes
 reload 1: applied
 v1 step 1 counter=2 name=kept added=41 list=3 2
 [HotReload] 1 changes
 reload 2: applied
 v2 step 2 counter=3 name=kept added=42 list=3 4
+[HotReload] 1 objects upgraded
 [HotReload] 2 changes
 reload 3: applied
 v3 step 3 counter=4 name=kept
+[HotReload] 1 objects upgraded
 [HotReload] 2 changes
 reload 4: applied
 v4 step 4 counter=5 name=kept added=retyped

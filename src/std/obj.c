@@ -179,16 +179,6 @@ HL_API bool hl_is_class_object( hl_type *t ) {
 	return *last == '$';
 }
 
-/*
-	Hot reload : a class object is allocated with room for more statics, so that a reload can
-	change its layout in place. The size is a multiple of 512 bytes, which the GC does not round up.
-*/
-HL_API int hl_class_object_size( int size ) {
-	int spare = size < 256 ? 256 : size;
-	size += spare;
-	return (size + 511) & ~511;
-}
-
 /**
 	Builds class metadata (fields indexes, etc.)
 	Does not require the method table to be finalized.
@@ -328,9 +318,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 
 	// mark bits
 	if( t->hasPtr ) {
-		// with hot reload, a class object is scanned up to the end of its spare room
-		int msize = hl_setup.hot_reload && hl_is_class_object(ot) ? hl_class_object_size(t->size) : t->size;
-		unsigned int *mark = (unsigned int*)hl_zalloc(alloc,hl_mark_size(msize));
+		unsigned int *mark = (unsigned int*)hl_zalloc(alloc,hl_mark_size(t->size));
 		ot->mark_bits = mark;
 		if( p && p->t->mark_bits ) memcpy(mark, p->t->mark_bits, hl_mark_size(p->size));
 		for(i=0;i<o->nfields;i++) {

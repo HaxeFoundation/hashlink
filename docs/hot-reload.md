@@ -20,13 +20,12 @@
 | Detecting a file change | High resolution write time and size |
 | Harness `tests/hotreload/` | Done, Linux only so far, not in CI |
 | Heaps app | `tests/hotreload/heaps/run.py`: 18 steps pass, 1 known failure (shader source changed) |
-| U1. Class objects | Done (`statics`, `statics_no_room`, `dce_std`, Heaps) |
+| U1. Class objects | Done, with the mechanism of instances (`statics`, `statics_many`, `dce_std`, Heaps) |
 | U2. Stack checks | Partly: the current thread (`statics_on_stack`); other threads are not stopped yet |
 | U0, U4, U8. Instances | Done: in place when the block has room, moved otherwise (`instance_fields`, `instance_refs`, `instance_in_place`, Heaps) |
 | U3. Spare room in instances | Dropped: hot reload must not add memory to every object |
 | U5. Virtuals | Done for the fields of virtuals; interfaces kept (`instance_fields`) |
 | U6 (hook), U7 (enums) | To do |
-| Class objects | Keep their spare room for now; to move to the mechanism of instances (one mechanism) |
 
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
 
@@ -131,7 +130,9 @@ Output: an upgrade plan per type (old size, new size, list of copies), and a rep
 
 ### U1. Class objects (static variables)
 
-**Done.** In hot reload mode, `hl_alloc_obj` allocates a class object (`$Name`) with spare room (twice its size, at least 256 more bytes, rounded to 512 bytes so that the GC does not round it again) and its mark bits cover the whole block. A reload that changes the statics of a class (same superclass) upgrades its class object in place: the statics kept (same name and type) are copied to their new offsets, the others are cleared, the new type is set, the new static methods get their closures, then the entry point initializes the added statics (`hot_init_bits` returns their bits). A static whose type changed is removed and added. The reload is refused when the new layout does not fit in the block (`statics_no_room`), naming the class.
+**Done**, with the mechanism of instances (U4, U8): a class object is the instance of its class object type, upgraded in place when its block has room and moved otherwise. No spare room. The statics kept (same name and type) are copied to their new offsets, the others are cleared, the new static methods get their closures (the bindings of the fields added), then the entry point initializes the added statics (`hot_init_bits` returns their bits). A static whose type changed is removed and added.
+
+The frame of the entry point is on the stack while the program runs and holds the class objects it initialized: these values are dead (it only returns after `main` or the event loop), so the search of the stacks for the blocks to move skips it. It is found from the return address into the entry point, with its frame pointer just under it, to the next return address into JIT code.
 
 The class object of each class is a single instance held by a global. In hot reload mode, class objects are allocated with spare room (see U3) so that a new layout fits in place. Upgrade: copy according to the U0 plan, set the new type, initialize the new statics. Initializers of new static variables: run only the initializers of the **added** statics, never the existing ones (consistent with item 5); this needs the compiler to expose them separately from the entry point.
 
@@ -146,7 +147,7 @@ First phase to deliver, because it covers the most common edit (adding a static)
 
 ### U3. Spare room in instances (dev mode)
 
-**Dropped.** Hot reload must not add memory to every allocated object. Instances are upgraded in place when their GC block has room (the GC rounds sizes), and moved otherwise (U8). The spare room of class objects (U1) is kept for now and will go once the class objects use the same mechanism as instances.
+**Dropped.** Hot reload must not add memory to every allocated object. Instances are upgraded in place when their GC block has room (the GC rounds sizes), and moved otherwise (U8). Class objects use the same mechanism (U1).
 
 In hot reload mode, object allocation reserves extra room after the fields (a configurable ratio with a minimum number of slots), so that added fields fit in place. Also use the real size of the GC block (`hl_gc_get_memsize`), which is often larger than requested. Instances allocated before a layout change keep their spare room; instances allocated after it use the new size plus spare room. When an instance has no room left, the reload is refused (or relocated, U8).
 

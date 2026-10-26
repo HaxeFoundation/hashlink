@@ -1,9 +1,0 @@
-v0 step 0 counter=1 name=kept
-[HotReload] Reload refused: live values cannot be upgraded:
-  Test: no room left for the new statics (872 bytes needed, 512 available)
-[HotReload] Restart required, the program keeps running the previous code
-reload 1: not applied
-v0 step 1 counter=2 name=kept
-[HotReload] 1 changes
-reload 2: applied
-v2 step 2 counter=3 name=kept
