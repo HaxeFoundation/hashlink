@@ -21,7 +21,7 @@
 | Harness `tests/hotreload/` | Done, Linux only so far, not in CI |
 | Heaps app | `tests/hotreload/heaps/run.py`: 18 steps pass, 1 known failure (shader source changed) |
 | U1. Class objects | Done, with the mechanism of instances (`statics`, `statics_many`, `dce_std`, Heaps) |
-| U2. Stack checks | Partly: the current thread (`statics_on_stack`); other threads are not stopped yet |
+| U2. Safe point and stack checks | Done: other threads stopped during the reload, all stacks checked (`statics_on_stack`, `threads`) |
 | U0, U4, U8. Instances | Done: in place when the block has room, moved otherwise (`instance_fields`, `instance_refs`, `instance_in_place`, Heaps) |
 | U3. Spare room in instances | Dropped: hot reload must not add memory to every object |
 | U5. Virtuals | Done for the fields of virtuals; interfaces kept (`instance_fields`) |
@@ -140,7 +140,7 @@ First phase to deliver, because it covers the most common edit (adding a static)
 
 ### U2. Safe point and stack checks
 
-**Done for U1.** Before applying a reload that upgrades class objects, the stack of the current thread is captured, and the reload is refused when a function running on it uses one of these class objects (the class objects each function uses are recorded when it is compiled: its registers are freed after JIT). The message names the function. The entry point is not checked: it reads the class objects before it calls `main`, and only returns after. Other threads are not checked yet.
+**Done.** `hl_module_patch` stops the other threads (`hl_gc_world`, at their safe points, as for a collection) while it compares, compiles and patches the code and upgrades the live values; they run again before the entry point, which is code of the program. Before a layout changes, the reload is refused when a running function uses the type (the object types each function uses are recorded when it is compiled: its registers are freed after JIT), naming it: the stack of the current thread is walked, the stacks of the other threads, saved where they stopped, are scanned for return addresses into JIT functions. The entry point is not checked: it reads the class objects before it calls `main`, and only returns after. The search for references to the blocks to move covers every thread (`threads`).
 
 - The reload runs at the existing `reload_check` point, with every other HL thread stopped (stop the world, as for a collection).
 - Walk the stacks of all threads (the stack walk used by the HL2 profiler and call stack capture): if a frame belongs to a function that reads or writes fields of an upgraded type (known from the bytecode: `OField`, `OSetField`, `OGetThis`, `OSetThis` on that type or its subclasses), refuse the reload and name the function. In practice the main loop function must not touch upgraded types directly; the message tells the agent which function to move.
@@ -308,7 +308,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | New string, int, float or bytes constants | Accepted | now |
 | New native function (`@:hlNative`, new hdll) | Accepted; library loaded on reload | 1 |
 | Change `main` | Accepted; `main` is not run again | 5 |
-| Reload while worker threads run | Accepted at the safe point, threads stopped | U2 |
+| Reload while worker threads run | Accepted at the safe point, threads stopped | done |
 | Reload with no change | Reported as no change, nothing patched | now |
 | Many successive reloads (100+) | Accepted; no growth beyond capacity, no lost state | 1, 2 |
 | Revert to an earlier version | Accepted like any other change | 1 |

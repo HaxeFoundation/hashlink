@@ -1809,6 +1809,38 @@ HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, 
 	gc_global_lock(false);
 }
 
+// ---- hot reload ----
+
+/*
+	Stops (or restarts) the other threads, at their safe points, as for a collection : the thread
+	that stops them can still allocate and collect.
+*/
+HL_API void hl_gc_world( bool stop ) {
+	if( stop ) {
+		gc_global_lock(true);
+		gc_stop_world(true);
+	} else {
+		gc_stop_world(false);
+		gc_global_lock(false);
+	}
+}
+
+/*
+	The stacks of the other threads, stopped (see hl_gc_world) : ranges[i*2] is where a stack was
+	saved, ranges[i*2+1] its top. Returns the number of stacks.
+*/
+HL_API int hl_gc_other_stacks( void **ranges, int max ) {
+	int n = 0;
+	for(int i=0;i<gc_threads.count && n < max;i++) {
+		hl_thread_info *t = gc_threads.threads[i];
+		if( t == current_thread ) continue;
+		ranges[n * 2] = t->stack_cur;
+		ranges[n * 2 + 1] = t->stack_top;
+		n++;
+	}
+	return n;
+}
+
 // ---- relocation of blocks (hot reload) ----
 
 typedef struct {

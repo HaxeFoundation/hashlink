@@ -1,0 +1,12 @@
+step 0 worker: v0:0 total=0
+[HotReload] 1 changes
+reload 1: applied
+step 1 worker: v1:3 total=1
+[HotReload] Reload refused: live values cannot be upgraded:
+  Acc: its layout changes and it is used by Worker.run, which is running in another thread : move the code that uses it out of it
+[HotReload] Restart required, the program keeps running the previous code
+reload 2: not applied
+step 2 worker: v1:6 total=3
+[HotReload] 1 changes
+reload 3: applied
+step 3 worker: v3:15 total=6

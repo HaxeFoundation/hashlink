@@ -512,37 +512,55 @@ static hl_function *hot_function_at( void *addr, hl_module **mod ) {
 	return NULL;
 }
 
+// reports a running function f which uses one of the layouts
+static void hot_check_function( hl_module *m, hl_function *f, hl_type_obj **layouts, int count, const char *where, hot_report *r ) {
+	hl_type_obj **fuses = m->hot_uses[f - m->code->functions];
+	for(int k=0;k<count;k++) {
+		bool uses = false;
+		for(int j=0;fuses[j] && !uses;j++)
+			uses = fuses[j] == layouts[k];
+		if( !uses ) continue;
+		hot_print(r, "\n  ");
+		hot_print_type_name(r, layouts[k]);
+		hot_print(r, ": its layout changes and it is used by ");
+		if( fun_obj(f) ) {
+			hot_print_type_name(r, fun_obj(f));
+			hot_print(r, ".");
+			hot_print_name(r, fun_field_name(f));
+		} else
+			hot_print(r, "fun$%d", f->findex);
+		hot_print(r, ", which is running%s : move the code that uses it out of it", where);
+		r->count++;
+	}
+}
+
 /*
-	The functions running on the stack keep running their code after the reload : refuse it if one of
-	them uses a type whose layout changes (it would use the previous offsets).
-	Only the current thread is checked.
+	The functions running on the stacks keep running their code after the reload : refuse it if one of
+	them uses a type whose layout changes (it would use the previous offsets). The stack of the current
+	thread is walked; the other threads are stopped, their stacks are scanned for return addresses
+	into JIT functions.
 */
 static void hot_check_stack( hl_type_obj **layouts, int count, hot_report *r ) {
 	void *stack[512];
-	int n = count ? hl_module_capture_stack(stack, 512) : 0;
+	if( count == 0 ) return;
+	int n = hl_module_capture_stack(stack, 512);
 	for(int i=0;i<n;i++) {
 		hl_module *m = NULL;
 		hl_function *f = hot_function_at(stack[i], &m);
 		if( f == NULL || m->hot_uses == NULL ) continue;
 		// the entry point initializes the class objects before it calls main, and only returns after
 		if( f->findex == m->code->entrypoint ) continue;
-		hl_type_obj **fuses = m->hot_uses[f - m->code->functions];
-		for(int k=0;k<count;k++) {
-			bool uses = false;
-			for(int j=0;fuses[j] && !uses;j++)
-				uses = fuses[j] == layouts[k];
-			if( !uses ) continue;
-			hot_print(r, "\n  ");
-			hot_print_type_name(r, layouts[k]);
-			hot_print(r, ": its layout changes and it is used by ");
-			if( fun_obj(f) ) {
-				hot_print_type_name(r, fun_obj(f));
-				hot_print(r, ".");
-				hot_print_name(r, fun_field_name(f));
-			} else
-				hot_print(r, "fun$%d", f->findex);
-			hot_print(r, ", which is running : move the code that uses it out of it");
-			r->count++;
+		hot_check_function(m, f, layouts, count, "", r);
+	}
+	void *ranges[256];
+	int nstacks = hl_gc_other_stacks(ranges, 128);
+	for(int i=0;i<nstacks;i++) {
+		for(void **p=(void**)ranges[i*2];p<(void**)ranges[i*2+1];p++) {
+			hl_module *m = NULL;
+			hl_function *f = hot_function_at(*p, &m);
+			if( f == NULL || m->hot_uses == NULL || !hl_module_is_call_site(*p) ) continue;
+			if( f->findex == m->code->entrypoint ) continue;
+			hot_check_function(m, f, layouts, count, " in another thread", r);
 		}
 	}
 }
@@ -1019,7 +1037,26 @@ static int hot_init_bits( hl_type *t, int word ) {
 #define HOT_SAME		-2	// unchanged : uses the current version
 #define HOT_ADDED		-3	// new function
 
+static bool hot_world_stopped = false;
+
+static h_bool hot_patch( hl_module *m1, hl_code *c );
+
+/*
+	Applies the code of a new version of the program. The other threads are stopped while the code
+	is compared and patched and the live values upgraded, then the entry point runs.
+*/
 h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
+	hl_gc_world(true);
+	hot_world_stopped = true;
+	h_bool r = hot_patch(m1, c);
+	if( hot_world_stopped ) {
+		hot_world_stopped = false;
+		hl_gc_world(false);
+	}
+	return r;
+}
+
+static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	int i;
 	hot_time(NULL);
 	hl_hot_reload *hr = m1->hot;
@@ -1368,6 +1405,9 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		cl.t = c->functions[m2->functions_indexes[c->entrypoint]].type;
 		cl.fun = m2->functions_ptrs[c->entrypoint];
 		cl.hasValue = 0;
+		// the other threads run again : the entry point is code of the program
+		hot_world_stopped = false;
+		hl_gc_world(false);
 		hot_init_code = c;
 		hot_init_new_types = new_types;
 		hot_init_instances = &inst;

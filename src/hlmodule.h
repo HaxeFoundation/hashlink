@@ -195,6 +195,7 @@ void hl_module_add( hl_module *m );
 void hl_module_null_function();
 bool hl_module_same_type( hl_type *t1, hl_type *t2 );
 int hl_module_capture_stack( void **stack, int size );
+bool hl_module_is_call_site( void *ret );
 
 // hot reload (reload.c)
 void hl_hot_reload_prepare( hl_module *m );

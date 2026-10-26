@@ -156,7 +156,7 @@ static void **walk_at( void *p, void *stack_base, void *copy ) {
 	return copy ? (void**)((char*)copy + ((char*)p - (char*)stack_base)) : (void**)p;
 }
 
-static bool is_call_site( void *ret ) {
+bool hl_module_is_call_site( void *ret ) {
 #if defined(_M_X64) || defined(__x86_64__)
 	unsigned char *p = (unsigned char*)ret;
 	int k;
@@ -191,7 +191,7 @@ static int frame_chain( void **fp, void *stack_base, void *stack_top, void *copy
 		next = rec[0];
 		ret = rec[1];
 		if( next <= (void*)fp || next >= stack_top ) break;
-		if( !is_call_site(ret) ) {
+		if( !hl_module_is_call_site(ret) ) {
 			*clean = !module_is_jit_code(ret,true);
 			break;
 		}
@@ -223,7 +223,7 @@ int hl_module_capture_stack_walk( void *pc, void *fp, void *stack_base, void *st
 				while( b > scan ) {
 					void *v = walk_at(b - 1,stack_base,copy)[0];
 					b--;
-					if( is_call_site(v) ) {
+					if( hl_module_is_call_site(v) ) {
 						if( out ) out[count] = v;
 						count++;
 						break;
@@ -517,7 +517,7 @@ int hl_module_capture_stack( void **stack, int size ) {
 		if( next <= cur || (void*)next >= stack_top ) break;
 		if( module_is_jit_code(ret,true) ) {
 			// null access stubs are reached with push+jmp
-			if( from_stub || is_call_site(ret) ) {
+			if( from_stub || hl_module_is_call_site(ret) ) {
 				pc = ret;
 				fp = next;
 			}
