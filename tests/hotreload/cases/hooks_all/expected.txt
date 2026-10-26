@@ -1,0 +1,8 @@
+v0 step 0 red,green,blue,rgb123,rgb009 reloads=0
+[HotReload] 5 objects upgraded
+[HotReload] 4 changes
+reload 1: applied
+v1 step 1 red,green,blue,rgb123,rgb009 reloads=1
+[HotReload] 1 changes
+reload 2: applied
+v2 step 2 red,green,blue,rgb123,rgb009 reloads=1

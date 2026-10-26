@@ -750,6 +750,13 @@ typedef struct {
 	hl_type **vconv_t;
 	int nvconv;
 	int max_vconv;
+	hl_code *code;			// the new code
+	hl_hot_reload *hr;
+	hot_pmap hooktypes;		// the live types whose class has onHotReload() in the new code -> its function index
+	void **hooked;			// their instances that are not rewritten
+	int *hooked_f;
+	int nhooked;
+	int max_hooked;
 } hot_instances;
 
 static void hot_convert( hot_instances *h, hl_type *ot, void *src, hl_type *nt, void *dst ) {
@@ -869,6 +876,19 @@ static void hot_check_stack( hot_itype *types, int count, hot_report *r ) {
 	}
 }
 
+static void hot_add_hooked( hot_instances *h, void *block, void *t ) {
+	int fidx = h->hooktypes.count ? hot_pmap_get(&h->hooktypes, t) : -1;
+	if( fidx < 0 ) return;
+	if( h->nhooked == h->max_hooked ) {
+		h->max_hooked = h->max_hooked ? h->max_hooked * 2 : 64;
+		h->hooked = (void**)realloc(h->hooked, sizeof(void*) * h->max_hooked);
+		h->hooked_f = (int*)realloc(h->hooked_f, sizeof(int) * h->max_hooked);
+	}
+	h->hooked[h->nhooked] = block;
+	h->hooked_f[h->nhooked] = fidx;
+	h->nhooked++;
+}
+
 static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 	hot_instances *h = (hot_instances*)ctx;
 	if( size < (int)sizeof(void*) ) return;
@@ -905,7 +925,11 @@ static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 			nsize = c->size;
 			hasptr = c->hasptr;
 		} else {
-			if( it->fields_same ) return; // only its methods change : nothing to rewrite
+			if( it->fields_same ) {
+				// only its methods change : nothing to rewrite
+				hot_add_hooked(h, block, t);
+				return;
+			}
 			nsize = it->nrt->size;
 			hasptr = it->nrt->hasPtr;
 		}
@@ -928,6 +952,7 @@ static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 		h->nobjs++;
 		return;
 	}
+	hot_add_hooked(h, block, t);
 	// a closure of a method of an instance to upgrade : bound again to the method of the same name
 	if( kind == MEM_KIND_DYNAMIC && h->nmethods && t && ((hl_type*)t)->kind == HFUN && size >= (int)sizeof(vclosure) ) {
 		vclosure *c = (vclosure*)block;
@@ -957,14 +982,22 @@ static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 
 /*
 	U6 : after an upgrade, the program can initialize the new fields with real values. The method
-	onHotReload() of an upgraded object is called once, and the static method onHotReload() of a
-	class whose statics changed. The closures are built while the objects are known to be alive,
+	onHotReload() of an upgraded object, or of any live instance of a class that has it (see
+	hot_hook_types), is called once, and the static method onHotReload() of a class whose statics
+	changed. The closures are built while the objects are known to be alive,
 	and called after the entry point.
 */
-static void hot_prepare_hooks( hot_instances *h ) {
+static void hot_prepare_hooks( hl_module *m, hot_instances *h ) {
 	int hash = hl_hash_utf8("onHotReload");
 	int count = 0;
-	vclosure **found = (vclosure**)malloc(sizeof(void*) * (h->nobjs + 1));
+	vclosure **found = (vclosure**)malloc(sizeof(void*) * (h->nobjs + h->nhooked + 1));
+	// the instances that are not rewritten
+	for(int k=0;k<h->nhooked;k++) {
+		int fidx = h->hooked_f[k];
+		hl_function *f = m->code->functions + m->functions_indexes[fidx];
+		if( f->type->fun->nargs != 1 ) continue;
+		found[count++] = hl_alloc_closure_ptr(f->type, m->functions_ptrs[fidx], h->hooked[k]);
+	}
 	for(int k=0;k<h->nobjs;k++) {
 		char *o = (char*)h->objs[k];
 		hot_itype *it = h->types + h->objs_info[k * 3];
@@ -1039,6 +1072,9 @@ static void hot_instances_free( hot_instances *h ) {
 	free(h->closures_info);
 	free(h->vconv);
 	free(h->vconv_t);
+	hot_pmap_free(&h->hooktypes);
+	free(h->hooked);
+	free(h->hooked_f);
 }
 
 static void hot_print_layout_name( hot_report *r, hot_itype *it ) {
@@ -1415,6 +1451,42 @@ static bool hot_same_slots( hot_itype *it ) {
 	return same;
 }
 
+// the method onHotReload() (no argument) of a class of the new code or of its superclasses : its function index
+static int hot_hook_findex( hl_type *t ) {
+	for(;t && t->kind == HOBJ;t=t->obj->super)
+		for(int i=0;i<t->obj->nproto;i++) {
+			hl_obj_proto *p = t->obj->proto + i;
+			if( ucmp(p->name, USTR("onHotReload")) == 0 ) return p->findex;
+		}
+	return -1;
+}
+
+/*
+	After a reload that upgraded values, onHotReload() is called on every live instance of a class that
+	has it, upgraded or not : a value can depend on the ones that changed (a map sorted by the index of
+	the constructors of an enum, EnumValueMap).
+*/
+static void hot_hook_types( hot_instances *h ) {
+	int modules_count;
+	hl_module **cur_modules = hl_get_modules(&modules_count);
+	hl_code *c = h->code;
+	for(int i=0;c && i<c->ntypes;i++) {
+		hl_type *t = c->types + i;
+		if( t->kind != HOBJ || hot_is_class_object(t) ) continue;
+		int fidx = hot_hook_findex(t);
+		hl_type *p = fidx >= 0 ? hot_find_type(h->hr, t) : NULL;
+		if( p == NULL ) continue; // a new class : no live instance
+		for(int m=0;m<modules_count;m++) {
+			hl_code *code = cur_modules[m]->code;
+			for(int k=0;k<code->ntypes;k++) {
+				hl_type *a = code->types + k;
+				if( a->kind == HOBJ && a->obj == p->obj ) hot_pmap_set(&h->hooktypes, a, fidx);
+			}
+		}
+		hot_pmap_set(&h->hooktypes, p, fidx);
+	}
+}
+
 /*
 	Finds the live instances of the types whose layout changes and checks that each fits in its block.
 	Called before anything is changed : a failure refuses the reload.
@@ -1495,6 +1567,7 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 		for(int k=0;k<code->ntypes;k++)
 			if( code->types[k].kind == HVIRTUAL ) hot_pmap_set(&h->virtuals, code->types + k, 0);
 	}
+	hot_hook_types(h);
 	hl_gc_iter_live(hot_scan_block, h);
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
@@ -1755,7 +1828,7 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 	}
 	for(int k=0;k<h->nobjs;k++)
 		h->objs[k] = news[k];
-	hot_prepare_hooks(h);
+	hot_prepare_hooks(m, h);
 	free(news);
 	hl_gc_enable(true);
 	if( h->nobjs ) {
@@ -1923,6 +1996,8 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	// check the layout of the live types before anything is changed
 	hot_instances inst;
 	memset(&inst, 0, sizeof(inst));
+	inst.code = c;
+	inst.hr = hr;
 	inst.types = (hot_itype*)malloc(sizeof(hot_itype) * (c->ntypes + 1));
 	int *itype_of = (int*)malloc(sizeof(int) * (c->ntypes + 1));
 	for(i=0;i<c->ntypes;i++) itype_of[i] = -1;
