@@ -138,7 +138,8 @@ class Run {
 			copyDir(dir + "/" + v, src);
 			var args = useServer ? ["--connect", "" + port] : [];
 			// the last class path has the priority : a case can replace Main.hx
-			args = args.concat(["--cwd", work, "-cp", root + "common", "-cp", "src", "-main", "Main", "-hl", v + ".hl"]);
+			// the entry point initializes the statics of new classes from HL 2.0
+			args = args.concat(["--cwd", work, "-cp", root + "common", "-cp", "src", "-main", "Main", "-hl", v + ".hl", "-D", "hl-ver=2.0.0"]);
 			if( FileSystem.exists(dir + "/build.txt") )
 				for( a in File.getContent(dir + "/build.txt").split("\n") ) {
 					a = StringTools.trim(a);

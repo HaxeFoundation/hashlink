@@ -137,7 +137,7 @@ def main():
 
 	server = subprocess.Popen([a.haxe, "--wait", str(a.port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 	args = ["--cwd", work, "-cp", "src", "-cp", "heaps", "-cp", os.path.abspath(a.format), "-cp", os.path.abspath(a.hlsdl),
-		"-D", "hlsdl=2.0.0", "-D", "heaps=2.1.0", "-D", "format=3.7.0", "-D", "hot-reload", "-dce", "no",
+		"-D", "hlsdl=2.0.0", "-D", "heaps=2.1.0", "-D", "format=3.7.0", "-D", "hot-reload", "-dce", "no", "-D", "hl-ver=2.0.0",
 		"-D", "hl-memo-check", "-main", "Main", "-hl", "app.hl"]
 
 	def compile():

@@ -91,6 +91,7 @@ if( bits & (1 << k) ) Foo.x = <init>;                         // static x is own
 if( is_init ) main();
 ```
 
+- Generated with `-D hl-ver=2.0.0` or higher only (the default `hl-ver` of the standard library is still 1.16.0); before, and for HL/C, the entry point is unchanged.
 - Word `-1` tells whether the class is new; it guards `__init__`.
 - `hot_init_bits` is an optional native (`?std`), never called when the program starts: no cost for a normal run, and an older VM still loads the code. HL/C keeps the previous entry point.
 - The VM answers from the reload whose entry point runs: all the bits for a class object type that is new, nothing otherwise; with U1, the bits of the statics added to an existing class.

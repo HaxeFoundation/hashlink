@@ -7,7 +7,7 @@ and the output expected when it runs with `hl --hot-reload`.
 haxe --cwd tests/hotreload --run Run --hl <path to hl> --haxe <path to haxe> [case...]
 ```
 
-The tests are written for the `haxe6-incremental` branch of the compiler (`HAXE_STD_PATH` must point to its `std`).
+The tests are written for the `haxe6-incremental` branch of the compiler (`HAXE_STD_PATH` must point to its `std`), and compile with `-D hl-ver=2.0.0`: the entry point initializes the statics of new classes from HL 2.0.
 
 ## How a case runs
 
