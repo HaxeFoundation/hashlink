@@ -46,7 +46,7 @@ python3 tests/hotreload/heaps/run.py --hl <hl> --haxe <haxe> --heaps <heaps> --f
 ```
 
 - Heaps must compile with the compiler: the `haxe6-annotations` branch of Heaps for `haxe6-incremental`.
-- The app needs the `sdl`, `fmt` and `ui` libraries of HashLink next to `hl` (or in the library path).
+- The app needs the `sdl` and `heaps` libraries of HashLink (`sdl.hdll`, `heaps.hdll`, SDL3) next to `hl` or in the library path.
 - On Linux without a display, the app runs in `xvfb-run`. `--gdb` runs `hl` in gdb and prints the native
   stack on a crash.
 - A step marked `known` describes a behavior that is not implemented yet: it is reported, not counted.
