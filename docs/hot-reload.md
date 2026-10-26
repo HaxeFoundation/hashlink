@@ -26,7 +26,7 @@
 | U3. Spare room in instances | Dropped: hot reload must not add memory to every object |
 | U5. Virtuals | Done for the fields of virtuals; interfaces kept (`instance_fields`) |
 | U6. Hook after upgrade | Done: `onHotReload()` (`hooks`) |
-| U7. Enums | Done (`enums`) |
+| U7. Enums | Done (`enums`, `enum_params`) |
 
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
 
@@ -180,7 +180,7 @@ After a successful upgrade, call an optional method on each upgraded instance (f
 
 ### U7. Enums
 
-**Done.** A changed enum is upgraded like the types of objects (its values are GC blocks whose first word is the type): the index of each live value is remapped to the constructor of the same name; the params of a constructor are kept by position when their type is the same (they have no name in HL), the others get the default value; a value is rewritten in place when its block has room, moved otherwise. Every `hl_type*` of the enum gets the new `tenum` and mark bits. The array `__evalues__` of the enum object, which the entry point reads to set the globals of the constant values again, is built in the order of the new constructors with the live constants (their identity is kept: `fav == Green` stays true). The standard library (`Type.initEnum`, `hot-reload` branch of Haxe) builds `__constructs__` and `__emap__` again when the constructors changed (`Type.getEnumConstructs`, `Type.createEnum`).
+**Done.** A changed enum is upgraded like the types of objects (its values are GC blocks whose first word is the type): the index of each live value is remapped to the constructor of the same name; the params of a constructor are kept by name when their type is the same (bytecode 7, written by the compiler from `hl-ver=2.0.0`, has the names of the params; by position for older bytecode), so that inserting, moving or removing a param keeps the data of the others; a renamed or new param gets the default value; a value is rewritten in place when its block has room, moved otherwise. Every `hl_type*` of the enum gets the new `tenum` and mark bits. The array `__evalues__` of the enum object, which the entry point reads to set the globals of the constant values again, is built in the order of the new constructors with the live constants (their identity is kept: `fav == Green` stays true). The standard library (`Type.initEnum`, `hot-reload` branch of Haxe) builds `__constructs__` and `__emap__` again when the constructors changed (`Type.getEnumConstructs`, `Type.createEnum`).
 
 A removed constructor with params and live values refuses the reload. The constant of a removed constructor without params is referenced by the enum object and a global: the reload is refused only when something else references it (a walk of the blocks, the stacks); otherwise it is detached.
 
@@ -207,6 +207,7 @@ When an instance has no spare room: allocate the new instance, copy, then redire
 - U4/U5: instances of a class and of its subclasses, referenced from fields, arrays, maps, closures and virtuals (structural typing), survive the addition and removal of fields in the base class.
 - U6: the hook runs once per upgraded instance.
 - U7: live enum values after adding, reordering and removing constructors.
+- U7: live enum values after moving, inserting and renaming params (`enum_params`).
 
 ## Test matrix
 

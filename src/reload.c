@@ -318,6 +318,19 @@ static const uchar *hot_super_name( hl_type_obj *o ) {
 	return o->super ? o->super->obj->name : USTR("");
 }
 
+/*
+	The parameter of the constructor nc that keeps the parameter p of oc : the one of the same name when
+	the bytecode has the names (from version 7), else the one at the same position. -1 if none.
+*/
+static int hot_enum_param( hl_enum_construct *oc, int p, hl_enum_construct *nc ) {
+	if( oc->pnames && nc->pnames && oc->pnames[p] ) {
+		for(int k=0;k<nc->nparams;k++)
+			if( nc->pnames[k] && ucmp(oc->pnames[p], nc->pnames[k]) == 0 ) return k;
+		return -1;
+	}
+	return p < nc->nparams ? p : -1;
+}
+
 static bool hot_same_virtuals( hl_type_obj *o1, hl_type_obj *o2 ) {
 	for(int pass=0;pass<2;pass++) {
 		hl_type_obj *a = pass ? o2 : o1;
@@ -420,7 +433,7 @@ static int hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 					break;
 				}
 				for(int k=0;k<c1->nparams;k++)
-					if( !hl_module_same_type(c1->params[k],c2->params[k]) ) {
+					if( !hl_module_same_type(c1->params[k],c2->params[k]) || hot_enum_param(c1,k,c2) != k ) {
 						same = false;
 						break;
 					}
@@ -840,12 +853,13 @@ static void hot_enum_plan( hot_itype *it ) {
 		if( it->cmap[i] < 0 ) continue;
 		hl_enum_construct *nc = n->constructs + it->cmap[i];
 		it->ccopies[i] = (int*)malloc(sizeof(int) * 3 * (oc->nparams + 1));
-		for(int p=0;p<oc->nparams && p<nc->nparams;p++) {
-			if( !hl_module_same_type(oc->params[p], nc->params[p]) ) continue;
+		for(int p=0;p<oc->nparams;p++) {
+			int np = hot_enum_param(oc, p, nc);
+			if( np < 0 || !hl_module_same_type(oc->params[p], nc->params[np]) ) continue;
 			int *c = it->ccopies[i] + it->nccopies[i]++ * 3;
-			c[0] = nc->offsets[p];
+			c[0] = nc->offsets[np];
 			c[1] = oc->offsets[p];
-			c[2] = hot_field_size(nc->params[p]);
+			c[2] = hot_field_size(nc->params[np]);
 		}
 	}
 }

@@ -1,0 +1,9 @@
+v0 step 0 rgb r=1 g=2 b=3,named name=a n=7
+[HotReload] 3 objects upgraded
+[HotReload] 5 changes
+reload 1: applied
+v1 step 1 rgb r=1 g=2 b=3,named name=a n=7 scale=0
+[HotReload] 2 objects upgraded
+[HotReload] 5 changes
+reload 2: applied
+v2 step 2 rgb red=0 g=2 b=3,named name=a n=7 scale=0

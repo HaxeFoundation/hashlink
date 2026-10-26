@@ -241,6 +241,14 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 				c->offsets = (int*)hl_malloc(&r->code->alloc,sizeof(int)*c->nparams);
 				for(j=0;j<c->nparams;j++)
 					c->params[j] = hl_get_type(r);
+				c->pnames = NULL;
+				if( r->code->version >= 7 && c->nparams ) {
+					c->pnames = (const uchar**)hl_malloc(&r->code->alloc,sizeof(uchar*)*c->nparams);
+					for(j=0;j<c->nparams;j++) {
+						int k = UINDEX();
+						c->pnames[j] = k == 0 ? NULL : (k - 1 < r->code->nstrings ? hl_get_ustring(r->code,k - 1) : NULL);
+					}
+				}
 			}
 		}
 		break;
@@ -428,7 +436,7 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	hl_alloc alloc;
 	int i;
 	int flags;
-	int max_version = 6;
+	int max_version = 7;
 	hl_alloc_init(&alloc);
 	c = hl_zalloc(&alloc,sizeof(hl_code));
 	c->alloc = alloc;
@@ -658,6 +666,9 @@ static int hash_type_first( hl_type *t, bool isrec ) {
 			HUSTR(c->name);
 			for(k=0;k<c->nparams;k++)
 				HTYPE(c->params[k]);
+			if( c->pnames )
+				for(k=0;k<c->nparams;k++)
+					if( c->pnames[k] ) HUSTR(c->pnames[k]);
 		}
 		break;
 	case HABSTRACT:
