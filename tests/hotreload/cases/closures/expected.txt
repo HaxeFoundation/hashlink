@@ -1,0 +1,7 @@
+v0 step 0 method=foo1 local=L0 new=L0
+[HotReload] 3 changes
+reload 1: applied
+v1 step 1 method=FOO1 local=L2:2 new=L2:2
+[HotReload] 1 changes
+reload 2: applied
+v2 step 2 method=FOO1 local=L2:4 new=L2:4

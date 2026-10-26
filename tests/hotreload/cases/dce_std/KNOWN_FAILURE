@@ -1,0 +1,1 @@
+with -dce std, the first use of a static of a std class adds a field to its class object: needs the upgrade of class objects (U1)

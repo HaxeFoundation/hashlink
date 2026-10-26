@@ -1,0 +1,7 @@
+v0 step 0
+[HotReload] * changes
+reload 1: applied
+v1 step 1 count=101
+[HotReload] 1 changes
+reload 2: applied
+v2 step 2 count=102

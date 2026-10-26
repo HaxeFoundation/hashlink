@@ -1,0 +1,8 @@
+v0 step 0 counter=1 foo1 0
+[HotReload] Reload refused: no room left for the new globals (113 needed, 106 available, see HL_HOT_RELOAD_GLOBALS)
+[HotReload] Restart required, the program keeps running the previous code
+reload 1: not applied
+v0 step 1 counter=2 foo1 2
+[HotReload] 1 changes
+reload 2: applied
+v2 step 2 counter=3 foo1 4
