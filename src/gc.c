@@ -1841,6 +1841,12 @@ HL_API int hl_gc_other_stacks( void **ranges, int max ) {
 	return n;
 }
 
+// the roots : addresses of the values the GC keeps alive
+HL_API void ***hl_gc_get_roots( int *count ) {
+	*count = gc_roots_count;
+	return gc_roots;
+}
+
 // ---- relocation of blocks (hot reload) ----
 
 typedef struct {

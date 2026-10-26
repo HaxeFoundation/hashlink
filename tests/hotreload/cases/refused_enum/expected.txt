@@ -1,9 +1,0 @@
-v0 step 0 rgb123
-[HotReload] Reload refused: the layout of live types changed (not supported yet):
-  Color: enum constructors changed
-[HotReload] Restart required, the program keeps running the previous code
-reload 1: not applied
-v0 step 1 rgb123
-[HotReload] 2 changes
-reload 2: applied
-v2 step 2 RGB123

@@ -742,6 +742,18 @@ static int hash_type_sign( hl_type *t, int depth ) {
 		break;
 	case HENUM:
 		HUSTR(t->tenum->name);
+		if( !t->tenum->global_value ) {
+			// an anonymous enum (the context of a closure) : its structure, so that a live closure
+			// does not call a function that expects other captured variables
+			H32(t->tenum->nconstructs);
+			for(i=0;i<t->tenum->nconstructs;i++) {
+				hl_enum_construct *c = t->tenum->constructs + i;
+				int k;
+				H32(c->nparams);
+				for(k=0;k<c->nparams;k++)
+					H32(hash_type_sign(c->params[k], depth + 1));
+			}
+		}
 		break;
 	case HREF:
 	case HNULL:

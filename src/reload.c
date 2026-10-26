@@ -425,14 +425,8 @@ static int hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 						break;
 					}
 			}
-			if( !same ) {
-				hot_print(r, "\n  ");
-				hot_print_name(r, e1->name);
-				hot_print(r, ": enum constructors changed");
-				r->count++;
-				return HOT_LAYOUT_CHANGED;
-			}
-			return HOT_LAYOUT_SAME;
+			// live values are remapped by the name of their constructor (U7)
+			return same ? HOT_LAYOUT_SAME : HOT_LAYOUT_INSTANCES;
 		}
 	default:
 		return HOT_LAYOUT_SAME;
@@ -472,11 +466,18 @@ static void hot_record_uses( hl_module *m ) {
 		int count = 0;
 		for(int i=0;i<f->nregs && count < 63;i++) {
 			hl_type *t = f->regs[i];
-			if( t->kind != HOBJ && t->kind != HSTRUCT ) continue;
+			// the layout of the type : obj, or tenum for an enum
+			hl_type_obj *layout;
+			if( t->kind == HOBJ || t->kind == HSTRUCT )
+				layout = t->obj;
+			else if( t->kind == HENUM )
+				layout = (hl_type_obj*)t->tenum;
+			else
+				continue;
 			bool found = false;
 			for(int j=0;j<count;j++)
-				if( tmp[j] == t->obj ) found = true;
-			if( !found ) tmp[count++] = t->obj;
+				if( tmp[j] == layout ) found = true;
+			if( !found ) tmp[count++] = layout;
 		}
 		hl_type_obj **uses = (hl_type_obj**)hl_malloc(&m->ctx.alloc, sizeof(void*) * (count + 1));
 		memcpy(uses, tmp, sizeof(void*) * count);
@@ -512,58 +513,6 @@ static hl_function *hot_function_at( void *addr, hl_module **mod ) {
 	return NULL;
 }
 
-// reports a running function f which uses one of the layouts
-static void hot_check_function( hl_module *m, hl_function *f, hl_type_obj **layouts, int count, const char *where, hot_report *r ) {
-	hl_type_obj **fuses = m->hot_uses[f - m->code->functions];
-	for(int k=0;k<count;k++) {
-		bool uses = false;
-		for(int j=0;fuses[j] && !uses;j++)
-			uses = fuses[j] == layouts[k];
-		if( !uses ) continue;
-		hot_print(r, "\n  ");
-		hot_print_type_name(r, layouts[k]);
-		hot_print(r, ": its layout changes and it is used by ");
-		if( fun_obj(f) ) {
-			hot_print_type_name(r, fun_obj(f));
-			hot_print(r, ".");
-			hot_print_name(r, fun_field_name(f));
-		} else
-			hot_print(r, "fun$%d", f->findex);
-		hot_print(r, ", which is running%s : move the code that uses it out of it", where);
-		r->count++;
-	}
-}
-
-/*
-	The functions running on the stacks keep running their code after the reload : refuse it if one of
-	them uses a type whose layout changes (it would use the previous offsets). The stack of the current
-	thread is walked; the other threads are stopped, their stacks are scanned for return addresses
-	into JIT functions.
-*/
-static void hot_check_stack( hl_type_obj **layouts, int count, hot_report *r ) {
-	void *stack[512];
-	if( count == 0 ) return;
-	int n = hl_module_capture_stack(stack, 512);
-	for(int i=0;i<n;i++) {
-		hl_module *m = NULL;
-		hl_function *f = hot_function_at(stack[i], &m);
-		if( f == NULL || m->hot_uses == NULL ) continue;
-		// the entry point initializes the class objects before it calls main, and only returns after
-		if( f->findex == m->code->entrypoint ) continue;
-		hot_check_function(m, f, layouts, count, "", r);
-	}
-	void *ranges[256];
-	int nstacks = hl_gc_other_stacks(ranges, 128);
-	for(int i=0;i<nstacks;i++) {
-		for(void **p=(void**)ranges[i*2];p<(void**)ranges[i*2+1];p++) {
-			hl_module *m = NULL;
-			hl_function *f = hot_function_at(*p, &m);
-			if( f == NULL || m->hot_uses == NULL || !hl_module_is_call_site(*p) ) continue;
-			if( f->findex == m->code->entrypoint ) continue;
-			hot_check_function(m, f, layouts, count, " in another thread", r);
-		}
-	}
-}
 
 /* ---- instances upgrade (U4), class objects included (U1) ---- */
 
@@ -632,6 +581,15 @@ typedef struct {
 	int ninstances;
 	int nrelocated;
 	int max_block;
+	// enums (U7)
+	bool is_enum;
+	void *old_layout;		// the previous obj or tenum : identifies the previous layout
+	hl_type_enum *old_enum;
+	int *cmap;				// for each previous constructor, the new index or -1
+	int **ccopies;			// for each previous constructor, the params kept : new offset, previous offset, size
+	int *nccopies;
+	int removed_live;		// live values of removed constructors (with params)
+	int removed_ctor;		// one of these constructors
 } hot_itype;
 
 typedef struct {
@@ -647,12 +605,71 @@ typedef struct {
 	int nvirts;
 	int max_virts;
 	varray *hooks;			// the closures of onHotReload to call after the entry point (rooted)
+	void **removed;			// enum constants (no params) of removed constructors
+	int *removed_info;		// their type index, previous constructor
+	int nremoved;
+	int max_removed;
 	hot_pmap maps;			// the registered object maps -> 0
 	void **live_maps;
 	int nlive_maps;
 	int max_live_maps;
 	int nrelocated;
 } hot_instances;
+
+// reports a running function f which uses one of the layouts
+static void hot_print_layout_name( hot_report *r, hot_itype *it );
+
+static void hot_check_function( hl_module *m, hl_function *f, hot_itype *types, int count, const char *where, hot_report *r ) {
+	hl_type_obj **fuses = m->hot_uses[f - m->code->functions];
+	for(int k=0;k<count;k++) {
+		bool uses = false;
+		for(int j=0;fuses[j] && !uses;j++)
+			uses = (void*)fuses[j] == types[k].old_layout;
+		if( !uses ) continue;
+		hot_print(r, "\n  ");
+		hot_print_layout_name(r, types + k);
+		hot_print(r, ": its layout changes and it is used by ");
+		if( fun_obj(f) ) {
+			hot_print_type_name(r, fun_obj(f));
+			hot_print(r, ".");
+			hot_print_name(r, fun_field_name(f));
+		} else
+			hot_print(r, "fun$%d", f->findex);
+		hot_print(r, ", which is running%s : move the code that uses it out of it", where);
+		r->count++;
+	}
+}
+
+/*
+	The functions running on the stacks keep running their code after the reload : refuse it if one of
+	them uses a type whose layout changes (it would use the previous offsets). The stack of the current
+	thread is walked; the other threads are stopped, their stacks are scanned for return addresses
+	into JIT functions.
+*/
+static void hot_check_stack( hot_itype *types, int count, hot_report *r ) {
+	void *stack[512];
+	if( count == 0 ) return;
+	int n = hl_module_capture_stack(stack, 512);
+	for(int i=0;i<n;i++) {
+		hl_module *m = NULL;
+		hl_function *f = hot_function_at(stack[i], &m);
+		if( f == NULL || m->hot_uses == NULL ) continue;
+		// the entry point initializes the class objects before it calls main, and only returns after
+		if( f->findex == m->code->entrypoint ) continue;
+		hot_check_function(m, f, types, count, "", r);
+	}
+	void *ranges[256];
+	int nstacks = hl_gc_other_stacks(ranges, 128);
+	for(int i=0;i<nstacks;i++) {
+		for(void **p=(void**)ranges[i*2];p<(void**)ranges[i*2+1];p++) {
+			hl_module *m = NULL;
+			hl_function *f = hot_function_at(*p, &m);
+			if( f == NULL || m->hot_uses == NULL || !hl_module_is_call_site(*p) ) continue;
+			if( f->findex == m->code->entrypoint ) continue;
+			hot_check_function(m, f, types, count, " in another thread", r);
+		}
+	}
+}
 
 static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 	hot_instances *h = (hot_instances*)ctx;
@@ -671,8 +688,38 @@ static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 	if( idx >= 0 ) {
 		hot_itype *it = h->types + idx;
 		it->ninstances++;
+		int nsize;
+		bool hasptr;
+		if( it->is_enum ) {
+			int oi = ((venum*)block)->index;
+			int ni = it->cmap[oi];
+			if( ni < 0 ) {
+				if( it->old_enum->constructs[oi].nparams ) {
+					it->removed_live++;
+					it->removed_ctor = oi;
+					return;
+				}
+				// a constant : the enum object and a global reference it, the reload checks the others
+				if( h->nremoved == h->max_removed ) {
+					h->max_removed = h->max_removed ? h->max_removed * 2 : 16;
+					h->removed = (void**)realloc(h->removed, sizeof(void*) * h->max_removed);
+					h->removed_info = (int*)realloc(h->removed_info, sizeof(int) * 2 * h->max_removed);
+				}
+				h->removed[h->nremoved] = block;
+				h->removed_info[h->nremoved * 2] = idx;
+				h->removed_info[h->nremoved * 2 + 1] = oi;
+				h->nremoved++;
+				return;
+			}
+			hl_enum_construct *c = it->t->tenum->constructs + ni;
+			nsize = c->size;
+			hasptr = c->hasptr;
+		} else {
+			nsize = it->nrt->size;
+			hasptr = it->nrt->hasPtr;
+		}
 		// moved when its block has no room for the new layout
-		bool relocate = it->nrt->size > size || (kind != MEM_KIND_DYNAMIC && it->nrt->hasPtr);
+		bool relocate = nsize > size || (kind != MEM_KIND_DYNAMIC && hasptr);
 		if( relocate ) {
 			it->nrelocated++;
 			h->nrelocated++;
@@ -712,6 +759,7 @@ static void hot_prepare_hooks( hot_instances *h ) {
 	for(int k=0;k<h->nobjs;k++) {
 		char *o = (char*)h->objs[k];
 		hot_itype *it = h->types + h->objs_info[k * 3];
+		if( it->is_enum ) continue;
 		hl_runtime_obj *rt = it->nrt;
 		hl_field_lookup *f = NULL;
 		for(hl_runtime_obj *r=rt;r && !f;r=r->parent)
@@ -753,9 +801,16 @@ static void hot_call_hooks( hot_instances *h ) {
 static void hot_instances_free( hot_instances *h ) {
 	if( h->hooks ) hl_remove_root(&h->hooks);
 	for(int i=0;i<h->ntypes;i++) {
-		free(h->types[i].copies);
-		free(h->types[i].added);
-		free(h->types[i].bindings);
+		hot_itype *it = h->types + i;
+		free(it->copies);
+		free(it->added);
+		free(it->bindings);
+		if( it->ccopies ) {
+			for(int c=0;c<it->old_enum->nconstructs;c++) free(it->ccopies[c]);
+			free(it->ccopies);
+		}
+		free(it->nccopies);
+		free(it->cmap);
 	}
 	free(h->types);
 	hot_pmap_free(&h->aliases);
@@ -764,7 +819,139 @@ static void hot_instances_free( hot_instances *h ) {
 	free(h->live_maps);
 	free(h->objs);
 	free(h->objs_info);
+	free(h->removed);
+	free(h->removed_info);
 	free(h->virts);
+}
+
+static void hot_print_layout_name( hot_report *r, hot_itype *it ) {
+	if( it->is_enum )
+		hot_print_name(r, it->old_enum->name);
+	else
+		hot_print_type_name(r, it->old_obj);
+}
+
+/*
+	Enums : the live values are remapped by the name of their constructor; the params of a
+	constructor are kept by position when their type is the same (they have no name).
+*/
+static void hot_enum_plan( hot_itype *it ) {
+	hl_type_enum *o = it->old->tenum, *n = it->t->tenum;
+	it->is_enum = true;
+	it->old_enum = o;
+	it->old_layout = o;
+	it->cmap = (int*)malloc(sizeof(int) * (o->nconstructs + 1));
+	it->ccopies = (int**)calloc(o->nconstructs + 1, sizeof(int*));
+	it->nccopies = (int*)calloc(o->nconstructs + 1, sizeof(int));
+	for(int i=0;i<o->nconstructs;i++) {
+		hl_enum_construct *oc = o->constructs + i;
+		it->cmap[i] = -1;
+		for(int k=0;k<n->nconstructs;k++)
+			if( ucmp(oc->name, n->constructs[k].name) == 0 ) {
+				it->cmap[i] = k;
+				break;
+			}
+		if( it->cmap[i] < 0 ) continue;
+		hl_enum_construct *nc = n->constructs + it->cmap[i];
+		it->ccopies[i] = (int*)malloc(sizeof(int) * 3 * (oc->nparams + 1));
+		for(int p=0;p<oc->nparams && p<nc->nparams;p++) {
+			if( !hl_module_same_type(oc->params[p], nc->params[p]) ) continue;
+			int *c = it->ccopies[i] + it->nccopies[i]++ * 3;
+			c[0] = nc->offsets[p];
+			c[1] = oc->offsets[p];
+			c[2] = hot_field_size(nc->params[p]);
+		}
+	}
+}
+
+// the enum object of an enum (holding __evalues__), and the array of its constants
+static vobj *hot_enum_object( hl_type_enum *e, varray ***values ) {
+	*values = NULL;
+	if( !e->global_value || !*e->global_value ) return NULL;
+	vobj *eobj = (vobj*)*e->global_value;
+	hl_runtime_obj *rt = hl_get_obj_rt(eobj->t);
+	hl_field_lookup *f = NULL;
+	int hash = hl_hash_utf8("__evalues__");
+	for(hl_runtime_obj *r=rt;r && !f;r=r->parent)
+		f = hl_lookup_find(r->lookup, r->nlookup, hash);
+	if( f && f->field_index >= 0 ) *values = (varray**)((char*)eobj + f->field_index);
+	return eobj;
+}
+
+static struct {
+	hot_pmap *removed;
+	hot_pmap *excluded;
+	int found;
+} hot_refs;
+
+static void hot_scan_refs( void *block, int size, int kind, void *ctx ) {
+	if( hot_refs.found >= 0 || kind == MEM_KIND_NOPTR ) return;
+	if( hot_pmap_get(hot_refs.excluded, block) >= 0 || hot_pmap_get(hot_refs.removed, block) >= 0 ) return;
+	void **w = (void**)block;
+	for(int i=0;i<size / HL_WSIZE;i++) {
+		int k = hot_pmap_get(hot_refs.removed, w[i]);
+		if( k >= 0 ) {
+			hot_refs.found = k;
+			return;
+		}
+	}
+}
+
+/*
+	The constant of a removed constructor (without params) is referenced by the enum object and a
+	global : the reload is refused only when something else references it (the heap, a stack).
+*/
+static void hot_check_removed( hot_instances *h, hot_report *r ) {
+	hot_pmap removed, excluded;
+	memset(&removed, 0, sizeof(removed));
+	memset(&excluded, 0, sizeof(excluded));
+	for(int k=0;k<h->nremoved;k++)
+		hot_pmap_set(&removed, h->removed[k], k);
+	for(int i=0;i<h->ntypes;i++) {
+		hot_itype *it = h->types + i;
+		if( !it->is_enum ) continue;
+		varray **values;
+		vobj *eobj = hot_enum_object(it->old_enum, &values);
+		if( eobj ) hot_pmap_set(&excluded, eobj, 0);
+		if( values && *values ) hot_pmap_set(&excluded, *values, 0);
+	}
+	hot_refs.removed = &removed;
+	hot_refs.excluded = &excluded;
+	hot_refs.found = -1;
+	hl_gc_iter_live(hot_scan_refs, NULL);
+	int found = hot_refs.found;
+	if( found < 0 ) {
+		int *sizes = (int*)malloc(sizeof(int) * h->nremoved);
+		for(int k=0;k<h->nremoved;k++) sizes[k] = (int)sizeof(venum);
+		found = hl_gc_stacks_find(h->removed, sizes, h->nremoved, NULL, NULL);
+		free(sizes);
+	}
+	if( found >= 0 ) {
+		hot_itype *it = h->types + h->removed_info[found * 2];
+		hot_print(r, "\n  ");
+		hot_print_name(r, it->old_enum->name);
+		hot_print(r, ".");
+		hot_print_name(r, it->old_enum->constructs[h->removed_info[found * 2 + 1]].name);
+		hot_print(r, ": the constructor is removed and a live value uses it");
+		r->count++;
+	}
+	hot_pmap_free(&removed);
+	hot_pmap_free(&excluded);
+}
+
+// the constants of removed constructors are detached : no global keeps them, nothing scans them
+static void hot_detach_removed( hot_instances *h ) {
+	int nroots;
+	void ***roots = hl_gc_get_roots(&nroots);
+	hot_pmap removed;
+	memset(&removed, 0, sizeof(removed));
+	for(int k=0;k<h->nremoved;k++)
+		hot_pmap_set(&removed, h->removed[k], k);
+	for(int i=0;i<nroots;i++)
+		if( hot_pmap_get(&removed, *roots[i]) >= 0 ) *roots[i] = NULL;
+	for(int k=0;k<h->nremoved;k++)
+		*(void**)h->removed[k] = NULL;
+	hot_pmap_free(&removed);
 }
 
 static bool hot_is_jit_code( void *addr ) {
@@ -812,7 +999,20 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 	hl_module **cur_modules = hl_get_modules(&modules_count);
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
+		if( it->t->kind == HENUM ) {
+			hot_enum_plan(it);
+			for(int m=0;m<modules_count;m++) {
+				hl_code *code = cur_modules[m]->code;
+				for(int k=0;k<code->ntypes;k++) {
+					hl_type *a = code->types + k;
+					if( a->kind == HENUM && a->tenum == it->old_enum ) hot_pmap_set(&h->aliases, a, i);
+				}
+			}
+			hot_pmap_set(&h->aliases, it->old, i);
+			continue;
+		}
 		it->old_obj = it->old->obj;
+		it->old_layout = it->old_obj;
 		it->ort = hl_get_obj_rt(it->old);
 		it->nrt = hl_get_obj_rt(it->t);
 		// the fields kept : same name and type
@@ -855,7 +1055,19 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 	for(int i=0;i<*nmaps;i++)
 		hot_pmap_set(&h->maps, maps[i], 0);
 	hl_gc_iter_live(hot_scan_block, h);
-	if( h->nrelocated == 0 ) return;
+	for(int i=0;i<h->ntypes;i++) {
+		hot_itype *it = h->types + i;
+		if( !it->removed_live ) continue;
+		hot_print(r, "\n  ");
+		hot_print_name(r, it->old_enum->name);
+		hot_print(r, ".");
+		hot_print_name(r, it->old_enum->constructs[it->removed_ctor].name);
+		hot_print(r, ": the constructor is removed and %d live values use it", it->removed_live);
+		r->count++;
+	}
+	if( r->count ) return;
+	if( h->nremoved ) hot_check_removed(h, r);
+	if( h->nrelocated == 0 || r->count ) return;
 	// the instances to move must not be referenced by a stack : it cannot be rewritten
 	void **olds = (void**)malloc(sizeof(void*) * h->nrelocated);
 	int *sizes = (int*)malloc(sizeof(int) * h->nrelocated);
@@ -874,7 +1086,7 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 	if( found >= 0 ) {
 		hot_itype *it = h->types + types[found];
 		hot_print(r, "\n  ");
-		hot_print_type_name(r, it->old_obj);
+		hot_print_layout_name(r, it);
 		hot_print(r, ": an instance that must be moved (no room for the new layout in its block) is referenced by a running function");
 		r->count++;
 	}
@@ -888,6 +1100,11 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 	of the types will change.
 */
 static void hot_set_layout( hl_type *a, hl_type *t ) {
+	if( t->kind == HENUM ) {
+		a->tenum = t->tenum;
+		a->mark_bits = t->mark_bits;
+		return;
+	}
 	a->obj = t->obj;
 	a->vobj_proto = t->vobj_proto;
 	a->mark_bits = t->mark_bits;
@@ -898,9 +1115,46 @@ static void hot_set_layout( hl_type *a, hl_type *t ) {
 	new offsets, the others are cleared. Then every type pointer of a previous layout gets the new one,
 	so that the instances keep their type, and the virtuals of the instances point to the new offsets.
 */
+// copies the kept fields (or params) of the value o (whose content is src) to n, in the new layout
+static void hot_copy_value( hot_itype *it, char *n, char *src ) {
+	if( it->is_enum ) {
+		int oi = ((venum*)src)->index;
+		((venum*)n)->index = it->cmap[oi];
+		for(int *c=it->ccopies[oi], *e=c + it->nccopies[oi] * 3;c<e;c+=3)
+			memcpy(n + c[0], src + c[1], c[2]);
+		return;
+	}
+	for(int *c=it->copies, *e=c + it->ncopies * 3;c<e;c+=3)
+		memcpy(n + c[0], src + c[1], c[2]);
+}
+
+/*
+	The constant values of an enum (its constructors without params) are in the array __evalues__ of
+	its object, which the entry point reads to set them again : the array is built again in the order
+	of the new constructors, with the live constants (same identity).
+*/
+static void hot_enum_values( hot_itype *it ) {
+	hl_type_enum *e = it->t->tenum;
+	varray **field;
+	hot_enum_object(e, &field);
+	if( field == NULL ) return;
+	varray *prev = *field;
+	varray *values = hl_alloc_array(&hlt_dyn, e->nconstructs);
+	for(int i=0;prev && i<prev->size && i<it->old_enum->nconstructs;i++) {
+		venum *v = hl_aptr(prev, venum*)[i];
+		int ni = it->cmap[i];
+		if( v && ni >= 0 && e->constructs[ni].nparams == 0 ) hl_aptr(values, venum*)[ni] = v;
+	}
+	for(int i=0;i<e->nconstructs;i++)
+		if( e->constructs[i].nparams == 0 && hl_aptr(values, venum*)[i] == NULL )
+			hl_aptr(values, venum*)[i] = hl_alloc_enum(it->old, i);
+	*field = values;
+}
+
 static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
+		if( it->is_enum ) continue;
 		it->nrt = hl_get_obj_proto(it->t);
 		// the GC scans an instance up to the end of its block
 		if( it->t->mark_bits && hl_mark_size(it->nrt->size) < hl_mark_size(it->max_block) ) {
@@ -911,33 +1165,42 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 	}
 	// no collection while the instances are rewritten and moved
 	hl_gc_enable(false);
+	if( h->nremoved ) hot_detach_removed(h);
 	void **news = (void**)malloc(sizeof(void*) * (h->nobjs + 1));
 	for(int k=0;k<h->nobjs;k++) {
 		char *o = (char*)h->objs[k];
 		hot_itype *it = h->types + h->objs_info[k * 3];
 		news[k] = o;
 		if( !h->objs_info[k * 3 + 2] ) continue;
-		char *n = (char*)hl_gc_alloc_gen(*(hl_type**)o, it->nrt->size, (it->nrt->hasPtr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
+		int size;
+		bool hasptr;
+		if( it->is_enum ) {
+			hl_enum_construct *c = it->t->tenum->constructs + it->cmap[((venum*)o)->index];
+			size = c->size;
+			hasptr = c->hasptr;
+		} else {
+			size = it->nrt->size;
+			hasptr = it->nrt->hasPtr;
+		}
+		char *n = (char*)hl_gc_alloc_gen(*(hl_type**)o, size, (hasptr ? MEM_KIND_DYNAMIC : MEM_KIND_NOPTR) | MEM_ZERO);
 		*(void**)n = *(void**)o;
-		for(int *c=it->copies, *e=c + it->ncopies * 3;c<e;c+=3)
-			memcpy(n + c[0], o + c[1], c[2]);
+		hot_copy_value(it, n, o);
 		news[k] = n;
 	}
 	hot_time("  move: allocate and copy");
 	// the instances that have room are rewritten in place : tmp holds their pointers
 	int max_size = 0;
-	for(int i=0;i<h->ntypes;i++)
-		if( h->types[i].ort->size > max_size ) max_size = h->types[i].ort->size;
+	for(int k=0;k<h->nobjs;k++)
+		if( h->objs_info[k * 3 + 1] > max_size ) max_size = h->objs_info[k * 3 + 1];
 	char *tmp = (char*)malloc(max_size + 1);
 	for(int k=0;k<h->nobjs;k++) {
 		if( h->objs_info[k * 3 + 2] ) continue;
 		char *o = (char*)h->objs[k];
 		hot_itype *it = h->types + h->objs_info[k * 3];
 		int block = h->objs_info[k * 3 + 1];
-		memcpy(tmp, o, it->ort->size);
+		memcpy(tmp, o, block);
 		memset(o + HL_WSIZE, 0, block - HL_WSIZE);
-		for(int *c=it->copies, *e=c + it->ncopies * 3;c<e;c+=3)
-			memcpy(o + c[0], tmp + c[1], c[2]);
+		hot_copy_value(it, o, tmp);
 	}
 	free(tmp);
 	// the type pointers of the previous layouts get the new one
@@ -969,7 +1232,7 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 		char *o = (char*)v->value;
 		if( o == NULL ) continue;
 		int idx = hot_pmap_get(&h->aliases, *(void**)o);
-		if( idx < 0 ) continue;
+		if( idx < 0 || h->types[idx].is_enum ) continue;
 		hot_itype *it = h->types + idx;
 		int mk = hot_pmap_get(&moved, o);
 		char *prev = mk >= 0 ? (char*)h->objs[mk] : o; // where the fields were
@@ -992,6 +1255,10 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 	// the methods bound to the fields added (static methods of a class object)
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
+		if( it->is_enum ) {
+			hot_enum_values(it);
+			continue;
+		}
 		int nstart = it->nrt->parent ? it->nrt->parent->nfields : 0;
 		it->bindings = (int*)malloc(sizeof(int) * (it->nrt->nbindings + 1));
 		for(int b=0;b<it->nrt->nbindings;b++) {
@@ -1002,6 +1269,7 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 	for(int k=0;k<h->nobjs;k++) {
 		hot_itype *it = h->types + h->objs_info[k * 3];
 		char *o = (char*)news[k];
+		if( it->is_enum ) continue;
 		for(int i=0;i<it->nbindings;i++) {
 			hl_runtime_binding *b = it->nrt->bindings + it->bindings[i];
 			*(void**)(o + it->nrt->fields_indexes[b->fid]) = b->closure ? hl_alloc_closure_ptr(b->closure,b->ptr,o) : b->ptr;
@@ -1082,7 +1350,7 @@ static int hot_init_bits( hl_type *t, int word ) {
 	hot_instances *h = hot_init_instances;
 	for(int i=0;h && i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
-		if( it->t != t ) continue;
+		if( it->t != t || it->is_enum ) continue;
 		if( word < 0 || word > (it->t->obj->nfields >> 5) ) return 0;
 		return (int)it->added[word];
 	}
@@ -1230,10 +1498,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 			hot_time("instances check");
 		}
 		if( r.count == 0 ) {
-			hl_type_obj **layouts = (hl_type_obj**)malloc(sizeof(void*) * (inst.ntypes + 1));
-			for(i=0;i<inst.ntypes;i++) layouts[i] = inst.types[i].old->obj;
-			hot_check_stack(layouts, inst.ntypes, &r);
-			free(layouts);
+			hot_check_stack(inst.types, inst.ntypes, &r);
 		}
 		if( r.count ) {
 			free(itype_of);

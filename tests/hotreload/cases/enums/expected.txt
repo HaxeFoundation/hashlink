@@ -1,0 +1,23 @@
+v0 step 0 red#0,green#1,rgb123#2 fav=true constructs=Red,Green,Rgb
+[HotReload] 5 objects upgraded, 2 moved
+[HotReload] 6 changes
+reload 1: applied
+v1 step 1 red#1,green#3,rgb123#0 fav=true constructs=Rgb,Red,Blue,Green blue=blue
+[HotReload] 6 objects upgraded, 1 moved
+[HotReload] 4 changes
+reload 2: applied
+v2 step 2 red#1,green#3,rgb1230#0 fav=true constructs=Rgb,Red,Blue,Green
+[HotReload] Reload refused: live values cannot be upgraded:
+  Color.Red: the constructor is removed and a live value uses it
+[HotReload] Restart required, the program keeps running the previous code
+reload 3: not applied
+v2 step 3 red#1,green#3,rgb1230#0 fav=true constructs=Rgb,Red,Blue,Green
+[HotReload] 4 objects upgraded
+[HotReload] 4 changes
+reload 4: applied
+v4 step 4 red#1,green#2,rgb1230#0 fav=true constructs=Rgb,Red,Green
+[HotReload] Reload refused: live values cannot be upgraded:
+  Color.Rgb: the constructor is removed and 1 live values use it
+[HotReload] Restart required, the program keeps running the previous code
+reload 5: not applied
+v4 step 5 red#1,green#2,rgb1230#0 fav=true constructs=Rgb,Red,Green

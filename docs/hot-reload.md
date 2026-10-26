@@ -26,7 +26,7 @@
 | U3. Spare room in instances | Dropped: hot reload must not add memory to every object |
 | U5. Virtuals | Done for the fields of virtuals; interfaces kept (`instance_fields`) |
 | U6. Hook after upgrade | Done: `onHotReload()` (`hooks`) |
-| U7. Enums | To do |
+| U7. Enums | Done (`enums`) |
 
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
 
@@ -180,6 +180,12 @@ After a successful upgrade, call an optional method on each upgraded instance (f
 
 ### U7. Enums
 
+**Done.** A changed enum is upgraded like the types of objects (its values are GC blocks whose first word is the type): the index of each live value is remapped to the constructor of the same name; the params of a constructor are kept by position when their type is the same (they have no name in HL), the others get the default value; a value is rewritten in place when its block has room, moved otherwise. Every `hl_type*` of the enum gets the new `tenum` and mark bits. The array `__evalues__` of the enum object, which the entry point reads to set the globals of the constant values again, is built in the order of the new constructors with the live constants (their identity is kept: `fav == Green` stays true). The standard library (`Type.initEnum`, `hot-reload` branch of Haxe) builds `__constructs__` and `__emap__` again when the constructors changed (`Type.getEnumConstructs`, `Type.createEnum`).
+
+A removed constructor with params and live values refuses the reload. The constant of a removed constructor without params is referenced by the enum object and a global: the reload is refused only when something else references it (a walk of the blocks, the stacks); otherwise it is detached.
+
+The signature of a local function keeps the structure of its context (an anonymous enum): when the captured variables change, the live closures keep their body and their context, the new closures use the new body (`closure_captures`).
+
 - Constructor added at the end: no change for live values.
 - Constructor added in the middle, removed or reordered: remap the constructor index of every live value of that enum (found by the U4 walk); values of a removed constructor have no target, so the reload is refused if any is alive.
 - Arguments of a constructor changed: same rules as fields (U0), applied to the live values of that constructor.
@@ -241,7 +247,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Change the body of a local function | Accepted; new closures use it | now |
 | Add a local function before existing ones | Accepted; live closures keep their own body (positional matching fixed) | open point |
 | Remove a local function | Accepted; live closures keep the old body | now |
-| Change the captured variables | Accepted for new closures; live closures keep their old environment | now |
+| Change the captured variables | Accepted for new closures; live closures keep their old environment | done |
 
 ### Instance fields
 
@@ -292,15 +298,15 @@ Every operation a developer or an agent can make between two reloads, with the e
 
 | Operation | Expected | Needs |
 |---|---|---|
-| Add a constructor at the end | Accepted | U7 |
-| Add a constructor in the middle | Accepted; live values remapped | U7 |
-| Reorder constructors | Accepted; live values remapped | U7 |
-| Remove a constructor without live values | Accepted | U7 |
-| Remove a constructor with live values | Refused | U7 |
-| Change the arguments of a constructor | Accepted; live values upgraded like fields | U7 |
+| Add a constructor at the end | Accepted | done |
+| Add a constructor in the middle | Accepted; live values remapped | done |
+| Reorder constructors | Accepted; live values remapped | done |
+| Remove a constructor without live values | Accepted | done |
+| Remove a constructor with live values | Refused | done |
+| Change the arguments of a constructor | Accepted; params kept by position and type | done |
 | Add an enum | Accepted | 1 |
 | Change an `enum abstract` value | Accepted; uses are inlined and compiled again; stored values unchanged | now |
-| `switch` on an enum after a change | Accepted; matches the new indexes | U7 |
+| `switch` on an enum after a change | Accepted; matches the new indexes | done |
 
 ### Other
 

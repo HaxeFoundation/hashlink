@@ -474,6 +474,7 @@ HL_API int hl_mark_size( int data_size );
 HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, void *ctx ), void *ctx );
 HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_start, void *skip_end );
 HL_API void hl_gc_world( bool stop );
+HL_API void ***hl_gc_get_roots( int *count );
 HL_API int hl_gc_other_stacks( void **ranges, int max );
 HL_API void hl_gc_remap_reserve( int count );
 HL_API void hl_gc_remap_add( void *old_block, void *new_block );
