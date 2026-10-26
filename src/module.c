@@ -783,35 +783,46 @@ void hl_module_init_indexes( hl_module *m ) {
 			break;
 		}
 	}
-	for(i=0;i<m->code->nfunctions;i++) {
-		int k;
-		hl_function *f = m->code->functions + i;
-		hl_function *real_f = f;
-		while( real_f && !real_f->obj ) real_f = real_f->field.ref;
-		if( real_f == NULL ) continue;
-		for(k=0;k<f->nops;k++) {
-			hl_opcode *op = f->ops + k;
-			switch( op->op ) {
-			case OCall0:
-			case OCall1:
-			case OCall2:
-			case OCall3:
-			case OCall4:
-			case OCallN:
-			case OStaticClosure:
-			case OInstanceClosure:
-				if( m->functions_indexes[op->p2] < m->code->nfunctions ) {
-					hl_function *floc = m->code->functions + m->functions_indexes[op->p2];
-					if( floc->obj ) continue;
-					floc->field.ref = real_f;
-					floc->ref = real_f->ref++;
+	// the method of each local function : the one of the function that references it, which can be
+	// a local function itself, listed after it : repeat until no function is attached
+	bool *scanned = (bool*)calloc(m->code->nfunctions, sizeof(bool));
+	bool attached = true;
+	while( attached ) {
+		attached = false;
+		for(i=0;i<m->code->nfunctions;i++) {
+			int k;
+			hl_function *f = m->code->functions + i;
+			hl_function *real_f = f;
+			if( scanned[i] ) continue;
+			while( real_f && !real_f->obj ) real_f = real_f->field.ref;
+			if( real_f == NULL ) continue;
+			scanned[i] = true;
+			for(k=0;k<f->nops;k++) {
+				hl_opcode *op = f->ops + k;
+				switch( op->op ) {
+				case OCall0:
+				case OCall1:
+				case OCall2:
+				case OCall3:
+				case OCall4:
+				case OCallN:
+				case OStaticClosure:
+				case OInstanceClosure:
+					if( m->functions_indexes[op->p2] < m->code->nfunctions ) {
+						hl_function *floc = m->code->functions + m->functions_indexes[op->p2];
+						if( floc->obj || floc->field.ref ) continue;
+						floc->field.ref = real_f;
+						floc->ref = real_f->ref++;
+						attached = true;
+					}
+					break;
+				default:
+					break;
 				}
-				break;
-			default:
-				break;
 			}
 		}
 	}
+	free(scanned);
 
 	static hl_type_obj obj_entry = {0};
 	hl_function *fent = m->code->functions + m->functions_indexes[m->code->entrypoint];
