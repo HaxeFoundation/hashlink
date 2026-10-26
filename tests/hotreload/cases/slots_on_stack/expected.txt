@@ -1,0 +1,9 @@
+v0 step 0
+[HotReload] 5 changes
+reload 1: applied name=sub
+v1 step 1
+[HotReload] Reload refused: live values cannot be upgraded:
+  Base: its methods move to other slots and it is used by Main.main, which is running : move the code that uses it out of it
+[HotReload] Restart required, the program keeps running the previous code
+reload 2: not applied name=sub
+v1 step 2

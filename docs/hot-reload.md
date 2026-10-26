@@ -24,7 +24,7 @@
 | U2. Safe point and stack checks | Done: other threads stopped during the reload, all stacks checked (`statics_on_stack`, `threads`) |
 | U0, U4, U8. Instances | Done: in place when the block has room, moved otherwise (`instance_fields`, `instance_refs`, `instance_in_place`, Heaps) |
 | U3. Spare room in instances | Dropped: hot reload must not add memory to every object |
-| U5. Virtuals | Done for the fields of virtuals; interfaces kept (`instance_fields`) |
+| U5. Virtuals, methods, superclass | Done: overrides and virtual methods added or removed, superclass changed (`overrides`, `superclass`, `slots_on_stack`, Heaps) |
 | U6. Hook after upgrade | Done: `onHotReload()` (`hooks`) |
 | U7. Enums | Done (`enums`, `enum_params`) |
 
@@ -38,7 +38,7 @@
 
 - The static methods of a class are fields of its class object (`$Foo`): adding a static method, or changing its signature, changes the layout of `$Foo`. Handled by U1.
 - With `-dce std` (the default), the first use of something of a standard class can change its layout: a static (`Type.getClassName`, `dce_std`) or an instance field (the stack of `haxe.Exception` adds `__exceptionStack`, `dce_instance_field`). Both are handled (U1, U4).
-- Adding an instance method is accepted when the virtual slots do not change; the live type keeps its proto, so the new method is not visible to reflection on it (U5).
+- A method that no class overrides is not virtual: it is called directly. Overriding it makes it virtual, which adds a slot to the class and its subclasses and turns its calls into virtual calls (compiled again since their code changes). Handled with the methods of the live types (U5).
 - The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype and calls the address (`tests/hotreload/cases/string_compare`).
 - Shaders (Heaps): the source of a shader is the static `SRC`, and `_SHADER` caches the shader built from it. The initializer of a static with `@:hotReload` runs again after every reload (`static_hot_reload`); with the change of Heaps in `tests/hotreload/heaps/heaps.patch` (the hxsl macro puts `@:hotReload` on `SRC`, `SharedShader` keeps its source, and with `-D hot-reload` `Shader.initialize` builds the shader again when `SRC` changed), a changed shader source is used by the new shader instances.
 - The global of a class or an enum is now identified by its name: its type hash changed with any type it references, which allocated a new global and lost the statics.
@@ -154,7 +154,7 @@ In hot reload mode, object allocation reserves extra room after the fields (a co
 
 ### U4. Heap walk and in-place rewrite
 
-**Done**, with U8. A type of an object whose fields change (same superclass, same overridden methods) is upgraded, with its subclasses (their fields move).
+**Done**, with U8. A class whose fields, superclass or methods change is upgraded, with its subclasses (their fields and slots move): the live instances get the new layout and the new methods. A change of a struct (`@:struct`, no type in its values) refuses the reload.
 
 - Before anything is changed: a full collection, then a walk of the live blocks finds the instances (their first word is one of the `hl_type*` that share the previous layout: the live type, and the aliases of the reloads) and the virtuals. An instance whose block has room is rewritten in place, the others are moved; the stacks (above the call to `checkReload` for the current thread, and the registers it was called with) must not reference an instance to move, and no running function may use a type whose layout changes (U2): otherwise the reload is refused.
 - Applied after the JIT, with the collections disabled: the fields kept (same name and type, through the whole hierarchy) are copied to their new offsets, the others cleared (default value). Then every `hl_type*` of the previous layout gets the new one (`obj`, `vobj_proto`, `mark_bits`): **instances keep their type pointer**, so `Std.isOfType`, `__type__` of the class object and the `super` of other types stay valid.
@@ -167,6 +167,16 @@ In hot reload mode, object allocation reserves extra room after the fields (a co
 - Run after the new functions are JIT-compiled and before their pointers are patched, so that no code runs between the two.
 
 ### U5. Derived runtime structures
+
+**Done.** A change of the methods of a class (an override added or removed, a virtual method added, removed or moved, another superclass) upgrades the class like a change of fields: every `hl_type*` of the previous layout gets the new `obj` and `vobj_proto` (the table of the virtual methods, built from the new code), and the type data (`hl_runtime_obj`: methods, lookup, interfaces, bindings) is the one of the new type, so virtual calls, dynamic calls, `Reflect` and `Std.isOfType` see the new methods and superclass.
+
+- When the fields keep their offsets (only the methods change), the instances are not rewritten nor moved: the type pointer is enough.
+- The code that runs during the reload keeps its version: it calls the methods by their slot. When a slot gets another method (a virtual method inserted or removed before others), a running function that uses the type refuses the reload (`slots_on_stack`); slots added after the others, or another method in a slot (an override), are accepted.
+- The virtuals whose value is an upgraded instance are computed again as `hl_to_virtual` does: their fields and their methods (`overrides`).
+- A closure of a method (`obj.name`) keeps the method resolved when it was created; the body of that method follows its changes.
+- Changing the superclass keeps the fields of the same name and type wherever they are declared; the others get their default value, as added fields (`superclass`).
+
+Plan:
 
 - **Virtuals** (`vvirtual`): their field pointers (`hl_vfields`) point into the object. Virtuals are heap blocks too: during the walk of U4, recompute the field pointers of the virtuals whose value is an upgraded object, or drop the cached virtual when a field it exposes was removed.
 - **Runtime type data** (`hl_runtime_obj`: field indexes, dynamic lookup table, interface and virtual caches, bindings): rebuilt for the new type; `hl_flush_proto` already handles the protos.
@@ -233,8 +243,8 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Remove a method no longer called | Accepted; old code stays for live closures | now |
 | Change the signature (arguments, return type) | Accepted as remove + add; callers recompiled | 1 (U1 for a static method) |
 | Rename a method | Accepted as remove + add | 1 |
-| Add an override in a subclass | Accepted; proto updated, existing instances dispatch to it | U0, U5 |
-| Remove an override | Accepted; dispatch falls back to the parent | U0, U5 |
+| Add an override in a subclass | Accepted; existing instances dispatch to it, a running function too if the slots keep their methods | done (`overrides`, `slots_on_stack`) |
+| Remove an override | Accepted; dispatch falls back to the parent | done (`overrides`) |
 | Change an `inline` function | Accepted; the callers are compiled again by the compiler | now |
 | Change a method called through an interface, `Dynamic` or reflection | Accepted | now |
 | Change a method held by a live closure (`obj.method` stored in a field) | Accepted; the closure calls the new body | now |
@@ -288,7 +298,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 | Remove a class without live instances | Accepted | 1 |
 | Remove a class with live instances | Refused | U0 |
 | Rename a class | Accepted as remove + add (same rule for live instances) | 1, U0 |
-| Change the superclass | Refused while instances are alive | U0 |
+| Change the superclass (of a leaf or not) | Accepted; fields of the same name and type kept, the instances and those of the subclasses upgraded | done (`superclass`) |
 | Add an interface to a class | Accepted; `Std.isOfType` and casts see it | U5 |
 | Remove an interface | Accepted; cached virtuals for it dropped | U5 |
 | Add a method to an interface (and its implementations) | Accepted | U5 |
@@ -333,7 +343,7 @@ Heaps checks for a reload every frame when compiled with `-D hot-reload` (`hxd.S
 
 - The main loop (`hxd.System.mainLoop`) stays on the stack: it keeps running its old body, which is fine as long as it does not change.
 - `tests/hotreload/heaps/run.py` drives such an app (see `tests/hotreload/README.md`). On a small app, with the whole of Heaps compiled (`-dce no`), on Linux: a warm compilation takes 0.7 to 1 s (2.3 s after an edit of `hxd.Math.clamp`, inlined in many places), and the reload is applied in less than 0.15 s, at the next frame.
-- Covered: method bodies of the app and of Heaps, a new class with statics, inline functions of Heaps (37 functions compiled again), a field added to a live `h2d.Text` (refused, then reverted), quick successive edits, `hxd.System.onReload` called after each reload.
+- Covered: method bodies of the app and of Heaps, a new class with statics, inline functions of Heaps (37 functions compiled again), a field added to a live `h2d.Text` and removed, statics added to `h2d.Object`, an override added to `h2d.Bitmap` while the main loop runs (a method of `h2d.Object` becomes virtual) and removed, shaders, quick successive edits, `hxd.System.onReload` called after each reload.
 - To do: reload time on a large app (SpaceCraft), Windows, shaders (see the findings above).
 
 ## Open points

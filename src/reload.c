@@ -362,8 +362,8 @@ static bool hot_same_virtuals( hl_type_obj *o1, hl_type_obj *o2 ) {
 }
 
 /*
-	Checks that a type of the new code has the same layout as the live one.
-	Until live values can be upgraded, any change refuses the reload.
+	Checks that a type of the new code has the same layout as the live one. The live values of a class
+	whose fields, superclass or methods change are upgraded; a change of a struct refuses the reload.
 */
 #define HOT_LAYOUT_SAME		0
 #define HOT_LAYOUT_CHANGED	1	// refused
@@ -406,32 +406,25 @@ static int hot_check_layout( hl_type *told, hl_type *tnew, hot_report *r ) {
 						break;
 					}
 			}
-			bool class_object = hot_is_class_object(told);
-			if( !same && told->kind == HOBJ && ucmp(hot_super_name(o1), hot_super_name(o2)) == 0 && hot_same_virtuals(o1, o2) )
+			if( same && hot_same_virtuals(o1, o2) )
+				return HOT_LAYOUT_SAME;
+			// fields, superclass, overridden methods : the live instances get the new layout and methods
+			if( told->kind == HOBJ )
 				return HOT_LAYOUT_INSTANCES;
-			if( !same ) {
-				hot_print(r, "\n  ");
-				hot_print_type_name(r, o1);
-				hot_print(r, class_object ? ": statics changed" : ": fields changed");
-				if( ucmp(hot_super_name(o1), hot_super_name(o2)) != 0 ) {
-					hot_print(r, ", superclass ");
-					hot_print_name(r, hot_super_name(o1));
-					hot_print(r, " -> ");
-					hot_print_name(r, hot_super_name(o2));
-				}
-				hot_print_fields(r, "added", o2, o1);
-				hot_print_fields(r, "removed", o1, o2);
-				r->count++;
-				return HOT_LAYOUT_CHANGED;
+			// a struct has no type in its values : they cannot be found
+			hot_print(r, "\n  ");
+			hot_print_type_name(r, o1);
+			hot_print(r, same ? ": methods changed" : ": fields changed");
+			if( ucmp(hot_super_name(o1), hot_super_name(o2)) != 0 ) {
+				hot_print(r, ", superclass ");
+				hot_print_name(r, hot_super_name(o1));
+				hot_print(r, " -> ");
+				hot_print_name(r, hot_super_name(o2));
 			}
-			if( !hot_same_virtuals(o1, o2) ) {
-				hot_print(r, "\n  ");
-				hot_print_type_name(r, o1);
-				hot_print(r, ": overridden methods changed");
-				r->count++;
-				return HOT_LAYOUT_CHANGED;
-			}
-			return HOT_LAYOUT_SAME;
+			hot_print_fields(r, "added", o2, o1);
+			hot_print_fields(r, "removed", o1, o2);
+			r->count++;
+			return HOT_LAYOUT_CHANGED;
 		}
 	case HENUM:
 		{
@@ -605,6 +598,8 @@ typedef struct {
 	int ninstances;
 	int nrelocated;
 	int max_block;
+	bool fields_same;		// the fields keep their offsets : only the methods change, the instances are not rewritten
+	bool slots_same;		// each virtual slot keeps its method : the running functions can keep calling them
 	// enums (U7)
 	bool is_enum;
 	void *old_layout;		// the previous obj or tenum : identifies the previous layout
@@ -642,13 +637,15 @@ static void hot_print_layout_name( hot_report *r, hot_itype *it );
 static void hot_check_function( hl_module *m, hl_function *f, hot_itype *types, int count, const char *where, hot_report *r ) {
 	hl_type_obj **fuses = m->hot_uses[f - m->code->functions];
 	for(int k=0;k<count;k++) {
+		// same offsets and same slots : the code that runs keeps working on the instances
+		if( types[k].fields_same && types[k].slots_same ) continue;
 		bool uses = false;
 		for(int j=0;fuses[j] && !uses;j++)
 			uses = (void*)fuses[j] == types[k].old_layout;
 		if( !uses ) continue;
 		hot_print(r, "\n  ");
 		hot_print_layout_name(r, types + k);
-		hot_print(r, ": its layout changes and it is used by ");
+		hot_print(r, types[k].fields_same ? ": its methods move to other slots and it is used by " : ": its layout changes and it is used by ");
 		if( fun_obj(f) ) {
 			hot_print_type_name(r, fun_obj(f));
 			hot_print(r, ".");
@@ -727,6 +724,7 @@ static void hot_scan_block( void *block, int size, int kind, void *ctx ) {
 			nsize = c->size;
 			hasptr = c->hasptr;
 		} else {
+			if( it->fields_same ) return; // only its methods change : nothing to rewrite
 			nsize = it->nrt->size;
 			hasptr = it->nrt->hasPtr;
 		}
@@ -1001,6 +999,48 @@ static void hot_entry_frame( void **start, void **end ) {
 	}
 }
 
+// the fields are at the same offsets, with the same types
+static bool hot_same_fields( hot_itype *it ) {
+	hl_runtime_obj *o = it->ort, *n = it->nrt;
+	if( o->nfields != n->nfields || o->size != n->size || o->hasPtr != n->hasPtr ) return false;
+	for(int fi=0;fi<n->nfields;fi++) {
+		hl_obj_field *of = hl_obj_field_fetch(it->old, fi), *nf = hl_obj_field_fetch(it->t, fi);
+		if( of->hashed_name != nf->hashed_name || !hl_module_same_type(of->t, nf->t) || o->fields_indexes[fi] != n->fields_indexes[fi] )
+			return false;
+	}
+	return true;
+}
+
+// the name of the method of each virtual slot of o (the slots of its superclasses included)
+static void hot_slot_names( hl_type_obj *o, int *names, int count ) {
+	memset(names, 0, sizeof(int) * count);
+	hl_type_obj *chain[256];
+	int depth = 0;
+	for(hl_type_obj *c=o;c && depth < 256;c=c->super ? c->super->obj : NULL)
+		chain[depth++] = c;
+	while( depth > 0 ) {
+		hl_type_obj *c = chain[--depth];
+		for(int i=0;i<c->nproto;i++) {
+			int s = c->proto[i].pindex;
+			if( s >= 0 && s < count ) names[s] = c->proto[i].hashed_name;
+		}
+	}
+}
+
+// the virtual slots of the previous layout keep their method (new slots can be added after them)
+static bool hot_same_slots( hot_itype *it ) {
+	int no = it->ort->nproto, nn = it->nrt->nproto;
+	if( nn < no ) return false;
+	if( no == 0 ) return true;
+	int *o = (int*)malloc(sizeof(int) * no), *n = (int*)malloc(sizeof(int) * nn);
+	hot_slot_names(it->old->obj, o, no);
+	hot_slot_names(it->t->obj, n, nn);
+	bool same = memcmp(o, n, sizeof(int) * no) == 0;
+	free(o);
+	free(n);
+	return same;
+}
+
 /*
 	Finds the live instances of the types whose layout changes and checks that each fits in its block.
 	Called before anything is changed : a failure refuses the reload.
@@ -1046,6 +1086,8 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 				}
 			}
 		}
+		it->fields_same = hot_same_fields(it);
+		it->slots_same = hot_same_slots(it);
 		// every type pointer that has the previous layout
 		for(int m=0;m<modules_count;m++) {
 			hl_code *code = cur_modules[m]->code;
@@ -1219,21 +1261,19 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 	// the references to the moved instances are replaced by a collection (with the new layouts :
 	// the GC scans them precisely). Their previous blocks are garbage : their type is cleared so
 	// that nothing scans them.
-	hot_pmap moved;
-	memset(&moved, 0, sizeof(moved));
 	if( h->nrelocated ) {
 		hl_gc_remap_reserve(h->nrelocated);
 		for(int k=0;k<h->nobjs;k++) {
 			if( !h->objs_info[k * 3 + 2] ) continue;
 			hl_gc_remap_add(h->objs[k], news[k]);
-			if( h->nvirts ) hot_pmap_set(&moved, news[k], k); // to find where the fields of the virtuals were
 			*(void**)h->objs[k] = NULL;
 		}
 		hot_time("  in place, types and remaps");
 		hl_gc_remap_apply();
 		hot_time("  move: remap collection");
 	}
-	// virtuals : their fields point into the value
+	// virtuals : their fields point into the value, their methods are the ones of its type : computed
+	// again as hl_to_virtual does, with the new layout
 	for(int k=0;k<h->nvirts;k++) {
 		vvirtual *v = (vvirtual*)h->virts[k];
 		char *o = (char*)v->value;
@@ -1241,24 +1281,24 @@ static void hot_instances_apply( hl_module *m, hot_instances *h ) {
 		int idx = hot_pmap_get(&h->aliases, *(void**)o);
 		if( idx < 0 || h->types[idx].is_enum ) continue;
 		hot_itype *it = h->types + idx;
-		int mk = hot_pmap_get(&moved, o);
-		char *prev = mk >= 0 ? (char*)h->objs[mk] : o; // where the fields were
 		for(int i=0;i<v->t->virt->nfields;i++) {
-			char *p = (char*)hl_vfields(v)[i];
-			// fields of the previous layout : computed again
-			if( p < prev || p >= prev + it->ort->size ) continue; // a method
 			hl_obj_field *vf = v->t->virt->fields + i;
-			hl_vfields(v)[i] = NULL;
-			for(int fi=0;fi<it->nrt->nfields;fi++) {
-				hl_obj_field *nf = hl_obj_field_fetch(it->t, fi);
-				if( nf->hashed_name == vf->hashed_name && hl_same_type(nf->t, vf->t) ) {
-					hl_vfields(v)[i] = o + it->nrt->fields_indexes[fi];
-					break;
-				}
-			}
+			hl_field_lookup *f = NULL;
+			for(hl_runtime_obj *r=it->nrt;r && !f;r=r->parent)
+				f = hl_lookup_find(r->lookup, r->nlookup, vf->hashed_name);
+			if( f && f->field_index < 0 ) {
+				hl_type tmp;
+				hl_type_fun tf;
+				tmp.kind = HMETHOD;
+				tmp.fun = &tf;
+				tf.args = f->t->fun->args + 1;
+				tf.nargs = f->t->fun->nargs - 1;
+				tf.ret = f->t->fun->ret;
+				hl_vfields(v)[i] = hl_safe_cast(&tmp, vf->t) ? it->nrt->methods[-f->field_index-1] : NULL;
+			} else
+				hl_vfields(v)[i] = f == NULL || !hl_same_type(f->t, vf->t) ? NULL : o + f->field_index;
 		}
 	}
-	hot_pmap_free(&moved);
 	// the methods bound to the fields added (static methods of a class object)
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
