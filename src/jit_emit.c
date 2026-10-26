@@ -1222,7 +1222,12 @@ void hl_emit_final( jit_ctx *jit ) {
 	while( l ) {
 		vclosure *n = (vclosure*)l->value;
 		l->value = NULL;
-		l->fun = jit->final_code + (int_val)jit->mod->functions_ptrs[(int_val)l->fun];
+		int fid = (int)(int_val)l->fun;
+		void ***slots = jit->mod->hot_slots;
+		if( slots && slots[fid] )
+			l->fun = *slots[fid]; // hot reload : function compiled by another module
+		else
+			l->fun = jit->final_code + (int_val)jit->mod->functions_ptrs[fid];
 		l = n;
 	}
 	ctx->closure_list = NULL;

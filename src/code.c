@@ -914,23 +914,37 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 	h->types_hashes = types_hashes;
 
 	h->globals_signs = malloc(sizeof(int) * c->nglobals);
+	bool *named = malloc(sizeof(bool) * c->nglobals);
 	for(i=0;i<c->nglobals;i++) {
 		hl_type *t = c->globals[i];
 		h->globals_signs[i] = i | 0x80000000;
+		named[i] = false;
 		if( t->kind == HABSTRACT )
 			h->globals_signs[i] = hl_code_hash_type(h,t); // some global abstracts allocated by compiler
 	}
+	// the global of a class or an enum is identified by its name only : its layout is checked
+	// separately, and its type hash changes with any type it references
 	for(i=0;i<c->ntypes;i++) {
 		hl_type *t = c->types + i;
+		int g;
+		int hash = -1;
 		switch( t->kind ) {
 		case HOBJ:
 		case HSTRUCT:
-			if( t->obj->global_value )
-				h->globals_signs[(int)(int_val)t->obj->global_value - 1] = hl_code_hash_type(h,t);
+			if( !t->obj->global_value ) break;
+			g = (int)(int_val)t->obj->global_value - 1;
+			H(t->kind);
+			HUSTR(t->obj->name);
+			h->globals_signs[g] = hash;
+			named[g] = true;
 			break;
 		case HENUM:
-			if( t->tenum->global_value )
-				h->globals_signs[(int)(int_val)t->tenum->global_value - 1] = hl_code_hash_type(h,t);
+			if( !t->tenum->global_value ) break;
+			g = (int)(int_val)t->tenum->global_value - 1;
+			H(t->kind);
+			HUSTR(t->tenum->name);
+			h->globals_signs[g] = hash;
+			named[g] = true;
 			break;
 		default:
 			break;
@@ -975,45 +989,31 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 	}
 
 	for(i=0;i<c->nglobals;i++)
-		h->globals_signs[i] ^= hl_code_hash_type(h,c->globals[i]);
+		if( !named[i] ) h->globals_signs[i] ^= hl_code_hash_type(h,c->globals[i]);
+	free(named);
 	return h;
 }
 
 
-void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
+/*
+	Renumbers the globals of a new code so that they match the reference ones : remap[i] is the
+	reference index of the global i, or -1 for a new global, which gets an index after old_count.
+*/
+void hl_code_hash_remap_globals( hl_code_hash *hnew, int *remap, int old_count, hl_type **old_types, int *old_signs ) {
 	hl_code *c = hnew->code;
 	int i;
-	int old_start = 0;
-
 	int count = c->nglobals;
-	int old_count = hold->code->nglobals;
-	int extra =	old_count - count;
-	if( extra < 0 ) extra = 0;
-	int *remap = malloc(sizeof(int) * count);
-
-	for(i=0;i<count;i++) {
-		int k;
-		int h = hnew->globals_signs[i];
-		remap[i] = -1;
-		for(k=old_start;k<old_count;k++) {
-			if( hold->globals_signs[k] == h ) {
-				if( k == old_start ) old_start++;
-				remap[i] = k;
-				break;
-			}
-		}
-	}
+	int new_count = old_count;
 
 	// new globals
 	for(i=0;i<count;i++)
 		if( remap[i] == -1 )
-			remap[i] = old_count + extra++;
+			remap[i] = new_count++;
 
 	hl_type **nglobals;
-	int new_count = old_count + extra;
 	ALLOC(nglobals,hl_type*,new_count);
 	for(i=0;i<new_count;i++)
-		nglobals[i] = i < old_count ? hold->code->globals[i] : &hlt_void;
+		nglobals[i] = i < old_count ? old_types[i] : &hlt_void;
 	for(i=0;i<count;i++)
 		nglobals[remap[i]] = c->globals[i];
 	c->globals = nglobals;
@@ -1028,7 +1028,7 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 
 	int *nsigns = malloc(sizeof(int) * c->nglobals);
 	for(i=0;i<new_count;i++)
-		nsigns[i] = i < old_count ? hold->globals_signs[i] : -1;
+		nsigns[i] = i < old_count ? old_signs[i] : -1;
 	for(i=0;i<count;i++)
 		nsigns[remap[i]] = hnew->globals_signs[i];
 	free(hnew->globals_signs);
@@ -1070,8 +1070,6 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 			}
 		}
 	}
-
-	free(remap);
 }
 
 void hl_code_hash_finalize( hl_code_hash *h ) {

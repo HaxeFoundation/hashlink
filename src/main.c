@@ -25,6 +25,8 @@
 
 #ifdef HL_WIN
 #	include <locale.h>
+#	undef _GUID
+#	include <windows.h>
 typedef uchar pchar;
 #define pprintf(str,file)	uprintf(USTR(str),file)
 #define pfopen(file,ext) _wfopen(file,USTR(ext))
@@ -51,18 +53,35 @@ typedef struct {
 	hl_code *code;
 	hl_module *m;
 	vdynamic *ret;
-	int file_time;
+	int64 file_time;
+	int64 file_size;
 } main_context;
 
-static int pfiletime( pchar *file )	{
+/*
+	Last write time in the best resolution the file system offers, so that two versions
+	written within the same second are told apart (the size is compared too).
+*/
+static int64 pfiletime( pchar *file, int64 *size ) {
 #ifdef HL_WIN
-	struct _stat32 st;
-	_wstat32(file,&st);
-	return (int)st.st_mtime;
+	WIN32_FILE_ATTRIBUTE_DATA data;
+	if( !GetFileAttributesExW(file,GetFileExInfoStandard,&data) ) {
+		*size = -1;
+		return -1;
+	}
+	*size = ((int64)data.nFileSizeHigh << 32) | data.nFileSizeLow;
+	return ((int64)data.ftLastWriteTime.dwHighDateTime << 32) | data.ftLastWriteTime.dwLowDateTime;
 #else
 	struct stat st;
-	stat(file,&st);
-	return (int)st.st_mtime;
+	if( stat(file,&st) != 0 ) {
+		*size = -1;
+		return -1;
+	}
+	*size = (int64)st.st_size;
+#	if defined(__APPLE__)
+	return (int64)st.st_mtimespec.tv_sec * 1000000000 + st.st_mtimespec.tv_nsec;
+#	else
+	return (int64)st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec;
+#	endif
 #endif
 }
 
@@ -99,9 +118,10 @@ static main_context* main_ctx = NULL;
 static bool check_reload( vbyte *alt_file ) {
 	main_context* m = main_ctx;
 	pchar* file = alt_file ? (pchar*)alt_file : m->file;
-	int time = pfiletime(file);
+	int64 size;
+	int64 time = pfiletime(file,&size);
 	bool changed;
-	if( time == m->file_time )
+	if( time == m->file_time && size == m->file_size )
 		return false;
 	char *error_msg = NULL;
 	hl_code *code = load_code(file, &error_msg, false);
@@ -109,6 +129,7 @@ static bool check_reload( vbyte *alt_file ) {
 		return false;
 	changed = hl_module_patch(m->m, code);
 	m->file_time = time;
+	m->file_size = size;
 	hl_code_free(code);
 	return changed;
 }
@@ -302,7 +323,7 @@ int main(int argc, pchar *argv[]) {
 	if( !hl_module_init(ctx.m,(hot_reload?HL_MODULE_HOT_RELOAD:0) | (dump?HL_MODULE_DUMP:0) | (debug_port > 0 && !debug_opt?HL_MODULE_DEBUG:0)) )
 		return 3;
 	if( hot_reload ) {
-		ctx.file_time = pfiletime(ctx.file);
+		ctx.file_time = pfiletime(ctx.file,&ctx.file_size);
 		hl_setup.reload_check = check_reload;
 	}
 	hl_setup.load_plugin = load_plugin;

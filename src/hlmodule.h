@@ -132,6 +132,7 @@ typedef struct {
 #endif
 
 typedef struct _jit_ctx jit_ctx;
+typedef struct hl_hot_reload hl_hot_reload;
 
 typedef struct {
 	hl_code *code;
@@ -145,6 +146,8 @@ typedef struct {
 	hl_code_hash *hash;
 	hl_debug_infos *jit_debug;
 	jit_ctx *jit_ctx;
+	hl_hot_reload *hot;	// hot reload : the reference state, on the first module
+	void ***hot_slots;	// hot reload : for the functions this module did not compile, where their current address is
 	bool debug;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
@@ -160,7 +163,7 @@ void hl_code_hash_finalize( hl_code_hash *h );
 void hl_code_hash_free( hl_code_hash *h );
 void hl_code_free( hl_code *c );
 int hl_code_hash_type( hl_code_hash *h, hl_type *t );
-void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold );
+void hl_code_hash_remap_globals( hl_code_hash *hnew, int *remap, int old_count, hl_type **old_types, int *old_signs );
 
 const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
