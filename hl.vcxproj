@@ -297,6 +297,7 @@
     <ClCompile Include="src\jit_x86_64.c" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\module.c" />
+    <ClCompile Include="src\reload.c" />
     <ClCompile Include="src\profile.c" />
   </ItemGroup>
   <ItemGroup>

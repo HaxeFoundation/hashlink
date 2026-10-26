@@ -186,6 +186,20 @@ h_bool hl_module_debug( hl_module *m, int port, h_bool wait );
 hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err );
 hl_module **hl_get_modules( int *count );
 
+// internal : module.c functions used by reload.c
+void hl_module_init_natives( hl_module *m );
+void hl_module_init_indexes( hl_module *m );
+void hl_module_init_constant( hl_module *m, hl_constant *c );
+void hl_module_add( hl_module *m );
+void hl_module_null_function();
+bool hl_module_same_type( hl_type *t1, hl_type *t2 );
+int hl_module_capture_stack( void **stack, int size );
+
+// hot reload (reload.c)
+void hl_hot_reload_prepare( hl_module *m );
+void hl_hot_reload_init( hl_module *m );
+void hl_hot_reload_free( hl_hot_reload *hr );
+
 void hl_profile_setup( int sample_count );
 void hl_profile_end();
 
