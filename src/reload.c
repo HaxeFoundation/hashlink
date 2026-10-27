@@ -38,12 +38,18 @@
 
 static int hot_init_bits( hl_type *t, int word );
 
+/* whether the switch [name] is on: set, and neither empty nor "0" */
+static bool hot_switch( const char *name ) {
+	const char *v = getenv(name);
+	return v != NULL && *v != 0 && strcmp(v,"0") != 0;
+}
+
 // HL_HOT_RELOAD_TIMES prints the time of the phases of a reload
 HL_API double hl_sys_time();
 static double hot_time_last = 0.;
 static void hot_time( const char *phase ) {
 	static int enabled = -1;
-	if( enabled < 0 ) enabled = getenv("HL_HOT_RELOAD_TIMES") != NULL;
+	if( enabled < 0 ) enabled = hot_switch("HL_HOT_RELOAD_TIMES");
 	if( !enabled ) return;
 	double t = hl_sys_time();
 	if( phase ) printf("[HotReload] %s %.1f ms\n", phase, (t - hot_time_last) * 1000.);
@@ -1968,7 +1974,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c );
 */
 static void hot_check_types( void ) {
 	static int enabled = -1;
-	if( enabled < 0 ) enabled = getenv("HL_HOT_RELOAD_CHECK") != NULL;
+	if( enabled < 0 ) enabled = hot_switch("HL_HOT_RELOAD_CHECK");
 	if( !enabled ) return;
 	int count, errors = 0, checked = 0;
 	hl_module **mods = hl_get_modules(&count);
