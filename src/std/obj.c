@@ -359,8 +359,10 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	if( t->nproto ) {
 		void **fptr = (void**)hl_malloc(alloc, sizeof(void*) * t->nproto);
 		ot->vobj_proto = fptr;
+		// the prototype of o->super, not of p->t : a hot reload aliases the unchanged types of the new code to
+		// the runtime data of the live ones, and the prototype of a class never instantiated is built on the alias
 		if( p )
-			memcpy(fptr, p->t->vobj_proto, p->nproto * sizeof(void*));
+			memcpy(fptr, o->super->vobj_proto, p->nproto * sizeof(void*));
 		for(i=0;i<o->nproto;i++) {
 			hl_obj_proto *p = o->proto + i;
 			if( p->pindex >= 0 ) fptr[p->pindex] = m->functions_ptrs[p->findex];
