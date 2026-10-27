@@ -28,7 +28,16 @@ typedef struct {
 	int ncells;
 	int nentries;
 	int maxentries;
+#	ifdef _MREHASH
+	bool rehash; // keys moved (hot reload) : the cells are rebuilt at the next access
+#	endif
 } t_map;
+
+#ifdef _MREHASH
+#	define _MCHECK(m) if( (m)->rehash ) _MREHASH(m)
+#else
+#	define _MCHECK(m)
+#endif
 
 #ifndef _MNO_EXPORTS
 HL_PRIM
@@ -50,6 +59,7 @@ _MSTATIC _MVAL_TYPE *_MNAME(find)( t_map *m, t_key key ) {
 	unsigned int hash;
 
 	if( !m->values ) return NULL;
+	_MCHECK(m);
 	hash = _MNAME(hash)(key);
 	ckey = hash % ((unsigned)m->ncells);
 	c = _MINDEX(m,ckey);
@@ -145,6 +155,7 @@ static void _MNAME(resize)( t_map *m ) {
 #ifndef _MNO_EXPORTS
 
 HL_PRIM void _MNAME(set)( t_map *m, t_key key, _MVAL_TYPE value ) {
+	_MCHECK(m);
 	_MNAME(set_impl)(m,_MNAME(filter)(key),value);
 }
 
@@ -162,6 +173,7 @@ HL_PRIM bool _MNAME(remove)( t_map *m, t_key key ) {
 	int c, prev = -1, ckey;
 	unsigned int hash;
 	if( !m->cells ) return false;
+	_MCHECK(m);
 	key = _MNAME(filter)(key);
 	hash = _MNAME(hash)(key);
 	ckey = hash % ((unsigned)m->ncells);
@@ -245,3 +257,5 @@ HL_PRIM int _MNAME(size)( t_map *m ) {
 #undef _MSTATIC
 #undef _MALLOC_HOOK
 #undef _MTYPE
+#undef _MREHASH
+#undef _MCHECK

@@ -238,10 +238,13 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 
 /*
 	The object maps hash the address of their keys : when the GC moves objects (hot reload), it calls
-	a hook for each live object map, identified by its type, which rehashes it.
+	a hook for each live object map, identified by its type, which marks it to be rehashed. The map is
+	rehashed by its next access, from the thread using it : the threads were stopped at any allocation,
+	maybe in the middle of an operation on the map (a resize), so the hook must not read it nor change it.
 */
 static hl_type hlt_homap = { HABSTRACT, { USTR("ObjectMap") } };
 static void hl_ho_rehash_hook( void *m );
+static void hl_ho_rehash( void *m );
 
 static void hl_ho_register() {
 	static bool done = false;
@@ -260,12 +263,18 @@ static void hl_ho_register() {
 #define _MKEY(m,c)	m->values[c].key
 #define	_MSET(c)	m->values[c].key = key
 #define _MERASE(c)  m->values[c].key = NULL
+#define _MREHASH(m)	hl_ho_rehash(m)
 
 #include "maps.h"
 
-// rebuilds the cells of an object map after the address of some keys changed
 static void hl_ho_rehash_hook( void *map ) {
+	((hl_ho_map*)map)->rehash = true;
+}
+
+// rebuilds the cells of an object map after the address of some keys changed
+static void hl_ho_rehash( void *map ) {
 	hl_ho_map *m = (hl_ho_map*)map;
+	m->rehash = false;
 	if( !m->values ) return;
 	hl_ho_map old = *m; // on the stack : keeps the previous arrays alive
 	memset(m,0,sizeof(hl_ho_map));
