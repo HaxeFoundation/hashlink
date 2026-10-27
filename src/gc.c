@@ -438,10 +438,19 @@ HL_API hl_threads_info *hl_gc_threads_info() {
 	return &gc_threads;
 }
 
+/*
+	The stops nest : a hot reload stops the world (hl_gc_world) then collects and checks the stacks, which
+	stop and restart it too. Only the outermost restart clears stopping_world : a thread that returns from a
+	native call (hl_blocking) while it is set waits for the global lock, so it does not run while the reload
+	moves the objects. Always called with the global lock held.
+*/
+static int gc_stop_depth = 0;
+
 static void gc_stop_world( bool b ) {
 #	ifdef HL_THREADS
 	if( b ) {
 		int i;
+		gc_stop_depth++;
 		gc_threads.stopping_world = true;
 		GC_MEMORY_BARRIER();
 		for(i=0;i<gc_threads.count;i++) {
@@ -451,7 +460,8 @@ static void gc_stop_world( bool b ) {
 		GC_MEMORY_BARRIER();
 	} else {
 		// releasing global lock will release all threads
-		gc_threads.stopping_world = false;
+		if( --gc_stop_depth == 0 )
+			gc_threads.stopping_world = false;
 	}
 #	else
 	if( b ) gc_save_context(current_thread,&b,NULL,NULL);
