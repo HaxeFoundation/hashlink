@@ -1,0 +1,19 @@
+class Obj {
+	// a dynamic method : the constructor starts with "if( this.onEvent == null ) this.onEvent = ..."
+	public dynamic function onEvent() return "event";
+	// an initializer with a test
+	public var b : Int = Sys.args().length > 100 ? 1 : 2;
+	public var added : Int = 42;
+	// computed : a live instance keeps the default value
+	public var computed : Int = Sys.args().length > 100 ? 7 : 8;
+	public var x : Int = 5;
+	public function new() {}
+}
+
+class Test {
+	static var o : Obj;
+	public static function check( step : Int ) {
+		if( o == null ) o = new Obj();
+		Sys.println("v2 step " + step + " " + o.onEvent() + " b=" + o.b + " x=" + o.x + " added=" + o.added + " computed=" + o.computed);
+	}
+}

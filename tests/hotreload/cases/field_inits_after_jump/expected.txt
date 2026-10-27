@@ -1,0 +1,9 @@
+v0 step 0 event b=2 x=5
+[HotReload] 1 objects upgraded, 1 moved
+[HotReload] 4 changes
+reload 1: applied
+v1 step 1 event b=2 x=5 added=42
+[HotReload] 1 objects upgraded
+[HotReload] 4 changes
+reload 2: applied
+v2 step 2 event b=2 x=5 added=42 computed=0

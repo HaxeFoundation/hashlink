@@ -1293,9 +1293,10 @@ static void hot_rebind_closures( hot_instances *h ) {
 
 /*
 	The fields added to the instances of a class get the constant values their constructor sets
-	(Haxe moves the initializers of the fields to the constructor) : the start of the constructors of
-	the class and its superclasses is read until the first jump. Other values (arrays, objects,
-	expressions) leave the default value : onHotReload() can set them.
+	(Haxe moves the initializers of the fields to the constructor) : the constructors of the class and
+	its superclasses are read until the first loop, the code that may not run (after a forward jump,
+	before its target) skipped. Other values (arrays, objects, expressions) leave the default value :
+	onHotReload() can set them.
 */
 typedef struct {
 	int kind;	// -1 : not a constant, 3 : null
@@ -1311,9 +1312,50 @@ static void hot_ctor_inits( hl_module *m, hl_function *f, hot_rconst *fields, in
 	bool *isconst = (bool*)calloc(c->nglobals + 1, sizeof(bool));
 	for(int i=0;i<c->nconstants;i++) isconst[c->constants[i].global] = true;
 	for(int i=0;i<f->nregs;i++) regs[i].kind = -1;
+	/*
+		The code between a forward jump and its target may not run (a test at the start of the constructor,
+		such as a field checked for null) : its writes are ignored and the registers it sets are unknown, and
+		the code after the target runs. A backward jump, a loop or a switch ends the reading.
+	*/
+	int cond_end = 0;
 	for(int k=0;k<f->nops;k++) {
 		hl_opcode *o = f->ops + k;
 		hot_rconst *dst = regs + o->p1;
+		int target = -1;
+		switch( o->op ) {
+		case OJTrue: case OJFalse: case OJNull: case OJNotNull:
+			target = k + 1 + o->p2;
+			break;
+		case OJSLt: case OJSGte: case OJSGt: case OJSLte: case OJULt: case OJUGte: case OJNotLt: case OJNotGte: case OJEq: case OJNotEq:
+			target = k + 1 + o->p3;
+			break;
+		case OJAlways:
+			target = k + 1 + o->p1;
+			break;
+		default:
+			break;
+		}
+		if( target >= 0 ) {
+			if( target <= k ) break; // a loop
+			if( target > cond_end ) cond_end = target;
+			continue;
+		}
+		if( k < cond_end ) {
+			// code that may not run
+			switch( o->op ) {
+			case ORet: case OThrow: case ORethrow:
+			case OSetField: case OSetThis: case OSetGlobal: case OSetI8: case OSetI16: case OSetMem: case OSetArray: case OSetref:
+			case OSetEnumField: case ONullCheck: case OAssert: case ONop: case OPrefetch: case OAsm: case ODynSet:
+				break;
+			case OLabel: case OSwitch: case OTrap: case OEndTrap:
+				k = f->nops;
+				break;
+			default:
+				dst->kind = -1;
+				break;
+			}
+			continue;
+		}
 		switch( o->op ) {
 		case OInt:
 			dst->kind = HOT_INIT_NUM;
@@ -1351,10 +1393,8 @@ static void hot_ctor_inits( hl_module *m, hl_function *f, hot_rconst *fields, in
 		case OSetThis:
 			if( o->p1 < nfields ) fields[o->p1] = regs[o->p2];
 			break;
-		case OJTrue: case OJFalse: case OJNull: case OJNotNull: case OJSLt: case OJSGte: case OJSGt: case OJSLte:
-		case OJULt: case OJUGte: case OJNotLt: case OJNotGte: case OJEq: case OJNotEq: case OJAlways:
 		case OLabel: case ORet: case OThrow: case ORethrow: case OSwitch: case OTrap: case OEndTrap:
-			k = f->nops; // the end of the straight code
+			k = f->nops; // the end of the code that always runs
 			break;
 		case OSetGlobal: case OSetI8: case OSetI16: case OSetMem: case OSetArray: case OSetref: case OSetEnumField:
 		case ONullCheck: case OAssert: case ONop: case OPrefetch: case OAsm: case ODynSet:
