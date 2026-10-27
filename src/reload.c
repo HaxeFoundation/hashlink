@@ -827,6 +827,29 @@ static void hot_convert( hot_instances *h, hl_type *ot, void *src, hl_type *nt, 
 // reports a running function f which uses one of the layouts
 static void hot_print_layout_name( hot_report *r, hot_itype *it );
 
+/*
+	The running functions that delayed the last reload : while one of them still runs, trying the same file again
+	would read it and compare it for nothing (hl_hot_still_blocked).
+*/
+static hl_function **hot_blockers = NULL;
+static int hot_nblockers = 0, hot_max_blockers = 0;
+
+static void hot_add_blocker( hl_function *f ) {
+	for(int i=0;i<hot_nblockers;i++)
+		if( hot_blockers[i] == f ) return;
+	if( hot_nblockers == hot_max_blockers ) {
+		hot_max_blockers = hot_max_blockers ? hot_max_blockers * 2 : 8;
+		hot_blockers = (hl_function**)realloc(hot_blockers, sizeof(hl_function*) * hot_max_blockers);
+	}
+	hot_blockers[hot_nblockers++] = f;
+}
+
+static bool hot_is_blocker( hl_function *f ) {
+	for(int i=0;i<hot_nblockers;i++)
+		if( hot_blockers[i] == f ) return true;
+	return false;
+}
+
 static void hot_check_function( hl_module *m, hl_function *f, hot_itype *types, int count, const char *where, hot_report *r ) {
 	hl_type_obj **fuses = m->hot_uses[f - m->code->functions];
 	for(int k=0;k<count;k++) {
@@ -848,6 +871,7 @@ static void hot_check_function( hl_module *m, hl_function *f, hot_itype *types, 
 		hot_print(r, ", which is running%s : move the code that uses it out of it", where);
 		r->count++;
 		r->running++;
+		hot_add_blocker(f);
 	}
 }
 
@@ -880,6 +904,33 @@ static void hot_check_stack( hot_itype *types, int count, hot_report *r ) {
 			hot_check_function(m, f, types, count, " in another thread", r);
 		}
 	}
+}
+
+/*
+	Whether one of the functions that delayed the last reload still runs, in any thread : the stacks are walked
+	as hot_check_stack does, the other threads stopped meanwhile. Cheap next to reading and comparing the code.
+*/
+bool hl_hot_still_blocked( void ) {
+	if( hot_nblockers == 0 ) return false;
+	bool found = false;
+	void *stack[512];
+	hl_gc_world(true);
+	int n = hl_module_capture_stack(stack, 512);
+	for(int i=0;i<n && !found;i++) {
+		hl_module *m = NULL;
+		hl_function *f = hot_function_at(stack[i], &m);
+		found = f != NULL && hot_is_blocker(f);
+	}
+	void *ranges[256];
+	int nstacks = found ? 0 : hl_gc_other_stacks(ranges, 128);
+	for(int i=0;i<nstacks && !found;i++)
+		for(void **p=(void**)ranges[i*2];p<(void**)ranges[i*2+1] && !found;p++) {
+			hl_module *m = NULL;
+			hl_function *f = hot_function_at(*p, &m);
+			found = f != NULL && hl_module_is_call_site(*p) && hot_is_blocker(f);
+		}
+	hl_gc_world(false);
+	return found;
 }
 
 static void hot_add_hooked( hot_instances *h, void *block, void *t ) {
@@ -1534,10 +1585,10 @@ static void hot_hook_types( hot_instances *h ) {
 }
 
 /*
-	Finds the live instances of the types whose layout changes and checks that each fits in its block.
-	Called before anything is changed : a failure refuses the reload.
+	The plan of the types whose layout changes : the fields kept, converted and added, the methods, the type
+	pointers that have the previous layout. Called before anything is changed.
 */
-static void hot_instances_check( hot_instances *h, hot_report *r ) {
+static void hot_instances_plan( hot_instances *h ) {
 	int modules_count;
 	hl_module **cur_modules = hl_get_modules(&modules_count);
 	for(int i=0;i<h->ntypes;i++) {
@@ -1613,6 +1664,14 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 		for(int k=0;k<code->ntypes;k++)
 			if( code->types[k].kind == HVIRTUAL ) hot_pmap_set(&h->virtuals, code->types + k, 0);
 	}
+}
+
+/*
+	The live values of the types whose layout changes : a full collection and a walk of the heap, the costly part
+	of a reload. After hot_instances_plan and hot_check_stack, so that a reload delayed by the running code does not
+	pay it at every try.
+*/
+static void hot_instances_scan( hot_instances *h, hot_report *r ) {
 	hl_gc_iter_live(hot_scan_block, h);
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
@@ -2042,6 +2101,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	int i;
 	hot_time(NULL);
+	hot_nblockers = 0;
 	hl_hot_reload *hr = m1->hot;
 	if( hr == NULL ) return false;
 
@@ -2198,12 +2258,12 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		hot_report r = { buf, sizeof(buf), 0, 0 };
 		buf[0] = 0;
 		hot_time("compare");
-		if( inst.ntypes ) {
-			hot_instances_check(&inst, &r);
+		// the running code first : it delays the reload, and is cheap to check (no walk of the heap)
+		if( inst.ntypes ) hot_instances_plan(&inst);
+		hot_check_stack(inst.types, inst.ntypes, &r);
+		if( r.count == 0 && inst.ntypes ) {
+			hot_instances_scan(&inst, &r);
 			hot_time("instances check");
-		}
-		if( r.count == 0 ) {
-			hot_check_stack(inst.types, inst.ntypes, &r);
 		}
 		if( r.count ) {
 			free(itype_of);

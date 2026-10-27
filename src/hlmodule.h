@@ -208,6 +208,7 @@ bool hl_module_is_call_site( void *ret );
 void hl_hot_reload_prepare( hl_module *m );
 void hl_hot_reload_init( hl_module *m );
 void hl_hot_reload_free( hl_hot_reload *hr );
+bool hl_hot_still_blocked( void );
 
 void hl_profile_setup( int sample_count );
 void hl_profile_end();

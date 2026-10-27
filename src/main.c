@@ -166,6 +166,11 @@ static bool check_reload( vbyte *alt_file ) {
 	if( time == m->file_time && size == m->file_size ) {
 		if( !hl_setup.hot_retry || hl_sys_time() - last_try < retry_delay() )
 			return false;
+		// the function that delayed it still runs : no need to read the file and compare it again
+		if( hl_hot_still_blocked() ) {
+			last_try = hl_sys_time();
+			return false;
+		}
 	} else {
 		bool same;
 		if( !check_header(m, file, size, &same) )
