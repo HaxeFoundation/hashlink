@@ -1,0 +1,13 @@
+v0 step 0 44850 other1,other2,other4 base:300
+[HotReload] 4 changes
+[HotReload] CHECK * types, 0 errors
+reload 1: applied
+v1 step 1 44850 other1,other2,other4 base:200,leaf:100
+[HotReload] 5 changes
+[HotReload] CHECK * types, 0 errors
+reload 2: applied
+v2 step 2 44850 other1,other2,other4 base:100,leaf:100,mid:100
+[HotReload] 3 changes
+[HotReload] CHECK * types, 0 errors
+reload 3: applied
+v3 step 3 44850 other1,other2,other4 base:100,mid:200

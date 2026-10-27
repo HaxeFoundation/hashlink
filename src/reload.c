@@ -1922,6 +1922,63 @@ static bool hot_world_stopped = false;
 static h_bool hot_patch( hl_module *m1, hl_code *c );
 
 /*
+	HL_HOT_RELOAD_CHECK : after a reload, checks the runtime data of the object types of every module, up
+	their superclasses : each runtime object is the one of the type it names, and its interfaces are fields of
+	that type (hl_to_virtual reads rt->t->obj->fields[rt->interfaces[i]]).
+*/
+static void hot_check_types( void ) {
+	static int enabled = -1;
+	if( enabled < 0 ) enabled = getenv("HL_HOT_RELOAD_CHECK") != NULL;
+	if( !enabled ) return;
+	int count, errors = 0, checked = 0;
+	hl_module **mods = hl_get_modules(&count);
+	for(int mi=0;mi<count;mi++) {
+		hl_code *code = mods[mi]->code;
+		for(int i=0;i<code->ntypes;i++) {
+			hl_type *t = code->types + i;
+			if( t->kind != HOBJ || t->obj == NULL || t->obj->rt == NULL ) continue;
+			hl_runtime_obj *rt = t->obj->rt;
+			int depth = 0;
+			checked++;
+			while( rt && depth < 64 ) {
+				hl_type_obj *o = rt->t ? rt->t->obj : NULL;
+				const char *why = NULL;
+				if( o == NULL )
+					why = "its runtime object names a type with no object data";
+				else if( o->rt != rt )
+					why = "its runtime object is not the one of the type it names (stale runtime data)";
+				else if( rt->t->vobj_proto ) {
+					// the interfaces are computed with the prototype (hl_get_obj_proto), not before
+					for(int k=0;k<rt->ninterfaces;k++)
+						if( rt->interfaces[k] < 0 || rt->interfaces[k] >= o->nfields ) {
+							why = "an interface index is out of the fields of the type";
+							break;
+						}
+				}
+				if( why && ++errors <= 30 ) {
+					char tname[256], oname[256];
+					snprintf(tname, sizeof(tname), "%s", hl_to_utf8(t->obj->name));
+					snprintf(oname, sizeof(oname), "%s", o ? hl_to_utf8(o->name) : "?");
+					// where the type named by the runtime object comes from, and which type has it now
+					int tm = -1, ti = -1, om = -1, oi = -1;
+					for(int k=0;k<count;k++) {
+						hl_code *ck = mods[k]->code;
+						if( rt->t >= ck->types && rt->t < ck->types + ck->ntypes ) { tm = k; ti = (int)(rt->t - ck->types); }
+						for(int j=0;j<ck->ntypes && om < 0;j++)
+							if( (ck->types[j].kind == HOBJ || ck->types[j].kind == HSTRUCT) && ck->types[j].obj && ck->types[j].obj->rt == rt ) { om = k; oi = j; }
+					}
+					printf("[HotReload] CHECK %s (module %d) : superclass level %d, %s : %s (named type: module %d #%d, runtime object of: module %d #%d)\n", tname, mi, depth, oname, why, tm, ti, om, oi);
+				}
+				rt = rt->parent;
+				depth++;
+			}
+		}
+	}
+	printf("[HotReload] CHECK %d types, %d errors\n", checked, errors);
+	fflush(stdout);
+}
+
+/*
 	Applies the code of a new version of the program. The other threads are stopped while the code
 	is compared and patched and the live values upgraded, then the entry point runs.
 */
@@ -2075,6 +2132,17 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		default:
 			break;
 		}
+	}
+	/*
+		The runtime data already made for the new and upgraded types (class objects, made when the new
+		module was initialized) was made before the aliases : its parent can be the runtime data of an
+		unchanged type of the new code, which no type has now and whose prototype is never built.
+	*/
+	for(i=0;i<c->ntypes;i++) {
+		hl_type *t = c->types + i;
+		if( (t->kind != HOBJ && t->kind != HSTRUCT) || t->obj == NULL || t->obj->rt == NULL || t->obj->super == NULL ) continue;
+		if( !new_types[i] && !upgraded[i] ) continue;
+		t->obj->rt->parent = hl_get_obj_rt(t->obj->super);
 	}
 	free(upgraded);
 
@@ -2288,6 +2356,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	printf("[HotReload] %d changes\n", changes_count);
 	fflush(stdout);
 	hl_module_add(m2);
+	hot_check_types();
 
 	// call the new entry point : it initializes the new types, and the statics and __init__ that
 	// hot_init_bits tells (the ones of the new classes), the other statics keep their values
