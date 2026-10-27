@@ -2,7 +2,8 @@ class Main {
 	static function main() {
 		var file = Sys.args()[0];
 		var data = sys.io.File.getBytes(file);
-		var copy = haxe.io.Path.directory(file) + "/copy.hl";
+		// next to the file : a relative path has no directory part
+		var copy = haxe.io.Path.join([haxe.io.Path.directory(file), "copy.hl"]);
 		Test.check(0);
 		// the compiler is still writing : shorter than the length in its header, not read
 		sys.io.File.saveBytes(copy, data.sub(0, data.length >> 1));
