@@ -17,7 +17,7 @@
 | 3. Linear-time matching | Done |
 | 4. Layout changes | Done: refused with the types and fields named |
 | 5. Entry point run again | Done: the statics and `__init__` of new classes are initialized (compiler + VM, see item 5); added statics of existing classes wait for U1 |
-| Detecting a file change | High resolution write time and size |
+| Detecting a file change | High resolution write time and size, then the header of bytecode 7 (length, build id) |
 | Harness `tests/hotreload/` | Done, Linux only so far, not in CI |
 | Heaps app | `tests/hotreload/heaps/run.py`: all steps pass, shaders included (with `heaps.patch`) |
 | U1. Class objects | Done, with the mechanism of instances (`statics`, `statics_many`, `dce_std`, Heaps) |
@@ -352,7 +352,7 @@ Heaps checks for a reload every frame when compiled with `-D hot-reload` (`hxd.S
 
 ## Open points
 
-- **Detecting a file change.** `check_reload` (`src/main.c`) now compares the high resolution write time and the size. A partly written file fails to load and is read again at its next change; the compiler should still write the `.hl` atomically (temporary file, then rename).
+- **Detecting a file change.** `check_reload` (`src/main.c`) compares the high resolution write time and the size; then, from bytecode 7, it reads only the header that follows `HLB` and the version: the length of the file (u32) and a build id (16 bytes, the digest of the rest), written by the compiler. A file shorter than its length is still being written: checked again at the next call, without reading it. A file with the build id of the code loaded last (written again, or compiled to the same bytecode) is not read: no second load and compare for one compilation (`file_header`, `no_change`). The tools that read the bytecode with the `format` library (`hlmem`, the debugger) need to learn version 7 (this header, the names of the params of enum constructors and of local functions).
 - **Closures of the same name.** Local functions are identified by their name in their method (bytecode 7, `hl_function.lname`), by their rank before. Two functions of the same name (two closures passed to `map` in the same method) are told apart by their rank: adding one before the other shifts it.
 
 ## Out of scope for now

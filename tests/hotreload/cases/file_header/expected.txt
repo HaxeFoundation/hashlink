@@ -1,0 +1,8 @@
+v0 step 0
+partial: not applied
+v0 step 1
+[HotReload] 1 changes
+complete: applied
+v1 step 2
+same code: not applied
+v1 step 3

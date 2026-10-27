@@ -434,6 +434,23 @@ static int *hl_read_debug_infos( hl_reader *r, int nops ) {
 	return debug;
 }
 
+/*
+	The start of a bytecode file : returns its version, and from version 7 the length the file
+	must have and its build id (file_size is -1 before), or -1 if the data is not bytecode or too
+	short. HL_HEADER_SIZE bytes are enough.
+*/
+int hl_code_read_header( const unsigned char *data, int size, int *file_size, unsigned char *build_id ) {
+	*file_size = -1;
+	if( size < 4 || data[0] != 'H' || data[1] != 'L' || data[2] != 'B' )
+		return -1;
+	int version = data[3];
+	if( version < 7 ) return version;
+	if( size < HL_HEADER_SIZE ) return -1;
+	*file_size = data[4] | (data[5] << 8) | (data[6] << 16) | (data[7] << 24);
+	memcpy(build_id, data + 8, HL_BUILD_ID_SIZE);
+	return version;
+}
+
 hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	hl_reader _r = { data, size, 0, 0, NULL };
 	hl_reader *r = &_r;
@@ -453,6 +470,13 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	if( c->version <= 1 || c->version > max_version ) {
 		printf("Found version %d while HL %d.%d supports up to %d\n",c->version,HL_VERSION>>16,(HL_VERSION>>8)&0xFF,max_version);
 		EXIT("Unsupported bytecode version");
+	}
+	if( c->version >= 7 ) {
+		c->file_size = hl_read_i32(r);
+		for(i=0;i<HL_BUILD_ID_SIZE;i++)
+			c->build_id[i] = READ();
+		if( c->file_size != size )
+			EXIT("Truncated bytecode");
 	}
 	flags = UINDEX();
 	c->nints = UINDEX();

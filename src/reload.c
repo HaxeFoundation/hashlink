@@ -1567,7 +1567,6 @@ static void hot_instances_check( hot_instances *h, hot_report *r ) {
 		for(int k=0;k<code->ntypes;k++)
 			if( code->types[k].kind == HVIRTUAL ) hot_pmap_set(&h->virtuals, code->types + k, 0);
 	}
-	hot_hook_types(h);
 	hl_gc_iter_live(hot_scan_block, h);
 	for(int i=0;i<h->ntypes;i++) {
 		hot_itype *it = h->types + i;
@@ -2046,6 +2045,39 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	hl_module_init_indexes(m2);
 	hl_code_hash_finalize(m2->hash);
 
+	// the methods onHotReload() of the new code, before its types are aliased to the previous code
+	if( inst.ntypes ) hot_hook_types(&inst);
+
+	/*
+		Alias the types which have the same layout : they are different pointers but share the runtime
+		data. Before anything builds the runtime data of a type to upgrade, which refers to the one of
+		its superclasses.
+	*/
+	bool *new_types = (bool*)malloc(sizeof(bool) * (c->ntypes + 1));
+	bool *upgraded = (bool*)malloc(sizeof(bool) * (c->ntypes + 1));
+	memset(upgraded, 0, sizeof(bool) * (c->ntypes + 1));
+	for(i=0;i<inst.ntypes;i++)
+		upgraded[inst.types[i].index] = true;
+	for(i=0;i<c->ntypes;i++) {
+		hl_type *t = c->types + i;
+		hl_type *p = hot_find_type(hr, t);
+		new_types[i] = p == NULL && hot_type_name(t) != NULL;
+		if( p == NULL || upgraded[i] ) continue;
+		switch( t->kind ) {
+		case HOBJ:
+		case HSTRUCT:
+			t->obj = p->obj;
+			t->vobj_proto = p->vobj_proto;
+			break;
+		case HENUM:
+			t->tenum = p->tenum;
+			break;
+		default:
+			break;
+		}
+	}
+	free(upgraded);
+
 	// the live values whose type layout changes must be found, with room for their new layout
 	{
 		char buf[4096];
@@ -2061,6 +2093,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		}
 		if( r.count ) {
 			free(itype_of);
+			free(new_types);
 			hot_instances_free(&inst);
 			return hot_refuse_gen(m2, "live values cannot be upgraded:", buf, r.count == r.running);
 		}
@@ -2110,6 +2143,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	free(taken);
 	if( changes_count == 0 ) {
 		free(match);
+		free(new_types);
 		hot_instances_free(&inst);
 		free(itype_of);
 		printf("[HotReload] No changes found\n");
@@ -2118,31 +2152,6 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		return false;
 	}
 
-	// alias the types which have the same layout : they are different pointers but share the runtime data
-	bool *new_types = (bool*)malloc(sizeof(bool) * (c->ntypes + 1));
-	bool *upgraded = (bool*)malloc(sizeof(bool) * (c->ntypes + 1));
-	memset(upgraded, 0, sizeof(bool) * (c->ntypes + 1));
-	for(i=0;i<inst.ntypes;i++)
-		upgraded[inst.types[i].index] = true;
-	for(i=0;i<c->ntypes;i++) {
-		hl_type *t = c->types + i;
-		hl_type *p = hot_find_type(hr, t);
-		new_types[i] = p == NULL && hot_type_name(t) != NULL;
-		if( p == NULL || upgraded[i] ) continue;
-		switch( t->kind ) {
-		case HOBJ:
-		case HSTRUCT:
-			t->obj = p->obj;
-			t->vobj_proto = p->vobj_proto;
-			break;
-		case HENUM:
-			t->tenum = p->tenum;
-			break;
-		default:
-			break;
-		}
-	}
-	free(upgraded);
 
 	// JIT the new and changed functions
 	jit_ctx *ctx = hl_jit_alloc();
