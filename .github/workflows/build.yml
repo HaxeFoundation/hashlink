@@ -13,112 +13,36 @@ defaults:
 
 jobs:
 
+  # Jobs are split per OS so tests only wait for their own OS builds.
+  # Steps are defined once in the linux jobs and reused via YAML anchors.
+
   ###########################################################
-  build:
+  build-linux:
   ###########################################################
     runs-on: ${{ matrix.runner }}
 
     strategy:
       fail-fast: false
       matrix:
-        target: [linux, darwin, windows]
+        target: [linux]
         architecture: [64, arm64]
-        build_system: [make, cmake, cmake-mingw, cmake-clang-cl, vs2026, makegcc14]
+        build_system: [make, cmake, makegcc14]
 
         include:
           - target: linux
-            archive_ext: tar.gz
-
-          - target: linux
             runner: ubuntu-latest
             haxe_nightly_dir: linux64
+            archive_ext: tar.gz
 
           - target: linux
             architecture: arm64
             runner: ubuntu-24.04-arm
             haxe_nightly_dir: linux-arm64
 
-          - target: darwin
-            haxe_nightly_dir: mac
-            archive_ext: tar.gz
-
-          - target: darwin
-            architecture: 64
-            runner: macos-15-intel
-
-          - target: darwin
-            architecture: arm64
-            runner: macos-latest
-
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
 
-          - build_system: cmake-mingw
-            cmake_configuration: RelWithDebInfo
-
-          - build_system: cmake-clang-cl
-            cmake_configuration: RelWithDebInfo
-
-          - build_system: vs2026
-            msbuild_configuration: Release
-
-          - target: windows
-            runner: windows-2025-vs2026 # has VS 2026 preinstalled which supports PlatformToolset <= v145, WindowsTargetPlatformVersion 10
-            haxe_nightly_dir: windows64
-            archive_ext: zip
-
-          - target: windows
-            build_system: cmake
-            cmake_generator: Visual Studio 18 2026
-
-          - target: windows
-            runner: windows-latest
-            build_system: cmake-mingw
-
-          - target: windows
-            build_system: cmake-clang-cl
-            cmake_generator: Visual Studio 18 2026
-
-          - target: windows
-            architecture: 64
-            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
-            architecture_string: x64
-
-        exclude:
-          - target: linux
-            build_system: vs2026
-
-          - target: darwin
-            build_system: vs2026
-
-          - target: darwin
-            architecture: 32
-
-          - target: windows
-            architecture: arm64
-
-          - target: windows
-            build_system: make
-
-          - target: darwin
-            build_system: makegcc14
-
-          - target: windows
-            build_system: makegcc14
-
-          - target: darwin
-            build_system: cmake-mingw
-
-          - target: linux
-            build_system: cmake-mingw
-
-          - target: darwin
-            build_system: cmake-clang-cl
-
-          - target: linux
-            build_system: cmake-clang-cl
-
-    steps:
+    steps: &build-steps
     - name: "SCM Checkout"
       uses: actions/checkout@v7
 
@@ -431,6 +355,71 @@ jobs:
         name: ${{ matrix.target }}-${{ matrix.build_system }}-${{ matrix.architecture }}
         path: ${{ env.HASHLINK_DISTRIBUTION }}
 
+  ###########################################################
+  build-darwin:
+  ###########################################################
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [darwin]
+        architecture: [64, arm64]
+        build_system: [make, cmake]
+
+        include:
+          - target: darwin
+            haxe_nightly_dir: mac
+            archive_ext: tar.gz
+
+          - target: darwin
+            architecture: 64
+            runner: macos-15-intel
+
+          - target: darwin
+            architecture: arm64
+            runner: macos-latest
+
+          - build_system: cmake
+            cmake_configuration: RelWithDebInfo
+
+    steps: *build-steps
+
+  ###########################################################
+  build-windows:
+  ###########################################################
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [windows]
+        architecture: [64]
+        build_system: [cmake, cmake-mingw, cmake-clang-cl, vs2026]
+
+        include:
+          - target: windows
+            runner: windows-2025 # has VS 2026 preinstalled which supports PlatformToolset <= v145, WindowsTargetPlatformVersion 10
+            haxe_nightly_dir: windows64
+            archive_ext: zip
+            ffmpeg_url: https://github.com/HaxeFoundation/hashlink/files/5648056/ffmpeg-3.4.2-win64-dev.zip
+            architecture_string: x64
+
+          - build_system: cmake
+            cmake_configuration: RelWithDebInfo
+            cmake_generator: Visual Studio 18 2026
+
+          - build_system: cmake-mingw
+            cmake_configuration: RelWithDebInfo
+
+          - build_system: cmake-clang-cl
+            cmake_configuration: RelWithDebInfo
+            cmake_generator: Visual Studio 18 2026
+
+          - build_system: vs2026
+            msbuild_configuration: Release
+
+    steps: *build-steps
 
   build-android:
     runs-on: ubuntu-latest
@@ -459,14 +448,14 @@ jobs:
           -DANDROID_PLATFORM=24 -DANDROID_ABI=arm64-v8a -DBUILD_SHARED_LIBS=OFF -DWITH_VM=OFF
         cmake --build build
 
-  haxe-test-suite:
-    needs: build
-    env:
-      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+  ###########################################################
+  haxe-test-linux:
+  ###########################################################
+    needs: build-linux
     strategy:
       fail-fast: false
       matrix:
-        os: [darwin, linux, windows]
+        os: [linux]
         architecture: [x86_64, arm64]
         include:
         - architecture: arm64
@@ -474,37 +463,20 @@ jobs:
 
         - os: linux
           runner: ubuntu-latest
+          build_system: make
 
         - os: linux
           architecture: arm64
           runner: ubuntu-24.04-arm
 
-        - os: darwin
-          architecture: x86_64
-          runner: macos-15-intel
-
-        - os: darwin
-          architecture: arm64
-          runner: macos-latest
-
-        - os: windows
-          runner: windows-2025-vs2026
-
-        exclude:
-        - os: darwin
-          architecture: x86_32
-
-        - os: windows
-          architecture: arm64
-
     runs-on: ${{ matrix.runner }}
-    steps:
+    steps: &haxe-test-steps
     - uses: actions/checkout@v7
     - name: Download binary
       uses: actions/download-artifact@v8
       with:
         name: |
-          ${{ matrix.os }}-${{ matrix.os == 'windows' && 'vs2026' || 'make' }}-${{
+          ${{ matrix.os }}-${{ matrix.build_system }}-${{
             matrix.architecture == 'arm64' && 'arm64' ||
             matrix.architecture == 'x86_64' && '64' ||
             matrix.architecture == 'x86_32' && '32'
@@ -522,7 +494,7 @@ jobs:
         fi
         sudo apt-get update -qqy
         sudo apt-get install -qqy libpng16-16t64${SUFFIX} libjpeg-turbo8${SUFFIX} libturbojpeg${SUFFIX} zlib1g${SUFFIX} libogg0${SUFFIX} libvorbis0a${SUFFIX} \
-          libvorbisfile3${SUFFIX} libvorbisenc2${SUFFIX} libsqlite3-0${SUFFIX} ${EXTRA_APT_PKGS}
+          libvorbisfile3${SUFFIX} libvorbisenc2${SUFFIX} libsqlite3-0${SUFFIX} libmbedtls14t64${SUFFIX} ${EXTRA_APT_PKGS}
 
     - name: Install brew packages
       if: matrix.os == 'darwin'
@@ -591,6 +563,7 @@ jobs:
         ref: ${{ steps.haxe_sha.outputs.sha }}
 
     - name: Test
+      timeout-minutes: 20
       run: |
         if [[ "${{ matrix.os }}" == "darwin" ]]; then
           echo "" > sys/compile-fs.hxml
@@ -599,10 +572,53 @@ jobs:
       working-directory: haxe/tests
 
   ###########################################################
+  haxe-test-darwin:
+  ###########################################################
+    needs: build-darwin
+    env:
+      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [darwin]
+        architecture: [x86_64, arm64]
+        include:
+        - architecture: arm64
+          test-flags: --skip-hl-jit # not yet supported
+
+        - os: darwin
+          runner: macos-15-intel
+          build_system: make
+
+        - os: darwin
+          architecture: arm64
+          runner: macos-latest
+
+    runs-on: ${{ matrix.runner }}
+    steps: *haxe-test-steps
+
+  ###########################################################
+  haxe-test-windows:
+  ###########################################################
+    needs: build-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows]
+        architecture: [x86_64]
+        include:
+        - os: windows
+          runner: windows-2025
+          build_system: vs2026
+
+    runs-on: ${{ matrix.runner }}
+    steps: *haxe-test-steps
+
+  ###########################################################
   publish-latest-release:
   ###########################################################
     runs-on: ubuntu-latest
-    needs: [build, haxe-test-suite]
+    needs: [build-linux, build-darwin, build-windows, haxe-test-linux, haxe-test-darwin, haxe-test-windows]
     if: github.ref == 'refs/heads/master'
     concurrency: publish-latest-release # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idconcurrency
 
