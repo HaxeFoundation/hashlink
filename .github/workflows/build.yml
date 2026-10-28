@@ -587,6 +587,7 @@ jobs:
         ref: ${{ steps.haxe_sha.outputs.sha }}
 
     - name: Test
+      timeout-minutes: 20
       run: |
         if [[ "${{ matrix.os }}" == "darwin" ]]; then
           echo "" > sys/compile-fs.hxml
