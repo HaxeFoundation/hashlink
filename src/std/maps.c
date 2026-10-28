@@ -238,14 +238,13 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 
 HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) );
 static hl_type hlt_homap = { HABSTRACT, { USTR("ObjectMap") } };
-static void hl_ho_rehash_hook( void *m );
 static void hl_ho_rehash( void *m );
 
 static void hl_ho_register() {
 	static bool done = false;
 	if( done ) return;
 	done = true;
-	hl_gc_set_remap_hook(&hlt_homap, hl_ho_rehash_hook);
+	hl_gc_set_remap_hook(&hlt_homap, hl_ho_rehash);
 }
 
 #define _MTYPE			&hlt_homap
@@ -258,17 +257,11 @@ static void hl_ho_register() {
 #define _MKEY(m,c)	m->values[c].key
 #define	_MSET(c)	m->values[c].key = key
 #define _MERASE(c)  m->values[c].key = NULL
-#define _MREHASH(m)	hl_ho_rehash(m)
 
 #include "maps.h"
 
-static void hl_ho_rehash_hook( void *map ) {
-	((hl_ho_map*)map)->rehash = true;
-}
-
 static void hl_ho_rehash( void *map ) {
 	hl_ho_map *m = (hl_ho_map*)map;
-	m->rehash = false;
 	if( !m->values ) return;
 	hl_ho_map old = *m;
 	memset(m,0,sizeof(hl_ho_map));

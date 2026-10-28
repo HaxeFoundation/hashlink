@@ -2278,8 +2278,6 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		cl.t = c->functions[m2->functions_indexes[c->entrypoint]].type;
 		cl.fun = m2->functions_ptrs[c->entrypoint];
 		cl.hasValue = 0;
-		hot_world_stopped = false;
-		hl_gc_world(false);
 		hot_init_code = c;
 		hot_init_new_types = new_types;
 		hot_init_instances = &inst;

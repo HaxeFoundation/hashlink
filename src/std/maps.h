@@ -28,16 +28,7 @@ typedef struct {
 	int ncells;
 	int nentries;
 	int maxentries;
-#	ifdef _MREHASH
-	bool rehash;
-#	endif
 } t_map;
-
-#ifdef _MREHASH
-#	define _MCHECK(m) if( (m)->rehash ) _MREHASH(m)
-#else
-#	define _MCHECK(m)
-#endif
 
 #ifndef _MNO_EXPORTS
 HL_PRIM
@@ -59,7 +50,6 @@ _MSTATIC _MVAL_TYPE *_MNAME(find)( t_map *m, t_key key ) {
 	unsigned int hash;
 
 	if( !m->values ) return NULL;
-	_MCHECK(m);
 	hash = _MNAME(hash)(key);
 	ckey = hash % ((unsigned)m->ncells);
 	c = _MINDEX(m,ckey);
@@ -76,22 +66,29 @@ static void _MNAME(resize)( t_map *m );
 _MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	int c, ckey = 0;
 	unsigned int hash = _MNAME(hash)(key);
-	if( m->values ) {
-		ckey = hash % ((unsigned)m->ncells);
-		c = _MINDEX(m,ckey);
-		while( c >= 0 ) {
-			if( _MMATCH(c) ) {
-				m->values[c].value = value;
-				return;
+	t_value *values;
+	while( true ) {
+		values = m->values;
+		if( values ) {
+			ckey = hash % ((unsigned)m->ncells);
+			c = _MINDEX(m,ckey);
+			while( c >= 0 ) {
+				if( _MMATCH(c) ) {
+					m->values[c].value = value;
+					return;
+				}
+				c = _MNEXT(m,c);
 			}
-			c = _MNEXT(m,c);
 		}
-	}
-	c = hl_freelist_get(&m->lfree);
-	if( c < 0 ) {
-		_MNAME(resize)(m);
-		ckey = hash % ((unsigned)m->ncells);
-		c = hl_freelist_get(&m->lfree);
+		hl_free_list lfree = m->lfree;
+		c = hl_freelist_get(&lfree);
+		if( m->values != values ) continue;
+		if( c < 0 ) {
+			_MNAME(resize)(m);
+			continue;
+		}
+		m->lfree = lfree;
+		break;
 	}
 	_MSET(c);
 	if( m->maxentries < _MLIMIT ) {
@@ -105,9 +102,11 @@ _MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	m->nentries++;
 }
 
-static void _MNAME(resize)( t_map *m ) {
+static void _MNAME(resize)( t_map *map ) {
 	// save
-	t_map old = *m;
+	t_map old = *map;
+	t_map cur = *map;
+	t_map *m = &cur;
 
 	if( m->nentries != m->maxentries ) hl_error("assert");
 
@@ -150,12 +149,12 @@ static void _MNAME(resize)( t_map *m ) {
 			}
 		}
 	}
+	if( map->values == old.values ) *map = cur;
 }
 
 #ifndef _MNO_EXPORTS
 
 HL_PRIM void _MNAME(set)( t_map *m, t_key key, _MVAL_TYPE value ) {
-	_MCHECK(m);
 	_MNAME(set_impl)(m,_MNAME(filter)(key),value);
 }
 
@@ -170,17 +169,22 @@ HL_PRIM vdynamic* _MNAME(get)( t_map *m, t_key key ) {
 }
 
 HL_PRIM bool _MNAME(remove)( t_map *m, t_key key ) {
-	int c, prev = -1, ckey;
+	int c, prev, ckey;
 	unsigned int hash;
-	if( !m->cells ) return false;
-	_MCHECK(m);
 	key = _MNAME(filter)(key);
 	hash = _MNAME(hash)(key);
+retry:
+	if( !m->cells ) return false;
+	prev = -1;
 	ckey = hash % ((unsigned)m->ncells);
 	c = _MINDEX(m,ckey);
 	while( c >= 0 ) {
 		if( _MMATCH(c) ) {
-			hl_freelist_add(&m->lfree,c);
+			t_value *values = m->values;
+			hl_free_list lfree = m->lfree;
+			hl_freelist_add(&lfree,c);
+			if( m->values != values ) goto retry;
+			m->lfree = lfree;
 			m->nentries--;
 			_MERASE(c);
 			m->values[c].value = NULL;
@@ -257,5 +261,3 @@ HL_PRIM int _MNAME(size)( t_map *m ) {
 #undef _MSTATIC
 #undef _MALLOC_HOOK
 #undef _MTYPE
-#undef _MREHASH
-#undef _MCHECK
