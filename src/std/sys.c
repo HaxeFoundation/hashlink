@@ -417,6 +417,63 @@ HL_PRIM varray *hl_sys_stat( vbyte *path ) {
 	return a;
 }
 
+#if defined(HL_WIN)
+static double filetime_to_ms( FILETIME ft ) {
+	const long long unix_epoch = 116444736000000000LL; // 100ns ticks from 1601-01-01 to 1970-01-01
+	ULARGE_INTEGER u;
+	u.LowPart = ft.dwLowDateTime;
+	u.HighPart = ft.dwHighDateTime;
+	if( u.QuadPart == 0 )
+		return 0.;
+	return (double)((long long)u.QuadPart - unix_epoch) / 10000.;
+}
+#else
+static double timespec_to_ms( struct timespec t ) {
+	return t.tv_sec * 1000. + t.tv_nsec / 1000000.;
+}
+#endif
+
+// same as sys_stat but with 64-bit size and times in milliseconds
+HL_PRIM varray *hl_sys_stat2( vbyte *path ) {
+	varray *a;
+	double *d;
+#	if defined(HL_WIN)
+	struct _stat64 s;
+	WIN32_FILE_ATTRIBUTE_DATA attr;
+	if( _wstat64((pchar*)path,&s) != 0 || !GetFileAttributesExW((pchar*)path,GetFileExInfoStandard,&attr) )
+		return NULL;
+#	else
+	pstat s;
+	memset(&s,0,sizeof(s));
+	if( stat((pchar*)path,&s) != 0 )
+		return NULL;
+#	endif
+	a = hl_alloc_array(&hlt_f64,11);
+	d = hl_aptr(a,double);
+	*d++ = s.st_gid;
+	*d++ = s.st_uid;
+#	if defined(HL_WIN)
+	*d++ = filetime_to_ms(attr.ftLastAccessTime);
+	*d++ = filetime_to_ms(attr.ftLastWriteTime);
+	*d++ = filetime_to_ms(attr.ftCreationTime);
+#	elif defined(__APPLE__)
+	*d++ = timespec_to_ms(s.st_atimespec);
+	*d++ = timespec_to_ms(s.st_mtimespec);
+	*d++ = timespec_to_ms(s.st_ctimespec);
+#	else
+	*d++ = timespec_to_ms(s.st_atim);
+	*d++ = timespec_to_ms(s.st_mtim);
+	*d++ = timespec_to_ms(s.st_ctim);
+#	endif
+	*d++ = (double)s.st_size;
+	*d++ = s.st_dev;
+	*d++ = (double)s.st_ino;
+	*d++ = s.st_nlink;
+	*d++ = s.st_rdev;
+	*d++ = s.st_mode;
+	return a;
+}
+
 HL_PRIM bool hl_sys_is_dir( vbyte *path ) {
 	pstat s;
 	if( stat((pchar*)path,&s) != 0 )
@@ -716,6 +773,7 @@ DEFINE_PRIM(_BOOL, sys_exists, _BYTES);
 DEFINE_PRIM(_BOOL, sys_delete, _BYTES);
 DEFINE_PRIM(_BOOL, sys_rename, _BYTES _BYTES);
 DEFINE_PRIM(_ARR, sys_stat, _BYTES);
+DEFINE_PRIM(_ARR, sys_stat2, _BYTES);
 DEFINE_PRIM(_BOOL, sys_is_dir, _BYTES);
 DEFINE_PRIM(_BOOL, sys_create_dir, _BYTES _I32);
 DEFINE_PRIM(_BOOL, sys_remove_dir, _BYTES);
