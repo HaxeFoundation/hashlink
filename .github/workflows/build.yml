@@ -63,17 +63,13 @@ jobs:
             msbuild_configuration: Release
 
           - target: windows
-            runner: windows-2025-vs2026 # has VS 2026 preinstalled which supports PlatformToolset <= v145, WindowsTargetPlatformVersion 10
+            runner: windows-2025 # has VS 2026 preinstalled which supports PlatformToolset <= v145, WindowsTargetPlatformVersion 10
             haxe_nightly_dir: windows64
             archive_ext: zip
 
           - target: windows
             build_system: cmake
             cmake_generator: Visual Studio 18 2026
-
-          - target: windows
-            runner: windows-latest
-            build_system: cmake-mingw
 
           - target: windows
             build_system: cmake-clang-cl
@@ -488,7 +484,7 @@ jobs:
           runner: macos-latest
 
         - os: windows
-          runner: windows-2025-vs2026
+          runner: windows-2025
 
         exclude:
         - os: darwin
