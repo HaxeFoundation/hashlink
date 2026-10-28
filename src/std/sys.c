@@ -46,8 +46,8 @@
 #	define getcwd(buf,size) (void*)(int_val)GetCurrentDirectoryW(size,buf)
 #	define chdir	!SetCurrentDirectoryW
 #	define system	_wsystem
-typedef struct _stat32 pstat;
-#	define stat		_wstat32
+typedef struct _stat64 pstat;
+#	define stat		_wstat64
 #	define unlink	_wunlink
 #	define rename	_wrename
 #	define mkdir(path,mode)	_wmkdir(path)
@@ -437,13 +437,12 @@ static double timespec_to_ms( struct timespec t ) {
 HL_PRIM varray *hl_sys_stat2( vbyte *path ) {
 	varray *a;
 	double *d;
+	pstat s;
 #	if defined(HL_WIN)
-	struct _stat64 s;
 	WIN32_FILE_ATTRIBUTE_DATA attr;
-	if( _wstat64((pchar*)path,&s) != 0 || !GetFileAttributesExW((pchar*)path,GetFileExInfoStandard,&attr) )
+	if( stat((pchar*)path,&s) != 0 || !GetFileAttributesExW((pchar*)path,GetFileExInfoStandard,&attr) )
 		return NULL;
 #	else
-	pstat s;
 	memset(&s,0,sizeof(s));
 	if( stat((pchar*)path,&s) != 0 )
 		return NULL;
