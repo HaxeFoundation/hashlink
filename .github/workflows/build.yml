@@ -522,7 +522,7 @@ jobs:
         fi
         sudo apt-get update -qqy
         sudo apt-get install -qqy libpng16-16t64${SUFFIX} libjpeg-turbo8${SUFFIX} libturbojpeg${SUFFIX} zlib1g${SUFFIX} libogg0${SUFFIX} libvorbis0a${SUFFIX} \
-          libvorbisfile3${SUFFIX} libvorbisenc2${SUFFIX} libsqlite3-0${SUFFIX} ${EXTRA_APT_PKGS}
+          libvorbisfile3${SUFFIX} libvorbisenc2${SUFFIX} libsqlite3-0${SUFFIX} libmbedtls14t64${SUFFIX} ${EXTRA_APT_PKGS}
 
     - name: Install brew packages
       if: matrix.os == 'darwin'
