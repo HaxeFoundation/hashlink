@@ -2123,7 +2123,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 #			ifdef HL_DEBUG
 			uprintf(USTR("%s."), fun_obj(f2)->name);
 			uprintf(USTR("%s"), fun_field_name(f2));
-			if( !f2->obj && f2->field.name ) uprintf(USTR("~%s"), f2->field.name); else if( !f2->obj ) printf("~%d", f2->ref);
+			if( !f2->obj && hl_function_lname(c, f2) ) uprintf(USTR("~%s"), hl_function_lname(c, f2)); else if( !f2->obj ) printf("~%d", f2->ref);
 			printf(match[i] == HOT_ADDED ? " has been added\n" : " has been modified [%d]\n", f2->nops);
 #			endif
 			changes_count++;

@@ -141,6 +141,12 @@ const uchar *hl_get_ustring( hl_code *code, int index ) {
 	return str;
 }
 
+const uchar *hl_function_lname( hl_code *code, hl_function *f ) {
+	if( !code->lnames || f->obj ) return NULL;
+	int k = code->lnames[f - code->functions];
+	return k < 0 ? NULL : hl_get_ustring(code, k);
+}
+
 static const uchar *hl_read_ustring( hl_reader *r ) {
 	int i = INDEX();
 	if( i < 0 || i >= r->code->nstrings ) {
@@ -352,7 +358,7 @@ static void hl_read_function( hl_reader *r, hl_function *f ) {
 		hl_read_opcode(r, f, f->ops+i);
 	if( r->code->version >= 7 ) {
 		int k = UINDEX();
-		if( k > 0 && k - 1 < r->code->nstrings ) f->field.name = hl_get_ustring(r->code, k - 1);
+		r->code->lnames[f - r->code->functions] = k > 0 && k - 1 < r->code->nstrings ? k - 1 : -1;
 	}
 }
 
@@ -531,6 +537,7 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	}
 	CHK_ERROR();
 	ALLOC(c->functions, hl_function, c->nfunctions);
+	if( c->version >= 7 ) ALLOC(c->lnames, int, c->nfunctions);
 	for(i=0;i<c->nfunctions;i++) {
 		hl_read_function(r,c->functions+i);
 		CHK_ERROR();
@@ -816,8 +823,9 @@ static int hash_fun_sign( hl_code_hash *h, hl_function *f ) {
 	} else if( f->field.ref ) {
 		HUSTR(f->field.ref->obj->name);
 		HUSTR(f->field.ref->field.name);
-		if( f->field.name ) {
-			HUSTR(f->field.name);
+		const uchar *lname = hl_function_lname(h->code, f);
+		if( lname ) {
+			HUSTR(lname);
 		} else {
 			H32(f->ref);
 		}

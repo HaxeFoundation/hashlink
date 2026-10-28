@@ -59,7 +59,7 @@ struct hl_function {
 #	define ASSIGN_SCOPE_END(f,i)	((f)->assigns[(i)*3+2])
 
 	hl_type_obj *obj;
-	struct {
+	union {
 		const uchar *name;
 		hl_function *ref; // obj = NULL
 	} field;
@@ -106,6 +106,7 @@ typedef struct {
 	hl_type**	globals;
 	hl_native*	natives;
 	hl_function*functions;
+	int*		lnames;
 	hl_constant*constants;
 	hl_alloc	alloc;
 	hl_alloc	falloc;
@@ -174,6 +175,7 @@ int hl_code_hash_type( hl_code_hash *h, hl_type *t );
 void hl_code_hash_remap_globals( hl_code_hash *hnew, int *remap, int old_count, hl_type **old_types, int *old_signs );
 
 const uchar *hl_get_ustring( hl_code *c, int index );
+const uchar *hl_function_lname( hl_code *c, hl_function *f );
 const char* hl_op_name( int op );
 
 typedef unsigned char h_bool;
