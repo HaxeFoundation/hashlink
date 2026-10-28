@@ -850,10 +850,7 @@ static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 #define REGULAR_BITS 8
 #define GC_MARK_BATCH	64
 
-/*
-	Remaps (hot reload) : a collection that replaces the references to some blocks by references
-	to others, when it scans the blocks and the roots. The blocks replaced are no longer marked.
-*/
+// the remaps of a collection (hot reload, see hl_gc_remap_apply)
 static struct {
 	int size;		// power of two
 	int count;
@@ -861,59 +858,7 @@ static struct {
 	void **news;
 } gc_remap = {0};
 
-static unsigned int gc_remap_hash( void *p ) {
-	uint64 h = (uint64)(int_val)p;
-	h ^= h >> 29;
-	h *= 0xbf58476d1ce4e5b9ULL;
-	h ^= h >> 32;
-	return (unsigned int)h;
-}
-
-static void *gc_remap_find( void *p ) {
-	unsigned int i = gc_remap_hash(p) & (gc_remap.size - 1);
-	while( true ) {
-		void *k = gc_remap.olds[i];
-		if( k == p ) return gc_remap.news[i];
-		if( k == NULL ) return NULL;
-		i = (i + 1) & (gc_remap.size - 1);
-	}
-}
-
-static void gc_remap_set( void *old_block, void *new_block ) {
-	unsigned int i = gc_remap_hash(old_block) & (gc_remap.size - 1);
-	while( gc_remap.olds[i] && gc_remap.olds[i] != old_block ) i = (i + 1) & (gc_remap.size - 1);
-	if( !gc_remap.olds[i] ) gc_remap.count++;
-	gc_remap.olds[i] = old_block;
-	gc_remap.news[i] = new_block;
-}
-
-static void gc_remap_grow( int count ) {
-	int osize = gc_remap.size;
-	void **olds = gc_remap.olds, **news = gc_remap.news;
-	int size = osize ? osize : 256;
-	while( count * 2 > size ) size <<= 1;
-	if( size == osize ) return;
-	gc_remap.size = size;
-	gc_remap.count = 0;
-	gc_remap.olds = (void**)calloc(gc_remap.size, sizeof(void*));
-	gc_remap.news = (void**)malloc(sizeof(void*) * gc_remap.size);
-	for(int i=0;i<osize;i++)
-		if( olds[i] ) gc_remap_set(olds[i], news[i]);
-	free(olds);
-	free(news);
-}
-
-// makes room for count more remaps
-HL_API void hl_gc_remap_reserve( int count ) {
-	gc_remap_grow(gc_remap.count + count);
-}
-
-// adds a remap for the next hl_gc_remap_apply
-HL_API void hl_gc_remap_add( void *old_block, void *new_block ) {
-	if( (gc_remap.count + 1) * 2 > gc_remap.size )
-		gc_remap_grow(gc_remap.count + 1);
-	gc_remap_set(old_block, new_block);
-}
+static void *gc_remap_find( void *p );
 
 static GC_FORCEINLINE int gc_flush_mark_gen( gc_mstack *stack, bool remap ) {
 	GC_STACK_BEGIN(stack);
@@ -1929,6 +1874,66 @@ HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_s
 	gc_global_lock(false);
 	free(r);
 	return found;
+}
+
+// ---- remaps (hot reload) ----
+
+/*
+	Remaps : a collection that replaces the references to some blocks by references
+	to others, when it scans the blocks and the roots. The blocks replaced are no longer marked.
+*/
+static unsigned int gc_remap_hash( void *p ) {
+	uint64 h = (uint64)(int_val)p;
+	h ^= h >> 29;
+	h *= 0xbf58476d1ce4e5b9ULL;
+	h ^= h >> 32;
+	return (unsigned int)h;
+}
+
+static void *gc_remap_find( void *p ) {
+	unsigned int i = gc_remap_hash(p) & (gc_remap.size - 1);
+	while( true ) {
+		void *k = gc_remap.olds[i];
+		if( k == p ) return gc_remap.news[i];
+		if( k == NULL ) return NULL;
+		i = (i + 1) & (gc_remap.size - 1);
+	}
+}
+
+static void gc_remap_set( void *old_block, void *new_block ) {
+	unsigned int i = gc_remap_hash(old_block) & (gc_remap.size - 1);
+	while( gc_remap.olds[i] && gc_remap.olds[i] != old_block ) i = (i + 1) & (gc_remap.size - 1);
+	if( !gc_remap.olds[i] ) gc_remap.count++;
+	gc_remap.olds[i] = old_block;
+	gc_remap.news[i] = new_block;
+}
+
+static void gc_remap_grow( int count ) {
+	int osize = gc_remap.size;
+	void **olds = gc_remap.olds, **news = gc_remap.news;
+	int size = osize ? osize : 256;
+	while( count * 2 > size ) size <<= 1;
+	if( size == osize ) return;
+	gc_remap.size = size;
+	gc_remap.count = 0;
+	gc_remap.olds = (void**)calloc(gc_remap.size, sizeof(void*));
+	gc_remap.news = (void**)malloc(sizeof(void*) * gc_remap.size);
+	for(int i=0;i<osize;i++)
+		if( olds[i] ) gc_remap_set(olds[i], news[i]);
+	free(olds);
+	free(news);
+}
+
+// makes room for count more remaps
+HL_API void hl_gc_remap_reserve( int count ) {
+	gc_remap_grow(gc_remap.count + count);
+}
+
+// adds a remap for the next hl_gc_remap_apply
+HL_API void hl_gc_remap_add( void *old_block, void *new_block ) {
+	if( (gc_remap.count + 1) * 2 > gc_remap.size )
+		gc_remap_grow(gc_remap.count + 1);
+	gc_remap_set(old_block, new_block);
 }
 
 /*

@@ -242,6 +242,7 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 	rehashed by its next access, from the thread using it : the threads were stopped at any allocation,
 	maybe in the middle of an operation on the map (a resize), so the hook must not read it nor change it.
 */
+HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) ); // gc.c
 static hl_type hlt_homap = { HABSTRACT, { USTR("ObjectMap") } };
 static void hl_ho_rehash_hook( void *m );
 static void hl_ho_rehash( void *m );

@@ -31,7 +31,7 @@
 **HL 2.0 JIT.** On `master`, the new JIT did not support hot reload: `hl_jit_patch_method` asserted, `hl_jit_reset` was empty, the previous module was ignored by `hl_jit_code` and `m->jit_ctx` kept a freed context. Now:
 
 - a reload allocates a new JIT context for its module;
-- the reload module calls the functions it did not compile through their current address: the *slot* of the function, the entry of `functions_ptrs` of the module that added it (`hl_module.hot_slots`, `CALL_FUN` / `LOAD_FUN` / static closures);
+- the reload module calls the functions it did not compile by their address when it is compiled, as closures (`hl_module.functions_extern`, calls and static and instance closures, `jit_emit.c`): a function replaced later jumps to its new version (below), so the address stays valid;
 - the start of a replaced function is rewritten as `mov rax, slot; jmp [rax]` (functions are 16 bytes aligned), so the callers compiled before, the vtables and the live closures reach the latest version.
 
 **Findings while testing.**
@@ -39,7 +39,7 @@
 - The static methods of a class are fields of its class object (`$Foo`): adding a static method, or changing its signature, changes the layout of `$Foo`. Handled by U1.
 - With `-dce std` (the default), the first use of something of a standard class can change its layout: a static (`Type.getClassName`, `dce_std`) or an instance field (the stack of `haxe.Exception` adds `__exceptionStack`, `dce_instance_field`). Both are handled (U1, U4).
 - A method that no class overrides is not virtual: it is called directly. Overriding it makes it virtual, which adds a slot to the class and its subclasses and turns its calls into virtual calls (compiled again since their code changes). Handled with the methods of the live types (U5).
-- The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype and calls the address (`tests/hotreload/cases/string_compare`).
+- The JIT of a reload read `rt->compareFun` of a live type as a function index, while it is the address of the function once the prototype of the type is initialized: any comparison of strings in reloaded code crashed. A reload now initializes the prototype of the live types it aliases that have a compare function, and the JIT calls the address for a type of another module (`tests/hotreload/cases/string_compare`).
 - Shaders (Heaps): the source of a shader is the static `SRC`, and `_SHADER` caches the shader built from it. The initializer of a static with `@:hotReload` runs again after every reload (`static_hot_reload`); with the change of Heaps in `tests/hotreload/heaps/heaps.patch` (the hxsl macro puts `@:hotReload` on `SRC`, `SharedShader` keeps its source, and with `-D hot-reload` `Shader.initialize` builds the shader again when `SRC` changed), a changed shader source is used by the new shader instances.
 - The global of a class or an enum is now identified by its name: its type hash changed with any type it references, which allocated a new global and lost the statics.
 
@@ -232,7 +232,7 @@ Every operation a developer or an agent can make between two reloads, with the e
 - Location: `tests/hotreload/` (see its README). One directory per case, with the successive versions of the sources (`v0/`, `v1/`, `v2/`...) and the expected output.
 - The runner compiles every version to its own `.hl` (through the compilation server of `haxe6-incremental`, as in real use), then runs `hl --hot-reload v0.hl`.
 - The program drives the steps itself: at step *i* it calls `hl.Api.checkReload("v<i>.hl")` (the `debugFile` argument loads another file), then calls `Test.check(i)`, which is defined in each version and therefore patched. No timing, no file watching: the test is deterministic.
-- `check_reload` compares the last write time in the best resolution of the file system (100 ns on NTFS) and the size.
+- `hl_hot_reload_file_changed` (`src/reload.c`) compares the last write time in the best resolution of the file system (100 ns on NTFS) and the size.
 - Each case checks: the result of the reload (accepted or refused, and the message), the values of the live state after it, the behavior of the new code, and that a second and third reload still work (cumulative state, item 1).
 - Run on Windows (JIT x86_64) in CI, plus `-D hl-memo-check` on the compiler side to make sure warm and cold `.hl` are identical.
 
@@ -352,8 +352,8 @@ Heaps checks for a reload every frame when compiled with `-D hot-reload` (`hxd.S
 
 ## Open points
 
-- **Detecting a file change.** `check_reload` (`src/main.c`) compares the high resolution write time and the size; then, from bytecode 7, it reads only the header that follows `HLB` and the version: the length of the file (u32) and a build id (16 bytes, the digest of the rest), written by the compiler. A file shorter than its length is still being written: checked again at the next call, without reading it. A file with the build id of the code loaded last (written again, or compiled to the same bytecode) is not read: no second load and compare for one compilation (`file_header`, `no_change`). The tools that read the bytecode with the `format` library (`hlmem`, the debugger) need to learn version 7 (this header, the names of the params of enum constructors and of local functions).
-- **Closures of the same name.** Local functions are identified by their name in their method (bytecode 7, `hl_function.lname`), by their rank before. Two functions of the same name (two closures passed to `map` in the same method) are told apart by their rank: adding one before the other shifts it.
+- **Detecting a file change.** `hl_hot_reload_file_changed` (`src/reload.c`, called by `check_reload` of `src/main.c`) compares the high resolution write time and the size; then, from bytecode 7, it reads only the header that follows `HLB` and the version: the length of the file (u32) and a build id (16 bytes, the digest of the rest), written by the compiler. A file shorter than its length is still being written: checked again at the next call, without reading it. A file with the build id of the code loaded last (written again, or compiled to the same bytecode) is not read: no second load and compare for one compilation (`file_header`, `no_change`). The tools that read the bytecode with the `format` library (`hlmem`, the debugger) need to learn version 7 (this header, the names of the params of enum constructors and of local functions).
+- **Closures of the same name.** Local functions are identified by their name in their method (bytecode 7, `hl_function.field.name`, next to `field.ref`, the method), by their rank before. Two functions of the same name (two closures passed to `map` in the same method) are told apart by their rank: adding one before the other shifts it.
 
 ## Out of scope for now
 

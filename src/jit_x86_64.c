@@ -1198,11 +1198,6 @@ static void alloc_const( code_ctx *ctx, uint64 value ) {
 	int_arr_add_impl(&ctx->jit->galloc,&ctx->const_refs,pos);
 }
 
-static void **hot_slot( jit_ctx *jit, int fid ) {
-	void ***slots = jit->mod->hot_slots;
-	return slots ? slots[fid] : NULL;
-}
-
 static int emit_lea_rel( code_ctx *ctx, ereg out ) {
 	B(0x48 + ((out & 8) ? 4 : 0));
 	B(0x8D);
@@ -1454,37 +1449,22 @@ void hl_codegen_function( jit_ctx *jit ) {
 		case LOAD_FUN:
 			{
 				ereg w = IS_REG(out) ? out : RTMP;
+				int pos = emit_lea_rel(ctx,w);
 				int fid = e->size_offs;
-				void **slot = hot_slot(jit,fid);
-				if( slot ) {
-					// hot reload : function compiled by another module, read its current address
-					emit_ext(ctx,_MOV,w,VAL_CONST,M_PTR,(int_val)slot);
-					emit_mov(ctx, w, MK_ADDR(w,0), M_PTR);
-				} else {
-					int pos = emit_lea_rel(ctx,w);
-					int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,pos);
-					int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
-				}
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,pos);
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
 				if( w != out )
 					emit_mov(ctx, out, w, M_PTR);
 			}
 			break;
 		case CALL_FUN:
+			B(0xE8);
 			{
+				int pos = jit->out_pos + byte_count(ctx->code);
 				int fid = e->a;
-				void **slot = hot_slot(jit,fid);
-				if( slot ) {
-					// hot reload : function compiled by another module, call through its current address
-					emit_ext(ctx,_MOV,RTMP,VAL_CONST,M_PTR,(int_val)slot);
-					emit_mov(ctx, RTMP, MK_ADDR(RTMP,0), M_PTR);
-					EMIT(_CALL, RTMP, UNUSED, M_NONE);
-				} else {
-					B(0xE8);
-					int pos = jit->out_pos + byte_count(ctx->code);
-					int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,pos);
-					int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
-					W(0);
-				}
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,pos);
+				int_arr_add_impl(&ctx->jit->galloc,&ctx->funs,fid);
+				W(0);
 			}
 			if( ctx->jit->mod->debug ) emit_mov(ctx, MK_ADDR(RSP,-HL_WSIZE), R(RBP), M_PTR);
 			break;

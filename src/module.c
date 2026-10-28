@@ -1157,7 +1157,7 @@ void hl_module_free( hl_module *m ) {
 #endif
 	if( m->hash ) hl_code_hash_free(m->hash);
 	if( m->hot ) hl_hot_reload_free(m->hot);
-	free(m->hot_slots);
+	free(m->functions_extern);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->ctx.functions_types);

@@ -470,17 +470,6 @@ HL_API int hl_type_size( hl_type *t );
 HL_API int hl_pad_struct( int size, hl_type *t );
 
 HL_API hl_runtime_obj *hl_get_obj_rt( hl_type *ot );
-HL_API int hl_mark_size( int data_size );
-HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, void *ctx ), void *ctx );
-HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_start, void *skip_end );
-HL_API void hl_gc_world( bool stop );
-HL_API void ***hl_gc_get_roots( int *count );
-HL_API int hl_gc_other_stacks( void **ranges, int max );
-HL_API void hl_gc_remap_reserve( int count );
-HL_API void hl_gc_remap_add( void *old_block, void *new_block );
-HL_API void hl_gc_remap_apply( void );
-HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) );
-HL_API void hl_gc_enable( bool b );
 HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot );
 HL_API void hl_flush_proto( hl_type *ot );
 HL_API void hl_init_enum( hl_type *et, hl_module_context *m );
@@ -648,11 +637,9 @@ typedef struct {
 	bool is_debugger_enabled;
 	bool is_debugger_attached;
 	int (*hot_init_bits)( hl_type *t, int word );
-	bool hot_reload;
 	void *hot_stack_limit;	// during a reload : the stack of the current thread above it is the program's
 	void *hot_regs;			// during a reload : the registers when the program called it
 	int hot_regs_size;
-	bool hot_retry;			// the last reload was refused by the running code : the same file is tried again
 } hl_setup_t;
 
 HL_API hl_setup_t hl_setup;

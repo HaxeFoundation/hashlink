@@ -719,14 +719,16 @@ static ereg emit_call_fid( emit_ctx *ctx, int findex, ereg *args, int nargs, emi
 	return mode == M_VOID ? UNUSED : new_value(ctx);
 }
 
+// a function that this module does not compile : its address, else NULL
+static void *fun_extern( hl_module *m, int findex ) {
+	return m->functions_extern ? m->functions_extern[findex] : NULL;
+}
+
+// compareFun : the index of a function of this module, or the address of the function of a type of another module
 static ereg emit_compare_call( emit_ctx *ctx, hl_type *t, ereg args[] ) {
 	hl_runtime_obj *rt = hl_get_obj_rt(t);
-	if( rt->t->obj->m != &ctx->mod->ctx ) {
-		// hot reload : the type belongs to a previous module, where compareFun is a function index
-		// until the prototype is initialized, then its address : initialize it and call the address
-		rt = hl_get_obj_proto(rt->t);
-		return emit_native_call(ctx, rt->compareFun, args, 2, &hlt_i32);
-	}
+	if( t->obj->m != &ctx->mod->ctx )
+		return emit_dyn_call(ctx, LOAD_CONST_PTR(rt->compareFun), args, 2, &hlt_i32);
 	return emit_call_fid(ctx, (int)(int_val)rt->compareFun, args, 2, M_I32);
 }
 
@@ -739,7 +741,10 @@ static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int 
 		args[i] = LOAD(R(args_regs[i]));
 	if( isNative )
 		STORE(dst, emit_native_call(ctx, m->functions_ptrs[findex], args, count, dst->t));
-	else {
+	else if( fun_extern(m, findex) ) {
+		ereg out = emit_dyn_call(ctx, LOAD_CONST_PTR(fun_extern(m, findex)), args, count, dst->t);
+		if( out ) STORE(dst, out);
+	} else {
 		ereg out = emit_call_fid(ctx,findex,args,count,hl_type_mode(dst->t));
 		if( out ) STORE(dst, out);
 	}
@@ -754,6 +759,10 @@ static vclosure *alloc_static_closure( emit_ctx *ctx, int fid ) {
 		// native
 		c->t = m->code->natives[fidx - m->code->nfunctions].t;
 		c->fun = m->functions_ptrs[fid];
+		c->value = NULL;
+	} else if( fun_extern(m, fid) ) {
+		c->t = m->code->functions[fidx].type;
+		c->fun = fun_extern(m, fid);
 		c->value = NULL;
 	} else {
 		c->t = m->code->functions[fidx].type;
@@ -1233,12 +1242,7 @@ void hl_emit_final( jit_ctx *jit ) {
 	while( l ) {
 		vclosure *n = (vclosure*)l->value;
 		l->value = NULL;
-		int fid = (int)(int_val)l->fun;
-		void ***slots = jit->mod->hot_slots;
-		if( slots && slots[fid] )
-			l->fun = *slots[fid]; // hot reload : function compiled by another module
-		else
-			l->fun = jit->final_code + (int_val)jit->mod->functions_ptrs[fid];
+		l->fun = jit->final_code + (int_val)jit->mod->functions_ptrs[(int_val)l->fun];
 		l = n;
 	}
 	ctx->closure_list = NULL;
@@ -1717,10 +1721,14 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg args[3];
 			args[0] = LOAD_CONST_PTR(m->code->functions[m->functions_indexes[o->p2]].type);
-			einstr *e = emit_instr(ctx, LOAD_FUN);
-			e->mode = M_PTR;
-			e->size_offs = o->p2;
-			args[1] = new_value(ctx);
+			if( fun_extern(m, o->p2) )
+				args[1] = LOAD_CONST_PTR(fun_extern(m, o->p2));
+			else {
+				einstr *e = emit_instr(ctx, LOAD_FUN);
+				e->mode = M_PTR;
+				e->size_offs = o->p2;
+				args[1] = new_value(ctx);
+			}
 			args[2] = LOAD(rb);
 			STORE(dst, emit_native_call(ctx,hl_alloc_closure_ptr,args,3,dst->t));
 		}

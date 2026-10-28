@@ -25,8 +25,6 @@
 
 #ifdef HL_WIN
 #	include <locale.h>
-#	undef _GUID
-#	include <windows.h>
 typedef uchar pchar;
 #define pprintf(str,file)	uprintf(USTR(str),file)
 #define pfopen(file,ext) _wfopen(file,USTR(ext))
@@ -53,39 +51,7 @@ typedef struct {
 	hl_code *code;
 	hl_module *m;
 	vdynamic *ret;
-	int64 file_time;
-	int64 file_size;
-	bool has_build_id;
-	unsigned char build_id[HL_BUILD_ID_SIZE];	// of the code loaded last (bytecode 7)
 } main_context;
-
-/*
-	Last write time in the best resolution the file system offers, so that two versions
-	written within the same second are told apart (the size is compared too).
-*/
-static int64 pfiletime( pchar *file, int64 *size ) {
-#ifdef HL_WIN
-	WIN32_FILE_ATTRIBUTE_DATA data;
-	if( !GetFileAttributesExW(file,GetFileExInfoStandard,&data) ) {
-		*size = -1;
-		return -1;
-	}
-	*size = ((int64)data.nFileSizeHigh << 32) | data.nFileSizeLow;
-	return ((int64)data.ftLastWriteTime.dwHighDateTime << 32) | data.ftLastWriteTime.dwLowDateTime;
-#else
-	struct stat st;
-	if( stat(file,&st) != 0 ) {
-		*size = -1;
-		return -1;
-	}
-	*size = (int64)st.st_size;
-#	if defined(__APPLE__)
-	return (int64)st.st_mtimespec.tv_sec * 1000000000 + st.st_mtimespec.tv_nsec;
-#	else
-	return (int64)st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec;
-#	endif
-#endif
-}
 
 static hl_code *load_code( const pchar *file, char **error_msg, bool print_errors ) {
 	hl_code *code;
@@ -117,80 +83,18 @@ static hl_code *load_code( const pchar *file, char **error_msg, bool print_error
 
 static main_context* main_ctx = NULL;
 
-HL_API double hl_sys_time();
-
-// a reload delayed by the running code is tried again at most every HL_HOT_RELOAD_RETRY seconds (0.5 by default)
-static double retry_delay() {
-	static double delay = -1;
-	if( delay < 0 ) {
-		const char *v = getenv("HL_HOT_RELOAD_RETRY");
-		delay = v ? atof(v) : 0.5;
-		if( delay < 0 ) delay = 0;
-	}
-	return delay;
-}
-
-static void set_build_id( main_context *m, hl_code *code ) {
-	m->has_build_id = code->version >= 7;
-	if( m->has_build_id ) memcpy(m->build_id, code->build_id, HL_BUILD_ID_SIZE);
-}
-
-/*
-	From bytecode 7, the start of the file tells its length and its build id : a file still being
-	written (shorter than its length) is checked again at the next call, and a file with the code
-	already loaded (written again, or compiled to the same bytecode) is not read.
-*/
-static bool check_header( main_context *m, pchar *file, int64 size, bool *same ) {
-	unsigned char head[HL_HEADER_SIZE], id[HL_BUILD_ID_SIZE];
-	int file_size;
-	*same = false;
-	FILE *f = pfopen(file,"rb");
-	if( f == NULL ) return false;
-	int n = (int)fread(head, 1, HL_HEADER_SIZE, f);
-	fclose(f);
-	int version = hl_code_read_header(head, n, &file_size, id);
-	if( version < 0 ) return false;
-	if( version < 7 ) return true;
-	if( file_size != size ) return false;
-	*same = m->has_build_id && memcmp(id, m->build_id, HL_BUILD_ID_SIZE) == 0;
-	return true;
-}
-
 static bool check_reload( vbyte *alt_file ) {
-	static double last_try = 0;
 	main_context* m = main_ctx;
 	pchar* file = alt_file ? (pchar*)alt_file : m->file;
-	int64 size;
-	int64 time = pfiletime(file,&size);
 	bool changed;
-	if( time == m->file_time && size == m->file_size ) {
-		if( !hl_setup.hot_retry || hl_sys_time() - last_try < retry_delay() )
-			return false;
-		// the function that delayed it still runs : no need to read the file and compare it again
-		if( hl_hot_still_blocked() ) {
-			last_try = hl_sys_time();
-			return false;
-		}
-	} else {
-		bool same;
-		if( !check_header(m, file, size, &same) )
-			return false;
-		if( same ) {
-			m->file_time = time;
-			m->file_size = size;
-			return false;
-		}
-	}
-	last_try = hl_sys_time();
-	hl_setup.hot_retry = false;
+	if( !hl_hot_reload_file_changed(file) )
+		return false;
 	char *error_msg = NULL;
 	hl_code *code = load_code(file, &error_msg, false);
 	if( code == NULL )
 		return false;
 	changed = hl_module_patch(m->m, code);
-	m->file_time = time;
-	m->file_size = size;
-	set_build_id(m, code);
+	hl_hot_reload_file_loaded(code);
 	hl_code_free(code);
 	return changed;
 }
@@ -384,8 +288,7 @@ int main(int argc, pchar *argv[]) {
 	if( !hl_module_init(ctx.m,(hot_reload?HL_MODULE_HOT_RELOAD:0) | (dump?HL_MODULE_DUMP:0) | (debug_port > 0 && !debug_opt?HL_MODULE_DEBUG:0)) )
 		return 3;
 	if( hot_reload ) {
-		ctx.file_time = pfiletime(ctx.file,&ctx.file_size);
-		set_build_id(&ctx, ctx.code);
+		hl_hot_reload_file_init(ctx.file, ctx.code);
 		hl_setup.reload_check = check_reload;
 	}
 	hl_setup.load_plugin = load_plugin;

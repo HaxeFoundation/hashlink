@@ -59,11 +59,10 @@ struct hl_function {
 #	define ASSIGN_SCOPE_END(f,i)	((f)->assigns[(i)*3+2])
 
 	hl_type_obj *obj;
-	union {
-		const uchar *name;
+	struct {
+		const uchar *name; // a local function (obj = NULL) : its name in its method (bytecode 7), NULL if unknown
 		hl_function *ref; // obj = NULL
 	} field;
-	const uchar *lname; // the name of a local function in its method (bytecode 7), NULL if unknown
 };
 
 #define fun_obj(f) ((f)->obj ? (f)->obj : (f)->field.ref ? (f)->field.ref->obj : NULL)
@@ -153,7 +152,7 @@ typedef struct {
 	hl_debug_infos *jit_debug;
 	jit_ctx *jit_ctx;
 	hl_hot_reload *hot;	// hot reload : the reference state, on the first module
-	void ***hot_slots;	// hot reload : for the functions this module did not compile, where their current address is
+	void **functions_extern;	// the address of the functions this module does not compile (a hot reload compiles the changed ones), NULL for the others
 	hl_type_obj ***hot_uses;	// hot reload : for each function, the object types it uses (NULL terminated)
 	void **hot_code;	// hot reload : for each function, the address of the code this module compiled for it, or NULL
 	bool debug;
@@ -194,21 +193,13 @@ h_bool hl_module_debug( hl_module *m, int port, h_bool wait );
 hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err );
 hl_module **hl_get_modules( int *count );
 
-// internal : module.c functions used by reload.c
-void hl_module_init_natives( hl_module *m );
-void hl_module_init_indexes( hl_module *m );
-void hl_module_init_constant( hl_module *m, hl_constant *c );
-void hl_module_add( hl_module *m );
-void hl_module_null_function();
-bool hl_module_same_type( hl_type *t1, hl_type *t2 );
-int hl_module_capture_stack( void **stack, int size );
-bool hl_module_is_call_site( void *ret );
-
 // hot reload (reload.c)
 void hl_hot_reload_prepare( hl_module *m );
 void hl_hot_reload_init( hl_module *m );
 void hl_hot_reload_free( hl_hot_reload *hr );
-bool hl_hot_still_blocked( void );
+void hl_hot_reload_file_init( const void *file, hl_code *code );
+bool hl_hot_reload_file_changed( const void *file );
+void hl_hot_reload_file_loaded( hl_code *code );
 
 void hl_profile_setup( int sample_count );
 void hl_profile_end();

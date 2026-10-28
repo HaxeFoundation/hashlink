@@ -28,6 +28,28 @@
 #	include <windows.h>
 #endif
 
+// the functions of the GC (gc.c) and of the objects (std/obj.c) that a reload uses
+HL_API int hl_mark_size( int data_size );
+HL_API void hl_gc_enable( bool b );
+HL_API void hl_gc_world( bool stop );
+HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, void *ctx ), void *ctx );
+HL_API int hl_gc_other_stacks( void **ranges, int max );
+HL_API void ***hl_gc_get_roots( int *count );
+HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_start, void *skip_end );
+HL_API void hl_gc_remap_reserve( int count );
+HL_API void hl_gc_remap_add( void *old_block, void *new_block );
+HL_API void hl_gc_remap_apply( void );
+
+// the functions of the modules (module.c) that a reload uses
+void hl_module_init_natives( hl_module *m );
+void hl_module_init_indexes( hl_module *m );
+void hl_module_init_constant( hl_module *m, hl_constant *c );
+void hl_module_add( hl_module *m );
+void hl_module_null_function();
+bool hl_module_same_type( hl_type *t1, hl_type *t2 );
+int hl_module_capture_stack( void **stack, int size );
+bool hl_module_is_call_site( void *ret );
+
 /*
 	Hot reload : the code of a new version of the program is compared with the running one, and
 	the functions that changed are compiled and patched, the live values (class objects, instances)
@@ -240,7 +262,7 @@ static void hot_reload_init( hl_module *m, int max_globals, int max_globals_size
 	hl_code *c = m->code;
 	for(i=0;i<c->nfunctions;i++) {
 		hl_function *f = c->functions + i;
-		if( f->field.name == NULL ) continue;
+		if( fun_obj(f) == NULL ) continue;
 		hot_add_function(hr, m->hash->functions_signs[i], m->hash->functions_hashes[i], f, m->functions_ptrs + f->findex);
 	}
 	hr->nglobals = c->nglobals;
@@ -829,7 +851,7 @@ static void hot_print_layout_name( hot_report *r, hot_itype *it );
 
 /*
 	The running functions that delayed the last reload : while one of them still runs, trying the same file again
-	would read it and compare it for nothing (hl_hot_still_blocked).
+	would read it and compare it for nothing (hot_still_blocked).
 */
 static hl_function **hot_blockers = NULL;
 static int hot_nblockers = 0, hot_max_blockers = 0;
@@ -910,7 +932,7 @@ static void hot_check_stack( hot_itype *types, int count, hot_report *r ) {
 	Whether one of the functions that delayed the last reload still runs, in any thread : the stacks are walked
 	as hot_check_stack does, the other threads stopped meanwhile. Cheap next to reading and comparing the code.
 */
-bool hl_hot_still_blocked( void ) {
+static bool hot_still_blocked( void ) {
 	if( hot_nblockers == 0 ) return false;
 	bool found = false;
 	void *stack[512];
@@ -1959,7 +1981,7 @@ static void hot_discard( hl_module *m ) {
 	free(m->unwind_table);
 #	endif
 	hl_free(&m->ctx.alloc);
-	free(m->hot_slots);
+	free(m->functions_extern);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->ctx.functions_types);
@@ -1969,13 +1991,14 @@ static void hot_discard( hl_module *m ) {
 /*
 	A reload refused because of the code that runs (a function that uses a type whose layout changes,
 	an instance to move referenced by a stack) is tried again by the next checks of the file
-	(hl_setup.hot_retry) : the running code changes. It is reported once while the reason stays the same.
+	(hot_retry) : the running code changes. It is reported once while the reason stays the same.
 */
+static bool hot_retry = false;
 static char *hot_last_delay = NULL;
 
 static h_bool hot_refuse_gen( hl_module *m2, const char *msg, const char *details, bool retry ) {
 	if( !details ) details = "";
-	hl_setup.hot_retry = retry;
+	hot_retry = retry;
 	if( retry ) {
 		if( hot_last_delay == NULL || strcmp(hot_last_delay, details) != 0 ) {
 			printf("[HotReload] Reload delayed: %s%s\n[HotReload] Tried again until the running code no longer uses them\n", msg, details);
@@ -2229,6 +2252,8 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		switch( t->kind ) {
 		case HOBJ:
 		case HSTRUCT:
+			// the new code calls the compare function of the previous one by its address, given by its prototype
+			if( hl_get_obj_rt(p)->compareFun ) hl_get_obj_proto(p);
 			t->obj = p->obj;
 			t->vobj_proto = p->vobj_proto;
 			break;
@@ -2278,13 +2303,13 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	int *match = (int*)malloc(sizeof(int) * nfuns);
 	bool *taken = (bool*)malloc(sizeof(bool) * (hr->nfunctions + 1));
 	memset(taken,0,sizeof(bool) * (hr->nfunctions + 1));
-	m2->hot_slots = (void***)malloc(sizeof(void**) * (nfuns + c->nnatives));
-	memset(m2->hot_slots,0,sizeof(void**) * (nfuns + c->nnatives));
+	m2->functions_extern = (void**)malloc(sizeof(void*) * (nfuns + c->nnatives));
+	memset(m2->functions_extern,0,sizeof(void*) * (nfuns + c->nnatives));
 	int changes_count = 0;
 	for(i=0;i<nfuns;i++) {
 		hl_function *f2 = c->functions + i;
 		match[i] = HOT_SKIP;
-		if( f2->field.name == NULL ) continue;
+		if( fun_obj(f2) == NULL ) continue;
 		int sign = m2->hash->functions_signs[i];
 		int cursor = -1, k;
 		match[i] = HOT_ADDED;
@@ -2299,7 +2324,8 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 			taken[k] = true;
 			if( hf->hash == m2->hash->functions_hashes[i] ) {
 				match[i] = HOT_SAME;
-				m2->hot_slots[f2->findex] = hf->slot;
+				// its current address : if it changes later, this one jumps to the new one (hl_jit_patch_method)
+				m2->functions_extern[f2->findex] = *hf->slot;
 			} else
 				match[i] = k;
 			break;
@@ -2308,7 +2334,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 #			ifdef HL_DEBUG
 			uprintf(USTR("%s."), fun_obj(f2)->name);
 			uprintf(USTR("%s"), fun_field_name(f2));
-			if( !f2->obj && f2->lname ) uprintf(USTR("~%s"), f2->lname); else if( !f2->obj ) printf("~%d", f2->ref);
+			if( !f2->obj && f2->field.name ) uprintf(USTR("~%s"), f2->field.name); else if( !f2->obj ) printf("~%d", f2->ref);
 			printf(match[i] == HOT_ADDED ? " has been added\n" : " has been modified [%d]\n", f2->nops);
 #			endif
 			changes_count++;
@@ -2419,7 +2445,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	for(i=0;i<nfuns;i++) {
 		hl_function *f2 = c->functions + i;
 		if( match[i] == HOT_SAME ) {
-			m2->functions_ptrs[f2->findex] = *m2->hot_slots[f2->findex];
+			m2->functions_ptrs[f2->findex] = m2->functions_extern[f2->findex];
 			continue;
 		}
 		void *ptr = ((unsigned char*)m2->jit_code) + ((int_val)m2->functions_ptrs[f2->findex]);
@@ -2458,7 +2484,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 
 	free(hot_last_delay);
 	hot_last_delay = NULL;
-	hl_setup.hot_retry = false;
+	hot_retry = false;
 	printf("[HotReload] %d changes\n", changes_count);
 	fflush(stdout);
 	hl_module_add(m2);
@@ -2502,7 +2528,6 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 */
 void hl_hot_reload_prepare( hl_module *m ) {
 	int extra_globals = hot_reload_extra_globals();
-	hl_setup.hot_reload = true;
 	int nsize = m->globals_size + extra_globals * sizeof(void*);
 	int *nindexes = malloc(sizeof(int) * (m->code->nglobals + extra_globals));
 	memcpy(nindexes,m->globals_indexes,sizeof(int)*m->code->nglobals);
@@ -2522,4 +2547,132 @@ void hl_hot_reload_init( hl_module *m ) {
 	hl_setup.hot_init_bits = hot_init_bits;
 	hl_code_hash_finalize(m->hash);
 	hot_reload_init(m, m->code->nglobals + extra_globals, m->globals_size + extra_globals * (int)sizeof(void*));
+}
+
+
+/* ---- the file of the code ---- */
+
+#ifdef HL_WIN
+typedef uchar pchar;
+#	define pfopen(file,ext) _wfopen(file,USTR(ext))
+#else
+#	include <sys/stat.h>
+typedef char pchar;
+#	define pfopen(file,ext) fopen(file,ext)
+#endif
+
+static struct {
+	int64 time;
+	int64 size;
+	int64 new_time;	// of the file hl_hot_reload_file_changed found changed
+	int64 new_size;
+	bool has_build_id;
+	unsigned char build_id[HL_BUILD_ID_SIZE];	// of the code loaded last (bytecode 7)
+	double last_try;
+} hot_file = {0};
+
+/*
+	Last write time in the best resolution the file system offers, so that two versions
+	written within the same second are told apart (the size is compared too).
+*/
+static int64 hot_file_time( const pchar *file, int64 *size ) {
+#ifdef HL_WIN
+	WIN32_FILE_ATTRIBUTE_DATA data;
+	if( !GetFileAttributesExW(file,GetFileExInfoStandard,&data) ) {
+		*size = -1;
+		return -1;
+	}
+	*size = ((int64)data.nFileSizeHigh << 32) | data.nFileSizeLow;
+	return ((int64)data.ftLastWriteTime.dwHighDateTime << 32) | data.ftLastWriteTime.dwLowDateTime;
+#else
+	struct stat st;
+	if( stat(file,&st) != 0 ) {
+		*size = -1;
+		return -1;
+	}
+	*size = (int64)st.st_size;
+#	if defined(__APPLE__)
+	return (int64)st.st_mtimespec.tv_sec * 1000000000 + st.st_mtimespec.tv_nsec;
+#	else
+	return (int64)st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec;
+#	endif
+#endif
+}
+
+// a reload delayed by the running code is tried again at most every HL_HOT_RELOAD_RETRY seconds (0.5 by default)
+static double hot_retry_delay() {
+	static double delay = -1;
+	if( delay < 0 ) {
+		const char *v = getenv("HL_HOT_RELOAD_RETRY");
+		delay = v ? atof(v) : 0.5;
+		if( delay < 0 ) delay = 0;
+	}
+	return delay;
+}
+
+static void hot_set_build_id( hl_code *code ) {
+	hot_file.has_build_id = code->version >= 7;
+	if( hot_file.has_build_id ) memcpy(hot_file.build_id, code->build_id, HL_BUILD_ID_SIZE);
+}
+
+/*
+	From bytecode 7, the start of the file tells its length and its build id : a file still being
+	written (shorter than its length) is checked again at the next call, and a file with the code
+	already loaded (written again, or compiled to the same bytecode) is not read.
+*/
+static bool hot_check_header( const pchar *file, int64 size, bool *same ) {
+	unsigned char head[HL_HEADER_SIZE], id[HL_BUILD_ID_SIZE];
+	int file_size;
+	*same = false;
+	FILE *f = pfopen(file,"rb");
+	if( f == NULL ) return false;
+	int n = (int)fread(head, 1, HL_HEADER_SIZE, f);
+	fclose(f);
+	int version = hl_code_read_header(head, n, &file_size, id);
+	if( version < 0 ) return false;
+	if( version < 7 ) return true;
+	if( file_size != size ) return false;
+	*same = hot_file.has_build_id && memcmp(id, hot_file.build_id, HL_BUILD_ID_SIZE) == 0;
+	return true;
+}
+
+// the file of the code (a pchar of main.c) the program started with
+void hl_hot_reload_file_init( const void *file, hl_code *code ) {
+	hot_file.time = hot_file_time((const pchar*)file, &hot_file.size);
+	hot_set_build_id(code);
+}
+
+// whether the file must be read and its code given to hl_module_patch, then to hl_hot_reload_file_loaded
+bool hl_hot_reload_file_changed( const void *file ) {
+	int64 size;
+	int64 time = hot_file_time((const pchar*)file, &size);
+	if( time == hot_file.time && size == hot_file.size ) {
+		if( !hot_retry || hl_sys_time() - hot_file.last_try < hot_retry_delay() )
+			return false;
+		// the function that delayed it still runs : no need to read the file and compare it again
+		if( hot_still_blocked() ) {
+			hot_file.last_try = hl_sys_time();
+			return false;
+		}
+	} else {
+		bool same;
+		if( !hot_check_header((const pchar*)file, size, &same) )
+			return false;
+		if( same ) {
+			hot_file.time = time;
+			hot_file.size = size;
+			return false;
+		}
+	}
+	hot_file.last_try = hl_sys_time();
+	hot_retry = false;
+	hot_file.new_time = time;
+	hot_file.new_size = size;
+	return true;
+}
+
+void hl_hot_reload_file_loaded( hl_code *code ) {
+	hot_file.time = hot_file.new_time;
+	hot_file.size = hot_file.new_size;
+	hot_set_build_id(code);
 }
