@@ -1939,7 +1939,6 @@ void hl_codegen_init( jit_ctx *jit ) {
 			emit_mov(ctx, MK_ADDR(RSP,shadow + i), R(R10), M_PTR);
 		}
 		EMIT(_CALL,RTMP,UNUSED,M_PTR);
-		// the debugger knows a single trampoline : keep the one of the first module
 		if( hl_jit_trampoline < 0 ) hl_jit_trampoline = jit->out_pos + byte_count(ctx->code);
 		emit_mov(ctx, MK_ADDR(RSP,-HL_WSIZE), R(RBP), M_PTR);
 		EMIT(ADD,R(RSP),MK_CONST(frame),M_PTR);

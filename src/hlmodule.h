@@ -60,7 +60,7 @@ struct hl_function {
 
 	hl_type_obj *obj;
 	struct {
-		const uchar *name; // a local function (obj = NULL) : its name in its method (bytecode 7), NULL if unknown
+		const uchar *name;
 		hl_function *ref; // obj = NULL
 	} field;
 };
@@ -75,12 +75,12 @@ typedef struct {
 } hl_constant;
 
 #define HL_BUILD_ID_SIZE	16
-#define HL_HEADER_SIZE		(4 + 4 + HL_BUILD_ID_SIZE)	// from bytecode 7
+#define HL_HEADER_SIZE		(4 + 4 + HL_BUILD_ID_SIZE)
 
 typedef struct {
 	int version;
-	int file_size;							// from bytecode 7 : the length the file must have
-	unsigned char build_id[HL_BUILD_ID_SIZE];	// from bytecode 7 : the same for the same code
+	int file_size;
+	unsigned char build_id[HL_BUILD_ID_SIZE];
 	int nints;
 	int nfloats;
 	int nstrings;
@@ -151,10 +151,10 @@ typedef struct {
 	hl_code_hash *hash;
 	hl_debug_infos *jit_debug;
 	jit_ctx *jit_ctx;
-	hl_hot_reload *hot;	// hot reload : the reference state, on the first module
-	void **functions_extern;	// the address of the functions this module does not compile (a hot reload compiles the changed ones), NULL for the others
-	hl_type_obj ***hot_uses;	// hot reload : for each function, the object types it uses (NULL terminated)
-	void **hot_code;	// hot reload : for each function, the address of the code this module compiled for it, or NULL
+	hl_hot_reload *hot;
+	void **functions_extern;
+	hl_type_obj ***hot_uses;
+	void **hot_code;
 	bool debug;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
@@ -193,7 +193,6 @@ h_bool hl_module_debug( hl_module *m, int port, h_bool wait );
 hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err );
 hl_module **hl_get_modules( int *count );
 
-// hot reload (reload.c)
 void hl_hot_reload_prepare( hl_module *m );
 void hl_hot_reload_init( hl_module *m );
 void hl_hot_reload_free( hl_hot_reload *hr );

@@ -18,7 +18,7 @@
 
 typedef struct {
 #	ifdef _MTYPE
-	hl_type *t; // identifies the map in the heap (see the remap hooks of the GC)
+	hl_type *t;
 #	endif
 	void *cells;
 	void *nexts;
@@ -29,7 +29,7 @@ typedef struct {
 	int nentries;
 	int maxentries;
 #	ifdef _MREHASH
-	bool rehash; // keys moved (hot reload) : the cells are rebuilt at the next access
+	bool rehash;
 #	endif
 } t_map;
 

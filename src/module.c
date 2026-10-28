@@ -783,8 +783,6 @@ void hl_module_init_indexes( hl_module *m ) {
 			break;
 		}
 	}
-	// the method of each local function : the one of the function that references it, which can be
-	// a local function itself, listed after it : repeat until no function is attached
 	bool *scanned = (bool*)calloc(m->code->nfunctions, sizeof(bool));
 	bool attached = true;
 	while( attached ) {

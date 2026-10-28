@@ -438,12 +438,6 @@ HL_API hl_threads_info *hl_gc_threads_info() {
 	return &gc_threads;
 }
 
-/*
-	The stops nest : a hot reload stops the world (hl_gc_world) then collects and checks the stacks, which
-	stop and restart it too. Only the outermost restart clears stopping_world : a thread that returns from a
-	native call (hl_blocking) while it is set waits for the global lock, so it does not run while the reload
-	moves the objects. Always called with the global lock held.
-*/
 static int gc_stop_depth = 0;
 
 static void gc_stop_world( bool b ) {
@@ -850,9 +844,8 @@ static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 #define REGULAR_BITS 8
 #define GC_MARK_BATCH	64
 
-// the remaps of a collection (hot reload, see hl_gc_remap_apply)
 static struct {
-	int size;		// power of two
+	int size;
 	int count;
 	void **olds;
 	void **news;
@@ -961,7 +954,6 @@ static GC_NOINLINE int gc_flush_mark_remap( gc_mstack *stack ) {
 }
 
 static int gc_flush_mark( gc_mstack *stack ) {
-	// the usual marking stays without the test of the remaps
 	if( gc_remap.count ) return gc_flush_mark_remap(stack);
 	return gc_flush_mark_gen(stack, false);
 }
@@ -1749,13 +1741,9 @@ static void gc_iter_live_page( gc_pheader *p, int private_data ) {
 	gc_iter_live_blocks(p, gc_iter_live_block);
 }
 
-/*
-	Calls the callback for every live block, after a collection, with the world stopped.
-	The callback must not allocate.
-*/
 HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, void *ctx ), void *ctx ) {
 	gc_global_lock(true);
-	gc_major(); // a full collection (not only a mark) keeps the state of the allocator
+	gc_major();
 	gc_stop_world(true);
 	live_iter.callback = callback;
 	live_iter.ctx = ctx;
@@ -1764,12 +1752,7 @@ HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, 
 	gc_global_lock(false);
 }
 
-// ---- hot reload ----
 
-/*
-	Stops (or restarts) the other threads, at their safe points, as for a collection : the thread
-	that stops them can still allocate and collect.
-*/
 HL_API void hl_gc_world( bool stop ) {
 	if( stop ) {
 		gc_global_lock(true);
@@ -1780,10 +1763,6 @@ HL_API void hl_gc_world( bool stop ) {
 	}
 }
 
-/*
-	The stacks of the other threads, stopped (see hl_gc_world) : ranges[i*2] is where a stack was
-	saved, ranges[i*2+1] its top. Returns the number of stacks.
-*/
 HL_API int hl_gc_other_stacks( void **ranges, int max ) {
 	int n = 0;
 	for(int i=0;i<gc_threads.count && n < max;i++) {
@@ -1796,13 +1775,11 @@ HL_API int hl_gc_other_stacks( void **ranges, int max ) {
 	return n;
 }
 
-// the roots : addresses of the values the GC keeps alive
 HL_API void ***hl_gc_get_roots( int *count ) {
 	*count = gc_roots_count;
 	return gc_roots;
 }
 
-// ---- relocation of blocks (hot reload) ----
 
 typedef struct {
 	void *start;
@@ -1837,11 +1814,6 @@ static int gc_stack_find( void **start, void **end, gc_range *r, int count ) {
 	return -1;
 }
 
-/*
-	Returns the index of a block that a stack or the saved registers of a thread reference
-	(a pointer to it or inside it), or -1. Such a block cannot be relocated. The words of the
-	current thread stack in [skip_start, skip_end) are ignored (a frame whose values are dead).
-*/
 HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_start, void *skip_end ) {
 	gc_range *r = (gc_range*)malloc(sizeof(gc_range) * (count + 1));
 	int found = -1;
@@ -1856,7 +1828,6 @@ HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_s
 	for(int i=0;i<gc_threads.count && found < 0;i++) {
 		hl_thread_info *t = gc_threads.threads[i];
 		if( t == current_thread && hl_setup.hot_stack_limit ) {
-			// the frames of the reload itself hold no value of the program, but garbage
 			void **start = (void**)hl_setup.hot_stack_limit;
 			if( skip_start && skip_start >= (void*)start && skip_end <= t->stack_top ) {
 				found = gc_stack_find(start, (void**)skip_start, r, count);
@@ -1876,12 +1847,7 @@ HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_s
 	return found;
 }
 
-// ---- remaps (hot reload) ----
 
-/*
-	Remaps : a collection that replaces the references to some blocks by references
-	to others, when it scans the blocks and the roots. The blocks replaced are no longer marked.
-*/
 static unsigned int gc_remap_hash( void *p ) {
 	uint64 h = (uint64)(int_val)p;
 	h ^= h >> 29;
@@ -1924,23 +1890,16 @@ static void gc_remap_grow( int count ) {
 	free(news);
 }
 
-// makes room for count more remaps
 HL_API void hl_gc_remap_reserve( int count ) {
 	gc_remap_grow(gc_remap.count + count);
 }
 
-// adds a remap for the next hl_gc_remap_apply
 HL_API void hl_gc_remap_add( void *old_block, void *new_block ) {
 	if( (gc_remap.count + 1) * 2 > gc_remap.size )
 		gc_remap_grow(gc_remap.count + 1);
 	gc_remap_set(old_block, new_block);
 }
 
-/*
-	Remap hooks : a value whose content depends on the address of other blocks (an object map hashes
-	the address of its keys) is identified by its type (its first word), and the hook of its type is
-	called for it after a collection that moved blocks.
-*/
 #define GC_MAX_REMAP_HOOKS 8
 static struct {
 	hl_type *types[GC_MAX_REMAP_HOOKS];
@@ -1988,23 +1947,16 @@ static void gc_find_hook_page( gc_pheader *p, int private_data ) {
 		gc_iter_live_blocks(p, gc_find_hook_value);
 }
 
-/*
-	Runs a collection that applies the remaps added (hl_gc_remap_add) : the references to the old blocks,
-	from the blocks and the roots, are replaced by references to the new ones, with the parallel marking.
-	The stacks must not reference the old blocks (see hl_gc_stacks_find) : they are scanned conservatively.
-*/
 HL_API void hl_gc_remap_apply() {
 	if( gc_remap.count == 0 ) return;
 	gc_global_lock(true);
 	gc_major();
-	// the values of the remap hooks, found while the marks are valid
 	gc_remap_hooks.nvalues = 0;
 	if( gc_remap_hooks.count ) gc_iter_pages(gc_find_hook_page);
 	gc_global_lock(false);
 	free(gc_remap.olds);
 	free(gc_remap.news);
 	memset(&gc_remap, 0, sizeof(gc_remap));
-	// the hooks can allocate : they are called after the walk (the values stay reachable, no code of the program runs)
 	int n = gc_remap_hooks.nvalues;
 	void **values = (void**)malloc(sizeof(void*) * (n + 1));
 	int *kinds = (int*)malloc(sizeof(int) * (n + 1));

@@ -439,7 +439,7 @@ typedef struct {
 	int size;
 	bool hasptr;
 	int *offsets;
-	const uchar **pnames; // the names of the parameters (bytecode 7), NULL if unknown
+	const uchar **pnames;
 } hl_enum_construct;
 
 typedef struct {
@@ -637,8 +637,8 @@ typedef struct {
 	bool is_debugger_enabled;
 	bool is_debugger_attached;
 	int (*hot_init_bits)( hl_type *t, int word );
-	void *hot_stack_limit;	// during a reload : the stack of the current thread above it is the program's
-	void *hot_regs;			// during a reload : the registers when the program called it
+	void *hot_stack_limit;
+	void *hot_regs;
 	int hot_regs_size;
 } hl_setup_t;
 

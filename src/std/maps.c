@@ -236,13 +236,7 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 	return key;
 }
 
-/*
-	The object maps hash the address of their keys : when the GC moves objects (hot reload), it calls
-	a hook for each live object map, identified by its type, which marks it to be rehashed. The map is
-	rehashed by its next access, from the thread using it : the threads were stopped at any allocation,
-	maybe in the middle of an operation on the map (a resize), so the hook must not read it nor change it.
-*/
-HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) ); // gc.c
+HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) );
 static hl_type hlt_homap = { HABSTRACT, { USTR("ObjectMap") } };
 static void hl_ho_rehash_hook( void *m );
 static void hl_ho_rehash( void *m );
@@ -272,12 +266,11 @@ static void hl_ho_rehash_hook( void *map ) {
 	((hl_ho_map*)map)->rehash = true;
 }
 
-// rebuilds the cells of an object map after the address of some keys changed
 static void hl_ho_rehash( void *map ) {
 	hl_ho_map *m = (hl_ho_map*)map;
 	m->rehash = false;
 	if( !m->values ) return;
-	hl_ho_map old = *m; // on the stack : keeps the previous arrays alive
+	hl_ho_map old = *m;
 	memset(m,0,sizeof(hl_ho_map));
 	m->t = old.t;
 	for(int i=0;i<old.ncells;i++) {

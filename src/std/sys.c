@@ -681,8 +681,6 @@ HL_PRIM vbyte *hl_sys_hl_file() {
 
 HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
 	if( hl_setup.reload_check == NULL ) return false;
-	// a reload that moves objects checks that the program stack does not reference them :
-	// that's the stack above this frame, and the registers the program gave
 	jmp_buf regs;
 	setjmp(regs);
 	hl_setup.hot_stack_limit = &regs;
@@ -694,10 +692,6 @@ HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
 	return r;
 }
 
-/*
-	Hot reload : which statics of a class the entry point must initialize, by words of 32 bits
-	(bit k of word w is the own field w * 32 + k of the class object type t), word -1 telling if the class is new.
-*/
 HL_PRIM int hl_hot_init_bits( hl_type *t, int word ) {
 	return hl_setup.hot_init_bits ? hl_setup.hot_init_bits(t, word) : 0;
 }

@@ -719,12 +719,10 @@ static ereg emit_call_fid( emit_ctx *ctx, int findex, ereg *args, int nargs, emi
 	return mode == M_VOID ? UNUSED : new_value(ctx);
 }
 
-// a function that this module does not compile : its address, else NULL
 static void *fun_extern( hl_module *m, int findex ) {
 	return m->functions_extern ? m->functions_extern[findex] : NULL;
 }
 
-// compareFun : the index of a function of this module, or the address of the function of a type of another module
 static ereg emit_compare_call( emit_ctx *ctx, hl_type *t, ereg args[] ) {
 	hl_runtime_obj *rt = hl_get_obj_rt(t);
 	if( t->obj->m != &ctx->mod->ctx )

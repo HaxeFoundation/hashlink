@@ -433,11 +433,6 @@ static int *hl_read_debug_infos( hl_reader *r, int nops ) {
 	return debug;
 }
 
-/*
-	The start of a bytecode file : returns its version, and from version 7 the length the file
-	must have and its build id (file_size is -1 before), or -1 if the data is not bytecode or too
-	short. HL_HEADER_SIZE bytes are enough.
-*/
 int hl_code_read_header( const unsigned char *data, int size, int *file_size, unsigned char *build_id ) {
 	*file_size = -1;
 	if( size < 4 || data[0] != 'H' || data[1] != 'L' || data[2] != 'B' )
@@ -760,8 +755,6 @@ static int hash_native( hl_code_hash *h, hl_native *n ) {
 	return hash;
 }
 
-// a hash of a type that does not depend on the layout of the objects and enums, only their names :
-// a function keeps its signature when the class of its arguments (this) changes layout
 static int hash_type_sign( hl_type *t, int depth ) {
 	int hash = -1;
 	int i;
@@ -782,8 +775,6 @@ static int hash_type_sign( hl_type *t, int depth ) {
 	case HENUM:
 		HUSTR(t->tenum->name);
 		if( !t->tenum->global_value ) {
-			// an anonymous enum (the context of a closure) : its structure, so that a live closure
-			// does not call a function that expects other captured variables
 			H32(t->tenum->nconstructs);
 			for(i=0;i<t->tenum->nconstructs;i++) {
 				hl_enum_construct *c = t->tenum->constructs + i;
@@ -825,7 +816,6 @@ static int hash_fun_sign( hl_code_hash *h, hl_function *f ) {
 	} else if( f->field.ref ) {
 		HUSTR(f->field.ref->obj->name);
 		HUSTR(f->field.ref->field.name);
-		// a local function : by its name when the bytecode has it, else by its rank in the method
 		if( f->field.name ) {
 			HUSTR(f->field.name);
 		} else {
@@ -1022,8 +1012,6 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 		if( t->kind == HABSTRACT )
 			h->globals_signs[i] = hl_code_hash_type(h,t); // some global abstracts allocated by compiler
 	}
-	// the global of a class or an enum is identified by its name only : its layout is checked
-	// separately, and its type hash changes with any type it references
 	for(i=0;i<c->ntypes;i++) {
 		hl_type *t = c->types + i;
 		int g;
@@ -1095,10 +1083,6 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 }
 
 
-/*
-	Renumbers the globals of a new code so that they match the reference ones : remap[i] is the
-	reference index of the global i, or -1 for a new global, which gets an index after old_count.
-*/
 void hl_code_hash_remap_globals( hl_code_hash *hnew, int *remap, int old_count, hl_type **old_types, int *old_signs ) {
 	hl_code *c = hnew->code;
 	int i;
