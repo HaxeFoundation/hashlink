@@ -1900,10 +1900,9 @@ HL_API void hl_gc_remap_add( void *old_block, void *new_block ) {
 	gc_remap_set(old_block, new_block);
 }
 
-#define GC_MAX_REMAP_HOOKS 8
 static struct {
-	hl_type *types[GC_MAX_REMAP_HOOKS];
-	void (*hooks[GC_MAX_REMAP_HOOKS])( void * );
+	hl_type **types;
+	void (**hooks)( void * );
 	int count;
 	void **values;
 	int *kinds;
@@ -1917,8 +1916,9 @@ HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) ) {
 	for(i=0;i<gc_remap_hooks.count;i++)
 		if( gc_remap_hooks.types[i] == t ) break;
 	if( i == gc_remap_hooks.count ) {
-		if( i == GC_MAX_REMAP_HOOKS ) hl_fatal("Too many remap hooks");
 		gc_remap_hooks.count++;
+		gc_remap_hooks.types = (hl_type**)realloc(gc_remap_hooks.types, sizeof(hl_type*) * gc_remap_hooks.count);
+		gc_remap_hooks.hooks = (void (**)( void * ))realloc(gc_remap_hooks.hooks, sizeof(void*) * gc_remap_hooks.count);
 	}
 	gc_remap_hooks.types[i] = t;
 	gc_remap_hooks.hooks[i] = hook;
