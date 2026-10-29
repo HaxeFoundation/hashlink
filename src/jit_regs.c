@@ -383,7 +383,9 @@ static void regs_compute_liveness( regs_ctx *ctx ) {
 				if( v && IS_NULL(v->pref_reg) )
 					v->pref_reg = r;
 			}
-			if( !needs_push && e->mode != M_NORET ) ctx->has_direct_call = true;
+			// a call that never returns (hl_throw, hl_null_access...) still needs the Win64
+			// shadow space: the callee may spill its arguments there, over our saved frame
+			if( !needs_push ) ctx->has_direct_call = true;
 			if( write && IS_NULL(write->pref_reg) )
 				write->pref_reg = REG_CFG(REG_MODE(e->mode))->ret;
 		} else switch( e->op ) {
