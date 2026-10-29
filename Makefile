@@ -282,7 +282,7 @@ $(HL) $(HLC):
 	$(HDLL_LINK) $(USE_LIBHL_LDFLAGS) $(HDLL_LDFLAGS) $($*_LDFLAGS) -shared $^ $($*_LDLIBS) -o $@
 
 $(FMT): CPPFLAGS += $(FMT_CPPFLAGS)
-fmt_LDLIBS = -lpng -lturbojpeg -lvorbisfile -lz -lm
+fmt_LDLIBS = -lz -lpng -lturbojpeg -lvorbisfile -lm
 fmt.hdll: $(FMT) $(LIBHL)
 
 $(SDL): CPPFLAGS += $(SDL_CPPFLAGS)
