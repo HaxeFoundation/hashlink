@@ -418,55 +418,61 @@ HL_PRIM varray *hl_sys_stat( vbyte *path ) {
 }
 
 #if defined(HL_WIN)
-static double filetime_to_ms( FILETIME ft ) {
-	const long long unix_epoch = 116444736000000000LL; // 100ns ticks from 1601-01-01 to 1970-01-01
+static int64 filetime_to_us( FILETIME ft ) {
+	const int64 unix_epoch = 116444736000000000LL; // 100ns ticks from 1601-01-01 to 1970-01-01
 	ULARGE_INTEGER u;
 	u.LowPart = ft.dwLowDateTime;
 	u.HighPart = ft.dwHighDateTime;
 	if( u.QuadPart == 0 )
-		return 0.;
-	return (double)((long long)u.QuadPart - unix_epoch) / 10000.;
+		return 0;
+	return ((int64)u.QuadPart - unix_epoch) / 10;
 }
 #else
-static double timespec_to_ms( struct timespec t ) {
-	return t.tv_sec * 1000. + t.tv_nsec / 1000000.;
+static int64 timespec_to_us( struct timespec t ) {
+	return (int64)t.tv_sec * 1000000 + t.tv_nsec / 1000;
 }
 #endif
 
-// same as sys_stat but with 64-bit size and times in milliseconds
+// same as sys_stat but with 64-bit values and times in microseconds
 HL_PRIM varray *hl_sys_stat2( vbyte *path ) {
 	varray *a;
-	double *d;
+	int64 *d;
 	pstat s;
 #	if defined(HL_WIN)
 	WIN32_FILE_ATTRIBUTE_DATA attr;
 	if( stat((pchar*)path,&s) != 0 || !GetFileAttributesExW((pchar*)path,GetFileExInfoStandard,&attr) )
 		return NULL;
 #	else
-	memset(&s,0,sizeof(s));
 	if( stat((pchar*)path,&s) != 0 )
 		return NULL;
 #	endif
-	a = hl_alloc_array(&hlt_f64,11);
-	d = hl_aptr(a,double);
+	a = hl_alloc_array(&hlt_i64,11);
+	d = hl_aptr(a,int64);
 	*d++ = s.st_gid;
 	*d++ = s.st_uid;
 #	if defined(HL_WIN)
-	*d++ = filetime_to_ms(attr.ftLastAccessTime);
-	*d++ = filetime_to_ms(attr.ftLastWriteTime);
-	*d++ = filetime_to_ms(attr.ftCreationTime);
+	if( attr.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT ) {
+		// symlink/junction : attr describes the link, stat followed it
+		*d++ = (int64)s.st_atime * 1000000;
+		*d++ = (int64)s.st_mtime * 1000000;
+		*d++ = (int64)s.st_ctime * 1000000;
+	} else {
+		*d++ = filetime_to_us(attr.ftLastAccessTime);
+		*d++ = filetime_to_us(attr.ftLastWriteTime);
+		*d++ = filetime_to_us(attr.ftCreationTime);
+	}
 #	elif defined(__APPLE__)
-	*d++ = timespec_to_ms(s.st_atimespec);
-	*d++ = timespec_to_ms(s.st_mtimespec);
-	*d++ = timespec_to_ms(s.st_ctimespec);
+	*d++ = timespec_to_us(s.st_atimespec);
+	*d++ = timespec_to_us(s.st_mtimespec);
+	*d++ = timespec_to_us(s.st_ctimespec);
 #	else
-	*d++ = timespec_to_ms(s.st_atim);
-	*d++ = timespec_to_ms(s.st_mtim);
-	*d++ = timespec_to_ms(s.st_ctim);
+	*d++ = timespec_to_us(s.st_atim);
+	*d++ = timespec_to_us(s.st_mtim);
+	*d++ = timespec_to_us(s.st_ctim);
 #	endif
-	*d++ = (double)s.st_size;
+	*d++ = s.st_size;
 	*d++ = s.st_dev;
-	*d++ = (double)s.st_ino;
+	*d++ = s.st_ino;
 	*d++ = s.st_nlink;
 	*d++ = s.st_rdev;
 	*d++ = s.st_mode;
