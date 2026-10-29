@@ -444,12 +444,26 @@ HL_PRIM int HL_NAME(enumerate_device_extension_properties)( VkPhysicalDevice pde
 	return r;
 }
 
+static PFN_vkVoidFunction get_device_proc( const char *name, bool aliases ) {
+	PFN_vkVoidFunction f = vkGetDeviceProcAddr(ctx.device, name);
+	const char *suffixes[] = { "KHR", "EXT" };
+	char alias[128];
+	for( int i = 0; !f && aliases && i < 2; i++ ) {
+		snprintf(alias, sizeof(alias), "%s%s", name, suffixes[i]);
+		f = vkGetDeviceProcAddr(ctx.device, alias);
+	}
+	return f;
+}
+
 HL_PRIM int HL_NAME(device_create)( VkPhysicalDevice pdev, VkDeviceCreateInfo *inf ) {
 	if( ctx.device ) hl_error("Vulkan device already created");
 	VkResult r = vkCreateDevice(pdev, inf, NULL, &ctx.device);
 	if( r != VK_SUCCESS ) return r;
 	ctx.pdev = pdev;
-#	define VKF(name) name = (PFN_##name)vkGetDeviceProcAddr(ctx.device, #name); if( !name ) return VK_ERROR_INCOMPATIBLE_DRIVER;
+	VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+	vkGetPhysicalDeviceProperties2(pdev, &props);
+	bool aliases = props.properties.apiVersion < VK_API_VERSION_1_3;
+#	define VKF(name) name = (PFN_##name)get_device_proc(#name, aliases); if( !name ) return VK_ERROR_INCOMPATIBLE_DRIVER;
 	VK_DEVICE_FUNCS
 #	undef VKF
 	return VK_SUCCESS;
