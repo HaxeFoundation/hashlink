@@ -352,6 +352,12 @@ enum abstract StructureType(Int) to Int {
 	var PHYSICAL_DEVICE_VULKAN_1_1_FEATURES = 49;
 	var PHYSICAL_DEVICE_VULKAN_1_2_FEATURES = 51;
 	var PHYSICAL_DEVICE_VULKAN_1_3_FEATURES = 53;
+	var PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES = 1000314007;
+	var PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES = 1000044003;
+	var PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT = 1000267000;
+	var PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT = 1000377000;
+	var PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES = 1000413000;
+	var PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES = 1000276000;
 	var PHYSICAL_DEVICE_FEATURES_2 = 1000059000;
 	var PHYSICAL_DEVICE_PROPERTIES_2 = 1000059001;
 	var RESOLVE_IMAGE_INFO_2 = 1000337005;
@@ -2154,6 +2160,62 @@ enum abstract AllocatorCreateFlags(Int) to Int {
 		var arr = hl.CArray.alloc(PhysicalDeviceVulkan13Features, count);
 		for( i in 0...count ) arr[i].sType = PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
 		return arr;
+	}
+}
+
+@:struct class PhysicalDeviceSynchronization2Features {
+	var sType : StructureType;
+	public var pNext : hl.Bytes;
+	public var synchronization2 : Int;
+	public function new() {
+		sType = PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+	}
+}
+
+@:struct class PhysicalDeviceDynamicRenderingFeatures {
+	var sType : StructureType;
+	public var pNext : hl.Bytes;
+	public var dynamicRendering : Int;
+	public function new() {
+		sType = PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+	}
+}
+
+@:struct class PhysicalDeviceExtendedDynamicStateFeaturesEXT {
+	var sType : StructureType;
+	public var pNext : hl.Bytes;
+	public var extendedDynamicState : Int;
+	public function new() {
+		sType = PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+	}
+}
+
+@:struct class PhysicalDeviceExtendedDynamicState2FeaturesEXT {
+	var sType : StructureType;
+	public var pNext : hl.Bytes;
+	public var extendedDynamicState2 : Int;
+	public var extendedDynamicState2LogicOp : Int;
+	public var extendedDynamicState2PatchControlPoints : Int;
+	public function new() {
+		sType = PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
+	}
+}
+
+@:struct class PhysicalDeviceMaintenance4Features {
+	var sType : StructureType;
+	public var pNext : hl.Bytes;
+	public var maintenance4 : Int;
+	public function new() {
+		sType = PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES;
+	}
+}
+
+@:struct class PhysicalDeviceShaderDemoteToHelperInvocationFeatures {
+	var sType : StructureType;
+	public var pNext : hl.Bytes;
+	public var shaderDemoteToHelperInvocation : Int;
+	public function new() {
+		sType = PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES;
 	}
 }
 
