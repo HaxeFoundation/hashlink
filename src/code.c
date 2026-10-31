@@ -131,7 +131,10 @@ static const char *hl_read_string( hl_reader *r ) {
 }
 
 const uchar *hl_get_ustring( hl_code *code, int index ) {
-	uchar *str = code->ustrings[index];
+	uchar *str;
+	if( index < 0 || index >= code->nstrings || code->ustrings == NULL || code->strings == NULL )
+		return USTR("");
+	str = code->ustrings[index];
 	if( str == NULL ) {
 		int size = hl_utf8_length((vbyte*)code->strings[index],0);
 		str = hl_malloc(&code->alloc,(size+1)<<1);
@@ -145,7 +148,7 @@ static const uchar *hl_read_ustring( hl_reader *r ) {
 	int i = INDEX();
 	if( i < 0 || i >= r->code->nstrings ) {
 		ERROR("Invalid string index");
-		i = 0;
+		return USTR("");
 	}
 	return hl_get_ustring(r->code,i);
 }
