@@ -411,13 +411,17 @@ HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 	return true;
 #	elif defined(HL_WIN)
 	double ms = clamp_wait_timeout(timeout) * 1000.0;
-	// INFINITE (0xFFFFFFFF) would mean no timeout at all
-	DWORD dms = ms >= (double)(INFINITE - 1) ? INFINITE - 1 : (DWORD)ms;
+	// INFINITE (0xFFFFFFFF) would mean no timeout at all, so waits of more than
+	// about 49.7 days are cut short
+	bool capped = ms >= (double)(INFINITE - 1);
+	DWORD dms = capped ? INFINITE - 1 : (DWORD)ms;
 	hl_blocking(true);
 	BOOL ok = SleepConditionVariableCS(&cond->cond, &cond->cs, dms);
 	DWORD err = ok ? 0 : GetLastError();
 	hl_blocking(false);
-	return ok || err != ERROR_TIMEOUT;
+	// a capped wait that runs out did not reach the requested timeout, so it
+	// counts as a spurious wakeup
+	return ok || err != ERROR_TIMEOUT || capped;
 #	else
 	struct timeval tv;
 	struct timespec t;
