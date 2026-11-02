@@ -367,6 +367,11 @@ jobs:
         architecture: [64, arm64]
         build_system: [make, cmake]
 
+        exclude:
+          # no Homebrew bottles on Intel: brew bundle builds from source (~40min), cmake covers x86_64
+          - architecture: 64
+            build_system: make
+
         include:
           - target: darwin
             haxe_nightly_dir: mac
@@ -497,7 +502,7 @@ jobs:
           libvorbisfile3${SUFFIX} libvorbisenc2${SUFFIX} libsqlite3-0${SUFFIX} libmbedtls14t64${SUFFIX} ${EXTRA_APT_PKGS}
 
     - name: Install brew packages
-      if: matrix.os == 'darwin'
+      if: matrix.os == 'darwin' && matrix.build_system == 'make'
       run: |
         brew update
         brew install libpng jpeg-turbo libvorbis sqlite mbedtls
@@ -525,6 +530,11 @@ jobs:
           sudo cp hl /usr/local/bin/
         fi
         sudo cp libhl.* *.hdll /usr/local/lib/
+        if [[ "${{ matrix.os }}-${{ matrix.build_system }}" == "darwin-cmake" ]]; then
+          # cmake package already bundles shared third-party libs
+          sudo cp *.dylib /usr/local/lib/
+          otool -L *.hdll
+        fi
         sudo cp include/* /usr/local/include/
 
     - name: Install binary (Windows)
@@ -588,11 +598,12 @@ jobs:
 
         - os: darwin
           runner: macos-15-intel
-          build_system: make
+          build_system: cmake
 
         - os: darwin
           architecture: arm64
           runner: macos-latest
+          build_system: make
 
     runs-on: ${{ matrix.runner }}
     steps: *haxe-test-steps
