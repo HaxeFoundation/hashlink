@@ -93,6 +93,18 @@
 #	define HL_BSD
 #endif
 
+#if defined(__FreeBSD__)
+#	define HL_FREEBSD
+#endif
+
+#if defined(__NetBSD__)
+#	define HL_NETBSD
+#endif
+
+#if defined(__OpenBSD__)
+#	define HL_OPENBSD
+#endif
+
 #if defined(_64BITS) || defined(__x86_64__) || defined(_M_X64) || defined(__LP64__) || defined(__wasm64__)
 #	define HL_64
 #endif
