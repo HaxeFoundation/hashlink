@@ -39,8 +39,11 @@ extern "C" VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr( VkIns
 #	pragma clang diagnostic pop
 #endif
 
-#ifdef HL_WIN
+#if defined(HL_WIN)
 #include <dxcapi.h>
+#	define HL_VULKAN_DXC
+#elif defined(HL_VULKAN_DXC)
+#include <dxc/dxcapi.h>
 #endif
 
 #define VK_GLOBAL_FUNCS \
@@ -444,12 +447,26 @@ HL_PRIM int HL_NAME(enumerate_device_extension_properties)( VkPhysicalDevice pde
 	return r;
 }
 
+static PFN_vkVoidFunction get_device_proc( const char *name, bool aliases ) {
+	PFN_vkVoidFunction f = vkGetDeviceProcAddr(ctx.device, name);
+	const char *suffixes[] = { "KHR", "EXT" };
+	char alias[128];
+	for( int i = 0; !f && aliases && i < 2; i++ ) {
+		snprintf(alias, sizeof(alias), "%s%s", name, suffixes[i]);
+		f = vkGetDeviceProcAddr(ctx.device, alias);
+	}
+	return f;
+}
+
 HL_PRIM int HL_NAME(device_create)( VkPhysicalDevice pdev, VkDeviceCreateInfo *inf ) {
 	if( ctx.device ) hl_error("Vulkan device already created");
 	VkResult r = vkCreateDevice(pdev, inf, NULL, &ctx.device);
 	if( r != VK_SUCCESS ) return r;
 	ctx.pdev = pdev;
-#	define VKF(name) name = (PFN_##name)vkGetDeviceProcAddr(ctx.device, #name); if( !name ) return VK_ERROR_INCOMPATIBLE_DRIVER;
+	VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+	vkGetPhysicalDeviceProperties2(pdev, &props);
+	bool aliases = props.properties.apiVersion < VK_API_VERSION_1_3;
+#	define VKF(name) name = (PFN_##name)get_device_proc(#name, aliases); if( !name ) return VK_ERROR_INCOMPATIBLE_DRIVER;
 	VK_DEVICE_FUNCS
 #	undef VKF
 	return VK_SUCCESS;
@@ -1218,29 +1235,68 @@ DEFINE_PRIM(_VOID, cmd_copy_query_pool_results, _CMD _QUERY_POOL _I32 _I32 _NATI
 DEFINE_PRIM(_VOID, reset_query_pool, _QUERY_POOL _I32 _I32);
 DEFINE_PRIM(_I32, get_query_pool_results, _QUERY_POOL _I32 _I32 _I32 _BYTES _I64 _I32);
 
-#ifdef HL_WIN
+#ifdef HL_VULKAN_DXC
 
 typedef struct {
 	IDxcLibrary *library;
 	IDxcCompiler *compiler;
 } vk_compiler;
 
+#ifdef HL_WIN
+#	define DXC_LIB_NAME "dxcompiler.dll"
+#	define to_wide(s) ((LPCWSTR)(s))
+#else
+#	ifdef HL_MAC
+#		define DXC_LIB_NAME "libdxcompiler.dylib"
+#	else
+#		define DXC_LIB_NAME "libdxcompiler.so"
+#	endif
+// wchar_t is 32-bit here while HL strings are UTF-16
+static LPCWSTR to_wide( uchar *s ) {
+	int len = ustrlen(s);
+	wchar_t *w = (wchar_t*)hl_gc_alloc_noptr((len + 1) * sizeof(wchar_t));
+	for( int i = 0; i <= len; i++ )
+		w[i] = s[i];
+	return w;
+}
+#endif
+
 HL_PRIM vk_compiler *HL_NAME(compiler_create)() {
+#ifdef HL_WIN
+	DxcCreateInstanceProc create = DxcCreateInstance;
+#else
+	static DxcCreateInstanceProc create = NULL;
+	if( create == NULL ) {
+		void *lib = dlopen(DXC_LIB_NAME, RTLD_NOW);
+		if( lib ) create = (DxcCreateInstanceProc)dlsym(lib, "DxcCreateInstance");
+		if( create == NULL )
+			hl_error("Failed to load " DXC_LIB_NAME);
+	}
+#endif
 	vk_compiler *comp = (vk_compiler*)hl_gc_alloc_raw(sizeof(vk_compiler));
 	memset(comp,0,sizeof(vk_compiler));
-	if( DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(&comp->library)) != S_OK || DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&comp->compiler)) != S_OK )
-		hl_error("Failed to create DXC compiler (dxcompiler.dll missing?)");
+	if( create(CLSID_DxcLibrary, IID_PPV_ARGS(&comp->library)) != S_OK || create(CLSID_DxcCompiler, IID_PPV_ARGS(&comp->compiler)) != S_OK )
+		hl_error("Failed to create DXC compiler (" DXC_LIB_NAME " missing?)");
 	return comp;
 }
 
 HL_PRIM vbyte *HL_NAME(compiler_compile)( vk_compiler *comp, uchar *source, uchar *profile, varray *args, int *dataLen ) {
 	IDxcBlobEncoding *blob = NULL;
 	IDxcOperationResult *result = NULL;
-	comp->library->CreateBlobWithEncodingFromPinned(source,(int)ustrlen(source)*2,1200/*DXC_CP_UTF16*/,&blob);
+	char *src = hl_to_utf8(source);
+	comp->library->CreateBlobWithEncodingFromPinned(src,(UINT32)strlen(src),65001/*DXC_CP_UTF8*/,&blob);
 	if( blob == NULL )
 		hl_error("Could not create blob");
+#ifdef HL_WIN
+	LPCWSTR *wargs = hl_aptr(args,LPCWSTR);
+#else
+	LPCWSTR *wargs = (LPCWSTR*)hl_gc_alloc_raw(args->size * sizeof(LPCWSTR));
+	for( int i = 0; i < args->size; i++ )
+		wargs[i] = to_wide(hl_aptr(args,uchar*)[i]);
+#endif
+	LPCWSTR wprofile = to_wide(profile);
 	hl_blocking(true);
-	comp->compiler->Compile(blob,L"",L"main",profile,hl_aptr(args,LPCWSTR),args->size,NULL,0,NULL,&result);
+	comp->compiler->Compile(blob,L"",L"main",wprofile,wargs,args->size,NULL,0,NULL,&result);
 	hl_blocking(false);
 	HRESULT hr;
 	result->GetStatus(&hr);

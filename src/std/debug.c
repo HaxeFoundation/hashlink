@@ -169,6 +169,9 @@ HL_API bool hl_debug_flush( int pid, vbyte *addr, int size ) {
 
 #ifdef MAC_DEBUG
 static int get_reg( int r ) {
+	static const int cpu[] = { REG_RAX, REG_RCX, REG_RDX, REG_RBX, REG_RSP, REG_RBP, REG_RSI, REG_RDI, REG_R8, REG_R9, REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, REG_R15 };
+	if( r >= 10 && r < 42 && !(r & 1) )
+		return cpu[(r - 10) >> 1];
 	switch( r ) {
 		case 0: return REG_RSP;
 		case 1: return REG_RBP;
@@ -187,10 +190,15 @@ static int get_reg( int r ) {
 #endif
 
 #ifdef USE_PTRACE
+#ifdef HL_64
+static bool is_fp_reg( int r ) {
+	return r >= 11 && r < 42 && (r & 1);
+}
+#endif
+
 static void *get_reg( int r ) {
 		struct user_regs_struct *regs = NULL;
 		struct user *user = NULL;
-		struct user_fpregs_struct *fp = NULL;
 		switch( r ) {
 		case -1: return &user->u_fpstate;
 #		ifdef HL_64
@@ -198,7 +206,21 @@ static void *get_reg( int r ) {
 		case 1: return &regs->rbp;
 		case 2: return &regs->rip;
 		case 10: return &regs->rax;
-		case 11: return (void*)(-((int_val)&fp->xmm_space[0])-1);
+		case 12: return &regs->rcx;
+		case 14: return &regs->rdx;
+		case 16: return &regs->rbx;
+		case 18: return &regs->rsp;
+		case 20: return &regs->rbp;
+		case 22: return &regs->rsi;
+		case 24: return &regs->rdi;
+		case 26: return &regs->r8;
+		case 28: return &regs->r9;
+		case 30: return &regs->r10;
+		case 32: return &regs->r11;
+		case 34: return &regs->r12;
+		case 36: return &regs->r13;
+		case 38: return &regs->r14;
+		case 40: return &regs->r15;
 #		else
 		case 0: return &regs->esp;
 		case 1: return &regs->ebp;
@@ -334,8 +356,18 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 	return (void*)*GetContextReg(&c,reg);
 #endif
 #	elif defined(MAC_DEBUG)
+	if( get_reg(reg) < 0 ) return NULL;
 	return mdbg_read_register(pid, thread, get_reg(reg), is64);
 #	elif defined(USE_PTRACE)
+#	ifdef HL_64
+	if( is_fp_reg(reg) ) {
+		struct user_fpregs_struct fp;
+		void *out = NULL;
+		if( ptrace(PTRACE_GETFPREGS,thread,0,&fp) < 0 ) return NULL;
+		memcpy(&out, &fp.xmm_space[((reg - 11) >> 1) * 4], sizeof(void*));
+		return out;
+	}
+#	endif
 	void *r = get_reg(reg);
 	if( ((int_val)r) < 0 ) {
 		// peek FP ptr
@@ -366,8 +398,17 @@ HL_API bool hl_debug_write_register( int pid, int thread, int reg, void *value, 
 	return (bool)SetThreadContext(OpenTID(thread),&c);
 #	endif
 #	elif defined(MAC_DEBUG)
+	if( get_reg(reg) < 0 ) return false;
 	return mdbg_write_register(pid, thread, get_reg(reg), value, is64);
 #	elif defined(USE_PTRACE)
+#	ifdef HL_64
+	if( is_fp_reg(reg) ) {
+		struct user_fpregs_struct fp;
+		if( ptrace(PTRACE_GETFPREGS,thread,0,&fp) < 0 ) return false;
+		memcpy(&fp.xmm_space[((reg - 11) >> 1) * 4], &value, sizeof(void*));
+		return ptrace(PTRACE_SETFPREGS,thread,0,&fp) >= 0;
+	}
+#	endif
 	return ptrace(PTRACE_POKEUSER,thread,get_reg(reg),value) >= 0;
 #	else
 	return false;

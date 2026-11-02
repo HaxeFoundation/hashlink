@@ -22,6 +22,7 @@
 #include <hl.h>
 
 #include <string.h>
+#include <math.h>
 #ifdef HL_CONSOLE
 #	include <posix/posix.h>
 #else
@@ -46,14 +47,9 @@ static struct tm *gmtime_r( time_t *t, struct tm *r ) {
 
 #endif
 
-HL_PRIM int hl_date_now() {
-	return (int)time(NULL);
-}
-
-HL_PRIM vbyte *hl_date_to_string( int date, int *len ) {
+static vbyte *date_to_string( time_t d, int *len ) {
 	char buf[127];
 	struct tm t;
-	time_t d = (time_t)(unsigned)date;
 	int size;
 	uchar *out;
 	if( !localtime_r(&d,&t) )
@@ -65,17 +61,9 @@ HL_PRIM vbyte *hl_date_to_string( int date, int *len ) {
 	return (vbyte*)out;
 }
 
-HL_PRIM double hl_date_get_time( int date ) {
-	return ((unsigned)date) * 1000.;
-}
-
-HL_PRIM int hl_date_from_time( double time ) {
-	return (int)(unsigned int)(time / 1000.);
-}
-
-HL_PRIM int hl_date_from_string( vbyte *b, int len ) {
+static time_t date_from_string( vbyte *b ) {
 	struct tm t;
-	int o = 0;
+	time_t o = 0;
 	const char *str = hl_to_utf8((uchar*)b);
 	bool recal = true;
 	memset(&t,0,sizeof(struct tm));
@@ -100,12 +88,12 @@ HL_PRIM int hl_date_from_string( vbyte *b, int len ) {
 	if( recal ) {
 		t.tm_year -= 1900;
 		t.tm_mon--;
-		o = (int)mktime(&t);
+		o = mktime(&t);
 	}
 	return o;
 }
 
-HL_PRIM int hl_date_new( int y, int mo, int d, int h, int m, int s ) {
+static time_t date_new( int y, int mo, int d, int h, int m, int s ) {
 	struct tm t;
 	memset(&t,0,sizeof(struct tm));
 	t.tm_year = y - 1900;
@@ -115,35 +103,112 @@ HL_PRIM int hl_date_new( int y, int mo, int d, int h, int m, int s ) {
 	t.tm_min = m;
 	t.tm_sec = s;
 	t.tm_isdst = -1;
-	return (int)mktime(&t);
+	return mktime(&t);
+}
+
+static void date_get_inf( time_t d, bool utc, int *y, int *mo, int *day, int *h, int *m, int *s, int *wday ) {
+	struct tm t;
+	if( !(utc ? gmtime_r(&d,&t) : localtime_r(&d,&t)) )
+		hl_error("invalid date");
+	if( y ) *y = t.tm_year + 1900;
+	if( mo ) *mo = t.tm_mon;
+	if( day ) *day = t.tm_mday;
+	if( h ) *h = t.tm_hour;
+	if( m ) *m = t.tm_min;
+	if( s ) *s = t.tm_sec;
+	if( wday ) *wday = t.tm_wday;
+}
+
+// Int32 API (seconds, stored as unsigned)
+
+HL_PRIM int hl_date_now() {
+	return (int)time(NULL);
+}
+
+HL_PRIM vbyte *hl_date_to_string( int date, int *len ) {
+	return date_to_string((time_t)(unsigned)date,len);
+}
+
+HL_PRIM double hl_date_get_time( int date ) {
+	return ((unsigned)date) * 1000.;
+}
+
+HL_PRIM int hl_date_from_time( double time ) {
+	return (int)(unsigned int)(time / 1000.);
+}
+
+HL_PRIM int hl_date_from_string( vbyte *b, int len ) {
+	return (int)date_from_string(b);
+}
+
+HL_PRIM int hl_date_new( int y, int mo, int d, int h, int m, int s ) {
+	return (int)date_new(y,mo,d,h,m,s);
 }
 
 HL_PRIM void hl_date_get_inf( int date, int *y, int *mo, int *day, int *h, int *m, int *s, int *wday ) {
-	struct tm t;
-	time_t d = (time_t)(unsigned)date;
-	if( !localtime_r(&d,&t) )
-		hl_error("invalid date");
-	if( y ) *y = t.tm_year + 1900;
-	if( mo ) *mo = t.tm_mon;
-	if( day ) *day = t.tm_mday;
-	if( h ) *h = t.tm_hour;
-	if( m ) *m = t.tm_min;
-	if( s ) *s = t.tm_sec;
-	if( wday ) *wday = t.tm_wday;
+	date_get_inf((time_t)(unsigned)date,false,y,mo,day,h,m,s,wday);
 }
 
 HL_PRIM void hl_date_get_utc_inf( int date, int *y, int *mo, int *day, int *h, int *m, int *s, int *wday ) {
-	struct tm t;
-	time_t d = (time_t)(unsigned)date;
-	if( !gmtime_r(&d,&t) )
+	date_get_inf((time_t)(unsigned)date,true,y,mo,day,h,m,s,wday);
+}
+
+// Int64 API (microseconds since epoch)
+
+static time_t date_from_us( int64 us ) {
+	int64 s = us / 1000000;
+	if( us % 1000000 < 0 ) s--; // floor
+	return (time_t)s;
+}
+
+HL_PRIM int64 hl_date_now2() {
+	struct timespec ts = {0};
+#ifdef HL_WIN
+	timespec_get(&ts,TIME_UTC);
+#else
+	clock_gettime(CLOCK_REALTIME,&ts);
+#endif
+	return (int64)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+
+HL_PRIM double hl_date_get_time2( int64 date ) {
+	return date / 1000.;
+}
+
+HL_PRIM int64 hl_date_from_time2( double time ) {
+	return (int64)floor(time * 1000. + 0.5);
+}
+
+HL_PRIM vbyte *hl_date_to_string2( int64 date, int *len ) {
+	return date_to_string(date_from_us(date),len);
+}
+
+HL_PRIM int64 hl_date_from_string2( vbyte *b, int len ) {
+	return (int64)date_from_string(b) * 1000000;
+}
+
+HL_PRIM int64 hl_date_new2( int y, int mo, int d, int h, int m, int s ) {
+	return (int64)date_new(y,mo,d,h,m,s) * 1000000;
+}
+
+HL_PRIM void hl_date_get_inf2( int64 date, int *y, int *mo, int *day, int *h, int *m, int *s, int *wday ) {
+	date_get_inf(date_from_us(date),false,y,mo,day,h,m,s,wday);
+}
+
+HL_PRIM void hl_date_get_utc_inf2( int64 date, int *y, int *mo, int *day, int *h, int *m, int *s, int *wday ) {
+	date_get_inf(date_from_us(date),true,y,mo,day,h,m,s,wday);
+}
+
+// local time - UTC, in seconds
+HL_PRIM int hl_date_get_tz_offset2( int64 date ) {
+	struct tm local, utc;
+	time_t d = date_from_us(date);
+	int days, secs;
+	if( !localtime_r(&d,&local) || !gmtime_r(&d,&utc) )
 		hl_error("invalid date");
-	if( y ) *y = t.tm_year + 1900;
-	if( mo ) *mo = t.tm_mon;
-	if( day ) *day = t.tm_mday;
-	if( h ) *h = t.tm_hour;
-	if( m ) *m = t.tm_min;
-	if( s ) *s = t.tm_sec;
-	if( wday ) *wday = t.tm_wday;
+	days = local.tm_year != utc.tm_year ? (local.tm_year > utc.tm_year ? 1 : -1) : local.tm_yday - utc.tm_yday;
+	secs = ((days * 24 + local.tm_hour - utc.tm_hour) * 60 + local.tm_min - utc.tm_min) * 60 + local.tm_sec - utc.tm_sec;
+	return secs;
 }
 
 DEFINE_PRIM(_I32, date_now, _NO_ARG);
@@ -154,3 +219,13 @@ DEFINE_PRIM(_I32, date_from_string, _BYTES _I32);
 DEFINE_PRIM(_I32, date_new, _I32 _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, date_get_inf, _I32 _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));
 DEFINE_PRIM(_VOID, date_get_utc_inf, _I32 _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));
+
+DEFINE_PRIM(_I64, date_now2, _NO_ARG);
+DEFINE_PRIM(_F64, date_get_time2, _I64);
+DEFINE_PRIM(_I64, date_from_time2, _F64);
+DEFINE_PRIM(_BYTES, date_to_string2, _I64 _REF(_I32));
+DEFINE_PRIM(_I64, date_from_string2, _BYTES _I32);
+DEFINE_PRIM(_I64, date_new2, _I32 _I32 _I32 _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, date_get_inf2, _I64 _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_VOID, date_get_utc_inf2, _I64 _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32) _REF(_I32));
+DEFINE_PRIM(_I32, date_get_tz_offset2, _I64);
