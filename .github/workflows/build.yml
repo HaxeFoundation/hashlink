@@ -30,7 +30,7 @@ jobs:
 
         include:
           - target: linux
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             haxe_nightly_dir: linux64
             archive_ext: tar.gz
 
@@ -462,7 +462,7 @@ jobs:
           test-flags: --skip-hl-jit # not yet supported
 
         - os: linux
-          runner: ubuntu-latest
+          runner: ubuntu-24.04
           build_system: make
 
         - os: linux
