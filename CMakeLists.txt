@@ -233,13 +233,19 @@ if (WITH_VM)
         src/debugger.c
         src/profile.c
     )
+    # flat package: hl may be copied to <prefix>/bin with libs in <prefix>/lib
+    if(FLAT_INSTALL_TREE)
+        set(HL_RPATH_LIBDIR lib)
+    else()
+        set(HL_RPATH_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+    endif()
     if(APPLE)
         set_target_properties(hl PROPERTIES
-            INSTALL_RPATH "@executable_path;@executable_path/../${CMAKE_INSTALL_LIBDIR}"
+            INSTALL_RPATH "@executable_path;@executable_path/../${HL_RPATH_LIBDIR}"
         )
     elseif (UNIX)
         set_target_properties(hl PROPERTIES
-            INSTALL_RPATH "$ORIGIN;$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+            INSTALL_RPATH "$ORIGIN;$ORIGIN/../${HL_RPATH_LIBDIR}"
         )
     endif()
 
