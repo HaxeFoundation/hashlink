@@ -57,7 +57,7 @@ if(WIN32)
 endif()
 
 option(WITH_VULKAN "Build vulkan.hdll." ON)
-if(WIN32 AND WITH_VULKAN)
+if(WITH_VULKAN AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     add_subdirectory(vulkan)
 endif()
 
