@@ -420,8 +420,8 @@ HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 	DWORD err = ok ? 0 : GetLastError();
 	hl_blocking(false);
 	// a capped wait that runs out did not reach the requested timeout, so it
-	// counts as a spurious wakeup
-	return ok || err != ERROR_TIMEOUT || capped;
+	// counts as a spurious wakeup. Other errors return false like on POSIX.
+	return ok || (capped && err == ERROR_TIMEOUT);
 #	else
 	struct timeval tv;
 	struct timespec t;
