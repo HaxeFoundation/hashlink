@@ -394,28 +394,46 @@ HL_PRIM void hl_condition_wait(hl_condition *cond) {
 #	endif
 }
 
+// Upper bound for timed waits in seconds (about 31 years), so that deadlines
+// and millisecond counts do not overflow. Non-positive and NaN timeouts become 0.
+#define HL_MAX_WAIT_SECONDS 1e9
+
+static double clamp_wait_timeout( double timeout ) {
+	if( !(timeout > 0) )
+		return 0;
+	if( timeout > HL_MAX_WAIT_SECONDS )
+		return HL_MAX_WAIT_SECONDS;
+	return timeout;
+}
+
 HL_PRIM bool hl_condition_timed_wait(hl_condition *cond, double timeout) {
 #	if !defined(HL_THREADS)
 	return true;
 #	elif defined(HL_WIN)
+	double ms = clamp_wait_timeout(timeout) * 1000.0;
+	// INFINITE (0xFFFFFFFF) would mean no timeout at all, so waits of more than
+	// about 49.7 days are cut short
+	bool capped = ms >= (double)(INFINITE - 1);
+	DWORD dms = capped ? INFINITE - 1 : (DWORD)ms;
 	hl_blocking(true);
-	SleepConditionVariableCS(&cond->cond, &cond->cs,
-	                         (DWORD)((FLOAT)timeout * 1000.0));
+	BOOL ok = SleepConditionVariableCS(&cond->cond, &cond->cs, dms);
+	DWORD err = ok ? 0 : GetLastError();
 	hl_blocking(false);
-	return true;
+	// a capped wait that runs out did not reach the requested timeout, so it
+	// counts as a spurious wakeup. Other errors return false like on POSIX.
+	return ok || (capped && err == ERROR_TIMEOUT);
 #	else
 	struct timeval tv;
 	struct timespec t;
-	double delta = timeout;
-	int idelta = (int)delta, idelta2;
-	delta -= idelta;
-	delta *= 1.0e9;
+	double delta = clamp_wait_timeout(timeout);
+	long long sec = (long long)delta;
+	long long nsec = (long long)((delta - (double)sec) * 1e9);
 	gettimeofday(&tv, NULL);
-	delta += tv.tv_usec * 1000.0;
-	idelta2 = (int)(delta / 1e9);
-	delta -= idelta2 * 1e9;
-	t.tv_sec = tv.tv_sec + idelta + idelta2;
-	t.tv_nsec = (long)delta;
+	nsec += (long long)tv.tv_usec * 1000;
+	sec += tv.tv_sec + nsec / 1000000000;
+	nsec %= 1000000000;
+	t.tv_sec = (time_t)sec;
+	t.tv_nsec = (long)nsec;
 	hl_blocking(true);
 	bool ret = pthread_cond_timedwait(&cond->cond, &cond->mutex, &t) == 0;
 	hl_blocking(false);
