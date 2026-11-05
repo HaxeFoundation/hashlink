@@ -43,6 +43,17 @@ class Build {
 		log('Code generated in $output');
 	}
 
+	function isDebugBuild() : Bool {
+		var configuration = config.defines.get("hlgen.build.configuration");
+		if( configuration == null )
+			return config.defines.exists("debug");
+		return switch( configuration.toLowerCase() ) {
+			case "debug": true;
+			case "release": false;
+			default: throw 'Invalid hlgen.build.configuration "$configuration" (expected debug or release)';
+		}
+	}
+
 	public function compile() {
 		var tpl = config.defines.get("hlgen.makefile");
 		return switch tpl {
@@ -51,13 +62,13 @@ class Build {
 					case 'x86_32': ["EXTRA_CFLAGS=-m32", "EXTRA_LDFLAGS=-m32"];
 					case _: [];
 				};
-				Sys.command("make", ["-j", "-C", targetDir].concat(platformArgs).concat(config.defines.exists("debug") ? ["DEBUG=1"] : []));
+				Sys.command("make", ["-j", "-C", targetDir].concat(platformArgs).concat(isDebugBuild() ? ["DEBUG=1"] : []));
 			case "hxcpp":
 				var platformArgs = switch config.defines.get("hlgen.build.architecture") {
 					case 'x86_32': ["HXCPP_M32"];
 					case _: [];
 				};
-				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(config.defines.exists("debug") ? ["-Ddebug"] : []).concat(platformArgs));
+				Sys.command("haxelib", ["--cwd", targetDir, "run", "hxcpp", "Build.xml"].concat(isDebugBuild() ? ["-Ddebug"] : []).concat(platformArgs));
 			case "vs2019", "vs2022", "vs2026":
 				var version = switch (tpl) {
 					case "vs2019": "[16.0,17.0]";
@@ -78,7 +89,7 @@ class Build {
 							case 'x86_32': 'x86';
 							case _: 'x64';
 						};
-						var configuration = config.defines.exists("debug") ? "Debug" : "Release";
+						var configuration = isDebugBuild() ? "Debug" : "Release";
 						var msbuildArgs = ['$name.sln', '-t:$name', "-nologo", "-verbosity:minimal", '-property:Configuration=$configuration', '-property:Platform=$platform'];
 						log('"$msbuild"' + " " + msbuildArgs.join(" "));
 						Sys.setCwd(targetDir);
