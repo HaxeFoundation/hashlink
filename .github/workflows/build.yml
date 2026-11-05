@@ -639,6 +639,13 @@ jobs:
       uses: actions/checkout@v7
 
     - name: "Get: all build artifacts"
+      id: download
+      continue-on-error: true
+      uses: actions/download-artifact@v8
+
+    # intermittent "Artifact download failed after 5 retries", see actions/download-artifact#339
+    - name: "Get: all build artifacts (retry)"
+      if: steps.download.outcome == 'failure'
       uses: actions/download-artifact@v8
 
     - name: "Delete previous 'latest' release"
