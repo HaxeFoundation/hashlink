@@ -650,8 +650,21 @@ jobs:
     - name: "SCM Checkout"
       uses: actions/checkout@v7
 
+    # not the action's own extraction: its streaming unzip can stop early on a PK\x07\x08 copied
+    # from a CPack zip inside the artifact ("Artifact download failed after 5 retries"),
+    # see also actions/download-artifact#339
     - name: "Get: all build artifacts"
       uses: actions/download-artifact@v8
+      with:
+        path: _artifacts
+        skip-decompress: true
+
+    - name: "Extract build artifacts"
+      run: |
+        set -eu
+        for zip in _artifacts/*/*; do
+          unzip -q "$zip" -d "$(basename "$(dirname "$zip")")"
+        done
 
     - name: "Delete previous 'latest' release"
       env:
