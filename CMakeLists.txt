@@ -19,9 +19,9 @@ include(GNUInstallDirs)
 include(FindPkgConfig)
 include(CTest)
 
-set(WITH_VM_DEFAULT ON)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64" AND (NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
-    set(WITH_VM_DEFAULT OFF)
+set(WITH_VM_DEFAULT OFF)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|aarch64|arm64|ARM64)$" OR CMAKE_OSX_ARCHITECTURES MATCHES "x86_64|arm64")
+    set(WITH_VM_DEFAULT ON)
 endif()
 
 option(WITH_VM "Whether to build the Hashlink virtual machine" ${WITH_VM_DEFAULT})
@@ -225,12 +225,17 @@ else()
 endif()
 
 if (WITH_VM)
+    if((CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64") OR CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+        set(HL_JIT_BACKEND src/jit_aarch64.c src/jit_aarch64_emit.c)
+    else()
+        set(HL_JIT_BACKEND src/jit_x86_64.c)
+    endif()
     add_executable(hl
         src/code.c
         src/jit.c
         src/jit_emit.c
         src/jit_regs.c
-        src/jit_x86_64.c
+        ${HL_JIT_BACKEND}
         src/jit_dump.c
         src/main.c
         src/module.c

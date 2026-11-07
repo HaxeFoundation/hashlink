@@ -512,7 +512,7 @@ static int module_capture_stack( void **stack, int size ) {
 	while( depth++ < 64 ) {
 		void **next;
 		void *ret;
-		if( (void*)cur < (void*)&stack || (void*)(cur + 2) > stack_top || (((int_val)cur) & (sizeof(void*) - 1)) ) break;
+		if( (void*)(cur + 2) > stack_top || (((int_val)cur) & (sizeof(void*) - 1)) ) break;
 		next = (void**)cur[0];
 		ret = cur[1];
 		if( next <= cur || (void*)next >= stack_top ) break;
