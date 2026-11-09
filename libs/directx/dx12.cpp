@@ -253,7 +253,6 @@ private:
 		if (GFSDK_Aftermath_GpuCrashDump_GetDeviceInfo(decoder, &device) != GFSDK_Aftermath_Result_Success)
 			return false;
 		switch (device.status) {
-		case GFSDK_Aftermath_Device_Status_Timeout:
 		case GFSDK_Aftermath_Device_Status_OutOfMemory:
 		case GFSDK_Aftermath_Device_Status_PageFault:
 		case GFSDK_Aftermath_Device_Status_DmaFault:
