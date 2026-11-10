@@ -67,8 +67,17 @@ typedef enum {
 	STACK_OFFS,
 	CATCH,
 	ADDRESS,
+	FMATH,
 	NOP,
 } emit_op;
+
+typedef enum {
+	FM_SQRT,
+	FM_ABS,
+	FM_FLOOR,
+	FM_CEIL,
+	FM_ISNAN,
+} fmath_op;
 
 typedef enum {
 	M_NONE,
@@ -207,6 +216,7 @@ typedef struct {
 	ereg req_bit_shifts;
 	ereg req_div_a;
 	ereg req_div_b;
+	int fmath_ops;
 } regs_config;
 
 typedef struct {

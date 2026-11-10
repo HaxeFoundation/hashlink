@@ -137,6 +137,9 @@ typedef enum {
 	ANDNPD,
 	ORPD,
 	XORPD,
+	SQRTSD,
+	UCOMISD,
+	MOVQR,
 	CVTSI2SD,
 	CVTSI2SS,
 	CVTTSD2SI,
@@ -269,6 +272,9 @@ static opform OP_FORMS[] = {
 	{ "ANDNPD", 0x660F55 },
 	{ "ORPD", 0x660F56 },
 	{ "XORPD", 0x660F57 },
+	{ "SQRTSD", 0xF20F51 },
+	{ "UCOMISD", 0x660F2E },
+	{ "MOVQR", 0x660F7E },
 	{ "CVTSI2SD", 0xF20F2A },
 	{ "CVTSI2SS", 0xF30F2A },
 	{ "CVTTSD2SI", 0xF20F2C },
@@ -410,13 +416,13 @@ static int scratch_float_reg = -1;
 static ereg scratch_not_param[] = { R(RAX), R(R10), R(R11) };
 
 static bool cpu_avx = false;
+static bool cpu_sse41 = false;
 
 static void detect_cpu_features() {
 #ifdef HAS_CPUID
 	unsigned int ecx;
 	uint64 xcr0;
 	cpu_avx = false;
-	if( getenv("HL_JIT_NO_AVX") ) return;
 #	ifdef _MSC_VER
 	{
 		int regs[4];
@@ -431,6 +437,8 @@ static void detect_cpu_features() {
 		if( !__get_cpuid(1,&eax,&ebx,&ecx,&edx) ) return;
 	}
 #	endif
+	cpu_sse41 = (ecx & (1<<19)) != 0;
+	if( getenv("HL_JIT_NO_AVX") ) return;
 	// AVX (bit 28) is only usable if the OS enabled XSAVE (bit 27) so that XCR0 can be read
 	if( (ecx & (1<<27)) == 0 || (ecx & (1<<28)) == 0 ) return;
 #	ifdef _MSC_VER
@@ -492,6 +500,8 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->req_bit_shifts = R(RCX);
 	cfg->req_div_a = R(RAX);
 	cfg->req_div_b = R(RCX);
+	cfg->fmath_ops = (1 << FM_SQRT) | (1 << FM_ABS) | (1 << FM_ISNAN);
+	if( cpu_sse41 ) cfg->fmath_ops |= (1 << FM_FLOOR) | (1 << FM_CEIL);
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
@@ -1670,6 +1680,76 @@ void hl_codegen_function( jit_ctx *jit ) {
 					ereg r2 = get_tmp(e->mode);
 					EMIT(op,r2,r,op_mode);
 					emit_mov(ctx,out,r2,e->mode);
+				}
+			}
+			break;
+		case FMATH:
+			{
+				ereg a = e->a;
+				ereg ftmp = get_tmp(M_F64);
+				switch( e->size_offs ) {
+				case FM_SQRT:
+					{
+						if( !IS_REG(a) ) {
+							emit_mov(ctx,ftmp,a,M_F64);
+							a = ftmp;
+						}
+						ereg d = IS_REG(out) ? out : ftmp;
+						EMIT(SQRTSD,d,a,M_F64);
+						if( d != out ) emit_mov(ctx,out,d,M_F64);
+					}
+					break;
+				case FM_ABS:
+					if( IS_REG(a) )
+						EMIT(MOVQR,a,RTMP,M_PTR);
+					else
+						emit_mov(ctx,RTMP,a,M_PTR);
+					EMIT(SHL,RTMP,MK_CONST(1),M_PTR);
+					EMIT(SHR,RTMP,MK_CONST(1),M_PTR);
+					if( IS_REG(out) )
+						EMIT(MOVQ,out,RTMP,M_PTR);
+					else
+						emit_mov(ctx,out,RTMP,M_PTR);
+					break;
+				case FM_FLOOR:
+				case FM_CEIL:
+					{
+						if( !IS_REG(a) ) {
+							emit_mov(ctx,ftmp,a,M_F64);
+							a = ftmp;
+						}
+						int fr = REG_REG(ftmp) - 64, ar = REG_REG(a) - 64;
+						B(0x66);
+						if( (fr | ar) & 8 ) B(0x40 | ((fr & 8) ? 4 : 0) | ((ar & 8) ? 1 : 0));
+						B(0x0F);
+						B(0x3A);
+						B(0x0B);
+						MOD_RM(3,fr,ar);
+						B(e->size_offs == FM_FLOOR ? 9 : 10);
+						ereg d = IS_REG(out) ? out : RTMP;
+						EMIT(CVTTSD2SI,d,ftmp,M_I32);
+						if( d != out ) emit_mov(ctx,out,d,M_I32);
+					}
+					break;
+				case FM_ISNAN:
+					{
+						if( !IS_REG(a) ) {
+							emit_mov(ctx,ftmp,a,M_F64);
+							a = ftmp;
+						}
+						ereg d = IS_REG(out) ? out : RTMP;
+						int dr = REG_REG(d);
+						EMIT(XOR,d,d,M_I32);
+						EMIT(UCOMISD,a,a,M_F64);
+						if( dr >= 4 ) B(0x40 | ((dr & 8) ? 1 : 0));
+						B(0x0F);
+						B(0x9A);
+						MOD_RM(3,0,dr);
+						if( d != out ) emit_mov(ctx,out,d,M_UI8);
+					}
+					break;
+				default:
+					jit_assert();
 				}
 			}
 			break;

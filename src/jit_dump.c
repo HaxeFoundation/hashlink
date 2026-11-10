@@ -57,6 +57,7 @@ static const char *op_names[] = {
 	"stack",
 	"catch",
 	"address",
+	"fmath",
 	"nop"
 };
 
