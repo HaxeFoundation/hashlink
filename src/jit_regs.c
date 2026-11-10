@@ -872,6 +872,8 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				break;
 			}
 			{
+				if( jit->mod->debug && ctx->emit_pos == ctx->pos_map[cur_op] )
+					EMIT(NOP,UNUSED,UNUSED,M_NONE);
 				int epilog_start = ctx->emit_pos;
 				if( stack_offset )
 					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,M_PTR,stack_offset);
