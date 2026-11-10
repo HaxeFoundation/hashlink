@@ -37,6 +37,7 @@ typedef struct {
 	int pos;
 	const char *error;
 	hl_code *code;
+	hl_alloc *alloc;
 } hl_reader;
 
 #undef ERROR
@@ -118,7 +119,7 @@ static hl_type *hl_get_type( hl_reader *r ) {
 		ERROR("Invalid type index");
 		i = 0;
 	}
-	return r->code->types + i;
+	return r->code->types[i];
 }
 
 static const char *hl_read_string( hl_reader *r ) {
@@ -158,9 +159,9 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 		{
 			int i;
 			int nargs = READ();
-			t->fun = (hl_type_fun*)hl_zalloc(&r->code->alloc,sizeof(hl_type_fun));
+			t->fun = (hl_type_fun*)hl_zalloc(r->alloc,sizeof(hl_type_fun));
 			t->fun->nargs = nargs;
-			t->fun->args = (hl_type**)hl_malloc(&r->code->alloc,sizeof(hl_type*)*nargs);
+			t->fun->args = (hl_type**)hl_malloc(r->alloc,sizeof(hl_type*)*nargs);
 			for(i=0;i<nargs;i++)
 				t->fun->args[i] = hl_get_type(r);
 			t->fun->ret = hl_get_type(r);
@@ -176,16 +177,17 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 			int nfields = UINDEX();
 			int nproto = UINDEX();
 			int nbindings = UINDEX();
-			t->obj = (hl_type_obj*)hl_malloc(&r->code->alloc,sizeof(hl_type_obj));
+			t->obj = (hl_type_obj*)hl_malloc(r->alloc,sizeof(hl_type_obj));
 			t->obj->name = name;
-			t->obj->super = super < 0 ? NULL : r->code->types + super;
+			if( super >= r->code->ntypes ) ERROR("Invalid type index");
+			t->obj->super = super < 0 || super >= r->code->ntypes ? NULL : r->code->types[super];
 			t->obj->global_value = (void**)(int_val)global;
 			t->obj->nfields = nfields;
 			t->obj->nproto = nproto;
 			t->obj->nbindings = nbindings;
-			t->obj->fields = (hl_obj_field*)hl_malloc(&r->code->alloc,sizeof(hl_obj_field)*nfields);
-			t->obj->proto = (hl_obj_proto*)hl_malloc(&r->code->alloc,sizeof(hl_obj_proto)*nproto);
-			t->obj->bindings = (int*)hl_malloc(&r->code->alloc,sizeof(int)*nbindings*2);
+			t->obj->fields = (hl_obj_field*)hl_malloc(r->alloc,sizeof(hl_obj_field)*nfields);
+			t->obj->proto = (hl_obj_proto*)hl_malloc(r->alloc,sizeof(hl_obj_proto)*nproto);
+			t->obj->bindings = (int*)hl_malloc(r->alloc,sizeof(int)*nbindings*2);
 			t->obj->rt = NULL;
 			t->obj->m = NULL;
 			for(i=0;i<nfields;i++) {
@@ -211,9 +213,9 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 		{
 			int i;
 			int nfields = UINDEX();
-			t->virt = (hl_type_virtual*)hl_malloc(&r->code->alloc,sizeof(hl_type_virtual));
+			t->virt = (hl_type_virtual*)hl_malloc(r->alloc,sizeof(hl_type_virtual));
 			t->virt->nfields = nfields;
-			t->virt->fields = (hl_obj_field*)hl_malloc(&r->code->alloc,sizeof(hl_obj_field)*nfields);
+			t->virt->fields = (hl_obj_field*)hl_malloc(r->alloc,sizeof(hl_obj_field)*nfields);
 			for(i=0;i<nfields;i++) {
 				hl_obj_field *f = t->virt->fields + i;
 				f->name = hl_read_ustring(r);
@@ -228,17 +230,17 @@ static void hl_read_type( hl_reader *r, hl_type *t ) {
 	case HENUM:
 		{
 			int i,j;
-			t->tenum = hl_malloc(&r->code->alloc,sizeof(hl_type_enum));
+			t->tenum = hl_malloc(r->alloc,sizeof(hl_type_enum));
 			t->tenum->name = hl_read_ustring(r);
 			t->tenum->global_value = (void**)(int_val)UINDEX();
 			t->tenum->nconstructs = UINDEX();
-			t->tenum->constructs = (hl_enum_construct*)hl_malloc(&r->code->alloc, sizeof(hl_enum_construct)*t->tenum->nconstructs);
+			t->tenum->constructs = (hl_enum_construct*)hl_malloc(r->alloc, sizeof(hl_enum_construct)*t->tenum->nconstructs);
 			for(i=0;i<t->tenum->nconstructs;i++) {
 				hl_enum_construct *c = t->tenum->constructs + i;
 				c->name = hl_read_ustring(r);
 				c->nparams = UINDEX();
-				c->params = (hl_type**)hl_malloc(&r->code->alloc,sizeof(hl_type*)*c->nparams);
-				c->offsets = (int*)hl_malloc(&r->code->alloc,sizeof(int)*c->nparams);
+				c->params = (hl_type**)hl_malloc(r->alloc,sizeof(hl_type*)*c->nparams);
+				c->offsets = (int*)hl_malloc(r->alloc,sizeof(int)*c->nparams);
 				for(j=0;j<c->nparams;j++)
 					c->params[j] = hl_get_type(r);
 			}
@@ -436,6 +438,7 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 	if( READ() != 'H' || READ() != 'L' || READ() != 'B' )
 		EXIT("Invalid HL bytecode header");
 	r->code = c;
+	r->alloc = &c->alloc;
 	c->version = READ();
 	if( c->version <= 1 || c->version > max_version ) {
 		printf("Found version %d while HL %d.%d supports up to %d\n",c->version,HL_VERSION>>16,(HL_VERSION>>8)&0xFF,max_version);
@@ -481,9 +484,47 @@ hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg ) {
 		c->debugfiles = hl_read_strings(r, c->ndebugfiles, &c->debugfiles_lens);
 		CHK_ERROR();
 	}
-	ALLOC(c->types, hl_type, c->ntypes);
+	{
+		int types_pos = r->pos;
+		int size = 0;
+		int j;
+		char *data;
+		hl_alloc tmp;
+		hl_alloc_init(&tmp);
+		hl_type *ttypes = (hl_type*)hl_zalloc(&tmp, sizeof(hl_type) * c->ntypes);
+		int *nprotos = (int*)hl_zalloc(&tmp, sizeof(int) * c->ntypes);
+		c->types = (hl_type**)hl_malloc(&tmp, sizeof(hl_type*) * c->ntypes);
+		for(i=0;i<c->ntypes;i++)
+			c->types[i] = ttypes + i;
+		r->alloc = &tmp;
+		for(i=0;i<c->ntypes && !r->error;i++)
+			hl_read_type(r, ttypes + i);
+		r->alloc = &c->alloc;
+		if( r->error ) {
+			hl_free(&tmp);
+			CHK_ERROR();
+		}
+		for(i=0;i<c->ntypes;i++) {
+			hl_type *t = ttypes + i;
+			int depth = 0;
+			while( t && (t->kind == HOBJ || t->kind == HSTRUCT) && depth++ < c->ntypes ) {
+				for(j=0;j<t->obj->nproto;j++)
+					if( t->obj->proto[j].pindex >= nprotos[i] ) nprotos[i] = t->obj->proto[j].pindex + 1;
+				t = t->obj->super;
+			}
+			size += sizeof(hl_type) + nprotos[i] * sizeof(void*);
+		}
+		data = (char*)hl_zalloc(&c->alloc, size);
+		ALLOC(c->types, hl_type*, c->ntypes);
+		for(i=0;i<c->ntypes;i++) {
+			c->types[i] = (hl_type*)data;
+			data += sizeof(hl_type) + nprotos[i] * sizeof(void*);
+		}
+		hl_free(&tmp);
+		r->pos = types_pos;
+	}
 	for(i=0;i<c->ntypes;i++) {
-		hl_read_type(r, c->types + i);
+		hl_read_type(r, c->types[i]);
 		CHK_ERROR();
 	}
 	ALLOC(c->globals, hl_type*, c->nglobals);
@@ -636,6 +677,8 @@ static int hash_type_first( hl_type *t, bool isrec ) {
 			H32(f->hashed_name);
 			HTYPE(f->t);
 		}
+		for(i=0;i<t->obj->nproto;i++)
+			H32(t->obj->proto[i].pindex);
 		break;
 	case HREF:
 	case HNULL:
@@ -669,8 +712,19 @@ static int hash_type_first( hl_type *t, bool isrec ) {
 	return hash;
 }
 
+int hl_code_type_index( hl_code *c, hl_type *t ) {
+	int min = 0, max = c->ntypes;
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		hl_type *tm = c->types[mid];
+		if( tm == t ) return mid;
+		if( tm < t ) min = mid + 1; else max = mid;
+	}
+	return -1;
+}
+
 #undef HTYPE
-#define HTYPE(t) H32(h->types_hashes[t - h->code->types])
+#define HTYPE(t) H32(h->types_hashes[hl_code_type_index(h->code,t)])
 
 static int hash_type_rec( hl_code_hash *h, hl_type *t ) {
 	int hash = -1;
@@ -761,7 +815,7 @@ static int hash_fun( hl_code_hash *h, hl_function *f ) {
 		//case OBytes:
 		case OType:
 			H32(o->p1);
-			HTYPE(c->types + o->p2);
+			HTYPE(c->types[o->p2]);
 			break;
 		case OCall0:
 			H32(o->p1);
@@ -906,10 +960,10 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 
 	h->types_hashes = malloc(sizeof(int) * c->ntypes);
 	for(i=0;i<c->ntypes;i++)
-		h->types_hashes[i] = hash_type_first(c->types + i, false);
+		h->types_hashes[i] = hash_type_first(c->types[i], false);
 	int *types_hashes = malloc(sizeof(int) * c->ntypes); // use a second buffer for order-indepedent
 	for(i=0;i<c->ntypes;i++)
-		types_hashes[i] = h->types_hashes[i] ^ hash_type_rec(h, c->types + i);
+		types_hashes[i] = h->types_hashes[i] ^ hash_type_rec(h, c->types[i]);
 	free(h->types_hashes);
 	h->types_hashes = types_hashes;
 
@@ -921,7 +975,7 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
 			h->globals_signs[i] = hl_code_hash_type(h,t); // some global abstracts allocated by compiler
 	}
 	for(i=0;i<c->ntypes;i++) {
-		hl_type *t = c->types + i;
+		hl_type *t = c->types[i];
 		switch( t->kind ) {
 		case HOBJ:
 		case HSTRUCT:
@@ -1035,7 +1089,7 @@ void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold ) {
 	hnew->globals_signs = nsigns;
 
 	for(i=0;i<c->ntypes;i++) {
-		hl_type *t = c->types + i;
+		hl_type *t = c->types[i];
 		switch( t->kind ) {
 		case HSTRUCT:
 		case HOBJ:

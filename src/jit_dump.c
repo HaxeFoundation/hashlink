@@ -222,7 +222,7 @@ static void dump_value( jit_ctx *ctx, uint64 value, emit_mode mode ) {
 	default:
 		if( value == 0 )
 			printf("NULL");
-		else if( mode == M_PTR && value >= (uint64)code->types && value < (uint64)(code->types + code->ntypes) && (((char*)value-(char*)code->types) % sizeof(hl_type)) == 0 )
+		else if( mode == M_PTR && hl_code_type_index(code,(hl_type*)value) >= 0 )
 			uprintf(USTR("<%s>"),hl_type_str((hl_type*)value));
 		else if( mode == M_PTR && value == (uint64)mod->globals_data )
 			printf("<globals>");

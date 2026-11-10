@@ -170,7 +170,7 @@ struct _emit_ctx {
 #define LOAD_MEM(v, offs, t) emit_load_mem(ctx, v, offs, t, t)
 #define LOAD_MEM_PTR(v, offs) LOAD_MEM(v, offs, &hlt_bytes)
 #define STORE_MEM(to, offs, v) emit_store_mem(ctx, to, offs, v)
-#define LOAD_OBJ_METHOD(obj,id) LOAD_MEM_PTR(LOAD_MEM_PTR(LOAD_MEM_PTR(obj,0),HL_WSIZE*2),HL_WSIZE*(id))
+#define LOAD_OBJ_METHOD(obj,id) LOAD_MEM_PTR(LOAD_MEM_PTR(obj,0),sizeof(hl_type)+HL_WSIZE*(id))
 #define OFFSET(base,index,mult,offset) emit_gen_ext(ctx, LEA, base, index, M_PTR, (mult) | ((offset) << 8))
 #define BREAK() emit_gen(ctx, DEBUG_BREAK, UNUSED, UNUSED, 0)
 #define GET_MODE(r) emit_get_mode(ctx,r)
@@ -2020,7 +2020,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		}
 		break;
 	case OType:
-		STORE(dst, LOAD_CONST_PTR(m->code->types + o->p2));
+		STORE(dst, LOAD_CONST_PTR(m->code->types[o->p2]));
 		break;
 	case OGetType:
 		{

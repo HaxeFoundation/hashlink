@@ -567,7 +567,7 @@ static void hl_module_types_dump( void (*fdump)( void *, int) ) {
 	for(i=0;i<modules_count;i++) {
 		hl_module *m = cur_modules[i];
 		for(j=0;j<m->code->ntypes;j++) {
-			hl_type *t = m->code->types + j;
+			hl_type *t = m->code->types[j];
 			fdump(&t,sizeof(void*));
 			if( t->kind == HFUN ) fcount++;
 		}
@@ -576,7 +576,7 @@ static void hl_module_types_dump( void (*fdump)( void *, int) ) {
 	for(i=0;i<modules_count;i++) {
 		hl_module *m = cur_modules[i];
 		for(j=0;j<m->code->ntypes;j++) {
-			hl_type *t = m->code->types + j;
+			hl_type *t = m->code->types[j];
 			if( t->kind == HFUN ) {
 				hl_type *ct = (hl_type*)&t->fun->closure_type;
 				fdump(&ct,sizeof(void*));
@@ -740,7 +740,7 @@ static void hl_module_init_indexes( hl_module *m ) {
 		m->ctx.functions_types[n->findex] = n->t;
 	}
 	for(i=0;i<m->code->ntypes;i++) {
-		hl_type *t = m->code->types + i;
+		hl_type *t = m->code->types[i];
 		switch( t->kind ) {
 		case HOBJ:
 		case HSTRUCT:
@@ -960,7 +960,7 @@ static void hl_module_init_constant( hl_module *m, hl_constant *c ) {
 				*(const void**)addr = hl_get_ustring(m->code, idx);
 				break;
 			case HTYPE:
-				*(hl_type**)addr = m->code->types + idx;
+				*(hl_type**)addr = m->code->types[idx];
 				break;
 			default:
 				*(void**)addr = *(void**)(m->globals_data + m->globals_indexes[idx]);
@@ -1132,7 +1132,7 @@ hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err ) {
 	if( t->kind != HOBJ && t->kind != HSTRUCT )
 		return NULL;
 	for(i=0;i<m->code->ntypes;i++) {
-		hl_type *t2 = m->code->types + i;
+		hl_type *t2 = m->code->types[i];
 		if( t2->kind == t->kind && ucmp(t->obj->name,t2->obj->name) == 0 ) {
 			int r = check_same_obj(t->obj,t2->obj);
 			if( r == 0 )
@@ -1256,7 +1256,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 
 	// patch same types
 	for(i1=0;i1<m1->code->ntypes;i1++) {
-		hl_type *p = m1->code->types + i1;
+		hl_type *p = m1->code->types[i1];
 		switch( p->kind ) {
 		case HOBJ:
 		case HSTRUCT:
@@ -1268,7 +1268,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 			continue;
 		}
 		for(i2=0;i2<c->ntypes;i2++) {
-			hl_type *t = c->types + i2;
+			hl_type *t = c->types[i2];
 			if( p->kind != t->kind ) continue;
 			switch( p->kind ) {
 			case HOBJ:
@@ -1276,7 +1276,10 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 				if( ucmp(p->obj->name,t->obj->name) != 0 ) continue;
 				if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
 					t->obj = p->obj; // alias the types ! they are different pointers but have the same layout
-					t->vobj_proto = p->vobj_proto;
+					if( p->vobj_proto ) {
+						t->vobj_proto = hl_vobj_proto(t);
+						memcpy(t->vobj_proto, hl_vobj_proto(p), p->obj->rt->nproto * sizeof(void*));
+					}
 				} else {
 					uprintf(USTR("[HotReload] Type %s has changed\n"),t->obj->name);
 					changes_count++;
@@ -1334,7 +1337,7 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 		m1->functions_ptrs[f1->findex] = ptr;
 	}
 	for(i=0;i<m1->code->ntypes;i++) {
-		hl_type *t = m1->code->types + i;
+		hl_type *t = m1->code->types[i];
 		if( t->kind == HOBJ || t->kind == HSTRUCT ) hl_flush_proto(t);
 	}
 

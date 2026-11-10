@@ -120,7 +120,7 @@ static bool load_plugin( pchar *file ) {
 		return false;
 	int i;
 	for(i=0;i<code->ntypes;i++) {
-		hl_type *t1 = code->types + i;
+		hl_type *t1 = code->types[i];
 		if( t1->kind != HOBJ && t1->kind != HSTRUCT ) continue;
 		hl_type *t2 = hl_module_resolve_type(main_ctx->m, t1, false);
 		// ensure that cast will work between types !

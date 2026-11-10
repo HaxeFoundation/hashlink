@@ -462,6 +462,9 @@ struct hl_type {
 	unsigned int *mark_bits;
 };
 
+#define hl_vobj_proto(t)			((void**)((hl_type*)(t) + 1))
+#define hl_type_proto_slots(nproto)	(1 + ((nproto) * sizeof(void*) + sizeof(hl_type) - 1) / sizeof(hl_type))
+
 C_FUNCTION_BEGIN
 
 HL_API int hl_type_size( hl_type *t );

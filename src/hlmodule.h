@@ -97,7 +97,7 @@ typedef struct {
 	char**		debugfiles;
 	int*		debugfiles_lens;
 	uchar**		ustrings;
-	hl_type*	types;
+	hl_type**	types;
 	hl_type**	globals;
 	hl_native*	natives;
 	hl_function*functions;
@@ -159,6 +159,7 @@ hl_code_hash *hl_code_hash_alloc( hl_code *c );
 void hl_code_hash_finalize( hl_code_hash *h );
 void hl_code_hash_free( hl_code_hash *h );
 void hl_code_free( hl_code *c );
+int hl_code_type_index( hl_code *c, hl_type *t );
 int hl_code_hash_type( hl_code_hash *h, hl_type *t );
 void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold );
 

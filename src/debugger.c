@@ -62,6 +62,7 @@ static void hl_debug_loop() {
 #	ifdef HL_WIN_CALL
 	flags |= 8;
 #	endif
+	flags |= 16;
 	hl_get_thread()->flags |= HL_THREAD_INVISIBLE;
 	do {
 		vbyte cmd;
