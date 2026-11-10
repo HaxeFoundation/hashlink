@@ -281,7 +281,7 @@ HL_PRIM hl_runtime_obj *hl_get_obj_rt( hl_type *ot ) {
 	t->nmethods = p ? p->nmethods : o->nproto;
 	t->methods = NULL;
 	o->rt = t;
-	ot->vobj_proto = NULL;
+	ot->vobj_table = NULL;
 
 	// fields lookup
 	compareHash = hl_hash_gen(USTR("__compare"),false);
@@ -346,12 +346,12 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 	hl_field_lookup *strField, *cmpField, *castField, *getField;
 	int i;
 	int nmethods, nbindings;
-	if( ot->vobj_proto ) return t;
+	if( ot->vobj_table ) return t;
 	if( o->super ) p = hl_get_obj_proto(o->super);
 
 	hl_global_lock(true);
 
-	if( ot->vobj_proto ) {
+	if( ot->vobj_table ) {
 		hl_global_lock(false);
 		return t;
 	}
@@ -363,7 +363,7 @@ HL_API hl_runtime_obj *hl_get_obj_proto( hl_type *ot ) {
 		hl_obj_proto *pr = o->proto + i;
 		if( pr->pindex >= 0 ) fptr[pr->pindex] = m->functions_ptrs[pr->findex];
 	}
-	ot->vobj_proto = fptr;
+	ot->vobj_table = fptr;
 
 	t->methods = (void**)hl_malloc(alloc, sizeof(void*) * t->nmethods);
 	if( p ) memcpy(t->methods,p->methods,p->nmethods * sizeof(void*));
@@ -462,7 +462,7 @@ HL_API void hl_flush_proto( hl_type *ot ) {
 	hl_type_obj *o = ot->obj;
 	hl_runtime_obj *rt = ot->obj->rt;
 	hl_module_context *m = o->m;
-	if( !rt || !ot->vobj_proto ) return;
+	if( !rt || !ot->vobj_table ) return;
 	for(i=0;i<o->nbindings;i++) {
 		int fid = o->bindings[i<<1];
 		int mid = o->bindings[(i<<1)|1];

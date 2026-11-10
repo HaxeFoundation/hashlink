@@ -1276,9 +1276,9 @@ h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
 				if( ucmp(p->obj->name,t->obj->name) != 0 ) continue;
 				if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
 					t->obj = p->obj; // alias the types ! they are different pointers but have the same layout
-					if( p->vobj_proto ) {
-						t->vobj_proto = hl_vobj_proto(t);
-						memcpy(t->vobj_proto, hl_vobj_proto(p), p->obj->rt->nproto * sizeof(void*));
+					if( p->vobj_table ) {
+						t->vobj_table = hl_vobj_proto(t);
+						memcpy(t->vobj_table, hl_vobj_proto(p), p->obj->rt->nproto * sizeof(void*));
 					}
 				} else {
 					uprintf(USTR("[HotReload] Type %s has changed\n"),t->obj->name);

@@ -458,7 +458,7 @@ struct hl_type {
 		hl_type_virtual *virt;
 		hl_type	*tparam;
 	};
-	void **vobj_proto;
+	void **vobj_table;
 	unsigned int *mark_bits;
 };
 
