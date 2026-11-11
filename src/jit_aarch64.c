@@ -450,6 +450,88 @@ static void emit_pop( code_ctx *ctx, ereg r, emit_mode mode ) {
 	emit_sp_offs(ctx, 16);
 }
 
+// PUSH/POP that can share its SP update with its neighbours
+static bool is_slot_op( einstr *e, emit_op op ) {
+	if( e->op != op ) return false;
+	ereg r = e->a;
+	switch( REG_KIND(r) ) {
+	case R_CONST:
+		return op == PUSH;
+	case R_REG_PTR:
+		return op == PUSH && gpr_id(r) != SP_REG;
+	case R_REG:
+		if( is_fp_mode(e->mode) ) return true;
+		if( gpr_id(r) == SP_REG ) return false;
+		return gpr_id(r) != FP || (op == PUSH && REG_VALUE(r) != 0);
+	default:
+		return false;
+	}
+}
+
+static bool can_fold_sp( int offs, int max_slot ) {
+	return (offs & 7) == 0 && offs + max_slot <= 0xFFF * 8;
+}
+
+// consecutive PUSH or POP, and the STACK_OFFS after the pushes or before the pops, share one SP update.
+// each value keeps its own 16 bytes slot. returns the last instruction consumed
+static int emit_stack_run( code_ctx *ctx, int start ) {
+	jit_ctx *jit = ctx->jit;
+	einstr *ins = jit->reg_instrs;
+	int count = jit->reg_instr_count;
+	int pos = start;
+	int offs = 0;
+	emit_op op = ins[pos].op;
+	if( op == STACK_OFFS ) {
+		offs = ins[pos].size_offs;
+		op = POP;
+		pos++;
+	}
+	int first = pos;
+	while( pos < count && is_slot_op(ins + pos, op) ) pos++;
+	int n = pos - first;
+	if( op == POP && (n == 0 || !can_fold_sp(offs, 16 * (n - 1))) ) {
+		// not foldable: emit the STACK_OFFS alone
+		emit_sp_offs(ctx, offs);
+		return start;
+	}
+	if( op == PUSH && pos < count && ins[pos].op == STACK_OFFS && ins[pos].size_offs < 0
+		&& can_fold_sp(-ins[pos].size_offs, 16 * (n - 1)) ) {
+		offs = -ins[pos].size_offs;
+		pos++;
+	}
+	if( op == PUSH ) {
+		emit_sp_offs(ctx, -(16 * n + offs));
+		for( int i = 0; i < n; i++ ) {
+			einstr *e = ins + first + i;
+			int slot = (offs + 16 * (n - 1 - i)) >> 3;
+			byte_reserve(ctx->code, MAX_OP_SIZE);
+			ctx->code.cur -= MAX_OP_SIZE;
+			if( is_fp_mode(e->mode) ) {
+				Arm64FpReg src = materialize_fpr(ctx, e->a, e->mode, (Arm64FpReg)31);
+				encode_ldr_str_imm(ctx, 3, 1, 0, slot, SP_REG, (Arm64Reg)src);
+			} else {
+				Arm64Reg src = materialize_gpr(ctx, e->a, e->mode, ARM_TMP1);
+				encode_ldr_str_imm(ctx, 3, 0, 0, slot, SP_REG, src);
+			}
+		}
+	} else {
+		byte_reserve(ctx->code, 4 * n + MAX_OP_SIZE);
+		ctx->code.cur -= 4 * n + MAX_OP_SIZE;
+		for( int i = 0; i < n; i++ ) {
+			einstr *e = ins + first + i;
+			int slot = (offs + 16 * i) >> 3;
+			if( is_fp_mode(e->mode) )
+				encode_ldr_str_imm(ctx, 3, 1, 1, slot, SP_REG, (Arm64Reg)fpr_id(e->a));
+			else
+				encode_ldr_str_imm(ctx, 3, 0, 1, slot, SP_REG, gpr_id(e->a));
+		}
+		emit_sp_offs(ctx, 16 * n + offs);
+	}
+	for( int k = start + 1; k < pos; k++ )
+		ctx->pos_map[k] = ctx->pos_map[start];
+	return pos - 1;
+}
+
 // e->size_offs holds the OJxxx opcode, read back by the following JCOND/CMOV
 static void emit_cmp( code_ctx *ctx, einstr *e ) {
 	if( is_fp_mode(e->mode) ) {
@@ -1308,13 +1390,22 @@ retry:
 			encode_branch_reg(ctx, /*opc=*/2 /*RET*/, LR);
 			break;
 		case PUSH:
-			emit_push(ctx, e->a, e->mode);
+			if( is_slot_op(e, PUSH) )
+				cur_pos = emit_stack_run(ctx, cur_pos);
+			else
+				emit_push(ctx, e->a, e->mode);
 			break;
 		case POP:
-			emit_pop(ctx, e->a, e->mode);
+			if( is_slot_op(e, POP) )
+				cur_pos = emit_stack_run(ctx, cur_pos);
+			else
+				emit_pop(ctx, e->a, e->mode);
 			break;
 		case STACK_OFFS:
-			emit_sp_offs(ctx, e->size_offs);
+			if( e->size_offs > 0 )
+				cur_pos = emit_stack_run(ctx, cur_pos);
+			else
+				emit_sp_offs(ctx, e->size_offs);
 			break;
 		case CMP:
 			emit_cmp(ctx, e);
