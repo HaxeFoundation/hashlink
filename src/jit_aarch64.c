@@ -96,6 +96,7 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->req_bit_shifts = 0;
 	cfg->req_div_a = 0;
 	cfg->req_div_b = 0;
+	cfg->fmath_ops = (1 << FM_SQRT) | (1 << FM_ABS) | (1 << FM_FLOOR) | (1 << FM_CEIL) | (1 << FM_ISNAN);
 
 	cfg->stack_reg = R(SP_REG);
 	cfg->stack_pos = R(FP);
@@ -1012,6 +1013,40 @@ static void emit_conv( code_ctx *ctx, einstr *e, ereg out_e, bool unsign ) {
 	}
 }
 
+// input is always F64, e->size_offs is the fmath_op
+static void emit_fmath( code_ctx *ctx, einstr *e, ereg out_e ) {
+	Arm64FpReg a = materialize_fpr(ctx, e->a, M_F64, (Arm64FpReg)29);
+	bool out_reg = REG_KIND(out_e) == R_REG;
+	switch( e->size_offs ) {
+	case FM_SQRT:
+	case FM_ABS:
+		{
+			Arm64FpReg d = out_reg ? fpr_id(out_e) : (Arm64FpReg)31;
+			encode_fp_1src(ctx, 0, 0, /*F64*/1, e->size_offs == FM_SQRT ? /*FSQRT*/3 : /*FABS*/1, a, d);
+			if( !out_reg ) emit_mov(ctx, out_e, V(31), M_F64);
+		}
+		break;
+	case FM_FLOOR:
+	case FM_CEIL:
+	case FM_ISNAN:
+		{
+			Arm64Reg d = out_reg ? gpr_id(out_e) : ARM_TMP1;
+			if( e->size_offs == FM_ISNAN ) {
+				// FCMP Dn, Dn ; CSET Wd, VS
+				encode_fp_compare(ctx, 0, 0, 1, a, 0, a);
+				encode_cond_select(ctx, 0, 0, XZR, COND_VC, 1, XZR, d);
+			} else {
+				// FCVTMS / FCVTPS Wd, Dn
+				encode_fcvt_int(ctx, 0, 0, 1, e->size_offs == FM_FLOOR ? 2 : 1, 0, a, d);
+			}
+			if( !out_reg ) emit_mov(ctx, out_e, R(ARM_TMP1), e->mode);
+		}
+		break;
+	default:
+		jit_assert();
+	}
+}
+
 static void emit_store( code_ctx *ctx, einstr *e ) {
 	int offs = e->size_offs;
 	Arm64Reg base;
@@ -1445,6 +1480,9 @@ retry:
 			break;
 		case CONV_UNSIGNED:
 			emit_conv(ctx, e, out, /*unsign=*/true);
+			break;
+		case FMATH:
+			emit_fmath(ctx, e, out);
 			break;
 		case STORE:
 			emit_store(ctx, e);
