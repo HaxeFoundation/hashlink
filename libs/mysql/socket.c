@@ -49,7 +49,7 @@
 #	define HANDLE_EINTR(x)	if( errno == EINTR ) goto x
 #endif
 
-#if defined(OS_WINDOWS) || defined(OS_MAC)
+#ifndef MSG_NOSIGNAL
 #	define MSG_NOSIGNAL 0
 #endif
 
@@ -75,7 +75,7 @@ void psock_init() {
 
 PSOCK psock_create() {
 	PSOCK s = socket(AF_INET,SOCK_STREAM,0);
-#	if defined(OS_MAC) || defined(OS_BSD)
+#	if defined(SO_NOSIGPIPE)
 	if( s != INVALID_SOCKET )
 		setsockopt(s,SOL_SOCKET,SO_NOSIGPIPE,NULL,0);
 #	endif
