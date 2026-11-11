@@ -1153,6 +1153,19 @@ static void emit_load_fun( code_ctx *ctx, ereg out_e, int fid ) {
 	if( REG_KIND(out_e) != R_REG ) emit_mov(ctx, out_e, R(ARM_TMP1), M_PTR);
 }
 
+// B/BL to code already emitted in this module (target is an out_pos offset)
+static void emit_near_branch( code_ctx *ctx, int target_pos, bool link ) {
+	int pos = ctx->jit->out_pos + byte_count(ctx->code);
+	intptr_t delta = (intptr_t)target_pos - (intptr_t)pos;
+	if( delta & 3 ) jit_error("aarch64 near branch misaligned");
+	if( delta < -(intptr_t)(1<<27) || delta >= (intptr_t)(1<<27) )
+		jit_error("aarch64 near branch out of imm26 range");
+	if( link )
+		encode_branch_link(ctx, (int)(delta >> 2));
+	else
+		encode_branch_uncond(ctx, (int)(delta >> 2));
+}
+
 static void emit_call_ptr( code_ctx *ctx, einstr *e ) {
 	uint64_t target = (uint64_t)e->value;
 	int near_pos = -1;
@@ -1163,17 +1176,12 @@ static void emit_call_ptr( code_ctx *ctx, einstr *e ) {
 
 	if( near_pos >= 0 ) {
 		// jump : PUSH_ADDR already set the return address
-		int pos = ctx->jit->out_pos + byte_count(ctx->code);
-		intptr_t delta = (intptr_t)near_pos - (intptr_t)pos;
-		encode_branch_uncond(ctx, (int)(delta >> 2));
+		emit_near_branch(ctx, near_pos, false);
 	} else if( ctx->jit->mod->debug && ctx->jit->code_funs.trampoline
 		&& e->size_offs <= TRAMPOLINE_STACK_ARGS && hl_jit_is_callback((void*)target) ) {
 		// lets the debugger step into native callbacks
 		emit_const_load(ctx, ARM_TMP1, target);
-		int pos = ctx->jit->out_pos + byte_count(ctx->code);
-		intptr_t delta = (intptr_t)ctx->jit->code_funs.trampoline - (intptr_t)pos;
-		if( delta & 3 ) jit_error("aarch64 debug trampoline misaligned");
-		encode_branch_link(ctx, (int)(delta >> 2));
+		emit_near_branch(ctx, ctx->jit->code_funs.trampoline, true);
 	} else {
 		emit_const_load(ctx, ARM_TMP1, target);
 		encode_branch_reg(ctx, /*BLR*/1, ARM_TMP1);
