@@ -1217,6 +1217,9 @@ static int emit_lea_rel( code_ctx *ctx, ereg out ) {
 	return pos;
 }
 
+// COMISS/COMISD set the flags like an unsigned compare, and UI8/UI16 values are unsigned
+#define IS_UNSIGNED_CMP(mode)	(IS_FLOAT(mode) || (mode) == M_UI8 || (mode) == M_UI16)
+
 static int get_cond_jump( code_ctx *ctx ) {
 	int prev = 0;
 	einstr *p;
@@ -1234,19 +1237,19 @@ static int get_cond_jump( code_ctx *ctx ) {
 		op = JNotZero;
 		break;
 	case OJSGte:
-		op = IS_FLOAT(p->mode) ? JUGte : JSGte;
+		op = IS_UNSIGNED_CMP(p->mode) ? JUGte : JSGte;
 		break;
 	case OJSGt:
-		op = IS_FLOAT(p->mode) ? JUGt : JSGt;
+		op = IS_UNSIGNED_CMP(p->mode) ? JUGt : JSGt;
 		break;
 	case OJUGte:
 		op = JUGte;
 		break;
 	case OJSLt:
-		op = IS_FLOAT(p->mode) ? JULt : JSLt;
+		op = IS_UNSIGNED_CMP(p->mode) ? JULt : JSLt;
 		break;
 	case OJSLte:
-		op = IS_FLOAT(p->mode) ? JULte : JSLte;
+		op = IS_UNSIGNED_CMP(p->mode) ? JULte : JSLte;
 		break;
 	case OJULt:
 		op = JULt;
