@@ -587,7 +587,8 @@ jobs:
         if [[ "${{ matrix.os }}" == "darwin" ]]; then
           echo "" > sys/compile-fs.hxml
         fi
-        haxe --run RunCi hl ${{ matrix.test-flags }}
+        # 1.x: force hl-ver
+        haxe --run RunCi hl -D hl-ver=1.16.0 ${{ matrix.test-flags }}
       working-directory: haxe/tests
 
   ###########################################################
