@@ -22,6 +22,11 @@ function(set_as_hdll target)
             BUILD_WITH_INSTALL_RPATH TRUE
             INSTALL_RPATH "@loader_path"
         )
+    elseif (UNIX)
+        # find bundled third-party shared libs (e.g. libopenal) next to the HDLL
+        set_target_properties(${target}.hdll PROPERTIES
+            INSTALL_RPATH "$ORIGIN"
+        )
     endif()
     if (NOT MSVC AND NOT APPLE)
         target_link_options(${target}.hdll PRIVATE "-Wl,--no-undefined")
