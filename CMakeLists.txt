@@ -59,11 +59,6 @@ if (MINGW)
     add_link_options(-municode)
 endif()
 
-if(UNIX AND NOT APPLE)
-    # needed for correct JIT stack traces
-    add_compile_options(-fno-omit-frame-pointer)
-endif()
-
 list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_CURRENT_SOURCE_DIR}/other/cmake
 )
@@ -215,6 +210,11 @@ endif()
 
 if(APPLE)
     target_include_directories(libhl PRIVATE include)
+endif()
+
+if(UNIX AND NOT APPLE)
+    # needed for correct JIT stack traces; PUBLIC so hl and hdlls get it too
+    target_compile_options(libhl PUBLIC -fno-omit-frame-pointer)
 endif()
 
 if(WIN32)

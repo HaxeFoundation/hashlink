@@ -222,7 +222,8 @@ jobs:
                 ;;
               linux*)
                 cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
-                  ${{ matrix.download_deps && '-DDOWNLOAD_DEPENDENCIES=ON -DFLAT_INSTALL_TREE=ON' || '' }}
+                  -DFLAT_INSTALL_TREE=ON \
+                  ${{ matrix.download_deps && '-DDOWNLOAD_DEPENDENCIES=ON' || '' }}
                 ;;
             esac
 
