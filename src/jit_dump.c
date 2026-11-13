@@ -255,7 +255,7 @@ static void hl_dump_fun_name( hl_function *f ) {
 }
 
 static void hl_dump_args( jit_ctx *ctx, einstr *e ) {
-	if( e->nargs == 0xFF )
+	if( e->nargs == 0xFFFF )
 		return;
 	ereg *v = hl_emit_get_args(ctx->emit, e);
 	printf("(");
