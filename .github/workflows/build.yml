@@ -42,6 +42,10 @@ jobs:
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
 
+          - architecture: 64
+            build_system: cmake
+            cmake_configuration: Release
+
     steps: &build-steps
     - name: "SCM Checkout"
       uses: actions/checkout@v7
@@ -72,7 +76,6 @@ jobs:
 
             sudo apt-get update -y
             if [[ "${{ matrix.architecture }}-${{ matrix.build_system }}" == 64-cmake ]]; then
-              # standalone package: third-party libs are downloaded, only zlib from system
               sudo apt-get install --no-install-recommends -y zlib1g-dev
             else
               sudo apt-get install --no-install-recommends -y \
