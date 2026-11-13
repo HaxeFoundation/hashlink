@@ -43,7 +43,7 @@ typedef struct {
 	int scope_end;
 } vreg;
 
-#define MAX_TMP_ARGS	32
+#define MAX_TMP_ARGS	256
 #define MAX_TRAPS		32
 
 typedef struct _linked_inf linked_inf;

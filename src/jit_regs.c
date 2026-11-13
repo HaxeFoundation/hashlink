@@ -711,6 +711,7 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 	eblock *cur_block = NULL;
 	call_regs regs = {0};
 	int write_index = 1;
+	int_arr stack_pushes = {0};
 	ctx->pos_map[0] = 0;
 
 	int persists_size = (ctx->persists_uses[0] + ctx->persists_uses[1]) * 8;
@@ -741,14 +742,13 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 			ereg *args = hl_emit_get_args(ctx->jit->emit,&e);
 			call_regs regs = {0};
 			int stack_args = 0;
-			int stack_bits = 0;
 			for(int k=0;k<e.nargs;k++) {
 				value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
 				emit_mode mode = v ? v->mode : M_I32;
 				ereg r = get_call_reg(ctx,regs,mode);
 				if( IS_NULL(r) ) {
 					stack_args += get_stack_size(mode);
-					stack_bits |= 1 << k;
+					int_arr_add(stack_pushes,k);
 				} else if( !v || r != v->reg ) {
 					int_arr_add(ctx->pack_movs,r);
 					int_arr_add(ctx->pack_movs,v ? v->reg : args[k]);
@@ -763,11 +763,10 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				}
 				if( offset )
 					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,0,-offset);
-				for(int k=e.nargs-1;k>=0;k--) {
-					if( stack_bits & (1 << k) ) {
-						value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
-						EMIT(PUSH,VAL_REG(args[k])->reg,UNUSED,v && IS_FLOAT(v->mode) ? v->mode : M_PTR);
-					}
+				for(int i=int_arr_count(stack_pushes)-1;i>=0;i--) {
+					int k = int_arr_get(stack_pushes,i);
+					value_info *v = REG_IS_VAL(args[k]) ? VAL_REG(args[k]) : NULL;
+					EMIT(PUSH,VAL_REG(args[k])->reg,UNUSED,v && IS_FLOAT(v->mode) ? v->mode : M_PTR);
 				}
 				if( IS_WINCALL64 ) {
 					regs_emit(ctx,UNUSED,STACK_OFFS,UNUSED,UNUSED,0,-0x20);
@@ -775,8 +774,9 @@ static void regs_emit_instrs( regs_ctx *ctx ) {
 				}
 				instr_stack_offset = stack_args+offset;
 			}
+			int_arr_reset(&stack_pushes);
 			flush_movs(ctx,0);
-			e.nargs = 0xFF;
+			e.nargs = 0xFFFF;
 			e.size_offs = stack_args;
 			if( vout && vout->last_read > cur_op )
 				ret_val = &REG_CFG(REG_MODE(e.mode))->ret;
