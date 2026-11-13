@@ -45,6 +45,7 @@ jobs:
           - architecture: 64
             build_system: cmake
             cmake_configuration: Release
+            download_deps: true
 
     steps: &build-steps
     - name: "SCM Checkout"
@@ -75,7 +76,7 @@ jobs:
             fi
 
             sudo apt-get update -y
-            if [[ "${{ matrix.architecture }}-${{ matrix.build_system }}" == 64-cmake ]]; then
+            if [[ "${{ matrix.download_deps }}" == true ]]; then
               sudo apt-get install --no-install-recommends -y zlib1g-dev
             else
               sudo apt-get install --no-install-recommends -y \
@@ -177,7 +178,7 @@ jobs:
         haxelib list
 
     - name: "Build and install SDL3"
-      if: runner.os == 'Linux' && !(matrix.architecture == 64 && matrix.build_system == 'cmake')
+      if: runner.os == 'Linux' && !matrix.download_deps
       run: |
         wget https://github.com/libsdl-org/SDL/releases/download/release-3.4.10/SDL3-3.4.10.tar.gz
         tar -xzvf SDL3-3.4.10.tar.gz
@@ -219,13 +220,9 @@ jobs:
                 cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} -DWITH_SDL=OFF \
                   -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake
                 ;;
-              linux64)
-                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
-                  -DDOWNLOAD_DEPENDENCIES=ON \
-                  -DFLAT_INSTALL_TREE=ON
-                ;;
               linux*)
-                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }}
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+                  ${{ matrix.download_deps && '-DDOWNLOAD_DEPENDENCIES=ON -DFLAT_INSTALL_TREE=ON' || '' }}
                 ;;
             esac
 
