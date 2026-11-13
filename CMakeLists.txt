@@ -59,6 +59,11 @@ if (MINGW)
     add_link_options(-municode)
 endif()
 
+if(UNIX AND NOT APPLE)
+    # needed for correct JIT stack traces
+    add_compile_options(-fno-omit-frame-pointer)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_CURRENT_SOURCE_DIR}/other/cmake
 )
