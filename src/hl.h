@@ -618,6 +618,16 @@ typedef char pchar;
 
 #include <setjmp.h>
 
+// On macOS, setjmp/longjmp also save and restore the signal mask (two syscalls),
+// which HashLink does not need for traps or for saving GC registers.
+#ifdef HL_MAC
+#	define hl_setjmp	_setjmp
+#	define hl_longjmp	_longjmp
+#else
+#	define hl_setjmp	setjmp
+#	define hl_longjmp	longjmp
+#endif
+
 typedef struct {
 	pchar* file_path;
 	pchar** sys_args;
@@ -956,7 +966,7 @@ struct _hl_trap_ctx {
 	hl_trap_ctx *prev;
 	vdynamic *tcheck;
 };
-#define hl_trap(ctx,r,label) { hl_thread_info *__tinf = hl_get_thread(); ctx.tcheck = NULL; ctx.prev = __tinf->trap_current; __tinf->trap_current = &ctx; if( setjmp(ctx.buf) ) { r = __tinf->exc_value; goto label; } }
+#define hl_trap(ctx,r,label) { hl_thread_info *__tinf = hl_get_thread(); ctx.tcheck = NULL; ctx.prev = __tinf->trap_current; __tinf->trap_current = &ctx; if( hl_setjmp(ctx.buf) ) { r = __tinf->exc_value; goto label; } }
 #define hl_endtrap(ctx)	hl_get_thread()->trap_current = ctx.prev
 
 #define HL_EXC_MAX_STACK	0x100
