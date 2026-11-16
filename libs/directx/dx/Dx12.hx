@@ -16,6 +16,7 @@ enum DriverInitFlag {
 	DEBUG;
 	GPU_BASED_VALIDATION;
 	BREAK_ON_ERROR;
+	DRED;
 }
 
 enum abstract Constant(Int) to Int {

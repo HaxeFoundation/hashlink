@@ -71,6 +71,7 @@ enum DriverInitFlag {
 	DEBUG                    = 1 << 0,
 	GPU_BASED_VALIDATION     = 1 << 1,
 	BREAK_ON_ERROR           = 1 << 2,
+	DRED                     = 1 << 3,
 };
 
 class GpuCrashTracker {
@@ -394,11 +395,135 @@ HL_PRIM void HL_NAME(suppress_debug_messages)(D3D12_INFO_QUEUE_FILTER* filter) {
 #endif
 }
 
+#ifndef HL_XBS
+static ID3D12Device *crash_reported_device = NULL;
+
+static const char *DRED_OPS[] = {
+	"SetMarker", "BeginEvent", "EndEvent", "DrawInstanced", "DrawIndexedInstanced", "ExecuteIndirect", "Dispatch",
+	"CopyBufferRegion", "CopyTextureRegion", "CopyResource", "CopyTiles", "ResolveSubresource", "ClearRenderTargetView",
+	"ClearUnorderedAccessView", "ClearDepthStencilView", "ResourceBarrier", "ExecuteBundle", "Present", "ResolveQueryData",
+	"BeginSubmission", "EndSubmission", "DecodeFrame", "ProcessFrames", "AtomicCopyBufferUint", "AtomicCopyBufferUint64",
+	"ResolveSubresourceRegion", "WriteBufferImmediate", "DecodeFrame1", "SetProtectedResourceSession", "DecodeFrame2",
+	"ProcessFrames1", "BuildRaytracingAccelerationStructure", "EmitRaytracingAccelerationStructurePostbuildInfo",
+	"CopyRaytracingAccelerationStructure", "DispatchRays", "InitializeMetaCommand", "ExecuteMetaCommand", "EstimateMotion",
+	"ResolveMotionVectorHeap", "SetPipelineState1", "InitializeExtensionCommand", "ExecuteExtensionCommand", "DispatchMesh",
+	"EncodeFrame", "ResolveEncoderOutputMetadata", "Barrier", "BeginCommandList", "DispatchGraph", "SetProgram",
+};
+
+static const wchar_t *dred_context( const D3D12_AUTO_BREADCRUMB_NODE1 *n, UINT index ) {
+	for( UINT i = 0; i < n->BreadcrumbContextsCount; i++ )
+		if( n->pBreadcrumbContexts[i].BreadcrumbIndex == index )
+			return n->pBreadcrumbContexts[i].pContextString;
+	return NULL;
+}
+
+static char report_buf[16384];
+static int report_len;
+
+static void report( const char *fmt, ... ) {
+	int max = sizeof(report_buf) - report_len;
+	if( max <= 1 ) return;
+	int n = snprintf(report_buf + report_len, max, "[pid %u] ", GetCurrentProcessId());
+	report_len += n < max ? n : max - 1;
+	max = sizeof(report_buf) - report_len;
+	va_list args;
+	va_start(args, fmt);
+	n = vsnprintf(report_buf + report_len, max, fmt, args);
+	va_end(args);
+	if( n > 0 ) report_len += n < max ? n : max - 1;
+}
+
+static void dump_device_removed( HRESULT err, HRESULT reason, int line ) {
+	if( crash_reported_device == static_driver->device )
+		return;
+	crash_reported_device = static_driver->device;
+	const char *rname =
+		reason == DXGI_ERROR_DEVICE_HUNG ? "DEVICE_HUNG: this process's GPU work timed out" :
+		reason == DXGI_ERROR_DEVICE_RESET ? "DEVICE_RESET: GPU reset caused by another process" :
+		reason == DXGI_ERROR_DEVICE_REMOVED ? "DEVICE_REMOVED" :
+		reason == DXGI_ERROR_DRIVER_INTERNAL_ERROR ? "DRIVER_INTERNAL_ERROR" :
+		reason == DXGI_ERROR_INVALID_CALL ? "INVALID_CALL" : "?";
+	report_len = 0;
+	report("DX12 device lost: error %X at line %d, removed reason %X %s\n", (DWORD)err, line, (DWORD)reason, rname);
+
+	DXGI_QUERY_VIDEO_MEMORY_INFO mem;
+	if( SUCCEEDED(static_driver->adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &mem)) )
+		report("Local video memory: usage %lluMB / budget %lluMB\n", mem.CurrentUsage >> 20, mem.Budget >> 20);
+	if( SUCCEEDED(static_driver->adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &mem)) )
+		report("Non local video memory: usage %lluMB / budget %lluMB\n", mem.CurrentUsage >> 20, mem.Budget >> 20);
+
+	ID3D12DeviceRemovedExtendedData1 *dred;
+	if( SUCCEEDED(static_driver->device->QueryInterface(IID_PPV_ARGS(&dred))) ) {
+		D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 bc;
+		if( SUCCEEDED(dred->GetAutoBreadcrumbsOutput1(&bc)) ) {
+			bool any = false;
+			for( const D3D12_AUTO_BREADCRUMB_NODE1 *n = bc.pHeadAutoBreadcrumbNode; n; n = n->pNext ) {
+				UINT count = n->BreadcrumbCount;
+				UINT done = n->pLastBreadcrumbValue ? *n->pLastBreadcrumbValue : 0;
+				if( done >= count ) continue;
+				any = true;
+				report("Command list %S on queue %S: %u/%u ops completed\n", n->pCommandListDebugNameW, n->pCommandQueueDebugNameW, done, count);
+				const wchar_t *stack[32];
+				int depth = 0;
+				for( UINT i = 0; i < done; i++ ) {
+					D3D12_AUTO_BREADCRUMB_OP op = n->pCommandHistory[i];
+					if( op == D3D12_AUTO_BREADCRUMB_OP_BEGINEVENT ) {
+						if( depth < 32 ) stack[depth] = dred_context(n, i);
+						depth++;
+					} else if( op == D3D12_AUTO_BREADCRUMB_OP_ENDEVENT && depth > 0 )
+						depth--;
+				}
+				for( int i = 0; i < depth && i < 32; i++ )
+					report("  in event %S\n", stack[i]);
+				UINT first = done > 20 ? done - 20 : 0;
+				UINT last = done + 5 < count ? done + 5 : count;
+				for( UINT i = first; i < last; i++ ) {
+					UINT op = n->pCommandHistory[i];
+					const wchar_t *ctx = dred_context(n, i);
+					const char *mark = i == done ? "->" : "  ";
+					if( op < sizeof(DRED_OPS) / sizeof(DRED_OPS[0]) )
+						report("  %s %u %s %S\n", mark, i, DRED_OPS[op], ctx ? ctx : L"");
+					else
+						report("  %s %u op#%u %S\n", mark, i, op, ctx ? ctx : L"");
+				}
+			}
+			if( !any )
+				report("DRED: all command lists completed\n");
+		} else
+			report("DRED breadcrumbs not available, set DX12Driver.DRED = true\n");
+		D3D12_DRED_PAGE_FAULT_OUTPUT1 pf;
+		if( SUCCEEDED(dred->GetPageFaultAllocationOutput1(&pf)) && pf.PageFaultVA ) {
+			report("Page fault at GPU VA 0x%llX\n", pf.PageFaultVA);
+			for( const D3D12_DRED_ALLOCATION_NODE1 *a = pf.pHeadExistingAllocationNode; a; a = a->pNext )
+				report("  live allocation %S (type %d)\n", a->ObjectNameW, a->AllocationType);
+			for( const D3D12_DRED_ALLOCATION_NODE1 *a = pf.pHeadRecentFreedAllocationNode; a; a = a->pNext )
+				report("  freed allocation %S (type %d)\n", a->ObjectNameW, a->AllocationType);
+		}
+		dred->Release();
+	}
+	fwrite(report_buf, 1, report_len, stdout);
+	fflush(stdout);
+}
+#endif
+
 static void ReportDxError( HRESULT err, int line ) {
 	dx12_flush_messages();
-	if( (err == DXGI_ERROR_DEVICE_REMOVED || err == DXGI_ERROR_DEVICE_HUNG || err == DXGI_ERROR_DEVICE_RESET) && GpuCrashTracker::s_instance )
-		GpuCrashTracker::s_instance->WaitCrashDump();
-	hl_error("DXERROR %X line %d",(DWORD)err,line);
+	HRESULT reason = S_OK;
+	if( err == DXGI_ERROR_DEVICE_REMOVED || err == DXGI_ERROR_DEVICE_HUNG || err == DXGI_ERROR_DEVICE_RESET ) {
+		if( GpuCrashTracker::s_instance )
+			GpuCrashTracker::s_instance->WaitCrashDump();
+#ifndef HL_XBS
+		if( static_driver && static_driver->device ) {
+			reason = static_driver->device->GetDeviceRemovedReason();
+			if( reason != S_OK )
+				dump_device_removed(err, reason, line);
+		}
+#endif
+	}
+	if( reason != S_OK )
+		hl_error("DXERROR %X line %d, removed reason %X",(DWORD)err,line,(DWORD)reason);
+	else
+		hl_error("DXERROR %X line %d",(DWORD)err,line);
 }
 
 static void OnDebugMessage(
@@ -468,6 +593,16 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *de
 	}
 
 #ifndef HL_XBS
+	if( flags & DRED ) {
+		ID3D12DeviceRemovedExtendedDataSettings1 *dred;
+		if( SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dred))) ) {
+			dred->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+			dred->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+			dred->SetBreadcrumbContextEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+			dred->Release();
+		}
+	}
+
 	CHKERR(CreateDXGIFactory2(dxgiFlags, IID_PPV_ARGS(&drv->factory)));
 
 	UINT index = 0;
@@ -494,6 +629,7 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, DriverInitFlag flags, uchar *de
 	if( !drv->device )
 		return NULL;
 	drv->device->SetName(L"HL_DX12");
+	crash_reported_device = NULL;
 	if( drv->debug ) {
 		CHKERR(drv->device->QueryInterface(IID_PPV_ARGS(&drv->debugDevice)));
 		CHKERR(drv->device->QueryInterface(IID_PPV_ARGS(&drv->infoQueue)));
