@@ -191,7 +191,7 @@ private:
 		uint32_t shaderCount = 0;
 		GFSDK_Aftermath_GpuCrashDump_GetActiveShadersInfoCount(decoder, &shaderCount);
 
-		if (shaderCount == 0 && !HasFault(decoder)) {
+		if (shaderCount == 0 && !HasInfo(decoder)) {
 			GFSDK_Aftermath_GpuCrashDump_DestroyDecoder(decoder);
 			if (on_unregistered_thread)
 				hl_unregister_thread();
@@ -244,22 +244,13 @@ private:
 			hl_unregister_thread();
 	}
 
-	static bool HasFault(GFSDK_Aftermath_GpuCrashDump_Decoder decoder)
+	static bool HasInfo(GFSDK_Aftermath_GpuCrashDump_Decoder decoder)
 	{
 		GFSDK_Aftermath_GpuCrashDump_PageFaultInfo pageFault;
 		if (GFSDK_Aftermath_GpuCrashDump_GetPageFaultInfo(decoder, &pageFault) == GFSDK_Aftermath_Result_Success)
 			return true;
-		GFSDK_Aftermath_GpuCrashDump_DeviceInfo device;
-		if (GFSDK_Aftermath_GpuCrashDump_GetDeviceInfo(decoder, &device) != GFSDK_Aftermath_Result_Success)
-			return false;
-		switch (device.status) {
-		case GFSDK_Aftermath_Device_Status_OutOfMemory:
-		case GFSDK_Aftermath_Device_Status_PageFault:
-		case GFSDK_Aftermath_Device_Status_DmaFault:
-			return true;
-		default:
-			return false;
-		}
+		uint32_t markerCount = 0;
+		return GFSDK_Aftermath_GpuCrashDump_GetEventMarkersInfoCount(decoder, &markerCount) == GFSDK_Aftermath_Result_Success && markerCount > 0;
 	}
 
 	void OnCrashFile(const char* path, const void* pData, uint32_t size, bool last = false)
