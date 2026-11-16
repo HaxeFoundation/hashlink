@@ -947,8 +947,8 @@ HL_PRIM void HL_NAME(copy_descriptors_simple)(int numDescriptors, D3D12_CPU_DESC
 	static_driver->device->CopyDescriptorsSimple(numDescriptors, dstCpuAddress, srcCpuAddress, heapType);
 }
 
-HL_PRIM void HL_NAME(check_feature_support)(D3D12_FEATURE feature, void* data, int dataSize) {
-	static_driver->device->CheckFeatureSupport(feature, &data, dataSize);
+HL_PRIM bool HL_NAME(check_feature_support)(D3D12_FEATURE feature, void* data, int dataSize) {
+	return SUCCEEDED(static_driver->device->CheckFeatureSupport(feature, data, dataSize));
 }
 
 DEFINE_PRIM(_VOID, create_render_target_view, _RES _STRUCT _I64);
@@ -971,7 +971,7 @@ DEFINE_PRIM(_I64, get_required_intermediate_size, _RES _I32 _I32);
 DEFINE_PRIM(_BOOL, update_sub_resource, _RES _RES _RES _I64 _I32 _I32 _STRUCT);
 DEFINE_PRIM(_VOID, get_copyable_footprints, _STRUCT _I32 _I32 _I64 _STRUCT _BYTES _BYTES _BYTES);
 DEFINE_PRIM(_VOID, copy_descriptors_simple, _I32 _I64 _I64 _I32);
-DEFINE_PRIM(_VOID, check_feature_support, _I32 _BYTES _I32);
+DEFINE_PRIM(_BOOL, check_feature_support, _I32 _BYTES _I32);
 
 // ---- SHADERS
 
