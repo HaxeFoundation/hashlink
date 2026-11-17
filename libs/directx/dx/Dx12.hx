@@ -292,6 +292,13 @@ abstract WaitEvent(hl.Abstract<"dx_event">) {
 	static function create( state : Bool ) : WaitEvent { return null; }
 }
 
+@:hlNative("dx12","aftermath_")
+abstract AftermathContext(hl.Abstract<"dx_aftermath_context">) {
+	public static function createContext( list : CommandList ) : AftermathContext { return null; }
+	public function beginEvent( name : hl.Bytes ) {}
+	public function endEvent() {}
+}
+
 enum abstract DescriptorHeapType(Int) {
 	var CBV_SRV_UAV = 0;
 	var SAMPLER = 1;

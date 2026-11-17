@@ -1604,3 +1604,54 @@ HL_PRIM void HL_NAME(set_gpu_crash_handler)(vclosure* c)
 }
 
 DEFINE_PRIM(_VOID, set_gpu_crash_handler, _FUN(_VOID, _BYTES _BYTES _I32 _BOOL));
+
+typedef struct {
+#ifdef HL_AFTERMATH
+	GFSDK_Aftermath_ContextHandle handle;
+	std::string path;
+	std::vector<size_t> stack;
+#endif
+} dx_aftermath_context;
+
+HL_PRIM dx_aftermath_context *HL_NAME(aftermath_create_context)( ID3D12GraphicsCommandList *l ) {
+#ifdef HL_AFTERMATH
+	if( !static_driver || !static_driver->gpuCrashTracker )
+		return NULL;
+	GFSDK_Aftermath_ContextHandle handle;
+	if( GFSDK_Aftermath_DX12_CreateContextHandle(l, &handle) != GFSDK_Aftermath_Result_Success )
+		return NULL;
+	dx_aftermath_context *ctx = new dx_aftermath_context();
+	ctx->handle = handle;
+	return ctx;
+#else
+	return NULL;
+#endif
+}
+
+HL_PRIM void HL_NAME(aftermath_begin_event)( dx_aftermath_context *ctx, const wchar_t *name ) {
+#ifdef HL_AFTERMATH
+	ctx->stack.push_back(ctx->path.size());
+	if( !ctx->path.empty() )
+		ctx->path += '/';
+	char buf[256];
+	int len = WideCharToMultiByte(CP_UTF8, 0, name, -1, buf, sizeof(buf), NULL, NULL);
+	if( len > 0 )
+		ctx->path.append(buf, len - 1);
+	GFSDK_Aftermath_SetEventMarker(ctx->handle, ctx->path.c_str(), (uint32_t)ctx->path.size() + 1);
+#endif
+}
+
+HL_PRIM void HL_NAME(aftermath_end_event)( dx_aftermath_context *ctx ) {
+#ifdef HL_AFTERMATH
+	if( ctx->stack.empty() )
+		return;
+	ctx->path.resize(ctx->stack.back());
+	ctx->stack.pop_back();
+	GFSDK_Aftermath_SetEventMarker(ctx->handle, ctx->path.c_str(), (uint32_t)ctx->path.size() + 1);
+#endif
+}
+
+#define _AFTERMATH_CTX _ABSTRACT(dx_aftermath_context)
+DEFINE_PRIM(_AFTERMATH_CTX, aftermath_create_context, _RES);
+DEFINE_PRIM(_VOID, aftermath_begin_event, _AFTERMATH_CTX _BYTES);
+DEFINE_PRIM(_VOID, aftermath_end_event, _AFTERMATH_CTX);
