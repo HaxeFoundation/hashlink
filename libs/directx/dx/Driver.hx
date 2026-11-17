@@ -486,6 +486,13 @@ enum abstract PresentFlags(Int) {
 	@:op(a | b) static function or(a:PresentFlags, b:PresentFlags) : PresentFlags;
 }
 
+enum abstract DepthStencilViewFlags(Int) {
+	var None = 0;
+	var ReadOnlyDepth = 1;
+	var ReadOnlyStencil = 2;
+	@:op(a | b) static function or(a:DepthStencilViewFlags, b:DepthStencilViewFlags) : DepthStencilViewFlags;
+}
+
 @:hlNative("directx")
 class Driver {
 
@@ -626,7 +633,7 @@ class Driver {
 		return dxCreateTexture2d(desc,data);
 	}
 
-	public static function createDepthStencilView( texture : Resource, format : Format, readOnly : Bool ) : DepthStencilView {
+	public static function createDepthStencilView( texture : Resource, format : Format, flags : DepthStencilViewFlags ) : DepthStencilView {
 		return null;
 	}
 
