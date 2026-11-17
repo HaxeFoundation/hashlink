@@ -628,6 +628,13 @@ typedef char pchar;
 #	define hl_longjmp	longjmp
 #endif
 
+// Address of the setjmp function called by the JIT: on MinGW, setjmp is a macro.
+#ifdef HL_MINGW
+#	define SETJMP_FUN	_setjmp
+#else
+#	define SETJMP_FUN	hl_setjmp
+#endif
+
 typedef struct {
 	pchar* file_path;
 	pchar** sys_args;

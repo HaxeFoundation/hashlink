@@ -25,12 +25,6 @@
 #include <hlmodule.h>
 #include <math.h>
 
-#ifdef HL_MINGW
-#	define SETJMP_FUN	_setjmp
-#else
-#	define SETJMP_FUN	hl_setjmp
-#endif
-
 typedef enum {
 	LOAD_ADDR,
 	LOAD_CONST,
