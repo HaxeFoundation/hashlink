@@ -236,6 +236,19 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 	return key;
 }
 
+HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) );
+static hl_type hlt_homap = { HABSTRACT, { USTR("ObjectMap") } };
+static void hl_ho_rehash( void *m );
+
+static void hl_ho_register() {
+	static bool done = false;
+	if( done ) return;
+	done = true;
+	hl_gc_set_remap_hook(&hlt_homap, hl_ho_rehash);
+}
+
+#define _MTYPE			&hlt_homap
+#define _MALLOC_HOOK()	hl_ho_register()
 #define hlt_key		hlt_dyn
 #define hl_hohash(key)	((unsigned int)(int_val)(key))
 #define _MKEY_TYPE	vdynamic*
@@ -246,6 +259,21 @@ static vdynamic *hl_hofilter( vdynamic *key ) {
 #define _MERASE(c)  m->values[c].key = NULL
 
 #include "maps.h"
+
+static void hl_ho_rehash( void *map ) {
+	hl_ho_map *m = (hl_ho_map*)map;
+	if( !m->values ) return;
+	hl_ho_map old = *m;
+	memset(m,0,sizeof(hl_ho_map));
+	m->t = old.t;
+	for(int i=0;i<old.ncells;i++) {
+		int c = old.maxentries < 128 ? ((signed char*)old.cells)[i] : ((int*)old.cells)[i];
+		while( c >= 0 ) {
+			hl_hoset_impl(m, old.values[c].key, old.values[c].value);
+			c = old.maxentries < 128 ? ((signed char*)old.nexts)[c] : ((int*)old.nexts)[c];
+		}
+	}
+}
 
 // ----- LOOKUP MAP ---------------------------------
 

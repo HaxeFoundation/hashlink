@@ -17,6 +17,9 @@
 #endif
 
 typedef struct {
+#	ifdef _MTYPE
+	hl_type *t;
+#	endif
 	void *cells;
 	void *nexts;
 	t_entry *entries;
@@ -33,6 +36,12 @@ HL_PRIM
 t_map *_MNAME(alloc)() {
 	t_map *m = (t_map*)hl_gc_alloc_raw(sizeof(t_map));
 	memset(m,0,sizeof(t_map));
+#	ifdef _MTYPE
+	m->t = _MTYPE;
+#	endif
+#	ifdef _MALLOC_HOOK
+	_MALLOC_HOOK();
+#	endif
 	return m;
 }
 
@@ -57,22 +66,29 @@ static void _MNAME(resize)( t_map *m );
 _MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	int c, ckey = 0;
 	unsigned int hash = _MNAME(hash)(key);
-	if( m->values ) {
-		ckey = hash % ((unsigned)m->ncells);
-		c = _MINDEX(m,ckey);
-		while( c >= 0 ) {
-			if( _MMATCH(c) ) {
-				m->values[c].value = value;
-				return;
+	t_value *values;
+	while( true ) {
+		values = m->values;
+		if( values ) {
+			ckey = hash % ((unsigned)m->ncells);
+			c = _MINDEX(m,ckey);
+			while( c >= 0 ) {
+				if( _MMATCH(c) ) {
+					m->values[c].value = value;
+					return;
+				}
+				c = _MNEXT(m,c);
 			}
-			c = _MNEXT(m,c);
 		}
-	}
-	c = hl_freelist_get(&m->lfree);
-	if( c < 0 ) {
-		_MNAME(resize)(m);
-		ckey = hash % ((unsigned)m->ncells);
-		c = hl_freelist_get(&m->lfree);
+		hl_free_list lfree = m->lfree;
+		c = hl_freelist_get(&lfree);
+		if( m->values != values ) continue;
+		if( c < 0 ) {
+			_MNAME(resize)(m);
+			continue;
+		}
+		m->lfree = lfree;
+		break;
 	}
 	_MSET(c);
 	if( m->maxentries < _MLIMIT ) {
@@ -86,9 +102,11 @@ _MSTATIC void _MNAME(set_impl)( t_map *m, t_key key, _MVAL_TYPE value ) {
 	m->nentries++;
 }
 
-static void _MNAME(resize)( t_map *m ) {
+static void _MNAME(resize)( t_map *map ) {
 	// save
-	t_map old = *m;
+	t_map old = *map;
+	t_map cur = *map;
+	t_map *m = &cur;
 
 	if( m->nentries != m->maxentries ) hl_error("assert");
 
@@ -131,6 +149,7 @@ static void _MNAME(resize)( t_map *m ) {
 			}
 		}
 	}
+	if( map->values == old.values ) *map = cur;
 }
 
 #ifndef _MNO_EXPORTS
@@ -150,16 +169,22 @@ HL_PRIM vdynamic* _MNAME(get)( t_map *m, t_key key ) {
 }
 
 HL_PRIM bool _MNAME(remove)( t_map *m, t_key key ) {
-	int c, prev = -1, ckey;
+	int c, prev, ckey;
 	unsigned int hash;
-	if( !m->cells ) return false;
 	key = _MNAME(filter)(key);
 	hash = _MNAME(hash)(key);
+retry:
+	if( !m->cells ) return false;
+	prev = -1;
 	ckey = hash % ((unsigned)m->ncells);
 	c = _MINDEX(m,ckey);
 	while( c >= 0 ) {
 		if( _MMATCH(c) ) {
-			hl_freelist_add(&m->lfree,c);
+			t_value *values = m->values;
+			hl_free_list lfree = m->lfree;
+			hl_freelist_add(&lfree,c);
+			if( m->values != values ) goto retry;
+			m->lfree = lfree;
 			m->nentries--;
 			_MERASE(c);
 			m->values[c].value = NULL;
@@ -234,3 +259,5 @@ HL_PRIM int _MNAME(size)( t_map *m ) {
 #undef _MINDEX
 #undef _MNEXT
 #undef _MSTATIC
+#undef _MALLOC_HOOK
+#undef _MTYPE
