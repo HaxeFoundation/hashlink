@@ -294,7 +294,7 @@ HL_API hl_thread_info *hl_get_thread() {
 static GC_NOINLINE void gc_save_context(hl_thread_info *t, void *prev_stack, void *caller_pc, void *caller_sp ) {
 	t->gc_ctx_seq++;
 	GC_RELEASE_BARRIER();
-	setjmp(t->gc_regs);
+	hl_setjmp(t->gc_regs);
 	t->gc_ctx_pc = GC_RETURN_PC;
 	t->gc_ctx_sp = GC_RETURN_SP;
 	t->gc_ctx_caller_pc = caller_pc;
