@@ -439,6 +439,7 @@ typedef struct {
 	int size;
 	bool hasptr;
 	int *offsets;
+	const uchar **pnames;
 } hl_enum_construct;
 
 typedef struct {

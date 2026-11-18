@@ -74,8 +74,13 @@ typedef struct {
 	int *fields;
 } hl_constant;
 
+#define HL_BUILD_ID_SIZE	16
+#define HL_HEADER_SIZE		(4 + 4 + HL_BUILD_ID_SIZE)
+
 typedef struct {
 	int version;
+	int file_size;
+	unsigned char build_id[HL_BUILD_ID_SIZE];
 	int nints;
 	int nfloats;
 	int nstrings;
@@ -101,6 +106,7 @@ typedef struct {
 	hl_type**	globals;
 	hl_native*	natives;
 	hl_function*functions;
+	int*		lnames;
 	hl_constant*constants;
 	hl_alloc	alloc;
 	hl_alloc	falloc;
@@ -154,6 +160,7 @@ typedef struct {
 } hl_module;
 
 hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg );
+int hl_code_read_header( const unsigned char *data, int size, int *file_size, unsigned char *build_id );
 
 hl_code_hash *hl_code_hash_alloc( hl_code *c );
 void hl_code_hash_finalize( hl_code_hash *h );
@@ -164,6 +171,7 @@ int hl_code_hash_type( hl_code_hash *h, hl_type *t );
 void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold );
 
 const uchar *hl_get_ustring( hl_code *c, int index );
+const uchar *hl_function_lname( hl_code *c, hl_function *f );
 const char* hl_op_name( int op );
 
 typedef unsigned char h_bool;
