@@ -719,6 +719,17 @@ static ereg emit_call_fid( emit_ctx *ctx, int findex, ereg *args, int nargs, emi
 	return mode == M_VOID ? UNUSED : new_value(ctx);
 }
 
+static void *fun_extern( hl_module *m, int findex ) {
+	return m->functions_extern ? m->functions_extern[findex] : NULL;
+}
+
+static ereg emit_compare_call( emit_ctx *ctx, hl_type *t, ereg args[] ) {
+	hl_runtime_obj *rt = hl_get_obj_rt(t);
+	if( t->obj->m != &ctx->mod->ctx )
+		return emit_dyn_call(ctx, LOAD_CONST_PTR(rt->compareFun), args, 2, &hlt_i32);
+	return emit_call_fid(ctx, (int)(int_val)rt->compareFun, args, 2, M_I32);
+}
+
 static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int *args_regs ) {
 	hl_module *m = ctx->mod;
 	int fid = m->functions_indexes[findex];
@@ -743,6 +754,9 @@ static void emit_call_fun( emit_ctx *ctx, vreg *dst, int findex, int count, int 
 			STORE(dst, emit_gen_ext(ctx, FMATH, args[0], UNUSED, hl_type_mode(dst->t), fm));
 		else
 			STORE(dst, emit_native_call(ctx, m->functions_ptrs[findex], args, count, dst->t));
+	} else if( fun_extern(m, findex) ) {
+		ereg out = emit_dyn_call(ctx, LOAD_CONST_PTR(fun_extern(m, findex)), args, count, dst->t);
+		if( out ) STORE(dst, out);
 	} else {
 		ereg out = emit_call_fid(ctx,findex,args,count,hl_type_mode(dst->t));
 		if( out ) STORE(dst, out);
@@ -758,6 +772,10 @@ static vclosure *alloc_static_closure( emit_ctx *ctx, int fid ) {
 		// native
 		c->t = m->code->natives[fidx - m->code->nfunctions].t;
 		c->fun = m->functions_ptrs[fid];
+		c->value = NULL;
+	} else if( fun_extern(m, fid) ) {
+		c->t = m->code->functions[fidx].type;
+		c->fun = fun_extern(m, fid);
 		c->value = NULL;
 	} else {
 		c->t = m->code->functions[fidx].type;
@@ -1474,7 +1492,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 					int ja = emit_jump(ctx, true);
 					emit_test(ctx,b,OJNull);
 					int jb = emit_jump(ctx, true);
-					emit_test(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32),OJNotNull);
+					emit_test(ctx, emit_compare_call(ctx,at,args),OJNotNull);
 					int jcmp = emit_jump(ctx, true);
 					patch_jump(ctx, jeq);
 					register_block_jump(ctx, offset, false);
@@ -1496,7 +1514,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 					emit_test(ctx,b,OJEq);
 					register_block_jump(ctx,offset,true);
 					split_block(ctx);
-					emit_test(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32),OJNotNull);
+					emit_test(ctx, emit_compare_call(ctx,at,args),OJNotNull);
 					register_block_jump(ctx,offset,true);
 					patch_jump(ctx,jeq);
 				}
@@ -1508,7 +1526,7 @@ static void emit_jump_dyn( emit_ctx *ctx, hl_op op, hl_type *at, ereg a, hl_type
 					int ja = emit_jump(ctx, true);
 					emit_test(ctx,b,OJNull);
 					int jb = emit_jump(ctx, true);
-					emit_cmp(ctx, emit_call_fid(ctx,(int)(int_val)at->obj->rt->compareFun,args,2,M_I32), LOAD_CONST(0,&hlt_i32),op);
+					emit_cmp(ctx, emit_compare_call(ctx,at,args), LOAD_CONST(0,&hlt_i32),op);
 					register_block_jump(ctx,offset,true);
 					patch_jump(ctx,ja);
 					patch_jump(ctx,jb);
@@ -1729,10 +1747,14 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		{
 			ereg args[3];
 			args[0] = LOAD_CONST_PTR(m->code->functions[m->functions_indexes[o->p2]].type);
-			einstr *e = emit_instr(ctx, LOAD_FUN);
-			e->mode = M_PTR;
-			e->size_offs = o->p2;
-			args[1] = new_value(ctx);
+			if( fun_extern(m, o->p2) )
+				args[1] = LOAD_CONST_PTR(fun_extern(m, o->p2));
+			else {
+				einstr *e = emit_instr(ctx, LOAD_FUN);
+				e->mode = M_PTR;
+				e->size_offs = o->p2;
+				args[1] = new_value(ctx);
+			}
 			args[2] = LOAD(rb);
 			STORE(dst, emit_native_call(ctx,hl_alloc_closure_ptr,args,3,dst->t));
 		}

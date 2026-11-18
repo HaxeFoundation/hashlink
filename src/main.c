@@ -51,20 +51,7 @@ typedef struct {
 	hl_code *code;
 	hl_module *m;
 	vdynamic *ret;
-	int file_time;
 } main_context;
-
-static int pfiletime( pchar *file )	{
-#ifdef HL_WIN
-	struct _stat32 st;
-	_wstat32(file,&st);
-	return (int)st.st_mtime;
-#else
-	struct stat st;
-	stat(file,&st);
-	return (int)st.st_mtime;
-#endif
-}
 
 static hl_code *load_code( const pchar *file, char **error_msg, bool print_errors ) {
 	hl_code *code;
@@ -99,16 +86,15 @@ static main_context* main_ctx = NULL;
 static bool check_reload( vbyte *alt_file ) {
 	main_context* m = main_ctx;
 	pchar* file = alt_file ? (pchar*)alt_file : m->file;
-	int time = pfiletime(file);
 	bool changed;
-	if( time == m->file_time )
+	if( !hl_hot_reload_file_changed(file) )
 		return false;
 	char *error_msg = NULL;
 	hl_code *code = load_code(file, &error_msg, false);
 	if( code == NULL )
 		return false;
 	changed = hl_module_patch(m->m, code);
-	m->file_time = time;
+	hl_hot_reload_file_loaded(code);
 	hl_code_free(code);
 	return changed;
 }
@@ -291,6 +277,7 @@ int main(int argc, pchar *argv[]) {
 	hl_register_thread(&ctx);
 	main_ctx = &ctx;
 	ctx.file = file;
+	hl_setup.hot_reload = hot_reload;
 	ctx.code = load_code(file, &error_msg, true);
 	if( ctx.code == NULL ) {
 		if( error_msg ) printf("%s\n", error_msg);
@@ -302,7 +289,7 @@ int main(int argc, pchar *argv[]) {
 	if( !hl_module_init(ctx.m,(hot_reload?HL_MODULE_HOT_RELOAD:0) | (dump?HL_MODULE_DUMP:0) | (debug_port > 0 && !debug_opt?HL_MODULE_DEBUG:0)) )
 		return 3;
 	if( hot_reload ) {
-		ctx.file_time = pfiletime(ctx.file);
+		hl_hot_reload_file_init(ctx.file, ctx.code);
 		hl_setup.reload_check = check_reload;
 	}
 	hl_setup.load_plugin = load_plugin;

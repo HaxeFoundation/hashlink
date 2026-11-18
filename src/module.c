@@ -33,13 +33,12 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #	include <dlfcn.h>
 #endif
 
-#define HOT_RELOAD_EXTRA_GLOBALS	4096
-
 #ifdef __GNUC__
 #	define STACK_WALK_C_FRAMES
 #endif
 
 HL_API void hl_prim_not_loaded( const uchar *err );
+
 
 static hl_module **cur_modules = NULL;
 static int modules_count = 0;
@@ -157,7 +156,7 @@ static void **walk_at( void *p, void *stack_base, void *copy ) {
 	return copy ? (void**)((char*)copy + ((char*)p - (char*)stack_base)) : (void**)p;
 }
 
-static bool is_call_site( void *ret ) {
+bool hl_module_is_call_site( void *ret ) {
 #if defined(_M_X64) || defined(__x86_64__)
 	unsigned char *p = (unsigned char*)ret;
 	int k;
@@ -192,7 +191,7 @@ static int frame_chain( void **fp, void *stack_base, void *stack_top, void *copy
 		next = rec[0];
 		ret = rec[1];
 		if( next <= (void*)fp || next >= stack_top ) break;
-		if( !is_call_site(ret) ) {
+		if( !hl_module_is_call_site(ret) ) {
 			*clean = !module_is_jit_code(ret,true);
 			break;
 		}
@@ -224,7 +223,7 @@ int hl_module_capture_stack_walk( void *pc, void *fp, void *stack_base, void *st
 				while( b > scan ) {
 					void *v = walk_at(b - 1,stack_base,copy)[0];
 					b--;
-					if( is_call_site(v) ) {
+					if( hl_module_is_call_site(v) ) {
 						if( out ) out[count] = v;
 						count++;
 						break;
@@ -462,7 +461,7 @@ int hl_module_capture_stack_unwind( void *pc, void *sp, void **regs, bool leaf, 
 
 #endif
 
-static int module_capture_stack( void **stack, int size ) {
+int hl_module_capture_stack( void **stack, int size ) {
 #ifdef WIN64_UNWIND_TABLES
 	CONTEXT context;
 	RtlCaptureContext(&context);
@@ -518,7 +517,7 @@ static int module_capture_stack( void **stack, int size ) {
 		if( next <= cur || (void*)next >= stack_top ) break;
 		if( module_is_jit_code(ret,true) ) {
 			// null access stubs are reached with push+jmp
-			if( from_stub || is_call_site(ret) ) {
+			if( from_stub || hl_module_is_call_site(ret) ) {
 				pc = ret;
 				fp = next;
 			}
@@ -625,7 +624,7 @@ hl_module *hl_module_alloc( hl_code *c ) {
 	return m;
 }
 
-static void null_function() {
+void hl_module_null_function() {
 	hl_error("Null function ptr");
 }
 
@@ -727,7 +726,7 @@ static void disabled_primitive() {
 	hl_error("This library primitive has been disabled");
 }
 
-static void hl_module_init_indexes( hl_module *m ) {
+void hl_module_init_indexes( hl_module *m ) {
 	int i;
 	for(i=0;i<m->code->nfunctions;i++) {
 		hl_function *f = m->code->functions + i;
@@ -784,35 +783,44 @@ static void hl_module_init_indexes( hl_module *m ) {
 			break;
 		}
 	}
-	for(i=0;i<m->code->nfunctions;i++) {
-		int k;
-		hl_function *f = m->code->functions + i;
-		hl_function *real_f = f;
-		while( real_f && !real_f->obj ) real_f = real_f->field.ref;
-		if( real_f == NULL ) continue;
-		for(k=0;k<f->nops;k++) {
-			hl_opcode *op = f->ops + k;
-			switch( op->op ) {
-			case OCall0:
-			case OCall1:
-			case OCall2:
-			case OCall3:
-			case OCall4:
-			case OCallN:
-			case OStaticClosure:
-			case OInstanceClosure:
-				if( m->functions_indexes[op->p2] < m->code->nfunctions ) {
-					hl_function *floc = m->code->functions + m->functions_indexes[op->p2];
-					if( floc->obj ) continue;
-					floc->field.ref = real_f;
-					floc->ref = real_f->ref++;
+	bool *scanned = (bool*)calloc(m->code->nfunctions, sizeof(bool));
+	bool attached = true;
+	while( attached ) {
+		attached = false;
+		for(i=0;i<m->code->nfunctions;i++) {
+			int k;
+			hl_function *f = m->code->functions + i;
+			hl_function *real_f = f;
+			if( scanned[i] ) continue;
+			while( real_f && !real_f->obj ) real_f = real_f->field.ref;
+			if( real_f == NULL ) continue;
+			scanned[i] = true;
+			for(k=0;k<f->nops;k++) {
+				hl_opcode *op = f->ops + k;
+				switch( op->op ) {
+				case OCall0:
+				case OCall1:
+				case OCall2:
+				case OCall3:
+				case OCall4:
+				case OCallN:
+				case OStaticClosure:
+				case OInstanceClosure:
+					if( m->functions_indexes[op->p2] < m->code->nfunctions ) {
+						hl_function *floc = m->code->functions + m->functions_indexes[op->p2];
+						if( floc->obj || floc->field.ref ) continue;
+						floc->field.ref = real_f;
+						floc->ref = real_f->ref++;
+						attached = true;
+					}
+					break;
+				default:
+					break;
 				}
-				break;
-			default:
-				break;
 			}
 		}
 	}
+	free(scanned);
 
 	static hl_type_obj obj_entry = {0};
 	hl_function *fent = m->code->functions + m->functions_indexes[m->code->entrypoint];
@@ -882,7 +890,7 @@ static void modules_init_vtune() {
 }
 #endif
 
-static void hl_module_init_natives( hl_module *m ) {
+void hl_module_init_natives( hl_module *m ) {
 	char tmp[256];
 	int i;
 	void *libHandler = NULL;
@@ -931,7 +939,7 @@ static void hl_module_init_natives( hl_module *m ) {
 	}
 }
 
-static void hl_module_init_constant( hl_module *m, hl_constant *c ) {
+void hl_module_init_constant( hl_module *m, hl_constant *c ) {
 	hl_type *t = m->code->globals[c->global];
 	hl_runtime_obj *rt;
 	vdynamic **global = (vdynamic**)(m->globals_data + m->globals_indexes[c->global]);
@@ -975,7 +983,7 @@ static void hl_module_init_constant( hl_module *m, hl_constant *c ) {
 	hl_remove_root(global);
 }
 
-static void hl_module_add( hl_module *m ) {
+void hl_module_add( hl_module *m ) {
 	hl_module **old_modules = cur_modules;
 	hl_module **new_modules = (hl_module**)malloc(sizeof(void*)*(modules_count + 1));
 	memcpy(new_modules, old_modules, sizeof(void*)*modules_count);
@@ -989,23 +997,11 @@ int hl_module_init( hl_module *m, int flags ) {
 	int i;
 	jit_ctx *ctx;
 	bool hot_reload = (flags & HL_MODULE_HOT_RELOAD) != 0;
-	// expand globals
-	if( hot_reload ) {
-		int nsize = m->globals_size + HOT_RELOAD_EXTRA_GLOBALS * sizeof(void*);
-		int *nindexes = malloc(sizeof(int) * (m->code->nglobals + HOT_RELOAD_EXTRA_GLOBALS));
-		memcpy(nindexes,m->globals_indexes,sizeof(int)*m->code->nglobals);
-		memset(nindexes + m->code->nglobals,0xFF,HOT_RELOAD_EXTRA_GLOBALS * sizeof(int));
-		free(m->globals_indexes);
-		free(m->globals_data);
-		m->globals_indexes = nindexes;
-		m->globals_data = malloc(nsize);
-		memset(m->globals_data,0,m->globals_size);
-		memset(m->globals_data + m->globals_size,0xFF,HOT_RELOAD_EXTRA_GLOBALS * sizeof(void*));
-	}
+	if( hot_reload ) hl_hot_reload_prepare(m);
 	// RESET globals
 	for(i=0;i<m->code->nglobals;i++) {
 		hl_type *t = m->code->globals[i];
-		if( t->kind == HFUN ) *(void**)(m->globals_data + m->globals_indexes[i]) = null_function;
+		if( t->kind == HFUN ) *(void**)(m->globals_data + m->globals_indexes[i]) = hl_module_null_function;
 		if( hl_is_ptr(t) )
 			hl_add_root(m->globals_data+m->globals_indexes[i]);
 	}
@@ -1047,7 +1043,7 @@ int hl_module_init( hl_module *m, int flags ) {
 	}
 	hl_module_add(m);
 	hl_setup.resolve_symbol = module_resolve_symbol;
-	hl_setup.capture_stack = module_capture_stack;
+	hl_setup.capture_stack = hl_module_capture_stack;
 	hl_setup.capture_break_context = module_capture_break_context;
 	hl_gc_set_dump_types(hl_module_types_dump);
 #	ifdef HL_VTUNE
@@ -1056,15 +1052,12 @@ int hl_module_init( hl_module *m, int flags ) {
 #	ifdef WIN64_UNWIND_TABLES
 	RtlAddFunctionTable(m->unwind_table, m->unwind_table_size, (DWORD64)m->jit_code);
 #	endif
-	hl_jit_free(ctx, hot_reload);
-	if( hot_reload ) {
-		hl_code_hash_finalize(m->hash);
-		m->jit_ctx = ctx;
-	}
+	hl_jit_free(ctx, false);
+	if( hot_reload ) hl_hot_reload_init(m);
 	return 1;
 }
 
-static bool check_same_type( hl_type *t1, hl_type *t2 ) {
+bool hl_module_same_type( hl_type *t1, hl_type *t2 ) {
 	if( hl_safe_cast(t1,t2) )
 		return true;
 	if( t1->kind != t2->kind )
@@ -1079,9 +1072,9 @@ static bool check_same_type( hl_type *t1, hl_type *t2 ) {
 		if( t1->fun->nargs != t2->fun->nargs )
 			return false;
 		for(i=0;i<t1->fun->nargs;i++)
-			if( !check_same_type(t1->fun->args[i],t2->fun->args[i]) )
+			if( !hl_module_same_type(t1->fun->args[i],t2->fun->args[i]) )
 				return false;
-		return check_same_type(t1->fun->ret, t2->fun->ret);
+		return hl_module_same_type(t1->fun->ret, t2->fun->ret);
 	case HVIRTUAL:
 		if( t1->virt == t2->virt )
 			return true;
@@ -1092,7 +1085,7 @@ static bool check_same_type( hl_type *t1, hl_type *t2 ) {
 		for(i=0;i<t1->virt->nfields;i++) {
 			hl_obj_field *f1 = t1->virt->fields + i;
 			hl_obj_field *f2 = t2->virt->fields + i;
-			if( f1->hashed_name != f2->hashed_name || !check_same_type(f1->t, f2->t) ) {
+			if( f1->hashed_name != f2->hashed_name || !hl_module_same_type(f1->t, f2->t) ) {
 				t2->virt = vt2;
 				return false;
 			}
@@ -1104,7 +1097,7 @@ static bool check_same_type( hl_type *t1, hl_type *t2 ) {
 	case HENUM:
 		return ucmp(t1->tenum->name, t2->tenum->name) == 0;
 	case HPACKED:
-		return check_same_type(t1->tparam, t2->tparam);
+		return hl_module_same_type(t1->tparam, t2->tparam);
 	default:
 		break;
 	}
@@ -1119,7 +1112,7 @@ static int check_same_obj( hl_type_obj *o1, hl_type_obj *o2 ) {
 		if( o1->proto[i].hashed_name != o2->proto[i].hashed_name )
 			return -1;
 	for(i=0;i<o1->nfields;i++)
-		if( o1->fields[i].hashed_name != o2->fields[i].hashed_name || !check_same_type(o1->fields[i].t,o2->fields[i].t) )
+		if( o1->fields[i].hashed_name != o2->fields[i].hashed_name || !hl_module_same_type(o1->fields[i].t,o2->fields[i].t) )
 			return -1;
 	for(i=0;i<o1->nproto;i++)
 		if( o1->proto[i].pindex != o2->proto[i].pindex )
@@ -1149,220 +1142,6 @@ hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err ) {
 	return NULL;
 }
 
-h_bool hl_module_patch( hl_module *m1, hl_code *c ) {
-	int i,i1,i2;
-	bool has_changes = false;
-	int changes_count = 0;
-	jit_ctx *ctx = m1->jit_ctx;
-
-	hl_module *m2 = hl_module_alloc(c);
-	m2->hash = hl_code_hash_alloc(c);
-	hl_code_hash_remap_globals(m2->hash,m1->hash);
-
-	// share global data
-	free(m2->globals_data);
-	free(m2->globals_indexes);
-	m2->globals_data = m1->globals_data;
-	m2->globals_indexes = m1->globals_indexes;
-	int gsize = m1->globals_size;
-	for(i=m1->code->nglobals;i<m2->code->nglobals;i++) {
-		hl_type *t = c->globals[i];
-		gsize += hl_pad_size(gsize, t);
-		m2->globals_indexes[i] = gsize;
-		gsize += hl_type_size(t);
-		if( hl_is_ptr(t) )
-			hl_add_root(m2->globals_data+m2->globals_indexes[i]);
-	}
-	memset(m2->globals_data+m1->globals_size,0,gsize - m1->globals_size);
-	m2->globals_size = gsize;
-
-	hl_module_init_natives(m2);
-	hl_module_init_indexes(m2);
-	hl_jit_reset(ctx, m2);
-	hl_code_hash_finalize(m2->hash);
-
-	for(i=0;i<m2->code->nconstants;i++) {
-		hl_constant *c = m2->code->constants + i;
-		if( c->global >= m1->code->nglobals )
-			hl_module_init_constant(m2, c);
-	}
-
-	for(i2=0;i2<m2->code->nfunctions;i2++) {
-		hl_function *f2 = m2->code->functions + i2;
-		int sign2 = m2->hash->functions_signs[i2];
-		if( f2->field.name == NULL ) {
-			m2->hash->functions_hashes[i2] = -1;
-			continue;
-		}
-		for(i1=0;i1<m1->code->nfunctions;i1++) {
-			int sign1 = m1->hash->functions_signs[i1];
-			if( sign1 == sign2 ) {
-				hl_function *f1 = m1->code->functions + i1;
-				if( (f1->obj != NULL) != (f2->obj != NULL) || !f1->field.name || !f2->field.name ) {
-					printf("[HotReload] Signature conflict\n");
-					continue;
-				}
-				if( ucmp(fun_obj(f1)->name,fun_obj(f2)->name) != 0 || ucmp(fun_field_name(f1),fun_field_name(f2)) != 0 ) {
-					printf("[HotReload] Signature conflict\n");
-					continue;
-				}
-
-				int hash2 = m2->hash->functions_hashes[i2];
-				int hash1 = m1->hash->functions_hashes[i1];
-				m2->hash->functions_hashes[i2] = i1; // index reference
-				if( hash1 == hash2 )
-					break;
-#				ifdef HL_DEBUG
-				uprintf(USTR("%s."), fun_obj(f1)->name);
-				uprintf(USTR("%s"), fun_field_name(f1));
-				if( !f1->obj )
-					printf("~%d", f1->ref);
-				printf(" has been modified [%d]\n", f1->nops);
-#				endif
-				changes_count++;
-
-				m1->hash->functions_hashes[i1] = hash2; // update hash
-				int fpos = hl_jit_function(ctx, m2, f2);
-				if( fpos < 0 ) return false;
-				m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
-				has_changes = true;
-				break;
-			}
-		}
-		if( i1 == m1->code->nfunctions ) {
-			// not found (signature changed or new method) : inject new method!
-			int fpos = hl_jit_function(ctx, m2, f2);
-			if( fpos < 0 ) return false;
-			m2->hash->functions_hashes[i2] = -1;
-			m2->functions_ptrs[f2->findex] = (void*)(int_val)fpos;
-#			ifdef HL_DEBUG
-			uprintf(USTR("%s."), fun_obj(f2)->name);
-			uprintf(USTR("%s"), fun_field_name(f2));
-			if( !f2->obj )
-				printf("~%d", f2->ref);
-			printf(" has been added\n");
-#			endif
-			changes_count++;
-			has_changes = true;
-			// should be added to m1 functions for later reload?
-		}
-	}
-	if( !has_changes ) {
-		printf("[HotReload] No changes found\n");
-		fflush(stdout);
-		hl_jit_free(ctx, true);
-		return false;
-	}
-
-	// patch same types
-	for(i1=0;i1<m1->code->ntypes;i1++) {
-		hl_type *p = m1->code->types[i1];
-		switch( p->kind ) {
-		case HOBJ:
-		case HSTRUCT:
-			break;
-		case HENUM:
-			if( !p->tenum->global_value ) continue;
-			break;
-		default:
-			continue;
-		}
-		for(i2=0;i2<c->ntypes;i2++) {
-			hl_type *t = c->types[i2];
-			if( p->kind != t->kind ) continue;
-			switch( p->kind ) {
-			case HOBJ:
-			case HSTRUCT:
-				if( ucmp(p->obj->name,t->obj->name) != 0 ) continue;
-				if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
-					t->obj = p->obj; // alias the types ! they are different pointers but have the same layout
-					if( p->vobj_table ) {
-						t->vobj_table = hl_vobj_proto(t);
-						memcpy(t->vobj_table, hl_vobj_proto(p), p->obj->rt->nproto * sizeof(void*));
-					}
-				} else {
-					uprintf(USTR("[HotReload] Type %s has changed\n"),t->obj->name);
-					changes_count++;
-				}
-				break;
-			case HENUM:
-				if( ucmp(p->tenum->name,t->tenum->name) != 0 ) continue;
-				if( hl_code_hash_type(m1->hash,p) == hl_code_hash_type(m2->hash,t)  ) {
-					t->tenum = p->tenum; // alias the types ! they are different pointers but have the same layout
-				} else {
-					uprintf(USTR("[HotReload] Type %s has changed\n"),t->tenum->name);
-					changes_count++;
-				}
-				break;
-			default:
-				break;
-			}
-			break;
-		}
-	}
-
-	m2->jit_code = hl_jit_code(ctx, m2, &m2->codesize, &m2->jit_debug, m1);
-
-	// patch missing debug info
-	int start = -1;
-	if( m2->jit_debug ) {
-		for(i=0;i<c->nfunctions;i++) {
-			if( m2->jit_debug[i].start < 0 ) {
-				m2->jit_debug[i].start = start;
-				m2->jit_debug[i].offsets = NULL;
-			} else {
-				start = m2->jit_debug[i].start;
-			}
-		}
-	}
-
-	hl_jit_free(ctx,true);
-
-	if( m2->jit_code == NULL ) {
-		printf("[HotReload] Couldn't JIT result\n");
-		fflush(stdout);
-		return false;
-	}
-
-	for(i=0;i<m2->code->nfunctions;i++) {
-		hl_function *f2 = m2->code->functions + i;
-		if( m2->hash->functions_hashes[i] < -1 ) continue;
-		if( m2->functions_ptrs[f2->findex] == NULL ) continue;
-		void *ptr = ((unsigned char*)m2->jit_code) + ((int_val)m2->functions_ptrs[f2->findex]);
-		m2->functions_ptrs[f2->findex] = ptr;
-		// update real function ptr
-		if( m2->hash->functions_hashes[i] < 0 ) continue;
-		hl_function *f1 = m1->code->functions + m2->hash->functions_hashes[i];
-		hl_jit_patch_method(m1->functions_ptrs[f1->findex], m1->functions_ptrs + f1->findex);
-		m1->functions_ptrs[f1->findex] = ptr;
-	}
-	for(i=0;i<m1->code->ntypes;i++) {
-		hl_type *t = m1->code->types[i];
-		if( t->kind == HOBJ || t->kind == HSTRUCT ) hl_flush_proto(t);
-	}
-
-	if( changes_count > 0 ) {
-		printf("[HotReload] %d changes\n", changes_count);
-		fflush(stdout);
-	}
-	hl_module_add(m2);
-
-	// call entry point (will only update types)
-	for(i=modules_count-1;i>=0;i--) {
-		hl_module *m = cur_modules[i];
-		if( m->functions_ptrs[m->code->entrypoint] ) {
-			vclosure cl;
-			cl.t = m->code->functions[m->functions_indexes[m->code->entrypoint]].type;
-			cl.fun = m->functions_ptrs[m->code->entrypoint];
-			cl.hasValue = 0;
-			hl_dyn_call(&cl,NULL,0);
-			break;
-		}
-	}
-
-	return true;
-}
-
 void hl_module_free( hl_module *m ) {
 	for(int i=0;i<m->code->nglobals;i++) {
 		if( hl_is_ptr(m->code->globals[i]) )
@@ -1375,6 +1154,8 @@ void hl_module_free( hl_module *m ) {
 	free(m->unwind_table);
 #endif
 	if( m->hash ) hl_code_hash_free(m->hash);
+	if( m->hot ) hl_hot_reload_free(m->hot);
+	free(m->functions_extern);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->ctx.functions_types);

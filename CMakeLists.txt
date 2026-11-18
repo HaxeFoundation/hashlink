@@ -234,6 +234,7 @@ if (WITH_VM)
         src/jit_dump.c
         src/main.c
         src/module.c
+        src/reload.c
         src/debugger.c
         src/profile.c
     )

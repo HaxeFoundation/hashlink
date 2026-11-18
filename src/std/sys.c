@@ -745,6 +745,10 @@ HL_PRIM bool hl_sys_check_reload( vbyte *debug_alt_file ) {
 	return hl_setup.reload_check != NULL && hl_setup.reload_check(debug_alt_file);
 }
 
+HL_PRIM int hl_hot_sync_statics( hl_type *t, int word ) {
+	return hl_setup.hot_sync_statics ? hl_setup.hot_sync_statics(t, word) : 0;
+}
+
 HL_PRIM bool hl_sys_has_debugger() {
 	return hl_setup.is_debugger_attached;
 }
@@ -792,6 +796,7 @@ DEFINE_PRIM(_I32, sys_get_char, _BOOL);
 DEFINE_PRIM(_ARR, sys_args, _NO_ARG);
 DEFINE_PRIM(_I32, sys_getpid, _NO_ARG);
 DEFINE_PRIM(_BOOL, sys_check_reload, _BYTES);
+DEFINE_PRIM(_I32, hot_sync_statics, _TYPE _I32);
 DEFINE_PRIM(_VOID, sys_profile_event, _I32 _BYTES _I32);
 DEFINE_PRIM(_VOID, sys_vtune_init, _NO_ARG);
 DEFINE_PRIM(_I32, sys_set_flags, _I32);

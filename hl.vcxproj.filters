@@ -4,6 +4,7 @@
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\code.c" />
     <ClCompile Include="src\module.c" />
+    <ClCompile Include="src\reload.c" />
     <ClCompile Include="src\debugger.c" />
     <ClCompile Include="src\profile.c" />
     <ClCompile Include="src\jit_dump.c" />
