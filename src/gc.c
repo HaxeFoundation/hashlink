@@ -58,10 +58,12 @@
 #if defined(HL_VCC)
 #	include <intrin.h>
 #	define GC_NOINLINE		__declspec(noinline)
+#	define GC_FORCEINLINE	__forceinline
 #	define GC_RETURN_PC	_ReturnAddress()
 #	define GC_RETURN_SP	((char*)_AddressOfReturnAddress() + sizeof(void*))
 #else
 #	define GC_NOINLINE
+#	define GC_FORCEINLINE	inline __attribute__((always_inline))
 #	define GC_RETURN_PC	NULL
 #	define GC_RETURN_SP	NULL
 #endif
@@ -436,10 +438,13 @@ HL_API hl_threads_info *hl_gc_threads_info() {
 	return &gc_threads;
 }
 
+static int gc_stop_depth = 0;
+
 static void gc_stop_world( bool b ) {
 #	ifdef HL_THREADS
 	if( b ) {
 		int i;
+		gc_stop_depth++;
 		gc_threads.stopping_world = true;
 		GC_MEMORY_BARRIER();
 		for(i=0;i<gc_threads.count;i++) {
@@ -449,7 +454,8 @@ static void gc_stop_world( bool b ) {
 		GC_MEMORY_BARRIER();
 	} else {
 		// releasing global lock will release all threads
-		gc_threads.stopping_world = false;
+		if( --gc_stop_depth == 0 )
+			gc_threads.stopping_world = false;
 	}
 #	else
 	if( b ) gc_save_context(current_thread,&b,NULL,NULL);
@@ -838,7 +844,16 @@ static void gc_dispatch_mark( gc_mstack *st, bool all ) {
 #define REGULAR_BITS 8
 #define GC_MARK_BATCH	64
 
-static int gc_flush_mark( gc_mstack *stack ) {
+static struct {
+	int size;
+	int count;
+	void **olds;
+	void **news;
+} gc_remap = {0};
+
+static void *gc_remap_find( void *p );
+
+static GC_FORCEINLINE int gc_flush_mark_gen( gc_mstack *stack, bool remap ) {
 	GC_STACK_BEGIN(stack);
 	if( !__current_stack ) return 0;
 	int count = 0;
@@ -911,6 +926,13 @@ static int gc_flush_mark( gc_mstack *stack ) {
 			p = *block++;
 			pos++;
 			if( !p ) continue;
+			if( remap ) {
+				void *np = gc_remap_find(p);
+				if( np ) {
+					block[-1] = np;
+					p = np;
+				}
+			}
 			page = GC_GET_PAGE(p);
 			if( !page || !INPAGE(p,page) ) continue;
 			int bid = gc_allocator_get_block_id(page,p);
@@ -925,6 +947,15 @@ static int gc_flush_mark( gc_mstack *stack ) {
 	}
 	GC_STACK_END();
 	return count;
+}
+
+static GC_NOINLINE int gc_flush_mark_remap( gc_mstack *stack ) {
+	return gc_flush_mark_gen(stack, true);
+}
+
+static int gc_flush_mark( gc_mstack *stack ) {
+	if( gc_remap.count ) return gc_flush_mark_remap(stack);
+	return gc_flush_mark_gen(stack, false);
 }
 
 ASAN_DISABLE
@@ -968,6 +999,10 @@ static void gc_mark() {
 		void *p = *gc_roots[i];
 		gc_pheader *page;
 		if( !p ) continue;
+		if( gc_remap.count ) {
+			void *np = gc_remap_find(p);
+			if( np ) *gc_roots[i] = p = np;
+		}
 		page = GC_GET_PAGE(p);
 		if( !page || !INPAGE(p,page) ) continue; // the value was set to a not gc allocated ptr
 		int bid = gc_allocator_get_block_id(page, p);
@@ -1689,6 +1724,248 @@ static void gc_count_live_block( void *block, int size ) {
 static void gc_count_live_page( gc_pheader *p, int private_data ) {
 	if( (1 << p->page_kind) & live_obj.page_kinds )
 		gc_iter_live_blocks(p, gc_count_live_block);
+}
+
+static struct {
+	void (*callback)( void *block, int size, int kind, void *ctx );
+	void *ctx;
+	int kind;
+} live_iter;
+
+static void gc_iter_live_block( void *block, int size ) {
+	live_iter.callback(block, size, live_iter.kind, live_iter.ctx);
+}
+
+static void gc_iter_live_page( gc_pheader *p, int private_data ) {
+	live_iter.kind = p->page_kind;
+	gc_iter_live_blocks(p, gc_iter_live_block);
+}
+
+HL_API void hl_gc_iter_live( void (*callback)( void *block, int size, int kind, void *ctx ), void *ctx ) {
+	gc_global_lock(true);
+	gc_major();
+	gc_stop_world(true);
+	live_iter.callback = callback;
+	live_iter.ctx = ctx;
+	gc_iter_pages(gc_iter_live_page);
+	gc_stop_world(false);
+	gc_global_lock(false);
+}
+
+
+HL_API void hl_gc_world( bool stop ) {
+	if( stop ) {
+		gc_global_lock(true);
+		gc_stop_world(true);
+	} else {
+		gc_stop_world(false);
+		gc_global_lock(false);
+	}
+}
+
+HL_API int hl_gc_other_stacks( void **ranges, int max ) {
+	int n = 0;
+	for(int i=0;i<gc_threads.count && n < max;i++) {
+		hl_thread_info *t = gc_threads.threads[i];
+		if( t == current_thread ) continue;
+		ranges[n * 2] = t->stack_cur;
+		ranges[n * 2 + 1] = t->stack_top;
+		n++;
+	}
+	return n;
+}
+
+HL_API void ***hl_gc_get_roots( int *count ) {
+	*count = gc_roots_count;
+	return gc_roots;
+}
+
+
+typedef struct {
+	void *start;
+	void *end;
+	int index;
+} gc_range;
+
+static int gc_range_cmp( const void *a, const void *b ) {
+	char *pa = (char*)((gc_range*)a)->start, *pb = (char*)((gc_range*)b)->start;
+	return pa < pb ? -1 : pa > pb ? 1 : 0;
+}
+
+static int gc_range_find( gc_range *r, int count, void *p ) {
+	int min = 0, max = count;
+	while( min < max ) {
+		int mid = (min + max) >> 1;
+		if( (char*)p < (char*)r[mid].start )
+			max = mid;
+		else if( (char*)p >= (char*)r[mid].end )
+			min = mid + 1;
+		else
+			return r[mid].index;
+	}
+	return -1;
+}
+
+static int gc_stack_find( void **start, void **end, gc_range *r, int count ) {
+	while( start < end ) {
+		int i = gc_range_find(r, count, *start++);
+		if( i >= 0 ) return i;
+	}
+	return -1;
+}
+
+HL_API int hl_gc_stacks_find( void **blocks, int *sizes, int count, void *skip_start, void *skip_end, void *stack_limit, void *regs, int regs_size ) {
+	gc_range *r = (gc_range*)malloc(sizeof(gc_range) * (count + 1));
+	int found = -1;
+	for(int i=0;i<count;i++) {
+		r[i].start = blocks[i];
+		r[i].end = (char*)blocks[i] + sizes[i];
+		r[i].index = i;
+	}
+	qsort(r, count, sizeof(gc_range), gc_range_cmp);
+	gc_global_lock(true);
+	gc_stop_world(true);
+	for(int i=0;i<gc_threads.count && found < 0;i++) {
+		hl_thread_info *t = gc_threads.threads[i];
+		if( t == current_thread && stack_limit ) {
+			void **start = (void**)stack_limit;
+			if( skip_start && skip_start >= (void*)start && skip_end <= t->stack_top ) {
+				found = gc_stack_find(start, (void**)skip_start, r, count);
+				start = (void**)skip_end;
+			}
+			if( found < 0 ) found = gc_stack_find(start, (void**)t->stack_top, r, count);
+			if( found < 0 ) found = gc_stack_find((void**)regs, (void**)((char*)regs + regs_size), r, count);
+			continue;
+		}
+		found = gc_stack_find((void**)t->stack_cur, (void**)t->stack_top, r, count);
+		if( found < 0 ) found = gc_stack_find((void**)&t->gc_regs, (void**)&t->gc_regs + (sizeof(jmp_buf) / sizeof(void*)), r, count);
+		if( found < 0 ) found = gc_stack_find((void**)&t->extra_stack_data, (void**)&t->extra_stack_data + t->extra_stack_size, r, count);
+	}
+	gc_stop_world(false);
+	gc_global_lock(false);
+	free(r);
+	return found;
+}
+
+
+static unsigned int gc_remap_hash( void *p ) {
+	uint64 h = (uint64)(int_val)p;
+	h ^= h >> 29;
+	h *= 0xbf58476d1ce4e5b9ULL;
+	h ^= h >> 32;
+	return (unsigned int)h;
+}
+
+static void *gc_remap_find( void *p ) {
+	unsigned int i = gc_remap_hash(p) & (gc_remap.size - 1);
+	while( true ) {
+		void *k = gc_remap.olds[i];
+		if( k == p ) return gc_remap.news[i];
+		if( k == NULL ) return NULL;
+		i = (i + 1) & (gc_remap.size - 1);
+	}
+}
+
+static void gc_remap_set( void *old_block, void *new_block ) {
+	unsigned int i = gc_remap_hash(old_block) & (gc_remap.size - 1);
+	while( gc_remap.olds[i] && gc_remap.olds[i] != old_block ) i = (i + 1) & (gc_remap.size - 1);
+	if( !gc_remap.olds[i] ) gc_remap.count++;
+	gc_remap.olds[i] = old_block;
+	gc_remap.news[i] = new_block;
+}
+
+static void gc_remap_grow( int count ) {
+	int osize = gc_remap.size;
+	void **olds = gc_remap.olds, **news = gc_remap.news;
+	int size = osize ? osize : 256;
+	while( count * 2 > size ) size <<= 1;
+	if( size == osize ) return;
+	gc_remap.size = size;
+	gc_remap.count = 0;
+	gc_remap.olds = (void**)calloc(gc_remap.size, sizeof(void*));
+	gc_remap.news = (void**)malloc(sizeof(void*) * gc_remap.size);
+	for(int i=0;i<osize;i++)
+		if( olds[i] ) gc_remap_set(olds[i], news[i]);
+	free(olds);
+	free(news);
+}
+
+HL_API void hl_gc_remap_reserve( int count ) {
+	gc_remap_grow(gc_remap.count + count);
+}
+
+HL_API void hl_gc_remap_add( void *old_block, void *new_block ) {
+	if( (gc_remap.count + 1) * 2 > gc_remap.size )
+		gc_remap_grow(gc_remap.count + 1);
+	gc_remap_set(old_block, new_block);
+}
+
+static struct {
+	hl_type **types;
+	void (**hooks)( void * );
+	int count;
+	void **values;
+	int *kinds;
+	int nvalues;
+	int max_values;
+} gc_remap_hooks = {0};
+
+HL_API void hl_gc_set_remap_hook( hl_type *t, void (*hook)( void *value ) ) {
+	gc_global_lock(true);
+	int i;
+	for(i=0;i<gc_remap_hooks.count;i++)
+		if( gc_remap_hooks.types[i] == t ) break;
+	if( i == gc_remap_hooks.count ) {
+		gc_remap_hooks.count++;
+		gc_remap_hooks.types = (hl_type**)realloc(gc_remap_hooks.types, sizeof(hl_type*) * gc_remap_hooks.count);
+		gc_remap_hooks.hooks = (void (**)( void * ))realloc(gc_remap_hooks.hooks, sizeof(void*) * gc_remap_hooks.count);
+	}
+	gc_remap_hooks.types[i] = t;
+	gc_remap_hooks.hooks[i] = hook;
+	gc_global_lock(false);
+}
+
+static void gc_find_hook_value( void *block, int size ) {
+	if( size < (int)sizeof(void*) ) return;
+	hl_type *t = *(hl_type**)block;
+	for(int i=0;i<gc_remap_hooks.count;i++)
+		if( gc_remap_hooks.types[i] == t ) {
+			if( gc_remap_hooks.nvalues == gc_remap_hooks.max_values ) {
+				gc_remap_hooks.max_values = gc_remap_hooks.max_values ? gc_remap_hooks.max_values * 2 : 64;
+				gc_remap_hooks.values = (void**)realloc(gc_remap_hooks.values, sizeof(void*) * gc_remap_hooks.max_values);
+				gc_remap_hooks.kinds = (int*)realloc(gc_remap_hooks.kinds, sizeof(int) * gc_remap_hooks.max_values);
+			}
+			gc_remap_hooks.values[gc_remap_hooks.nvalues] = block;
+			gc_remap_hooks.kinds[gc_remap_hooks.nvalues] = i;
+			gc_remap_hooks.nvalues++;
+			return;
+		}
+}
+
+static void gc_find_hook_page( gc_pheader *p, int private_data ) {
+	if( p->page_kind == MEM_KIND_DYNAMIC || p->page_kind == MEM_KIND_RAW )
+		gc_iter_live_blocks(p, gc_find_hook_value);
+}
+
+HL_API void hl_gc_remap_apply() {
+	if( gc_remap.count == 0 ) return;
+	gc_global_lock(true);
+	gc_major();
+	gc_remap_hooks.nvalues = 0;
+	if( gc_remap_hooks.count ) gc_iter_pages(gc_find_hook_page);
+	gc_global_lock(false);
+	free(gc_remap.olds);
+	free(gc_remap.news);
+	memset(&gc_remap, 0, sizeof(gc_remap));
+	int n = gc_remap_hooks.nvalues;
+	void **values = (void**)malloc(sizeof(void*) * (n + 1));
+	int *kinds = (int*)malloc(sizeof(int) * (n + 1));
+	memcpy(values, gc_remap_hooks.values, sizeof(void*) * n);
+	memcpy(kinds, gc_remap_hooks.kinds, sizeof(int) * n);
+	for(int i=0;i<n;i++)
+		gc_remap_hooks.hooks[kinds[i]](values[i]);
+	free(values);
+	free(kinds);
 }
 
 HL_API int hl_gc_get_live_objects( hl_type *t, varray *arr ) {
