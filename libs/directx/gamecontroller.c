@@ -355,8 +355,7 @@ static void gctrl_onDetect( vclosure *onDetect, dx_gctrl_device *device, const c
 }
 
 HL_PRIM void HL_NAME(gctrl_detect)( vclosure *onDetect ) {
-	if (dx_gctrl_syncNeeded) {
-		EnterCriticalSection(&dx_gctrl_cs);
+	if (dx_gctrl_syncNeeded && TryEnterCriticalSection(&dx_gctrl_cs)) {
 
 		dx_gctrl_device *device = dx_gctrl_devices;
 		while (device) {
