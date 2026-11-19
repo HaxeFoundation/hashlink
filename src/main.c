@@ -53,7 +53,7 @@ typedef struct {
 	vdynamic *ret;
 } main_context;
 
-static hl_code *load_code( const pchar *file, char **error_msg, bool print_errors ) {
+static hl_code *load_code( const pchar *file, char **error_msg, bool print_errors, bool keep_data ) {
 	hl_code *code;
 	FILE *f = pfopen(file,"rb");
 	int pos, size;
@@ -77,7 +77,11 @@ static hl_code *load_code( const pchar *file, char **error_msg, bool print_error
 	}
 	fclose(f);
 	code = hl_code_read((unsigned char*)fdata, size, error_msg);
-	free(fdata);
+	if( code && keep_data ) {
+		code->raw_data = (unsigned char*)fdata;
+		code->raw_size = size;
+	} else
+		free(fdata);
 	return code;
 }
 
@@ -90,10 +94,14 @@ static bool check_reload( vbyte *alt_file ) {
 	if( !hl_hot_reload_file_changed(file) )
 		return false;
 	char *error_msg = NULL;
-	hl_code *code = load_code(file, &error_msg, false);
+	hl_code *code = load_code(file, &error_msg, false, hl_setup.is_debugger_enabled);
 	if( code == NULL )
 		return false;
 	changed = hl_module_patch(m->m, code);
+	if( !changed ) {
+		free(code->raw_data);
+		code->raw_data = NULL;
+	}
 	hl_hot_reload_file_loaded(code);
 	hl_code_free(code);
 	return changed;
@@ -101,7 +109,7 @@ static bool check_reload( vbyte *alt_file ) {
 
 static bool load_plugin( pchar *file ) {
 	char *error_msg = NULL;
-	hl_code *code = load_code(file, &error_msg, false);
+	hl_code *code = load_code(file, &error_msg, false, false);
 	if( code == NULL )
 		return false;
 	int i;
@@ -278,7 +286,7 @@ int main(int argc, pchar *argv[]) {
 	main_ctx = &ctx;
 	ctx.file = file;
 	hl_setup.hot_reload = hot_reload;
-	ctx.code = load_code(file, &error_msg, true);
+	ctx.code = load_code(file, &error_msg, true, hot_reload && debug_port > 0);
 	if( ctx.code == NULL ) {
 		if( error_msg ) printf("%s\n", error_msg);
 		return 1;

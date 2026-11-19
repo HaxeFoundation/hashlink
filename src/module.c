@@ -984,6 +984,7 @@ void hl_module_init_constant( hl_module *m, hl_constant *c ) {
 }
 
 void hl_module_add( hl_module *m ) {
+	hl_debug_lock(true);
 	hl_module **old_modules = cur_modules;
 	hl_module **new_modules = (hl_module**)malloc(sizeof(void*)*(modules_count + 1));
 	memcpy(new_modules, old_modules, sizeof(void*)*modules_count);
@@ -991,6 +992,9 @@ void hl_module_add( hl_module *m ) {
 	cur_modules = new_modules;
 	modules_count++;
 	free(old_modules);
+	hl_debug_module_added(m);
+	hl_debug_lock(false);
+	hl_debug_module_break();
 }
 
 int hl_module_init( hl_module *m, int flags ) {
@@ -1156,6 +1160,7 @@ void hl_module_free( hl_module *m ) {
 	if( m->hash ) hl_code_hash_free(m->hash);
 	if( m->hot ) hl_hot_reload_free(m->hot);
 	free(m->functions_extern);
+	free(m->globals_remap);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->ctx.functions_types);

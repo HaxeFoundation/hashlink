@@ -81,6 +81,8 @@ typedef struct {
 	int version;
 	int file_size;
 	unsigned char build_id[HL_BUILD_ID_SIZE];
+	unsigned char *raw_data;
+	int raw_size;
 	int nints;
 	int nfloats;
 	int nstrings;
@@ -157,6 +159,8 @@ typedef struct {
 	void **functions_extern;
 	hl_type_obj ***hot_uses;
 	void **hot_code;
+	int *globals_remap;
+	int globals_remap_count;
 	bool debug;
 	hl_module_context ctx;
 #ifdef WIN64_UNWIND_TABLES
@@ -196,6 +200,9 @@ void hl_module_free( hl_module *m );
 h_bool hl_module_debug( hl_module *m, int port, h_bool wait );
 hl_type *hl_module_resolve_type( hl_module *m, hl_type *t, bool err );
 hl_module **hl_get_modules( int *count );
+void hl_debug_lock( bool lock );
+void hl_debug_module_added( hl_module *m );
+void hl_debug_module_break( void );
 
 #define HL_HOT_RELOAD_VSLOTS 64
 void hl_hot_reload_prepare( hl_module *m );

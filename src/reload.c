@@ -1838,6 +1838,7 @@ static void hot_discard( hl_module *m ) {
 #	endif
 	hl_free(&m->ctx.alloc);
 	free(m->functions_extern);
+	free(m->globals_remap);
 	free(m->functions_indexes);
 	free(m->functions_ptrs);
 	free(m->ctx.functions_types);
@@ -1996,7 +1997,8 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		}
 		free(used);
 		hl_code_hash_remap_globals(m2->hash, remap, hr->nglobals, hr->globals_types, hr->globals_signs);
-		free(remap);
+		m2->globals_remap = remap;
+		m2->globals_remap_count = count;
 	}
 	if( c->nglobals > hr->max_globals ) {
 		char tmp[128];
