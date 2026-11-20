@@ -1768,7 +1768,7 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 				for(i=0;i<ot->obj->nproto;i++) {
 					hl_obj_proto *pp = ot->obj->proto + i;
 					if( pp->pindex == o->p3 ) {
-						t = m->code->functions[m->functions_indexes[pp->findex]].type;
+						t = ot->obj->m->functions_types[pp->findex];
 						break;
 					}
 				}
