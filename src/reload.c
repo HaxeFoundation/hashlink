@@ -50,6 +50,1041 @@ bool hl_module_same_type( hl_type *t1, hl_type *t2 );
 int hl_module_capture_stack( void **stack, int size );
 bool hl_module_is_call_site( void *ret );
 
+#define OP(_,_a,_b,_c) (_b == AR ? _c : (_c == X ? (_b == X ? (_a == X ? 0 : 1) : 2) : 3)),
+#define OP_BEGIN static int hl_op_nargs[] = {
+#define OP_END };
+#include "opcodes.h"
+
+#define ALLOC(v,ptr,count) v = (ptr *)hl_zalloc(&c->alloc,(count)*sizeof(ptr))
+
+static const unsigned int crc32_table[] =
+{
+  0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9,
+  0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
+  0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61,
+  0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd,
+  0x4c11db70, 0x48d0c6c7, 0x4593e01e, 0x4152fda9,
+  0x5f15adac, 0x5bd4b01b, 0x569796c2, 0x52568b75,
+  0x6a1936c8, 0x6ed82b7f, 0x639b0da6, 0x675a1011,
+  0x791d4014, 0x7ddc5da3, 0x709f7b7a, 0x745e66cd,
+  0x9823b6e0, 0x9ce2ab57, 0x91a18d8e, 0x95609039,
+  0x8b27c03c, 0x8fe6dd8b, 0x82a5fb52, 0x8664e6e5,
+  0xbe2b5b58, 0xbaea46ef, 0xb7a96036, 0xb3687d81,
+  0xad2f2d84, 0xa9ee3033, 0xa4ad16ea, 0xa06c0b5d,
+  0xd4326d90, 0xd0f37027, 0xddb056fe, 0xd9714b49,
+  0xc7361b4c, 0xc3f706fb, 0xceb42022, 0xca753d95,
+  0xf23a8028, 0xf6fb9d9f, 0xfbb8bb46, 0xff79a6f1,
+  0xe13ef6f4, 0xe5ffeb43, 0xe8bccd9a, 0xec7dd02d,
+  0x34867077, 0x30476dc0, 0x3d044b19, 0x39c556ae,
+  0x278206ab, 0x23431b1c, 0x2e003dc5, 0x2ac12072,
+  0x128e9dcf, 0x164f8078, 0x1b0ca6a1, 0x1fcdbb16,
+  0x018aeb13, 0x054bf6a4, 0x0808d07d, 0x0cc9cdca,
+  0x7897ab07, 0x7c56b6b0, 0x71159069, 0x75d48dde,
+  0x6b93dddb, 0x6f52c06c, 0x6211e6b5, 0x66d0fb02,
+  0x5e9f46bf, 0x5a5e5b08, 0x571d7dd1, 0x53dc6066,
+  0x4d9b3063, 0x495a2dd4, 0x44190b0d, 0x40d816ba,
+  0xaca5c697, 0xa864db20, 0xa527fdf9, 0xa1e6e04e,
+  0xbfa1b04b, 0xbb60adfc, 0xb6238b25, 0xb2e29692,
+  0x8aad2b2f, 0x8e6c3698, 0x832f1041, 0x87ee0df6,
+  0x99a95df3, 0x9d684044, 0x902b669d, 0x94ea7b2a,
+  0xe0b41de7, 0xe4750050, 0xe9362689, 0xedf73b3e,
+  0xf3b06b3b, 0xf771768c, 0xfa325055, 0xfef34de2,
+  0xc6bcf05f, 0xc27dede8, 0xcf3ecb31, 0xcbffd686,
+  0xd5b88683, 0xd1799b34, 0xdc3abded, 0xd8fba05a,
+  0x690ce0ee, 0x6dcdfd59, 0x608edb80, 0x644fc637,
+  0x7a089632, 0x7ec98b85, 0x738aad5c, 0x774bb0eb,
+  0x4f040d56, 0x4bc510e1, 0x46863638, 0x42472b8f,
+  0x5c007b8a, 0x58c1663d, 0x558240e4, 0x51435d53,
+  0x251d3b9e, 0x21dc2629, 0x2c9f00f0, 0x285e1d47,
+  0x36194d42, 0x32d850f5, 0x3f9b762c, 0x3b5a6b9b,
+  0x0315d626, 0x07d4cb91, 0x0a97ed48, 0x0e56f0ff,
+  0x1011a0fa, 0x14d0bd4d, 0x19939b94, 0x1d528623,
+  0xf12f560e, 0xf5ee4bb9, 0xf8ad6d60, 0xfc6c70d7,
+  0xe22b20d2, 0xe6ea3d65, 0xeba91bbc, 0xef68060b,
+  0xd727bbb6, 0xd3e6a601, 0xdea580d8, 0xda649d6f,
+  0xc423cd6a, 0xc0e2d0dd, 0xcda1f604, 0xc960ebb3,
+  0xbd3e8d7e, 0xb9ff90c9, 0xb4bcb610, 0xb07daba7,
+  0xae3afba2, 0xaafbe615, 0xa7b8c0cc, 0xa379dd7b,
+  0x9b3660c6, 0x9ff77d71, 0x92b45ba8, 0x9675461f,
+  0x8832161a, 0x8cf30bad, 0x81b02d74, 0x857130c3,
+  0x5d8a9099, 0x594b8d2e, 0x5408abf7, 0x50c9b640,
+  0x4e8ee645, 0x4a4ffbf2, 0x470cdd2b, 0x43cdc09c,
+  0x7b827d21, 0x7f436096, 0x7200464f, 0x76c15bf8,
+  0x68860bfd, 0x6c47164a, 0x61043093, 0x65c52d24,
+  0x119b4be9, 0x155a565e, 0x18197087, 0x1cd86d30,
+  0x029f3d35, 0x065e2082, 0x0b1d065b, 0x0fdc1bec,
+  0x3793a651, 0x3352bbe6, 0x3e119d3f, 0x3ad08088,
+  0x2497d08d, 0x2056cd3a, 0x2d15ebe3, 0x29d4f654,
+  0xc5a92679, 0xc1683bce, 0xcc2b1d17, 0xc8ea00a0,
+  0xd6ad50a5, 0xd26c4d12, 0xdf2f6bcb, 0xdbee767c,
+  0xe3a1cbc1, 0xe760d676, 0xea23f0af, 0xeee2ed18,
+  0xf0a5bd1d, 0xf464a0aa, 0xf9278673, 0xfde69bc4,
+  0x89b8fd09, 0x8d79e0be, 0x803ac667, 0x84fbdbd0,
+  0x9abc8bd5, 0x9e7d9662, 0x933eb0bb, 0x97ffad0c,
+  0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668,
+  0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
+};
+
+#define H(b) hash = (hash >> 8) ^ crc32_table[(hash ^ (b)) & 0xFF]
+#define H32(i) { H(i&0xFF); H((i>>8)&0xFF); H((i>>16)&0xFF); H(((unsigned int)i)>>24); }
+#define HFUN(idx) H32(h->functions_signs[h->functions_indexes[idx]]);
+#define HSTR(s) { const char *_c = s; while( *_c ) H(*_c++); }
+#define HUSTR(s) { const uchar *_c = s; while( *_c ) H(*_c++); }
+#define HTYPE(t) if( !isrec ) H32(hash_type_first(t,true))
+
+// hash with only partial recursion
+static int hash_type_first( hl_type *t, bool isrec ) {
+	int hash = -1;
+	int i;
+	H(t->kind);
+	switch( t->kind ) {
+	case HFUN:
+	case HMETHOD:
+		H(t->fun->nargs);
+		for(i=0;i<t->fun->nargs;i++)
+			HTYPE(t->fun->args[i]);
+		HTYPE(t->fun->ret);
+		break;
+	case HOBJ:
+	case HSTRUCT:
+		HUSTR(t->obj->name);
+		H32(t->obj->nfields);
+		H32(t->obj->nproto);
+		for(i=0;i<t->obj->nfields;i++) {
+			hl_obj_field *f = t->obj->fields + i;
+			H32(f->hashed_name);
+			HTYPE(f->t);
+		}
+		for(i=0;i<t->obj->nproto;i++)
+			H32(t->obj->proto[i].pindex);
+		break;
+	case HREF:
+	case HNULL:
+		HTYPE(t->tparam);
+		break;
+	case HVIRTUAL:
+		H32(t->virt->nfields);
+		for(i=0;i<t->virt->nfields;i++) {
+			hl_obj_field *f = t->virt->fields + i;
+			H32(f->hashed_name);
+			HTYPE(f->t);
+		}
+		break;
+	case HENUM:
+		HUSTR(t->tenum->name);
+		for(i=0;i<t->tenum->nconstructs;i++) {
+			hl_enum_construct *c = t->tenum->constructs + i;
+			int k;
+			H(c->nparams);
+			HUSTR(c->name);
+			for(k=0;k<c->nparams;k++)
+				HTYPE(c->params[k]);
+			if( c->pnames )
+				for(k=0;k<c->nparams;k++)
+					if( c->pnames[k] ) HUSTR(c->pnames[k]);
+		}
+		break;
+	case HABSTRACT:
+		HUSTR(t->abs_name);
+		break;
+	default:
+		break;
+	}
+	return hash;
+}
+
+#undef HTYPE
+#define HTYPE(t) H32(h->types_hashes[hl_code_type_index(h->code,t)])
+
+static int hash_type_rec( hl_code_hash *h, hl_type *t ) {
+	int hash = -1;
+	int i;
+	switch( t->kind ) {
+	case HFUN:
+	case HMETHOD:
+		for(i=0;i<t->fun->nargs;i++)
+			HTYPE(t->fun->args[i]);
+		HTYPE(t->fun->ret);
+		break;
+	case HOBJ:
+	case HSTRUCT:
+		for(i=0;i<t->obj->nfields;i++) {
+			hl_obj_field *f = t->obj->fields + i;
+			HTYPE(f->t);
+		}
+		break;
+	case HREF:
+	case HNULL:
+		HTYPE(t->tparam);
+		break;
+	case HVIRTUAL:
+		for(i=0;i<t->virt->nfields;i++) {
+			hl_obj_field *f = t->virt->fields + i;
+			HTYPE(f->t);
+		}
+		break;
+	case HENUM:
+		for(i=0;i<t->tenum->nconstructs;i++) {
+			hl_enum_construct *c = t->tenum->constructs + i;
+			int k;
+			for(k=0;k<c->nparams;k++)
+				HTYPE(c->params[k]);
+		}
+		break;
+	default:
+		break;
+	}
+	return hash;
+}
+
+static int hash_native( hl_code_hash *h, hl_native *n ) {
+	int hash = -1;
+	HSTR(n->lib);
+	HSTR(n->name);
+	HTYPE(n->t);
+	return hash;
+}
+
+static int hash_type_sign( hl_type *t, int depth ) {
+	int hash = -1;
+	int i;
+	H(t->kind);
+	if( depth > 4 ) return hash;
+	switch( t->kind ) {
+	case HFUN:
+	case HMETHOD:
+		H(t->fun->nargs);
+		for(i=0;i<t->fun->nargs;i++)
+			H32(hash_type_sign(t->fun->args[i], depth + 1));
+		H32(hash_type_sign(t->fun->ret, depth + 1));
+		break;
+	case HOBJ:
+	case HSTRUCT:
+		HUSTR(t->obj->name);
+		break;
+	case HENUM:
+		HUSTR(t->tenum->name);
+		if( !t->tenum->global_value ) {
+			H32(t->tenum->nconstructs);
+			for(i=0;i<t->tenum->nconstructs;i++) {
+				hl_enum_construct *c = t->tenum->constructs + i;
+				int k;
+				H32(c->nparams);
+				for(k=0;k<c->nparams;k++)
+					H32(hash_type_sign(c->params[k], depth + 1));
+			}
+		}
+		break;
+	case HREF:
+	case HNULL:
+	case HPACKED:
+		H32(hash_type_sign(t->tparam, depth + 1));
+		break;
+	case HVIRTUAL:
+		H32(t->virt->nfields);
+		for(i=0;i<t->virt->nfields;i++) {
+			hl_obj_field *f = t->virt->fields + i;
+			H32(f->hashed_name);
+			H32(hash_type_sign(f->t, depth + 1));
+		}
+		break;
+	case HABSTRACT:
+		HUSTR(t->abs_name);
+		break;
+	default:
+		break;
+	}
+	return hash;
+}
+
+static int hash_fun_sign( hl_code_hash *h, hl_function *f ) {
+	int hash = -1;
+	H32(hash_type_sign(f->type, 0));
+	const uchar *own = hl_function_lname(h->code, f);
+	if( f->obj ) {
+		HUSTR(f->obj->name);
+		HUSTR(f->field.name);
+	} else if( own && own[0] == '$' ) {
+		HUSTR(own);
+	} else if( f->field.ref ) {
+		HUSTR(f->field.ref->obj->name);
+		HUSTR(f->field.ref->field.name);
+		const uchar *lname = hl_function_lname(h->code, f);
+		if( lname ) {
+			HUSTR(lname);
+		} else {
+			H32(f->ref);
+		}
+	}
+	return hash;
+}
+
+static int hash_op( hl_code_hash *h, int hash, hl_opcode *o ) {
+	hl_code *c = h->code;
+	int i;
+	{
+		H(o->op);
+		switch( o->op ) {
+		case OInt:
+			H32(o->p1);
+			H32(c->ints[o->p2]);
+			break;
+		case OFloat:
+			H32(o->p1);
+			H32( ((int*)c->floats)[o->p2<<1] );
+			H32( ((int*)c->floats)[(o->p2<<1)|1] );
+			break;
+		case OString:
+			H32(o->p1);
+			HSTR(c->strings[o->p2]);
+			break;
+		case OBytes:
+			H32(o->p1);
+			if( h->bytes_hashes )
+				H32(h->bytes_hashes[o->p2])
+			else
+				HSTR(c->strings[o->p2]);
+			break;
+		case OType:
+			H32(o->p1);
+			HTYPE(c->types[o->p2]);
+			break;
+		case OCall0:
+			H32(o->p1);
+			HFUN(o->p2);
+			break;
+		case OCall1:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			break;
+		case OCall2:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			H32((int)(int_val)o->extra);
+			break;
+		case OCall3:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			H32(o->extra[0]);
+			H32(o->extra[1]);
+			break;
+		case OCall4:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			H32(o->extra[0]);
+			H32(o->extra[1]);
+			H32(o->extra[2]);
+			break;
+		case OCallN:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			for(i=0;i<o->p3;i++)
+				H32(o->extra[i]);
+			break;
+		case OStaticClosure:
+			H32(o->p1);
+			HFUN(o->p2);
+			break;
+		case OInstanceClosure:
+			H32(o->p1);
+			HFUN(o->p2);
+			H32(o->p3);
+			break;
+		case ODynGet:
+			H32(o->p1);
+			H32(o->p2);
+			HSTR(c->strings[o->p3]);
+			break;
+		case ODynSet:
+			H32(o->p1);
+			HSTR(c->strings[o->p2]);
+			H32(o->p3);
+			break;
+		default:
+			switch( hl_op_nargs[o->op] ) {
+			case 0:
+				break;
+			case 1:
+				H32(o->p1);
+				break;
+			case 2:
+				H32(o->p1);
+				H32(o->p2);
+				break;
+			case 3:
+				H32(o->p1);
+				H32(o->p2);
+				H32(o->p3);
+				break;
+			case 4:
+				H32(o->p1);
+				H32(o->p2);
+				H32(o->p3);
+				H32((int)(int_val)o->extra);
+				break;
+			case -1:
+				switch( o->op ) {
+				case OCallN:
+				case OCallClosure:
+				case OCallMethod:
+				case OCallThis:
+				case OMakeEnum:
+					H32(o->p1);
+					H32(o->p2);
+					H32(o->p3);
+					for(i=0;i<o->p3;i++)
+						H32(o->extra[i]);
+					break;
+				case OSwitch:
+					H32(o->p1);
+					H32(o->p2);
+					for(i=0;i<o->p2;i++)
+						H32(o->extra[i]);
+					H32(o->p3);
+					break;
+				default:
+					printf("Don't know how to process opcode %d",o->op);
+					break;
+				}
+				break;
+			default:
+				{
+					int size = hl_op_nargs[o->op] - 3;
+					H32(o->p1);
+					H32(o->p2);
+					H32(o->p3);
+					for(i=0;i<size;i++)
+						H32(o->extra[i]);
+				}
+				break;
+			}
+		}
+	}
+	return hash;
+}
+
+#define HMIX(v) { int _v = (v); H32(_v); }
+#define MAX_CHAIN 256
+
+static int hash_type_chain( hl_type *t, hl_type **chain ) {
+	int n = 0;
+	while( t && (t->kind == HOBJ || t->kind == HSTRUCT) && n < MAX_CHAIN ) {
+		chain[n++] = t;
+		t = t->obj->super;
+	}
+	return n;
+}
+
+static int hash_storage( hl_type *t, int depth );
+
+static int hash_layout( hl_type *t, int depth ) {
+	int hash = -1;
+	hl_type *chain[MAX_CHAIN];
+	int i, k, n;
+	if( depth > 16 ) return hash;
+	n = hash_type_chain(t, chain);
+	if( n == 0 ) return hash;
+	H(chain[n-1]->kind);
+	for(k=n-1;k>=0;k--) {
+		hl_type_obj *o = chain[k]->obj;
+		H32(o->nfields);
+		for(i=0;i<o->nfields;i++)
+			HMIX(hash_storage(o->fields[i].t, depth + 1));
+	}
+	return hash;
+}
+
+static int hash_storage( hl_type *t, int depth ) {
+	int hash = -1;
+	H(t->kind);
+	if( t->kind == HPACKED )
+		HMIX(hash_layout(t->tparam, depth + 1));
+	return hash;
+}
+
+static int hash_field_access( hl_type *t, int fid ) {
+	int hash = -1;
+	hl_type *chain[MAX_CHAIN];
+	int i, k, n, g = 0;
+	n = hash_type_chain(t, chain);
+	if( n == 0 ) return hash;
+	H(chain[n-1]->kind);
+	for(k=n-1;k>=0;k--) {
+		hl_type_obj *o = chain[k]->obj;
+		for(i=0;i<o->nfields;i++) {
+			hl_obj_field *f = o->fields + i;
+			HMIX(hash_storage(f->t, 0));
+			if( g++ == fid ) {
+				H32(f->hashed_name);
+				HMIX(hash_type_sign(f->t, 0));
+				return hash;
+			}
+		}
+	}
+	H32(fid);
+	return hash;
+}
+
+static hl_obj_proto *hash_proto_at( hl_type *t, int slot ) {
+	int i;
+	for(;t && (t->kind == HOBJ || t->kind == HSTRUCT);t=t->obj->super)
+		for(i=0;i<t->obj->nproto;i++)
+			if( t->obj->proto[i].pindex == slot )
+				return t->obj->proto + i;
+	return NULL;
+}
+
+static int hash_compare( hl_code_hash *h, hl_type *t ) {
+	int hash = -1;
+	int i, depth = 0;
+	int cmp = hl_hash_gen(USTR("__compare"), false);
+	for(;t && (t->kind == HOBJ || t->kind == HSTRUCT);t=t->obj->super,depth++)
+		for(i=0;i<t->obj->nproto;i++) {
+			hl_obj_proto *p = t->obj->proto + i;
+			if( p->hashed_name != cmp ) continue;
+			H32(depth);
+			H32(p->pindex);
+			HFUN(p->findex);
+		}
+	return hash;
+}
+
+static int hash_full_type( hl_code_hash *h, hl_type *t ) {
+	return h->types_hashes[hl_code_type_index(h->code,t)];
+}
+
+static int hash_nominal_type( hl_code_hash *h, hl_type *t ) {
+	return h->types_nominal[hl_code_type_index(h->code,t)];
+}
+
+static int hash_reg_type( hl_code_hash *h, hl_type *t ) {
+	int hash = -1;
+	int i, k;
+	switch( t->kind ) {
+	case HOBJ:
+		return hash_type_sign(t, 0);
+	case HSTRUCT:
+		return hash_full_type(h, t);
+	case HENUM:
+		H(t->kind);
+		HUSTR(t->tenum->name);
+		H32(t->tenum->nconstructs);
+		for(i=0;i<t->tenum->nconstructs;i++) {
+			hl_enum_construct *c = t->tenum->constructs + i;
+			HUSTR(c->name);
+			H32(c->nparams);
+			for(k=0;k<c->nparams;k++) {
+				HMIX(hash_storage(c->params[k], 0));
+				HMIX(hash_type_sign(c->params[k], 0));
+			}
+		}
+		return hash;
+	default:
+		return hash_nominal_type(h, t);
+	}
+}
+
+static int hash_pointer_type( hl_code_hash *h, int hash, hl_type *t ) {
+	if( t->kind != HOBJ ) HMIX(hash_nominal_type(h, t));
+	return hash;
+}
+
+static bool hash_is_obj( hl_type *t ) {
+	return t->kind == HOBJ || t->kind == HSTRUCT;
+}
+
+static int hash_op_deps( hl_code_hash *h, int hash, hl_function *f, hl_opcode *o ) {
+	hl_code *c = h->code;
+	hl_type *t;
+	hl_obj_proto *p;
+	switch( o->op ) {
+	case OField:
+		t = f->regs[o->p2];
+		if( hash_is_obj(t) ) HMIX(hash_field_access(t, o->p3));
+		break;
+	case OSetField:
+		t = f->regs[o->p1];
+		if( hash_is_obj(t) ) HMIX(hash_field_access(t, o->p2));
+		break;
+	case OGetThis:
+		t = f->regs[0];
+		if( hash_is_obj(t) ) HMIX(hash_field_access(t, o->p2));
+		break;
+	case OSetThis:
+		t = f->regs[0];
+		if( hash_is_obj(t) ) HMIX(hash_field_access(t, o->p1));
+		break;
+	case OPrefetch:
+		t = f->regs[o->p1];
+		if( o->p2 > 0 && hash_is_obj(t) ) HMIX(hash_field_access(t, o->p2 - 1));
+		break;
+	case ONew:
+		t = f->regs[o->p1];
+		HMIX(hash_nominal_type(h, t));
+		if( hash_is_obj(t) ) HMIX(hash_layout(t, 0));
+		break;
+	case OGetArray:
+		t = f->regs[o->p1];
+		if( f->regs[o->p2]->kind == HABSTRACT && hash_is_obj(t) ) HMIX(hash_layout(t, 0));
+		break;
+	case OSetArray:
+		t = f->regs[o->p3];
+		if( f->regs[o->p1]->kind == HABSTRACT && hash_is_obj(t) ) HMIX(hash_layout(t, 0));
+		break;
+	case OVirtualClosure:
+		t = f->regs[o->p2];
+		p = hash_is_obj(t) ? hash_proto_at(t, o->p3) : NULL;
+		if( p ) {
+			int idx = h->functions_indexes[p->findex];
+			H32(p->hashed_name);
+			if( idx < c->nfunctions ) HMIX(hash_type_sign(c->functions[idx].type, 0));
+		}
+		break;
+	case OCallMethod:
+		t = f->regs[o->extra[0]];
+		p = t->kind == HOBJ ? hash_proto_at(t, o->p2) : NULL;
+		if( p ) H32(p->hashed_name);
+		break;
+	case OCallThis:
+		t = f->regs[0];
+		p = t->kind == HOBJ ? hash_proto_at(t, o->p2) : NULL;
+		if( p ) H32(p->hashed_name);
+		break;
+	case OJEq:
+	case OJNotEq:
+	case OJSLt:
+	case OJSGte:
+	case OJSLte:
+	case OJSGt:
+	case OJULt:
+	case OJUGte:
+	case OJNotLt:
+	case OJNotGte:
+		if( hash_is_obj(f->regs[o->p1]) ) HMIX(hash_compare(h, f->regs[o->p1]));
+		if( hash_is_obj(f->regs[o->p2]) ) HMIX(hash_compare(h, f->regs[o->p2]));
+		break;
+	case OToDyn:
+		hash = hash_pointer_type(h, hash, f->regs[o->p2]);
+		break;
+	case OSafeCast:
+		hash = hash_pointer_type(h, hash, f->regs[o->p1]);
+		hash = hash_pointer_type(h, hash, f->regs[o->p2]);
+		break;
+	case ODynGet:
+	case OCallClosure:
+		hash = hash_pointer_type(h, hash, f->regs[o->p1]);
+		break;
+	case ODynSet:
+		hash = hash_pointer_type(h, hash, f->regs[o->p3]);
+		break;
+	default:
+		break;
+	}
+	return hash;
+}
+
+static int hash_fun( hl_code_hash *h, hl_function *f ) {
+	int hash = -1;
+	int i, k;
+	for(i=0;i<f->nregs;i++)
+		HMIX(hash_reg_type(h, f->regs[i]));
+	for(k=0;k<f->nops;k++) {
+		hash = hash_op(h, hash, f->ops + k);
+		hash = hash_op_deps(h, hash, f, f->ops + k);
+	}
+	return hash;
+}
+
+static int hl_code_hash_type( hl_code_hash *h, hl_type *t ) {
+	int hash = -1;
+	HTYPE(t);
+	return hash;
+}
+
+static bool hash_is_class_global( hl_code_hash *h, hl_type *t, int g, bool *named ) {
+	if( t->kind != HOBJ || named[g] || h->globals_signs[g] != (int)(g | 0x80000000) || hl_code_type_index(h->code, t) < 0 )
+		return false;
+	const uchar *name = t->obj->name, *last = name;
+	while( *name ) {
+		if( *name == '.' ) last = name + 1;
+		name++;
+	}
+	return *last == '$';
+}
+
+static hl_type *hash_global_type_value( hl_code *c, hl_function *f, int pos ) {
+	int r = f->ops[pos].p2;
+	int k, j;
+	for(k=pos-1;k>=0 && k>=pos-8;k--) {
+		hl_opcode *op = f->ops + k;
+		if( op->op != OSetField || op->p1 != r ) continue;
+		for(j=k-1;j>=0 && j>=pos-8;j--) {
+			hl_opcode *ot = f->ops + j;
+			if( ot->op == OType && ot->p1 == op->p3 )
+				return c->types[ot->p2];
+		}
+	}
+	return NULL;
+}
+
+static int hash_type_local( hl_type *t ) {
+	int hash = -1;
+	int i;
+	H(t->kind);
+	switch( t->kind ) {
+	case HOBJ:
+	case HSTRUCT:
+		HUSTR(t->obj->name);
+		break;
+	case HENUM:
+		HUSTR(t->tenum->name);
+		if( !t->tenum->global_value ) {
+			H32(t->tenum->nconstructs);
+			for(i=0;i<t->tenum->nconstructs;i++) {
+				H32(t->tenum->constructs[i].nparams);
+				HUSTR(t->tenum->constructs[i].name);
+			}
+		}
+		break;
+	case HABSTRACT:
+		HUSTR(t->abs_name);
+		break;
+	case HVIRTUAL:
+		H32(t->virt->nfields);
+		for(i=0;i<t->virt->nfields;i++)
+			H32(t->virt->fields[i].hashed_name);
+		break;
+	case HFUN:
+	case HMETHOD:
+		H32(t->fun->nargs);
+		break;
+	default:
+		break;
+	}
+	return hash;
+}
+
+#define NOMINAL_ROUNDS 8
+
+static void hash_nominal_types( hl_code_hash *h ) {
+	hl_code *c = h->code;
+	int *local = malloc(sizeof(int) * c->ntypes);
+	int *prev = malloc(sizeof(int) * c->ntypes);
+	int i, k, r;
+	for(i=0;i<c->ntypes;i++)
+		local[i] = prev[i] = hash_type_local(c->types[i]);
+	h->types_nominal = malloc(sizeof(int) * c->ntypes);
+	for(r=0;r<NOMINAL_ROUNDS;r++) {
+		for(i=0;i<c->ntypes;i++) {
+			hl_type *t = c->types[i];
+			int hash = local[i];
+#			define HCHILD(ct) HMIX(prev[hl_code_type_index(c,ct)])
+			switch( t->kind ) {
+			case HFUN:
+			case HMETHOD:
+				for(k=0;k<t->fun->nargs;k++)
+					HCHILD(t->fun->args[k]);
+				HCHILD(t->fun->ret);
+				break;
+			case HVIRTUAL:
+				for(k=0;k<t->virt->nfields;k++)
+					HCHILD(t->virt->fields[k].t);
+				break;
+			case HREF:
+			case HNULL:
+			case HPACKED:
+				HCHILD(t->tparam);
+				break;
+			case HENUM:
+				if( !t->tenum->global_value ) {
+					int j;
+					for(k=0;k<t->tenum->nconstructs;k++)
+						for(j=0;j<t->tenum->constructs[k].nparams;j++)
+							HCHILD(t->tenum->constructs[k].params[j]);
+				}
+				break;
+			default:
+				break;
+			}
+#			undef HCHILD
+			h->types_nominal[i] = hash;
+		}
+		memcpy(prev, h->types_nominal, sizeof(int) * c->ntypes);
+	}
+	free(local);
+	free(prev);
+}
+
+static int compare_int( const void *a, const void *b ) {
+	int x = *(const int*)a, y = *(const int*)b;
+	return x < y ? -1 : x > y ? 1 : 0;
+}
+
+hl_code_hash *hl_code_hash_alloc( hl_code *c ) {
+	int i;
+	hl_code_hash *h = malloc(sizeof(hl_code_hash));
+	memset(h,0,sizeof(hl_code_hash));
+	h->code = c;
+
+	h->functions_indexes = malloc(sizeof(int) * (c->nfunctions + c->nnatives));
+	for(i=0;i<c->nfunctions;i++) {
+		hl_function *f = c->functions + i;
+		h->functions_indexes[f->findex] = i;
+	}
+	for(i=0;i<c->nnatives;i++) {
+		hl_native *n = c->natives + i;
+		h->functions_indexes[n->findex] = i + c->nfunctions;
+	}
+
+	if( c->version >= 5 && c->nbytes > 0 ) {
+		int *sorted = malloc(sizeof(int) * c->nbytes);
+		memcpy(sorted, c->bytes_pos, sizeof(int) * c->nbytes);
+		qsort(sorted, c->nbytes, sizeof(int), compare_int);
+		h->bytes_hashes = malloc(sizeof(int) * c->nbytes);
+		for(i=0;i<c->nbytes;i++) {
+			int pos = c->bytes_pos[i];
+			int min = 0, max = c->nbytes;
+			while( min < max ) {
+				int mid = (min + max) >> 1;
+				if( sorted[mid] <= pos ) min = mid + 1; else max = mid;
+			}
+			int end = min < c->nbytes ? sorted[min] : c->bytes_size;
+			int hash = -1;
+			int len = end - pos;
+			for(int k=pos;k<end;k++)
+				H((unsigned char)c->bytes[k]);
+			H32(len);
+			h->bytes_hashes[i] = hash;
+		}
+		free(sorted);
+	}
+
+	h->types_hashes = malloc(sizeof(int) * c->ntypes);
+	for(i=0;i<c->ntypes;i++)
+		h->types_hashes[i] = hash_type_first(c->types[i], false);
+	int *types_hashes = malloc(sizeof(int) * c->ntypes); // use a second buffer for order-indepedent
+	for(i=0;i<c->ntypes;i++)
+		types_hashes[i] = h->types_hashes[i] ^ hash_type_rec(h, c->types[i]);
+	free(h->types_hashes);
+	h->types_hashes = types_hashes;
+	hash_nominal_types(h);
+
+	h->globals_signs = malloc(sizeof(int) * c->nglobals);
+	bool *named = malloc(sizeof(bool) * c->nglobals);
+	for(i=0;i<c->nglobals;i++) {
+		hl_type *t = c->globals[i];
+		h->globals_signs[i] = i | 0x80000000;
+		named[i] = false;
+		if( t->kind == HABSTRACT )
+			h->globals_signs[i] = hl_code_hash_type(h,t); // some global abstracts allocated by compiler
+	}
+	for(i=0;i<c->ntypes;i++) {
+		hl_type *t = c->types[i];
+		int g;
+		int hash = -1;
+		switch( t->kind ) {
+		case HOBJ:
+		case HSTRUCT:
+			if( !t->obj->global_value ) break;
+			g = (int)(int_val)t->obj->global_value - 1;
+			H(t->kind);
+			HUSTR(t->obj->name);
+			h->globals_signs[g] = hash;
+			named[g] = true;
+			break;
+		case HENUM:
+			if( !t->tenum->global_value ) break;
+			g = (int)(int_val)t->tenum->global_value - 1;
+			H(t->kind);
+			HUSTR(t->tenum->name);
+			h->globals_signs[g] = hash;
+			named[g] = true;
+			break;
+		default:
+			break;
+		}
+	}
+	for(i=0;i<c->nconstants;i++) {
+		hl_constant *k = c->constants + i;
+		hl_type *t = c->globals[k->global];
+		int hash = -1;
+		int j;
+		for(j=0;j<k->nfields;j++) {
+			int index = k->fields[j];
+			switch( t->obj->fields[j].t->kind ) {
+			case HI32:
+				H32(c->ints[index]);
+				break;
+			case HBYTES:
+				HSTR(c->strings[index]);
+				break;
+			default:
+				break;
+			}
+		}
+		h->globals_signs[k->global] = hash;
+	}
+
+	// look into boot code to identify globals that are constant enum constructors
+	// this is a bit hackish but we need them for remap and there's no metatada
+	hl_function *f = c->functions + h->functions_indexes[c->entrypoint];
+	for(i=4;i<f->nops;i++) {
+		hl_opcode *op = f->ops + i;
+		hl_type *t;
+		switch( op->op ) {
+		case OSetGlobal:
+			t = c->globals[op->p1];
+			if( t->kind == HENUM && f->ops[i-2].op == OGetArray && f->ops[i-3].op == OInt )
+				h->globals_signs[op->p1] = c->ints[f->ops[i-3].p2];
+			else if( t->kind == HOBJ && !named[op->p1] && h->globals_signs[op->p1] == (int)(op->p1 | 0x80000000) ) {
+				hl_type *tv = hash_global_type_value(c, f, i);
+				if( tv ) {
+					int hash = -1;
+					H(t->kind);
+					HUSTR(t->obj->name);
+					H(0xFE);
+					H32(hash_type_sign(tv, 0));
+					h->globals_signs[op->p1] = hash;
+				}
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	{
+		int *count = (int*)calloc(c->ntypes, sizeof(int));
+		for(i=0;i<c->nglobals;i++)
+			if( hash_is_class_global(h, c->globals[i], i, named) ) count[hl_code_type_index(c, c->globals[i])]++;
+		for(i=0;i<c->nglobals;i++) {
+			hl_type *t = c->globals[i];
+			if( !hash_is_class_global(h, t, i, named) || count[hl_code_type_index(c, t)] != 1 ) continue;
+			int hash = -1;
+			H(t->kind);
+			HUSTR(t->obj->name);
+			H(0xFF);
+			h->globals_signs[i] = hash;
+		}
+		free(count);
+	}
+
+	for(i=0;i<c->nglobals;i++)
+		if( !named[i] ) h->globals_signs[i] ^= hl_code_hash_type(h,c->globals[i]);
+	free(named);
+	return h;
+}
+
+
+static void hl_code_hash_remap_globals( hl_code_hash *hnew, int *remap, int old_count, hl_type **old_types, int *old_signs ) {
+	hl_code *c = hnew->code;
+	int i;
+	int count = c->nglobals;
+	int new_count = old_count;
+
+	// new globals
+	for(i=0;i<count;i++)
+		if( remap[i] == -1 )
+			remap[i] = new_count++;
+
+	hl_type **nglobals;
+	ALLOC(nglobals,hl_type*,new_count);
+	for(i=0;i<new_count;i++)
+		nglobals[i] = i < old_count ? old_types[i] : &hlt_void;
+	for(i=0;i<count;i++)
+		nglobals[remap[i]] = c->globals[i];
+	c->globals = nglobals;
+	c->nglobals = new_count;
+
+#	ifdef HL_DEBUG
+	for(i=old_count;i<new_count;i++) {
+		hl_type *t = c->globals[i];
+		uprintf(USTR("New global %s\n"),hl_type_str(t));
+	}
+#	endif
+
+	int *nsigns = malloc(sizeof(int) * c->nglobals);
+	for(i=0;i<new_count;i++)
+		nsigns[i] = i < old_count ? old_signs[i] : -1;
+	for(i=0;i<count;i++)
+		nsigns[remap[i]] = hnew->globals_signs[i];
+	free(hnew->globals_signs);
+	hnew->globals_signs = nsigns;
+
+	for(i=0;i<c->ntypes;i++) {
+		hl_type *t = c->types[i];
+		switch( t->kind ) {
+		case HSTRUCT:
+		case HOBJ:
+			if( t->obj->global_value )
+				t->obj->global_value = (void*)(int_val)(remap[(int)(int_val)t->obj->global_value - 1] + 1);
+			break;
+		case HENUM:
+			if( t->tenum->global_value )
+				t->tenum->global_value = (void*)(int_val)(remap[(int)(int_val)t->tenum->global_value - 1] + 1);
+			break;
+		default:
+			break;
+		}
+	}
+	for(i=0;i<c->nconstants;i++)
+		c->constants[i].global = remap[c->constants[i].global];
+
+	for(i=0;i<c->nfunctions;i++) {
+		hl_function *f = c->functions + i;
+		int k;
+		for(k=0;k<f->nops;k++) {
+			hl_opcode *op = f->ops + k;
+			switch( op->op ) {
+			case OGetGlobal:
+				op->p2 = remap[op->p2];
+				break;
+			case OSetGlobal:
+			case OCatch:
+				op->p1 = remap[op->p1];
+				break;
+			default:
+				break;
+			}
+		}
+	}
+}
+
+static void hl_code_hash_finalize( hl_code_hash *h ) {
+	hl_code *c = h->code;
+	int i;
+	h->functions_signs = malloc(sizeof(int) * (c->nfunctions + c->nnatives));
+	for(i=0;i<c->nfunctions;i++) {
+		hl_function *f = c->functions + i;
+		h->functions_signs[i] = hash_fun_sign(h, f);
+	}
+	for(i=0;i<c->nnatives;i++) {
+		hl_native *n = c->natives + i;
+		h->functions_signs[i + c->nfunctions] = hash_native(h,n);
+	}
+	h->functions_hashes = malloc(sizeof(int) * c->nfunctions);
+	for(i=0;i<c->nfunctions;i++) {
+		hl_function *f = c->functions + i;
+		h->functions_hashes[i] = hash_fun(h,f);
+	}
+}
+
+void hl_code_hash_free( hl_code_hash *h ) {
+	free(h->functions_hashes);
+	free(h->functions_indexes);
+	free(h->functions_signs);
+	free(h->globals_signs);
+	free(h->types_hashes);
+	free(h->bytes_hashes);
+	free(h->types_nominal);
+	free(h);
+}
+
 
 #define HOT_RELOAD_EXTRA_GLOBALS	4096
 
@@ -84,6 +1119,7 @@ typedef struct {
 	int sign;
 	int hash;
 	hl_function *f;
+	hl_code *code;
 	void **slot;
 } hot_function;
 
@@ -172,6 +1208,28 @@ static int hot_name_hash( const uchar *name ) {
 	return (int)h;
 }
 
+static const uchar *hot_global_lname( hl_code *c, hl_function *f ) {
+	const uchar *lname = hl_function_lname(c, f);
+	return lname && lname[0] == '$' ? lname : NULL;
+}
+
+static bool hot_has_identity( hl_code *c, hl_function *f ) {
+	return fun_obj(f) != NULL || hot_global_lname(c, f) != NULL;
+}
+
+static bool hot_same_identity( hl_code *c1, hl_function *f1, hl_code *c2, hl_function *f2 ) {
+	const uchar *l1 = hot_global_lname(c1, f1), *l2 = hot_global_lname(c2, f2);
+	if( l1 || l2 )
+		return l1 && l2 && ucmp(l1, l2) == 0;
+	return (f1->obj != NULL) == (f2->obj != NULL) && ucmp(fun_obj(f1)->name,fun_obj(f2)->name) == 0 && ucmp(fun_field_name(f1),fun_field_name(f2)) == 0;
+}
+
+static int hot_identity_key( hl_code *c, hl_function *f ) {
+	const uchar *lname = hot_global_lname(c, f);
+	if( lname ) return hot_name_hash(lname);
+	return hot_name_hash(fun_obj(f)->name) * 31 + hot_name_hash(fun_field_name(f)) + (f->obj ? 1 : 0);
+}
+
 static const uchar *hot_type_name( hl_type *t ) {
 	switch( t->kind ) {
 	case HOBJ:
@@ -184,7 +1242,7 @@ static const uchar *hot_type_name( hl_type *t ) {
 	}
 }
 
-static void hot_add_function( hl_hot_reload *hr, int sign, int hash, hl_function *f, void **slot ) {
+static void hot_add_function( hl_hot_reload *hr, int sign, int hash, hl_function *f, hl_code *code, void **slot ) {
 	if( hr->nfunctions == hr->max_functions ) {
 		hr->max_functions = hr->max_functions ? hr->max_functions * 2 : 256;
 		hr->functions = (hot_function*)realloc(hr->functions, sizeof(hot_function) * hr->max_functions);
@@ -193,6 +1251,7 @@ static void hot_add_function( hl_hot_reload *hr, int sign, int hash, hl_function
 	hf->sign = sign;
 	hf->hash = hash;
 	hf->f = f;
+	hf->code = code;
 	hf->slot = slot;
 	hot_map_add(&hr->functions_map, sign, hr->nfunctions);
 	hr->nfunctions++;
@@ -248,8 +1307,8 @@ static void hot_reload_init( hl_module *m, int max_globals, int max_globals_size
 	hl_code *c = m->code;
 	for(i=0;i<c->nfunctions;i++) {
 		hl_function *f = c->functions + i;
-		if( fun_obj(f) == NULL ) continue;
-		hot_add_function(hr, m->hash->functions_signs[i], m->hash->functions_hashes[i], f, m->functions_ptrs + f->findex);
+		if( !hot_has_identity(c, f) ) continue;
+		hot_add_function(hr, m->hash->functions_signs[i], m->hash->functions_hashes[i], f, c, m->functions_ptrs + f->findex);
 	}
 	hr->nglobals = c->nglobals;
 	hr->max_globals = max_globals;
@@ -2142,7 +3201,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 	for(i=0;i<nfuns;i++) {
 		hl_function *f2 = c->functions + i;
 		match[i] = HOT_SKIP;
-		if( fun_obj(f2) == NULL ) continue;
+		if( !hot_has_identity(c, f2) ) continue;
 		int sign = m2->hash->functions_signs[i];
 		int cursor = -1, k;
 		match[i] = HOT_ADDED;
@@ -2150,7 +3209,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 			hot_function *hf = hr->functions + k;
 			hl_function *f1 = hf->f;
 			if( taken[k] ) continue;
-			if( (f1->obj != NULL) != (f2->obj != NULL) || ucmp(fun_obj(f1)->name,fun_obj(f2)->name) != 0 || ucmp(fun_field_name(f1),fun_field_name(f2)) != 0 ) {
+			if( !hot_same_identity(hf->code, f1, c, f2) ) {
 				printf("[HotReload] Signature conflict\n");
 				continue;
 			}
@@ -2164,9 +3223,12 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		}
 		if( match[i] != HOT_SAME ) {
 #			ifdef HL_DEBUG
-			uprintf(USTR("%s."), fun_obj(f2)->name);
-			uprintf(USTR("%s"), fun_field_name(f2));
-			if( !f2->obj && hl_function_lname(c, f2) ) uprintf(USTR("~%s"), hl_function_lname(c, f2)); else if( !f2->obj ) printf("~%d", f2->ref);
+			if( fun_obj(f2) ) {
+				uprintf(USTR("%s."), fun_obj(f2)->name);
+				uprintf(USTR("%s"), fun_field_name(f2));
+				if( !f2->obj && hl_function_lname(c, f2) ) uprintf(USTR("~%s"), hl_function_lname(c, f2)); else if( !f2->obj ) printf("~%d", f2->ref);
+			} else
+				uprintf(USTR("%s"), hl_function_lname(c, f2));
 			printf(match[i] == HOT_ADDED ? " has been added\n" : " has been modified [%d]\n", f2->nops);
 #			endif
 			changes_count++;
@@ -2281,7 +3343,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		int hash = m2->hash->functions_hashes[i];
 		int sign = m2->hash->functions_signs[i];
 		if( match[i] == HOT_ADDED ) {
-			hot_add_function(hr, sign, hash, f2, m2->functions_ptrs + f2->findex);
+			hot_add_function(hr, sign, hash, f2, c, m2->functions_ptrs + f2->findex);
 			continue;
 		}
 		hot_function *hf = hr->functions + match[i];
@@ -2289,6 +3351,7 @@ static h_bool hot_patch( hl_module *m1, hl_code *c ) {
 		*hf->slot = ptr;
 		hf->hash = hash;
 		hf->f = f2;
+		hf->code = c;
 	}
 	free(match);
 
