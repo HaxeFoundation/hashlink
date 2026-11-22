@@ -46,6 +46,10 @@ elseif(DOWNLOAD_DEPENDENCIES)
     LIBRARY
     RUNTIME
 )
+    if(NOT APPLE)
+        # find the bundled libopenal next to openal.hdll
+        set_target_properties(openal.hdll PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
 else()
     find_package(OpenAL REQUIRED)
 endif()

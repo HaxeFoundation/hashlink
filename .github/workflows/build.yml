@@ -42,6 +42,11 @@ jobs:
           - build_system: cmake
             cmake_configuration: RelWithDebInfo
 
+          - architecture: 64
+            build_system: cmake
+            cmake_configuration: Release
+            download_deps: true
+
     steps: &build-steps
     - name: "SCM Checkout"
       uses: actions/checkout@v7
@@ -71,15 +76,19 @@ jobs:
             fi
 
             sudo apt-get update -y
-            sudo apt-get install --no-install-recommends -y \
-              libmbedtls-dev${SUFFIX} \
-              libopenal-dev${SUFFIX} \
-              libpng-dev${SUFFIX} \
-              libturbojpeg-dev${SUFFIX} \
-              libuv1-dev${SUFFIX} \
-              libvorbis-dev${SUFFIX} \
-              libsqlite3-dev${SUFFIX} \
-              ${EXTRA_APT_PKGS}
+            if [[ "${{ matrix.download_deps }}" == true ]]; then
+              sudo apt-get install --no-install-recommends -y zlib1g-dev
+            else
+              sudo apt-get install --no-install-recommends -y \
+                libmbedtls-dev${SUFFIX} \
+                libopenal-dev${SUFFIX} \
+                libpng-dev${SUFFIX} \
+                libturbojpeg-dev${SUFFIX} \
+                libuv1-dev${SUFFIX} \
+                libvorbis-dev${SUFFIX} \
+                libsqlite3-dev${SUFFIX} \
+                ${EXTRA_APT_PKGS}
+            fi
 
             # ref https://github.com/libsdl-org/SDL/blob/main/docs/README-linux.md#build-dependencies
             sudo apt-get install --no-install-recommends -y \
@@ -169,7 +178,7 @@ jobs:
         haxelib list
 
     - name: "Build and install SDL3"
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && !matrix.download_deps
       run: |
         wget https://github.com/libsdl-org/SDL/releases/download/release-3.4.10/SDL3-3.4.10.tar.gz
         tar -xzvf SDL3-3.4.10.tar.gz
@@ -212,7 +221,9 @@ jobs:
                   -DCMAKE_TOOLCHAIN_FILE=other/cmake/linux32.toolchain.cmake
                 ;;
               linux*)
-                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }}
+                cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.cmake_configuration }} \
+                  -DFLAT_INSTALL_TREE=ON \
+                  ${{ matrix.download_deps && '-DDOWNLOAD_DEPENDENCIES=ON' || '' }}
                 ;;
             esac
 
@@ -468,11 +479,12 @@ jobs:
 
         - os: linux
           runner: ubuntu-24.04
-          build_system: make
+          build_system: cmake
 
         - os: linux
           architecture: arm64
           runner: ubuntu-24.04-arm
+          build_system: make
 
     runs-on: ${{ matrix.runner }}
     steps: &haxe-test-steps
@@ -488,7 +500,7 @@ jobs:
           }}
 
     - name: Install apt packages
-      if: matrix.os == 'linux'
+      if: matrix.os == 'linux' && matrix.build_system == 'make'
       run: |
         if [ ${{matrix.architecture}} == x86_32 ]; then
           sudo dpkg --add-architecture i386
@@ -676,7 +688,7 @@ jobs:
           --title "HashLink Nightly Build" \
           "darwin-cmake-64/hashlink-${short_commit}-darwin-cmake.tar.gz#hashlink-latest-darwin.tar.gz" \
           "darwin-cmake-arm64/hashlink-${short_commit}-darwin-arm64-cmake.tar.gz#hashlink-latest-darwin-arm64.tar.gz" \
-          "linux-make-64/hashlink-${short_commit}-linux-amd64.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
+          "linux-cmake-64/hashlink-${short_commit}-linux-amd64-cmake.tar.gz#hashlink-latest-linux-amd64.tar.gz" \
           "linux-make-arm64/hashlink-${short_commit}-linux-arm64.tar.gz#hashlink-latest-linux-arm64.tar.gz" \
           "windows-vs2026-64/hashlink-${short_commit}-win64.zip#hashlink-latest-win64.zip" \
           "windows-cmake-mingw-64/hashlink-${short_commit}-win64-cmake-mingw.zip#hashlink-latest-win64-mingw.zip"
