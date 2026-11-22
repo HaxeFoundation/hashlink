@@ -583,9 +583,6 @@ jobs:
         os: [darwin]
         architecture: [x86_64, arm64]
         include:
-        - architecture: arm64
-          test-flags: --skip-hl-jit # not yet supported
-
         - os: darwin
           runner: macos-15-intel
           build_system: cmake
