@@ -2080,3 +2080,15 @@ void hl_codegen_final( jit_ctx *jit ) {
 	}
 	int_arr_free(&ctx->const_addr);
 }
+
+// MOV RAX, slot ; JMP [RAX]
+void hl_jit_patch_method( void *old_fun, void **slot ) {
+	unsigned char *b = (unsigned char*)old_fun;
+	unsigned long long addr = (unsigned long long)(int_val)slot;
+	*b++ = 0x48;
+	*b++ = 0xB8;
+	for(int i=0;i<8;i++)
+		*b++ = (unsigned char)(addr >> (i * 8));
+	*b++ = 0xFF;
+	*b++ = 0x20;
+}

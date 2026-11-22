@@ -385,14 +385,3 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	hl_setup.static_call = callback_c2hl;
 	return code;
 }
-
-void hl_jit_patch_method( void *old_fun, void **slot ) {
-	unsigned char *b = (unsigned char*)old_fun;
-	unsigned long long addr = (unsigned long long)(int_val)slot;
-	*b++ = 0x48;
-	*b++ = 0xB8;
-	for(int i=0;i<8;i++)
-		*b++ = (unsigned char)(addr >> (i * 8));
-	*b++ = 0xFF;
-	*b++ = 0x20;
-}

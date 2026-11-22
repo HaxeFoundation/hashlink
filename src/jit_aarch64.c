@@ -31,6 +31,9 @@
 #include "jit_aarch64_emit.h"
 #include <string.h>
 #include <stdio.h>
+#if defined(__APPLE__)
+#	include <pthread.h>
+#endif
 
 #ifdef HL_DEBUG
 #	define GEN_DEBUG
@@ -44,6 +47,8 @@
 
 // largest code sequence emitted for a single IR op
 #define MAX_OP_SIZE	128
+// functions are padded to this size so hl_jit_patch_method can overwrite their entry
+#define PATCH_SIZE	20
 
 #define R(id)		MK_REG(id, R_REG)
 #define V(id)		MK_REG((id) + 64, R_REG)
@@ -1545,6 +1550,8 @@ retry:
 
 		if( ctx->code.cur > ctx->code.max ) jit_error("aarch64 code buffer overrun");
 	}
+	while( byte_count(ctx->code) < PATCH_SIZE )
+		EMIT32(ctx, 0xD503201F); // NOP
 
 	hl_codegen_flush(jit);
 
@@ -1740,7 +1747,7 @@ static void emit_debug_trampoline( code_ctx *ctx ) {
 		encode_ldp_stp(ctx, 0x02, 0, 0x12, off / 8, X12, X11, X9); // STP X9,X12,[X11,#off]
 	}
 	encode_branch_reg(ctx, /*BLR*/1, ARM_TMP1);
-	hl_jit_trampoline = ctx->jit->out_pos + byte_count(ctx->code);
+	if( hl_jit_trampoline < 0 ) hl_jit_trampoline = ctx->jit->out_pos + byte_count(ctx->code);
 	emit_helper_epilogue(ctx);
 }
 
@@ -1862,4 +1869,15 @@ void hl_codegen_final( jit_ctx *jit ) {
 			jit->final_code + target_offs;
 	}
 	int_arr_free(&ctx->const_addr);
+}
+
+// LDR X16, slot ; LDR X16, [X16] ; BR X16 ; slot
+void hl_jit_patch_method( void *old_fun, void **slot ) {
+	unsigned int code[3] = { 0x58000070, 0xF9400210, 0xD61F0200 };
+#if defined(__APPLE__)
+	pthread_jit_write_protect_np(false);
+#endif
+	memcpy(old_fun, code, sizeof(code));
+	memcpy((char*)old_fun + sizeof(code), &slot, sizeof(slot));
+	hl_flush_executable_memory(old_fun, PATCH_SIZE);
 }
