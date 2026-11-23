@@ -26,6 +26,7 @@
 #ifdef HL_WIN
 #	undef _GUID
 #	include <windows.h>
+#	define strdup _strdup
 #endif
 
 HL_API int hl_mark_size( int data_size );
