@@ -133,6 +133,7 @@ typedef struct {
 	int *functions_indexes;
 	int *bytes_hashes;
 	int *types_nominal;
+	int *types_signs;
 } hl_code_hash;
 
 #if defined(HL_64) && defined(HL_WIN)

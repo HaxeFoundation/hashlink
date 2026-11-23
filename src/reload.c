@@ -298,9 +298,14 @@ static int hash_type_sign( hl_type *t, int depth ) {
 	return hash;
 }
 
+static int hash_sign( hl_code_hash *h, hl_type *t ) {
+	int idx = h->types_signs ? hl_code_type_index(h->code, t) : -1;
+	return idx < 0 ? hash_type_sign(t, 0) : h->types_signs[idx];
+}
+
 static int hash_fun_sign( hl_code_hash *h, hl_function *f ) {
 	int hash = -1;
-	H32(hash_type_sign(f->type, 0));
+	H32(hash_sign(h, f->type));
 	const uchar *own = hl_function_lname(h->code, f);
 	if( f->obj ) {
 		HUSTR(f->obj->name);
@@ -508,7 +513,7 @@ static int hash_storage( hl_type *t, int depth ) {
 	return hash;
 }
 
-static int hash_field_access( hl_type *t, int fid ) {
+static int hash_field_access( hl_code_hash *h, hl_type *t, int fid ) {
 	int hash = -1;
 	hl_type *chain[MAX_CHAIN];
 	int i, k, n, g = 0;
@@ -522,7 +527,7 @@ static int hash_field_access( hl_type *t, int fid ) {
 			HMIX(hash_storage(f->t, 0));
 			if( g++ == fid ) {
 				H32(f->hashed_name);
-				HMIX(hash_type_sign(f->t, 0));
+				HMIX(hash_sign(h, f->t));
 				return hash;
 			}
 		}
@@ -568,7 +573,7 @@ static int hash_reg_type( hl_code_hash *h, hl_type *t ) {
 	int i, k;
 	switch( t->kind ) {
 	case HOBJ:
-		return hash_type_sign(t, 0);
+		return hash_sign(h, t);
 	case HSTRUCT:
 		return hash_full_type(h, t);
 	case HENUM:
@@ -581,7 +586,7 @@ static int hash_reg_type( hl_code_hash *h, hl_type *t ) {
 			H32(c->nparams);
 			for(k=0;k<c->nparams;k++) {
 				HMIX(hash_storage(c->params[k], 0));
-				HMIX(hash_type_sign(c->params[k], 0));
+				HMIX(hash_sign(h, c->params[k]));
 			}
 		}
 		return hash;
@@ -606,23 +611,23 @@ static int hash_op_deps( hl_code_hash *h, int hash, hl_function *f, hl_opcode *o
 	switch( o->op ) {
 	case OField:
 		t = f->regs[o->p2];
-		if( hash_is_obj(t) ) HMIX(hash_field_access(t, o->p3));
+		if( hash_is_obj(t) ) HMIX(hash_field_access(h, t, o->p3));
 		break;
 	case OSetField:
 		t = f->regs[o->p1];
-		if( hash_is_obj(t) ) HMIX(hash_field_access(t, o->p2));
+		if( hash_is_obj(t) ) HMIX(hash_field_access(h, t, o->p2));
 		break;
 	case OGetThis:
 		t = f->regs[0];
-		if( hash_is_obj(t) ) HMIX(hash_field_access(t, o->p2));
+		if( hash_is_obj(t) ) HMIX(hash_field_access(h, t, o->p2));
 		break;
 	case OSetThis:
 		t = f->regs[0];
-		if( hash_is_obj(t) ) HMIX(hash_field_access(t, o->p1));
+		if( hash_is_obj(t) ) HMIX(hash_field_access(h, t, o->p1));
 		break;
 	case OPrefetch:
 		t = f->regs[o->p1];
-		if( o->p2 > 0 && hash_is_obj(t) ) HMIX(hash_field_access(t, o->p2 - 1));
+		if( o->p2 > 0 && hash_is_obj(t) ) HMIX(hash_field_access(h, t, o->p2 - 1));
 		break;
 	case ONew:
 		t = f->regs[o->p1];
@@ -643,7 +648,7 @@ static int hash_op_deps( hl_code_hash *h, int hash, hl_function *f, hl_opcode *o
 		if( p ) {
 			int idx = h->functions_indexes[p->findex];
 			H32(p->hashed_name);
-			if( idx < c->nfunctions ) HMIX(hash_type_sign(c->functions[idx].type, 0));
+			if( idx < c->nfunctions ) HMIX(hash_sign(h, c->functions[idx].type));
 		}
 		break;
 	case OCallMethod:
@@ -1059,6 +1064,9 @@ static void hl_code_hash_remap_globals( hl_code_hash *hnew, int *remap, int old_
 static void hl_code_hash_finalize( hl_code_hash *h ) {
 	hl_code *c = h->code;
 	int i;
+	h->types_signs = malloc(sizeof(int) * c->ntypes);
+	for(i=0;i<c->ntypes;i++)
+		h->types_signs[i] = hash_type_sign(c->types[i], 0);
 	h->functions_signs = malloc(sizeof(int) * (c->nfunctions + c->nnatives));
 	for(i=0;i<c->nfunctions;i++) {
 		hl_function *f = c->functions + i;
@@ -1083,6 +1091,7 @@ void hl_code_hash_free( hl_code_hash *h ) {
 	free(h->types_hashes);
 	free(h->bytes_hashes);
 	free(h->types_nominal);
+	free(h->types_signs);
 	free(h);
 }
 
