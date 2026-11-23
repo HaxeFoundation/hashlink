@@ -143,6 +143,7 @@ struct _emit_ctx {
 	int *pos_map;
 	int pos_map_size;
 	int trap_count;
+	int trap_pops;
 
 	int_arr args_data;
 	int_arr jump_regs;
@@ -1140,6 +1141,7 @@ void hl_emit_function( jit_ctx *jit ) {
 	ctx->fun = f;
 	ctx->emit_pos = 0;
 	ctx->trap_count = 0;
+	ctx->trap_pops = 0;
 	ctx->phi_count = 0;
 	ctx->current_assign = 0;
 	ctx->in_args = false;
@@ -1226,6 +1228,8 @@ void hl_emit_function( jit_ctx *jit ) {
 			if( ctx->mod->debug && f->ops[op_pos].op != OLabel && blocks_count(ctx->current_block->preds) > 1 )
 				emit_debug_scope_phis(ctx);
 		}
+		if( f->ops[op_pos].op != OEndTrap && f->ops[op_pos].op != ONop )
+			ctx->trap_pops = 0;
 		emit_opcode(ctx,f->ops + op_pos);
 	}
 	// emit a break if we're not supposed to reach here : will fix RtlUnwind on windows too.
@@ -2343,8 +2347,9 @@ static void emit_opcode( emit_ctx *ctx, hl_opcode *o ) {
 		break;
 	case OEndTrap:
 		{
-			if( ctx->trap_count == 0 ) jit_assert();
-			ereg st = ctx->traps[ctx->trap_count - 1].stack;
+			if( ctx->trap_pops >= ctx->trap_count ) jit_assert();
+			ereg st = ctx->traps[ctx->trap_count - 1 - ctx->trap_pops].stack;
+			ctx->trap_pops++;
 
 			ereg thread, current_addr;
 			static hl_thread_info *tinf = NULL;
