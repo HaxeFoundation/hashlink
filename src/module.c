@@ -261,6 +261,10 @@ int hl_module_capture_stack_walk( void *pc, void *fp, void *stack_base, void *st
 #define UREG_RSP	4
 #define UREG_RBP	5
 
+#ifdef HL_VCC
+#	define UNWIND_SEH_GUARD
+#endif
+
 static bool unwind_read( void *addr, void *stack_base, void *stack_top, void *copy, void **out ) {
 	if( addr < stack_base || (char*)addr + sizeof(void*) > (char*)stack_top || (((int_val)addr) & (sizeof(void*) - 1)) ) return false;
 	*out = *walk_at(addr,stack_base,copy);
@@ -403,9 +407,12 @@ static bool unwind_native_frame( void **pc, char **sp, void **regs, bool leaf, v
 	this can't be fooled by stale frames left in the stack by previous calls.
 */
 int hl_module_capture_stack_unwind( void *pc, void *sp, void **regs, bool leaf, void *stack_base, void *stack_top, void *copy, void **out, int size ) {
-	int count = 0;
+	volatile int count = 0;
 	char *rsp = (char*)sp;
 	if( !out ) size = 0x7FFFFFFF;
+#ifdef UNWIND_SEH_GUARD
+	__try {
+#endif
 	while( count < size && pc ) {
 		if( module_is_jit_code(pc,false) ) {
 			void **fp = (void**)regs[UREG_RBP];
@@ -456,6 +463,10 @@ int hl_module_capture_stack_unwind( void *pc, void *sp, void **regs, bool leaf, 
 		if( rsp <= prev ) break;
 		leaf = false;
 	}
+#ifdef UNWIND_SEH_GUARD
+	} __except( GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH ) {
+	}
+#endif
 	return count;
 }
 
