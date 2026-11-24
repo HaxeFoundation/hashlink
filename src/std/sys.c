@@ -639,8 +639,10 @@ HL_PRIM vbyte *hl_sys_full_path( vbyte *path ) {
 
 		// get actual file/dir name with proper case
 		if ((handle = FindFirstFileW(out, &data)) != INVALID_HANDLE_VALUE) {
-			// replace the component with proper case
-			memcpy(out + last, data.cFileName, (i - last) * sizeof(pchar));
+			// replace the component with proper case, unless it is a short (8.3)
+			// name, which FindFirstFileW gives back as the longer full name
+			if( (int)ustrlen(data.cFileName) == i - last )
+				memcpy(out + last, data.cFileName, (i - last) * sizeof(pchar));
 			FindClose(handle);
 		}
 
