@@ -302,7 +302,7 @@ static void hl_debug_loop() {
 		hl_socket *s = hl_socket_accept(debug_socket);
 		if( s == NULL ) break;
 		hl_debug_lock(true);
-		debug_out o = { s, NULL, 0, 0 };
+		debug_out o = { NULL, NULL, 0, 0 };
 		debug_write(&o, "HLD2", 4);
 		debug_write_int(&o, flags);
 		debug_write_int(&o, hl_ver);
@@ -326,6 +326,9 @@ static void hl_debug_loop() {
 		for(int i=0;i<nmodules;i++)
 			debug_write_extra(&o, mods[i]);
 		debug_write_ptr(&o, &debug_registry);
+		debug_out so = { s, NULL, 0, 0 };
+		debug_write(&so, o.buf, o.pos);
+		free(o.buf);
 		client_socket = s;
 		hl_debug_lock(false);
 
