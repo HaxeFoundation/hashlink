@@ -29,6 +29,11 @@
 #include <posix/posix.h>
 #endif
 
+#if defined(CATCH_STACK_OVERFLOW) && defined(_M_X64)
+#	define RESTORE_STACK_GUARD
+#	include <malloc.h>
+#endif
+
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
 	hl_blocking(true);
 #	ifdef HL_WIN_DESKTOP
@@ -88,6 +93,24 @@ static bool break_on_trap( hl_thread_info *t, hl_trap_ctx *trap, vdynamic *v ) {
 	return false;
 }
 
+#ifdef RESTORE_STACK_GUARD
+#define STACK_GUARD_MARGIN (64 << 10)
+HL_THREAD_STATIC_VAR _JUMP_BUFFER *overflow_jump;
+HL_THREAD_STATIC_VAR unsigned __int64 overflow_rip;
+
+static void overflow_landing() {
+	_JUMP_BUFFER *jb = overflow_jump;
+	ULONG_PTR low, high;
+	GetCurrentThreadStackLimits(&low, &high);
+	if( (ULONG_PTR)&low - low >= STACK_GUARD_MARGIN && _resetstkoflw() )
+		hl_get_thread()->flags &= ~HL_EXC_STACK_OVERFLOW;
+	jb->Rip = overflow_rip;
+	jb->Rsp += 8;
+	jb->Frame = 0; // already unwound : only restore the registers
+	hl_longjmp((_JBTYPE*)jb, 1);
+}
+#endif
+
 HL_PRIM void hl_throw( vdynamic *v ) {
 	hl_thread_info *t = hl_get_thread();
 	hl_trap_ctx *trap = t->trap_current;
@@ -110,6 +133,15 @@ HL_PRIM void hl_throw( vdynamic *v ) {
 	t->flags &= ~HL_EXC_RETHROW;
 	if( t->exc_handler && call_handler ) hl_dyn_call_safe(t->exc_handler,&v,1,&call_handler);
 	if( hl_setup.throw_jump == NULL ) hl_setup.throw_jump = hl_longjmp;
+#	ifdef RESTORE_STACK_GUARD
+	if( t->flags & HL_EXC_STACK_OVERFLOW ) {
+		_JUMP_BUFFER *jb = (_JUMP_BUFFER*)trap->buf;
+		overflow_jump = jb;
+		overflow_rip = jb->Rip;
+		jb->Rip = (unsigned __int64)overflow_landing;
+		jb->Rsp -= 8; // enter overflow_landing as if called, with an aligned stack
+	}
+#	endif
 	hl_setup.throw_jump(trap->buf,1);
 	HL_UNREACHABLE;
 }

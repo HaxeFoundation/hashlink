@@ -13,4 +13,9 @@
 #	endif
 #endif
 
+// hardware exceptions (access violation, stack overflow) are turned into haxe exceptions
+#if defined(HL_VCC) && !defined(HL_XBO)
+#	define CATCH_STACK_OVERFLOW
+#endif
+
 #endif
