@@ -2013,6 +2013,7 @@ void hl_codegen_init( jit_ctx *jit ) {
 		jit->code_funs.trampoline = jit->out_pos + byte_count(ctx->code);
 
 		EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
+		EMIT(_MOV,R(RBP),R(RSP),M_PTR);
 		EMIT(SUB,R(RSP),MK_CONST(frame),M_PTR);
 		for(int i=0;i<nregs;i++) {
 			bool is_float = i >= cfg->regs.npersists;
