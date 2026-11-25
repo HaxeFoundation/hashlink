@@ -207,7 +207,7 @@ class GameController {
 	// 
 
 	static var UID = 0;
-	static var ALL = [];
+	static var ALL : Array<GameController> = [];
 
 	public static function init(){
 		var mappings = DInputMapping.parseDefaults();

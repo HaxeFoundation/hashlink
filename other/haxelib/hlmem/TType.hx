@@ -20,7 +20,7 @@ class TType {
 	public var parentClass : TType;
 
 	public var falsePositive = 0;
-	public var falsePositiveIndexes = [];
+	public var falsePositiveIndexes : Array<Int> = [];
 
 	public function new(tid, t, ?cl) {
 		this.tid = tid;
