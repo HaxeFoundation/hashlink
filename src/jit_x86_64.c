@@ -505,6 +505,7 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
+	cfg->min_stack_args_size = HL_WSIZE;
 #	ifdef GEN_DEBUG
 	cfg->debug_prefix_size = 6;
 #	endif
@@ -2079,4 +2080,16 @@ void hl_codegen_final( jit_ctx *jit ) {
 		*(void**)(jit->final_code + ctx->const_table_pos + pos) = jit->final_code + offs;
 	}
 	int_arr_free(&ctx->const_addr);
+}
+
+// MOV RAX, slot ; JMP [RAX]
+void hl_jit_patch_method( void *old_fun, void **slot ) {
+	unsigned char *b = (unsigned char*)old_fun;
+	unsigned long long addr = (unsigned long long)(int_val)slot;
+	*b++ = 0x48;
+	*b++ = 0xB8;
+	for(int i=0;i<8;i++)
+		*b++ = (unsigned char)(addr >> (i * 8));
+	*b++ = 0xFF;
+	*b++ = 0x20;
 }
