@@ -568,7 +568,18 @@ static bool module_capture_break_context( void **rip, void **regs ) {
 #ifdef WIN64_UNWIND_TABLES
 	CONTEXT c;
 	RtlCaptureContext(&c);
-	while( !module_is_jit_code((void*)c.Rip,false) ) {
+	while( true ) {
+		bool null_stub = false;
+		for(int i=0;i<modules_count;i++)
+			for(int k=0;k<2;k++)
+				if( (unsigned char*)c.Rip == (unsigned char*)cur_modules[i]->jit_code + hl_jit_null_rets[k] ) null_stub = true;
+		if( null_stub ) {
+			void **frame = (void**)c.Rbp;
+			*rip = frame[1];
+			memcpy(regs, frame - hl_jit_stub_regs, hl_jit_stub_regs * sizeof(void*));
+			return true;
+		}
+		if( module_is_jit_code((void*)c.Rip,false) ) break;
 		DWORD64 base;
 		PRUNTIME_FUNCTION fn_entry = RtlLookupFunctionEntry(c.Rip, &base, NULL);
 		if( !fn_entry ) return false;

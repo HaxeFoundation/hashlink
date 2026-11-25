@@ -25,6 +25,8 @@
 static jit_ctx *current_ctx = NULL;
 
 int hl_jit_trampoline = -1;
+int hl_jit_null_rets[2] = { -1, -1 };
+int hl_jit_stub_regs = 0;
 
 static hl_alloc callback_alloc = {0};
 static ptr_set callback_natives = {0};
@@ -359,6 +361,7 @@ void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **d
 	hl_codegen_final(ctx);
 	arg_reg_count = ctx->cfg.regs.nargs;
 	arg_fp_count = ctx->cfg.floats.nargs;
+	hl_jit_stub_regs = ctx->cfg.stub_regs;
 	call_jit_c2hl = ctx->final_code + ctx->code_funs.c2hl;
 	call_jit_hl2c = ctx->final_code + ctx->code_funs.hl2c;
 #	ifdef WIN64_UNWIND_TABLES

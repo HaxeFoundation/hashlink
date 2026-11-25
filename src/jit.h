@@ -207,6 +207,7 @@ typedef struct {
 	ereg stack_pos;
 	int stack_align;
 	int debug_prefix_size;
+	int stub_regs;
 	ereg req_bit_shifts;
 	ereg req_div_a;
 	ereg req_div_b;

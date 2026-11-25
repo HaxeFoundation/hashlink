@@ -505,6 +505,7 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
+	cfg->stub_regs = 32;
 #	ifdef GEN_DEBUG
 	cfg->debug_prefix_size = 6;
 #	endif
@@ -1398,7 +1399,7 @@ void hl_codegen_function( jit_ctx *jit ) {
 			break;
 		case PUSH_CONST:
 			if( e->mode != M_PTR ) jit_assert();
-			if( (e->value&0xFF) == e->value )
+			if( (int64)e->value == (signed char)e->value )
 				emit_ext(ctx,PUSH8, VAL_CONST, UNUSED, M_PTR, e->value);
 			else if( (e->value&0xFFFFFFFF) == e->value )
 				emit_ext(ctx,_PUSH, VAL_CONST, UNUSED, M_I32, e->value); // will push 64bits
@@ -1876,29 +1877,33 @@ static void flush_function( code_ctx *ctx, int start ) {
 
 void hl_codegen_init( jit_ctx *jit ) {
 	code_ctx *ctx = jit->code;
-	byte_reserve(ctx->code,1024);
-	ctx->code.cur -= 1024;
-
-	// generate hl_null_access stub
-	ctx->null_access_pos = jit->out_pos + byte_count(ctx->code);
-	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
-	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
-	EMIT(SUB,R(RSP),MK_CONST(0x20),M_PTR);
-	emit_ext(ctx,_MOV,R(RAX),VAL_CONST,M_PTR,(int_val)hl_null_access);
-	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
-	BREAK();
-	flush_function(ctx, ctx->null_access_pos);
-
-	// generate hl_null_field access stub
-	ctx->null_field_pos = jit->out_pos + byte_count(ctx->code);
-	EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
-	EMIT(_MOV,R(RBP),R(RSP),M_PTR);
-	EMIT(SUB,R(RSP),MK_CONST(0x28),M_PTR);
-	EMIT(_MOV,jit->cfg.regs.arg[0],MK_ADDR(RBP,HL_WSIZE*2),M_I32);
-	emit_ext(ctx,_MOV,R(RAX),VAL_CONST,M_PTR,(int_val)hl_jit_null_field_access);
-	EMIT(_CALL,R(RAX),UNUSED,M_PTR);
-	BREAK();
-	flush_function(ctx, ctx->null_field_pos);
+	// generate hl_null_access and hl_null_field access stubs
+	for(int field=0;field<2;field++) {
+		byte_reserve(ctx->code,1024);
+		ctx->code.cur -= 1024;
+		int pos = jit->out_pos + byte_count(ctx->code);
+		if( field ) ctx->null_field_pos = pos; else ctx->null_access_pos = pos;
+		EMIT(_PUSH,R(RBP),UNUSED,M_PTR);
+		EMIT(_MOV,R(RBP),R(RSP),M_PTR);
+		int nregs = jit->mod->debug ? jit->cfg.stub_regs : 0;
+		EMIT(SUB,R(RSP),MK_CONST(0x20 + (field + nregs) * HL_WSIZE),M_PTR);
+		if( nregs ) {
+			for(int r=0;r<nregs;r++) {
+				if( r == RSP || r == RBP ) continue;
+				emit_mov(ctx, MK_ADDR(RBP,(r - nregs) * HL_WSIZE), r < 16 ? R(r) : MMX(r - 16), r < 16 ? M_PTR : M_F64);
+			}
+			emit_mov(ctx, RTMP, MK_ADDR(RBP,0), M_PTR);
+			emit_mov(ctx, MK_ADDR(RBP,(RBP - nregs) * HL_WSIZE), RTMP, M_PTR);
+			EMIT(_LEA,RTMP,MK_ADDR(RBP,(field + 2) * HL_WSIZE),M_PTR);
+			emit_mov(ctx, MK_ADDR(RBP,(RSP - nregs) * HL_WSIZE), RTMP, M_PTR);
+		}
+		if( field ) EMIT(_MOV,jit->cfg.regs.arg[0],MK_ADDR(RBP,HL_WSIZE*2),M_I32);
+		emit_ext(ctx,_MOV,R(RAX),VAL_CONST,M_PTR,field ? (int_val)hl_jit_null_field_access : (int_val)hl_null_access);
+		EMIT(_CALL,R(RAX),UNUSED,M_PTR);
+		if( nregs && hl_jit_null_rets[field] < 0 ) hl_jit_null_rets[field] = jit->out_pos + byte_count(ctx->code);
+		BREAK();
+		flush_function(ctx, pos);
+	}
 
 	// generate c2hl stub
 	jit->code_funs.c2hl = jit->out_pos + byte_count(ctx->code);
