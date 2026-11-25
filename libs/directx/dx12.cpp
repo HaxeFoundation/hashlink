@@ -520,8 +520,13 @@ static void ReportDxError( HRESULT err, int line ) {
 		}
 #endif
 	}
+#ifndef HL_XBS
+	if( reason != S_OK )
+		hl_error("DXERROR %X line %d, removed reason %X\n%s",(DWORD)err,line,(DWORD)reason,hl_to_utf16(report_buf));
+#else
 	if( reason != S_OK )
 		hl_error("DXERROR %X line %d, removed reason %X",(DWORD)err,line,(DWORD)reason);
+#endif
 	else
 		hl_error("DXERROR %X line %d",(DWORD)err,line);
 }
