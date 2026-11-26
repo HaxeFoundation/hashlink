@@ -505,7 +505,9 @@ void hl_jit_init_regs( regs_config *cfg ) {
 	cfg->stack_reg = R(RSP);
 	cfg->stack_pos = R(RBP);
 	cfg->stack_align = 16;
+#	ifdef WIN64_UNWIND_TABLES
 	cfg->stub_regs = 32;
+#	endif
 #	ifdef GEN_DEBUG
 	cfg->debug_prefix_size = 6;
 #	endif
